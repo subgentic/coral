@@ -166,7 +166,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (!k) return;
         const scope = k.card ? panel.querySelector(`.ac-card[data-id="${k.card}"], .ac-reply[data-id="${k.card}"]`) : panel;
         const cand = scope ? [...scope.querySelectorAll('button, textarea, a')].filter(n => n.classList.contains(k.cls) && (n.textContent || '').trim() === k.text) : [];
-        const target = cand[0] || panel.querySelector('.ac-card.ac-active') || panel.querySelector('.ac-filter[aria-pressed="true"]');
+        const target = (k.cls === 'ac-lock' && panel.querySelector('.ac-lock')) || cand[0] || panel.querySelector('.ac-card.ac-active') || panel.querySelector('.ac-filter[aria-pressed="true"]');
         if (target) { if (!target.matches('button, textarea, a')) target.tabIndex = -1; target.focus({ preventScroll: true }); }
     }
     function render() {
@@ -192,9 +192,17 @@ export function attachComments(dialog, body, host, opts = {}) {
             sr.addEventListener('click', () => { st.showResolved = !st.showResolved; render(); });
             head.append(sr);
         }
+        const d = st.data;
+        if (d.canLock) { // one small lock beside the heading (#13578): closed lock = locked; the explanation is its tip, not a box
+            const why = d.locked ? 'Comments are locked: nobody can add comments to this file. Press to unlock.' : 'Locking stops anyone adding comments to this file. You can unlock it any time.';
+            const lock = el('button', 'btn btn-quiet btn-icon btn-xs ac-lock'); lock.type = 'button';
+            lock.append(el('span', 'material-icons', d.locked ? 'lock' : 'lock_open'));
+            lock.setAttribute('aria-label', d.locked ? 'Unlock comments' : 'Lock comments'); lock.setAttribute('aria-pressed', String(!!d.locked)); lock.title = why;
+            lock.addEventListener('click', async () => { try { await api.setLocked(st.hex, st.server, !d.locked); await refresh(); } catch (e) { showToast(e.message, true); } });
+            head.append(lock);
+        }
         const close = btn('ac-sheet-close ic-close', '', 'Hide the comments'); close.addEventListener('click', () => { userSet(false); toggle.focus(); }); head.append(close);
         panel.append(head);
-        const d = st.data;
         if (d.locked) panel.append(el('p', 'ac-note ac-locked', d.canLock ? 'Comments are locked: nobody can add comments to this file. You can unlock it any time.' : 'Comments are locked: read only.'));
         else if (!d.canComment) panel.append(el('p', 'ac-note ac-readonly', d.reason || 'You can read the comments here but not write them.'));
         const setup = !d.locked && askSetup();
@@ -209,12 +217,6 @@ export function attachComments(dialog, body, host, opts = {}) {
                 const { openServersTab } = await importOnce('./servers_tab.js'); openServersTab(setup.id);
             });
             panel.append(n, go);
-        }
-        if (d.canLock) {
-            const why = d.locked ? 'Comments are locked: nobody can add comments to this file. You can unlock it any time.' : 'Locking stops anyone adding comments to this file. You can unlock it any time.';
-            const lock = btn('ac-lock', d.locked ? 'Unlock comments' : 'Lock comments'); lock.title = why;
-            lock.addEventListener('click', async () => { try { await api.setLocked(st.hex, st.server, !d.locked); await refresh(); } catch (e) { showToast(e.message, true); } });
-            panel.append(lock); if (!d.locked && !opts.compact) panel.append(el('p', 'ac-note ac-lock-note', why)); // locked: the note above says it; a compact panel (a file's diff, #13528) has it as the button's tip only
         }
         const wrap = el('ul', 'ac-list');
         const shownAll = list.filter(t => st.showResolved || !t.c.resolved);

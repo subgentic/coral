@@ -3,7 +3,6 @@ account_tree
 add
 analytics
 api
-architecture
 archive
 arrow_back
 arrow_forward
@@ -13,14 +12,12 @@ badge
 bedtime
 block
 bolt
-bug_report
 build
 cancel
 chat
 chat_bubble_outline
 check
 check_box
-check_box_outline_blank
 check_circle
 checklist
 circle
@@ -30,7 +27,6 @@ close
 cloud
 code
 commit
-construction
 content_copy
 create
 create_new_folder
@@ -92,6 +88,7 @@ launch
 light
 link
 lock
+lock_open
 login
 manage_accounts
 memory
@@ -146,9 +143,7 @@ tab
 task
 terminal
 timeline
-timer
 title
-travel_explore
 tune
 unarchive
 update

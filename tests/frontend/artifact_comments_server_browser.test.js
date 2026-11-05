@@ -84,7 +84,7 @@ const DATA = process.env.CORAL_TEST_DATA_DIR || '';
         check('locked: a new comment is refused with the reason', blocked.status === 403 && /locked/.test(blocked.body.error), JSON.stringify(blocked.body));
         await open();
         await waitFor(`!!document.querySelector('.ac-panel .ac-locked')`, 'the locked note', 6000);
-        check('the panel shows the lock and offers Unlock, no composer', (await ev(`!!document.querySelector('.ac-panel .ac-lock') && /Unlock/.test(document.querySelector('.ac-panel .ac-lock').textContent) && !document.querySelector('.ac-panel .ac-whole')`)) === true);
+        check('the panel shows the lock and offers Unlock, no composer', (await ev(`!!document.querySelector('.ac-panel .ac-lock') && /Unlock/.test(document.querySelector('.ac-panel .ac-lock').getAttribute('aria-label')) && !document.querySelector('.ac-panel .ac-whole')`)) === true);
         await api('DELETE', `/api/artifacts/${HEX}/comments/lock`, { scope: 'artifact' });
 
         // Through Coral Hub a viewer only reads: the same list, with no write answered (the stamp is the connector's; here only the refusal of a forged one is checked)

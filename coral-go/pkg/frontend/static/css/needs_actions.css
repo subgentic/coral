@@ -16,3 +16,12 @@
     .inbox-needs-results .inbox-goaldone-actions { column-gap: 4px; }
     .inbox-needs-results .inbox-goaldone-actions > .btn { padding-inline: 4px; }
 }
+
+/* #13586 (the Operator: the buttons sit off-centre and Dismiss is hard to see). A row's actions are centred on the row, not hung from its top line, and stay on one line with the three dots;
+   Dismiss keeps no fill (the least emphasised) but has an outline, in the secondary text colour (4.5:1 on both themes). */
+@media (min-width: 768px) {
+    .inbox-needs-results tr:has(.inbox-review-item) > td:has(.inbox-review-actions) { vertical-align: middle; }
+    .inbox-needs-results .inbox-goaldone-actions { flex-wrap: nowrap; }
+}
+.inbox-review-actions > .btn.btn-quiet.btn-small:not(.btn-icon) { border-color: var(--text-muted); color: var(--text-secondary); }
+.inbox-review-actions > .btn.btn-quiet.btn-small:not(.btn-icon):hover { border-color: var(--text-secondary); color: var(--text-primary); }
