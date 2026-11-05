@@ -1,3 +1,4 @@
+import { typingGateExitCode } from './typing_trace.mjs';
 // bigboard_measure.mjs BASE LOGIN_TOKEN_FILE OUT.json   (#13154, goal #215)
 //
 // Measures the dashboard against a server running on the big-board fixture (bigboard_seed.sh), the way a person meets it: a headless
@@ -16,6 +17,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 if (process.env.PERF_RUN !== '1') { console.error('[measure] opt-in: set PERF_RUN=1'); process.exit(2); }
+if (process.env.TYPING_GATE === '1' && process.env.TYPING_TRACE !== '1') { console.error('[measure] TYPING_GATE requires TYPING_TRACE=1'); process.exit(2); }
 const [BASE, TOKEN_FILE, OUT] = process.argv.slice(2);
 if (!BASE || !OUT) { console.error('usage: PERF_RUN=1 node bigboard_measure.mjs BASE LOGIN_TOKEN_FILE OUT.json'); process.exit(2); }
 const url = new URL(BASE);
@@ -39,9 +41,10 @@ const pct = (a, q) => { if (!a.length) return 0; const s = [...a].sort((x, y) =>
 // DevTools port, and the spawned process killed by PID before the next try (a launch that hung once did not come back in 90 s: #13154's 9 tries in a row).
 const CHROME_FLAGS = ['--headless=new', '--remote-debugging-port=0', '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--window-size=1400,900', '--use-mock-keychain', '--password-store=basic',
     '--disable-background-networking', '--disable-component-update', '--no-service-autorun', '--disable-sync', ...(process.env.CI ? ['--no-sandbox'] : [])];
+const CHROME_ATTEMPTS = process.env.TYPING_TRACE === '1' ? 1 : 4;
 let profile = '', chrome = null, chromeErr = '', chromeExit = '';
 const launchChrome = async () => {
-    for (let attempt = 1; attempt <= 4; attempt++) {
+    for (let attempt = 1; attempt <= CHROME_ATTEMPTS; attempt++) {
         profile = fs.mkdtempSync(path.join(os.tmpdir(), 'bigboard-chrome.')); chromeErr = ''; chromeExit = '';
         chrome = spawn(chromePath, [...CHROME_FLAGS, `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
         chrome.stderr.on('data', d => { chromeErr = (chromeErr + d).slice(-3000); });
@@ -55,7 +58,7 @@ const launchChrome = async () => {
         try { chrome.kill('SIGKILL'); } catch {}
         await sleep(1500); try { fs.rmSync(profile, { recursive: true, force: true }); } catch {}
     }
-    throw new Error('Chrome did not open its DevTools port in 4 tries');
+    throw new Error('Chrome did not open its DevTools port in ' + CHROME_ATTEMPTS + ' attempt(s)');
 };
 let client;
 const done = async code => { try { await client?.close(); } catch {} try { chrome.kill('SIGTERM'); } catch {} await sleep(500); try { fs.rmSync(profile, { recursive: true, force: true }); } catch {} process.exit(code); };
@@ -192,6 +195,19 @@ process.on('SIGINT', () => done(130));
         const f = rows.slice(marker).filter(r => /files|changes|git|worktree/i.test(r.url)).map(r => ({ route: fold(new URL(r.url).pathname), ms: Math.round((r.end - r.sent) * 1000), bytes: r.bytes }));
         return { ...ms, requests: f };
     });
+    // #13156: opt-in attribution on the real fixture, after Files has loaded.
+    // Choose the actual remote identity, and refuse sleeping/ended agents.
+    if (process.env.TYPING_TRACE === '1') {
+        const { measureTypingBurst } = await import('./typing_trace.mjs');
+        const traceDir = path.join(path.dirname(OUT), path.basename(OUT, '.json') + '-typing');
+        // A requested confirmation subset never relaxes the complete two-target gate below.
+        for (const target of ['composer', 'terminal'].filter(t => !process.env.TYPING_TARGETS || process.env.TYPING_TARGETS.split(',').includes(t))) await step('typing_trace_' + target, async () => {
+            const agent = await ev(`fetch('/api/sessions/live').then(r=>r.json()).then(j=>(Array.isArray(j)?j:j.sessions||[]).find(a=>!a.sleeping&&!a.archived&&a.agent_type!=='terminal'))`);
+            if (!agent) throw new Error('No awake mock agent: restart/wake fixture agents on the isolated copy before tracing');
+            await ev(`(async()=>{await window.selectLiveSession(${JSON.stringify(agent.name)},${JSON.stringify(agent.agent_type || 'claude')},${JSON.stringify(agent.session_id)},${JSON.stringify(agent.server || 'local')});window.switchAgenticTab('files','top');window.setLiveViewMode(${JSON.stringify(target === 'composer' ? 'chat' : 'terminal')});const x=await import((window.__coralStatic||'/static/')+'xterm_renderer.js');const ready=await window.__until(()=>{const el=document.querySelector(${JSON.stringify(target === 'composer' ? '#command-input' : '#xterm-container .xterm-helper-textarea')}),files=document.getElementById('changed-files-list');return !!el&&!el.disabled&&el.getClientRects().length>0&&!!files&&files.getClientRects().length>0&&${target === 'terminal' ? 'x.isTerminalWsOpen()' : 'true'};},${CAP});if(ready===null)throw Error('Live input/Files not ready');return true;})()`);
+            return measureTypingBurst({client,ev,outDir:traceDir,target,label:target,characters:200});
+        });
+    }
     // Needs you: the Inbox tab, then the first file for review opened; the time from the click to the viewer on screen, and the rows
     await step('needs_you_open', async () => {
         const m0 = rows.length;
@@ -224,5 +240,5 @@ process.on('SIGINT', () => done(130));
     fs.writeFileSync(OUT, JSON.stringify(out, null, 1));
     console.log(JSON.stringify({ load: out.load, idle: out.idle }));
     for (const r of routes.slice(0, 14)) console.log(`${r.phase.padEnd(5)} ${String(r.p95).padStart(8)} ms p95 ${String(r.p50).padStart(8)} p50 ${String(r.max).padStart(8)} max  n=${String(r.n).padStart(3)}  ${String(r.bytes_each).padStart(8)} B  ${r.route}`);
-    await done(0);
+    await done(typingGateExitCode(interactions, process.env.TYPING_GATE === '1', process.env.TYPING_TRACE === '1'));
 })().catch(async e => { console.error('[measure] ' + (e.stack || e)); await done(1); });

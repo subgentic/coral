@@ -104,6 +104,7 @@
 1	changed_files.js	moreButton(filepath, name)
 1	changed_files.js	options
 2	changed_files.js	previewBtn
+1	changed_files.js	rowsHtml
 2	changed_files.js	shareBtn
 1	changed_files.js	staleNoteHtml()
 2	changed_files.js	starBtn

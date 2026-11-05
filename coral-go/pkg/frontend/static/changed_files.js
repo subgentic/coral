@@ -13,6 +13,7 @@ import { fileIconHtml } from './file_explorer.js';
 import { openPreviewTab, openArtifactTab, setPreviewSession, refreshOpenFiles } from './preview_pane.js';
 import { storeKey, readStars, writeStars } from './local_store.js';
 import { importOnce } from './import_once.js';
+import { morphHtml } from './dom_morph.js';
 import { serverFetch, serverForSession, sessionServer, currentServer, isCloud, dropBody } from './server_base.js';
 
 let _currentFiles = [];
@@ -667,7 +668,31 @@ export async function refreshChangedFiles(quiet = false, auto = false) { // quie
     if (btn) setTimeout(() => btn.classList.remove('refreshing'), 300);
 }
 
+// A late file read can arrive after the person started typing. Keep polling/model updates live,
+// but paint the list once typing pauses; a first 500-row population cannot reuse old rows.
+const FILES_TYPING_IDLE_MS = 300;
+let _lastTypingAt = -Infinity, _typingPaintTimer = 0, _typingPaintFor = '';
+const typingField = e => !!e && (e.id === 'command-input' || e.classList?.contains('xterm-helper-textarea'));
+function queueTypingPaint() {
+    clearTimeout(_typingPaintTimer);
+    _typingPaintFor = _keyOf(state.currentSession);
+    _typingPaintTimer = setTimeout(() => { _typingPaintTimer = 0; if (_typingPaintFor === _keyOf(state.currentSession)) renderChangedFiles(); }, FILES_TYPING_IDLE_MS);
+}
+function noteFilesTyping(e) {
+    if (!typingField(e.target)) return;
+    _lastTypingAt = performance.now();
+    if (_typingPaintTimer) {
+        if (_typingPaintFor === _keyOf(state.currentSession)) queueTypingPaint();
+        else { clearTimeout(_typingPaintTimer); _typingPaintTimer = 0; } // the pending list belonged to another agent
+    }
+}
+document.addEventListener('input', noteFilesTyping, true);
+document.addEventListener('keydown', e => {
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key?.length === 1 || ['Backspace', 'Delete', 'Enter'].includes(e.key) || e.isComposing)) noteFilesTyping(e);
+}, true);
  function renderChangedFiles() {
+    if (typingField(document.activeElement) && performance.now() - _lastTypingAt < FILES_TYPING_IDLE_MS) { queueTypingPaint(); return; }
+    if (_typingPaintTimer) { clearTimeout(_typingPaintTimer); _typingPaintTimer = 0; }
     const list = document.getElementById('changed-files-list');
     const titleEl = document.getElementById('changed-files-title');
     const countEl = document.getElementById('files-bar-count');
@@ -746,7 +771,7 @@ export async function refreshChangedFiles(quiet = false, auto = false) { // quie
     const scroller = scrollerOf(list), scrolled = scroller ? scroller.scrollTop : 0;
     let anchor = null; // the file under the top of the view and how far its row is from that top: a file that arrives above it moves the list, not the reader's place
     if (scroller) { const top = scroller.getBoundingClientRect().top; for (const row of list.querySelectorAll('.file-item')) { const slot = row.nextElementSibling, end = (slot && slot.classList.contains('file-diff') && !slot.hidden ? slot : row).getBoundingClientRect().bottom; if (end > top) { anchor = { path: row.dataset.filepath, at: row.getBoundingClientRect().top - top }; break; } } }
-    list.innerHTML = files.map((f, i) => {
+    const rowsHtml = files.map((f, i) => {
         const { dir, name } = splitPath(f.filepath);
         const statusCls = getStatusClass(f.status);
         const statusLabel = getStatusLabel(f.status);
@@ -789,16 +814,20 @@ export async function refreshChangedFiles(quiet = false, auto = false) { // quie
             <div class="file-action-btns">${copyBtn}${previewBtn}${editBtn}${shareBtn}</div>
         </div>${diffSlot}`;
     }).join('');
-    for (const fresh of list.querySelectorAll('.file-diff')) { const old = kept.get(fresh.dataset.filepath); if (old && !fresh.hidden) { old.id = fresh.id; fresh.replaceWith(old); if (old.querySelector('.diff-comments')) importOnce('./diff_comments.js').then(m => m.placeDiffCommentIcon(old)).catch(() => {}); /* its comment icon goes back in the new row (#13528) */ } }
+    const allOpen = !plain && files.every(f => _expandedFiles.has(f.filepath)), expandAllText = allOpen ? 'Collapse all' : 'Expand all', expandAllLabel = `${expandAllText} the changes`;
+    // Expand all (#11350) is on the list's first line, not in the header: the header keeps its size when the first list arrives (#7671).
+    const expandAll = plain ? '' : `<button type="button" class="btn btn-quiet btn-xs files-expand-all" data-on-click="files-expand-all" aria-label="${escapeAttr(expandAllLabel)}">${escapeHtml(expandAllText)}</button>`;
+    // Reusing unchanged rows avoids tearing down thousands of layout objects when an async read lands during typing (#13666).
+    const replaceEditors = !sameAgent && !!list.querySelector('.file-diff:not([hidden])');
+    const listHtml = `${staleNoteHtml()}<div class="files-legend"><span>New files are green, deleted ones red, the rest changed.</span>${expandAll}</div>${rowsHtml}`;
+    if (replaceEditors) list.innerHTML = listHtml; // another agent gets fresh editor slots and their state
+    else morphHtml(list, listHtml);
+    for (const fresh of list.querySelectorAll('.file-diff')) { const old = kept.get(fresh.dataset.filepath); if (old && old !== fresh && !fresh.hidden) { old.id = fresh.id; fresh.replaceWith(old); if (old.querySelector('.diff-comments')) importOnce('./diff_comments.js').then(m => m.placeDiffCommentIcon(old)).catch(() => {}); /* its comment icon goes back in the new row (#13528) */ } }
     if (scroller && scrolled) {
         scroller.scrollTop = scrolled;
         const row = anchor && [...list.querySelectorAll('.file-item')].find(r => r.dataset.filepath === anchor.path);
         if (row) scroller.scrollTop += (row.getBoundingClientRect().top - scroller.getBoundingClientRect().top) - anchor.at;
     }
-    const allOpen = !plain && files.every(f => _expandedFiles.has(f.filepath)), expandAllText = allOpen ? 'Collapse all' : 'Expand all', expandAllLabel = `${expandAllText} the changes`;
-    // Expand all (#11350) is on the list's first line, not in the header: the header keeps its size when the first list arrives (#7671).
-    const expandAll = plain ? '' : `<button type="button" class="btn btn-quiet btn-xs files-expand-all" data-on-click="files-expand-all" aria-label="${escapeAttr(expandAllLabel)}">${escapeHtml(expandAllText)}</button>`;
-    list.insertAdjacentHTML('afterbegin', `${staleNoteHtml()}<div class="files-legend"><span>New files are green, deleted ones red, the rest changed.</span>${expandAll}</div>`);
     if (heldMore) [...list.querySelectorAll('.file-more-btn')].find(b => b.dataset.path === heldMore)?.focus({ preventScroll: true });
     paintExpandAll();
     if (!plain && _expandedFiles.size) showExpanded(list, files); // the diffs that were open are drawn again from what was read (#11350)
