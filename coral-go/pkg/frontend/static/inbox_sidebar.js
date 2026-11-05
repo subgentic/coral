@@ -15,7 +15,7 @@ import { doneGoals, nextQuietEnd, quietEndsAt, hideGoalDone, setGoalDoneCount, i
  * are in Display options. The hub's own framed /inbox is not this: it keeps the frame, full width (inbox_tab.js). */
 import { state } from './state.js';
 
-const { mutedReviewItems, mutedWords, reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewGroups, setReviewRead, markOpenedReadVisibly, isRead, savedFiles } = await importOnce('./inbox_reviews.js');
+const { mutedReviewItems, mutedWords, reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewsChangedOnServer, reviewGroups, setReviewRead, markOpenedReadVisibly, isRead, savedFiles } = await importOnce('./inbox_reviews.js');
 import { failedUnread, finishedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
 import { operatorAsks, refreshOperatorAsks, askLine, askPlain, askKey, openAskDialog, askSubjects, askSubjectWords } from './operator_asks.js';
 import { go, note, backIs, currentRoute } from './nav.js';
@@ -335,7 +335,7 @@ function needsBulkActions() {
                 else throw new Error('that one cannot be dismissed');
             });
             asks.refreshOperatorAsks(true); syncGoalDoneCount(); done();
-            tell(words('Dismissed', r, rows.length), `${words('Dismissed', r, rows.length)}.${undo.length ? ' Undo is in the notice.' : ''}`, undo.length ? { action: { label: 'Undo', onClick: async () => { for (const f of undo) { try { await f(); } catch { /* it stays ignored */ } } asks.refreshOperatorAsks(true); refreshReviews(true); syncGoalDoneCount(); renderInboxNav(true); tell('Back in Needs you'); } } } : undefined); // one after the other: goals share one hidden list that each undo rewrites (#12328)
+            tell(words('Dismissed', r, rows.length), `${words('Dismissed', r, rows.length)}.${undo.length ? ' Undo is in the notice.' : ''}`, undo.length ? { action: { label: 'Undo', onClick: async () => { for (const f of undo) { try { await f(); } catch { /* it stays ignored */ } } asks.refreshOperatorAsks(true); reviewsChangedOnServer(); refreshReviews(true); syncGoalDoneCount(); renderInboxNav(true); tell('Back in Needs you'); } } } : undefined); // one after the other: goals share one hidden list that each undo rewrites (#12328)
         } },
         { label: 'Close goal', hidden: rows => rows.length > 0 && !rows.some(s => s.goalDone), more: true, disabled: rows => !(rows.length === 1 && rows[0].goalDone), run: rows => { done(); openGoalDone(rows[0].goalDone, true); } }, // a goal that looks done: its two answers are in the bar's menu on a phone, where the row has no buttons; a ninth icon made the bar wider than a 360 px toolbar (#12328)
         { label: 'Not yet', hidden: rows => rows.length > 0 && !rows.some(s => s.goalDone), more: true, disabled: rows => !(rows.length > 0 && rows.every(s => s.goalDone)), run: async rows => {
