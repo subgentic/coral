@@ -1,6 +1,6 @@
 // The phone's navigation model, slice A (#11236 approved, #11239): the screen types (phone_screens.js) and ONE tab strip. At 390 and 320 px, 100% and 200% text, light and dark:
 //  - Home, Inbox and Automations are top-level screens: the floating nav is on each, with its own slot lit (Inbox, Agents; none for Automations, which the ☰ menu opens: #11472);
-//  - the Inbox uses the menu below 640 px; at 700 px its strip remains. Automations' Jobs / Workflows are a strip of 44 px text tabs under the bar (the current one with an accent underline), not a select and not a drawer's button, and a tab switches the view;
+//  - the Inbox uses its menu at phone-bar widths. Automations' Jobs / Workflows are a strip of 44 px text tabs under the bar (the current one with an accent underline), not a select and not a drawer's button, and a tab switches the view;
 //  - nothing scrolls sideways but the strip itself.
 // Drives Chrome over CDP through agent_view_harness.js against an isolated dev server.
 const assert = require('node:assert/strict');
@@ -43,7 +43,7 @@ const { coralReady } = require('./helpers/wait');
             // Phone Inbox: navigate with visible menu buttons, preserving the current folder.
             await ev(`document.querySelector('.phone-nav-slot[data-phone-nav=nav-inbox]').click(); true`);
             await waitFor(`!!document.getElementById('group-table-title') && document.getElementById('group-table-title').getClientRects().length > 0`, `${tag}: the Inbox title`, 10000);
-            assert.equal(await ev(`document.querySelector('#group-table-view .view-list-nav').getClientRects().length`), 0, `${tag}: no phone Inbox strip`);
+            assert.equal(await ev(`(document.querySelector('#group-table-view .view-list-nav')?.getClientRects().length || 0)`), 0, `${tag}: no phone Inbox strip`);
             await ev(`[...document.querySelectorAll('.phone-menu-btn')].find(e => e.getClientRects().length).click(); true`);
             await waitFor(`!!document.querySelector('#nav-more-menu:not([hidden]) .nav-drawer-folder[aria-current="true"]')`, `${tag}: current folder in menu`, 6000);
             const folders = await ev(`[...document.querySelectorAll('#nav-more-menu .nav-drawer-folder')].map(b => ({ name: b.querySelector('.nav-drawer-label').textContent, current: b.getAttribute('aria-current') === 'true', height: b.getBoundingClientRect().height }))`);
@@ -53,33 +53,13 @@ const { coralReady } = require('./helpers/wait');
             await ev(`[...document.querySelectorAll('.phone-menu-btn')].find(e => e.getClientRects().length).click(); true`);
             await waitFor(`document.querySelector('#nav-more-menu:not([hidden]) .nav-drawer-folder[aria-current="true"] .nav-drawer-label')?.textContent === 'Goals'`, `${tag}: menu now marks Goals`, 6000);
             await ev(`document.body.click(); true`);
-            // At 700 px only, Inbox retains its strip and its scroll-to-current behavior.
-            await Emulation.setDeviceMetricsOverride({ width: 700, height: 844, deviceScaleFactor: 1, mobile: true });
-            await ev(`document.querySelector('.phone-nav-slot[data-phone-nav=nav-inbox]').click(); true`);
-            await waitFor(`!!document.querySelector('#group-table-view .view-list-item') && document.querySelector('#group-table-view .view-list-item').getClientRects().length > 0`, `${tag}: the Inbox`, 10000).catch(async e => { throw new Error(e.message + ' ' + JSON.stringify(await ev(`({ views: [...document.querySelectorAll('#mobile-agent-list,#inbox-view,#group-table-view,#scheduler-view')].map(e => e.id + ':' + getComputedStyle(e).display).join(','), navOn: document.body.className.includes('phone-nav-on'), ptype: document.body.dataset.phoneType, sidebarDisp: getComputedStyle(document.querySelector('.sidebar-pane[data-pane=hub-inbox]')).display, disp: getComputedStyle(document.getElementById('inbox-view')).display, vl: document.querySelectorAll('.view-list').length, items: document.querySelectorAll('.view-list-item').length, inInbox: document.querySelectorAll('#inbox-view .view-list').length, navlist: [...document.querySelectorAll('.view-list')].map(v => (v.id || v.className) + '@' + (v.parentElement.id || v.parentElement.className).slice(0, 30) + ':' + v.getClientRects().length + '/' + getComputedStyle(v.querySelector('.view-list-nav')).display + '/' + getComputedStyle(v).display), body: document.body.dataset.navTab })`))); });
-            assert.equal(await ev(`document.body.dataset.phoneType`), 'top-level', `${tag}: the Inbox is a top-level screen`);
-            assert.equal(await lit(), 'nav-inbox', `${tag}: the nav stays and Inbox is lit`);
-            await shot(`model-a-inbox-${w}-${fs}-${theme}`);
-            let s = await strip('#group-table-view .view-list');
-            assert.ok(s && s.shown && s.dir === 'row' && !s.select && !s.trigger && s.titles === 0 && s.n >= 3 && s.heights.every(h => h >= 44) && /^3px /.test(s.underline), `${tag}: the Inbox's folders are a strip of 44 px tabs with an accent underline, no select, no drawer button: ` + JSON.stringify(s));
-            const other = await ev(`(() => { const b = [...document.querySelectorAll('#group-table-view .view-list-item')].find(x => x.getAttribute('aria-current') !== 'true' && x.getClientRects().length && !x.disabled); const key = b.dataset.key; b.click(); return key; })()`);
-            await waitFor(`document.querySelector('#group-table-view .view-list-item[data-key="${other}"]')?.getAttribute('aria-current') === 'true'`, `${tag}: a tab switches the folder`, 6000);
-            // the open tab is kept in view: the LAST folder (with fifteen tabs it opened off screen, QA Reviewer 2) is brought into the strip when it is chosen
-            const last = await ev(`(() => { const t = [...document.querySelectorAll('#group-table-view .view-list-nav .view-list-item')].filter(b => !b.disabled); const b = t[t.length - 1]; b.scrollIntoView({ inline: 'nearest', block: 'nearest' }); b.click(); return b.dataset.key; })()`);
-            await waitFor(`document.querySelector('#group-table-view .view-list-item[data-key="${last}"]')?.getAttribute('aria-current') === 'true'`, `${tag}: the last folder opens`, 8000);
-            const inViewJs = `(() => { const nav = document.querySelector('#group-table-view .view-list-nav'), nr = nav.getBoundingClientRect(), c = nav.querySelector('.view-list-item[aria-current="true"]').getBoundingClientRect(); return c.left >= nr.left - 1 && c.right <= nr.right + 1; })()`;
-            await waitFor(inViewJs, `${tag}: the strip re-centres on the open folder (a slow runner takes longer than a fixed sleep)`, 8000).catch(() => {}); // the strip scrolls over frames after the folder's page is drawn: wait for the state, then assert it
-            const inView = await ev(inViewJs);
-            assert.ok(inView, `${tag}: the open folder is inside the strip, however far along it is`);
-            assert.equal(await ev(`document.documentElement.scrollWidth <= innerWidth`), true, `${tag}: the Inbox does not scroll sideways`);
-            await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile: true });
             // Automations: Jobs / Workflows
             await ev(`window.switchNavTab('automations'); true`);
             await waitFor(`[...document.querySelectorAll('#scheduler-view .view-list-item, #group-table-view .view-list-item')].some(b => b.getClientRects().length > 0 && /Jobs|Workflows/.test(b.textContent))`, `${tag}: Automations (its folder is the page, Jobs or Workflows, whichever was open last)`, 10000);
             assert.equal(await ev(`document.body.dataset.phoneType`), 'top-level', `${tag}: Automations is a top-level screen`);
             assert.equal(await lit(), 'nav-automations', `${tag}: the bar is on and Automations is the tab that is lit (#11535: Automations is one of the bar's four)`);
             const host = await ev(`[...document.querySelectorAll('#scheduler-view .view-list, #group-table-view .view-list')].find(v => v.getClientRects().length > 0 && /Jobs/.test(v.textContent)) ? ([...document.querySelectorAll('#scheduler-view .view-list, #group-table-view .view-list')].find(v => v.getClientRects().length > 0 && /Jobs/.test(v.textContent)).closest('#scheduler-view') ? '#scheduler-view .view-list' : '#group-table-view .view-list') : '#group-table-view .view-list'`);
-            s = await strip(host);
+            const s = await strip(host);
             assert.ok(s && s.shown && s.dir === 'row' && !s.select && s.n >= 2 && s.heights.every(h => h >= 44) && s.names.some(n => /Jobs/.test(n)) && s.names.some(n => /Workflows/.test(n)), `${tag}: Jobs and Workflows are tabs, not a select: ` + JSON.stringify(s));
             // the strip brings the open tab into view, hints that it scrolls, and every tab can be tapped (the Mobile Beta Tester: Workflows was off screen and a tap did nothing)
             const fit = await ev(`(() => { const nav = document.querySelector('${host} .view-list-nav'), nr = nav.getBoundingClientRect(), cur = nav.querySelector('.view-list-item[aria-current="true"]'), cr = cur.getBoundingClientRect(), cs = getComputedStyle(nav);
