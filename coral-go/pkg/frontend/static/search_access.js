@@ -1,7 +1,7 @@
 /* How far an agent's chat search reaches (#11048, #11053): the level is on the agent's team member row (GET /api/teams/detail/{team} members[].search_reach; every member starts at "own") and only the Operator raises it
  * (PUT /api/team-members/{id}/search-access, never through the Hub: there the dialog shows the level and says where to change it). "own" shows nothing, so a chip means the agent reads beyond its own board. The top level
  * asks again in the same dialog (focus on Back) before it is saved. The dialog is a native <dialog> like the Remind dialog: Escape closes it, the focus goes back to the button that opened it. */
-import { teamFetch, isCloud } from './server_base.js';
+import { teamFetch, serverFetch, splitKey, isCloud, isHub } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { whenText } from './when_text.js';
 import { el as mk } from './dom_el.js';
@@ -46,9 +46,9 @@ function mountAccessLog(host, member) {
     const head = mk('p', 'search-access-note search-access-log-head', 'Recent access'), list = mk('ul', 'search-access-log-list');
     const all = mk('button', 'btn btn-small search-access-log-all', 'Show all'); all.type = 'button';
     box.append(head, list, all); host.append(box);
-    fetch('/api/search-access/log?limit=100').then(r => r.ok ? r.json() : null).then(d => {
+    serverFetch(splitKey(member.team).server, '/api/search-access/log?limit=100').then(r => r.ok ? r.json() : null).then(d => {
         if (!d || !Array.isArray(d.rows) || !box.isConnected) return;
-        const mine = d.rows.filter(r => r.agent === member.name && (!member.team || r.team === member.team)); // this member of this team: another team's agent of the same name is not shown here
+        const mine = d.rows.filter(r => r.agent === member.name && (!member.team || r.team === splitKey(member.team).name)); // this member of this team: another team's agent of the same name is not shown here
         const draw = every => {
             const rows = every ? d.rows.slice(0, 20) : mine.slice(0, 5);
             list.replaceChildren(...rows.map(r => mk('li', null, logLine(r, every))));
@@ -64,7 +64,7 @@ function mountAccessLog(host, member) {
 let dialog = null;
 const close = () => { if (dialog && dialog.open) dialog.close(); };
 
-/** Open the dialog for one member: { name, id, level }; opts.opener takes the focus back, opts.readOnly forces the Hub's read-only dialog (isCloud() by default), opts.onChanged(level) runs after a save. */
+/** Open the dialog for one member: { name, id, level }; opts.opener takes the focus back, opts.readOnly forces the Hub's read-only dialog (cloud or self-hosted Hub by default), opts.onChanged(level) runs after a save. */
 export function openSearchAccess(member, opts = {}) {
     if (!dialog) {
         dialog = mk('dialog', 'modal-content dlg-confirm reminder-dialog search-access-dialog');
@@ -74,7 +74,7 @@ export function openSearchAccess(member, opts = {}) {
         document.body.appendChild(dialog);
     }
     close();
-    const readOnly = opts.readOnly ?? isCloud(); // the raise route is the Operator's on this computer alone
+    const readOnly = opts.readOnly ?? (isCloud() || isHub()); // the raise route is the Operator's on this computer alone
     let level = member.level;
     const title = mk('h3', null, `Search access: ${visibleName(member.name)}`); title.id = 'search-access-title';
     const err = mk('div', 'field-error'); err.setAttribute('role', 'alert'); err.hidden = true;
@@ -86,7 +86,7 @@ export function openSearchAccess(member, opts = {}) {
         err.hidden = true; go.disabled = cancel.disabled = true; dialog.dataset.busy = '1';
         let res = null, msg = '';
         try {
-            const r = await fetch(`/api/team-members/${encodeURIComponent(member.id)}/search-access`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(confirm ? { level, confirm: 'operator' } : { level }) });
+            const r = await serverFetch(splitKey(member.team).server, `/api/team-members/${encodeURIComponent(member.id)}/search-access`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(confirm ? { level, confirm: 'operator' } : { level }) });
             res = r.ok ? await r.json().catch(() => ({ ok: true })) : null;
             if (!r.ok) msg = (await r.json().catch(() => ({}))).error || `HTTP ${r.status}`;
         } catch (e) { msg = (e && e.message) || 'Could not save.'; }
