@@ -39,7 +39,7 @@ const { removeBoards, removeTeams } = require('./helpers/board_cleanup');
         await until(`(() => { let inA = false; for (const li of document.querySelectorAll('#live-sessions-list li')) { if (li.classList.contains('archived-summary-row')) { inA = true; continue; } if (!inA && li.dataset.sessionId === ${JSON.stringify(qa.session_id)}) return false; } return true; })()`, 'QA Engineer to leave the main list');
         const after = await sidebar();
         assert.ok(!after.main.includes(qa.session_id), 'QA Engineer left the main list: ' + JSON.stringify(after));
-        assert.match(after.summary || '', new RegExp(`Archived \\(${base.archivedInSidebar + 1}\\)`), `the sidebar says Archived (${base.archivedInSidebar + 1}), one more than before: ` + JSON.stringify(after));
+        assert.ok(Number(/Archived \((\d+)\)/.exec(after.summary || '')?.[1] || 0) >= base.archivedInSidebar + 1, `the sidebar says Archived (${base.archivedInSidebar + 1}) or more, one more than before at least (a suite beside this may archive too, #13389): ` + JSON.stringify(after));
         await ev(`document.querySelector('#live-sessions-list .archived-summary-row .row-btn').click(); true`); // the section opens
         await until(`!!document.querySelector('#live-sessions-list [data-session-id="${qa.session_id}"]') && [...document.querySelectorAll('#live-sessions-list .archived-summary-row ~ li')].some(li => li.dataset.sessionId === ${JSON.stringify(qa.session_id)})`, 'QA Engineer under Archived once the section is open');
 
@@ -50,8 +50,8 @@ const { removeBoards, removeTeams } = require('./helpers/board_cleanup');
         // Inbox > Archived counts the agent too (it has no chat yet), and its row opens the agent (#10654)
         // The counts are read from the history index, which takes the archive a moment after the sessions list does: wait for Archived to gain this agent. It is an Archived row that gains it and no All chats row.
         let counts = {};
-        for (let i = 0; i < 40; i++) { counts = (await api('GET', '/api/sessions/history/counts')).data || {}; if (counts.archived === (base.counts.archived || 0) + 1) break; await new Promise(r => setTimeout(r, 250)); } // sleep-ok: the history index catches up
-        assert.equal(counts.archived, (base.counts.archived || 0) + 1, 'Archived gained this agent in the counts: ' + JSON.stringify({ base: base.counts, counts }));
+        for (let i = 0; i < 40; i++) { counts = (await api('GET', '/api/sessions/history/counts')).data || {}; if (counts.archived >= (base.counts.archived || 0) + 1) break; await new Promise(r => setTimeout(r, 250)); } // sleep-ok: the history index catches up
+        assert.ok(counts.archived >= (base.counts.archived || 0) + 1, 'Archived gained this agent in the counts (at least: a suite beside this one may archive too, #13389; the agent itself is named by its row below): ' + JSON.stringify({ base: base.counts, counts }));
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('chats-archived')).then(() => true)`);
         await until(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].some(r => /Archived, no messages yet/.test(r.textContent) && r.textContent.includes(${JSON.stringify(QA_NAME)}))`, 'the archived agent\'s row in Inbox > Archived');
         const archivedRow = await ev(`(() => { const r = [...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].find(x => /Archived, no messages yet/.test(x.textContent) && x.textContent.includes(${JSON.stringify(QA_NAME)})); return { text: r.textContent.replace(/\\s+/g, ' ').trim(), buttons: [...r.querySelectorAll('.dt-flag')].length }; })()`);
