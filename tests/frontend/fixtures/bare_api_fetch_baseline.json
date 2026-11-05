@@ -5,6 +5,10 @@
       "count": 1,
       "reason": "the Analytics page is this computer's: every one of its cost and efficiency routes is a bare path, and the page has no computer switch"
     },
+    "automations_queue.js": {
+      "count": 1,
+      "reason": "the Queue folder of Automations reads this computer's own resource queue (GET /api/resources); Automations is local-only, as the jobs and workflows its other folders read with bare fetches"
+    },
     "board_export.js": {
       "count": 1,
       "reason": "the live list is the merged list of every computer ({sessions, servers}); the code below it keeps this board's server"

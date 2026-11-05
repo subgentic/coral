@@ -13,7 +13,6 @@ let resources = [], loaded = false, denied = false, timer = 0, listeners = new S
 
 const emit = () => { for (const fn of listeners) fn(); };
 export const onQueueChanged = fn => { listeners.add(fn); };
-export const queueLoaded = () => loaded;
 export const queueDenied = () => denied;
 
 /** Read the queue. A failed read keeps what was shown (and says nothing: the next poll tries again). */
@@ -122,7 +121,7 @@ export function queueTable(rows, narrowed) {
             columns: [ // a narrow list drops the note, then the task, then the time (dropAt)
                 { key: 'agent', label: 'Agent', primary: true, width: 'grow', cell: r => (r.state === 'free' ? DT.el('span', 'dt-time', 'All slots free') : DT.el('span', 'queue-agent', r.agent)) },
                 { key: 'state', label: 'State', width: '10rem', cell: r => (r.state === 'free' ? '' : DT.chip(stateWord(r), r.state === 'holding' ? 'goal-state-task-active' : '')) },
-                { key: 'note', label: 'Note', width: '14rem', dropAt: 40, tone: 'tertiary', cell: r => r.note || '' },
+                { key: 'why', label: 'Note', width: '14rem', dropAt: 40, tone: 'tertiary', cell: r => r.note || '' },
                 { key: 'task', label: 'Task', width: '6rem', dropAt: 52, tone: 'tertiary', cell: r => (r.task ? `#${r.task}` : '') },
                 { key: 'time', label: 'Lease left / waited', width: '10rem', dropAt: 28, tone: 'tertiary', cell: r => (r.state === 'holding' ? leaseWords(r) : r.state === 'waiting' ? waitWords(r) : '') },
                 ...(denied ? [] : [{ key: 'actions', label: 'Actions', width: '17rem', cell: actionsCell }]),

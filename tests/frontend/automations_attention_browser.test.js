@@ -57,7 +57,7 @@ const STUB = `(() => {
             assert.equal(await pathname(), '/automations/failed', `${at}the address is the folder's`);
             assert.deepEqual(await folderWords(mobile), mobile ? ['Running now (2)', 'Failed (2)', 'Recent runs (0)', 'Jobs (4)', 'Workflows (3)', 'Queue (0)'] : ['Running now2', 'Failed2', 'Recent runs0', 'Jobs4', 'Workflows3', 'Queue0'], `${at}the folders with their counts: Needs attention, then the library`);
             if (!mobile) {
-                assert.deepEqual(await ev(`[...document.querySelectorAll('.view-list-title')].map(e => e.textContent.trim())`), ['Needs attention', 'Library'], `${at}two sections`);
+                assert.deepEqual(await ev(`[...document.querySelectorAll('.view-list-title')].map(e => e.textContent.trim())`), ['Needs attention', 'Library', 'Resources'], `${at}three sections: what needs attention, the library, the resource queue`);
                 assert.equal(await ev(`!!document.querySelector('.view-list-item[data-key="failed"] .view-list-alert')`), true, `${at}Failed's count is the red pill`);
                 assert.equal(await ev(`!!document.querySelector('.view-list-item[data-key="running"] .view-list-alert')`), false, `${at}and Running now's is not`);
             }
