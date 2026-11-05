@@ -21,7 +21,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab(${JSON.stringify(group)})).then(() => true)`);
         await ev(framesJs(8));
     };
-    const want = (mobile, group, own) => [mobile && group !== 'artifacts' ? 'phone-bar-search' : own]; // on a phone the pill is the page's search and the page's box is not drawn; Files has its own kind of box
+    const want = (mobile, group, own) => [mobile ? 'phone-bar-search' : own]; // on a phone the pill is the page's search and the page's box is not drawn
     const OWN = { needs: 'inbox-needs-search', tasks: 'inbox-tk-search', goals: 'inbox-goals-search', artifacts: 'ia-search', saved: 'inbox-saved-search', chats: 'inbox-chats-search', 'chats-active': 'inbox-chats-search' };
     try {
         await Page.enable();
