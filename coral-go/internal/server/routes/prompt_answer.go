@@ -642,16 +642,14 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 	}
 	// An answer always names its exact target, as for Send: a bare name would reach
 	// whatever pane matches it and could answer another agent's prompt (#3211).
-	if _, status, message := h.validateExactLiveTarget(r.Context(), name, body.AgentType, body.SessionID, false); status != 0 {
+	target, status, message := h.validateExactLiveTarget(r.Context(), name, body.AgentType, body.SessionID, false)
+	if status != 0 {
 		writeExactTargetError(w, status, message)
 		return
 	}
-	// One prompt is answered or closed by one sender at a time: a person's answer waits for Coral's own close or pick to finish, and each re-reads the screen inside the lock (agent_lock.go)
-	lockKey := body.SessionID
-	if lockKey == "" {
-		lockKey = "name:" + name
-	}
-	defer h.lockAgent(lockKey)()
+	// One prompt is answered or closed by one sender at a time: a person's answer waits for Coral's own close or pick to finish, and each re-reads the screen inside the lock (agent_lock.go). The key is the
+	// validated session's own id, the one every watcher locks on, so a request can never take a different key for the same prompt (a name is not one: the target is validated by its session id above).
+	defer h.lockAgent(target.SessionID)()
 	h.touch(r, body.SessionID, board.TouchAnswer)    // the Operator answers an agent's question (#11225): counted before the keys go, so a typed answer is not counted twice
 	if body.SessionID != "" && humanInputCaller(r) { // the Inbox's numbers (#7512): the wait's kind and age, never the agent or the answer
 		st := h.deriveSingleSessionState(r.Context(), body.SessionID, 0)

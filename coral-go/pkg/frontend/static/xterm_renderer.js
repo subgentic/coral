@@ -722,9 +722,10 @@ function _wireRevealScroll(containerEl) {
     _cursorDisposable = typeof terminal.onCursorMove === 'function' ? terminal.onCursorMove(() => revealCursor()) : null;
 }
 
-/** Whether this view has the keyboard focus in a visible page: what the server's dialog timeout counts as a person at the agent (goal #14). */
+/** Whether this view has the keyboard focus in a visible, ACTIVE window: what the server's dialog timeout counts as a person at the agent (goal #14). A window that is visible but not the active one keeps its
+ *  activeElement, so the page must also have the window's focus (document.hasFocus()). */
 function _viewFocused() {
-    return !!(terminal && terminal.textarea && document.activeElement === terminal.textarea && !document.hidden);
+    return !!(terminal && terminal.textarea && document.activeElement === terminal.textarea && !document.hidden && document.hasFocus());
 }
 
 /** Tell the server whether this view is focused: on every change, on a new socket, and again every FOCUS_REPORT_MS while it stays focused (the server forgets a report after 2 minutes). Only the
@@ -740,6 +741,10 @@ function _reportFocus() {
     if (!on && _focusTimer) { clearInterval(_focusTimer); _focusTimer = null; }
 }
 document.addEventListener('visibilitychange', _reportFocus);
+window.addEventListener('blur', _reportFocus); // the window went inactive (another window took the keyboard): visibilitychange does not say
+window.addEventListener('focus', _reportFocus);
+/** The re-report timer is stopped with the socket it reports on (a disconnect or a dispose); the next socket's first report starts it again. */
+function _stopFocusTimer() { if (_focusTimer) { clearInterval(_focusTimer); _focusTimer = null; } }
 
 /** The terminal's focus state, and what xterm's resize tells the pane. */
 function _wireFocusAndResize(containerEl) {
@@ -1013,6 +1018,7 @@ export function disconnectTerminalWs() {
     _connectedServer = 'local';
     _inputQueue = [];
     _setDisconnectedBadge(false);
+    _stopFocusTimer();
     if (terminalWs) {
         terminalWs.close();
         terminalWs = null;
@@ -1025,6 +1031,7 @@ document.addEventListener('coral:signed-out', () => disconnectTerminalWs());
 export function disposeTerminal() {
     dbg('disposeTerminal', { hadTerminal: !!terminal });
     disconnectTerminalWs();
+    _stopFocusTimer(); // (disconnectTerminalWs stops it too: said here as well, since a terminal that is gone reports nothing)
     if (_selectionDisposable) {
         _selectionDisposable.dispose();
         _selectionDisposable = null;
