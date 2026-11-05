@@ -1,5 +1,5 @@
 // The phone's accessibility P2s from slice A (#11281, from #11260, #11270 and the accessibility pass): at 390 and 320 px, 100% and 200% text, light and dark:
-//  - the Inbox's and Automations' strip is a real tab list: role=tablist, each view a role=tab with aria-selected (one true), aria-controls the page's tabpanel, which is named by the open tab; one Tab stop (roving), Left/Right move the focus
+//  - Inbox uses accessible menu buttons; Automations' strip is a real tab list: role=tablist, each view a role=tab with aria-selected (one true), aria-controls the page's tabpanel, which is named by the open tab; one Tab stop (roving), Left/Right move the focus
 //    and Enter opens the tab it is on;
 //  - the bottom nav is a landmark named Main and its four buttons say Agents page, Inbox page, Automations page and Analytics page (#11472: the bar is Gmail's; no control shares a name with the drawer's entries);
 //  - the Home list's per-row and per-team ⋯ is a 44 px button;
@@ -73,11 +73,6 @@ const { coralReady } = require('./helpers/wait');
             await ev(`[...document.querySelectorAll('#nav-more-menu .nav-drawer-folder')].find(e => e.querySelector('.nav-drawer-label').textContent === 'Goals').focus(); true`);
             await press('Enter', 13);
             await waitFor(`document.getElementById('group-table-title')?.textContent === 'Goals'`, `${tag}: Enter on the menu button opens Goals`, 8000);
-            // Keep the strip's roving-focus contract at the width that still draws it.
-            await Emulation.setDeviceMetricsOverride({ width: 700, height: 844, deviceScaleFactor: 1, mobile: true });
-            await waitFor(`!!document.querySelector('#group-table-view [role=tab]') && document.querySelector('#group-table-view [role=tab]').getClientRects().length > 0`, `${tag}: 700 px Inbox strip`, 10000);
-            await probe('700 px Inbox', tag);
-            await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile: true });
             // Automations
             await ev(`window.switchNavTab('automations'); true`);
             await waitFor(`!!document.querySelector('#group-table-view [role=tab]') && document.querySelector('#group-table-view [aria-label="Automations folders"]')`, `${tag}: the Automations strip`, 10000);

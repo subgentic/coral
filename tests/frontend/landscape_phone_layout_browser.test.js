@@ -45,7 +45,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
                     assert.ok(row && row.b <= h, `${tag}: the first agent row is inside the screen (${JSON.stringify(row)})`);
                     continue;
                 }
-                assert.equal(await ev(`document.querySelector('#group-table-view .view-list-nav').getClientRects().length`), 0, `${tag}: no Inbox strip in phone landscape`);
+                assert.equal(await ev(`(document.querySelector('#group-table-view .view-list-nav')?.getClientRects().length || 0)`), 0, `${tag}: no Inbox strip in phone landscape`);
                 const title = await ev(`(() => { const e = document.getElementById('group-table-title'), r = e.getBoundingClientRect(); return { text: e.textContent, top: r.top, bottom: r.bottom, width: r.width }; })()`);
                 assert.ok(title.text === 'Needs you' && title.width > 20 && title.top >= 0 && title.bottom <= h, `${tag}: the current folder is visible inside the screen: ${JSON.stringify(title)}`);
                 await ev(`[...document.querySelectorAll('.phone-menu-btn')].find(e => e.getClientRects().length).click(); true`);
