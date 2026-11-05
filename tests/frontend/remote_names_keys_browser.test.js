@@ -31,6 +31,14 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(found.sameTeam, true, 'F9: its own team\'s row is found: ' + JSON.stringify(found));
         assert.equal(found.otherTeam, false, 'F9: an uncached team\'s agent is not answered from another team\'s Lead: ' + JSON.stringify(found));
         assert.equal(found.noTeam, true, 'F9: an agent with no team known still falls back by name: ' + JSON.stringify(found));
+        // F9 (UI Reviewer's SHOULD): a local and a remote team with the SAME bare board name each get their own row, through sessionTeamKey
+        const same = await ev(`(async () => { const real = window.fetch; const answer = tag => Promise.resolve(new Response(JSON.stringify({ summary: { available: 1, busy: 0 }, observed_at: new Date().toISOString(), agents: [{ name: 'Lead', subscriber_id: 'Lead', state: tag }] }), { headers: { 'content-type': 'application/json' } }));
+            window.fetch = (u, o) => { const url = String(u && u.url || u); return /\\/board\\/twin\\/status/.test(url) ? answer(/\\/m1\\//.test(url) ? 'remote-row' : 'local-row') : real(u, o); };
+            try { const a = await import(${S} + 'team_availability.js'); await a.refreshTeamAvailability('twin', true); await a.refreshTeamAvailability('@m1/twin', true);
+                const st = row => { const r = a.getCachedAgentAvailability(row); return r && r.state; };
+                return { local: st({ name: 'Lead', board_project: 'twin' }), remote: st({ name: 'Lead', board_project: 'twin', server: 'm1' }) };
+            } finally { window.fetch = real; } })()`);
+        assert.deepEqual(same, { local: 'local-row', remote: 'remote-row' }, 'F9: the same board name on this computer and on m1 are two teams, each with its own row: ' + JSON.stringify(same));
         console.log('remote_names_keys_browser: ok');
     } finally { await client.close().catch(() => {}); }
 })().catch(e => { console.error(e); process.exit(1); });
