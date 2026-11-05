@@ -131,4 +131,3 @@ func TestAnOversizeWidenedClickIsRefusedOnlyWhereItWouldHaveBeenSigned(t *testin
 	assert.Empty(t, s1.header.Get(hubowner.Header))
 	s1.mu.Unlock()
 }
-

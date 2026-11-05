@@ -32,7 +32,10 @@ func WithSessionSignedIn(ctx context.Context) context.Context {
 	return context.WithValue(ctx, sessionSignedInKey{}, true)
 }
 
-func sessionSignedIn(ctx context.Context) bool { v, _ := ctx.Value(sessionSignedInKey{}).(bool); return v }
+func sessionSignedIn(ctx context.Context) bool {
+	v, _ := ctx.Value(sessionSignedInKey{}).(bool)
+	return v
+}
 
 // remoteGenerations remembers, per remote, which generation of the owner-stamp allowlist its health answer says it accepts (hub_owner_routes), for generationTTL: a hub asks a remote only when a widened route is about
 // to be signed, at most once a minute. A remote that does not say (an older Coral) accepts generation 1, the original eight; a remote that cannot be asked is taken at the last answer or at 1.
