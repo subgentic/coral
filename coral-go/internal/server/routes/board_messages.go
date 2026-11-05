@@ -222,7 +222,7 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 		if strings.EqualFold(msg.SubscriberID, board.OperatorName) && humanInputCaller(r) { // the Inbox's numbers (#7512): the Operator answered a question put to them
 			if asked, err := h.bs.GetMessageByID(r.Context(), project, body.ReplyTo); err == nil && asked != nil && asked.Ask != nil {
 				inboxActioned(r, tracking.InboxAsk, "", "answer", inboxTime(asked.CreatedAt))
-				h.recordWords(r, board.ActAnswer, "question", strconv.FormatInt(body.ReplyTo, 10), project, "", msg.Content) // the Operator's typed answer is a row, as a button's click is (#13609)
+				h.recordWords(r, board.ActAnswer, "question", strconv.FormatInt(body.ReplyTo, 10), project, asked.SubscriberID, msg.Content) // the title is who asked // the Operator's typed answer is a row, as a button's click is (#13609)
 				answeredAsk = true
 			}
 		}

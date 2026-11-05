@@ -76,6 +76,7 @@ func TestTheOperatorsTypedAnswerThroughTheRealRouteShowsInTheActivityList(t *tes
 	require.Len(t, rows, 1, "the Send is in the Activity list")
 	assert.Equal(t, board.ActAnswer, rows[0]["action"])
 	assert.Equal(t, "question", rows[0]["item_kind"])
+	assert.Equal(t, "Lead", rows[0]["title"], "the title is who asked")
 	assert.Equal(t, "team", rows[0]["team"])
 	assert.Equal(t, "local", rows[0]["source"])
 	assert.Contains(t, rows[0]["note"], "the second one")
@@ -84,7 +85,7 @@ func TestTheOperatorsTypedAnswerThroughTheRealRouteShowsInTheActivityList(t *tes
 func TestAPermissionPromptAnswerThroughTheRealRouteShowsInTheActivityList(t *testing.T) {
 	const sid = "00000000-0000-0000-0000-000000013609"
 	menu := "Do you want to proceed?\n❯ 1. Yes\n  2. No, and tell Claude what to do differently (esc)\n"
-	run := func(t *testing.T, event string) ([]map[string]any, int) {
+	run := func(t *testing.T, event string, n int, label string) ([]map[string]any, int) {
 		_, handler, term, ss := setupSessionsTestServer(t)
 		require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "c-act", WorkingDir: "/tmp/test"}))
 		term.addSession("c-act", "/tmp/test")
@@ -112,19 +113,25 @@ func TestAPermissionPromptAnswerThroughTheRealRouteShowsInTheActivityList(t *tes
 		r.Get("/api/activity", NewBoardHandler(bs).ListActivity)
 		srv := httptest.NewServer(r)
 		t.Cleanup(srv.Close)
-		b, _ := json.Marshal(map[string]any{"n": 1, "label": "Yes", "session_id": sid, "agent_type": "claude"})
+		b, _ := json.Marshal(map[string]any{"n": n, "label": label, "session_id": sid, "agent_type": "claude"})
 		resp, err := http.Post(srv.URL+"/api/sessions/live/c-act/answer-prompt", "application/json", bytes.NewReader(b))
 		require.NoError(t, err)
 		resp.Body.Close()
 		return activityList(t, srv.URL), resp.StatusCode
 	}
-	rows, code := run(t, "stop") // nothing is waiting: the handler refuses, so no click happened
+	rows, code := run(t, "stop", 1, "Yes") // nothing is waiting: the handler refuses, so no click happened
 	assert.Equal(t, http.StatusConflict, code)
 	assert.Empty(t, rows)
-	rows, code = run(t, "permission_request")
+	rows, code = run(t, "permission_request", 1, "Yes")
 	require.Equal(t, http.StatusOK, code)
 	require.Len(t, rows, 1, "the answer is in the Activity list")
-	assert.Equal(t, board.ActPromptAnswer, rows[0]["action"])
+	assert.Equal(t, board.ActPromptAllow, rows[0]["action"], "Yes is an allow, by the option's own kind")
 	assert.Equal(t, "agent", rows[0]["item_kind"])
 	assert.Equal(t, "c-act", rows[0]["item_id"])
+	assert.Equal(t, "Yes", rows[0]["note"], "the option's label is the note")
+	rows, code = run(t, "permission_request", 2, "No, and tell Claude what to do differently (esc)")
+	require.Equal(t, http.StatusOK, code)
+	require.Len(t, rows, 1)
+	assert.Equal(t, board.ActPromptReject, rows[0]["action"], "No is a reject")
+	assert.Contains(t, rows[0]["note"], "No, and tell Claude")
 }
