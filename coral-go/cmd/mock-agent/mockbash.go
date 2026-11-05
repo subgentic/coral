@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync/atomic"
+	"time"
 )
 
 var mockBashSeq atomic.Int64
@@ -27,8 +28,19 @@ func parseMockBash(line string) (mode, command string, ok bool) {
 	return mode, command, true
 }
 
+// submitsInFlight counts the UserPromptSubmit hooks queued and not yet fired. A real agent's tool call comes well after the submit that began its turn; the stand-in runs the call on its own goroutine, so it waits for them,
+// or the submit (which clears the session's pending tool at Coral) could land after the PreToolUse it should precede (#13718's live run).
+var submitsInFlight atomic.Int32
+
+func waitForSubmits() {
+	for i := 0; i < 600 && submitsInFlight.Load() > 0; i++ {
+		time.Sleep(10 * time.Millisecond) // sleep-ok: a poll of the counter above, 6 s at most
+	}
+}
+
 // runMockBash is one such call.
 func runMockBash(h *hookRunner, name, mode, command string, redraw func()) {
+	waitForSubmits()
 	defer func() { // the turn ends after the call, as Claude Code's does: Coral holds typed input while a turn runs, so without the Stop the next line would wait forever
 		if redraw != nil {
 			redraw() // an empty input box again: Coral will not type into a box that still shows a line

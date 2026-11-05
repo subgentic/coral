@@ -111,7 +111,7 @@ func applyControl(box *inputBox, line string) (handled, waiting bool) {
 	}
 	if mode, command, ok := parseMockBash(line); ok { // a Bash tool call through the hooks (mockbash.go)
 		box.tell("bash:" + mode + ":" + command)
-		return true, false
+		return true, true // the turn goes on while the call runs: its own Stop comes when the call is done (a Stop now would clear the pending tool the PreToolUse is about to record, which a real agent never does)
 	}
 	switch line {
 	case "MOCK_ASK_PERMISSION":

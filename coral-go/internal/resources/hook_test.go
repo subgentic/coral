@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/proctree"
 	"github.com/subgentic/coral/pkg/resourcequeue"
 )
 
@@ -24,12 +25,12 @@ type hookRig struct {
 	agents map[string]string // session -> member
 	procs  map[string][]string
 	events []HookEvent
-	pids   map[int]bool // processes that are alive
+	plist  []proctree.Proc // the machine's processes (a fake ps)
 }
 
 func newHookRig(t *testing.T) *hookRig {
 	t.Helper()
-	g := &hookRig{t: t, now: time.Date(2026, 11, 5, 9, 0, 0, 0, time.UTC), agents: map[string]string{"s-a": "Agent A", "s-b": "Agent B", "s-c": "Agent C"}, procs: map[string][]string{}, pids: map[int]bool{}}
+	g := &hookRig{t: t, now: time.Date(2026, 11, 5, 9, 0, 0, 0, time.UTC), agents: map[string]string{"s-a": "Agent A", "s-b": "Agent B", "s-c": "Agent C"}, procs: map[string][]string{}}
 	m, err := Open(Options{Now: g.clock, AgeStep: -1})
 	require.NoError(t, err)
 	g.m = m
@@ -42,7 +43,11 @@ func newHookRig(t *testing.T) *hookRig {
 		},
 		Commands: func(s string) []string { g.mu.Lock(); defer g.mu.Unlock(); return g.procs[s] },
 		Event:    func(e HookEvent) { g.events = append(g.events, e) },
-		PidAlive: func(pid int) bool { g.mu.Lock(); defer g.mu.Unlock(); return g.pids[pid] },
+		Procs: func() ([]proctree.Proc, bool) {
+			g.mu.Lock()
+			defer g.mu.Unlock()
+			return append([]proctree.Proc(nil), g.plist...), true
+		},
 	})
 	return g
 }

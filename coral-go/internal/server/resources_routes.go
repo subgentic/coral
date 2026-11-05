@@ -30,6 +30,11 @@ func (s *Server) registerResources(r chi.Router, sess *routes.SessionsHandler) {
 		return
 	}
 	hook := resources.NewHook(mgr, resources.HookOptions{
+		Procs: func() ([]proctree.Proc, bool) {
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			return proctree.Snapshot(ctx)
+		},
 		Agent: func(ctx context.Context, sessionName string) (string, bool) {
 			sub, err := s.boardStore.GetSubscriptionBySessionName(ctx, sessionName)
 			if err != nil || sub == nil || sub.IsActive == 0 || sub.SubscriberID == "" {
@@ -60,6 +65,7 @@ func (s *Server) registerResources(r chi.Router, sess *routes.SessionsHandler) {
 	h := &routes.ResourcesHandler{M: mgr, Board: s.boardStore, Hook: hook}
 	if sess != nil {
 		h.ToolCall = sess.CurrentToolCall // an agent's hand claim is tied to the tool call it is made in (#13718)
+		h.AgentPID = s.sessionPID
 	}
 	r.Get("/api/resources", h.List)
 	r.Get("/api/resources/{name}", h.Get)
@@ -80,6 +86,21 @@ func agentStillOnABoard(s *Server, agent string) bool {
 	}
 	sub, err := s.boardStore.GetSubscription(context.Background(), agent)
 	return err != nil || sub != nil
+}
+
+// sessionPID is the agent's own process, 0 when the backend cannot say.
+func (s *Server) sessionPID(sessionName string) int {
+	p, ok := s.backend.(ptymanager.SessionPIDProvider)
+	if !ok {
+		return 0
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	pid, err := p.SessionPID(ctx, sessionName)
+	if err != nil || pid <= 1 {
+		return 0
+	}
+	return pid
 }
 
 // commandsBelowSession is the command lines of the processes the session's agent has started that still run, or nil when that is not known (no per-session process, no ps): the hook then gives a slot back

@@ -9,6 +9,7 @@
 #   release    the slot goes back when the call ends, and the second agent's retry then runs
 #   background a call that returns while its work (a child of the agent) still runs keeps the slot until the work is gone
 #   other      a command that matches nothing is not held and claims nothing
+#   by hand    a coral-board claim in a call goes back when the call ends; made by a background job's shell it stays while that shell runs (#13718)
 # Usage:  tests/stress/run_resource_hook.sh      CORAL_RESOURCE_HOOK_PORT (default 8477), KEEP_TEST_DATA=1
 # Never touches ~/.coral or ports 8420/8450; the server runs with --cloud-url off and is stopped by PID, its tmux by its own socket.
 #
@@ -87,6 +88,7 @@ holder_is() { [[ "$(holders)" == *"$1"* ]]; }
 nobody() { [[ -z "$(holders | tr -d ' ')" ]]; }
 captured() { capture "$1" "$2" | grep -q "$3"; }
 
+if [[ -z "${ONLY_HAND:-}" ]]; then # ONLY_HAND=1: just the by-hand scenarios (a quicker run while working on them)
 # ── claim, refuse, release ────────────────────────────────────────────
 send "$ann_name" "$ann_sid" "MOCK_BASH wait sleep 7"
 wait_until 20 "Ann's call to claim the slot" holder_is Ann && pass "Ann's matching command claimed the slot while it runs" || true
@@ -112,6 +114,20 @@ wait_until 20 "the call to have returned" captured "$ann_name" "$ann_sid" "bash 
 sleep 12
 holder_is Ann && pass "the slot is still Ann's while her backgrounded work runs" || fail "the slot was freed while the work runs: holders=$(holders)"
 wait_until 60 "the work to end and the slot to go back" nobody && pass "the slot went back once the work was gone" || true
+
+fi
+# ── a claim by hand follows its tool call and its shell (#13718) ──────
+# foreground: Ann claims with coral-board in a call and never releases: the slot goes back when the call ends
+send "$ann_name" "$ann_sid" "MOCK_BASH wait $BIN/coral-board resource claim mac-heavy --note by-hand; sleep 6"
+wait_until 20 "Ann's hand claim to be granted" holder_is Ann && pass "Ann's coral-board claim held the slot while her call ran" || fail "no hand claim: holders=$(holders)"
+wait_until 40 "the hand claim to go back with its call" nobody && pass "the hand claim went back when its call ended, with no release command" || fail "the hand claim stayed after its call: holders=$(holders)"
+# background: the claim is made by a shell that outlives the call; the slot stays while that shell runs, then goes back
+send "$ann_name" "$ann_sid" "MOCK_BASH nowait $BIN/coral-board resource claim mac-heavy --note bg-hand; sleep 30"
+wait_until 20 "Ann's background hand claim" holder_is Ann || fail "no background hand claim"
+wait_until 20 "the call to have returned" captured "$ann_name" "$ann_sid" "bash DONE (nowait)" || true
+sleep 12
+holder_is Ann && pass "the hand claim stays while the shell of her background job runs" || fail "the background hand claim was freed while its shell runs: holders=$(holders)"
+wait_until 60 "the job to end and the slot to go back" nobody && pass "the hand claim went back once the job's shell was gone" || fail "the background hand claim stayed: holders=$(holders)"
 
 # ── the server log: the pattern, never the command ────────────────────
 if grep -q "shell hook" "$TMP/server.log" && ! grep -q "MOCK_BASH\|sleep 7 \|sleep 40 " "$TMP/server.log"; then pass "the server log names the resource and the pattern, not the command ($(grep -c 'shell hook' "$TMP/server.log") lines)"; else fail "the server log: $(grep -n 'shell hook\|MOCK_BASH' "$TMP/server.log" | head -3)"; fi

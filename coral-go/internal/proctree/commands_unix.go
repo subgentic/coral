@@ -32,3 +32,14 @@ func psPath() string {
 	}
 	return "ps"
 }
+
+// Snapshot runs ps once and answers every process; ok is false when that cannot be known.
+func Snapshot(ctx context.Context) (procs []Proc, ok bool) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, psPath(), "-axo", "pid=,ppid=,command=").Output()
+	if err != nil {
+		return nil, false
+	}
+	return Parse(string(out)), true
+}

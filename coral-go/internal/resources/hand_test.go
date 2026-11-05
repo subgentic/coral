@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/proctree"
 )
 
 // #13718, the Operator's design: a slot an agent claims by hand belongs to the tool call it was claimed in, and Coral gives it back when that call ends (or the agent's turn or session does): a forgotten release cannot hold the line.
@@ -16,7 +18,7 @@ func (g *hookRig) handClaim(session, agent, call string) {
 	res, err := g.m.Claim(context.Background(), "mac-heavy", agent, "by hand")
 	require.NoError(g.t, err)
 	_ = res
-	g.h.BindHand(session, agent, "mac-heavy", call, 0)
+	g.h.BindHand(session, agent, "mac-heavy", call, 0, 0)
 }
 
 func TestAHandClaimIsGivenBackWhenItsToolCallEnds(t *testing.T) {
@@ -76,47 +78,97 @@ func TestAClaimWithNoToolCallStaysUntilItsLease(t *testing.T) {
 	assert.Empty(t, g.holders(), "its lease ends it, as before")
 }
 
-// A job run in the background outlives its tool call (Claude's run_in_background, Codex's background terminal): the claim is also bound to the claiming shell's process and goes back only when BOTH the call has ended AND that process is gone.
-func (g *hookRig) bgClaim(session, agent, call string, pid int) {
+// A job run in the background outlives its tool call (Claude's run_in_background, Codex's background terminal): the claim also follows the work the call started under the claiming shell, and goes back when the call has ended
+// AND that work is gone. The shell itself may be a persistent one (a Codex terminal): only what started after the claim counts. The pid is believed only when it is in the agent's own process tree.
+const agentPID = 100
+
+func (g *hookRig) setProcs(ps ...proctree.Proc) { g.mu.Lock(); g.plist = ps; g.mu.Unlock() }
+func (g *hookRig) addProc(p proctree.Proc)      { g.mu.Lock(); g.plist = append(g.plist, p); g.mu.Unlock() }
+func (g *hookRig) dropProc(pid int) {
+	g.mu.Lock()
+	var keep []proctree.Proc
+	for _, p := range g.plist {
+		if p.PID != pid {
+			keep = append(keep, p)
+		}
+	}
+	g.plist = keep
+	g.mu.Unlock()
+}
+
+// bgClaim: a claim run by coral-board (pid cli) whose parent is the shell `shell`, a child of the agent.
+func (g *hookRig) bgClaim(session, agent, call string, shell int) {
 	g.t.Helper()
 	_, err := g.m.Claim(context.Background(), "mac-heavy", agent, "bg")
 	require.NoError(g.t, err)
-	g.mu.Lock()
-	g.pids[pid] = true
-	g.mu.Unlock()
-	g.h.BindHand(session, agent, "mac-heavy", call, pid)
+	g.h.BindHand(session, agent, "mac-heavy", call, shell, agentPID)
 }
 
-func (g *hookRig) die(pid int) { g.mu.Lock(); delete(g.pids, pid); g.mu.Unlock() }
-
-func TestABackgroundClaimLivesAsLongAsItsProcessAfterItsCallEnds(t *testing.T) {
+func TestAForegroundClaimIsGivenBackAtTheEndOfItsCallEvenInAShellThatKeepsRunning(t *testing.T) {
 	g := newHookRig(t)
-	g.bgClaim("s-a", "Agent A", "call-1", 4242)
-	g.h.After("s-a", "call-1") // the call returned at once, the job goes on
+	// a persistent shell (a Codex terminal) with an older background job that is still running, and the claim's own command
+	g.setProcs(proctree.Proc{PID: agentPID, PPID: 1, Command: "codex"}, proctree.Proc{PID: 500, PPID: agentPID, Command: "bash"},
+		proctree.Proc{PID: 480, PPID: 500, Command: "go test ./... (older job)"}, proctree.Proc{PID: 501, PPID: 500, Command: "coral-board resource claim mac-heavy"})
+	g.bgClaim("s-a", "Agent A", "call-1", 500)
+	g.dropProc(501) // the claim command returned: nothing new started under the shell
+	g.h.After("s-a", "call-1")
+	assert.Empty(t, g.holders(), "the shell and its older job go on, but nothing this call started does: freed at the call's end")
+}
+
+func TestABackgroundJobKeepsTheSlotAfterItsCallUntilTheWorkItStartedIsGone(t *testing.T) {
+	g := newHookRig(t)
+	g.setProcs(proctree.Proc{PID: agentPID, PPID: 1, Command: "claude"}, proctree.Proc{PID: 500, PPID: agentPID, Command: "bash -c claim; go test ./..."},
+		proctree.Proc{PID: 501, PPID: 500, Command: "coral-board resource claim mac-heavy"})
+	g.bgClaim("s-a", "Agent A", "call-1", 500)
+	g.dropProc(501)
+	g.addProc(proctree.Proc{PID: 502, PPID: 500, Command: "go test ./..."}) // the work the call started
+	g.h.After("s-a", "call-1")
 	g.h.Sweep()
-	assert.Equal(t, []string{"Agent A"}, g.holders(), "the job still runs: the slot stays")
+	assert.Equal(t, []string{"Agent A"}, g.holders(), "the work still runs: the slot stays")
 	g.h.TurnEnded("s-a") // the agent's turn ended while the job runs: still held
 	g.h.Sweep()
 	assert.Equal(t, []string{"Agent A"}, g.holders())
-	g.die(4242)
+	g.dropProc(502)
 	g.h.Sweep()
-	assert.Empty(t, g.holders(), "the job's process is gone and its call has ended: the slot goes back")
+	assert.Empty(t, g.holders(), "the work is gone and the call has ended: back")
 }
 
-func TestAForegroundClaimEndsWithItsCallAndAProcessThatDiesFirstDoesNotFreeItEarly(t *testing.T) {
+func TestAShellThatBecameTheJobItselfKeepsTheSlotWhileItRuns(t *testing.T) {
 	g := newHookRig(t)
-	g.bgClaim("s-a", "Agent A", "call-1", 11)
-	g.die(11) // the process is gone but the call has not ended (a slow PostToolUse): not freed yet
+	g.setProcs(proctree.Proc{PID: agentPID, PPID: 1, Command: "claude"}, proctree.Proc{PID: 500, PPID: agentPID, Command: "sh -c claim && go test ./..."},
+		proctree.Proc{PID: 501, PPID: 500, Command: "coral-board resource claim mac-heavy"})
+	g.bgClaim("s-a", "Agent A", "call-1", 500)
+	g.dropProc(501)
+	g.dropProc(500)
+	g.addProc(proctree.Proc{PID: 500, PPID: agentPID, Command: "go test ./..."}) // the shell exec'd the last command: same pid, new program
+	g.h.After("s-a", "call-1")
+	assert.Equal(t, []string{"Agent A"}, g.holders(), "the pid is now the job")
+	g.dropProc(500)
+	g.h.Sweep()
+	assert.Empty(t, g.holders())
+}
+
+func TestADeadProcessDoesNotFreeAClaimWhoseCallHasNotEnded(t *testing.T) {
+	g := newHookRig(t)
+	g.setProcs(proctree.Proc{PID: agentPID, PPID: 1, Command: "claude"}, proctree.Proc{PID: 500, PPID: agentPID, Command: "sh"})
+	g.bgClaim("s-a", "Agent A", "call-1", 500)
+	g.dropProc(500)
 	g.h.Sweep()
 	assert.Equal(t, []string{"Agent A"}, g.holders(), "the call has not ended")
 	g.h.After("s-a", "call-1")
-	assert.Empty(t, g.holders(), "both ended: freed at the call's end")
+	assert.Empty(t, g.holders())
 }
 
-func TestACrashedSessionFreesABackgroundClaimWhateverItsProcess(t *testing.T) {
+func TestAPidOutsideTheAgentsProcessTreeIsNotBelievedAndACrashedSessionFreesEverything(t *testing.T) {
 	g := newHookRig(t)
-	g.bgClaim("s-a", "Agent A", "call-1", 77)
+	g.setProcs(proctree.Proc{PID: agentPID, PPID: 1, Command: "claude"}, proctree.Proc{PID: 900, PPID: 1, Command: "somebody else's daemon"})
+	g.bgClaim("s-a", "Agent A", "call-1", 900) // named, but not below the agent: the claim follows its call alone
 	g.h.After("s-a", "call-1")
-	g.h.SessionEnded("s-a") // the agent is gone: its jobs are not a reason to keep the slot
+	assert.Empty(t, g.holders(), "a pid the agent does not own cannot keep a slot")
+	g.setProcs(proctree.Proc{PID: agentPID, PPID: 1, Command: "claude"}, proctree.Proc{PID: 500, PPID: agentPID, Command: "sh"})
+	g.bgClaim("s-b", "Agent B", "call-2", 500)
+	g.addProc(proctree.Proc{PID: 502, PPID: 500, Command: "go test ./..."})
+	g.h.After("s-b", "call-2")
+	g.h.SessionEnded("s-b") // the agent is gone: its jobs are not a reason to keep the slot
 	assert.Empty(t, g.holders())
 }
