@@ -91,7 +91,6 @@ type Config struct {
 const (
 	DefaultLease       = 30 * time.Minute
 	DefaultAwayGrace   = 10 * time.Minute // how long a place is kept for an agent whose wait ended without a turn (#13706)
-	AwayClaimWindow    = 2 * time.Minute  // how long a slot that came to such a place waits for its agent before it passes on
 	DefaultMaxPerAgent = 3
 	DefaultAgeStep     = 3 * time.Minute // 10 points in about 30 minutes of waiting: one rank step of the board's task priorities (0, 10, 20, 30), so nothing starves behind a steady stream of the next class up
 	DefaultAgeCap      = 10
@@ -251,11 +250,9 @@ func (q *Queue) Claim(key string, who Claimant) (Result, error) {
 		if who.Priority > e.Priority {
 			e.Priority = who.Priority
 		}
-		if !e.Away.IsZero() { // the agent is back (#13706): its place is its own again, and a slot that came while it was away becomes a whole lease
+		if !e.Away.IsZero() { // the agent is back (#13706): its place, still where it was, is its own again, and a free slot is its now
 			e.Away = time.Time{}
-			if !e.Waiting() {
-				e.Lease = q.now().Add(r.lease())
-			}
+			q.fill(key)
 		}
 		res := q.resultOf(e)
 		err := q.save()
@@ -319,7 +316,7 @@ func (q *Queue) Release(key, agent string) error {
 }
 
 // Leave is for an agent whose wait ended without a turn (its --timeout, the tool call it waited in): a place in line is kept for grace, the agent's own claim again takes it back at the same place, and
-// when the grace ends (Reap) it goes. A slot that comes to such a place waits AwayClaimWindow for its agent, then passes on. A slot the agent already holds is given back, as Release does (#13706).
+// when the grace ends (Reap) it goes. A slot that comes while the agent is away goes to the next one who is here, and the absent one keeps its place at the front for its return. A slot the agent already holds is given back, as Release does (#13706).
 func (q *Queue) Leave(key, agent string, grace time.Duration) error {
 	q.mu.Lock()
 	if _, ok := q.res[key]; !ok {
@@ -576,16 +573,18 @@ func (q *Queue) fill(key string) []Entry {
 	}
 	var granted []Entry
 	for q.held(key) < r.Slots {
-		line := q.line(key)
-		if len(line) == 0 {
+		var e *Entry
+		for _, x := range q.line(key) {
+			if x.Away.IsZero() { // an agent that is away is skipped (#13706): the slot goes to the next one who is here, and the absent one keeps its place at the front
+				e = x
+				break
+			}
+		}
+		if e == nil {
 			break
 		}
-		e := line[0]
 		e.Granted = q.now()
 		e.Lease = e.Granted.Add(r.lease())
-		if !e.Away.IsZero() { // its agent is not waiting any more: a short window to come back, then the slot passes on
-			e.Lease = e.Granted.Add(min(r.lease(), AwayClaimWindow))
-		}
 		granted = append(granted, *e)
 	}
 	return granted

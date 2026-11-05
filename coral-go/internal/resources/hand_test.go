@@ -44,7 +44,10 @@ func TestAWaitingHandClaimKeepsItsPlaceForAGraceWhenItsCallEnds(t *testing.T) {
 	assert.False(t, g.queue()[0].Away.IsZero(), "and marked as kept for an agent that is away")
 	assert.Equal(t, []string{"Agent A"}, g.holders(), "the holder is untouched")
 	g.h.After("s-a", "call-a")
-	assert.Equal(t, []string{"Agent B"}, g.holders(), "a slot that comes to the kept place is Agent B's, for the short window")
+	assert.Empty(t, g.holders(), "a slot that comes while B is away is not held for B: nobody here is waiting, so it stays free")
+	require.Len(t, g.queue(), 1, "and B's place is still there")
+	g.handClaim("s-b", "Agent B", "call-b2") // B is back
+	assert.Equal(t, []string{"Agent B"}, g.holders(), "back, B has the free slot at once")
 }
 
 func TestAWaitingHandClaimOfASessionThatEndedLeavesTheLineAtOnce(t *testing.T) {

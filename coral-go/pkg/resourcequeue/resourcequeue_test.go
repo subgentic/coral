@@ -350,39 +350,31 @@ func TestAPlaceLeftAndNeverTakenBackGoesWhenTheGraceEnds(t *testing.T) {
 	assert.Equal(t, []string{"next"}, names(st.Queue), "after the grace the place is gone")
 }
 
-func TestASlotThatComesToAPlaceLeftWaitsOnlyAShortWhileForItsAgent(t *testing.T) {
-	var granted []string
-	q, c := fixture(t, Config{OnGrant: func(e Entry) { granted = append(granted, e.Agent) }})
+func TestASlotThatComesWhileAnAgentIsAwayGoesToTheNextOneHereAndTheAbsentKeepsItsPlace(t *testing.T) {
+	q, _ := fixture(t, Config{})
 	claim(t, q, "mac", "holder", 0)
 	claim(t, q, "mac", "away", 0)
 	claim(t, q, "mac", "next", 0)
 	require.NoError(t, q.Leave("mac", "away", 10*time.Minute))
 	require.NoError(t, q.Release("mac", "holder"))
 	st, _ := q.Status("mac")
-	require.Equal(t, []string{"away"}, names(st.Holders))
-	assert.Equal(t, AwayClaimWindow, st.Holders[0].Lease.Sub(st.Holders[0].Granted), "an agent that is not there has a short window, not the whole lease")
-	c.add(AwayClaimWindow + time.Second)
-	_, err := q.Reap()
-	require.NoError(t, err)
+	assert.Equal(t, []string{"next"}, names(st.Holders), "the Mac does not sit idle for an agent that walked away: the next one here has it now")
+	assert.Equal(t, []string{"away"}, names(st.Queue), "and the absent one keeps its place")
+	require.NoError(t, q.Release("mac", "next"))
 	st, _ = q.Status("mac")
-	assert.Equal(t, []string{"next"}, names(st.Holders), "unclaimed, the slot passes to the next in line")
+	assert.Empty(t, st.Holders, "only an absent agent is left in line: the slot stays free, nobody present is waiting")
+	r := claim(t, q, "mac", "away", 0)
+	assert.True(t, r.Granted, "back, it has the free slot at once")
 }
 
-func TestAnAgentThatComesBackToASlotGivenWhileAwayKeepsItForAWholeLease(t *testing.T) {
-	q, c := fixture(t, Config{})
+func TestAnAbsentAgentStaysAheadOfThoseWhoJoinedAfterItWhileItIsAway(t *testing.T) {
+	q, _ := fixture(t, Config{})
 	claim(t, q, "mac", "holder", 0)
 	claim(t, q, "mac", "away", 0)
 	require.NoError(t, q.Leave("mac", "away", 10*time.Minute))
-	require.NoError(t, q.Release("mac", "holder"))
-	c.add(AwayClaimWindow / 2)
+	claim(t, q, "mac", "late", 0)
 	r := claim(t, q, "mac", "away", 0)
-	require.True(t, r.Granted)
-	assert.Equal(t, DefaultLease, r.Entry.Lease.Sub(c.now()), "back in time: a whole lease from now")
-	c.add(AwayClaimWindow + time.Second)
-	_, err := q.Reap()
-	require.NoError(t, err)
-	st, _ := q.Status("mac")
-	assert.Equal(t, []string{"away"}, names(st.Holders))
+	assert.Equal(t, 1, r.Place, "back, it is still ahead of the one who joined while it was away")
 }
 
 func TestLeavingAHoldIsReleasingItAndLeavingNothingIsAnError(t *testing.T) {
