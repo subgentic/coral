@@ -9,11 +9,13 @@ import { teamLabel } from './server_status.js';
 import { el } from './dom_el.js';
 
 
-function row(icon, label, count, run) {
+function row(icon, label, count, run, current = false) {
     const b = el('button', 'menu-item nav-more-item nav-drawer-folder'); b.type = 'button'; b.setAttribute('role', 'menuitem');
+    if (current) { b.setAttribute('aria-current', 'true'); b.classList.add('is-current'); } // the open folder: marked by weight and a bar, and said in words
     const i = el('span', 'material-icons', icon); i.setAttribute('aria-hidden', 'true');
     b.append(i, el('span', 'nav-drawer-label', label));
-    if (count > 0) b.append(el('span', 'nav-drawer-count', count > 99 ? '99+' : String(count)));
+    if (typeof count === 'string' && count) b.append(el('span', 'nav-drawer-count', count)); // Needs you says '0 of 3'
+    else if (count > 0) b.append(el('span', 'nav-drawer-count', count > 99 ? '99+' : String(count)));
     b.addEventListener('click', run);
     return b;
 }
@@ -51,9 +53,18 @@ export function drawerTop() {
     const ctx = contextOf();
     const out = [el('div', 'nav-drawer-head', 'Coral')];
     if (ctx === 'hub-inbox' || ctx === 'history') { // the Inbox, its Tasks and Chats: the Inbox's folders with their counts
-        const c = inboxCountsNow();
-        out.push(row('email', 'Needs you', c.needs, slot('nav-inbox')), row('checklist', 'Tasks', c.tasks, inboxPage('tasks', 'Tasks')),
-            row('star', 'Saved', c.saved, () => { window.switchNavTab?.('hub-inbox'); importOnce('./inbox_tab.js').then(m => m.selectInboxTab('saved')); }), row('chat_bubble_outline', 'Chats', 0, inboxPage('chats', 'Chats')));
+        const rows = state.inboxFolderRows?.(); // every folder of the Inbox, as its sidebar lists them (#13596: a phone has no tab strip)
+        if (rows) {
+            const PLAIN = { 'saved-bookmark': 'star' };
+            for (const sec of rows.sections) {
+                if (sec.title && rows.sections.length > 1 && sec.items.length > 1) out.push(el('div', 'nav-drawer-group', sec.title));
+                for (const it of sec.items) out.push(row(PLAIN[it.icon] || (/^[a-z_]+$/.test(it.icon || '') ? it.icon : 'folder'), it.label, it.count, () => { window.switchNavTab?.('hub-inbox'); importOnce('./inbox_tab.js').then(() => rows.pick(it.key)); }, it.key === rows.current));
+            }
+        } else {
+            const c = inboxCountsNow();
+            out.push(row('email', 'Needs you', c.needs, slot('nav-inbox')), row('checklist', 'Tasks', c.tasks, inboxPage('tasks', 'Tasks')),
+                row('star', 'Saved', c.saved, () => { window.switchNavTab?.('hub-inbox'); importOnce('./inbox_tab.js').then(m => m.selectInboxTab('saved')); }), row('chat_bubble_outline', 'Chats', 0, inboxPage('chats', 'Chats')));
+        }
     } else {
         if (ctx === 'agents') out.push(row('smart_toy', 'All agents', (state.liveSessions || []).length, () => window.switchNavTab?.('agents')));
         out.push(row('checklist', 'Tasks', inboxCountsNow().tasks, inboxPage('tasks', 'Tasks')), row('chat_bubble_outline', 'Chats', 0, inboxPage('chats', 'Chats'))); // the bar has no Tasks or Chats: every other drawer has them first

@@ -41,7 +41,7 @@ const { coralReady } = require('./helpers/wait');
             assert.deepEqual(stateControl, { pills: width === 1280, select: false }, `${width}: the pills are the row's state control where they fit; on a phone the choice is a select in the Filters sheet, none in the row (#8700)`);
             if (width === 390) {
                 const searchLayout = await ev(`(() => { const h = document.getElementById('group-table-view'), search = h.querySelector('.list-bar-search').getBoundingClientRect(), toggle = h.querySelector('.list-bar-toggle').getBoundingClientRect(); return { width: search.width, minimum: 10 * parseFloat(getComputedStyle(document.documentElement).fontSize), sameRow: Math.abs((search.top + search.height / 2) - (toggle.top + toggle.height / 2)) < 6, over: document.documentElement.scrollWidth - innerWidth }; })()`);
-                assert.ok(searchLayout.width >= searchLayout.minimum && searchLayout.sameRow && searchLayout.over <= 0, `phone search keeps 10rem and the Filters icon is on its row: ${JSON.stringify(searchLayout)}`);
+                assert.ok(searchLayout.width === 0 && searchLayout.over <= 0, `the page's box is not drawn on a phone (the top pill is the search, #13591): ${JSON.stringify(searchLayout)}`);
             }
             await shot(`inbox-tasks-toolbar-${width}`);
             await ev(`document.querySelector('#group-table-view .list-bar-toggle').click(); true`);

@@ -1,5 +1,5 @@
 // A landscape phone (#12647, coral-hub's beta pass): at 844x390 and 915x412 with a coarse pointer the page is the phone's (phone_layout.js PHONE_QUERY), but the view list stayed
-// the desktop's stacked column, about 1,000 px tall, and pushed the page's own pane below the fold on /inbox/needs and /agents. The list is the strip there, as at 390 wide, and the
+// the desktop's stacked column, about 1,000 px tall, and pushed the page's own pane below the fold on /inbox/needs and /agents. Inbox now uses its menu there, as at 390 wide, and the
 // pane under it starts inside the screen. Drives Chrome over CDP through agent_view_harness.js against an isolated dev server.
 const fs = require('node:fs');
 const assert = require('node:assert/strict');
@@ -45,9 +45,12 @@ const { coralReady, framesJs } = require('./helpers/wait');
                     assert.ok(row && row.b <= h, `${tag}: the first agent row is inside the screen (${JSON.stringify(row)})`);
                     continue;
                 }
-                assert.ok(r.vl, `${tag}: a view list is drawn`);
-                assert.equal(r.vl.dir, 'row', `${tag}: the view list is a strip, not a column (${JSON.stringify(r)})`);
-                assert.ok(r.vl.h <= 100, `${tag}: the strip is short, not a column (${JSON.stringify(r)})`);
+                assert.equal(await ev(`(document.querySelector('#group-table-view .view-list-nav')?.getClientRects().length || 0)`), 0, `${tag}: no Inbox strip in phone landscape`);
+                const title = await ev(`(() => { const e = document.getElementById('group-table-title'), r = e.getBoundingClientRect(); return { text: e.textContent, top: r.top, bottom: r.bottom, width: r.width }; })()`);
+                assert.ok(title.text === 'Needs you' && title.width > 20 && title.top >= 0 && title.bottom <= h, `${tag}: the current folder is visible inside the screen: ${JSON.stringify(title)}`);
+                await ev(`[...document.querySelectorAll('.phone-menu-btn')].find(e => e.getClientRects().length).click(); true`);
+                await waitFor(`!!document.querySelector('#nav-more-menu:not([hidden]) .nav-drawer-folder[aria-current="true"]')`, `${tag}: current folder in menu`, 6000);
+                assert.equal(await ev(`document.querySelector('#nav-more-menu .nav-drawer-folder[aria-current="true"] .nav-drawer-label').textContent`), 'Needs you', `${tag}: menu marks the current folder`);
             }
         }
         // The landscape clause excludes a mouse, a taller tablet, and a wider touch laptop.
@@ -58,6 +61,6 @@ const { coralReady, framesJs } = require('./helpers/wait');
             assert.ok(desktop, `${w}x${h} touch=${touch}: keeps the desktop top bar`);
         }
         assert.deepEqual(failures, [], 'landscape top bar');
-        console.log('PASS landscape phone: the view list is a strip at 844x390 and 915x412');
+        console.log('PASS landscape phone: Inbox uses its menu at 844x390 and 915x412');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

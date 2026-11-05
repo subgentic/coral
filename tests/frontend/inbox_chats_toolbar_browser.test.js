@@ -52,8 +52,8 @@ const COUNTS = { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 1,
 
             check(`${label}: ${label === '390' ? 'opening the folder does not put the keyboard on the search box: a phone starts at the first row or the heading (#9985)' : "opening the folder puts the focus on the page's search box, not on the heading"}`, await ev(`(() => { const a = document.activeElement; return ${label === '390' ? '!a || !/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)' : "!!a && a.matches('input[type=search]') && !!a.closest('.inbox-folder-toolbar')"}; })()`), await ev(`document.activeElement && (document.activeElement.id || document.activeElement.className || document.activeElement.tagName)`));
             const g = await geometry();
-            check(`${label}: All chats has a search box named "Search chats" and the Filters icon in the same row, to its right`, g && g.qName === 'Search chats' && g.sameRow && g.right && /Filters/.test(g.toggleName), JSON.stringify(g));
-            if (mobile) check(`${label}: the search keeps at least 10rem and nothing is wider than the screen`, g && g.searchW >= 160 && g.over <= 0, JSON.stringify(g));
+            check(`${label}: All chats has a search box named "Search chats" and the Filters icon in the same row, to its right`, g && g.qName === 'Search chats' && (mobile ? g.searchW === 0 : g.sameRow && g.right) && /Filters/.test(g.toggleName), JSON.stringify(g));
+            if (mobile) check(`${label}: the page's box is not drawn (the top pill is the search, #13591) and nothing is wider than the screen`, g && g.searchW === 0 && g.over <= 0, JSON.stringify(g));
             await panel();
             check(`${label}: All chats' panel has CLI, Agent, Tag, From and To`, (await labels()) === 'CLI|Agent|Tag|From|To', await labels());
 
