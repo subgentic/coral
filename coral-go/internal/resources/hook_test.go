@@ -163,6 +163,9 @@ func TestACallThatReturnsWhileItsWorkRunsKeepsTheSlotUntilTheWorkIsGone(t *testi
 func TestAnAutoClaimIsCappedAtTwiceTheLeaseWhateverIsRunning(t *testing.T) {
 	g := newHookRig(t)
 	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy)) // its PostToolUse never comes
+	g.mu.Lock()
+	g.procs["s-a"] = []string{"go test ./..."} // and matching work does run (without it a call that never ended holds the claim for the first lease only, #13743)
+	g.mu.Unlock()
 	for i := 0; i < 5; i++ {
 		g.add(10 * time.Minute) // 50 minutes: still under twice the 30 minute lease
 	}

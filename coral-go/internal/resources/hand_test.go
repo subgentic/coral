@@ -241,3 +241,62 @@ func TestAKeptPlaceIsTheSamePlaceWhenTheHeldCommandIsRunAgain(t *testing.T) {
 	assert.Equal(t, "Agent B", q[0].Agent)
 	assert.True(t, q[0].Away.IsZero(), "and it is present again: no grace runs on it")
 }
+
+// #13732 (QA Engineer's real Codex run, stub model): a Codex command that outlives its yield never reports its PostToolUse, so the hook counted the call as running for ever and renewed the lease to the cap. The end of the turn
+// (the Stop event) ends every call of the session: the slot goes back then if the work the call started is gone, and when that work is gone if it is not.
+func TestAnAutoClaimWhoseCallNeverReportedItsEndIsGivenBackWhenTheTurnEnds(t *testing.T) {
+	g := newHookRig(t)
+	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy))
+	assert.Equal(t, []string{"Agent A"}, g.holders())
+	g.add(10 * time.Minute) // the call never said it ended: still "running", the lease renewed
+	assert.Equal(t, []string{"Agent A"}, g.holders())
+	g.h.TurnEnded("s-a") // the turn is over, and the work is gone
+	assert.Empty(t, g.holders(), "a call cannot outlive its turn: no work runs, the slot goes back")
+}
+
+func TestAnAutoClaimWhoseWorkOutlivesTheTurnHoldsUntilTheWorkIsGone(t *testing.T) {
+	g := newHookRig(t)
+	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy))
+	g.mu.Lock()
+	g.procs["s-a"] = []string{"go test ./..."} // the suite keeps running after the turn
+	g.mu.Unlock()
+	g.h.TurnEnded("s-a")
+	assert.Equal(t, []string{"Agent A"}, g.holders(), "the work still runs: the slot stays")
+	g.add(time.Minute)
+	assert.Equal(t, []string{"Agent A"}, g.holders())
+	g.mu.Lock()
+	g.procs["s-a"] = nil
+	g.mu.Unlock()
+	g.add(time.Minute) // the sweep
+	assert.Empty(t, g.holders(), "the work is gone: back")
+}
+
+// #13743: a renewal can never carry a claim past its first lease without the work still running. A call that never reported its end counts as running only within the first lease; after it, matching work must be seen.
+func TestACallThatNeverEndedCannotRenewTheClaimPastItsFirstLeaseWithoutWork(t *testing.T) {
+	g := newHookRig(t)
+	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy)) // MaxLease 30 min in the rig
+	for i := 0; i < 4; i++ {                                                    // the sweep runs every few seconds in the server: minutes in steps keep the lease renewed
+		g.add(5 * time.Minute)
+	}
+	assert.Equal(t, []string{"Agent A"}, g.holders(), "within its first lease the open call holds it")
+	for i := 0; i < 3; i++ {
+		g.add(5 * time.Minute) // past the first lease, no matching work anywhere
+	}
+	assert.Empty(t, g.holders(), "past the first lease with no work seen it is not renewed any more")
+}
+
+func TestMatchingWorkStillKeepsAClaimPastItsFirstLeaseUntilTheCap(t *testing.T) {
+	g := newHookRig(t)
+	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy))
+	g.mu.Lock()
+	g.procs["s-a"] = []string{"go test ./..."}
+	g.mu.Unlock()
+	for i := 0; i < 9; i++ {
+		g.add(5 * time.Minute) // 45 minutes
+	}
+	assert.Equal(t, []string{"Agent A"}, g.holders(), "the suite runs: the claim is renewed past the first lease")
+	for i := 0; i < 8; i++ {
+		g.add(5 * time.Minute) // past twice the lease: the cap
+	}
+	assert.Empty(t, g.holders(), "the cap still ends it")
+}
