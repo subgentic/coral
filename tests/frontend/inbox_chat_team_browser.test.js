@@ -25,6 +25,8 @@ const { coralReady } = require('./helpers/wait');
             await Emulation.setDeviceMetricsOverride({ width, height: 800, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); await stub();
+            const remoteTeamName = await ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'), { teamOfChat } = await import((window.__coralStatic || '/static/') + 'team_names.js'), { noteBoardLabels } = await import((window.__coralStatic || '/static/') + 'server_base.js'); noteBoardLabels([{ board_project: 'b-remote-id', board_label: 'Remote crew', server: 'qa-team-remote' }]); const saved = state.liveSessions; try { state.liveSessions = [{ session_id: 'remote-label-chat', board_project: 'b-remote-id', server: 'qa-team-remote' }, { session_id: 'other-team-chat', board_project: 'b-other-id', server: 'local' }]; return teamOfChat({ session_id: 'remote-label-chat' })?.name; } finally { state.liveSessions = saved; } })()`);
+            assert.equal(remoteTeamName, 'Remote crew', at + 'teamOfChat resolves the labelled team on its source computer');
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('chats')).then(() => true)`);
             await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length === 3`, at + 'the three chats', 15000);
