@@ -47,9 +47,18 @@ const ATTACK = {
             return c.Fetch.fulfillRequest({ requestId: p.requestId, responseCode: body === 'not found' ? 404 : 200, responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }], body: Buffer.from(body).toString('base64') });
         });
         const reqs = []; const hops = new Map(); const log = [];
-        // One request id carries every hop of a redirect (the button's POST, then the 303's GET), and the three events of a hop do not arrive in a fixed order: Network.requestWillBeSentExtraInfo (the headers the browser REALLY sent:
-        // Origin, Sec-Fetch-*) may come after responseReceived, or after the next hop's requestWillBeSent. So the hops of an id are a list, in order, a hop outside this server is kept as a placeholder so the order holds, the
-        // extra info goes to the first hop that has not had its own, and a case that reads the headers waits for r.sent as well as the status (trial-250 gate: 'Origin undefined, answered 303').
+        // One request id carries every hop of a redirect (the button's POST, then the 303's GET), and the events of a hop do not arrive in a fixed order, nor do the hops' extra infos: Network.requestWillBeSentExtraInfo (the
+        // headers the browser REALLY sent: Origin, Sec-Fetch-*) of the GET hop can come BEFORE the POST's (trial-251 gate: the POST read the GET's headers, 'Origin undefined, answered 303'). So the hops of an id are a list in
+        // order (a hop outside this server is kept as a placeholder so the order holds), the extra infos of an id are kept apart and ordered by the time their request was sent (connectTiming.requestTime), and they are handed to
+        // the hops only when there is one for every hop and the last hop has its answer: a hop's headers are never read before they are its own. A case waits for r.sent as well as the status.
+        // CDP_EXTRA_REORDER_MS delays the FIRST extra info of every id by that many ms (the test of this collector: the old assignment fails with it set, this one passes).
+        const extras = new Map();
+        const settle = id => {
+            const list = hops.get(id) || [], ex = extras.get(id) || [];
+            if (!list.length || ex.length !== list.length || list[list.length - 1].status === undefined) return;
+            const ordered = [...ex].sort((x, y) => (x.time || 0) - (y.time || 0));
+            list.forEach((r, i) => { r.headers = ordered[i].headers; r.sent = true; });
+        };
         c.Network.requestWillBeSent(e => {
             const list = hops.get(e.requestId) || []; hops.set(e.requestId, list);
             if (e.redirectResponse && list.length) list[list.length - 1].status = e.redirectResponse.status; // the answer that redirected belongs to the hop before it
@@ -57,9 +66,14 @@ const ATTACK = {
             const r = { url: e.request.url.replace(BASE, '').replace(/login_token=[^&]+/, 'login_token=<redacted>'), method: e.request.method, headers: {}, outside: !mine };
             list.push(r);
             if (mine) reqs.push(r);
+            settle(e.requestId);
         });
-        c.Network.requestWillBeSentExtraInfo(e => { const r = (hops.get(e.requestId) || []).find(x => !x.sent); if (r) { r.headers = Object.fromEntries(Object.entries(e.headers).map(([k, v]) => [k.toLowerCase(), v])); r.sent = true; } });
-        c.Network.responseReceived(e => { const list = hops.get(e.requestId); const r = list && list[list.length - 1]; if (r) r.status = e.response.status; });
+        const delayFirst = Number(process.env.CDP_EXTRA_REORDER_MS || 0);
+        c.Network.requestWillBeSentExtraInfo(e => {
+            const keep = () => { const ex = extras.get(e.requestId) || []; extras.set(e.requestId, ex); ex.push({ headers: Object.fromEntries(Object.entries(e.headers).map(([k, v]) => [k.toLowerCase(), v])), time: e.connectTiming && e.connectTiming.requestTime }); settle(e.requestId); };
+            if (delayFirst && !(extras.get(e.requestId) || []).length && !(extras.get('late:' + e.requestId))) { extras.set('late:' + e.requestId, true); setTimeout(keep, delayFirst); } else keep();
+        });
+        c.Network.responseReceived(e => { const list = hops.get(e.requestId); const r = list && list[list.length - 1]; if (r) { r.status = e.response.status; settle(e.requestId); } });
         c.on('Log.entryAdded', e => log.push(e.entry.text));
         const ev = async x => { const r = await c.Runtime.evaluate({ expression: x, returnByValue: true, awaitPromise: true }); if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text || JSON.stringify(r.exceptionDetails)); return r.result.value; };
         const waitFor = async (expr, what, ms = 8000) => {
