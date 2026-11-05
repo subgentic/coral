@@ -100,9 +100,9 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"DELETE /api/artifacts/{hex64}": "owner-only", "PUT /api/artifacts/{hex64}/star": "owner-only", "DELETE /api/artifacts/{hex64}/star": "owner-only", // the star (#9819)
 		"GET /api/board/{project}/proposals":               "owner-only",
 		"GET /api/proposals":                               "owner-only",
-		"POST /api/board/{project}/proposals/{id}/approve": "owner-only",
-		"POST /api/board/{project}/proposals/{id}/reject":  "owner-only",
-		"GET /api/board/{project}/artifacts":               "owner-only", "GET /api/board/{project}/tasks/{id}/artifact-content": "owner-only",
+		"POST /api/board/{project}/proposals/{id}/approve": "owner-only", "POST /api/board/{project}/goals/{id}/driver": "owner-only", "POST /api/board/{project}/goals/{id}/move": "owner-only", // #13517
+		"POST /api/board/{project}/proposals/{id}/reject": "owner-only",
+		"GET /api/board/{project}/artifacts":              "owner-only", "GET /api/board/{project}/tasks/{id}/artifact-content": "owner-only",
 		"GET /api/session-artifacts": "owner-only", "GET /api/team-artifacts": "owner-only", "GET /api/settings/prompt-inspection": "owner-only", "PUT /api/board/{project}/settings": "owner-only",
 		"POST /api/board/{project}/cross-team/enable": "owner-only-hub", "POST /api/board/{project}/cross-team/disable": "owner-only-hub",
 		"POST /api/board/{project}/cross-team/files/enable": "owner-only-hub", "POST /api/board/{project}/cross-team/files/disable": "owner-only-hub",
@@ -151,7 +151,8 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"POST /api/board/{project}/messages":                                   "owner-sees", "POST /api/board/{project}/subscribe": "owner-sees", "POST /api/board/{project}/tasks": "owner-sees", "POST /api/board/{project}/goals": "owner-sees", // they can start a new board (#11627)
 		"POST /api/board/{project}/working-mode/presets": "owner-sees", "PUT /api/board/{project}/working-mode": "owner-sees",
 		"GET /api/sessions/live":            "owner-sees", // the live list: everyone gets it, the stamped owner also gets waits_on_this (#12377)
-		"GET /api/board/{project}/settings": "owner-sees", "GET /api/system/update": "owner-update", "POST /api/system/update/relaunch": "owner-update",
+		"GET /api/board/{project}/settings": "owner-sees", "GET /api/system/update": "owner-update",
+		"POST /api/system/update/relaunch": "owner-only", "POST /api/system/update/check-hub": "owner-only", // the Hub updates a computer only as its stamped owner, behind the person's switch (#13258)
 	}
 	got := map[string]string{}
 	for _, r := range tunnel.OwnerRoutes() {

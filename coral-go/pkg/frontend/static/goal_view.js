@@ -2,6 +2,7 @@
 import { loadStyles } from './lazy_styles.js';
 import { openTask } from './task_navigation.js';
 import { boardFetch, keyLabel, serverUrl, splitKey, remoteServer, LOCAL_SERVER } from './server_base.js';
+const { goalWrite, offersOperatorChanges, operatorChangesNeedNewer, operatorChangesNote } = await importOnce('./goal_write.js'); // a goal close or update is previewed first when the Hub asks for it (#13503)
 import { OPERATOR_ID, copyText, showToast } from './utils.js';
 import { whenText } from './when_text.js';
 import { toTaskPage, toGoal, errorOf } from './goals_adapter.js';
@@ -165,10 +166,10 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
                 } catch (e) { if (ny) ny.disabled = false; showToast(`Not saved: ${e && e.message ? e.message : 'try again'}`, true); }
             } });
         }
-        if (W.isOpenGoal(g) && sp.server === LOCAL_SERVER) { // the Operator's own two changes, made on this computer's server (#12693)
-            act.push({ key: 'driver', cls: 'btn goals-change-driver', label: 'Change driver', aria: `Change driver: ${g.title}`, run: () => importOnce('./goal_operator_dialogs.js').then(m => m.openChangeDriver({ project: sp.name, goal: g, onClose: () => backToAction('.goals-change-driver'),
+        if (W.isOpenGoal(g) && offersOperatorChanges(sp.server)) { // the Operator's own two changes (#12693): on this computer, and through a Hub (coral-hub's or our own) on a goal's computer that reports a Coral with the routes (#13517; hidden through a Hub before that, #13515)
+            act.push({ key: 'driver', cls: 'btn goals-change-driver', label: 'Change driver', aria: `Change driver: ${g.title}`, run: () => importOnce('./goal_operator_dialogs.js').then(m => m.openChangeDriver({ project: model.project, goal: g, onClose: () => backToAction('.goals-change-driver'),
                 onDone: async driver => { say(driver ? `Driver changed to ${driver}` : 'Driver cleared'); showToast(driver ? `Driver changed to ${driver}` : 'Driver cleared'); await loadGoals(); } })) });
-            act.push({ key: 'move', cls: 'btn goals-move', label: 'Move to another team', aria: `Move to another team: ${g.title}`, run: () => importOnce('./goal_operator_dialogs.js').then(m => m.openMoveGoal({ project: sp.name, goal: g, openTasks: W.openTasksOf(g.rollup), onClose: () => backToAction('.goals-move'),
+            act.push({ key: 'move', cls: 'btn goals-move', label: 'Move to another team', aria: `Move to another team: ${g.title}`, run: () => importOnce('./goal_operator_dialogs.js').then(m => m.openMoveGoal({ project: model.project, goal: g, openTasks: W.openTasksOf(g.rollup), onClose: () => backToAction('.goals-move'),
                 onMoved: async (out, label) => { showToast(`Goal given to ${label} as goal #${out.goal.id}`); closeGoal(); await loadGoals(); } })) });
         }
         if (W.isOpenGoal(g)) act.push({ key: 'close', cls: 'btn btn-primary goals-close', label: 'Close goal', aria: `Close goal: ${g.title}`, run: () => openClose(g) }); // named for its goal: the Close dialog's own button is just Close goal
@@ -184,6 +185,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
             acts.append(moreMenu(`goal-more-${g.id}`, menuItems.map(a => ({ label: a.label, title: a.title, ariaLabel: a.aria, className: a.cls.replace(/^btn( btn-primary)? ?/, ''), run: a.run })), { label: 'More goal actions' }));
         }
         row.append(acts); main.append(row);
+        if (W.isOpenGoal(g) && operatorChangesNeedNewer(sp.server)) { const note = el('p', 'goals-note goals-ops-note', operatorChangesNote()); note.setAttribute('role', 'note'); main.append(note); } // an older computer behind a Hub: the two buttons are hidden, and the page says why (#13517)
         const h = el('h2', 'goals-detail-title', g.title); h.tabIndex = -1; if (phone) { h.title = g.title; row.classList.add('goal-head-phone'); } h.id = 'goals-detail-title';
         row.append(h); // the title is in the header row: a phone puts the back beside it and the link and actions under (team_page.css), as on the task page
         foldWayBack(main, '.goals-back', '.goals-detail-title');
@@ -460,7 +462,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
 
     async function reopenGoal(g) {
         try {
-            const r = await boardFetch(model.project, `/goals/${g.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: OPERATOR_ID, state: 'active' }) });
+            const r = await goalWrite(model.project, 'goal_update', g.id, `/goals/${g.id}`, 'PATCH', { subscriber_id: OPERATOR_ID, state: 'active' });
             if (!r.ok) throw await failure(r);
             say(W.reopenedText);
             await loadGoals();
@@ -503,7 +505,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
             const as = form.querySelector('input[name="goal-close-state"]:checked')?.value === 'dropped' ? 'dropped' : 'done';
             const why = reason.value.trim() || W.closeReasonDefault(as); // the server needs one line; a person is not made to write it
             try {
-                const r = await boardFetch(model.project, `/goals/${g.id}/close`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: OPERATOR_ID, reason: why, state: as }) });
+                const r = await goalWrite(model.project, 'goal_close', g.id, `/goals/${g.id}/close`, 'POST', { subscriber_id: OPERATOR_ID, reason: why, state: as });
                 if (!r.ok) throw await failure(r);
                 dlg.close();
                 say(W.closedAsText(as, open));

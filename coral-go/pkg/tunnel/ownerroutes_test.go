@@ -165,6 +165,14 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/board/") && (strings.HasSuffix(p, "/goal-images") || strings.HasSuffix(p, "/goals")) { // and the goal create, which names them
 				continue
 			}
+			// The Operator's change of a goal's driver and its move to another team (#13517) are the owner's alone through the hub: the old list never had them.
+			if m == http.MethodPost && regexp.MustCompile(`^/api/board/[^/]+/goals/[^/]+/(driver|move)$`).MatchString(p) {
+				continue
+			}
+			// Asking this computer to check for an update (#13258) is the owner's alone through the hub: the old list never had it.
+			if m == http.MethodPost && p == UpdateCheckPath {
+				continue
+			}
 			// Chief's state (#11470) is the owner's alone through the hub: the old list never had it.
 			if m == http.MethodGet && p == "/api/chief" {
 				continue
@@ -208,11 +216,15 @@ func TestEveryOwnerRouteIsInTheTableWithATierAndAMode(t *testing.T) {
 		assert.Equal(t, r.Mode, mode, key)
 		assert.Equal(t, r.Tier, Classify(r.Method, p, ""), key)
 	}
-	// the update routes keep their label optional, everything that refuses a non-owner needs the label
-	_, m := OwnerRoute(http.MethodPost, UpdateRelaunchPath)
+	// the update status keeps its label optional (the handler decides what a non-owner sees); the relaunch, which installs and restarts a computer, refuses a non-owner before the handler and needs the label (#13258)
+	_, m := OwnerRoute(http.MethodGet, UpdateStatusPath)
 	assert.Equal(t, OwnerUpdate, m)
 	assert.False(t, m.LabelRequired())
 	assert.False(t, m.Refuses())
+	_, m = OwnerRoute(http.MethodPost, UpdateRelaunchPath)
+	assert.Equal(t, OwnerRefuse, m)
+	assert.True(t, m.LabelRequired())
+	assert.True(t, m.Refuses())
 	_, m = OwnerRoute(http.MethodGet, "/api/artifacts")
 	assert.True(t, m.LabelRequired())
 	assert.True(t, m.Refuses())

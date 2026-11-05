@@ -11,6 +11,7 @@ import { agentNameForm, agentStatus } from './agent_form.js';
 import { cliPathButton } from './prerequisites.js';
 import { serverFetch, boardFetch, identityKey, LOCAL_SERVER, isHub } from './server_base.js';
 const { launch } = await importOnce('./launch_state.js');
+const { goalWrite } = await importOnce('./goal_write.js');
 const { _acfServer, _effectiveServer, _settingsFor } = await importOnce('./launch_models.js');
 const { trackPermissionPick, _getPermissionFlagsForAgentMode, _normalizePermFlagsForAgent, _updatePermModeDescription, _hasPermFlag } = await importOnce('./permission_flags.js');
 const { _findPersona, _getSavedTeamTemplates, _upsertSavedTeamTemplates } = await importOnce('./persona_store.js');
@@ -862,11 +863,7 @@ async function addFirstTask(key, lead, goal, saveGoal = false) {
     let goalId = null;
     if (saveGoal) { // the first task is also the team's goal, and the task is listed under it (#10279)
         try {
-            const g = await boardFetch(key, '/goals', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title, ...(goal !== title ? { outcome: goal } : {}), subscriber_id: OPERATOR_ID }),
-            });
+            const g = await goalWrite(key, 'goal_create', 0, '/goals', 'POST', { title, ...(goal !== title ? { outcome: goal } : {}), subscriber_id: OPERATOR_ID }); // previewed first when the Hub asks for it (#13503)
             if (!g.ok) throw new Error(String(g.status));
             goalId = Number((await g.json()).id) || null;
             if (goalId) showToast("Your first task is saved as the team's goal: it is on the Goals tab."); // the Goals 1 that appears says where it came from (#10532)

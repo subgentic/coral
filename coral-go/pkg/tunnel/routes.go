@@ -332,6 +332,7 @@ var routeTable = cat(
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/saved")),
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/board/{project}/proposals", "/api/proposals")),                                               // what agents asked to add: the Operator's (#11389)
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/proposals/{id}/approve", "/api/board/{project}/proposals/{id}/reject")), // and the Operator's decision
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/goals/{id}/driver", "/api/board/{project}/goals/{id}/move")),            // the Operator's own two changes to a goal, who drives it and which team it is on (#12693, #13517): a person's, as the question buttons are
 	owner(OwnerRefuse, rules(http.MethodPatch, TierInteract, "/api/saved/{id}")),
 	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/saved/{id}")),
 	// What a viewer sees of a board's settings is the machine's to decide (the health setup is the owner's, #5307): the marker is stamped, the handler gives a non-owner less.
@@ -536,7 +537,8 @@ var routeTable = cat(
 	owner(OwnerRefuse, rules(http.MethodPut, TierInteract, "/api/artifacts/{hex64}/star")),
 	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/artifacts/{hex64}/star")),
 	owner(OwnerRefuse, rules(http.MethodGet, TierLaunch, PromptInspectionPath)),
-	owner(OwnerUpdate, rules(http.MethodPost, TierLaunch, UpdateRelaunchPath)),
+	owner(OwnerRefuse, rules(http.MethodPost, TierLaunch, UpdateRelaunchPath)), // installing and restarting a computer is the owner's alone, refused before the handler (a grantee at any tier gets 403 owner_only); the machine linked before the owner label was recorded must link again (#13258)
+	owner(OwnerRefuse, rules(http.MethodPost, TierLaunch, UpdateCheckPath)),    // ask this computer to check for and stage an update (never installs): no body, no query, the owner's alone and only with the person's switch on (#13258)
 	// Pinning a folder to the Agents list names a folder to launch into (#3630): Launch, like
 	// browsing for one. Reading the pins is View (above).
 	rules(http.MethodPost, TierLaunch, "/api/pinned-folders"),

@@ -115,7 +115,7 @@ async function sendRelaunch(go, later) {
     const win = installsLocally(current);
     go.disabled = true; later.disabled = true;
     // Windows: the version this dialog showed is sent with the click, so the server installs that one or none (409 stale_version); a relaunch sends the acknowledgement of what it showed
-    const res = win ? await requestInstall(current.staged.version) : await requestRelaunch(current.relaunch.ack);
+    const res = win ? await requestInstall(current.staged.version) : await requestRelaunch(current.relaunch.ack, { server: current.server || '' });
     if (res.ok) {
         const to = current.staged.version;
         dialog.querySelector('#update-confirm-title').textContent = `Installing Coral ${to}`;
@@ -184,8 +184,8 @@ function watchUpdate(to, onGiveUp) {
 function close() { if (dialog) dialog.style.display = 'none'; } // display-ok: modal_chrome (Escape, the Tab trap) and dialog_focus read a .modal's display, as for every dialog
 
 /** Show the confirmation for the status s (a relaunch is offered in it). */
-export function openUpdateDialog(s) {
-    ensure(); current = s;
+export function openUpdateDialog(s, { server = '' } = {}) {
+    ensure(); current = server ? { ...s, server } : s; // a computer behind the hub: the relaunch goes to it (#13258)
     attachDialogFocus(dialog); // records the opener (the control that has focus now) before the dialog is shown
     draw('');
     dialog.style.display = 'flex'; // display-ok: modal_chrome (Escape, the Tab trap) and dialog_focus read a .modal's display, as for every dialog

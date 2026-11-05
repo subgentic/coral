@@ -9,6 +9,7 @@ export const ACTION_LABEL = {
     approve: 'Approved', changes: 'Asked for changes', deny: 'Denied', ignore: 'Dismissed', supersede: 'Superseded older version', unignore: 'Put back', save: 'Saved for later', unsave: 'Moved back to Needs you',
     undone: 'Undone (the agent could not be told)', answer: 'Answered', dismiss: 'Dismissed', goal_close: 'Closed a goal', mark_read: 'Marked read',
     send_review: 'Sent for review', unsend_review: 'Taken out of review',
+    hub_update_check: 'Coral Hub checked for an update', hub_update_relaunch: 'Coral Hub relaunched into an update',
 };
 export const ACTIONS = Object.keys(ACTION_LABEL);
 export const SORTS = ['newest', 'oldest'];

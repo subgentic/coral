@@ -325,8 +325,8 @@ POST /api/board/{project}/goal-requests/{requestID}/accept never
 POST /api/board/{project}/goal-requests/{requestID}/decline never
 POST /api/board/{project}/goals interact
 POST /api/board/{project}/goals/{goalID}/close interact
-POST /api/board/{project}/goals/{goalID}/driver never
-POST /api/board/{project}/goals/{goalID}/move never
+POST /api/board/{project}/goals/{goalID}/driver interact
+POST /api/board/{project}/goals/{goalID}/move interact
 POST /api/board/{project}/groups/{groupID}/members never
 POST /api/board/{project}/health/ack never
 POST /api/board/{project}/hub-notice interact
@@ -451,6 +451,7 @@ POST /api/system/terminal-backend/end-leftover never
 POST /api/system/terminal-backend/notice-seen never
 POST /api/system/terminal-logs/delete-ended never
 POST /api/system/update/check never
+POST /api/system/update/check-hub launch
 POST /api/system/update/install never
 POST /api/system/update/relaunch launch
 POST /api/system/update/relaunch-local never

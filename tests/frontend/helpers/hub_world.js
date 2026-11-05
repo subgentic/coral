@@ -7,7 +7,7 @@ const HOST = new URL(BASE).host;
 const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self'", "style-src-attr 'unsafe-inline'", "font-src 'self'", "img-src 'self' data: blob:", `connect-src 'self' ws://${HOST}`, "object-src 'none'", "base-uri 'none'", "form-action 'self'", "frame-ancestors 'none'"].join('; ');
 
 /** Set the page up as the Hub's before the first navigation: the viewport, the cloud boot flag with the hub's CSP, and the stubbed API. */
-async function setupHubWorld({ client, Page, Emulation, width, height, mobile, inbox, needs, hubPages, hubFeed = false }) {
+async function setupHubWorld({ client, Page, Emulation, width, height, mobile, inbox, needs, hubPages, hubFeed = false, bootExtra = '' }) {
     const { Fetch, Network } = client;
     if (hubFeed) {
         // Fetch.fulfillRequest below replaces the document with a synthetic response:
@@ -33,7 +33,7 @@ async function setupHubWorld({ client, Page, Emulation, width, height, mobile, i
             }
             if (e.responseStatusCode !== 200) return Fetch.continueRequest({ requestId: e.requestId });
             const b = await Fetch.getResponseBody({ requestId: e.requestId });
-            const html = (b.base64Encoded ? Buffer.from(b.body, 'base64').toString('utf8') : b.body).replace('"mode":"local"', '"mode":"cloud"' + ((typeof inbox === 'function' ? inbox() : inbox) ? ',"inbox":"native"' : '') + ((typeof needs === 'function' ? needs() : needs) ? ',"needs":"native"' : '')); // needs: the Hub's boot value that moves Needs you off its frame (#13446); inbox: the boot value the Hub sets per release pin (#9100 Goal #100); a function is read at each load
+            const html = (b.base64Encoded ? Buffer.from(b.body, 'base64').toString('utf8') : b.body).replace('"mode":"local"', '"mode":"cloud"' + ((typeof inbox === 'function' ? inbox() : inbox) ? ',"inbox":"native"' : '') + ((typeof needs === 'function' ? needs() : needs) ? ',"needs":"native"' : '')+ (bootExtra ? ',' + bootExtra : '')); // needs: the Hub's boot value that moves Needs you off its frame (#13446); inbox: the boot value the Hub sets per release pin (#9100 Goal #100); a function is read at each load
             await Fetch.fulfillRequest({ requestId: e.requestId, responseCode: 200, responseHeaders: (e.responseHeaders || []).filter(h => !/^content-(security-policy|length)$/i.test(h.name)).concat([{ name: 'Content-Security-Policy', value: CSP }]), body: Buffer.from(html).toString('base64') });
         });
   await Page.addScriptToEvaluateOnNewDocument({source:`(() => {

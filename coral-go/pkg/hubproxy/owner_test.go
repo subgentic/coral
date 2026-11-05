@@ -245,3 +245,28 @@ func TestTheSignedInPersonsIgnoreOfAQuestionIsSignedAndAnythingElseIsNot(t *test
 	assert.Equal(t, `{"undo":true}`, s2.body)
 	s2.mu.Unlock()
 }
+
+// The owner's change of a goal's driver and its move to another team through our own hub (#13517): the signed-in person's call is signed for the remote to verify, bound to that goal and that route; the same call from an API key or an
+// agent goes out unsigned, and a stamp made for one goal's driver is no use for another goal or for its move.
+func TestTheSignedInPersonsGoalDriverAndMoveAreSignedAndNothingElseIs(t *testing.T) {
+	for _, c := range []struct{ path, body string }{
+		{"/api/board/team/goals/7/driver", `{"driver":"dev-1"}`},
+		{"/api/board/team/goals/7/move", `{"to_project":"other","driver":"dev-2"}`},
+	} {
+		hub, s := hubFor(t, ownerTestSecret)
+		post(t, hub, c.path, c.body, true, nil)
+		s.mu.Lock()
+		stamp := s.header.Get(hubowner.Header)
+		require.NotEmpty(t, stamp, "the person's %s was not signed", c.path)
+		require.NoError(t, verifier().Verify(stamp, s.method, c.path, s.target, []byte(s.body)))
+		assert.Error(t, verifier().Verify(stamp, s.method, "/api/board/team/goals/8"+strings.TrimPrefix(c.path, "/api/board/team/goals/7"), "/api/board/team/goals/8"+strings.TrimPrefix(c.path, "/api/board/team/goals/7"), []byte(s.body)), "one goal's stamp is not another goal's")
+		s.mu.Unlock()
+
+		hub2, s2 := hubFor(t, ownerTestSecret)
+		post(t, hub2, c.path, c.body, false, nil) // an API key or an agent at the hub, not the person
+		s2.mu.Lock()
+		assert.Empty(t, s2.header.Get(hubowner.Header), "a request that is not the signed-in person's is not signed: "+c.path)
+		assert.Equal(t, c.body, s2.body)
+		s2.mu.Unlock()
+	}
+}

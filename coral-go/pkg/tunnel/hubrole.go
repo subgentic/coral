@@ -23,15 +23,16 @@ const HubRoleOwner = "owner"
 const (
 	UpdateStatusPath   = "/api/system/update"
 	UpdateRelaunchPath = "/api/system/update/relaunch"
+	UpdateCheckPath    = "/api/system/update/check-hub"
 )
 
 // PromptInspectionPath is the read-only view of the global prompts.
 const PromptInspectionPath = "/api/settings/prompt-inspection"
 
-// IsUpdateRoute reports whether (method, decodedPath) is GET /api/system/update or POST /api/system/update/relaunch.
+// IsUpdateRoute reports whether (method, decodedPath) is GET /api/system/update, POST /api/system/update/relaunch or POST /api/system/update/check-hub.
 func IsUpdateRoute(method, decodedPath string) bool {
 	return (method == http.MethodGet && decodedPath == UpdateStatusPath) ||
-		(method == http.MethodPost && decodedPath == UpdateRelaunchPath)
+		(method == http.MethodPost && (decodedPath == UpdateRelaunchPath || decodedPath == UpdateCheckPath))
 }
 
 type hubRoleKey struct{}

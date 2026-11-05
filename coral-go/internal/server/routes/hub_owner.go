@@ -110,6 +110,8 @@ var ownerRefusals = map[string]string{
 	tunnel.OwnerRouteKey("DELETE", "/api/artifacts/{hex64}"):                                        "through Coral Hub only the account this computer is linked to can delete an artifact",
 	tunnel.OwnerRouteKey("GET", "/api/board/{project}/proposals"):                                   "through Coral Hub only the account this computer is linked to can decide what an agent asked to add",
 	tunnel.OwnerRouteKey("GET", "/api/proposals"):                                                   "through Coral Hub only the account this computer is linked to can decide what an agent asked to add",
+	tunnel.OwnerRouteKey("POST", "/api/board/{project}/goals/{id}/driver"):                          "through Coral Hub only the account this computer is linked to can change who drives a goal",
+	tunnel.OwnerRouteKey("POST", "/api/board/{project}/goals/{id}/move"):                            "through Coral Hub only the account this computer is linked to can move a goal to another team",
 	tunnel.OwnerRouteKey("POST", "/api/board/{project}/proposals/{id}/approve"):                     "through Coral Hub only the account this computer is linked to can decide what an agent asked to add",
 	tunnel.OwnerRouteKey("POST", "/api/board/{project}/proposals/{id}/reject"):                      "through Coral Hub only the account this computer is linked to can decide what an agent asked to add",
 	tunnel.OwnerRouteKey("POST", "/api/artifacts/{hex64}/comments"):                                 textCommentsOwnerOnly,
@@ -326,6 +328,11 @@ func ownerSeveralClearsIn(now time.Time) time.Duration {
 //
 // The machine's own record decides which rules apply, before any marker is read (#7061): a team's machine runs identifyTeamOwner and nothing else (the personal owner marker is not an owner there,
 // whatever else the request carries), a personal one runs what follows, and a record that cannot be read or understood is no owner.
+// stampedOwnerOf is identifyOwner for a caller that must see who the stamp says, before the label rules refuse it (the relink answer of the Hub update routes, #13258): the stamp checks stay in this file.
+func stampedOwnerOf(r *http.Request, ownerUser func(context.Context) (string, error), record func(context.Context) (string, string, error), noLabelLogged *sync.Once) callerIdentity {
+	return identifyOwner(r, ownerUser, record, noLabelLogged)
+}
+
 func identifyOwner(r *http.Request, ownerUser func(context.Context) (string, error), record func(context.Context) (string, string, error), noLabelLogged *sync.Once) callerIdentity {
 	var id callerIdentity
 	if !cloud.TunneledAuthentic(r) {

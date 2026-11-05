@@ -107,6 +107,24 @@ func TestLoadServerConfigAppliesTheFlagsOverTheConfig(t *testing.T) {
 	_ = home
 }
 
+// #13258: --allow-hub-update and CORAL_ALLOW_HUB_UPDATE=1 each ask for the Hub update switch at launch; neither asked is off; the flag does not need the environment and does not undo it.
+func TestAllowHubUpdateFromTheFlagAndTheEnvironment(t *testing.T) {
+	isolateConfig(t)
+	dataDir := t.TempDir()
+	cfg, _ := loadServerConfig(serverFlagsFor(t, "--home", dataDir))
+	assert.False(t, cfg.AllowHubUpdate, "not asked: off")
+	cfg, _ = loadServerConfig(serverFlagsFor(t, "--home", dataDir, "--allow-hub-update"))
+	assert.True(t, cfg.AllowHubUpdate, "--allow-hub-update")
+	t.Setenv("CORAL_ALLOW_HUB_UPDATE", "1")
+	cfg, _ = loadServerConfig(serverFlagsFor(t, "--home", dataDir))
+	assert.True(t, cfg.AllowHubUpdate, "CORAL_ALLOW_HUB_UPDATE=1")
+	cfg, _ = loadServerConfig(serverFlagsFor(t, "--home", dataDir, "--allow-hub-update=false"))
+	assert.True(t, cfg.AllowHubUpdate, "the flag adds to the environment, it does not turn it off")
+	t.Setenv("CORAL_ALLOW_HUB_UPDATE", "0")
+	cfg, _ = loadServerConfig(serverFlagsFor(t, "--home", dataDir))
+	assert.False(t, cfg.AllowHubUpdate, "CORAL_ALLOW_HUB_UPDATE=0 is not asking")
+}
+
 func TestParseServerFlagsSetsTheSharedDataDirPermission(t *testing.T) {
 	isolateConfig(t)
 	oldArgs := os.Args

@@ -313,12 +313,14 @@ func TestOwnerChecksFailClosed(t *testing.T) {
 	assert.Equal(t, 403, code)
 }
 
-func TestAMachineEnrolledWithoutALabelReliesOnTheMarkerAlone(t *testing.T) {
+// A computer linked before it recorded its owner has no label to check a stamped owner against: the marker alone is no longer enough (fb2bbcade, Security's INFO b), and the answer says what to do, not that the caller is not the owner.
+func TestAMachineEnrolledWithoutALabelMustBeLinkedAgainBeforeAHubUpdate(t *testing.T) {
 	e := newRelaunchEnv(t)
 	e.label = ""
-	tok := e.token(ownerA)
-	code, _ := e.post(ack(tok), hubHdr(ownerA))
-	assert.Equal(t, 202, code)
+	code, out := e.post(`{"ack":"x"}`, hubHdr(ownerA))
+	assert.Equal(t, 403, code)
+	assert.Equal(t, "relink_needed", out["code"], "link this computer to Coral Hub again, not 'you are not the owner'")
+	assert.Zero(t, e.up.applyCount(), "nothing was applied")
 }
 
 func TestTheCapTheSwitchAndTheOperatorOptOutAreReadOnEveryRequest(t *testing.T) {
@@ -430,13 +432,13 @@ func TestAStaleTokenGetsTheNewListAndANewToken(t *testing.T) {
 }
 
 func TestTheTokenIsBoundToTheIdentityAndExpires(t *testing.T) {
-	// Two owners of a machine enrolled without a label: a token issued to one does not verify for the other.
+	// A machine enrolled without an owner label (linked before it was recorded) refuses even the owner's relaunch (#13258: the relaunch row is the owner's alone and needs the label): it must link again.
 	e := newRelaunchEnv(t)
 	e.label = ""
 	tok := e.token(ownerA)
 	code, out := e.post(ack(tok), hubHdr(ownerB))
-	assert.Equal(t, 409, code)
-	assert.Equal(t, "stale_ack", out["code"])
+	assert.Equal(t, 403, code)
+	assert.Equal(t, "relink_needed", out["code"], "a distinct answer: link this computer again, not 'you are not the owner'")
 	assert.Zero(t, e.up.applyCount())
 
 	// A token with its payload or MAC changed does not verify.

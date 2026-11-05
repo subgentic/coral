@@ -176,6 +176,7 @@ func prepareWithDatabase(ctx context.Context, db *store.DB, cfg *config.Config, 
 	if err := applyCloudMaxMode(ctx, db, cfg); err != nil {
 		return err
 	}
+	_ = applyAllowHubUpdate(ctx, db, cfg) // warns and goes on when it cannot save: this switch never stops a start
 	setupSessionTokens(db, cfg.CoralDir())
 	setupAgentTools(cfg.CoralDir())
 	removeOrphanProxyCA(cfg.CoralDir())

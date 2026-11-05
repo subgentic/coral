@@ -475,6 +475,12 @@ export function decisionNeedsPerson(server) {
     return !(live && live.owner_stamp === true);
 }
 
+/** The Hub asks for its goal preview before a goal create, close or update (#13503): one boot value `goal_preview: true`, set by the Hub's server for the accounts its goals gate allows, never from a request. The preview flow
+ *  (goal_write.js) is used ONLY when this is true; on the self-hosted Hub and on a computer's own dashboard it is false and the goal writes go out as they always did. */
+export function goalPreviewOn() {
+    return isCloud() && bootConfig().goal_preview === true;
+}
+
 /** The Hub-served dashboard draws its own Inbox (Chats folders and Boards) in place of the Hub's framed one, and the top row's Chats and Board tabs go (Goal #100). One switch, set by the Hub's
  *  boot value `inbox: 'native'`; off until the Hub's own pages have moved off /inbox. Read by: the Inbox tab (inbox_tab.js), the folder list and sources (inbox_sidebar.js, inbox_servers.js, mailbox_chats.js)
  *  and the tab filter (nav_tabs.js, through the body class that cloud.js sets). */
