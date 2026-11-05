@@ -35,6 +35,7 @@ export function getCachedAgentAvailability(session) {
     }
     // No row has this session id: its own team's row by name, else (no team known for it) any board's.
     if (snapshot) return byName(snapshot.agents) || null;
+    if (session.board_project) return null; // its team is known and not cached: another team's Lead is not its state (#13695, F9)
     for (const cached of availabilityCache.values()) {
         const found = byName(cached.agents);
         if (found) return found;

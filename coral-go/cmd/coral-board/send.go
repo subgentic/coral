@@ -228,6 +228,7 @@ func runRelaySend(id sendIdentity, address, replyTo, messageID, message string, 
 		Duplicate       bool     `json:"duplicate"`
 		Attached        []string `json:"attached"`
 		Unattached      []string `json:"unattached_links"`
+		LocalOnly       []string `json:"local_only_links"`
 		AutoAttached    []string `json:"auto_attached"`
 	}
 	_ = json.Unmarshal(data, &result)
@@ -262,6 +263,13 @@ func runRelaySend(id sendIdentity, address, replyTo, messageID, message string, 
 	if len(result.AutoAttached) > 0 {
 		fmt.Fprintf(out, "%d of them %s attached automatically because the message's text links %s.\n",
 			len(result.AutoAttached), plural(len(result.AutoAttached), "was", "were"), plural(len(result.AutoAttached), "it", "them"))
+	}
+	if len(result.LocalOnly) > 0 {
+		fmt.Fprintf(out, "Warning: the message names %d goal or diff %s. A coral://goals or coral://diffs link names this computer's goals and commits: on the other Coral it opens a different goal, or nothing. Say which team and goal in words as well.\n",
+			len(result.LocalOnly), plural(len(result.LocalOnly), "link", "links"))
+		for _, l := range result.LocalOnly {
+			fmt.Fprintf(out, "  this computer only: %s\n", l)
+		}
 	}
 	if len(result.Unattached) > 0 {
 		fmt.Fprintf(out, "Warning: the message names %d %s that %s not attached. A coral://artifacts link is a file on this computer only: the other Coral cannot open it. They were not attached automatically (the Operator's cross-team files switch is off, the file is not one this team uploaded, or it is over the limits of 4 files, 8 MiB each and 16 MiB in all). Send again with --attach coral://artifacts/<id> for each you can.\n",

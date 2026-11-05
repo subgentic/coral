@@ -402,6 +402,12 @@ func (h *BoardHandler) relayDelivered(w http.ResponseWriter, ctx context.Context
 		out["warnings"] = []string{"unattached_artifact_links"}
 		out["unattached_links"] = links
 	}
+	// A goal or a diff link names a team and a number or a commit of THIS computer; it is not attached (there is nothing to attach) and means a different goal, or nothing, on the other Coral (#13695, C5).
+	if links := localOnlyLinks(b.Content); len(links) > 0 {
+		w, _ := out["warnings"].([]string)
+		out["warnings"] = append(w, "local_only_links")
+		out["local_only_links"] = links
+	}
 	if prepared != nil && len(prepared.atts) > 0 {
 		// The shared rows only now: the hub has the files and the message.
 		h.recordSharedAttachments(prepared.atts, project, server, team, b.SubscriberID, mirror.ID, time.Now().UTC().Format(time.RFC3339))
@@ -492,6 +498,27 @@ func (h *BoardHandler) ListRelayTargets(w http.ResponseWriter, r *http.Request) 
 // artifactLinkRe is a coral://artifacts link as an agent writes it: the lower-case SHA-256, not part of a longer hex run.
 // The /api/artifacts/<hex> form (what an upload's "url" and a copied dashboard link look like) names the same file on this computer and means just as little elsewhere (#5500).
 var artifactLinkRe = regexp.MustCompile(`(?:coral://artifacts/|/api/artifacts/)([0-9a-f]{64})(?:[^0-9a-fA-F]|$)`)
+
+// localOnlyLinkRe is a coral://goals/<team>/<n> or coral://diffs/<team>/<session>/<hash> link as an agent writes it.
+var localOnlyLinkRe = regexp.MustCompile(`coral://(?:goals|diffs)/[^\s)>\]"'<]+`)
+
+// localOnlyLinks are the goal and diff links in text, in order, once each, without the sentence punctuation after them: they name this computer's goals and commits, so on another Coral they open a
+// different goal or nothing. The message is still sent; the reply names them.
+func localOnlyLinks(text string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, m := range localOnlyLinkRe.FindAllString(text, -1) {
+		m = strings.TrimRight(m, ".,;:!?")
+		if seen[m] {
+			continue
+		}
+		seen[m] = true
+		if len(out) < maxUnattachedLinksNamed {
+			out = append(out, m)
+		}
+	}
+	return out
+}
 
 // maxUnattachedLinksNamed bounds the reply: a message with a hundred links names the first few.
 const maxUnattachedLinksNamed = 10

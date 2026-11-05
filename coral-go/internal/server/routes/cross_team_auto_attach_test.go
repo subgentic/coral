@@ -190,3 +190,18 @@ func TestRelaySendAutoAttachSkipsASecretFileAndBoundsTheLinksConsidered(t *testi
 	events2, _, _ := e2.wire.snapshot()
 	assert.Equal(t, []string{"message"}, events2, "the real file at the end was not sent: it is past the links looked at")
 }
+
+// C5 (#13695): a goal or a diff link in a relayed message is this computer's: the reply warns, as it does for an unattached artifact link, and the message is still sent.
+func TestRelaySendWarnsForGoalAndDiffLinks(t *testing.T) {
+	e := newRelayAttachEnv(t, true)
+	code, out, _ := e.relayText(alphaOrchSID, "m1", "see coral://goals/alpha/7, and (coral://diffs/alpha/sess1/abc123def). Also coral://goals/alpha/7 again.")
+	require.Equal(t, http.StatusOK, code, out)
+	assert.Equal(t, []any{"coral://goals/alpha/7", "coral://diffs/alpha/sess1/abc123def"}, out["local_only_links"], "each once, without the sentence punctuation")
+	assert.Equal(t, []any{"local_only_links"}, out["warnings"])
+	_, _, msgs := e.wire.snapshot()
+	assert.Equal(t, 1, msgs, "the message is sent")
+	code, out, _ = e.relayText(alphaOrchSID, "m1", "no links here")
+	require.Equal(t, http.StatusOK, code, out)
+	assert.NotContains(t, out, "local_only_links")
+	assert.NotContains(t, out, "warnings")
+}

@@ -27,7 +27,6 @@ func TestParseGoalRefTakesTheFormsAPersonPastes(t *testing.T) {
 		"the dashboard link":        {[]string{"http://127.0.0.1:8420/team/coral-go-team/goals/65"}, 65, "coral-go-team"},
 		"the link with a query":     {[]string{"https://app.coralhub.dev/team/alpha/goals/7?tab=tasks#x"}, 7, "alpha"},
 		"the link with a slash":     {[]string{"http://localhost:8420/team/alpha/goals/7/"}, 7, "alpha"},
-		"a link to a server name":   {[]string{"http://localhost:8420/@laptop/team/alpha/goals/7"}, 7, "alpha"},
 	} {
 		id, board, err := parseGoalRef(tc.args)
 		require.NoError(t, err, name)
@@ -46,6 +45,7 @@ func TestParseGoalRefTakesTheFormsAPersonPastes(t *testing.T) {
 		"too large":          {"99999999999999999999"},
 		"two numbers":        {"65", "66"},
 		"a link with a word": {"http://localhost:8420/team/alpha/goals/abc"},
+		"a link to a computer (C1: it was read as this computer's goal 7)": {"http://localhost:8420/@laptop/team/alpha/goals/7"},
 	} {
 		_, _, err := parseGoalRef(args)
 		assert.Error(t, err, name)

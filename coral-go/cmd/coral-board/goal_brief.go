@@ -22,7 +22,7 @@ import (
 const goalBriefUsage = "Usage: coral-board goal brief <goal> [--json]   (a number, #65, goal #65, or the goal page's link)"
 
 // goalRefLinkRe is the goal page's address: .../team/<team>/goals/<id>, optionally after a server (@name) segment, with a query, a fragment or a trailing slash.
-var goalRefLinkRe = regexp.MustCompile(`^/(?:@[^/]+/)?team/([^/]+)/goals/([0-9]+)/?$`)
+var goalRefLinkRe = regexp.MustCompile(`^/(@[^/]+/)?team/([^/]+)/goals/([0-9]+)/?$`)
 
 // parseGoalRef reads what a person pastes to name a goal: "65", "#65", "goal #65" (one argument or two) or the goal page's link. The board is the link's team ("" for the other forms, which mean the
 // subscribed board). An id is a whole number from 1 up.
@@ -40,11 +40,15 @@ func parseGoalRef(args []string) (id int64, board string, err error) {
 		if m == nil {
 			return 0, "", fmt.Errorf("not a goal page link: %q", ref)
 		}
-		id, perr = strconv.ParseInt(m[2], 10, 64)
+		if m[1] != "" {
+			// A link that names a computer (#13695, C1): this CLI reads the goals of the Coral it talks to and sends no computer, so it would read goal N of a team with that name HERE, which is empty or another goal. Say so and let the person give the number.
+			return 0, "", fmt.Errorf("this link names the computer %s, and coral-board reads only this computer's goals: give the goal's number (for example 'goal brief %s') from the computer that holds it", strings.TrimSuffix(m[1], "/"), m[3])
+		}
+		id, perr = strconv.ParseInt(m[3], 10, 64)
 		if perr != nil || id <= 0 {
 			return 0, "", fmt.Errorf("not a goal number in the link: %q", ref)
 		}
-		team, uerr := url.PathUnescape(m[1])
+		team, uerr := url.PathUnescape(m[2])
 		if uerr != nil || team == "" {
 			return 0, "", fmt.Errorf("not a team in the link: %q", ref)
 		}
