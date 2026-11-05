@@ -13,8 +13,9 @@
 .ac-head { display: flex; align-items: center; gap: var(--space-sm); flex-wrap: wrap; position: sticky; top: calc(-1 * var(--space-md)); z-index: 1; margin: calc(-1 * var(--space-md)) calc(-1 * var(--space-md)) 0; padding: var(--space-md); background: var(--bg-secondary); }
 .ac-title { margin: 0; font-size: var(--fs-lg, 1rem); flex: 1 1 auto; }
 .ac-count { margin-left: 8px; color: var(--text-muted); font-weight: var(--fw-regular); }
-.ac-panel .ac-showresolved { border: 0; background: transparent; color: var(--text-secondary); border-radius: var(--radius-md); padding: 2px 8px; font-size: var(--fs-sm, 0.8125rem); cursor: pointer; }
-.ac-panel .ac-showresolved:hover { color: var(--text-primary); background: var(--bg-tertiary); }
+.ac-panel .ac-showresolved, .ac-panel .ac-showearlier { border: 0; background: transparent; color: var(--text-secondary); border-radius: var(--radius-md); padding: 2px 8px; font-size: var(--fs-sm, 0.8125rem); cursor: pointer; }
+.ac-panel .ac-showearlier { white-space: normal; text-align: left; } /* its words are long: they wrap, they are not cut at 390 px */
+.ac-panel .ac-showresolved:hover, .ac-panel .ac-showearlier:hover { color: var(--text-primary); background: var(--bg-tertiary); }
 .ac-sheet-close { display: none; }
 .ac-toggle { display: none; }
 /* The viewer's Comments (N) button is on at every width; its panel is a column only while it is open (a phone's sheet has its own rules below). */
@@ -58,7 +59,7 @@
 .ac-act, .ac-jump { background: none; border: 0; color: var(--text-secondary); padding: 2px 6px; cursor: pointer; }
 .ac-act:hover, .ac-jump:hover { color: var(--text-primary); text-decoration: underline; }
 /* a .btn is 36 px tall (--control-height): these are small links and chips inside a card; the phone and touch rules below give them 44 */
-.ac-panel .ac-act, .ac-panel .ac-jump, .ac-panel .ac-resolve, .ac-panel .ac-showresolved { min-height: 22px; }
+.ac-panel .ac-act, .ac-panel .ac-jump, .ac-panel .ac-resolve, .ac-panel .ac-showresolved, .ac-panel .ac-showearlier { min-height: 22px; }
 /* Resolve, at the top right of the card */
 .ac-panel .ac-resolve { flex: none; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0 8px; background: none; color: var(--text-primary); font-size: var(--fs-sm, 0.8125rem); font-weight: var(--fw-medium); }
 .ac-panel .ac-resolve:hover { background: var(--bg-tertiary); text-decoration: none; }
@@ -91,16 +92,16 @@
     .ac-sheet-close { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; order: 2; }
     .ac-head { flex-wrap: wrap; }
     .ac-title { order: 1; }
-    .ac-showresolved { order: 3; flex: 1 0 100%; text-align: left; }
+    .ac-showresolved, .ac-showearlier { order: 3; flex: 1 0 100%; text-align: left; }
     /* the composer stays in reach at the sheet's bottom while the list scrolls above it */
     .ac-panel > .ac-composer { position: sticky; bottom: calc(-1 * var(--space-md)); background: var(--bg-secondary); padding: 6px 0 calc(var(--space-md)); margin-bottom: calc(-1 * var(--space-md)); z-index: 1; }
     /* with the keyboard up there is little height: the sheet may use all of the viewer, and the header folds to one row (the filters and the close button; the title is the sheet's own name and
        the filters already say what is shown), so the sticky header and the sticky composer never overlap */
     body.keyboard-open .ac-panel { max-height: 100%; }
     body.keyboard-open .ac-title { display: none; }
-    body.keyboard-open .ac-showresolved { order: 1; flex: 1 1 0; }
+    body.keyboard-open .ac-showresolved, body.keyboard-open .ac-showearlier { order: 1; flex: 1 1 0; }
     body.keyboard-open .ac-sheet-close { order: 2; }
-    .ac-panel .ac-showresolved, .ac-panel .ac-replybox, .ac-panel .ac-resolve, .ac-panel .ac-act, .ac-panel .ac-jump, .ac-whole, .ac-lock, .ac-cancel, .ac-send, .ac-add-image, .ac-thumb-remove, .ac-thumb-markup, .ac-ask-label, .ac-ask-go { min-height: 44px; }
+    .ac-panel .ac-showresolved, .ac-panel .ac-showearlier, .ac-panel .ac-replybox, .ac-panel .ac-resolve, .ac-panel .ac-act, .ac-panel .ac-jump, .ac-whole, .ac-lock, .ac-cancel, .ac-send, .ac-add-image, .ac-thumb-remove, .ac-thumb-markup, .ac-ask-label, .ac-ask-go { min-height: 44px; }
     .ac-panel .ac-resolve { padding: 0 14px; }
     .ac-act, .ac-jump { padding: 2px 12px; }
 }
@@ -123,7 +124,7 @@
     .preview-main > .ac-panel .ac-sheet-close { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; order: 2; }
     .preview-main > .ac-panel .ac-head { flex-wrap: wrap; }
     .preview-main > .ac-panel .ac-title { order: 1; }
-    .preview-main > .ac-panel .ac-showresolved { order: 3; flex: 1 0 100%; text-align: left; min-height: 44px; }
+    .preview-main > .ac-panel .ac-showresolved, .preview-main > .ac-panel .ac-showearlier { order: 3; flex: 1 0 100%; text-align: left; min-height: 44px; }
     .preview-main > .ac-panel > .ac-composer { position: sticky; bottom: calc(-1 * var(--space-md)); background: var(--bg-secondary); padding: 6px 0 calc(var(--space-md)); margin-bottom: calc(-1 * var(--space-md)); z-index: 1; }
 }
 /* The toolbar toggle remains available beside the document and above its sheet. */

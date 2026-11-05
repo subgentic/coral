@@ -18,11 +18,13 @@ import { pushOverlay, popOverlay } from './overlay_history.js';
 import { state } from './state.js';
 import { boardKeyName, sessionTeamKey, contextServer } from './server_base.js';
 import { browserLocal } from './safe_storage.js';
+import { storeKey } from './local_store.js';
 import { boardOfPage } from './dock_page.js';
 import { el } from './dom_el.js';
 import { pollEvery } from './overload.js';
 await loadStyles('pictures.css'); // the picture rules load with this module, before anything draws (page_weight: not at start)
 
+const EARLIER_KEY = 'coral-artifact-comments-earlier'; // 'show' or 'hide' the comments made on older versions while the latest is open (#13606): hidden by default, kept per account
 const OPEN_KEY = 'coral-artifact-comments-open'; // default for the docked preview; the viewer supplies a key for each file type
 
 /** The team the artifact is opened from, as the bare board name the comments routes take: the team's page (where a board opens, #8129), or the open agent's own team; none otherwise (#5182). The viewer and the docked preview pane (#5311) both ask. */
@@ -96,12 +98,17 @@ export function attachComments(dialog, body, host, opts = {}) {
     new MutationObserver(() => { clearTimeout(relocateTimer); relocateTimer = setTimeout(() => { if (st.data && st.text) paint(true); }, 150); }).observe(body, { childList: true, subtree: true, characterData: true });
 
     // ── the data
-    const threads = () => {
+    const allThreads = () => {
         const all = (st.data?.comments || []);
         const replies = new Map();
         for (const c of all) if (c.parentId != null && !c.deleted) { if (!replies.has(c.parentId)) replies.set(c.parentId, []); replies.get(c.parentId).push(c); }
         return all.filter(c => c.parentId == null && (!c.deleted || replies.has(c.id))).map(c => ({ c, replies: replies.get(c.id) || [] })).sort((a,b) => st.video ? (a.c.atS ?? Infinity) - (b.c.atS ?? Infinity) : 0);
     };
+    // A comment made on an OLDER version of the series (read with series=1, every one of them carries fromVersion) is hidden while the latest is open, unless the person chose to show them (#13606, the Operator):
+    // the list, the marks on the text and the marks on a video's timeline all come from threads(). A toggle in the head says how many are hidden and how many of those are unresolved.
+    const isEarlier = c => c.fromVersion != null;
+    const earlierShown = () => browserLocal.get(storeKey(EARLIER_KEY)) === 'show';
+    const threads = () => allThreads().filter(t => earlierShown() || !isEarlier(t.c));
     // A comment of an EARLIER version of the series (read with series=1) is `found` in this one (pinned on its text like any), `ambiguous` (the text is here more than once: never pinned to a guess) or gone
     // (`gone`, `unchecked`): the last two are listed apart and are about the older version's text, so nothing on this one's text marks them (#6472).
     const stampRange = c => `${st.videoTime?.(c.atS) || ''}${c.endS != null ? '–' + st.videoTime?.(c.endS) : ''}`;
@@ -184,6 +191,16 @@ export function attachComments(dialog, body, host, opts = {}) {
         opts.onCanWrite?.(!!(st.data && st.data.canComment && !st.data.locked)); // the viewer shows Mark up only to someone who can comment (#12394)
         opts.onCount?.(openCount()); // a goal's Comments tab says how many are open (#11955)
         head.append(h);
+        // Comments of earlier versions: hidden unless chosen, with how many (and how many of those still need an answer) so they stay findable (#13606).
+        const earlierAll = allThreads().filter(t => isEarlier(t.c) && !t.c.deleted);
+        if (earlierAll.length) {
+            const open = earlierAll.filter(t => !t.c.resolved).length, on = earlierShown();
+            const words = `${earlierAll.length} from earlier versions${open ? ` (${open} unresolved)` : ''}`;
+            const eb = btn('ac-showearlier', on ? 'Hide earlier versions' : `Show ${words}`); eb.setAttribute('aria-pressed', String(on));
+            eb.title = on ? `Hide the ${words}` : `${words} are hidden while the latest version is open`;
+            eb.addEventListener('click', () => { browserLocal.set(storeKey(EARLIER_KEY), on ? 'hide' : 'show'); render(); paint(); });
+            head.append(eb);
+        }
         // Resolved threads are out of the way, as in Docs: one toggle brings them back (and only while there are any).
         const nResolved = list.filter(t => t.c.resolved && !t.c.deleted).length;
         if (nResolved || st.showResolved) {

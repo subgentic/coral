@@ -22,6 +22,7 @@ const { coralReady } = require('./helpers/wait');
             const at = `${w}px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+            await ev(`try { localStorage.removeItem('coral-artifact-comments-earlier'); } catch (e) {} true`); // the default: earlier versions' comments hidden (#13606)
             await coralReady(ev);
             await ev(STUB);
             await openV();
@@ -63,6 +64,17 @@ const { coralReady } = require('./helpers/wait');
 
             console.log(`${at}: the comments of a later version: carried, ambiguous, gone`);
             if (mobile) await ev(`document.querySelector('#artifact-viewer .ac-toggle').click(); true`);
+            // #13606: the comments made on older versions are hidden while the latest is open, with how many and how many still need an answer; a toggle brings them back, and the choice is kept
+            await waitFor(`!!document.querySelector('#artifact-viewer .ac-showearlier')`, `${at}: the earlier-versions toggle`, 6000);
+            const toggleText = await ev(`document.querySelector('#artifact-viewer .ac-showearlier').textContent`);
+            assert.equal(toggleText, 'Show 3 from earlier versions (3 unresolved)', `${at}: the toggle says how many are hidden and how many still need an answer`);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#artifact-viewer .ac-card')].map(c => c.dataset.id)`), ['10'], `${at}: only this version's own comment is listed while the earlier ones are hidden`);
+            assert.equal(await ev(`document.querySelector('#artifact-viewer .ac-showearlier').getAttribute('aria-pressed')`), 'false');
+            if (process.env.CORAL_SCREENSHOT_DIR) { require('node:fs').mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); require('node:fs').writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/doc-earlier-hidden-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
+            await ev(`document.querySelector('#artifact-viewer .ac-showearlier').click(); true`);
+            if (process.env.CORAL_SCREENSHOT_DIR) require('node:fs').writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/doc-earlier-shown-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
+            assert.equal(await ev(`localStorage.getItem('coral-artifact-comments-earlier')`), 'show', `${at}: the choice is kept`);
+            assert.equal(await ev(`document.querySelector('#artifact-viewer .ac-showearlier').textContent`), 'Hide earlier versions');
             await waitFor(`document.querySelectorAll('#artifact-viewer .ac-card').length >= 3`, `${at}: the comments`, 6000);
             assert.equal(await ev(`document.querySelector('#artifact-viewer .ac-card[data-id="2"] .ac-kind').textContent`), 'agent', `${at}: an agent says agent, not owner`);
             assert.match(await ev(`document.querySelector('#artifact-viewer .ac-card[data-id="1"] .ac-from').textContent`), /^from v2$/, `${at}: a carried comment says where it is from, in plain text`);
