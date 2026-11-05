@@ -212,3 +212,19 @@ func TestTheRenewIntervalIsAThirdOfTheLeaseWithinLimits(t *testing.T) {
 		}
 	}
 }
+
+// QA Reviewer 2's SHOULD: a run that lost its slot never reports success, even when the command itself exited 0.
+func TestALostSlotIsNeverReportedAsSuccess(t *testing.T) {
+	if got := heavyFinalCode(0, true); got == 0 {
+		t.Fatal("a command that succeeded but ran without its slot is not a success")
+	}
+	if got := heavyFinalCode(0, false); got != 0 {
+		t.Fatalf("an ordinary success stays 0, got %d", got)
+	}
+	if got := heavyFinalCode(7, true); got != 7 {
+		t.Fatalf("a real exit code is kept: %d", got)
+	}
+	if got := heavyFinalCode(3, false); got != 3 {
+		t.Fatalf("%d", got)
+	}
+}
