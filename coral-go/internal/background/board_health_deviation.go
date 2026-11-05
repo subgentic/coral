@@ -111,6 +111,9 @@ func (m *BoardHealthMonitor) deviationItems(ctx context.Context, project string,
 			continue
 		}
 		target := resolveWait(w, subs, taskByID2(taskByID))
+		if m.inQueueWait(w, target) {
+			continue // in a resource line behind the party it waits on: the line moving is the answer (#13707)
+		}
 		on := target.label
 		if target.sub != nil {
 			if rcpt != nil && board.SameIdentity(target.sub.SubscriberID, rcpt.SubscriberID) {

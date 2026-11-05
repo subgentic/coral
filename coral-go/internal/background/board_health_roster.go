@@ -122,6 +122,9 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 				if w.WaitType == board.WaitOperator {
 					continue // listed with the operator's questions
 				}
+				if m.inQueueWait(w, target) {
+					continue // in a resource line: counted as waiting, listed nowhere (#13707)
+				}
 				on, you := target.label, false
 				var senders []string
 				if target.sub != nil {
@@ -256,6 +259,9 @@ func (m *BoardHealthMonitor) escalateWaits(ctx context.Context, project string) 
 		target := resolveWait(w, subs, tasks)
 		if target.sub == nil || board.SameIdentity(target.sub.SubscriberID, w.SubscriberID) {
 			continue // the Operator, a commit or a label: nobody to tell
+		}
+		if m.inQueueWait(w, target) {
+			continue // in a resource line behind it: nobody to tell (#13707)
 		}
 		subject := fmt.Sprint(w.ID)
 		if c, err := m.store.GetHealthCounter(ctx, project, ruleWaitEscalation, target.sub.SubscriberID, subject); err != nil || c.Escalated {

@@ -34,6 +34,7 @@ func (s *Server) registerResources(r chi.Router, sess *routes.SessionsHandler) {
 	}
 	s.resourceMgr = mgr
 	rq.SetManager(mgr)
+	s.resourceQueue = mgr.Queue()
 	hook := resources.NewHook(mgr, resources.HookOptions{
 		Procs: func() ([]proctree.Proc, bool) {
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)

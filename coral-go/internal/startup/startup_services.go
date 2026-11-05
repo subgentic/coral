@@ -295,6 +295,7 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 		healthMonitor := background.NewBoardHealthMonitor(srv.BoardStore(), 5*time.Minute)
 		healthMonitor.SetAgents(taskStore, agentRT, discoverFn)
 		healthMonitor.SetLandingWatch(landingWatch)
+		healthMonitor.SetResourceQueue(srv.ResourceQueue()) // a wait in the mac-heavy line is a queue wait, not a wait on the agent ahead (#13707)
 		if bh := srv.BoardHandler(); bh != nil {
 			healthMonitor.SetPausedFn(bh.IsPaused) // the check says when the board is paused, so no nudges can go missing unseen (#11182)
 		}
