@@ -248,8 +248,8 @@ func resourceClaim(rest []string) {
 			last = res.Place
 		}
 		if !until.IsZero() && time.Now().After(until) {
-			_, _, _ = resourceCall("POST", "/"+name+"/release", map[string]any{"subscriber_id": me}) // leave the line: nobody is waiting for a turn that will not be used
-			fmt.Fprintln(os.Stderr, "Gave up waiting for "+rest[0]+" (left the line).")
+			_, _, _ = resourceCall("POST", "/"+name+"/release", map[string]any{"subscriber_id": me, "keep_place": true}) // the place is kept for a few minutes (#13706); a slot that comes to it waits two minutes for the agent, then passes on
+			fmt.Fprintln(os.Stderr, "Gave up waiting for "+rest[0]+". Your place in line is kept for 10 minutes: run the same claim again to go on waiting from it.")
 			exitFn(4)
 			return
 		}

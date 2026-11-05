@@ -176,6 +176,7 @@ func (h *ResourcesHandler) Get(w http.ResponseWriter, r *http.Request) {
 type agentBody struct {
 	SubscriberID string `json:"subscriber_id"`
 	Note         string `json:"note"`
+	KeepPlace    bool   `json:"keep_place,omitempty"` // release: a wait that ended without a turn (the CLI's --timeout): the place in line is kept for a grace, not dropped (#13706)
 	ParentPID    int    `json:"parent_pid,omitempty"` // a claim by an agent: the shell that ran coral-board (a job in the background keeps the slot while it runs, #13718)
 }
 
@@ -231,12 +232,16 @@ func (h *ResourcesHandler) Claim(w http.ResponseWriter, r *http.Request) {
 
 // Release answers POST /api/resources/{name}/release.
 func (h *ResourcesHandler) Release(w http.ResponseWriter, r *http.Request) {
-	_, who, ok := h.agent(w, r)
+	body, who, ok := h.agent(w, r)
 	if !ok {
 		return
 	}
 	h.reap()
-	if err := h.M.Queue().Release(chi.URLParam(r, "name"), who); err != nil {
+	release := h.M.Queue().Release
+	if body.KeepPlace {
+		release = func(key, agent string) error { return h.M.Queue().Leave(key, agent, resourcequeue.DefaultAwayGrace) }
+	}
+	if err := release(chi.URLParam(r, "name"), who); err != nil {
 		h.fail(w, err)
 		return
 	}

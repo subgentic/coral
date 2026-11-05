@@ -175,7 +175,11 @@ func (h *Hook) endHands(session, call, why string) {
 
 func (h *Hook) giveBack(keys []holdKey, why string) {
 	for _, k := range keys {
-		if err := h.m.Queue().Release(k.resource, k.agent); err == nil { // already released by hand: nothing to do
+		grace := resourcequeue.DefaultAwayGrace // a place still in line is kept for a grace when the wait ended without a turn (#13706); a slot held is given back; an agent that is GONE keeps nothing
+		if why == "gone" {
+			grace = 0
+		}
+		if err := h.m.Queue().Leave(k.resource, k.agent, grace); err == nil { // already released by hand: nothing to do
 			h.event(HookEvent{Kind: "released", Resource: k.resource, Agent: k.agent, Why: why})
 		}
 	}
@@ -330,6 +334,9 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 		return refusal(res.Key, r.Place)
 	}
 	// in the line already (this agent's earlier refused call, or an explicit claim): still waiting
+	if mine != nil && !mine.Away.IsZero() { // the agent is back with the command (#13706): its kept place is its own again, no grace runs on it
+		_, _ = h.m.Queue().Claim(res.Key, resourcequeue.Claimant{Agent: agent})
+	}
 	if ah := h.hold[key]; ah != nil {
 		ah.session = session
 		if ah.refused == nil {
