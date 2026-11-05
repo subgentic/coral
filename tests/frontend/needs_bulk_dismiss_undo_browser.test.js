@@ -34,7 +34,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
         await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 3`, 'three review rows', 15000);
 
-        await ev(`[...document.querySelectorAll('${T} .dt-table tbody .dt-check input')].slice(0, 2).forEach(i => i.click()); true`);
+        await ev(`[...document.querySelectorAll('${T} tbody button[role="checkbox"][aria-label^="Select "]')].slice(0, 2).forEach(b => b.click()); true`);
         await waitFor(`!!document.querySelector('.dt-bar') && /2 selected/.test(document.querySelector('.dt-bar').textContent)`, '2 selected in the bar', 8000);
         await ev(`[...document.querySelectorAll('.dt-bar button')].find(b => (b.getAttribute('aria-label') || b.textContent).trim().startsWith('Dismiss')).click(); true`);
         await waitFor(`document.querySelectorAll('${T} tbody tr').length === 1`, 'the two dismissed files leave Needs you', 10000);
