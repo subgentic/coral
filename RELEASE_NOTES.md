@@ -1,5 +1,117 @@
 # Release Notes
 
+## v2.0.52 — Recent runs load a page at a time, Activity links to what it made, and Upload is a plus button
+
+### Changes
+
+#### What you will notice first
+
+- **Recent runs loads 50 at a time.** The computer answers one page of 50 with search and the Result filter applied before the cut, a "Load more" button and the true total, so a long list opens quickly.
+- **Activity shows what was done, with links.** Task actions, permission-prompt answers, typed answers and Inbox actions are recorded and described in plain sentences, and a row links to what it made (a goal, a task, a saved file) when the target is safe to open.
+- **Comments panel: one small lock icon** beside the heading replaces the full-width Lock button and its note.
+- **The Board tab has no head line.** Its Table or Chat view, Pause or Resume and Export actions are in the dock menu.
+- **Comments made on older versions of a file are hidden** while the latest version is open, in the list and as marks on the text.
+- **New versions of a file are found while its review viewer stays open.**
+- **The ask dialog's quick replies sit below the question,** with a larger reply box.
+- **Upload is a plus button,** and its explanation (who can read the files, who is told) is also its accessible description.
+- **`coral machine launch` works with a real DigitalOcean account.** The machine's firewall is applied by a launch tag, which is removed again when the firewall is deleted and while no droplet still carries it.
+
+#### Fixed
+
+- **A phone opened straight on an agent now uses the chosen font.** Settings that arrive after the terminal was built are applied to it.
+- **Undo of a Dismiss or of Move to Needs you is no longer overwritten** by a read that was already in flight.
+
+#### Through Coral Hub
+
+- **Recent runs through Coral Hub** read one page from the computer's new view-tier route, `GET /api/automations/runs`.
+
+#### Known issues
+
+- **macOS: the tmux change (#12836) can make macOS ask once more, only after tmux restarts (a full restart of your agents or a reboot).** Coral's tmux server and guardian are now their own responsible process, so macOS may ask, per folder, whether `tmux` (or `coral`) may reach Documents, Desktop or Downloads. Full Disk Access you gave Coral.app does not carry over: if you gave Coral Full Disk Access, add `tmux` and `coral` too (both in `Coral.app/Contents/MacOS`). The staged tmux copy (each Coral version keeps its own under `tmux-bin/`) asks again after a tmux change. Say yes once; if you say no, nothing is lost, the agent just cannot read that folder.
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For Coral Hub
+
+- **`release-diff` output** (`go run ./internal/releasediff/cmd/release-diff v2.0.51 b404d20d2`):
+
+  ### Tunnel routes, v2.0.51 to b404d20d2
+
+  Added, reachable through the tunnel (1)
+
+  - `GET /api/automations/runs`: view
+
+  ### Board settings keys (BoardSettings, HealthSettings included), v2.0.51 to b404d20d2
+
+  No key was added, removed or changed.
+
+  ### What Coral Hub compiles in or embeds, v2.0.51 to b404d20d2
+
+  `pkg/tunnel`: 2 files of Go code changed (+2, -1)
+
+  - `coral-go/pkg/tunnel/routes.go`: +1, -1
+  - `coral-go/pkg/tunnel/routes_query.go`: +1, -0
+  - test files, not compiled by the Hub: 1 file (+56, -0)
+  - other files (data, docs), not compiled by the Hub: 1 file (+1, -0)
+
+  `pkg/frontend`: 37 files the Hub embeds changed (+345, -189)
+
+  - `coral-go/pkg/frontend/static/app.js`: +0, -1
+  - `coral-go/pkg/frontend/static/artifact_comments.js`: +32, -12
+  - `coral-go/pkg/frontend/static/artifact_review.js`: +4, -4
+  - `coral-go/pkg/frontend/static/artifact_tags.js`: +1, -1
+  - `coral-go/pkg/frontend/static/artifact_versions.js`: +19, -2
+  - `coral-go/pkg/frontend/static/automation_runs.js`: +65, -8
+  - `coral-go/pkg/frontend/static/automations.js`: +18, -14
+  - `coral-go/pkg/frontend/static/board_chat.js`: +39, -38
+  - `coral-go/pkg/frontend/static/board_controls.js`: +1, -2
+  - `coral-go/pkg/frontend/static/board_pause_button.js`: +0, -12
+  - `coral-go/pkg/frontend/static/board_search.js`: +3, -1
+  - `coral-go/pkg/frontend/static/css/artifact-comments.css`: +10, -7
+  - `coral-go/pkg/frontend/static/css/board_table.css`: +0, -1
+  - `coral-go/pkg/frontend/static/css/components.css`: +1, -7
+  - `coral-go/pkg/frontend/static/css/data_table.css`: +1, -0
+  - `coral-go/pkg/frontend/static/css/needs_actions.css`: +8, -1
+  - `coral-go/pkg/frontend/static/css/operator_ask_dialog.css`: +4, -1
+  - `coral-go/pkg/frontend/static/css/operator_share.css`: +4, -2
+  - `coral-go/pkg/frontend/static/css/session.css`: +2, -15
+  - `coral-go/pkg/frontend/static/css/touch.css`: +2, -10
+  - `coral-go/pkg/frontend/static/goal_comments.js`: +2, -3
+  - `coral-go/pkg/frontend/static/inbox_activity.js`: +11, -9
+  - `coral-go/pkg/frontend/static/inbox_reviews.js`: +5, -2
+  - `coral-go/pkg/frontend/static/inbox_sidebar.js`: +6, -6
+  - `coral-go/pkg/frontend/static/list_bar.js`: +12, -6
+  - `coral-go/pkg/frontend/static/operator_activity_filters.js`: +8, -0
+  - `coral-go/pkg/frontend/static/operator_activity_words.js`: +15, -0
+  - `coral-go/pkg/frontend/static/operator_ask_dialog.js`: +4, -3
+  - `coral-go/pkg/frontend/static/operator_share.js`: +14, -7
+  - `coral-go/pkg/frontend/static/render.js`: +0, -6
+  - `coral-go/pkg/frontend/static/settings_core.js`: +2, -1
+  - `coral-go/pkg/frontend/static/sidebar_groups.js`: +1, -1
+  - `coral-go/pkg/frontend/static/skill_versions.js`: +17, -0
+  - `coral-go/pkg/frontend/static/skills_tab.js`: +22, -6
+  - `coral-go/pkg/frontend/static/team_artifacts_page.js`: +2, -0
+  - `coral-go/pkg/frontend/static/vendor/fonts/material-icons.woff2`: +0, -0
+  - `coral-go/pkg/frontend/static/xterm_renderer.js`: +10, -0
+
+  Unchanged: `pkg/hubproxy`, `pkg/hubowner`, `pkg/redact`, `agent_docs`.
+
+  ### Coral packages compiled into the Hub through its imports, v2.0.51 to b404d20d2
+
+  Unchanged: `internal/fsreplace`, `internal/httputil`, `internal/logsafe`, `internal/safego`, `internal/secfile`, `internal/secrets`, `pkg/redact/betterleaks`.
+
+- **Added through the tunnel:** `GET /api/automations/runs` at the view tier (query words cursor, limit, q, result, unread); the two older reads stay for the Inbox badge.
+- **Ready signals, hooks, tokens, framed paths**: unchanged.
+
+#### For developers and releases
+
+- The macOS release's "Verify signed, notarized release" step tries `stapler validate` three times, 30 seconds apart, before it fails, for Apple's CloudKit "network connection was lost" after an accepted notarization.
+- Test-only fixes after the first gates: the Actions column width, the Recent runs and Activity suites, the ask dialog, the secrets census fixture, the Upload class, and `big_board_budget` and `activity_folder_real`.
+- The README has the demo section and its film.
+
 ## v2.0.51 — Files from agents with no team reach Needs you, every agent is told what Coral gives it, and a computer can be updated from Coral Hub
 
 ### Changes
