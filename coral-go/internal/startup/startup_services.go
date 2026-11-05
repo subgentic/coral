@@ -320,6 +320,7 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 	// Remote board poller
 	remotePoller := background.NewRemoteBoardPoller(rbStore, agentRT, 30*time.Second)
 	remotePoller.SetDiscoverFn(discoverFn)
+	remotePoller.SetKeyFor(background.RemoteKeyFor(store.NewRemoteServerStore(sessStore.DB(), cfg.CoralDir()))) // the poll carries the registered server's key (#13695, G7)
 	safeGo(ctx, "remote_board_poller", func() { remotePoller.Run(ctx) })
 }
 

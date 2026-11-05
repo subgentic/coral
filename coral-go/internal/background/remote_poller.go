@@ -30,6 +30,8 @@ type RemoteBoardPoller struct {
 	// validateAddr is the same check made again at dial time, on the address the connection is really made to, and returns the IP to dial: a DNS answer that changes between the check above and the
 	// connect cannot reach a refused address (#7109). A test replaces it.
 	validateAddr func(addr string) (string, error)
+	// keyFor gives the API key of the registered server at exactly this URL (G7, #13695): a key-protected remote answers 401 to a poll with no Authorization. Nil sends none.
+	keyFor func(ctx context.Context, remoteURL string) (string, bool)
 }
 
 // NewRemoteBoardPoller creates a new RemoteBoardPoller.
@@ -67,6 +69,11 @@ func NewRemoteBoardPoller(rbStore *store.RemoteBoardStore, runtime AgentRuntime,
 		},
 	}
 	return p
+}
+
+// SetKeyFor sets the lookup of the key the poll is sent with (RemoteKeyFor).
+func (p *RemoteBoardPoller) SetKeyFor(fn func(ctx context.Context, remoteURL string) (string, bool)) {
+	p.keyFor = fn
 }
 
 // SetDiscoverFn sets a custom agent discovery function.
@@ -128,6 +135,11 @@ func (p *RemoteBoardPoller) RunOnce(ctx context.Context) error {
 		if err != nil {
 			p.logger.Warn("failed to create remote poll request", "server", sub.RemoteServer, "error", err)
 			continue
+		}
+		if p.keyFor != nil { // redirects are never followed (CheckRedirect), so the key goes to this URL and nowhere else
+			if key, ok := p.keyFor(ctx, sub.RemoteServer); ok {
+				req.Header.Set("Authorization", "Bearer "+key)
+			}
 		}
 		resp, err := p.client.Do(req)
 		if err != nil {
