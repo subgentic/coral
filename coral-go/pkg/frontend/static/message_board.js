@@ -99,7 +99,7 @@ export function showBoardInPage(project, host, messageId = null) {
         const box = document.getElementById('mb-messages');
         if (box) box.textContent = 'This team was deleted.';
     });
-    loadPausedState(project);
+    loadPausedState(project, false); // Initial state sync should not announce a change.
     loadSleepState(project);
     syncBoardDeleteButton(project);
     applyBoardTable(project);
