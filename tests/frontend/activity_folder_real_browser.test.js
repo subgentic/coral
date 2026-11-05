@@ -50,10 +50,13 @@ const HEX = 'c'.repeat(64);
         console.log('1. The folder lists what was done, to what, where, from where; the check is said above it');
         await openFolder(false);
         const mine = `[...document.querySelectorAll('#group-table-view tbody tr')].filter(r => r.textContent.includes(${JSON.stringify(B)}))`;
-        await waitFor(`${mine}.length === 2`, 'this run\'s two rows', 10000);
+        await waitFor(`${mine}.length === 4`, 'this run\'s four rows (each goal is created and then closed: a row for each, #13609)', 10000);
         const t = await ev(`document.getElementById('group-table-view').textContent.replace(/\\s+/g, ' ')`);
-        assert.match(t, /Closed a goal/); assert.ok(t.includes(SECOND) && t.includes(FIRST), 'both of this run\'s goals are listed'); assert.match(t, /this computer/); assert.match(t, /not needed any more/);
-        assert.match(await ev(`document.querySelector('.activity-check').textContent`), new RegExp(`^${N0 + 2} actions in the record, none changed outside Coral\\. Edits made outside Coral are shown unless the whole record was rewritten\\.$`));
+        assert.match(t, /Closed a goal/); assert.match(t, /Created a goal/); assert.ok(t.includes(SECOND) && t.includes(FIRST), 'both of this run\'s goals are listed');
+        // the action identity of this run's rows: two creates and two closes, and each goal has one of each
+        const words = await ev(`${mine}.map(r => (r.textContent.includes('Closed a goal') ? 'close' : r.textContent.includes('Created a goal') ? 'create' : '?') + ':' + (r.textContent.includes(${JSON.stringify(FIRST)}) ? 'first' : r.textContent.includes(${JSON.stringify(SECOND)}) ? 'second' : '?'))`);
+        assert.deepEqual([...words].sort(), ['close:first', 'close:second', 'create:first', 'create:second'], `each goal has a created row and a closed row: ${JSON.stringify(words)}`); assert.match(t, /this computer/); assert.match(t, /not needed any more/);
+        assert.match(await ev(`document.querySelector('.activity-check').textContent`), new RegExp(`^${N0 + 4} actions in the record, none changed outside Coral\\. Edits made outside Coral are shown unless the whole record was rewritten\\.$`));
         assert.equal(await ev(`document.querySelector('.activity-check').getAttribute('role')`), 'status');
         assert.match(await ev(`document.querySelector('#group-table-view tbody tr').textContent`), new RegExp(SECOND), 'newest first');
         console.log('   ✓');
@@ -75,9 +78,10 @@ const HEX = 'c'.repeat(64);
 
         console.log('2. The sidebar search narrows the rows');
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.filterInbox(${JSON.stringify(FIRST)})).then(() => true)`);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, 'one row', 8000);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, 'the two rows of that goal (created, closed)', 8000);
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => r.textContent.includes('Closed a goal') ? 'close' : r.textContent.includes('Created a goal') ? 'create' : '?').sort()`), ['close', 'create'], 'the search keeps both of the goal\'s rows');
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.filterInbox('')).then(() => true)`);
-        await waitFor(`${mine}.length === 2`, 'this run\'s two rows again', 8000);
+        await waitFor(`${mine}.length === 4`, 'this run\'s four rows again', 8000);
         console.log('   ✓');
 
         console.log('3. A goal row opens the goal');
