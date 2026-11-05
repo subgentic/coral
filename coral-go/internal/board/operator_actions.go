@@ -58,6 +58,45 @@ const (
 	// ActHubUpdateCheck and ActHubUpdateRelaunch: Coral Hub's owner had this computer check for an update, or relaunch into one it staged (#13340, #13258). The row names the Hub user.
 	ActHubUpdateCheck    = "hub_update_check"
 	ActHubUpdateRelaunch = "hub_update_relaunch"
+	// The rest of what the Operator does in the Inbox and the task pages (#13609): every click that changes something is a row. A task action's item is the task (kind "task"), and an agent
+	// action's item is the agent's session name (kind "agent").
+	ActTaskCreate   = "task_create"
+	ActTaskComplete = "task_complete"
+	ActTaskCancel   = "task_cancel"
+	ActTaskPublish  = "task_publish"
+	ActTaskEdit     = "task_edit"     // the words, the owner, the priority or the goal of a task
+	ActTaskRemind   = "task_remind"   // a nudge, a reminder, or stopping one
+	ActTaskPark     = "task_park"     // park, put back, or release a task
+	ActTaskReply    = "task_reply"    // the Operator's words on a task
+	ActPromptAnswer = "prompt_answer" // an answer that is neither: a question's option or a typed answer; the note is the option's label
+	ActPromptAllow  = "prompt_allow"  // a permission prompt answered Yes (once or always); the note is the option's label, which says which
+	ActPromptReject = "prompt_reject" // a permission prompt answered No; the note is the option's label
+	ActWaitDismiss  = "wait_dismiss"
+	ActWaitSend     = "wait_send"
+	ActMessage      = "message" // a message the Operator posted to a team's board
+	// Slice 2 (#13609): the rest of the Inbox, Files, Saved and Chats clicks.
+	ActMarkUnread     = "mark_unread" // with ActMarkRead: the explicit Mark read and Mark unread buttons (opening a file marks it read by itself: not a click)
+	ActFileTags       = "file_tags"   // the tag editor of a file
+	ActFileStar       = "file_star"
+	ActFileUnstar     = "file_unstar"
+	ActFileKeep       = "file_keep"
+	ActFileRelease    = "file_release"
+	ActFileDelete     = "file_delete"
+	ActFileShare      = "file_share" // a file shared with an agent
+	ActSavedAdd       = "saved_add"
+	ActSavedUpdate    = "saved_update" // Done or Reopen on a saved message
+	ActSavedRemove    = "saved_remove"
+	ActChatFlag       = "chat_flag" // star or archive of a chat
+	ActChatSend       = "chat_send" // the chat composer's Send to an agent
+	ActRunSeen        = "run_seen"  // a failed run opened or dismissed
+	ActAgentsRecord   = "agents_record"
+	ActGoalCreate     = "goal_create"
+	ActGoalEdit       = "goal_edit" // a goal's words, or Reopen
+	ActGoalDriver     = "goal_driver"
+	ActGoalMove       = "goal_move"
+	ActGoalRequestAdd = "goal_request_accept"
+	ActGoalRequestNo  = "goal_request_decline"
+	ActInboxHide      = "inbox_hide" // Dismiss or Not yet on a goal-looks-done row, a welcome item's Dismiss: kept in settings
 )
 
 // ActivityMeta is what a handler knows about the action, set on the context so the store's own transaction can write the row: the actor and source come from the verified request, never the body.

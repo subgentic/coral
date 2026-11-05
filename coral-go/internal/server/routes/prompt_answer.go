@@ -748,6 +748,14 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 	h.refreshAfterConfirmedAnswer(r.Context(), body.AgentType, body.SessionID)
 	h.retrySkippedBoardNudge(r.Context(), body.SessionID, naming.SessionName(body.AgentType, body.SessionID), "request_resolved")
 	at := h.answers.note(body.SessionID, opt.Label)
+	row := board.ActPromptAnswer // the Activity row says what the Operator chose, by the option's own kind, with its label as the note (#13609): never a guess from the session name
+	switch {
+	case opt.Kind == "allow_once" || opt.Kind == "allow_always":
+		row = board.ActPromptAllow
+	case optionIsReject(opt):
+		row = board.ActPromptReject
+	}
+	noteActivity(r, row, "agent", name, "", "", opt.Label)
 	h.kickWS()                     // every screen showing the card takes the answer now
 	h.forgetDialog(body.SessionID) // the prompt was answered: it is not a dialog the agent is stuck at (#11437); the next pass reads the screen again
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "answered": opt.Label, "at": at})

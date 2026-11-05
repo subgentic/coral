@@ -214,6 +214,7 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	answeredAsk := false
 	if body.ReplyTo > 0 {
 		if err := h.bs.RecordReply(r.Context(), project, msg.ID, body.ReplyTo); err != nil {
 			slog.Warn("board reply not recorded", "board", project, "message", msg.ID, "error", err)
@@ -221,8 +222,13 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 		if strings.EqualFold(msg.SubscriberID, board.OperatorName) && humanInputCaller(r) { // the Inbox's numbers (#7512): the Operator answered a question put to them
 			if asked, err := h.bs.GetMessageByID(r.Context(), project, body.ReplyTo); err == nil && asked != nil && asked.Ask != nil {
 				inboxActioned(r, tracking.InboxAsk, "", "answer", inboxTime(asked.CreatedAt))
+				h.recordWords(r, board.ActAnswer, "question", strconv.FormatInt(body.ReplyTo, 10), project, asked.SubscriberID, msg.Content) // the title is who asked // the Operator's typed answer is a row, as a button's click is (#13609)
+				answeredAsk = true
 			}
 		}
+	}
+	if !answeredAsk && strings.EqualFold(msg.SubscriberID, board.OperatorName) && !body.DryRun {
+		h.recordWords(r, board.ActMessage, "message", strconv.FormatInt(msg.ID, 10), project, "", msg.Content) // any other message the Operator sent to the team (the board's composer, a task's "Changes" note) (#13609)
 	}
 	if len(asked) > 0 || body.ReplyTo > 0 {
 		if filled, err := h.bs.GetMessageByID(r.Context(), project, msg.ID); err == nil {
