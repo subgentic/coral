@@ -18,7 +18,7 @@ const { coralReady } = require('./helpers/wait');
             scrim: shown(scrim), focus: document.activeElement === tr ? 'trigger' : nav.contains(document.activeElement) ? 'nav' : document.activeElement.tagName, title: (document.querySelector('#group-table-title') || {}).textContent, win: innerWidth }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const [w, h, mobile] of [[1280, 820, false], [700, 844, true], [740, 915, true]]) { // the tab strip is the phone layout from 640 to 767 px; under 640 the Inbox has none (#13596: inbox_phone_no_tabs)
+        for (const [w, h, mobile] of [[1280, 820, false], [390, 844, true], [412, 915, true]]) {
             const at = `${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
@@ -32,18 +32,11 @@ const { coralReady } = require('./helpers/wait');
                 console.log('PASS ' + at + 'the desktop keeps its column');
                 continue;
             }
-            // The phone's folders are the ONE tab strip (#11236, #11239 slice A): 44 px text tabs under the bar, the open folder underlined with its count inside, no select, no drawer button, no scrim.
+            // The phone has no folder tab strip, select, drawer button or scrim of its own (#13596): its folders are in the ☰ drawer (inbox_phone_no_tabs_browser), the page's title names the open one.
             assert.ok(!s.select && !s.trigger && !s.scrim, at + 'no select, no drawer button and no scrim on a phone ' + JSON.stringify(s));
-            const tabs = await ev(`(() => { const nav = document.querySelector('${T} .view-list-nav'), cs = getComputedStyle(nav); const t = [...nav.querySelectorAll('.view-list-item')].filter(b => b.getClientRects().length); const cur = t.find(b => b.getAttribute('aria-current') === 'true');
-                return { row: cs.flexDirection === 'row', h: t.map(b => Math.round(b.getBoundingClientRect().height)), cur: cur && cur.dataset.key, curText: cur && cur.innerText.replace(/\\s+/g, ' ').trim(), underline: cur && getComputedStyle(cur).borderBottomWidth, dbg: cur && (cur.outerHTML.slice(0, 260) + '|' + getComputedStyle(cur).display + '|' + getComputedStyle(cur).flexDirection + '|' + Math.round(cur.getBoundingClientRect().width)), label: cur && cur.getAttribute('aria-label') }; })()`);
-            assert.ok(tabs.row && tabs.h.length >= 4 && tabs.h.every(h => h >= 44) && tabs.cur === 'tasks' && /^Tasks\s*3$/.test(tabs.curText) && tabs.underline === '3px' && tabs.label === 'Tasks, 3', at + 'the folders are a strip of 44 px tabs; the open one is underlined and says its count ' + JSON.stringify(tabs));
-            await ev(`document.querySelector('${T} .view-list-item[data-key="tasks"]').focus(); document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); true`);
-            const moved = await ev(`document.activeElement.dataset.key`);
-            assert.notEqual(moved, 'tasks', at + 'Right arrow moves the keyboard to the next tab: ' + moved);
-            await ev(`document.querySelector('${T} .view-list-item[data-key="needs"]').click(); true`);
-            await waitFor(`document.querySelector('${T} .view-list-item[data-key="needs"]')?.getAttribute('aria-current') === 'true'`, at + 'a tab opens its list', 8000);
+            assert.equal(await ev(`[...document.querySelectorAll('${T} .view-list-nav, ${T} [role=tablist]')].filter(e => e.getClientRects().length).length`), 0, at + 'no tab strip');
             assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), true, at + 'no sideways scroll');
-            console.log('PASS ' + at + 'the tab strip');
+            console.log('PASS ' + at + 'no tab strip, nothing sideways');
         }
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
