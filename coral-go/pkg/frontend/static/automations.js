@@ -74,7 +74,7 @@ const sections = () => [{ title: 'Needs attention', items: FOLDERS.filter(f => f
 function renderNav(force = false) {
     const list = $('automations-nav-list');
     if (!list) return;
-    const key = JSON.stringify([folder, sections(), filtersOf('jobs'), filtersOf('workflows'), filtersOf('running'), filtersOf('failed'), openJobId(), W.openWorkflowId(), liveRuns().map(r => r.id), filtersOf('recent'), AR.recentRuns().map(r => [r.key, r.run.status, AR.isUnread(r)]), AR.pagedSignature(), AQ.queueDenied(), AQ.queueItems().map(r => [r.key, r.state, r.place, r.lease_until, r.agent]),
+    const key = JSON.stringify([folder, sections(), filtersOf('jobs'), filtersOf('workflows'), filtersOf('running'), filtersOf('failed'), openJobId(), W.openWorkflowId(), liveRuns().map(r => r.id), filtersOf('recent'), AR.recentRuns().map(r => [r.key, r.run.status, AR.isUnread(r)]), AR.pagedSignature(), AQ.queueDenied(), AQ.queueTick(), AQ.queueItems().map(r => [r.key, r.state, r.place, r.lease_until, r.agent]),
         rowsOf('jobs').map(i => [i.id, i.name, i.enabled, i.at, i.run && i.run.status, i.run && i.run.id, runsWords(i)]), rowsOf('workflows').map(i => [i.id, i.name, i.enabled, i.stepCount, i.usedBy, i.run && i.run.status, i.run && i.run.id])]);
     if (!force && key === navKey) return;
     navKey = key;
