@@ -9,7 +9,7 @@ const FOLDERS = [['needs', 'Search needs you'], ['tasks', 'Search tasks'], ['goa
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
-    const state = () => ev(`(() => { const vis = e => !!e && e.getClientRects().length > 0, t = document.getElementById('top-search'), q = document.querySelector('#inbox-view .list-bar-search'), tog = document.querySelector('#inbox-view .list-bar-toggle');
+    const state = () => ev(`(() => { const vis = e => !!e && e.getClientRects().length > 0, t = document.getElementById('top-search'), q = document.querySelector('#group-table-view .list-bar-search'), tog = document.querySelector('#group-table-view .list-bar-toggle');
         const r = e => { const b = e.getBoundingClientRect(); return { l: Math.round(b.left), r: Math.round(b.right), t: Math.round(b.top), b: Math.round(b.bottom) }; };
         return { top: vis(t), topName: t && t.getAttribute('aria-label'), topPh: t && t.placeholder, topRect: vis(t) ? r(t) : null, box: vis(q), boxName: q && q.getAttribute('aria-label'), toggle: vis(tog), menu: vis(document.getElementById('top-menu-btn')), over: document.documentElement.scrollWidth - innerWidth }; })()`);
     try {
@@ -25,7 +25,7 @@ const FOLDERS = [['needs', 'Search needs you'], ['tasks', 'Search tasks'], ['goa
             await waitFor(`document.querySelectorAll('.view-list-item').length > 3`, 'the folders', 10000);
             for (const [key, name] of FOLDERS) {
                 await ev(`(() => { const all = [...document.querySelectorAll('.view-list-item[data-key="${key}"]')]; (all.find(b => b.getClientRects().length > 0) || all[0]).click(); return true; })()`);
-                await waitFor(`!!document.querySelector('#inbox-view .list-bar-search')`, `${label}: the ${key} page's toolbar`, 10000);
+                await waitFor(`!!document.querySelector('#group-table-view .list-bar-search')`, `${label}: the ${key} page's toolbar`, 10000);
                 await new Promise(r => setTimeout(r, 400)); // sleep-ok: the top field follows the page's redraw on the next frame
                 const s = await state();
                 if (mobile) {
@@ -40,9 +40,9 @@ const FOLDERS = [['needs', 'Search needs you'], ['tasks', 'Search tasks'], ['goa
                 // typing in the top field reaches the page's search: a word that matches nothing shows the page's empty state, and clearing it brings the page back
                 await ev(`(() => { const d = [...document.querySelectorAll('.view-list-item[data-key="needs"]')]; (d.find(b => b.getClientRects().length > 0) || d[0]).click(); return true; })()`);
                 await waitFor(`document.getElementById('top-search') && document.getElementById('top-search').getAttribute('aria-label') === 'Search needs you'`, 'back on Needs you', 5000);
-                await ev(`window.__seen = []; document.querySelector('#inbox-view .list-bar-search').addEventListener('input', e => window.__seen.push(e.target.value)); document.getElementById('top-search').focus(); true`);
+                await ev(`window.__seen = []; document.querySelector('#group-table-view .list-bar-search').addEventListener('input', e => window.__seen.push(e.target.value)); document.getElementById('top-search').focus(); true`);
                 await client.Input.insertText({ text: 'zzqq' }); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the page debounces typing
-                check(`390: typing in the top field reaches the page's search box`, JSON.stringify(await ev(`window.__seen`)).includes('zzqq') && (await ev(`document.querySelector('#inbox-view .list-bar-search').value`)) === 'zzqq', JSON.stringify(await ev(`window.__seen`)));
+                check(`390: typing in the top field reaches the page's search box`, JSON.stringify(await ev(`window.__seen`)).includes('zzqq') && (await ev(`document.querySelector('#group-table-view .list-bar-search').value`)) === 'zzqq', JSON.stringify(await ev(`window.__seen`)));
                 await ev(`(() => { const d = [...document.querySelectorAll('.view-list-item[data-key="tasks"]')]; (d.find(b => b.getClientRects().length > 0) || d[0]).click(); return true; })()`);
                 await waitFor(`document.getElementById('top-search').getAttribute('aria-label') === 'Search tasks'`, 'Tasks', 5000);
                 check(`390: another tab's field has that tab's own words, not what was typed on Needs you`, (await ev(`document.getElementById('top-search').value`)) !== 'zzqq', await ev(`document.getElementById('top-search').value`));

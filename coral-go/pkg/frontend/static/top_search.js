@@ -7,8 +7,8 @@ let input = null, shown = null, queued = 0;
 
 function pageSearch() {
     if (!window.matchMedia(NARROW).matches) return null;
-    const view = document.getElementById('inbox-view');
-    if (!view || view.style.display === 'none' || !view.getClientRects().length) return null;
+    const view = document.getElementById('group-table-view'); // the Inbox's pages are drawn here (data-group "hub-inbox:<folder>")
+    if (!view || !/^hub-inbox/.test(view.dataset.group || '') || view.style.display === 'none' || !view.getClientRects().length) return null;
     return [...view.querySelectorAll('.list-bar-search')].find(q => q.closest('.list-bar-search-wrap')) || null;
 }
 
@@ -44,10 +44,10 @@ function start() {
         shown.value = input.value;
         shown.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', repeat: e.repeat, bubbles: true, cancelable: true }));
     });
-    const view = document.getElementById('inbox-view');
+    const view = document.getElementById('group-table-view');
     if (view) {
         new MutationObserver(later).observe(view, { childList: true, subtree: true });
-        new MutationObserver(later).observe(view, { attributes: true, attributeFilter: ['style', 'hidden', 'class'] });
+        new MutationObserver(later).observe(view, { attributes: true, attributeFilter: ['style', 'hidden', 'class', 'data-group'] });
         view.addEventListener('click', later, true); view.addEventListener('change', later, true);
     }
     window.matchMedia(NARROW).addEventListener('change', later);
