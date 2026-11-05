@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/pkg/resourcequeue"
 )
 
@@ -141,5 +142,5 @@ func (p filePersister) Save(st resourcequeue.State) error {
 		os.Remove(name)
 		return err
 	}
-	return os.Rename(name, p.path)
+	return fsreplace.Rename(name, p.path) // a bare os.Rename over an existing file is refused on Windows while it is open elsewhere (TestNoBareRename, #9738)
 }
