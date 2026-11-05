@@ -90,7 +90,7 @@ func TestALaunchLineWaitsOutAStartupChildShellAndStillRefusesAShellThatStays(t *
 	// a pane whose shell is still starting: the first looks find a child shell, a later one the prompt
 	starting := &startupShellTerminal{fgSessionTerminal: newFGTerminal(mock), until: 2}
 	require.NoError(t, sendLaunchCommand(context.Background(), starting, "claude-y", "claude --resume"), "the startup settled: the line is typed")
-	assert.Equal(t, int32(3), starting.looks.Load(), "it looked again until the shell was gone")
+	assert.Equal(t, int32(4), starting.looks.Load(), "it looked again until two looks in a row found no shell")
 	assert.NotEmpty(t, starting.sentTo("claude-y"), "and the line went to the pane")
 
 	// a shell a person started stays: refused after the window
