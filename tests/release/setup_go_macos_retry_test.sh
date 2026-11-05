@@ -5,7 +5,8 @@
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 action="$root/.github/actions/setup-go-macos/action.yml"
-python3 -I - "$action" <<'PY'
+status=0
+python3 -I - "$action" <<'PY' || status=$?
 import re, sys
 text = open(sys.argv[1]).read()
 fails = 0
@@ -75,5 +76,4 @@ else: bad("the cache-hit output falls back from the retry to the first restore")
 
 sys.exit(1 if fails else 0)
 PY
-status=$?
 [ "$status" = 0 ] && echo "PASS setup_go_macos_retry" || { echo "FAIL setup_go_macos_retry"; exit 1; }
