@@ -31,12 +31,17 @@ cd "$S/home"
 # the scripted answers of the mock agents (MOCK_AGENT_REPLIES): one entry per agent, keyed by its [Name] tag, from story.json
 python3 -I -c "import json,sys;d=json.load(open(sys.argv[1]));print(json.dumps([c['reply'] for c in d['chats']]+([d['goalChat']['reply']] if 'goalChat' in d else [])+[{'text':x} for x in d.get('fillers',[])]))" "$HERE/../story.json" > "$S/work/replies.json"
 python3 -I -c "import json,sys;print(json.dumps(json.load(open(sys.argv[1]))['mockPrompts']))" "$HERE/../story.json" > "$S/work/prompts.json"   # the words of the prompts the mock raises (MOCK_PROMPTS_FILE)
+# No real agent CLI may be reachable from the rig: its PATH is only our bin and the system dirs; if one of them has a CLI of any agent type, stop before anything starts.
+for c in claude codex agy pi opencode hermes gemini antigravity; do
+  f=$(PATH="$S/bin:/usr/bin:/bin" command -v "$c" 2>/dev/null)
+  if [ -n "$f" ] && [ "$f" != "$S/bin/$c" ]; then echo "refusing to start: a real '$c' is on the rig's PATH ($f)" >&2; stop_demo; exit 3; fi
+done
 nohup env -i HOME="$S/home" PATH="$S/bin:/usr/bin:/bin" CORAL_DATA_DIR="$S/data" CORAL_TELEMETRY_DISABLED=1 CORAL_HOOK_DIR="$S/bin" \
   MOCK_AGENT_READY=1 MOCK_AGENT_MODELS=1 MOCK_AGENT_QUIET=1 MOCK_AGENT_GOAL="$(python3 -I -c "import json,sys;print(json.load(open(sys.argv[1]))['goal']['title'])" "$HERE/../story.json")" MOCK_PROMPTS_FILE="$S/work/prompts.json" MOCK_AGENT_REPLIES="$S/work/replies.json" MOCK_AGENT_ENV_DUMP="$S/work/envdump" CLAUDE_PROJECTS_DIR="$S/work/claude-projects" \
   "$S/bin/coral" --host 127.0.0.1 --port "$PORT" --cloud-url off --no-browser --backend pty > "$S/work/server.log" 2>&1 &
 echo $! > "$S/work/server.pid"; sleep 4
 KEY=$("$HERE/denv.sh" coral api-key 2>&1 | tail -1); (umask 077; echo "$KEY" > "$S/work/key")
-curl -s -m 5 -X PUT "http://127.0.0.1:$PORT/api/settings" -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' -d "{\"cli_path_claude\": \"$S/bin/mock-agent\"}" >/dev/null
+curl -s -m 5 -X PUT "http://127.0.0.1:$PORT/api/settings" -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' -d "{\"cli_path_claude\": \"$S/bin/mock-agent\", \"cli_path_codex\": \"$S/bin/mock-agent\", \"cli_path_agy\": \"$S/bin/mock-agent\", \"cli_path_pi\": \"$S/bin/mock-agent\", \"cli_path_opencode\": \"$S/bin/mock-agent\", \"cli_path_hermes\": \"$S/bin/mock-agent\"}" >/dev/null   # every agent CLI is the mock: a launch of any type can never start a real agent
 PW=$(python3 -I -c "import secrets;print(secrets.token_hex(8))")   # a random one-run password; the demo Coral is thrown away
 printf '%s\n%s\n' "$PW" "$PW" | "$HERE/denv.sh" coral set-password --stdin --url "http://127.0.0.1:$PORT" --home "$S/data" >/dev/null 2>&1
 if [ -z "$NOLAUNCH" ] && [ -z "$RESUME" ]; then node "$HERE/setup.mjs" launch; sleep 3; fi
