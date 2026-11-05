@@ -17,7 +17,6 @@
 .inbox-ask-offers-hint { margin: 8px 0 0; color: var(--text-muted); font-size: var(--fs-md); }
 @media (max-width: 999px) {
     dialog.inbox-ask-dialog { width: var(--dlg-w-form); }
-    .inbox-ask-offers-hint { display: none; }
 }
 @media (min-width: 1000px) {
     dialog.inbox-ask-dialog[open] { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-rows: auto auto auto minmax(0, 1fr) auto; column-gap: 24px; height: 85dvh; max-height: 85dvh; overflow: hidden; }
@@ -38,3 +37,7 @@
 .inbox-ask-attach .ac-picker { flex-shrink: 0; }
 .inbox-ask-attach .ac-images-hint { min-width: 0; }
 .inbox-ask-pics .ac-add-image { width: 44px; min-height: 44px; padding: 0; }
+
+/* #13583: quick choices follow the question; the reply keeps the freed lines and grows with input. */
+.inbox-ask-dialog .inbox-ask-box { min-height: 9em; }
+.inbox-ask-reading .inbox-ask-offers { margin-top: 16px; }
