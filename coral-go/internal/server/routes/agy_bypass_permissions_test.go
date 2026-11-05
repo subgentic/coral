@@ -97,14 +97,10 @@ func setupAgyTestRig(t *testing.T) *agyTestRig {
 func lastSentCommand(term *mockSessionTerminal) string {
 	term.mu.Lock()
 	defer term.mu.Unlock()
-	var all []string
-	for _, cmds := range term.sent {
-		all = append(all, cmds...)
-	}
-	if len(all) == 0 {
+	if len(term.sentOrder) == 0 { // the last command SENT, whichever session it went to (the sent map ranges in a random order, #13565)
 		return ""
 	}
-	return all[len(all)-1]
+	return term.sentOrder[len(term.sentOrder)-1]
 }
 
 // 1. Fresh launch
@@ -1055,10 +1051,9 @@ func TestPinnedLaunchPermissionMode_OldSessionFallback(t *testing.T) {
 		PermissionMode: nil, // old row from before migration
 	}))
 	require.NoError(t, rig.ss.SetSetting(ctx, "default_permission_mode", "default"))
-	// Forget case A's command: lastSentCommand reads a map of sessions in random order, so with both cases' commands in it the "last" one was
-	// case A's about 1 run in 8 and this case failed.
+	// Forget case A's command, so the "last" one is this case's (lastSentCommand now reads the send order; it once read a map of sessions in random order and failed about 1 run in 8).
 	rig.term.mu.Lock()
-	rig.term.sent = map[string][]string{}
+	rig.term.sent, rig.term.sentOrder = map[string][]string{}, nil
 	rig.term.mu.Unlock()
 	restartBody2, _ := json.Marshal(map[string]any{
 		"session_id": sid2,
