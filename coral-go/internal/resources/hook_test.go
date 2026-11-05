@@ -242,3 +242,31 @@ func TestWithNoMatchingResourceNothingIsLookedUp(t *testing.T) {
 	var none *Hook
 	assert.False(t, none.Active())
 }
+
+// #13659: where the process list has no command lines (Windows) it names programs, and a slot is held while the agent still runs a program the resource is about.
+func TestAProcessListOfProgramNamesHoldsTheSlotWhileThatProgramRuns(t *testing.T) {
+	g := newHookRig(t)
+	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "call-1", "go test ./... &"))
+	g.mu.Lock()
+	g.procs["s-a"] = []string{"go", "conhost"} // image names, as a Toolhelp snapshot has them
+	g.mu.Unlock()
+	g.h.After("s-a", "call-1")
+	assert.Equal(t, []string{"Agent A"}, g.holders(), "go is still running below the agent: the slot stays")
+	g.add(10 * time.Minute)
+	assert.Equal(t, []string{"Agent A"}, g.holders())
+	g.mu.Lock()
+	g.procs["s-a"] = []string{"conhost", "notepad"} // nothing the resource is about
+	g.mu.Unlock()
+	g.add(4 * time.Second)
+	assert.Empty(t, g.holders(), "no program of the resource runs below the agent now: the slot goes back")
+}
+
+func TestMatchImage(t *testing.T) {
+	pats := []string{"go test ./...", "node run_cdp_suites.mjs", "C:npm run x"}
+	for _, yes := range []string{"go", "GO", "go.exe", "node", "node.exe"} {
+		assert.True(t, MatchImage(yes, pats), yes)
+	}
+	for _, no := range []string{"", "gofmt", "g", "go test", "npm", "notepad", "go.exe go"} {
+		assert.False(t, MatchImage(no, pats), no)
+	}
+}

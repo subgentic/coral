@@ -363,6 +363,9 @@ func (h *Hook) startedWorkRuns(ah *autoHold, res resourcequeue.Resource, snap ma
 		if c == unknownRunning {
 			return true
 		}
+		if !strings.ContainsAny(c, " \t") && MatchImage(c, res.Match) { // a bare program name: a list with no command lines (Windows)
+			return true
+		}
 		if _, hit := MatchCommand(c, res.Match); hit {
 			return true
 		}

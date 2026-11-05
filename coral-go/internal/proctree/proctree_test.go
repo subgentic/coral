@@ -59,3 +59,21 @@ func TestWhereItCannotBeKnownItSaysSo(t *testing.T) {
 	_, ok = CommandsBelow(context.Background(), 0)
 	assert.False(t, ok)
 }
+
+func TestAWindowsSnapshotBecomesImageNamesBelowTheRoot(t *testing.T) {
+	rows := []SnapshotRow{
+		{PID: 0, PPID: 0, ExeFile: "[System Process]"},
+		{PID: 4, PPID: 0, ExeFile: "System"},
+		{PID: 100, PPID: 4, ExeFile: `C:\Windows\conhost.EXE`},
+		{PID: 200, PPID: 100, ExeFile: "claude.exe"},
+		{PID: 300, PPID: 200, ExeFile: "cmd.exe"},
+		{PID: 310, PPID: 300, ExeFile: "Go.EXE"},
+		{PID: 320, PPID: 310, ExeFile: "node.exe"},
+		{PID: 400, PPID: 100, ExeFile: "other-agent.exe"},
+		{PID: 410, PPID: 400, ExeFile: "go.exe"},
+	}
+	assert.ElementsMatch(t, []string{"cmd", "go", "node"}, Below(FromSnapshot(rows), 200), "the tree is the parent links from the session's pid: another agent's go.exe is not in it")
+	assert.Empty(t, Below(FromSnapshot(rows), 320))
+	assert.Equal(t, "go", Image(`C:\Program Files\Go\bin\go.exe`))
+	assert.Equal(t, "npm", Image("npm.cmd"))
+}

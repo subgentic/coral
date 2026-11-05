@@ -44,3 +44,19 @@ func inOrder(words, want []string) bool {
 	}
 	return at == len(want)
 }
+
+// MatchImage is for a process list that has no command lines (Windows, #13659): image is a program name ("go", "node") and it matches when it is the FIRST word of a pattern (compared in lower case, without
+// .exe). It holds a slot only while the agent still runs a program the resource is about, which is coarser than the full match (go test ./... and go build are both "go"), and the safe way to be coarser:
+// a slot is kept a little longer, never freed under a run that is going on.
+func MatchImage(image string, patterns []string) bool {
+	image = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(image)), ".exe")
+	if image == "" || strings.ContainsAny(image, " \t") {
+		return false
+	}
+	for _, p := range patterns {
+		if w := strings.Fields(p); len(w) > 0 && strings.TrimSuffix(strings.ToLower(w[0]), ".exe") == image {
+			return true
+		}
+	}
+	return false
+}
