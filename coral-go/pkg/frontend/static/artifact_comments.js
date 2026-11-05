@@ -183,6 +183,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         const h = el('h3', 'ac-title', 'Comments'); h.append(el('span', 'ac-count', String(openCount())));
         opts.onCanWrite?.(!!(st.data && st.data.canComment && !st.data.locked)); // the viewer shows Mark up only to someone who can comment (#12394)
         opts.onCount?.(openCount()); // a goal's Comments tab says how many are open (#11955)
+        opts.onState?.({ composing: !!(st.composing && st.composing.anchor), count: openCount() }); // a file's diff (#13528): its icon says the count, and closes an empty thread whose composer was cancelled
         head.append(h);
         // Resolved threads are out of the way, as in Docs: one toggle brings them back (and only while there are any).
         const nResolved = list.filter(t => t.c.resolved && !t.c.deleted).length;
@@ -213,7 +214,7 @@ export function attachComments(dialog, body, host, opts = {}) {
             const why = d.locked ? 'Comments are locked: nobody can add comments to this file. You can unlock it any time.' : 'Locking stops anyone adding comments to this file. You can unlock it any time.';
             const lock = btn('ac-lock', d.locked ? 'Unlock comments' : 'Lock comments'); lock.title = why;
             lock.addEventListener('click', async () => { try { await api.setLocked(st.hex, st.server, !d.locked); await refresh(); } catch (e) { showToast(e.message, true); } });
-            panel.append(lock); if (!d.locked) panel.append(el('p', 'ac-note ac-lock-note', why)); // locked: the note above says it
+            panel.append(lock); if (!d.locked && !opts.compact) panel.append(el('p', 'ac-note ac-lock-note', why)); // locked: the note above says it; a compact panel (a file's diff, #13528) has it as the button's tip only
         }
         const wrap = el('ul', 'ac-list');
         const shownAll = list.filter(t => st.showResolved || !t.c.resolved);
@@ -229,12 +230,12 @@ export function attachComments(dialog, body, host, opts = {}) {
             d.addEventListener('toggle', () => { st.groupOpen[g] = d.open; });
             li.append(d); wrap.append(li);
         }
-        if (!shownAll.length) wrap.append(el('p', 'empty-state empty-state-tight', st.text ? 'No open comments. Select some text to add one.' : opts.words?.empty || 'No open comments. Use the button below to comment on the whole document.'));
+        if (!shownAll.length && !opts.compact) wrap.append(el('p', 'empty-state empty-state-tight', st.text ? 'No open comments. Select some text to add one.' : opts.words?.empty || 'No open comments. Use the button below to comment on the whole document.'));
         panel.append(wrap);
         const sendable = list.map(t => t.c).filter(c => canAsk(c) && !d.locked);
         if (st.video && sendable.length) { const sendAll = btn('ac-send-open', `Send ${plural(sendable.length, 'open comment')} to an agent`); sendAll.addEventListener('click', () => openMany(sendable)); panel.append(sendAll); }
         if (st.composing && st.composing.anchor) panel.append(composer());
-        else if (d.canComment && !d.locked) {
+        else if (d.canComment && !d.locked && !opts.compact) {
             const whole = btn('ac-whole', st.video ? 'Comment at playhead' : opts.words?.whole || 'Comment on the whole document'); whole.addEventListener('click', () => { const time = st.video?.current(); st.composing = { anchor: opts.wholeAnchor ? opts.wholeAnchor() : { whole: true }, ...time, ...(time ? { timeLabel: stampRange(time) } : {}) }; st.error = ''; render(); panel.querySelector('.ac-input')?.focus(); });
             panel.append(whole);
         }
@@ -473,6 +474,8 @@ export function attachComments(dialog, body, host, opts = {}) {
             if (cm.tray) cm.tray.add([new File([blob], name || 'marked-picture.png', { type: blob.type })]);
             return true;
         },
+        /** Whether a comment is being written now (a draft stays while the panel is hidden). */
+        isComposing: () => !!(st.composing && st.composing.anchor),
         /** A comment on an anchor the caller made (the lines selected in an agent's diff, #12536): the composer opens on it, in the panel. Resolves false when this person cannot comment here. */
         composeOn(anchor) {
             if (!st.hex || !st.data || !st.data.canComment || st.data.locked) return false;
