@@ -103,3 +103,15 @@ func TestPostsInAWindowAreThoseWithinItsEdges(t *testing.T) {
 	assert.Equal(t, 1, len(PostsIn(posts, at(0, 0), at(16, 0))), "a post at the cut belongs to the since side")
 	assert.Equal(t, 1, len(PostsIn(posts, at(16, 0), at(23, 0))))
 }
+
+func TestARunStillOpenIsCountedUpToTheWindowsEnd(t *testing.T) { // Lead's SHOULD: an open run is not dropped
+	now := at(16, 30)
+	runs := HeavyRuns([]HeavyPost{
+		{Who: "A", Text: "HEAVY RUN START: A, Mac", At: at(15, 0)},
+		{Who: "B", Text: "HEAVY RUN START: B, Mac", At: at(16, 0)},
+	}, now)
+	require.Len(t, runs, 2)
+	assert.True(t, runs[0].Unclosed && runs[1].Unclosed)
+	assert.Equal(t, now, runs[0].End, "an open run lasts to now, not to nothing")
+	assert.Equal(t, 30, OverlapMinutesIn(runs, at(16, 0), now), "both were open from 16:00 to 16:30")
+}

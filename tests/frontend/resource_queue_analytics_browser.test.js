@@ -16,7 +16,7 @@ const BODY = () => ({
     by_pattern: [{ pattern: 'go test ./...', holds: 12 }, { pattern: 'npm run test:cloud', holds: 5 }],
     by_hour: Array.from({ length: 24 }, (_, h) => ({ hour: h, by_resource: h >= 9 && h <= 17 ? { 'mac-heavy': 2, mini: h === 10 ? 1 : 0 } : {} })),
     per_day: Array.from({ length: 7 }, (_, i) => ({ day: dayAgo(6 - i), claims: i, by_resource: { 'mac-heavy': i, mini: i % 2 }, refused: 0, kicked: 0, expired: 0, overlap_mac_min: i < 4 ? 40 + i : 0, overlap_mini_min: i === 1 ? 10 : 0, slot_posts: i < 4 ? 12 - i : 2 })),
-    before_after: { cut: dayAgo(2) + 'T16:00:00Z', before: { days: 4.67, overlap_min_per_day: 40, slot_posts_per_day: 12, wait_median_min: 14, wait_samples: 9, runs: 31 }, since: { days: 2, overlap_min_per_day: 5, slot_posts_per_day: 3, wait_median_min: 3, wait_samples: 11, runs: 12 } },
+    before_after: { cut: dayAgo(2) + 'T16:00:00Z', before: { days: 4.67, overlap_min: 187, slot_posts: 56, overlap_min_per_day: 40, slot_posts_per_day: 12, wait_median_min: 14, wait_samples: 9, runs: 31 }, since: { days: 2, overlap_min: 10, slot_posts: 6, overlap_min_per_day: 5, slot_posts_per_day: 3, wait_median_min: 3, wait_samples: 11, runs: 12 } },
 });
 
 (async () => {
@@ -108,6 +108,17 @@ const BODY = () => ({
             await waitFor(`/Not yet/.test(document.getElementById('cost-resource-queue').textContent)`, 'Not yet', 8000);
             const k = await ev(`[...document.querySelectorAll('#cost-resource-queue .atab-kpi')].map(x => x.textContent.replace(/\\s+/g, ' ').trim())`);
             assert.match(k[1], /Not yet/); assert.ok(!/% less than before/.test(k[1]), 'no change is claimed with nothing since');
+            await set(BODY()); await refresh();
+            await waitFor(`/5 min a day/.test(document.getElementById('cost-resource-queue').textContent)`, 'back', 8000);
+        });
+        await run('a side shorter than a day shows its totals so far, never a rate or a change', async () => {
+            const b = BODY(); b.before_after.since = { days: 0.02, overlap_min: 7, slot_posts: 1, overlap_min_per_day: 350, slot_posts_per_day: 50, wait_median_min: 2, wait_samples: 3, runs: 1 };
+            await set(b); await refresh();
+            await waitFor(`/7 min so far/.test(document.getElementById('cost-resource-queue').textContent)`, 'so far', 8000);
+            const all = await text('#cost-resource-queue');
+            assert.ok(!/350/.test(all) && !/50 posts a day/.test(all), 'no extrapolated rate: ' + all.slice(0, 400));
+            assert.match(all, /1 posts so far/); assert.ok(!/% less than before|% more than before/.test(all), 'no change is claimed from minutes of data');
+            assert.match(all, /totals only, a rate needs a day/);
             await set(BODY()); await refresh();
             await waitFor(`/5 min a day/.test(document.getElementById('cost-resource-queue').textContent)`, 'back', 8000);
         });

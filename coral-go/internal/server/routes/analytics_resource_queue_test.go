@@ -156,6 +156,9 @@ func TestTheBeforeAfterCutSplitsTheGoLiveDayAtTheCutAndNeverCountsAnEventOnBothS
 	b, s := out["before"].(rqSpan), out["since"].(rqSpan)
 	assert.InDelta(t, 1.0, b.SlotPostsPerDay*b.Days, 0.1, "one slot post before the cut (rates are rounded)")
 	assert.InDelta(t, 2.0, s.SlotPostsPerDay*s.Days, 0.1, "two after it")
+	assert.Equal(t, 60, b.OverlapMin, "the overlap 15:00-16:00 is before (a total, whatever the rate)")
+	assert.Equal(t, 60, s.OverlapMin)
+	assert.Equal(t, 2, s.SlotPosts)
 	assert.InDelta(t, 60.0, b.OverlapMinPerDay*b.Days, 2, "the overlap 15:00-16:00 is before")
 	assert.InDelta(t, 60.0, s.OverlapMinPerDay*s.Days, 2, "16:00-17:00 is since")
 

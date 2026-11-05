@@ -18,6 +18,8 @@ export function durWords(seconds) {
 }
 const minWords = (m) => (m < 0 ? 'no samples' : durWords(m * 60));
 const perDay = (n, unit) => `${String(Math.round(n * 10) / 10).replace(/\.0$/, '')} ${unit} a day`;
+/** A side's number: a rate once the side spans a day, else its total "so far" (twenty minutes of data says nothing about a day). */
+const rateWords = (sp, total, perDayValue, unit) => (sp.days >= 1 ? perDay(perDayValue || 0, unit) : `${total || 0} ${unit} so far`);
 const pctWords = (p) => `${String(Math.round(p * 10) / 10).replace(/\.0$/, '')}%`;
 const say = (text, status = false) => { const p = el('p', 'atab-say', text); if (status) p.setAttribute('role', 'status'); return p; }; // role=status only on the lines that appear when something is empty or went wrong: the explanations stay quiet when the period changes
 
@@ -29,8 +31,8 @@ export function queueModel(data) {
     const live = since.days > 0;
     const waitUnavailable = !!since.wait_unavailable || data.history === false || data.queue === false; // the queue's own record is not there: its wait is not "no samples", it is unavailable
     const rows = [
-        ['Heavy runs overlapping on one computer', perDay(before.overlap_min_per_day || 0, 'min'), live ? perDay(since.overlap_min_per_day || 0, 'min') : 'Not yet'],
-        ['Slot-request posts on the board', perDay(before.slot_posts_per_day || 0, 'posts'), live ? perDay(since.slot_posts_per_day || 0, 'posts') : 'Not yet'],
+        ['Heavy runs overlapping on one computer', rateWords(before, before.overlap_min, before.overlap_min_per_day, 'min'), live ? rateWords(since, since.overlap_min, since.overlap_min_per_day, 'min') : 'Not yet'],
+        ['Slot-request posts on the board', rateWords(before, before.slot_posts, before.slot_posts_per_day, 'posts'), live ? rateWords(since, since.slot_posts, since.slot_posts_per_day, 'posts') : 'Not yet'],
         ['Median wait for a slot', before.wait_samples ? `about ${minWords(before.wait_median_min)}` : 'no samples', live ? (waitUnavailable ? 'Unavailable' : since.wait_samples ? minWords(since.wait_median_min) : 'no samples') : 'Not yet'],
         ['Heavy runs started (from the posts)', String(before.runs || 0), live ? String(since.runs || 0) : 'Not yet'],
     ];
@@ -42,11 +44,11 @@ function pending(text) { const n = el('p', 'atab-pending'); n.append(el('b', nul
 /** The page's content for one read: an array of nodes. */
 export function drawQueue(data, phone) {
     const q = queueModel(data), out = [];
-    const less = (cur, prev) => (q.live && prev > 0 ? V.changeWords(cur, prev).replace(/^same as before$/, 'same as before').replace(/(\d+% (more|less))$/, '$1 than before') : '');
+    const less = (cur, prev) => (q.live && q.since.days >= 1 && q.before.days >= 1 && prev > 0 ? V.changeWords(cur, prev).replace(/^same as before$/, 'same as before').replace(/(\d+% (more|less))$/, '$1 than before') : '');
     out.push(V.kpiStrip([
-        { label: 'Overlapping heavy runs, before', value: perDay(q.before.overlap_min_per_day || 0, 'min'), note: `${q.before.days || 0} days of the board’s HEAVY RUN posts` },
-        { label: 'Overlapping heavy runs, since the queue', value: q.live ? perDay(q.since.overlap_min_per_day || 0, 'min') : 'Not yet', delta: less(q.since.overlap_min_per_day, q.before.overlap_min_per_day), good: q.since.overlap_min_per_day <= q.before.overlap_min_per_day ? true : false, note: q.live ? `${q.since.days} days since the queue went live` : `the queue went live ${q.cutWhen}Z` },
-        { label: 'Slot-request posts, since', value: q.live ? perDay(q.since.slot_posts_per_day || 0, 'posts') : 'Not yet', delta: less(q.since.slot_posts_per_day, q.before.slot_posts_per_day), good: q.since.slot_posts_per_day <= q.before.slot_posts_per_day ? true : false, note: `before: ${perDay(q.before.slot_posts_per_day || 0, 'posts')}` },
+        { label: 'Overlapping heavy runs, before', value: rateWords(q.before, q.before.overlap_min, q.before.overlap_min_per_day, 'min'), note: `${q.before.days || 0} days of the board’s HEAVY RUN posts` },
+        { label: 'Overlapping heavy runs, since the queue', value: q.live ? rateWords(q.since, q.since.overlap_min, q.since.overlap_min_per_day, 'min') : 'Not yet', delta: less(q.since.overlap_min_per_day, q.before.overlap_min_per_day), good: q.since.overlap_min_per_day <= q.before.overlap_min_per_day ? true : false, note: q.live ? (q.since.days >= 1 ? `${q.since.days} days since the queue went live` : `${durWords(q.since.days * 86400)} since the queue went live: totals only, a rate needs a day`) : `the queue went live ${q.cutWhen}Z` },
+        { label: 'Slot-request posts, since', value: q.live ? rateWords(q.since, q.since.slot_posts, q.since.slot_posts_per_day, 'posts') : 'Not yet', delta: less(q.since.slot_posts_per_day, q.before.slot_posts_per_day), good: q.since.slot_posts_per_day <= q.before.slot_posts_per_day ? true : false, note: `before: ${rateWords(q.before, q.before.slot_posts, q.before.slot_posts_per_day, 'posts')}` },
         { label: 'Median wait for a slot, since', value: q.waitUnavailable ? 'Unavailable' : q.live && q.since.wait_samples ? minWords(q.since.wait_median_min) : 'No samples', note: q.waitUnavailable ? 'the queue’s own record is not available on this computer' : q.before.wait_samples ? `before: about ${minWords(q.before.wait_median_min)} (an estimate)` : 'before: no samples' },
     ]));
     out.push(V.panel('Before and after the queue', `the queue went live ${q.cutWhen} UTC`,

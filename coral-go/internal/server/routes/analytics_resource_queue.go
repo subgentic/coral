@@ -122,7 +122,9 @@ type rqDay struct {
 // rqSpan is one side of the cut.
 type rqSpan struct {
 	Days             float64 `json:"days"`
-	OverlapMinPerDay float64 `json:"overlap_min_per_day"`
+	OverlapMin       int     `json:"overlap_min"`         // the side's total, whatever its length
+	SlotPosts        int     `json:"slot_posts"`          // the side's total
+	OverlapMinPerDay float64 `json:"overlap_min_per_day"` // a rate only means something once the side spans a day: the page shows totals ('so far') before that
 	SlotPostsPerDay  float64 `json:"slot_posts_per_day"`
 	WaitMedianMin    float64 `json:"wait_median_min"` // before: estimated from the posts; since: the queue's own waits (0 samples: -1)
 	WaitSamples      int     `json:"wait_samples"`
@@ -371,8 +373,10 @@ func (h *ResourceQueueAnalyticsHandler) beforeAfter(runs []board.HeavyRun, posts
 		sp.Days = math.Round(to.Sub(from).Hours()/24*100) / 100
 		days := to.Sub(from).Hours() / 24
 		in := board.PostsIn(posts, from, to)
-		sp.OverlapMinPerDay = math.Round(float64(board.OverlapMinutesIn(runs, from, to))/days*10) / 10
-		sp.SlotPostsPerDay = math.Round(float64(countPosts(board.SlotRequestPosts(in)))/days*10) / 10
+		sp.OverlapMin = board.OverlapMinutesIn(runs, from, to)
+		sp.SlotPosts = countPosts(board.SlotRequestPosts(in))
+		sp.OverlapMinPerDay = math.Round(float64(sp.OverlapMin)/days*10) / 10
+		sp.SlotPostsPerDay = math.Round(float64(sp.SlotPosts)/days*10) / 10
 		for _, r := range runs {
 			if !r.Start.Before(from) && r.Start.Before(to) {
 				sp.Runs++
