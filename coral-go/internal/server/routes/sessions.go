@@ -30,6 +30,7 @@ import (
 	"github.com/subgentic/coral/internal/proxy"
 	"github.com/subgentic/coral/internal/ptr"
 	"github.com/subgentic/coral/internal/ptymanager"
+	"github.com/subgentic/coral/internal/resources"
 	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/secrets"
 	setreg "github.com/subgentic/coral/internal/settings"
@@ -41,6 +42,8 @@ import (
 type SessionsHandler struct {
 	dialogs  dialogWatch     // the prompts seen on awake agents' screens (#11437)
 	opencode OpencodeRuntime // the opencode servers, one per agent; nil until the server wires it
+
+	resourceHook *resources.Hook // the resource queue's shell hook (#13645); nil when the queue is off
 
 	// piModelCheck says a Pi model is not one Pi lists (#11105); nil until the server wires it.
 	piModelCheck func(ctx context.Context, model string) string

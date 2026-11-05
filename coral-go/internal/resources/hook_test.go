@@ -72,7 +72,7 @@ const heavy = "cd coral-go && TOKEN=hunter2-secret go test -count=1 ./... 2>&1 |
 
 func TestAMatchingCallOnAFreeResourceRunsHoldsTheSlotAndGivesItBack(t *testing.T) {
 	g := newHookRig(t)
-	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "call-1", heavy))
+	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy))
 	assert.Equal(t, []string{"Agent A"}, g.holders())
 	g.h.After("s-a", "call-1")
 	assert.Empty(t, g.holders(), "the slot goes back when the call ends")
@@ -85,7 +85,7 @@ func TestAMatchingCallOnAFreeResourceRunsHoldsTheSlotAndGivesItBack(t *testing.T
 func TestACommandThatMatchesNothingNeverTouchesTheQueue(t *testing.T) {
 	g := newHookRig(t)
 	for _, c := range []string{"go build ./...", "go test -run X ./one", `echo "go test ./..."`, "ls"} {
-		assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "c", c), c)
+		assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "c", c), c)
 	}
 	assert.Empty(t, g.holders())
 	assert.Empty(t, g.queue())
@@ -96,7 +96,7 @@ func TestABusyResourceHoldsTheCommandWithItsPlaceAndKeepsThePlaceOnRetry(t *test
 	g := newHookRig(t)
 	_, err := g.m.Claim(t.Context(), "mac-heavy", "Agent B", "explicit")
 	require.NoError(t, err)
-	msg := g.h.Before(t.Context(), "s-a", "call-1", heavy)
+	msg := g.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy)
 	assert.Contains(t, msg, "mac-heavy is busy")
 	assert.Contains(t, msg, "number 1 in line")
 	assert.Contains(t, msg, "coral-board resource claim mac-heavy --wait", "the first thing it says is how to wait")
@@ -108,12 +108,12 @@ func TestABusyResourceHoldsTheCommandWithItsPlaceAndKeepsThePlaceOnRetry(t *test
 	require.Len(t, q, 1)
 	assert.Equal(t, "auto: go test ./...", q[0].Note, "the queue shows the pattern, never the command")
 	assert.NotContains(t, q[0].Note, "hunter2")
-	assert.Contains(t, g.h.Before(t.Context(), "s-a", "call-2", heavy), "number 1 in line", "the retry keeps its place")
+	assert.Contains(t, g.h.Before(t.Context(), "s-a", "s-a", "call-2", heavy), "number 1 in line", "the retry keeps its place")
 	assert.Len(t, g.queue(), 1, "and does not queue twice")
 
 	require.NoError(t, g.m.Queue().Release("mac-heavy", "Agent B"))
 	assert.Equal(t, []string{"Agent A"}, g.holders(), "the slot came up")
-	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "call-3", heavy), "the next attempt runs")
+	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "call-3", heavy), "the next attempt runs")
 	g.h.After("s-a", "call-3")
 	assert.Empty(t, g.holders())
 }
@@ -121,22 +121,22 @@ func TestABusyResourceHoldsTheCommandWithItsPlaceAndKeepsThePlaceOnRetry(t *test
 func TestEverythingThatCanGoWrongLetsTheCommandRun(t *testing.T) {
 	g := newHookRig(t)
 	g.agents = map[string]string{} // the session is on no board
-	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "c", heavy))
+	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "c", heavy))
 	assert.Empty(t, g.holders())
 	g.agents = map[string]string{"s-a": "Agent A"}
 	require.NoError(t, g.m.Queue().Define(resourcequeue.Resource{Key: "mac-heavy", Slots: 1, Match: []string{"go test ./..."}, Allowed: []string{"somebody else"}}))
-	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "c", heavy), "a claim the queue refuses does not stop the command")
+	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "c", heavy), "a claim the queue refuses does not stop the command")
 	var none *Hook
-	assert.Equal(t, "", none.Before(t.Context(), "s-a", "c", heavy), "no hook, no queue: runs")
+	assert.Equal(t, "", none.Before(t.Context(), "s-a", "s-a", "c", heavy), "no hook, no queue: runs")
 	none.After("s-a", "c")
 	none.SessionEnded("s-a")
-	assert.Equal(t, "", NewHook(nil, HookOptions{}).Before(t.Context(), "s-a", "c", heavy))
-	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "c", strings.Repeat("echo x\n", 50000)+"go test ./..."), "a command past the reader's bounds runs")
+	assert.Equal(t, "", NewHook(nil, HookOptions{}).Before(t.Context(), "s-a", "s-a", "c", heavy))
+	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "c", strings.Repeat("echo x\n", 50000)+"go test ./..."), "a command past the reader's bounds runs")
 }
 
 func TestACallThatReturnsWhileItsWorkRunsKeepsTheSlotUntilTheWorkIsGone(t *testing.T) {
 	g := newHookRig(t)
-	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "call-1", "nohup go test ./... > out.log 2>&1 &"))
+	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "call-1", "nohup go test ./... > out.log 2>&1 &"))
 	g.mu.Lock()
 	g.procs["s-a"] = []string{"go test ./..."} // the suite is still running under the agent
 	g.mu.Unlock()
@@ -155,7 +155,7 @@ func TestACallThatReturnsWhileItsWorkRunsKeepsTheSlotUntilTheWorkIsGone(t *testi
 
 func TestAnAutoClaimIsCappedAtTwiceTheLeaseWhateverIsRunning(t *testing.T) {
 	g := newHookRig(t)
-	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "call-1", heavy)) // its PostToolUse never comes
+	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy)) // its PostToolUse never comes
 	for i := 0; i < 5; i++ {
 		g.add(10 * time.Minute) // 50 minutes: still under twice the 30 minute lease
 	}
@@ -168,7 +168,7 @@ func TestAnAutoClaimIsCappedAtTwiceTheLeaseWhateverIsRunning(t *testing.T) {
 func TestASlotGrantedToAWaitingAutoClaimPassesOnIfItsAgentRunsNothing(t *testing.T) {
 	g := newHookRig(t)
 	_, _ = g.m.Claim(t.Context(), "mac-heavy", "Agent C", "explicit")
-	assert.NotEqual(t, "", g.h.Before(t.Context(), "s-a", "call-1", heavy), "A waits")
+	assert.NotEqual(t, "", g.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy), "A waits")
 	_, _ = g.m.Claim(t.Context(), "mac-heavy", "Agent B", "explicit") // B waits behind A
 	require.NoError(t, g.m.Queue().Release("mac-heavy", "Agent C"))
 	assert.Equal(t, []string{"Agent A"}, g.holders(), "A's turn came")
@@ -181,7 +181,7 @@ func TestASlotGrantedToAWaitingAutoClaimPassesOnIfItsAgentRunsNothing(t *testing
 func TestAnExplicitClaimIsNeverTrackedOrReleasedByTheHook(t *testing.T) {
 	g := newHookRig(t)
 	_, _ = g.m.Claim(t.Context(), "mac-heavy", "Agent A", "explicit")
-	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "call-1", heavy))
+	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy))
 	g.h.After("s-a", "call-1")
 	g.add(time.Minute)
 	assert.Equal(t, []string{"Agent A"}, g.holders(), "the agent claimed it, so the agent releases it")
@@ -190,7 +190,7 @@ func TestAnExplicitClaimIsNeverTrackedOrReleasedByTheHook(t *testing.T) {
 
 func TestAnEndedSessionGivesItsAutoClaimBack(t *testing.T) {
 	g := newHookRig(t)
-	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "call-1", heavy))
+	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy))
 	g.h.SessionEnded("s-a")
 	assert.Empty(t, g.holders())
 	assert.Equal(t, "gone", g.events[len(g.events)-1].Why)
@@ -198,7 +198,7 @@ func TestAnEndedSessionGivesItsAutoClaimBack(t *testing.T) {
 
 func TestTheHookClaimsForTheSessionsOwnAgentOnly(t *testing.T) {
 	g := newHookRig(t)
-	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "call-1", heavy))
+	assert.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy))
 	// another agent's end-of-call or session end never frees A's slot
 	g.h.After("s-b", "call-1")
 	g.h.SessionEnded("s-b")

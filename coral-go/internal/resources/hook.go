@@ -18,10 +18,10 @@ import (
 
 // HookOptions are what a Hook is made from; the zero value of each optional field is a sensible default.
 type HookOptions struct {
-	// Agent is the board member name of an agent session (the name its explicit claims carry), ok false when the session is on no board.
+	// Agent is the board member name of an agent session by its session NAME (the name its explicit claims carry), ok false when the session is on no board.
 	Agent func(ctx context.Context, session string) (string, bool)
 	// Commands are the command lines of the processes the session's agent has started that are still running; nil: not known, so a slot is given back when the call ends.
-	Commands func(session string) []string
+	Commands func(name string) []string
 	Now      func() time.Time
 	// ClaimWindow is how long a slot granted to a waiting auto-claim waits for its agent to run something before it passes to the next in line (default 2 minutes).
 	ClaimWindow time.Duration
@@ -43,7 +43,8 @@ type holdKey struct{ resource, agent string }
 
 type autoHold struct {
 	entry   int64
-	session string
+	session string // the session id
+	name    string // its name
 	pattern string
 	calls   map[string]bool // tool_use ids of the matched calls still running
 	granted time.Time       // first seen holding the slot
@@ -75,12 +76,12 @@ func (h *Hook) event(e HookEvent) {
 	}
 }
 
-// Before is called for a Bash call about to run. It returns the text to refuse the call with, or "" to let it run.
-func (h *Hook) Before(ctx context.Context, session, toolUseID, command string) (refuse string) {
+// Before is called for a Bash call about to run: session is the session's id (what After and SessionEnded are given), name its name on the board and in the terminal. It returns the text to refuse the call with, or "" to let it run.
+func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command string) (refuse string) {
 	if h == nil || h.m == nil || h.o.Agent == nil {
 		return ""
 	}
-	agent, ok := h.o.Agent(ctx, session)
+	agent, ok := h.o.Agent(ctx, name)
 	if !ok || agent == "" {
 		return ""
 	}
@@ -122,7 +123,7 @@ func (h *Hook) Before(ctx context.Context, session, toolUseID, command string) (
 		if err != nil {
 			return "" // queue trouble never stops a command
 		}
-		ah := &autoHold{entry: r.Entry.ID, session: session, pattern: pattern, calls: map[string]bool{}}
+		ah := &autoHold{entry: r.Entry.ID, session: session, name: name, pattern: pattern, calls: map[string]bool{}}
 		h.hold[key] = ah
 		if r.Granted {
 			ah.calls[toolUseID] = true
@@ -270,7 +271,7 @@ func (h *Hook) startedWorkRuns(ah *autoHold, res resourcequeue.Resource) bool {
 	if h.o.Commands == nil {
 		return false
 	}
-	for _, c := range h.o.Commands(ah.session) {
+	for _, c := range h.o.Commands(ah.name) {
 		if _, hit := MatchCommand(c, res.Match); hit {
 			return true
 		}

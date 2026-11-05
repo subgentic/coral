@@ -31,6 +31,7 @@ import (
 type ResourcesHandler struct {
 	M     *resources.Manager
 	Board *board.Store
+	Hook  *resources.Hook // the shell hook, swept with every call (#13645); may be nil
 }
 
 type entryView struct {
@@ -99,7 +100,10 @@ func (h *ResourcesHandler) fail(w http.ResponseWriter, err error) {
 }
 
 // reap keeps the line honest on every call: leases that ran out end and agents that are gone are dropped before the answer is made.
-func (h *ResourcesHandler) reap() { _, _ = h.M.Queue().Reap() }
+func (h *ResourcesHandler) reap() {
+	_, _ = h.M.Queue().Reap()
+	h.Hook.Sweep() // the hook's claims that should end (a nil Hook does nothing)
+}
 
 // List answers GET /api/resources.
 func (h *ResourcesHandler) List(w http.ResponseWriter, r *http.Request) {
