@@ -20,6 +20,12 @@ for (const [name, s] of [['quiet A', quietA], ['quiet B', quietB], ['the +193 st
     assert.ok(nodeGrowth(s) <= nodeBound(per), `${name}: live grew ${nodeGrowth(s).toFixed(1)}, bound ${nodeBound(per)}`);
     assert.ok(totalFloorGrowth(s) <= totalFloorBound(per), `${name}: total floor grew ${totalFloorGrowth(s)}, bound ${totalFloorBound(per)}`);
 }
+// the worst toggle with no leak (QA Reviewer 2's SHOULD): the live count is at its low state in all three first samples and at its high state in all five last ones, 26 apart; it must still pass
+const worstToggle = at([4548, 4548, 4548, 4574, 4574, 4574, 4574, 4574, 4574], [11287, 11287, 11287, 11480, 11480, 11480, 11480, 11480, 11480]);
+assert.equal(nodeGrowth(worstToggle), 26, 'the worst no-leak toggle is 26 nodes');
+assert.ok(nodeGrowth(worstToggle) <= nodeBound(per), `worst toggle: live grew ${nodeGrowth(worstToggle)}, bound ${nodeBound(per)}`);
+assert.ok(totalFloorGrowth(worstToggle) <= totalFloorBound(per), 'and the +193 step of the total is inside its loose bound');
+
 // the step really was past the bound the first floor rule used for the total
 assert.ok(totalFloorGrowth(step) > 50, 'the step is bigger than 50: it failed the first floor rule');
 
