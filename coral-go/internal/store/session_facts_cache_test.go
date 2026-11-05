@@ -70,7 +70,9 @@ func TestSessionFactsAtScale(t *testing.T) {
 		ids[i] = fmt.Sprintf("sess-%d", i)
 	}
 	ss := NewSessionStore(db)
+	firstStart := time.Now()
 	first, err := ss.SessionFacts(ctx, ids)
+	firstTook := time.Since(firstStart)
 	require.NoError(t, err)
 	require.Len(t, first, sessions)
 	assert.Equal(t, "claude", first["sess-0"].Provider)
@@ -81,5 +83,8 @@ func TestSessionFactsAtScale(t *testing.T) {
 	took := time.Since(start)
 	require.NoError(t, err)
 	assert.Equal(t, first, second, "the kept facts are the read ones")
-	assert.Less(t, took, 50*time.Millisecond, "a kept read is a lookup (a generous budget)")
+	// A kept read is a lookup: a fraction of the read it replaces on the SAME machine. A fixed millisecond budget measured a Windows runner's speed, not the cache (58.8 ms against 50 there, #13389);
+	// an unkept read costs about what the first one did, so a quarter of it separates the two on any machine.
+	t.Logf("first read %v, kept read %v", firstTook, took)
+	assert.Less(t, took, firstTook/4, "a kept read is a lookup, far inside the read it replaces (first %v, kept %v)", firstTook, took)
 }
