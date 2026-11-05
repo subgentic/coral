@@ -167,10 +167,11 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (!a || !panel.contains(a)) return null;
         const card = a.closest('.ac-card, .ac-reply');
         const cls = [...a.classList].find(c => c.startsWith('ac-')) || a.tagName;
-        return { card: card ? card.dataset.id : '', cls, text: (a.textContent || '').trim(), isCard: a.classList.contains('ac-card') };
+        return { id: a.dataset.focusId || '', card: card ? card.dataset.id : '', cls, text: (a.textContent || '').trim(), isCard: a.classList.contains('ac-card') };
     }
     function restoreFocus(k) {
         if (!k) return;
+        if (k.id) { const t = panel.querySelector(`[data-focus-id="${k.id}"]`); if (t) { t.focus({ preventScroll: true }); return; } } // a control whose words flip (Show / Hide earlier versions) is found by its id, not its text
         const scope = k.card ? panel.querySelector(`.ac-card[data-id="${k.card}"], .ac-reply[data-id="${k.card}"]`) : panel;
         const cand = scope ? [...scope.querySelectorAll('button, textarea, a')].filter(n => n.classList.contains(k.cls) && (n.textContent || '').trim() === k.text) : [];
         const target = cand[0] || panel.querySelector('.ac-card.ac-active') || panel.querySelector('.ac-filter[aria-pressed="true"]');
@@ -196,7 +197,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (earlierAll.length) {
             const open = earlierAll.filter(t => !t.c.resolved).length, on = earlierShown();
             const words = `${earlierAll.length} from earlier versions${open ? ` (${open} unresolved)` : ''}`;
-            const eb = btn('ac-showearlier', on ? 'Hide earlier versions' : `Show ${words}`); eb.setAttribute('aria-pressed', String(on));
+            const eb = btn('ac-showearlier', on ? 'Hide earlier versions' : `Show ${words}`); eb.setAttribute('aria-pressed', String(on)); eb.dataset.focusId = 'showearlier';
             eb.title = on ? `Hide the ${words}` : `${words} are hidden while the latest version is open`;
             eb.addEventListener('click', () => { browserLocal.set(storeKey(EARLIER_KEY), on ? 'hide' : 'show'); render(); paint(); });
             head.append(eb);

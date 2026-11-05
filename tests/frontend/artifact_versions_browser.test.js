@@ -71,7 +71,10 @@ const { coralReady } = require('./helpers/wait');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#artifact-viewer .ac-card')].map(c => c.dataset.id)`), ['10'], `${at}: only this version's own comment is listed while the earlier ones are hidden`);
             assert.equal(await ev(`document.querySelector('#artifact-viewer .ac-showearlier').getAttribute('aria-pressed')`), 'false');
             if (process.env.CORAL_SCREENSHOT_DIR) { require('node:fs').mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); require('node:fs').writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/doc-earlier-hidden-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
-            await ev(`document.querySelector('#artifact-viewer .ac-showearlier').click(); true`);
+            await ev(`(() => { const p = document.querySelector('#artifact-viewer .ac-panel'); if (!p.classList.contains('ac-sheet-open')) document.querySelector('#artifact-viewer .ac-toggle').click(); return true; })()`); // a closed panel is inert and cannot hold focus
+            await waitFor(`document.querySelector('#artifact-viewer .ac-panel').classList.contains('ac-sheet-open') && !document.querySelector('#artifact-viewer .ac-panel').inert`, `${at}: the comments panel is open`, 6000);
+            await ev(`(() => { const b = document.querySelector('#artifact-viewer .ac-showearlier'); b.focus(); b.click(); return true; })()`);
+            assert.equal(await ev(`document.activeElement && document.activeElement.classList.contains('ac-showearlier') && document.activeElement.textContent`), 'Hide earlier versions', `${at}: the keyboard stays on the toggle after the redraw, though its words flipped`);
             if (process.env.CORAL_SCREENSHOT_DIR) require('node:fs').writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/doc-earlier-shown-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
             assert.equal(await ev(`localStorage.getItem('coral-artifact-comments-earlier')`), 'show', `${at}: the choice is kept`);
             assert.equal(await ev(`document.querySelector('#artifact-viewer .ac-showearlier').textContent`), 'Hide earlier versions');
