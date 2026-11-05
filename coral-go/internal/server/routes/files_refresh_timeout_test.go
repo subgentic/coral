@@ -120,8 +120,9 @@ func TestAGitRefreshThatTimesOutWithNoLastListIsEmptyAndSaysSo(t *testing.T) {
 	require.EqualValues(t, 0, first["total_changed"])
 }
 
-// On a followed worktree the stored list is the launch folder's, never the worktree's: a pass that times out there keeps nothing, instead of showing the launch folder's files as the worktree's last list.
-func TestATimedOutRefreshOfAFollowedWorktreeKeepsNothing(t *testing.T) {
+// On a followed worktree the stored list is the launch folder's, never the worktree's: a pass that times out there keeps nothing until a pass of the worktree's own has finished, and then keeps THAT list,
+// instead of showing the launch folder's files as the worktree's last list.
+func TestATimedOutRefreshOfAFollowedWorktreeKeepsOnlyItsOwnLastList(t *testing.T) {
 	r := newFollowRig(t, true)
 	gitguard.Reset()
 	t.Cleanup(gitguard.Reset)
@@ -146,11 +147,23 @@ func TestATimedOutRefreshOfAFollowedWorktreeKeepsNothing(t *testing.T) {
 	plain := post("&manual=1") // stores the launch folder's list
 	require.Equal(t, []string{"launch-only.txt"}, filepaths(plain))
 
+	old := refreshGitTimeout
 	gitOutOfTime(t)
 	followed := post("&worktree=follow&manual=1")
 	require.Equal(t, true, followed["timed_out"])
 	require.Empty(t, filepaths(followed), "the launch folder's list is not the worktree's last list")
 	require.EqualValues(t, 0, followed["total_changed"])
+
+	refreshGitTimeout = old
+	own := post("&worktree=follow&manual=1")
+	require.Equal(t, false, own["timed_out"])
+	require.Equal(t, []string{"work.txt"}, filepaths(own), "the worktree's own pass lists its own file")
+
+	gitOutOfTime(t)
+	again := post("&worktree=follow&manual=1")
+	require.Equal(t, true, again["timed_out"])
+	require.Equal(t, []string{"work.txt"}, filepaths(again), "now the worktree keeps its own last list, still not the launch folder's")
+	require.EqualValues(t, 1, again["total_changed"])
 	unfollowed := post("&manual=1")
 	require.Equal(t, true, unfollowed["timed_out"])
 	require.Equal(t, []string{"launch-only.txt"}, filepaths(unfollowed), "the launch folder keeps its own last list")

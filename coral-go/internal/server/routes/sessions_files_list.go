@@ -232,14 +232,6 @@ type refreshedFiles struct {
 	timedOut bool
 }
 
-// lastGoodTotals remembers, per refresh key, how many files changed in the last pass that finished: the stored list is cut at refreshFilesCap, so a pass that times out says the total it knew.
-var (
-	lastGoodMu     sync.Mutex
-	lastGoodTotals = map[string]int{}
-)
-
-const lastGoodMax = 1000
-
 // refreshComputeHook runs at the start of every pass (tests: count passes, make one slow).
 var refreshComputeHook = func() {}
 
@@ -412,31 +404,23 @@ func (h *SessionsHandler) computeRefreshedFiles(ctx0 context.Context, name, sess
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) && ctx0.Err() == nil {
 		// Git ran out of time: what it did answer is partial, and saying it was the whole list (0 changed, or a few) is wrong, so the answer carries timed_out and keeps the last good list and its
 		// total (nothing when there never was one); the stored list is left as it was.
-		// The stored list is the launch folder's (the poller writes it; a followed worktree's pass is never stored, #11351), so for a followed worktree there is nothing of its own to keep: empty.
+		// The last list a pass of THIS key finished (the flight keeps it, bounded and aged, #13247) is what is kept, with the total it knew; with none, a launch folder's stored list; a followed worktree
+		// never borrows the launch folder's list (the poller writes it, #11351), so it keeps nothing until one of its own passes has finished.
 		kept := []store.ChangedFile{}
 		keptTotal := 0
-		if !follow {
+		if last, ok := refreshFlights.lastFor(key); ok {
+			kept, keptTotal = last.files, last.total
+		} else if !follow {
 			if stored, found, _ := h.gs.GetChangedFiles(ctx0, name, sidPtr, diffMode); found {
 				kept = stored
 			}
 			keptTotal = len(kept)
-			lastGoodMu.Lock()
-			if t, ok := lastGoodTotals[key]; ok && t > keptTotal {
-				keptTotal = t
-			}
-			lastGoodMu.Unlock()
 		}
 		lctx, lcancel := context.WithTimeout(ctx0, 2*time.Second) // a folder git cannot read must not add one more slow call to a pass that already ran out of time
 		label := gitutil.CompareLabel(lctx, workdir, diffMode)
 		lcancel()
 		return refreshedFiles{files: kept, total: keptTotal, diffMode: diffMode, label: label, took: time.Since(began), timedOut: true}
 	}
-	lastGoodMu.Lock()
-	if len(lastGoodTotals) >= lastGoodMax { // one entry per folder, mode, session, follow state and agent seen: bounded, the oldest knowledge simply starts again
-		clear(lastGoodTotals)
-	}
-	lastGoodTotals[key] = total
-	lastGoodMu.Unlock()
 	if !follow { // the cache is the launch folder's list (the poller writes it): a followed worktree's is not kept in its place (#11351)
 		h.gs.ReplaceChangedFiles(ctx0, name, workdir, files, sidPtr, diffMode)
 	}
@@ -551,7 +535,9 @@ func (f *refreshFlight) do(ctx context.Context, key string, fresh bool, fn func(
 			}
 		}
 		if c.ok { // a pass that panicked is not kept: its answer is empty
-			f.keep(key, c.res, time.Now())
+			if !c.res.timedOut { // a pass that ran out of time kept nothing new: the last list that finished stays the one kept
+				f.keep(key, c.res, time.Now())
+			}
 		}
 		if took > refreshReuseOver && c.ok {
 			f.recent[key] = refreshRecent{res: c.res, until: time.Now().Add(min(took, 10*time.Second))}
