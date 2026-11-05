@@ -1,5 +1,110 @@
 # Release Notes
 
+## v2.0.53 — A queue for shared machines, a phone Inbox with a folder drawer, and steadier Activity
+
+### Changes
+
+#### What you will notice first
+
+- **A queue for shared resources.** An agent claims a resource such as `mac-heavy` or `mini` before it loads the machine (`coral-board resource claim --wait`), holds it for a lease and releases or renews it; a claim by a matching shell command is made for it by a hook (Claude, Codex and Pi), and the slot goes to the next in line when its turn is not used.
+- **The Queue folder of Automations** shows each resource's slots in use, its holders (agent, state, lease left) and its waiting line in order, with First, Up, Down and Kick actions.
+- **The phone Inbox has no tab row.** A drawer lists every folder with its count and marks the open one, and the folder's title is its visible name.
+- **On a phone the top pill is the Inbox's search,** in the words of the page ("Search needs you", "Search tasks").
+- **Activity names scheduled runs** and a job run's row opens that run, without the one-off internals.
+- **Windows: the agent's resource claims follow its processes** without `ps` (the Windows resource hook reads the process tree).
+
+#### Fixed
+
+- **The first Board pause synchronisation is quiet** when a page opens.
+- **Unread folder counts are spoken** from their metadata, and the phone menu headings and counts have an accessible context.
+- **Chat team display names** are resolved from the board labels.
+- **A lease under a minute** says its seconds (it read "lease over" for anything under half a minute).
+
+#### Through Coral Hub
+
+- **No route the Hub reaches changed.** The new resource routes are for this computer only.
+
+#### Known issues
+
+- **macOS: the tmux change (#12836) can make macOS ask once more, only after tmux restarts (a full restart of your agents or a reboot).** Coral's tmux server and guardian are now their own responsible process, so macOS may ask, per folder, whether `tmux` (or `coral`) may reach Documents, Desktop or Downloads. Full Disk Access you gave Coral.app does not carry over: if you gave Coral Full Disk Access, add `tmux` and `coral` too (both in `Coral.app/Contents/MacOS`). The staged tmux copy (each Coral version keeps its own under `tmux-bin/`) asks again after a tmux change. Say yes once; if you say no, nothing is lost, the agent just cannot read that folder.
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For Coral Hub
+
+- **`release-diff` output** (`go run ./internal/releasediff/cmd/release-diff v2.0.52 68f640f1d`):
+
+  ### Tunnel routes, v2.0.52 to 68f640f1d
+
+  Added, never reachable (the Hub has nothing to do) (9)
+
+  - `DELETE /api/resources/entries/{id}`: never
+  - `DELETE /api/resources/{name}`: never
+  - `GET /api/resources`: never
+  - `GET /api/resources/{name}`: never
+  - `POST /api/resources/entries/{id}/move`: never
+  - `POST /api/resources/{name}/claim`: never
+  - `POST /api/resources/{name}/release`: never
+  - `POST /api/resources/{name}/renew`: never
+  - `PUT /api/resources/{name}`: never
+
+  ### Board settings keys (BoardSettings, HealthSettings included), v2.0.52 to 68f640f1d
+
+  No key was added, removed or changed.
+
+  ### What Coral Hub compiles in or embeds, v2.0.52 to 68f640f1d
+
+  `pkg/frontend`: 23 files the Hub embeds changed (+294, -134)
+
+  - `coral-go/pkg/frontend/INBOX.md`: +0, -68
+  - `coral-go/pkg/frontend/PLATFORM_LAYER.md`: +0, -21
+  - `coral-go/pkg/frontend/static/automations.js`: +17, -8
+  - `coral-go/pkg/frontend/static/automations_queue.js`: +166, -0
+  - `coral-go/pkg/frontend/static/board_controls.js`: +6, -6
+  - `coral-go/pkg/frontend/static/css/data_table.css`: +2, -1
+  - `coral-go/pkg/frontend/static/css/mobile.css`: +5, -1
+  - `coral-go/pkg/frontend/static/css/scheduler.css`: +5, -0
+  - `coral-go/pkg/frontend/static/css/team_page.css`: +5, -0
+  - `coral-go/pkg/frontend/static/data_table.js`: +11, -2
+  - `coral-go/pkg/frontend/static/inbox_activity.js`: +4, -4
+  - `coral-go/pkg/frontend/static/inbox_panel.js`: +1, -1
+  - `coral-go/pkg/frontend/static/inbox_sidebar.js`: +5, -2
+  - `coral-go/pkg/frontend/static/mailbox_chats.js`: +2, -2
+  - `coral-go/pkg/frontend/static/message_board.js`: +1, -1
+  - `coral-go/pkg/frontend/static/notifications.js`: +4, -3
+  - `coral-go/pkg/frontend/static/operator_activity_words.js`: +8, -0
+  - `coral-go/pkg/frontend/static/phone_bar.js`: +11, -3
+  - `coral-go/pkg/frontend/static/phone_drawer.js`: +34, -7
+  - `coral-go/pkg/frontend/static/phone_layout.js`: +3, -0
+  - `coral-go/pkg/frontend/static/routes.js`: +1, -1
+  - `coral-go/pkg/frontend/static/sidebar_groups.js`: +2, -2
+  - `coral-go/pkg/frontend/static/team_names.js`: +1, -1
+
+  `agent_docs`: 2 files the Hub embeds changed (+42, -0)
+
+  - `coral-go/agent_docs/README.md`: +1, -0
+  - `coral-go/agent_docs/resource-queue.md`: +41, -0
+
+  Unchanged: `pkg/hubproxy`, `pkg/hubowner`, `pkg/redact`, `pkg/tunnel`.
+
+  ### Coral packages compiled into the Hub through its imports, v2.0.52 to 68f640f1d
+
+  `internal/fsreplace`: 0 files of Go code changed (+0, -0), imported by `pkg/hubowner`
+
+  - test files, not compiled by the Hub: 1 file (+1, -1)
+
+  Unchanged: `internal/httputil`, `internal/logsafe`, `internal/safego`, `internal/secfile`, `internal/secrets`, `pkg/redact/betterleaks`.
+
+- **Added, never reachable through the tunnel:** the nine `/api/resources` routes (list, read, create or change, claim, release, renew, move, delete). **Ready signals, hooks, tokens, framed paths**: unchanged.
+
+#### For developers and releases
+
+- Material that is not for Coral's users moved out of this repository to coral-internal.
+- Test-only fixes after the first gates: the artifact paging and Needs you walk suites, the Queue folder's lazy file, toolbar edges, the shared-server row counts in `activity_folder_real` and `inbox_ignored_real`, `big_board_budget` waits for a quiet page, and several Windows tests.
+
 ## v2.0.52 — Recent runs load a page at a time, Activity links to what it made, and Upload is a plus button
 
 ### Changes
