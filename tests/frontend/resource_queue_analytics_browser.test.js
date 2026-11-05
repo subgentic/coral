@@ -72,6 +72,9 @@ const BODY = () => ({
             assert.match(all, /Heavy runs overlapping on one computer\s*40 min a day\s*5 min a day/, all.slice(0, 600));
             assert.match(all, /Median wait for a slot\s*about 14 min\s*3 min/);
             assert.match(all, /they are estimates/);
+            assert.equal(await ev(`[...document.querySelectorAll('#cost-resource-queue .atab-card')].find(c => /Before and after/.test(c.querySelector('h3').textContent)).querySelector('th, [role=columnheader]').textContent.trim()`), 'Measure', 'the first column is named');
+            assert.equal(await ev(`document.querySelectorAll('#cost-resource-queue .atab-say[role=status]').length`), 0, 'the explanations are not live regions');
+            assert.match(all, new RegExp('went live ' + dayAgo(2) + ' 16:00'), 'the date comes from the read');
             assert.ok(t.length > 0);
         });
         await run('a bar a day for the overlap, the go-live day marked, in words as well as bars', async () => {
