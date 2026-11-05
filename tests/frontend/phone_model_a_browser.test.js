@@ -1,6 +1,6 @@
 // The phone's navigation model, slice A (#11236 approved, #11239): the screen types (phone_screens.js) and ONE tab strip. At 390 and 320 px, 100% and 200% text, light and dark:
 //  - Home, Inbox and Automations are top-level screens: the floating nav is on each, with its own slot lit (Inbox, Agents; none for Automations, which the ☰ menu opens: #11472);
-//  - the Inbox's folders and Automations' Jobs / Workflows are a strip of 44 px text tabs under the bar (the current one with an accent underline), not a select and not a drawer's button, and a tab switches the view;
+//  - the Inbox uses the menu below 640 px; at 700 px its strip remains. Automations' Jobs / Workflows are a strip of 44 px text tabs under the bar (the current one with an accent underline), not a select and not a drawer's button, and a tab switches the view;
 //  - nothing scrolls sideways but the strip itself.
 // Drives Chrome over CDP through agent_view_harness.js against an isolated dev server.
 const assert = require('node:assert/strict');
@@ -40,7 +40,21 @@ const { coralReady } = require('./helpers/wait');
             for (let i = 0; i < t.length; i++) for (let j = i + 1; j < t.length; j++) assert.ok(t[i].r <= t[j].l + 1 || t[j].r <= t[i].l + 1 || t[i].b <= t[j].t + 1 || t[j].b <= t[i].t + 1, `${tag}: ${t[i].n} and ${t[j].n} overlap: ` + JSON.stringify([t[i], t[j]]));
             assert.ok(t.length >= 5 && t.every(x => x.r - x.l >= 44 && x.b - x.t >= 44) && t.every(x => x.r <= w && x.l >= 0), `${tag}: the nav's four and the + are 44 px or more and on the screen: ` + JSON.stringify(t));
             if (fs >= 24) { const bd = await ev(`(() => { const b = document.querySelector('.phone-nav-slot[data-phone-nav=nav-inbox] .phone-nav-badge'); if (!b || b.hidden || !b.getClientRects().length) return null; const r = b.getBoundingClientRect(), i = document.querySelector('.phone-nav-slot[data-phone-nav=nav-inbox] svg').getBoundingClientRect(); const ov = Math.max(0, Math.min(r.right, i.right) - Math.max(r.left, i.left)) * Math.max(0, Math.min(r.bottom, i.bottom) - Math.max(r.top, i.top)); return { w: Math.round(r.width), over: Math.round(ov / (i.width * i.height) * 100) }; })()`); if (bd) assert.ok(bd.over <= 35, `${tag}: the Inbox count badge does not cover the icon at large text: ` + JSON.stringify(bd)); }
-            // Inbox: its folders are the tab strip
+            // Phone Inbox: navigate with visible menu buttons, preserving the current folder.
+            await ev(`document.querySelector('.phone-nav-slot[data-phone-nav=nav-inbox]').click(); true`);
+            await waitFor(`!!document.getElementById('group-table-title') && document.getElementById('group-table-title').getClientRects().length > 0`, `${tag}: the Inbox title`, 10000);
+            assert.equal(await ev(`document.querySelector('#group-table-view .view-list-nav').getClientRects().length`), 0, `${tag}: no phone Inbox strip`);
+            await ev(`[...document.querySelectorAll('.phone-menu-btn')].find(e => e.getClientRects().length).click(); true`);
+            await waitFor(`!!document.querySelector('#nav-more-menu:not([hidden]) .nav-drawer-folder[aria-current="true"]')`, `${tag}: current folder in menu`, 6000);
+            const folders = await ev(`[...document.querySelectorAll('#nav-more-menu .nav-drawer-folder')].map(b => ({ name: b.querySelector('.nav-drawer-label').textContent, current: b.getAttribute('aria-current') === 'true', height: b.getBoundingClientRect().height }))`);
+            assert.ok(['Needs you', 'Tasks', 'Goals', 'Saved', 'Artifacts', 'Activity', 'All chats'].every(n => folders.some(f => f.name === n)) && folders.filter(f => f.current).length === 1 && folders.every(f => f.height >= 44), `${tag}: all folders reachable with one current item and 44 px targets: ${JSON.stringify(folders)}`);
+            await ev(`[...document.querySelectorAll('#nav-more-menu .nav-drawer-folder')].find(b => b.querySelector('.nav-drawer-label').textContent === 'Goals').click(); true`);
+            await waitFor(`document.getElementById('group-table-title')?.textContent === 'Goals'`, `${tag}: menu opens Goals`, 8000);
+            await ev(`[...document.querySelectorAll('.phone-menu-btn')].find(e => e.getClientRects().length).click(); true`);
+            await waitFor(`document.querySelector('#nav-more-menu:not([hidden]) .nav-drawer-folder[aria-current="true"] .nav-drawer-label')?.textContent === 'Goals'`, `${tag}: menu now marks Goals`, 6000);
+            await ev(`document.body.click(); true`);
+            // At 700 px only, Inbox retains its strip and its scroll-to-current behavior.
+            await Emulation.setDeviceMetricsOverride({ width: 700, height: 844, deviceScaleFactor: 1, mobile: true });
             await ev(`document.querySelector('.phone-nav-slot[data-phone-nav=nav-inbox]').click(); true`);
             await waitFor(`!!document.querySelector('#group-table-view .view-list-item') && document.querySelector('#group-table-view .view-list-item').getClientRects().length > 0`, `${tag}: the Inbox`, 10000).catch(async e => { throw new Error(e.message + ' ' + JSON.stringify(await ev(`({ views: [...document.querySelectorAll('#mobile-agent-list,#inbox-view,#group-table-view,#scheduler-view')].map(e => e.id + ':' + getComputedStyle(e).display).join(','), navOn: document.body.className.includes('phone-nav-on'), ptype: document.body.dataset.phoneType, sidebarDisp: getComputedStyle(document.querySelector('.sidebar-pane[data-pane=hub-inbox]')).display, disp: getComputedStyle(document.getElementById('inbox-view')).display, vl: document.querySelectorAll('.view-list').length, items: document.querySelectorAll('.view-list-item').length, inInbox: document.querySelectorAll('#inbox-view .view-list').length, navlist: [...document.querySelectorAll('.view-list')].map(v => (v.id || v.className) + '@' + (v.parentElement.id || v.parentElement.className).slice(0, 30) + ':' + v.getClientRects().length + '/' + getComputedStyle(v.querySelector('.view-list-nav')).display + '/' + getComputedStyle(v).display), body: document.body.dataset.navTab })`))); });
             assert.equal(await ev(`document.body.dataset.phoneType`), 'top-level', `${tag}: the Inbox is a top-level screen`);
@@ -58,6 +72,7 @@ const { coralReady } = require('./helpers/wait');
             const inView = await ev(inViewJs);
             assert.ok(inView, `${tag}: the open folder is inside the strip, however far along it is`);
             assert.equal(await ev(`document.documentElement.scrollWidth <= innerWidth`), true, `${tag}: the Inbox does not scroll sideways`);
+            await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile: true });
             // Automations: Jobs / Workflows
             await ev(`window.switchNavTab('automations'); true`);
             await waitFor(`[...document.querySelectorAll('#scheduler-view .view-list-item, #group-table-view .view-list-item')].some(b => b.getClientRects().length > 0 && /Jobs|Workflows/.test(b.textContent))`, `${tag}: Automations (its folder is the page, Jobs or Workflows, whichever was open last)`, 10000);
