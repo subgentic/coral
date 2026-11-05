@@ -1376,6 +1376,7 @@
     .phone-bar .phone-bar-title .phone-bar-search { flex: 1 1 auto; min-width: 0; width: 100%; height: 100%; padding: 0; margin: 0; border: 0; outline: 0; background: transparent; color: var(--text-primary); font: inherit; } /* the view's search, in the pill (#11476) */
     .phone-bar .phone-bar-title:has(.phone-bar-search) .phone-bar-title-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; } /* the title stays for a screen reader: the field says what it searches */
     .list-bar-search-wrap.phone-searched { display: none; } /* the pill is this page's search field (#13591) */
+    .list-bar-search-row:has(> .phone-searched) { justify-content: flex-end; } /* the Filters icon keeps the right end of the row, where it sat beside the box */
     .phone-bar .phone-bar-title:has(.phone-bar-search):focus-within { box-shadow: 0 0 0 2px var(--accent); }
     header.top-bar > .phone-bar { display: flex; }
     header.top-bar > :not(.phone-bar) { display: none !important; } /* the old pill, the views menu, Home and the gear: the one bar replaces them on a phone */

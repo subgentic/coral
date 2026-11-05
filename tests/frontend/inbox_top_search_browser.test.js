@@ -8,6 +8,8 @@ const FOLDERS = [['needs', 'Search needs you'], ['tasks', 'Search tasks'], ['goa
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const fs = require('node:fs');
+    const shot = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR; if (!dir) return; fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(`${dir}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
     const state = () => ev(`(() => { const vis = e => !!e && e.getClientRects().length > 0, t = document.querySelector('header.top-bar .phone-bar-search'), q = document.querySelector('#group-table-view .list-bar-search'), tog = document.querySelector('#group-table-view .list-bar-toggle');
@@ -15,7 +17,7 @@ const FOLDERS = [['needs', 'Search needs you'], ['tasks', 'Search tasks'], ['goa
         return { top: vis(t), topName: t && t.getAttribute('aria-label'), topPh: t && t.placeholder, topRect: vis(t) ? r(t) : null, box: vis(q), boxName: q && q.getAttribute('aria-label'), toggle: vis(tog), menu: vis(document.querySelector('header.top-bar .phone-menu-btn')), over: document.documentElement.scrollWidth - innerWidth }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const [label, w, h, mobile] of [['390', 390, 844, true], ['1280', 1280, 800, false]]) {
+        for (const [label, w, h, mobile] of [['390', 390, 844, true], ['432', 432, 700, true], ['1280', 1280, 800, false]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev);
@@ -29,6 +31,7 @@ const FOLDERS = [['needs', 'Search needs you'], ['tasks', 'Search tasks'], ['goa
                 await waitFor(`!!document.querySelector('#group-table-view .list-bar-search')`, `${label}: the ${key} page's toolbar`, 10000);
                 await new Promise(r => setTimeout(r, 400)); // sleep-ok: the top field follows the page's redraw on the next frame
                 const s = await state();
+                if (key === 'needs') await shot(`top-search-needs-${w}`);
                 if (mobile) {
                     check(`${label}/${key}: the top pill is the search field, named "${name}"`, s.top && s.topName === name + ' from the top bar' && s.topPh === name, JSON.stringify(s));
                     check(`${label}/${key}: the box under the tabs is not drawn, the Filters icon is, the hamburger is, nothing is wider than the screen`, !s.box && s.toggle && s.menu && s.over <= 0, JSON.stringify(s));
@@ -37,7 +40,7 @@ const FOLDERS = [['needs', 'Search needs you'], ['tasks', 'Search tasks'], ['goa
                     check(`${label}/${key}: the page keeps its own box named "${name}" and the top bar has no search field`, !s.top && s.box && s.boxName === name, JSON.stringify(s));
                 }
             }
-            if (mobile) {
+            if (mobile && w === 390) {
                 // typing in the top field reaches the page's search: a word that matches nothing shows the page's empty state, and clearing it brings the page back
                 await ev(`(() => { const d = [...document.querySelectorAll('.view-list-item[data-key="needs"]')]; (d.find(b => b.getClientRects().length > 0) || d[0]).click(); return true; })()`);
                 await waitFor(`(document.querySelector('header.top-bar .phone-bar-search') || {}).placeholder === 'Search needs you'`, 'back on Needs you', 5000);
