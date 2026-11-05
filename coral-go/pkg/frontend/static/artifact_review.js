@@ -94,11 +94,11 @@ export async function denyRow(team, row, reason) {
 }
 /** Dismiss a review row: out of Needs you with no verdict and nobody told; the file stays where it is. Unignore puts it back as it was. */
 export async function ignoreRow(team, row) { const out = await decide(team, row, 'ignore'); out.earlier = await onEarlier(row, e => decide(e.team, e, 'ignore')); settled(row); return out; }
-export async function unignoreRow(team, row) { const out = await decide(team, row, 'unignore'); importOnce('./inbox_reviews.js').then(m => m.refreshReviews(true)).catch(() => {}); return out; }
+export async function unignoreRow(team, row) { const out = await decide(team, row, 'unignore'); importOnce('./inbox_reviews.js').then(m => { m.reviewsChangedOnServer(); return m.refreshReviews(true); }).catch(() => {}); return out; }
 
 /** Save for later (#11641): out of Needs you and its counts, kept in Saved with its decisions; nobody is told. Move to Needs you (unsave) puts it back as it was. */
 export async function saveRow(team, row) { const out = await decide(team, row, 'save'); out.earlier = await onEarlier(row, e => decide(e.team, e, 'save')); settled(row); return out; }
-export async function unsaveRow(team, row) { const out = await decide(team, row, 'unsave'); out.earlier = await onEarlier(row, e => decide(e.team, e, 'unsave')); importOnce('./inbox_reviews.js').then(m => m.refreshReviews(true)).catch(() => {}); return out; }
+export async function unsaveRow(team, row) { const out = await decide(team, row, 'unsave'); out.earlier = await onEarlier(row, e => decide(e.team, e, 'unsave')); importOnce('./inbox_reviews.js').then(m => { m.reviewsChangedOnServer(); return m.refreshReviews(true); }).catch(() => {}); return out; }
 export function saySaved(team, row) {
     showToast(`Saved for later: ${shown(row.name)}`, false, undefined, { action: { label: 'Undo', onClick: () => unsaveRow(team, row).then(() => announceNotice(`${shown(row.name)} is back in Needs you.`)).catch(e => showToast(e.message)) } });
     announceNotice(`Saved for later: ${shown(row.name)}. Undo is in the notice.`);
@@ -243,7 +243,7 @@ export function attachReview(d, { reload }) {
             const m = await importOnce('./artifact_send_review.js');
             if (c.inReview) { await m.removeFromReview(c.team, c.hex); showToast('Removed from review'); }
             else { const q = await m.askReviewQuestion({ count: 1, name: c.filename }); if (q === null) return; await m.sendForReview(c.team, c.hex, q); showToast('Sent for review: it is in Needs you'); }
-            importOnce('./inbox_reviews.js').then(x => x.refreshReviews(true)).catch(() => {});
+            importOnce('./inbox_reviews.js').then(x => { x.reviewsChangedOnServer(); return x.refreshReviews(true); }).catch(() => {});
             reload();
         } catch (e) { showToast(e.message, true); }
     });
@@ -266,7 +266,7 @@ export function attachReview(d, { reload }) {
             const r = sent.results[0];
             if (!sent.ok || !r || (r.state !== 'sent' && r.state !== 'already_asked')) throw new Error(r ? `${who}: ${resultWords(r)}. The request is in the comments.` : (sent.error || 'The agent could not be asked.'));
             await decide(cur.team, cur.row, 'changes');
-            importOnce('./inbox_reviews.js').then(m => m.refreshReviews(true)).catch(() => {});
+            importOnce('./inbox_reviews.js').then(m => { m.reviewsChangedOnServer(); return m.refreshReviews(true); }).catch(() => {});
             showToast(`Changes requested. ${who} was asked.`);
             text.value = ''; tray.clear(); done = true; openForm(false); show({ ...cur, state: 'changes' }); changes.focus({ preventScroll: true }); reload();
         } catch (err) { error.textContent = err.message; } finally { sending = false; syncSend(); text.readOnly = false; }
