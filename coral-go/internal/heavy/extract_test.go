@@ -152,3 +152,20 @@ func TestCleanNameRefusesWhatAnArchiveWriterCannotEvenEncode(t *testing.T) {
 	require.Error(t, linkTarget("a/b", "../../x"))
 	require.NoError(t, linkTarget("a/b", "../c"))
 }
+
+func TestExtractCountsEveryEntryAgainstTheFileCapNotOnlyRegularFiles(t *testing.T) {
+	var es []ent
+	for i := 0; i < 20; i++ {
+		es = append(es, ent{name: "d" + string(rune('a'+i)) + "/", typ: tar.TypeDir, mode: 0o755})
+	}
+	_, err := Extract(t.TempDir(), mkTar(t, es...), Limits{Files: 10, Bytes: 1 << 20})
+	assert.ErrorIs(t, err, ErrTooBig, "twenty empty folders are twenty entries")
+	var links []ent
+	for i := 0; i < 20; i++ {
+		links = append(links, ent{name: "l" + string(rune('a'+i)), typ: tar.TypeSymlink, link: "target", mode: 0o777})
+	}
+	_, err = Extract(t.TempDir(), mkTar(t, links...), Limits{Files: 10, Bytes: 1 << 20})
+	assert.ErrorIs(t, err, ErrTooBig, "and so are twenty links")
+	_, err = Extract(t.TempDir(), mkTar(t, es[:5]...), Limits{Files: 10, Bytes: 1 << 20})
+	assert.NoError(t, err, "under the cap is fine")
+}

@@ -53,15 +53,15 @@ type FileSet struct {
 // codeExt are the extensions of source and text whose names may say "token" or "credentials" without being secrets (internal/background/token_poller.go builds the product).
 var codeExt = map[string]bool{".go": true, ".js": true, ".mjs": true, ".cjs": true, ".ts": true, ".tsx": true, ".jsx": true, ".css": true, ".html": true, ".md": true, ".sh": true, ".py": true, ".rs": true, ".c": true, ".h": true, ".sql": true}
 
-// looksSecret is the belt and braces beyond git's own ignore: a name that looks like a key or a credential is not sent even when git does not ignore it. .env*, *.pem, *.key and id_* never; credentials* and *token* unless the
-// file is source or text by its extension.
-func looksSecret(base string) bool {
+// looksSecret is the belt and braces beyond git's own ignore: a name that looks like a key or a credential is not sent even when git does not ignore it. .env*, *.pem, *.key and id_* never; credentials* and *token* unless
+// the file is TRACKED source or text by its extension (an untracked credentials.sh or token.md is skipped).
+func looksSecret(base string, tracked bool) bool {
 	l := strings.ToLower(base)
 	switch {
 	case strings.HasPrefix(l, ".env"), strings.HasSuffix(l, ".pem"), strings.HasSuffix(l, ".key"), strings.HasPrefix(l, "id_"):
 		return true
 	case strings.Contains(l, "credentials"), strings.Contains(l, "token"):
-		return !codeExt[strings.ToLower(filepath.Ext(l))]
+		return !(tracked && codeExt[strings.ToLower(filepath.Ext(l))]) // source or text that git TRACKS may say token or credentials; the same name untracked is the forgotten file the rule is for
 	}
 	return false
 }
@@ -74,6 +74,12 @@ func FileList(root string, lim ClientLimits) (FileSet, error) {
 	out, err := cmd.Output()
 	if err != nil {
 		return fs, fmt.Errorf("heavy: git ls-files: %w", err)
+	}
+	tracked := map[string]bool{}
+	if tout, err := exec.Command("git", "-C", root, "ls-files", "-z", "--cached").Output(); err == nil {
+		for _, n := range bytes.Split(tout, []byte{0}) {
+			tracked[string(n)] = true
+		}
 	}
 	seen := map[string]bool{}
 	var files int
@@ -101,7 +107,7 @@ func FileList(root string, lim ClientLimits) (FileSet, error) {
 			}
 			fs.Send = append(fs.Send, FileEntry{Name: name, Link: target, IsLink: true})
 		case fi.Mode().IsRegular():
-			if looksSecret(path.Base(name)) {
+			if looksSecret(path.Base(name), tracked[name]) {
 				fs.Skipped = append(fs.Skipped, Skip{name, "a name that looks like a secret"})
 				continue
 			}
@@ -174,6 +180,8 @@ func SSHArgs(alias string) ([]string, error) {
 	return []string{
 		"-T", "-a", "-x",
 		"-o", "BatchMode=yes",
+		"-o", "ControlMaster=no",
+		"-o", "ControlPath=none", // a ControlMaster in the Operator's config must not keep the connection alive after the client goes: the drop detection reads stdin ending
 		"-o", "StrictHostKeyChecking=yes",
 		"-o", "ClearAllForwardings=yes",
 		"-o", "ForwardAgent=no",

@@ -51,14 +51,18 @@ func TestFileListIsGitsOwnMinusIgnoredFilesLinksOutAndSecrets(t *testing.T) {
 	put(t, dir, "id_rsa", "-----")
 	put(t, dir, "credentials.json", "{}")
 	put(t, dir, "notes/my_token.txt", "tok")
-	put(t, dir, "internal/background/token_poller.go", "package background") // a source file whose name says token: it is needed to build
+	put(t, dir, "internal/background/token_poller.go", "package background") // a TRACKED source file whose name says token: it is needed to build
+	put(t, dir, "scripts/credentials.sh", "echo secret")                     // the same words, untracked: skipped whatever the extension
+	put(t, dir, "notes/token.md", "a token")
+	put(t, dir, "tools/tokens.py", "TOKEN = 1")
+	put(t, dir, "docs/credentials_flow.md", "# docs, tracked")
 	put(t, dir, "docs/credentials_flow.md", "# docs")
 	outside := t.TempDir()
 	put(t, outside, "secret", "x")
 	require.NoError(t, os.Symlink(filepath.Join(outside, "secret"), filepath.Join(dir, "leaks")))
 	require.NoError(t, os.Symlink("src/main.go", filepath.Join(dir, "inside")))
 	require.NoError(t, os.Symlink("../../../../etc/passwd", filepath.Join(dir, "up")))
-	c := exec.Command("git", "-C", dir, "add", "src/main.go", ".gitignore")
+	c := exec.Command("git", "-C", dir, "add", "src/main.go", ".gitignore", "internal/background/token_poller.go", "docs/credentials_flow.md")
 	require.NoError(t, c.Run())
 
 	fl, err := FileList(dir, ClientLimits{Files: 1000, Bytes: 1 << 20})
@@ -71,9 +75,9 @@ func TestFileListIsGitsOwnMinusIgnoredFilesLinksOutAndSecrets(t *testing.T) {
 	assert.Contains(t, names, "untracked.txt", "untracked and not ignored: sent")
 	assert.Contains(t, names, ".gitignore")
 	assert.Contains(t, names, "inside", "a link inside the worktree is kept")
-	assert.Contains(t, names, "internal/background/token_poller.go", "a source file is not a secret because of its name")
-	assert.Contains(t, names, "docs/credentials_flow.md")
-	for _, no := range []string{"ignored.txt", "build/out.bin", ".env", ".env.local", "deploy/server.pem", "deploy/server.key", "id_rsa", "credentials.json", "notes/my_token.txt", "leaks", "up"} {
+	assert.Contains(t, names, "internal/background/token_poller.go", "a TRACKED source file is not a secret because of its name")
+	assert.Contains(t, names, "docs/credentials_flow.md", "nor is tracked text")
+	for _, no := range []string{"scripts/credentials.sh", "notes/token.md", "tools/tokens.py", "ignored.txt", "build/out.bin", ".env", ".env.local", "deploy/server.pem", "deploy/server.key", "id_rsa", "credentials.json", "notes/my_token.txt", "leaks", "up"} {
 		assert.NotContains(t, names, no, no)
 	}
 	var said []string
@@ -103,7 +107,7 @@ func TestSSHArgumentsAreFixedAndTheDestinationIsTheOperatorsAliasAfterDoubleDash
 	args, err := SSHArgs("coral-heavy-mini")
 	require.NoError(t, err)
 	joined := strings.Join(args, " ")
-	for _, want := range []string{"-T", "-a", "-x", "BatchMode=yes", "StrictHostKeyChecking=yes", "ClearAllForwardings=yes", "ForwardAgent=no", "ForwardX11=no", "SendEnv=-*", "ServerAliveInterval=15"} {
+	for _, want := range []string{"-T", "-a", "-x", "ControlMaster=no", "ControlPath=none", "BatchMode=yes", "StrictHostKeyChecking=yes", "ClearAllForwardings=yes", "ForwardAgent=no", "ForwardX11=no", "SendEnv=-*", "ServerAliveInterval=15"} {
 		assert.Contains(t, joined, want)
 	}
 	require.GreaterOrEqual(t, len(args), 2)
