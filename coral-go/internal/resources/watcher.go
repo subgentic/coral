@@ -155,3 +155,10 @@ func (w *Watcher) Stuck(entryID int64) (StuckInfo, bool) {
 	}
 	return StuckInfo{Kind: cur.kind, Since: cur.since, Level: cur.level, Age: w.o.Now().Sub(cur.since)}, true
 }
+
+// tracked is how many holders the watcher is keeping an episode for (tests: a released holder must not stay in it).
+func (w *Watcher) tracked() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return len(w.st)
+}

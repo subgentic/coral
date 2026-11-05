@@ -133,3 +133,40 @@ func TestTheOperatorAndAWaitingEntryAreNeverStuck(t *testing.T) {
 	assert.Empty(t, g.said)
 	assert.False(t, strings.Contains(strings.Join(g.said, ""), "Waiter"))
 }
+
+// QA Reviewer 2's pins on the watcher's episodes.
+func TestAWorkingSignalWithATimeEndsTheEpisodeJustAsAnEmptyOneDoes(t *testing.T) {
+	g := newWatchRig(t)
+	g.claim("Codex")
+	g.state["Codex"] = sig{"prompt", g.c.now()}
+	g.c.add(6 * time.Minute)
+	g.w.Check()
+	id := g.m.Queue().Snapshot().Entries[0].ID
+	_, ok := g.w.Stuck(id)
+	require.True(t, ok)
+	g.state["Codex"] = sig{"", g.c.now()} // working again: no kind, but a real time since
+	g.w.Check()
+	_, ok = g.w.Stuck(id)
+	assert.False(t, ok, "kind \"\" ends the episode whatever its since")
+}
+
+func TestAReleasedOrKickedHoldersStateIsForgottenAndANewHoldStartsClean(t *testing.T) {
+	g := newWatchRig(t)
+	g.claim("Codex")
+	g.state["Codex"] = sig{"prompt", g.c.now()}
+	g.c.add(11 * time.Minute)
+	g.w.Check()
+	require.Len(t, g.said, 1, "a first look at eleven minutes says the ten-minute notice once")
+	require.NoError(t, g.m.Queue().Release("mac-heavy", "Codex")) // it gave the slot back (or was kicked)
+	g.w.Check()
+	assert.Equal(t, 0, g.w.tracked(), "the released holder's episode is forgotten, not kept for ever")
+	g.claim("Codex") // a new hold of the same agent: a new entry
+	g.state["Codex"] = sig{"prompt", g.c.now()}
+	g.w.Check()
+	_, ok := g.w.Stuck(g.m.Queue().Snapshot().Entries[0].ID)
+	assert.False(t, ok, "nothing is carried over to the new hold")
+	assert.Len(t, g.said, 1, "and nothing more is said until it has sat at its prompt again")
+	g.c.add(5 * time.Minute)
+	g.w.Check()
+	assert.Len(t, g.said, 2, "a fresh five minutes, a fresh notice")
+}
