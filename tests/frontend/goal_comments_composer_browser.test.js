@@ -39,6 +39,7 @@ const ownerRowExists = () => { try { return sqliteText(path.join(DATA, 'sessions
                 await waitFor(`!!document.getElementById('goal-tab-comments')`, `${width}: goal page`, 10000);
                 await ev(`document.getElementById('goal-tab-comments').click(); true`);
                 await waitFor(`!!document.querySelector('.goal-comments .ac-whole')`, `${width}: Comment on this goal`, 10000);
+                assert.match(await ev(`document.querySelector('.goal-comments .ac-lock').title`), /adding comments to this goal/, `${width}: lock title names the goal`);
                 await shot(`goal-compose-${width}-before-click`);
                 console.log(width + ' panel ' + await ev(`JSON.stringify({ inert: document.querySelector('.goal-comments .ac-panel').inert, locked: !!document.querySelector('.goal-comments .ac-locked') })`));
                 const whole = await ev(`(() => { const b = document.querySelector('.goal-comments .ac-whole'); b.scrollIntoView({ block: 'center', behavior: 'instant' }); const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);

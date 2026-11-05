@@ -21,7 +21,5 @@ export function mountGoalComments(host, { team, goalId, onCount = () => {} }) {
     const comments = attachComments(box, body, box, { toggleHost: true, sheet: () => false, shown: () => true, initialOpen: true, preferenceKey: () => null, words, onCount });
     comments.open(goalSubject(team, goalId), contextServer(), team);
     comments.docWhole();
-    // Initial openness is applied after the async read too: an empty goal stays interactive.
-    comments.setSheet(true);
     return { destroy() { comments.close(); box.remove(); } };
 }
