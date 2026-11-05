@@ -32,7 +32,7 @@ const kept = model.persist(storageKey);
 export const loadFilters = () => ({ ...kept.load('inbox-needs', browserLocal), q: '' });
 export const saveFilters = f => kept.save('inbox-needs', { ...f, q: '' }, browserLocal);
 
-/** The leading icon of a Needs you row (#13144): one glyph per kind, drawn by css/data_table.css from data-kind (all from the icon subset, tests/frontend/fixtures/material-icons.names.txt), named by the kind's own word for a screen reader. The glyph is drawn by CSS (data-kind), so the row's text stays its words. */
+/** The leading icon of a Needs you row (#13144): one glyph per kind, drawn in a full-height gutter by css/data_table.css from data-kind (all from the icon subset, tests/frontend/fixtures/material-icons.names.txt), named by the kind's own word for a screen reader. The glyph is drawn by CSS (data-kind), so the row's text stays its words. */
 export function kindIcon(s) {
     const k = kindOf(s), i = document.createElement('span');
     i.className = 'material-icons inbox-kind-icon'; i.dataset.kind = k; i.setAttribute('role', 'img'); i.setAttribute('aria-label', KIND_LABEL[k]); i.title = KIND_LABEL[k];
@@ -43,6 +43,14 @@ export function withKindIcon(s, cell) {
     const node = typeof cell === 'string' || !cell ? Object.assign(document.createElement('span'), { textContent: cell || '' }) : cell;
     node.insertBefore(kindIcon(s), node.firstChild);
     return node;
+}
+/** Reserve one full-height icon gutter without changing the table's data/action columns. */
+export function decorateKindRow(tr) {
+    const icon = tr.querySelector('.inbox-kind-icon');
+    if (!icon || tr.classList.contains('dt-mailed')) return;
+    tr.classList.add('inbox-kind-row');
+    const cell = icon.closest('td'), column = document.createElement('span');
+    column.className = 'inbox-kind-column'; column.append(icon); cell.append(column);
 }
 /** The kind of a waiting agent for the pills: `waiting_kind` permission or question, else other. */
 export const kindOf = s => (s && (s.waiting_kind === 'permission' || s.waiting_kind === 'question' || s.waiting_kind === 'review' || s.waiting_kind === 'run' || s.waiting_kind === 'proposal' || s.waiting_kind === 'goal_done' || s.waiting_kind === 'skill_review' || s.waiting_kind === 'welcome') ? s.waiting_kind : 'other');

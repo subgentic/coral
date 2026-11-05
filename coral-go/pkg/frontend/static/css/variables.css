@@ -12,6 +12,18 @@
 [data-theme="dark"] {
     /* The browser's own controls (the date picker's calendar icon, an unticked checkbox, a select's list, the scrollbars) take the theme: with no colour-scheme they are drawn for a light page (#4851) */
     color-scheme: dark;
+    /* Needs you kind tiles (#13701): glyph/background pairs exceed AA contrast. */
+    --needs-icon-indigo-fg: #e0e7ff;
+    --needs-icon-indigo-bg: #303d69;
+    --needs-icon-green-fg: #c7f9ec;
+    --needs-icon-green-bg: #164c40;
+    --needs-icon-purple-fg: #f3dcff;
+    --needs-icon-purple-bg: #543061;
+    --needs-icon-amber-fg: #ffe2bc;
+    --needs-icon-amber-bg: #61401d;
+    --needs-icon-blue-fg: #cdecff;
+    --needs-icon-blue-bg: #204962;
+
 
     /* Surface / Background — deep warm black */
     --bg-primary:   #111114;
@@ -157,6 +169,7 @@
     --fs-lg:   0.875rem;   /* 14px */
     --fs-xl:   1rem;       /* 16px */
     --fs-2xl:  1.25rem;    /* 20px: a page title, an item page title, a big figure (Goal #84) */
+    --needs-icon-size: 1.375rem; /* 22px: Needs you kind glyph inside its 32px tile */
     --glyph-sm: 1.5rem;    /* 24px: a decorative icon glyph, not a text step */
     --glyph-md: 2.5rem;    /* 40px */
     --fs-display: 2rem;    /* 32px: the welcome title only */
@@ -268,6 +281,18 @@
 /* ── Light Theme ───────────────────────────────────────────── */
 
 [data-theme="light"] {
+    /* Needs you kind tiles: the same contrast pairs reversed for light surfaces. */
+    --needs-icon-indigo-fg: #303d69;
+    --needs-icon-indigo-bg: #e0e7ff;
+    --needs-icon-green-fg: #164c40;
+    --needs-icon-green-bg: #c7f9ec;
+    --needs-icon-purple-fg: #543061;
+    --needs-icon-purple-bg: #f3dcff;
+    --needs-icon-amber-fg: #61401d;
+    --needs-icon-amber-bg: #ffe2bc;
+    --needs-icon-blue-fg: #204962;
+    --needs-icon-blue-bg: #cdecff;
+
     color-scheme: light;
 
     /* Surface / Background — warm off-white, not pure white */

@@ -28,6 +28,26 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
         await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 4`, 'the review rows and the questions', 20000);
+        // #13701: the icon owns a full-height gutter; every preview starts beyond it.
+        for (const width of [1280, 390, 320, 1440]) {
+            await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: width < 768 });
+            await ev(framesJs(8));
+            const geometry = await ev(`(() => [...document.querySelectorAll('${T} tbody .dt-row')].map(tr => {
+                const icon = tr.querySelector('.inbox-kind-icon'); if (!icon) return null;
+                const i = icon.getBoundingClientRect(), r = tr.getBoundingClientRect();
+                const texts = [...tr.querySelectorAll('.dt-subtitle, .inbox-review-name, .inbox-review-from, .inbox-proposal-body')].filter(e => e.getClientRects().length);
+                return { kind: icon.dataset.kind, center: Math.abs((i.top + i.bottom - r.top - r.bottom) / 2), right: i.right, textLeft: Math.min(...texts.map(e => e.getBoundingClientRect().left)) };
+            }).filter(Boolean))()`);
+            for (const r of geometry) {
+                check(r.center <= 2, width + 'px: icon centered on full row: ' + JSON.stringify(r));
+                check(r.textLeft >= r.right + 4, width + 'px: excerpt clears icon column: ' + JSON.stringify(r));
+            }
+            if ([390, 1280].includes(width) && process.env.CORAL_SCREENSHOT_DIR) {
+                const fs = require('node:fs'), dir = process.env.CORAL_SCREENSHOT_DIR; fs.mkdirSync(dir, { recursive: true });
+                fs.writeFileSync(dir + '/needs-kind-column-' + width + '.png', Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
+            }
+        }
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         for (const [zoom, label] of [['100%', '100% text'], ['200%', '200% text']]) {
             await ev(`document.documentElement.style.fontSize = '${zoom}'; true`); await ev(framesJs(6));
             const rows = await ev(`(() => [...document.querySelectorAll('${T} tbody tr')].map(tr => { const i = tr.querySelector('.inbox-kind-icon'); if (!i) return { kind: null, text: tr.textContent.slice(0, 30) };
@@ -73,6 +93,22 @@ const { removeBoards } = require('./helpers/board_cleanup');
             check(!!longBox && longBox.lines === 2 && longBox.padTop + longBox.padBottom === 0, `390 px, ${theme}: a four-line question is clamped to exactly two lines, with no padding for a third to show in: ` + JSON.stringify(longBox));
             check(leaks.length === 0, `390 px, ${theme}: a clamped question shows no part of a third line in its padding: ` + JSON.stringify(leaks));
             check(clashes.length === 0, `390 px, ${theme}: no two texts of a Needs you row overlap: ` + JSON.stringify(clashes));
+        }
+        // The all-agent phone list uses the mail renderer, including answer choices.
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
+        await ev(require('./helpers/inbox_world').INBOX_WORLD);
+        await ev(`(() => { const real = window.fetch; window.fetch = (u, o) => /\\/api\\/sessions\\/live\\/[^/]+\\/chat\\?/.test(String(u)) ? Promise.resolve(new Response(JSON.stringify({ messages: [], total: 0, prompt_options: { question: 'Which temperature unit?', ask_id: 'temperature', multi: false, options: ['Celsius', 'Fahrenheit', 'Kelvin'].map((label, i) => ({ n: i + 1, label, action: 'select' })) } }), { headers: { 'content-type': 'application/json' } })) : real(u, o); return true; })()`);
+        await ev(`(async () => { const { state } = await import(${S} + 'state.js'); state.liveSessions = [{ name: 'be', session_id: '00000001-0000-4000-8000-000000000001', agent_type: 'claude', server: 'local', status: 'idle', display_name: 'Backend Dev', waiting_for_input: true, waiting_kind: 'question', waiting_summary: 'Which temperature unit?', waiting_since: new Date().toISOString(), waiting_choices: ['Celsius', 'Fahrenheit', 'Kelvin'] }]; const m = await import(${S} + 'inbox_tab.js'); m.updateInboxTab(); window.switchNavTab('hub-inbox'); await m.selectInboxTab('needs'); return true; })()`);
+        await waitFor(`document.querySelector('${T} .dt-mail-kind') && document.querySelectorAll('${T} .inbox-answer').length === 3`, 'the agent phone mail row', 15000);
+        for (const width of [390, 320]) {
+            await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: true }); await ev(framesJs(8));
+            const row = await ev(`(() => { const tr = document.querySelector('${T} .dt-mailed'), i = tr.querySelector('.inbox-kind-icon').getBoundingClientRect(), r = tr.getBoundingClientRect(), text = tr.querySelector('.dt-mail-text').getBoundingClientRect(); return { center: Math.abs((i.top + i.bottom - r.top - r.bottom) / 2), right: i.right, textLeft: text.left, overflow: document.documentElement.scrollWidth > innerWidth }; })()`);
+            check(row.center <= 2 && row.textLeft >= row.right + 4 && !row.overflow, width + 'px: phone mail gutter spans the full row: ' + JSON.stringify(row));
+        }
+        for (const theme of ['dark', 'light']) {
+            await ev(`${themeJs(theme)}; true`); await ev(framesJs(4));
+            const contrast = await ev(`(async () => { const NF = await import(${S} + 'needs_filters.js'); const channel = x => { x /= 255; return x <= .04045 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4; }; const lum = c => { const rgb = c.match(/[\\d.]+/g).map(Number); return channel(rgb[0]) * .2126 + channel(rgb[1]) * .7152 + channel(rgb[2]) * .0722; }; return NF.KINDS.map(k => { const i = NF.kindIcon({ waiting_kind: k }); document.body.append(i); const cs = getComputedStyle(i), a = lum(cs.color), b = lum(cs.backgroundColor); i.remove(); return { kind: k, ratio: (Math.max(a,b) + .05) / (Math.min(a,b) + .05) }; }); })()`);
+            for (const c of contrast) check(c.ratio >= 4.5, theme + ': AA kind tile contrast: ' + JSON.stringify(c));
         }
     } finally { await removeBoards(ev, ['qn']).catch(() => {}); await client.close(); }
     if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
