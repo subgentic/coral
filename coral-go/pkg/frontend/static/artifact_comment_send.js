@@ -33,7 +33,7 @@ function askableState(a) {
     return { can: true, why: '' };
 }
 
-/** Why the picker is empty (#13687), in plain words: which computer was asked, how many agents it listed, and how many of those cannot be named (no role on the team, or a terminal). `computer` is its name or '' for this computer. */
+/** Why the picker is empty (#13687), in plain words: which computer was asked, how many agents it listed, and how many of those cannot be named (no role on the team, or a terminal). The computer argument is its name, or empty for this computer. */
 export function emptyWords(computer, listed, shown) {
     const where = computer ? `the computer ${computer}` : 'this computer';
     if (!listed) return `No agent on this board can be asked: ${where} lists no agent on it.`;
