@@ -54,7 +54,7 @@ const ATTACK = {
             const r = { url: e.request.url.replace(BASE, '').replace(/login_token=[^&]+/, 'login_token=<redacted>'), method: e.request.method, headers: {} };
             reqs.push(r); byId.set(e.requestId, r);
         });
-        c.Network.requestWillBeSentExtraInfo(e => { const r = byId.get(e.requestId); if (r) r.headers = Object.fromEntries(Object.entries(e.headers).map(([k, v]) => [k.toLowerCase(), v])); });
+        c.Network.requestWillBeSentExtraInfo(e => { const r = byId.get(e.requestId); if (r) { r.headers = Object.fromEntries(Object.entries(e.headers).map(([k, v]) => [k.toLowerCase(), v])); r.sent = true; } }); // the headers the browser really sent (Origin, Sec-Fetch-*) come only in this event, which Chrome does not order before responseReceived: a case that reads them waits for r.sent too (trial-250 gate: Origin undefined, answered 303)
         c.Network.responseReceived(e => { const r = byId.get(e.requestId); if (r) r.status = e.response.status; });
         c.on('Log.entryAdded', e => log.push(e.entry.text));
         const ev = async x => { const r = await c.Runtime.evaluate({ expression: x, returnByValue: true, awaitPromise: true }); if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text || JSON.stringify(r.exceptionDetails)); return r.result.value; };
@@ -165,7 +165,7 @@ const ATTACK = {
                 const p = await freshPage();
                 await p.c.Page.navigate({ url: site + '/post.html' });
                 await p.waitFor(`location.href.startsWith('${BASE}/auth/local') && document.readyState === 'complete'`, 'the form POST to land');
-                await until(() => localOpen(p.reqs).some(r => r.status), 'the answer to the POST');
+                await until(() => localOpen(p.reqs).some(r => r.status && r.sent), 'the answer to the POST');
                 const posts = localOpen(p.reqs);
                 assert.equal(posts.length, 1, JSON.stringify(p.reqs));
                 assert.equal(posts[0].headers['sec-fetch-site'], sfs);
@@ -229,7 +229,7 @@ const ATTACK = {
                 const promised = proof.note; // one snapshot: no DOM access after an awaited status request
                 assert.ok(/asks you to create a password/i.test(promised) && !/without a password/i.test(promised), 'the note says the password prompt comes next, and promises no way around it: ' + promised);
                 await clickLocalOpen(p);
-                await until(() => localOpen(p.reqs).some(r => r.status), 'the answer to the button request');
+                await until(() => localOpen(p.reqs).some(r => r.status && r.sent), 'the answer to the button request');
                 const posts = localOpen(p.reqs);
                 assert.equal(posts.length, 1, JSON.stringify(p.reqs.map(r => r.method + ' ' + r.url)));
                 const sent = `Origin ${posts[0].headers['origin']}, Sec-Fetch-Site ${posts[0].headers['sec-fetch-site']}, answered ${posts[0].status}`;
