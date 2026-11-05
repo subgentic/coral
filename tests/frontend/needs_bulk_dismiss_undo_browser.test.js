@@ -34,7 +34,11 @@ const { coralReady } = require('./helpers/wait');
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
         await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 3`, 'three review rows', 15000);
 
-        await ev(`[...document.querySelectorAll('${T} tbody button[role="checkbox"][aria-label^="Select "]')].slice(0, 2).forEach(b => b.click()); true`);
+        for (const n of ['bulk-01', 'bulk-02']) { // the first press starts selecting (the rows are drawn again), so each is found anew
+            await waitFor(`!![...document.querySelectorAll('${T} tbody [aria-label^="Select ${n}"], ${T} tbody tr')].find(x => /${n}/.test(x.getAttribute('aria-label') || x.textContent))`, n + ' is a row', 8000);
+            await ev(`(() => { const row = [...document.querySelectorAll('${T} tbody tr')].find(r => /${n}/.test(r.textContent)), pick = row.querySelector('button[role="checkbox"], .dt-check input'); pick.click(); return true; })()`);
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].some(r => /${n}/.test(r.textContent) && (r.querySelector('[aria-checked="true"]') || r.querySelector('.dt-check input:checked')))`, n + ' is selected', 6000);
+        }
         await waitFor(`!!document.querySelector('.dt-bar') && /2 selected/.test(document.querySelector('.dt-bar').textContent)`, '2 selected in the bar', 8000);
         await ev(`[...document.querySelectorAll('.dt-bar button')].find(b => (b.getAttribute('aria-label') || b.textContent).trim().startsWith('Dismiss')).click(); true`);
         await waitFor(`document.querySelectorAll('${T} tbody tr').length === 1`, 'the two dismissed files leave Needs you', 10000);
