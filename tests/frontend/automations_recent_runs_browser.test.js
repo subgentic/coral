@@ -71,7 +71,7 @@ const STUB = `(() => {
             await ev(`window.openAutomationsFolder('recent'); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 5`, `${at}the five runs in Recent runs`, 10000);
             assert.equal(await pathname(), '/automations/recent', `${at}the address is the folder's`);
-            assert.deepEqual(await folderWords(mobile), mobile ? ['Running now (1)', 'Failed (2)', 'Recent runs (4)', 'Jobs (3)', 'Workflows (2)'] : ['Running now1', 'Failed2', 'Recent runs4', 'Jobs3', 'Workflows2'], `${at}Recent runs is a folder of Needs attention and counts the runs not opened`);
+            assert.deepEqual(await folderWords(mobile), mobile ? ['Running now (1)', 'Failed (2)', 'Recent runs (4)', 'Jobs (3)', 'Workflows (2)', 'Queue (0)'] : ['Running now1', 'Failed2', 'Recent runs4', 'Jobs3', 'Workflows2', 'Queue0'], `${at}Recent runs is a folder of Needs attention and counts the runs not opened`);
             assert.deepEqual(await rows(), ['watch-the-queue|Running|read', 'nightly-build-job|Failed|unread', 'nightly-build|Failed|unread', 'summarize-the-day|Passed|unread', 'review-pass|Passed|unread'],
                 `${at}every run newest first, the job's run once (the workflow run it made is left out), a dot on each finished run, none on the one still going`);
             const cols = await ev(`[...document.querySelectorAll('#group-table-view table th')].filter(h => h.getClientRects().length).map(h => (h.querySelector('.dt-sort > span, .dt-head-text') || h).textContent.trim()).filter(Boolean)`);

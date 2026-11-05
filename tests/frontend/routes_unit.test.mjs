@@ -74,7 +74,7 @@ rt('/workflows/7', { view: 'workflows', id: 7 });
 rt('/workflows/7/runs/3', { view: 'workflows', id: 7, run: 3 });
 // Automations (Goal #74): Workflows and Jobs as one screen. A folder, a job or a workflow under its own folder, and a workflow's run page.
 rt('/automations', { view: 'automations', folder: null });
-for (const folder of ['running', 'failed', 'jobs', 'workflows']) rt(`/automations/${folder}`, { view: 'automations', folder });
+for (const folder of ['running', 'failed', 'jobs', 'workflows', 'queue']) rt(`/automations/${folder}`, { view: 'automations', folder });
 rt('/automations/jobs/4', { view: 'automations', folder: 'jobs', id: 4 });
 rt('/automations/workflows/7', { view: 'automations', folder: 'workflows', id: 7 });
 rt('/automations/workflows/7/runs/3', { view: 'automations', folder: 'workflows', id: 7, run: 3 });
