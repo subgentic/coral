@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"runtime"
 	"strconv"
 	"testing"
 	"time"
@@ -22,6 +23,9 @@ import (
 // The goal is 3 s; this in-process ceiling is 4 s so a loaded machine (other agents' go tests) does not fail the gate: 14 s before #13522, 1.4 to 2.6 s after. The browser suite (big_board_budget) holds the 3 s.
 // A CI runner (the env var CI is set) is slower than the Mac and the mini: trial-250's gate measured 4.12 s there. So CI has its own ceiling of 8 s: still under the 14 s the cache-less code took
 // on the fastest machine (a runner would take longer), so the old code still fails, and a run that is merely slow does not.
+// walkAllocBoundMB bounds what the in-process walk allocates (client and server together). Measured on the mini (#13614): 554 MB with the fast path (the same twice), 25,064 MB when a page copies the matching rows of the whole list. 2,000 MB is 3.6 times the first and a twelfth of the second, so losing the fast path fails here on any machine, whatever its clock.
+const walkAllocBoundMB = 2000
+
 const (
 	goalNeedsYouWalkMs   = 4000
 	goalNeedsYouWalkCIMs = 8000
@@ -96,13 +100,23 @@ func TestNeedsYouWalkOfABigBoardIsUnderTheGoal(t *testing.T) {
 			scale = f
 		}
 	}
+	var m0, m1 runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&m0)
 	t0 := time.Now()
 	files, pages := walkForReview(t, srv)
 	elapsed := time.Since(t0)
+	runtime.ReadMemStats(&m1)
+	allocMB := float64(m1.TotalAlloc-m0.TotalAlloc) / (1 << 20)
+	t.Logf("PERF the walk allocated %.0f MB (bound %d MB)", allocMB, walkAllocBoundMB)
 	t.Logf("PERF the cold walk of the for-review list: %d files in %d pages, %s (goal %s)", files, pages, elapsed.Round(time.Millisecond), time.Duration(float64(needsYouWalkCeilingMs())*scale)*time.Millisecond)
 	require.Equal(t, 20000, files, "every file for review is in the walk")
 	if elapsed > time.Duration(float64(needsYouWalkCeilingMs())*scale)*time.Millisecond {
 		t.Errorf("the cold walk of 20,000 for-review files took %s, over the goal's %d ms (#13522)", elapsed.Round(time.Millisecond), int(float64(needsYouWalkCeilingMs())*scale))
+	}
+	// An allocation bound, not a clock: the walk of a loaded or slow machine takes longer, but a page that copies the whole list (every matching row, for every page: #13614) allocates gigabytes wherever it runs.
+	if allocMB > walkAllocBoundMB {
+		t.Errorf("the walk allocated %.0f MB, over the bound's %d MB: a page must not copy the list it is cut from (#13614)", allocMB, walkAllocBoundMB)
 	}
 	_ = fmt.Sprint
 }
