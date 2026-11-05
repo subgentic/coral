@@ -3,7 +3,7 @@ package board
 import "context"
 
 // ClaimedTaskAnywhere is the most important task member has claimed and is working on (in progress) on ANY board, with the board it is on and its priority (critical, high, medium or low): what the resource
-// queue (pkg/resourcequeue, #13613) ranks an agent's claim by. ok is false when the member has no task in progress. The most important wins; the oldest task breaks a tie.
+// queue (pkg/resourcequeue, #13613) ranks an agent's claim by. ok is false when the member has no task in progress. The most important wins; the most recently claimed breaks a tie (a forgotten old task must not outrank today's work).
 func (s *Store) ClaimedTaskAnywhere(ctx context.Context, member string) (taskID int64, project, priority string, ok bool, err error) {
 	var rows []struct {
 		ID       int64  `db:"id"`
@@ -11,7 +11,7 @@ func (s *Store) ClaimedTaskAnywhere(ctx context.Context, member string) (taskID 
 		Priority string `db:"priority"`
 	}
 	if err = s.reader().SelectContext(ctx, &rows, `SELECT id, board_id, priority FROM board_tasks WHERE assigned_to = ? COLLATE NOCASE AND status = 'in_progress'
-		ORDER BY CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END, id ASC LIMIT 1`, member); err != nil {
+		ORDER BY CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END, COALESCE(claimed_at, created_at) DESC, id DESC LIMIT 1`, member); err != nil {
 		return 0, "", "", false, err
 	}
 	if len(rows) == 0 {
