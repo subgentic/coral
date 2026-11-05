@@ -50,7 +50,7 @@ const HEX = '9'.repeat(64), OLD = '8'.repeat(64);
      bytes=next;break;
     }
     window.__videoURL=URL.createObjectURL(new Blob([bytes],{type:'video/webm'}));
-    window.__writes=[];window.__comments=[{id:1,artifact_id:'${HEX}',parent_id:null,anchor:{whole:true},at_s:0,body:'Check the opening',author:{kind:'owner',name:'You',subject:'owner'},can:{reply:true,edit:true,delete:true,resolve:true}},{id:2,artifact_id:'${OLD}',from_version:1,carried:'found',parent_id:null,anchor:{whole:true},at_s:1.2,end_s:1.7,body:'Earlier cut: shorten this shot',author:{kind:'owner',name:'You',subject:'owner'},can:{reply:true,edit:true,delete:true,resolve:true}}];
+    window.__writes=[];try{Object.keys(localStorage).filter(k=>k.startsWith('coral-artifact-comments-earlier')).forEach(k=>localStorage.removeItem(k))}catch(e){}window.__comments=[{id:1,artifact_id:'${HEX}',parent_id:null,anchor:{whole:true},at_s:0,body:'Check the opening',author:{kind:'owner',name:'You',subject:'owner'},can:{reply:true,edit:true,delete:true,resolve:true}},{id:2,artifact_id:'${OLD}',from_version:1,carried:'found',parent_id:null,anchor:{whole:true},at_s:1.2,end_s:1.7,body:'Earlier cut: shorten this shot',author:{kind:'owner',name:'You',subject:'owner'},can:{reply:true,edit:true,delete:true,resolve:true}}];
     const real=window.fetch;const json=o=>new Response(JSON.stringify(o),{headers:{'Content-Type':'application/json'}});
     window.fetch=async(u,o={})=>{const url=String(u),method=o.method||'GET';
      if(/\\/api\\/artifacts\\/[89]{64}\\/comments/.test(url)){
@@ -68,7 +68,15 @@ const HEX = '9'.repeat(64), OLD = '8'.repeat(64);
    })()`);
    await waitFor(`!!document.querySelector('#artifact-viewer video')`,'video');
    await shot(`video-before-${config.width}-${config.theme}`);
-   await waitFor(`!!document.querySelector('.avc-track') && document.querySelectorAll('.avc-dot').length===2`,'timeline and comments');
+   // #13606: the comment made on v1 is hidden while the latest is open: no mark on the timeline, a toggle that says how many, and the choice is kept
+   await waitFor(`!!document.querySelector('.avc-track') && document.querySelectorAll('.avc-dot').length===1`,'timeline with only this version\'s comment');
+   await shot(`video-earlier-hidden-${config.width}-${config.theme}`);
+   assert.equal(await ev(`document.querySelector('.ac-showearlier').textContent`),'Show 1 from earlier versions (1 unresolved)');
+   assert.equal(await ev(`!!document.querySelector('.avc-dot[data-id="2"]') || [...document.querySelectorAll('.ac-card')].some(c=>c.dataset.id==='2')`),false,'the v1 comment is neither a mark nor a card while hidden');
+   await ev(`document.querySelector('.ac-showearlier').click()`);
+   assert.equal(await ev(`Object.keys(localStorage).some(k=>k.startsWith('coral-artifact-comments-earlier')&&localStorage.getItem(k)==='show')`),true,'the choice is kept (per account on the Hub)');
+   await waitFor(`document.querySelectorAll('.avc-dot').length===2`,'the earlier comment is back on the timeline');
+   await shot(`video-earlier-shown-${config.width}-${config.theme}`);
    await waitFor(`Number.isFinite(document.querySelector('#artifact-viewer video').duration)`,'real video metadata');
    assert.equal(await ev(`document.querySelector('.avc-dot').getAttribute('aria-label').startsWith('00:00')`),true);
    await ev(`document.querySelector('.avc-dot[data-id="2"]').click()`);
