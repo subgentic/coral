@@ -351,13 +351,13 @@ func (q *Queue) Claim(key string, who Claimant) (Result, error) {
 		q.unlockEmit()
 		return Result{}, ErrNotAllowed
 	}
-	if e := q.entryOf(key, who.Agent); e != nil {
+	if e := q.entryFor(key, who.Agent); e != nil {
 		if who.Priority > e.Priority {
 			e.Priority = who.Priority
 		}
 		if !e.Away.IsZero() { // the agent is back (#13706): its place, still where it was, is its own again, and a free slot is its now
 			e.Away = time.Time{}
-			q.fill(key)
+			q.fill(e.Resource)
 		}
 		res := q.resultOf(e)
 		err := q.save()
@@ -389,15 +389,14 @@ func (q *Queue) Claim(key string, who Claimant) (Result, error) {
 func (q *Queue) Renew(key, agent string) (Entry, error) {
 	q.mu.Lock()
 	defer q.unlockEmit()
-	r, ok := q.res[key]
-	if !ok {
+	if _, ok := q.res[key]; !ok {
 		return Entry{}, ErrNoResource
 	}
-	e := q.entryOf(key, agent)
+	e := q.entryFor(key, agent)
 	if e == nil || e.Waiting() {
 		return Entry{}, ErrNotHolder
 	}
-	e.Lease = q.now().Add(q.leaseOf(e, r))
+	e.Lease = q.now().Add(q.leaseOf(e, q.res[e.Resource]))
 	q.note("renewed", e)
 	return *e, q.save()
 }
@@ -409,7 +408,7 @@ func (q *Queue) Release(key, agent string) error {
 		q.unlockEmit()
 		return ErrNoResource
 	}
-	e := q.entryOf(key, agent)
+	e := q.entryFor(key, agent)
 	if e == nil {
 		q.unlockEmit()
 		return ErrNotHolder
@@ -419,8 +418,9 @@ func (q *Queue) Release(key, agent string) error {
 	} else {
 		q.note("released", e)
 	}
+	at := e.Resource // the entry may have been found through a name that shares its slots
 	q.drop(e.ID)
-	granted := q.fill(key)
+	granted := q.fill(at)
 	err := q.save()
 	q.unlockEmit()
 	q.notify(granted)
@@ -435,14 +435,15 @@ func (q *Queue) Leave(key, agent string, grace time.Duration) error {
 		q.mu.Unlock()
 		return ErrNoResource
 	}
-	e := q.entryOf(key, agent)
+	e := q.entryFor(key, agent)
 	if e == nil {
 		q.mu.Unlock()
 		return ErrNotHolder
 	}
 	if !e.Waiting() || grace <= 0 {
+		at := e.Resource
 		q.drop(e.ID)
-		granted := q.fill(key)
+		granted := q.fill(at)
 		err := q.save()
 		q.mu.Unlock()
 		q.notify(granted)
@@ -627,6 +628,40 @@ func (q *Queue) entryOf(key, agent string) *Entry {
 	return nil
 }
 
+// related are the resources that share slots with key: for a pool, itself and its members; for a member, each pool it is in and those pools' members, and itself.
+func (q *Queue) related(key string) map[string]bool {
+	out := map[string]bool{key: true}
+	add := func(pool string) {
+		out[pool] = true
+		if r := q.res[pool]; r != nil {
+			for _, m := range r.Members {
+				out[m] = true
+			}
+		}
+	}
+	if r := q.res[key]; r != nil && len(r.Members) > 0 {
+		add(key)
+	}
+	for _, p := range q.poolsWith(key) {
+		add(p)
+	}
+	return out
+}
+
+// entryFor is the agent's entry on key, or on anything that shares slots with it: an agent holds at most one slot across a pool and its members (a chained run is one command: it never needs two), so a second claim joins the first.
+func (q *Queue) entryFor(key, agent string) *Entry {
+	if e := q.entryOf(key, agent); e != nil {
+		return e
+	}
+	rel := q.related(key)
+	for _, e := range q.entries {
+		if e.Claimant.Agent == agent && rel[e.Resource] {
+			return e
+		}
+	}
+	return nil
+}
+
 func (q *Queue) drop(id int64) {
 	kept := q.entries[:0]
 	for _, e := range q.entries {
@@ -657,19 +692,7 @@ func (q *Queue) line(key string) []*Entry {
 			w = append(w, e)
 		}
 	}
-	sort.SliceStable(w, func(i, j int) bool {
-		a, b := w[i], w[j]
-		if a.Pin != b.Pin {
-			return a.Pin > b.Pin
-		}
-		if ra, rb := q.rank(a), q.rank(b); ra != rb {
-			return ra > rb
-		}
-		if !a.Enqueued.Equal(b.Enqueued) {
-			return a.Enqueued.Before(b.Enqueued)
-		}
-		return a.ID < b.ID
-	})
+	sort.SliceStable(w, func(i, j int) bool { return q.before(w[i], w[j]) })
 	return w
 }
 
@@ -694,61 +717,68 @@ func (q *Queue) leaseOf(e *Entry, r *Resource) time.Duration {
 	return r.lease()
 }
 
-// fill grants the waiting of key, and of what shares its slots: when key is a pool its members' own lines too (a pool hold that went frees a slot for them), when it is a member the pools it is in.
-func (q *Queue) fill(key string) []Entry {
-	granted := q.fillOne(key)
-	if r, ok := q.res[key]; ok && len(r.Members) > 0 {
-		for _, m := range r.Members {
-			granted = append(granted, q.fillOne(m)...)
-		}
-	} else {
-		for _, p := range q.poolsWith(key) {
-			granted = append(granted, q.fillOne(p)...)
-		}
+// before is the order of the waiting: a person's pin, then rank (priority and age), then who came first.
+func (q *Queue) before(a, b *Entry) bool {
+	if a.Pin != b.Pin {
+		return a.Pin > b.Pin
 	}
-	return granted
+	if ra, rb := q.rank(a), q.rank(b); ra != rb {
+		return ra > rb
+	}
+	if !a.Enqueued.Equal(b.Enqueued) {
+		return a.Enqueued.Before(b.Enqueued)
+	}
+	return a.ID < b.ID
 }
 
-// fillOne grants the waiting of one resource, in line order, while slots are free; a pool takes the first member (in its order) that has one. It returns the entries it granted.
-func (q *Queue) fillOne(key string) []Entry {
+// bestWaiter is who gets a free slot of member m: the best of ALL the lines that share it, the member's own and those of the pools it is in, by one ranking (priority, then age), whatever freed the slot. An agent that is away is skipped.
+func (q *Queue) bestWaiter(m string) *Entry {
+	var best *Entry
+	for _, key := range append([]string{m}, q.poolsWith(m)...) {
+		for _, x := range q.line(key) {
+			if !x.Away.IsZero() { // an agent that is away is skipped (#13706): the slot goes to the next one who is here, and the absent one keeps its place at the front
+				continue
+			}
+			if best == nil || q.before(x, best) {
+				best = x
+			}
+			break // line() is in order: its first one here is its best
+		}
+	}
+	return best
+}
+
+// fill grants free slots to the waiting. Slots are the members' (a plain resource is its own member): for key, or for the members of key when it is a pool, a free slot goes to bestWaiter. It returns the entries it granted.
+func (q *Queue) fill(key string) []Entry {
 	r, ok := q.res[key]
 	if !ok {
 		return nil
 	}
+	members := []string{key}
+	if len(r.Members) > 0 {
+		members = r.Members
+	}
 	var granted []Entry
-	for {
-		slot := key
-		if len(r.Members) > 0 {
-			slot = ""
-			for _, m := range r.Members {
-				if mr := q.res[m]; mr != nil && q.held(m) < mr.Slots {
-					slot = m
-					break
-				}
+	for progress := true; progress; {
+		progress = false
+		for _, m := range members {
+			mr := q.res[m]
+			if mr == nil || len(mr.Members) > 0 || q.held(m) >= mr.Slots {
+				continue
 			}
-			if slot == "" {
-				break
+			e := q.bestWaiter(m)
+			if e == nil {
+				continue
 			}
-		} else if q.held(key) >= r.Slots {
-			break
-		}
-		var e *Entry
-		for _, x := range q.line(key) {
-			if x.Away.IsZero() { // an agent that is away is skipped (#13706): the slot goes to the next one who is here, and the absent one keeps its place at the front
-				e = x
-				break
+			e.Granted = q.now()
+			if e.Resource != m { // a pool's entry: it holds this member
+				e.Member = m
 			}
+			e.Lease = e.Granted.Add(q.leaseOf(e, q.res[e.Resource]))
+			granted = append(granted, *e)
+			q.note("granted", e)
+			progress = true
 		}
-		if e == nil {
-			break
-		}
-		e.Granted = q.now()
-		if len(r.Members) > 0 {
-			e.Member = slot
-		}
-		e.Lease = e.Granted.Add(q.leaseOf(e, r))
-		granted = append(granted, *e)
-		q.note("granted", e)
 	}
 	return granted
 }
