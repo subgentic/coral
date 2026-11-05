@@ -6,8 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 )
 
@@ -35,7 +37,7 @@ func autoAcceptOffenders(root string, readFile func(string) ([]byte, error)) ([]
 	var out []string
 	walkErr := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			if errors.Is(err, fs.ErrNotExist) { // removed under the walk
+			if removedMidWalk(err, runtime.GOOS) { // removed under the walk
 				if d != nil && d.IsDir() {
 					return filepath.SkipDir
 				}
@@ -58,7 +60,7 @@ func autoAcceptOffenders(root string, readFile func(string) ([]byte, error)) ([]
 			return nil
 		}
 		b, err := readFile(path)
-		if errors.Is(err, fs.ErrNotExist) { // listed, then removed before it was read
+		if removedMidWalk(err, runtime.GOOS) { // listed, then removed before it was read
 			return nil
 		}
 		if err != nil {
@@ -73,6 +75,44 @@ func autoAcceptOffenders(root string, readFile func(string) ([]byte, error)) ([]
 		return nil
 	})
 	return out, walkErr
+}
+
+// removedMidWalk says whether err is what a file or folder removed (or being made or removed) under the walk gives. On Linux and macOS that is "does not exist". On Windows a file that is being created or deleted
+// is still held open for a moment, so a read of it fails with a SHARING VIOLATION (32) or a LOCK VIOLATION (33), and a folder going away with ACCESS DENIED (5): the same event, a different word (#13490: windows-tests
+// failed with "The process cannot access the file because it is being used by another process"). goos is a parameter so the rule is tested on every platform. Anything else is still an error.
+func removedMidWalk(err error, goos string) bool {
+	if errors.Is(err, fs.ErrNotExist) {
+		return true
+	}
+	if goos != "windows" {
+		return false
+	}
+	var errno syscall.Errno
+	if errors.As(err, &errno) {
+		switch errno {
+		case 32, 33, 5: // ERROR_SHARING_VIOLATION, ERROR_LOCK_VIOLATION, ERROR_ACCESS_DENIED
+			return true
+		}
+	}
+	return false
+}
+
+func TestOnlyWindowsReadsASharingViolationAsRemovedMidWalk(t *testing.T) {
+	wrap := func(e error) error { return &fs.PathError{Op: "open", Path: `C:\x\churn\c`, Err: e} }
+	for _, e := range []syscall.Errno{32, 33, 5} {
+		if !removedMidWalk(wrap(e), "windows") {
+			t.Errorf("Windows error %d (a file mid-delete or mid-create) was an error", int(e))
+		}
+		if removedMidWalk(wrap(e), "linux") || removedMidWalk(wrap(e), "darwin") {
+			t.Errorf("error %d is not a vanished file off Windows: it is another error there and must fail the walk", int(e))
+		}
+	}
+	if !removedMidWalk(wrap(fs.ErrNotExist), "linux") || !removedMidWalk(wrap(fs.ErrNotExist), "windows") {
+		t.Error("does not exist is a removed file everywhere")
+	}
+	if removedMidWalk(wrap(syscall.Errno(13)), "windows") || removedMidWalk(wrap(errors.New("disk on fire")), "windows") {
+		t.Error("any other error still fails the walk")
+	}
 }
 
 // #13490: a file or folder removed while the tree is walked is skipped, and an offender that stays is still found.
