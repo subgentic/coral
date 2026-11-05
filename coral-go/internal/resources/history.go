@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -27,14 +28,32 @@ type History struct {
 	wg      sync.WaitGroup
 	dropped atomic.Int64
 	pending atomic.Int64
-	mu      sync.Mutex // closes once
+	mu      sync.RWMutex // Add holds it shared while it sends; Close takes it to close the channel, so nothing sends on a closed one
 	closed  bool
 
+	path      string
 	writeGate func() // tests: stands in for a stuck file
+}
+
+// private sets the file and its sidecars to the owner alone (a no-op for what does not exist; not the permission model on Windows).
+func (h *History) private() {
+	for _, suffix := range []string{"", "-wal", "-shm"} {
+		_ = os.Chmod(h.path+suffix, 0o600)
+	}
+}
+
+// prune removes the rows older than HistoryDays: at open, and once a day while the writer runs.
+func (h *History) prune(now time.Time) {
+	_, _ = h.db.Exec(`DELETE FROM resource_events WHERE at < ?`, now.Add(-HistoryDays*24*time.Hour).UnixMilli())
 }
 
 // OpenHistory opens (and makes) the file and starts its writer. Rows older than HistoryDays are removed.
 func OpenHistory(path string) (*History, error) {
+	if f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600); err != nil { // made private before SQLite opens it (it makes its -wal and -shm with the file's mode)
+		return nil, err
+	} else {
+		_ = f.Close()
+	}
 	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=busy_timeout(2000)&_pragma=journal_mode(WAL)")
 	if err != nil {
 		return nil, err
@@ -47,8 +66,9 @@ func OpenHistory(path string) (*History, error) {
 		_ = db.Close()
 		return nil, err
 	}
-	_, _ = db.Exec(`DELETE FROM resource_events WHERE at < ?`, time.Now().Add(-HistoryDays*24*time.Hour).UnixMilli())
-	h := &History{db: db, ch: make(chan resourcequeue.Event, historyBuffer)}
+	h := &History{db: db, ch: make(chan resourcequeue.Event, historyBuffer), path: path}
+	h.prune(time.Now())
+	h.private()
 	h.wg.Add(1)
 	go h.run()
 	return h, nil
@@ -56,7 +76,20 @@ func OpenHistory(path string) (*History, error) {
 
 func (h *History) run() {
 	defer h.wg.Done()
-	for e := range h.ch {
+	daily := time.NewTicker(24 * time.Hour)
+	defer daily.Stop()
+	for {
+		var e resourcequeue.Event
+		select {
+		case <-daily.C:
+			h.prune(time.Now())
+			continue
+		case ev, ok := <-h.ch:
+			if !ok {
+				return
+			}
+			e = ev
+		}
 		if h.writeGate != nil {
 			h.writeGate()
 		}
@@ -74,6 +107,11 @@ func (h *History) run() {
 func (h *History) Add(e resourcequeue.Event) {
 	if h == nil {
 		return
+	}
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	if h.closed {
+		return // closed: the event is not kept, and nothing panics
 	}
 	h.pending.Add(1)
 	select {
@@ -98,7 +136,7 @@ func (h *History) Flush() {
 		return
 	}
 	for i := 0; i < 2000 && h.pending.Load() > 0; i++ {
-		time.Sleep(5 * time.Millisecond)
+		time.Sleep(5 * time.Millisecond) // sleep-ok: a poll of the writer's counter for tests and the read; a few ms steps, 10 s at most
 	}
 }
 

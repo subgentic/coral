@@ -1,7 +1,9 @@
 package resources
 
 import (
+	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -82,4 +84,43 @@ func TestAHistoryFileThatCannotBeOpenedLeavesTheQueueWorking(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, r.Granted)
 	assert.Nil(t, m.History())
+}
+
+func TestAddAfterCloseIsNotAPanic(t *testing.T) { // Lead's MUST: the hook's refusal can arrive while the server closes
+	m := openWithHistory(t, t.TempDir())
+	m.Close()
+	assert.NotPanics(t, func() { m.Record(resourcequeue.Event{Kind: "refused", Resource: "mac", Agent: "x"}) })
+	assert.NotPanics(t, func() { _, _ = m.Claim(t.Context(), "mac", "a", "") })
+}
+
+func TestTheHistoryFileAndItsSidecarsAreForTheirOwnerAlone(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("file modes are not the permission model on Windows")
+	}
+	dir := t.TempDir()
+	m := openWithHistory(t, dir)
+	_, err := m.Claim(t.Context(), "mac", "a", "")
+	require.NoError(t, err)
+	m.History().Flush()
+	for _, f := range []string{"resource_history.db", "resource_history.db-wal", "resource_history.db-shm"} {
+		fi, err := os.Stat(filepath.Join(dir, f))
+		if os.IsNotExist(err) && f != "resource_history.db" {
+			continue // a sidecar exists only while the file is open in WAL mode
+		}
+		require.NoError(t, err, f)
+		assert.Equal(t, os.FileMode(0o600), fi.Mode().Perm(), f)
+	}
+}
+
+func TestTheRecordIsPrunedPastItsDaysWhileRunning(t *testing.T) { // a Coral that runs for weeks must not keep more than 90 days
+	m := openWithHistory(t, t.TempDir())
+	old := time.Now().Add(-(HistoryDays + 1) * 24 * time.Hour)
+	m.History().Add(resourcequeue.Event{At: old, Kind: "refused", Resource: "mac", Agent: "old"})
+	m.History().Add(resourcequeue.Event{At: time.Now(), Kind: "refused", Resource: "mac", Agent: "new"})
+	m.History().Flush()
+	m.History().prune(time.Now())
+	ev, err := m.History().Events(old.Add(-time.Hour), time.Now().Add(time.Hour))
+	require.NoError(t, err)
+	require.Len(t, ev, 1)
+	assert.Equal(t, "new", ev[0].Agent)
 }
