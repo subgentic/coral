@@ -207,3 +207,32 @@ func TestAHistoryFileFromThePreviousReleaseIsMigratedAndItsOldRowsStillRead(t *t
 	require.NoError(t, err)
 	h2.Close()
 }
+
+func TestTheNewWaysAnEntryEndsHaveTheirOwnReasons(t *testing.T) { // #13706, #13718: job ended, turn ended, a kept place that ran out
+	h := openRuns(t)
+	for i, c := range []struct{ kind, why string }{{"released", "job ended"}, {"released", "turn ended"}, {"cancelled", "kept place"}, {"cancelled", "gone"}} {
+		id := int64(i + 1)
+		h.Add(ev("enqueued", "mac", "a", t0, id))
+		h.Add(ev(c.kind, "mac", "a", t0.Add(time.Duration(i+1)*time.Minute), id, func(e *resourcequeue.Event) { e.Why = c.why }))
+	}
+	h.Flush()
+	p, err := h.Runs(RunsQuery{})
+	require.NoError(t, err)
+	got := map[int64]string{}
+	for _, r := range p.Runs {
+		got[r.Entry] = r.End
+	}
+	assert.Equal(t, map[int64]string{1: EndJobEnded, 2: EndTurnEnded, 3: EndKeptPlace, 4: EndGone}, got)
+	for _, w := range []struct {
+		search string
+		want   []int64
+	}{{"job ended", []int64{1}}, {"turn ended", []int64{2}}, {"kept place", []int64{3}}} {
+		p, err := h.Runs(RunsQuery{Search: w.search})
+		require.NoError(t, err)
+		var ids []int64
+		for _, r := range p.Runs {
+			ids = append(ids, r.Entry)
+		}
+		assert.Equal(t, w.want, ids, w.search)
+	}
+}

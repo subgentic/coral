@@ -431,6 +431,7 @@
 .dt-mail-live { flex: none; align-self: center; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--success); }
 .dt-mail-snippet { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--table-tertiary-color); }
 .dt-mail-ask { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); color: var(--table-secondary-color); }
+.dt-mail-ask.dt-mail-ask-wrap { overflow: visible; text-overflow: clip; white-space: normal; } /* a card whose second line is data, not a sentence to cut (the Queue history, #13724) */
 .dt-mail-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .dt-mail-time { font-size: var(--fs-base); color: var(--table-tertiary-color); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .dt-mail-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }

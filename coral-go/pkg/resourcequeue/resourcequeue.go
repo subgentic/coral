@@ -125,6 +125,14 @@ func (q *Queue) note(kind string, e *Entry) {
 	q.pend = append(q.pend, ev)
 }
 
+// noteWhy is note with the reason the caller gave.
+func (q *Queue) noteWhy(kind string, e *Entry, why string) {
+	q.note(kind, e)
+	if why != "" && len(q.pend) > 0 {
+		q.pend[len(q.pend)-1].Why = why
+	}
+}
+
 // unlockEmit lets the lock go and then tells the sink of what changed: outside the lock, and a sink that panics changes nothing.
 func (q *Queue) unlockEmit() {
 	evs := q.pend
@@ -386,27 +394,39 @@ func (q *Queue) ReleaseWhy(key, agent, why string) error {
 // Leave is for an agent whose wait ended without a turn (its --timeout, the tool call it waited in): a place in line is kept for grace, the agent's own claim again takes it back at the same place, and
 // when the grace ends (Reap) it goes. A slot that comes while the agent is away goes to the next one who is here, and the absent one keeps its place at the front for its return. A slot the agent already holds is given back, as Release does (#13706).
 func (q *Queue) Leave(key, agent string, grace time.Duration) error {
+	return q.LeaveWhy(key, agent, grace, "")
+}
+
+// LeaveWhy is Leave with the reason the caller gives, told to the OnEvent sink (#13724): a slot given back is a "released" event, a place given up a "cancelled" one, a place kept an "away" one (not an end: the entry
+// is still in line), each with the reason ("call ended", "job ended", "turn ended", "gone"). A kept place that the grace ends is a "cancelled" event with the reason "kept place" (Reap).
+func (q *Queue) LeaveWhy(key, agent string, grace time.Duration, why string) error {
 	q.mu.Lock()
 	if _, ok := q.res[key]; !ok {
-		q.mu.Unlock()
+		q.unlockEmit()
 		return ErrNoResource
 	}
 	e := q.entryOf(key, agent)
 	if e == nil {
-		q.mu.Unlock()
+		q.unlockEmit()
 		return ErrNotHolder
 	}
 	if !e.Waiting() || grace <= 0 {
+		if e.Waiting() {
+			q.noteWhy("cancelled", e, why)
+		} else {
+			q.noteWhy("released", e, why)
+		}
 		q.drop(e.ID)
 		granted := q.fill(key)
 		err := q.save()
-		q.mu.Unlock()
+		q.unlockEmit()
 		q.notify(granted)
 		return err
 	}
 	e.Away = q.now().Add(grace)
+	q.noteWhy("away", e, why)
 	err := q.save()
-	q.mu.Unlock()
+	q.unlockEmit()
 	return err
 }
 
@@ -420,6 +440,7 @@ func (q *Queue) Reap() (ended []Entry, err error) {
 		dead := q.cfg.Alive != nil && !q.cfg.Alive(e.Claimant.Agent)
 		expired := !e.Waiting() && !e.Lease.IsZero() && !now.Before(e.Lease)
 		if e.Waiting() && !e.Away.IsZero() && !now.Before(e.Away) { // a place kept for an agent that did not come back (#13706)
+			q.noteWhy("cancelled", e, "kept place")
 			ended = append(ended, *e)
 			keys[e.Resource] = true
 			continue

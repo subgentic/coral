@@ -107,3 +107,29 @@ func TestAnEventCarriesTheBoardOfTheTaskAndAHookReleaseTheReasonItGives(t *testi
 	require.NoError(t, q.Release("mac", "b"))
 	assert.Equal(t, "", s.last().Why, "a hand release says no reason of its own")
 }
+
+// #13724 with #13706 and #13718: a slot given back with a reason, a place kept for an agent that is away and the kept place that ran out are each an event the history can say in words.
+func TestLeaveTellsTheReasonAKeptPlaceAndTheEndOfAKeptPlace(t *testing.T) {
+	s := &sink{}
+	q, c := fixture(t, Config{OnEvent: s.add})
+	claim(t, q, "mac", "a", 0)
+	claim(t, q, "mac", "b", 0) // waits
+	require.NoError(t, q.LeaveWhy("mac", "b", 10*time.Minute, "turn ended"))
+	assert.Equal(t, "away", s.last().Kind, "the place is kept: not an end")
+	assert.Equal(t, "turn ended", s.last().Why)
+	c.add(11 * time.Minute)
+	_, err := q.Reap()
+	require.NoError(t, err)
+	rel := s.last()
+	assert.Equal(t, "cancelled", rel.Kind, "the kept place ran out")
+	assert.Equal(t, "kept place", rel.Why)
+	assert.Equal(t, "b", rel.Agent)
+	require.NoError(t, q.LeaveWhy("mac", "a", 10*time.Minute, "job ended")) // a holder: the slot is given back
+	assert.Equal(t, "released", s.last().Kind)
+	assert.Equal(t, "job ended", s.last().Why)
+	claim(t, q, "mac", "c", 0)
+	claim(t, q, "mac", "d", 0) // waits
+	require.NoError(t, q.LeaveWhy("mac", "d", 0, "gone"))
+	assert.Equal(t, "cancelled", s.last().Kind, "no grace: the place goes")
+	assert.Equal(t, "gone", s.last().Why)
+}

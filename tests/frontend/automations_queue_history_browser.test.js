@@ -18,16 +18,17 @@ const STUB = `(() => { const real = window.fetch; window.__queueTickMs = 1000;
     window.__all[1] = { ...window.__all[1], started_at: '', held_s: 0, wait_s: 400, end: 'kicked_from_line', task: 0, goal_id: 0, goal_title: '', pattern: '' }; // never ran, no task
     window.__all[2] = { ...window.__all[2], project: '', goal_id: 0, goal_title: '' }; // a row from before the record kept the board: its task is text
     window.fetch = (u, o) => { const url = new URL(String(u), location.origin), p = url.pathname, get = !o || !o.method || o.method === 'GET';
-        const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } }));
+        const json = (b, s = 200, ms = 0) => Promise.resolve(new Response(ms ? new ReadableStream({ start(c) { setTimeout(() => { c.enqueue(new TextEncoder().encode(JSON.stringify(b))); c.close(); }, ms); } }) : JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } })); // ms: the headers arrive now and the body later, as a slow reply does
         if (p === '/api/resources' && get) return json(window.__live);
         if (p === '/api/analytics/resource-queue/runs') { window.__runReqs.push(url.search);
-            if (window.__runs.status !== 200) return json({ error: 'no' }, window.__runs.status);
+            if (window.__runs.status !== 200 || (window.__runs.failMore && /before=/.test(url.search))) return json({ error: 'no' }, window.__runs.failMore && /before=/.test(url.search) ? 500 : window.__runs.status);
             if (!window.__runs.history) return json({ history: false, runs: [], next: '', resources: [], agents: [] });
             const q = (url.searchParams.get('q') || '').toLowerCase(), res = url.searchParams.get('resource'), ag = url.searchParams.get('agent'), before = url.searchParams.get('before'), lim = Math.min(50, +url.searchParams.get('limit') || 50);
             let list = window.__all.filter(r => (!res || r.resource === res) && (!ag || r.agent === ag) && (!q || [r.agent, r.resource, r.pattern, '#' + r.task, r.end.replace(/_/g, ' ')].some(s => String(s).toLowerCase().includes(q))));
             if (before) { const at = list.findIndex(r => r.key === before); list = at < 0 ? [] : list.slice(at + 1); }
             const page = list.slice(0, lim);
-            return json({ history: true, runs: page, next: list.length > lim ? page[page.length - 1].key : '', resources: RES, agents: AG }); }
+            const slow = (window.__slow || []).find(x => url.search.includes(x[0])); // [search text, ms]: that request's body is late
+            return json({ history: true, runs: page, next: list.length > lim ? page[page.length - 1].key : '', resources: RES, agents: AG }, 200, slow ? slow[1] : 0); }
         return real(u, o); };
     return true; })()`;
 
@@ -97,6 +98,8 @@ const STUB = `(() => { const real = window.fetch; window.__queueTickMs = 1000;
                 await run(at + 'the filters fill the width and the page does not scroll sideways', async () => {
                     const g = await ev(`(() => { const f = [...document.querySelectorAll('${history} .qh-filter')].map(s => Math.round(s.getBoundingClientRect().height)); return { heights: f, over: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
                     assert.deepEqual(g.heights, [44, 44], at + 'the filters are 44 px on a phone: ' + JSON.stringify(g)); assert.ok(g.over <= 1, 'no sideways scroll');
+                    const cut = await ev(`[...document.querySelectorAll('${history} tbody tr[data-key] .dt-mail-ask')].slice(0, 6).filter(a => a.scrollWidth > a.clientWidth + 1).map(a => a.textContent)`);
+                    assert.deepEqual(cut, [], 'the second line of a card is not cut at 390: ' + JSON.stringify(cut));
                 });
             }
             await run(at + 'Show more reads the next 50 by the cursor, each run once, and the button goes at the end', async () => {
@@ -137,6 +140,54 @@ const STUB = `(() => { const real = window.fetch; window.__queueTickMs = 1000;
                 await waitFor(`(() => { const r = document.querySelector('${history} tbody tr[data-key]'); return !!r && /Brand New Agent/.test(r.textContent); })()`, 'the new run on top: ' + await dbg(), 15000);
                 assert.ok((await reqs()).length > before, 'it asked again');
                 await ev(`window.__live = ${JSON.stringify(LIVE)}; window.__all.shift(); true`);
+            });
+            await run(at + 'a filter with the keyboard on it updates the list at once and the keyboard stays on it (no stale rows until a blur)', async () => {
+                await ev(`document.querySelectorAll('${history} .qh-filter')[0].focus(); true`);
+                assert.equal(await ev(`document.activeElement.getAttribute('aria-label')`), 'Resource', 'the filter has the keyboard');
+                await ev(`{ const s = document.activeElement; s.value = 'mini'; s.dispatchEvent(new Event('change', { bubbles: true })); } true`);
+                await waitFor(`document.querySelectorAll('${history} tbody tr[data-key]').length === 50 && ![...document.querySelectorAll('${history} tbody tr[data-key]')].some(r => /mac-heavy/.test(r.textContent))`, 'only mini while the filter still has the keyboard: ' + await dbg(), 8000);
+                await waitFor(`document.activeElement && document.activeElement.getAttribute('aria-label') === 'Resource' && document.activeElement.value === 'mini'`, 'the keyboard is back on the filter, with its choice', 4000);
+                await ev(`document.activeElement.blur(); true`);
+                await new Promise(r => setTimeout(r, 400)); // sleep-ok: nothing more may change after the blur
+                assert.equal(await ev(`[...document.querySelectorAll('${history} tbody tr[data-key]')].some(r => /mac-heavy/.test(r.textContent))`), false, 'and no mac-heavy row comes back after the blur');
+                await ev(`{ const s = document.querySelectorAll('${history} .qh-filter')[0]; s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); } true`);
+                await waitFor(`document.querySelectorAll('${history} tbody tr[data-key]').length === 50 && [...document.querySelectorAll('${history} tbody tr[data-key]')].some(r => /mac-heavy/.test(r.textContent))`, 'all again', 8000);
+            });
+            await run(at + 'typing a search while Show more is on its way: the old page and cursor go at once, the late reply is dropped, a slow earlier search cannot win', async () => {
+                await ev(`window.__runReqs.length = 0; window.__slow = [['before=', 1500]]; document.querySelector('${history} .qh-more').click(); true`);
+                await waitFor(`window.__runReqs.some(q => /before=/.test(q))`, 'the next page asked for', 4000);
+                await ev(`(() => { const i = document.getElementById('automations-search'); i.value = '#13119'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+                assert.equal(await ev(`document.querySelectorAll('${history} tbody tr[data-key]').length + document.querySelectorAll('${history} .qh-more').length`), 0, 'at once: no old rows, no Show more for the old list');
+                await waitFor(`document.querySelectorAll('${history} tbody tr[data-key]').length === 1`, 'the one run of the new search: ' + await dbg(), 8000);
+                await new Promise(r => setTimeout(r, 1800)); // sleep-ok: the late reply of the old page arrives now and must change nothing
+                assert.equal(await ev(`document.querySelectorAll('${history} tbody tr[data-key]').length`), 1, 'the late old page did not add rows to the new search');
+                assert.ok(!(await reqs()).some(q => /q=/.test(q) && /before=/.test(q)), 'no request carried the new search with the old cursor: ' + JSON.stringify(await reqs()));
+                // a slow earlier search against a quick later one
+                await ev(`window.__slow = [['q=%2313118', 1500]]; window.__runReqs.length = 0; (() => { const i = document.getElementById('automations-search'); i.value = '#13118'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+                await waitFor(`window.__runReqs.some(q => /q=%2313118/.test(q))`, 'the slow search asked', 4000);
+                await ev(`(() => { const i = document.getElementById('automations-search'); i.value = '#13117'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+                await waitFor(`document.querySelectorAll('${history} tbody tr[data-key]').length === 1 && /13117/.test(document.querySelector('${history}').textContent)`, 'the later search shows', 8000);
+                await new Promise(r => setTimeout(r, 1800)); // sleep-ok: the earlier, slower reply arrives now and must change nothing
+                assert.ok(/13117/.test(await ev(`document.querySelector('${history}').textContent`)) && !/13118/.test(await ev(`document.querySelector('${history}').textContent`)), 'the slower earlier reply did not overwrite the later search: ' + await dbg());
+                await ev(`window.__slow = []; (() => { const i = document.getElementById('automations-search'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+                await waitFor(`document.querySelectorAll('${history} tbody tr[data-key]').length === 50`, 'cleared', 8000);
+            });
+            await run(at + 'a failed refresh or a failed next page with rows on screen says so above them and Retry asks for that page, the next one by its cursor', async () => {
+                // a failed next page
+                await ev(`window.__runs.failMore = true; window.__runReqs.length = 0; document.querySelector('${history} .qh-more').click(); true`);
+                await waitFor(`/More runs could not be read/.test(document.querySelector('${history}').textContent) && !!document.querySelector('${history} .qh-retry')`, 'the failed page said: ' + await dbg(), 8000);
+                assert.equal(await ev(`document.querySelectorAll('${history} tbody tr[data-key]').length`), 50, 'the rows stay');
+                assert.ok(await ev(`!!document.querySelector('${history} .qh-more')`), 'and Show more is still there');
+                await ev(`window.__runs.failMore = false; window.__runReqs.length = 0; document.querySelector('${history} .qh-retry').click(); true`);
+                await waitFor(`document.querySelectorAll('${history} tbody tr[data-key]').length === 100 && !/could not be/.test(document.querySelector('${history}').textContent)`, 'Retry read the next page: ' + await dbg(), 8000);
+                assert.ok((await reqs()).some(q => /before=\d+-1/.test(q)), 'with the cursor: ' + JSON.stringify(await reqs()));
+                // a failed refresh (the live queue moved and the read failed)
+                await ev(`window.__runs.status = 500; window.__live = { resources: [{ name: 'mac-heavy', slots: 1, machine: 'Mac', max_lease_seconds: 3600, holders: [{ id: 701, agent: 'Another', enqueued_at: new Date().toISOString(), granted_at: new Date().toISOString(), lease_until: new Date(Date.now() + 600000).toISOString() }], queue: [] }] }; true`);
+                await waitFor(`/could not be refreshed/.test(document.querySelector('${history}').textContent)`, 'the failed refresh said: ' + await dbg(), 15000);
+                assert.equal(await ev(`document.querySelectorAll('${history} tbody tr[data-key]').length`), 100, 'the rows stay');
+                await ev(`window.__runs.status = 200; window.__live = ${JSON.stringify(LIVE)}; document.querySelector('${history} .qh-retry').click(); true`);
+                await waitFor(`!/could not be/.test(document.querySelector('${history}').textContent)`, 'Retry cleared it', 8000);
+                await ev(`document.querySelector('${history} .qh-more') && document.querySelectorAll('${history} tbody tr[data-key]').length; true`);
             });
             await run(at + 'no record and a failed read say so in a line, and Retry reads again', async () => {
                 await ev(`window.__runs.history = false; true`);

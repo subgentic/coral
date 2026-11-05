@@ -13,13 +13,14 @@ const { liveAgentOf, openAgent } = await importOnce('./agent_live.js');
 export const END_WORDS = {
     released: 'Released', call_ended: 'Call ended', unused: 'Not used', cap: 'Time cap', gone: 'Session ended', expired: 'Lease ran out',
     kicked: 'Kicked', kicked_from_line: 'Kicked from the line', left_line: 'Left the line', ran_anyway: 'Ran anyway',
+    job_ended: 'Job ended', turn_ended: 'Turn ended', kept_place: 'Kept place ran out', // #13706, #13718
 };
 const endWord = r => END_WORDS[r.end] || 'Ended';
-const STOPPED = new Set(['kicked', 'kicked_from_line', 'expired', 'cap']); // an end that was not the agent's own
+const STOPPED = new Set(['kicked', 'kicked_from_line', 'expired', 'cap', 'kept_place']); // an end that was not the agent's own
 
 const PAGE = 50;
-const st = { runs: [], next: '', loaded: false, loading: false, error: false, recorded: true, resources: [], agents: [], resource: '', agent: '', q: '', version: 0, wanted: false, timer: 0, seq: 0, qTimer: 0 };
-let listeners = new Set(), frozenSignature = null;
+const st = { runs: [], next: '', loaded: false, loading: false, error: '', recorded: true, resources: [], agents: [], resource: '', agent: '', q: '', version: 0, wanted: false, timer: 0, seq: 0, qTimer: 0 }; // error: '' | 'refresh' | 'page' (what failed, so Retry asks for the right page)
+let listeners = new Set(), refocus = '';
 
 export const onHistoryChanged = fn => { listeners.add(fn); };
 /** Changes whenever what the history shows does, so the page's key can carry it. */
@@ -38,15 +39,20 @@ const params = (extra = {}) => {
     return p.toString();
 };
 
-/** Read the first page again (after a filter, a search, or the live queue changed); more=true reads the page after the last one shown and adds it. A reply for an older question is dropped. */
+/** What the list is for: a reply or a cursor belongs to the filters and search it was asked with, and to no other. */
+const qkey = () => JSON.stringify([st.resource, st.agent, st.q.trim()]);
+
+/** Read the first page again (after a filter, a search, or the live queue changed); more=true reads the page after the last one shown and adds it. A reply for another question is dropped, after the body is read as well as before. */
 export async function readHistory({ more = false } = {}) {
-    const seq = ++st.seq;
+    if (more && (!st.next || st.loading)) return; // no page to ask for yet, or one is on its way
+    const seq = ++st.seq, key = qkey(), cursor = more ? st.next : '';
     st.loading = true; if (more) bump(); // the button says it is reading
     try {
-        const r = await fetch(`/api/analytics/resource-queue/runs?${params(more ? { before: st.next } : {})}`);
-        if (seq !== st.seq) return;
+        const r = await fetch(`/api/analytics/resource-queue/runs?${params(more ? { before: cursor } : {})}`);
+        if (seq !== st.seq || key !== qkey()) return;
         if (!r.ok) throw new Error(String(r.status));
         const b = await r.json();
+        if (seq !== st.seq || key !== qkey()) return; // the question changed while the body was read
         const got = Array.isArray(b.runs) ? b.runs : [];
         st.recorded = b.history !== false;
         st.resources = Array.isArray(b.resources) ? b.resources : [];
@@ -54,11 +60,10 @@ export async function readHistory({ more = false } = {}) {
         if (more) { const have = new Set(st.runs.map(x => x.key)); st.runs = [...st.runs, ...got.filter(x => !have.has(x.key))]; st.next = b.next || ''; }
         else if (st.runs.length > PAGE) { // a live refresh keeps the pages already opened: the new runs join the top, the cursor stays
             const have = new Set(st.runs.map(x => x.key));
-            const fresh = got.filter(x => !have.has(x.key));
-            st.runs = [...fresh, ...st.runs];
+            st.runs = [...got.filter(x => !have.has(x.key)), ...st.runs];
         } else { st.runs = got; st.next = b.next || ''; }
-        st.loaded = true; st.error = false;
-    } catch { if (seq !== st.seq) return; st.error = true; } finally { if (seq === st.seq) { st.loading = false; bump(); } }
+        st.loaded = true; st.error = '';
+    } catch { if (seq !== st.seq || key !== qkey()) return; st.error = more ? 'page' : 'refresh'; } finally { if (seq === st.seq) { st.loading = false; bump(); if (refocus) setTimeout(() => { refocus = ''; }, 300); } } // the choice's own redraws (the list cleared, then its rows) each hand the keyboard back to the filter; after that it is let go
 }
 
 /** Start or stop: on while the Queue folder is the one on screen. The live queue's own changes read the first page again (an entry that ended is a new run). */
@@ -66,25 +71,29 @@ export function watchHistory(on) {
     st.wanted = !!on;
     if (!st.wanted) { clearInterval(st.timer); st.timer = 0; return; }
     if (!st.loaded && !st.loading) readHistory();
-    if (!st.timer) st.timer = pollEvery(() => { if (st.wanted && !document.hidden && !focusedFilter()) readHistory(); }, 30000); // a backstop: the live queue's changes read it sooner
+    if (!st.timer) st.timer = pollEvery(() => { if (st.wanted && !document.hidden && !focusedFilter() && st.error !== 'page') readHistory(); }, 30000); // a backstop: the live queue's changes read it sooner
 }
 /** The live queue changed: a run may have ended. */
-export function queueMoved() { if (st.wanted && st.loaded && !focusedFilter()) readHistory(); }
+export function queueMoved() { if (st.wanted && st.loaded && !focusedFilter() && st.error !== 'page') readHistory(); }
 
-/** The folder's search text: the server searches, a moment after the typing stops. */
+/** The folder's search text: it binds to the list at once (the old rows and cursor go, an older reply is dropped), the server is asked a moment after the typing stops. */
 export function setSearch(q) {
     q = String(q || '');
     if (q === st.q) return;
     st.q = q;
+    restart();
     clearTimeout(st.qTimer);
-    st.qTimer = setTimeout(() => { st.runs = []; st.next = ''; st.loaded = false; readHistory(); bump(); }, 250);
+    st.qTimer = setTimeout(() => readHistory(), 250);
 }
-const setFilter = (key, value) => { st[key] = value; st.runs = []; st.next = ''; st.loaded = false; bump(); readHistory(); };
+/** The list is for a new question: nothing of the old one stays, and a reply on its way for it is dropped. */
+function restart() { st.seq++; st.runs = []; st.next = ''; st.loaded = false; st.loading = true; st.error = ''; bump(); }
+const setFilter = (key, value, label) => { st[key] = value; refocus = label; clearTimeout(st.qTimer); restart(); readHistory(); };
 const focusedFilter = () => { const a = document.activeElement; return !!(a && a.classList && a.classList.contains('qh-filter')); };
 
 const time = iso => { const d = new Date(iso || ''); return Number.isFinite(d.getTime()) ? formatMonthDayTime(d) : ''; };
 const waitedWords = r => (r.wait_s >= 1 ? compactDuration(r.wait_s) : 'No wait');
-const heldWords = r => (r.started_at ? (r.held_s >= 1 ? compactDuration(r.held_s) : 'Under a second') : '');
+const heldWords = r => (r.started_at ? (r.held_s >= 1 ? compactDuration(r.held_s) : '<1 s') : '');
+const cardWords = r => `${endWord(r)}${r.started_at ? ' · held ' + heldWords(r) : ''} · ${r.wait_s >= 1 ? 'waited ' + compactDuration(r.wait_s) : 'no wait'}`; // the card's second line: how it ended, for how long, and the wait
 const openTask = (r, from) => importOnce('./task_navigation.js').then(m => m.openTask(r.project, r.task, from, { from: '' }));
 const openGoal = r => importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(r.project, r.goal_id));
 const goalWords = r => `#${r.goal_id} ${r.goal_title}`;
@@ -101,13 +110,8 @@ const emptyLine = () => (st.error ? 'The history could not be read.'
         : !st.loaded ? 'Reading the history.'
             : st.q.trim() || st.resource || st.agent ? 'No run matches the search and filters.' : 'No run has ended yet. A run appears here when its agent gives the slot back or it is removed.');
 
-/** A signature of what the history shows, for the table's redraw key; frozen while a filter has the keyboard so its open list is not drawn away. */
-export function historySignature() {
-    const now = JSON.stringify([st.version, st.runs.length, st.next]);
-    if (focusedFilter() && frozenSignature !== null) return frozenSignature;
-    frozenSignature = now;
-    return now;
-}
+/** A signature of what the history shows, for the table's redraw key. */
+export const historySignature = () => JSON.stringify([st.version, st.runs.length, st.next]);
 
 function select(label, value, options, onPick) {
     const wrap = DT.el('label', 'qh-field');
@@ -115,8 +119,13 @@ function select(label, value, options, onPick) {
     const s = DT.el('select', 'qh-filter');
     s.setAttribute('aria-label', label);
     for (const [v, text] of [['', `All ${label.toLowerCase()}s`], ...options.map(o => [o, o])]) { const o = DT.el('option', '', text); o.value = v; if (v === value) o.selected = true; s.append(o); }
-    s.addEventListener('change', () => onPick(s.value));
-    s.addEventListener('blur', () => { frozenSignature = null; bump(); }); // what arrived while the list was open is drawn now
+    s.addEventListener('change', () => onPick(s.value, label));
+    if (refocus === label) { // the page was drawn again for this very choice: the keyboard goes back to the filter it was on, the new one (marked here, found once it is in the document)
+        s.dataset.refocus = '1';
+        let tries = 0;
+        const back = () => { const el = document.querySelector('.qh-filter[data-refocus]'); if (el) { el.focus({ preventScroll: true }); delete el.dataset.refocus; } else if (++tries < 20) setTimeout(back, 25); };
+        setTimeout(back, 0);
+    }
     wrap.append(s);
     return wrap;
 }
@@ -131,7 +140,7 @@ export function historySection() {
     head.append(h, count);
     if (st.recorded) {
         const filters = DT.el('div', 'qh-filters');
-        filters.append(select('Resource', st.resource, st.resources, v => setFilter('resource', v)), select('Agent', st.agent, st.agents, v => setFilter('agent', v)));
+        filters.append(select('Resource', st.resource, st.resources, (v, l) => setFilter('resource', v, l)), select('Agent', st.agent, st.agents, (v, l) => setFilter('agent', v, l)));
         head.append(filters);
     }
     sec.append(head);
@@ -140,6 +149,11 @@ export function historySection() {
         if (st.error) { const b = DT.el('button', 'btn btn-small', 'Retry'); b.type = 'button'; b.addEventListener('click', () => readHistory()); p.append(' ', b); }
         box.append(p); sec.append(box);
         return sec;
+    }
+    if (st.error) { // the rows stay; a failed refresh or a failed next page says so, and Retry asks for that page again (the next page by its own cursor)
+        const box = DT.el('div', 'empty-state empty-state-tight'), p = DT.el('p', 'empty-state-line', st.error === 'page' ? 'More runs could not be read.' : 'The history could not be refreshed.'); p.setAttribute('role', 'status');
+        const b = DT.el('button', 'btn btn-small qh-retry', 'Retry'); b.type = 'button'; b.addEventListener('click', () => readHistory({ more: st.error === 'page' }));
+        p.append(' ', b); box.append(p); sec.append(box);
     }
     sec.append(DT.dataTable({
         label: `Queue history, ${st.runs.length}`, rows: st.runs, oneLine: true, resize: true, keepOrder: true, rowKey: r => r.key, rowName: r => `${r.agent}, ${r.resource}, ${endWord(r)}`,
@@ -154,8 +168,8 @@ export function historySection() {
             { key: 'held', label: 'Held', width: '5.5rem', tone: 'tertiary', cell: heldWords },
             { key: 'end', label: 'Ended', width: '11rem', cell: r => DT.chip(endWord(r), STOPPED.has(r.end) ? 'goal-state-task-blocked' : '') },
         ],
-        mail: r => ({ lead: { icon: STOPPED.has(r.end) ? 'cancel' : 'check_circle', square: true, name: endWord(r) }, title: r.agent, medium: true, snippet: `${r.resource}${r.pattern ? ' · ' + r.pattern : ''}`, state: endWord(r), time: time(r.started_at || r.ended_at),
-            ask: `${endWord(r)}${r.started_at ? ' · held ' + heldWords(r).toLowerCase() : ''} · waited ${waitedWords(r).toLowerCase()}`, // a second line: how it ended and for how long; the first line is who, where and when
+        mail: r => ({ lead: { icon: STOPPED.has(r.end) ? 'cancel' : 'check_circle', square: true, name: endWord(r) }, title: r.agent, medium: true, snippet: `${r.resource}${r.pattern ? ' · ' + r.pattern : ''}`, state: endWord(r), askWrap: true, time: time(r.started_at || r.ended_at),
+            ask: cardWords(r), // a second line: how it ended and for how long; the first line is who, where and when
             actions: linkActions(r).map(a => ({ label: a.label, title: a.title, run: a.run })) }),
     }).el);
     if (st.next) {

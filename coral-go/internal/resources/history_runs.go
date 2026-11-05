@@ -23,6 +23,9 @@ const (
 	EndKickedFromLine = "kicked_from_line" // a person removed an entry that was still waiting
 	EndLeftLine       = "left_line"        // the agent left the line itself
 	EndRanAnyway      = "ran_anyway"       // the CLI ran the command that was refused: its place in line went
+	EndJobEnded       = "job_ended"        // the job a hand claim was held for ended
+	EndTurnEnded      = "turn_ended"       // the agent's turn ended (the safety net for a tool call that never reported its end)
+	EndKeptPlace      = "kept_place"       // a place kept for an agent whose wait ended was not taken back in time
 )
 
 // RunsPageSize is the most runs one read answers (the Operator's "paged at 50").
@@ -32,6 +35,7 @@ const RunsPageSize = 50
 var endWords = map[string]string{
 	EndReleased: "released", EndCallEnded: "call ended", EndUnused: "not used", EndCap: "time cap", EndGone: "session ended",
 	EndExpired: "lease ran out", EndKicked: "kicked", EndKickedFromLine: "kicked from the line", EndLeftLine: "left the line", EndRanAnyway: "ran anyway",
+	EndJobEnded: "job ended", EndTurnEnded: "turn ended", EndKeptPlace: "kept place",
 }
 
 // Run is one entry of the queue that ended.
@@ -110,6 +114,12 @@ func endOf(kind, why string, granted bool) string {
 		return EndGone
 	case "ran anyway":
 		return EndRanAnyway
+	case "job ended":
+		return EndJobEnded
+	case "turn ended":
+		return EndTurnEnded
+	case "kept place":
+		return EndKeptPlace
 	}
 	switch kind {
 	case "expired":
@@ -289,6 +299,12 @@ func endClause(codes []string) (string, []any) {
 			whys["cap"] = true
 		case EndRanAnyway:
 			whys["ran anyway"] = true
+		case EndJobEnded:
+			whys["job ended"] = true
+		case EndTurnEnded:
+			whys["turn ended"] = true
+		case EndKeptPlace:
+			whys["kept place"] = true
 		case EndGone:
 			kinds["gone"] = true
 			whys["gone"] = true
