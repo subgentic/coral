@@ -60,6 +60,7 @@ export const total = () => rows.length;
 /** The page's table spec for the sidebar's group table. `open` has { file(row), goal(row), question(row) }: how a row's item opens (the sidebar knows the routes). */
 export function spec(f, open) {
     const list = filtered(f);
+    const displayWords = r => /^(task_|prompt_|wait_)/.test(r.action) || r.action === 'answer' ? actionWord(r) : itemWords(r);
     const opens = r => (r.item_kind === 'file' && /^[a-f0-9]{64}$/i.test(r.version || r.item_id || '')) || (r.item_kind === 'agent' && r.item_id && r.action !== 'agents_record') || (['goal', 'question', 'task', 'message'].includes(r.item_kind) && /^\d+$/.test(r.item_id)) || (r.item_kind === 'chat' && !!r.item_id);
     return { title: 'Activity', noun: ['action', 'actions'], rows: list,
         empty: { line: !loaded || loading ? 'Reading the record…' : failed ? (denied ? 'Only the account this computer is linked to can see the Activity record.' : 'The record could not be read.') : AF.isFiltered(f) ? 'No action matches the search and filters.' : 'Nothing yet.',
@@ -73,8 +74,8 @@ export function spec(f, open) {
                 open: r => { if (!opens(r)) return; if (r.item_kind === 'file' && /^[a-f0-9]{64}$/i.test(r.version || r.item_id || '')) open.file(r); else if (r.item_kind === 'goal') open.goal(r); else if (r.item_kind === 'question' && opens(r)) open.question(r); else if (r.item_kind === 'task' && opens(r)) open.task(r); else if (r.item_kind === 'agent' && opens(r)) open.agent(r); else if (r.item_kind === 'message' && opens(r)) open.message(r); else if (r.item_kind === 'chat' && opens(r)) open.chat(r); },
                 mail: r => ({ lead: { icon: 'checklist', square: true, name: actionWord(r) }, title: itemWords(r), team: teamOf(r), snippet: '', ask: actionWord(r), state: actionWord(r), time: DT.timeCell(r.at).textContent }),
                 columns: [ // narrowing drops From (62 rem), then Team (52), then When (36), then You did (16): the data table's own thresholds, so the On column (the item) never shrinks (the table rules' R2)
-                    { key: 'action', label: 'You did', sort: true, sortValue: actionWord, line: 2, width: '12rem', dropAt: 16, cell: r => { const w = DT.el('span', 'activity-did', actionWord(r)); return w; } },
-                    { key: 'item', label: 'On', primary: true, width: 'grow', sort: true, sortValue: itemWords, line: 1, cell: r => (opens(r) ? DT.primaryButton(itemWords(r), `Open ${itemWords(r)}`) : DT.el('span', 'activity-item', itemWords(r))) },
+                    { key: 'action', label: 'You did', sort: true, sortValue: actionWord, line: 2, width: '12rem', dropAt: 16, cell: r => { const w = DT.el('span', 'activity-did', AF.ACTION_LABEL[r.action] || r.action); if (r.note && displayWords(r) === itemWords(r)) w.append(DT.el('span', 'activity-note', ` “${r.note}”`)); return w; } },
+                    { key: 'item', label: 'On', primary: true, width: 'grow', sort: true, sortValue: itemWords, line: 1, cell: r => { const text = displayWords(r), el = opens(r) ? DT.primaryButton(text, `Open ${itemWords(r)}`) : DT.el('span', 'activity-item', text); DT.tipIf(el, text, () => el.scrollWidth > el.clientWidth); return el; } },
                     { key: 'team', label: 'Team', sort: true, sortValue: teamOf, line: 2, width: '9rem', dropAt: 52, cell: teamOf },
                     { key: 'from', label: 'From', sort: true, sortValue: fromWords, line: 2, tone: 'tertiary', width: '11rem', dropAt: 62, cell: fromWords },
                     { key: 'when', label: 'When', sort: 'date', sortValue: r => r.at, firstDir: 'desc', line: 0, tone: 'tertiary', align: 'end', width: '7rem', dropAt: 36, cell: r => DT.timeCell(r.at) },
