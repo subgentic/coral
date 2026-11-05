@@ -7,6 +7,7 @@ const BASE = require('./test_base').BASE;
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
 const { removeBoards } = require('./helpers/board_cleanup');
+const { ownRows, settleOwn } = require('./helpers/own_rows');
 
 async function httpJson(method, path, body, headers = {}) {
     const r = await fetch(BASE + path, { method, headers: { 'Content-Type': 'application/json', ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -28,8 +29,7 @@ async function httpJson(method, path, body, headers = {}) {
         if (!standIn.sid) throw new Error('no stand-in agent: ' + standIn.diag);
         const sid = standIn.sid, name = standIn.name, tok = { 'X-Coral-Session-Token': standIn.token };
         assert.ok((await httpJson('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'Needs Walker', job_title: 'Backend Dev', session_name: name })).status < 300);
-        const base = await needs();
-        const mine = d => d.items.filter(i => i.team === B);
+        const mine = d => ownRows(d.items, { team: B }); // the shard's server is shared: only this suite's board is counted (#13389)
 
         // an agent waiting on a question
         // the events and requests are stored under the live list's own name for the agent (its folder), not the launch's session name
@@ -38,7 +38,7 @@ async function httpJson(method, path, body, headers = {}) {
         let r = await httpJson('POST', `/api/sessions/live/${encodeURIComponent(agentName)}/events`, { event_type: 'permission_request', summary: 'Wants to run npm test', session_id: sid }, tok);
         assert.ok(r.status < 300, JSON.stringify(r));
         let d = await needs();
-        assert.equal(d.count, base.count + 1, 'the waiting agent is counted: ' + JSON.stringify(d));
+        assert.equal(ownRows(mine(d), { kind: 'agent' }).length, 1, 'the waiting agent is counted: ' + JSON.stringify(mine(d)));
         const agent = mine(d).find(i => i.kind === 'agent');
         assert.ok(agent, 'an agent item on the team: ' + JSON.stringify(d.items));
         assert.ok(agent.id.startsWith('agent:') && agent.line && agent.at, JSON.stringify(agent));
@@ -54,7 +54,7 @@ async function httpJson(method, path, body, headers = {}) {
         assert.ok(!JSON.stringify(d).includes(token) && !JSON.stringify(d).includes(token.slice(0, 20)), 'the token is redacted');
         assert.ok(!ask.line.includes('\n'), 'one line');
         assert.equal(ask.from, 'Needs Walker');
-        assert.equal(d.counts.question, (base.counts.question || 0) + 1);
+        assert.equal(ownRows(mine(d), { kind: 'question' }).length, 1, 'the one question is counted: ' + JSON.stringify(mine(d)));
 
         // a file the agent tags for review
         const up = await httpJson('POST', `/api/agent/artifacts?session_id=${sid}&tag=for+review&question=${encodeURIComponent('Approve the plan?')}`, 'plan ' + Date.now(), { 'X-Artifact-Name': 'plan.txt', 'X-Artifact-Media-Type': 'text/plain', ...tok });
@@ -75,19 +75,20 @@ async function httpJson(method, path, body, headers = {}) {
         const ids = []; let cur = '1970-01-01T00:00:00Z';
         for (let n = 0; n < 40; n++) { const page = await needs('?limit=1&after=' + encodeURIComponent(cur)); if (!page.items.length) break; ids.push(page.items[0].id); cur = page.cursor; }
         assert.equal(new Set(ids).size, ids.length, 'none twice: ' + ids);
-        assert.equal(ids.length, d.count, 'every waiting thing, in pages of one: ' + ids.length + ' of ' + d.count);
+        for (const i of d.items) assert.ok(ids.includes(i.id), 'every item of the list arrives in the pages of one: ' + i.id); // others' rows may come and go: only this list's items are named
 
         // Dismiss takes it out of the count and Unignore puts it back; Approve and Deny take it out for good
         const review1 = async decision => person('POST', `/api/board/${B}/artifacts/${hex}/review`, { decision });
-        const countOf = async () => (await needs()).counts.review;
+        const countOf = async () => ownRows(mine(await needs()), { kind: 'review' }).length; // this suite's file only
         const before = await countOf();
+        assert.equal(before, 1, 'the one file is waiting');
         assert.equal((await review1('ignore')).status, 200);
-        assert.equal(await countOf(), before - 1, 'ignored: not waiting');
+        assert.equal(await settleOwn(countOf, before - 1), before - 1, 'ignored: not waiting');
         assert.equal((await review1('unignore')).status, 200);
-        assert.equal(await countOf(), before, 'unignored: waiting again');
+        assert.equal(await settleOwn(countOf, before), before, 'unignored: waiting again');
         const denied = await review1('deny');
         assert.equal(denied.status, 200, JSON.stringify(denied));
-        assert.equal(await countOf(), before - 1, 'denied: not waiting');
+        assert.equal(await settleOwn(countOf, before - 1), before - 1, 'denied: not waiting');
 
         // a script that is not a person has no standing here
         r = await httpJson('GET', '/api/needs-you', undefined, tok);
