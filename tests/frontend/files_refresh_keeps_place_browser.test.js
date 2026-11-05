@@ -58,6 +58,8 @@ const FILES = {
             const before = await ev(`(() => ({ top: window.__sc.scrollTop, opened: ![...document.querySelectorAll('#changed-files-list .file-diff[data-filepath="e.go"] .cm-collapsedLines')].some(b => /^7 unchanged/.test(b.textContent.trim())), open: [...document.querySelectorAll('#changed-files-list .file-diff')].filter(d => !d.hidden).length, ed: (window.__ed = document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"] .cm-editor')) && 1 }))()`);
             check(`${tag}: before the refresh the panel is scrolled, a block is open, two diffs are open`, before.top > 100 && before.opened && before.open === 2, JSON.stringify(before));
             // a refresh brings in one more file: the list is drawn again from what was read
+            await ev(`window.__fileRows = [...document.querySelectorAll('#changed-files-list .file-item')]; import((window.__coralStatic || '/static/') + 'changed_files.js').then(m => m.loadChangedFiles('wp', 'wp-id')).then(() => true)`);
+            check(`${tag}: an unchanged async file read reuses every row while typing can continue`, await ev(`window.__fileRows.every(r => r.isConnected && r === [...document.querySelectorAll('#changed-files-list .file-item')].find(n => n.dataset.filepath === r.dataset.filepath))`));
             await ev(`window.__files['z.txt'] = { status: 'added', original: '', current: 'new\\n', additions: 1, deletions: 0 }; window.refreshChangedFiles(true).then(() => true)`);
             await waitFor(`document.querySelectorAll('#changed-files-list .file-item').length === 3`, `${tag}: the refreshed list has three files`, 8000);
             await ev(framesJs(20));

@@ -13,6 +13,7 @@ import { fileIconHtml } from './file_explorer.js';
 import { openPreviewTab, openArtifactTab, setPreviewSession, refreshOpenFiles } from './preview_pane.js';
 import { storeKey, readStars, writeStars } from './local_store.js';
 import { importOnce } from './import_once.js';
+import { morphHtml } from './dom_morph.js';
 import { serverFetch, serverForSession, sessionServer, currentServer, isCloud, dropBody } from './server_base.js';
 
 let _currentFiles = [];
@@ -746,7 +747,7 @@ export async function refreshChangedFiles(quiet = false, auto = false) { // quie
     const scroller = scrollerOf(list), scrolled = scroller ? scroller.scrollTop : 0;
     let anchor = null; // the file under the top of the view and how far its row is from that top: a file that arrives above it moves the list, not the reader's place
     if (scroller) { const top = scroller.getBoundingClientRect().top; for (const row of list.querySelectorAll('.file-item')) { const slot = row.nextElementSibling, end = (slot && slot.classList.contains('file-diff') && !slot.hidden ? slot : row).getBoundingClientRect().bottom; if (end > top) { anchor = { path: row.dataset.filepath, at: row.getBoundingClientRect().top - top }; break; } } }
-    list.innerHTML = files.map((f, i) => {
+    const rowsHtml = files.map((f, i) => {
         const { dir, name } = splitPath(f.filepath);
         const statusCls = getStatusClass(f.status);
         const statusLabel = getStatusLabel(f.status);
@@ -789,16 +790,18 @@ export async function refreshChangedFiles(quiet = false, auto = false) { // quie
             <div class="file-action-btns">${copyBtn}${previewBtn}${editBtn}${shareBtn}</div>
         </div>${diffSlot}`;
     }).join('');
-    for (const fresh of list.querySelectorAll('.file-diff')) { const old = kept.get(fresh.dataset.filepath); if (old && !fresh.hidden) { old.id = fresh.id; fresh.replaceWith(old); if (old.querySelector('.diff-comments')) importOnce('./diff_comments.js').then(m => m.placeDiffCommentIcon(old)).catch(() => {}); /* its comment icon goes back in the new row (#13528) */ } }
+    const allOpen = !plain && files.every(f => _expandedFiles.has(f.filepath)), expandAllText = allOpen ? 'Collapse all' : 'Expand all', expandAllLabel = `${expandAllText} the changes`;
+    // Expand all (#11350) is on the list's first line, not in the header: the header keeps its size when the first list arrives (#7671).
+    const expandAll = plain ? '' : `<button type="button" class="btn btn-quiet btn-xs files-expand-all" data-on-click="files-expand-all" aria-label="${escapeAttr(expandAllLabel)}">${escapeHtml(expandAllText)}</button>`;
+    // Reusing unchanged rows avoids tearing down thousands of layout objects when an async read lands during typing (#13666).
+    if (!sameAgent) for (const slot of list.querySelectorAll('.file-diff')) slot.replaceChildren(); // never keep another agent's editor
+    morphHtml(list, `${staleNoteHtml()}<div class="files-legend"><span>New files are green, deleted ones red, the rest changed.</span>${expandAll}</div>${rowsHtml}`);
+    for (const fresh of list.querySelectorAll('.file-diff')) { const old = kept.get(fresh.dataset.filepath); if (old && old !== fresh && !fresh.hidden) { old.id = fresh.id; fresh.replaceWith(old); if (old.querySelector('.diff-comments')) importOnce('./diff_comments.js').then(m => m.placeDiffCommentIcon(old)).catch(() => {}); /* its comment icon goes back in the new row (#13528) */ } }
     if (scroller && scrolled) {
         scroller.scrollTop = scrolled;
         const row = anchor && [...list.querySelectorAll('.file-item')].find(r => r.dataset.filepath === anchor.path);
         if (row) scroller.scrollTop += (row.getBoundingClientRect().top - scroller.getBoundingClientRect().top) - anchor.at;
     }
-    const allOpen = !plain && files.every(f => _expandedFiles.has(f.filepath)), expandAllText = allOpen ? 'Collapse all' : 'Expand all', expandAllLabel = `${expandAllText} the changes`;
-    // Expand all (#11350) is on the list's first line, not in the header: the header keeps its size when the first list arrives (#7671).
-    const expandAll = plain ? '' : `<button type="button" class="btn btn-quiet btn-xs files-expand-all" data-on-click="files-expand-all" aria-label="${escapeAttr(expandAllLabel)}">${escapeHtml(expandAllText)}</button>`;
-    list.insertAdjacentHTML('afterbegin', `${staleNoteHtml()}<div class="files-legend"><span>New files are green, deleted ones red, the rest changed.</span>${expandAll}</div>`);
     if (heldMore) [...list.querySelectorAll('.file-more-btn')].find(b => b.dataset.path === heldMore)?.focus({ preventScroll: true });
     paintExpandAll();
     if (!plain && _expandedFiles.size) showExpanded(list, files); // the diffs that were open are drawn again from what was read (#11350)
