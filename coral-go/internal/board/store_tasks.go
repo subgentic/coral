@@ -701,12 +701,22 @@ func (s *Store) ClaimTask(ctx context.Context, project, subscriberID string, req
 			continue
 		}
 		s.recordClaimSession(ctx, project, subscriberID, taskID)
+		s.noteClaimedTaskFiles(ctx, project, taskID)
 		return s.getTaskByID(ctx, project, taskID)
 	}
 	if reviewsOnly && !named { // nothing of its own: the oldest pooled review that matches its areas
 		return s.ClaimPoolReview(ctx, project, subscriberID, 0)
 	}
 	return nil, nil
+}
+
+// noteClaimedTaskFiles moves the board's artifacts revision after a claim of a task that already has files (one sent back and claimed again): the claim sets its assigned_to and session_id, which the team's
+// artifact list attributes its files by (#13566). A task with no files is no row of the list: no note, so a claim of one stirs nothing.
+func (s *Store) noteClaimedTaskFiles(ctx context.Context, project string, taskID int64) {
+	var has int
+	if err := s.db.GetContext(ctx, &has, `SELECT has_artifacts FROM task_workflows WHERE task_id = ?`, taskID); err == nil && has == 1 {
+		s.NoteArtifactsChanged(project)
+	}
 }
 
 // errSlotHeld is the refusal of a claim by an agent that has a task in progress.

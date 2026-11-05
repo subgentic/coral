@@ -732,7 +732,7 @@ func (s *Store) completeTaskWithArtifacts(ctx context.Context, project string, t
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	if len(artifacts) > 0 {
+	if len(artifacts) > 0 || (w.CompletionReview != nil && len(w.CompletionReview.Artifacts) > 0) { // a task completed with none still has the files of its completion review, and completing it sets their time (#13566)
 		s.NoteArtifactsChanged(project)
 	}
 	s.computeAndStoreTaskCost(ctx, project, taskID)
