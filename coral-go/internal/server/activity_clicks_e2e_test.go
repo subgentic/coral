@@ -84,7 +84,7 @@ func TestOperatorClicksAreInTheActivityRecord(t *testing.T) {
 		id := mk("A task")
 		c := mkcase(id)
 		before := len(rows())
-		code, out := do(c.method, c.path, c.body, map[string]string{"X-Coral-Session-Token": "not-a-real-token"})
+		code, out := do(c.method, c.path, c.body, map[string]string{store.SessionTokenHeader: "not-a-real-token"})
 		require.Len(t, rows(), before, "%s: an agent's call is no click (%d %s)", c.name, code, out)
 		code, out = do(c.method, c.path, c.body, map[string]string{"Origin": ts.URL, "Sec-Fetch-Site": "same-origin"}) // the dashboard's own fetch
 		require.Less(t, code, 300, "%s: %s", c.name, out)
@@ -182,7 +182,7 @@ func TestMoreOperatorClicksAreInTheActivityRecord(t *testing.T) {
 	for _, mk := range cases {
 		c := mk()
 		before := len(rows())
-		code, out := do(c.method, c.path, c.body, map[string]string{"X-Coral-Session-Token": "not-a-real-token"})
+		code, out := do(c.method, c.path, c.body, map[string]string{store.SessionTokenHeader: "not-a-real-token"})
 		require.Len(t, rows(), before, "%s: an agent's call is no click (%d %s)", c.name, code, out)
 		code, out = do(c.method, c.path, c.body, person)
 		require.Less(t, code, 300, "%s: %s", c.name, out)
