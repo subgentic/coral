@@ -272,3 +272,42 @@ func TestDefineTakesAMatchListAndShowsItBack(t *testing.T) {
 	code, _ = g.do("token:Plain Dev", "PUT", "/api/resources/mac-heavy", map[string]any{"slots": 1, "match": []string{"go test"}})
 	assert.Equal(t, 403, code, "an agent cannot add patterns: they decide what the hook claims")
 }
+
+// #13704: the Queue folder links the agent, the task and its goal: the list answer carries the task's board (ids repeat across boards) and the task's goal, read server-side, one lookup per distinct task and never one per row on the page.
+func TestTheListCarriesEachEntrysTaskBoardAndGoal(t *testing.T) {
+	g := newResRig(t)
+	ctx := context.Background()
+	g.subscribe("alpha", "Dev A", "Developer", false)
+	g.subscribe("alpha", "Dev B", "Developer", false)
+	g.subscribe("beta", "Dev C", "Developer", false)
+	goal, err := g.bs.CreateGoal(ctx, "alpha", board.GoalInput{Title: "Resource queue, round 2", Outcome: "x", DoneWhen: "y", CreatedBy: "Dev A"})
+	require.NoError(t, err)
+	withGoal, err := g.bs.CreateTask(ctx, "alpha", "has a goal", "", "high", "Dev A", "Dev A")
+	require.NoError(t, err)
+	_, err = g.bs.ClaimTask(ctx, "alpha", "Dev A", withGoal.ID)
+	require.NoError(t, err)
+	err = g.bs.SetTaskGoal(ctx, "alpha", withGoal.ID, &goal.ID)
+	require.NoError(t, err)
+	noGoal, err := g.bs.CreateTask(ctx, "alpha", "no goal", "", "high", "Dev B", "Dev B")
+	require.NoError(t, err)
+	_, err = g.bs.ClaimTask(ctx, "alpha", "Dev B", noGoal.ID)
+	require.NoError(t, err)
+	g.do("operator", "PUT", "/api/resources/mac-heavy", map[string]any{"slots": 1})
+	g.do("token:Dev A", "POST", "/api/resources/mac-heavy/claim", map[string]any{})
+	g.do("token:Dev B", "POST", "/api/resources/mac-heavy/claim", map[string]any{})
+	g.do("token:Dev C", "POST", "/api/resources/mac-heavy/claim", map[string]any{}) // no task at all
+
+	_, list := g.do("operator", "GET", "/api/resources", nil)
+	res := list["resources"].([]any)[0].(map[string]any)
+	h := res["holders"].([]any)[0].(map[string]any)
+	assert.Equal(t, "alpha", h["project"], "the task's board")
+	assert.EqualValues(t, goal.ID, h["goal_id"])
+	assert.Equal(t, "Resource queue, round 2", h["goal_title"])
+	q := res["queue"].([]any)
+	b := q[0].(map[string]any)
+	assert.Equal(t, "alpha", b["project"])
+	assert.NotContains(t, b, "goal_id", "a task with no goal has none")
+	c := q[1].(map[string]any)
+	assert.NotContains(t, c, "project", "no task, no board")
+	assert.NotContains(t, c, "goal_title")
+}
