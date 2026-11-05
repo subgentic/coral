@@ -29,7 +29,7 @@ func TestNoBareRename(t *testing.T) {
 				return filepath.SkipDir
 			}
 			if _, err := os.Stat(filepath.Join(path, "go.mod")); err == nil && path != root {
-				return filepath.SkipDir // a module of its own (tools/coral-agents-token) cannot import internal/
+				return filepath.SkipDir // a module of its own (a tool with its own go.mod) cannot import internal/
 			}
 			return nil
 		}
