@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/proctree"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/resources"
@@ -50,7 +51,24 @@ func (s *Server) registerResources(r chi.Router, sess *routes.SessionsHandler) {
 	if sess != nil {
 		sess.SetResourceHook(hook)
 	}
-	s.goBackground(func(ctx context.Context) { // slots whose call ended while a background job ran go back when the job does, even with no API call to sweep them
+	watch := resources.NewWatcher(mgr, resources.WatchOptions{
+		Signal: func(agent string) (string, time.Time) {
+			sub, err := s.boardStore.GetSubscription(context.Background(), agent)
+			if err != nil || sub == nil || sub.SessionName == "" || sess == nil {
+				return "", time.Time{} // not readable: left alone
+			}
+			return sess.ResourceSignal(naming.SessionIDFromName(sub.SessionName))
+		},
+		Notify: func(agent, text string) { // the Orchestrator of the holder's team; a failed post loses the notice only
+			sub, err := s.boardStore.GetSubscription(context.Background(), agent)
+			if err != nil || sub == nil {
+				return
+			}
+			slog.Info("[resource] holder stuck", "agent", agent, "text", text)
+			_, _ = s.boardStore.PostSystemMessage(context.Background(), sub.Project, "Coral Queue", "@Orchestrator "+text, nil)
+		},
+	})
+	s.goBackground(func(ctx context.Context) { // every 15 s: slots whose call ended while a background job ran go back when the job does (#13718), and a holder stuck at a prompt is looked at (#13705)
 		t := time.NewTicker(15 * time.Second)
 		defer t.Stop()
 		for {
@@ -59,10 +77,11 @@ func (s *Server) registerResources(r chi.Router, sess *routes.SessionsHandler) {
 				return
 			case <-t.C:
 				hook.Sweep()
+				watch.Check()
 			}
 		}
 	})
-	h := &routes.ResourcesHandler{M: mgr, Board: s.boardStore, Hook: hook}
+	h := &routes.ResourcesHandler{M: mgr, Board: s.boardStore, Hook: hook, Watch: watch}
 	if sess != nil {
 		h.ToolCalls = sess.ToolCallsInFlight // an agent's hand claim is tied to the tool call it is made in (#13718)
 		h.AgentPID = s.sessionPID

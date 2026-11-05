@@ -32,7 +32,8 @@ import (
 type ResourcesHandler struct {
 	M     *resources.Manager
 	Board *board.Store
-	Hook  *resources.Hook // the shell hook, swept with every call (#13645); may be nil
+	Watch *resources.Watcher // a holder stuck at a prompt or idle (#13705); may be nil
+	Hook  *resources.Hook    // the shell hook, swept with every call (#13645); may be nil
 	// ToolCalls are the tool_use ids of the calls the session has in flight (the one running coral-board resource claim is among them; tools run in parallel); none when not known: a claim then keeps its lease (#13718); nil: hand claims are not tied to a call.
 	ToolCalls func(sessionID string) []string
 	// AgentPID is the process of the agent itself (its session's), 0 when not known: a shell that IS the agent (a simple command a shell ran directly leaves the agent as the claim's parent) says nothing about the job, so such a claim follows its call alone (#13718).
@@ -50,6 +51,8 @@ type entryView struct {
 	Lease    string `json:"lease_until,omitempty"`
 	Pinned   bool   `json:"pinned,omitempty"`
 	Place    int    `json:"place,omitempty"`
+	Stuck    string `json:"stuck,omitempty"`     // "prompt" or "idle" once the holder has been told of (#13705)
+	StuckMin int    `json:"stuck_min,omitempty"` // how long, in minutes
 }
 
 type resourceView struct {
@@ -117,7 +120,23 @@ func (h *ResourcesHandler) List(w http.ResponseWriter, r *http.Request) {
 	for _, st := range h.M.Queue().All() {
 		out = append(out, viewStatus(st))
 	}
+	h.addStuck(out)
 	writeJSON(w, http.StatusOK, map[string]any{"resources": out})
+}
+
+// addStuck marks the holders the watcher has told the Orchestrator of (#13705): the Queue folder shows them as Stuck.
+func (h *ResourcesHandler) addStuck(views []resourceView) {
+	if h.Watch == nil {
+		return
+	}
+	for i := range views {
+		for j := range views[i].Holders {
+			e := &views[i].Holders[j]
+			if info, ok := h.Watch.Stuck(e.ID); ok {
+				e.Stuck, e.StuckMin = info.Kind, int(info.Age/time.Minute)
+			}
+		}
+	}
 }
 
 // Get answers GET /api/resources/{name}.
@@ -128,7 +147,9 @@ func (h *ResourcesHandler) Get(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, viewStatus(st))
+	one := []resourceView{viewStatus(st)}
+	h.addStuck(one)
+	writeJSON(w, http.StatusOK, one[0])
 }
 
 type agentBody struct {

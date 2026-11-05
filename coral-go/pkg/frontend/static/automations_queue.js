@@ -65,7 +65,7 @@ export function queueItems() {
     for (const r of resources) {
         const holders = r.holders || [], queue = r.queue || [], head = { resource: r.name, machine: r.machine || '', slots: r.slots, used: holders.length, waiting: queue.length };
         if (!holders.length && !queue.length) rows.push({ ...head, key: `${r.name}-free`, id: 0, state: 'free', agent: '', note: '', task: 0, place: 0, last: true, first: true });
-        holders.forEach(e => rows.push({ ...head, key: `${r.name}-${e.id}`, id: e.id, state: 'holding', agent: e.agent, note: e.note || '', task: e.task || 0, place: 0, lease_until: e.lease_until, enqueued_at: e.enqueued_at, pinned: !!e.pinned }));
+        holders.forEach(e => rows.push({ ...head, key: `${r.name}-${e.id}`, id: e.id, state: 'holding', agent: e.agent, note: e.note || '', task: e.task || 0, stuck: e.stuck || '', stuck_min: e.stuck_min || 0, place: 0, lease_until: e.lease_until, enqueued_at: e.enqueued_at, pinned: !!e.pinned }));
         queue.forEach((e, i) => rows.push({ ...head, key: `${r.name}-${e.id}`, id: e.id, state: 'waiting', agent: e.agent, note: e.note || '', task: e.task || 0, place: e.place || i + 1, first: i === 0, last: i === queue.length - 1, enqueued_at: e.enqueued_at, pinned: !!e.pinned }));
     }
     return rows;
@@ -139,19 +139,21 @@ function neighbour(row) {
     return after ? [after.id, 'Kick'] : [row.id, 'Kick'];
 }
 
-const stateWord = row => (row.state === 'holding' ? 'Holding' : row.state === 'waiting' ? `Waiting, place ${row.place}` : 'Free');
+/** A holder the Orchestrator was told is stuck (#13705): at a prompt for a person, or idle, while others wait. */
+const stuckWords = r => (r.stuck === 'prompt' ? `At a prompt waiting for a person for ${r.stuck_min} min` : `Idle for ${r.stuck_min} min`);
+const stateWord = row => (row.state === 'holding' ? (row.stuck ? `Stuck ${row.stuck_min} min` : 'Holding') : row.state === 'waiting' ? `Waiting, place ${row.place}` : 'Free');
 
 /** The Queue folder's table. */
 export function queueTable(rows, narrowed) {
     return { title: 'Queue', noun: ['entry', 'entries'], rows,
         empty: { line: narrowed ? 'No entry matches the search.' : loaded ? 'No resource is defined.' : 'Reading the queue.', hint: narrowed || !loaded ? '' : 'An Orchestrator defines a resource with coral-board resource; agents claim a slot before a heavy run and wait in line when it is taken.' },
-        signature: JSON.stringify([denied, rows.map(r => [r.key, r.state, r.place, r.agent, r.note, r.used, r.slots, r.waiting, r.lease_until, r.first, r.last, r.state === 'holding' ? leaseWords(r) : r.state === 'waiting' ? waitWords(r) : ''])]), // the words of the clock are in it: the table is drawn again when they change
+        signature: JSON.stringify([denied, rows.map(r => [r.key, r.state, r.place, r.agent, r.stuck, r.stuck_min, r.note, r.used, r.slots, r.waiting, r.lease_until, r.first, r.last, r.state === 'holding' ? leaseWords(r) : r.state === 'waiting' ? waitWords(r) : ''])]), // the words of the clock are in it: the table is drawn again when they change
         node: () => DT.dataTable({
             label: `Queue, ${rows.length}`, rows, oneLine: true, resize: true, keepOrder: true, rowKey: r => r.key, rowName: r => (r.state === 'free' ? `${r.resource}, all free` : `${r.agent}, ${stateWord(r)}, ${r.resource}`),
             groupBy: groupOf,
             columns: [ // a narrow list drops the note (62 rem), then the task and the time (52): the data_table.css steps are 62, 52, 36, 28 and 16, no other number hides a column
                 { key: 'agent', label: 'Agent', primary: true, width: 'grow', cell: r => (r.state === 'free' ? DT.el('span', 'dt-time', 'All slots free') : DT.el('span', 'queue-agent', r.agent)) },
-                { key: 'state', label: 'State', width: '8.5rem', cell: r => (r.state === 'free' ? '' : DT.chip(stateWord(r), r.state === 'holding' ? 'goal-state-task-active' : '')) },
+                { key: 'state', label: 'State', width: '8.5rem', cell: r => (r.state === 'free' ? '' : (() => { const c = DT.chip(stateWord(r), r.state === 'holding' && !r.stuck ? 'goal-state-task-active' : ''); if (r.stuck) c.title = stuckWords(r) + '. The Orchestrator has been told.'; return c; })()) },
                 { key: 'why', label: 'Note', width: '12rem', dropAt: 62, tone: 'tertiary', cell: r => r.note || '' },
                 { key: 'task', label: 'Task', width: '6rem', dropAt: 52, tone: 'tertiary', cell: r => (r.task ? `#${r.task}` : '') },
                 { key: 'time', label: 'Lease left / waited', width: '9rem', dropAt: 52, tone: 'tertiary', cell: r => (r.state === 'holding' ? leaseWords(r) : r.state === 'waiting' ? waitWords(r) : '') },
