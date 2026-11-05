@@ -1,5 +1,84 @@
 # Release Notes
 
+## v2.0.54 — Long artifact lists in pages, a Resource queue view in Analytics, and a steadier Files list
+
+### Changes
+
+#### What you will notice first
+
+- **Artifact lists come in pages of 50.** Every artifact list answers at most 50 rows a request and the team page asks for the next page as you scroll; search also matches a file's review question, its goal's title and its team, and the Needs you unread filter belongs to this computer.
+- **A Resource queue view in Analytics** shows how much each shared resource is used and whether the queue helps: claims, busy share, wait median and 90th percentile, claims made by hand or by a hook, refusals and kicks, with the change against the period before.
+- **The Queue folder says it is experimental**, in its list label, its table heading and its doc.
+- **Ranking in the queue:** among equal priorities the most recently claimed task goes first, so a forgotten old task no longer outranks today's work.
+- **Files keeps your typing smooth.** Late arrivals paint after you pause typing, unchanged rows are reused, and a paint meant for one agent no longer lands in another's editor.
+
+#### Fixed
+
+- **A search through Coral Hub matches what the viewer is shown:** the review question and the team are redacted before they are matched.
+- **Resource history** keeps its file private (0600), prunes after 90 days, and a late add after close does not crash.
+- **macOS release:** the Go cache restore is tried once more when the first finds nothing.
+
+#### Through Coral Hub
+
+- **One computer-only route was added:** `GET /api/analytics/resource-queue`. The artifact list routes answer at most 50 a request and a Hub walk of the for-review list is redacted on every page.
+
+#### Known issues
+
+- **macOS: the tmux change (#12836) can make macOS ask once more, only after tmux restarts (a full restart of your agents or a reboot).** Coral's tmux server and guardian are now their own responsible process, so macOS may ask, per folder, whether `tmux` (or `coral`) may reach Documents, Desktop or Downloads. Full Disk Access you gave Coral.app does not carry over: if you gave Coral Full Disk Access, add `tmux` and `coral` too (both in `Coral.app/Contents/MacOS`). The staged tmux copy (each Coral version keeps its own under `tmux-bin/`) asks again after a tmux change. Say yes once; if you say no, nothing is lost, the agent just cannot read that folder.
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For Coral Hub
+
+- **`release-diff` output** (`go run ./internal/releasediff/cmd/release-diff v2.0.53 7995a94c9`):
+
+  ### Tunnel routes, v2.0.53 to 7995a94c9
+
+  Added, never reachable (the Hub has nothing to do) (1)
+
+  - `GET /api/analytics/resource-queue`: never
+
+  ### Board settings keys (BoardSettings, HealthSettings included), v2.0.53 to 7995a94c9
+
+  No key was added, removed or changed.
+
+  ### What Coral Hub compiles in or embeds, v2.0.53 to 7995a94c9
+
+  `pkg/tunnel`: 1 file of Go code changed (+2, -2)
+
+  - `coral-go/pkg/tunnel/routes_query.go`: +2, -2
+
+  `pkg/frontend`: 9 files the Hub embeds changed (+142, -15)
+
+  - `coral-go/pkg/frontend/static/analytics_queue.js`: +85, -0
+  - `coral-go/pkg/frontend/static/analytics_tabs.js`: +16, -5
+  - `coral-go/pkg/frontend/static/analytics_views.js`: +1, -0
+  - `coral-go/pkg/frontend/static/automations.js`: +1, -1
+  - `coral-go/pkg/frontend/static/automations_queue.js`: +1, -1
+  - `coral-go/pkg/frontend/static/changed_files.js`: +35, -6
+  - `coral-go/pkg/frontend/static/cost_dashboard.js`: +1, -1
+  - `coral-go/pkg/frontend/static/team_artifacts_page.js`: +1, -1
+  - `coral-go/pkg/frontend/templates/includes/views/cost_dashboard.html`: +1, -0
+
+  `agent_docs`: 1 file the Hub embeds changed (+2, -0)
+
+  - `coral-go/agent_docs/resource-queue.md`: +2, -0
+
+  Unchanged: `pkg/hubproxy`, `pkg/hubowner`, `pkg/redact`.
+
+  ### Coral packages compiled into the Hub through its imports, v2.0.53 to 7995a94c9
+
+  Unchanged: `internal/fsreplace`, `internal/httputil`, `internal/logsafe`, `internal/safego`, `internal/secfile`, `internal/secrets`, `pkg/redact/betterleaks`.
+
+- **Added, never reachable through the tunnel:** `GET /api/analytics/resource-queue`. **Changed:** the artifact list routes return at most 50 a request, and a search (`q`) now also matches the review question, the goal title and the team, and the two list routes `GET /api/board/{}/artifacts` and `GET /api/team-artifacts` accept a new `read` query parameter (0 or 1; the computer's own unread filter). **Ready signals, hooks, tokens, framed paths**: unchanged.
+
+#### For developers and releases
+
+- Test-only fixes after the first gates: the folder-list suites expect "Queue (experimental)", the session-token source scan tolerates a vanishing temp folder, the `auth_local_open` browser suite orders a request's extra infos by send time, and the shared-server row counts in `activity_folder_real` and `inbox_ignored_real`.
+
 ## v2.0.53 — A queue for shared machines, a phone Inbox with a folder drawer, and steadier Activity
 
 ### Changes
