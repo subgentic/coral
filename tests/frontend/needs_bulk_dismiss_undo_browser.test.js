@@ -1,5 +1,5 @@
 // Undo of a bulk Dismiss in Needs you while a review read is in flight (#13601): the read's lists were taken before the Undo's writes, so its answer must not be what the table shows.
-// Three review files on one team, two selected and dismissed from the selection bar, the no-team read held 1.5 s, a refresh started, then the toast's Undo: the table has all three rows back.
+// (390 px: the selection bar is the phone layout's.) Three review files on one team, two selected and dismissed from the selection bar, the no-team read held 1.5 s, a refresh started, then the toast's Undo: the table has all three rows back.
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
@@ -13,7 +13,7 @@ const { coralReady } = require('./helpers/wait');
     const rowNames = () => ev(`[...document.querySelectorAll('${T} tbody tr')].map(r => (r.textContent.match(/bulk-0\\d/) || [''])[0])`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        await Emulation.setDeviceMetricsOverride({ width: 1440, height: 800, deviceScaleFactor: 1, mobile: false });
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 800, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true }); // the Needs you table selects rows on a phone layout only
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`(() => { const original = window.fetch, json = (b, st = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: st, headers: { 'Content-Type': 'application/json' } }));
             const hex = n => n.toString(16).padStart(64, '0');
