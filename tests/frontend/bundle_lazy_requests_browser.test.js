@@ -43,7 +43,7 @@ const BASE = require('./test_base').BASE;
         };
 
         console.log('1. A first visit is one file for a tab family, and no stub');
-        await visit('automations', ['agent_marks.js', 'automations.js', 'automations_queue.js', 'inbox_toolbar.js', 'team_toolbar.js', 'view_list.js']); // automations_queue.js is the Queue folder (#13651), loaded with Automations and used by nothing else; agent_marks.js (650 bytes, #12169's H and O letters) is read by view_list.js, segmented.js and launch_agent_pick.js through importOnce, so like info_toggle.js it stays a file of its own
+        await visit('automations', ['agent_link.js', 'agent_marks.js', 'automations.js', 'automations_queue.js', 'inbox_toolbar.js', 'team_toolbar.js', 'view_list.js']); // agent_link.js is the shared agent name the Queue folder draws (#13704); automations_queue.js is the Queue folder (#13651), loaded with Automations and used by nothing else; agent_marks.js (650 bytes, #12169's H and O letters) is read by view_list.js, segmented.js and launch_agent_pick.js through importOnce, so like info_toggle.js it stays a file of its own
         await visit('tokens', ['cost_dashboard.js', 'info_toggle.js']); // info_toggle.js is shared with the team pages, so it stays a file of its own (like the Inbox's toolbar for Automations)
         await visit('docs', ['docs.js']);
 
