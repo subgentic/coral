@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
 	"github.com/subgentic/coral/internal/server/routes"
+	"github.com/subgentic/coral/internal/store/storetest"
 	"github.com/subgentic/coral/pkg/hubowner"
 )
 
@@ -42,6 +43,9 @@ var neverStamped = []string{
 	"POST /api/pinned-folders", "DELETE /api/pinned-folders", "DELETE /api/shared-images/{id}",
 	"POST /api/board/remotes", "DELETE /api/board/remotes", "PUT /api/custom-models", "POST /api/hub-auto-accept",
 	"POST /api/artifacts/{id}/comment-images", "POST /api/board/{project}/goal-images",
+	// the routes that install the stamp's secret and hold the API keys of the computers (Hub mode: served by hubModeRoutes below)
+	"POST /api/servers/{id}/owner-secret", "POST /api/servers", "PATCH /api/servers/{id}", "DELETE /api/servers/{id}",
+	"POST /api/servers/provision/plan", "POST /api/servers/provision/{plan}/connect", "POST /api/servers/provision/{plan}/run", "POST /api/servers/provision/{plan}/forget-key", "DELETE /api/servers/provision/{plan}",
 }
 
 // stampedAnyway: routes that are not an Activity row of their own but are on the list on purpose (tier B, Security's answer on #13694): a person's decision gated like the Activity ones.
@@ -59,14 +63,31 @@ func servedRoutes(t *testing.T) (chi.Routes, map[string]string) {
 	srv, _, _ := strictServer(t, false)
 	rt := srv.Router()
 	served := map[string]string{} // shape -> the router's own pattern
-	require.NoError(t, chi.Walk(rt, func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
-		switch method {
-		case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
-			served[method+" "+routeShape(route)] = method + " " + route
-		}
-		return nil
-	}))
+	walk := func(rt chi.Routes) {
+		require.NoError(t, chi.Walk(rt, func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+			switch method {
+			case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+				served[method+" "+routeShape(route)] = method + " " + route
+			}
+			return nil
+		}))
+	}
+	walk(rt)
+	walk(hubModeRouter(t)) // the routes only a computer in Hub mode serves (the servers it holds keys for, provisioning)
 	return rt, served
+}
+
+// hubModeRouter is a router of a server in Hub mode.
+func hubModeRouter(t *testing.T) chi.Routes {
+	t.Helper()
+	dir := t.TempDir()
+	cfg := newE2EConfig(t, dir)
+	cfg.HubMode = true
+	db, err := storetest.Open(t, cfg.DBPath)
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	stack := newTermStack(t)
+	return newTestServer(t, cfg, db, stack.backend, stack.terminal).Router()
 }
 
 func stampShapes() map[string]string {
@@ -140,5 +161,20 @@ func TestNothingThatChangesTheComputerIsStamped(t *testing.T) {
 		}
 		_, on := stamped[routeShape(k)]
 		require.False(t, on, "%s is not an Inbox action but is on the stamp list", k)
+	}
+}
+
+// The other direction (Security's SHOULD on #13694): hubowner.Allowed matches {x} against any one segment, so a wide entry also admits a fixed-word route of the same shape that another handler serves
+// (a future DELETE /api/artifacts/prune would be admitted by DELETE /api/artifacts/{id}). For every served mutating route, a concrete path of it (parameters become 1, fixed words stay) is allowed only
+// when the route's own shape is on the list.
+func TestOnlyListedRoutesAreAdmittedByTheStampList(t *testing.T) {
+	_, served := servedRoutes(t)
+	stamped := stampShapes()
+	for _, route := range served {
+		method, pattern, _ := strings.Cut(route, " ")
+		if hubowner.Allowed(method, paramRe.ReplaceAllString(pattern, "1")) {
+			_, on := stamped[routeShape(route)]
+			require.True(t, on, "%s is admitted by a wider pattern of the stamp list without being on it: a stamp would be made for another handler's route", route)
+		}
 	}
 }
