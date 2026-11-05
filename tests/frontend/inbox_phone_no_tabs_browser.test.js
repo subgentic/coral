@@ -9,7 +9,7 @@ const fs = require('node:fs');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const shot = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR; if (!dir) return; fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(`${dir}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
-    const themes = async name => { for (const t of ['dark', 'light']) { await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: t }] }); await new Promise(r => setTimeout(r, 250)); await shot(`${name}-${t}`); } await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: 'dark' }] }); }; // sleep-ok: the theme repaints before the shot
+    const themes = async name => { for (const t of ['dark', 'light']) { await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(t)}); true`); await new Promise(r => setTimeout(r, 250)); await shot(`${name}-${t}`); } await ev(`document.documentElement.setAttribute('data-theme', 'dark'); true`); }; // sleep-ok: the theme repaints before the shot
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
     const strip = () => ev(`(() => { const vis = e => !!e && e.getClientRects().length > 0; const h = document.getElementById('group-table-view'); return { tablist: [...h.querySelectorAll('[role=tablist], .view-list-nav, .view-list-drawer')].filter(vis).length, tabs: [...h.querySelectorAll('[role=tab]')].filter(vis).length, back: [...h.querySelectorAll('.group-table-back')].filter(vis).length,
