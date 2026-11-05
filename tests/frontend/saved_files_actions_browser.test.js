@@ -27,7 +27,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 window.__items = [1, 2].map(item); window.__calls = [];
                 window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin), method = (opts.method || 'GET').toUpperCase(), m = u.pathname.match(/^\\/api\\/board\\/${team}\\/artifacts(?:\\/([0-9a-f]{64})\\/(review|tags))?$/);
                     if (method !== 'GET' && /^\\/api\\/board\\//.test(u.pathname)) window.__calls.push({ method, path: u.pathname.replace('/api/board/${team}', ''), body: opts.body ? JSON.parse(opts.body) : null });
-                    if (u.pathname === '/api/team-artifacts') return json({ artifacts: [], has_more: false }); // the Inbox also reads the no-team list (#13574): this suite's files are all on its one team
+                    if (u.pathname === '/api/team-artifacts') return new Promise(done => setTimeout(() => done(json({ artifacts: [], has_more: false })), window.__ntDelay || 0)); // the Inbox also reads the no-team list (#13574): this suite's files are all on its one team
                     if (!m) return original(url, opts);
                     if (!m[1]) return json({ project: '${team}', artifacts: window.__items.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))), has_more: false });
                     const it = window.__items.find(a => a.id === m[1]), body = opts.body ? JSON.parse(opts.body) : {};
@@ -71,6 +71,17 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await waitFor(`document.querySelectorAll('.saved-files tbody tr').length === 2`, at + 'Undo brings it back to Saved', 8000);
             calls = await ev(`window.__calls`);
             check(calls.length === 2 && calls[1].body.decision === 'unignore', at + 'Undo is one "unignore": ' + JSON.stringify(calls));
+            // A read already in flight when Undo lands (the no-team read is slow, #13601): its team list was taken before the Undo's write, so it must not be the answer Saved shows
+            await ev(`window.__ntDelay = 1500; true`);
+            await ev(`document.querySelector('.saved-files button[aria-label="More actions for plan-1.md"]').click(); true`);
+            await waitFor(`!!document.querySelector('.saved-files .menu-item[aria-label="Dismiss: plan-1.md"]')`, at + 'the dots have Dismiss (second time)', 5000);
+            await ev(`document.querySelector('.saved-files .menu-item[aria-label="Dismiss: plan-1.md"]').click(); true`);
+            await waitFor(`document.querySelectorAll('.saved-files tbody tr').length === 1`, at + 'the second Dismiss leaves Saved', 8000);
+            await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Dismissed: plan-1\\.md/.test(t.textContent) && [...t.querySelectorAll('button')].some(b => b.textContent.trim() === 'Undo'))`, at + 'the second toast, with Undo', 8000);
+            await ev(`import(${S} + 'inbox_reviews.js').then(m => { window.__inFlight = m.refreshReviews(true); return true; })`); // a refresh starts now and is held by the slow read
+            await ev(`[...document.querySelectorAll('.toast')].filter(t => /Dismissed: plan-1\\.md/.test(t.textContent)).forEach(t => t.querySelectorAll('button').forEach(b => { if (b.textContent.trim() === 'Undo') b.click(); })); true`);
+            await waitFor(`document.querySelectorAll('.saved-files tbody tr').length === 2`, at + 'Undo during a read in flight still brings it back to Saved', 8000);
+            await ev(`window.__ntDelay = 0; window.__inFlight.then(() => true)`);
             await removeBoards(ev, [team]).catch(() => {});
         }
     } finally { await client.close(); }
