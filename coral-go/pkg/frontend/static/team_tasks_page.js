@@ -344,11 +344,11 @@ export async function readTask(project, id) {
 
 /** The live agent on this computer that has a task (its session, else its assignee's name on this board), or null: the page then has no Open the agent. */
 function agentOf(project, task) {
-    const live = state.liveSessions || [];
+    const live = (state.liveSessions || []).filter(s => inTeam(s, project));
     if (task.session_id) { const bySession = live.find(s => s && s.session_id === task.session_id); if (bySession) return bySession; }
     const name = task.assigned_to;
     if (!name) return null;
-    return live.find(s => s && (s.board_project === project || !s.board_project) && (s.display_name === name || s.name === name)) || null;
+    return live.find(s => s.display_name === name || s.name === name) || null;
 }
 
 // ── a task's page ────────────────────────────────────────────────────────

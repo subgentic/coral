@@ -339,3 +339,5 @@ node activity_click_header.test.mjs
 
 node remote_search_access.test.mjs
 node remote_goal_comments.test.mjs
+
+node remote_agent_identity.test.mjs

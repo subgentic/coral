@@ -2,17 +2,16 @@
  * (the lazy helper that draws names as links) builds on it. A name that is not a running agent is left alone. */
 import { state } from './state.js';
 import { importOnce } from './import_once.js';
-import { sessionServer, splitKey } from './server_base.js';
+import { sessionServer, sessionTeamKey } from './server_base.js';
 import { markHidden } from './visible_marks.js';
 import { escapeHtml, escapeAttr } from './utils.js';
 
 /** The running agent a board role name belongs to: the live session whose board role is `name` (any case) on `board` when one is given, or the session id `session`. */
 export function liveAgentOf(name, { board = '', session = '' } = {}) {
-    const rows = state.liveSessions || [];
+    const rows = (state.liveSessions || []).filter(s => s && !s.archived && (!board || sessionTeamKey(s) === board));
     if (session) { const hit = rows.find(s => s.session_id === session); if (hit) return hit; }
     const want = String(name || '').trim().toLowerCase(); if (!want) return null;
-    const team = board ? splitKey(board).name : '';
-    return rows.find(s => !s.archived && String(s.board_subscriber_id || '').trim().toLowerCase() === want && (!team || String(s.board_project || '') === team || String(s.board_project || '') === board)) || null;
+    return rows.find(s => String(s.board_subscriber_id || '').trim().toLowerCase() === want) || null;
 }
 
 // The file viewer (a modal div) or a native dialog the name sat in is closed first, so the chat is not opened behind it (#12168).

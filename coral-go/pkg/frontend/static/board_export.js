@@ -2,7 +2,7 @@
  * connectBoard, and the select-mode state lives here). */
 import { importOnce } from './import_once.js';
 import { escapeHtml, escapeAttr, showToast } from './utils.js';
-import { keyLabel, splitKey, sessionServer, boardFetch } from './server_base.js';
+import { keyLabel, splitKey, sessionTeamKey, boardFetch } from './server_base.js';
 import { attachDialogFocus } from './dialog_focus.js';
 import { fetchAllBoardMessages, fetchAllHistory, fetchAllLiveChat, fetchSubscribers } from './board_fetch.js';
 const { parseAgentHistory, renderExportHTML, renderExportMarkdown } = await importOnce('./board_export_render.js'); // a part of the board page's group: loaded with it
@@ -111,9 +111,9 @@ export async function doExportBoard() {
         // 4. Fetch live sessions to get working directories and names
         const liveResp = await fetch('/api/sessions/live');
         const liveRaw = await liveResp.json();
-        // The list is {sessions, servers} when remotes exist; only this board's server counts.
+        // The list is {sessions, servers} when remotes exist; only this exact team (computer and board) counts.
         const boardSrv = splitKey(host.project()).server;
-        const liveSessions = (Array.isArray(liveRaw) ? liveRaw : (liveRaw.sessions || [])).filter(s => sessionServer(s) === boardSrv);
+        const liveSessions = (Array.isArray(liveRaw) ? liveRaw : (liveRaw.sessions || [])).filter(s => sessionTeamKey(s) === host.project());
 
         // 5. Fetch selected agent chat histories and merge
         for (const agent of selectedAgents) {

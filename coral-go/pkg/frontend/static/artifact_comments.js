@@ -16,7 +16,7 @@ import { scrollBehavior } from './motion.js';
 const { agentLink, linkAvatar } = await importOnce('./agent_link.js'); // lazy, like the rest of the thread (#12168)
 import { pushOverlay, popOverlay } from './overlay_history.js';
 import { state } from './state.js';
-import { boardKeyName, sessionTeamKey, contextServer } from './server_base.js';
+import { boardKeyName, sessionTeamKey, contextServer, boardTeamKey } from './server_base.js';
 import { browserLocal } from './safe_storage.js';
 import { storeKey } from './local_store.js';
 import { boardOfPage } from './dock_page.js';
@@ -269,10 +269,10 @@ export function attachComments(dialog, body, host, opts = {}) {
     // when the card is hovered or has focus, always on a touch screen.
     function entry(c, top) {
         const e = el('div', 'ac-entry' + (top ? '' : ' ac-reply')); e.dataset.id = String(c.id);
-        const av = avatar(c); e.append(c.authorKind === 'agent' ? linkAvatar(av, c.authorName || c.authorId, { board: st.board }) : av); // an agent's circle and name open its chat (#12168)
+        const av = avatar(c); e.append(c.authorKind === 'agent' ? linkAvatar(av, c.authorName || c.authorId, { board: boardTeamKey(st.server, st.board) }) : av); // an agent's circle and name open its chat (#12168)
         const main = el('div', 'ac-entry-main');
         const m = el('div', 'ac-meta');
-        m.append(c.authorKind === 'agent' ? agentLink(c.authorName || c.authorId, { board: st.board, cls: 'ac-author' }) : el('span', 'ac-author', c.authorName || c.authorId || 'unknown'));
+        m.append(c.authorKind === 'agent' ? agentLink(c.authorName || c.authorId, { board: boardTeamKey(st.server, st.board), cls: 'ac-author' }) : el('span', 'ac-author', c.authorName || c.authorId || 'unknown'));
         if (KIND[c.authorKind]) m.append(el('span', 'ac-kind', KIND[c.authorKind]));
         const dot = el('span', 'ac-dot', '·'); dot.setAttribute('aria-hidden', 'true'); m.append(dot);
         const time = el('span', 'ac-time', ago(c.createdAt)); time.title = c.createdAt; m.append(time);
