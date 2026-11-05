@@ -44,6 +44,7 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`document.querySelectorAll('${T} tbody tr').length === 1`, 'the two dismissed files leave Needs you', 10000);
         await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Dismissed 2/.test(t.textContent) && [...t.querySelectorAll('button')].some(b => b.textContent.trim() === 'Undo'))`, 'the toast says Dismissed 2, with Undo', 8000);
         await ev(`window.__ntDelay = 1500; import(${S} + 'inbox_reviews.js').then(m => { window.__inFlight = m.refreshReviews(true); return true; })`); // a read starts now: its team list is taken before the Undo, its no-team read is slow
+        await new Promise(r => setTimeout(r, 400)); // sleep-ok: the read's team list comes back (before the Undo writes) while its no-team read is still held
         await ev(`[...document.querySelectorAll('.toast')].filter(t => /Dismissed 2/.test(t.textContent)).forEach(t => t.querySelectorAll('button').forEach(b => { if (b.textContent.trim() === 'Undo') b.click(); })); true`);
         await waitFor(`document.querySelectorAll('${T} tbody tr').length === 3`, 'Undo with a read in flight brings both back to Needs you', 9000);
         check(JSON.stringify((await rowNames()).sort()) === JSON.stringify(['bulk-01', 'bulk-02', 'bulk-03']), 'the three files are the rows: ' + JSON.stringify(await rowNames()));
