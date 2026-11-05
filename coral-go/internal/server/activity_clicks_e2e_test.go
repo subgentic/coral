@@ -241,6 +241,10 @@ func TestRowsNameWhatTheirClickMadeAndTheKindOfRun(t *testing.T) {
 	jobRun, err := store.NewScheduleStore(srv.db).CreateScheduledRun(ctx, job.ID, "2026-10-27T00:00:00Z", "failed")
 	require.NoError(t, err)
 	require.NotEqual(t, jobRun, int64(1))
+	for jobRun == job.ID { // the job's number and the run's differ, so a swapped pair cannot pass by luck (the server seeds an example job)
+		jobRun, err = store.NewScheduleStore(srv.db).CreateScheduledRun(ctx, job.ID, "2026-10-28T00:00:00Z", "failed")
+		require.NoError(t, err)
+	}
 	wf, err := store.NewWorkflowStore(srv.db).CreateWorkflow(ctx, &store.Workflow{Name: "w", StepsJSON: `[]`, DefaultAgentJSON: "{}", BaseBranch: "main", MaxDurationS: 60, Enabled: 1})
 	require.NoError(t, err)
 	wfRun, err := store.NewWorkflowStore(srv.db).CreateWorkflowRun(ctx, wf.ID, "api", nil)
@@ -265,5 +269,6 @@ func TestRowsNameWhatTheirClickMadeAndTheKindOfRun(t *testing.T) {
 	require.Equal(t, "New one", got[board.ActTaskCreate+"/task"].Title)
 	require.Equal(t, savedID, got[board.ActSavedAdd+"/message"].ItemID, "the new bookmark's number")
 	require.Equal(t, itoa(wfRun.ID), got[board.ActRunSeen+"/workflow_run"].ItemID, "a workflow's run")
-	require.Equal(t, itoa(jobRun), got[board.ActRunSeen+"/job_run"].ItemID, "an automation job's run")
+	require.Equal(t, itoa(job.ID)+":"+itoa(jobRun), got[board.ActRunSeen+"/job_run"].ItemID, "an automation job's run: the job's number, a colon, the run's number (#13626)")
+	require.Equal(t, "j", got[board.ActRunSeen+"/job_run"].Title, "the job's name")
 }

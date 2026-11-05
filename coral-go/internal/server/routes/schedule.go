@@ -13,6 +13,7 @@ import (
 
 	"github.com/subgentic/coral/internal/agent"
 	"github.com/subgentic/coral/internal/background"
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/gitutil"
 	"github.com/subgentic/coral/internal/httputil"
@@ -508,7 +509,14 @@ func (h *ScheduleHandler) MarkRunSeen(w http.ResponseWriter, r *http.Request) {
 		errNotFound(w, "run not found")
 		return
 	}
-	inboxActioned(r, tracking.InboxRun, "", "seen", time.Time{}) // the Inbox's numbers (#7512): a failed run opened or dismissed
+	inboxActioned(r, tracking.InboxRun, "", "seen", time.Time{})                           // the Inbox's numbers (#7512): a failed run opened or dismissed
+	if run, err := h.sched.GetScheduledRun(r.Context(), runID); err == nil && run != nil { // the row names the job too (jobID:runID, the job's name as the title), so it can open the run (#13626)
+		name := ""
+		if job, err := h.sched.GetScheduledJob(r.Context(), run.JobID); err == nil && job != nil {
+			name = job.Name
+		}
+		noteActivity(r, board.ActRunSeen, "job_run", strconv.FormatInt(run.JobID, 10)+":"+strconv.FormatInt(runID, 10), "", name, "")
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "run_id": runID})
 }
 
