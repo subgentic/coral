@@ -17,10 +17,11 @@ export function mountGoalComments(host, { team, goalId, onCount = () => {} }) {
     body.hidden = true;
     box.append(body);
     host.append(box);
-    const words = { empty: 'No comments yet. Your comment goes to the goal’s owner, who answers here.', whole: 'Comment on this goal', quote: 'This goal' };
-    const comments = attachComments(box, body, box, { toggleHost: true, sheet: () => false, shown: () => true, words, onCount });
+    const words = { subject: 'goal', empty: 'No comments yet. Your comment goes to the goal’s owner, who answers here.', whole: 'Comment on this goal', quote: 'This goal' };
+    const comments = attachComments(box, body, box, { toggleHost: true, sheet: () => false, shown: () => true, initialOpen: true, preferenceKey: () => null, words, onCount });
     comments.open(goalSubject(team, goalId), contextServer(), team);
     comments.docWhole();
+    // Initial openness is applied after the async read too: an empty goal stays interactive.
     comments.setSheet(true);
     return { destroy() { comments.close(); box.remove(); } };
 }
