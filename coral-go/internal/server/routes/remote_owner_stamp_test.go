@@ -89,3 +89,60 @@ func TestOnlyThePersonSignedInAtTheHubHasTheirDecisionSigned(t *testing.T) {
 		r.Header.Set(hubowner.Header, "v1.1.00000000000000000000000000000000."+strings.Repeat("0", 64))
 	}))
 }
+
+// #13725 through the real observer and the real mount: a WIDENED route (#13694, generation 2) is signed for the person who holds a sign-in SESSION (the dashboard cookie) and not for this computer's own browser with
+// sign-in off, and only for a remote whose health says it accepts generation 2.
+func TestAWidenedClickIsSignedOnlyForASignInSessionAndARemoteThatAcceptsIt(t *testing.T) {
+	db, err := storetest.Open(t, filepath.Join(t.TempDir(), "s.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	var mu sync.Mutex
+	var stamp string
+	remoteGen := 2
+	rem := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.ReadAll(r.Body)
+		if r.URL.Path == "/api/health" {
+			mu.Lock()
+			g := remoteGen
+			mu.Unlock()
+			_, _ = io.WriteString(w, `{"status":"ok","hub_owner_routes":`+string(rune('0'+g))+`}`)
+			return
+		}
+		mu.Lock()
+		stamp = r.Header.Get(hubowner.Header)
+		mu.Unlock()
+	}))
+	t.Cleanup(rem.Close)
+	cookie := false
+	o := NewIdentityObserver(db, nil, func(*http.Request) bool { return cookie })
+	o.SetVerifiers(func(*http.Request) bool { return true }, nil)
+	r := chi.NewRouter()
+	r.Use(o.Middleware)
+	target := proxy.HTTPTarget{URL: rem.URL, AllowPrivate: true, OwnerSecret: strings.Repeat("ab", 32), RemoteID: "ssh-box"}
+	target.APIKey = remoteStampTestKey
+	MountRemoteProxy(r, ownerResolver{target})
+	hub := httptest.NewServer(r)
+	t.Cleanup(hub.Close)
+	send := func(mutate func(*http.Request)) string {
+		req, _ := http.NewRequest("POST", hub.URL+"/api/remote/ssh-box/api/board/team/tasks/5/complete", strings.NewReader(`{"note":"done"}`))
+		req.Header.Set("Content-Type", "application/json")
+		mutate(req)
+		mu.Lock()
+		stamp = ""
+		mu.Unlock()
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+		mu.Lock()
+		defer mu.Unlock()
+		return stamp
+	}
+	cookie = true
+	assert.NotEmpty(t, send(func(r *http.Request) {}), "a sign-in session's widened click was not signed")
+	cookie = false
+	assert.Empty(t, send(func(r *http.Request) {
+		r.Header.Set("Origin", hub.URL)
+		r.Header.Set("Sec-Fetch-Site", "same-origin")
+	}), "this computer's own browser (sign-in off) had a widened click signed")
+	assert.Empty(t, send(func(r *http.Request) { r.Header.Set("Authorization", "Bearer the-hubs-own-key") }), "a script's widened click was signed")
+}
