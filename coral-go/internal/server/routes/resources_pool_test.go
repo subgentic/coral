@@ -53,6 +53,12 @@ func TestAPoolIsDefinedClaimedAndListedWithTheMachineEachHolderGot(t *testing.T)
 	assert.Len(t, by["mini"]["holders"].([]any), 1, "the member's own list shows the pool's hold on it")
 	assert.NotContains(t, by["mini"], "members")
 
+	// the single-resource answer (what coral-board resource status reads) names the machine too
+	_, one := g.do("operator", "GET", "/api/resources/heavy", nil)
+	oneHolders := one["holders"].([]any)
+	require.Len(t, oneHolders, 2)
+	assert.Equal(t, "Mini", oneHolders[1].(map[string]any)["machine"])
+
 	code, _ = g.do("operator", "DELETE", "/api/resources/mini", nil)
 	assert.Equal(t, 409, code, "a resource in a pool is not removed from under it: told as a conflict")
 }

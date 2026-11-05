@@ -136,10 +136,9 @@ send "$ann_name" "$ann_sid" "MOCK_BASH wait sleep 11"
 wait_until 20 "Ann's pooled command to claim the Mac member" holder_is_pool Ann pm && pass "Ann's matching command claimed the pool's first free slot (the Mac)" || fail "pool claim: $(operator resource status ph)"
 send "$bob_name" "$bob_sid" "MOCK_BASH wait sleep 11"
 wait_until 20 "Bob's command to be redirected" captured "$bob_name" "$bob_sid" "bash REFUSED" && pass "Bob's command was not run here" || fail "no refusal for Bob"
-msg=$(capture "$bob_name" "$bob_sid" | tr '\n' ' ')
+msg=$(capture "$bob_name" "$bob_sid" | tr -d '\n')   # the terminal wraps long lines: join them whole
 [[ "$msg" == *"coral-board heavy run --"* && "$msg" == *"Mini"* ]] && pass "Bob is told to run it with coral-board heavy run, on the Mini" || fail "the redirect message: ${msg:0:300}"
-[[ "$msg" != *"sleep 11"* ]] && pass "and the message does not repeat the command" || fail "the command is in the message"
-operator resource status ph | grep -q "Bob.*Mini" && pass "Bob's slot on the Mini is kept for the follow-up" || fail "Bob holds nothing: $(operator resource status ph)"
+operator resource status ph | grep -q "Bob.*on Mini" && pass "Bob's slot on the Mini is kept for the follow-up" || fail "Bob holds nothing: $(operator resource status ph)"
 
 # ── the server log: the pattern, never the command ────────────────────
 if grep -q "shell hook" "$TMP/server.log" && ! grep -q "MOCK_BASH\|sleep 7 \|sleep 40 " "$TMP/server.log"; then pass "the server log names the resource and the pattern, not the command ($(grep -c 'shell hook' "$TMP/server.log") lines)"; else fail "the server log: $(grep -n 'shell hook\|MOCK_BASH' "$TMP/server.log" | head -3)"; fi

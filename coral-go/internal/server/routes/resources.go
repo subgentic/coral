@@ -197,6 +197,7 @@ func (h *ResourcesHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	one := []resourceView{viewStatus(st)}
 	h.addStuck(one)
+	h.addMachines(one) // a pool's holds say which machine they are on here too (#13751)
 	writeJSON(w, http.StatusOK, one[0])
 }
 
