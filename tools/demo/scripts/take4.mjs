@@ -1,6 +1,6 @@
 import fs from "node:fs"
 import path from "node:path"
-import { execFileSync } from "node:child_process"
+import { execFileSync, execFile } from "node:child_process"
 import { OPEN, key, chromium, beat, launchTeam, sleep, agent, askPermission, askQuestion, BASE, S, SEED, REPO, HERE, story } from "./lib.mjs"
 process.env.CORAL_TELEMETRY_DISABLED = "1"
 // Demo film v4. Beats are recorded (c1..c10); steps are not (world, chats, usage). Order of a run (see ../README.md):
@@ -111,40 +111,47 @@ const B = {
     const put = (p) => fetch(BASE + "/api/settings", { method: "PUT", headers: H, body: JSON.stringify({ cli_path_claude: p }) })
     await put(cli)
     try {
-      const r = await fetch(BASE + "/api/sessions/launch-team", { method: "POST", headers: H, body: JSON.stringify({ board_name: "solo", working_dir: REPO, agents: [{ agent_type: "claude", name: "Claude", prompt: "Skyline sample." }] }) })
+      const r = await fetch(BASE + "/api/sessions/launch-team", { method: "POST", headers: H, body: JSON.stringify({ board_name: "solo", new_board: true, working_dir: REPO, agents: [{ agent_type: "claude", name: "Claude", prompt: "Skyline sample." }] }) })
       const j = await r.json(); if (!j.ok) throw new Error("the real launch was refused: " + JSON.stringify(j).slice(0, 200))
       const id = j.agents[0].session_id; await sleep(9000)
+      // Coral's chat reads transcripts from the rig's claude-projects folder; the real CLI writes its own under the demo home: link its files in (the mock agents' files stay as they are)
+      {
+        const dn = "-private-tmp-coral-demo-home-projects-demo-app", from = S + "/home/.claude/projects/" + dn, to = S + "/work/claude-projects/" + dn
+        fs.mkdirSync(to, { recursive: true })
+        for (const f of fs.existsSync(from) ? fs.readdirSync(from).filter((x) => x.endsWith(".jsonl")) : []) if (!fs.existsSync(to + "/" + f)) fs.symlinkSync(from + "/" + f, to + "/" + f)
+      }
       let cap = await (await fetch(BASE + "/api/sessions/live/claude-" + id + "/capture", { headers: H })).text(); try { cap = JSON.parse(cap).capture || "" } catch (e) { /* plain text */ }
       fs.writeFileSync(S + "/work/real-terminal.txt", cap); console.error("REAL TERMINAL TEXT:\n" + cap.replace(/\n{3,}/g, "\n").slice(0, 1500))
-      const bad = [/\/tmp\//, /\/Users\//, /@[\w-]+\.[a-z]{2,}/i, /Welcome back/i, /scratchpad/, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i].map((re) => (cap.match(re) || [])[0]).filter(Boolean)
+      // (the Operator cleared the demo folder path, the plan name, the MCP warning and Coral's join prompt in this shot: the host paths and account name stay blocked)
+      const bad = [/\/Users\//, /@[\w-]+\.[a-z]{2,}/i, /Welcome back/i, /scratchpad/, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i].map((re) => (cap.match(re) || [])[0]).filter(Boolean)
       if (bad.length) throw new Error("the real terminal shows: " + bad.join(" | "))
       const t = await beat(browser, "real")
       await t.page.addInitScript(() => setInterval(() => { for (const el of document.querySelectorAll("div, section, aside, p, span")) if (/isn.t signed in/i.test(el.textContent || "") && el.textContent.length < 400 && el.children.length < 6) el.style.display = "none" }, 120))   // the CLI is signed out on purpose here: the page's notice about it is not part of the shot
       await t.go("/agents/" + id); await t.cap("Any CLI agent runs in Coral just as it does in your terminal.")
-      await t.click(t.page.locator("button[aria-label='Terminal view']")); await sleep(7000)
+      await t.click(t.page.locator("button[aria-label='Terminal view']")); await sleep(3500)
+      // fill it in: click into the terminal, type hello like a person, send it, then show the same conversation in the chat view
+      await t.move(t.page.locator(".xterm, canvas").first(), 20); await t.page.mouse.down(); await t.page.mouse.up(); await sleep(400)
+      await t.cap("Type to it right here."); for (const ch of "hello") { await t.page.keyboard.type(ch); await sleep(160) }
+      await sleep(600); await t.page.keyboard.press("Enter"); await sleep(12000)
+      await t.cap("The same conversation, in the chat view."); await t.click(t.page.locator("button[aria-label='Chat view']")); await sleep(4000)
+      // the git diff is shown here, once: the files the agent changed, expanded to every change
+      await t.cap("And every change it makes, as a diff you can read."); await t.click(t.page.locator("text=Expand all >> visible=true").first()); await sleep(3500)
+      await t.page.mouse.move(1350, 500, { steps: 15 }); await t.page.mouse.wheel(0, 300); await sleep(3500)
       return await t.finish()
     } finally { await put(S + "/bin/mock-agent") }
   },
-  async c2() { // terminal first (it is the CLI), then the chat view of the same agent
+  async c2() { // the chat view of one agent (the empty terminal screen is out: it showed nothing)
     await termCheck("Orchestrator")
     const t = await beat(browser, "c2")
     await t.go("/agents"); await t.cap("Every agent is a CLI you already use.")
     await t.click(t.page.locator("text=Orchestrator >> visible=true").first()); await sleep(2500)
-    await t.click(t.page.locator("button[aria-label='Terminal view']")); await sleep(3500)
-    await t.cap("This is its terminal.")
-    await sleep(2500)
-    await t.click(t.page.locator("button[aria-label='Chat view']")); await sleep(2500)
-    await t.cap("Chat is the same agent, easier to read.")
-    await sleep(3500)
+    await t.cap("Chat shows the same agent, easier to read."); await sleep(4500)
     return t.finish()
   },
   async c3() { // another agent's chat, already full, with its files and tasks
     const t = await beat(browser, "c3")
     await t.go("/agents/" + sid(diffAgent)); await t.cap("Every agent keeps its own conversation.")
     await sleep(4500)
-    await t.click(t.page.locator("button[aria-label='Files']")); await t.cap("And the files it changed."); await sleep(2200)
-    await t.click(t.page.locator("text=Expand all >> visible=true").first()); await t.cap("Expand all to read every change as a diff."); await sleep(3000)
-    await t.page.mouse.move(1350, 500, { steps: 15 }); await t.page.mouse.wheel(0, 300); await sleep(3000)
     await t.click(t.page.locator("button[aria-label^='Tasks']")); await t.cap("And where its tasks stand."); await sleep(3500)
     return t.finish()
   },
@@ -165,11 +172,12 @@ const B = {
       const bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0)); const dt = new DataTransfer(); dt.items.add(new File([bytes], name, { type: "image/png" }))
       let el = [...document.querySelectorAll("*")].filter((e) => /Drop, paste or choose/.test(e.textContent || "") && e.getBoundingClientRect().height < 220 && e.getBoundingClientRect().width > 0).pop()
       for (const type of ["dragenter", "dragover", "drop"]) el.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt }))
-    }, [b64, story.goal.picture]); await sleep(2500)
-    if (!(await t.page.locator("text=Drop, paste or choose").count().then((n) => n === 0).catch(() => false))) { await t.page.locator("input[type=file]").first().setInputFiles(SEED + "/" + story.goal.picture); await sleep(2500) }   // still empty: use the file chooser
+    }, [b64, story.goal.picture]); await sleep(1300)
+    // (the drop box stays on screen after a picture is added: the picture count says whether it took)
+    if (!(await t.page.getByText(/pictures\s*[·•-]\s*[1-9]/i).count().then((n) => n > 0).catch(() => false))) { await t.page.locator("input[type=file]").first().setInputFiles(SEED + "/" + story.goal.picture); await sleep(1500) }   // still empty: use the file chooser
     await t.cap("The guide sizes it as you write.")
-    await sleep(2200)
-    await t.click(t.page.locator("button:has-text('Create goal') >> visible=true").first()); await sleep(2500)
+    await sleep(1800)
+    await t.click(t.page.locator("button:has-text('Create goal') >> visible=true").first()); await t.cap(""); await sleep(1200)   // the next beat opens on the goals list: no wait here
     return t.finish()
   },
   async c5() { // a goal about two thirds done: where is it? then a comment on the goal and the answer
@@ -181,15 +189,18 @@ const B = {
     }
     const t = await beat(browser, "c5")
     await t.go("/inbox/goals"); await t.cap("Every goal shows how far along it is.")
-    await sleep(2500)
+    await sleep(1800)
     await t.click(t.page.locator(`text=${story.goal.title} >> visible=true`).first()); await sleep(3500)
     await t.cap("Tasks by state, and the files they produced.")
-    await t.page.mouse.move(900, 600, { steps: 20 }); await t.page.mouse.wheel(0, 400); await sleep(3000)
-    await t.page.mouse.wheel(0, -400); await sleep(1200)
-    await t.click(t.page.locator("text=Artifacts >> visible=true").last()); await t.cap("The files its tasks produced."); await sleep(2500)
+    // scroll down once so the tabs are at the top of the screen, then switch between them there (no scrolling back up)
+    await t.page.mouse.move(900, 600, { steps: 20 }); await t.page.mouse.wheel(0, 420); await sleep(1500)
+    await t.click(t.page.locator("text=/^Tasks\\s*\\d+/ >> visible=true").last()); await sleep(1800)
+    await t.click(t.page.locator("text=Artifacts >> visible=true").last()); await t.cap("The files its tasks produced."); await sleep(1500)
+    // open one of the files, read it for a moment, close it: still scrolled down
+    try { await t.click(t.page.locator("text=/goal-(forecast-api|accuracy|test-plan)/ >> visible=true").first()); await sleep(3000); await t.page.keyboard.press("Escape"); await sleep(900) } catch (e) { console.error("artifact open skipped: " + String(e).slice(0, 120)) }
     await t.cap("Ask about it right on the goal.")
-    await t.cap("Ask about it right on the goal.")
-    await t.click(t.page.locator("text=Comments >> visible=true").last()); await sleep(1500)
+    await t.click(t.page.locator("text=Comments >> visible=true").last()); await sleep(900)
+    await t.page.mouse.move(900, 500, { steps: 10 }); await t.page.mouse.wheel(0, 700); await sleep(900)   // down to the comment box: the comment and the answer stay in view, no scrolling back up
     await pclick(t, t.page.locator("button.ac-whole >> visible=true").first()); await sleep(900); await shot(t, "c5-opened")
     // keys sent to the goal panel's box do not land in it in a recording: grow its value letter by letter instead, with the page's own input events
     const typeGoal = async (text) => {
@@ -213,28 +224,31 @@ const B = {
       await t.click(t.page.locator("text=Comments >> visible=true").last()); shown = await seen()
     }
     if (!shown) { await shot(t, "c5-noreply"); throw new Error("the agent's answer never showed on the goal") }
-    await sleep(4500)
+    await t.page.mouse.wheel(0, 700); await sleep(3800)   // the answer is in view; stop here
     return t.finish()
   },
   async c6() { // the Inbox: the agent's question has its answers on the row; answer it right there
     const t = await beat(browser, "c6")
     await t.go("/inbox/needs"); await t.cap("Your Inbox: everything that is waiting on you.")
-    await sleep(3500)
+    await sleep(1000)   // the cursor goes straight to the question
     const row = t.page.locator("text=Celsius or Fahrenheit >> visible=true").first()
-    await t.move(row); await sleep(1200)
-    await t.cap("Answer an agent's question without leaving the Inbox.")
-    await t.click(t.page.locator("button:text-is('Celsius') >> visible=true").first()); await sleep(4000)
+    await t.cap("Open the question to read it in full."); await t.move(row, 40); await sleep(1200)
+    await t.page.mouse.click((await row.boundingBox()).x + 40, (await row.boundingBox()).y + 8); await sleep(3200)   // the row itself opens, slowly enough to follow
+    await shot(t, "c6-opened")
+    await t.cap("Answer it right there.")
+    await t.click(t.page.getByText("Celsius", { exact: true }).locator("visible=true").first()); await sleep(1300)   // the opened question is a card in the agent's chat: its options are text blocks   // the beat ends just after the answer: the next one fades in
     return t.finish()
   },
   async c7() { // a document to review: comment on it, the new version comes back at once, and Compare
     fs.writeFileSync(S + "/work/live.md", fs.readFileSync(SEED + "/" + live.file, "utf8") + "\n<!-- take " + Date.now() + " -->\n")   // a hidden marker: the same bytes as an earlier take would be refused
+    // the file is uploaded before the take starts, so the page loads with it in the list: no reload on camera, straight to the document
+    const up = uploadOf(agent(live.agent, "coral-agent", "artifact", "upload", S + "/work/live.md", "--name", live.name, "--tag", "for review", "--question", live.question))
+    await sleep(1500)
     const t = await beat(browser, "c7")
     await t.go("/inbox/needs")
-    const up = uploadOf(agent(live.agent, "coral-agent", "artifact", "upload", S + "/work/live.md", "--name", live.name, "--tag", "for review", "--question", live.question))
     const row = t.page.locator(`text=${live.name} >> visible=true`).first()
-    const there = await row.waitFor({ state: "visible", timeout: 12000 }).then(() => true).catch(() => false)
-    if (!there) { await shot(t, "c7-list"); await t.page.reload({ waitUntil: "domcontentloaded" }); await sleep(2500) }   // the list did not take the new item live: load it again
-    await t.click(row); await sleep(2500)
+    await row.waitFor({ state: "visible", timeout: 12000 })
+    await t.click(row); await sleep(2200)
     await t.cap("A file to review, with everything it says.")
     await t.page.mouse.wheel(0, 500); await sleep(2500); await t.page.mouse.wheel(0, -500); await sleep(1000)
     await t.click(t.page.getByRole("button", { name: /^Comments/ })); await sleep(900)
@@ -243,26 +257,31 @@ const B = {
     await t.cap("Comment on it.")
     await typeInto(t, box, live.comment, 18); await sleep(400)
     await pclick(t, t.page.locator(".ac-composer button >> visible=true").filter({ hasText: /^Comment$/ }).first())
-    await sleep(1500); await shot(t, "c7-after-send")
+    await sleep(300); await shot(t, "c7-after-send")
     const link = up.series_id ? "coral://artifacts/series/" + up.series_id : up.uri   // an earlier take of the same name makes this a version: comments belong to the series
-    let id; for (let k = 0; k < 14 && !id; k++) { await sleep(500); try { const o = agent(live.agent, "coral-agent", "artifact", "comments", link); id = (o.match(/Thread (\d+)/) || [])[1]; if (!id && k === 13) console.error("comments output: " + o.slice(0, 300)) } catch (e) { if (k === 13) console.error("comments error: " + String(e.stderr || e.message).slice(0, 300)) } }   // the comment reaches the agent a moment after Send
+    let id; for (let k = 0; k < 40 && !id; k++) { await sleep(150); try { const o = agent(live.agent, "coral-agent", "artifact", "comments", link); id = (o.match(/Thread (\d+)/) || [])[1]; if (!id && k === 39) console.error("comments output: " + o.slice(0, 300)) } catch (e) { if (k === 13) console.error("comments error: " + String(e.stderr || e.message).slice(0, 300)) } }   // the comment reaches the agent a moment after Send
     if (!id) throw new Error("the comment never reached the agent")
     let txt = fs.readFileSync(S + "/work/live.md", "utf8"); for (const [a, b] of live.edits) txt = txt.replace(a, b); fs.writeFileSync(S + "/work/live.md", txt)
+    // The open file does not take new comments live (asked of the Orchestrator), so the film cuts here: the agent answers and uploads, the file is closed and opened again,
+    // all of it outside the take, and the film goes from the sent comment to the file with the answer and the new version. The review page says so.
+    t.cutStart()
     agent(live.agent, "coral-agent", "artifact", "reply", link, id, live.reply)
     agent(live.agent, "coral-agent", "artifact", "upload", S + "/work/live.md", "--name", live.name, "--new-version-of", link, "--tag", "for review", "--question", live.question2)
+    await t.page.evaluate(() => { const c = document.getElementById("__cap"); if (c) c.style.transition = "none" })
+    await t.click(t.page.locator("button:text-is('Close') >> visible=true").last()); await sleep(1200)
+    await t.click(t.page.locator(`text=${live.name} >> visible=true`).first()); await sleep(2000)
+    await sleep(1200)
+    const seenNow = (ms) => t.page.locator(`text=${live.replyFind}`).first().waitFor({ state: "visible", timeout: ms }).then(() => true).catch(() => false)
+    let ok = await seenNow(600)
+    for (let k = 0; k < 3 && !ok; k++) { await t.click(t.page.getByRole("button", { name: /^Comments/ })); ok = await seenNow(3000) }   // the panel may open by itself or need the button: press until the answer is there
+    t.cutEnd()
     await t.cap("The answer and a new version, within seconds.")
-    // the agent's answer must be on screen: wait for it, draw the panel again (Comments button) if it does not come, and fail the take rather than film a silent agent
-    const answered = () => t.page.locator(`text=${live.replyFind}`).first().waitFor({ state: "visible", timeout: 6000 }).then(() => true).catch(() => false)
-    let ok = await answered()
-    for (let k = 0; k < 3 && !ok; k++) {   // the open dialog reads its thread when it opens: close it and open the file again (no page reload)
-      await t.click(t.page.locator("button:text-is('Close') >> visible=true").last()); await sleep(1200)
-      await t.click(t.page.locator(`text=${live.name} >> visible=true`).first()); await sleep(2000)
-      await t.click(t.page.getByRole("button", { name: /^Comments/ })); ok = await answered()
-    }
-    if (!ok) { await shot(t, "c7-noreply"); throw new Error("the agent's answer never showed on screen") }
-    await sleep(3500)
+    if (!ok) { await shot(t, "c7-noreply"); try { console.error("THREAD: " + agent(live.agent, "coral-agent", "artifact", "comments", link).slice(0, 700)) } catch (e) { console.error("thread read failed") }; throw new Error("the agent's answer never showed on screen") }
+    await sleep(1500)
     await t.cap("And the new version, with what changed.")   // the version chip, then Compare
-    await t.click(t.page.getByRole("button", { name: /v\d+ of \d+/ }).first()); await sleep(1200)
+    await shot(t, "c7-before-chip"); await t.click(t.page.getByRole("button", { name: /v\d+ of \d+/ }).first()); await sleep(1200); await shot(t, "c7-after-chip")
+    await t.click(t.page.getByText("Open the latest").first()); await sleep(2000); await shot(t, "c7-latest")
+    await t.click(t.page.getByRole("button", { name: /v\d+ of \d+/ }).first()); await sleep(900); await shot(t, "c7-menu2")
     await t.click(t.page.getByText(/Compare/).first()); await sleep(4500)
     return t.finish()
   },
