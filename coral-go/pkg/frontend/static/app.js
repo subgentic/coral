@@ -63,7 +63,6 @@ import './board_table.js';
 import './board_system_lines.js';
 import './board_attachments.js';
 import './board_artifacts.js';
-import './board_pause_button.js';
 import './growing_textarea.js';
 import './folder_tags.js';
 import './pinned_folders.js';
