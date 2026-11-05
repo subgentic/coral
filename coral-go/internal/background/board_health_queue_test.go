@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/pkg/resourcequeue"
 )
 
@@ -77,4 +78,41 @@ func TestAWaitOnTheAgentBehindYouInTheLineIsStillAWait(t *testing.T) {
 	h.now = h.now.Add(30 * time.Minute)
 	h.m.scan(context.Background())
 	assert.Len(t, escalations(t, h), 1)
+}
+
+// QA Reviewer 2's SHOULDs on #13707.
+// 1. The deviation rule: with a history of answered waits on the holder, a wait past twice their median is a deviation for anyone else, and not for a waiter behind that holder in the line.
+func TestAQueueWaitIsNotADeviationEvenWithAHistoryOfAnswers(t *testing.T) {
+	d := newDeviationHarness(t)
+	d.member("Orchestrator", "Orchestrator", 1, 0)
+	d.member("QA Reviewer 2", "QA", 2, 0)
+	d.member("Frontend Dev", "Developer", 3, 0)
+	d.member("Backend Dev", "Developer", 4, 0)
+	q, err := resourcequeue.New(resourcequeue.Config{})
+	require.NoError(t, err)
+	require.NoError(t, q.Define(resourcequeue.Resource{Key: "mac-heavy", Slots: 1}))
+	_, err = q.Claim("mac-heavy", resourcequeue.Claimant{Agent: "QA Reviewer 2"})
+	require.NoError(t, err)
+	_, err = q.Claim("mac-heavy", resourcequeue.Claimant{Agent: "Frontend Dev"})
+	require.NoError(t, err)
+	d.answered("Frontend Dev", "message", "QA Reviewer 2", 5*time.Minute)
+	d.answered("Backend Dev", "message", "QA Reviewer 2", 5*time.Minute)
+	d.wait(3, "Frontend Dev", "message", "QA Reviewer 2") // behind the holder in the line
+	d.wait(4, "Backend Dev", "message", "QA Reviewer 2")  // not in the line: a real wait
+	_, err = d.raw.ExecContext(context.Background(), `UPDATE board_waits SET created_at=? WHERE status='active'`, ts(d.now.Add(-21*time.Minute)))
+	require.NoError(t, err)
+	d.m.SetResourceQueue(q)
+	out := d.check()
+	assert.Contains(t, out, "Backend Dev: has waited 21 min on QA Reviewer 2; an answer usually takes 5 min", "a wait outside the line is still a deviation")
+	assert.NotContains(t, out, "Frontend Dev: has waited", "a wait in the line is not")
+}
+
+// 2. A wait on a label or a commit has no member target: with its waiter in a line, nothing panics and the wait is as it was.
+func TestAWaitOnALabelOrACommitInALineIsUnchangedAndDoesNotPanic(t *testing.T) {
+	h, _ := queueHarness(t)
+	h.wait(3, "Frontend Dev", "commit", "abc1234")
+	h.wait(4, "Backend Dev", "any", "")
+	h.now = h.now.Add(30 * time.Minute)
+	assert.NotPanics(t, func() { h.m.scan(context.Background()); _ = h.check() })
+	assert.False(t, h.m.inQueueWait(board.RegisteredWait{SubscriberID: "Frontend Dev", WaitType: "commit", TargetID: "abc1234"}, waitTarget{}), "no member to be ahead: not a queue wait")
 }
