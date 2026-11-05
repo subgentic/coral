@@ -8,22 +8,26 @@
 #   ~/.ssh/authorized_keys      ONE line:  restrict,command="<home>/bin/coral-heavy-run" <the Mac's public key>
 # so that key can run the wrapper and nothing else: no shell, no forwarding, none of the Operator's files or keychain.
 #
-# Usage: mini-setup.sh --pubkey "ssh-ed25519 AAAA... coral-heavy" --wrapper ./coral-heavy-run [--go 1.26.10] [--node 22.23.4] [--skip-toolchains] [--dry-run]
+# Usage: mini-setup.sh --pubkey "ssh-ed25519 AAAA... coral-heavy" --wrapper ./coral-heavy-run [--skip-toolchains] [--dry-run]
+#        [--go VER --go-sha256 HEX] [--node VER --node-sha256 HEX]   (only to use a version other than the pinned ones, with its published checksum)
 #   --pubkey   the public key made on the Mac (ssh-keygen -t ed25519 -f ~/.ssh/coral_heavy -N ""): the content of coral_heavy.pub
 #   --wrapper  the built wrapper for this machine: on the Mac, GOOS=darwin GOARCH=arm64 go build -o coral-heavy-run ./cmd/coral-heavy-run (from coral-go), copied here
-# It never touches any ssh setting beyond that account's own authorized_keys.
+# The Go and Node checksums of the default versions are written in this file (reviewed with it), not fetched from the download site. It never touches any ssh setting beyond that account's own authorized_keys.
 set -euo pipefail
 
-PUBKEY=""; WRAPPER=""; GOVER="1.26.10"; NODEVER="22.23.4"; SKIP_TOOLS=0; DRY=0
+DEFAULT_GO="1.26.10"; DEFAULT_NODE="22.23.4"
+PUBKEY=""; WRAPPER=""; GOVER="$DEFAULT_GO"; NODEVER="$DEFAULT_NODE"; GOSUM=""; NODESUM=""; SKIP_TOOLS=0; DRY=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --pubkey) PUBKEY="${2-}"; shift 2 ;;
         --wrapper) WRAPPER="${2-}"; shift 2 ;;
         --go) GOVER="${2-}"; shift 2 ;;
         --node) NODEVER="${2-}"; shift 2 ;;
+        --go-sha256) GOSUM="${2-}"; shift 2 ;;
+        --node-sha256) NODESUM="${2-}"; shift 2 ;;
         --skip-toolchains) SKIP_TOOLS=1; shift ;;
         --dry-run) DRY=1; shift ;;
-        -h|--help) sed -n '2,19p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,21p' "$0"; exit 0 ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
 done
@@ -38,6 +42,25 @@ do_() { if [[ $DRY -eq 0 ]]; then "$@"; fi; }
 [[ "$PUBKEY" =~ ^ssh-ed25519\ [A-Za-z0-9+/]{60,100}={0,2}(\ [A-Za-z0-9._-]{1,64})?$ ]] || die "--pubkey must be one plain 'ssh-ed25519 AAAA... [comment]' line (no options, no newline, no quotes)"
 [[ -n "$WRAPPER" && -f "$WRAPPER" ]] || die "--wrapper must be the built coral-heavy-run file"
 [[ "$GOVER" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ && "$NODEVER" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "bad --go or --node version"
+
+# the checksums of the default versions, copied from the official checksum lists of go.dev and nodejs.org, written here so a changed download site cannot change both the file and its checksum
+pinned_go() { case "$1" in
+    darwin-arm64) echo 0b5183492292ada170f9b561a834863808dd02edba599e4ad0e89899330020b3 ;;
+    darwin-amd64) echo e820ab780c273ae4a340b79d0f3c4313b74ee029aa3874792145d44b9f4f91da ;;
+    linux-amd64) echo ccfe7ae822d2c2f41f4fe7c956199967a4dac22d0ee0d2b2bfdb440aab3b20c5 ;;
+    linux-arm64) echo 3f4227ce7b206a513e794f1393adb473a07b46e94d18bd15d1c684bbb7319797 ;;
+esac; }
+pinned_node() { case "$1" in
+    darwin-arm64) echo c9e1dbc748b33ed2d14f42445191ecaf14c56259c7a9a26d0042c49ec2b66428 ;;
+    darwin-x64) echo efcc2b0db6f94bf53eddb038fe2b370277a042bd29e4f19b8f8e23598795b819 ;;
+    linux-arm64) echo f7a1e486dbc8b286847815b477d4fb5e9fb963ed4489c3e1588853d685f589f9 ;;
+    linux-x64) echo b8492284c76a54baf58d61668dd0e41ee0fc98adabf9503d30f05d08f55b4406 ;;
+esac; }
+if [[ $SKIP_TOOLS -eq 0 ]]; then
+    # a version other than the pinned one needs its own published checksum, given here (nothing is taken from the site that serves the file)
+    [[ "$GOVER" == "$DEFAULT_GO" || "$GOSUM" =~ ^[0-9a-f]{64}$ ]] || die "--go $GOVER is not the pinned version ($DEFAULT_GO): give its published checksum with --go-sha256"
+    [[ "$NODEVER" == "$DEFAULT_NODE" || "$NODESUM" =~ ^[0-9a-f]{64}$ ]] || die "--node $NODEVER is not the pinned version ($DEFAULT_NODE): give its published checksum with --node-sha256"
+fi
 
 say "make $HOME/coral-test and $HOME/bin (private)"
 if [[ $DRY -eq 0 ]]; then
@@ -68,16 +91,12 @@ if [[ $SKIP_TOOLS -eq 0 ]]; then
     say "install Go $GOVER and Node $NODEVER under $HOME/.local (official downloads, checked against the published SHA-256)"
     if [[ $DRY -eq 0 ]]; then
         mkdir -p "$HOME/.local"
-        gosum="$(curl -fsSL "https://go.dev/dl/?mode=json&include=all" | python3 -c 'import json,sys; v="go'"$GOVER"'"; f="go'"$GOVER"'.'"$GOOS-$GOARCH"'.tar.gz"
-for r in json.load(sys.stdin):
-    if r["version"]==v:
-        for x in r["files"]:
-            if x["filename"]==f: print(x["sha256"])')"
-        [[ -n "$gosum" ]] || die "no checksum published for go$GOVER $GOOS-$GOARCH"
+        gosum="${GOSUM:-$(pinned_go "$GOOS-$GOARCH")}"
+        [[ -n "$gosum" ]] || die "no pinned Go checksum for $GOOS-$GOARCH: give --go-sha256"
         fetch_checked "https://go.dev/dl/go$GOVER.$GOOS-$GOARCH.tar.gz" "$gosum" "$HOME/.local/go.tgz"
         rm -rf "$HOME/.local/go" && tar -C "$HOME/.local" -xzf "$HOME/.local/go.tgz" && rm -f "$HOME/.local/go.tgz"
-        nsum="$(curl -fsSL "https://nodejs.org/dist/v$NODEVER/SHASUMS256.txt" | awk -v f="node-v$NODEVER-$NODEARCH.tar.gz" '$2==f {print $1}')"
-        [[ -n "$nsum" ]] || die "no checksum published for node v$NODEVER $NODEARCH"
+        nsum="${NODESUM:-$(pinned_node "$NODEARCH")}"
+        [[ -n "$nsum" ]] || die "no pinned Node checksum for $NODEARCH: give --node-sha256"
         fetch_checked "https://nodejs.org/dist/v$NODEVER/node-v$NODEVER-$NODEARCH.tar.gz" "$nsum" "$HOME/.local/node.tgz"
         rm -rf "$HOME/.local/node" "$HOME/.local/node-v$NODEVER-$NODEARCH" && tar -C "$HOME/.local" -xzf "$HOME/.local/node.tgz" && rm -f "$HOME/.local/node.tgz"
         mv "$HOME/.local/node-v$NODEVER-$NODEARCH" "$HOME/.local/node"
@@ -112,11 +131,12 @@ Host coral-heavy-mini
     IdentitiesOnly yes
     StrictHostKeyChecking yes
 
-2. Pin this machine's host key, after checking its fingerprint matches. Here, as an admin, show it:
+2. Pin this machine's host key, after checking its fingerprint. Here on the mini, as an admin, show it:
        ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
-   then on the Mac, add the key and compare the fingerprint it prints to the one above BEFORE trusting it:
-       ssh-keyscan -t ed25519 ${HOSTNAME_NOW} | tee /tmp/mini_hostkey.txt | ssh-keygen -lf -
-       cat /tmp/mini_hostkey.txt >> ~/.ssh/known_hosts
+   then on the Mac write the scanned key to a file in YOUR OWN home (never a shared folder like /tmp, where another user could swap it), compare its fingerprint with the one above, and only if they match add it:
+       ssh-keyscan -t ed25519 ${HOSTNAME_NOW} > ~/mini_hostkey.txt
+       ssh-keygen -lf ~/mini_hostkey.txt        # compare this fingerprint with the one the mini showed
+       cat ~/mini_hostkey.txt >> ~/.ssh/known_hosts && rm ~/mini_hostkey.txt
 
 Test (from the Mac; it prints "refused: not a heavy-run stream" because it sends nothing, which is the wrapper answering):
        ssh -T coral-heavy-mini

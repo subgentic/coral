@@ -96,3 +96,27 @@ func TestSetupDryRunWritesNothingAndRefusesToRunAsRoot(t *testing.T) {
 	_, err = runSetup(t, home, "--pubkey", goodKey, "--wrapper", fakeWrapper(t), "--skip-toolchains")
 	assert.Error(t, err, "root is refused")
 }
+
+func TestSetupPinsItsDefaultToolchainChecksumsAndWillNotTrustAVersionWithoutOne(t *testing.T) {
+	script, err := os.ReadFile("../../../tools/heavy/mini-setup.sh")
+	require.NoError(t, err)
+	assert.Regexp(t, `darwin-arm64\) echo [0-9a-f]{64}`, string(script), "the default checksums are in the script, reviewed with it")
+	assert.Contains(t, string(script), "0b5183492292ada170f9b561a834863808dd02edba599e4ad0e89899330020b3", "Go 1.26.10 darwin-arm64")
+	assert.Contains(t, string(script), "c9e1dbc748b33ed2d14f42445191ecaf14c56259c7a9a26d0042c49ec2b66428", "Node 22.23.4 darwin-arm64")
+	assert.NotContains(t, string(script), "go.dev/dl/?mode=json", "not taken from the same site as the file")
+	assert.NotContains(t, string(script), "SHASUMS256.txt", "nor Node's")
+	home := t.TempDir()
+	out, err := runSetup(t, home, "--pubkey", goodKey, "--wrapper", fakeWrapper(t), "--go", "1.2.3", "--dry-run")
+	assert.Error(t, err, "a version that is not the pinned one needs its checksum given: "+out)
+	assert.Contains(t, out, "--go-sha256")
+	out, err = runSetup(t, home, "--pubkey", goodKey, "--wrapper", fakeWrapper(t), "--go", "1.2.3", "--go-sha256", strings.Repeat("a", 64), "--dry-run")
+	assert.NoError(t, err, out)
+}
+
+func TestSetupNeverWritesTheHostKeyToASharedFolder(t *testing.T) {
+	out, err := runSetup(t, t.TempDir(), "--pubkey", goodKey, "--wrapper", fakeWrapper(t), "--skip-toolchains", "--dry-run")
+	require.NoError(t, err, out)
+	assert.NotContains(t, out, "/tmp/", "a fixed name in a shared folder lets another user swap the key between the two commands")
+	assert.Contains(t, out, "known_hosts")
+	assert.Contains(t, out, "compare", "the fingerprint is compared before the key is added")
+}

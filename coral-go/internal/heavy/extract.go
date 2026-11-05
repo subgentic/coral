@@ -77,6 +77,7 @@ func Extract(dir string, r io.Reader, lim Limits) (Stats, error) {
 	}
 	type link struct{ at, target string }
 	var links []link
+	entries := 0
 	tr := tar.NewReader(r)
 	for {
 		h, err := tr.Next()
@@ -96,6 +97,9 @@ func Extract(dir string, r io.Reader, lim Limits) (Stats, error) {
 		name, err := cleanName(h.Name)
 		if err != nil {
 			return st, err
+		}
+		if entries++; entries > lim.Files { // every entry counts, not only the regular files: millions of empty folders or links are an archive too
+			return st, ErrTooBig
 		}
 		if err := claim(name); err != nil {
 			return st, err
