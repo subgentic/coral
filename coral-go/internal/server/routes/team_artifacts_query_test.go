@@ -650,3 +650,36 @@ func TestTheSearchOfAHubViewerCannotProbeARedactedReviewQuestionOrTeam(t *testin
 	assert.True(t, match(hub, "deploy with"), "the words around the token still match: the shown text is searched")
 	assert.True(t, match(hub, strings.ToLower(hub.ReviewQuestion[len("Deploy with "):len("Deploy with ")+4])), "and so does the marker that replaced the token")
 }
+
+// The ORDER, through the real list route (the Orchestrator's question on #13614): through Coral Hub the handler redacts the items BEFORE it matches q, so a Hub viewer's q set to the start of a token that sits in a file's
+// review question finds nothing, while the same q on this computer's own list finds the file. (The unit test above composes the two calls; this one runs the handler.)
+func TestARealHubListRedactsTheReviewQuestionBeforeItMatchesQ(t *testing.T) {
+	resetOwnerState(t)
+	withLabel(t, ownerLabel, nil)
+	e := newTagEnv(t)
+	ctx := context.Background()
+	id := e.ids["report.md"]
+	e.uploadedBy(t, "sess-dev", id)
+	secret := "ghp_" + strings.Repeat("a1B2c3D4e5", 4)
+	e.h.applyManifestTags(ctx, "tag-team", "sess-dev", false, []board.TaskArtifact{{Name: "report.md", URI: "coral://artifacts/" + id, Tags: []string{"for review"}, Question: "Deploy with " + secret + " ok?"}})
+	get := func(query string, hub bool) []string {
+		req, err := http.NewRequest(http.MethodGet, e.srv.URL+"/api/board/tag-team/artifacts?"+query, nil)
+		require.NoError(t, err)
+		if hub {
+			for k, v := range ownerHeaders(ownerLabel) {
+				req.Header.Set(k, v)
+			}
+		}
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		var out map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+		return namesOf(out)
+	}
+	prefix := url.QueryEscape(secret[:12])
+	assert.Contains(t, get("q="+prefix, false), "report.md", "on this computer the token's start is in the question: the file matches")
+	assert.NotContains(t, get("q="+prefix, true), "report.md", "through the Hub the question is redacted before the match: the token's start finds nothing")
+	assert.Contains(t, get("q="+url.QueryEscape("deploy with"), true), "report.md", "the words around the token match the shown text")
+}
