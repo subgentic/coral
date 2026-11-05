@@ -14,6 +14,7 @@ import './team_form.js';
 import './agent_form.js';
 import './branch_expand.js';
 import './nav_tabs.js';
+import './top_search.js';
 import { initPrerequisiteChecks } from './prerequisites.js';
 import './system_status.js';
 import { beginDashboardAnalytics, dashboardInitialized, dashboardFailed } from './dashboard_analytics.js';

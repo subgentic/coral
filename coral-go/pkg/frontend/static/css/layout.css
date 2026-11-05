@@ -88,6 +88,12 @@
     .agent-bar-menu .material-icons, .phone-menu-btn .material-icons { position: relative; }
     .top-menu-btn[data-waiting] .material-icons::after, .agent-bar-menu[data-waiting] .material-icons::after, .phone-menu-btn[data-waiting] .material-icons::after { content: ""; position: absolute; top: -2px; right: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--warning); box-shadow: 0 0 0 2px var(--topbar-bg); } /* something waits for the person: the Needs input amber on the icon's corner, no number (#9829); the button's name says what waits */
     .top-menu-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* #13591: on an Inbox page the pill is that page's search field (top_search.js); the box under the tabs is hidden and the hamburger stays the views' button */
+    .top-search { display: none; }
+    body.top-search-on .top-search { display: block; flex: 1 1 auto; min-width: 0; margin: 0 8px 0 0; border-radius: 999px; padding-inline: 16px; min-height: var(--control-touch-height, 44px); box-sizing: border-box; }
+    body.top-search-on .top-menu-btn { flex: 0 0 auto; margin-right: 0; }
+    body.top-search-on .top-menu-label { display: none; }
+    .list-bar-search-wrap.top-searched { display: none; }
 }
 
 .top-bar-title {
