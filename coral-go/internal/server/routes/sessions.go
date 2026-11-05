@@ -712,6 +712,7 @@ func (h *SessionsHandler) protocolPath() string {
 	}
 	if h.cfg.CoralRoot != "" && (os.Getenv("CORAL_ROOT") != "" || config.TierName == "dev") {
 		candidates = append(candidates,
+			filepath.Join(h.cfg.CoralRoot, "internal", "protocol", "PROTOCOL.md"),
 			filepath.Join(h.cfg.CoralRoot, "PROTOCOL.md"),
 			filepath.Join(h.cfg.CoralRoot, "src", "coral", "PROTOCOL.md"))
 	}

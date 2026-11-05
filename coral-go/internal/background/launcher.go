@@ -399,6 +399,8 @@ func FindProtocolMD() string {
 		return ""
 	}
 	for _, rel := range []string{
+		"internal/protocol/PROTOCOL.md",
+		"coral-go/internal/protocol/PROTOCOL.md",
 		"src/coral/PROTOCOL.md",
 		"PROTOCOL.md",
 	} {
