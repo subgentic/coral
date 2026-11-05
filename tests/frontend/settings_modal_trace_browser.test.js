@@ -22,7 +22,7 @@ const SCEN = [
     ['every setting set', FULL, {}, undefined, {}],
     ['custom themes and an odd poll interval', { ...FULL, custom_theme: 'Mine', git_poll_interval_s: '45', cli_path_agy: '', cli_path_gemini: '/bin/gemini', default_model_agy: '', default_model_gemini: 'g-old' }, { themes: true }, undefined, {}],
     ['requests fail', { ...FULL }, { privacy: 500, themes: 500, models: 500, key: 401, status: 500 }, undefined, {}],
-    ['the api key and models answer', FULL, { key: 'sk-test-123' }, undefined, {}],
+    ['the provider fields and models answer', FULL, { key: 'sk-test-123' }, undefined, {}],
     ['a group asked for', FULL, {}, 'terminal', {}],
     ['browser settings', { ...FULL }, {}, undefined, { 'coral-group-by-team': 'false', 'coral-update-check-enabled': 'false' }],
 ];
