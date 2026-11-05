@@ -17,10 +17,9 @@ export function mountGoalComments(host, { team, goalId, onCount = () => {} }) {
     body.hidden = true;
     box.append(body);
     host.append(box);
-    const words = { empty: 'No comments yet. Your comment goes to the goal’s owner, who answers here.', whole: 'Comment on this goal', quote: 'This goal' };
-    const comments = attachComments(box, body, box, { toggleHost: true, sheet: () => false, shown: () => true, words, onCount });
+    const words = { subject: 'goal', empty: 'No comments yet. Your comment goes to the goal’s owner, who answers here.', whole: 'Comment on this goal', quote: 'This goal' };
+    const comments = attachComments(box, body, box, { toggleHost: true, sheet: () => false, shown: () => true, initialOpen: true, preferenceKey: () => null, words, onCount });
     comments.open(goalSubject(team, goalId), contextServer(), team);
     comments.docWhole();
-    comments.setSheet(true);
     return { destroy() { comments.close(); box.remove(); } };
 }
