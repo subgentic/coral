@@ -814,12 +814,14 @@ jobs:
       - name: Verify signed, notarized release
         run: |
           set -euo pipefail
+          # shellcheck source=/dev/null
+          source tests/release/staple_retry.sh   # validate_retry: the ticket check is tried 3 times, 30 s apart, for Apple's CloudKit "network connection was lost" (#13568)
           codesign --verify --strict --verbose=2 "dist/$DMG_NAME"
           # An unstapled artifact (UNSTAPLED_DMG or UNSTAPLED_APP, set only after Apple said Accepted) has no ticket to validate, and spctl
           # would ask the same Apple service that was unreachable: those checks are skipped for that artifact only.
           if [ "${UNSTAPLED_DMG:-}" != 1 ]; then
             spctl -a -t open --context context:primary-signature -vv "dist/$DMG_NAME"
-            xcrun stapler validate "dist/$DMG_NAME"
+            validate_retry "dist/$DMG_NAME"
           fi
           MNT="$RUNNER_TEMP/dmgverify"
           mkdir -p "$MNT"
@@ -827,7 +829,7 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$MNT/Coral.app"
           if [ "${UNSTAPLED_APP:-}" != 1 ]; then
             spctl -a -t exec -vv "$MNT/Coral.app"
-            xcrun stapler validate "$MNT/Coral.app"
+            validate_retry "$MNT/Coral.app"
           fi
           # Hardened runtime on every Mach-O in the bundle.
           for f in "$MNT"/Coral.app/Contents/MacOS/*; do

@@ -10,16 +10,17 @@ fail() { echo "FAIL: $*"; fails=$((fails + 1)); }
 mkdir -p "$tmp/bin"
 cat >"$tmp/bin/xcrun" <<'SH'
 #!/usr/bin/env bash
-# xcrun stapler staple|validate PATH: STUB_STAPLE_FAILS counts how many staple calls fail before one works; STUB_VALIDATE_FAIL=1 makes validate fail.
+# xcrun stapler staple|validate PATH: STUB_STAPLE_FAILS counts how many staple calls fail before one works; STUB_VALIDATE_FAIL=1 makes validate fail; STUB_VALIDATE_FAILS counts how many validate calls fail before one works.
 echo "$2 $3" >>"$STUB_LOG"
 if [ "$2" = staple ]; then
   n=$(grep -c '^staple ' "$STUB_LOG"); [ "$n" -gt "${STUB_STAPLE_FAILS:-0}" ] || exit 1
 fi
 if [ "$2" = validate ] && [ "${STUB_VALIDATE_FAIL:-}" = 1 ]; then exit 1; fi
+if [ "$2" = validate ] && [ -n "${STUB_VALIDATE_FAILS:-}" ]; then n=$(grep -c '^validate ' "$STUB_LOG"); [ "$n" -gt "$STUB_VALIDATE_FAILS" ] || exit 1; fi
 exit 0
 SH
 chmod 755 "$tmp/bin/xcrun"
-export PATH="$tmp/bin:$PATH" STAPLE_WAIT=0 STAPLE_TRIES=5
+export PATH="$tmp/bin:$PATH" STAPLE_WAIT=0 STAPLE_TRIES=5 VALIDATE_WAIT=0
 # shellcheck source=/dev/null
 source "$root/tests/release/staple_retry.sh"
 count() { grep -c "^$1 " "$STUB_LOG" || true; }
@@ -59,4 +60,17 @@ b=$(grep -n '"$STATUS" = "Accepted"' "$wf" | head -1 | cut -d: -f1 || true); s2=
 [ -n "$b" ] && [ -n "$s2" ] && [ "$b" -lt "$s2" ] && ok "the DMG's Accepted check comes before its staple" || fail "dmg: accepted line $b, staple line $s2"
 [ "$(grep -c 'UNSTAPLED_DMG:-}" != 1' "$wf" || true)" = 1 ] && [ "$(grep -c 'UNSTAPLED_APP:-}" != 1' "$wf" || true)" = 1 ] && ok "the verify step guards each artifact's spctl and stapler validate by its own flag" || fail "verify guards: dmg $(grep -c 'UNSTAPLED_DMG:-}" != 1' "$wf" || true), app $(grep -c 'UNSTAPLED_APP:-}" != 1' "$wf" || true)"
 if grep -nE '^[[:space:]]*xcrun stapler (staple|validate) ' "$wf" | grep -v "staple_retry" | grep -q "stapler staple"; then fail "a bare 'stapler staple' is still in release.yml"; else ok "no bare stapler staple is left in release.yml"; fi
+# validate_retry (#13568): the verify step's `stapler validate` is tried a few times, because Apple's ticket service (CloudKit) answers "The network connection was lost" (error 68) after an accepted notarization
+unset STUB_STAPLE_FAILS STUB_VALIDATE_FAIL
+export STUB_VALIDATE_FAILS=0; rc=$(run validate_retry x.dmg); [ "$rc" = 0 ] && [ "$(count validate)" = 1 ] && ok "a validate that works the first time is called once" || fail "validate first try: rc=$rc calls=$(count validate)"
+export STUB_VALIDATE_FAILS=2; rc=$(run validate_retry x.dmg); [ "$rc" = 0 ] && [ "$(count validate)" = 3 ] && ok "two failed validates and a success: three tries, return 0" || fail "validate retry: rc=$rc calls=$(count validate)"
+export STUB_VALIDATE_FAILS=99; rc=$(run validate_retry x.dmg); [ "$rc" = 1 ] && [ "$(count validate)" = 3 ] && ok "a validate that never works gives up after three tries and returns 1" || fail "validate gives up: rc=$rc calls=$(count validate)"
+export STUB_VALIDATE_FAILS=99 VALIDATE_TRIES=5; rc=$(run validate_retry x.dmg); [ "$rc" = 1 ] && [ "$(count validate)" = 5 ] && ok "VALIDATE_TRIES sets the number of tries" || fail "VALIDATE_TRIES: rc=$rc calls=$(count validate)"
+unset VALIDATE_TRIES STUB_VALIDATE_FAILS
+# the verify step uses it for the DMG and the app, and a real failure still fails the job (set -e: the call is bare)
+vs=$(awk '/- name: Verify signed, notarized release/{f=1} f&&/- name: Cleanup keychain/{exit} f' "$root/.github/workflows/release.yml")
+[ "$(grep -c 'validate_retry ' <<<"$vs")" = 2 ] && ok "the verify step validates the DMG and the app with validate_retry" || fail "verify step: $(grep -c 'validate_retry ' <<<"$vs") validate_retry calls (want 2)"
+grep -q 'source tests/release/staple_retry.sh' <<<"$vs" && ok "the verify step sources staple_retry.sh" || fail "the verify step does not source staple_retry.sh"
+! grep -qE 'xcrun stapler validate' <<<"$vs" && ok "no bare 'xcrun stapler validate' is left in the verify step" || fail "a bare stapler validate is still in the verify step"
+! grep -E 'validate_retry ' <<<"$vs" | grep -qE '\|\||if |!' && ok "validate_retry is called bare, so a real failure fails the job" || fail "validate_retry is guarded: a failure would be swallowed"
 [ "$fails" = 0 ] && echo "PASS staple_retry" || { echo "$fails FAILED"; exit 1; }
