@@ -27,7 +27,7 @@ the Orchestrator can move you.
                                                   A slot now (exit 0), or a place in line: with --wait the command waits until the slot is yours
   resource release <name>                         Give the slot back, or leave the line
   resource renew <name>                           A full lease from now
-  resource define <name> --slots N [--machine M] [--lease 30m] [--allow a,b]
+  resource define <name> --slots N [--machine M] [--lease 30m] [--allow a,b] [--match "go test ./..."]...
                                                   The Operator or an Orchestrator: make or change a resource
   resource remove <name>                          The Operator or an Orchestrator
   resource move <entry-id> first|up|down          The Operator or an Orchestrator: reorder the line
@@ -277,6 +277,8 @@ func resourceDefine(rest []string) {
 	machine := fs.String("machine", "", "where it is, for people to read")
 	lease := fs.Duration("lease", 0, "how long a claim lasts unless renewed (default 30m)")
 	allow := fs.String("allow", "", "comma-separated agents that may claim it (default: everyone)")
+	var match listFlag
+	fs.Var(&match, "match", `a shell command that claims it by itself, such as "go test ./..." (repeat for more; the hook, off without one)`)
 	clihelp.ParseFlags(fs, rest[1:], func() string { return resourceUsageText })
 	if *slots < 1 {
 		fmt.Fprintln(os.Stderr, "--slots N (1 or more) is required")
@@ -286,6 +288,9 @@ func resourceDefine(rest []string) {
 	body := map[string]any{"slots": *slots, "machine": *machine, "max_lease_seconds": int(lease.Seconds())}
 	if *allow != "" {
 		body["allowed"] = strings.Split(*allow, ",")
+	}
+	if len(match) > 0 {
+		body["match"] = []string(match)
 	}
 	data, status, err := resourceCall("PUT", "/"+name, body)
 	if err != nil || status != http.StatusOK {

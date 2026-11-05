@@ -22,7 +22,7 @@ Do not post "starting a heavy run" and "run finished" notes for a resource you c
 
 ## For the Orchestrator and the Operator
 
-- Define resources: `coral-board resource define mac-heavy --slots 1 --machine mac --lease 30m` (and `mini`). `--allow a,b` limits who may claim one. Names are letters, digits, dot, dash and underscore.
+- Define resources: `coral-board resource define mac-heavy --slots 1 --machine mac --lease 30m` (and `mini`). `--allow a,b` limits who may claim one. `--match "go test ./..."` (repeat it) turns on the shell hook for the resource (below). Names are letters, digits, dot, dash and underscore.
 - Reorder the line: `coral-board resource move <entry-id> first|up|down` (entry ids are in `resource list`). After a move the line stands as set; later arrivals join behind it.
 - Free a slot: `coral-board resource kick <entry-id>` drops a holder or a waiting entry. `resource remove <name>` deletes a resource.
 - Only the Operator and a registered Orchestrator (the launch record, not a name or title) can define, remove, move or kick; an ordinary agent gets `manager_only` (403).
