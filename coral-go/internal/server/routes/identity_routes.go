@@ -362,6 +362,7 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/scheduled/jobs/{jobID}":                           "read a scheduled job (its prompt and flags)",
 	"GET /api/scheduled/jobs/{jobID}/runs":                      "list a scheduled job's runs",
 	"GET /api/scheduled/runs/recent":                            "list every scheduled run",
+	"GET /api/automations/runs":                                 "list every job and workflow run, a page at a time (#13183)",
 	"DELETE /api/teams/detail/{name}":                           "delete a team",
 	"PUT /api/teams/detail/{name}/home-folder":                  "change the folder a team's agents start in",
 	"PUT /api/team-members/{memberID}/search-access":            "change how far an agent's chat search reaches",

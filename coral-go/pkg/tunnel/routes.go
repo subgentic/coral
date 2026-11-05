@@ -224,7 +224,7 @@ var routeTable = cat(
 		"/api/goals", // every board's goals in one call (#7260): the Operator's, redacted like the per-board read
 		"/api/tags", "/api/folder-tags", "/api/folder-tags/{name}", "/api/pinned-folders",
 		// The Operator's saved messages (#4510): his own bookmarks, snippets redacted when saved.
-		"/api/scheduled/jobs", "/api/scheduled/jobs/{id}", "/api/scheduled/jobs/{id}/runs", "/api/scheduled/runs/recent",
+		"/api/scheduled/jobs", "/api/scheduled/jobs/{id}", "/api/scheduled/jobs/{id}/runs", "/api/scheduled/runs/recent", "/api/automations/runs", // Recent runs as pages (#13183): the same View-tier read as /api/scheduled/runs/recent, a page at a time (the connector redacts its reply like the old one: View routes are redacted by default)
 		"/api/themes", "/api/themes/variables", "/api/themes/{name}",
 		"/api/templates/agents", "/api/templates/agents/{category}", "/api/templates/agents/{category}/{name}",
 		"/api/templates/commands", "/api/templates/commands/{category}", "/api/templates/commands/{category}/{name}",
