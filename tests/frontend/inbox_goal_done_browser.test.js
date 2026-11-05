@@ -56,6 +56,42 @@ const B = 'goal-done-' + Date.now().toString(36);
         assert.match(rows[0].text, new RegExp(`Goal #${gid} looks done: Ship the pilot`));
         assert.match(rows[0].text, /Done when: it is shipped/);
         assert.deepEqual(rows[0].buttons.filter(b => /^(Close goal|Not yet|Dismiss)$/.test(b)), ['Close goal', 'Not yet', 'Dismiss']);
+        // #13586 (the Operator: "buttons are somewhat offcenter. Dismiss is hard to see"): the actions are centred on the row, Close goal, Not yet, Dismiss and the three dots are on one line, and Dismiss is an outlined button with readable words, on both themes
+        for (const theme of ['dark', 'light']) {
+            await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: theme }] });
+            await openNeeds();
+            await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, `${theme}: the goal item`, 20000);
+            const g = await ev(`(() => { const tr = [...document.querySelectorAll('${T} tbody tr')].find(r => /looks done/.test(r.textContent)), box = tr.querySelector('.inbox-goaldone-actions'), td = box.closest('td'), R = e => e.getBoundingClientRect(),
+                btns = [...box.querySelectorAll(':scope > button, :scope > .inbox-row-more > button')].filter(b => R(b).width > 0), tr_ = R(tr), c = e => { const r = R(e); return (r.top + r.bottom) / 2; },
+                px = col => { const cv = document.createElement('canvas'); cv.width = cv.height = 1; const x = cv.getContext('2d'); x.fillStyle = col; x.fillRect(0, 0, 1, 1); return [...x.getImageData(0, 0, 1, 1).data].slice(0, 3); },
+                lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); },
+                ratio = (a, b) => { const x = lum(px(a)), y = lum(px(b)); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); },
+                bgOf = e => { for (let n = e; n; n = n.parentElement) { const v = getComputedStyle(n).backgroundColor; if (px(v).length && !/rgba\(.*, 0\)|transparent/.test(v)) return v; } return getComputedStyle(document.body).backgroundColor; },
+                d = btns.find(b => /^Dismiss$/.test(b.textContent.trim())), cs = d && getComputedStyle(d), bg = bgOf(td);
+                return { n: btns.length, names: btns.map(b => b.textContent.trim() || b.getAttribute('aria-label')), centres: btns.map(b => Math.round(c(b))), rowCentre: Math.round((tr_.top + tr_.bottom) / 2), tdAlign: getComputedStyle(td).verticalAlign,
+                    border: cs && parseFloat(cs.borderTopWidth), text: cs && ratio(cs.color, bg), edge: cs && ratio(cs.borderTopColor, bg), rowH: Math.round(tr_.height), fits: box.scrollWidth <= box.clientWidth + 1 }; })()`);
+            assert.ok(g.n >= 3 && g.names.slice(0, 3).join() === 'Close goal,Not yet,Dismiss', `${theme}: the three buttons (an unread row has no three dots on a desktop: its menu is only Mark unread, for a row already read): ` + JSON.stringify(g));
+            assert.ok(Math.max(...g.centres) - Math.min(...g.centres) <= 1, `${theme}: the buttons (and the three dots, when the row has them) are on one line (same centre): ` + JSON.stringify(g));
+            assert.ok(g.tdAlign === 'middle' && Math.abs(g.centres[0] - g.rowCentre) <= 2, `${theme}: the actions are centred on the row, not at its top: ` + JSON.stringify(g));
+            assert.ok(g.border >= 1 && g.edge >= 3 && g.text >= 4.5, `${theme}: Dismiss has an outline (3:1) and words at 4.5:1: ` + JSON.stringify(g));
+            assert.ok(g.fits, `${theme}: nothing is cut off in the actions cell: ` + JSON.stringify(g));
+        }
+        // the same row in a list that also has a review row (a review row alone wants 15rem: the goal row's four controls decide, whichever kinds are listed with it)
+        const stub = `(() => { const original = window.fetch; window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin);
+            if ((opts.method || 'GET') === 'GET' && u.pathname === '/api/board/${B}/artifacts' && u.searchParams.get('tag') === 'for review') return Promise.resolve(new Response(JSON.stringify({ project: '${B}', has_more: false, artifacts: [{ id: 'a'.repeat(64), name: 'plan-mixed.md', media_type: 'text/markdown', size: 30, created_at: new Date().toISOString(), source: 'upload', available: true, tags: ['for review'], produced_by: 'Boss', review_question: 'Ship it?' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+            return original(url, opts); }; })();`;
+        const stubId = (await Page.addScriptToEvaluateOnNewDocument({ source: stub })).identifier; // before the page's first read: a late stub sat behind the list already read
+        try {
+            await openNeeds();
+            try { await waitFor(`/plan-mixed/.test(document.querySelector('${T}')?.textContent || '') && /looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'a review row and the goal row in one list', 20000); }
+            catch (e) { assert.fail('the mixed list did not appear; rows: ' + JSON.stringify(await ev(`[...document.querySelectorAll('${T} tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ').trim().slice(0, 80))`))); }
+        const mixed = await ev(`(() => { const tr = [...document.querySelectorAll('${T} tbody tr')].find(r => /looks done/.test(r.textContent)), box = tr.querySelector('.inbox-goaldone-actions'), td = box.closest('td'), R = e => e.getBoundingClientRect(), bs = [...box.querySelectorAll(':scope > button, :scope > .inbox-row-more > button')].filter(b => R(b).width > 0), cell = R(td), c = e => (R(e).top + R(e).bottom) / 2;
+            return { n: bs.length, inside: bs.every(b => R(b).left >= cell.left - 1 && R(b).right <= cell.right + 1), spread: Math.max(...bs.map(c)) - Math.min(...bs.map(c)), cellW: Math.round(cell.width), fits: box.scrollWidth <= box.clientWidth + 1, align: getComputedStyle(td).verticalAlign }; })()`);
+        assert.ok(mixed.n >= 3 && mixed.inside && mixed.spread <= 1 && mixed.fits && mixed.align === 'middle' && mixed.cellW >= 17 * 16 - 2, 'with a review row listed too, the goal row keeps its controls inside the cell, on one line, centred, in a 17rem column: ' + JSON.stringify(mixed));
+        } finally { await Page.removeScriptToEvaluateOnNewDocument({ identifier: stubId }); }
+        await Emulation.setEmulatedMedia({ features: [] });
+        await openNeeds();
+        await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the goal item again', 20000);
         const badge = async () => Number(await ev(`(document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0`));
         await waitFor(`Number((document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0) >= 1`, 'the item is in the Inbox number', 20000); // the badge is drawn after the list: read at once it was 0 on a slower machine (Windows, v2.0.35 gate)
         const withItem = await badge(); assert.ok(withItem >= 1, 'the item is in the Inbox number: ' + withItem);

@@ -92,6 +92,7 @@
     .ac-head { flex-wrap: wrap; }
     .ac-title { order: 1; }
     .ac-showresolved { order: 3; flex: 1 0 100%; text-align: left; }
+    .ac-panel .ac-lock { order: 2; min-width: 44px; min-height: 44px; } /* the lock icon (#13578): beside the close button, a finger's box */
     /* the composer stays in reach at the sheet's bottom while the list scrolls above it */
     .ac-panel > .ac-composer { position: sticky; bottom: calc(-1 * var(--space-md)); background: var(--bg-secondary); padding: 6px 0 calc(var(--space-md)); margin-bottom: calc(-1 * var(--space-md)); z-index: 1; }
     /* with the keyboard up there is little height: the sheet may use all of the viewer, and the header folds to one row (the filters and the close button; the title is the sheet's own name and
@@ -124,6 +125,7 @@
     .preview-main > .ac-panel .ac-head { flex-wrap: wrap; }
     .preview-main > .ac-panel .ac-title { order: 1; }
     .preview-main > .ac-panel .ac-showresolved { order: 3; flex: 1 0 100%; text-align: left; min-height: 44px; }
+    .preview-main > .ac-panel .ac-lock { order: 2; min-width: 44px; min-height: 44px; }
     .preview-main > .ac-panel > .ac-composer { position: sticky; bottom: calc(-1 * var(--space-md)); background: var(--bg-secondary); padding: 6px 0 calc(var(--space-md)); margin-bottom: calc(-1 * var(--space-md)); z-index: 1; }
 }
 /* The toolbar toggle remains available beside the document and above its sheet. */
