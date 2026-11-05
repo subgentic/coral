@@ -1,5 +1,140 @@
 # Release Notes
 
+## v2.0.51 — Files from agents with no team reach Needs you, every agent is told what Coral gives it, and a computer can be updated from Coral Hub
+
+### Changes
+
+#### What you will notice first
+
+- **Files from agents on no team show up in Needs you.** They appear in a group called "Not on a team", with their question; you can open a file, approve it, ask for changes or deny it, comment, and the agent is told.
+- **Every agent is told what Coral gives it.** An agent on no team now learns about the Inbox, skills and the rest, and a team agent in a release build gets its protocol, which was empty before.
+- **Update a computer from Coral Hub.** The owner turns the relaunch switch on in Settings > Network and Hub (or, for a computer nobody sits at, starts Coral with `--allow-hub-update`, or `CORAL_ALLOW_HUB_UPDATE=1`); then the Hub's owner can update and relaunch it from the computer's page, the Servers list marks it "Update available", and an Update check can be asked for from the Hub.
+- **Needs you builds its list faster on a big board.** The list is kept for a walk through its pages and rebuilt only when something changes.
+- **Hide any tab you like, including Board.** In the tab list editor Board no longer has a lock: it can be hidden and moved like Files, Browse and Artifacts, and a hidden tab leaves an empty-state note instead of a blank panel.
+- **A small comment icon on each changed file.** In the Changes view a file's comments are one icon in its row, with a count when there are open comments; it opens the thread and the composer, and pressing it again hides them.
+- **The team's health icon opens its Health check settings.** The pulse in the sidebar is a button on a local team; on a Hub or remote team it is only an indicator.
+
+#### Fixed
+
+- **A phone's docked bar and a Hub page's frame:** in large text the frame's clearance now counts the docked bar's border.
+- **Windows terminals are steadier:** a terminal's processes are read again a few times before its text is refused as unreadable.
+
+#### Through Coral Hub
+
+- **Answering a question put to the Operator through Coral Hub is the owner's alone,** and fails closed if the lookup fails.
+- **Change a goal's driver or move it through Coral Hub,** with the goal previewed first; an older computer behind a Hub says why the actions are missing.
+- **A computer behind the Hub can be updated and relaunched by its owner** (see "What you will notice first").
+
+#### Known issues
+
+- **macOS: the tmux change (#12836) can make macOS ask once more, only after tmux restarts (a full restart of your agents or a reboot).** Coral's tmux server and guardian are now their own responsible process, so macOS may ask, per folder, whether `tmux` (or `coral`) may reach Documents, Desktop or Downloads. Full Disk Access you gave Coral.app does not carry over: if you gave Coral Full Disk Access, add `tmux` and `coral` too (both in `Coral.app/Contents/MacOS`). The staged tmux copy (each Coral version keeps its own under `tmux-bin/`) asks again after a tmux change. Say yes once; if you say no, nothing is lost, the agent just cannot read that folder.
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For Coral Hub
+
+- **`release-diff` output** (`go run ./internal/releasediff/cmd/release-diff v2.0.49 35265e61f`; the final head is checked again before the tag):
+
+  ### Tunnel routes, v2.0.49 to 35265e61f
+
+  Added, reachable through the tunnel (1)
+
+  - `POST /api/system/update/check-hub`: launch, owner-only
+
+  Changed (3)
+
+  - `POST /api/board/{project}/goals/{goalID}/driver`: never to interact owner-only
+  - `POST /api/board/{project}/goals/{goalID}/move`: never to interact owner-only
+  - `POST /api/system/update/relaunch`: launch owner-update to launch owner-only
+
+  ### Board settings keys (BoardSettings, HealthSettings included), v2.0.49 to 35265e61f
+
+  No key was added, removed or changed.
+
+  ### What Coral Hub compiles in or embeds, v2.0.49 to 35265e61f
+
+  `pkg/hubproxy`: 0 files of Go code changed (+0, -0)
+
+  - test files, not compiled by the Hub: 1 file (+25, -0)
+
+  `pkg/hubowner`: 1 file of Go code changed (+2, -0)
+
+  - `coral-go/pkg/hubowner/hubowner.go`: +2, -0
+  - test files, not compiled by the Hub: 1 file (+11, -1)
+
+  `pkg/tunnel`: 2 files of Go code changed (+6, -3)
+
+  - `coral-go/pkg/tunnel/hubrole.go`: +3, -2
+  - `coral-go/pkg/tunnel/routes.go`: +3, -1
+  - test files, not compiled by the Hub: 2 files (+45, -2)
+
+  `pkg/frontend`: 36 files the Hub embeds changed (+389, -100)
+
+  - `coral-go/pkg/frontend/static/agentic_state.js`: +2, -2
+  - `coral-go/pkg/frontend/static/analytics_tabs_data.js`: +1, -1
+  - `coral-go/pkg/frontend/static/artifact_comments.js`: +6, -3
+  - `coral-go/pkg/frontend/static/board_fetch.js`: +12, -0
+  - `coral-go/pkg/frontend/static/changed_files.js`: +1, -1
+  - `coral-go/pkg/frontend/static/cloud_connect.js`: +4, -3
+  - `coral-go/pkg/frontend/static/cloud_server_view.js`: +39, -6
+  - `coral-go/pkg/frontend/static/css/agentic.css`: +0, -1
+  - `coral-go/pkg/frontend/static/css/components.css`: +1, -1
+  - `coral-go/pkg/frontend/static/css/diff-comments.css`: +4, -0
+  - `coral-go/pkg/frontend/static/css/forced-colors.css`: +1, -1
+  - `coral-go/pkg/frontend/static/css/mobile.css`: +2, -2
+  - `coral-go/pkg/frontend/static/css/session.css`: +3, -1
+  - `coral-go/pkg/frontend/static/diff_comments.js`: +33, -6
+  - `coral-go/pkg/frontend/static/goal_editor.js`: +2, -1
+  - `coral-go/pkg/frontend/static/goal_operator_dialogs.js`: +10, -7
+  - `coral-go/pkg/frontend/static/goal_view.js`: +7, -5
+  - `coral-go/pkg/frontend/static/goal_words.js`: +16, -0
+  - `coral-go/pkg/frontend/static/goal_write.js`: +129, -0
+  - `coral-go/pkg/frontend/static/goals_view.js`: +4, -5
+  - `coral-go/pkg/frontend/static/inbox_reviews.js`: +5, -4
+  - `coral-go/pkg/frontend/static/inbox_sidebar.js`: +5, -4
+  - `coral-go/pkg/frontend/static/list_card_parts.js`: +4, -2
+  - `coral-go/pkg/frontend/static/operator_activity_filters.js`: +1, -0
+  - `coral-go/pkg/frontend/static/render.js`: +1, -1
+  - `coral-go/pkg/frontend/static/server_base.js`: +9, -0
+  - `coral-go/pkg/frontend/static/tab_customize.js`: +24, -24
+  - `coral-go/pkg/frontend/static/team_artifacts_page.js`: +1, -1
+  - `coral-go/pkg/frontend/static/team_dialogs.js`: +2, -5
+  - `coral-go/pkg/frontend/static/team_settings_modal.js`: +3, -3
+  - `coral-go/pkg/frontend/static/team_settings_page.js`: +1, -1
+  - `coral-go/pkg/frontend/static/team_working_mode.js`: +2, -2
+  - `coral-go/pkg/frontend/static/update_api.js`: +45, -1
+  - `coral-go/pkg/frontend/static/update_dialog.js`: +3, -3
+  - `coral-go/pkg/frontend/static/update_settings.js`: +3, -3
+  - `coral-go/pkg/frontend/static/update_words.js`: +3, -0
+
+  `agent_docs`: 2 files the Hub embeds changed (+3, -1)
+
+  - `coral-go/agent_docs/artifacts.md`: +2, -0
+  - `coral-go/agent_docs/skills.md`: +1, -1
+
+  Unchanged: `pkg/redact`.
+
+  ### Coral packages compiled into the Hub through its imports, v2.0.49 to 35265e61f
+
+  `internal/secrets`: 1 file of Go code changed (+1, -1), imported by `internal/logsafe`
+
+  - `coral-go/internal/secrets/extra.go`: +1, -1
+  - test files, not compiled by the Hub: 1 file (+1, -1)
+
+  Unchanged: `internal/fsreplace`, `internal/httputil`, `internal/logsafe`, `internal/safego`, `internal/secfile`, `pkg/redact/betterleaks`.
+
+- **Ready signals, hooks, tokens, framed paths**: unchanged.
+
+#### For developers and releases
+
+- **v2.0.50 was never released:** its content ships here.
+- The agent protocol is compiled in from `internal/protocol` (the module root holds no Go package any more, and a test keeps it so).
+- The update rehearsal rig no longer links `x/crypto/openpgp`, and the update rehearsal's "ask" row now passes.
+- Test-only fixes after the first gates: the Servers table, team health, auth sign-in headers, bundle laziness, agent-instructions, terminal width, inbox count and heap-growth suites, and several Windows tests.
+
 ## v2.0.49 — Comment on a video, set up Chief's checks, and a question before an agent works in your home folder
 
 ### Changes
