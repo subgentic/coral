@@ -31,3 +31,6 @@ func CommandsBelow(ctx context.Context, root int) (cmds []string, ok bool) {
 	}
 	return Below(FromSnapshot(rows), root), true
 }
+
+// Snapshot: not known on Windows for a hand claim (it follows its tool call alone).
+func Snapshot(ctx context.Context) (procs []Proc, ok bool) { return nil, false }

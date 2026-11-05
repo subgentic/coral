@@ -35,6 +35,11 @@ func (s *Server) registerResources(r chi.Router, sess *routes.SessionsHandler) {
 	s.resourceMgr = mgr
 	rq.SetManager(mgr)
 	hook := resources.NewHook(mgr, resources.HookOptions{
+		Procs: func() ([]proctree.Proc, bool) {
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			return proctree.Snapshot(ctx)
+		},
 		Agent: func(ctx context.Context, sessionName string) (string, bool) {
 			sub, err := s.boardStore.GetSubscriptionBySessionName(ctx, sessionName)
 			if err != nil || sub == nil || sub.IsActive == 0 || sub.SubscriberID == "" {
@@ -50,7 +55,23 @@ func (s *Server) registerResources(r chi.Router, sess *routes.SessionsHandler) {
 	if sess != nil {
 		sess.SetResourceHook(hook)
 	}
+	s.goBackground(func(ctx context.Context) { // slots whose call ended while a background job ran go back when the job does, even with no API call to sweep them
+		t := time.NewTicker(15 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				hook.Sweep()
+			}
+		}
+	})
 	h := &routes.ResourcesHandler{M: mgr, Board: s.boardStore, Hook: hook}
+	if sess != nil {
+		h.ToolCalls = sess.ToolCallsInFlight // an agent's hand claim is tied to the tool call it is made in (#13718)
+		h.AgentPID = s.sessionPID
+	}
 	r.Get("/api/resources", h.List)
 	r.Get("/api/resources/{name}", h.Get)
 	r.Post("/api/resources/{name}/claim", h.Claim)
@@ -70,6 +91,21 @@ func agentStillOnABoard(s *Server, agent string) bool {
 	}
 	sub, err := s.boardStore.GetSubscription(context.Background(), agent)
 	return err != nil || sub != nil
+}
+
+// sessionPID is the agent's own process, 0 when the backend cannot say.
+func (s *Server) sessionPID(sessionName string) int {
+	p, ok := s.backend.(ptymanager.SessionPIDProvider)
+	if !ok {
+		return 0
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	pid, err := p.SessionPID(ctx, sessionName)
+	if err != nil || pid <= 1 {
+		return 0
+	}
+	return pid
 }
 
 // commandsBelowSession is the command lines of the processes the session's agent has started that still run, or nil when that is not known (no per-session process, no ps): the hook then gives a slot back

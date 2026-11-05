@@ -204,7 +204,7 @@ func resourceClaim(rest []string) {
 	note := fs.String("note", "", "why, for the others to read")
 	clihelp.ParseFlags(fs, rest[1:], func() string { return resourceUsageText })
 	me := resolveSubscriberID()
-	body := map[string]any{"subscriber_id": me, "note": flagText(*note, "note")}
+	body := map[string]any{"subscriber_id": me, "note": flagText(*note, "note"), "parent_pid": os.Getppid()} // the shell that runs this command: a job in the background keeps the slot while it runs
 	data, status, err := resourceCall("POST", "/"+name+"/claim", body)
 	if err != nil || (status != http.StatusOK && status != http.StatusAccepted) {
 		resourceFail("Could not claim "+rest[0], err, status, data)
@@ -216,7 +216,7 @@ func resourceClaim(rest []string) {
 	}
 	_ = json.Unmarshal(data, &res)
 	if res.Granted {
-		fmt.Printf("You hold a slot of %s. Release it when you are done: coral-board resource release %s\n", rest[0], rest[0])
+		fmt.Printf("You hold a slot of %s. As an agent, it goes back when THIS command (tool call) ends: claim and run the work in the same command. Release early with: coral-board resource release %s\n", rest[0], rest[0])
 		return
 	}
 	fmt.Printf("%s is busy: you are number %d in line.\n", rest[0], res.Place)
@@ -240,7 +240,7 @@ func resourceClaim(rest []string) {
 		res.Granted, res.Place = false, 0
 		_ = json.Unmarshal(data, &res)
 		if res.Granted {
-			fmt.Printf("Your turn: you hold a slot of %s. Release it when you are done: coral-board resource release %s\n", rest[0], rest[0])
+			fmt.Printf("Your turn: you hold a slot of %s. As an agent, it goes back when THIS command (tool call) ends: claim and run the work in the same command. Release early with: coral-board resource release %s\n", rest[0], rest[0])
 			return
 		}
 		if res.Place != last {

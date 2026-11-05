@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -33,6 +34,10 @@ type ResourcesHandler struct {
 	M     *resources.Manager
 	Board *board.Store
 	Hook  *resources.Hook // the shell hook, swept with every call (#13645); may be nil
+	// ToolCalls are the tool_use ids of the calls the session has in flight (the one running coral-board resource claim is among them; tools run in parallel); none when not known: a claim then keeps its lease (#13718); nil: hand claims are not tied to a call.
+	ToolCalls func(sessionID string) []string
+	// AgentPID is the process of the agent itself (its session's), 0 when not known: a shell that IS the agent (a simple command a shell ran directly leaves the agent as the claim's parent) says nothing about the job, so such a claim follows its call alone (#13718).
+	AgentPID func(sessionName string) int
 }
 
 type entryView struct {
@@ -171,6 +176,7 @@ func (h *ResourcesHandler) Get(w http.ResponseWriter, r *http.Request) {
 type agentBody struct {
 	SubscriberID string `json:"subscriber_id"`
 	Note         string `json:"note"`
+	ParentPID    int    `json:"parent_pid,omitempty"` // a claim by an agent: the shell that ran coral-board (a job in the background keeps the slot while it runs, #13718)
 }
 
 // agent reads the body and the verified name of the caller.
@@ -204,6 +210,17 @@ func (h *ResourcesHandler) Claim(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.fail(w, err)
 		return
+	}
+	if owner, ok := VerifiedSession(r.Context()); !ok || owner == nil {
+		slog.Info("[resource] a claim with no verified session keeps its lease", "agent", who, "resource", name)
+	} else if h.Hook != nil && h.ToolCalls != nil { // an agent's claim belongs to the tool call it is made in (#13718)
+		var agentPID int
+		if h.AgentPID != nil {
+			agentPID = h.AgentPID(owner.SessionName)
+		}
+		calls := h.ToolCalls(owner.SessionID)
+		slog.Info("[resource] a claim by an agent is tied to its tool call", "agent", who, "resource", name, "calls_known", len(calls), "shell_given", body.ParentPID > 1, "session", owner.SessionID)
+		h.Hook.BindHand(owner.SessionID, who, name, calls, body.ParentPID, agentPID) // the hook believes the shell only when it is below the agent
 	}
 	code := http.StatusOK
 	if !res.Granted {
