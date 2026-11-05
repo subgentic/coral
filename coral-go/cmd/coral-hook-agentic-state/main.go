@@ -98,7 +98,7 @@ func handle(d map[string]any, opts hookArgs, agyModel, agyConversation string) {
 
 	if hookType == "PreToolUse" {
 		why := recordPendingTool(base, agentName, sessionID, d, agyEvent, hooksRev)
-		if why != "" && agyEvent == "" && strings.HasPrefix(os.Getenv("CORAL_SESSION_NAME"), "claude-") {
+		if why != "" && refusalApplies(agyEvent, os.Getenv("CORAL_SESSION_NAME")) {
 			os.Stdout.Write(preToolDeny(why)) // the command is not run (#11157)
 			hooks.DebugLog(fmt.Sprintf("PRETOOL_REFUSED: agent=%s", agentName))
 		}
@@ -251,6 +251,12 @@ func recordPendingTool(base, agentName, sessionID string, d map[string]any, agyE
 		}
 	}
 	return ""
+}
+
+// refusalApplies is whether Coral's refusal is written as this CLI's PreToolUse answer: a Claude or a Codex session (Codex 0.166.0's PreToolUse takes Claude's permissionDecision deny, #13647), and not an agy hook. Any other
+// CLI is never told to hold a command: it runs.
+func refusalApplies(agyEvent, sessionName string) bool {
+	return agyEvent == "" && (strings.HasPrefix(sessionName, "claude-") || strings.HasPrefix(sessionName, "codex-"))
 }
 
 // preToolDeny is the PreToolUse hook output that stops the tool call and tells the agent why: Claude Code's permissionDecision "deny" with the reason.

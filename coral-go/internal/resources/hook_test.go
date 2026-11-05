@@ -242,3 +242,31 @@ func TestWithNoMatchingResourceNothingIsLookedUp(t *testing.T) {
 	var none *Hook
 	assert.False(t, none.Active())
 }
+
+// #13647 (Security's SHOULD): a CLI that ignores a refusal runs the command, and its end (PostToolUse) arrives for the call id the hook held. The agent is then running the work, so its waiting place goes: it
+// must not also hold a place and, later, a slot. A place that was granted since is its own and stays.
+func TestACallTheCliRanDespiteTheRefusalDropsItsWaitingPlaceAtItsEnd(t *testing.T) {
+	g := newHookRig(t)
+	_, err := g.m.Claim(t.Context(), "mac-heavy", "Agent B", "explicit")
+	require.NoError(t, err)
+	assert.Contains(t, g.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy), "number 1 in line")
+	require.Len(t, g.queue(), 1)
+	g.h.After("s-a", "call-1") // the CLI ran it anyway and it ended
+	assert.Empty(t, g.queue(), "the waiting place is dropped")
+	assert.Equal(t, []string{"Agent B"}, g.holders(), "and B's slot is untouched")
+	last := g.events[len(g.events)-1]
+	assert.Equal(t, "released", last.Kind)
+	assert.Equal(t, "ran anyway", last.Why)
+	assert.NotContains(t, last.Pattern+last.Why, "hunter2", "never the command")
+
+	// a call that was held and is not the one that ended leaves the place alone
+	assert.Contains(t, g.h.Before(t.Context(), "s-a", "s-a", "call-2", heavy), "number 1 in line")
+	g.h.After("s-a", "some-other-call")
+	require.Len(t, g.queue(), 1, "another call's end does not drop the place")
+
+	// when the place has been granted before the ended call's PostToolUse, the slot is the agent's own and stays
+	require.NoError(t, g.m.Queue().Release("mac-heavy", "Agent B"))
+	assert.Equal(t, []string{"Agent A"}, g.holders())
+	g.h.After("s-a", "call-2")
+	assert.Equal(t, []string{"Agent A"}, g.holders(), "a granted place is kept")
+}

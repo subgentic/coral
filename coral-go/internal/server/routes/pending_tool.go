@@ -510,18 +510,41 @@ func (h *SessionsHandler) patternKillRefusal(ctx context.Context, owner *store.S
 // SetResourceHook wires the resource queue's shell hook (#13645).
 func (h *SessionsHandler) SetResourceHook(hook *resources.Hook) { h.resourceHook = hook }
 
-// resourceRefusal is the text a heavy Bash command is held with when the shared machine it needs is busy (#13645), or "" to let it run. Everything cheap that decides whether to read the command comes
-// first, as for the pattern-kill guard: no hook, a tool that is not Bash and an agent that is not Claude (the refusal is the Claude CLI's hook answer) never make the server read an agent's command.
+// resourceRefusal is the text a heavy shell command is held with when the shared machine it needs is busy (#13645, #13647), or "" to let it run. Everything cheap that decides whether to read the command comes
+// first, as for the pattern-kill guard: no hook, a tool that is no shell command and an agent that is neither Claude nor Codex (the refusal is the CLI's own hook answer: Claude's permissionDecision deny, which
+// Codex's PreToolUse takes in the same words) never make the server read an agent's command.
 func (h *SessionsHandler) resourceRefusal(ctx context.Context, owner *store.SessionTokenOwner, tool, toolUseID string, input map[string]any) string {
-	if h.resourceHook == nil || tool != "Bash" || input == nil || owner == nil || !h.resourceHook.Active() { // Active: no resource has a match, so nothing below is read
+	if h.resourceHook == nil || !shellToolNames[tool] || input == nil || owner == nil || !h.resourceHook.Active() { // Active: no resource has a match, so nothing below is read
 		return ""
 	}
-	command, _ := input["command"].(string)
-	if command == "" {
+	ls, err := h.ss.GetLiveSession(ctx, owner.SessionID)
+	if err != nil || ls == nil {
 		return ""
 	}
-	if ls, err := h.ss.GetLiveSession(ctx, owner.SessionID); err != nil || ls == nil || ls.AgentType != at.Claude {
+	command := ""
+	switch ls.AgentType {
+	case at.Claude:
+		if tool == "Bash" {
+			command, _ = input["command"].(string)
+		}
+	case at.Codex:
+		command = codexShellCommand(input)
+	}
+	if command == "" || len(command) > 64<<10 {
 		return ""
 	}
 	return h.resourceHook.Before(ctx, owner.SessionID, owner.SessionName, toolUseID, command)
+}
+
+// shellToolNames are the tools a shell command comes in: Claude's Bash, and the names Codex's hooks give one (0.155.1 says Bash; codexShellTools in the hook program is the same list).
+var shellToolNames = map[string]bool{"Bash": true, "shell": true, "exec_command": true, "local_shell": true}
+
+// codexShellCommand is the command line of a Codex shell call, read only when it is one plain string (command, or cmd). A call that gives an argument list (bash, -lc, text) has no readable command here: it is not
+// joined and matched, it runs (Security's rule on #13647; a list is parsed only by a rule that is tested).
+func codexShellCommand(input map[string]any) string {
+	if s, ok := input["command"].(string); ok {
+		return s
+	}
+	s, _ := input["cmd"].(string)
+	return s
 }
