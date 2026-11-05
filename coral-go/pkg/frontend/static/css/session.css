@@ -995,27 +995,14 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
     font-size: var(--fs-base);
     font-weight: var(--fw-strong);
     color: var(--text-primary);
-    padding: 6px 10px;
-    border-bottom: 1px solid var(--border);
+    padding: 0;
     display: flex;
     align-items: center;
     gap: 6px;
     flex-shrink: 0;
-}
+} /* no visible line (#13585): the tab names the board, and its ... menu is the search row's; the name stays for a screen reader */
 
 .board-paused-banner { flex-shrink: 0; } /* where it sits: what it looks like is the one notice's (.notice, layout.css) */
-
-.board-chat-title {
-    flex: 1;
-    color: var(--text-primary);
-    text-decoration: none;
-    cursor: pointer;
-}
-
-.board-chat-title:hover {
-    color: var(--accent);
-    text-decoration: underline;
-}
 
 .board-chat-msgs-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; } /* the floating "Loading earlier messages..." is placed against it (#7762) */
 .board-chat-messages {

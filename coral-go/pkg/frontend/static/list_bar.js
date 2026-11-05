@@ -36,11 +36,17 @@ export function buildMoreMenu(id, items, noun = '') {
     for (const x of [5, 12, 19]) { const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); c.setAttribute('cx', String(x)); c.setAttribute('cy', '12'); c.setAttribute('r', '1.8'); svg.append(c); }
     btn.append(svg);
     const menu = make('div', 'menu team-more-menu list-bar-more-menu'); menu.id = `${id}-more-menu`; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', name);
-    for (const it of items) {
-        const b = make('button', 'menu-item', it.label); b.type = 'button'; b.setAttribute('role', 'menuitem');
-        b.addEventListener('click', async () => { (await importOnce('./menu_button.js')).closeMenus(); it.run(); });
-        menu.append(b);
-    }
+    // items may be a function: a menu whose words depend on state (Pause board / Resume board) is drawn again each time its button is pressed, before it opens
+    const fill = () => {
+        menu.replaceChildren();
+        for (const it of (typeof items === 'function' ? items() : items)) {
+            const b = make('button', 'menu-item', it.label); b.type = 'button'; b.setAttribute('role', 'menuitem');
+            b.addEventListener('click', async () => { (await importOnce('./menu_button.js')).closeMenus(); it.run(); });
+            menu.append(b);
+        }
+    };
+    fill();
+    if (typeof items === 'function') btn.addEventListener('click', fill, true);
     btn.addEventListener('click', async () => (await importOnce('./menu_button.js')).toggleMenu(btn)); // the menu's keyboard and outside-click handling load with the first use
     wrap.append(btn, menu);
     return wrap;
@@ -126,7 +132,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
     // spec.headerSlots (#5315): the owner's title goes before the search box and its action icons after the filter icon, on this one row (setHeader). The slots are display: contents, so their children are the row's own.
     const lead = spec.headerSlots ? make('span', 'list-bar-lead') : null, tail = spec.headerSlots ? make('span', 'list-bar-tail') : null;
     // spec.more (#7686): the list's other actions behind one More icon after the filter icon and the owner's own icons.
-    const more = spec.more && spec.more.length && !noSearch ? buildMoreMenu(p, spec.more, spec.moreNoun || '') : null;
+    const more = spec.more && (typeof spec.more === 'function' || spec.more.length) && !noSearch ? buildMoreMenu(p, spec.more, spec.moreNoun || '') : null;
     if (noSearch) searchRow.hidden = true; else searchRow.append(...(lead ? [lead] : []), wrap, count, ...(tog ? [tog] : []), ...(chev ? [chev] : []), ...(tail ? [tail] : []), ...(more ? [more] : []));
 
     const controls = make('div', 'list-bar-controls');

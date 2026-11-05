@@ -443,17 +443,11 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 /* The select bar's buttons are .btn-small: its margin is for a button on its own line (#9313). */
 .mb-select-bar .btn { margin: 0; }
 
-#mb-select-btn.active,
-.board-select-btn.active {
+#mb-select-btn.active {
     background: var(--accent);
     color: var(--text-on-accent);
 }
 
-/* The board panel's Pause and Export are icon buttons (#5491): a square target, the icon the only content; a paused board's play icon is in the warning colour. */
-.board-chat-header .board-icon-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; min-height: 32px; padding: 0 var(--space-sm); }
-.board-chat-header .board-icon-btn .material-icons { font-size: var(--fs-2xl); line-height: 1; }
-.board-chat-header .board-icon-btn.mb-action-danger { color: var(--warning); }
-@media (max-width: 767px), (pointer: coarse) { .board-chat-header .board-icon-btn { min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); } }
 
 /* Message board markdown content */
 /* Links in a post: the theme's link colour, not the browser's #0000ee,
