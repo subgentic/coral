@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/proctree"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/resources"
@@ -56,7 +57,29 @@ func (s *Server) registerResources(r chi.Router, sess *routes.SessionsHandler) {
 	if sess != nil {
 		sess.SetResourceHook(hook)
 	}
-	s.goBackground(func(ctx context.Context) { // slots whose call ended while a background job ran go back when the job does, even with no API call to sweep them
+	watch := resources.NewWatcher(mgr, resources.WatchOptions{
+		Signal: func(agent string) (string, time.Time) {
+			sub, err := s.boardStore.GetSubscription(context.Background(), agent)
+			if err != nil || sub == nil || sub.SessionName == "" || sess == nil {
+				return "", time.Time{} // not readable: left alone
+			}
+			kind, since := sess.ResourceSignal(naming.SessionIDFromName(sub.SessionName))
+			if kind == resources.SignalIdle {
+				cmds, known := s.commandsBelowSessionKnown(sub.SessionName)
+				return resources.GuardIdle(kind, since, known, len(cmds))
+			}
+			return kind, since
+		},
+		Notify: func(agent, text string) { // the Orchestrator of the holder's team; a failed post loses the notice only
+			sub, err := s.boardStore.GetSubscription(context.Background(), agent)
+			if err != nil || sub == nil {
+				return
+			}
+			slog.Info("[resource] holder stuck", "agent", agent, "text", text)
+			_, _ = s.boardStore.PostSystemMessage(context.Background(), sub.Project, "Coral Queue", "@Orchestrator "+text, nil)
+		},
+	})
+	s.goBackground(func(ctx context.Context) { // every 15 s: slots whose call ended while a background job ran go back when the job does (#13718), and a holder stuck at a prompt is looked at (#13705)
 		t := time.NewTicker(15 * time.Second)
 		defer t.Stop()
 		for {
@@ -65,10 +88,11 @@ func (s *Server) registerResources(r chi.Router, sess *routes.SessionsHandler) {
 				return
 			case <-t.C:
 				hook.Sweep()
+				watch.Check()
 			}
 		}
 	})
-	h := &routes.ResourcesHandler{M: mgr, Board: s.boardStore, Hook: hook}
+	h := &routes.ResourcesHandler{M: mgr, Board: s.boardStore, Hook: hook, Watch: watch}
 	if sess != nil {
 		h.ToolCalls = sess.ToolCallsInFlight // an agent's hand claim is tied to the tool call it is made in (#13718)
 		h.AgentPID = s.sessionPID
@@ -112,19 +136,21 @@ func (s *Server) sessionPID(sessionName string) int {
 // commandsBelowSession is the command lines of the processes the session's agent has started that still run, or nil when that is not known (no per-session process, no ps): the hook then gives a slot back
 // when the call ends.
 func (s *Server) commandsBelowSession(sessionName string) []string {
+	cmds, _ := s.commandsBelowSessionKnown(sessionName)
+	return cmds
+}
+
+// commandsBelowSessionKnown is commandsBelowSession with whether the answer is known: an empty list that is known means nothing runs below the agent, an unknown one says nothing.
+func (s *Server) commandsBelowSessionKnown(sessionName string) ([]string, bool) {
 	p, ok := s.backend.(ptymanager.SessionPIDProvider)
 	if !ok {
-		return nil
+		return nil, false
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	pid, err := p.SessionPID(ctx, sessionName)
 	if err != nil || pid <= 1 {
-		return nil
+		return nil, false
 	}
-	cmds, ok := proctree.CommandsBelow(ctx, pid)
-	if !ok {
-		return nil
-	}
-	return cmds
+	return proctree.CommandsBelow(ctx, pid)
 }
