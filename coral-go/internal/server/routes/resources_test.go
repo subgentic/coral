@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -66,7 +67,7 @@ func (g *resRig) do(as, method, path string, body any) (int, map[string]any) {
 	case as == "operator":
 		req = withActor(req, Actor{Kind: ActorOperator, Name: "Operator"})
 	case len(as) > 6 && as[:6] == "token:":
-		req = withActor(req, Actor{Kind: ActorToken, Name: as[6:]})
+		req = withActor(req, Actor{Kind: ActorToken, Name: as[6:], Session: as[6:]})
 	}
 	rec := httptest.NewRecorder()
 	g.r.ServeHTTP(rec, req)
@@ -75,16 +76,17 @@ func (g *resRig) do(as, method, path string, body any) (int, map[string]any) {
 	return rec.Code, out
 }
 
-func (g *resRig) subscribe(project, who, title string, _ bool) {
+// subscribe joins who to a board; peek is the LAUNCH record's Orchestrator flag (can_peek), which a join never sets. The agent's session is named like the agent.
+func (g *resRig) subscribe(project, who, title string, peek bool) {
 	g.t.Helper()
-	_, err := g.bs.Subscribe(context.Background(), project, who, title, "", nil, "")
+	_, err := g.bs.Subscribe(context.Background(), project, who, title, who, nil, "", peek)
 	require.NoError(g.t, err)
 }
 
 func TestOnlyTheOperatorOrAnOrchestratorDefinesRemovesAndReorders(t *testing.T) {
 	g := newResRig(t)
 	g.subscribe("alpha", "Plain Dev", "Developer", false)
-	g.subscribe("alpha", "The Orchestrator", "Orchestrator", false)
+	g.subscribe("alpha", "The Orchestrator", "Orchestrator", true)
 	def := map[string]any{"slots": 1, "machine": "mac"}
 
 	code, out := g.do("token:Plain Dev", "PUT", "/api/resources/mac-heavy", def)
@@ -193,4 +195,49 @@ func TestTheClaimerIsTheVerifiedCallerWhenIdentityIsEnforced(t *testing.T) {
 	assert.Equal(t, "Dev B", out["entry"].(map[string]any)["agent"])
 	code, _ = g.do("", "POST", "/api/resources/mac-heavy/claim", map[string]any{"subscriber_id": "Dev A"})
 	assert.Equal(t, 403, code, "nobody verified claims nothing")
+}
+
+// Security's MUST (#13613): a title or a name is caller-supplied, so an agent that joins a board with no Orchestrator as "Orchestrator", or is named like one, is not one.
+func TestAJoinedOrchestratorTitleOrNameIsNotAManager(t *testing.T) {
+	g := newResRig(t)
+	g.subscribe("lonely", "Self Styled", "Orchestrator", false)
+	g.subscribe("lonely", "x-orchestrator", "Developer", false)
+	g.subscribe("alpha", "Real One", "Orchestrator", true)
+	g.do("operator", "PUT", "/api/resources/mac-heavy", map[string]any{"slots": 1})
+	g.subscribe("alpha", "Waiting Dev", "Developer", false)
+	_, c := g.do("token:Waiting Dev", "POST", "/api/resources/mac-heavy/claim", map[string]any{})
+	g.do("token:Self Styled", "POST", "/api/resources/mac-heavy/claim", map[string]any{})
+	_, c2 := g.do("token:x-orchestrator", "POST", "/api/resources/mac-heavy/claim", map[string]any{})
+	id := strconv.Itoa(int(c2["entry"].(map[string]any)["id"].(float64)))
+	_ = c
+	for _, who := range []string{"token:Self Styled", "token:x-orchestrator"} {
+		code, out := g.do(who, "PUT", "/api/resources/other", map[string]any{"slots": 1})
+		assert.Equal(t, 403, code, who+" define")
+		assert.Equal(t, "manager_only", out["code"])
+		code, _ = g.do(who, "POST", "/api/resources/entries/"+id+"/move", map[string]any{"how": "first"})
+		assert.Equal(t, 403, code, who+" move")
+		code, _ = g.do(who, "DELETE", "/api/resources/entries/"+id, nil)
+		assert.Equal(t, 403, code, who+" cancel")
+		code, _ = g.do(who, "DELETE", "/api/resources/mac-heavy", nil)
+		assert.Equal(t, 403, code, who+" remove")
+	}
+	code, _ := g.do("token:Real One", "PUT", "/api/resources/other", map[string]any{"slots": 1})
+	assert.Equal(t, 200, code, "the session the launch record registered as an Orchestrator is one")
+}
+
+func TestResourceNamesNotesAndListsAreClean(t *testing.T) {
+	g := newResRig(t)
+	g.subscribe("alpha", "Dev A", "Developer", false)
+	for _, bad := range []string{"has%20space", "bad%1b%5b31mname", "-leading", "dot%2F..", "caf%C3%A9"} {
+		code, _ := g.do("operator", "PUT", "/api/resources/"+bad, map[string]any{"slots": 1})
+		assert.Equal(t, 400, code, bad)
+	}
+	code, _ := g.do("operator", "PUT", "/api/resources/ok-name_1.2", map[string]any{"slots": 1, "allowed": []string{"Dev A", "bad\u001b[31mx"}})
+	assert.Equal(t, 200, code)
+	long := strings.Repeat("é", 500) + "\u001b[31mred\u0007"
+	_, c := g.do("token:Dev A", "POST", "/api/resources/ok-name_1.2/claim", map[string]any{"note": long})
+	note := c["entry"].(map[string]any)["note"].(string)
+	assert.LessOrEqual(t, len([]rune(note)), 200, "a note is cut")
+	assert.NotContains(t, note, "\u001b")
+	assert.NotContains(t, note, "\u0007")
 }

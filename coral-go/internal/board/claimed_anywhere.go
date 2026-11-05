@@ -20,20 +20,15 @@ func (s *Store) ClaimedTaskAnywhere(ctx context.Context, member string) (taskID 
 	return rows[0].ID, rows[0].BoardID, rows[0].Priority, true, nil
 }
 
-// IsOrchestratorAnywhere reports whether member is an Orchestrator on any board it is subscribed to (the same rule a board uses: it can peek, or its id or job title says so).
-func (s *Store) IsOrchestratorAnywhere(ctx context.Context, member string) (bool, error) {
-	var rows []struct {
-		ID    string `db:"subscriber_id"`
-		Title string `db:"job_title"`
-		Peek  int    `db:"can_peek"`
+// SessionIsRegisteredOrchestrator reports whether the agent session is an active member whose LAUNCH RECORD says it is an Orchestrator (can_peek). Never by name or job title: a join takes the title from the
+// caller, and a team with no Orchestrator lets the first one that claims the title stand, so a title is not a privilege (Security, #13613; compare RequireTaskReviewer). The join route never sets can_peek.
+func (s *Store) SessionIsRegisteredOrchestrator(ctx context.Context, session string) (bool, error) {
+	if session == "" {
+		return false, nil
 	}
-	if err := s.reader().SelectContext(ctx, &rows, `SELECT subscriber_id, job_title, can_peek FROM board_subscribers WHERE subscriber_id = ? COLLATE NOCASE AND is_active = 1`, member); err != nil {
+	sub, err := s.GetSubscriptionBySessionName(ctx, session)
+	if err != nil || sub == nil {
 		return false, err
 	}
-	for _, r := range rows {
-		if isOrchestrator(r.ID, r.Title, r.Peek) {
-			return true, nil
-		}
-	}
-	return false, nil
+	return sub.IsActive != 0 && sub.CanPeek != 0, nil
 }

@@ -3,9 +3,11 @@ package routes
 import (
 	"errors"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/resources"
@@ -150,7 +152,7 @@ func (h *ResourcesHandler) Claim(w http.ResponseWriter, r *http.Request) {
 	}
 	h.reap()
 	name := urlParam(r, "name")
-	res, err := h.M.Claim(r.Context(), name, who, strings.TrimSpace(body.Note))
+	res, err := h.M.Claim(r.Context(), name, who, cleanText(body.Note, 200))
 	if err != nil {
 		h.fail(w, err)
 		return
@@ -189,19 +191,39 @@ func (h *ResourcesHandler) Renew(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"entry": viewEntry(e, 0)})
 }
 
-// manager is who may define, remove and reorder: the Operator, or an Orchestrator on any board.
+// manager is who may define, remove and reorder: the Operator, or an agent whose own session is a registered Orchestrator by its launch record (can_peek), looked up by the verified session. Never by the name
+// or job title an agent gave when it joined: that is caller-supplied (Security, #13613).
 func (h *ResourcesHandler) manager(w http.ResponseWriter, r *http.Request) bool {
 	actor := callerActor(r)
 	if actor.IsOperator() {
 		return true
 	}
-	if name, verified := actorName(actor); verified && h.Board != nil {
-		if is, err := h.Board.IsOrchestratorAnywhere(r.Context(), name); err == nil && is {
+	if actor.Kind == ActorToken && actor.Session != "" && h.Board != nil {
+		if is, err := h.Board.SessionIsRegisteredOrchestrator(r.Context(), actor.Session); err == nil && is {
 			return true
 		}
 	}
 	writeError(w, http.StatusForbidden, "manager_only", "only the Operator or an Orchestrator can define, remove or reorder resources")
 	return false
+}
+
+// resourceNameRe is a resource's name: letters, digits, dot, dash and underscore. Nothing else is ever printed into an agent's terminal.
+var resourceNameRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
+
+// cleanText drops control characters, trims and cuts to n runes: free text others will read.
+func cleanText(s string, n int) string {
+	var b strings.Builder
+	for _, r := range s {
+		if unicode.IsControl(r) {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	out := strings.TrimSpace(b.String())
+	if rs := []rune(out); len(rs) > n {
+		out = string(rs[:n])
+	}
+	return out
 }
 
 // Define answers PUT /api/resources/{name}.
@@ -219,12 +241,18 @@ func (h *ResourcesHandler) Define(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "invalid JSON")
 		return
 	}
-	name := strings.TrimSpace(urlParam(r, "name"))
-	if len(name) > 64 || strings.ContainsAny(name, " \t/\\") || body.MaxLeaseS < 0 || body.MaxLeaseS > 24*3600 || len(body.Allowed) > 100 || len(body.Machine) > 128 || body.Slots > 100 {
-		errBadRequest(w, "name up to 64 characters with no spaces or slashes, slots 1 to 100, a lease up to a day")
+	name := urlParam(r, "name")
+	if !resourceNameRe.MatchString(name) || body.Slots < 1 || body.Slots > 100 || body.MaxLeaseS < 0 || body.MaxLeaseS > 24*3600 || len(body.Allowed) > 100 {
+		errBadRequest(w, "name: letters, digits, dot, dash and underscore, up to 64; slots 1 to 100; a lease up to a day; at most 100 allowed agents")
 		return
 	}
-	if err := h.M.Queue().Define(resourcequeue.Resource{Key: name, Slots: body.Slots, Machine: strings.TrimSpace(body.Machine), MaxLease: time.Duration(body.MaxLeaseS) * time.Second, Allowed: body.Allowed}); err != nil {
+	allowed := make([]string, 0, len(body.Allowed))
+	for _, a := range body.Allowed {
+		if a = cleanText(a, 128); a != "" {
+			allowed = append(allowed, a)
+		}
+	}
+	if err := h.M.Queue().Define(resourcequeue.Resource{Key: name, Slots: body.Slots, Machine: cleanText(body.Machine, 128), MaxLease: time.Duration(body.MaxLeaseS) * time.Second, Allowed: allowed}); err != nil {
 		h.fail(w, err)
 		return
 	}
