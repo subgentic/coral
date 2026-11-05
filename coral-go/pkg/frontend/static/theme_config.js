@@ -6,11 +6,14 @@ import { escapeHtml, escapeAttr, showToast } from './utils.js';
 import { registerActions } from './actions.js';
 import { updateTerminalTheme } from './xterm_renderer.js';
 import { isCloud } from './server_base.js';
+import { applyTheme, applyThemeData, clearCustomThemeVars } from './settings_core.js';
+import { browserLocal } from './safe_storage.js';
 
 let variableGroups = {};   // { groupName: { cssVar: label, ... }, ... }
 let currentEdits = {};     // { cssVar: colorValue, ... }
 let pageBefore = null;      // { theme, style }: the page's own base and colours when the configurator opened, for Cancel to put back (a Preview changes the page itself, #12307)
 let savedThemes = [];      // [{ name, description, base }, ...]
+let activeName = '';       // the select's current value: the saved theme in use ('' = the page's own base, shown as Dark or Light)
 let lastBase = 'dark';     // the base the editor's colours were last taken from (the Based on list; the page's own base when the dialog opens)
 
 const pageBase = () => (document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark');
@@ -48,9 +51,12 @@ export async function showThemeConfigurator() {
     }
 
     pageBefore = { theme: document.documentElement.getAttribute('data-theme'), style: document.documentElement.getAttribute('style') };
+    activeName = (state.settings && state.settings.custom_theme) || '';
     renderModal();
     lastBase = pageBase();
     document.getElementById('theme-save-base').value = lastBase; // a light page starts on Light: a theme saved from it is a light one
+    if (activeName) document.getElementById('theme-save-name').value = activeName; // the theme in use is the one Save would update
+    syncSaveHint();
     const modal = document.getElementById('theme-configurator-modal');
     if (!modal._previewGuard) { // however it closes (Cancel, Escape, a backdrop click: the page-wide rules hide it with display:none), a preview that was not saved is undone
         modal._previewGuard = new MutationObserver(() => { if (modal.style.display === 'none' && pageBefore) hideThemeConfigurator(); });
@@ -75,12 +81,14 @@ function renderModal() {
     const modal = document.getElementById('theme-configurator-modal');
     if (!modal) return;
 
+    const inUse = activeName || `base:${pageBase()}`; // the theme the page is using is the one the list shows; with none saved it is the one named like the page's base (Dark, Light)
+    const isUse = name => name === inUse || (!activeName && String(name).toLowerCase() === pageBase());
     const themeOptions = savedThemes.map(t =>
-        `<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)}</option>`
+        `<option value="${escapeAttr(t.name)}"${isUse(t.name) ? ' selected' : ''}>${escapeHtml(t.name)}</option>`
     ).join('');
 
     const has = n => savedThemes.some(t => String(t.name).toLowerCase() === n); // Dark and Light are bases of their own; a theme the server lists by that name is shown once, as it is
-    const builtIn = ['dark', 'light'].filter(b => !has(b)).map(b => `<option value="${escapeAttr('base:' + b)}">${b === 'light' ? 'Light' : 'Dark'}</option>`).join('');
+    const builtIn = ['dark', 'light'].filter(b => !has(b)).map(b => `<option value="${escapeAttr('base:' + b)}"${'base:' + b === inUse ? ' selected' : ''}>${b === 'light' ? 'Light' : 'Dark'}</option>`).join('');
     const groups = Object.entries(variableGroups).map(([groupName, vars]) => {
         const rows = Object.entries(vars).map(([cssVar, label]) => {
             const value = currentEdits[cssVar] || '';
@@ -124,13 +132,14 @@ function renderModal() {
                 ${groups}
             </div>
             <div class="toolbar toolbar-stretch toolbar-pad-bare theme-save-bar">
-                <input type="text" id="theme-save-name" class="settings-input" placeholder="Theme name">
+                <input type="text" id="theme-save-name" class="settings-input" placeholder="Theme name" data-on-input="theme-name-input">
                 <input type="text" id="theme-save-desc" class="settings-input" placeholder="Description (optional)">
                 <select id="theme-save-base" class="settings-select form-control-auto" data-on-change="theme-base-change">
                     <option value="dark">Based on: Dark</option>
                     <option value="light">Based on: Light</option>
                 </select>
             </div>
+            <p class="settings-hint theme-save-hint" id="theme-save-hint" role="status"></p>
             <div class="modal-actions">
                 <button class="btn" data-on-click="theme-close">Cancel</button>
                 <button class="btn" data-on-click="theme-reset">Reset</button>
@@ -213,7 +222,7 @@ function resetThemeToDefaults() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ custom_theme: name }),
         });
-        state.settings.custom_theme = name;
+        state.settings.custom_theme = name; activeName = name;
 
         document.documentElement.setAttribute('data-theme', base === 'light' ? 'light' : 'dark');
         applyVariablesToDom(currentEdits);
@@ -224,15 +233,60 @@ function resetThemeToDefaults() {
     }
 };
 
+/** What Save and apply will do, in words: update the saved theme of that name, or make a new one (#13760). */
+function syncSaveHint() {
+    const hint = document.getElementById('theme-save-hint'), name = document.getElementById('theme-save-name')?.value.trim();
+    if (!hint) return;
+    if (!name) { hint.textContent = 'Name it to save it as a new theme. A theme you loaded is already in use.'; return; }
+    const exact = savedThemes.find(t => t.name === name);
+    const other = savedThemes.find(t => String(t.name).toLowerCase() === name.toLowerCase());
+    hint.textContent = exact ? `Save and apply updates "${exact.name}". Change the name to make a new copy.` : other ? `"${other.name}" is a saved theme with another capitalisation: saving makes a new theme.` : `Save and apply makes a new theme, "${name}".`;
+}
+
+/** The page as it is now is the page Cancel returns to: a loaded theme is in use, not a preview. */
+function commitPage() {
+    pageBefore = { theme: document.documentElement.getAttribute('data-theme'), style: document.documentElement.getAttribute('style') };
+}
+
+/** Make a theme the one in use: on the page, and as the saved setting (a reload keeps it). `theme` is the one already read ({ base, variables }), applied as it is: nothing is fetched twice. No theme (name '') puts the
+ *  built-in base on the page, with no saved theme. Resolves true when it was kept; when it was not (the theme is no theme, or the settings did not save) the page and the remembered preference go back as they were. */
+async function useTheme(name, theme, base) {
+    const root = document.documentElement, before = { theme: root.getAttribute('data-theme'), style: root.getAttribute('style') };
+    let pref = null; try { pref = browserLocal.get('coral-theme'); } catch { /* none */ }
+    const back = () => {
+        if (before.theme === null) root.removeAttribute('data-theme'); else root.setAttribute('data-theme', before.theme);
+        if (before.style === null) root.removeAttribute('style'); else root.setAttribute('style', before.style);
+        try { if (pref == null) browserLocal.remove('coral-theme'); else browserLocal.set('coral-theme', pref); } catch { /* none */ }
+        updateTerminalTheme();
+    };
+    clearCustomThemeVars();
+    if (name) { if (!applyThemeData(theme)) { back(); showToast('Could not use that theme: it has no colours', true); return false; } } else applyTheme(base);
+    try {
+        const body = name ? { custom_theme: name } : { theme: base, custom_theme: '' };
+        const resp = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (!resp.ok) throw new Error('settings');
+        Object.assign(state.settings, body);
+        activeName = name; commitPage();
+        return true;
+    } catch {
+        back();
+        showToast('Could not use that theme: it was not saved as your theme', true);
+        return false;
+    }
+}
+
 async function loadSelectedTheme() {
     const select = document.getElementById('theme-load-select');
     const name = select.value;
     if (!name) return;
+    const showInUse = () => { select.value = [...select.options].find(o => o.defaultSelected)?.value ?? ''; }; // a Load that was not kept: the list goes back to the theme in use
     if (name.startsWith('base:')) { // Dark or Light itself: every colour is the base's
         const base = name.slice(5) === 'light' ? 'light' : 'dark';
-        currentEdits = { ...currentEdits, ...baseValues(base) }; lastBase = base;
-        renderModal(); document.getElementById('theme-save-base').value = base;
-        showToast(`Loaded: ${base === 'light' ? 'Light' : 'Dark'}`);
+        const next = { ...baseValues(base) };
+        if (!(await useTheme('', null, base))) { showInUse(); return; } // not kept: nothing of the editor was touched, a draft stays as it was
+        currentEdits = next; lastBase = base;
+        renderModal(); document.getElementById('theme-save-base').value = base; syncSaveHint();
+        showToast(`Using theme: ${base === 'light' ? 'Light' : 'Dark'}`);
         return;
     }
 
@@ -244,16 +298,16 @@ async function loadSelectedTheme() {
             return;
         }
         const theme = data.theme;
-        currentEdits = { ...currentEdits, ...theme.variables };
-        document.getElementById('theme-save-name').value = name;
-        document.getElementById('theme-save-desc').value = theme.description || '';
-        document.getElementById('theme-save-base').value = theme.base || 'dark'; lastBase = theme.base === 'light' ? 'light' : 'dark';
+        const next = { ...baseValues(theme.base === 'light' ? 'light' : 'dark'), ...theme.variables }; // the chosen base's colours with the theme's own over them: the editor is what the page shows, whatever was edited before (#13760)
+        if (!(await useTheme(name, theme, theme.base))) { showInUse(); return; } // not kept: the editor (name, description, base, colours, an unsaved draft) is untouched; Load puts it in use now and for the next start, with no new copy
+        currentEdits = next; lastBase = theme.base === 'light' ? 'light' : 'dark';
         renderModal();
         // Restore name/desc after re-render
         document.getElementById('theme-save-name').value = name;
         document.getElementById('theme-save-desc').value = theme.description || '';
         document.getElementById('theme-save-base').value = theme.base || 'dark';
-        showToast(`Loaded: ${name}`);
+        syncSaveHint();
+        showToast(`Using theme: ${name}`);
     } catch (e) {
         showToast('Failed to load theme', true);
     }
@@ -273,7 +327,7 @@ function deleteSelectedTheme() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ custom_theme: '' }),
             });
-            state.settings.custom_theme = '';
+            state.settings.custom_theme = ''; activeName = '';
         }
         // Refresh theme list
         const resp = await fetch('/api/themes');
@@ -360,6 +414,7 @@ async function generateThemeFromDescription() {
             document.getElementById('theme-save-name').value = generatedName;
         }
 
+        syncSaveHint();
         showToast('Theme generated — click Preview to see it live');
     } catch (e) {
         showToast('Failed to generate theme', true);
@@ -396,15 +451,21 @@ function importThemeFile() {
                 return;
             }
 
-            // Load into editor
-            currentEdits = { ...currentEdits, ...data.variables };
+            // Put it in use first; the editor takes it only when it was kept (a refused save leaves the editor, and any unsaved draft in it, as it was)
             const themesResp = await fetch('/api/themes');
             savedThemes = (await themesResp.json()).themes || [];
-            renderModal();
-            document.getElementById('theme-save-name').value = result.name;
-            document.getElementById('theme-save-desc').value = data.description || '';
-            document.getElementById('theme-save-base').value = data.base || 'dark'; lastBase = data.base === 'light' ? 'light' : 'dark';
-            showToast(`Imported: ${result.name}`);
+            const next = { ...baseValues(data.base === 'light' ? 'light' : 'dark'), ...data.variables };
+            const kept = await useTheme(result.name, data, data.base); // an imported theme is stored by the server: it is put in use as Load does, no second copy
+            if (kept) {
+                currentEdits = next; lastBase = data.base === 'light' ? 'light' : 'dark';
+                renderModal();
+                document.getElementById('theme-save-name').value = result.name; document.getElementById('theme-save-desc').value = data.description || ''; document.getElementById('theme-save-base').value = data.base || 'dark';
+            } else {
+                const select = document.getElementById('theme-load-select'); // stored, not in use: it is in the list, and the editor stays as it is
+                if (select && ![...select.options].some(o => o.value === result.name)) select.append(new Option(result.name, result.name));
+            }
+            syncSaveHint();
+            showToast(kept ? `Imported and using: ${result.name}` : `Imported: ${result.name}`);
         } catch (e) {
             showToast('Failed to import theme', true);
         }
@@ -459,7 +520,7 @@ async function changeBase(el) {
     lastBase = to;
     const name = document.getElementById('theme-save-name').value, desc = document.getElementById('theme-save-desc').value;
     renderModal();
-    document.getElementById('theme-save-name').value = name; document.getElementById('theme-save-desc').value = desc; document.getElementById('theme-save-base').value = to;
+    document.getElementById('theme-save-name').value = name; document.getElementById('theme-save-desc').value = desc; document.getElementById('theme-save-base').value = to; syncSaveHint();
 }
 
 registerActions({
@@ -467,6 +528,7 @@ registerActions({
     'theme-var': el => window.__coral.updateThemeVar(el),
     'theme-var-text': el => window.__coral.updateThemeVarText(el),
     'theme-load': () => loadSelectedTheme(),
+    'theme-name-input': () => syncSaveHint(),
     'theme-delete': () => deleteSelectedTheme(),
     'theme-import': () => importThemeFile(),
     'theme-export': () => window.__coral.exportCurrentTheme(),

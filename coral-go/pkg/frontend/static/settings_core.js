@@ -310,25 +310,31 @@ export function clearCustomThemeVars() {
     for (const prop of toRemove) style.removeProperty(prop);
 }
 
+/** Put an already-read theme ({ base, variables }) on the page: its base, then its colours over it. true when it was applied; false for a payload that is no theme (the page is not touched). */
+export function applyThemeData(theme, { remember = true } = {}) {
+    if (!theme || !theme.variables || typeof theme.variables !== "object") return false;
+    // Apply the base theme (dark/light); anything else is not a base, and the page keeps its own
+    const base = theme.base;
+    if (base === "dark" || base === "light") applyTheme(base, { remember });
+
+    // Overlay custom variables: custom properties with a real value only (an empty or blank one would empty the token the stylesheet defines, #6087)
+    for (const [cssVar, value] of Object.entries(theme.variables)) {
+        if (typeof cssVar === "string" && cssVar.startsWith("--") && typeof value === "string" && value.trim()) document.documentElement.style.setProperty(cssVar, value.trim());
+    }
+
+    // Refresh terminal colors
+    updateTerminalTheme();
+    return true;
+}
+
 /** Load a custom theme by name: apply its base theme + overlay its CSS variables */
 export async function applyCustomThemeByName(name, { remember = true } = {}) {
     try {
         const resp = await fetch(`/api/themes/${encodeURIComponent(name)}`);
         if (!resp.ok) return; // a theme the server does not have: the stylesheet's tokens stay
         const data = await resp.json();
-        if (data.error || !data.theme?.variables || typeof data.theme.variables !== "object") return;
-
-        // Apply the base theme (dark/light); anything else is not a base, and the page keeps its own
-        const base = data.theme.base;
-        if (base === "dark" || base === "light") applyTheme(base, { remember });
-
-        // Overlay custom variables: custom properties with a real value only (an empty or blank one would empty the token the stylesheet defines, #6087)
-        for (const [cssVar, value] of Object.entries(data.theme.variables)) {
-            if (typeof cssVar === "string" && cssVar.startsWith("--") && typeof value === "string" && value.trim()) document.documentElement.style.setProperty(cssVar, value.trim());
-        }
-
-        // Refresh terminal colors
-        updateTerminalTheme();
+        if (data.error) return;
+        applyThemeData(data.theme, { remember });
     } catch {
         // Fall back to default
     }
