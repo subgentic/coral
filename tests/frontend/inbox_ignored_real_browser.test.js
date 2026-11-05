@@ -59,9 +59,9 @@ const { ownRows } = require('./helpers/own_rows');
         await waitFor(`[...document.querySelectorAll('${T} tbody tr')].some(r => /put-away\\.md/.test(r.textContent)) && ![...document.querySelectorAll('${T} tbody tr')].some(r => /keep-me\\.md/.test(r.textContent))`, 'the list is the dismissed files (this run\'s put-away.md among them, keep-me.md not)', 15000);
 
         // the file's actions have Unignore
-        await ev(`const row = [...document.querySelectorAll('${T} tbody tr')].find(r => /put-away\\.md/.test(r.textContent)); row.querySelector('.dt-primary, .inbox-review-name, td button').click(); true`);
-        await waitFor(`!![...document.querySelectorAll('button, [role="menuitem"]')].find(b => (b.textContent || '').trim() === 'Unignore')`, 'Unignore among the file\'s actions', 10000);
-        await ev(`[...document.querySelectorAll('button, [role="menuitem"]')].find(b => (b.textContent || '').trim() === 'Unignore').click(); true`);
+        // the table can redraw under the click when another suite's row changes a pill: open the actions and click Unignore in one in-page step, again if the menu went
+        const UNIGN = `(() => { const un = () => [...document.querySelectorAll('button, [role="menuitem"]')].find(b => (b.textContent || '').trim() === 'Unignore'); if (!un()) { const row = [...document.querySelectorAll('${T} tbody tr')].find(r => /put-away\\.md/.test(r.textContent)); const t = row && row.querySelector('.dt-primary, .inbox-review-name, td button'); if (t) t.click(); } const u = un(); if (u) { u.click(); return true; } return false; })()`;
+        await waitFor(UNIGN, 'Unignore among the file\'s actions, clicked', 15000);
         await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Back in Needs you: put-away\\.md/.test(t.textContent))`, 'the toast says it is back', 10000);
         const t = await tagsOf('put-away.md');
         check(t && t.includes('for review') && !t.includes('ignored'), 'Unignore: for review again, not ignored: ' + JSON.stringify(t));
