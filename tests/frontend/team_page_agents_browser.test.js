@@ -1,6 +1,6 @@
 // The team page's Agents tab (#7453, stage 2; UI/UX's doc 7aa984fe item 4, #7416's design as a tab): a group of status chips named "Show agents that are" with counts, a table of everyone on the board (Agent, Status,
 // Doing, Provider, Chat) with a button "Open chat with <name>" on every live row; the Remind dialog opens from the agent's own page (Message prefilled, Repeat, Remind focused; UI/UX and the Orchestrator, board 09:16Z: it posts the @mention message now and, with a repeat, also sets the repeating reminder), a row opens the agent's own page (back link Agents, h2 with the name, Remind and Open chat in the bar);
-// the health icon on the team's row opens this tab. Written failing-first by QA (#7499): by role and accessible name (helpers/team_page.js). Isolated dev server.
+// the health icon opens the team's Health check settings (#13569), while the Agents tab remains the roster. Written failing-first by QA (#7499): by role and accessible name (helpers/team_page.js). Isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, agentsUp, openTeam, goTab, scenarios } = require('./helpers/team_page');
@@ -114,10 +114,13 @@ const TEAM = `qa-agents-${Date.now() % 100000}`;
                 await ev(`(() => { const b = window.__tp.find('button, a', /^(\\u2190\\s*)?Agents$/); if (b) b.click(); return true; })()`); await settle(300);
                 assert.ok(await ev(`document.activeElement && /Backend Dev/.test(window.__na.text(document.activeElement))`), 'the focus is on the agent row');
             });
-            await S.run(`${label}: the health icon on the team's row opens this tab (a button named "Team health: ...")`, async () => {
+            await S.run(`${label}: the health settings button opens the team's Health check section`, async () => {
                 await goTab(ev, settle, 'Goals');
-                assert.ok(await ev(`(() => { const s = window.__tp.sidebar() || document; const b = [...s.querySelectorAll('button, [role=button]')].filter(window.__na.vis).find(x => /^Team health/i.test(window.__na.name(x))); if (!b) return false; b.click(); return true; })()`), 'no button named Team health');
-                await settle(400); assert.equal(await ev(`(() => { const t = window.__tp.tabs().find(x => x.getAttribute('aria-selected') === 'true'); return t ? window.__tp.tabLabel(t) : ''; })()`), 'Agents', 'the Agents tab is selected');
+                assert.ok(await ev(`(() => { const s = window.__tp.sidebar() || document; const b = [...s.querySelectorAll('button')].filter(window.__na.vis).find(x => /^Health monitor settings for /.test(window.__na.name(x))); if (!b) return false; b.click(); return true; })()`), 'a button named Health monitor settings for the team');
+                await waitFor(`!!document.querySelector('.team-settings-modal #team-settings-workspace .sv[data-ready]') && document.querySelector('.team-settings-modal #team-settings-health')?.hidden === false`, 'the pulse opens Health check settings', 15000);
+                assert.ok(await ev(`document.querySelector('.team-settings-modal h3')?.textContent.includes(${JSON.stringify(TEAM)})`), 'settings belong to the chosen team');
+                await ev(`document.querySelector('.team-settings-modal .sv-cancel').click(); true`);
+                await waitFor(`!document.querySelector('.team-settings-modal')`, 'settings closed');
             });
         }
         await removeBoards(ev, [TEAM]); S.finish(); // finish() exits the process, so the board goes first
