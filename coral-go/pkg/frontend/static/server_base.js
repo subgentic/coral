@@ -479,12 +479,21 @@ export function decisionNeedsPerson(server) {
 // Per-account choices cannot live in the Hub's shared shell. Startup waits for this
 // cached account read before loading Inbox folders or allowing goal writes. These
 // flags select UI flows only; the Hub still authorizes every read and write.
-let _needsNative = false, _goalPreview = false;
-export async function initCloudAccountFlags() {
-    if (!isCloud()) return;
-    const account = await readAccount();
-    _needsNative = account?.needs_native === true;
-    _goalPreview = account?.goal_preview === true;
+let _needsNative = false, _goalPreview = false, _accountFlagsInit = null;
+export function initCloudAccountFlags() {
+    if (!isCloud()) return Promise.resolve();
+    if (!_accountFlagsInit) _accountFlagsInit = (async () => {
+        let timer;
+        try {
+            const account = await Promise.race([
+                readAccount(),
+                new Promise(resolve => { timer = setTimeout(() => resolve(null), 4000); }),
+            ]);
+            _needsNative = account?.needs_native === true;
+            _goalPreview = account?.goal_preview === true;
+        } finally { clearTimeout(timer); }
+    })();
+    return _accountFlagsInit; // a late account answer cannot change routing after startup timed out
 }
 
 /** The cloud account's goals gate requests preview-before-write. Local writes stay unchanged. */

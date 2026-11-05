@@ -154,7 +154,7 @@ export const waitingReviewsLine = n => `${n} ${n === 1 ? 'file' : 'files'} for t
 
 /** What the Hub's goal preview says, by its word (#13503, coral-hub's contract): one plain sentence for each, in the editor's own error line. The word is the Hub's (`{error: word}`); the sentence is ours. */
 export const PREVIEW_WORDS = {
-    preview_required: 'The Hub needs to check this change first, and the check did not go with it. Try again.',
+    preview_required: 'The Hub needs to check this change first. Reload the page and try again.',
     preview_invalid: 'This was not the change the Hub checked, so nothing was changed. Try again.',
     preview_expired: 'The Hub\'s check of this change ran out. Try again.',
     preview_used: 'This change was already made.',

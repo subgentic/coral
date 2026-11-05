@@ -21,6 +21,15 @@ function rig({ on = true, previews = [], writes = [] } = {}) {
     assert.equal(r.log.length, 1); assert.equal(r.log[0].kind, 'write'); assert.equal(r.log[0].headers[PREVIEW_HEADER], undefined, 'no token header with the flag off');
     assert.equal(r.log[0].body, '{"title":"T"}');
 }
+// An account read that failed or timed out may miss the Hub's preview flag.
+{
+    const r = rig({ on: false, writes: [json({ error: 'preview_required' }, 400)] });
+    const resp = await r.call('goal_create', 0, '/goals', 'POST', { title: 'T' });
+    assert.equal(resp.status, 400);
+    assert.equal((await resp.json()).error, PREVIEW_WORDS.preview_required);
+    assert.match(PREVIEW_WORDS.preview_required, /reload.*try again/i);
+    assert.equal(r.log.length, 1, 'no automatic retry of a refused write');
+}
 // on: preview first (board without the server prefix, goal id for a close), then the write with the token and the same bytes
 {
     const r = rig();
