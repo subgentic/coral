@@ -79,6 +79,7 @@ type serverFlags struct {
 	agentPriority      *string
 	debugInput         *bool
 	cloudMaxMode       *string
+	allowHubUpdate     *bool
 	bootstrapFile      *string
 	proofFile          *string
 	cloudConnect       *string
@@ -109,6 +110,7 @@ func defineServerFlags() *serverFlags {
 	sf.agentPriority = flag.String("agent-priority", "", "Priority of agent processes: low (default, nice +10 / below normal so the server stays responsive) or normal. Also CORAL_AGENT_PRIORITY or the Settings choice")
 	sf.debugInput = flag.Bool("debug-input", false, "Record every write Coral makes to agent terminals in <data dir>/input-debug.log (debug; may contain secrets). Also CORAL_DEBUG_INPUT=1 or the Settings toggle")
 	sf.cloudMaxMode = flag.String("cloud-max-mode", "", "Most Coral Hub may do on this computer: view, interact or launch (also CORAL_CLOUD_MAX_MODE). Sets the same cap as Settings > Network and Hub, at startup, for a machine nobody sits at (a container); an invalid value stops Coral from starting. Unset leaves the saved setting (view by default). Only whoever starts Coral can set it: the hub and the API cannot")
+	sf.allowHubUpdate = flag.Bool("allow-hub-update", false, "Turn on the switch that lets Coral Hub relaunch this Coral to install updates (also CORAL_ALLOW_HUB_UPDATE=1), for a computer nobody sits at. Applied at every start; it only turns the switch on. Settings shows it as on (set at launch)")
 	sf.bootstrapFile = flag.String("bootstrap-file", "", "One-time Coral Hub credential file to enroll this server with at startup (owned by you, mode 0600, removed after reading). On Linux /run/coral/bootstrap.d/credential is read without the flag")
 	sf.proofFile = flag.String("proof-file", "", "Optional proof file to send with the bootstrap credential (at most 16 KiB of JSON from a provider helper)")
 	sf.cloudConnect = flag.String("cloud-connect", "", "Offer to connect to Coral Hub on a server not yet connected (also CORAL_CLOUD_CONNECT): prompt (the dashboard's first-launch screen, and a prompt in the terminal at startup; without a terminal, log the link and code), auto (the screen, and only log them) or off. Unset: prompt when --cloud-url/CORAL_CLOUD_URL is given, otherwise off (the build's default URL alone offers nothing; Coral Hub stays in Settings, on the home screen and in 'coral cloud connect')")
@@ -226,6 +228,9 @@ func loadServerConfig(sf *serverFlags) (*config.Config, string) {
 		os.Exit(2)
 	}
 	cfg.CloudMaxMode = maxMode
+	if *sf.allowHubUpdate {
+		cfg.AllowHubUpdate = true // the flag adds to the environment: neither turns the switch off
+	}
 	cloudMode, err := cloudStartupMode(cfg.EffectiveCloudConnect(), cfg.CloudURL != "", isTerminal(os.Stdin) && isTerminal(os.Stdout))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

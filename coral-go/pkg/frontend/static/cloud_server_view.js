@@ -96,11 +96,44 @@ async function call(id, method, body) {
     if (changed) accessChanged(id, await serverAccess(id));
 }
 
-/** The row's update badge (a link to the releases page), or null. */
-function updateBadge(e) {
+/** A computer's Update button was pressed (#13258): its own status says what can be done. An update that is staged and verified opens the confirmation (what restarts); a computer that has not checked is asked to (it fetches and verifies by itself) and
+ *  looked at again; anything missing is said in words. Nothing the computer sent is shown, and nothing is installed without the confirmation. */
+async function startUpdate(id, button) {
+    const A = await importOnce('./update_api.js'), { showToast } = await importOnce('./utils.js');
+    button.disabled = true;
+    try {
+        let s = await A.fetchUpdateStatusOf(id), act = A.hubUpdateAction(s);
+        if (act.kind === 'check') {
+            const r = await A.requestHubCheck(id);
+            if (!r.ok && r.code !== 'busy' && r.code !== 'too_soon') { showToast(A.reasonText(r.code)); return; }
+            for (let i = 0; i < 18; i++) { // the check runs on that computer: looked at again every 5 s, for 90 s
+                await new Promise(res => setTimeout(res, 5000)); // sleep-ok: the computer's own check takes as long as it takes
+                s = await A.fetchUpdateStatusOf(id); act = A.hubUpdateAction(s);
+                if (act.kind !== 'wait' && !(act.kind === 'check' && i < 17 && s && s.hubState === 'not_checked')) break;
+            }
+            if (act.kind === 'check') act = { kind: 'hint', text: 'That computer found no update to install.' };
+        }
+        if (act.kind === 'dialog') { const D = await importOnce('./update_dialog.js'); D.openUpdateDialog(s, { server: id }); } else showToast(act.text);
+    } finally { button.disabled = false; }
+}
+
+/** The row's update badge: a button that updates that computer from here (id given, #13258), else a link to the releases page, or null. */
+function updateBadge(e, id) {
     const n = updateNotice(e);
-    return n ? h('a', { className: `chip server-update-badge server-update-${n.level}`, href: RELEASES_URL, target: '_blank', rel: 'noopener noreferrer',
-        title: n.text, 'aria-label': n.text, text: n.label }) : null;
+    if (!n) return null;
+    if (id) {
+        const b = h('button', { type: 'button', className: `chip server-update-badge server-update-${n.level}`, title: `${n.text}. Update this computer from here.`, 'aria-label': `${n.text}. Update this computer`, text: n.label });
+        b.addEventListener('click', () => { startUpdate(id, b).catch(() => {}); });
+        return b;
+    }
+    return h('a', { className: `chip server-update-badge server-update-${n.level}`, href: RELEASES_URL, target: '_blank', rel: 'noopener noreferrer',
+        title: n.text, 'aria-label': n.text, text: n.label });
+}
+
+/** The table's version cell mark: "Update available" as plain text, not a button (a row has one action, opening the computer's page, where the Update button stays; #13258). */
+function updateMark(e) {
+    const n = updateNotice(e);
+    return n ? h('span', { className: `chip server-update-badge server-update-${n.level}`, title: n.text, text: n.level === 'available' ? 'Update available' : n.label }) : null; // in words: the chip's own short 'Update' is for the page's button
 }
 
 /** Change a server's hub access (view | interact | launch; launch is "up to what the computer allows"). Immediate, no dialog. Focus stays on the select. */
@@ -249,7 +282,7 @@ function detailCell(s, live, online, isBusy, helpId) {
 function machinePage(s) {
     const live = liveOf(s), online = s.online === true, isBusy = busy.has(s.id);
     const helpId = `${rowId(s.id)}-access-help`;
-    const upd = updateBadge(live), version = serverVersion(live);
+    const upd = updateBadge(live, s.id), version = serverVersion(live);
     const n = needsCount(s);
     const fact = (label, ...value) => [h('dt', { text: label }), h('dd', {}, ...value)];
     const page = h('section', { className: 'servers-page cs-page', id: rowId(s.id), tabindex: '-1', 'data-id': s.id, 'aria-labelledby': 'cs-page-name' },
@@ -277,7 +310,7 @@ function serversTable(shown) {
         name: s => nameCell(s, live(s), s.online === true),
         // The dot beside the name is the computer's health (#3446): when it is not fine the words say so here, beside Online, not only in the dot's tooltip (#12878: an amber dot was unexplained).
         status: s => { if (s.online !== true) return 'Offline'; const hl = live(s).machine_health; return hl && (hl.status === 'busy' || hl.status === 'stalled') ? `Online, ${healthStatusText(hl)}` : 'Online'; },
-        version: s => { const v = serverVersion(live(s)), upd = updateBadge(live(s)), f = document.createDocumentFragment(); f.append(h('span', { text: v ? v : '—' })); if (upd) f.append(' ', upd); return f; },
+        version: s => { const v = serverVersion(live(s)), upd = updateMark(live(s)), f = document.createDocumentFragment(); f.append(h('span', { text: v ? v : '—' })); if (upd) f.append(' ', upd); return f; },
         agents: s => String(serverAgentCount(live(s))),
         needs: s => { const n = needsCount(s); if (!n) return ''; const e = h('span', { className: 'cs-needs', text: String(n) }); e.title = `${n} agent${n === 1 ? '' : 's'} waiting for you`; return e; },
         seen: s => seenWords(s),

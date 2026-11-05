@@ -2,6 +2,7 @@ DELETE /api/artifacts/{id} launch owner-only
 DELETE /api/artifacts/{id}/comments/lock interact owner-only
 DELETE /api/artifacts/{id}/comments/{cid} interact owner-sees
 DELETE /api/artifacts/{id}/star interact owner-only
+DELETE /api/board/{project}/artifacts/{id}/review interact owner-only
 DELETE /api/saved/{id} interact owner-only
 GET /api/activity view owner-only
 GET /api/analytics/activity launch owner-only
@@ -45,12 +46,15 @@ POST /api/artifacts/{id}/comments/{cid}/send launch owner-only
 POST /api/board/{project}/artifacts/{id}/review interact owner-only
 POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim interact owner-only
 POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle interact owner-only
+POST /api/board/{project}/asks/{messageID}/close interact owner-only
 POST /api/board/{project}/cross-team/disable launch owner-only-hub
 POST /api/board/{project}/cross-team/enable launch owner-only-hub
 POST /api/board/{project}/cross-team/files/disable launch owner-only-hub
 POST /api/board/{project}/cross-team/files/enable launch owner-only-hub
 POST /api/board/{project}/goal-images interact owner-only
 POST /api/board/{project}/goals interact owner-sees
+POST /api/board/{project}/goals/{goalID}/driver interact owner-only
+POST /api/board/{project}/goals/{goalID}/move interact owner-only
 POST /api/board/{project}/messages interact owner-sees
 POST /api/board/{project}/operator-artifacts interact owner-only
 POST /api/board/{project}/operator-artifacts/message interact owner-only
@@ -65,10 +69,12 @@ POST /api/sessions/live/{name}/auto-sleep interact owner-only
 POST /api/sessions/live/{name}/dismiss-wait interact owner-only
 POST /api/sessions/live/{name}/notices/pause interact owner-only
 POST /api/sessions/live/{name}/notices/resume interact owner-only
-POST /api/system/update/relaunch launch owner-update
+POST /api/system/update/check-hub launch owner-only
+POST /api/system/update/relaunch launch owner-only
 PUT /api/artifacts/{id}/comments/lock interact owner-only
 PUT /api/artifacts/{id}/private interact owner-only
 PUT /api/artifacts/{id}/star interact owner-only
+PUT /api/board/{project}/artifacts/{id}/review interact owner-only
 PUT /api/board/{project}/artifacts/{id}/tags interact owner-only
 PUT /api/board/{project}/guide-roster launch owner-only
 PUT /api/board/{project}/orchestrator-grant launch owner-only

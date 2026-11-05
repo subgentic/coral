@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"sort"
+	"strings"
 )
 
 // The skills Coral ships as examples (#12463): a skill for writing skills, one for an agent working in a team, one for designing an automation. Markdown only (SKILL.md), embedded in the program; the server
@@ -67,4 +68,28 @@ func IsStarterName(name string) bool {
 		}
 	}
 	return false
+}
+
+// UsingCoralName is the starter skill that tells any agent what Coral gives it.
+const UsingCoralName = "using-coral"
+
+const (
+	launchSectionStart = "<!-- launch-section:start -->"
+	launchSectionEnd   = "<!-- launch-section:end -->"
+)
+
+// LaunchSection is the short part of the using-coral skill that every agent's launch text carries (#13523): the marked region of the skill's own SKILL.md, so the launch text and the skill are one text and cannot
+// drift apart. "" when the skill has no such region (a test pins that it has).
+func LaunchSection() string {
+	md, err := starterFS.ReadFile("starter/" + UsingCoralName + "/SKILL.md")
+	if err != nil {
+		return ""
+	}
+	s := string(md)
+	i := strings.Index(s, launchSectionStart)
+	j := strings.Index(s, launchSectionEnd)
+	if i < 0 || j < i {
+		return ""
+	}
+	return strings.TrimSpace(s[i+len(launchSectionStart) : j])
 }

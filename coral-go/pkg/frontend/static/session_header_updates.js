@@ -157,7 +157,7 @@ export function updateWaitingIndicator(s) {
     if (dot) {
         const key = presentationSessionState(s);
         dot.classList.toggle("waiting", key === 'needs_input' || key === 'check_terminal');
-        dot.classList.toggle("stuck", key === 'stuck');
+        dot.classList.toggle("stuck", key === 'stuck' || key === 'blocked');
         dot.classList.toggle("working", key === 'working');
         dot.classList.toggle("your-turn", key === 'your_turn');
         dot.classList.remove("done"); // green no longer means anything

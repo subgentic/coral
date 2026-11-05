@@ -300,11 +300,18 @@ var routeTable = cat(
 	// (the artifact's name quoted as cleaned data), "changes" only records the state (the comment itself is the comment route above; its send to an agent stays unlisted). The OWNER's alone: a guest or a grantee is refused
 	// by the machine before the handler runs. Interact, as a comment is: it moves no work and runs nothing.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/artifacts/{id}/review")),
+	// Sending a file for review and taking it out again (#13217): the Operator's own change of the file's review state, the tag "for review" and its question, which through the Hub the tags route no longer carries (it may
+	// only add or remove "read", #13117). The OWNER's alone, like the review itself; Interact, as the review and the tags are: it moves no work and runs nothing.
+	owner(OwnerRefuse, rules(http.MethodPut, TierInteract, "/api/board/{project}/artifacts/{id}/review")),
+	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/board/{project}/artifacts/{id}/review")),
 	// Marking a file read when it is opened for review is a write of the artifact's tags (PUT .../artifacts/{id}/tags, #12742): through the Hub it is the OWNER's alone, the machine refuses anyone else before the handler runs, and
 	// the handler checks a closed body for a request that came through the Hub (the tags of the local route, narrowed to a-z, 0-9, space and hyphen). Interact: it moves no work and runs nothing; it only records what the Operator has seen.
 	owner(OwnerRefuse, rules(http.MethodPut, TierInteract, "/api/board/{project}/artifacts/{id}/tags")),
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim")),
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle")),
+	// Ignore, and Undo of an Ignore, in the Operator's own Needs you table drawn on the Hub (#13446, #13450): POST .../asks/{messageID}/close {note} puts a question away (or, with undo, opens it again). The OWNER'"'"'s alone through the Hub: the machine refuses
+	// anyone else (403 owner_only) before the handler runs, a grantee and a viewer included, and the handler refuses a body from a caller it cannot verify. It moves no work and types nothing: Interact, as the two button routes above are.
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/asks/{messageID}/close")),
 	// The Operator's Dismiss of a stale wait (#11352) is the OWNER's alone through the hub (the operator's rule: the owner gets everything): a guest or a grantee gets 403 owner_only. It clears Coral's
 	// own record of a wait and types nothing, presses nothing in the agent's terminal, so Interact; the machine's own mode still caps it.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/sessions/live/{name}/dismiss-wait")),
@@ -325,6 +332,7 @@ var routeTable = cat(
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/saved")),
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/board/{project}/proposals", "/api/proposals")),                                               // what agents asked to add: the Operator's (#11389)
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/proposals/{id}/approve", "/api/board/{project}/proposals/{id}/reject")), // and the Operator's decision
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/goals/{id}/driver", "/api/board/{project}/goals/{id}/move")),            // the Operator's own two changes to a goal, who drives it and which team it is on (#12693, #13517): a person's, as the question buttons are
 	owner(OwnerRefuse, rules(http.MethodPatch, TierInteract, "/api/saved/{id}")),
 	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/saved/{id}")),
 	// What a viewer sees of a board's settings is the machine's to decide (the health setup is the owner's, #5307): the marker is stamped, the handler gives a non-owner less.
@@ -435,6 +443,7 @@ var routeTable = cat(
 		"/api/sessions/live/{id}/sleep",
 		"/api/sessions/live/team/{board}/sleep",
 		"/api/sessions/live/sleep-all",
+		"/api/sessions/live/sleep-gone", // #13171: filing terminal-gone agents under sleeping is the same Launch as sleeping them
 		"/api/board/{project}/pause",
 	),
 	rules(http.MethodDelete, TierLaunch, "/api/board/{project}/messages/{id}"),
@@ -528,7 +537,8 @@ var routeTable = cat(
 	owner(OwnerRefuse, rules(http.MethodPut, TierInteract, "/api/artifacts/{hex64}/star")),
 	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/artifacts/{hex64}/star")),
 	owner(OwnerRefuse, rules(http.MethodGet, TierLaunch, PromptInspectionPath)),
-	owner(OwnerUpdate, rules(http.MethodPost, TierLaunch, UpdateRelaunchPath)),
+	owner(OwnerRefuse, rules(http.MethodPost, TierLaunch, UpdateRelaunchPath)), // installing and restarting a computer is the owner's alone, refused before the handler (a grantee at any tier gets 403 owner_only); the machine linked before the owner label was recorded must link again (#13258)
+	owner(OwnerRefuse, rules(http.MethodPost, TierLaunch, UpdateCheckPath)),    // ask this computer to check for and stage an update (never installs): no body, no query, the owner's alone and only with the person's switch on (#13258)
 	// Pinning a folder to the Agents list names a folder to launch into (#3630): Launch, like
 	// browsing for one. Reading the pins is View (above).
 	rules(http.MethodPost, TierLaunch, "/api/pinned-folders"),

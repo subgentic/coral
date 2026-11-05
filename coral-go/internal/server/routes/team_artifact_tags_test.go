@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -35,6 +36,8 @@ func newTagEnv(t *testing.T) *tagEnv {
 	r := chi.NewRouter()
 	r.Get("/api/board/{project}/artifacts", h.ListTeamArtifacts)
 	r.Put("/api/board/{project}/artifacts/{id}/tags", h.SetArtifactTags)
+	r.Put("/api/board/{project}/artifacts/{id}/review", h.MarkArtifactForReview)
+	r.Delete("/api/board/{project}/artifacts/{id}/review", h.UnmarkArtifactForReview)
 	put := httptest.NewServer(r)
 	t.Cleanup(put.Close)
 	e := &tagEnv{srv: put, h: h, coralDir: coralDir, ids: map[string]string{}}
@@ -423,4 +426,79 @@ func TestAnAgentCannotTagItsUploadWithTheOperatorsStates(t *testing.T) {
 	// The Operator's route sets them.
 	code, _ := e.put(t, "tag-team", rid, `{"tags":["read","saved"]}`)
 	assert.Equal(t, http.StatusOK, code)
+}
+
+// An agent that belongs to no team has no board, so what a file for review keeps is kept under the reserved key (#13524, #13527): the upload is a 201 that says the tag was kept, nothing is dropped, the question and
+// tag are read back from that key, and the same file with no tag keeps nothing (as before); an agent on a team keeps its own board's.
+func TestAFileForReviewFromAnAgentWithNoTeamIsKeptUnderTheReservedKey(t *testing.T) {
+	l := newLinkRig(t)
+	old := uploaderLookup
+	t.Cleanup(func() { uploaderLookup = old })
+	team := ""
+	uploaderLookup = func(ctx context.Context, sid string) (string, string, string) { return team, "Solo", "Solo" }
+	up := func(query, content string) (int, map[string]any) {
+		req, err := http.NewRequest(http.MethodPost, l.srv.URL+"/api/agent/artifacts?session_id=s1"+query, strings.NewReader(content))
+		require.NoError(t, err)
+		req.Header.Set("X-Artifact-Name", "report.md")
+		req.Header.Set("X-Artifact-Media-Type", "text/markdown")
+		resp, err := agentClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var out map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		return resp.StatusCode, out
+	}
+	ctx := context.Background()
+	code, out := up("&tag=for+review&question=Approve+the+report%3F", "no team bytes")
+	require.Equal(t, http.StatusCreated, code, "%v", out)
+	assert.Equal(t, []any{"for review"}, out["tags"], "the tag is kept, not dropped")
+	id := strings.TrimPrefix(out["uri"].(string), "coral://artifacts/")
+	tags, err := l.h.bs.ArtifactTags(ctx, noTeamBoardID)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"for review"}, tags[id], "kept under the reserved key")
+	qs, err := l.h.bs.ArtifactQuestions(ctx, noTeamBoardID)
+	require.NoError(t, err)
+	assert.Equal(t, "Approve the report?", qs[id].Question)
+
+	code, out = up("", "plain bytes")
+	require.Equal(t, http.StatusCreated, code, "%v", out)
+	tags, _ = l.h.bs.ArtifactTags(ctx, noTeamBoardID)
+	assert.Empty(t, tags[strings.TrimPrefix(out["uri"].(string), "coral://artifacts/")], "an untagged file keeps nothing")
+
+	team = "alpha" // an agent on a team keeps its own board's, nothing under the reserved key
+	code, out = up("&tag=for+review&question=Approve+the+report%3F", "team bytes")
+	require.Equal(t, http.StatusCreated, code, "%v", out)
+	teamID := strings.TrimPrefix(out["uri"].(string), "coral://artifacts/")
+	tags, _ = l.h.bs.ArtifactTags(ctx, noTeamBoardID)
+	assert.Empty(t, tags[teamID], "a team's file is not under the reserved key")
+	tags, _ = l.h.bs.ArtifactTags(ctx, "alpha")
+	assert.Equal(t, []string{"for review"}, tags[teamID])
+}
+
+// A team that cannot be told is not "no team" (Security's INFO on #13524, #13527): a for-review upload whose checked lookup fails is a 500 and nothing is filed under the reserved key; with the lookup working
+// it is as before.
+func TestAFileForReviewWhoseUploadersTeamCannotBeCheckedIsA500NotFiledAsNoTeam(t *testing.T) {
+	l := newLinkRig(t)
+	old, oldCheck := uploaderLookup, uploaderTeamCheck
+	t.Cleanup(func() { uploaderLookup, uploaderTeamCheck = old, oldCheck })
+	uploaderLookup = func(ctx context.Context, sid string) (string, string, string) { return "", "Solo", "Solo" }
+	var failure error = errors.New("database is locked")
+	uploaderTeamCheck = func(ctx context.Context, sid string) (string, error) { return "", failure }
+	up := func(query, content string) int {
+		req, err := http.NewRequest(http.MethodPost, l.srv.URL+"/api/agent/artifacts?session_id=s1"+query, strings.NewReader(content))
+		require.NoError(t, err)
+		req.Header.Set("X-Artifact-Name", "report.md")
+		req.Header.Set("X-Artifact-Media-Type", "text/markdown")
+		resp, err := agentClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		return resp.StatusCode
+	}
+	assert.Equal(t, http.StatusInternalServerError, up("&tag=for+review&question=Approve%3F", "bytes while the store is busy"))
+	tags, err := l.h.bs.ArtifactTags(context.Background(), noTeamBoardID)
+	require.NoError(t, err)
+	assert.Empty(t, tags, "nothing was filed under the reserved key on a guess")
+	assert.Equal(t, http.StatusCreated, up("", "plain bytes while the store is busy"), "a file that is not for review never asks the checked lookup")
+	failure = nil
+	assert.Equal(t, http.StatusCreated, up("&tag=for+review&question=Approve%3F", "bytes once it answers"), "no team and no error: filed under the reserved key")
 }

@@ -1,10 +1,13 @@
 package routes
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -48,29 +51,42 @@ func (h *TokenUsageHandler) ListUsage(w http.ResponseWriter, r *http.Request) {
 		filter.TeamID = &id
 	}
 
-	records, err := h.ts.ListUsage(r.Context(), filter)
+	limit, after, ok := usagePageParams(w, q)
+	if !ok {
+		return
+	}
+	// One page and its place are cut in SQL (limit+1 rows say whether there is more); the totals and the per-agent rows are added up in SQL over every match (#13218).
+	rows, err := h.ts.ListUsagePage(r.Context(), filter, after, limit+1)
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
 	}
+	tot, err := h.ts.UsageTotalsFor(r.Context(), filter)
+	if err != nil {
+		errInternalServer(w, err.Error())
+		return
+	}
+	agents, err := h.ts.UsageByAgent(r.Context(), filter)
+	if err != nil {
+		errInternalServer(w, err.Error())
+		return
+	}
+	nextCursor := ""
+	if len(rows) > limit {
+		rows = rows[:limit]
+		last := rows[limit-1]
+		nextCursor = base64.RawURLEncoding.EncodeToString([]byte(last.RecordedAt + "|" + last.SessionID))
+	}
+	if rows == nil {
+		rows = []store.TokenUsage{}
+	}
 
-	// Compute aggregated totals
-	var totalInput, totalOutput, totalCacheRead, totalCacheWrite, totalTokens int64
-	var totalCost float64
 	var firstMessage, lastMessage time.Time
-	for _, r := range records {
-		totalInput += int64(r.InputTokens)
-		totalOutput += int64(r.OutputTokens)
-		totalCacheRead += int64(r.CacheReadTokens)
-		totalCacheWrite += int64(r.CacheWriteTokens)
-		totalTokens += int64(r.TotalTokens)
-		totalCost += r.CostUSD
-		if ts, err := time.Parse(time.RFC3339Nano, r.SessionStartAt); err == nil && (firstMessage.IsZero() || ts.Before(firstMessage)) {
-			firstMessage = ts
-		}
-		if ts, err := time.Parse(time.RFC3339Nano, r.LastActivityAt); err == nil && (lastMessage.IsZero() || ts.After(lastMessage)) {
-			lastMessage = ts
-		}
+	if ts, err := time.Parse(time.RFC3339Nano, tot.FirstStart); err == nil {
+		firstMessage = ts
+	}
+	if ts, err := time.Parse(time.RFC3339Nano, tot.LastActivity); err == nil {
+		lastMessage = ts
 	}
 	var executionTimeSec int64
 	if !firstMessage.IsZero() && !lastMessage.IsZero() && lastMessage.After(firstMessage) {
@@ -78,20 +94,50 @@ func (h *TokenUsageHandler) ListUsage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"records": records,
+		"records":     rows,
+		"total":       tot.Sessions,
+		"next_cursor": nextCursor,
+		"agents":      agents,
 		"totals": map[string]any{
-			"input_tokens":       totalInput,
-			"output_tokens":      totalOutput,
-			"cache_read_tokens":  totalCacheRead,
-			"cache_write_tokens": totalCacheWrite,
-			"total_tokens":       totalTokens,
-			"cost_usd":           totalCost,
-			"num_sessions":       len(records),
+			"input_tokens":       tot.InputTokens,
+			"output_tokens":      tot.OutputTokens,
+			"cache_read_tokens":  tot.CacheReadTokens,
+			"cache_write_tokens": tot.CacheWriteTokens,
+			"total_tokens":       tot.TotalTokens,
+			"cost_usd":           tot.CostUSD,
+			"num_sessions":       tot.Sessions,
 			"first_message_at":   formatOptionalTime(firstMessage),
 			"last_message_at":    formatOptionalTime(lastMessage),
 			"execution_time_sec": executionTimeSec,
 		},
 	})
+}
+
+// usagePageSize is the most session rows one request answers (#13187): the rest come by next_cursor.
+const usagePageSize = 50
+
+// usagePageParams reads limit=N (1..50, default 50) and cursor (the previous answer's next_cursor: the last row sent, its recorded_at and session id; 200 characters at most).
+// A bad one is a 400. The cursor is only a position in the list, never a query or a path.
+func usagePageParams(w http.ResponseWriter, q url.Values) (limit int, after *store.UsageAfter, ok bool) {
+	limit = usagePageSize
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > usagePageSize {
+			errBadRequest(w, "limit must be 1 to 50")
+			return 0, nil, false
+		}
+		limit = n
+	}
+	if c := q.Get("cursor"); c != "" {
+		raw, err := base64.RawURLEncoding.DecodeString(c)
+		at, id, found := strings.Cut(string(raw), "|")
+		if err != nil || len(c) > 200 || !found {
+			errBadRequest(w, "invalid cursor")
+			return 0, nil, false
+		}
+		after = &store.UsageAfter{RecordedAt: at, SessionID: id}
+	}
+	return limit, after, true
 }
 
 func formatOptionalTime(t time.Time) string {

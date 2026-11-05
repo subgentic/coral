@@ -165,7 +165,7 @@
     overflow-y: auto;
     scrollbar-gutter: stable; /* a list that scrolls does not move the header's parts left of where a short one has them (#7443) */
     /* The pinned New Agent footer covers the bottom of the scroll area: a row the keyboard focuses at that edge is scrolled clear of it (#6159). */
-    scroll-padding-bottom: 5rem;
+    scroll-padding-bottom: 8rem; /* the footer with Chief's reserved row (44 px more than the 5rem it needed before) */
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
@@ -186,6 +186,10 @@ body.panel-dragging .sidebar {
     /* The header row is 57 px from the top of the column to its rule (10 + 36 + 10 + the 1 px rule) on every tab: one component, one height (UI/UX's spec said 53; #7443). A tab without Display options is the same height, its search is wider. */
 }
 
+/* Chief's slot above New agent (#13167): room kept from the first paint, so its late answer moves nothing; here, not in chief.css (it loads with the answer) */
+.sidebar-footer:has(> .sidebar-chief-slot:not([hidden])) { flex-wrap: wrap; row-gap: 8px; }
+.sidebar-chief-slot { flex: 1 0 100%; min-height: 36px; }
+.sidebar-chief-slot[data-pending] { visibility: hidden; }
 .sidebar-footer {
     padding: 12px 12px 20px;
     border-top: 1px solid var(--border);
@@ -313,11 +317,8 @@ body.panel-dragging .sidebar {
     .sidebar-rail-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-lg); }
     /* Selected: the selected row's soft accent tile, and its name's primary colour */
     .sidebar-rail-item.active .rail-tile { background: var(--bg-hover); box-shadow: inset 3px 0 0 var(--accent); } /* the selected row's surface and its 3 px accent bar (.list-row-current, #9311): no size change; hover alone is the fill */
-    .sidebar-rail-item.active .rail-tile .rail-tile-icon { color: var(--text-primary); }
     @media (forced-colors: active) { .sidebar-rail-item.active .rail-tile { box-shadow: none; outline: 2px solid Highlight; outline-offset: -2px; } }
     .sidebar-rail-item.active .rail-tile:not([style]) { color: var(--text-primary); }
-    .rail-tile .rail-tile-icon { font-size: var(--fs-sm) !important; width: 10px; height: 10px; line-height: 10px; }
-    .rail-tile-emoji { font-size: var(--fs-sm); line-height: 1; }
     .rail-tile-badge {
         position: absolute;
         top: -5px;

@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/subgentic/coral/internal/board"
 )
@@ -24,6 +26,7 @@ type allTeamArtifactsResponse struct {
 	Total      int                   `json:"total"`
 	All        int                   `json:"all"`
 	NextCursor string                `json:"next_cursor"`
+	Rev        uint64                `json:"artifacts_rev"`
 	Teams      []teamArtifactTeamRef `json:"teams"`
 }
 
@@ -194,7 +197,7 @@ func TestAllTeamArtifactsCursorsDoNotCrossRoutes(t *testing.T) {
 }
 
 // #10312: the Inbox's Artifacts folder and an agent's own Artifacts tab list the same files. A file an agent with no team uploaded (a pasted screenshot) is in the agent's tab, so it is in the folder too,
-// under "No team"; a file a team already lists is not repeated; the Team filter takes "No team".
+// under "Not on a team"; a file a team already lists is not repeated; the Team filter takes "Not on a team".
 func TestAllTeamArtifactsListsTheFilesOfAgentsWithoutATeam(t *testing.T) {
 	_, h := setupBoardTestServer(t)
 	coralDir := t.TempDir()
@@ -211,8 +214,9 @@ func TestAllTeamArtifactsListsTheFilesOfAgentsWithoutATeam(t *testing.T) {
 	got := getAllTeamArtifacts(t, srv, "", http.StatusOK)
 	require.Equal(t, 1, got.All, "the standalone agent's file is in the folder")
 	require.Equal(t, []string{"screen.png"}, names(got.Artifacts))
-	require.Equal(t, "No team", got.Artifacts[0].Team)
-	require.Equal(t, []teamArtifactTeamRef{{Team: "No team", All: 1}}, got.Teams)
+	require.Equal(t, "Not on a team", got.Artifacts[0].Team)
+	require.Equal(t, []teamArtifactTeamRef{{BoardID: noTeamBoardID, Team: "Not on a team", All: 1}}, got.Teams)
+	require.Equal(t, noTeamBoardID, got.Artifacts[0].BoardID, "the row carries the reserved key a file for review is kept under (#13527)")
 
 	subscribeSession(t, h, "alpha", "Alice", "00000000-0000-4000-8000-0000000000a1")
 	completeWithArtifacts(t, h, "alpha", "A one", []board.TaskArtifact{{Name: "alpha-1.md", Content: "text"}})
@@ -225,8 +229,11 @@ func TestAllTeamArtifactsListsTheFilesOfAgentsWithoutATeam(t *testing.T) {
 		}
 	}
 
-	only := getAllTeamArtifacts(t, srv, "?team=No+team", http.StatusOK)
-	require.Equal(t, []string{"screen.png"}, names(only.Artifacts), "the Team filter takes No team")
+	only := getAllTeamArtifacts(t, srv, "?team=Not+on+a+team", http.StatusOK)
+	require.Equal(t, []string{"screen.png"}, names(only.Artifacts), "the Team filter takes Not on a team")
+	legacy := getAllTeamArtifacts(t, srv, "?team=No+team", http.StatusOK)
+	require.Equal(t, []string{"screen.png"}, names(legacy.Artifacts), "an older Hub filter still finds the renamed group")
+	require.Equal(t, "Not on a team", legacy.Artifacts[0].Team)
 	notThem := getAllTeamArtifacts(t, srv, "?team=alpha", http.StatusOK)
 	require.NotContains(t, names(notThem.Artifacts), "screen.png", "a team's filter leaves the no-team files out")
 }
@@ -266,4 +273,73 @@ func TestAllTeamArtifactsAllCountsFilesNotVersionsWithVersionsNewest(t *testing.
 	require.Equal(t, map[string]int{"alpha": 2, "beta": 1}, byTeam, "and so is each team's own count")
 	plain := getAllTeamArtifacts(t, srv, "?limit=1", http.StatusOK)
 	require.Equal(t, 6, plain.All, "without versions=newest a version is a row, as it always was")
+}
+
+// #13163 (QA Reviewer 2's SHOULD on #13151): the no-team group's own count is files too. Reverting only the no-team ref in ListAllTeamArtifacts (filesOrVersions to len(rows)) left the test above green, because it
+// had only team files. A file with no team that has three versions is one file with versions=newest, and three rows without it; the Team filter "Not on a team" agrees.
+func TestAllTeamArtifactsCountsAFileWithNoTeamAsAFileNotItsVersions(t *testing.T) {
+	t.Parallel()
+	srv, h := allTeamArtifactsServer(t)
+	const solo = "00000000-0000-4000-8000-0000000000c3" // an agent that belongs to no team
+	up := func(name, body, at string) {
+		t.Helper()
+		id := storeTyped(t, h.coralDir, body, name, "text/markdown")
+		dir := uploadsDir(h.coralDir, solo)
+		require.NoError(t, os.MkdirAll(dir, 0o755))
+		rec, _ := json.Marshal(agentUploadRecord{agentArtifactMeta: agentArtifactMeta{Name: name, MediaType: "text/markdown", Size: int64(len(body)), Digest: "sha256:" + id}, CreatedAt: at})
+		require.NoError(t, os.WriteFile(filepath.Join(dir, id+".json"), rec, 0o644))
+	}
+	up("notes.md", "n1", "2026-10-01T10:00:00Z")
+	up("notes.md", "n2", "2026-10-02T10:00:00Z")
+	up("notes.md", "n3", "2026-10-03T10:00:00Z")
+	up("other.md", "o1", "2026-10-04T10:00:00Z")
+
+	noTeamAll := func(q string) (all, group int) {
+		got := getAllTeamArtifacts(t, srv, q, http.StatusOK)
+		for _, ref := range got.Teams {
+			if ref.Team == "Not on a team" {
+				group = ref.All
+			}
+		}
+		return got.All, group
+	}
+	all, group := noTeamAll("?limit=1&versions=newest")
+	require.Equal(t, 2, all, "the list's own count is the two files, not the four versions")
+	require.Equal(t, 2, group, "and so is the Not on a team group's: the file counts once")
+	all, group = noTeamAll("?limit=1&team=Not+on+a+team&versions=newest")
+	require.Equal(t, 2, all, "the Not on a team filter agrees")
+	require.Equal(t, 2, group)
+	all, group = noTeamAll("?limit=1&versions=all")
+	require.Equal(t, 4, all, "as asked, every version is a row")
+	require.Equal(t, 4, group)
+}
+
+// A file a no-team agent sent for review is a review row in the Inbox's list (#13527): its tag and the question it asks are read from the reserved key, the for-review filter finds it, and a file that was not sent
+// for review stays a plain row. The row carries the reserved board key and the Not on a team label.
+func TestAllTeamArtifactsShowsAFileANoTeamAgentSentForReviewWithItsQuestion(t *testing.T) {
+	_, h := setupBoardTestServer(t)
+	coralDir := t.TempDir()
+	h.SetTaskArtifactWriter(coralDir, nil)
+	r := chi.NewRouter()
+	r.Get("/api/team-artifacts", h.ListAllTeamArtifacts)
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+	ctx := context.Background()
+
+	review := writeUpload(t, coralDir, "solo-1", "the report", "report.md", "2026-10-09T10:00:00Z")
+	writeUpload(t, coralDir, "solo-1", "just a log", "run.log", "2026-10-09T09:00:00Z")
+	_, err := h.bs.AddArtifactTags(ctx, noTeamBoardID, review, []string{"for review"})
+	require.NoError(t, err)
+	_, err = h.bs.SetArtifactQuestion(ctx, noTeamBoardID, review, "Ship the Q4 report?", "solo-1", time.Now())
+	require.NoError(t, err)
+
+	got := getAllTeamArtifacts(t, srv, "?tag=for+review", http.StatusOK)
+	require.Equal(t, []string{"report.md"}, names(got.Artifacts), "only the file sent for review")
+	row := got.Artifacts[0]
+	assert.Equal(t, []string{"for review"}, row.Tags)
+	assert.Equal(t, "Ship the Q4 report?", row.ReviewQuestion, "the question reaches the Operator with it")
+	assert.Equal(t, "Not on a team", row.Team)
+	assert.Equal(t, noTeamBoardID, row.BoardID)
+	all := getAllTeamArtifacts(t, srv, "", http.StatusOK)
+	assert.ElementsMatch(t, []string{"report.md", "run.log"}, names(all.Artifacts), "the plain file is still listed, with no review")
 }

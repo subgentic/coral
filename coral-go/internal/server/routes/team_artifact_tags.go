@@ -38,6 +38,7 @@ func (h *BoardHandler) attachArtifactTags(ctx context.Context, project string, i
 	}
 	questions, _ := h.bs.ArtifactQuestions(ctx, project) // what each upload for review asks (#11555); a read that fails leaves the rows without it
 	reviews, _ := h.bs.ArtifactReviews(ctx, project)     // when a review was decided (#136584); a read that fails leaves the rows without it
+	sent, _ := h.bs.ArtifactReviewSent(ctx, project)     // when each file was sent for review (#13231); a read that fails leaves the rows without it
 	for i := range items {
 		if items[i].managed != "" {
 			items[i].Tags = tags[items[i].managed]
@@ -46,6 +47,9 @@ func (h *BoardHandler) attachArtifactTags(ctx context.Context, project string, i
 			}
 			if q, ok := questions[items[i].managed]; ok && hasTag(items[i].Tags, tagForReview) {
 				items[i].ReviewQuestion = q.Question
+			}
+			if at, ok := sent[items[i].managed]; ok && hasTag(items[i].Tags, tagForReview) {
+				items[i].ReviewSentAt = at
 			}
 			if rv, ok := reviews[items[i].managed]; ok {
 				rv := rv
@@ -106,6 +110,9 @@ func (h *BoardHandler) teamHasManagedArtifact(ctx context.Context, project, id s
 
 // teamManagedArtifact is the team's row for the object id (its name, and who uploaded it), or false when it is not one of the team's.
 func (h *BoardHandler) teamManagedArtifact(ctx context.Context, project, id string) (teamArtifact, bool) {
+	if project == noTeamBoardID { // the files of agents on no team (#13532)
+		return h.noTeamManagedArtifact(ctx, id)
+	}
 	subscribers, err := h.bs.TeamSubscriberSessions(ctx, project)
 	if err != nil {
 		return teamArtifact{}, false
@@ -144,10 +151,11 @@ func (h *BoardHandler) SetArtifactTags(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "invalid JSON")
 		return
 	}
-	var tags []string
+	var tags, was []string
 	var err error
-	if cloud.Tunneled(r) {
-		tags, err = h.hubArtifactTags(r.Context(), project, id, body.Tags)
+	hub := cloud.Tunneled(r)
+	if hub {
+		tags, was, err = h.hubArtifactTags(r.Context(), project, id, body.Tags)
 	} else {
 		tags, err = board.NormalizeArtifactTags(body.Tags)
 	}
@@ -159,7 +167,27 @@ func (h *BoardHandler) SetArtifactTags(w http.ResponseWriter, r *http.Request) {
 		errNotFound(w, "this team has no such artifact")
 		return
 	}
-	if err := h.bs.SetArtifactTags(r.Context(), project, id, tags); err != nil {
+	if hub {
+		// A Hub write was judged against the list read above: it is made only if the list is still that one (#13129). If a local edit landed in between, the request is judged again against the new list (a few times), so it
+		// can never overwrite that edit; one the rule now refuses is a 400.
+		for attempt := 0; ; attempt++ {
+			err = h.bs.SetArtifactTagsIf(r.Context(), project, id, was, tags)
+			if !errors.Is(err, board.ErrArtifactTagsChanged) {
+				break
+			}
+			if attempt >= hubTagsRetries {
+				errConflict(w, "the tags changed while this was being saved; try again")
+				return
+			}
+			if tags, was, err = h.hubArtifactTags(r.Context(), project, id, body.Tags); err != nil {
+				errBadRequest(w, strings.TrimPrefix(err.Error(), board.ErrArtifactTag.Error()+": "))
+				return
+			}
+		}
+	} else {
+		err = h.bs.SetArtifactTags(r.Context(), project, id, tags)
+	}
+	if err != nil {
 		errInternalServer(w, "could not change the tags")
 		return
 	}
@@ -234,56 +262,56 @@ func (h *BoardHandler) askerUploaded(session, id string) bool {
 	return ok
 }
 
-// hubArtifactTags is the tags of a write that came through Coral Hub (#12742), checked against the list the server holds, never the client's word for what is there. The local rule (a tag is 1 to 24 letters, digits, spaces
-// or hyphens) holds for every tag; a tag the request ADDS must also be a-z, 0-9, space or hyphen, so the closed body is only for what is new, and a tag the artifact already has is kept whatever its letters (the page writes the
-// whole list back to add "read"). At most five tags, except that a request that adds nothing but "read" (the Operator opening a file) is never refused for the count: an artifact that already has more must still be markable read.
-func (h *BoardHandler) hubArtifactTags(ctx context.Context, project, id string, raw []string) ([]string, error) {
-	out := make([]string, 0, len(raw))
-	seen := map[string]bool{}
+// hubArtifactTags is the tags of a write that came through Coral Hub (#12742, #13117), judged against the list the server holds, never the client's word for what is there. The tags of a file are this computer's: a Hub
+// write may only ADD or REMOVE "read" (the Hub passes this computer's read mark through). Any other difference from the stored list, a tag added or a tag removed, is refused and nothing is stored. The request is a set:
+// the same tags in another order, or a repeat of the stored list, changes nothing, and what is stored keeps its order ("read" goes on the end). Marking a file read is never refused for the five-tag count, since it adds
+// nothing else. The local rule (1 to 24 letters, digits, spaces or hyphens) still holds for every tag in the request.
+func (h *BoardHandler) hubArtifactTags(ctx context.Context, project, id string, raw []string) (tags, was []string, err error) {
+	want := map[string]bool{}
 	for _, r := range raw {
 		tag, ok := board.NormalizeArtifactTag(r)
 		if !ok {
-			return nil, fmt.Errorf("%w: %q (1 to %d letters, digits, spaces or hyphens)", board.ErrArtifactTag, r, board.MaxArtifactTagLen)
+			return nil, nil, fmt.Errorf("%w: %q (1 to %d letters, digits, spaces or hyphens)", board.ErrArtifactTag, r, board.MaxArtifactTagLen)
 		}
-		if !seen[tag] {
-			seen[tag] = true
-			out = append(out, tag)
-		}
+		want[tag] = true
 	}
-	stored, err := h.bs.ArtifactTags(ctx, project)
+	all, err := h.bs.ArtifactTags(ctx, project)
 	if err != nil {
-		return nil, fmt.Errorf("%w: the tags could not be read", board.ErrArtifactTag)
+		return nil, nil, fmt.Errorf("%w: the tags could not be read", board.ErrArtifactTag)
 	}
+	stored := all[id]
 	had := map[string]bool{}
-	for _, t := range stored[id] {
+	for _, t := range stored {
 		had[t] = true
 	}
-	onlyRead := true
-	for _, t := range out {
-		if had[t] {
-			continue
-		}
-		if t != "read" {
-			onlyRead = false
-		}
-		if !asciiArtifactTags([]string{t}) {
-			return nil, fmt.Errorf("%w: %q (through Coral Hub a tag you add is 1 to %d of a-z, 0-9, spaces or hyphens)", board.ErrArtifactTag, t, board.MaxArtifactTagLen)
+	for t := range want {
+		if !had[t] && t != hubMarkTag {
+			return nil, nil, fmt.Errorf("%w: through Coral Hub only the tag %q can be added or removed, and %q is not on this file", board.ErrArtifactTag, hubMarkTag, t)
 		}
 	}
-	if len(out) > board.MaxArtifactTags && !onlyRead {
-		return nil, fmt.Errorf("%w: at most %d tags on an artifact", board.ErrArtifactTag, board.MaxArtifactTags)
+	for t := range had {
+		if !want[t] && t != hubMarkTag {
+			return nil, nil, fmt.Errorf("%w: through Coral Hub only the tag %q can be added or removed, and %q is on this file", board.ErrArtifactTag, hubMarkTag, t)
+		}
 	}
-	return out, nil
+	out := make([]string, 0, len(stored)+1)
+	for _, t := range stored {
+		if t != hubMarkTag || want[t] {
+			out = append(out, t)
+		}
+	}
+	if want[hubMarkTag] && !had[hubMarkTag] {
+		out = append(out, hubMarkTag)
+	}
+	hubTagsAfterRead()
+	return out, stored, nil
 }
 
-// asciiArtifactTags says every tag (already normalised: lower case, single spaces) uses only a-z, 0-9, space and hyphen.
-func asciiArtifactTags(tags []string) bool {
-	for _, t := range tags {
-		for _, r := range t {
-			if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == ' ' || r == '-') {
-				return false
-			}
-		}
-	}
-	return true
-}
+// hubMarkTag is the one tag a write through Coral Hub may add or remove: the file was opened (#13117).
+const hubMarkTag = "read"
+
+// hubTagsRetries is how many times a Hub write is judged again when a local edit changed the tags under it (#13129).
+const hubTagsRetries = 3
+
+// hubTagsAfterRead is a seam for a test: it runs once a Hub write has read the stored tags and worked out its answer, before it is written.
+var hubTagsAfterRead = func() {}

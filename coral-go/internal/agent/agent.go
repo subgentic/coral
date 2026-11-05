@@ -9,22 +9,26 @@ import (
 	"strings"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/skills"
 )
 
 var coralSessionIDPattern = regexp.MustCompile(`^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}`)
 
 // LaunchParams holds all parameters for building a launch command.
 type LaunchParams struct {
-	SessionID       string
-	SessionName     string // tmux session name (e.g. "claude-<uuid>"), used for CORAL_SESSION_NAME
-	ProtocolPath    string
-	ResumeSessionID string
-	Flags           []string
-	WorkingDir      string
-	BoardName       string
-	BoardLabel      string // the board's display name (#3536); the prompt shows it, BoardName (the id) stays the key
-	Role            string
-	Prompt          string
+	SessionID    string
+	SessionName  string // tmux session name (e.g. "claude-<uuid>"), used for CORAL_SESSION_NAME
+	ProtocolPath string
+	// EmbeddedProtocol: a team agent (one with a board) that finds no protocol file is given the protocol compiled into the program (#13523). A release build has no file next to the executable and, since #3601, reads none
+	// from the home folder; the embedded text cannot be replaced by an agent. False in tests, which name a file or none.
+	EmbeddedProtocol bool
+	ResumeSessionID  string
+	Flags            []string
+	WorkingDir       string
+	BoardName        string
+	BoardLabel       string // the board's display name (#3536); the prompt shows it, BoardName (the id) stays the key
+	Role             string
+	Prompt           string
 	// NoStartPrompt: this launch resumes a conversation that already has its first prompt, and what woke it says what to do: the CLI is started without the first message (auto-wake, #12358). The role
 	// still reaches a Claude agent through its system prompt, and every agent through its board protocol.
 	NoStartPrompt   bool
@@ -142,7 +146,11 @@ const DocsPromptLine = "Coral's docs for agents: run `coral-agent docs` to list 
 // then the session marker (last, as the history reader looks for it).
 func appendCoralSessionMarker(parts []string, sessionID string) []string {
 	if marker := BuildCoralSessionMarker(sessionID); marker != "" {
-		return append(parts, DocsPromptLine, marker)
+		parts = append(parts, DocsPromptLine)
+		if section := skills.LaunchSection(); section != "" { // what Coral gives any agent, a plain one included (#13523): the same text as the using-coral skill's launch region
+			parts = append(parts, section)
+		}
+		return append(parts, marker)
 	}
 	return parts
 }

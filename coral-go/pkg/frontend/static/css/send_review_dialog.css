@@ -1,0 +1,8 @@
+/* The Send for review dialog (artifact_send_review.js, #13152): centred as the other dialogs are (the base reset gives a bare dialog margin 0, which pinned it to the top left of the window, #11999 again), its own size from the shared form rule. */
+dialog.send-review-dialog { position: fixed; inset: 0; margin: auto; height: fit-content; max-height: 90dvh; overflow: auto; color: var(--text-primary); }
+dialog.send-review-dialog:not([open]) { display: none; }
+dialog.send-review-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
+.send-review-dialog h2 { margin: 0 0 4px; font-size: var(--fs-xl, 1.1rem); overflow-wrap: anywhere; }
+.send-review-dialog label { display: block; margin: 8px 0 4px; }
+.send-review-dialog input { display: block; width: 100%; box-sizing: border-box; }
+.send-review-dialog .inbox-ask-sub { margin: 0 0 8px; }

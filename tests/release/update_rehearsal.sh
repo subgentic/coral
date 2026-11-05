@@ -233,12 +233,15 @@ if setup ask; then
   pid0=$srv
   # the update is staged by an earlier run of the rehearsal program, which then ends: what the server's status shows is the real updater's reading of that state
   "${CENV[@]}" "$work/bin/rehearsal-update" --data-dir "$dd" --install "$inst" --parent "$srv" --installed "$N" --package "$work/pkg/n1.tar.gz" --version "$N1" --mode check > "$s/stage.out" 2> "$s/stage.err"
-  mv "$inst/coral-update" "$inst/coral-update.real"
+  # The real coral-update judges the install it runs from, and only a program named coral-update in a folder of the release is an install (apply/linux.go Install): renamed beside the shim it said
+  # "this program is not coral-update", so the status called the install unsupported (reason unsupported_install) and no ack was offered. The shim's status therefore asks the real program in a
+  # copy of the install (the same files, a folder of its own), where it IS coral-update.
+  rm -rf "$work/statview" && cp -a "$inst" "$work/statview"
   cat > "$inst/coral-update" <<SHIM
 #!/bin/sh
 # the ask rehearsal's stand-in for coral-update (tests/release/update_rehearsal.sh): never released
 case "\$1" in
-  status) exec "$inst/coral-update.real" "\$@" ;;
+  status) exec "$work/statview/coral-update" "\$@" ;;
   check) echo '{"result":"up_to_date"}'; exit 0 ;;
   apply) exec env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin HOME="$hh" CORAL_DATA_DIR="$dd" CORAL_CLOUD_URL=off CORAL_TELEMETRY_DISABLED=1 CORAL_NO_DEMO_SEED=1 CORAL_URL="http://127.0.0.1:$PORT" "$work/bin/rehearsal-update" --data-dir "$dd" --install "$inst" --parent "$srv" --installed "$N" --package "$work/pkg/n1.tar.gz" --version "$N1" --mode both --restage ;;
 esac

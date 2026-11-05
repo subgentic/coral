@@ -132,6 +132,9 @@ export function identityKey(server, name) {
     return s === LOCAL_SERVER ? String(name ?? '') : `@${s}/${name ?? ''}`;
 }
 
+/** The team key of a board named on a computer, for a caller that has the computer and the board's own name (a key that already names its computer, '@m1/team', is kept). */
+export const boardTeamKey = (server, board) => (String(board).startsWith('@') ? String(board) : identityKey(server, board));
+
 /** DOM-id/attribute-safe version of identityKey. */
 export function identityDomId(server, name) {
     return identityKey(server, name).replace(/[^A-Za-z0-9_-]/g, '_');
@@ -301,6 +304,7 @@ export function isBoardAnswerPending(project, answered) {
 export function keyLabel(key) {
     const k = String(key ?? '');
     const name = splitKey(k).name;
+    if (name === '~no-team') return 'Not on a team';
     const label = _boardLabels.get(k) || name;
     const same = _labelKeys.get(label.toLowerCase());
     return same && same.size > 1 && label !== name ? `${label} (${shortKey(name)})` : label;
@@ -359,6 +363,23 @@ export function sessionFolderKey(s) {
 export function boardFetch(teamKey, suffix, options) {
     const { server, name } = splitKey(teamKey);
     return fetch(serverUrl(`/api/board/${encodeURIComponent(name)}${suffix || ''}`, server), options);
+}
+
+/** One page of a team's artifacts that carry the tag (#13161: a computer answers at most 50 a request, an older one up to what is asked; the walk asks for 200, the page the walk always asked for, and takes what comes: asking for 50 made the first read of a big board four times as many requests, 17 s against 5 s on the 10,000-file board). `at` is the walk's place, { cursor: '', offset: 0 }; the computer's own cursor is used when it gives one. */
+export function boardArtifactPage(teamKey, tag, at) {
+    const where = at.cursor ? `&cursor=${encodeURIComponent(at.cursor)}` : at.offset ? `&offset=${at.offset}` : '';
+    const key = splitKey(teamKey);
+    if (key.name === '~no-team') return serverFetch(key.server, `/api/team-artifacts?team=No%20team&team=Not%20on%20a%20team&tag=${tag}&limit=200${where}`);
+    return boardFetch(teamKey, `/artifacts?tag=${tag}&limit=200${where}`);
+}
+/** Moves the walk to the next page of `data` (a page's answer); false when that was the last. It advances by what the computer returned, never by what was asked: an older Coral answers 200, a newer one 50, and the cursor, when there is one, is the place. */
+export function nextArtifactPage(at, data) {
+    const list = (data && data.artifacts) || [];
+    at.seen = (at.seen || 0) + list.length; // everything the walk has been given so far
+    if (!data || !data.has_more || !list.length) return false;
+    if (data.next_cursor) at.cursor = data.next_cursor;
+    else { at.cursor = ''; at.offset = at.seen; } // a page with no cursor after one with a cursor (a computer that changed under the walk): the walk goes on by offset from what it has, it does not ask for the same cursor again
+    return true;
 }
 
 // ── Validated GETs (#3439) ───────────────────────────────────────────────
@@ -454,11 +475,24 @@ export function decisionNeedsPerson(server) {
     return !(live && live.owner_stamp === true);
 }
 
+/** The Hub asks for its goal preview before a goal create, close or update (#13503): one boot value `goal_preview: true`, set by the Hub's server for the accounts its goals gate allows, never from a request. The preview flow
+ *  (goal_write.js) is used ONLY when this is true; on the self-hosted Hub and on a computer's own dashboard it is false and the goal writes go out as they always did. */
+export function goalPreviewOn() {
+    return isCloud() && bootConfig().goal_preview === true;
+}
+
 /** The Hub-served dashboard draws its own Inbox (Chats folders and Boards) in place of the Hub's framed one, and the top row's Chats and Board tabs go (Goal #100). One switch, set by the Hub's
  *  boot value `inbox: 'native'`; off until the Hub's own pages have moved off /inbox. Read by: the Inbox tab (inbox_tab.js), the folder list and sources (inbox_sidebar.js, inbox_servers.js, mailbox_chats.js)
  *  and the tab filter (nav_tabs.js, through the body class that cloud.js sets). */
 export function nativeInbox() {
     return isCloud() && bootConfig().inbox === 'native';
+}
+
+/** The Hub-served dashboard draws Coral's own Needs you table, not the Hub's framed page (#13446, #13450): the Hub's boot value `needs: 'native'`, read only together with `inbox: 'native'`. The Hub's own page config
+ *  (a machine, a URL or a message cannot set it), so a folder can move off the frame, or back, without the others. The table is the owner's: every route it calls is owner-only through the Hub, so the Hub must
+ *  set this value for the owner only: for a grantee or a viewer it would draw a table whose reads are refused (403 owner_only) and whose buttons answer 'Could not save (HTTP 403)'. */
+export function nativeNeeds() {
+    return nativeInbox() && bootConfig().needs === 'native';
 }
 
 /** Read /api/health once and cache the flag in state.hub. Safe to call often.

@@ -20,6 +20,7 @@ import { boardKeyName, sessionTeamKey, contextServer } from './server_base.js';
 import { browserLocal } from './safe_storage.js';
 import { boardOfPage } from './dock_page.js';
 import { el } from './dom_el.js';
+import { pollEvery } from './overload.js';
 await loadStyles('pictures.css'); // the picture rules load with this module, before anything draws (page_weight: not at start)
 
 const OPEN_KEY = 'coral-artifact-comments-open'; // default for the docked preview; the viewer supplies a key for each file type
@@ -64,7 +65,7 @@ function avatar(c) {
  *  size decides sheet(). */
 let panelSeq = 0; // one id per panel (the viewer's and the docked pane's)
 export function attachComments(dialog, body, host, opts = {}) {
-    const st = { groupOpen: {}, series: false, hex: null, server: undefined, board: undefined, source: '', text: false, whole: false, data: null, showResolved: false, active: null, composing: null, busy: false, error: '', ranges: new Map(), orphan: new Set(), gone: false };
+    const st = { lifetime: 0, video: null, videoTime: null, groupOpen: {}, series: false, hex: null, server: undefined, board: undefined, source: '', text: false, whole: false, data: null, showResolved: false, active: null, composing: null, busy: false, error: '', ranges: new Map(), orphan: new Set(), gone: false };
     const panel = el('aside', 'pane pane-aside ac-panel'); panel.setAttribute('aria-label', 'Comments'); panel.hidden = true;
     panel.id = `ac-panel-${++panelSeq}`; // the toggle names it (aria-controls): where the opened comments are
     const toggle = btn('ac-toggle', 'Comments', 'Comments: show the comments'); toggle.hidden = true; toggle.setAttribute('aria-expanded', 'false');
@@ -99,30 +100,56 @@ export function attachComments(dialog, body, host, opts = {}) {
         const all = (st.data?.comments || []);
         const replies = new Map();
         for (const c of all) if (c.parentId != null && !c.deleted) { if (!replies.has(c.parentId)) replies.set(c.parentId, []); replies.get(c.parentId).push(c); }
-        return all.filter(c => c.parentId == null && (!c.deleted || replies.has(c.id))).map(c => ({ c, replies: replies.get(c.id) || [] }));
+        return all.filter(c => c.parentId == null && (!c.deleted || replies.has(c.id))).map(c => ({ c, replies: replies.get(c.id) || [] })).sort((a,b) => st.video ? (a.c.atS ?? Infinity) - (b.c.atS ?? Infinity) : 0);
     };
     // A comment of an EARLIER version of the series (read with series=1) is `found` in this one (pinned on its text like any), `ambiguous` (the text is here more than once: never pinned to a guess) or gone
     // (`gone`, `unchecked`): the last two are listed apart and are about the older version's text, so nothing on this one's text marks them (#6472).
+    const stampRange = c => `${st.videoTime?.(c.atS) || ''}${c.endS != null ? '–' + st.videoTime?.(c.endS) : ''}`;
     const groupOf = (c) => (c.fromVersion == null || c.carried === 'found') ? 'main' : c.carried === 'ambiguous' ? 'look' : 'earlier';
     const ownHex = (c) => c.artifactId || st.hex; // a carried comment's replies, resolving and edits go to the version it was written on
     const openCount = () => threads().filter(t => !t.c.deleted && !t.c.resolved && groupOf(t.c) !== 'earlier').length;
     async function refresh() {
         if (!st.hex || (!st.text && !st.whole)) return;
-        const hex = st.hex;
+        const hex = st.hex, gen = ctxGen;
         try {
             const data = await api.listComments(hex, st.server, st.board, st.series);
-            if (hex !== st.hex) return;
+            if (hex !== st.hex || gen !== ctxGen) return;
             st.data = data; st.gone = false;
             if (!st.visibilitySet) {
                 st.visibilitySet = true;
-                setSheet(remembered() ?? (opts.toggleHost ? !phone.matches && openCount() > 0 : false)); // the viewer: closed until the person opens it, and then as they left it, so the file has the whole width (#12225); the docked preview keeps opening when there are comments
+                setSheet(remembered() ?? (st.video ? true : opts.toggleHost ? !phone.matches && openCount() > 0 : false)); // the viewer: closed until the person opens it, and then as they left it, so the file has the whole width (#12225); the docked preview keeps opening when there are comments
             }
         } catch (e) {
-            if (hex !== st.hex) return;
+            if (hex !== st.hex || gen !== ctxGen) return;
             st.gone = true; st.data = null; // no comments routes here (an older Coral, a hub that does not carry them): the viewer is as it was
         }
         render(); paint();
     }
+
+    // Live replies (#13299): an open panel (a file's, a goal's) shows what arrives while it is open, an agent's reply above all, without reopening. A light read of the thread every few seconds while the panel is on screen
+    // (nothing while the page is hidden, the panel is collapsed or nothing is open), redrawn only when the thread differs from the one on show, with the panel's scroll kept; a comment being written keeps its draft
+    // (st.composing.draft) and its caret and selection, and the focus goes back to the same control (render does that). The count of new comments is said once to a screen reader.
+    // An answer is only used by the context it was asked for: ctxGen moves on every open and close, and a late answer must match the generation, the file, the computer, the team and the series it was asked under, so a same-hash
+    // file of another computer or team (or the same file reopened) never shows an old answer.
+    const LIVE_MS = Number(globalThis.__coralCommentsPollMs) || 8000, sigOf = d => (d ? JSON.stringify([d.locked, d.comments]) : '');
+    let liveTimer = 0, ctxGen = 0, liveBusyGen = -1;
+    async function liveTick() {
+        if (liveBusyGen === ctxGen || !st.hex || !st.data || (!st.text && !st.whole) || !panel.getClientRects().length) return;
+        const gen = ctxGen, hex = st.hex, server = st.server, board = st.board, series = st.series; liveBusyGen = gen;
+        try {
+            const data = await api.listComments(hex, server, board, series);
+            if (gen !== ctxGen || hex !== st.hex || server !== st.server || board !== st.board || series !== st.series || !st.data || sigOf(data) === sigOf(st.data)) return;
+            const added = data.comments.filter(c => !c.deleted).length - st.data.comments.filter(c => !c.deleted).length, top = panel.scrollTop;
+            const ta = document.activeElement && document.activeElement.matches?.('.ac-input') && panel.contains(document.activeElement) ? document.activeElement : null, sel = ta ? [ta.selectionStart, ta.selectionEnd, ta.selectionDirection] : null; // the caret of a comment being written
+            st.data = data; render(); paint(); panel.scrollTop = top;
+            const now = document.activeElement;
+            if (sel && now && now.matches?.('.ac-input') && panel.contains(now)) { try { now.setSelectionRange(sel[0], sel[1], sel[2] || 'none'); } catch { /* a textarea always takes it */ } }
+            if (added > 0) announce(added === 1 ? 'A new comment arrived' : `${added} new comments arrived`);
+        } catch { /* the next tick asks again */ } finally { if (liveBusyGen === gen) liveBusyGen = -1; }
+    }
+    const liveStart = () => { ctxGen++; clearInterval(liveTimer); liveTimer = pollEvery(liveTick, LIVE_MS, { machine: () => st.server || '' }); }; // pollEvery: its ticks wait out an overloaded Coral or computer and a hidden tab
+    const liveStop = () => { ctxGen++; clearInterval(liveTimer); liveTimer = 0; };
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && liveTimer) liveTick(); });
 
     const { locate, hover, paint, forget } = createHighlights({ st, dialog, body, panel, threads, groupOf, render });
 
@@ -151,10 +178,12 @@ export function attachComments(dialog, body, host, opts = {}) {
         paintToggle();
         if (!show) return;
         const list = threads();
+        st.video?.update(list.map(t => t.c).filter(c => st.showResolved || !c.resolved), st.active, !!st.data?.canComment && !st.data?.locked);
         const head = el('div', 'ac-head');
         const h = el('h3', 'ac-title', 'Comments'); h.append(el('span', 'ac-count', String(openCount())));
         opts.onCanWrite?.(!!(st.data && st.data.canComment && !st.data.locked)); // the viewer shows Mark up only to someone who can comment (#12394)
         opts.onCount?.(openCount()); // a goal's Comments tab says how many are open (#11955)
+        opts.onState?.({ composing: !!(st.composing && st.composing.anchor), count: openCount() }); // a file's diff (#13528): its icon says the count, and closes an empty thread whose composer was cancelled
         head.append(h);
         // Resolved threads are out of the way, as in Docs: one toggle brings them back (and only while there are any).
         const nResolved = list.filter(t => t.c.resolved && !t.c.deleted).length;
@@ -168,11 +197,24 @@ export function attachComments(dialog, body, host, opts = {}) {
         const d = st.data;
         if (d.locked) panel.append(el('p', 'ac-note ac-locked', d.canLock ? 'Comments are locked: nobody can add comments to this file. You can unlock it any time.' : 'Comments are locked: read only.'));
         else if (!d.canComment) panel.append(el('p', 'ac-note ac-readonly', d.reason || 'You can read the comments here but not write them.'));
+        const setup = !d.locked && askSetup();
+        if (setup) { // Send to agent is not offered: say why, and where it is set up (#13230)
+            const n = el('p', 'ac-note ac-ask-setup', setup.ssh ? 'Send to agent is not set up for this computer: this hub has no Approve secret for it. Open the computer, then choose Set up approvals.' : 'Send to agent is not set up for this computer: this hub has no Approve secret for it. Open the computer, then choose Approve through this hub.');
+            const go = btn('ac-act ac-ask-setup-open', 'Open the computer'); go.addEventListener('click', async () => { // the viewer this panel is in closes first, or Computers opens behind it (#13251, UI Reviewer); a phone's viewer has its own history entry, whose Back lands after the click, so Computers opens once it has
+                const viewer = document.querySelector('#artifact-viewer:not([hidden])');
+                const settled = viewer && isPhoneLayout() ? new Promise(res => { window.addEventListener('popstate', () => res(), { once: true }); setTimeout(res, 600); }) : Promise.resolve();
+                viewer?.querySelector('.artifact-viewer-close')?.click();
+                for (const d of document.querySelectorAll('dialog[open]')) { try { d.close(); } catch { /* already closing */ } }
+                await settled;
+                const { openServersTab } = await importOnce('./servers_tab.js'); openServersTab(setup.id);
+            });
+            panel.append(n, go);
+        }
         if (d.canLock) {
             const why = d.locked ? 'Comments are locked: nobody can add comments to this file. You can unlock it any time.' : 'Locking stops anyone adding comments to this file. You can unlock it any time.';
             const lock = btn('ac-lock', d.locked ? 'Unlock comments' : 'Lock comments'); lock.title = why;
             lock.addEventListener('click', async () => { try { await api.setLocked(st.hex, st.server, !d.locked); await refresh(); } catch (e) { showToast(e.message, true); } });
-            panel.append(lock); if (!d.locked) panel.append(el('p', 'ac-note ac-lock-note', why)); // locked: the note above says it
+            panel.append(lock); if (!d.locked && !opts.compact) panel.append(el('p', 'ac-note ac-lock-note', why)); // locked: the note above says it; a compact panel (a file's diff, #13528) has it as the button's tip only
         }
         const wrap = el('ul', 'ac-list');
         const shownAll = list.filter(t => st.showResolved || !t.c.resolved);
@@ -188,11 +230,13 @@ export function attachComments(dialog, body, host, opts = {}) {
             d.addEventListener('toggle', () => { st.groupOpen[g] = d.open; });
             li.append(d); wrap.append(li);
         }
-        if (!shownAll.length) wrap.append(el('p', 'empty-state empty-state-tight', st.text ? 'No open comments. Select some text to add one.' : opts.words?.empty || 'No open comments. Use the button below to comment on the whole document.'));
+        if (!shownAll.length && !opts.compact) wrap.append(el('p', 'empty-state empty-state-tight', st.text ? 'No open comments. Select some text to add one.' : opts.words?.empty || 'No open comments. Use the button below to comment on the whole document.'));
         panel.append(wrap);
+        const sendable = list.map(t => t.c).filter(c => canAsk(c) && !d.locked);
+        if (st.video && sendable.length) { const sendAll = btn('ac-send-open', `Send ${plural(sendable.length, 'open comment')} to an agent`); sendAll.addEventListener('click', () => openMany(sendable)); panel.append(sendAll); }
         if (st.composing && st.composing.anchor) panel.append(composer());
-        else if (d.canComment && !d.locked) {
-            const whole = btn('ac-whole', opts.words?.whole || 'Comment on the whole document'); whole.addEventListener('click', () => { st.composing = { anchor: opts.wholeAnchor ? opts.wholeAnchor() : { whole: true } }; st.error = ''; render(); panel.querySelector('.ac-input')?.focus(); });
+        else if (d.canComment && !d.locked && !opts.compact) {
+            const whole = btn('ac-whole', st.video ? 'Comment at playhead' : opts.words?.whole || 'Comment on the whole document'); whole.addEventListener('click', () => { const time = st.video?.current(); st.composing = { anchor: opts.wholeAnchor ? opts.wholeAnchor() : { whole: true }, ...time, ...(time ? { timeLabel: stampRange(time) } : {}) }; st.error = ''; render(); panel.querySelector('.ac-input')?.focus(); });
             panel.append(whole);
         }
         const act = panel.querySelector('.ac-card.ac-active'); if (act && st.scrollCard) { st.scrollCard = false; act.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() }); }
@@ -216,6 +260,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         let resolveBtn = null;
         if (top) {
             const a = c.anchor || {};
+            if (st.video && c.atS != null) { const seek = btn('ac-video-time', stampRange(c), `Seek to ${stampRange(c)}`); seek.addEventListener('click', () => { st.video.seek(c.atS); activate(c.id, true); }); m.append(seek); }
             if (a.start_line) m.append(el('span', 'ac-lines', a.end_line && a.end_line !== a.start_line ? `lines ${a.start_line}-${a.end_line}` : `line ${a.start_line}`));
             if (c.resolved) m.append(el('span', 'chip ac-pill ac-pill-resolved', 'resolved'));
             if (c.fromVersion != null) {
@@ -254,7 +299,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         // ac-composing: a card with its reply box open keeps its actions row when the box loses the focus, so nothing under it moves between a press and its release (#12301)
         const li = el('li', 'ac-card' + (st.active === c.id ? ' ac-active' : '') + (c.resolved ? ' ac-resolved' : '') + (st.composing && st.composing.parentId === c.id ? ' ac-composing' : '')); li.dataset.id = String(c.id); li.setAttribute('aria-label', `Comment by ${c.authorName || c.authorId || 'unknown'}`); li.setAttribute('role', 'group');
         const a = c.anchor || {};
-        const q = el('blockquote', 'ac-quote' + (st.orphan.has(c.id) ? ' ac-orphan' : ''), a.whole ? (opts.words?.quote || 'The whole document') : a.quote || '');
+        const q = el('blockquote', 'ac-quote' + (st.orphan.has(c.id) ? ' ac-orphan' : ''), st.video && c.atS != null ? `Video: ${stampRange(c)}` : a.whole ? (opts.words?.quote || 'The whole document') : a.quote || '');
         li.append(q);
         li.append(entry(c, true));
         for (const r of replies) li.append(entry(r, false));
@@ -285,7 +330,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     }
     const act = (text, label, fn) => { if (typeof label === 'function') { fn = label; label = ''; } const b = btn('ac-act', text, label); b.addEventListener('click', fn); return b; };
 
-    const { canAsk, openAsk, askBlock, askedNow, fillStatus } = createAsk({ st, panel, render, announce, refresh, ownHex });
+    const { resetAsk, canAsk, askSetup, openAsk, openMany, askBlock, askedNow, fillStatus } = createAsk({ st, panel, render, announce, refresh, ownHex });
     function confirmThen(msg, fn) { if (window.showConfirmModal) window.showConfirmModal('Delete comment', msg, fn, undefined, { label: 'Delete comment', danger: true }); else fn(); }
     async function run(fn, said) {
         if (st.busy) return;
@@ -320,7 +365,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     function syncInert() {
         const open = panel.classList.contains('ac-sheet-open');
         panel.inert = !st.shownNow || !open;
-        body.inert = !!st.shownNow && sheet() && open;
+        body.inert = !!st.shownNow && sheet() && open && !st.video;
     }
     phone.addEventListener('change', () => { syncInert(); syncOn(); });
     if (opts.observe && typeof ResizeObserver === 'function') new ResizeObserver(() => { syncInert(); syncToggle(); paintToggle(); }).observe(opts.observe); // the pane's width decides whether the panel is a sheet
@@ -417,7 +462,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         sheetOpen: () => isOpen(), setSheet: (open) => setSheet(open),
         /** A new artifact is on show. */
         // The computer whose artifact it is: the caller's, else the one on show (the rule renderArtifact reads the content by); a bare /api/ route is the hub's own and 404s there (#6245).
-        open(hex, server, board, series = false) { st.series = !!series; region(false); { const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } } forget(); st.hex = hex; st.server = server || contextServer(); st.board = board; st.data = null; st.active = null; st.composing = null; st.error = ''; st.text = false; st.whole = false; st.gone = false; st.filter = 'open'; st.visibilitySet = false; render(); setSheet(false); },
+        open(hex, server, board, series = false) { liveStart(); st.lifetime++; resetAsk(); st.video?.close(); st.video = null; st.videoTime = null; dialog.classList.remove('avc-video'); st.series = !!series; region(false); { const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } } forget(); st.hex = hex; st.server = server || contextServer(); st.board = board; st.data = null; st.active = null; st.composing = null; st.error = ''; st.text = false; st.whole = false; st.gone = false; st.filter = 'open'; st.visibilitySet = false; render(); setSheet(false); },
         /** The document was drawn: `text` says whether it is text the comments apply to. */
         /** The document drawn is not text the comments can point into (HTML in its frame, a picture, a PDF, a table, a video, a download): the panel is there for a comment on the whole document. */
         /** Mark up in the viewer (#12367): the marked copy of the picture on show starts a comment on the whole file, in the tray with the text box ready, and the panel (a phone's sheet) opens on it. Resolves false when this person cannot comment here. */
@@ -429,14 +474,32 @@ export function attachComments(dialog, body, host, opts = {}) {
             if (cm.tray) cm.tray.add([new File([blob], name || 'marked-picture.png', { type: blob.type })]);
             return true;
         },
+        /** Whether a comment is being written now (a draft stays while the panel is hidden). */
+        isComposing: () => !!(st.composing && st.composing.anchor),
         /** A comment on an anchor the caller made (the lines selected in an agent's diff, #12536): the composer opens on it, in the panel. Resolves false when this person cannot comment here. */
         composeOn(anchor) {
             if (!st.hex || !st.data || !st.data.canComment || st.data.locked) return false;
             st.composing = { anchor }; st.error = ''; setSheet(true); render(); panel.querySelector('.ac-input')?.focus();
             return true;
         },
-        docWhole() { st.source = ''; st.text = false; st.whole = true; refresh(); },
+        async docWhole() {
+            st.source = ''; st.text = false; st.whole = true;
+            const video = body.querySelector('video'), hex = st.hex, lifetime = st.lifetime;
+            if (video && !st.video) {
+                try {
+                    const m = await importOnce('./artifact_video_comments.js');
+                    if (lifetime !== st.lifetime || hex !== st.hex || !video.isConnected || st.video) return;
+                    st.videoTime = m.videoTime;
+                    st.video = m.attachVideoComments(video, {
+                        onComment: time => { if (!st.data?.canComment || st.data.locked) return; st.composing = { anchor: { whole: true }, ...time, timeLabel: stampRange(time) }; st.error = ''; setSheet(true); render(); panel.querySelector('.ac-input')?.focus(); },
+                        onActivate: id => { activate(id, false); setSheet(true); },
+                    });
+                    dialog.classList.add('avc-video'); region(true); setSheet(true);
+                } catch (e) { showToast('Video review controls could not be loaded. ' + e.message, true); }
+            }
+            refresh();
+        },
         docRendered(source, text) { st.source = source || ''; st.text = !!text; if (!st.text) { render(); return; } region(true); refresh(); },
-        close() { hover(null); setSheet(false); region(false); forget(); st.ranges.clear(); st.hex = null; st.data = null; clearTimeout(selTimer); selBtn.hidden = true; const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } render(); },
+        close() { liveStop(); st.lifetime++; resetAsk(); st.video?.close(); st.video = null; st.videoTime = null; dialog.classList.remove('avc-video'); hover(null); setSheet(false); region(false); forget(); st.ranges.clear(); st.hex = null; st.data = null; clearTimeout(selTimer); selBtn.hidden = true; const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } render(); },
     };
 }

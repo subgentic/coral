@@ -321,6 +321,7 @@ var queryIdentityReads = map[string]string{
 	"board_messages.go subscriber_id":      queryBoard,
 	"skills_attach_live.go session_id":     queryLookup, // POST live/{name}/skills?session_id=: names the running agent the Operator attaches a skill to; an Operator-only route (an agent token, a key and Coral Hub get 403), and the session must be the one the {name} in the path names (#12676)
 	"agent_mcp.go session_id":              queryLookup, // GET live/{name}/mcp-servers?session_id=: names the session whose CLI configuration is listed; an Operator-only route, never an agent token or Coral Hub (#9769)
+	"agent_skills_loaded.go session_id":    queryLookup, // GET live/{name}/loaded-skills?session_id=: names the session whose loaded skills are listed; an Operator-only route, never an agent token or Coral Hub (#9769)
 	"sessions_waiting.go session_id":       queryLookup, // GET live/{name}/waiting?session_id=: names the exact session to list (validateExactLiveTarget); an Operator-only route (#7554)
 	"shared_images.go session_id":          queryLookup, // DELETE /api/shared-images/{id}?session_id=: the agent whose pasted image it is; the Operator calls it (#5284)
 	"operator_artifacts.go session_id":     queryLookup, // POST /api/board/{project}/operator-artifacts?session_id=: names the agent the Operator's file is for; checked against the board's own subscribers, an Operator-only route, never an agent token or a Hub grantee (#11376)

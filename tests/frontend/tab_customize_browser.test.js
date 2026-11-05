@@ -1,5 +1,5 @@
 // Customize the side panel's tab row (#4103): hide or show each tab, reorder them (buttons and Alt+arrows), a Reset, kept across a
-// reload for every agent, Chat (the first tab) always shown, a hidden open tab falling back to it, counts moving with their tab, the
+// reload for every agent, all tabs optional, a hidden open tab falling back to it, counts moving with their tab, the
 // phone sheet, and 200 percent text. Drives the real dashboard's tab row over CDP; run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -20,13 +20,13 @@ const { settle, coralReady } = require('./helpers/wait');
     const open = async () => { await ev(`document.getElementById('agentic-tab-customize').click(); true`); await waitFor(`!!document.getElementById('tab-customize')`, 'popover opens'); };
     const close = async () => { await ev(`document.getElementById('tab-customize')?.remove(); true`); };
     const ok = (name) => console.log(`   ✓ ${name}`);
-    const load = async () => {
+    const load = async (board = false) => {
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
-        await ev(`window.__m.add('tab-bot', 'A', 3, { sleeping: false }); true`);
+        await ev(`window.__m.add('tab-bot', 'A', 3, { sleeping: false, board_project: ${board ? JSON.stringify('tabs-team') : 'null'} }); true`);
         await settle(ev, 600); // sleep-ok: the first live list renders from several answers; no single completion event
         await ev(`window.selectLiveSession('tab-bot', 'claude', 'tab-bot-id', 'local'); true`);
         await ev(`(() => { const p = document.getElementById('agentic-state'); if (p.classList.contains('collapsed') || document.getElementById('agentic-tab-files').getBoundingClientRect().width === 0) window.toggleAgenticPanel(true); return true; })()`);
-        await waitFor(`document.getElementById('agentic-tab-files').getBoundingClientRect().width > 0`, 'side panel open', 8000);
+        await waitFor(`document.getElementById('agentic-tab-customize').getBoundingClientRect().width > 0`, 'side panel open', 8000);
     };
 
     try {
@@ -37,6 +37,36 @@ const { settle, coralReady } = require('./helpers/wait');
         await ev(`localStorage.removeItem('coral-agentic-tab-prefs'); true`);
         await load();
 
+        // #13529: Board is optional too, including when it is the active tab.
+        await load(true);
+        await open();
+        assert.equal(await ev(`document.querySelector('#tab-customize .tc-check[data-tab="board"]').disabled`), false, 'Board can be hidden');
+        assert.equal(await ev(`!!document.querySelector('#tab-customize .tc-lock')`), false, 'no tab lock icon');
+        await ev(`window.switchAgenticTab('board', 'top'); document.querySelector('#tab-customize .tc-check[data-tab="board"]').click(); true`);
+        assert.ok(!(await row()).includes('board'), 'Board hidden');
+        assert.notEqual(await ev(`document.querySelector('#agentic-block-top .agentic-tab.active')?.dataset.tab`), 'board');
+        await close(); await load(true);
+        assert.ok(!(await row()).includes('board'), 'hidden Board survives reload');
+        await open();
+        await ev(`(() => { for (const b of [...document.querySelectorAll('#tab-customize .tc-check:checked')]) document.querySelector('#tab-customize .tc-check[data-tab="' + b.dataset.tab + '"]').click(); return true; })()`);
+        assert.deepEqual(await row(), [], 'every tab can be hidden');
+        assert.equal(await ev(`document.querySelector('#agentic-panel-no-tabs').getAttribute('role')`), 'status', 'empty state is announced');
+        assert.notEqual(await ev(`localStorage.getItem('coral-agentic-tab-top')`), 'no-tabs', 'empty state is not a remembered tab');
+        assert.match(await ev(`document.querySelector('#agentic-panel-no-tabs.active')?.textContent || ''`), /All tabs are hidden/);
+        await close(); await load(true);
+        assert.deepEqual(await row(), [], 'all-hidden preference survives reload');
+        assert.notEqual(await ev(`localStorage.getItem('coral-agentic-tab-top')`), 'no-tabs', 'reload does not persist the empty-state sentinel');
+        assert.match(await ev(`document.querySelector('#agentic-panel-no-tabs.active')?.textContent || ''`), /Customize tabs/);
+        await open();
+        await ev(`document.querySelector('#tab-customize .tc-check[data-tab="board"]').click(); true`);
+        assert.equal(await ev(`document.querySelector('#agentic-block-top .agentic-tab.active')?.dataset.tab`), 'board', 'showing a tab leaves the empty state');
+        await ev(`document.querySelector('#tab-customize .tc-move[data-tab="board"][data-dir="1"]').click(); true`);
+        const boardOrder = await listed();
+        await close(); await load(true); await open();
+        assert.deepEqual(await listed(), boardOrder, 'Board moved position survives reload');
+        await close(); await ev(`localStorage.removeItem('coral-agentic-tab-prefs'); true`); await load();
+        ok('Board hides, moves and persists; every tab hidden has a recoverable empty state');
+
         const def = await row();
         assert.ok(def.includes('files') && def.includes('tasks') && def.includes('notes'), JSON.stringify(def));
         ok(`default row: ${def.join(', ')}`);
@@ -46,7 +76,7 @@ const { settle, coralReady } = require('./helpers/wait');
         assert.deepEqual(btn, { name: 'Customize tabs', pop: 'dialog', exp: 'false', last: 'agentic-mobile-close-btn' });
         ok('a Customize tabs button ends the row (named, aria-haspopup, collapsed)');
 
-        // Open; the first tab (no board in this page) is locked, and the first row's up and last row's down are aria-disabled.
+        // Open; the first tab (no board in this page) is editable, and the first row's up and last row's down are aria-disabled.
         await open();
         const first = def[0];
         const st = await ev(`(() => { const rows = [...document.querySelectorAll('#tab-customize .tc-row')];
@@ -54,12 +84,12 @@ const { settle, coralReady } = require('./helpers/wait');
             return { expanded: document.getElementById('agentic-tab-customize').getAttribute('aria-expanded'), lockDisabled: lock.disabled, lockChecked: lock.checked, upDis: rows[0].querySelector('[data-dir="-1"]').getAttribute('aria-disabled'),
                 downDis: rows[rows.length - 1].querySelector('[data-dir="1"]').getAttribute('aria-disabled'), midUp: rows[1].querySelector('[data-dir="-1"]').getAttribute('aria-disabled'), lockDown: rows[0].querySelector('[data-dir="1"]').getAttribute('aria-disabled'),
                 focus: document.activeElement.className, names: rows.map(r => r.querySelector('.tc-check').getAttribute('aria-label')) } })()`);
-        assert.equal(st.expanded, 'true'); assert.ok(st.lockDisabled && st.lockChecked, 'first tab locked and shown');
+        assert.equal(st.expanded, 'true'); assert.ok(!st.lockDisabled && st.lockChecked, 'first tab editable and shown');
         assert.equal(st.upDis, 'true'); assert.equal(st.downDis, 'true'); assert.equal(st.midUp, null);
-        assert.equal(st.lockDown, null, 'the locked tab can move down');
+        assert.equal(st.lockDown, null, 'the editable tab can move down');
         assert.ok(st.names.every(n => /^Show /.test(n)), JSON.stringify(st.names));
         assert.equal(st.focus, 'tc-check', 'focus goes into the popover');
-        ok('popover: first tab locked and checked, edge arrows aria-disabled, every row labelled, focus inside');
+        ok('popover: first tab editable and checked, edge arrows aria-disabled, every row labelled, focus inside');
 
         // Hide Tasks by Space on its checkbox (keyboard), the row loses it, and the count of Files stays with Files.
         await ev(`document.querySelector('#tab-customize .tc-check[data-tab="tasks"]').focus(); true`);
@@ -111,11 +141,11 @@ const { settle, coralReady } = require('./helpers/wait');
         assert.equal(await ev(`document.querySelector('#agentic-block-top .agentic-tab.active').dataset.tab`), first);
         ok('a hidden open tab (and a request for a hidden tab) falls back to the first tab');
 
-        // The locked tab can't be hidden even by a stale saved list.
+        // A saved hide also applies to the first tab.
         await ev(`localStorage.setItem('coral-agentic-tab-prefs', JSON.stringify({ agent: { order: [], hidden: [${JSON.stringify(first)}] } })); true`);
         await close(); await load();
-        assert.ok((await row()).includes(first), 'the first tab is shown despite a saved hide');
-        ok('the first tab stays visible even if a saved list hides it');
+        assert.ok(!(await row()).includes(first), 'the first tab respects a saved hide');
+        ok('the first tab can be hidden even if a saved list hides it');
 
         // Corrupt storage is ignored.
         await ev(`localStorage.setItem('coral-agentic-tab-prefs', '{not json'); true`);
@@ -123,22 +153,22 @@ const { settle, coralReady } = require('./helpers/wait');
         assert.deepEqual(await row(), def);
         ok('unreadable saved prefs fall back to the default row');
 
-        // What is read back is checked (Security, #4103): unknown and repeated ids dropped, non-strings dropped, missing tabs last, the first tab first and shown.
+        // What is read back is checked (Security, #4103): unknown and repeated ids dropped, non-strings dropped, missing tabs last, and hidden choices retained.
         await ev(`localStorage.setItem('coral-agentic-tab-prefs', JSON.stringify({ agent: { order: ['notes', 'nope', 'notes', 42, null, { x: 1 }, 'activity', '<img src=x onerror=1>'], hidden: [${JSON.stringify(first)}, 'ghost', 'tasks', 'tasks', 7] }, team: 'junk' })); true`);
         await load();
         const cleaned = await row();
-        assert.equal(cleaned[0], first, 'the first tab is first and shown');
-        assert.deepEqual(cleaned, [first, 'notes', 'activity', ...def.filter(t => ![first, 'notes', 'activity', 'tasks'].includes(t))], JSON.stringify(cleaned));
+        assert.equal(cleaned[0], 'notes', 'saved order is kept');
+        assert.deepEqual(cleaned, ['notes', 'activity', ...def.filter(t => ![first, 'notes', 'activity', 'tasks'].includes(t))], JSON.stringify(cleaned));
         assert.ok(!cleaned.includes('tasks'), 'a valid hidden id still hides');
         await open();
         const listed2 = await listed();
-        assert.deepEqual(listed2, [first, 'notes', 'activity', ...def.filter(t => ![first, 'notes', 'activity'].includes(t))], 'the list agrees: every tab can be shown again, none vanished');
+        assert.deepEqual(listed2, ['notes', 'activity', ...def.filter(t => !['notes', 'activity'].includes(t))], 'the list agrees: every tab can be shown again, none vanished');
         await ev(`document.querySelector('#tab-customize .tc-check[data-tab="notes"]').click(); true`); // a change rewrites the key from the cleaned value
         const stored = JSON.parse(await ev(`localStorage.getItem('coral-agentic-tab-prefs')`));
         const known = new Set(def.concat(['board']));
         assert.ok([...(stored.agent.order || []), ...(stored.agent.hidden || [])].every(id => known.has(id)), 'only known tab ids are stored: ' + JSON.stringify(stored));
         await close();
-        ok('stored lists are validated: unknown, repeated and non-string ids dropped, missing tabs last, the first tab first and shown');
+        ok('stored lists are validated: unknown, repeated and non-string ids dropped, missing tabs last, and hidden choices retained');
 
         // Kept per account: with a Hub account the key carries the account tag and the default key is not read.
         await ev(`localStorage.clear(); true`);
@@ -153,20 +183,20 @@ const { settle, coralReady } = require('./helpers/wait');
         await close();
         ok('the choice is kept per account (storeKey); another account reads its own');
 
-        // The locked tab can be put anywhere (the operator's call, #4103) but stays shown, in the saved place, across a reload.
+        // The editable tab can be put anywhere (the operator's call, #4103) and its hidden choice and saved place survive a reload.
         await ev(`localStorage.clear(); true`);
         await load();
         await open();
         await ev(`document.querySelector('#tab-customize .tc-move[data-tab="' + ${JSON.stringify(first)} + '"][data-dir="1"]').click(); true`);
         const moved1 = await row();
         assert.equal(moved1.indexOf(first), 1, 'moved down one: ' + JSON.stringify(moved1));
-        assert.equal(await ev(`document.querySelector('#tab-customize .tc-check[data-tab="' + ${JSON.stringify(first)} + '"]').disabled`), true, 'still locked on');
+        assert.equal(await ev(`document.querySelector('#tab-customize .tc-check[data-tab="' + ${JSON.stringify(first)} + '"]').disabled`), false, 'still editable');
         await ev(`localStorage.setItem('coral-agentic-tab-prefs', JSON.stringify({ agent: { order: ['notes', ${JSON.stringify(first)}], hidden: [${JSON.stringify(first)}] } })); true`);
         await close(); await load();
         const placed = await row();
-        assert.deepEqual(placed.slice(0, 2), ['notes', first], 'the saved place is kept after a reload');
-        assert.ok(placed.includes(first), 'and the locked tab is shown even though the list says hidden');
-        ok('the locked tab can be moved anywhere, stays shown, and keeps its place across a reload');
+        assert.deepEqual(placed.slice(0, 1), ['notes'], 'the saved place is kept after a reload');
+        assert.ok(!placed.includes(first), 'the moved tab respects its saved hidden state');
+        ok('every tab can be moved, hidden and remembered');
 
         // Reset removes the key.
         await ev(`localStorage.clear(); true`);

@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -229,4 +230,116 @@ func TestAnAgentsSkillListIsWhatIsAttachedToItWithUpdatesOffered(t *testing.T) {
 	got = list("agent")
 	assert.Equal(t, "removed", got[0].(map[string]any)["status"])
 	_ = other
+}
+
+// #13523: using-coral, the starter skill that says what Coral gives any agent, is attached to every launched agent, a plain one included, so `coral-agent skills list` shows it; it is attached and not added to the
+// launch note (the launch text names it already), a launch that names it keeps one row, and a store without it (not seeded) attaches nothing extra.
+func TestEveryLaunchedAgentHasUsingCoralAttachedAndItIsNotInTheNote(t *testing.T) {
+	e := newLaunchEnv(t)
+	ctx := context.Background()
+	// without the starter skill in the store: unchanged
+	code, out := e.post("/api/sessions/launch", e.h.Launch, map[string]any{"working_dir": t.TempDir(), "agent_type": "claude", "prompt": "Plain"})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	none, err := e.ss.AttachedSkills(ctx, out["session_id"].(string))
+	require.NoError(t, err)
+	assert.Empty(t, none)
+
+	zips, err := skills.StarterZips()
+	require.NoError(t, err)
+	var using *store.SkillRow
+	for _, z := range zips {
+		if z.Name != skills.UsingCoralName {
+			continue
+		}
+		sk, perr := skills.Parse(z.Data)
+		require.NoError(t, perr)
+		using, _, err = e.ss.AddSkill(ctx, store.AddSkillInput{Skill: sk, Digest: sk.Digest, Kind: store.PublisherCoral})
+		require.NoError(t, err)
+	}
+	require.NotNil(t, using, "the starter set has using-coral")
+
+	code, out = e.post("/api/sessions/launch", e.h.Launch, map[string]any{"working_dir": t.TempDir(), "agent_type": "claude", "prompt": "Plain two"})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	attached, err := e.ss.AttachedSkills(ctx, out["session_id"].(string))
+	require.NoError(t, err)
+	require.Len(t, attached, 1, "a plain agent has it attached")
+	assert.Equal(t, using.ID, attached[0].SkillID)
+	var cmds string
+	require.Eventually(t, func() bool {
+		for _, command := range e.terminal.sentToSession(out["session_name"].(string)) {
+			if match := promptFileRe.FindStringSubmatch(command); match != nil {
+				body, err := os.ReadFile(match[1])
+				require.NoError(t, err)
+				cmds = string(body)
+				return true
+			}
+		}
+		return false
+	}, 10*time.Second, 5*time.Millisecond, "the second launch sent its own prompt")
+	assert.NotContains(t, cmds, "Skills the Operator approved for this work", "a default skill is not put in the launch note")
+
+	sk := approvedSkill(t, e.ss, "release-notes", "Writes release notes from merged PRs.", 1)
+	code, out = e.post("/api/sessions/launch", e.h.Launch, map[string]any{"working_dir": t.TempDir(), "agent_type": "claude", "skills": []string{sk.ID, using.ID}})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	attached, err = e.ss.AttachedSkills(ctx, out["session_id"].(string))
+	require.NoError(t, err)
+	assert.Len(t, attached, 2, "the named skill and using-coral, once each")
+}
+
+var settingsFileRe = regexp.MustCompile(`--settings (\S+\.json)`)
+
+// systemPromptOf is the system prompt of the Claude launch that made session sessionName ("" while its command has not been sent): the settings file its command names.
+func (e *launchEnv) systemPromptOf(sessionName string) string {
+	for _, c := range e.terminal.sentToSession(sessionName) {
+		if m := settingsFileRe.FindStringSubmatch(c); m != nil {
+			b, err := os.ReadFile(m[1])
+			require.NoError(e.t, err, "the settings file")
+			var s struct {
+				SystemPrompt string `json:"systemPrompt"`
+			}
+			require.NoError(e.t, json.Unmarshal(b, &s))
+			return s.SystemPrompt
+		}
+	}
+	return ""
+}
+
+// systemPrompts are the system prompts of the Claude launches this env made (the settings file each command names).
+func (e *launchEnv) systemPrompts() []string {
+	var out []string
+	for _, c := range e.terminal.sentCommands() {
+		if m := settingsFileRe.FindStringSubmatch(c); m != nil {
+			b, err := os.ReadFile(m[1])
+			require.NoError(e.t, err, "the settings file")
+			var s struct {
+				SystemPrompt string `json:"systemPrompt"`
+			}
+			require.NoError(e.t, json.Unmarshal(b, &s))
+			out = append(out, s.SystemPrompt)
+		}
+	}
+	return out
+}
+
+// #13523: a launch through the real handler, in the release tier these tests run in (no PROTOCOL.md beside the test binary, as beside the installed app), carries the protocol compiled into the program for an agent
+// on a board and the "what Coral gives any agent" section for every agent; before it a team agent's protocol part was empty and a plain agent was told only where the docs are.
+func TestARealLaunchCarriesTheProtocolForATeamAgentAndTheCoralSectionForEveryAgent(t *testing.T) {
+	e := newLaunchEnv(t)
+	plain, out := e.post("/api/sessions/launch", e.h.Launch, map[string]any{"working_dir": t.TempDir(), "agent_type": "claude"})
+	require.Equal(t, http.StatusOK, plain, "%v", out)
+	plainName := fmt.Sprint(out["session_name"])
+	team, out2 := e.post("/api/sessions/launch", e.h.Launch, map[string]any{"working_dir": t.TempDir(), "agent_type": "claude", "board_name": "team-x", "role": "Developer"})
+	require.Equal(t, http.StatusOK, team, "%v", out2)
+	teamName := fmt.Sprint(out2["session_name"])
+	// each launch's prompt is found by its own session: the mock's list of every command comes back in a random order (it flattens a map), so "the first command" was sometimes the team agent's (#13556);
+	// a command is sent after the reply, so wait for it
+	var sys [2]string
+	require.Eventually(t, func() bool {
+		sys[0], sys[1] = e.systemPromptOf(plainName), e.systemPromptOf(teamName)
+		return sys[0] != "" && sys[1] != ""
+	}, 10*time.Second, 5*time.Millisecond, "both launches sent their command")
+	assert.True(t, strings.Contains(sys[0], "coral-agent skills search using-coral"), "a plain agent is told what Coral gives it")
+	assert.False(t, strings.Contains(sys[0], "# Coral Agent Protocol"), "a plain agent has no use for the orchestrator's manual")
+	assert.True(t, strings.Contains(sys[1], "coral-agent skills search using-coral"), "a team agent too")
+	assert.True(t, strings.Contains(sys[1], "# Coral Agent Protocol"), "a team agent in a release build carries the compiled-in protocol")
 }

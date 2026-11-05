@@ -125,7 +125,7 @@ const B = 'goal-done-' + Date.now().toString(36);
             await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the goal item on a phone', 20000);
             const shown = await ev(`(() => {
                 const tr = [...document.querySelectorAll('${T} tbody tr')].find(r => /looks done/.test(r.textContent)); if (!tr) return { error: 'no row' };
-                const title = [...tr.querySelectorAll('*')].find(e => e.children.length === 0 && /looks done: Customers sign up without help/.test(e.textContent)); if (!title) return { error: 'no title element' };
+                const title = [...tr.querySelectorAll('*')].find(e => [...e.children].every(c => c.classList.contains('inbox-kind-icon')) && /looks done: Customers sign up without help/.test(e.textContent)); /* the title's own element: its only element child may be the kind icon in front of it (#13144) */ if (!title) return { error: 'no title element' };
                 title.scrollIntoView({ block: 'center' }); const b = title.getBoundingClientRect(), hit = document.elementFromPoint(b.left + Math.min(20, b.width / 2), b.top + b.height / 2);
                 return { w: Math.round(b.width), h: Math.round(b.height), inView: b.left >= 0 && b.right <= innerWidth, onTop: !!hit && (hit === title || title.contains(hit)) }; // the title itself (or a part of it) is what a finger or an eye meets there: not the row it is clipped inside
             })()`);

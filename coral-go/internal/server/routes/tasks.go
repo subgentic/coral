@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -212,7 +213,7 @@ func (h *TasksHandler) SubmitTask(w http.ResponseWriter, r *http.Request) {
 func (h *TasksHandler) GetTaskStatus(w http.ResponseWriter, r *http.Request) {
 	runID, _ := strconv.ParseInt(chi.URLParam(r, "runID"), 10, 64)
 	run, err := h.sched.GetScheduledRun(r.Context(), runID)
-	if err != nil {
+	if err != nil || run == nil || h.isChiefRun(r.Context(), run) {
 		errNotFound(w, "run not found")
 		return
 	}
@@ -224,6 +225,10 @@ func (h *TasksHandler) GetTaskStatus(w http.ResponseWriter, r *http.Request) {
 // POST /api/tasks/runs/{runID}/kill
 func (h *TasksHandler) KillTask(w http.ResponseWriter, r *http.Request) {
 	runID, _ := strconv.ParseInt(chi.URLParam(r, "runID"), 10, 64)
+	if run, err := h.sched.GetScheduledRun(r.Context(), runID); err == nil && run != nil && h.isChiefRun(r.Context(), run) {
+		errNotFound(w, "run not found")
+		return
+	}
 
 	if h.scheduler != nil {
 		if !h.scheduler.KillRun(r.Context(), runID) {
@@ -256,13 +261,52 @@ func (h *TasksHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 	if status != "" {
 		statusPtr = &status
 	}
-	runs, err := h.sched.ListOneshotRuns(r.Context(), limit, statusPtr)
+	// cursor (the last answer's next_cursor) continues the list; the answer says how many runs there are and where the next page starts (#13188). Without a cursor it is the same newest page as always.
+	var after *store.RunAfter
+	if c := r.URL.Query().Get("cursor"); c != "" {
+		pos, ok := decodeRunCursor(c)
+		if !ok {
+			errBadRequest(w, "invalid cursor")
+			return
+		}
+		after = &pos
+	}
+	runs, total, err := h.sched.ListOneshotRunsPage(r.Context(), limit+1, statusPtr, after)
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
 	}
+	out := map[string]any{"total": total, "has_more": false}
+	if len(runs) > limit {
+		runs = runs[:limit]
+		last := runs[limit-1]
+		out["has_more"] = true
+		out["next_cursor"] = encodeRunCursor(last.ScheduledAt, last.ID)
+	}
 	h.attachProxyCosts(r.Context(), runs)
-	writeJSON(w, http.StatusOK, map[string]any{"runs": emptyIfNil(runs)})
+	out["runs"] = emptyIfNil(runs)
+	writeJSON(w, http.StatusOK, out)
+}
+
+// The run cursor: base64url of {"s": scheduled_at, "i": id}, at most 1024 bytes, only a position in the newest-first list.
+func encodeRunCursor(scheduledAt string, id int64) string {
+	raw, _ := json.Marshal(map[string]any{"s": scheduledAt, "i": id})
+	return base64.RawURLEncoding.EncodeToString(raw)
+}
+
+func decodeRunCursor(c string) (store.RunAfter, bool) {
+	var p struct {
+		S string `json:"s"`
+		I int64  `json:"i"`
+	}
+	if len(c) > 1024 {
+		return store.RunAfter{}, false
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(c)
+	if err != nil || json.Unmarshal(raw, &p) != nil || p.S == "" || p.I <= 0 {
+		return store.RunAfter{}, false
+	}
+	return store.RunAfter{ScheduledAt: p.S, ID: p.I}, true
 }
 
 // ListActiveRuns returns currently running tasks.
@@ -273,8 +317,19 @@ func (h *TasksHandler) ListActiveRuns(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, err.Error())
 		return
 	}
-	h.attachProxyCosts(r.Context(), runs)
-	writeJSON(w, http.StatusOK, map[string]any{"runs": emptyIfNil(runs)})
+	visible := runs[:0]
+	for _, run := range runs {
+		if !h.isChiefRun(r.Context(), &run) {
+			visible = append(visible, run)
+		}
+	}
+	h.attachProxyCosts(r.Context(), visible)
+	writeJSON(w, http.StatusOK, map[string]any{"runs": emptyIfNil(visible)})
+}
+
+func (h *TasksHandler) isChiefRun(ctx context.Context, run *store.ScheduledRun) bool {
+	job, err := h.sched.GetScheduledJob(ctx, run.JobID)
+	return err == nil && job != nil && job.JobType == "check"
 }
 
 func (h *TasksHandler) attachProxyCost(ctx context.Context, run *store.ScheduledRun) {

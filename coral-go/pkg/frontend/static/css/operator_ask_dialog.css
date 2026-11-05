@@ -4,9 +4,11 @@
 .inbox-ask-sub, .inbox-ask-offers-head, .inbox-ask-label { font-size: var(--fs-md); }
 .inbox-ask-foot { position: sticky; bottom: calc(-1 * var(--space-2xl)); padding: 12px 0; background: var(--bg-secondary); border-top: 1px solid var(--border); }
 @media (max-width: 500px) {
-    .inbox-ask-foot .inbox-ask-buttons { display: contents; }
-    .inbox-ask-foot .inbox-ask-send { flex: 1 0 100%; }
+    .inbox-ask-sendrow .inbox-ask-send { flex: 1 1 auto; } /* a phone: Send reply fills the row beside Add image, right under the box (#13148) */
 }
+.inbox-ask-sendrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; } /* the row under the reply box: Add image left, Send reply right */
+.inbox-ask-pick { display: inline-flex; flex: none; }
+.inbox-ask-sendrow .inbox-ask-send { margin-left: auto; } /* alone on the row until the picture button has loaded */
 
 /* A wide question uses the shared flow size: its reader and reply sit side by side.
    The DOM order and the narrow dialog's single scroll area stay the same. */
@@ -32,7 +34,7 @@
 }
 
 /* Reply attachments stay with their text, before the final dialog actions (#13043). */
-.inbox-ask-attach { display: flex; align-items: flex-start; gap: 8px; width: 100%; min-width: 0; }
+.inbox-ask-attach { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 100%; min-width: 0; }
 .inbox-ask-attach .ac-picker { flex-shrink: 0; }
-.inbox-ask-attach .ac-images-hint { min-width: 0; flex: 1; }
+.inbox-ask-attach .ac-images-hint { min-width: 0; }
 .inbox-ask-pics .ac-add-image { width: 44px; min-height: 44px; padding: 0; }

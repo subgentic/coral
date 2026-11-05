@@ -10,6 +10,14 @@ const { coralReady } = require('./helpers/wait');
     const api = (method, path, body) => ev(`fetch(${JSON.stringify(path)}, {method:${JSON.stringify(method)},headers:{'Content-Type':'application/json'},body:${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'}}).then(async r=>({status:r.status,body:await r.json()}))`);
     const shot = async name => { const dir=process.env.CORAL_SCREENSHOT_DIR;if(!dir)return;const fs=require('node:fs');fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(`${dir}/${name}.png`,Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64')); };
     const q = selector => `document.querySelector(${JSON.stringify(selector)})`;
+    // Phone artifact actions live in More (#13396); use the same labelled menu a person opens.
+    const artifactAction = async label => {
+        await ev(`document.querySelector('#team-panel-artifacts .dt-bar-more-toggle').click(); true`);
+        const item = `[...document.querySelectorAll('#team-panel-artifacts [role="menuitem"]')].find(b => b.textContent.trim() === ${JSON.stringify(label)} && !b.disabled && b.getClientRects().length)`;
+        await waitFor(`!!(${item})`, `artifact selection menu: ${label}`);
+        await ev(`${item}.click(); true`);
+    };
+
     const search = async (panel, value) => { await ev(`(()=>{const i=${q(panel+' .list-bar-search')};i.value=${JSON.stringify(value)};i.dispatchEvent(new Event('input',{bubbles:true}));i.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));return true;})()`); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
@@ -67,16 +75,20 @@ const { coralReady } = require('./helpers/wait');
         await shot('artifacts-selected-phone-200-light');
         await ev(`document.documentElement.style.removeProperty('font-size');document.documentElement.setAttribute('data-theme','dark');true`);
         await search(P,'Beta'); await waitFor(`${q(P+' tbody')}?.children.length===1`,'filtered artifact');
-        await ev(`${q(P+' .dt-bar-action')}.click();true`);
+        await artifactAction('Download');
         await waitFor(`window.__downloads.length===2`,'both downloads');
         assert.deepEqual((await ev(`window.__downloads`)).sort(),['Alpha.txt','Beta.txt']);
         await search(P,''); await waitFor(`${q(P+' tbody')}?.children.length===3`,'clear artifact filter');
-        await ev(`[...document.querySelectorAll('${P} tbody .dt-check input:not(:disabled)')].forEach(c=>c.click());[...document.querySelectorAll('${P} .dt-bar-action')].find(b=>b.textContent==='Delete').click();true`);
+        await ev(`[...document.querySelectorAll('${P} tbody .dt-check input:not(:disabled)')].forEach(c=>c.click());true`);
+        await artifactAction('Delete');
         assert.deepEqual(await ev(`window.__deletes`),[],'Delete first asks');
         await ev(`${q(P+' .dt-bar-keep')}.click();true`); assert.deepEqual(await ev(`window.__deletes`),[],'Keep does not delete');
-        await ev(`[...document.querySelectorAll('${P} .dt-bar-action')].find(b=>b.textContent==='Delete').click();${q(P+' .dt-bar .dt-danger')}.click();true`);
+        await artifactAction('Delete');
+        await ev(`${q(P+' .dt-bar .dt-danger')}.click();true`);
         await waitFor(`window.__deletes.length===2 && ${q(P+' .dt-bar-count')}?.textContent==='1 selected'`,'failed artifact remains selected',10000);
-        await ev(`window.__fail=false;[...document.querySelectorAll('${P} .dt-bar-action')].find(b=>b.textContent==='Delete').click();${q(P+' .dt-bar .dt-danger')}.click();true`);
+        await ev(`window.__fail=false;true`);
+        await artifactAction('Delete');
+        await ev(`${q(P+' .dt-bar .dt-danger')}.click();true`);
         await waitFor(`window.__deletes.length===3 && !${q(P+' .team-toolbar-selecting')}`,'retry completes',10000);
         console.log('PASS Goals/Artifacts bulk actions: filtering, required reason, eligibility, confirmation and partial failure');
     } finally { await removeBoards(ev,[B]).catch(()=>{}); await client.close(); }

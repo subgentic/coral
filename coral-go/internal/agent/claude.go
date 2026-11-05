@@ -150,7 +150,7 @@ func claudeSettingsFile(files *launchFiles, params LaunchParams, effectiveID str
 
 	// Combine protocol + board system prompt into systemPrompt
 	var sysParts []string
-	if proto := readProtocolFile(params.ProtocolPath); proto != "" {
+	if proto := protocolText(params); proto != "" {
 		sysParts = append(sysParts, proto)
 	}
 	boardSysPrompt := BuildBoardSystemPrompt(params.BoardName, params.Role, params.Prompt, params.PromptOverrides, params.BoardType)

@@ -48,6 +48,7 @@ type SessionsHandler struct {
 	searchRate             searchGuard
 	codexPermissionMu      sync.Mutex // orders Codex hook completion with deferred request promotion
 	codexPermissionWatches sync.Map   // sanitized, unconfirmed Codex approval candidates (#8471)
+	refreshRoots           sync.Map   // the folder a files refresh resolved for an agent, kept for refreshRootTTL (#13079)
 	// artifactNudge reminds an agent that published a claude.ai artifact to make a Coral one (#6583); nil: never.
 	artifactNudge *ClaudeArtifactNudger
 	// indexKick asks the history indexer for a pass soon (set by SetIndexKick): an agent's reply has just been written to its transcript (#6198).
@@ -353,6 +354,7 @@ func defaultModelFromSettings(settings map[string]string, agentType, requestMode
 
 // NewSessionsHandler creates a SessionsHandler with the given dependencies.
 func NewSessionsHandler(db *store.DB, cfg *config.Config, backend ptymanager.TerminalBackend, terminal ptymanager.SessionTerminal, bs *board.Store) *SessionsHandler {
+	bindArtifactRevisions(cfg.CoralDir(), bs)
 	reader := jsonl.NewSessionReader()
 	return &SessionsHandler{
 		currentDir:      background.NewCurrentDirFinder(reader.CurrentDirectory),

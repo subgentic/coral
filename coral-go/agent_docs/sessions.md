@@ -331,6 +331,10 @@ Fuzzy file search or directory browsing within the agent's working directory.
 | `q` | string | Fuzzy search query |
 | `dir` | string | Directory path to browse |
 | `session_id` | string | Session UUID |
+| `limit` | int | Page size, 1 up to the file-search setting (the setting, 500 by default, when not given) |
+| `cursor` | string | The last search's `next_cursor`: the matches after it (needs `q`) |
+
+A search or a listing answers `files` with `total` (every match), `has_more` and, for a search with more matches than the page, `next_cursor` beside it. A bad `limit` or `cursor`, or a `cursor` with no `q`, is a 400.
 
 **Response (search):**
 ```json
@@ -350,9 +354,11 @@ Fuzzy file search or directory browsing within the agent's working directory.
 
 Git snapshot for the agent's working directory.
 
-**Query Parameters:** `session_id`
+**Query Parameters:** `session_id`, `limit` (1 to 100, 20 by default), `cursor`
 
-**Response:**
+With no `session_id` the answer is `{"agent_name": "...", "snapshots": [...], "total": N, "has_more": bool, "next_cursor": "..."}`: the agent's snapshots newest first; `total` is every snapshot the agent has, and `next_cursor` (only when `has_more`) goes back as `cursor` for the next page. A bad `cursor` is a 400. With a `session_id` the answer holds that session's commits as before.
+
+**Response (the latest snapshot's fields, each snapshot has them):**
 ```json
 {
   "branch": "feature/new-thing",
@@ -1079,6 +1085,14 @@ Both answer 200 `{"ok": false, "error": "Session not found"}` for an unknown ses
 
 ```json
 {"ok": true, "sessions_affected": 5, "sessions_killed": 5}
+```
+
+#### POST `/api/sessions/live/sleep-gone`
+
+Files agents whose terminal is gone under plain sleeping (#13171; the dashboard's **Sleep** on a "Terminal gone" row and **Sleep N terminal-gone agents**). They are asleep already, so nothing is stopped: the sleep reason `terminal_gone` is cleared (the row says "Sleeping", not "Terminal gone"), the agent's resume info stays, and a later Wake resumes it like any sleeper. The body may name agents, `{"session_ids": ["..."]}` (at most 500); only a named agent that is a terminal-gone sleeper and not archived moves, and with no body every such agent does. An agent that is awake, a plain sleeper, archived or ended (its CLI exited) is left as it is. Needs Launch through Coral Hub, like Sleep all; an agent's own token cannot use it. `POST /api/sessions/live/{sessionID}/sleep` does the same for one agent.
+
+```json
+{"ok": true, "sessions_affected": 2}
 ```
 
 #### POST `/api/sessions/live/wake-all`

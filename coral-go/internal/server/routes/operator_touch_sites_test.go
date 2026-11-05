@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -54,6 +55,8 @@ func TestAPersonsWakeAndStopAreTouchesAndAnAgentsAreNot(t *testing.T) {
 	const team = "team-11225"
 	r, id := touchRig(t, team)
 	h := r.h
+	// The wake logger uses the private directory created at real startup.
+	require.NoError(t, os.MkdirAll(h.cfg.LogDir, 0700))
 
 	router := func(kind string) http.Handler {
 		rt := chi.NewRouter()

@@ -11,6 +11,7 @@ import { importOnce } from './import_once.js';
 import { resolveSessionIdentity } from './session_state.js';
 import { agentWords, whatStaysKill, WHAT_STAYS_ARCHIVE, WHAT_STAYS_SLEEP } from './agent_words.js';
 import { applySleepingView } from './sleeping_view.js';
+import { isHomeFolderAsk, askHomeFolder } from './home_folder_ask.js';
 
 // What Kill does with the agent's terminal log, said in every Kill confirmation (#4399): it is kept, on both terminal backends
 // (#4437: tmux's KillSession no longer removes it), in <data dir>/logs.
@@ -116,16 +117,22 @@ export async function setAgentAutoSleep(name, agentType, sessionId, mode) {
 export function toggleAgentSleep(name, agentType, sessionId, action) {
     const server = serverForSession(name, sessionId);
     // Resolves true when the server applied the action.
-    const doIt = async () => {
+    const doIt = async (confirmHome) => { // true only from the home-folder question below (a confirm dialog may pass other arguments)
         try {
-            const resp = await serverFetch(server, `/api/sessions/live/${encodeURIComponent(sessionId)}/${action}`, { method: 'POST' });
+            // the home-folder question travels in the body (the Hub's tunnel refuses a query it does not list, #13425)
+            const opts = action === 'wake' ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(confirmHome === true ? { home_folder_ask: true, confirm_home_folder: true } : { home_folder_ask: true }) } : { method: 'POST' };
+            const resp = await serverFetch(server, `/api/sessions/live/${encodeURIComponent(sessionId)}/${action}`, opts);
             const data = await resp.json();
+            if (action === 'wake' && confirmHome !== true && isHomeFolderAsk(resp.status, data)) { // the home folder itself (#13425): asked once, Wake anyway sends it again
+                return (await askHomeFolder('Wake', data.message)) ? doIt(true) : false;
+            }
             if (!data.ok) { showToast(data.error || 'Failed to toggle sleep', true); return false; }
             const sleeping = !!data.sleeping;
             const s = state.liveSessions.find(s => s.session_id === sessionId && sessionServer(s) === server);
             if (s) {
                 s.sleeping = sleeping;
                 if (!sleeping) s.archived = false; // waking unarchives (#3030)
+                if (sleeping && action === 'sleep') s.sleep_reason = null; // a terminal-gone agent put to sleep is plain sleeping now (#13171)
             }
             redrawLiveList();
             const who = (s && s.display_name) || name; // the agent's name, not its folder ("home")
@@ -138,11 +145,50 @@ export function toggleAgentSleep(name, agentType, sessionId, action) {
     };
     if (action === 'sleep') {
         const row = state.liveSessions.find(x => x.session_id === sessionId && sessionServer(x) === server);
+        if (row && row.sleeping && !row.archived && row.sleep_reason === 'terminal_gone') return doIt(); // already asleep, nothing runs to stop: it is only filed under sleeping (#13171)
         const who = agentWords(row, row ? resolveSessionIdentity(row) : name).label; // the agent's own name and team, not the folder it works in (#10785)
         showConfirmModal('Sleep agent', `Put ${who} to sleep? ${WHAT_STAYS_SLEEP}`, doIt, undefined, { danger: false, label: 'Sleep agent' });
         return Promise.resolve(false);
     }
     return doIt();
+}
+
+/**
+ * Sleep every agent in ids whose terminal is gone (#13171): they are asleep already, so this files them under sleeping (the "Terminal gone" chip goes, a later Wake resumes them as any sleeper). One request per
+ * computer; resolves with how many the servers moved.
+ */
+export async function sleepTerminalGone(ids) {
+    const byServer = new Map();
+    for (const id of ids) {
+        const row = state.liveSessions.find(x => x.session_id === id && x.sleeping && !x.archived && x.sleep_reason === 'terminal_gone');
+        if (!row) continue;
+        const server = sessionServer(row);
+        if (!byServer.has(server)) byServer.set(server, []);
+        byServer.get(server).push(id);
+    }
+    let moved = 0, failed = false, short = false;
+    for (const [server, list] of byServer) {
+        try {
+            const resp = await serverFetch(server, '/api/sessions/live/sleep-gone', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_ids: list }) });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok || !data.ok) { failed = true; continue; }
+            const affected = Number(data.sessions_affected) || 0;
+            moved += affected;
+            if (affected >= list.length) {
+                for (const id of list) {
+                    const row = state.liveSessions.find(x => x.session_id === id && sessionServer(x) === server);
+                    if (row) row.sleep_reason = null;
+                }
+            } else {
+                short = true; // the server moved fewer than asked (some changed meanwhile): which ones is its to say, so the rows are read again and no marker is cleared by guess (#13222)
+            }
+        } catch { failed = true; }
+    }
+    if (short) await importOnce('./api.js').then(m => m.loadLiveSessions()).catch(() => {});
+    redrawLiveList();
+    if (failed) showToast(moved ? `${moved} agent${moved === 1 ? ' is' : 's are'} now sleeping; some could not be moved` : 'Could not move the agents to sleeping', true);
+    else if (moved) showToast(`${moved} agent${moved === 1 ? ' is' : 's are'} now sleeping`);
+    return moved;
 }
 
 /**

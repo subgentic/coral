@@ -100,9 +100,9 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"DELETE /api/artifacts/{hex64}": "owner-only", "PUT /api/artifacts/{hex64}/star": "owner-only", "DELETE /api/artifacts/{hex64}/star": "owner-only", // the star (#9819)
 		"GET /api/board/{project}/proposals":               "owner-only",
 		"GET /api/proposals":                               "owner-only",
-		"POST /api/board/{project}/proposals/{id}/approve": "owner-only",
-		"POST /api/board/{project}/proposals/{id}/reject":  "owner-only",
-		"GET /api/board/{project}/artifacts":               "owner-only", "GET /api/board/{project}/tasks/{id}/artifact-content": "owner-only",
+		"POST /api/board/{project}/proposals/{id}/approve": "owner-only", "POST /api/board/{project}/goals/{id}/driver": "owner-only", "POST /api/board/{project}/goals/{id}/move": "owner-only", // #13517
+		"POST /api/board/{project}/proposals/{id}/reject": "owner-only",
+		"GET /api/board/{project}/artifacts":              "owner-only", "GET /api/board/{project}/tasks/{id}/artifact-content": "owner-only",
 		"GET /api/session-artifacts": "owner-only", "GET /api/team-artifacts": "owner-only", "GET /api/settings/prompt-inspection": "owner-only", "PUT /api/board/{project}/settings": "owner-only",
 		"POST /api/board/{project}/cross-team/enable": "owner-only-hub", "POST /api/board/{project}/cross-team/disable": "owner-only-hub",
 		"POST /api/board/{project}/cross-team/files/enable": "owner-only-hub", "POST /api/board/{project}/cross-team/files/disable": "owner-only-hub",
@@ -138,9 +138,12 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"PUT /api/artifacts/{hex64}/comments/lock": "owner-only", "DELETE /api/artifacts/{hex64}/comments/lock": "owner-only", "POST /api/artifacts/{hex64}/comments/{id}/send": "owner-only", "POST /api/artifacts/{hex64}/comment-images": "owner-only", "POST /api/board/{project}/goal-images": "owner-only",
 		// Approve, or ask changes of, a for-review artifact through the Hub is the owner's alone (#136584, #11354).
 		"POST /api/board/{project}/artifacts/{id}/review":                      "owner-only",
+		"PUT /api/board/{project}/artifacts/{id}/review":                       "owner-only",
+		"DELETE /api/board/{project}/artifacts/{id}/review":                    "owner-only",
 		"PUT /api/board/{project}/artifacts/{id}/tags":                         "owner-only",
 		"POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim":  "owner-only",
 		"POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle": "owner-only",
+		"POST /api/board/{project}/asks/{messageID}/close":                     "owner-only", // Ignore and Undo in the owner's Needs you table on the Hub (#13446)
 		"POST /api/sessions/live/{name}/dismiss-wait":                          "owner-only",
 		"POST /api/sessions/live/{name}/auto-sleep":                            "owner-only", // an agent's auto-sleep switch (#12111)
 		"POST /api/board/{project}/operator-artifacts":                         "owner-only",
@@ -148,7 +151,8 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"POST /api/board/{project}/messages":                                   "owner-sees", "POST /api/board/{project}/subscribe": "owner-sees", "POST /api/board/{project}/tasks": "owner-sees", "POST /api/board/{project}/goals": "owner-sees", // they can start a new board (#11627)
 		"POST /api/board/{project}/working-mode/presets": "owner-sees", "PUT /api/board/{project}/working-mode": "owner-sees",
 		"GET /api/sessions/live":            "owner-sees", // the live list: everyone gets it, the stamped owner also gets waits_on_this (#12377)
-		"GET /api/board/{project}/settings": "owner-sees", "GET /api/system/update": "owner-update", "POST /api/system/update/relaunch": "owner-update",
+		"GET /api/board/{project}/settings": "owner-sees", "GET /api/system/update": "owner-update",
+		"POST /api/system/update/relaunch": "owner-only", "POST /api/system/update/check-hub": "owner-only", // the Hub updates a computer only as its stamped owner, behind the person's switch (#13258)
 	}
 	got := map[string]string{}
 	for _, r := range tunnel.OwnerRoutes() {

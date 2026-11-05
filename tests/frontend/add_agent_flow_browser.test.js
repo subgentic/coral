@@ -85,7 +85,7 @@ const DIR = '/work/crew';
             const sent = await ev(`window.__launches[0]`);
             assert.equal(sent.working_dir, DIR); assert.equal(sent.display_name, 'Bo'); assert.equal(sent.board_id, TEAM); assert.equal(sent.board_name, TEAM);
             assert.ok(Array.isArray(sent.flags) || sent.flags === undefined);
-            const allowed = new Set(['working_dir', 'agent_type', 'display_name', 'flags', 'prompt', 'board_id', 'board_name', 'model', 'thinking', 'capabilities']);
+            const allowed = new Set(['working_dir', 'agent_type', 'display_name', 'flags', 'prompt', 'board_id', 'board_name', 'model', 'thinking', 'capabilities', 'home_folder_ask']); // home_folder_ask: this page can answer the home-folder question (#13425)
             assert.deepEqual(Object.keys(sent).filter(k => !allowed.has(k)), [], `${label}: nothing but what Add agent sent: ` + JSON.stringify(Object.keys(sent)));
             await waitFor(`!(${OPEN})`, `${label}: the dialog closes`);
 

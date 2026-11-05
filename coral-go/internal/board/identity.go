@@ -94,7 +94,9 @@ var ReservedNames = []string{"Coral Task Queue", "Coral Health Monitor", HubUnkn
 	// (#4176 rule 4). CoralSender is Coral's own notice sender.
 	CoralSender, "System", "Health",
 	// Coral Decisions: the sender of the Operator-decision notice Chief is told (#12171); an agent using it could send Chief text that reads as Coral's.
-	"Coral Decisions"}
+	"Coral Decisions",
+	// Coral Settings: the sender of the notice the Orchestrator gets when the Operator changes a team's settings (#13173).
+	SettingsSender}
 
 // HubUnknownSender is the sender of a Coral Hub chat post that names no Hub user (a hub
 // on an older pkg/hubproxy, #3377): reserved, so no member can look like it.

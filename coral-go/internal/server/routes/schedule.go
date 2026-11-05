@@ -65,6 +65,9 @@ func (h *ScheduleHandler) ListJobs(w http.ResponseWriter, r *http.Request) {
 	}
 	enriched := make([]enrichedJob, 0, len(jobs))
 	for _, job := range jobs {
+		if job.JobType == "check" {
+			continue
+		}
 		ej := enrichedJob{ScheduledJob: job}
 		lastRun, err := h.sched.GetLastRunForJob(r.Context(), job.ID)
 		if err == nil {
@@ -95,7 +98,7 @@ func (h *ScheduleHandler) ListJobs(w http.ResponseWriter, r *http.Request) {
 func (h *ScheduleHandler) GetJob(w http.ResponseWriter, r *http.Request) {
 	jobID, _ := strconv.ParseInt(chi.URLParam(r, "jobID"), 10, 64)
 	job, err := h.sched.GetScheduledJob(r.Context(), jobID)
-	if err != nil || job == nil {
+	if err != nil || job == nil || job.JobType == "check" {
 		errNotFound(w, "job not found")
 		return
 	}
@@ -141,6 +144,10 @@ func (h *ScheduleHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 
 	// Validate job_type-specific requirements
 	jobType := body.JobType
+	if jobType == "check" {
+		errBadRequest(w, "create checks through Chief checks")
+		return
+	}
 	if jobType == "" {
 		jobType = "prompt"
 	}
@@ -230,6 +237,9 @@ func (h *ScheduleHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 // UpdateJob updates an existing scheduled job.
 // PUT /api/scheduled/jobs/{jobID}
 func (h *ScheduleHandler) UpdateJob(w http.ResponseWriter, r *http.Request) {
+	if h.isChiefJob(w, r) {
+		return
+	}
 	jobID, _ := strconv.ParseInt(chi.URLParam(r, "jobID"), 10, 64)
 	var fields map[string]interface{}
 	if err := decodeJSON(r, &fields); err != nil {
@@ -237,6 +247,10 @@ func (h *ScheduleHandler) UpdateJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if fields["job_type"] == "check" {
+		errBadRequest(w, "use Chief checks to create a check")
+		return
+	}
 	// Validate cron expression if provided (matches Python behavior)
 	if cronExpr, ok := fields["cron_expr"]; ok {
 		if expr, ok := cronExpr.(string); ok {
@@ -359,6 +373,9 @@ func (h *ScheduleHandler) UpdateJob(w http.ResponseWriter, r *http.Request) {
 // DeleteJob deletes a scheduled job and its run history.
 // DELETE /api/scheduled/jobs/{jobID}
 func (h *ScheduleHandler) DeleteJob(w http.ResponseWriter, r *http.Request) {
+	if h.isChiefJob(w, r) {
+		return
+	}
 	jobID, _ := strconv.ParseInt(chi.URLParam(r, "jobID"), 10, 64)
 	if err := h.sched.DeleteScheduledJob(r.Context(), jobID); err != nil {
 		errInternalServer(w, err.Error())
@@ -370,6 +387,9 @@ func (h *ScheduleHandler) DeleteJob(w http.ResponseWriter, r *http.Request) {
 // ToggleJob pauses or resumes a scheduled job.
 // POST /api/scheduled/jobs/{jobID}/toggle
 func (h *ScheduleHandler) ToggleJob(w http.ResponseWriter, r *http.Request) {
+	if h.isChiefJob(w, r) {
+		return
+	}
 	jobID, _ := strconv.ParseInt(chi.URLParam(r, "jobID"), 10, 64)
 	job, err := h.sched.GetScheduledJob(r.Context(), jobID)
 	if err != nil {
@@ -400,6 +420,9 @@ func (h *ScheduleHandler) ToggleJob(w http.ResponseWriter, r *http.Request) {
 // run; a job that is already running answers 409, and a full scheduler 429. The job's schedule does not move.
 // POST /api/scheduled/jobs/{jobID}/run
 func (h *ScheduleHandler) RunJob(w http.ResponseWriter, r *http.Request) {
+	if h.isChiefJob(w, r) {
+		return
+	}
 	jobID, err := strconv.ParseInt(chi.URLParam(r, "jobID"), 10, 64)
 	if err != nil {
 		errBadRequest(w, "invalid job id")
@@ -430,6 +453,9 @@ func (h *ScheduleHandler) RunJob(w http.ResponseWriter, r *http.Request) {
 // GetJobRuns returns run history for a job.
 // GET /api/scheduled/jobs/{jobID}/runs
 func (h *ScheduleHandler) GetJobRuns(w http.ResponseWriter, r *http.Request) {
+	if h.isChiefJob(w, r) {
+		return
+	}
 	jobID, _ := strconv.ParseInt(chi.URLParam(r, "jobID"), 10, 64)
 	limit := clampLimit(queryInt(r, "limit", 20), 20, 200)
 	offset := clampOffset(queryInt(r, "offset", 0))
@@ -455,7 +481,14 @@ func (h *ScheduleHandler) GetRecentRuns(w http.ResponseWriter, r *http.Request) 
 		errInternalServer(w, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"runs": emptyIfNil(runs)})
+	filtered := runs[:0]
+	for _, run := range runs {
+		job, e := h.sched.GetScheduledJob(r.Context(), run.JobID)
+		if e == nil && job != nil && job.JobType != "check" {
+			filtered = append(filtered, run)
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"runs": emptyIfNil(filtered)})
 }
 
 // MarkRunSeen records that a person opened a run, so that its unread dot and its Needs you row go on every screen that shows it (#9315). The first time only.
@@ -596,4 +629,14 @@ func jobBaseMissing(ctx context.Context, repo, base string) *gitutil.BranchMissi
 		return missing
 	}
 	return nil
+}
+
+func (h *ScheduleHandler) isChiefJob(w http.ResponseWriter, r *http.Request) bool {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "jobID"), 10, 64)
+	job, err := h.sched.GetScheduledJob(r.Context(), id)
+	if err == nil && job != nil && job.JobType == "check" {
+		errNotFound(w, "job not found")
+		return true
+	}
+	return false
 }

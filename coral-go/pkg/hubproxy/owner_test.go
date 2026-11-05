@@ -173,3 +173,100 @@ func TestTheSecretIsNeverSentToTheRemoteOrBack(t *testing.T) {
 	}
 	assert.NotContains(t, s.body, ownerTestSecret)
 }
+
+// #13456: the signed-in owner's message to an agent is signed for that agent only, a message at the cap is signed, one over it is refused at the hub with a clear answer (never sent unstamped, which would
+// make the person's words automation on the remote), and a grantee's send (not the signed-in owner) goes out unstamped and whole.
+const sendPath = "/api/sessions/live/claude-abc/send"
+
+func TestTheOwnersSendIsSignedForThatAgentOnly(t *testing.T) {
+	hub, s := hubFor(t, ownerTestSecret)
+	body := `{"command":"please send me a short summary","agent_type":"claude","session_id":"abc"}`
+	post(t, hub, sendPath, body, true, nil)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	stamp := s.header.Get(hubowner.Header)
+	require.NotEmpty(t, stamp, "the owner's message to an agent was not signed")
+	require.NoError(t, verifier().Verify(stamp, s.method, sendPath, s.target, []byte(s.body)))
+	other := verifier()
+	assert.Error(t, other.Verify(stamp, s.method, "/api/sessions/live/claude-xyz/send", "/api/sessions/live/claude-xyz/send", []byte(s.body)), "a stamp for one agent's send was accepted on another agent's")
+}
+
+func TestAGranteesSendIsNotSignedAndAnOwnersLongSendIsRefusedNotUnstamped(t *testing.T) {
+	hub, s := hubFor(t, ownerTestSecret)
+	atCap := `{"command":"` + strings.Repeat("x", hubowner.MaxBody-len(`{"command":""}`)) + `"}`
+	require.Equal(t, hubowner.MaxBody, len(atCap))
+	post(t, hub, sendPath, atCap, true, nil)
+	s.mu.Lock()
+	assert.NotEmpty(t, s.header.Get(hubowner.Header), "a message at the cap is signed")
+	s.mu.Unlock()
+
+	over := `{"command":"` + strings.Repeat("x", hubowner.MaxBody) + `"}`
+	s.mu.Lock()
+	s.body, s.header = "", nil
+	s.mu.Unlock()
+	req, _ := http.NewRequest("POST", hub.URL+"/api/remote/a"+sendPath, strings.NewReader(over))
+	req.Header.Set("X-Test-Person", "1")
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, resp.StatusCode, "a long message from the owner is refused with a clear status")
+	assert.Contains(t, string(b), `"not_sent":true`)
+	assert.Contains(t, string(b), "too long")
+	s.mu.Lock()
+	assert.Empty(t, s.body, "nothing of the refused message reached the remote")
+	s.mu.Unlock()
+
+	post(t, hub, sendPath, over, false, nil) // a grantee: not the owner, never stamped, never refused here
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	assert.Empty(t, s.header.Get(hubowner.Header))
+	assert.Equal(t, over, s.body, "a grantee's long message went through whole")
+}
+
+// Ignore and Undo of a question through our own hub (#13462): the signed-in person's close is signed for the remote to verify; the same request from an API key or an agent (no person) goes out unsigned, and a
+// stamp is bound to that one question's close (the target), so it cannot be used on another question.
+func TestTheSignedInPersonsIgnoreOfAQuestionIsSignedAndAnythingElseIsNot(t *testing.T) {
+	const closePath = "/api/board/team/asks/42/close"
+	hub, s := hubFor(t, ownerTestSecret)
+	body := `{"note":"Dismissed by the operator"}`
+	post(t, hub, closePath, body, true, nil)
+	s.mu.Lock()
+	stamp := s.header.Get(hubowner.Header)
+	require.NotEmpty(t, stamp, "the person's Ignore was not signed")
+	require.NoError(t, verifier().Verify(stamp, s.method, closePath, s.target, []byte(s.body)))
+	assert.Error(t, verifier().Verify(stamp, s.method, "/api/board/team/asks/43/close", "/api/board/team/asks/43/close", []byte(s.body)), "one question's stamp is not another's")
+	s.mu.Unlock()
+
+	hub2, s2 := hubFor(t, ownerTestSecret)
+	post(t, hub2, closePath, `{"undo":true}`, false, nil) // an API key or an agent at the hub, not the person
+	s2.mu.Lock()
+	assert.Empty(t, s2.header.Get(hubowner.Header), "a request that is not the signed-in person's is not signed")
+	assert.Equal(t, `{"undo":true}`, s2.body)
+	s2.mu.Unlock()
+}
+
+// The owner's change of a goal's driver and its move to another team through our own hub (#13517): the signed-in person's call is signed for the remote to verify, bound to that goal and that route; the same call from an API key or an
+// agent goes out unsigned, and a stamp made for one goal's driver is no use for another goal or for its move.
+func TestTheSignedInPersonsGoalDriverAndMoveAreSignedAndNothingElseIs(t *testing.T) {
+	for _, c := range []struct{ path, body string }{
+		{"/api/board/team/goals/7/driver", `{"driver":"dev-1"}`},
+		{"/api/board/team/goals/7/move", `{"to_project":"other","driver":"dev-2"}`},
+	} {
+		hub, s := hubFor(t, ownerTestSecret)
+		post(t, hub, c.path, c.body, true, nil)
+		s.mu.Lock()
+		stamp := s.header.Get(hubowner.Header)
+		require.NotEmpty(t, stamp, "the person's %s was not signed", c.path)
+		require.NoError(t, verifier().Verify(stamp, s.method, c.path, s.target, []byte(s.body)))
+		assert.Error(t, verifier().Verify(stamp, s.method, "/api/board/team/goals/8"+strings.TrimPrefix(c.path, "/api/board/team/goals/7"), "/api/board/team/goals/8"+strings.TrimPrefix(c.path, "/api/board/team/goals/7"), []byte(s.body)), "one goal's stamp is not another goal's")
+		s.mu.Unlock()
+
+		hub2, s2 := hubFor(t, ownerTestSecret)
+		post(t, hub2, c.path, c.body, false, nil) // an API key or an agent at the hub, not the person
+		s2.mu.Lock()
+		assert.Empty(t, s2.header.Get(hubowner.Header), "a request that is not the signed-in person's is not signed: "+c.path)
+		assert.Equal(t, c.body, s2.body)
+		s2.mu.Unlock()
+	}
+}

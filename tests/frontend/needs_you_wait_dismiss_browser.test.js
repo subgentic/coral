@@ -15,7 +15,7 @@ const BASE = require('./test_base').BASE;
         await ev(`localStorage.removeItem('coral-asked-dismissed'); localStorage.removeItem('coral-waits-ignored'); localStorage.removeItem('coral-inbox-needs-filters'); window.__posts = [];
             const real = window.fetch; window.fetch = (u, o = {}) => { const url = String(u), m = (o.method || 'GET').toUpperCase();
                 if (m === 'POST' && /\\/dismiss-wait$/.test(url)) { const body = JSON.parse(o.body); window.__posts.push({ url, body }); const row = window.T.state.liveSessions.find(s => s.session_id === body.session_id), hide = row && row.waiting_kind !== 'permission'; if (hide) row.wait_ignored = true; return Promise.resolve(new Response(JSON.stringify(hide ? { ok: true, dismissed: true, hidden: true } : { ok: true, dismissed: true }), { headers: { 'content-type': 'application/json' } })); }
-                if (m === 'GET' && /\\/api\\/sessions\\/live$/.test(url)) return Promise.resolve(new Response(JSON.stringify(window.T.state.liveSessions), { headers: { 'content-type': 'application/json' } })); // the list the page reads again after a Dismiss: the rows it has, with what the machine says
+                if (m === 'GET' && /\\/api\\/sessions\\/live(\\?compact=1)?$/.test(url)) return Promise.resolve(new Response(JSON.stringify(window.T.state.liveSessions), { headers: { 'content-type': 'application/json' } })); // the list the page reads again after a Dismiss: the rows it has, with what the machine says
                 return real(u, o); }; true`);
         const SINCE = '2026-11-02T01:00:00Z';
         await ev(`(() => {

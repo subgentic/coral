@@ -7,7 +7,7 @@ const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
 
 (async () => {
-    const { client, Page, ev, waitFor, PRELOAD, install } = await connect();
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
@@ -67,6 +67,115 @@ const { coralReady } = require('./helpers/wait');
         await ev(`window.__mcp = { body: { error: 'no' }, status: 403 }; true`); await run();
         await new Promise(r => setTimeout(r, 300)); // sleep-ok: as above
         assert.equal(await ev(`document.getElementById('info-mcp').hidden`), true, 'a refusal shows no row');
+
+        console.log('Skills and Memory (#13209): the skills the agent loaded and its instruction files, a file opened read-only on a click; hidden when a route does not answer');
+        await ev(`window.__sk = { body: { skills: [{ name: 'release-notes', version: 2, loads: 3, status: 'approved' }, { name: 'old', version: 1, loads: 1, status: 'removed' }] }, status: 200 };
+            window.__mem = { body: { files: [{ id: 'a'.repeat(32), file: 'CLAUDE.md', kind: 'instructions', level: 'project' }] }, status: 200 };
+            window.__file = { body: { text: 'Be <b>brief</b>.', truncated: false }, status: 200 };
+            window.__secReqs = 0;
+            const prev = window.fetch;
+            window.fetch = (u, o) => { const url = String(u), reply = r => Promise.resolve(new Response(JSON.stringify(r.body), { status: r.status }));
+                if (/\\/loaded-skills\\?/.test(url)) { window.__secReqs++; return (window.__gateSk || Promise.resolve()).then(() => reply(window.__sk)); }
+                if (/\\/memory\\/[0-9a-f]{32}\\?/.test(url)) { window.__reqs.push(url); const id = url.match(/memory\\/([0-9a-f]{32})\\?/)[1], f = window.__files && window.__files[id]; return f ? f.gate.then(() => reply({ body: { text: f.text }, status: 200 })) : reply(window.__file); }
+                if (/\\/memory\\?/.test(url)) { window.__secReqs++; return reply(window.__mem); }
+                return prev(u, o); };
+            window.__state_.currentSession = { type: 'live', name: 'info a', agent_type: 'claude', session_id: 'sid-1', server: 'local' };
+            window.__answer.body = { agent_name: 'info a', agent_type: 'claude', tmux_command: 'tmux attach -t tm-1' }; true`);
+        await run();
+        await waitFor(`document.getElementById('info-skills').hidden === false && document.getElementById('info-memory').hidden === false`, 'the Skills and Memory rows');
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#info-skills div')].map(d => d.textContent)`), ['release-notes v2, loaded 3 times', 'old v1, loaded 1 time, removed']);
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#info-memory button')].map(d => d.textContent)`), ['CLAUDE.md: instructions, project']);
+        assert.equal(await ev(`document.getElementById('info-memory-text').hidden`), true, 'a file is opened only on a click');
+        await ev(`document.querySelector('#info-memory button').click(); true`);
+        await waitFor(`document.getElementById('info-memory-text').textContent === 'Be <b>brief</b>.'`, 'the file text');
+        assert.equal(await ev(`document.querySelector('#info-memory-text b')`), null, 'the text is text, never markup');
+        assert.match(await ev(`window.__reqs[window.__reqs.length - 1]`), /\/memory\/a{32}\?session_id=sid-1$/);
+        const before = await ev(`window.__secReqs`);
+        await ev(`window.__sk = { body: { error: 'no' }, status: 403 }; window.__mem = { body: { error: 'no' }, status: 403 }; true`); await run();
+        await waitFor(`window.__secReqs >= ${before + 2}`, 'both refused answers'); // both rows' requests were answered: the dialog's code after them runs in the next turns of the page, so wait for those, not a fixed time
+        await ev(`new Promise(r => setTimeout(() => setTimeout(() => r(true), 0), 0))`);
+        assert.equal(await ev(`document.getElementById('info-skills').hidden && document.getElementById('info-memory').hidden`), true, 'a refusal shows no rows');
+        await ev(`window.__sk = { body: { skills: [] }, status: 200 }; window.__mem = { body: { files: [] }, status: 200 }; true`); await run();
+        await waitFor(`document.getElementById('info-skills').hidden === false`, 'the empty Skills row');
+        assert.equal(await text('info-skills'), 'None loaded yet'); assert.equal(await text('info-memory'), 'None found');
+
+        console.log('Stale answers (UI Reviewer, #13245 M1): an open dropped by a later open (ineligible, or after a close) writes no row when its answer comes');
+        await ev(`window.__sk = { body: { skills: [{ name: 'only-local', version: 1, loads: 1, status: 'approved' }] }, status: 200 };
+            window.__mem = { body: { files: [] }, status: 200 };
+            window.__gateSk = new Promise(r => { window.__releaseSk = r; });
+            window.__state_.currentSession = { type: 'live', name: 'info a', agent_type: 'claude', session_id: 'sid-1', server: 'local' }; true`);
+        const held = await ev(`window.__secReqs`);
+        await run(); await waitFor(`window.__secReqs > ${held}`, 'the held skills request'); // the answer for agent A is still on its way
+        await ev(`window.__state_.currentSession = { type: 'live', name: 'info b', agent_type: 'claude', session_id: '', server: 'local' }; true`);
+        await run(); // the dialog opens for another agent that gets no sections (no session id: the same path a remote computer takes)
+        await ev(`window.__releaseSk(); true`);
+        await ev(`new Promise(r => setTimeout(() => setTimeout(() => r(true), 0), 0))`);
+        assert.equal(await ev(`document.getElementById('info-skills').hidden`), true, 'A\'s answer arrives after the open for B: the Skills row stays hidden');
+        await ev(`window.__gateSk = new Promise(r => { window.__releaseSk = r; });
+            window.__state_.currentSession = { type: 'live', name: 'info a', agent_type: 'claude', session_id: 'sid-1', server: 'local' }; true`);
+        const held2 = await ev(`window.__secReqs`);
+        await run(); await waitFor(`window.__secReqs > ${held2}`, 'the second held request');
+        await ev(`window.__m_.hideInfoModal(); window.__releaseSk(); true`);
+        await ev(`new Promise(r => setTimeout(() => setTimeout(() => r(true), 0), 0))`);
+        assert.equal(await ev(`document.getElementById('info-skills').hidden`), true, 'an answer after the dialog was closed writes nothing');
+        await ev(`window.__gateSk = null; true`);
+
+        console.log('Out-of-order files (M2): the file clicked last is the one shown, whatever order the answers come in; the block names it');
+        await ev(`window.__sk = { body: { skills: [] }, status: 200 };
+            window.__mem = { body: { files: [{ id: 'a'.repeat(32), file: 'one.md', kind: 'memory', level: 'user' }, { id: 'b'.repeat(32), file: 'two.md', kind: 'memory', level: 'user' }] }, status: 200 };
+            window.__files = {}; for (const [c, t] of [['a', 'FIRST file'], ['b', 'SECOND file']]) { const f = { text: t }; f.gate = new Promise(r => { f.release = r; }); window.__files[c.repeat(32)] = f; }
+            window.__state_.currentSession = { type: 'live', name: 'info a', agent_type: 'claude', session_id: 'sid-1', server: 'local' }; true`);
+        await run();
+        await waitFor(`document.querySelectorAll('#info-memory button').length === 2`, 'two files');
+        await ev(`const [b1, b2] = document.querySelectorAll('#info-memory button'); b1.click(); b2.click(); true`);
+        await waitFor(`window.__reqs.filter(u => /\\/memory\\/[0-9a-f]{32}\\?/.test(u)).length >= 2 && window.__reqs.some(u => u.includes('b'.repeat(32)))`, 'both file requests');
+        await ev(`window.__files['b'.repeat(32)].release(); true`); await waitFor(`document.getElementById('info-memory-text').textContent === 'SECOND file'`, 'the second file');
+        await ev(`window.__files['a'.repeat(32)].release(); true`);
+        await ev(`new Promise(r => setTimeout(() => setTimeout(() => r(true), 0), 0))`);
+        assert.equal(await text('info-memory-text'), 'SECOND file', 'the slower first file does not overwrite the second');
+        assert.equal(await ev(`document.getElementById('info-memory-text').dataset.file`), 'two.md: memory, user', 'the block names the file it shows');
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#info-memory button')].map(b => b.getAttribute('aria-pressed'))`), ['false', 'true']);
+        await ev(`window.__files = null; true`);
+
+        console.log('Phone (M3, UI Reviewer round 2): at 390 px with the root text at 100% and at 200% (32 px), in both themes: the files and their text are reachable, nothing runs past the dialog, Close is on screen, a file opens from the keyboard and is read-only');
+        await ev(`window.__files = null; window.__file = { body: { text: 'Be careful with the memory text.\\nSecond line.' }, status: 200 }; window.__sk = { body: { skills: [{ name: 'release-notes', version: 2, loads: 3, status: 'approved' }] }, status: 200 };
+            window.__mem = { body: { files: [{ id: 'a'.repeat(32), file: 'CLAUDE.md', kind: 'instructions', level: 'project' }, { id: 'b'.repeat(32), file: 'notes.md', kind: 'memory', level: 'user' }] }, status: 200 };
+            window.__state_.currentSession = { type: 'live', name: 'info a', agent_type: 'claude', session_id: 'sid-1', server: 'local' }; true`);
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+        for (const rootPx of [null, '32px']) {
+            for (const theme of ['light', 'dark']) {
+                const tag = `390 px, ${rootPx ? 'text 200% (root ' + rootPx + ')' : 'text 100%'}, ${theme}`;
+                await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); document.documentElement.style.fontSize = ${JSON.stringify(rootPx || '')}; document.querySelectorAll('.toast').forEach(t => t.remove()); true`);
+                await run(); await waitFor(`document.querySelectorAll('#info-memory button').length === 2`, 'two files');
+                await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); true`);
+                // the keyboard opens a file: focus the button, press Enter (a real key event through the browser, not a script click)
+                await ev(`document.querySelector('#info-memory button').focus(); true`);
+                await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
+                await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+                await waitFor(`document.getElementById('info-memory-text').textContent.startsWith('Be careful')`, `${tag}: the file text after Enter`);
+                await ev(`document.getElementById('info-memory-text').scrollIntoView({ block: 'center' }); true`); // the section in view, as a person would scroll to it
+                const m = await ev(`(() => {
+                    const modal = document.getElementById('info-modal'), box = modal.querySelector('.modal-content').getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
+                    const inBox = el => { const r = el.getBoundingClientRect(); return r.left >= box.left - 1 && r.right <= box.right + 1; };
+                    const bs = [...document.querySelectorAll('#info-memory button')], pre = document.getElementById('info-memory-text');
+                    const close = [...modal.querySelectorAll('button')].find(b => b.textContent.trim() === 'Close'), cr = close.getBoundingClientRect(), pr = pre.getBoundingClientRect();
+                    return { h: bs.map(b => Math.round(b.getBoundingClientRect().height)), buttonsInBox: bs.every(inBox), textInBox: inBox(pre), wide: modal.scrollWidth > modal.clientWidth + 1 || document.documentElement.scrollWidth > vw + 1,
+                        closeOnScreen: cr.top >= 0 && cr.bottom <= vh && cr.left >= 0 && cr.right <= vw, textVisible: pr.bottom > 0 && pr.top < vh, pressed: bs.map(b => b.getAttribute('aria-pressed')), file: pre.dataset.file,
+                        editable: !!document.querySelector('#info-memory input, #info-memory textarea, #info-memory [contenteditable]') || pre.isContentEditable, fs: getComputedStyle(document.documentElement).fontSize };
+                })()`);
+                assert.ok(m.h.length === 2 && m.h.every(h => h >= 44), `${tag}: both file buttons are 44 px or taller: ${JSON.stringify(m)}`);
+                assert.ok(m.buttonsInBox && m.textInBox, `${tag}: the files and their text stay inside the dialog: ${JSON.stringify(m)}`);
+                assert.equal(m.wide, false, `${tag}: no sideways scroll: ${JSON.stringify(m)}`);
+                assert.ok(m.closeOnScreen && m.textVisible, `${tag}: the opened text is on screen with Close reachable: ${JSON.stringify(m)}`);
+                assert.deepEqual(m.pressed, ['true', 'false'], `${tag}: Enter opened the first file`); assert.equal(m.file, 'CLAUDE.md: instructions, project');
+                assert.equal(m.editable, false, `${tag}: the text is read-only`);
+                if (rootPx) assert.equal(m.fs, rootPx, `${tag}: the page really is at 200% text`);
+                if (process.env.INFO_SHOTS) require('node:fs').writeFileSync(`${process.env.INFO_SHOTS}/info-sections-390-${rootPx ? 'text200' : 'text100'}-${theme}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); // evidence for a reviewer, not part of the check
+                await ev(`window.__m_.hideInfoModal(); true`);
+            }
+        }
+        await ev(`document.documentElement.removeAttribute('data-theme'); document.documentElement.style.fontSize = ''; true`);
+        await Emulation.clearDeviceMetricsOverride();
 
         console.log('Copy and close');
         await ev(`window.__answer.body = { agent_name: 'info a', tmux_command: 'tmux attach -t zz' }; true`); await run();

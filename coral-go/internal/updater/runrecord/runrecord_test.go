@@ -137,3 +137,9 @@ func TestRestartableIsTheRecordBeingOneStartWouldAccept(t *testing.T) {
 	require.NoError(t, os.Chmod(filepath.Join(data, "updates", File), 0o644))
 	assert.Error(t, Restartable(data, exe), "a record others can read is not trusted")
 }
+
+// #13258: a relaunch after an update keeps CORAL_ALLOW_HUB_UPDATE (the launch-time Hub update switch): the restarted Coral runs with the same launch the person gave it (its argv is kept whole, its environment by this list).
+func TestAllowedEnvKeepsTheHubUpdateLaunchSwitch(t *testing.T) {
+	got := AllowedEnv([]string{"CORAL_ALLOW_HUB_UPDATE=1", "CORAL_SESSION_TOKEN=secret"})
+	assert.Equal(t, []string{"CORAL_ALLOW_HUB_UPDATE=1"}, got)
+}

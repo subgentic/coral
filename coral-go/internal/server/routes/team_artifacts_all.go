@@ -5,6 +5,7 @@ package routes
 // (board_id, team). The same owner rule as the team route (the Operator's, or the owner through Coral Hub); GET /api/artifacts is the machine-wide store list and stays as it is.
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -20,7 +21,7 @@ import (
 )
 
 // noTeamLabel is the Team column's word for the files of agents that belong to no team (#10312).
-const noTeamLabel = "No team"
+const noTeamLabel = "Not on a team"
 
 // maxStandaloneUploadSessions bounds the upload folders one read looks into for agents without a team: the most recently written ones.
 const maxStandaloneUploadSessions = 200
@@ -108,6 +109,7 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 		errBadRequest(w, fmt.Sprintf("offset must be an integer between 0 and %d", maxTeamArtifactOffset))
 		return
 	}
+	artifactsRev := h.bs.ArtifactsRevision("")
 	projects, err := h.bs.ListProjects(r.Context())
 	if err != nil {
 		errInternalServer(w, "could not list artifacts")
@@ -150,12 +152,12 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 	}
 	// The files of agents that belong to no team (their own Artifacts tab lists them, GET /api/session-artifacts) are one more "team" of this list, so the Inbox does not say 0 artifacts for a pasted
 	// screenshot that the agent's tab shows (#10312). Each file is listed once: one a team's list already holds is not repeated.
-	if len(teams) == 0 || wanted[noTeamLabel] {
+	if len(teams) == 0 || wanted[noTeamLabel] || wanted["No team"] {
 		if rows := h.standaloneUploadItems(r, items, projects); len(rows) > 0 {
 			for i := range rows {
-				rows[i].Team = noTeamLabel
+				rows[i].Team, rows[i].BoardID = noTeamLabel, noTeamBoardID // the board key a file for review is kept under (#13527): the Inbox reads the row as a review of that key
 			}
-			refs = append(refs, teamArtifactTeamRef{Team: noTeamLabel, All: filesOrVersions(tq, rows)})
+			refs = append(refs, teamArtifactTeamRef{BoardID: noTeamBoardID, Team: noTeamLabel, All: filesOrVersions(tq, rows)})
 			items = append(items, rows...)
 		}
 	}
@@ -170,8 +172,13 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 	if refs == nil {
 		refs = []teamArtifactTeamRef{}
 	}
-	resp := map[string]any{
-		"artifacts": sel.page, "limit": limit, "offset": sel.start, "has_more": sel.hasMore, "truncated": truncated || cut,
+	anchor := ""
+	if len(projects) > 0 {
+		anchor = projects[0].Project
+	}
+	resp := map[string]any{"artifacts_board": anchor,
+		"artifacts_rev": artifactsRev,
+		"artifacts":     sel.page, "limit": limit, "offset": sel.start, "has_more": sel.hasMore, "truncated": truncated || cut,
 		"total": sel.total, "all": all, "teams": refs,
 	}
 	if sel.next != "" {
@@ -185,9 +192,51 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 
 // standaloneUploadItems are the uploaded files of the sessions that have an upload folder, belong to no team and whose files no row in have lists: the agents without a team. At most maxStandaloneUploadSessions folders are read, the newest first (a folder's own modification time).
 func (h *BoardHandler) standaloneUploadItems(r *http.Request, have []teamArtifact, projects []board.ProjectInfo) []teamArtifact {
+	out := filterReadable(r, h.coralDir, h.standaloneUploads(r.Context(), have, projects))
+	// What a no-team agent sent for review is kept under the reserved key (#13527): its tags, question and kind are read from there, so the file is a row Needs you shows, with the question it asks.
+	h.attachArtifactTags(r.Context(), noTeamBoardID, out)
+	h.attachArtifactKinds(r, noTeamBoardID, out)
+	return out
+}
+
+// noTeamManagedArtifact is the upload of an agent on no team whose stored object is id (#13532): what a decision on the reserved key is made about. It is the same set the Inbox lists, before the read check
+// (the person deciding is the one who may read it).
+func (h *BoardHandler) noTeamManagedArtifact(ctx context.Context, id string) (teamArtifact, bool) {
+	projects, err := h.bs.ListProjects(ctx)
+	if err != nil {
+		return teamArtifact{}, false
+	}
+	for _, it := range h.standaloneUploads(ctx, nil, projects) {
+		if it.managed == id {
+			return it, true
+		}
+	}
+	return teamArtifact{}, false
+}
+
+func (h *BoardHandler) standaloneUploads(ctx context.Context, have []teamArtifact, projects []board.ProjectInfo) []teamArtifact {
+	sessions := h.noTeamUploadSessions(ctx, projects)
+	if sessions == nil {
+		return nil
+	}
+	listed := make(map[string]bool, len(have))
+	for _, it := range have {
+		listed[it.ID] = true
+	}
+	var out []teamArtifact
+	for _, it := range h.uploads.merge(nil, h.coralDir, sessions) {
+		if !listed[it.ID] {
+			out = append(out, it)
+		}
+	}
+	return out
+}
+
+// noTeamUploadSessions are the sessions that have an upload folder and belong to no team, the most recent maxStandaloneUploadSessions of them (nil when the folder cannot be read).
+func (h *BoardHandler) noTeamUploadSessions(ctx context.Context, projects []board.ProjectInfo) map[string]string {
 	inTeam := map[string]bool{} // an agent of a team is that team's, whichever teams the request asked for
 	for _, p := range projects {
-		if subs, err := h.bs.TeamSubscriberSessions(r.Context(), p.Project); err == nil {
+		if subs, err := h.bs.TeamSubscriberSessions(ctx, p.Project); err == nil {
 			for _, sid := range subs {
 				inTeam[sid] = true
 			}
@@ -220,15 +269,21 @@ func (h *BoardHandler) standaloneUploadItems(r *http.Request, have []teamArtifac
 	for _, f := range folders {
 		sessions[f.id] = ""
 	}
-	listed := make(map[string]bool, len(have))
-	for _, it := range have {
-		listed[it.ID] = true
+	return sessions
+}
+
+// noTeamUploaders are the sessions of agents on no team that hold an upload record of the object id: more than one when the same bytes were uploaded by two agents (#13539).
+func (h *BoardHandler) noTeamUploaders(ctx context.Context, id string) []string {
+	projects, err := h.bs.ListProjects(ctx)
+	if err != nil {
+		return nil
 	}
-	var out []teamArtifact
-	for _, it := range filterReadable(r, h.coralDir, h.uploads.merge(nil, h.coralDir, sessions)) {
-		if !listed[it.ID] {
-			out = append(out, it)
+	var out []string
+	for sid := range h.noTeamUploadSessions(ctx, projects) {
+		if _, ok := readUploadRecord(h.coralDir, sid, id); ok {
+			out = append(out, sid)
 		}
 	}
+	sort.Strings(out)
 	return out
 }

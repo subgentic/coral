@@ -53,6 +53,7 @@ func (s *Store) SetArtifactKind(ctx context.Context, boardID, hex, kind, session
 			boardID, hex, kind, session, at.UTC().Format(time.RFC3339)); err != nil {
 			return "", err
 		}
+		s.NoteArtifactsChanged(boardID)
 	}
 	return s.ArtifactKind(ctx, boardID, hex)
 }

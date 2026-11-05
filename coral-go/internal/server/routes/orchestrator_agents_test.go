@@ -740,3 +740,46 @@ func TestASeatNameCannotMentionAnyoneInTheLogOrTheBoardLine(t *testing.T) {
 	}
 	assert.True(t, said, "the wake is said on the board")
 }
+
+// An agent whose process was killed is still an awake row until the reconciler's passes mark it (#13413): the wake asks the terminal, and an agent whose CLI has ended at a plain shell is
+// put to sleep as Ended and woken, not refused as "not_asleep". A running CLI is still refused.
+func TestWakeRestartsAnAwakeRowWhoseProcessHasEnded(t *testing.T) {
+	r := newOrchRig(t)
+	r.usualBoard()
+	sid := r.seat("Dev3", "Developer", orchBoard, "claude", false, 5)
+	code, _ := r.operatorGrant("Orchestrator", nil)
+	require.Equal(t, http.StatusOK, code)
+	name := naming.SessionName("claude", sid)
+	fg := newFGTerminal(r.term)
+	r.h.terminal = fg
+
+	fg.setFG(name, "node") // the CLI runs
+	code, out := r.agentPost("Orchestrator", "wake", "Dev3", "")
+	assert.Equal(t, http.StatusConflict, code)
+	assert.Equal(t, "not_asleep", out["code"])
+
+	fg.setFG(name, "zsh") // the process was killed: only the shell is left
+	code, out = r.agentPost("Orchestrator", "wake", "Dev3", "")
+	assert.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Equal(t, "Dev3", out["woke"])
+	assert.False(t, r.asleep("Dev3"), "woken, not left Ended")
+}
+
+// A member name with a slash or a space ("UX/UX Engineer") is reached by its escaped name (#13415): the path value is the raw escaped text, so the handler reads it unescaped.
+func TestWakeAndSleepReachAnAgentWhoseNameHasASlashAndASpace(t *testing.T) {
+	r := newOrchRig(t)
+	r.usualBoard()
+	r.seat("UX/UX Engineer", "Designer", orchBoard, "claude", true, 6)
+	code, _ := r.operatorGrant("Orchestrator", nil)
+	require.Equal(t, http.StatusOK, code)
+
+	code, out := r.agentPost("Orchestrator", "wake", "UX/UX Engineer", "") // sent as UX%2FUX%20Engineer
+	assert.Equal(t, http.StatusOK, code, "%v", out)
+	assert.False(t, r.asleep("UX/UX Engineer"))
+	code, out = r.agentPost("Orchestrator", "sleep", "UX/UX Engineer", "")
+	assert.Equal(t, http.StatusOK, code, "%v", out)
+	assert.True(t, r.asleep("UX/UX Engineer"))
+
+	code, out = r.agentPost("Orchestrator", "wake", "UX/Nobody", "")
+	assert.Equal(t, "no_such_agent", out["code"], "%d: another name with a slash is still unknown", code)
+}

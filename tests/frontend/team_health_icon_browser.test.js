@@ -54,7 +54,8 @@ const { coralReady } = require('./helpers/wait');
             // On: accent, full strength, named on.
             await render(true);
             const on = await icon();
-            assert.equal(on.label, 'Team health monitor: on'); assert.equal(on.title, 'Team health monitor: on'); assert.equal(on.on, true);
+            assert.equal(on.label, `Health monitor settings for ${TEAM}`); assert.equal(on.title, `Health monitor settings for ${TEAM}`); assert.equal(on.on, true);
+            assert.ok(on.w >= 24 && on.h >= 24, 'health settings has a 24px target');
             assert.ok(on.beside, `${dev}: it sits beside the team's info button ${JSON.stringify(on)}`);
             const accent = await ev(`getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()`);
             const same = await ev(`(() => { const c = document.createElement('i'); c.style.color = ${JSON.stringify(accent)}; document.body.appendChild(c); const v = getComputedStyle(c).color; c.remove(); return v; })()`);
@@ -103,6 +104,7 @@ const { coralReady } = require('./helpers/wait');
             // Coral Hub: the list carries no state, so no icon.
             await render(undefined, 'hub-' + TEAM);
             assert.equal(await icon(), null, `${dev}: no icon where the list gives no state`);
+            assert.deepEqual(await ev(`import(${MOD} + 'list_card_parts.js').then(m => { const host = document.createElement('div'); host.innerHTML = m.teamHealthBtn('@remote/${TEAM}', [{ team_health_on: true }]); const icon = host.firstElementChild; return { tag: icon.tagName, role: icon.getAttribute('role'), label: icon.getAttribute('aria-label'), action: icon.hasAttribute('data-on-click'), focusable: icon.tabIndex >= 0 }; })`), { tag: 'SPAN', role: 'img', label: 'Health monitor is on', action: false, focusable: false }, 'remote Hub keeps the on signal without an unavailable settings action');
         }
 
         // A click opens the team's settings on the Health check tab, which (real server) shows a new team's check off and what it costs.
@@ -113,9 +115,12 @@ const { coralReady } = require('./helpers/wait');
         assert.ok(sub < 300, 'subscribe');
         await render(false);
         assert.equal(await icon(), null, 'a new team has the check off: no icon, the settings are reached from the info button');
-        await ev(`window.showTeamWorkingModeWorkspace(${JSON.stringify(TEAM)}); true`);
+        await render(true);
+        await ev(`document.querySelector('.team-health-btn').focus(); true`);
+        await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
+        await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
         await waitFor(`!!document.querySelector('#team-settings-workspace .sv[data-ready]') && !!document.querySelector('#team-settings-health [name=on]')`, 'the Settings tab with the Health check section', 15000);
-        await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=health]').click(); true`);
+        assert.equal(await ev(`document.querySelector('#team-settings-workspace .settings-pane[data-section=health]')?.hidden`), false, 'pulse opens Health check directly');
         const panel = await ev(`(() => { const h = n => document.querySelector('#team-settings-health [name="' + n + '"]'); return { on: h('on').checked, text: document.querySelector('#team-settings-health .sv-row[data-key=on] .sv-help').textContent, shown: !document.getElementById('team-settings-health').hidden, interval: h('interval_min').value }; })()`);
         assert.equal(panel.on, false, 'a new team has the check off');
         assert.ok(panel.shown && /tokens/.test(panel.text) && /stuck or idle/.test(panel.text), `the setting says what it does and costs: ${panel.text}`);
@@ -130,6 +135,10 @@ const { coralReady } = require('./helpers/wait');
         assert.deepEqual(await ev(`(() => { const keys = [...document.querySelectorAll('#team-settings-health .sv-row')].map(r => r.dataset.key); const at = k => keys.indexOf(k); return [at('health_reviews') < at('auto_delegate_on'), at('auto_delegate_on') < at('health_rules'), at('on') < at('health_reviews'), at('claim_nudge_on') > at('health_rules')]; })()`), [true, true, true, true], 'handing reviews to the default reviewers is its own section (Reviews), apart from the check and its rules');
         assert.ok(/whether or not the health check/.test(await ev(`document.querySelector('#team-settings-health .sv-row[data-key=auto_delegate_on] .sv-help').textContent`)), 'and says that it works with the check off');
         await shot('settings-health');
+        await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+        await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+        await waitFor(`!document.querySelector('.team-settings-modal')`, 'health settings closed');
+        assert.equal(await ev(`document.activeElement === document.querySelector('.team-health-btn')`), true, 'closing settings restores focus to the pulse');
 
         // The Agent Team dialog's step 3 has the Health check tab (#7407, the design): the switch is off, and a launch sends health_monitor only when it is on.
         await ev(`(async () => { window.__launches = []; const real = window.fetch; const json = (b) => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'content-type': 'application/json' } }));

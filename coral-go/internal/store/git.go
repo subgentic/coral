@@ -201,13 +201,34 @@ func (s *GitStore) getRecentGitSnapshots(ctx context.Context, since string, limi
 
 // GetGitSnapshots returns recent snapshots for an agent.
 func (s *GitStore) GetGitSnapshots(ctx context.Context, agentName string, limit int) ([]GitSnapshot, error) {
+	snaps, _, err := s.GetGitSnapshotsPage(ctx, agentName, limit, nil)
+	return snaps, err
+}
+
+// GitAfter is the place a page of an agent's snapshots continues from: the last one sent, in the list's order (newest recorded first, then id).
+type GitAfter struct {
+	RecordedAt string
+	ID         int64
+}
+
+// GetGitSnapshotsPage is an agent's snapshots past the place after (nil: from the newest), at most limit, and the true number the agent has (#13188).
+func (s *GitStore) GetGitSnapshotsPage(ctx context.Context, agentName string, limit int, after *GitAfter) ([]GitSnapshot, int, error) {
+	var total int
+	if err := s.db.GetContext(ctx, &total, `SELECT COUNT(*) FROM git_snapshots WHERE agent_name = ?`, agentName); err != nil {
+		return nil, 0, err
+	}
+	q := `SELECT ` + gitSnapshotCols + ` FROM git_snapshots WHERE agent_name = ?`
+	args := []interface{}{agentName}
+	if after != nil {
+		q += ` AND (recorded_at < ? OR (recorded_at = ? AND id < ?))`
+		args = append(args, after.RecordedAt, after.RecordedAt, after.ID)
+	}
+	q += ` ORDER BY recorded_at DESC, id DESC LIMIT ?`
+	args = append(args, limit)
 	var snaps []GitSnapshot
-	err := s.db.SelectContext(ctx, &snaps,
-		`SELECT `+gitSnapshotCols+`
-		 FROM git_snapshots WHERE agent_name = ?
-		 ORDER BY recorded_at DESC, id DESC LIMIT ?`,
-		agentName, limit)
-	return sanitizeAll(snaps, err)
+	err := s.db.SelectContext(ctx, &snaps, q, args...)
+	snaps, err = sanitizeAll(snaps, err)
+	return snaps, total, err
 }
 
 // GetLatestGitState returns the most recent snapshot for an agent.
@@ -303,6 +324,23 @@ func (s *GitStore) GetGitSnapshotsForSession(ctx context.Context, sessionID stri
 		 ORDER BY commit_timestamp ASC, id ASC LIMIT ?`,
 		*idx.FirstTS, *idx.LastTS, limit)
 	return sanitizeAll(snaps, err)
+}
+
+// CountGitSnapshotsForSession is how many commits GetGitSnapshotsForSession would return without its limit: the session's own, else (as there) those in the time range its index row gives (#13289).
+func (s *GitStore) CountGitSnapshotsForSession(ctx context.Context, sessionID string) (int, error) {
+	var n int
+	if err := s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM git_snapshots WHERE session_id = ?`, sessionID); err != nil || n > 0 {
+		return n, err
+	}
+	var idx struct {
+		FirstTS *string `db:"first_timestamp"`
+		LastTS  *string `db:"last_timestamp"`
+	}
+	if err := s.db.GetContext(ctx, &idx, "SELECT first_timestamp, last_timestamp FROM session_index WHERE session_id = ?", sessionID); err != nil || idx.FirstTS == nil || idx.LastTS == nil {
+		return 0, nil
+	}
+	err := s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM git_snapshots WHERE commit_timestamp >= ? AND commit_timestamp <= ?`, *idx.FirstTS, *idx.LastTS)
+	return n, err
 }
 
 // ReplaceChangedFiles replaces changed-file records for an agent/session and diff mode.

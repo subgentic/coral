@@ -216,7 +216,7 @@ const contrast = (a, b) => {
 
         console.log('2b. Row cells (status, Coral version, agents) and the page\'s last contact (when offline), update badge, no "null"');
         const rowInfo = await ev(`Object.fromEntries([...document.querySelectorAll('#servers-view .cs-row')].map(r => {
-            const badges = [...r.querySelectorAll('a.server-update-badge')].map(a => ({ cls: a.className, href: a.getAttribute('href'), aria: a.getAttribute('aria-label'), target: a.getAttribute('target'), rel: a.getAttribute('rel'), inVersion: !!a.closest('.cs-col-version') }));
+            const badges = [...r.querySelectorAll('.server-update-badge')].map(a => ({ tag: a.tagName, cls: a.className, href: a.getAttribute('href'), title: a.title, text: a.textContent.trim(), interactive: !!a.closest('a, button') || a.hasAttribute('tabindex'), inVersion: !!a.closest('.cs-col-version') }));
             const cell = c => r.querySelector('.cs-col-' + c).textContent.replace(/\\s+/g, ' ').trim();
             return [r.id.replace('server-row-', ''), { status: cell('status'), version: r.querySelector('.cs-col-version span').textContent, agents: cell('agents'), meta: '', badges }];
         }))`);
@@ -231,10 +231,12 @@ const contrast = (a, b) => {
             assert.equal(rowInfo[id].badges.length, 1, `${id}: one update badge`);
             const b = rowInfo[id].badges[0];
             assert.equal(b.cls, `chip server-update-badge server-update-${level}`);
-            assert.equal(b.href, RELEASES, `${id}: constant download link`);
-            assert.equal(b.aria, notice[id], `${id}: aria-label is the notice`);
+            // the table's version cell shows the notice as a plain mark (a row has one action, opening the computer's page, where the Update button is; #13258, the Orchestrator's decision)
+            assert.equal(b.tag, 'SPAN', `${id}: a plain mark, not a link or a button`);
+            assert.ok(!b.href && !b.interactive, `${id}: the mark is not an action`);
+            assert.equal(b.title, notice[id], `${id}: the tip is the notice`);
+            assert.match(b.text, level === 'required' ? /^Update required/ : /^Update available/, `${id}: the mark says it in words`);
             assert.ok(b.inVersion, `${id}: badge sits in the Coral column`);
-            assert.equal(b.target, '_blank'); assert.equal(b.rel, 'noopener noreferrer');
         }
         assert.equal(rowInfo.m3.badges.length, 0, 'no badge when current'); assert.equal(rowInfo.m4.badges.length, 0, 'no badge when unknown');
         const nulls = await ev(`(() => { const w = document.createTreeWalker(document.getElementById('servers-view'), NodeFilter.SHOW_TEXT); const out = []; for (let n = w.nextNode(); n; n = w.nextNode()) if (/\\bnull\\b/.test(n.nodeValue)) out.push(n.nodeValue.trim()); return out; })()`);

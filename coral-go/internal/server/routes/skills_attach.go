@@ -8,6 +8,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/subgentic/coral/internal/skills"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -102,4 +103,20 @@ func unionSkillIDs(team, member []string) []string {
 		}
 	}
 	return out
+}
+
+// withDefaultSkills adds the skill every agent has attached (#13523: using-coral, the starter skill that says what Coral gives any agent) to the ones a launch named, so `coral-agent skills list` shows it to a
+// plain agent as to a team's. It is attached, not put in the launch note (the launch text already points to it by name). One that is not in the store (not seeded) is simply not added, and a launch that already
+// names it keeps its one row.
+func (h *SessionsHandler) withDefaultSkills(ctx context.Context, rows []store.SkillRow) []store.SkillRow {
+	def, err := h.ss.LatestApprovedSkill(ctx, skills.UsingCoralName)
+	if err != nil || def == nil {
+		return rows
+	}
+	for _, r := range rows {
+		if r.Name == def.Name {
+			return rows
+		}
+	}
+	return append(append([]store.SkillRow{}, rows...), *def)
 }

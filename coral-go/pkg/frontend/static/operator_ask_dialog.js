@@ -44,7 +44,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     const close = document.createElement('button'); close.type = 'button'; close.className = 'btn'; close.textContent = 'Close';
     // Dismiss closes a question with no answer and nothing said to the agent, as the row's own Dismiss does (#12599): the same route and the same toast with Undo. A wait has no ask row to close, so it has no Dismiss.
     const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'btn btn-quiet'; dismiss.textContent = 'Dismiss'; dismiss.title = 'Take it out of Needs you; nobody is told'; dismiss.hidden = a.kind !== 'ask' || fromAnotherComputer(a); // the close route is this computer's: a question from another computer is answered there
-    row.append(close, ...(dismiss.hidden ? [] : [dismiss]), send); // Close on the left, then Dismiss, Send reply on the right (as the other dialogs)
+    row.append(close, ...(dismiss.hidden ? [] : [dismiss])); // Close and Dismiss stay in the footer; Send reply is on the row right under the reply box (#13148, the Operator: 'The send reply is too far away from text input')
     let tray = null;
     const finish = () => { if (tray) tray.destroy(); dlg.close(); dlg.remove(); if (onDone) onDone(); };
     const sync = () => { send.disabled = !!tray && (tray.busy() || tray.failed()); }; // Send waits for a picture going up, and for a failed one to be taken out
@@ -91,6 +91,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     if (!whole.hidden) reading.append(whole);
     const compose = document.createElement('div'); compose.className = 'inbox-ask-compose';
     const addSlot = document.createElement('div'); addSlot.className = 'inbox-ask-attach'; pics.append(addSlot);
+    const sendRow = document.createElement('div'); sendRow.className = 'inbox-ask-sendrow'; const pickSlot = document.createElement('span'); pickSlot.className = 'inbox-ask-pick'; sendRow.append(pickSlot, send); addSlot.append(sendRow); // Add image on the left, Send reply on the right, the pictures note under them (#13148)
     compose.append(...(offered ? [offered] : []), label, pics, err);
     dlg.append(title, sub, ...(links.hidden ? [] : [links]), reading, compose, foot);
     if (!fromAnotherComputer(a)) { // the picture is stored on the question's own team, as a goal's pictures are
@@ -100,7 +101,7 @@ export function openAskDialog(a, onDone, runners = {}) {
             tray.attach(dlg, box); tray.listen(sync);
             const picker = tray.picker(), add = picker.querySelector('button');
             add.textContent = ''; const icon = document.createElement('span'); icon.className = 'material-icons'; icon.setAttribute('aria-hidden', 'true'); icon.textContent = 'image'; add.append(icon); add.title = 'Add image';
-            addSlot.append(picker, tray.hint()); pics.append(tray.node);
+            pickSlot.append(picker); addSlot.append(tray.hint()); pics.append(tray.node);
         }).catch(() => { /* a reply needs no picture: the dialog works without the button */ });
     }
     close.addEventListener('click', finish);
@@ -110,6 +111,7 @@ export function openAskDialog(a, onDone, runners = {}) {
         catch (e) { err.textContent = e.message || 'Could not dismiss it.'; dismiss.disabled = false; sync(); }
     });
     dlg.addEventListener('cancel', e => { e.preventDefault(); finish(); });
+    box.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !send.disabled) { e.preventDefault(); send.click(); } }); // Ctrl or Cmd+Enter sends, as the task page's reply box does (#13148)
     send.addEventListener('click', async () => {
         err.textContent = ''; send.disabled = true;
         const links = tray ? tray.hexes().map(h => `coral://artifacts/${h}`) : []; // each picture is named by its artifact link, which the board and the agents read

@@ -28,8 +28,10 @@ const { installGuard, reached } = require('./helpers/silent_dismiss');
         await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
         await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length === 5`, 'five welcome items', 8000);
         await waitFor(`!!document.getElementById('group-table-view')._welcomeSwipe`, 'the swipe is attached (lazy, for a touch screen)', 8000);
-        const titles = () => ev(`[...document.querySelectorAll('#group-table-view .inbox-welcome-name')].map(e => e.firstChild.textContent)`);
-        const rowOf = title => `[...document.querySelectorAll('#group-table-view tbody tr')].find(tr => (tr.querySelector('.inbox-welcome-name') || {}).firstChild && tr.querySelector('.inbox-welcome-name').firstChild.textContent === ${JSON.stringify(title)})`;
+        // a row's name has the kind icon as its first child since #13144: the title is its first node that is not the icon
+        const NAME_TEXT = "(e => { const t = [...e.childNodes].find(n => !(n.nodeType === 1 && n.classList.contains('inbox-kind-icon'))); return t ? t.textContent : ''; })";
+        const titles = () => ev(`[...document.querySelectorAll('#group-table-view .inbox-welcome-name')].map(e => ${NAME_TEXT}(e))`);
+        const rowOf = title => `[...document.querySelectorAll('#group-table-view tbody tr')].find(tr => tr.querySelector('.inbox-welcome-name') && ${NAME_TEXT}(tr.querySelector('.inbox-welcome-name')) === ${JSON.stringify(title)})`;
         const geo = title => ev(`(() => { const tr = ${rowOf(title)}; tr.scrollIntoView({ block: 'center' }); const r = tr.getBoundingClientRect(); return { left: r.left, right: r.right, y: r.top + r.height / 2, width: r.width, id: tr.dataset.welcomeId || '', transform: tr.style.transform, transition: tr.style.transition }; })()`);
         const swipe = async (g, dx, dy = 0, steps = 8, pause = 12) => { const x0 = g.right - 24; await touch('touchStart', x0, g.y); for (let i = 1; i <= steps; i++) { await touch('touchMove', x0 + dx * i / steps, g.y + dy * i / steps); await wait(pause); } return x0 + dx; };
         const AGENT = 'Start your first agent';
@@ -53,7 +55,7 @@ const { installGuard, reached } = require('./helpers/silent_dismiss');
         // a long drag dismisses it, with Undo
         await ev(`window.__said = []; new MutationObserver(recs => { for (const r of recs) { const t = (r.target.textContent || ''); if (t) window.__said.push(t); } }).observe(document.body, { childList: true, characterData: true, subtree: true }); true`); // what is written into the page while it happens: a live region says its words and clears them
         g = await geo(AGENT); end = await swipe(g, -g.width * 0.7); await touch('touchEnd', end, g.y);
-        await waitFor(`!(${'[...document.querySelectorAll(\'#group-table-view .inbox-welcome-name\')]'}.some(e => e.firstChild.textContent === ${JSON.stringify(AGENT)}))`, 'the row is dismissed', 6000).catch(() => {});
+        await waitFor(`!(${'[...document.querySelectorAll(\'#group-table-view .inbox-welcome-name\')]'}.some(e => ${NAME_TEXT}(e) === ${JSON.stringify(AGENT)}))`, 'the row is dismissed', 6000).catch(() => {});
         check(!(await titles()).includes(AGENT) && (await titles()).length === 4, 'a long drag dismisses the row: ' + JSON.stringify(await titles()));
         const puts = await ev(`window.__puts`);
         check(puts.some(p => String(p.inbox_welcome_done || '').split(',').includes('agent')), 'the dismissal is saved like the button\'s: ' + JSON.stringify(puts));
@@ -63,13 +65,15 @@ const { installGuard, reached } = require('./helpers/silent_dismiss');
 
         // Undo puts it back and the items are on
         await ev(`[...document.querySelectorAll('.toast')].find(x => /Dismissed: Start your first agent/.test(x.textContent)).querySelectorAll('button').forEach(b => { if (b.textContent.trim() === 'Undo') b.click(); }); true`);
-        await waitFor(`[...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.firstChild.textContent === ${JSON.stringify(AGENT)})`, 'Undo brings the row back', 6000).catch(() => {});
+        await waitFor(`[...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => ${NAME_TEXT}(e) === ${JSON.stringify(AGENT)})`, 'Undo brings the row back', 6000).catch(() => {});
         const after = await ev(`window.__puts`);
         check((await titles()).includes(AGENT) && after.some(p => p.inbox_welcome === 'on' && !String(p.inbox_welcome_done).split(',').includes('agent')), 'Undo puts the row back and saves it: ' + JSON.stringify(after.slice(-1)));
 
         // the visible Dismiss button is the same dismissal, with no Undo toast
-        await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); [...${rowOf('Make a team so agents can work together')}.querySelectorAll('button')].find(b => b.textContent.trim() === 'Dismiss').click(); true`);
-        await waitFor(`![...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.firstChild.textContent === 'Make a team so agents can work together')`, 'the Dismiss button dismisses', 6000).catch(() => {});
+        const TEAM = 'Make a team so agents can work together';
+        try { await waitFor(`!!${rowOf(TEAM)}`, 'the team item is a row to press Dismiss on', 8000); } catch (e) { throw new Error(e.message + ' | rows now: ' + JSON.stringify(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(tr => (tr.querySelector('.inbox-welcome-name') || tr).textContent.slice(0, 50))`))); } // a row that is not there says which are (the list may be drawn again after Undo)
+        await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); [...${rowOf(TEAM)}.querySelectorAll('button')].find(b => b.textContent.trim() === 'Dismiss').click(); true`);
+        await waitFor(`![...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => ${NAME_TEXT}(e) === 'Make a team so agents can work together')`, 'the Dismiss button dismisses', 6000).catch(() => {});
         check(!(await titles()).includes('Make a team so agents can work together') && !(await ev(`[...document.querySelectorAll('.toast')].some(t => /Undo/.test(t.textContent))`)), 'the Dismiss button still works and offers no Undo');
 
         check(!(await reached(ev)).length, 'the swipe, its Undo and the Dismiss button sent nothing to an agent: ' + JSON.stringify(await reached(ev)));
@@ -79,7 +83,7 @@ const { installGuard, reached } = require('./helpers/silent_dismiss');
         g = await geo('Connect a second computer or the Hub'); end = await swipe(g, -g.width / 6); await touch('touchEnd', end, g.y); await frames(20);
         check((await geo('Connect a second computer or the Hub')).transition === 'none', 'with reduced motion the row does not slide back');
         g = await geo('Connect a second computer or the Hub'); end = await swipe(g, -g.width * 0.7); await touch('touchEnd', end, g.y);
-        await waitFor(`![...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.firstChild.textContent.startsWith('Connect a second computer'))`, 'dismissed with reduced motion', 6000).catch(() => {});
+        await waitFor(`![...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => ${NAME_TEXT}(e).startsWith('Connect a second computer'))`, 'dismissed with reduced motion', 6000).catch(() => {});
         check(!(await titles()).some(t => t.startsWith('Connect a second computer')), 'with reduced motion a long drag still dismisses');
     } finally { await client.close(); }
     if (found.length) { console.error(found.join('\n')); process.exit(1); }

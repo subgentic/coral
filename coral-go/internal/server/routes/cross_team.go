@@ -173,6 +173,8 @@ func (h *BoardHandler) UpdateBoardSettings(w http.ResponseWriter, r *http.Reques
 		// HealthRaw takes the "health" key before the embedded update's own field can (the shallower field wins), so the update sees the request's own keys and a health body that names only
 		// some settings changes only those.
 		HealthRaw json.RawMessage `json:"health"`
+		// Launch says the save is the team launch's own: the dialog's choices applied once the board exists (team_launch_settings.js). That is how the team starts, not a change to tell its Orchestrator about (#13221).
+		Launch bool `json:"launch"`
 	}
 	if cloud.Tunneled(r) {
 		// Through Coral Hub this is the owner's alone, decided before the body is read (#5307), and the body is strict: one JSON object of at
@@ -369,10 +371,14 @@ func (h *BoardHandler) UpdateBoardSettings(w http.ResponseWriter, r *http.Reques
 	if hubRecorded {
 		beforeHub, _ = h.bs.GetBoardSettings(r.Context(), project)
 	}
+	priorSettings, _ := h.bs.GetBoardSettings(r.Context(), project) // what the Orchestrator is told changed (#13173)
 	settings, err := h.bs.UpdateBoardSettings(r.Context(), project, body.BoardSettingsUpdate)
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
+	}
+	if !(body.Launch && callerActor(r).Kind != ActorToken) { // an agent's token cannot silence the notice for its own change
+		noteSettingsChange(h.bs, r, project, priorSettings, settings)
 	}
 	listEditRefused = false
 	if hubRecorded {
@@ -420,6 +426,7 @@ func (h *BoardHandler) UpdateBoardSettings(w http.ResponseWriter, r *http.Reques
 			slog.Warn("cross-team: could not log a list edit", "board", project, "error", err)
 		}
 	}
+	h.bs.NoteArtifactsChanged(project)
 	writeJSON(w, http.StatusOK, settings)
 }
 
@@ -896,8 +903,10 @@ func (h *BoardHandler) recordHubSettings(w http.ResponseWriter, r *http.Request,
 		if u.Health != nil || u.HealthPatch != nil { // the health setup sent in the same body was applied with the rest: it is undone with it (QA's #7329 finding)
 			undo.Health = &before.Health
 		}
-		if _, uerr := h.bs.UpdateBoardSettings(ctx, project, undo); uerr != nil {
+		if undone, uerr := h.bs.UpdateBoardSettings(ctx, project, undo); uerr != nil {
 			slog.Error("[cloud] could not undo a Coral Hub settings change that was not recorded", "board", project, "error", uerr)
+		} else {
+			noteSettingsChange(h.bs, r, project, after, undone) // the change was told when it was made: the undo cancels it in the same window, or is told as its own change after it
 		}
 		writeError(w, http.StatusInternalServerError, "record_failed", textHubSwitchNotRecorded)
 		return false

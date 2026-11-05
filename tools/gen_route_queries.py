@@ -62,8 +62,9 @@ EXTRA = {
     # The machine-wide list (#5575), the owner's: listAllArtifacts reads the page size, the cursor it gave and a board filter.
     'GET /api/artifacts': {'limit', 'cursor', 'board', 'starred'},
     # The comments on an artifact (#5176), registered by SessionsHandler.RegisterArtifactComments (not followed by the scan above):
-    # listArtifactComments reads the thread state filter and the board a lock is read for.
-    'GET /api/artifacts/{}/comments': {'state', 'board'},
+    # listArtifactComments reads the thread state filter and the board a lock is read for, and series (#6459): with series=1 only, the earlier versions' comments marked with where their text stands in the version on show.
+    # The shell's file viewer sends series=1 on every read (artifact_comments_api.js listComments), so through Coral Hub every Inbox click on a file was refused until it was listed (#13502).
+    'GET /api/artifacts/{}/comments': {'state', 'board', 'series'},
 }
 
 # Parameters a handler reads that Coral Hub never sends, refused through the tunnel (#3942, agreed with coral-hub):
@@ -92,6 +93,8 @@ ENUM = {
     'GET /api/team-artifacts': {'versions': ['newest']},
     # The artifact link form (#3168): only v=2 passes; any other value or a second v is refused. open=1 (#11836, #11845) is the viewer's Open in new tab (a readable tab, not a download); only that exact value passes.
     'GET /api/artifacts/{}': {'v': ['2'], 'open': ['1']},
+    # The earlier versions' comments (#6459, #13502): the handler acts on series=1 only and ignores any other value, so only that exact value passes (the shell sends nothing else).
+    'GET /api/artifacts/{}/comments': {'series': ['1']},
     # The token-usage summary without its per-session list (#9820, coral-hub): include accepts only totals; any other word is refused here as it is by the handler.
     'GET /api/token-usage/summary': {'include': ['totals']},
     # The prerequisite check (#4579, Launch tier): type is one of the agent types the handler knows (an UNKNOWN type answers found:true, so

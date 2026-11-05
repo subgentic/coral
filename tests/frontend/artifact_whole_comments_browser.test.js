@@ -56,7 +56,9 @@ const WIDTHS = [{ label: '1280', width: 1280, height: 800, mobile: false }, { la
                 check(`${tag}: the Comments button is offered`, await ev(`!document.querySelector('.ac-toggle').hidden`));
                 await ev(`(() => { const p = document.querySelector('.ac-panel'); if (!p.classList.contains('ac-sheet-open')) document.querySelector('.ac-toggle').click(); return true; })()`);
                 await waitFor(`!!document.querySelector('.ac-panel .ac-whole')`, `${tag}: Comment on the whole document`, 6000);
-                check(`${tag}: the panel offers "Comment on the whole document"`, await ev(`document.querySelector('.ac-panel .ac-whole').textContent.trim() === 'Comment on the whole document'`));
+                // a video's panel has a timeline and its one button is "Comment at playhead" (#13175); its comment is made at the playhead (time 0 for bytes that are not a playable video), so its card says Video: <time> where the others say The whole document
+                const want = k.mediaType.startsWith('video/') ? 'Comment at playhead' : 'Comment on the whole document';
+                check(`${tag}: the panel offers "${want}"`, await ev(`document.querySelector('.ac-panel .ac-whole').textContent.trim() === ${JSON.stringify(want)}`));
                 check(`${tag}: no comment can be made by selecting text unless it is text`, await ev(`(() => { const b = document.querySelector('.ac-selbtn'); return !b || b.hidden; })()`));
                 check(`${tag}: the panel is beside the document, never inside it`, await ev(`(() => { const p = document.querySelector('.ac-panel'), body = document.querySelector('.artifact-viewer-body'); return !body.contains(p) && !p.closest('iframe') && p.closest('.artifact-viewer-main') !== null; })()`));
                 if (k.html) {
@@ -69,7 +71,7 @@ const WIDTHS = [{ label: '1280', width: 1280, height: 800, mobile: false }, { la
                 await waitFor(`document.querySelectorAll('.ac-panel .ac-card').length === ${wi + 1}`, `${tag}: the new card`, 6000);
                 const d = await list(k.hex);
                 check(`${tag}: the server holds one whole-document comment with that text`, d && d.comments.length === wi + 1 && d.comments.every(c => c.anchor && c.anchor.whole === true) && d.comments.some(c => c.body === 'Looks right: ' + tag), JSON.stringify(d && d.comments && d.comments.map(c => c.anchor)));
-                check(`${tag}: the card says it is on the whole document`, await ev(`[...document.querySelectorAll('.ac-panel .ac-card .ac-quote')].every(q => /The whole document/.test(q.textContent))`));
+                check(`${tag}: the card says where the comment is: ${k.mediaType.startsWith('video/') ? 'the video time' : 'the whole document'}`, await ev(`[...document.querySelectorAll('.ac-panel .ac-card .ac-quote')].every(q => ${k.mediaType.startsWith('video/') ? '/^Video: /' : '/The whole document/'}.test(q.textContent))`));
                 check(`${tag}: Resolve and Reply are there, and Lock for the owner`, await ev(`(() => { const t = document.querySelector('.ac-panel').textContent; return /Resolve/.test(t) && /Reply/.test(t) && !!document.querySelector('.ac-panel .ac-lock'); })()`));
                 // clean up: the artifact's comments go with it, and the viewer closes
                 await ev(`document.querySelector('.artifact-viewer-close').click(); true`);

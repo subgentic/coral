@@ -5,16 +5,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/subgentic/coral/internal/querypage"
+	"github.com/subgentic/coral/internal/safego"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -44,8 +47,10 @@ type teamArtifact struct {
 	// Starred: the Operator starred this stored object on this computer (#9819); false for a row with no stored object.
 	Starred   bool   `json:"starred"`
 	CreatedAt string `json:"created_at"`
-	TaskID    int64  `json:"task_id"`
-	TaskTitle string `json:"task_title"`
+	// ReviewSentAt is when the file was sent for review (RFC 3339, UTC), present only while it carries the tag "for review" and was sent after the time was kept (#13231): "waiting for review" counts from it, a re-send starts it again.
+	ReviewSentAt string `json:"review_sent_at,omitempty"`
+	TaskID       int64  `json:"task_id"`
+	TaskTitle    string `json:"task_title"`
 	// GoalID and GoalTitle: the goal of this board the task works toward (#8579); absent for a task with none, and for a row of no task.
 	GoalID    *int64 `json:"goal_id,omitempty"`
 	GoalTitle string `json:"goal_title,omitempty"`
@@ -106,6 +111,7 @@ type teamArtifact struct {
 
 	index      int
 	managed    string // 64-hex Coral object id for coral-managed artifacts
+	fromRecord bool   // an upload row whose record holds the name, the type and the digest: the list needs no read of the sidecar for it (#13552)
 	uploadTask int64  // the task an upload's record says it is linked to (#7739): shown only once the board says the task is the team's (linkUploadTasks)
 }
 
@@ -178,7 +184,8 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 		errBadRequest(w, "session_id must be at most 128 characters without control characters")
 		return
 	}
-	items, scanTruncated, err := h.projectArtifactItems(r, project, sessionFilter)
+	artifactsRev := h.bs.ArtifactsRevision(project)
+	items, scanTruncated, _, err := h.projectArtifactItemsView(r, project, sessionFilter) // read-only: the query below filters into a new slice, and the page below is copied before a row of it is changed (#13552)
 	if err != nil {
 		errInternalServer(w, "could not list artifacts")
 		return
@@ -192,7 +199,7 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 		}
 	}
 	if tq != nil {
-		h.queryTeamArtifacts(w, r, project, items, scanTruncated, limit, offset, sessionFilter, tq)
+		h.queryTeamArtifacts(w, r, project, items, scanTruncated, limit, offset, sessionFilter, tq, artifactsRev)
 		return
 	}
 	end := offset + limit
@@ -203,7 +210,7 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 	if end > len(items) {
 		end = len(items)
 	}
-	page := items[offset:end]
+	page := append([]teamArtifact(nil), items[offset:end]...) // this page's own rows: the list it was cut from may be the kept one
 	dir := h.artifactObjectDir()
 	starred, serr := h.bs.StarredArtifactIDs(r.Context()) // a bookmark: an unreadable set leaves the rows unstarred
 	if serr != nil {
@@ -226,7 +233,8 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 		page = []teamArtifact{}
 	}
 	resp := map[string]any{
-		"project": project, "artifacts": page, "limit": limit, "offset": offset,
+		"artifacts_rev": artifactsRev,
+		"project":       project, "artifacts": page, "limit": limit, "offset": offset,
 		"has_more": hasMore, "truncated": scanTruncated,
 	}
 	if sessionFilter != "" {
@@ -238,10 +246,107 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 // projectArtifactItems is a team's artifact list as the team route builds it, before any query: the task results, the uploads of its agents, the cross-team rows and the upload task links, cut to what the caller may read.
 // sessionFilter keeps one session's uploads (only a session of this board).
 func (h *BoardHandler) projectArtifactItems(r *http.Request, project, sessionFilter string) ([]teamArtifact, bool, error) {
-	subscribers, err := h.bs.TeamSubscriberSessions(r.Context(), project)
+	items, truncated, aliased, err := h.projectArtifactItemsView(r, project, sessionFilter)
 	if err != nil {
 		return nil, false, err
 	}
+	if aliased {
+		items = cloneTeamRows(items) // a caller that writes to its rows (or through them) gets its own list
+	}
+	return items, truncated, nil
+}
+
+// projectArtifactItemsView is projectArtifactItems for a caller that only READS the rows (the team list's query: it filters into a new slice and copies the rows of its page before it changes one). shared says the
+// rows are the kept list's (aliased: the slice itself, or a copy of it that still shares what the rows point to), which no request may write to or through; a request whose parts need a row changed (the new-comments counts, a kind or a muted team, a private mark taken off, a Hub viewer's redaction) gets its own
+// copy, and one that changes nothing, the Operator's walk of a big board, copies nothing: 20,000 rows were copied for every page (#13552).
+func (h *BoardHandler) projectArtifactItemsView(r *http.Request, project, sessionFilter string) (items []teamArtifact, scanTruncated, aliased bool, err error) {
+	builtAt := h.itemsCache.clock() // when the data is read: the entry is as old as this, however long the build takes
+	subscribers, err := h.bs.TeamSubscriberSessions(r.Context(), project)
+	if err != nil {
+		return nil, false, false, err
+	}
+	// The revision is read BEFORE the data: a write during the build leaves the entry older than the next token (see teamItemsCache).
+	key := teamItemsKey{project: project, session: sessionFilter, rev: h.bs.ArtifactsRevision(project), subscribers: h.teamItemsSubscribers(subscribers)}
+	items, scanTruncated, anyPrivate, hit := h.itemsCache.get(key)
+	shared := hit // the slice is the kept one (own() copies it by value); the rows keep sharing what they point to either way
+	if !hit {
+		items, scanTruncated, err = h.buildProjectArtifactItems(r, project, sessionFilter, subscribers)
+		if err != nil {
+			return nil, false, false, err
+		}
+		h.itemsCache.put(key, builtAt, items, scanTruncated)
+		for i := range items {
+			if items[i].Private {
+				anyPrivate = true
+				break
+			}
+		}
+	}
+	own := func() { // the first write to a shared list copies it
+		if shared {
+			items = append([]teamArtifact(nil), items...)
+			shared = false
+		}
+	}
+	ctx := r.Context()
+	// What depends on the caller, or on settings that do not move the revision, is applied to this request's own view.
+	if h.commentNews != nil && len(items) > 0 && operatorOrKeyCaller(r) {
+		if news, nerr := h.commentNews(ctx); nerr == nil && len(news) > 0 {
+			own()
+			for i := range items {
+				items[i].NewComments = news[items[i].ID]
+			}
+		}
+	}
+	if len(items) > 0 && operatorOrKeyCaller(r) {
+		if kinds, kerr := h.bs.ArtifactKindsOf(ctx, project); kerr == nil {
+			prefs := h.inboxPrefs(ctx)
+			for i := range items {
+				if items[i].managed == "" {
+					continue
+				}
+				kind := kinds[items[i].managed]
+				setKind := kind != "" && kind != board.KindFile
+				muted := prefs.muted(project, kind)
+				if !setKind && !muted {
+					continue
+				}
+				own()
+				if setKind {
+					items[i].Kind = kind
+				}
+				if muted {
+					items[i].Muted = true
+				}
+			}
+		}
+	}
+	if filtered := filterReadable(r, h.coralDir, items); !sameList(filtered, items) { // an agent's list holds only what the one read check lets it read, so the totals and the cursor count nothing else (#5577)
+		items, shared = filtered, false // a new slice: this request's own
+	}
+	if anyPrivate && !ownerSeesPrivateMarks(r) {
+		own()
+		for i := range items {
+			items[i].Private = false // the marks are kept with the list; this caller may not see them
+		}
+	}
+	if shared && cloud.Tunneled(r) {
+		own() // a Hub viewer's rows are redacted in place by the query
+	}
+	return items, scanTruncated, hit, nil
+}
+
+// sameList says a and b are the one slice (the same first row, the same length): filterReadable answers the list it was given when it has nothing to take out.
+func sameList(a, b []teamArtifact) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	return len(a) == 0 || &a[0] == &b[0]
+}
+
+// buildProjectArtifactItems is the part of the list that is the team's own (the same for every caller): the task results, the uploads of its agents, the cross-team rows, the upload task links and the tags.
+func (h *BoardHandler) buildProjectArtifactItems(r *http.Request, project, sessionFilter string, subscribers map[string]string) ([]teamArtifact, bool, error) {
+	teamItemsBuildHook()
 	tasks, scanTruncated, err := h.bs.ListTeamArtifactTasksQuery(r.Context(), board.TeamArtifactQuery{
 		Project: project, Limit: board.MaxTeamArtifactTaskScan, SessionID: sessionFilter, Subscribers: subscribers,
 	})
@@ -261,10 +366,7 @@ func (h *BoardHandler) projectArtifactItems(r *http.Request, project, sessionFil
 	}
 	h.linkUploadTasks(r.Context(), project, items)
 	h.attachArtifactTags(r.Context(), project, items)
-	h.attachNewComments(r, items)
-	h.attachArtifactKinds(r, project, items)
-	items = filterReadable(r, h.coralDir, items) // an agent's list holds only what the one read check lets it read, so the totals and the cursor count nothing else (#5577)
-	h.attachArtifactPrivate(r, items)
+	h.markPrivateArtifacts(r.Context(), items)
 	return items, scanTruncated, nil
 }
 
@@ -417,6 +519,9 @@ func enrichTeamArtifact(it *teamArtifact, objectDir string) {
 		}
 		size := blob.Size()
 		it.Size, it.Available = &size, true
+		if it.fromRecord { // the upload record already holds the name, the type and the digest (the sidecar is the same text): the blob's own stat above is the one check of the file (#13552)
+			return
+		}
 		meta, ok := readArtifactSidecar(path + ".json")
 		if !ok {
 			return
@@ -552,9 +657,33 @@ type uploadDirCache struct {
 type uploadDirEntry struct {
 	mod     time.Time
 	uploads []sessionUpload
+	files   map[string]uploadFileSig // each record file as it was read: a dir that changed re-reads only the files that did (#13292)
+}
+
+// uploadFileSig is what says a record file is as it was when it was read.
+type uploadFileSig struct {
+	size int64
+	mod  time.Time
+	up   sessionUpload
+	ok   bool // the file held a record (a file that did not is remembered too, so it is not read again)
 }
 
 var uploadDirSettle = 2 * time.Second
+
+// uploadReadWorkers is how many record files are read at once in a cold directory (#13292: 20,000 records were read one after the other, 3.85 s).
+const uploadReadWorkers = 8
+
+// uploadWarmFolders is how many folders the start-up warm reads at once (each by uploadReadWorkers readers: 16 files open at most, Security's INFO on #13292).
+const uploadWarmFolders = 2
+
+// uploadRecordReads counts every record file that was read (the server's start-up test reads it through UploadRecordReads).
+var uploadRecordReads atomic.Int64
+
+// UploadRecordReads is how many upload record files have been read by this process so far (a test seam: the start-up warm reads them before any request).
+func UploadRecordReads() int64 { return uploadRecordReads.Load() }
+
+// uploadRecordReadHook runs once for each record file that is actually read (tests count them).
+var uploadRecordReadHook = func() {}
 
 // list returns the session's upload records (nil when it has none).
 func (c *uploadDirCache) list(coralDir, sessionID string) []sessionUpload {
@@ -572,9 +701,10 @@ func (c *uploadDirCache) list(coralDir, sessionID string) []sessionUpload {
 	mod := st.ModTime()
 	settled := time.Since(mod) >= uploadDirSettle
 	c.mu.Lock()
-	if e, ok := c.dirs[dir]; ok && settled && e.mod.Equal(mod) {
+	prev, had := c.dirs[dir]
+	if had && settled && prev.mod.Equal(mod) {
 		c.mu.Unlock()
-		return e.uploads
+		return prev.uploads
 	}
 	c.mu.Unlock()
 
@@ -582,31 +712,119 @@ func (c *uploadDirCache) list(coralDir, sessionID string) []sessionUpload {
 	if err != nil {
 		return nil
 	}
-	var uploads []sessionUpload
+	type slot struct {
+		name string
+		sig  uploadFileSig
+		read bool // this file has to be read
+	}
+	slots := make([]slot, 0, len(entries))
 	for _, e := range entries {
 		id := strings.TrimSuffix(e.Name(), ".json")
 		if e.IsDir() || id == e.Name() || len(id) != 64 {
 			continue
 		}
-		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
-		if err != nil || len(data) > maxArtifactMetaBytes {
-			continue
+		sl := slot{name: e.Name(), read: true}
+		if had {
+			if info, err := e.Info(); err == nil {
+				if old, ok := prev.files[e.Name()]; ok && old.size == info.Size() && old.mod.Equal(info.ModTime()) && time.Since(info.ModTime()) >= uploadDirSettle {
+					sl.sig, sl.read = old, false // as it was read, and not written in the last moments
+				}
+			}
 		}
-		var rec agentUploadRecord
-		if json.Unmarshal(data, &rec) != nil {
-			continue
-		}
-		uploads = append(uploads, sessionUpload{id: strings.ToLower(id), rec: rec})
+		slots = append(slots, sl)
 	}
+	var wg sync.WaitGroup
+	next := make(chan int)
+	for w := 0; w < uploadReadWorkers; w++ {
+		wg.Add(1)
+		go func() {
+			defer safego.Recover("upload records read")
+			defer wg.Done()
+			for i := range next {
+				slots[i].sig = readUploadRecordFile(dir, slots[i].name)
+			}
+		}()
+	}
+	for i := range slots {
+		if slots[i].read {
+			next <- i
+		}
+	}
+	close(next)
+	wg.Wait()
+	var uploads []sessionUpload
+	files := make(map[string]uploadFileSig, len(slots))
+	for _, sl := range slots {
+		files[sl.name] = sl.sig
+		if sl.sig.ok {
+			uploads = append(uploads, sl.sig.up)
+		}
+	}
+	// Newest first, ties by id, once per change of the folder (the cache keeps it sorted): every request merged these into the team's list and sorted 20,000 rows by their time again (#13522: 57% of a page's CPU).
+	slices.SortStableFunc(uploads, func(a, b sessionUpload) int {
+		if a.rec.CreatedAt != b.rec.CreatedAt {
+			return strings.Compare(b.rec.CreatedAt, a.rec.CreatedAt)
+		}
+		return strings.Compare(a.id, b.id)
+	})
 	if settled {
 		c.mu.Lock()
 		if c.dirs == nil {
 			c.dirs = make(map[string]uploadDirEntry)
 		}
-		c.dirs[dir] = uploadDirEntry{mod: mod, uploads: uploads}
+		c.dirs[dir] = uploadDirEntry{mod: mod, uploads: uploads, files: files}
 		c.mu.Unlock()
 	}
 	return uploads
+}
+
+// readUploadRecordFile reads and parses one record file: the file as read (its size and time are those before the read, so a write during it is read again next time).
+func readUploadRecordFile(dir, name string) uploadFileSig {
+	uploadRecordReadHook()
+	uploadRecordReads.Add(1)
+	path := filepath.Join(dir, name)
+	var sig uploadFileSig
+	if info, err := os.Stat(path); err == nil {
+		sig.size, sig.mod = info.Size(), info.ModTime()
+	}
+	data, err := os.ReadFile(path)
+	if err != nil || len(data) > maxArtifactMetaBytes {
+		return sig
+	}
+	var rec agentUploadRecord
+	if json.Unmarshal(data, &rec) != nil {
+		return sig
+	}
+	sig.up, sig.ok = sessionUpload{id: strings.ToLower(strings.TrimSuffix(name, ".json")), rec: rec}, true
+	return sig
+}
+
+// warm reads every session's upload records into the cache, a few at a time, so the first artifacts read after a start is not the one that pays for the scan (#13292).
+func (c *uploadDirCache) warm(coralDir string) {
+	root := filepath.Join(coralDir, "artifacts", "uploads")
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return
+	}
+	var wg sync.WaitGroup
+	next := make(chan string)
+	for w := 0; w < uploadWarmFolders; w++ {
+		wg.Add(1)
+		go func() {
+			defer safego.Recover("upload records warm")
+			defer wg.Done()
+			for sid := range next {
+				c.list(coralDir, sid)
+			}
+		}()
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			next <- e.Name()
+		}
+	}
+	close(next)
+	wg.Wait()
 }
 
 // merge adds the listed sessions' uploaded objects that no task result in items
@@ -644,6 +862,7 @@ func (c *uploadDirCache) merge(items []teamArtifact, coralDir string, sessions m
 				ID: u.id, Name: u.rec.Name, MediaType: u.rec.MediaType, CreatedAt: u.rec.CreatedAt, Size: sizeOfRecord(u.rec.Size),
 				Source: "upload", URI: "coral://artifacts/" + u.id, Digest: u.rec.Digest,
 				ReferenceCount: 1, SessionID: &sid, managed: u.id, uploadTask: u.rec.TaskID,
+				fromRecord: u.rec.Name != "" && !digestLikeName.MatchString(u.rec.Name) && u.rec.MediaType != "" && u.rec.Digest != "",
 			}
 			if producer != "" {
 				p := producer
@@ -659,11 +878,14 @@ func (c *uploadDirCache) merge(items []teamArtifact, coralDir string, sessions m
 	}
 	if added {
 		// Newest first; ties keep a stable order (by id) whatever the map order.
-		sort.SliceStable(items, func(i, j int) bool {
-			if items[i].CreatedAt != items[j].CreatedAt {
-				return items[i].CreatedAt > items[j].CreatedAt
+		slices.SortStableFunc(items, func(a, b teamArtifact) int {
+			if a.CreatedAt != b.CreatedAt {
+				return strings.Compare(b.CreatedAt, a.CreatedAt)
 			}
-			return items[i].TaskID == 0 && items[j].TaskID == 0 && items[i].ID < items[j].ID
+			if a.TaskID == 0 && b.TaskID == 0 {
+				return strings.Compare(a.ID, b.ID)
+			}
+			return 0
 		})
 	}
 	return items
@@ -813,7 +1035,16 @@ func (h *BoardHandler) addWaitsOnThis(r *http.Request, project string, rows []te
 // attachArtifactPrivate marks the items the manager made private, for the owner's own read only (the person at this computer, or the Hub owner): an agent's list and a guide's never carry the mark. A failure leaves the
 // marks off (the list is the same without them).
 func (h *BoardHandler) attachArtifactPrivate(r *http.Request, items []teamArtifact) {
-	if h.bs == nil || !ownerSeesPrivateMarks(r) {
+	if !ownerSeesPrivateMarks(r) {
+		return
+	}
+	h.markPrivateArtifacts(r.Context(), items)
+}
+
+// markPrivateArtifacts puts Private on the rows whose artifact is private to the manager, whoever asks: the list kept for a walk holds it (a mark moves the revision, SetArtifactPrivate), and a caller who may not see
+// the marks has them taken off its copy (hidePrivateMarks).
+func (h *BoardHandler) markPrivateArtifacts(ctx context.Context, items []teamArtifact) {
+	if h.bs == nil {
 		return
 	}
 	ids := make([]string, 0, len(items))
@@ -822,7 +1053,7 @@ func (h *BoardHandler) attachArtifactPrivate(r *http.Request, items []teamArtifa
 			ids = append(ids, id)
 		}
 	}
-	marks, err := h.bs.PrivateArtifacts(r.Context(), ids)
+	marks, err := h.bs.PrivateArtifacts(ctx, ids)
 	if err != nil || len(marks) == 0 {
 		return
 	}
@@ -865,3 +1096,6 @@ func (h *BoardHandler) attachSeriesVersions(rows []teamArtifact, project string)
 		}
 	}
 }
+
+// WarmUploads reads every session's upload records into the board handler's cache (called once after a start, in the background).
+func (h *BoardHandler) WarmUploads() { h.uploads.warm(h.coralDir) }

@@ -80,7 +80,7 @@ function renderLiveActivityChart() {
 
 export function switchAgenticTab(tabName, blockId) {
     document.dispatchEvent(new CustomEvent('coral:agentic-tab')); // the agent row's ⋯ card closes when another part of the agent page opens (#11284)
-    if (dockKind() === 'agent') tabName = openableTab(tabName); // a tab the user hid opens the always-shown one instead (only the agent page's tabs can be hidden)
+    if (dockKind() === 'agent') tabName = openableTab(tabName); // a hidden tab opens the first visible tab, or the empty state (only the agent page's tabs can be hidden)
     // Scope tab/panel switching to the containing block
     const block = blockId
         ? document.getElementById(`agentic-block-${blockId}`)
@@ -100,7 +100,7 @@ export function switchAgenticTab(tabName, blockId) {
     if (activePanel) activePanel.classList.add('active');
 
     // Persist tab choice per block
-    if (blockId) {
+    if (blockId && tabName !== 'no-tabs') {
         browserLocal.set(dockKey(`coral-agentic-tab-${blockId}`), tabName);
     }
 

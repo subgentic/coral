@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -482,5 +483,81 @@ func TestDaemonCommandsTestTheCommandLineBeforeTheyActOnAPID(t *testing.T) {
 	}
 	if strings.Contains(stop, "kill -9") || strings.Contains(stop, "pkill") || strings.Contains(stop, "killall") {
 		t.Errorf("stop must signal one PID with SIGTERM only: %s", stop)
+	}
+}
+
+// A secret install the far computer ends non-zero (a release folder it does not have, say) says why: the exit code and the start of what it wrote, for the hub's log only (#13230).
+func TestInstallOwnerSecretThatFailsSaysWhy(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the far ssh is a #!/bin/sh stand-in, which Windows cannot run; the shipped code does not depend on it")
+	}
+	ssh := filepath.Join(t.TempDir(), "ssh")
+	if err := os.WriteFile(ssh, []byte("#!/bin/sh\ncat >/dev/null\necho 'sh: coral: not found' >&2\nexit 127\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	tg, _ := ParseTarget("rich@box.example.com")
+	err := Runner{SSH: ssh}.InstallOwnerSecret(context.Background(), tg, "2.0.10", "ssh-box", strings.Repeat("ab", 32))
+	var oe *OwnerSecretError
+	if !errors.As(err, &oe) {
+		t.Fatalf("err = %v, want an OwnerSecretError", err)
+	}
+	if oe.ExitCode != 127 || !strings.Contains(oe.Stderr, "coral: not found") {
+		t.Errorf("got %+v", oe)
+	}
+}
+
+// A far command that echoes its stdin in an error must not put the secret in the hub's log (#13251, Security's SHOULD): the secret, the whole payload and a cut piece of a secret are taken out.
+func TestInstallOwnerSecretFailureKeepsTheSecretOutOfTheKeptStderr(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the far ssh is a #!/bin/sh stand-in, which Windows cannot run; the shipped code does not depend on it")
+	}
+	secret := strings.Repeat("ab", 32)
+	ssh := filepath.Join(t.TempDir(), "ssh")
+	script := "#!/bin/sh\ninput=$(cat)\necho \"bad input: $input and again ${input#*secret}\" >&2\necho \"half " + secret[:40] + " end\" >&2\nexit 3\n"
+	if err := os.WriteFile(ssh, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	tg, _ := ParseTarget("rich@box.example.com")
+	err := Runner{SSH: ssh}.InstallOwnerSecret(context.Background(), tg, "2.0.10", "ssh-box", secret)
+	var oe *OwnerSecretError
+	if !errors.As(err, &oe) {
+		t.Fatalf("err = %v", err)
+	}
+	if strings.Contains(oe.Stderr, secret[:20]) || strings.Contains(oe.Stderr, `"remote"`) {
+		t.Errorf("the secret or the payload is in the kept stderr: %q", oe.Stderr)
+	}
+	if !strings.Contains(oe.Stderr, "bad input") {
+		t.Errorf("the rest of the message was lost: %q", oe.Stderr)
+	}
+}
+
+// What withoutSecret takes out of the kept stderr (#13272, QA Reviewer 2's pins on #13251): each rule alone, and the length of a hex run that goes.
+func TestWithoutSecretEachRuleAlone(t *testing.T) {
+	secret := strings.Repeat("ab", 32)
+	payload := `{"remote":"ssh-box","secret":"` + secret + `"}`
+	if got := withoutSecret("x "+secret+" y", secret, payload); got != "x [secret] y" {
+		t.Errorf("the secret alone: %q", got)
+	}
+	if got := withoutSecret("bad "+payload, secret, payload); got != "bad [stdin]" {
+		t.Errorf("the whole payload: %q", got)
+	}
+	if got := withoutSecret("no secret here, id ssh-box", secret, payload); got != "no secret here, id ssh-box" {
+		t.Errorf("plain text changed: %q", got)
+	}
+}
+
+func TestWithoutSecretHexThreshold(t *testing.T) {
+	secret, payload := strings.Repeat("ab", 32), "p"
+	if got := withoutSecret("k "+strings.Repeat("a", 15)+" k", secret, payload); got != "k "+strings.Repeat("a", 15)+" k" {
+		t.Errorf("15 hex digits are kept: %q", got)
+	}
+	if got := withoutSecret("k "+strings.Repeat("a", 16)+" k", secret, payload); got != "k [hex] k" {
+		t.Errorf("16 hex digits go: %q", got)
+	}
+	if got := withoutSecret("k "+strings.Repeat("A", 20)+" k", secret, payload); got != "k [hex] k" {
+		t.Errorf("upper case too: %q", got)
+	}
+	if got := withoutSecret("a deadbeef and cafe", secret, payload); got != "a deadbeef and cafe" {
+		t.Errorf("a short hex word is kept: %q", got)
 	}
 }

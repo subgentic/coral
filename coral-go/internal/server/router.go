@@ -305,6 +305,7 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 	sysHandler.SetSavedPresence(savedBoardHas, histHandler.SavedAgentPresence)
 	schedHandler := routes.NewScheduleHandler(s.db, s.cfg)
 	s.schedHandler = schedHandler
+	s.chiefChecks = routes.NewChiefChecksHandler(s.db, sessHandler)
 	workflowHandler := routes.NewWorkflowHandler(s.db, s.cfg)
 	s.workflowHandler = workflowHandler
 	themeHandler := routes.NewThemesHandler(s.cfg)
@@ -349,7 +350,8 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/sessions/live/{name}/chat", sessHandler.Chat)
 	r.Get("/api/sessions/live/{name}/attachment/{ref}", sessHandler.ChatAttachment) // a pasted image of the chat, for its chip (#5032)
 	r.Get("/api/sessions/live/{name}/info", sessHandler.Info)
-	r.Get("/api/sessions/live/{name}/mcp-servers", sessHandler.AgentMCPServers) // #9769: which MCP servers the agent has configured, read-only
+	r.Get("/api/sessions/live/{name}/loaded-skills", sessHandler.AgentLoadedSkills) // #13208: the skills the agent LOADED through skills get (a record, not a folder scan), read-only
+	r.Get("/api/sessions/live/{name}/mcp-servers", sessHandler.AgentMCPServers)     // #9769: which MCP servers the agent has configured, read-only
 	r.Get("/api/sessions/live/{name}/files", sessHandler.Files)
 	r.Get("/api/sessions/live/{name}/memory", sessHandler.ListMemory)      // an agent's instruction and memory files (#7454): the Operator's, never through the Hub
 	r.Get("/api/sessions/live/{name}/memory/{id}", sessHandler.ReadMemory) // one of them as text, by an id the list issued
@@ -400,6 +402,7 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 
 	// Bulk sleep/wake all (must be registered before {name} routes to avoid conflicts)
 	r.Post("/api/sessions/live/sleep-all", sessHandler.SleepAll)
+	r.Post("/api/sessions/live/sleep-gone", sessHandler.SleepGone) // agents whose terminal is gone move to plain sleeping (#13171)
 	r.Post("/api/sessions/live/wake-all", sessHandler.WakeAll)
 
 	// Team sleep/wake
@@ -495,6 +498,7 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	// Cloud Hub connector settings (never reachable through the tunnel)
 	s.cloudHandler = routes.NewCloudHandler(store.NewSessionStore(s.db), s.cfg.CoralDir())
 	s.cloudHandler.OfferAtLaunch = s.cfg.OffersCloudConnect()
+	s.cloudHandler.HubUpdateAtLaunch = s.cfg.AllowHubUpdate
 	r.Get("/api/cloud/status", s.cloudHandler.GetStatus)
 	r.Post("/api/cloud/connect", s.cloudHandler.Connect)
 	r.Post("/api/cloud/connect/cancel", s.cloudHandler.CancelConnect)
@@ -543,11 +547,15 @@ func (s *Server) registerCloud(r *chi.Mux) {
 		s.sysHandler.SetUpdaterRecord(updater.Record) // the update notice reads what the updater's last check found, and asks GitHub for nothing where the updater checks (#9726)
 	}
 	upd := routes.NewUpdateRelaunchHandler(store.NewSessionStore(s.db), s.cfg.CoralDir(), func() string { return routes.TerminalKind(s.terminal) }, updater)
+	if s.boardStore != nil {
+		upd.Activity = s.boardStore.RecordActivity // the Hub's update check and relaunch are rows of the Operator's record (#13340)
+	}
 	r.Get("/api/system/update", upd.Status)
 	r.Post("/api/system/update/relaunch", upd.Relaunch)
 	r.Post("/api/system/update/install", s.cloudHandler.InstallUpdate) // #166: the local "Install update" (Windows), never through Coral Hub
 	r.Post("/api/system/update/relaunch-local", upd.RelaunchLocal)     // #5280 step 3: the person at this computer; local only, 404 until the feature is on
 	r.Post("/api/system/update/check", upd.CheckNow)                   // #5280 step 3 B: local only, 404 until the feature is on
+	r.Post("/api/system/update/check-hub", upd.CheckHub)               // #13258: the Hub owner asks for a check (the owner and the switch gate it); never installs
 	r.Put("/api/system/update/settings", upd.SetAuto)                  // check automatically
 	s.goBackground(upd.RunBackgroundChecks)                            // returns at once while the feature is off
 	upd.Idle, upd.InFlight, upd.LastPerson, upd.Work = s.sessHandler.UpdateIdleReason, ptymanager.AutomatedInputInFlight, terminalinput.LastPersonInput, background.BusyWork
@@ -710,6 +718,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/sessions/history/{sessionID}/resume-info", histHandler.GetResumeInfo)
 
 	// Scheduled jobs
+	s.chiefChecks.Register(r)
 	r.Get("/api/scheduled/jobs", schedHandler.ListJobs)
 	r.Get("/api/scheduled/jobs/{jobID}", schedHandler.GetJob)
 	r.With(routes.RefuseSignInLink).Post("/api/scheduled/jobs", schedHandler.CreateJob)

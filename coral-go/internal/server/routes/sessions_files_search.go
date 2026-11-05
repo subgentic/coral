@@ -4,10 +4,13 @@ package routes
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -80,11 +83,37 @@ func (h *SessionsHandler) SearchFiles(w http.ResponseWriter, r *http.Request) {
 		allFiles = kept
 	}
 
-	if query == "" {
-		if len(allFiles) > fileSearchLimit {
-			allFiles = allFiles[:fileSearchLimit]
+	// limit (1 to the setting, which is the default) and cursor (a search's last next_cursor) page the matches; the answer says how many there are (total) and whether more are cut (has_more),
+	// beside files: a request with neither answers the first fileSearchLimit files as always (#13289).
+	pageLimit := fileSearchLimit
+	if v := r.URL.Query().Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > fileSearchLimit {
+			errBadRequest(w, "limit must be 1 to "+strconv.Itoa(fileSearchLimit))
+			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"files": allFiles})
+		pageLimit = n
+	}
+	var after *fileMatchPos
+	if c := r.URL.Query().Get("cursor"); c != "" {
+		pos, ok := decodeFileMatchPos(c)
+		if !ok {
+			errBadRequest(w, "invalid cursor")
+			return
+		}
+		after = &pos
+	}
+	if query == "" {
+		// The list in git's order, which a cursor cannot name (new files come after the tracked ones): a listing has total and has_more, and a cursor with it is a 400.
+		if after != nil {
+			errBadRequest(w, "cursor needs a search (q)")
+			return
+		}
+		total := len(allFiles)
+		if len(allFiles) > pageLimit {
+			allFiles = allFiles[:pageLimit]
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"files": allFiles, "total": total, "has_more": total > len(allFiles)})
 		return
 	}
 
@@ -114,14 +143,53 @@ func (h *SessionsHandler) SearchFiles(w http.ResponseWriter, r *http.Request) {
 		}
 		return matches[i].path < matches[j].path
 	})
-	result := make([]string, 0, fileSearchLimit)
-	for i, m := range matches {
-		if i >= fileSearchLimit {
-			break
-		}
-		result = append(result, m.path)
+	total := len(matches)
+	start := 0
+	if after != nil { // the first match after the cursor's place in (score, path) order: stable while the list changes under it
+		start = sort.Search(len(matches), func(i int) bool {
+			if matches[i].score != after.Score {
+				return matches[i].score > after.Score
+			}
+			return matches[i].path > after.Path
+		})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"files": result})
+	result := make([]string, 0, pageLimit)
+	for i := start; i < len(matches) && len(result) < pageLimit; i++ {
+		result = append(result, matches[i].path)
+	}
+	out := map[string]any{"files": result, "total": total, "has_more": false}
+	if end := start + len(result); end < len(matches) && len(result) > 0 {
+		last := matches[end-1]
+		out["has_more"] = true
+		out["next_cursor"] = encodeFileMatchPos(last.score, last.path)
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// The file search cursor: base64url of {"s": score, "p": path}, at most 1024 bytes, only a place in the (score, path) order of one search.
+type fileMatchPos struct {
+	Score int
+	Path  string
+}
+
+func encodeFileMatchPos(score int, path string) string {
+	raw, _ := json.Marshal(map[string]any{"s": score, "p": path})
+	return base64.RawURLEncoding.EncodeToString(raw)
+}
+
+func decodeFileMatchPos(c string) (fileMatchPos, bool) {
+	var p struct {
+		S int    `json:"s"`
+		P string `json:"p"`
+	}
+	if len(c) > 1024 {
+		return fileMatchPos{}, false
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(c)
+	if err != nil || json.Unmarshal(raw, &p) != nil || p.P == "" || p.S < 0 || p.S > 2 {
+		return fileMatchPos{}, false
+	}
+	return fileMatchPos{Score: p.S, Path: p.P}, true
 }
 
 // searchFilesDir lists filesystem entries in a specific directory for

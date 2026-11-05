@@ -238,3 +238,111 @@ func TestAStampRefusalAsksForTheClocksToBeChecked(t *testing.T) {
 	require.Equal(t, http.StatusForbidden, w.Code)
 	assert.Contains(t, w.Body.String(), "Check that both computers' clocks are right")
 }
+
+// #13456: a message to an agent through a self-hosted Hub reaches the remote with the server's API key. A bare key is automation (a script holding it must not appear as the Operator), but the hub's signed-in owner
+// at Interact is a person: the owner stamp is accepted on the send route too, so the chat shows the message as theirs and the agent gets it as a person's.
+func TestTheSendRouteTakesAnOwnerStampAndABareKeyStaysAutomation(t *testing.T) {
+	rig := newStampRig(t, true)
+	route := "/api/sessions/live/claude-abc/send"
+	body := `{"command":"please send me a short summary of the batch","agent_type":"claude","session_id":"abc"}`
+
+	w := rig.do("POST", route, body, nil)
+	require.Equal(t, 200, w.Code)
+	assert.False(t, rig.seen.human, "a bare API key on the send route is automation, whoever holds the key")
+
+	w = rig.do("POST", route, body, func(r *http.Request) {
+		r.Header.Set(hubowner.Header, stampFor(t, "POST", route, body, time.Now()))
+	})
+	require.Equal(t, 200, w.Code, w.Body.String())
+	assert.True(t, rig.seen.human, "the hub's signed-in owner is a person on the send route")
+	assert.Equal(t, callerHubOwner, rig.seen.kind)
+
+	other := "/api/sessions/live/claude-abc/keys" // a stamp for any other input route is still refused
+	w = rig.do("POST", other, body, func(r *http.Request) {
+		r.Header.Set(hubowner.Header, stampFor(t, "POST", other, body, time.Now()))
+	})
+	assert.Equal(t, 403, w.Code, "only the send route joined the allowlist")
+}
+
+// The owner's decision on a team's proposed goal or task, made at the hub, is a person's on the remote (#13454): Approve and Reject take an owner stamp, a bare key stays automation (and the
+// handlers refuse it), a stamp for one decision or one proposal is no use for another, and a stamp is used once.
+func TestTheProposalDecisionsTakeAnOwnerStampAndABareKeyStaysAutomation(t *testing.T) {
+	rig := newStampRig(t, true)
+	body := `{"title":"Ship it"}`
+	for _, action := range []string{"approve", "reject"} {
+		route := "/api/board/team/proposals/7/" + action
+		w := rig.do("POST", route, body, nil)
+		require.Equal(t, 200, w.Code)
+		assert.False(t, rig.seen.human, "a bare key on %s is automation, whoever holds it", action)
+
+		stamp := stampFor(t, "POST", route, body, time.Now())
+		w = rig.do("POST", route, body, func(r *http.Request) { r.Header.Set(hubowner.Header, stamp) })
+		require.Equal(t, 200, w.Code, w.Body.String())
+		assert.True(t, rig.seen.human, "the hub's signed-in owner decides on %s", action)
+		assert.Equal(t, callerHubOwner, rig.seen.kind)
+
+		w = rig.do("POST", route, body, func(r *http.Request) { r.Header.Set(hubowner.Header, stamp) })
+		assert.Equal(t, 403, w.Code, "a stamp is used once: a replay is refused (%s)", action)
+	}
+
+	approveStamp := stampFor(t, "POST", "/api/board/team/proposals/7/approve", body, time.Now())
+	w := rig.do("POST", "/api/board/team/proposals/7/reject", body, func(r *http.Request) { r.Header.Set(hubowner.Header, approveStamp) })
+	assert.Equal(t, 403, w.Code, "an Approve stamp does not Reject")
+	w = rig.do("POST", "/api/board/team/proposals/8/approve", body, func(r *http.Request) {
+		r.Header.Set(hubowner.Header, stampFor(t, "POST", "/api/board/team/proposals/7/approve", body, time.Now()))
+	})
+	assert.Equal(t, 403, w.Code, "a stamp for proposal 7 is no use for proposal 8")
+	other := "/api/board/team/proposals/7/edit" // no other proposal route joined the allowlist
+	w = rig.do("POST", other, body, func(r *http.Request) { r.Header.Set(hubowner.Header, stampFor(t, "POST", other, body, time.Now())) })
+	assert.Equal(t, 403, w.Code, "only Approve and Reject joined the allowlist")
+	w = rig.do("POST", "/api/board/team/proposals/7/approve", `{"title":"changed"}`, func(r *http.Request) {
+		r.Header.Set(hubowner.Header, stampFor(t, "POST", "/api/board/team/proposals/7/approve", body, time.Now()))
+	})
+	assert.Equal(t, 403, w.Code, "a stamp covers the body it was made for: an edited title is refused")
+}
+
+// Ignore and Undo of a question through our own hub (#13462): a genuine stamp on the close route makes the API-key request the hub's signed-in person's; a bare key is automation; a stamp made for another question's
+// close, or for another body, is refused.
+func TestAGenuineStampOnTheAskCloseMakesItAPersonsAndNothingElseDoes(t *testing.T) {
+	const route = "/api/board/team/asks/42/close"
+	rig := newStampRig(t, true)
+	body := `{"note":"Dismissed by the operator"}`
+	w := rig.do("POST", route, body, nil)
+	require.Equal(t, 200, w.Code)
+	assert.False(t, rig.seen.human, "a bare API key is automation")
+	w = rig.do("POST", route, body, func(r *http.Request) { r.Header.Set(hubowner.Header, stampFor(t, "POST", route, body, time.Now())) })
+	require.Equal(t, 200, w.Code, w.Body.String())
+	assert.True(t, rig.seen.human, "a genuine stamp is the hub's signed-in person")
+	assert.Equal(t, callerHubOwner, rig.seen.kind)
+	w = rig.do("POST", "/api/board/team/asks/43/close", body, func(r *http.Request) { r.Header.Set(hubowner.Header, stampFor(t, "POST", route, body, time.Now())) })
+	assert.NotEqual(t, 200, w.Code, "a stamp for question 42's close is refused on question 43")
+	assert.False(t, rig.seen.ran)
+	w = rig.do("POST", route, `{"undo":true}`, func(r *http.Request) { r.Header.Set(hubowner.Header, stampFor(t, "POST", route, body, time.Now())) })
+	assert.NotEqual(t, 200, w.Code, "a stamp for one body is refused on another")
+}
+
+// The owner's change of a goal's driver and its move to another team, made at the hub (#13517), are a person's on the remote: a genuine stamp makes the API-key request the hub's signed-in person's, a bare key stays automation, and a stamp
+// made for one goal or one of the two routes is no use for another.
+func TestGoalDriverAndMoveTakeAnOwnerStampAndABareKeyStaysAutomation(t *testing.T) {
+	rig := newStampRig(t, true)
+	for _, c := range []struct{ route, body string }{
+		{"/api/board/team/goals/7/driver", `{"driver":"dev-1"}`},
+		{"/api/board/team/goals/7/move", `{"to_project":"other"}`},
+	} {
+		w := rig.do("POST", c.route, c.body, nil)
+		require.Equal(t, 200, w.Code)
+		assert.False(t, rig.seen.human, "a bare API key on %s is automation, whoever holds it", c.route)
+		stamp := stampFor(t, "POST", c.route, c.body, time.Now())
+		w = rig.do("POST", c.route, c.body, func(r *http.Request) { r.Header.Set(hubowner.Header, stamp) })
+		require.Equal(t, 200, w.Code, w.Body.String())
+		assert.True(t, rig.seen.human, "the hub's signed-in owner is a person on %s", c.route)
+		assert.Equal(t, callerHubOwner, rig.seen.kind)
+	}
+	driverStamp := stampFor(t, "POST", "/api/board/team/goals/7/driver", `{"driver":"dev-1"}`, time.Now())
+	w := rig.do("POST", "/api/board/team/goals/7/move", `{"driver":"dev-1"}`, func(r *http.Request) { r.Header.Set(hubowner.Header, driverStamp) })
+	assert.Equal(t, 403, w.Code, "a driver stamp does not move a goal")
+	w = rig.do("POST", "/api/board/team/goals/8/driver", `{"driver":"dev-1"}`, func(r *http.Request) {
+		r.Header.Set(hubowner.Header, stampFor(t, "POST", "/api/board/team/goals/7/driver", `{"driver":"dev-1"}`, time.Now()))
+	})
+	assert.Equal(t, 403, w.Code, "a stamp for goal 7 is no use for goal 8")
+}

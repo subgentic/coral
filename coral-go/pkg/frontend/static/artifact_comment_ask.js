@@ -2,7 +2,8 @@
 import { importOnce } from './import_once.js';
 import { isSignedOut } from './overload.js';
 import { scrollBehavior } from './motion.js';
-import { decisionNeedsPerson } from './server_base.js';
+import { decisionNeedsPerson, normServer } from './server_base.js';
+import { state } from './state.js';
 const api = await importOnce('./artifact_comments_api.js');
 const askUi = await importOnce('./artifact_comment_send.js');
 const { agentLink } = await importOnce('./agent_link.js');
@@ -11,6 +12,17 @@ const { agentLink } = await importOnce('./agent_link.js');
 export function createAsk({ st, panel, render, announce, refresh, ownHex }) {
     const askedBy = new Map(); // comment id -> Map(agent role, lowercase -> words): who was asked into a thread from this panel (the server refuses a second ask of an open one, and says so)
     const canAsk = (c) => !decisionNeedsPerson(st.server) && !!st.board && !!st.data?.canLock && !c.deleted && !c.resolved && c.parentId == null;
+    /** Why Send to agent is not offered on this computer's file, when the reason is the missing Approve secret (#13230): `{ id, ssh }` for the computer, null when nothing is wrong. A person who comments on a file from a computer set up
+     *  over SSH saw no Send to agent and no word why; the note says it and points at the Computers page, where an SSH computer has a button that sets it up. */
+    const askSetup = () => {
+        if (!st.board || !st.data?.canLock || !decisionNeedsPerson(st.server)) return null;
+        const live = (state.servers || []).find(s => s && normServer(s.id) === normServer(st.server));
+        return live ? { id: live.id, ssh: live.transport === 'ssh' } : null;
+    };
+    // A viewer lifetime owns its picker and transient status, even when the
+    // next open uses the same computer, team and file.
+    const resetAsk = () => { st.ask = null; askedBy.clear(); names.clear(); };
+    const current = k => st.ask === k && st.lifetime === k.lifetime && st.hex === k.context.hex && st.server === k.context.server && st.board === k.context.board;
     const names = new Map(); // lower-cased role -> the role as written ("UX/UX Engineer"): the line under a comment shows it as written (#12168)
     const askedOf = (id) => askedBy.get(id) || (askedBy.set(id, new Map()), askedBy.get(id));
     // Who is asked into this thread: what the server's list says (an ask that is still open, with how many times the agent has replied: it survives a reload) and what this page sent since (the newest words).
@@ -32,7 +44,7 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex }) {
     const redrawStatus = id => { const p = panel.querySelector(`.ac-card[data-id="${id}"] .ac-ask-status`); if (p) fillStatus(p, id); };
     function askBlock() {
         const k = st.ask;
-        return askUi.buildSendBlock({ id: k.id, board: st.board, agents: k.agents, picked: k.picked, asked: askedNow(k.id), results: k.results, busy: k.busy, error: k.error,
+        return askUi.buildSendBlock({ id: k.id, board: st.board, agents: k.agents, picked: k.picked, asked: k.queue.length > 1 ? new Map() : askedNow(k.id), count: k.queue.length, results: k.results, busy: k.busy, error: k.error,
             onToggle: (role) => { if (k.picked.has(role)) k.picked.delete(role); else if (k.picked.size < askUi.MAX_AGENTS) k.picked.add(role); redrawAsk(role); },
             onCancel: () => { st.ask = null; render(); panel.querySelector(`.ac-card[data-id="${k.id}"] .ac-ask-open`)?.focus(); },
             onSend: () => sendAsk() });
@@ -43,37 +55,47 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex }) {
         old.replaceWith(askBlock());
         if (focusRole) [...panel.querySelectorAll('.ac-ask input[type="checkbox"]')].find(i => i.value === focusRole)?.focus();
     }
-    async function openAsk(c) {
-        const k = st.ask = { id: c.id, hex: ownHex(c), agents: null, picked: new Set(), results: null, busy: false, error: '' };
+    async function openAsk(c, queue = [c]) {
+        const k = st.ask = { queue: queue.map(c => ({ ...c, artifactId: ownHex(c) })), context: { hex: st.hex, server: st.server, board: st.board }, lifetime: st.lifetime, id: c.id, hex: ownHex(c), agents: null, picked: new Set(), results: null, busy: false, error: '' };
         render();
         panel.querySelector('.ac-ask')?.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() });
         try {
             const { refreshTeamAvailability } = await importOnce('./team_availability.js');
-            const data = await refreshTeamAvailability(st.board, true);
-            if (st.ask !== k) return;
+            const data = await refreshTeamAvailability(k.context.board, true);
+            if (!current(k)) return;
             k.agents = askUi.pickableAgents(data && data.agents);
-        } catch { if (st.ask !== k) return; k.agents = 'error'; }
+        } catch { if (!current(k)) return; k.agents = 'error'; }
         redrawAsk();
         panel.querySelector('.ac-ask input[type="checkbox"]:not(:disabled)')?.focus();
     }
     async function sendAsk() {
-        const k = st.ask; if (!k || k.busy || !k.picked.size) return;
+        const k = st.ask; if (!k || !current(k) || k.busy || !k.picked.size) return;
         k.busy = true; k.error = ''; redrawAsk();
-        const hex = st.hex;
-        let res;
-        try { res = await api.sendComment(k.hex || hex, st.server, k.id, [...k.picked]); } catch { res = { ok: false, status: 0, results: [], error: 'Coral could not be reached.' }; }
-        if (st.ask !== k) return;
+        const agents = [...k.picked];
+        let res, sentThreads = 0;
+        try {
+            const { sendCommentQueue } = await importOnce('./artifact_comment_send_queue.js');
+            const batch = await sendCommentQueue(k.queue, {
+                isCurrent: () => current(k),
+                send: c => api.sendComment(c.artifactId, k.context.server, c.id, agents),
+                record: (c, results) => { for (const r of results) if (r.state === 'sent' || r.state === 'already_asked') { names.set(r.agent.toLowerCase(), r.agent); askedOf(c.id).set(r.agent.toLowerCase(), r.state === 'sent' ? 'Asked just now' : 'Already asked'); } },
+            });
+            if (batch.cancelled) return;
+            res = batch.response; sentThreads = batch.sentThreads;
+        } catch { res = { ok: false, status: 0, results: [], error: 'Coral could not be reached. Some earlier comments may already have been sent; their status stays in each thread.' }; }
+        if (!current(k)) return;
         k.busy = false;
+        if (!res.ok) k.error = res.error || 'Some comments could not be sent. Check each thread before trying again.';
         if (res.results.length) {
             k.results = res.results;
             const asked = askedOf(k.id);
-            for (const r of res.results) if (r.state === 'sent' || r.state === 'already_asked') names.set(r.agent.toLowerCase(), r.agent), asked.set(r.agent.toLowerCase(), r.state === 'sent' ? 'Asked just now' : 'Already asked');
+            for (const r of res.results) if (k.queue.length === 1 && (r.state === 'sent' || r.state === 'already_asked')) names.set(r.agent.toLowerCase(), r.agent), asked.set(r.agent.toLowerCase(), r.state === 'sent' ? 'Asked just now' : 'Already asked');
             const n = res.results.filter(r => r.state === 'sent').length;
-            announce(n ? `Asked ${n} agent${n === 1 ? '' : 's'}. Their replies come into this thread.` : 'Nobody was asked.');
-            if (n) for (const ms of [10000, 30000, 90000]) setTimeout(() => { if (hex === st.hex && !isSignedOut()) refresh(); }, ms); // the agents' replies are replies in the thread: fetched a few times while they work
+            announce(k.queue.length > 1 ? `Sent ${sentThreads} of ${k.queue.length} comments. Replies come into each comment’s own thread.` : n ? `Asked ${n} agent${n === 1 ? '' : 's'}. Their replies come into this thread.` : 'Nobody was asked.');
+            if (n) for (const ms of [10000, 30000, 90000]) setTimeout(() => { if (current(k) && !isSignedOut()) refresh(); }, ms); // the agents' replies are replies in the thread: fetched a few times while they work
         } else { k.error = res.error || 'The comment was not sent.'; }
-        redrawAsk(); redrawStatus(k.id);
+        redrawAsk(); for (const c of k.queue) redrawStatus(c.id);
         panel.querySelector('.ac-ask .ac-cancel')?.focus();
     }
-    return { canAsk, openAsk, askBlock, askedNow, statusWords, fillStatus };
+    return { resetAsk, canAsk, askSetup, openAsk, openMany: list => { const queue = list.filter(canAsk); if (queue.length) return openAsk(queue[0], queue); }, askBlock, askedNow, statusWords, fillStatus };
 }

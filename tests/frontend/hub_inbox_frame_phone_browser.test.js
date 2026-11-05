@@ -7,7 +7,7 @@ const { connect } = require('./agent_view_harness');
 const { framesJs } = require('./helpers/wait');
 const { setupHubWorld, BASE } = require('./helpers/hub_world');
 
-const NAMES = { needs: 'Needs you', tasks: 'Tasks', saved: 'Saved for later' };
+const NAMES = { needs: 'Needs you', tasks: 'Tasks', saved: 'Saved' };
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor } = await connect();
@@ -71,8 +71,9 @@ const NAMES = { needs: 'Needs you', tasks: 'Tasks', saved: 'Saved for later' };
             if (group === 'needs') await shot(`hub-frame-${theme}-${font}-${inset}`);
             const where = `${group} ${theme} ${font}px inset ${inset}`;
             measurements.push({ where, ...p });
+            assert.ok(Math.abs(parseFloat(p.padB) - p.navHeight) <= 0.25, where + ": frame padding equals actual bar height " + JSON.stringify(p));
             console.log(where + ' ' + JSON.stringify(p));
-            if (p.frameBottom > p.navTop + 1) failures.push(where + ': frame must end above nav ' + JSON.stringify(p));
+            if (p.frameBottom > p.navTop + 0.25) failures.push(where + ': frame must end above nav ' + JSON.stringify(p));
             if (Math.abs(p.frameBottom - (p.viewBottom - parseFloat(p.padB))) > 1) failures.push(where + ': frame must fit the remaining content height below the folder strip ' + JSON.stringify(p));
             assert.equal(parseFloat(p.navPadB), 8 + inset, where + ': safe-area override actually applies');
             }

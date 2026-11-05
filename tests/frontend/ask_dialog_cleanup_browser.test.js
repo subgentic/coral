@@ -20,8 +20,7 @@ const fs = require('node:fs');
             check(m.links.join('|') === 'Goal #196|Task #12473' && m.linkTitles.every(s => /very long/.test(s)) && m.aboutHeight <= 50, width + ' compact subject links with full hover titles');
             check(m.whatHidden && m.rows <= 3 && m.boxHeight < 120 && !m.hintHidden && m.pickerIcon && !m.overflow, width + ' compact offers, reply, image picker and visible sharing note: ' + JSON.stringify(m));
             check(m.foot.every(b => b.height >= 44 && b.left >= 0 && b.right <= width + 1), width + ' footer targets fit');
-            const send = m.foot.at(-1), close = m.foot.find(b => b.name === 'Close');
-            check(width === 1280 ? Math.abs(send.top - close.top) <= 1 : send.top > close.top, width + ' footer row on desktop, stacked Send on phone');
+                        check(m.foot.map(b => b.name).join('|') === 'Close' || m.foot.map(b => b.name).join('|') === 'Close|Dismiss', width + ' the footer holds Close (and Dismiss); Send reply is under the box (#13148): ' + JSON.stringify(m.foot.map(b => b.name)));
             const growth = await ev(`(() => { const b = document.querySelector('dialog.inbox-ask-dialog textarea'), old = b.getBoundingClientRect().height; b.value = 'Another line\\n'.repeat(8); b.dispatchEvent(new Event('input', { bubbles: true })); return { old, height: b.getBoundingClientRect().height, overflow: b.scrollHeight > b.clientHeight + 2 }; })()`);
             check(growth.height > growth.old && !growth.overflow, width + ' reply grows with typing');
             // A failed upload is still an added image and must show the sharing hint; no real upload is needed.

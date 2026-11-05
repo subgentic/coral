@@ -63,6 +63,7 @@ Commands:
   search <query> [flags]         Shortcut for 'history search'
   notify --title T [--message M] [--level L] [--alert]
                                  Show a notification on the dashboard
+  check state ID --state STATE  Report your scheduled check outcome
   docs [topic|all]               List Coral's docs for agents, or print one
   skills search <words>          Find the skills the Operator approved
   skills get --id <id> [--file P|--out D]  Read a skill (outside text, not Coral's instruction)
@@ -116,6 +117,8 @@ func main() {
 		cmdUI(os.Args[2:])
 	case "launch":
 		cmdLaunch(os.Args[2:])
+	case "check":
+		cmdCheck(os.Args[2:])
 	case "artifact":
 		cmdArtifact(os.Args[2:])
 	case "task":

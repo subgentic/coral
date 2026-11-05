@@ -157,27 +157,39 @@ func (s *TaskStore) AgentEventExists(ctx context.Context, sessionID, eventType, 
 // ListAgentEvents returns recent events for an agent.
 // If agentName is empty, events are not filtered by agent (useful for history queries by session).
 func (s *TaskStore) ListAgentEvents(ctx context.Context, agentName string, limit int, sessionID *string) ([]AgentEvent, error) {
-	var whereClauses []string
 	var args []interface{}
 	if agentName != "" {
-		whereClauses = append(whereClauses, "agent_name = ?")
 		args = append(args, agentName)
 	}
 	if sessionID != nil {
-		whereClauses = append(whereClauses, "session_id = ?")
 		args = append(args, *sessionID)
-	}
-	where := ""
-	if len(whereClauses) > 0 {
-		where = " WHERE " + strings.Join(whereClauses, " AND ")
 	}
 	args = append(args, limit)
 	var events []AgentEvent
-	err := s.reader().SelectContext(ctx, &events,
-		`SELECT id, agent_name, session_id, event_type, tool_name, summary, detail_json, created_at, duration_ms, ref_id
-		 FROM agent_events`+where+` ORDER BY created_at DESC, id DESC LIMIT ?`,
-		args...)
+	err := s.reader().SelectContext(ctx, &events, listAgentEventsSQL(agentName != "", sessionID != nil), args...)
 	return events, err
+}
+
+// listAgentEventsSQL is the query of ListAgentEvents, for an agent name and/or a session id. With a session id, the unary plus keeps the agent's name a filter and not a way in: with no statistics yet, the planner took
+// the agent's index and read every event the agent ever had to find the session's (11 ms at 60,000 rows and growing with them, on every poll, #13155); the session's own index finds its newest rows in order.
+func listAgentEventsSQL(withAgent, withSession bool) string {
+	var where []string
+	if withAgent {
+		if withSession {
+			where = append(where, "+agent_name = ?")
+		} else {
+			where = append(where, "agent_name = ?")
+		}
+	}
+	if withSession {
+		where = append(where, "session_id = ?")
+	}
+	clause := ""
+	if len(where) > 0 {
+		clause = " WHERE " + strings.Join(where, " AND ")
+	}
+	return `SELECT id, agent_name, session_id, event_type, tool_name, summary, detail_json, created_at, duration_ms, ref_id
+		 FROM agent_events` + clause + ` ORDER BY created_at DESC, id DESC LIMIT ?`
 }
 
 // GetAgentEventCounts returns tool usage counts for an agent.

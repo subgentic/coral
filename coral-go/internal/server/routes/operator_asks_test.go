@@ -341,3 +341,71 @@ func TestOperatorAsksCarryTheTeamsNameBesideItsBoardID(t *testing.T) {
 		assert.Equal(t, "Sprout team", r["board_label"], "a wait carries it too")
 	}
 }
+
+// #13147: the agent that asked takes its own question back ("withdrawn by <who>"), the board's orchestrator may too, the Operator and any other member may not (the Operator ignores one); it leaves the Operator's list
+// and the health check's open asks, and what the ask says is the withdrawal.
+func TestTheAskerWithdrawsItsOwnQuestionAndNoOneElseButTheOrchestrator(t *testing.T) {
+	h, bs := operatorAsksRig(t)
+	ctx := context.Background()
+	for _, who := range []struct{ id, title string }{{"Lead", "Lead Developer"}, {"Orch", "Orchestrator"}, {"Other", "QA"}} {
+		_, err := bs.Subscribe(ctx, "team", who.id, who.title, "", nil, "all")
+		require.NoError(t, err)
+	}
+	ask := func() int64 {
+		q, err := bs.PostMessage(ctx, "team", "Lead", "@Operator may I proceed?", nil)
+		require.NoError(t, err)
+		require.NoError(t, bs.RecordAsk(ctx, "team", q, []string{"Operator"}))
+		return q.ID
+	}
+	withdraw := func(id int64, who, note string) (int, map[string]any) {
+		body, _ := json.Marshal(map[string]any{"subscriber_id": who, "withdraw": true, "note": note})
+		req := httptest.NewRequest(http.MethodPost, "/api/board/team/asks/x/close", strings.NewReader(string(body)))
+		if who == "Operator" {
+			req = asPerson(withActor(req, Actor{Kind: ActorOperator, Name: "Operator"}))
+		} else {
+			req = withActor(req, Actor{Kind: ActorToken, Name: who, Session: "claude-" + who})
+		}
+		rc := chi.NewRouteContext()
+		rc.URLParams.Add("project", "team")
+		rc.URLParams.Add("messageID", fmt.Sprint(id))
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rc))
+		w := httptest.NewRecorder()
+		h.CloseAsk(w, req)
+		var out map[string]any
+		_ = json.Unmarshal(w.Body.Bytes(), &out)
+		return w.Code, out
+	}
+	open := func() int { _, rows, _ := readOperatorAsks(t, h, asPerson); return len(rows) }
+
+	id := ask()
+	require.Equal(t, 1, open())
+	for _, who := range []string{"Other", "Operator"} {
+		code, out := withdraw(id, who, "")
+		assert.Equal(t, http.StatusForbidden, code, who)
+		assert.Equal(t, "not_allowed", out["code"], who)
+	}
+	assert.Equal(t, 1, open(), "a refused withdraw closed nothing")
+	code, out := withdraw(id, "Lead", "") // no reason needed
+	assert.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Equal(t, true, out["withdrawn"])
+	assert.Equal(t, 0, open(), "it leaves the Operator's list")
+	asks, err := bs.OpenAsks(ctx, "team", time.Now())
+	require.NoError(t, err)
+	assert.Empty(t, asks, "and the health check's open asks")
+	m, err := bs.GetMessageByID(ctx, "team", id)
+	require.NoError(t, err)
+	require.NotNil(t, m.Ask)
+	assert.True(t, m.Ask.Closed)
+	assert.Equal(t, "Lead", m.Ask.ClosedBy)
+	assert.Equal(t, "withdrawn by Lead", m.Ask.ClosedNote)
+
+	id2 := ask() // the orchestrator, with a reason
+	code, _ = withdraw(id2, "Orch", "asked again with the fix in #5")
+	assert.Equal(t, http.StatusOK, code)
+	m, err = bs.GetMessageByID(ctx, "team", id2)
+	require.NoError(t, err)
+	assert.Equal(t, "withdrawn by Orch: asked again with the fix in #5", m.Ask.ClosedNote)
+	assert.Equal(t, 0, open())
+	code, _ = withdraw(99999, "Lead", "")
+	assert.Equal(t, http.StatusNotFound, code)
+}

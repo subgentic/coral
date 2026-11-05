@@ -16,6 +16,7 @@ const { _renderDepPicker, _getSelectedDeps } = await importOnce('./task_dep_pick
 const { _taskRequiredOutputs, nudgeBoardTask, remindBoardTask, stopBoardTaskReminder } = await importOnce('./task_reminders.js');
 const { loadBoardTasks } = await importOnce('./task_list.js');
 const { reviewRequested, canSendBack, canComplete } = await importOnce('./task_list_data.js');
+const { moreMenu } = await importOnce('./more_menu.js'); // lazy: its failure is retried (the shared More menu, #13119)
 
 const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 
@@ -38,25 +39,10 @@ export function taskButtons(task, ctx) {
         { label: 'Remind', title: `Send periodic reminders to ${task.assigned_to}`, run: () => remindBoardTask(task.id) },
         { label: 'Stop reminders', title: 'Stop periodic reminders', run: () => stopBoardTaskReminder(task.id) });
     items.push({ label: 'Cancel task', danger: true, className: 'team-task-cancel', run: () => ctx.redraw(task, 'cancel') });
-    out.push(moreMenu(`task-more-${task.id}`, items));
+    out.push(moreMenu(`task-more-${task.id}`, items, { label: 'More task actions' }));
     if (task.status === 'draft') out.push(btn('btn btn-primary', 'Publish', () => publish(task, ctx)));
     if (mayComplete) out.push(btn('btn btn-primary', 'Complete', () => ctx.redraw(task, 'complete')));
     return out;
-}
-
-/** A text More button and its menu (menu_button.js: arrow keys, Escape, the menu opens upward where the bar leaves no room below). items: [{ label, title, danger, className, run }]. */
-function moreMenu(id, items) {
-    const wrap = el('span', 'task-more');
-    const toggle = btn('btn task-more-btn', 'More'); toggle.id = id; toggle.setAttribute('aria-haspopup', 'menu'); toggle.setAttribute('aria-expanded', 'false'); toggle.setAttribute('aria-controls', `${id}-menu`);
-    const menu = el('div', 'menu team-more-menu task-more-menu'); menu.id = `${id}-menu`; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', 'More task actions');
-    for (const it of items) {
-        const b = btn(it.danger ? 'menu-item menu-item-danger mb-action-danger' : 'menu-item', it.label, async () => { (await importOnce('./menu_button.js')).closeMenus(); it.run(); });
-        b.setAttribute('role', 'menuitem'); if (it.title) b.title = it.title; if (it.className) b.classList.add(it.className);
-        menu.append(b);
-    }
-    toggle.addEventListener('click', async () => (await importOnce('./menu_button.js')).toggleMenu(toggle));
-    wrap.append(toggle, menu);
-    return wrap;
 }
 
 /** The bar while Cancel asks: the question and its two answers. */

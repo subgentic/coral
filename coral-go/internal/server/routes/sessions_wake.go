@@ -182,9 +182,9 @@ func (h *SessionsHandler) prepareWake(ctx context.Context, ls *store.LiveSession
 	}
 
 	launchParams := agent.LaunchParams{
-		SessionID:       ls.SessionID,
-		SessionName:     sessionName,
-		ProtocolPath:    h.protocolPath(),
+		SessionID:    ls.SessionID,
+		SessionName:  sessionName,
+		ProtocolPath: h.protocolPath(), EmbeddedProtocol: true,
 		ResumeSessionID: ls.SessionID,
 		Flags:           flags,
 		WorkingDir:      ls.WorkingDir,
@@ -270,6 +270,17 @@ func (h *SessionsHandler) startWake(ctx context.Context, ls *store.LiveSession, 
 	}
 	if alreadyRunning {
 		log.Printf("[wake] session=%s is still running — skipping relaunch, clearing sleeping flag only", sessionName)
+	}
+	_, onTmux := h.backend.(*ptymanager.TmuxBackend)
+	if alreadyRunning && (backend != "pty" || onTmux) && h.terminal != nil {
+		// A restart/wake can retain the pane after its pipe worker has gone.
+		// StartLogging is idempotent for a healthy pipe; preserve its history.
+		// A failure here is a warning, never a failed wake (#13458): the agent is running, and a person's reconnect repairs the pipe.
+		if err := ptymanager.EnsureAgentLog(logFile); err != nil {
+			log.Printf("[wake] session=%s: the log file could not be prepared, waking without restoring its logging: %v", sessionName, err)
+		} else if err := h.terminal.StartLogging(ctx, sessionName, logFile); err != nil {
+			log.Printf("[wake] session=%s: the log pipe could not be restored, waking anyway: %v", sessionName, err)
+		}
 	}
 	// The terminal is there but the agent CLI exited from it, leaving a plain shell (#3219):
 	// resume the agent in that shell, as launch does, instead of only clearing the flag.

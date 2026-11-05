@@ -789,7 +789,7 @@ export async function refreshChangedFiles(quiet = false, auto = false) { // quie
             <div class="file-action-btns">${copyBtn}${previewBtn}${editBtn}${shareBtn}</div>
         </div>${diffSlot}`;
     }).join('');
-    for (const fresh of list.querySelectorAll('.file-diff')) { const old = kept.get(fresh.dataset.filepath); if (old && !fresh.hidden) { old.id = fresh.id; fresh.replaceWith(old); } }
+    for (const fresh of list.querySelectorAll('.file-diff')) { const old = kept.get(fresh.dataset.filepath); if (old && !fresh.hidden) { old.id = fresh.id; fresh.replaceWith(old); if (old.querySelector('.diff-comments')) importOnce('./diff_comments.js').then(m => m.placeDiffCommentIcon(old)).catch(() => {}); /* its comment icon goes back in the new row (#13528) */ } }
     if (scroller && scrolled) {
         scroller.scrollTop = scrolled;
         const row = anchor && [...list.querySelectorAll('.file-item')].find(r => r.dataset.filepath === anchor.path);

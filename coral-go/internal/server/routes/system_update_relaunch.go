@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/subgentic/coral/internal/board"
 	"io"
 	"log/slog"
 	"net/http"
@@ -215,6 +216,9 @@ type UpdateRelaunchHandler struct {
 	// CanRestart says whether Coral can be started again once it has ended (the server's own record of how it was started, or a service manager that restarts it);
 	// nil is yes. A relaunch is not offered, and the route answers 409, while it says no (#5419).
 	CanRestart func() bool
+	// Activity writes a row of the Operator's record (board.Store.RecordActivity): Coral Hub's owner had this computer check for an update, or relaunch into one (#13340). Nil: no row (a test, or a server with no board store). A
+	// row that cannot be written is logged and never stops the request: the record does not block an update.
+	Activity func(ctx context.Context, m board.ActivityMeta, action, kind, item, version, team string) error
 	// Dir is <data dir>/updates.
 	Dir string
 	Now func() time.Time
@@ -273,6 +277,18 @@ func (h *UpdateRelaunchHandler) localOn() bool { return h.Updater != nil }
 func (h *UpdateRelaunchHandler) identify(r *http.Request) callerIdentity {
 	return ownerIdentityWith(r, h.OwnerUser, h.OwnerRecord, &h.noLabelLogged)
 }
+
+// relinkNeeded: the request carries a stamped owner marker for a personal machine, but this computer was linked to Coral Hub before it recorded its owner label, so the routes that need the label (the relaunch and the
+// Hub's check) refuse even the owner until the computer is linked again. A distinct answer (#13258, Security's INFO): the Hub user is told what to do, not that they are not the owner.
+func (h *UpdateRelaunchHandler) relinkNeeded(r *http.Request) bool {
+	id := stampedOwnerOf(r, h.OwnerUser, h.OwnerRecord, &h.noLabelLogged) // the stamp checks live in hub_owner.go only (TestTheOwnerDecisionHasOneImplementation)
+	return id.owner && !id.team && routeNeedsOwnerLabel(r) && !ownerLabelRecordedWith(r, h.OwnerUser)
+}
+
+const (
+	codeRelinkNeeded = "relink_needed"
+	textRelinkNeeded = "this computer was linked to Coral Hub before it recorded its owner: link this computer to Coral Hub again to update it from there"
+)
 
 // gate is the status of the checks that don't depend on the update's state, as the reason the relaunch is unavailable ("" = pass).
 func (h *UpdateRelaunchHandler) gate(ctx context.Context, id callerIdentity) (reason string, code string) {
@@ -687,6 +703,9 @@ func (h *UpdateRelaunchHandler) Status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.addChannelFacts(r, out)
+	if viaTunnel(r) {
+		out["hub_state"] = h.hubState(v, out["state"])
+	}
 	// What the page may promise (#7343): the Hub's relaunch exists only while the Hub's feature is on
 	out["relaunch_available"] = h.on()
 	if relaunchNeedsLocalApproval && !viaTunnel(r) {
@@ -703,6 +722,34 @@ func (h *UpdateRelaunchHandler) Status(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
+// The closed set of words coral-hub's Computers page reads for a computer's update (#13258): nothing else, no path and no updater text. staged is told with the staged version and its verified flag (the existing
+// staged object); the switch words come first, so a computer that does not let the Hub update it says so whatever else is true.
+const (
+	hubStateRelaunchOff = "hub_relaunch_off"
+	hubStateChecking    = "checking"
+	hubStateFailed      = "failed"
+	hubStateStaged      = "staged"
+	hubStateNotChecked  = "not_checked"
+	hubStateUpToDate    = "up_to_date"
+)
+
+func (h *UpdateRelaunchHandler) hubState(v relaunchView, state any) string {
+	switch {
+	case !v.hubAllowed:
+		return hubStateRelaunchOff
+	case h.checking.Load():
+		return hubStateChecking
+	case state == updFailed:
+		return hubStateFailed
+	case v.version != "":
+		return hubStateStaged
+	case v.rec.CheckedAt.IsZero():
+		return hubStateNotChecked
+	default:
+		return hubStateUpToDate
+	}
+}
+
 // -- the relaunch --
 
 func (h *UpdateRelaunchHandler) refuse(w http.ResponseWriter, r *http.Request, id callerIdentity, v *relaunchView, status int, code, msg string, extra map[string]any) {
@@ -716,6 +763,35 @@ func (h *UpdateRelaunchHandler) refuse(w http.ResponseWriter, r *http.Request, i
 
 func (h *UpdateRelaunchHandler) audit(ctx context.Context, id callerIdentity, v *relaunchView, code string) {
 	h.auditAs(ctx, id, v, code, relaunchSource(id.pseudo))
+	switch code { // the two things the Hub did that the Operator may want to find in their record (#13340); a refusal is in the update audit above, not here
+	case "check_started":
+		h.hubActivity(ctx, id, board.ActHubUpdateCheck, "", "")
+	case "started":
+		version, from := "", ""
+		if v != nil {
+			version, from = v.version, v.rec.Installed
+		}
+		h.hubActivity(ctx, id, board.ActHubUpdateRelaunch, version, from)
+	}
+}
+
+// hubActivity writes the row for something Coral Hub's owner had this computer do: by the Hub user (the record's opaque "hub:" label), source "hub", the update as the item and the staged version. Only a request
+// that came through the Hub is Coral Hub's: this computer's own person and Coral's own idle install are not.
+func (h *UpdateRelaunchHandler) hubActivity(ctx context.Context, id callerIdentity, action, version, installed string) {
+	if h.Activity == nil || relaunchSource(id.pseudo) != "hub" {
+		return
+	}
+	note := ""
+	if updateVersionRe.MatchString(installed) && updateVersionRe.MatchString(version) { // only a version the status reply would also show (Security's INFO a on #13340): anything else is no note
+		note = "from " + installed
+	}
+	if !updateVersionRe.MatchString(version) {
+		version = "" // and the same for the version column
+	}
+	m := board.ActivityMeta{Actor: activityActor(id), Source: "hub", Title: "Coral update", Note: note}
+	if err := h.Activity(context.WithoutCancel(ctx), m, action, "update", "coral", version, ""); err != nil {
+		slog.Warn("[update] could not record the Hub's update action in the Operator's record", "action", action, "error", err)
+	}
 }
 
 // relaunchSource is the source word for whoever asked: the Hub's owner is a pseudonym, the person here is "local", Coral's own idle install is "auto".
@@ -775,6 +851,10 @@ func (h *UpdateRelaunchHandler) Relaunch(w http.ResponseWriter, r *http.Request)
 	// 1 and 2: the stamp is authentic and the caller is the owner. (A local caller is not: the local control relaunches locally.)
 	id := h.identify(r)
 	if !id.owner {
+		if h.relinkNeeded(r) {
+			h.refuse(w, r, id, nil, http.StatusForbidden, codeRelinkNeeded, textRelinkNeeded, nil)
+			return
+		}
 		h.refuse(w, r, id, nil, http.StatusForbidden, "owner_only", "only the account this computer is linked to can relaunch it from Coral Hub", nil)
 		return
 	}

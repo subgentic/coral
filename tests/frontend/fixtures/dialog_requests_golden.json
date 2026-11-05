@@ -92,7 +92,8 @@
     "flags": [
       "--permission-mode",
       "auto"
-    ]
+    ],
+    "home_folder_ask": true
   },
   "agent_full_config": {
     "name": "",
@@ -126,7 +127,8 @@
     "prompt": "Test everything.\nTwice.",
     "model": "gpt-x",
     "board_name": "my-board",
-    "board_server": "http://remote:8420"
+    "board_server": "http://remote:8420",
+    "home_folder_ask": true
   },
   "agent_existing_board": {
     "working_dir": "/work/repo",
@@ -137,7 +139,8 @@
       "auto"
     ],
     "board_name": "taken",
-    "board_id": "taken"
+    "board_id": "taken",
+    "home_folder_ask": true
   },
   "team_edit_prefilled": {
     "name": "Dev",
@@ -199,6 +202,7 @@
       "custom_instructions": ""
     },
     "worktree": true,
-    "base_branch": "develop"
+    "base_branch": "develop",
+    "home_folder_ask": true
   }
 }

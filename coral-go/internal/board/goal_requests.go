@@ -317,24 +317,39 @@ func (s *Store) ListGoalRequestsIn(ctx context.Context, board, status string, li
 	if limit <= 0 || limit > 200 {
 		limit = 100
 	}
+	out, _, err := s.ListGoalRequestsInPage(ctx, board, status, 0, limit)
+	return out, err
+}
+
+// ListGoalRequestsInPage is the board's received requests with an id below beforeID (0: from the newest), newest first, at most limit, and the true number the board and status match (#13289).
+func (s *Store) ListGoalRequestsInPage(ctx context.Context, board, status string, beforeID int64, limit int) ([]GoalRequestIn, int, error) {
 	if err := s.expireGoalRequests(ctx, s.db); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if err := s.reconcileAcceptedRequests(ctx, s.db); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	q, args := `SELECT `+goalRequestInColumns+` FROM board_goal_requests_in WHERE board_id = ?`, []any{board}
+	where, args := ` WHERE board_id = ?`, []any{board}
 	if status != "" {
-		q += ` AND status = ?`
+		where += ` AND status = ?`
 		args = append(args, status)
+	}
+	var total int
+	if err := s.reader().GetContext(ctx, &total, `SELECT COUNT(*) FROM board_goal_requests_in`+where, args...); err != nil {
+		return nil, 0, err
+	}
+	q := `SELECT ` + goalRequestInColumns + ` FROM board_goal_requests_in` + where
+	if beforeID > 0 {
+		q += ` AND id < ?`
+		args = append(args, beforeID)
 	}
 	q += ` ORDER BY id DESC LIMIT ?`
 	args = append(args, limit)
 	out := []GoalRequestIn{}
 	if err := s.reader().SelectContext(ctx, &out, q, args...); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return out, nil
+	return out, total, nil
 }
 
 // GetGoalRequestIn reads one received request of board.

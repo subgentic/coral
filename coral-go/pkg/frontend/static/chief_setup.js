@@ -40,6 +40,9 @@ export async function mountChiefSetup(host) {
     const intro = el('p', 'chief-setup-intro', 'Chief is the one agent you talk to, from your phone too. Give it a name and a face, say which team it works with, and turn its page on.');
     const preview = el('div', 'chief-preview'); preview.setAttribute('role', 'img');
     const form = el('div', 'chief-setup-form'); section.append(intro, preview, form); host.append(section);
+    const checks = el('button', 'btn', 'Manage checks and sources'); checks.type = 'button';
+    checks.addEventListener('click', () => importOnce('./chief_checks.js').then(m => m.showChiefChecks()).catch(() => showToast('Checks could not be opened. Try again.', true)));
+    section.insertBefore(checks, form);
     const modelRow = el('p', 'chief-model');
 
     let view = null;
@@ -101,6 +104,7 @@ export async function mountChiefSetup(host) {
             const r = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
             if (!r.ok) { let m = ''; try { m = (await r.json()).error || ''; } catch { /* no reason given */ } throw new Error(m || `Chief could not be saved (HTTP ${r.status}).`); }
             if (Object.hasOwn(body, 'chief_name') || Object.hasOwn(body, 'chief_avatar') || Object.hasOwn(body, 'chief_avatar_letter')) showToast('Chief’s look is saved.', false, 3000);
+            document.dispatchEvent(new Event('coral-chief-changed')); // the menus' Set up Chief becomes Chief (chief_entry.js, #13167)
             return {};
         },
     });

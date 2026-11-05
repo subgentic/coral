@@ -109,13 +109,14 @@ type provisionPlan struct {
 	steps         []provisionStep
 	keys          []sshprov.HostKey // held here: what is trusted is THIS, never a key from a request
 	// acceptance is what the far Coral is given on stdin: this hub's own terms version and digest and who. It is made by the server from the hub's own marker, never from the request; nil on a tier that skips the EULA.
-	acceptance []byte
-	system     string
-	created    time.Time
-	cancel     context.CancelFunc
-	failure    string
-	keyChanged bool           // the failure was a host key that no longer matches: the owner may forget the saved one (#12056)
-	forgotten  []provisionKey // the key the owner had Coral forget: shown beside the one the computer presents now, so the two can be compared
+	acceptance   []byte
+	system       string
+	created      time.Time
+	cancel       context.CancelFunc
+	failure      string
+	keyChanged   bool           // the failure was a host key that no longer matches: the owner may forget the saved one (#12056)
+	ownerVersion string         // an approvals plan: the release the far computer runs, whose own `hub-owner-secret` takes the secret
+	forgotten    []provisionKey // the key the owner had Coral forget: shown beside the one the computer presents now, so the two can be compared
 }
 
 const (
@@ -123,6 +124,8 @@ const (
 	kindUpgrade = "upgrade"
 	kindStop    = "stop"
 	kindRemove  = "remove"
+	// kindApprovals sets up Approve and Request changes through this hub for a computer set up over SSH that has no secret (#13230): it installs one by the far Coral's own command.
+	kindApprovals = "approvals"
 )
 
 func (p *provisionPlan) kind() string {
@@ -283,7 +286,7 @@ func NewProvisioner(s *store.RemoteServerStore) *Provisioner {
 	pr.checkHealth = pr.realCheckHealth
 	pr.eula = hubEULAState
 	pr.installOwner = func(ctx context.Context, p *provisionPlan, secret string) error {
-		return pr.runner.InstallOwnerSecret(ctx, p.Target, pr.version, p.ServerID, secret)
+		return pr.runner.InstallOwnerSecret(ctx, p.Target, pr.ownerFolder(p), p.ServerID, secret)
 	}
 	return pr
 }
@@ -809,7 +812,7 @@ func (pr *Provisioner) finish(ctx context.Context, p *provisionPlan) error {
 	// The owner stamp (#11378): a new secret for this computer, installed on it by its own command line before it is registered, so Approve and Request changes can work through this hub. A failure here does
 	// not stop the registration; the page says the stamp is not set up.
 	ownerSecret, serr := hubowner.NewSecret()
-	ownerOK := serr == nil && pr.installOwner(ctx, p, ownerSecret) == nil
+	ownerOK := serr == nil && pr.installOwnerLogged(ctx, p, ownerSecret) == nil
 	if _, err := pr.store.AddSSH(ctx, p.ServerID, p.Label, rs.SSHTarget, rs.RemotePort, instanceID, key); err != nil {
 		switch {
 		case errors.Is(err, store.ErrRemoteExists):

@@ -1,7 +1,7 @@
 /* The Operator's review of an artifact a team tagged "for review" (#136584, #136588), in the artifact viewer: Approve (the row leaves Needs you, the uploading agent is told) and Request changes (a comment
  * on the whole document, sent to the uploader through the comments' own Send to agent, and the file leaves Needs you: it is the agent's turn, and its next version comes back as a new item). The state is read from the team's artifact list (its tags and,
  * once decided, the time); the buttons show only for a pending one; through Coral Hub the owner has both: the change-request send is the owner's too (#11354). */
-import { boardFetch, identityKey, decisionNeedsPerson } from './server_base.js';
+import { boardFetch, boardArtifactPage, nextArtifactPage, identityKey, decisionNeedsPerson, isCloud } from './server_base.js';
 import { showToast, announceNotice } from './notifications.js';
 import { markHidden } from './visible_marks.js';
 import { importOnce } from './import_once.js';
@@ -15,8 +15,8 @@ const rowHex = a => HEX.exec(a.uri || a.digest || a.id || '')?.[1]?.toLowerCase(
 /** The team's row for the artifact and the state of its review: pending, changes, approved or reviewed (the old Mark reviewed); null when it was never for review. */
 export async function reviewStateOf(team, hex) {
     for (const tag of ['for%20review', 'approved', 'reviewed']) {
-        for (let offset = 0; offset <= 10000; offset += 200) {
-            const r = await boardFetch(team, `/artifacts?tag=${tag}&limit=200&offset=${offset}`);
+        for (let at = { cursor: '', offset: 0 }, pages = 0; pages < 200; pages++) { // 50 a page, by the computer's cursor (#13161)
+            const r = await boardArtifactPage(team, tag, at);
             if (!r.ok) return null;
             const data = await r.json(), list = data.artifacts || [];
             const row = list.find(a => rowHex(a) === hex);
@@ -26,7 +26,7 @@ export async function reviewStateOf(team, hex) {
                 const state = tags.includes('approved') ? 'approved' : tags.includes('for review') ? (tags.includes('changes requested') ? 'changes' : 'pending') : 'reviewed';
                 return { row, state, at: row.review?.at || '' };
             }
-            if (!data.has_more || !list.length) break;
+            if (!nextArtifactPage(at, data)) break;
         }
     }
     return null;
@@ -34,25 +34,31 @@ export async function reviewStateOf(team, hex) {
 
 const timeWords = at => { const t = Date.parse(at); return Number.isNaN(t) ? '' : new Date(t).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }); };
 
-async function decide(team, row, decision, reason, note) {
-    const r = await boardFetch(team, `/artifacts/${encodeURIComponent(row.id)}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(reason ? { decision, reason } : note ? { decision, note } : { decision }) });
+async function decide(team, row, decision, reason, note, quiet = false) {
+    const r = await boardFetch(team, `/artifacts/${encodeURIComponent(row.id)}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, ...(reason ? { reason } : {}), ...(note ? { note } : {}), ...(quiet ? { quiet: true } : {}) }) });
     const body = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(body.message || body.error || `Could not save the review (HTTP ${r.status}).`);
+    if (!r.ok) { const error = new Error(body.message || body.error || `Could not save the review (HTTP ${r.status}).`); error.status = r.status; error.code = body.code; throw error; }
     return body;
 }
 
-/** Approving a version settles the ones before it quietly: their 'for review' tag comes off (no review, no message); resolves { settled, failed }. */
+/** Approving or denying a version settles the ones before it quietly (no review or message): locally their 'for review' tag comes off; through the Hub automatic superseded settlement keeps the restricted tags route out of it. Resolves { settled, failed }. */
 async function settleEarlierVersions(m, row) {
     let settled = 0, failed = 0;
     for (const e of m.earlierVersions(row)) {
         try {
             const current = await m.currentTags(e);
             if (current !== null) {
-                const r = await boardFetch(e.team, `/artifacts/${encodeURIComponent(e.id)}/tags`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tags: current.filter(t => t !== 'for review') }) });
-                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                if (isCloud()) {
+                    // Automatic settlement is superseded, not an Operator dismissal.
+                    // The server omits the Inbox action event for quiet cleanup.
+                    await decide(e.team, e, 'ignore', undefined, undefined, true);
+                } else {
+                    const r = await boardFetch(e.team, `/artifacts/${encodeURIComponent(e.id)}/tags`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tags: current.filter(t => t !== 'for review') }) });
+                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                }
             }
             settled++;
-        } catch { failed++; }
+        } catch (e) { if (isCloud() && e.status === 404) continue; if (e.status === 409 && e.code === 'not_for_review') settled++; else failed++; }
     }
     return { settled, failed };
 }
@@ -182,6 +188,11 @@ export function attachReview(d, { reload }) {
     const mk = (tag, cls, text, attrs = {}) => { const e = document.createElement(tag); e.className = cls; if (text) e.textContent = text; for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (tag === 'button') e.type = 'button'; return e; };
     const stateEl = mk('span', 'chip artifact-review-state', '', { role: 'status' }), approve = mk('button', 'btn btn-primary artifact-review-approve', 'Approve'), changes = mk('button', 'btn artifact-review-changes', 'Request changes', { 'aria-expanded': 'false' });
     const approveNote = mk('button', 'menu-item artifact-review-note', 'Approve with a note', { role: 'menuitem' });
+    // Send for review / Remove from review (#13152): the Operator's own way to put this file in Needs you, or take it out, in the ⋯ menu (artifact_send_review.js)
+    const sendItem = mk('button', 'menu-item artifact-review-send', 'Send for review', { role: 'menuitem' }); sendItem.hidden = true;
+    (d.querySelector('.artifact-viewer-menu') || bar).prepend(sendItem);
+    let sendCtx = null; // { team, hex, server, filename, inReview } of the open file
+    const syncSendItem = () => { sendItem.hidden = !sendCtx || decisionNeedsPerson(sendCtx.server); if (sendCtx) sendItem.textContent = sendCtx.inReview ? 'Remove from review' : 'Send for review'; };
     const slotted = !!d.querySelector('.artifact-viewer-chips'); // the controls are on the header row; without it (a bare viewer) they stay in this bar
     stateEl.hidden = approve.hidden = changes.hidden = approveNote.hidden = true;
     (d.querySelector('.artifact-viewer-chips') || bar).append(stateEl); (d.querySelector('.artifact-viewer-actions') || bar).append(approve, changes); (d.querySelector('.artifact-viewer-menu') || bar).prepend(approveNote);
@@ -226,6 +237,16 @@ export function attachReview(d, { reload }) {
         try { const out = await approveRow(cur.team, cur.row); sayApproved(cur.row.name || 'the artifact', out); show({ ...cur, state: 'approved', at: out.review?.at || new Date().toISOString() }); }
         catch (e) { showToast(e.message, true); } finally { approve.disabled = false; }
     });
+    sendItem.addEventListener('click', async () => {
+        const c = sendCtx; if (!c) return;
+        try {
+            const m = await importOnce('./artifact_send_review.js');
+            if (c.inReview) { await m.removeFromReview(c.team, c.hex); showToast('Removed from review'); }
+            else { const q = await m.askReviewQuestion({ count: 1, name: c.filename }); if (q === null) return; await m.sendForReview(c.team, c.hex, q); showToast('Sent for review: it is in Needs you'); }
+            importOnce('./inbox_reviews.js').then(x => x.refreshReviews(true)).catch(() => {});
+            reload();
+        } catch (e) { showToast(e.message, true); }
+    });
     approveNote.addEventListener('click', () => {
         if (!cur) return;
         const was = cur;
@@ -252,15 +273,17 @@ export function attachReview(d, { reload }) {
     });
     return {
         async open(hex, opts = {}) {
-            const g = ++gen; show(null); if (!opts.switched) done = false;
+            const g = ++gen; show(null); sendCtx = null; syncSendItem(); if (!opts.switched) done = false;
             if (!opts.board) return;
             const team = identityKey(opts.server, opts.board);
             let s = null;
             try { s = await reviewStateOf(team, hex); } catch { s = null; }
-            if (g !== gen || !s) return;
+            if (g !== gen) return;
+            sendCtx = { team, hex, server: opts.server, filename: opts.filename || '', inReview: !!s && (s.state === 'pending' || s.state === 'changes') }; syncSendItem();
+            if (!s) return;
             show({ ...s, team, hex, server: opts.server, name: opts.board });
             if (opts.requestChanges && !opts.switched && !done && (s.state === 'pending' || s.state === 'changes')) openForm(true); // not on the reload after a send: the form stays closed
         },
-        close() { gen++; show(null); form.hidden = true; tray.clear(); },
+        close() { gen++; show(null); sendCtx = null; syncSendItem(); form.hidden = true; tray.clear(); },
     };
 }

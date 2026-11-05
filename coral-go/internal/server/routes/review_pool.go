@@ -35,6 +35,10 @@ func (h *BoardHandler) SetReviewSettings(w http.ResponseWriter, r *http.Request)
 		errBadRequest(w, "send reviews_only, review_areas or both")
 		return
 	}
+	var priorReview map[string]any // what the Orchestrator is told changed (#13221)
+	if sub, serr := h.bs.GetProjectSubscription(r.Context(), project, who); serr == nil && sub != nil {
+		priorReview = reviewSettingsShown(sub.SubscriberID, sub.ReviewsOnly, sub.ReviewAreas.Slice())
+	}
 	res, err := h.bs.SetReviewSettings(r.Context(), project, who, body.ReviewsOnly, body.ReviewAreas)
 	switch {
 	case errors.Is(err, board.ErrNotOnBoard):
@@ -44,8 +48,14 @@ func (h *BoardHandler) SetReviewSettings(w http.ResponseWriter, r *http.Request)
 	case err != nil:
 		errInternalServer(w, "could not change the review settings")
 	default:
+		noteSettingsChange(h.bs, r, project, priorReview, reviewSettingsShown(res.SubscriberID, res.ReviewsOnly, res.ReviewAreas))
 		writeJSON(w, http.StatusOK, res)
 	}
+}
+
+// reviewSettingsShown is a member's review settings as the settings notice compares them.
+func reviewSettingsShown(member string, reviewsOnly bool, areas []string) map[string]any {
+	return map[string]any{"review." + member + ".reviews_only": reviewsOnly, "review." + member + ".areas": areas}
 }
 
 // reviewAreasFromPaths is the areas a change touches, from the paths it changes (the defaults of submit-review when the author names none and the request lists the paths): go for Go code and

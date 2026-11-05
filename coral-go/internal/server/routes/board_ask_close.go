@@ -18,6 +18,9 @@ import (
 // closed one, so a question answered in chat or in an artifact comment stayed open and the health check repeated it. The asker, the Operator or the board's orchestrator may close it, with a note that says where
 // it was answered (shown with the ask). The caller is the one the identity layer proves, as for any board write.
 func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // through the Hub (#13450) a question is put away, or brought back, by the account this computer is linked to and nobody else: a grantee, a viewer and a guide get 403 owner_only before anything below reads the body
+		return
+	}
 	project := urlParam(r, "project")
 	id, err := parseID(chi.URLParam(r, "messageID"))
 	if err != nil || id <= 0 {
@@ -27,7 +30,8 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		SubscriberID string `json:"subscriber_id"` // accepted for the command line's sake and ignored: the verified caller closes
 		Note         string `json:"note"`
-		Undo         bool   `json:"undo"` // open the question again (the Operator's Undo of an Ignore, #11552): no note, the same callers, nothing posted
+		Withdraw     bool   `json:"withdraw"` // the asker (or the board's orchestrator) takes the question back (#13147): the note is "withdrawn by <who>", the reason after it is optional
+		Undo         bool   `json:"undo"`     // open the question again (the Operator's Undo of an Ignore, #11552): no note, the same callers, nothing posted
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -41,6 +45,9 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	note := strings.TrimSpace(clitext.Clean(body.Note))
+	if body.Withdraw && !body.Undo {
+		note = withdrawnNote(actor, note)
+	}
 	if note == "" && !body.Undo {
 		errBadRequest(w, "a note is required: say where it was answered")
 		return
@@ -54,10 +61,11 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "not_allowed", "only the asker, the Operator or the board's orchestrator may close a question")
 		return
 	}
+	if body.Withdraw && !body.Undo && !h.mayWithdrawAsk(r, project, actor, asker) {
+		writeError(w, http.StatusForbidden, "not_allowed", "only the agent that asked, or the board's orchestrator, may withdraw a question (the Operator ignores one)")
+		return
+	}
 	if body.Undo {
-		if refuseNonOwner(w, r) { // through the Hub only the account this computer is linked to (a grantee is refused; the Hub's tier table does not offer this route at all)
-			return
-		}
 		if !humanInputCaller(r) { // an Ignore is the Operator's: the agent that asked, the orchestrator and every other token are refused, so no agent reopens what the Operator put away (Security's SHOULD on #11576)
 			writeError(w, http.StatusForbidden, "owner_only", "only the person at this computer can open a question again")
 			return
@@ -87,7 +95,24 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 		h.recordActivity(r, board.ActIgnore, "question", strconv.FormatInt(id, 10), project, "", note)
 		inboxActioned(r, tracking.InboxAsk, "", "dismiss", time.Time{}) // the Inbox's numbers (#7512)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "closed_by": actor})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "closed_by": actor, "withdrawn": body.Withdraw})
+}
+
+// withdrawnNote is the note a withdrawn question carries: who took it back, and why when they said.
+func withdrawnNote(actor, reason string) string {
+	note := "withdrawn by " + actor
+	if reason != "" {
+		note += ": " + reason
+	}
+	return note
+}
+
+// mayWithdrawAsk: only the agent that asked, or the board's orchestrator (#13147). The Operator is not one: a question is the Operator's to answer or ignore, and a withdraw is the asker taking it back.
+func (h *BoardHandler) mayWithdrawAsk(r *http.Request, project, actor, asker string) bool {
+	if strings.EqualFold(actor, "Operator") {
+		return false
+	}
+	return h.mayCloseAsk(r, project, actor, asker)
 }
 
 // mayCloseAsk: the asker, the Operator, or the board's orchestrator.

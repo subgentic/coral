@@ -113,7 +113,7 @@ export function answeredElsewhere(sid) {
 /** Was this message's cancel the person's own (so its refusal is not an error)? */
 export function wasCancelled(sid, id) { return cancelling.delete(key(sid, id)); }
 
-/** The live row's own list (`held_messages: [{id, text}]`) is the truth for that agent when the server sends it. */
+/** The live row's own list (`held_messages: [{id, text}]`) is the truth for that agent when the server sends it. null is "none held" and a MISSING key is "not said", so the server must keep held_messages: null in every row it sends, the compact live list (?compact=1) included: that is why routes/sessions_list.go keeps it in keepNullKeys (#13186). */
 export function syncQueuedFromRow(row) {
     if (!row || !row.session_id) return;
     if (row.held_messages !== null && !Array.isArray(row.held_messages)) return; // not said at all: nothing is known; null is the server's "none held" (a cancel or a send on another screen empties the list)

@@ -638,6 +638,30 @@ const SleepReasonCoralStopped = "coral_stopped"
 // auto-wake, as an agent Coral stopped.
 const SleepReasonHooksUpdate = "hooks_update"
 
+// SleepTerminalGone files agents whose terminal is gone under plain sleeping (#13171): their rows stay asleep, with their resume info, and the reason "terminal_gone" is cleared, so the dashboard says "Sleeping"
+// and not "Terminal gone", and a later wake resumes them like any sleeper. sessionIDs names the agents to move (an id that is not a terminal-gone sleeper is left as it is); none names every one. It reports how many moved.
+func (s *SessionStore) SleepTerminalGone(ctx context.Context, sessionIDs []string) (int, error) {
+	query := "UPDATE live_sessions SET sleep_reason = NULL WHERE status = 'active' AND is_sleeping = 1 AND is_archived = 0 AND sleep_reason = ?"
+	args := []any{SleepReasonTerminalGone}
+	if sessionIDs != nil {
+		if len(sessionIDs) == 0 {
+			return 0, nil
+		}
+		in, inArgs, err := sqlx.In(" AND session_id IN (?)", sessionIDs)
+		if err != nil {
+			return 0, err
+		}
+		query += in
+		args = append(args, inArgs...)
+	}
+	res, err := s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return 0, err
+	}
+	n, err := res.RowsAffected()
+	return int(n), err
+}
+
 // SetSessionSleepingFor puts an agent to sleep for a reason Coral found (#3344), shown in the
 // dashboard instead of a plain "Sleeping". Waking clears it.
 func (s *SessionStore) SetSessionSleepingFor(ctx context.Context, sessionID, reason string) error {

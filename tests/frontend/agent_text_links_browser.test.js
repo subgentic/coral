@@ -75,7 +75,7 @@ const HEX = 'd'.repeat(64);
 
             console.log('  Clicking every blocked item and file reference leaves the page where it is');
             const before = await ev('location.href');
-            const targetsBefore = (await Target.getTargets()).targetInfos.filter(t => t.type === 'page').length;
+            const pagesBefore = new Set((await Target.getTargets()).targetInfos.filter(t => t.type === 'page').map(t => t.targetId)); // ids, not a count: a tab of another suite closing or opening meanwhile is not this click's doing (#13332)
             const moved = await ev(`(async () => {
                 const box = document.getElementById('qa-links-${mode}');
                 const click = (el, extra) => el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0, ...(extra || {}) }));
@@ -84,9 +84,9 @@ const HEX = 'd'.repeat(64);
                 await new Promise(r => setTimeout(r, 500)); // sleep-ok: proves a negative, a navigation or new tab would start within this
                 return location.href;
             })()`);
-            const targetsAfter = (await Target.getTargets()).targetInfos.filter(t => t.type === 'page').length;
+            const newPages = (await Target.getTargets()).targetInfos.filter(t => t.type === 'page' && !pagesBefore.has(t.targetId)).map(t => t.targetId);
             check('location.href is unchanged', moved === before, `${before} -> ${moved}`);
-            check('no new tab opened (plain, ctrl and middle clicks)', targetsAfter === targetsBefore, `${targetsBefore} -> ${targetsAfter}`);
+            check('no new tab opened (plain, ctrl and middle clicks)', newPages.length === 0, `new tabs: ${newPages.join(', ')}`);
             await ev(`document.getElementById('qa-links-${mode}').remove()`);
         }
     } catch (e) {

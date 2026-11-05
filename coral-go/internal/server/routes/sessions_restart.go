@@ -445,9 +445,9 @@ func (h *SessionsHandler) restartCommand(ctx context.Context, p *restartPlan) (s
 		return "", refuse
 	}
 	cmd, err := h.launchCommand(ctx, agent.GetAgent(p.agentType), agent.LaunchParams{
-		SessionID:       p.newSessionID,
-		SessionName:     p.newSessionName,
-		ProtocolPath:    h.protocolPath(),
+		SessionID:    p.newSessionID,
+		SessionName:  p.newSessionName,
+		ProtocolPath: h.protocolPath(), EmbeddedProtocol: true,
 		Flags:           p.flags,
 		WorkingDir:      p.workdir,
 		CLIPath:         cliPath, // Settings > CLI paths (#3205)

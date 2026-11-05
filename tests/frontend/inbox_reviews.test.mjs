@@ -12,6 +12,7 @@ const started = new Promise(resolve => { entered = resolve; });
 globalThis.fetch = async (url, options = {}) => {
     reads++;
     const u = new URL(url, 'http://localhost');
+    if (u.pathname === '/api/team-artifacts') return Response.json({artifacts:[],has_more:false});
     if(u.pathname==='/api/board/projects')return Response.json([{project:'a'}]);
     if(u.pathname.endsWith('/tags')) {
         if(fail)return Response.json({error:'Try again'}, {status:500});
@@ -44,3 +45,89 @@ assert.equal(M.reviewErrors().length,1);
 failRead=false; artifacts=[]; await M.refreshReviews(true);
 assert.equal(M.reviewItems().length,0,'deletion removes rows at next refresh');
 console.log('inbox_reviews: ok');
+
+// A discarded scan must not certify its unapplied payload as fresh (#13293).
+let token = 100, rows = [row(301)], hold = false, resolveList, sawList;
+let heldList = new Promise(resolve => { sawList = resolve; });
+globalThis.fetch = async url => {
+    const u = new URL(url, 'http://localhost');
+    if (u.pathname === '/api/team-artifacts') return Response.json({artifacts:[],has_more:false});
+    if (u.pathname === '/api/board/projects') return Response.json([{ project: 'a' }]);
+    if (u.pathname.endsWith('/status')) return Response.json({ artifacts_rev: token });
+    const data = { artifacts: u.searchParams.get('tag') === 'saved' ? [] : rows.slice(), has_more: false, artifacts_rev: token };
+    if (hold && u.searchParams.get('tag') !== 'saved') {
+        hold = false; sawList(); await new Promise(resolve => { resolveList = resolve; });
+    }
+    return Response.json(data);
+};
+await M.refreshReviews(true);
+rows.push(row(302)); token++; hold = true;
+const discarded = M.refreshReviews(true);
+await heldList;
+M.settleReview(M.reviewItems()[0]);
+resolveList(); await discarded;
+assert.ok(!M.reviewItems().some(a => a.id === row(302).id), 'the superseded scan was discarded');
+const realNow = Date.now;
+Date.now = () => realNow() + 31000;
+try { await M.refreshReviews(); } finally { Date.now = realNow; }
+assert.ok(M.reviewItems().some(a => a.id === row(302).id), 'a discarded scan cannot suppress the next background read of unapplied rows');
+console.log('inbox_reviews: discarded revision is not cached');
+
+// #13293 rebase onto #13304: a source arriving during a revision-triggered
+// scan needs one complete rescan, with no lost source or duplicate queued scan.
+const { state } = await import('../../coral-go/pkg/frontend/static/state.js');
+const feed = await import('../../coral-go/pkg/frontend/static/artifacts_feed.js');
+state.hub = true; state.serversKnown = true;
+state.servers = [{ id: 'box-1', status: 'online' }];
+let projectScans = 0, unblock, inList;
+const listStarted = new Promise(resolve => { inList = resolve; });
+let pauseFirst = true;
+globalThis.fetch = async url => {
+    const u = new URL(url, 'http://localhost');
+    if (u.pathname === '/api/team-artifacts') return Response.json({artifacts:[],has_more:false});
+    if (u.pathname === '/api/board/projects') { projectScans++; return Response.json([]); }
+    if (u.pathname.endsWith('/projects')) return Response.json([{ project: 'alpha' }]);
+    if (u.pathname.endsWith('/status')) return Response.json({ artifacts_rev: 201 });
+    const remote = u.pathname.includes('/box-2/') ? 2 : 1;
+    if (pauseFirst && remote === 1 && u.searchParams.get('tag') === 'for review') {
+        pauseFirst = false; inList(); await new Promise(resolve => { unblock = resolve; });
+    }
+    return Response.json({ artifacts_rev: 201, has_more: false, artifacts: u.searchParams.get('tag') === 'saved' ? [] : [row(400 + remote)] });
+};
+const withLateSource = M.refreshReviews(true);
+await listStarted;
+state.servers.push({ id: 'box-2', status: 'online' });
+feed.publishArtifactsRev({ '@box-1/alpha': 201 });
+unblock(); await withLateSource;
+for (let i = 0; i < 100 && !M.reviewItems().some(a => a.id === row(402).id); i++) await new Promise(setImmediate);
+assert.ok(M.reviewItems().some(a => a.id === row(401).id), 'the original source stays');
+assert.ok(M.reviewItems().some(a => a.id === row(402).id), 'the source arriving during the scan is included');
+await new Promise(setImmediate);
+assert.equal(projectScans, 2, 'the source change and queued revision share exactly one rescan');
+console.log('inbox_reviews: late source and pending revision coalesce');
+
+// An older computer may ignore the No team filter and return every team's files.
+// Neither those rows nor rows without the reserved board identity belong in Needs you.
+state.hub = true;
+state.serversKnown = true;
+state.servers = [{ id: 'old-box', status: 'online' }];
+const oldSourceReads = [];
+globalThis.fetch = async url => {
+    const u = new URL(url, 'http://localhost');
+    if (u.pathname.endsWith('/projects')) return Response.json([]);
+    if (u.pathname.endsWith('/team-artifacts')) {
+        oldSourceReads.push(u.pathname);
+        return Response.json({ artifacts: [
+            { ...row(901), board_id: 'another-team' },
+            { ...row(902), board_id: '@old-box/another-team' },
+            row(903),
+        ], has_more: false });
+    }
+    return Response.json({ artifacts: [], has_more: false });
+};
+await M.refreshReviews(true);
+assert.equal(M.reviewItems().length, 0, 'an old source returning every team must add no no-team review rows');
+assert.equal(M.savedFiles().length, 0, 'an old source must add no no-team saved rows either');
+assert.ok(oldSourceReads.includes('/api/team-artifacts'), 'the local reserved source was scanned');
+assert.ok(oldSourceReads.includes('/api/remote/old-box/api/team-artifacts'), 'the remote reserved source was scanned');
+console.log('inbox_reviews: older unfiltered local and remote sources add no reserved review rows');

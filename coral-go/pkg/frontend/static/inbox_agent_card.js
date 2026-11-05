@@ -8,6 +8,8 @@ import { importOnce } from './import_once.js';
 import { showToast } from './utils.js';
 import { blockedReason } from './hub_access.js';
 import { resolveSessionIdentity } from './session_state.js';
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('permission_card_dialog.css'); // the card's own layout (#13169): not the Operator question dialog's grid
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const REJECT_FORM = /^(?:no|deny|reject|cancel)\b/i;
@@ -31,7 +33,7 @@ const openAgent = s => { window.switchNavTab?.('agents'); Promise.resolve(window
 
 export function openAgentCard(s) {
     const who = resolveSessionIdentity(s);
-    const dlg = el('dialog', 'modal-content dlg-form inbox-ask-dialog'); dlg.setAttribute('aria-labelledby', 'inbox-card-title');
+    const dlg = el('dialog', 'modal-content dlg-form inbox-ask-dialog inbox-card-dialog'); dlg.setAttribute('aria-labelledby', 'inbox-card-title');
     const title = el('h2', null, `${who} asks you`); title.id = 'inbox-card-title'; importOnce('./agent_link.js').then(m => { if (title.isConnected) title.replaceChildren(m.agentLink(who, { board: s.board_project, session: s.session_id }), ' asks you'); }).catch(() => {}); // (#12168)
     const sub = el('p', 'inbox-ask-sub', 'Waiting for a permission. Nothing is sent until you choose.');
     const body = el('div', 'inbox-card-body'); body.setAttribute('aria-live', 'polite');

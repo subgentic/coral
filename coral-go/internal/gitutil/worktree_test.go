@@ -19,20 +19,31 @@ func gitIn(t *testing.T, dir string, args ...string) string {
 	return string(out)
 }
 
+// realTempDir is a new temp folder with its symbolic links resolved (a macOS temp folder is /var/... and git prints /private/var/...), so a path the test holds is the path git lists.
+func realTempDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	if real, err := filepath.EvalSymlinks(dir); err == nil {
+		return real
+	}
+	return dir
+}
+
 // #6701: a worktree is removed through the repository that owns it, wherever the caller stands, and only when nothing in it is unsaved.
 func TestRemoveWorktree(t *testing.T) {
 	ctx := context.Background()
 	repo := baseRepo(t, "master", true)
-	holder := t.TempDir() // the folder that holds worktrees: not a repository
+	holder := realTempDir(t) // the folder that holds worktrees: not a repository
 	wt := filepath.Join(holder, "team")
 	add := func() { gitIn(t, repo, "worktree", "add", "-b", "coral-team/team", "--", wt, "master") }
 
 	add()
+	assert.Contains(t, gitIn(t, repo, "worktree", "list"), filepath.ToSlash(wt), "the worktree is listed while it exists: the path checks below look for the path git prints") // (so a folder git prints resolved, as macOS temp folders are, shows here, not as a pass for the wrong reason)
 	got, err := RemoveWorktree(ctx, repo, wt, "coral-team/team")
 	require.NoError(t, err)
 	assert.Equal(t, WorktreeOutcome{State: "removed", Path: wt, Branch: "coral-team/team"}, got)
 	assert.NoDirExists(t, wt)
-	assert.NotContains(t, gitIn(t, repo, "worktree", "list"), "team")
+	assert.NotContains(t, gitIn(t, repo, "worktree", "list"), filepath.ToSlash(wt), "the worktree is no longer listed") // (by its path: the folder the test runs in can have "team" in its own)
 	assert.Empty(t, gitIn(t, repo, "branch", "--list", "coral-team/team"), "nothing on the branch: it goes")
 
 	// the repository given as the folder that is none: found from the worktree
@@ -61,11 +72,12 @@ func TestRemoveWorktree(t *testing.T) {
 
 	// the folder deleted by hand: the registration goes, and that is not an error
 	gitIn(t, repo, "worktree", "add", "--", wt, "coral-team/team")
+	assert.Contains(t, gitIn(t, repo, "worktree", "list"), filepath.ToSlash(wt), "listed while the folder is there")
 	require.NoError(t, os.RemoveAll(wt))
 	got, err = RemoveWorktree(ctx, repo, wt, "")
 	require.NoError(t, err)
 	assert.Equal(t, "removed", got.State)
-	assert.NotContains(t, gitIn(t, repo, "worktree", "list"), "team")
+	assert.NotContains(t, gitIn(t, repo, "worktree", "list"), filepath.ToSlash(wt), "the registration went with the folder")
 
 	// something that is no worktree of any repository is said, in one line
 	_, err = RemoveWorktree(ctx, "", t.TempDir(), "")
@@ -157,10 +169,11 @@ func TestAddTeamWorktreeFailedCheckoutLeavesNoBranch(t *testing.T) {
 	blob := strings.TrimSpace(gitIn(t, repo, "rev-parse", "HEAD:f.txt"))
 	require.NoError(t, os.Remove(filepath.Join(repo, ".git", "objects", blob[:2], blob[2:]))) // the checkout cannot read it
 
-	_, err := AddTeamWorktree(ctx, repo, filepath.Join(t.TempDir(), "team"), "coral-team/broken", "master")
+	failedWt := filepath.Join(realTempDir(t), "team")
+	_, err := AddTeamWorktree(ctx, repo, failedWt, "coral-team/broken", "master")
 	require.Error(t, err)
 	assert.Empty(t, gitIn(t, repo, "branch", "--list", "coral-team/broken"), "no branch is left behind")
-	assert.NotContains(t, gitIn(t, repo, "worktree", "list"), "team")
+	assert.NotContains(t, gitIn(t, repo, "worktree", "list"), filepath.ToSlash(failedWt), "and no worktree")
 }
 
 // A base that exists only on the remote starts from the remote's branch.

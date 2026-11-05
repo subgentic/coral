@@ -19,7 +19,7 @@ import (
 func TestCLIHelpAndFlagErrorsAreGolden(t *testing.T) {
 	cases := [][]string{
 		{}, {"help"}, {"--help"}, {"help", "windows"}, {"help", "exit-codes"}, {"help", "json"}, {"help", "timeouts"}, {"help", "bogus"},
-		{"help", "task"}, {"help", "artifact"}, {"help", "docs"}, {"task", "--help"},
+		{"help", "check"}, {"check", "help"}, {"check", "state", "bad"}, {"help", "task"}, {"help", "artifact"}, {"help", "docs"}, {"task", "--help"},
 		{"task", "list", "--bogus"}, {"task", "current", "--bogus"}, {"task", "detail", "--bogus"}, {"task", "detail", "--json", "1", "--bogus"},
 		{"artifact", "--bogus"}, {"docs", "--bogus"},
 	}

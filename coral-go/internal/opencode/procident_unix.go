@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 // isRecordedServer reports whether rec.PID is still the process that was recorded: its command line (ps) is exactly the recorded command and it began when the record says.
@@ -16,7 +17,27 @@ func isRecordedServer(rec pidRecord) bool {
 	if err != nil || strings.TrimSpace(string(out)) != rec.Command {
 		return false
 	}
-	return processStart(rec.PID) == rec.Started
+	return sameStart(processStart(rec.PID), rec.Started)
+}
+
+const (
+	psStartLayout = "Mon Jan _2 15:04:05 2006"
+	startSlack    = 2 * time.Second
+)
+
+// sameStart is whether two ps start times name one process start. lstart has whole-second resolution and on Linux it is the boot time plus start ticks, so two reads of one
+// process under load can be a second apart (#13412, as #13409): up to startSlack apart is the same process, a recycled pid starts later. Identical text is always the same.
+func sameStart(a, b string) bool {
+	if a == b {
+		return true
+	}
+	ta, err1 := time.ParseInLocation(psStartLayout, a, time.Local)
+	tb, err2 := time.ParseInLocation(psStartLayout, b, time.Local)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	d := ta.Sub(tb)
+	return d >= -startSlack && d <= startSlack
 }
 
 // processStart is ps's start time of pid ("" where ps is not there or the process is not).

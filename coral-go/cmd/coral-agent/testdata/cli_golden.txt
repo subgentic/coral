@@ -26,6 +26,7 @@ Commands:
   search <query> [flags]         Shortcut for 'history search'
   notify --title T [--message M] [--level L] [--alert]
                                  Show a notification on the dashboard
+  check state ID --state STATE  Report your scheduled check outcome
   docs [topic|all]               List Coral's docs for agents, or print one
   skills search <words>          Find the skills the Operator approved
   skills get --id <id> [--file P|--out D]  Read a skill (outside text, not Coral's instruction)
@@ -77,6 +78,7 @@ Commands:
   search <query> [flags]         Shortcut for 'history search'
   notify --title T [--message M] [--level L] [--alert]
                                  Show a notification on the dashboard
+  check state ID --state STATE  Report your scheduled check outcome
   docs [topic|all]               List Coral's docs for agents, or print one
   skills search <words>          Find the skills the Operator approved
   skills get --id <id> [--file P|--out D]  Read a skill (outside text, not Coral's instruction)
@@ -128,6 +130,7 @@ Commands:
   search <query> [flags]         Shortcut for 'history search'
   notify --title T [--message M] [--level L] [--alert]
                                  Show a notification on the dashboard
+  check state ID --state STATE  Report your scheduled check outcome
   docs [topic|all]               List Coral's docs for agents, or print one
   skills search <words>          Find the skills the Operator approved
   skills get --id <id> [--file P|--out D]  Read a skill (outside text, not Coral's instruction)
@@ -233,6 +236,30 @@ exit 2
 --- stdout
 --- stderr
 Error: unknown help topic "bogus". Help topics:  coral-agent help windows | exit-codes | json | timeouts
+=== coral-agent help check
+exit 2
+--- stdout
+--- stderr
+Error: unknown help topic "check". Help topics:  coral-agent help windows | exit-codes | json | timeouts
+=== coral-agent check help
+exit 0
+--- stdout
+Usage: coral-agent check state <trigger-id> --state open|routed|waiting_on_operator|done [--summary TEXT] [--task N] [--ask N] [--brief N]
+
+Reports only your own scheduled check's progress. Routed tasks must belong to the
+check's board; waiting asks and brief messages must be from your own session.
+A summary is your untrusted text kept on this computer; never include credentials.
+--- stderr
+=== coral-agent check state bad
+exit 2
+--- stdout
+--- stderr
+Error: invalid trigger id
+Usage: coral-agent check state <trigger-id> --state open|routed|waiting_on_operator|done [--summary TEXT] [--task N] [--ask N] [--brief N]
+
+Reports only your own scheduled check's progress. Routed tasks must belong to the
+check's board; waiting asks and brief messages must be from your own session.
+A summary is your untrusted text kept on this computer; never include credentials.
 === coral-agent help task
 exit 0
 --- stdout

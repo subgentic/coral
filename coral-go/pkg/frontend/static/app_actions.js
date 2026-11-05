@@ -6,7 +6,7 @@ import { state } from './state.js';
 import { loadLiveSessions } from './api.js';
 import { restartSession, restartStage, hideRestartModal, confirmRestart, editGoal, refreshGoal } from './controls.js';
 import { selectLiveSession, selectHistorySession, editAndResubmit, renameAgent, editInstructions, setAgentIcon, toggleChatFlag } from './sessions.js';
-import { RESET_LOG_NOTE, toggleGroupCollapse, killGroup, killBoard, toggleTeamSleep, toggleAgentSleep, toggleAgentArchive, toggleArchivedSection, shareAgentTeam, saveTeamFromSidebar, killSessionDirect, showInfoDirect, attachDirect, restartDirect, restartSameDirect, showConfirmModal, hideConfirmModal, showPromptModal, hidePromptModal, showAlertModal, hideAlertModal, copyFolderPath, moveGroupUp, moveGroupDown, toggleGroupByTeam, expandSleepingGroup, setBoardAccentColor, moveSessionUp, moveSessionDown, showTeamTokenUsage, distillTeamKnowledge, filterLiveAgents, syncDisplayMenu, agentSearchKey, toggleShowServer, toggleGroupByServer, toggleRowLine, groupHeaderKey, teamHeaderKey } from './render.js';
+import { RESET_LOG_NOTE, toggleGroupCollapse, killGroup, killBoard, toggleTeamSleep, toggleAgentSleep, sleepTerminalGone, toggleAgentArchive, toggleArchivedSection, shareAgentTeam, saveTeamFromSidebar, killSessionDirect, showInfoDirect, attachDirect, restartDirect, restartSameDirect, showConfirmModal, hideConfirmModal, showPromptModal, hidePromptModal, showAlertModal, hideAlertModal, copyFolderPath, moveGroupUp, moveGroupDown, toggleGroupByTeam, expandSleepingGroup, setBoardAccentColor, moveSessionUp, moveSessionDown, showTeamTokenUsage, distillTeamKnowledge, filterLiveAgents, syncDisplayMenu, agentSearchKey, toggleShowServer, toggleGroupByServer, toggleRowLine, groupHeaderKey, teamHeaderKey } from './render.js';
 import { whatStaysReset } from './agent_words.js';
 import { toggleBrowser, browserNavigateTo, browserNavigateUp, browserSelectRecent, browserUse } from './browser.js';
 import { toggleAgenticPanel, toggleSidebarRail, focusSidebarSearch } from './sidebar.js';
@@ -168,6 +168,10 @@ registerActions({
     'docs-copy-agent-line': () => { importOnce('./docs.js').then(m => m.copyDocsLine()).catch(() => {}); }, // the Docs page's button, in the page from the start; docs.js loads with the Docs tab
     'm-close-top-bar-settings-then-check-for-updates': () => { window.__coral.closeTopBarSettings(); window.checkForUpdates(true); },
     'm-close-top-bar-settings-then-show-servers-modal': () => { window.__coral.closeTopBarSettings(); window.showServersModal(); },
+    'm-open-chief-settings': () => { window.__coral.closeTopBarSettings(); window.showSettingsModal('chief'); }, // the menu's Set up Chief (#13167)
+    'open-chief-settings': () => { window.showSettingsModal('chief'); }, // the sidebar's
+    'm-chief-hub-note': () => { window.__coral.closeTopBarSettings(); importOnce('./chief_entry.js').then(m => showToast(m.HUB_SETUP_NOTE)); },
+    'chief-hub-note': () => { importOnce('./chief_entry.js').then(m => showToast(m.HUB_SETUP_NOTE)); },
     'm-close-top-bar-settings-then-show-settings-modal': () => { window.__coral.closeTopBarSettings(); window.showSettingsModal(); },
     'm-close-top-bar-settings-then-show-shortcuts': () => { window.__coral.closeTopBarSettings(); importOnce('./shortcuts.js').then(m => m.showShortcuts()); },
     'm-close-top-bar-settings-then-show-theme-configurator': () => { window.__coral.closeTopBarSettings(); window.showThemeConfigurator(); },
@@ -452,7 +456,7 @@ Object.assign(window, {
     toggleGroupCollapse, groupHeaderKey, teamHeaderKey, killGroup, moveGroupUp, moveGroupDown,
     copyFolderPath, killBoard, setBoardAccentColor, resetTeam,
     moveSessionUp, moveSessionDown,
-    toggleTeamSleep, toggleAgentSleep, toggleAgentArchive, toggleArchivedSection,
+    toggleTeamSleep, toggleAgentSleep, sleepTerminalGone, toggleAgentArchive, toggleArchivedSection,
     exitTeamPage, openTeamPage,
     showTeamAvailabilityWorkspace, showTeamWorkingModeWorkspace, showTeamLinkDialog,
     shareAgentTeam, saveTeamFromSidebar, showTeamTokenUsage, distillTeamKnowledge,

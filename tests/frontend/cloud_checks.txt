@@ -2,8 +2,10 @@
 # One line each, not one `&&` chain in package.json: Windows refuses a command line over 8,191 characters
 # ("The command line is too long", #11042), and a line each merges without conflict (.gitattributes: merge=union).
 # A plain-node suite is "node <file>.test.js"; suites.mjs reads those lines to know no suite is left out of every run.
+node artifact_send_review_unit.test.mjs
 node class_list_tokens.test.mjs
 node cli_refusal_words.test.mjs
+node comments_late_answer.test.mjs
 node computer_words_census.test.mjs
 node css_duplicate_census.test.mjs
 node phone_screens_census.test.mjs
@@ -101,6 +103,8 @@ node renderer_payloads.test.mjs
 node cloud_hardening.test.mjs
 node hub_too_large.test.mjs
 node server_base.test.js
+node remote_limit.test.mjs
+node update_hub_action.test.mjs
 node team_artifact_filters.test.js
 node task_filters.test.js
 node server_state.test.mjs
@@ -300,6 +304,8 @@ node no_ignore_word.test.mjs
 node agent_list_starting.test.mjs
 node bare_api_fetch_census.test.mjs
 node inbox_servers_read.test.mjs
+node proposals_state_hub.test.mjs
+node proposals_actions_hub.test.mjs
 node inbox_artifacts_loading.test.mjs
 node files_refresh_403_other_agent.test.mjs
 node skill_filter.test.mjs
@@ -307,3 +313,23 @@ node goal_guide.test.mjs
 node inbox_teams_checked.test.mjs
 node launch_cards_goal_desc.test.js
 node cloud_signin_leaving.test.js
+
+node hub_world_scope.test.js
+node server_approvals_page.test.mjs
+node live_list_compact_ask.test.mjs
+node held_row_compact.test.mjs
+node live_list_hub_plain.test.mjs
+node hub_review_settlement.test.mjs
+node team_launch_settings_launch_flag.test.mjs
+node agent_info_sections.test.mjs
+node home_folder_ask.test.mjs
+node artifact_comment_send_queue.test.mjs
+
+node artifact_comment_ask_context.test.mjs
+node chief_checks_model.test.mjs
+
+node chief_checks_state_api.test.mjs
+
+node chief_checks_lan.test.mjs
+node goal_write.test.mjs
+node hub_update_launch_words.test.mjs

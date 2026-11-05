@@ -253,7 +253,9 @@ func storeArtifactVia(coralDir, sessionID, name, mediaType, uploadedBy, source, 
 			r := newUploadRecord(mine, sessionID, uploadedBy, source)
 			r.HubUser = hubUser
 			rec, _ := json.Marshal(r)
-			_ = writeFileAtomic(filepath.Join(up, hexID+".json"), rec, 0o600)
+			if err := writeFileAtomic(filepath.Join(up, hexID+".json"), rec, 0o600); err == nil {
+				noteArtifactRecordChanged(coralDir, r.Board)
+			}
 		}
 	}
 	return hexID, stored, nil

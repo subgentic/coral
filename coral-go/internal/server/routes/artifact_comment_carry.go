@@ -96,6 +96,7 @@ type carriedComment struct {
 // carriedComments are the comments of the versions before this one in its series, for a caller who may read each of them. id is the version being read, n its number.
 func (h *SessionsHandler) carriedComments(r *http.Request, id string, n int, members []seriesMember, state string) []carriedComment {
 	var text string
+	video := h.videoCommentArtifact(id)
 	checked := false
 	if b, err := readSmallFile(filepath.Join(h.artifactDir(), id), carryMaxText); err == nil {
 		text, checked = string(b), true
@@ -126,6 +127,8 @@ func (h *SessionsHandler) carriedComments(r *http.Request, id string, n int, mem
 				} else {
 					c.state = carryGone
 				}
+			case t.AtS != nil && video:
+				c.state = carryFound
 			case !checked:
 				c.state = carryUnchecked
 			default:

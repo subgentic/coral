@@ -248,7 +248,7 @@
 1	launch_core.js	failList
 1	launch_core.js	started
 1	list_card_parts.js	PIN_ICON
-1	list_card_parts.js	SVGO.o5
+2	list_card_parts.js	SVGO.o5
 4	list_card_parts.js	icon
 1	markdown.js	HL_MARK
 2	message_board.js	p.message_count
@@ -303,7 +303,7 @@
 1	registered_server_view.js	label
 1	registered_server_view.js	m.cls
 1	registered_server_view.js	online
-1	registered_server_view.js	s.transport === 'ssh' && !running ? `${upgradeControl(s, version, busy)} <button type="button" class="btn" dat
+1	registered_server_view.js	s.transport === 'ssh' && !running ? `${upgradeControl(s, version, busy)} ${s.owner_stamp ? '' : `<button type=
 1	registered_server_view.js	setup
 1	registered_server_view.js	statusPill(status)
 1	registered_server_view.js	title
@@ -342,7 +342,7 @@
 1	session_header_updates.js	_whereBack
 2	session_rows.js	!instructionsOffered(s, isCloud()) ? '' : `<button class="menu-item overflow-menu-item" data-on-click="agent-i
 1	session_rows.js	MORE_DOTS_SVG
-18	session_rows.js	SVGO.o0
+19	session_rows.js	SVGO.o0
 8	session_rows.js	SVGO.o1
 4	session_rows.js	SVGO.o2
 2	session_rows.js	SVGO.o4
@@ -360,6 +360,7 @@
 1	session_rows.js	dirChip
 1	session_rows.js	dotClass
 1	session_rows.js	hooksMissingChip(s)
+1	session_rows.js	isGoneAsleep(s) ? `<button class="menu-item overflow-menu-item" data-on-click="agent-sleep" data-name="${escap
 2	session_rows.js	label
 1	session_rows.js	nameTail ? `<span class="session-label-tags">${reminderTag}${typeTag}${dirChip}</span>` : `${reminderTag}${typ
 1	session_rows.js	piHooksChip(s)
@@ -368,7 +369,7 @@
 1	session_rows.js	rowLinesHtml(s)
 1	session_rows.js	sleepingClass
 1	session_rows.js	stale ? '' : kebabMenu
-1	session_rows.js	stale ? '' : waitingBadge + heldChip + sleepChip + wakeBtn
+1	session_rows.js	stale ? '' : waitingBadge + heldChip + sleepChip + wakeBtn + sleepBtn
 1	session_rows.js	staleClass
 1	session_rows.js	stateInfo.pillClass ? ' ' + stateInfo.pillClass : ''
 1	session_rows.js	stuckClass
@@ -409,11 +410,9 @@
 1	sidebar_groups.js	t.chips.filter(c => CHIP_ACTION_ATTR[c.action]).map(c => `<button type="button" class="group-chip" ${CHIP_ACTI
 1	sidebar_groups.js	top
 1	sidebar_rail.js	_RAIL_ICONS[g.kind]
-1	sidebar_rail.js	_railRoleIcon(s)
 1	sidebar_rail.js	badge
 1	sidebar_rail.js	dot
 1	sidebar_rail.js	g.kind
-1	sidebar_rail.js	icon
 1	sidebar_rail.js	style
 1	sidebar_rail.js	unread > 9 ? '9+' : unread
 1	subagents.js	_formatTokenCount(n || 0)

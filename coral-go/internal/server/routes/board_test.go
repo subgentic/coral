@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -24,19 +25,28 @@ import (
 	"github.com/subgentic/coral/internal/store/storetest"
 )
 
-// lastBoardTestDBPath is the file of the board store setupBoardTestServer made last.
-var lastBoardTestDBPath string
+// boardTestDBPaths maps each handler setupBoardTestServer made to its board store's file (one global "last" path was written by every parallel test: a data race, and the wrong file when another test set up in between, #13362).
+var boardTestDBPaths sync.Map // *BoardHandler -> string
+
+// boardTestDBPath is the file of the board store behind h.
+func boardTestDBPath(h *BoardHandler) string {
+	p, _ := boardTestDBPaths.Load(h)
+	s, _ := p.(string)
+	return s
+}
 
 func setupBoardTestServer(t *testing.T) (*httptest.Server, *BoardHandler) {
 	t.Helper()
 
 	dbPath := t.TempDir() + "/board_test.db"
-	lastBoardTestDBPath = dbPath // a test that must change the file as another program could (the Activity record's tamper checks, #12070) opens it itself
+	// a test that must change the file as another program could (the Activity record's tamper checks, #12070) opens it itself
 	bs, err := boardtest.Open(dbPath)
 	require.NoError(t, err)
 	t.Cleanup(func() { bs.Close() })
 
 	handler := NewBoardHandler(bs)
+	boardTestDBPaths.Store(handler, dbPath) // a test that must change the file as another program could (the Activity record's tamper checks, #12070) opens it itself through boardTestDBPath
+	t.Cleanup(func() { boardTestDBPaths.Delete(handler) })
 	// Cleanups run last-registered first: the server closes, then the work requests
 	// started after answering finishes, then the store closes, then the TempDir goes.
 	// Without the wait that work could still open the database while the directory
@@ -99,6 +109,12 @@ func setupBoardTestServer(t *testing.T) (*httptest.Server, *BoardHandler) {
 	r.Get("/api/board/{project}/paused", handler.GetPaused)
 	r.Delete("/api/board/{project}", handler.DeleteBoard)
 	r.Put("/api/board/{project}/settings", handler.UpdateBoardSettings)
+	r.Put("/api/board/{project}/working-mode", handler.SetWorkingMode)
+	r.Post("/api/board/{project}/working-mode/presets", handler.SaveWorkflowPreset)
+	r.Put("/api/board/{project}/working-mode/presets/{presetID}", handler.SaveWorkflowPreset)
+	r.Post("/api/board/{project}/working-mode/presets/{presetID}/reset", handler.ResetWorkflowPreset)
+	r.Put("/api/board/{project}/subscribers/{subscriberID}/review-settings", handler.SetReviewSettings)
+	r.Put("/api/board/{project}/guide-roster", handler.GuideRoster)
 	r.Post("/api/board/{project}/waits", handler.RegisterWait)
 	r.Get("/api/board/{project}/waits", handler.GetActiveWait)
 	r.Delete("/api/board/{project}/waits", handler.CancelWait)

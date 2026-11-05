@@ -8,12 +8,12 @@ import { registerDialog, closeDialog } from './modal_chrome.js';
 let open = null; // { team, modal }
 
 /** Open the team's settings. Resolves true when the dialog is up (or was already for this team). */
-export async function openTeamSettings(team) {
+export async function openTeamSettings(team, options = {}) {
     const key = String(team || '');
     if (!key) return false;
     const { hasUnsavedTeamSettings, confirmTeamWorkspaceChange, showTeamWorkingMode } = await importOnce('./team_working_mode.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
     if (open && open.modal.isConnected) {
-        if (open.team === key) { open.modal.querySelector('.sv-nav button, button, [tabindex]')?.focus(); return true; }
+        if (open.team === key) { if (options.section) open.view?.showGroup(options.section); open.modal.querySelector('.sv-nav button, button, [tabindex]')?.focus(); return true; }
         if (hasUnsavedTeamSettings() && !(await confirmTeamWorkspaceChange())) return false; // another team's settings while this one holds edits: ask first
         closeDialog(open.modal);
     }
@@ -43,7 +43,7 @@ export async function openTeamSettings(team) {
     document.addEventListener('keydown', keepIn, true); document.addEventListener('keyup', keepIn, true);
     open = { team: key, modal };
     try {
-        await showTeamWorkingMode(key, { page: modal.querySelector('.team-settings-host'), closeDialog: () => close() });
+        open.view = await showTeamWorkingMode(key, { section: options.section, page: modal.querySelector('.team-settings-host'), closeDialog: () => close() });
     } catch (e) {
         console.error('team settings', e);
         modal.querySelector('.team-settings-host').textContent = 'Team settings could not be shown. Close this and try again.';

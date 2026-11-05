@@ -122,9 +122,21 @@ func (h *BoardHandler) ListAllTasks(w http.ResponseWriter, r *http.Request) {
 	if r.URL.RawQuery != "" && h.queryAllTasks(w, r) {
 		return
 	}
-	// At most 500 whole rows (#4602; the task query path caps at 500 too, and 100 with long text).
+	// At most 500 whole rows (#4602; the task query path caps at 500 too, and 100 with long text). The same rows as the task query's first page (newest first), so the answer
+	// can say how many tasks there are and where the next page starts: a request with no cursor answers as it always has, with total, has_more and next_cursor added (#13188).
 	limit := clampLimit(queryInt(r, "limit", 100), 100, maxAllTasksRows)
-	tasks, err := h.bs.ListAllTasks(r.Context(), limit)
+	query, qerr := board.ParseTaskQuery(board.TaskQueryParams{})
+	if qerr != nil {
+		errInternalServer(w, qerr.Error())
+		return
+	}
+	query.Limit = limit
+	tasks, res, err := h.bs.QueryTaskRowsResult(r.Context(), query)
+	if err != nil {
+		errInternalServer(w, err.Error())
+		return
+	}
+	total, err := h.bs.CountTaskQuery(r.Context(), query)
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
@@ -140,7 +152,11 @@ func (h *BoardHandler) ListAllTasks(w http.ResponseWriter, r *http.Request) {
 	if err := h.bs.FillGoalTitles(r.Context(), tasks); err != nil {
 		slog.Warn("could not read the goal titles of the tasks", "error", err)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"tasks": emptyIfNil(tasks)})
+	out := map[string]any{"tasks": emptyIfNil(tasks), "total": total, "has_more": res.NextCursor != ""}
+	if res.NextCursor != "" {
+		out["next_cursor"] = res.NextCursor
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 // ActiveTask returns the subscriber's current in-progress task.

@@ -2,6 +2,7 @@ package background
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/tmux"
 )
@@ -91,9 +93,7 @@ func TestReconciler_ExitedAgentIsMarkedSleeping(t *testing.T) {
 	rt.set(FormatSessionName("claude", testUUID), "zsh")
 
 	r.reconcileOnce(ctx)
-	assert.False(t, isSleeping(t, ss, testUUID), "one pass is not enough")
-	r.reconcileOnce(ctx)
-	assert.True(t, isSleeping(t, ss, testUUID), "marked sleeping after reconcileMissThreshold passes")
+	assert.True(t, isSleeping(t, ss, testUUID), "a terminal back at its idle shell is Ended on the first pass, not the second (#13418)")
 	assert.Empty(t, rt.killed, "the shell is left as it is (Wake resumes in it)")
 	ls, err := ss.GetLiveSession(ctx, testUUID)
 	require.NoError(t, err)
@@ -120,12 +120,13 @@ func TestReconciler_ShellBlipDoesNotMark(t *testing.T) {
 	rt.listed = []AgentInfo{{AgentType: "claude", SessionID: testUUID}}
 	name := FormatSessionName("claude", testUUID)
 	rt.set(name, "zsh")
+	rt.set(name, "node") // the CLI runs: nothing to mark however many passes
 	r.reconcileOnce(ctx)
-	rt.set(name, "node") // the CLI is back (e.g. the user resumed it by hand)
 	r.reconcileOnce(ctx)
+	assert.False(t, isSleeping(t, ss, testUUID))
 	rt.set(name, "zsh")
 	r.reconcileOnce(ctx)
-	assert.False(t, isSleeping(t, ss, testUUID), "the count resets when the CLI is seen again")
+	assert.True(t, isSleeping(t, ss, testUUID), "gone again: marked at that pass")
 }
 
 func TestReconciler_ExitedWithinLaunchGraceIsNotMarked(t *testing.T) {
@@ -262,4 +263,98 @@ func TestReconciler_ReplacedSessionGetsItsOwnLaunchGrace(t *testing.T) {
 		r.reconcileOnce(ctx)
 	}
 	assert.False(t, isSleeping(t, ss, newID), "inside its own launch grace it is not an exited agent")
+}
+
+// candRuntime is the exited fixture's terminal that can also name the single foreground program of a pane (ptymanager.AgentRecorder).
+type candRuntime struct {
+	*fgReconRuntime
+	cands map[string]ptymanager.AgentCandidate
+}
+
+func (c *candRuntime) AgentCandidate(_ context.Context, name, _, _, _ string) (ptymanager.AgentCandidate, string, error) {
+	cand, ok := c.cands[name]
+	if !ok {
+		return ptymanager.AgentCandidate{}, "nothing is in the foreground of the terminal", nil
+	}
+	return cand, "", nil
+}
+
+func (c *candRuntime) RecordAgent(context.Context, string, string, string, ptymanager.AgentCandidate) (ptymanager.AgentCandidate, error) {
+	return ptymanager.AgentCandidate{}, errors.New("not used")
+}
+
+func newResumeFixture(t *testing.T) (*store.SessionStore, *fgReconRuntime, *candRuntime, *SessionReconciler, string) {
+	ss, rt, r := newExitedFixture(t)
+	cr := &candRuntime{fgReconRuntime: rt, cands: map[string]ptymanager.AgentCandidate{}}
+	r.runtime = cr
+	registerAwake(t, ss, "claude", testUUID)
+	rt.listed = []AgentInfo{{AgentType: "claude", SessionID: testUUID}}
+	return ss, rt, cr, r, FormatSessionName("claude", testUUID)
+}
+
+// An agent marked Ended whose terminal runs ITS OWN CLI again (a person started it by hand in that shell) is awake again on the next pass, with no wake (#13431). Any other program
+// in the pane (a pager, an editor, a REPL, a stray child) leaves it Ended: Coral's notices must not be typed into it.
+func TestReconciler_AnEndedAgentWhoseCLIRunsAgainIsAwakeAgain(t *testing.T) {
+	ss, rt, cr, r, name := newResumeFixture(t)
+	ctx := context.Background()
+	rt.set(name, "zsh")
+	r.reconcileOnce(ctx)
+	require.True(t, isSleeping(t, ss, testUUID), "ended at its idle shell")
+	r.reconcileOnce(ctx)
+	assert.True(t, isSleeping(t, ss, testUUID), "still at the shell: still Ended")
+
+	for _, other := range []string{"/usr/bin/less", "/usr/bin/vim", "/usr/bin/python3", "/opt/x/claude-notes"} {
+		rt.set(name, other)
+		cr.cands[name] = ptymanager.AgentCandidate{PID: 5, Image: other}
+		r.reconcileOnce(ctx)
+		assert.True(t, isSleeping(t, ss, testUUID), "%s is not the agent's CLI: stays Ended", other)
+	}
+	cr.cands[name] = ptymanager.AgentCandidate{PID: 5, Image: "/usr/bin/less", Under: "bash"}
+	r.reconcileOnce(ctx)
+	assert.True(t, isSleeping(t, ss, testUUID), "a program under a nested shell stays Ended whatever it is called")
+	cr.cands[name] = ptymanager.AgentCandidate{PID: 5, Unidentified: true, Image: "/x/claude"}
+	r.reconcileOnce(ctx)
+	assert.True(t, isSleeping(t, ss, testUUID), "an image that cannot be identified stays Ended")
+
+	cr.cands[name] = ptymanager.AgentCandidate{PID: 6, Image: "/home/u/.local/bin/claude"} // the person started the CLI
+	r.reconcileOnce(ctx)
+	assert.False(t, isSleeping(t, ss, testUUID), "its own CLI runs again: awake without a wake")
+	ls, err := ss.GetLiveSession(ctx, testUUID)
+	require.NoError(t, err)
+	assert.Nil(t, ls.SleepReason)
+}
+
+func TestReconciler_AnEndedAgentWhoseCLIIsANodeScriptIsAwakeAgain(t *testing.T) {
+	ss, rt, cr, r, name := newResumeFixture(t)
+	ctx := context.Background()
+	rt.set(name, "zsh")
+	r.reconcileOnce(ctx)
+	require.True(t, isSleeping(t, ss, testUUID))
+	cr.cands[name] = ptymanager.AgentCandidate{PID: 6, Image: "/usr/local/bin/node", Script: "/usr/lib/node_modules/@x/claude"}
+	r.reconcileOnce(ctx)
+	assert.False(t, isSleeping(t, ss, testUUID))
+}
+
+func TestReconciler_OnlyAnAgentExitedSleepIsUndoneByItsCLIRunning(t *testing.T) {
+	ss, rt, cr, r, name := newResumeFixture(t)
+	ctx := context.Background()
+	rt.set(name, "node")
+	cr.cands[name] = ptymanager.AgentCandidate{PID: 6, Image: "/bin/claude"}
+	require.NoError(t, ss.SetSessionSleeping(ctx, testUUID, true)) // a person's sleep: no reason
+	r.reconcileOnce(ctx)
+	assert.True(t, isSleeping(t, ss, testUUID), "a person's sleep stays")
+	require.NoError(t, ss.SetSessionSleepingFor(ctx, testUUID, store.SleepReasonTerminalGone))
+	r.reconcileOnce(ctx)
+	assert.True(t, isSleeping(t, ss, testUUID), "another reason stays")
+}
+
+func TestReconciler_AnEndedAgentWhoseTerminalIsGoneIsNotWoken(t *testing.T) {
+	ss, rt, cr, r, name := newResumeFixture(t)
+	ctx := context.Background()
+	require.NoError(t, ss.SetSessionSleepingFor(ctx, testUUID, store.SleepReasonAgentExited))
+	rt.listed = nil // no terminal of its own listed
+	rt.set(name, "node")
+	cr.cands[name] = ptymanager.AgentCandidate{PID: 6, Image: "/bin/claude"}
+	r.reconcileOnce(ctx)
+	assert.True(t, isSleeping(t, ss, testUUID), "no terminal to read: stays Ended")
 }

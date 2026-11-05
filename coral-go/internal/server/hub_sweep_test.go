@@ -212,8 +212,8 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		// /api/sessions/resolve names a session only by its live process (#3864); the rig's
 		// session has none, so its answer is a 404 "no matching session" (the reply has no path).
 		resolveAnswered := f[1] == "/api/sessions/resolve" && rec.Code == 404 && strings.Contains(rec.Body.String(), "no matching session")
-		// GET /api/system/update answers 404 while the auto-update relaunch is switched off (#5280): the route answering.
-		updateOff := f[1] == "/api/system/update" && rec.Code == 404
+		// GET /api/system/update is on in every build (#13258); the rig has no updater program beside it to ask, so its answer is the route's own fixed 500 "update status is unavailable" (no path, no updater text): the route answering.
+		updateOff := f[1] == "/api/system/update" && (rec.Code == 404 || (rec.Code == 500 && strings.Contains(rec.Body.String(), "update status is unavailable")))
 		// GET /api/saved/{id}/message names a bookmark; the rig has none, so the owner's answer is the route's 404 "no such saved message" (#5753).
 		savedAbsent := f[1] == "/api/saved/{id}/message" && rec.Code == 404 && strings.Contains(rec.Body.String(), "no such saved message")
 		// The owner's version list and series reads (#11354) name an artifact in a series; the rig's is in none, so the owner's answer is the route's own 404 (the plain hub caller was refused above).

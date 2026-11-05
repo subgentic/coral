@@ -125,6 +125,8 @@ function formatStaleness(seconds) {
  export const SESSION_STATES = {
     sleeping:       { label: 'Sleeping',       dot: 'sleeping',  pill: null,             pillClass: '',          chip: 'idle',        attention: false },
     stuck:          { label: 'Stuck',          dot: 'stuck',     pill: 'Stuck',          pillClass: 'stuck',     chip: 'error',       attention: true },
+    // The agent's CLI refuses to work (row.blocked, #13486): its turns end at once with no work, so it is neither Idle nor Ready for input. It wears Stuck's dot and pill (same shape without colour, same colour); the words say why.
+    blocked:        { label: 'Blocked',        dot: 'stuck',     pill: 'Blocked',        pillClass: 'stuck',     chip: 'error',       attention: true },
     needs_input:    { label: 'Needs input',    dot: 'waiting',   pill: 'Needs input',    pillClass: '',          chip: 'needs-input', attention: true },
     check_terminal: { label: 'Check terminal', dot: 'waiting',   pill: 'Check terminal', pillClass: '',          chip: 'needs-input', attention: true },
     your_turn:      { label: 'Ready for input', dot: 'your-turn', pill: null,            pillClass: '',          chip: '',            attention: false },
@@ -147,6 +149,16 @@ function _isAwaitingUser(s) {
     return !!s.done;
 }
 
+/** Why an awake agent is blocked, in words ('' when it is not): the live row's `blocked` {kind, model} (#13486). A refused model is said with its name when the server sent one (it passes the server's safe-name rule; capped here too); a
+ *  kind this page does not know is still a block, said plainly, so a later kind (a usage limit) needs no change here. A sleeping agent is never blocked. */
+function blockedWords(s) {
+    const b = s && !s.sleeping && s.blocked;
+    if (!b || typeof b !== 'object' || typeof b.kind !== 'string' || !b.kind) return '';
+    if (b.kind !== 'model_refused') return 'Blocked';
+    const model = typeof b.model === 'string' ? b.model.trim().slice(0, 64) : '';
+    return model ? `Codex refuses its model ${model}` : 'Codex refuses its model';
+}
+
 /** Resolve the single winning state key for a session. */
 export function deriveSessionState(s, opts = {}) {
     if (!s) return 'idle';
@@ -154,6 +166,7 @@ export function deriveSessionState(s, opts = {}) {
     if (s.stuck) return 'stuck';
     if (s.waiting_for_input) return 'needs_input';
     if (s.not_started) return 'check_terminal';
+    if (blockedWords(s)) return 'blocked'; // its turns do no work: not Ready for input, not Idle (#13486); a question it asks still wins above
     const availability = getCachedAgentAvailability(s)?.availability;
     if (availability === 'waiting' && !s.working) return 'waiting_on';
     if (availability === 'task_idle') return 'task_idle';
@@ -196,6 +209,12 @@ export function sessionStateInfo(s, opts) {
     // Asleep because its start was refused for its CLI (#353): "Failed to start", in the row and the header.
     if (key === 'sleeping' && isStartFailed(s)) info.label = info.pill = 'Failed to start';
     if (key === 'waiting_on') info.label = waitingOnLabel(getCachedAgentAvailability(s)?.waiting_on) || info.label;
+    // The word first, then the reason (the dot's name, the row's title and the tooltip read this): "Blocked: Codex refuses its model gpt-6.1-sol". The chip stays one word; its title carries the reason (session_rows.js).
+    if (key === 'blocked') {
+        const why = blockedWords(s);
+        info.label = why === 'Blocked' ? 'Blocked' : `Blocked: ${why}`;
+        info.short = why === 'Blocked' ? 'Blocked' : 'Blocked: Codex refuses its model'; // a phone row's one line has no room for a 64-character model name: the name stays in the label (the dot's name, the row's title)
+    }
     // What the agent itself says it waits on (#3481): its permission, question, plan or
     // input request. A prompt Coral only saw on the screen has no kind: plain Needs input.
     // waiting_kind comes from the agent's own event: only an own key of the table counts

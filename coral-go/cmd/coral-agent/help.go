@@ -79,6 +79,8 @@ func commandUsage(cmd string, rest []string) string {
 		return taskUsageText()
 	case "history", "search":
 		return historyUsageText
+	case "check":
+		return checkUsageText
 	case "ui":
 		return uiUsageText
 	case "artifact":

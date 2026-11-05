@@ -181,6 +181,7 @@ func TestPaceWakeStartsWakesApart(t *testing.T) {
 	var starts []time.Time
 	var mu sync.Mutex
 	var wg sync.WaitGroup
+	t0 := time.Now()
 	for i := 0; i < 4; i++ {
 		wg.Add(1)
 		go func() {
@@ -196,8 +197,12 @@ func TestPaceWakeStartsWakesApart(t *testing.T) {
 	}
 	wg.Wait()
 	sort.Slice(starts, func(i, j int) bool { return starts[i].Before(starts[j]) })
-	for i := 1; i < len(starts); i++ {
-		assert.GreaterOrEqual(t, starts[i].Sub(starts[i-1]), 25*time.Millisecond, "wake %d started too soon after the one before", i)
+	// What paceWake guarantees is the SCHEDULE: each wake is reserved a gap after the one before, a timer never fires early, so the k-th wake to start (counting from 0) starts no earlier than t0 + k gaps.
+	// The gap between two recorded times is not guaranteed: a goroutine that is slow to record its start (a loaded machine) shrinks the gap before it (22.8 ms for a 30 ms gap, #13556). So the check is on the
+	// schedule from t0, with no slack: it fails when two wakes start together or the gap is shorter than it should be, and a late recording cannot fail it.
+	require.Len(t, starts, 4)
+	for i := range starts {
+		assert.GreaterOrEqual(t, starts[i].Sub(t0), time.Duration(i)*deliveryWakeGap, "wake %d started before its place in the schedule", i)
 	}
 }
 

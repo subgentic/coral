@@ -27,7 +27,7 @@ const { coralReady } = require('./helpers/wait');
             // a button of the list, pressed once it is there: the list is redrawn when the proposals and the settings are read, so a button found a moment ago may be gone
             const press = async (label, sel = '#group-table-view button', nth = 0) => { await waitFor(`[...document.querySelectorAll(${JSON.stringify(sel)})].filter(b => b.textContent === ${JSON.stringify(label)}).length > ${nth}`, `${tag}: the ${label} button`, 8000); await ev(`[...document.querySelectorAll(${JSON.stringify(sel)})].filter(b => b.textContent === ${JSON.stringify(label)})[${nth}].click(); true`); };
             const open = () => ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
-            const titles = () => ev(`[...document.querySelectorAll('#group-table-view .inbox-review-name')].map(e => e.firstChild ? e.firstChild.textContent : '')`);
+            /* the kind icon is the name's first child since #13144: the title is its first node that is not the icon */ const titles = () => ev(`[...document.querySelectorAll('#group-table-view .inbox-review-name')].map(e => { const t = [...e.childNodes].find(n => !(n.nodeType === 1 && n.classList.contains('inbox-kind-icon'))); return t ? t.textContent : ''; })`);
             await open();
             await waitFor(`document.querySelectorAll('#group-table-view .inbox-review-name').length === 5`, `${tag}: five welcome items`, 8000);
             check(JSON.stringify(await titles()) === JSON.stringify(TITLES), `${tag}: the five items in order: ` + JSON.stringify(await titles()));

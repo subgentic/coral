@@ -33,8 +33,10 @@ const ATTACK = {
     // A new page in a new browser context, with the Network, Page, Runtime and Log domains on, and the other site's two pages served by interception.
     const freshPage = async () => {
         const { browserContextId } = await browser.Target.createBrowserContext({ disposeOnDetach: true });
+        assert.ok(browserContextId, 'the case owns a new browser context');
         contexts.push(browserContextId);
         const { targetId } = await browser.Target.createTarget({ url: 'about:blank', browserContextId });
+        assert.ok(targetId, 'the case owns an exact page target');
         const c = await CDP({ port, target: targetId });
         pages.push(c);
         await Promise.all([c.Page.enable(), c.Runtime.enable(), c.Network.enable(), c.Log.enable()]);
@@ -44,36 +46,119 @@ const ATTACK = {
             const body = ATTACK[new URL(p.request.url).pathname] || 'not found';
             return c.Fetch.fulfillRequest({ requestId: p.requestId, responseCode: body === 'not found' ? 404 : 200, responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }], body: Buffer.from(body).toString('base64') });
         });
-        const reqs = []; const byId = new Map(); const log = [];
+        const reqs = []; const hops = new Map(); const log = [];
+        // One request id carries every hop of a redirect (the button's POST, then the 303's GET), and the three events of a hop do not arrive in a fixed order: Network.requestWillBeSentExtraInfo (the headers the browser REALLY sent:
+        // Origin, Sec-Fetch-*) may come after responseReceived, or after the next hop's requestWillBeSent. So the hops of an id are a list, in order, a hop outside this server is kept as a placeholder so the order holds, the
+        // extra info goes to the first hop that has not had its own, and a case that reads the headers waits for r.sent as well as the status (trial-250 gate: 'Origin undefined, answered 303').
         c.Network.requestWillBeSent(e => {
-            // A redirect hop keeps the request's id: the answer that redirected belongs to the request before it (the 303 that follows the button's POST).
-            if (e.redirectResponse && byId.has(e.requestId)) byId.get(e.requestId).status = e.redirectResponse.status;
-            if (!e.request.url.startsWith(BASE)) return;
-            const r = { url: e.request.url.replace(BASE, '').replace(/login_token=[^&]+/, 'login_token=<redacted>'), method: e.request.method, headers: {} };
-            reqs.push(r); byId.set(e.requestId, r);
+            const list = hops.get(e.requestId) || []; hops.set(e.requestId, list);
+            if (e.redirectResponse && list.length) list[list.length - 1].status = e.redirectResponse.status; // the answer that redirected belongs to the hop before it
+            const mine = e.request.url.startsWith(BASE);
+            const r = { url: e.request.url.replace(BASE, '').replace(/login_token=[^&]+/, 'login_token=<redacted>'), method: e.request.method, headers: {}, outside: !mine };
+            list.push(r);
+            if (mine) reqs.push(r);
         });
-        c.Network.requestWillBeSentExtraInfo(e => { const r = byId.get(e.requestId); if (r) r.headers = Object.fromEntries(Object.entries(e.headers).map(([k, v]) => [k.toLowerCase(), v])); });
-        c.Network.responseReceived(e => { const r = byId.get(e.requestId); if (r) r.status = e.response.status; });
+        c.Network.requestWillBeSentExtraInfo(e => { const r = (hops.get(e.requestId) || []).find(x => !x.sent); if (r) { r.headers = Object.fromEntries(Object.entries(e.headers).map(([k, v]) => [k.toLowerCase(), v])); r.sent = true; } });
+        c.Network.responseReceived(e => { const list = hops.get(e.requestId); const r = list && list[list.length - 1]; if (r) r.status = e.response.status; });
         c.on('Log.entryAdded', e => log.push(e.entry.text));
-        const ev = async x => { const r = await c.Runtime.evaluate({ expression: x, returnByValue: true, awaitPromise: true }); if (r.exceptionDetails) throw new Error(JSON.stringify(r.exceptionDetails).slice(0, 300)); return r.result.value; };
+        const ev = async x => { const r = await c.Runtime.evaluate({ expression: x, returnByValue: true, awaitPromise: true }); if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text || JSON.stringify(r.exceptionDetails)); return r.result.value; };
         const waitFor = async (expr, what, ms = 8000) => {
             const end = Date.now() + ms;
             while (Date.now() < end) {
                 let ok = false;
-                try { ok = await ev(expr); } catch (e) { if (!isNavigationError(e)) throw e; }
+                try { ok = await ev(expr); } catch (e) { if (!isNavigationError(e)) throw new Error(e.message + '; page ' + await diagnostics({ targetId, ev })); }
                 if (ok) return;
                 await sleep(25);
             }
-            throw new Error(`timed out waiting for ${what}: requests ${JSON.stringify(reqs)}`);
+            throw new Error(`timed out waiting for ${what}: requests ${JSON.stringify(reqs.map(({url,method,status})=>({url,method,status})))}; targets ${await diagnostics({ targetId, ev })}`);
         };
         const cookies = async () => (await c.Network.getCookies({ urls: [BASE] })).cookies.map(k => k.name);
         const status = () => ev(`fetch('${BASE}/api/system/status', { cache: 'no-store', credentials: 'include' }).then(r => r.status)`);
-        return { c, ev, waitFor, reqs, log, cookies, status };
+        return { c, targetId, browserContextId, ev, waitFor, reqs, log, cookies, status, authRenavigations: 0 };
+    };
+    // Queries/hashes may carry sign-in credentials: timeout evidence needs target
+    // identity and origin/path only, never those credentials.
+    const safeUrl = raw => { try { const u = new URL(raw); u.search = ''; u.hash = ''; return ['http:', 'https:', 'about:'].includes(u.protocol) ? u.href : u.protocol + '<omitted>'; } catch { return '<unavailable>'; } };
+    const pageState = async page => {
+        try {
+            const [at, included, omitted] = await page.ev(`Promise.all([
+                Promise.resolve({url:location.href,title:document.title}),
+                fetch('${BASE}/api/system/status',{cache:'no-store',credentials:'include',signal:AbortSignal.timeout(3000)}).then(r=>r.status).catch(()=>null),
+                fetch('${BASE}/api/system/status',{cache:'no-store',credentials:'omit',signal:AbortSignal.timeout(3000)}).then(r=>r.status).catch(()=>null)
+            ])`);
+            return { url: safeUrl(at.url), title: at.title, includedStatus: included, cookieLessStatus: omitted };
+        } catch { return { url: '<unavailable>', title: '<unavailable>', includedStatus: null, cookieLessStatus: null }; }
+    };
+    const diagnostics = async (page, state = null) => {
+        const { targetInfos } = await browser.Target.getTargets();
+        return JSON.stringify({ targetId: page.targetId, ...(state || await pageState(page)), targets: targetInfos.map(t => ({ targetId: t.targetId, type: t.type, url: safeUrl(t.url), browserContextId: t.browserContextId, attached: t.attached })) });
     };
     // A condition on this side (the events Chrome sent), polled: no fixed sleep.
-    const until = async (fn, what, ms = 8000) => { const end = Date.now() + ms; while (Date.now() < end) { if (await fn()) return; await sleep(25); } throw new Error('timed out waiting for ' + what); };
+    const until = async (fn, what, ms = 8000, page = null) => { const end = Date.now() + ms; while (Date.now() < end) { try { if (await fn()) return; } catch (e) { if (!isNavigationError(e)) throw e; } await sleep(25); } throw new Error('timed out waiting for ' + what + (page ? ': targets ' + await diagnostics(page) : '')); };
     const shownButton = p => p.ev(`(() => { const b = document.getElementById('local-open'); if (!b) return false; const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !b.closest('[hidden]'); })()`);
     const localOpen = reqs => reqs.filter(r => r.method === 'POST' && r.url.startsWith('/auth/local'));
+    // Observe readiness and click in the SAME evaluate. The module can enable
+    // the button and then navigate away when loopback is open: a separate CDP
+    // readiness check followed by a click races that intended redirect.
+    const clickLocalOpen = async p => {
+        const deadline = Date.now() + 30000;
+        for (let attempt = 0; attempt < 2; attempt++) {
+            let result = null, error = null;
+            try {
+                const cap = Math.max(1, Math.min(15000, deadline - Date.now()));
+                result = await p.ev(`new Promise(resolve => {
+                    let observer, timer;
+                    const finish = value => { observer?.disconnect(); clearTimeout(timer); document.removeEventListener('readystatechange',check); resolve(value); };
+                    const check = () => {
+                        const b = document.getElementById('local-open');
+                        if (b && document.documentElement.dataset.authReady === 'true' && !b.disabled) { b.click(); finish(true); return true; }
+                        if (!b && document.readyState === 'complete') { finish(location.href); return true; }
+                        return false;
+                    };
+                    if (check()) return;
+                    observer = new MutationObserver(check);
+                    observer.observe(document,{subtree:true,childList:true,attributes:true,attributeFilter:['data-auth-ready','disabled']});
+                    document.addEventListener('readystatechange',check);
+                    timer = setTimeout(()=>finish(location.href),${cap});
+                })`);
+            } catch (e) { error = e; }
+            if (result === true) return;
+            const state = await pageState(p);
+            console.log('  local-open miss: ' + await diagnostics(p,state));
+            // A navigation can destroy the evaluate after its click already
+            // issued the POST. Never click twice in that case.
+            if (localOpen(p.reqs).length > 0) return;
+            if (state.includedStatus === 200 && state.cookieLessStatus === 401) throw new Error('session still alive after reset-password --clear: ' + await diagnostics(p,state));
+            let leftAuth = false;
+            for (const raw of [result,state.url]) { try { const u = new URL(raw); leftAuth ||= u.origin === base.origin && !u.pathname.startsWith('/auth'); } catch { /* no usable URL */ } }
+            if (attempt === 0 && p.authRenavigations < 1 && (leftAuth || (error && isNavigationError(error))) && Date.now() < deadline) { p.authRenavigations++; await p.c.Page.navigate({url:BASE+'/auth'}); continue; }
+            if (error && !isNavigationError(error)) throw error;
+            throw new Error('local-open was not clicked within its two-navigation cap: ' + await diagnostics(p,state));
+        }
+    };
+    // Capture every pre-click assertion together, after the cookie-less status
+    // read. A separate awaited fetch must not leave a stale note-element lookup.
+    const localOpenProof = async p => {
+        const deadline = Date.now() + 30000;
+        for (let attempt = 0; attempt < 2; attempt++) {
+            let snapshot = null, error = null;
+            try {
+                await p.waitFor(`(location.origin === '${BASE}' && !location.pathname.startsWith('/auth')) || (document.documentElement?.dataset.authReady === 'true' && !!document.getElementById('local-open'))`, 'the auth handler or its redirect', Math.max(1,deadline-Date.now()));
+                snapshot = await p.ev(`(async () => {
+                    const cookieLessStatus = await fetch('${BASE}/api/system/status',{cache:'no-store',credentials:'omit',signal:AbortSignal.timeout(3000)}).then(r=>r.status);
+                    return {authReady:document.documentElement?.dataset.authReady === 'true',buttonPresent:!!document.getElementById('local-open'),note:document.getElementById('local-open-note')?.textContent ?? null,href:location.href,cookieLessStatus};
+                })()`);
+            } catch (e) { error = e; }
+            if (snapshot?.authReady && snapshot.buttonPresent && snapshot.note !== null) return snapshot;
+            const state = await pageState(p);
+            console.log('  local-open proof miss: ' + await diagnostics(p,state) + '; exception: ' + (error?.message || 'missing auth button/note'));
+            if (state.includedStatus === 200 && state.cookieLessStatus === 401) throw new Error('session still alive after reset-password --clear: ' + await diagnostics(p,state));
+            let leftAuth = false;
+            for (const raw of [snapshot?.href,state.url]) { try { const u = new URL(raw); leftAuth ||= u.origin === base.origin && !u.pathname.startsWith('/auth'); } catch { /* no usable URL */ } }
+            if (attempt === 0 && p.authRenavigations < 1 && (leftAuth || (error && isNavigationError(error))) && Date.now() < deadline) { p.authRenavigations++; await p.c.Page.navigate({url:BASE+'/auth'}); continue; }
+            throw new Error('auth button/note proof missing before click: ' + (error?.message || JSON.stringify(snapshot)) + '; page ' + await diagnostics(p,state));
+        }
+    };
     let failed = 0;
     const test = async (name, fn) => {
         try { await fn(); console.log(`  ok - ${name}`); } catch (e) { failed++; console.log(`  FAIL - ${name}: ${e.message}`); }
@@ -84,7 +169,7 @@ const ATTACK = {
                 const p = await freshPage();
                 await p.c.Page.navigate({ url: site + '/post.html' });
                 await p.waitFor(`location.href.startsWith('${BASE}/auth/local') && document.readyState === 'complete'`, 'the form POST to land');
-                await until(() => localOpen(p.reqs).some(r => r.status), 'the answer to the POST');
+                await until(() => localOpen(p.reqs).some(r => r.status && r.sent), 'the answer to the POST');
                 const posts = localOpen(p.reqs);
                 assert.equal(posts.length, 1, JSON.stringify(p.reqs));
                 assert.equal(posts[0].headers['sec-fetch-site'], sfs);
@@ -125,37 +210,37 @@ const ATTACK = {
         try {
             let ownEv = null;
             await test("the suite's own tab signs in again through the button", async () => {
-                const { targetInfos } = await browser.Target.getTargets();
-                const mine = targetInfos.find(t => t.type === 'page' && !contexts.includes(t.browserContextId)); // the suite's own tab: not in a context this suite made
-                assert.ok(mine, 'the suite tab');
-                const own = await CDP({ port, target: mine.targetId });
-                pages.push(own);
-                await Promise.all([own.Runtime.enable(), own.Page.enable()]);
-                const ev = async x => (await own.Runtime.evaluate({ expression: x, returnByValue: true, awaitPromise: true })).result.value;
+                // Own an exact target in a fresh context. A leftover page from an
+                // earlier strict suite can have the same BASE URL, so neither
+                // URL matching nor target-list order identifies this case.
+                const p = await freshPage();
+                const { c: own, ev } = p;
                 await own.Page.navigate({ url: BASE + '/auth' });
-                await until(async () => (await ev(`!!document.getElementById('local-open') && document.readyState === 'complete'`)) === true, 'the button in the suite tab');
-                await ev(`document.getElementById('local-open').click(), true`);
-                await until(async () => (await ev(`location.origin === '${BASE}' && !location.pathname.startsWith('/auth') && document.readyState === 'complete'`)) === true, 'the suite tab to leave /auth', 10000);
+                await clickLocalOpen(p);
+                await until(() => localOpen(p.reqs).some(r => r.status), 'the suite tab button POST', 30000, p);
+                assert.equal(localOpen(p.reqs).length, 1, 'the suite tab clicks once');
+                assert.ok(localOpen(p.reqs)[0].status < 400, 'the suite tab button POST succeeds');
+                await until(async () => (await ev(`location.origin === '${BASE}' && !location.pathname.startsWith('/auth') && document.readyState === 'complete'`)) === true, 'the suite tab to leave /auth', 30000, p);
                 assert.equal(await ev(`fetch('${BASE}/api/system/status', { cache: 'no-store' }).then(r => r.status)`), 200);
                 ownEv = ev;
             });
             await test('the button on /auth signs this browser in', async () => {
                 const p = await freshPage();
                 await p.c.Page.navigate({ url: BASE + '/auth' });
-                await p.waitFor(`!!document.getElementById('local-open') && document.readyState === 'complete'`, 'the button');
                 if (process.env.CORAL_TEST_STRICT !== '1') { console.log('  skipped here: only a strict shard (the runner sets CORAL_TEST_STRICT=1 there) gives this browser a 401 to turn into a 200; the strict shard asserts it'); return; } // the default-mode run of a STRICT_SUITES suite (#12907, Security's SHOULD: the skip depends on the shard, not on the answer)
-                assert.equal(await p.status(), 401, 'not signed in before');
-                const promised = await p.ev(`document.getElementById('local-open-note').textContent`); // #12834: the words match what the next screen does
+                const proof = await localOpenProof(p);
+                assert.equal(proof.cookieLessStatus, 401, 'not signed in before (cookie-less): ' + JSON.stringify(proof));
+                const promised = proof.note; // one snapshot: no DOM access after an awaited status request
                 assert.ok(/asks you to create a password/i.test(promised) && !/without a password/i.test(promised), 'the note says the password prompt comes next, and promises no way around it: ' + promised);
-                await p.ev(`document.getElementById('local-open').click(), true`);
-                await until(() => localOpen(p.reqs).some(r => r.status), 'the answer to the button request');
+                await clickLocalOpen(p);
+                await until(() => localOpen(p.reqs).some(r => r.status && r.sent), 'the answer to the button request');
                 const posts = localOpen(p.reqs);
                 assert.equal(posts.length, 1, JSON.stringify(p.reqs.map(r => r.method + ' ' + r.url)));
                 const sent = `Origin ${posts[0].headers['origin']}, Sec-Fetch-Site ${posts[0].headers['sec-fetch-site']}, answered ${posts[0].status}`;
                 assert.equal(posts[0].headers['origin'], BASE, `the request names this server (${sent})`);
                 assert.equal(posts[0].headers['sec-fetch-site'], 'same-origin', sent);
                 assert.ok(posts[0].status < 400, `the route accepts its own button (${sent})`);
-                await p.waitFor(`!location.pathname.startsWith('/auth')`, 'the page to leave /auth', 10000);
+                await p.waitFor(`!location.pathname.startsWith('/auth')`, 'the page to leave /auth', 30000);
                 assert.ok((await p.cookies()).length > 0, 'a session cookie is set');
                 assert.equal(await p.status(), 200, 'signed in after');
                 await p.waitFor(`!!document.getElementById('set-password-modal')`, 'the password prompt the note said would come', 20000); // #12834: and it does
@@ -190,10 +275,14 @@ const ATTACK = {
             if (back.status !== 0) { failed++; console.log(`  FAIL - the runner's password was not set back: ${(back.stderr || '').slice(0, 300)}`); }
         }
     } finally {
-        for (const c of pages) await c.close().catch(() => {});
-        for (const id of contexts) await browser.Target.disposeBrowserContext({ browserContextId: id }).catch(() => {});
-        await browser.close();
+        // Closing is bounded: a CDP call whose answer never comes (a page or context that is already gone, a browser that exits first) used to hang the suite for the runner's whole 180 s after the last case had printed ok
+        // (trial-248, run 41897148416: all 7 ok, then "[runner] TIMEOUT"). `.catch` only handles a rejection, never a silence, so each step races a short timer, and the suite ends with an explicit exit below.
+        const bounded = p => Promise.race([Promise.resolve(p).catch(() => {}), new Promise(r => setTimeout(r, 5000).unref())]); // sleep-ok: the bound on a close that may never answer, not a wait for the page
+        for (const c of pages) await bounded(c.close());
+        for (const id of contexts) await bounded(browser.Target.disposeBrowserContext({ browserContextId: id }));
+        await bounded(browser.close());
     }
     if (failed) { console.log(`auth_local_open_browser: ${failed} failed`); process.exit(1); }
     console.log('auth_local_open_browser: all passed');
+    process.exit(0); // nothing is left to wait for: a socket or timer still open must not keep the runner waiting
 })().catch(e => { console.error(e); process.exit(1); });

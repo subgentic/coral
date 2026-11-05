@@ -432,7 +432,11 @@ func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept, starred map[string
 		}
 	}
 	if q.since != nil || q.until != nil {
-		t, ok := parseArtifactTime(it.CreatedAt)
+		when := it.CreatedAt
+		if it.ReviewSentAt != "" {
+			when = it.ReviewSentAt // a file waiting for review is as old as its review: "waiting longer than X" counts from when it was sent (#13231)
+		}
+		t, ok := parseArtifactTime(when)
 		if !ok {
 			return false
 		}
@@ -711,7 +715,20 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 	if q.collapse {
 		set = collapseVersions(set) // after the filters: a version that matches stands for its file, as Needs you does (#11700)
 	}
-	sort.SliceStable(set, func(i, j int) bool { return artifactAfter(q.sortName, keyOf(set[j]), keyOf(set[i])) })
+	inOrder := true // the list is kept newest first: a walk of its pages finds it in order, and does not sort 20,000 rows for every page (#13522); each row's key is made once for the check
+	if len(set) > 1 {
+		var prev artifactSortKey = keyOf(set[0])
+		for i := 1; i < len(set) && inOrder; i++ {
+			next := keyOf(set[i])
+			if artifactAfter(q.sortName, prev, next) { // the comparator's own test (less(i, i-1)): this row would sort before the one above it
+				inOrder = false
+			}
+			prev = next
+		}
+	}
+	if !inOrder {
+		sort.SliceStable(set, func(i, j int) bool { return artifactAfter(q.sortName, keyOf(set[j]), keyOf(set[i])) })
+	}
 	sel := &teamArtifactSelection{total: len(set), tags: counts}
 	start := offset
 	if q.cursor != nil {
@@ -763,7 +780,7 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 }
 
 // queryTeamArtifacts answers a query over items (the collected, merged list). It writes the reply.
-func (h *BoardHandler) queryTeamArtifacts(w http.ResponseWriter, r *http.Request, project string, items []teamArtifact, truncated bool, limit, offset int, sessionFilter string, q *teamArtifactQuery) {
+func (h *BoardHandler) queryTeamArtifacts(w http.ResponseWriter, r *http.Request, project string, items []teamArtifact, truncated bool, limit, offset int, sessionFilter string, q *teamArtifactQuery, artifactsRev uint64) {
 	all := len(items)
 	if q != nil && q.collapse {
 		all = len(collapseVersions(items)) // the unfiltered total counts files, not versions (#11700)
@@ -776,7 +793,8 @@ func (h *BoardHandler) queryTeamArtifacts(w http.ResponseWriter, r *http.Request
 	h.addWaitsOnThis(r, project, sel.page)
 	h.attachSeriesVersions(sel.page, project)
 	resp := map[string]any{
-		"project": project, "artifacts": sel.page, "limit": limit, "offset": sel.start,
+		"artifacts_rev": artifactsRev,
+		"project":       project, "artifacts": sel.page, "limit": limit, "offset": sel.start,
 		"has_more": sel.hasMore, "truncated": truncated, "total": sel.total, "all": all,
 	}
 	if sel.next != "" {

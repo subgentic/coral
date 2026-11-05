@@ -27,6 +27,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 window.__items = [1, 2].map(item); window.__calls = [];
                 window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin), method = (opts.method || 'GET').toUpperCase(), m = u.pathname.match(/^\\/api\\/board\\/${team}\\/artifacts(?:\\/([0-9a-f]{64})\\/(review|tags))?$/);
                     if (method !== 'GET' && /^\\/api\\/board\\//.test(u.pathname)) window.__calls.push({ method, path: u.pathname.replace('/api/board/${team}', ''), body: opts.body ? JSON.parse(opts.body) : null });
+                    if (u.pathname === '/api/team-artifacts') return json({ artifacts: [], has_more: false }); // the Inbox also reads the no-team list (#13574): this suite's files are all on its one team
                     if (!m) return original(url, opts);
                     if (!m[1]) return json({ project: '${team}', artifacts: window.__items.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))), has_more: false });
                     const it = window.__items.find(a => a.id === m[1]), body = opts.body ? JSON.parse(opts.body) : {};

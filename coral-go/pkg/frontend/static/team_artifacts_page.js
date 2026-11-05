@@ -1,4 +1,5 @@
-import { serverColumns, serverOf, serverLabel, multipleServers, readInboxArtifacts } from './inbox_servers.js';
+import { artifactRevision, artifactsUnchanged, onArtifactsRev } from './artifacts_feed.js';
+import { serverColumns, serverOf, serverLabel, multipleServers, readInboxArtifacts, inboxArtifactsUnchanged } from './inbox_servers.js';
 import { teamLabel } from './server_status.js';
 import { state } from './state.js';
 /* The team page's Artifacts tab (#7453): the team's artifacts as a table (Name, Type, Size, Task, Created) under the search, Filters and Sort bar the old tab had, and the document in the detail pane. The name opens the pane: the preview, every detail the old
@@ -15,7 +16,7 @@ import { browserLocal } from './safe_storage.js';
 import { renderArtifact } from './artifact_preview.js';
 import { showToast } from './utils.js';
 /** An agent's file with no team says whose it is where the Team column would say "No team" (#10797): the name comes from the live list, and "No team" stays when the agent is not in it. */
-const placeOf = item => { const a = item.team === 'No team' && item.session_id && (state.liveSessions || []).find(s => s.session_id === item.session_id); return a ? (a.display_name || a.name) : teamLabel(item.board_id, item.team); };
+const placeOf = item => { const a = (item.team === 'No team' || item.team === 'Not on a team') && item.session_id && (state.liveSessions || []).find(s => s.session_id === item.session_id); return a ? (a.display_name || a.name) : teamLabel(item.board_id, item.team); };
 const DT = await importOnce('./data_table.js');
 const { artifactTable, serverArtifactSort, tableSortOf } = await importOnce('./artifact_table.js');
 const { starControl } = await importOnce('./artifact_star.js');
@@ -50,6 +51,13 @@ export function createArtifactsList({ inbox = false } = {}) {
 
     const PAGE = 100;
     const model = { project: '', scope: null, key: '', loaded: false, items: [], hasMore: false, cursor: '', counts: null, truncated: false, loading: false, error: '', loadingMore: false, filters: { ...F.EMPTY }, kept: new Set(), tagCounts: {}, gen: 0, controller: null, teams: [] };
+    let loadedToken = null, loadedKey = '', loadedSnapshot = null, refreshNeeded = false;
+    onArtifactsRev((team, rev, reconnect) => {
+        if (!reconnect && !inbox && team !== model.project) return;
+        if (reconnect) { loadedToken = null; loadedSnapshot = null; }
+        refreshNeeded = true;
+        refreshQuiet();
+    });
     let root = null, hooks = {}, bar = null, barKey = '';
     let pendingBoard = null, labelTimer = null, retryLabels = false;
     function clearPendingBoard() { clearTimeout(labelTimer); labelTimer = null; pendingBoard = null; }
@@ -191,13 +199,14 @@ export function createArtifactsList({ inbox = false } = {}) {
             const matched = Number.isSafeInteger(data.total) ? data.total : model.items.length;
             model.counts = { matched, all: Number.isSafeInteger(data.all) ? Math.max(data.all, matched) : matched, truncated: !!data.truncated };
             if (!append) model.kept = await loadKept();
+            loadedKey = model.key; loadedToken = artifactRevision(data.artifacts_rev); loadedSnapshot = data.artifact_revisions || null;
             model.loaded = true;
             hooks.onCount?.(model.counts.all, false);
         } catch (e) {
             if (gen !== model.gen || e.name === 'AbortError') return;
             model.error = e.message || 'Unable to load artifacts.';
         } finally {
-            if (gen === model.gen) { model.controller = null; model.loading = false; model.loadingMore = false; draw(); }
+            if (gen === model.gen) { model.controller = null; model.loading = false; model.loadingMore = false; draw(); if (refreshNeeded && !reading) queueMicrotask(refreshQuiet); }
         }
     }
 
@@ -227,10 +236,16 @@ export function createArtifactsList({ inbox = false } = {}) {
 
     // The tab keeps itself current (it had a Refresh icon, #7686): when the window comes back to the front and on a slow read while it is on screen; a list the person paged further is left as it is.
     let watching = false, reading = false;
-    function refreshQuiet() {
+    async function refreshQuiet() {
         if (!root || !root.isConnected || !root.getClientRects().length || document.hidden || reading || retryLabels || !model.key || model.loading || model.loadingMore || model.items.length > PAGE) return;
         reading = true;
-        loadArtifacts({ keep: true }).finally(() => { reading = false; });
+        const key = model.key;
+        try {
+            const dirty = refreshNeeded; refreshNeeded = false;
+            const unchanged = !dirty && loadedKey === key && (inbox ? await inboxArtifactsUnchanged(loadedSnapshot) : !(model.scope && model.scope.standalone) && await artifactsUnchanged(model.project, loadedToken));
+            if (key !== model.key) return;
+            if (!unchanged || refreshNeeded) { refreshNeeded = false; await loadArtifacts({ keep: true }); }
+        } finally { reading = false; if (refreshNeeded) refreshQuiet(); }
     }
     function watch() {
         if (watching) return;
@@ -266,6 +281,26 @@ export function createArtifactsList({ inbox = false } = {}) {
         return null;
     }
     let drawnRows = 0; // the rows of the last drawing: the first new row is the one after them
+    /** Send for review / Remove from review (#13152) on files [{ project, hex, key }]: the optional question first (sending only), then each file through the review route; the rows say so at once.
+     *  Resolves to { ok: [keys], failed, why }, or null when the question was cancelled. */
+    async function changeReview(files, remove, name = '') {
+        if (model.bulkBusy || !files.length) return null;
+        const m = await importOnce('./artifact_send_review.js');
+        let question = '';
+        if (!remove) { question = await m.askReviewQuestion({ count: files.length, name }); if (question === null) return null; }
+        model.bulkBusy = true; const key = model.key;
+        try {
+            const r = await m.changeMany(files, { question, remove });
+            // a file's outcome belongs to its own team's row: the same bytes in another team (the Inbox lists both) are another artifact, so rows are matched by project and hash, never by hash alone
+            if (key === model.key) { for (const [k, tags] of r.ok) { const [project, hex] = JSON.parse(k); for (const it of model.items) if (managedHex(it) === hex && (inbox ? it.board_id : model.project) === project) it.tags = tags.length ? tags : undefined; } loadArtifacts({ keep: true }); }
+            const keyOf = new Map(files.map(f => [m.reviewKey(f.project, f.hex), f.key]));
+            return { ok: [...r.ok.keys()].map(k => keyOf.get(k)), failed: r.failed, why: r.why };
+        } finally { model.bulkBusy = false; }
+    }
+    const reviewFiles = items => items.filter(it => managedHex(it)).map(it => ({ project: inbox ? it.board_id : model.project, hex: managedHex(it), key: artifactKey(it) }));
+    /** A phone's selection bar is one line: Cancel, the count and the three dots (#13396, found by #13387: five text actions made a strip with Send for review off the screen's edge). Every action is in the menu, the review ones first. */
+    const phoneBarActions = acts => [...acts.filter(a => /review/i.test(a.label)), ...acts.filter(a => !/review/i.test(a.label))].map(a => ({ ...a, more: true }));
+
     function artifactBulkActions() {
         const finish = (key, ok, failed, verb) => {
             if (key === model.key) { for (const k of ok) artifactState.selected.delete(k); draw(); root?.querySelector('.list-bar-search')?.focus({ preventScroll: true }); }
@@ -299,6 +334,9 @@ export function createArtifactsList({ inbox = false } = {}) {
                     loadArtifacts({ keep: true });
                     showToast(`${label === 'Tag' ? 'Tagged' : 'Untagged'} ${ok.size} artifact${ok.size === 1 ? '' : 's'} ${tag}${failed ? `; ${failed} could not be changed` : ''}`, !!failed);
                 } })) : []),
+            ...[['Send for review', false, 'Put the selected files in Needs you to approve or ask for changes'], ['Remove from review', true, 'Take the selected files out of Needs you']].map(([label, remove, title]) => ({ label, title,
+                disabled: rows => rows.every(item => !managedHex(item) || (item.tags || []).includes(REVIEW) === !remove),
+                run: async rows => { const key = model.key, r = await changeReview(reviewFiles(rows.filter(item => (item.tags || []).includes(REVIEW) === !!remove)), remove); if (r) finish(key, r.ok, r.failed, remove ? 'Removed from review:' : 'Sent for review:'); } })),
             ...(local() ? [{ label: 'Delete', danger: true, disabled: rows => rows.some(item => !managedHex(item) || !linkOf(item)?.preview),
                 confirm: n => `Delete ${n} artifacts? Their links will become unavailable. This cannot be undone.`, run: async rows => {
                     if (model.bulkBusy || !local() || rows.some(item => !managedHex(item) || !linkOf(item)?.preview)) return;
@@ -351,7 +389,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             const table = artifactTable({
                 showUploader: !model.scope,
                 label: `Artifacts, ${model.items.length}`, ...(inbox ? { layout: 'fixed' } : {}), bare: !!model.scope || phoneTeam, compact: !!model.scope, fold: model.scope ? 'none' : 'column', foldAt: 40, rows: shown, groupBy: by ? (it) => groupHead(it, by, shown, !model.hasMore) : undefined, rowKey: itemKey, current: detailKey(), sortBar: inbox && !phoneTeam, state: artifactState, rowName: item => Tags.nameWithTags(readableName(item), item.tags),
-                selectable: model.scope ? null : { contextKey: model.key, canSelect: item => !!linkOf(item)?.preview, actions: artifactBulkActions(), onChange: keys => Toolbar.mountSelection(toolbarRow, keys.size ? table.bar : null), ...(phoneTeam ? { longPress: true, iconBar: true, clearLabel: 'Cancel' } : {}) },
+                selectable: model.scope ? null : { contextKey: model.key, canSelect: item => !!linkOf(item)?.preview, actions: phoneTeam ? phoneBarActions(artifactBulkActions()) : artifactBulkActions(), onChange: keys => Toolbar.mountSelection(toolbarRow, keys.size ? table.bar : null), ...(phoneTeam ? { longPress: true, iconBar: true, clearLabel: 'Cancel' } : {}) },
                 open: (item, tr) => openArtifact(item, tr.querySelector('.dt-primary')),
                 paged: model.hasMore || model.truncated,
                 onPageSort: sort => setFilters({ ...model.filters, sort }),
@@ -484,6 +522,11 @@ export function createArtifactsList({ inbox = false } = {}) {
             actions.push({ label: 'Copy link', run: () => { navigator.clipboard?.writeText(hex ? `coral://artifacts/${hex}` : new URL(link.url, location.href).href).then(() => showToast('Link copied'), () => showToast('The link could not be copied', true)); } });
             if (hex) actions.push({ label: item.starred ? 'Starred' : 'Star', title: item.starred ? 'Starred (click to remove the star)' : 'Star: add it to your Starred list (it can still be cleaned up)', pressed: !!item.starred, run: b => toggleStar(hex, name, b, item) });
             if (hex && (item.tags || []).includes(IGNORED)) actions.push({ label: 'Unignore', title: 'Put it back in Needs you', run: () => importOnce('./artifact_review.js').then(async m => { const out = await m.unignoreRow(inbox ? item.board_id : model.project, { id: hex }); retag(hex, out.tags || (item.tags || []).filter(t => t !== IGNORED).concat(REVIEW)); showToast(`Back in Needs you: ${name}`); }).catch(e => showToast(e.message, true)) });
+            if (hex && !isUnverified(item)) { // the Operator's own way to put a file in Needs you, and to take it out (#13152)
+                const inReview = (item.tags || []).includes(REVIEW);
+                actions.push(inReview ? { label: 'Remove from review', title: 'Take it out of Needs you', run: () => changeReview(reviewFiles([item]), true, name).then(r => { if (r) showToast(r.failed ? `Could not remove it from review: ${r.why}` : 'Removed from review', !!r.failed); }) }
+                    : { label: 'Send for review', title: 'Put it in Needs you to approve or ask for changes', run: () => changeReview(reviewFiles([item]), false, name).then(r => { if (r) showToast(r.failed ? `Could not send it for review: ${r.why}` : 'Sent for review: it is in Needs you', !!r.failed); }) });
+            }
             if (hex && local()) {
                 const on = model.kept.has(hex);
                 actions.push({ label: on ? 'Kept' : 'Keep', title: on ? 'Kept: Coral\u2019s cleanup never deletes this file (click to release)' : 'Keep: Coral\u2019s cleanup never deletes this file', pressed: on, run: b => toggleKeep(hex, name, b) });

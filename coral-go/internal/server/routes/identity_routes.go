@@ -30,6 +30,13 @@ func isAgentTool(r *http.Request) bool {
 // every mode since #3929 (only with strict local auth before); the Operator can (the dashboard,
 // an API key, the signed command line). Each agent call is recorded in the identity report.
 var operatorOnlyRoutes = map[string]string{
+	"GET /api/chief/checks":                "read scheduled checks",
+	"POST /api/chief/checks":               "create scheduled checks",
+	"GET /api/chief/checks/{checkID}":      "read a scheduled check",
+	"PUT /api/chief/checks/{checkID}":      "edit a scheduled check",
+	"DELETE /api/chief/checks/{checkID}":   "delete a scheduled check",
+	"POST /api/chief/checks/{checkID}/run": "run a scheduled check",
+	"GET /api/chief/triggers":              "read check triggers",
 	// #3668 (the board authorization audit): deleting a message, and pausing or resuming a board
 	// (the Operator's brake), are the Operator's.
 	"DELETE /api/board/{project}/messages/{messageID}": "delete a board message",
@@ -91,6 +98,7 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/board/{project}/cross-team/settings":       "read a team's cross-team switches for Coral Hub",
 	"GET /api/board/{project}/cross-team-state":          "read who may message a board",
 	"GET /api/sessions/live/{name}/mcp-servers":          "read an agent's MCP servers",
+	"GET /api/sessions/live/{name}/loaded-skills":        "read an agent's loaded skills",
 	"GET /api/board/{project}/cross-team-candidates":     "list the boards that may be put on a board's list",
 	"GET /api/board/{project}/cross-team-links":          "read the links between this computer's teams",
 	"POST /api/board/{project}/cross-team-links":         "link two teams of this computer",
@@ -119,6 +127,7 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/system/update/install":        "install the staged update (Windows)",
 	"POST /api/system/update/relaunch-local": "relaunch Coral into the staged update from this computer",
 	"POST /api/system/update/check":          "check for an update now",
+	"POST /api/system/update/check-hub":      "Coral Hub's owner asks this computer to check for an update now",
 	"PUT /api/system/update/settings":        "change whether Coral checks for updates automatically",
 	// #4065: the models each agent CLI offers. Reading runs no CLI, but agents have no use for
 	// it; a refresh runs the user's CLIs (rate limited) and is the Operator's.
@@ -159,6 +168,8 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/board/{project}/proposals/{id}/approve":                     "approve what an agent asked to add",
 	"POST /api/board/{project}/proposals/{id}/reject":                      "reject what an agent asked to add",
 	"PUT /api/board/{project}/artifacts/{id}/tags":                         "change an artifact's tags",
+	"PUT /api/board/{project}/artifacts/{id}/review":                       "send a file for review",
+	"DELETE /api/board/{project}/artifacts/{id}/review":                    "take a file out of review",
 	"POST /api/board/{project}/artifacts/{id}/review":                      "approve, deny or ignore an artifact or ask changes of it",
 	"POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim":  "use a button an agent put on a question to the Operator",
 	"POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle": "use a button an agent put on a question to the Operator",
@@ -295,6 +306,7 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/sessions/live/team/{boardName}/sleep":                  "put a team to sleep",
 	"POST /api/sessions/live/team/{boardName}/wake":                   "wake a team",
 	"POST /api/sessions/live/sleep-all":                               "put every agent to sleep",
+	"POST /api/sessions/live/sleep-gone":                              "move the agents whose terminal is gone to sleeping",
 	"POST /api/sessions/live/wake-all":                                "wake every agent",
 	"POST /api/sessions/live/{sessionID}/sleep":                       "put an agent to sleep",
 	"GET /api/sessions/live/{sessionID}/agent-candidate":              "see whether an agent's board notices are paused and which program could be recorded as the agent (#391)",
@@ -423,8 +435,9 @@ var hubModeRoutes = map[string]bool{
 // its team, terminal ones included, by design) but each call is recorded in the identity
 // report's agent_operator_calls, so the owner can see who launched what (#3445).
 var recordedAgentRoutes = map[string]string{
-	"POST /api/sessions/launch":      "launch an agent",
-	"POST /api/sessions/launch-team": "launch a team",
+	"POST /api/chief/triggers/{triggerID}/state": "report a check trigger outcome",
+	"POST /api/sessions/launch":                  "launch an agent",
+	"POST /api/sessions/launch-team":             "launch a team",
 }
 
 // guardPrefixes limit the (costly) route match: per method, the static start of every entry of

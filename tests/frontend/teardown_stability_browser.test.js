@@ -13,7 +13,9 @@ const MD = '# Title\n\ntext [link](https://example.test)\n\n```js\nconst x = 1;\
 const PANES = ['general', 'agents', 'files', 'terminal', 'notifications', 'network', 'security', 'cleanup', 'updates'];
 const DIALOGS = ['showLaunchModal', 'showCreateTaskModal', 'showDefaultPromptsModal', 'showServersModal', 'showOpenFolderModal', 'showTeamWizardModal', 'showJobModal', 'showAgentTaskDetailModal'];
 const CYCLES = Number(process.env.CYCLES || 50), SELFTEST = !!process.env.TEARDOWN_LEAK_SELFTEST;
-const BOUNDS = { listeners: 30, nodes: 60, documents: 0, intervals: 0, timeouts: 0, ws: 0, obs: 0, heapMB: 2 };
+// obs: 1 (#13132): launch_cards.js (#13109) keeps ONE IntersectionObserver on a goal card that is drawn but hidden, until it is shown; the warm-up has no hidden card, so the end has one standing watcher. It does not grow with the rounds
+// (+1 at 10, 50 and 100 rounds); a leak per round (the self-test adds one) is far past it.
+const BOUNDS = { listeners: 30, nodes: 60, documents: 0, intervals: 0, timeouts: 0, ws: 0, obs: 1, heapMB: 2 };
 // The terminal view is left out by default: on a Linux runner about 3 runs in 20 stalled in setLiveViewMode('chat') right after the terminal view (the page answered nothing and ran no script, 20 s, the 131 gate), the
 // same class as #5107 in heap_growth_browser, which loops the real terminals and has its own retry; this suite is about Settings, the viewer, tabs, dialogs and agent switching. TEARDOWN_TERMINAL=1 puts it back.
 const TERMINAL = process.env.TEARDOWN_TERMINAL === '1';

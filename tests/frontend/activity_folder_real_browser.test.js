@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
-const { sqliteExec } = require('./helpers/sqlite.js');
+const { sqliteExec, sqliteText } = require('./helpers/sqlite.js');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
 const DATA = process.env.CORAL_TEST_DATA_DIR || '';
@@ -33,7 +33,13 @@ const HEX = 'c'.repeat(64);
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await load();
         assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'orch', job_title: 'Orchestrator', session_name: 'claude-' + SID })).status < 300);
-        for (const [title, why] of [['First importer goal', 'shipped it'], ['Second importer goal', 'not needed any more']]) {
+        // The record is append-only and the server is shared by repeats of this suite (#13176): a run does not own it. The goals carry this run's id, the rows and the count are read
+        // against what the record held before, and the row edited in step 5 is put back, so a second run on the same server sees the same page as the first.
+        const FIRST = 'First importer goal ' + B, SECOND = 'Second importer goal ' + B;
+        const before = await api('GET', '/api/activity');
+        assert.equal(before.status, 200, JSON.stringify(before));
+        const N0 = (before.body.actions || []).length;
+        for (const [title, why] of [[FIRST, 'shipped it'], [SECOND, 'not needed any more']]) {
             const g = await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title, outcome: 'o', done_when: 'd' });
             assert.equal(g.status, 201, JSON.stringify(g));
             const id = g.body.id || (g.body.goal && g.body.goal.id);
@@ -43,12 +49,13 @@ const HEX = 'c'.repeat(64);
 
         console.log('1. The folder lists what was done, to what, where, from where; the check is said above it');
         await openFolder(false);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, 'two rows', 10000);
+        const mine = `[...document.querySelectorAll('#group-table-view tbody tr')].filter(r => r.textContent.includes(${JSON.stringify(B)}))`;
+        await waitFor(`${mine}.length === 2`, 'this run\'s two rows', 10000);
         const t = await ev(`document.getElementById('group-table-view').textContent.replace(/\\s+/g, ' ')`);
-        assert.match(t, /Closed a goal/); assert.match(t, /Second importer goal/); assert.match(t, /First importer goal/); assert.match(t, /this computer/); assert.match(t, /not needed any more/);
-        assert.match(await ev(`document.querySelector('.activity-check').textContent`), /^2 actions in the record, none changed outside Coral\. Edits made outside Coral are shown unless the whole record was rewritten\.$/);
+        assert.match(t, /Closed a goal/); assert.ok(t.includes(SECOND) && t.includes(FIRST), 'both of this run\'s goals are listed'); assert.match(t, /this computer/); assert.match(t, /not needed any more/);
+        assert.match(await ev(`document.querySelector('.activity-check').textContent`), new RegExp(`^${N0 + 2} actions in the record, none changed outside Coral\\. Edits made outside Coral are shown unless the whole record was rewritten\\.$`));
         assert.equal(await ev(`document.querySelector('.activity-check').getAttribute('role')`), 'status');
-        assert.match(await ev(`document.querySelector('#group-table-view tbody tr').textContent`), /Second importer goal/, 'newest first');
+        assert.match(await ev(`document.querySelector('#group-table-view tbody tr').textContent`), new RegExp(SECOND), 'newest first');
         console.log('   ✓');
 
         console.log('1b. The On column keeps its floor at every width: From and Team go before it shrinks (R2 of the table rules)');
@@ -67,15 +74,15 @@ const HEX = 'c'.repeat(64);
         console.log('   \u2713');
 
         console.log('2. The sidebar search narrows the rows');
-        await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.filterInbox('first')).then(() => true)`);
+        await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.filterInbox(${JSON.stringify(FIRST)})).then(() => true)`);
         await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, 'one row', 8000);
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.filterInbox('')).then(() => true)`);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, 'two rows again', 8000);
+        await waitFor(`${mine}.length === 2`, 'this run\'s two rows again', 8000);
         console.log('   ✓');
 
         console.log('3. A goal row opens the goal');
-        await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].find(r => /First importer goal/.test(r.textContent)).querySelector('.dt-primary').click(); true`);
-        await waitFor(`document.getElementById('goals-detail-title')?.textContent === 'First importer goal'`, 'the goal page', 15000);
+        await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].find(r => r.textContent.includes(${JSON.stringify(FIRST)})).querySelector('.dt-primary').click(); true`);
+        await waitFor(`document.getElementById('goals-detail-title')?.textContent === ${JSON.stringify(FIRST)}`, 'the goal page', 15000);
         console.log('   ✓');
 
         console.log('4. A file row (stubbed) opens that exact version in the viewer');
@@ -97,12 +104,19 @@ const HEX = 'c'.repeat(64);
         console.log('   \u2713');
 
         console.log('5. A row edited outside Coral: the page says so');
-        sqliteExec(path.join(DATA, 'messageboard.db'), `UPDATE operator_actions SET action = 'deny' WHERE id = (SELECT MIN(id) FROM operator_actions);`);
-        await load();
-        await openFolder(false);
-        await waitFor(`!!document.querySelector('.activity-check-broken')`, 'the broken record said', 10000);
-        assert.match(await ev(`document.querySelector('.activity-check-broken').textContent`), /^The record was changed outside Coral: a row was edited\. Edits made outside Coral are shown unless the whole record was rewritten\.$/);
-        assert.equal(await ev(`document.querySelector('.activity-check-broken').getAttribute('role')`), 'alert');
+        const DB = path.join(DATA, 'messageboard.db');
+        const [rowId, rowAction] = sqliteText(DB, 'SELECT id, action FROM operator_actions ORDER BY id LIMIT 1').replace(/\n$/, '').split('\u001f');
+        assert.ok(rowId, 'the record has a row to edit');
+        // the row is changed to a DIFFERENT action (it may already say deny) and put back whatever happens: the record is shared with the next run of this suite (#13176)
+        const putBack = () => sqliteExec(DB, `UPDATE operator_actions SET action = '${rowAction.replace(/'/g, "''")}' WHERE id = ${Number(rowId)};`);
+        sqliteExec(DB, `UPDATE operator_actions SET action = CASE WHEN action = 'deny' THEN 'approve' ELSE 'deny' END WHERE id = ${Number(rowId)};`);
+        try {
+            await load();
+            await openFolder(false);
+            await waitFor(`!!document.querySelector('.activity-check-broken')`, 'the broken record said', 10000);
+            assert.match(await ev(`document.querySelector('.activity-check-broken').textContent`), /^The record was changed outside Coral: a row was edited\. Edits made outside Coral are shown unless the whole record was rewritten\.$/);
+            assert.equal(await ev(`document.querySelector('.activity-check-broken').getAttribute('role')`), 'alert');
+        } finally { putBack(); }
         console.log('   ✓');
 
         console.log('6. A phone: mail rows, nothing scrolls sideways');

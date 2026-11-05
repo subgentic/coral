@@ -33,9 +33,11 @@ const B = 'goal-none-' + Date.now().toString(36), B2 = B + '-solo', B3 = B + '-o
         await waitFor(`/No tasks yet/.test(document.body.innerText)`, 'the Orchestrator own goal page', 15000);
         assert.match(await ev(`document.body.innerText`), /No tasks yet\. The Orchestrator made this goal and has not planned it\./, 'a goal the Orchestrator wrote itself says so');
         // the Copy for an agent button is a button (a border), and when it wraps under the state it starts at the line's own left edge, not 15 px in (#11027)
-        const c = await ev(`(() => { const b = document.querySelector('.goal-copy-agent'), l = document.querySelector('.goals-detail-line'); if (!b || !l) return null; l.style.width = '120px'; /* narrow enough that the button wraps to a row of its own */ const br = b.getBoundingClientRect(), lr = l.getBoundingClientRect(), first = l.firstElementChild.getBoundingClientRect(); return { border: getComputedStyle(b).borderLeftWidth, wrapped: br.top > first.bottom - 2, dx: Math.round(br.left - lr.left) }; })()`);
+        const c = await ev(`(() => { const b = document.querySelector('.goals-detail-line .goal-copy-agent'), l = document.querySelector('.goals-detail-line'); if (!l) return null; if (!b) return { inMore: !!document.querySelector('.goal-head-actions .task-more-menu .goal-copy-agent') }; /* a phone: Copy for an agent is in the header's More menu (#13119) */ l.style.width = '120px'; /* narrow enough that the button wraps to a row of its own */ const br = b.getBoundingClientRect(), lr = l.getBoundingClientRect(), first = l.firstElementChild.getBoundingClientRect(); return { border: getComputedStyle(b).borderLeftWidth, wrapped: br.top > first.bottom - 2, dx: Math.round(br.left - lr.left) }; })()`);
+        if (c && c.inMore) console.log('   Copy for an agent is in the More menu on a phone'); else {
         assert.ok(c && c.border !== '0px', 'Copy for an agent has a border, so it reads as a button: ' + JSON.stringify(c));
         assert.ok(c.wrapped && c.dx <= 2, 'wrapped under the state it starts at the line\'s left edge: ' + JSON.stringify(c));
+        }
         console.log('PASS');
     } finally { try { await removeBoards(ev, [B, B2, B3]); } catch (e) {} try { await client.close(); } catch (e) {} }
 })().catch(e => { console.error(e); process.exit(1); });

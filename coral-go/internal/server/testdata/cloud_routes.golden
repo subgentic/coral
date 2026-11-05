@@ -8,6 +8,7 @@ DELETE /api/artifacts/{id}/star interact
 DELETE /api/auth/sessions/{id} never
 DELETE /api/board/remotes never
 DELETE /api/board/{project} launch
+DELETE /api/board/{project}/artifacts/{id}/review interact
 DELETE /api/board/{project}/cross-team-links never
 DELETE /api/board/{project}/groups/{groupID}/members/{sessionID} never
 DELETE /api/board/{project}/messages/{messageID} launch
@@ -17,6 +18,7 @@ DELETE /api/board/{project}/subscribe never
 DELETE /api/board/{project}/tasks/{taskID}/park never
 DELETE /api/board/{project}/tasks/{taskID}/reminder interact
 DELETE /api/board/{project}/waits never
+DELETE /api/chief/checks/{checkID} never
 DELETE /api/folder-tags/{folderName}/{tagID} never
 DELETE /api/pinned-folders launch
 DELETE /api/saved/{id} interact
@@ -121,6 +123,9 @@ GET /api/board/{project}/working-mode view
 GET /api/board/{project}/working-mode/presets view
 GET /api/call-metrics/summary view
 GET /api/chief view
+GET /api/chief/checks never
+GET /api/chief/checks/{checkID} never
+GET /api/chief/triggers never
 GET /api/cloud/owner-label never
 GET /api/cloud/status never
 GET /api/custom-models view
@@ -174,6 +179,7 @@ GET /api/sessions/live/{name}/git view
 GET /api/sessions/live/{name}/history/context view
 GET /api/sessions/live/{name}/history/search view
 GET /api/sessions/live/{name}/info view
+GET /api/sessions/live/{name}/loaded-skills never
 GET /api/sessions/live/{name}/mcp-servers never
 GET /api/sessions/live/{name}/memory never
 GET /api/sessions/live/{name}/memory/{id} never
@@ -305,7 +311,7 @@ POST /api/board/{project}/agents/{subscriber}/wake never
 POST /api/board/{project}/artifacts/{id}/review interact
 POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim interact
 POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle interact
-POST /api/board/{project}/asks/{messageID}/close never
+POST /api/board/{project}/asks/{messageID}/close interact
 POST /api/board/{project}/clashes never
 POST /api/board/{project}/cross-team-links never
 POST /api/board/{project}/cross-team/disable launch
@@ -320,8 +326,8 @@ POST /api/board/{project}/goal-requests/{requestID}/accept never
 POST /api/board/{project}/goal-requests/{requestID}/decline never
 POST /api/board/{project}/goals interact
 POST /api/board/{project}/goals/{goalID}/close interact
-POST /api/board/{project}/goals/{goalID}/driver never
-POST /api/board/{project}/goals/{goalID}/move never
+POST /api/board/{project}/goals/{goalID}/driver interact
+POST /api/board/{project}/goals/{goalID}/move interact
 POST /api/board/{project}/groups/{groupID}/members never
 POST /api/board/{project}/health/ack never
 POST /api/board/{project}/hub-notice interact
@@ -360,6 +366,9 @@ POST /api/board/{project}/waits never
 POST /api/board/{project}/working-mode/presets interact
 POST /api/board/{project}/working-mode/presets/{presetID}/reset never
 POST /api/call-metrics never
+POST /api/chief/checks never
+POST /api/chief/checks/{checkID}/run never
+POST /api/chief/triggers/{triggerID}/state never
 POST /api/cloud/cli-hello never
 POST /api/cloud/connect never
 POST /api/cloud/connect/cancel never
@@ -387,6 +396,7 @@ POST /api/sessions/history/{sessionID}/tags never
 POST /api/sessions/launch launch
 POST /api/sessions/launch-team launch
 POST /api/sessions/live/sleep-all launch
+POST /api/sessions/live/sleep-gone launch
 POST /api/sessions/live/team/{boardName}/kill launch
 POST /api/sessions/live/team/{boardName}/reset launch
 POST /api/sessions/live/team/{boardName}/sleep launch
@@ -442,6 +452,7 @@ POST /api/system/terminal-backend/end-leftover never
 POST /api/system/terminal-backend/notice-seen never
 POST /api/system/terminal-logs/delete-ended never
 POST /api/system/update/check never
+POST /api/system/update/check-hub launch
 POST /api/system/update/install never
 POST /api/system/update/relaunch launch
 POST /api/system/update/relaunch-local never
@@ -470,6 +481,7 @@ PUT /api/artifacts/{id}/private interact
 PUT /api/artifacts/{id}/star interact
 PUT /api/auth/hub-origins never
 PUT /api/auth/hub-signin never
+PUT /api/board/{project}/artifacts/{id}/review interact
 PUT /api/board/{project}/artifacts/{id}/tags interact
 PUT /api/board/{project}/guide-roster launch
 PUT /api/board/{project}/orchestrator-grant launch
@@ -478,6 +490,7 @@ PUT /api/board/{project}/subscribers/{subscriberID}/review-settings never
 PUT /api/board/{project}/tasks/{taskID}/goal interact
 PUT /api/board/{project}/working-mode interact
 PUT /api/board/{project}/working-mode/presets/{presetID} never
+PUT /api/chief/checks/{checkID} never
 PUT /api/cloud/allow-auto-accept never
 PUT /api/cloud/hub-cross-team never
 PUT /api/cloud/hub-relaunch never

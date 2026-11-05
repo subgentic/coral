@@ -23,27 +23,10 @@ const _RAIL_ICONS = {
     workflow: '<span class="material-icons" style="font-size:var(--fs-md)" aria-hidden="true">account_tree</span>',
 };
 
-// Role keyword -> Material icon for the rail tiles (first match wins).
-const _RAIL_ROLE_ICONS = [
-    ['orchestrator', 'hub'], ['architect', 'architecture'], ['design', 'palette'], ['artist', 'palette'],
-    ['devops', 'settings'], ['backend', 'dns'], ['frontend', 'code'], ['qa', 'bug_report'], ['test', 'bug_report'],
-    ['review', 'rate_review'], ['lead', 'construction'], ['dev', 'code'], ['research', 'travel_explore'],
-];
-
-function _railRoleIcon(s) {
-    if (s.agent_type === 'terminal') return 'terminal';
-    const text = `${s.display_name || ''} ${s.board_job_title || ''}`.toLowerCase();
-    const hit = _RAIL_ROLE_ICONS.find(([k]) => text.includes(k));
-    return hit ? hit[1] : '';
-}
-
 function _railTile(s, active) {
     const label = resolveSessionIdentity(s) + (s.board_project ? ` · ${keyLabel(sessionTeamKey(s))}` : '');
     const dot = getDotClass(s);
     const unread = sessionUnreadCount(s);
-    const icon = s.icon && !s.sleeping
-        ? `<span class="rail-tile-emoji">${escapeHtml(s.icon)}</span>`
-        : (_railRoleIcon(s) ? `<span class="material-icons rail-tile-icon" aria-hidden="true">${_railRoleIcon(s)}</span>` : '');
     let badge = '';
     if (unread > 0) badge = `<span class="chip chip-count rail-tile-badge rail-tile-unread" aria-hidden="true">${unread > 9 ? '9+' : unread}</span>`; // the tile's name says the count (below)
     else if (dot === 'done') badge = '<span class="chip chip-count rail-tile-badge rail-tile-done material-icons" aria-hidden="true">check</span>';
@@ -52,7 +35,7 @@ function _railTile(s, active) {
     const railStale = isStaleSession(s);
     const railLabel = railStale ? `${label}: ${staleReason(s)}` : `${showServerLabels() ? `${label} · ${serverLabel(sessionServer(s))}` : label}, ${sessionStateInfo(s).label}${unread > 0 ? `, ${unread} unread` : ''}`;
     return `<button type="button" class="sidebar-rail-item${active ? ' active' : ''}${railStale ? ' session-stale' : ''}" title="${escapeAttr(railLabel)}" aria-label="${escapeAttr(railLabel)}"${railStale ? ' disabled' : ''}
-        ${railStale ? '' : `data-on-click="session-open" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(s.session_id || '')}" data-server="${escapeAttr(sessionServer(s))}"`}><span class="rail-tile"${agentNameColor(s) ? ` style="--agent-name-color:${escapeAttr(agentNameColor(s))}"` : ''}>${icon}<span class="rail-tile-text">${escapeHtml(_getInitials(resolveSessionIdentity(s)))}</span></span>${badge}</button>`;
+        ${railStale ? '' : `data-on-click="session-open" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(s.session_id || '')}" data-server="${escapeAttr(sessionServer(s))}"`}><span class="rail-tile"${agentNameColor(s) ? ` style="--agent-name-color:${escapeAttr(agentNameColor(s))}"` : ''}><span class="rail-tile-text">${escapeHtml(_getInitials(resolveSessionIdentity(s)))}</span></span>${badge}</button>`;
 }
 
 /** Icon rail shown when the sidebar is collapsed: a team/folder header per

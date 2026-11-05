@@ -6,7 +6,8 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
 
-const FAKE_VV = `(() => { const real = window.visualViewport; const t = new EventTarget(); const vv = { height: innerHeight, width: innerWidth, scale: 1, offsetTop: 0, offsetLeft: 0, pageTop: 0, pageLeft: 0, addEventListener: (...a) => t.addEventListener(...a), removeEventListener: (...a) => t.removeEventListener(...a), dispatchEvent: e => t.dispatchEvent(e) };
+// This case is the keyboard that shrinks only the VISUAL viewport (iOS Safari: no navigator.virtualKeyboard), where the page follows the stored height; Chrome on Android resizes the page itself and keeps 100dvh (phone_keyboard_resizes_content_browser, #13236).
+const FAKE_VV = `(() => { try { delete Navigator.prototype.virtualKeyboard; } catch (e) {} const real = window.visualViewport; const t = new EventTarget(); const vv = { height: innerHeight, width: innerWidth, scale: 1, offsetTop: 0, offsetLeft: 0, pageTop: 0, pageLeft: 0, addEventListener: (...a) => t.addEventListener(...a), removeEventListener: (...a) => t.removeEventListener(...a), dispatchEvent: e => t.dispatchEvent(e) };
     Object.defineProperty(window, 'visualViewport', { configurable: true, get: () => vv });
     window.__kb = (h, top) => { vv.height = h; vv.offsetTop = top || 0; t.dispatchEvent(new Event('resize')); }; })()`;
 

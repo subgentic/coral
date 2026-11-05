@@ -55,6 +55,7 @@ async function device(name) {
     await sleep(500); // sleep-ok: the first live list renders from several answers; no single completion event
     await ev(`window.selectLiveSession('dv', 'claude', 'dv-id', 'local'); true`);
     await waitFor(`!!document.getElementById('composer-queued') && !!window.__qaState.liveSessions.find(s => s.session_id === 'dv-id')`, `${name}: the composer and the agent`, 8000);
+    d.targetId = targetId; d.browserContextId = browserContextId; // what this device made, to close and dispose it at the end (#13332)
     return d;
 }
 
@@ -152,6 +153,8 @@ async function device(name) {
         console.log('   ✓ B shows A\'s message as pending, once, and settles it with the transcript');
         console.log('\nAll two-device checks passed');
     } finally {
-        await A.client.close(); await B.client.close();
+        // Each device made a tab in a browser context of its own: closed and disposed here, so a shared Chrome (the strict job's) is not left with two tabs that a later suite could take for its own (#13332).
+        for (const d of [A, B]) { try { await d.client.close(); } catch {} }
+        try { const b = await browserClient(); for (const d of [A, B]) { await b.Target.closeTarget({ targetId: d.targetId }).catch(() => {}); await b.Target.disposeBrowserContext({ browserContextId: d.browserContextId }).catch(() => {}); } await b.close(); } catch {}
     }
 })().catch(err => { console.error(err); process.exit(1); });

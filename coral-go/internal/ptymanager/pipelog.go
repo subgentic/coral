@@ -17,6 +17,16 @@ import (
 // restarted again): 0600, never through a symlink or a hard link.
 func ResetAgentLog(path string) error { return resetLog(path) }
 
+// EnsureAgentLog opens or creates the private log without erasing prior output.
+// Wake may keep an existing terminal, so ResetAgentLog is not appropriate there.
+func EnsureAgentLog(path string) error {
+	f, err := openLogAppend(path)
+	if err != nil {
+		return err
+	}
+	return f.Close()
+}
+
 // resetLog creates the log, or empties an existing one (a session spawned again).
 func resetLog(path string) error {
 	if path == "" {

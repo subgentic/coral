@@ -12,11 +12,14 @@ const BASE = require('./test_base').BASE;
     const { client, Page, ev, sleep, PRELOAD } = await connect();
     try {
         await Page.enable();
-        await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        // Chief's entry (#13167) is asked for by the first live-list render after 8 s of uptime, which a slow runner's late live-list answer can put inside any tab visit below (the Docs one: chief_entry.js and chief_look.js
+        // counted as the Docs tab's own files, on the 248 and 250 gates). The product's own seam, __chiefAfterMs = 0, asks at the first render: Chief loads at the start, before the baseline, and is no tab's request.
+        await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD + ';window.__chiefAfterMs = 0;' });
         await Page.navigate({ url: BASE });
         await Page.loadEventFired();
         await require('./helpers/wait').bind(ev).coralReady('startup', 'settings');
         await sleep(2500); // sleep-ok: the startup's own tasks run after the list renders; there is no event for "all started"
+        await require('./helpers/wait').bind(ev).waitFor(`performance.getEntriesByType('resource').some(e => e.name.endsWith('/chief_entry.js'))`, "Chief's entry loaded at the start (the first live-list render with __chiefAfterMs = 0)", 8000);
         const prefix = await ev('window.__coralStatic');
         assert.match(prefix, /^\/static\/bb\//, 'the page is bundled: ' + prefix);
         const seen = new Set(await ev(`performance.getEntriesByType('resource').map(e => new URL(e.name).pathname)`));

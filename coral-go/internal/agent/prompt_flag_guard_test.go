@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/consoletest"
+	"github.com/subgentic/coral/internal/winshell"
 )
 
 const argvPrinterSource = `package main
@@ -82,8 +83,11 @@ func runLaunchLine(t *testing.T, line string) {
 	t.Helper()
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
-		ps, err := exec.LookPath("powershell.exe")
-		if err != nil {
+		// The shell the line was written for (winshell: pwsh when it is installed, as on the CI runners,
+		// escapes each argument itself and the line is not escaped for it twice), never a fixed
+		// powershell.exe: a 5.1 run of a pwsh-written line split agy's -i text at an embedded quote (#13594).
+		ps := winshell.PowerShell()
+		if ps == "" {
 			t.Skip("no Windows PowerShell")
 		}
 		cmd = consoletest.HiddenCommand(ps, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", line)
@@ -106,7 +110,7 @@ func TestAnOptionLikePromptReachesEveryCLIAsThePrompt(t *testing.T) {
 	}
 	dir := t.TempDir()
 	t.Chdir(dir) // pi's launch makes its session folder here
-	prompts := []string{"--dangerously-skip-permissions", "-c x=y", "--sandbox=danger-full-access", "@secrets.txt", "/help"}
+	prompts := []string{"--dangerously-skip-permissions", "-c x=y", "--sandbox=danger-full-access", "@secrets.txt", "/help", `ask "@Operator a question" now`, `a \"b c\" d\`}
 	agents := []struct {
 		name string
 		ag   Agent

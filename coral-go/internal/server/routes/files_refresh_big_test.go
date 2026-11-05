@@ -154,6 +154,7 @@ func TestRefreshFilesPausesASlowFolderAndRefreshRunsOnePass(t *testing.T) {
 	t.Cleanup(func() { refreshComputeHook = func() {} })
 	post := func(query string) map[string]any {
 		t.Helper()
+		forgetRefreshResults() // a pass over refreshReuseOver (a loaded machine's cold git) is reused by the next ask: this test counts passes, so each ask starts with none stored (the full-run flake: expected 2 passes, saw 1)
 		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/"+name+"/files/refresh"+query, bytes.NewBufferString(`{"session_id":"`+sid+`"}`))
 		resp, err := http.DefaultClient.Do(req)
 		require.NoError(t, err)
@@ -282,4 +283,66 @@ loop:
 	require.Len(t, a.Files, refreshFilesCap, "and the list sent is the cap")
 	require.Less(t, worst, 200*time.Millisecond, "another route answers in under 200 ms while the refresh runs")
 	require.Greater(t, probes, 2, "the refresh took long enough to be probed")
+}
+
+// QA Reviewer 2's SHOULD on 825be2245 (#13181): the total is the changed files, said once. A file the agent wrote or edited that is tracked and changed, and sorts past the cut of the numbered list, is one of the
+// changed files already counted past the cut: its Write/Edit event must not add it again.
+func TestAnAgentsEditOfATrackedFilePastTheCutIsNotCountedTwiceInTheTotal(t *testing.T) {
+	gitguard.Reset()
+	t.Cleanup(gitguard.Reset)
+	_, handler, terminal, ss := setupSessionsTestServer(t)
+	router := chi.NewRouter()
+	router.Post("/api/sessions/live/{name}/files/refresh", handler.RefreshFiles)
+	server := httptest.NewServer(router)
+	t.Cleanup(server.Close)
+	repo := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		cmd := consoletest.HiddenCommand("git", append([]string{"-C", repo}, args...)...)
+		cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "HOME="+repo)
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, "git %v: %s", args, out)
+	}
+	git("init", "-q")
+	git("config", "user.email", "t@example.invalid")
+	git("config", "user.name", "t")
+	const n = refreshFilesCap + 100
+	for i := 0; i < n; i++ {
+		require.NoError(t, os.WriteFile(filepath.Join(repo, fmt.Sprintf("t-%05d.txt", i)), []byte("base\n"), 0o644))
+	}
+	git("add", "-A")
+	git("commit", "-qm", "init")
+	for i := 0; i < n; i++ {
+		require.NoError(t, os.WriteFile(filepath.Join(repo, fmt.Sprintf("t-%05d.txt", i)), []byte("base\nmore\n"), 0o644))
+	}
+	const sid = "00000000-0000-0000-0000-00000000b2b2"
+	name := "claude-" + sid
+	terminal.addSession(name, repo)
+	require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: name, WorkingDir: repo}))
+	realRepo, err := filepath.EvalSymlinks(repo) // the agent works in the real folder: the event names its files there
+	require.NoError(t, err)
+	last := filepath.Join(realRepo, fmt.Sprintf("t-%05d.txt", n-1)) // sorts last: past the cut
+	detail := `{"file_path":` + jsonString(last) + `}`
+	tool, session := "Write", sid
+	_, err = handler.ts.InsertAgentEvent(context.Background(), &store.AgentEvent{AgentName: name, SessionID: &session, EventType: "tool_use", ToolName: &tool, Summary: "Wrote", DetailJSON: &detail})
+	require.NoError(t, err)
+
+	req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/"+name+"/files/refresh", bytes.NewBufferString(`{"session_id":"`+sid+`"}`))
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	var out struct {
+		Files []store.ChangedFile `json:"files"`
+		Total int                 `json:"total_changed"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+	require.Len(t, out.Files, refreshFilesCap)
+	require.Equal(t, n, out.Total, "n files changed: said once, not n+1 for the agent's edit of one past the cut")
+}
+
+// forgetRefreshResults drops the answers the flight group keeps for reuse (not a pass in flight).
+func forgetRefreshResults() {
+	refreshFlights.mu.Lock()
+	clear(refreshFlights.recent)
+	refreshFlights.mu.Unlock()
 }

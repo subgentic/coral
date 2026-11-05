@@ -10,9 +10,15 @@ const S = `(window.__coralStatic || '/static/')`;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor } = await connect();
+    const socketEvents = [];
+    client.Network.webSocketCreated(e => socketEvents.push({event: 'created', id: e.requestId, url: e.url}));
+    client.Network.webSocketHandshakeResponseReceived(e => socketEvents.push({event: 'handshake', id: e.requestId, status: e.response.status, statusText: e.response.statusText}));
+    client.Network.webSocketFrameError(e => socketEvents.push({event: 'error', id: e.requestId, error: e.errorMessage}));
+    client.Network.webSocketClosed(e => socketEvents.push({event: 'closed', id: e.requestId}));
     const scenes = []; const found = [];
     const wait = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: announcements are timed; there is no event to wait for
-    const scene = async (name, run, { must = [], forbid = [] } = {}) => {
+    const scene = async (name, run, { must = [], forbid = [], before = null } = {}) => {
+        if (before) await before(); // settle the fixture before this scene's announcement window
         await clear(ev);
         try { await run(); } catch (e) { scenes.push({ name, entries: [] }); found.push(`${name}: the scene did not run (${String(e && e.message || e).slice(0, 160)})`); return; }
         await wait(600); // sleep-ok: the last announcement lands
@@ -21,11 +27,20 @@ const S = `(window.__coralStatic || '/static/')`;
         found.push(...problems(name, entries, { forbid }));
         for (const [re, label, count = 1] of must) { const n = said(entries, re).length; if (n !== count) found.push(`${name}: ${label} must be announced ${count === 1 ? 'once' : count + ' times'} (it was ${n})`); }
     };
+    const connectedHub = () => waitFor(`(async () => {
+        const {state} = await import(${S} + 'state.js');
+        return navigator.onLine !== false && state.coralWs?.readyState === 1 && !document.getElementById('connection-bar');
+    })()`, 'the Hub feed connected with its reconnect notice settled', 20000, `(async () => {
+        const {state} = await import(${S} + 'state.js');
+        const bar = document.getElementById('connection-bar');
+        return {onLine: navigator.onLine, socketReadyState: state.coralWs?.readyState ?? null, socketURL: state.coralWs?.url ?? null, barPresent: !!bar, barText: bar?.textContent ?? null, url: location.href};
+    })()`);
     try {
-        await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false });
+        await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false, hubFeed: true });
         const run = async tag => {
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
             await waitFor(`typeof window.switchNavTab==='function' && !!window.__coralReady`, 'dashboard'); await coralReady(ev, 'startup', 'liveList', 'settings');
+            await connectedHub();
             await watch(ev);
             await scene(`${tag}: hub: a search is made`, async () => {
                 await ev(`window.switchNavTab('history'); true`);
@@ -59,7 +74,7 @@ const S = `(window.__coralStatic || '/static/')`;
             await scene(`${tag}: hub: the Artifacts tab is opened`, async () => {
                 await ev(`window.switchNavTab('artifacts'); true`);
                 await waitFor(`!!document.getElementById('artifacts-frame')`, 'artifacts frame', 10000);
-            }, { forbid: [/./] }); // the tab says nothing of its own: the hub's page in the frame is its own document
+            }, { before: connectedHub, forbid: [/./] }); // pre-settlement notices are outside this scene; all announcements after opening still fail. The tab says nothing of its own: the hub's page in the frame is its own document
             await scene(`${tag}: hub: toasts`, async () => {
                 await ev(`(async () => { const n = await import(${S} + 'notifications.js'); n.showToast('Saved to the board.'); n.showToast('Could not reach the computer.', true); return true; })()`);
                 await wait(1500); // sleep-ok: the two are said one after the other
@@ -68,7 +83,7 @@ const S = `(window.__coralStatic || '/static/')`;
         await run('desktop');
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await run('phone');
-    } finally { await client.close(); }
+    } finally { console.log('Hub socket events: ' + JSON.stringify(socketEvents)); await client.close(); }
     if (process.env.ANNOUNCE_REPORT) { require('node:fs').writeFileSync(process.env.ANNOUNCE_REPORT, scenes.map(s => `## ${s.name}\n` + s.entries.map(e => `  ${String(e.t).padStart(5)} ms ${e.loud ? '!' : ' '} ${e.region}: ${e.text}`).join('\n')).join('\n') + '\n--\n' + found.join('\n') + '\n'); process.exit(0); }
     assert.deepEqual(found, [], 'screen-reader announcement problems through the Hub:\n  ' + found.join('\n  '));
     console.log(`PASS ${scenes.length} Hub scenes: each state is announced once, nothing chatters`);

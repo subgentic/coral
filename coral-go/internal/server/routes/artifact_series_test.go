@@ -353,8 +353,10 @@ func TestDeletingAVersionLeavesTheOthersTheirNumbersAndASeriesDeleteTakesAllOfTh
 	// the series delete: a person only
 	resp, _ = rig.noFollow("a1", http.MethodDelete, "/api/artifacts/series/"+sid)
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode, "an agent's token never deletes a series")
+	before := rig.h.bs.ArtifactsRevision("observed-team")
 	resp, _ = rig.noFollow("", http.MethodDelete, "/api/artifacts/series/"+sid)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Greater(t, rig.h.bs.ArtifactsRevision("observed-team"), before, "deleting the series invalidates lists that held its versions")
 	for _, digest := range []string{d[0], d[2]} {
 		status, _ := rig.getAs("", "/api/artifacts/"+digest+"/meta")
 		assert.Equal(t, 404, status, "every version went")

@@ -29,6 +29,7 @@ func taskClaimNudge(taskID int64) string {
 
 // BoardHandler handles message board HTTP endpoints.
 type BoardHandler struct {
+	itemsCache  teamItemsCache   // the built list of a team's artifacts, kept for a walk of its pages (#13522)
 	goalDoneNow func() time.Time // the clock of the "Goal looks done" quiet period (#12161); nil is time.Now
 	// goalDoneQuiet reads the quiet period (goal_done_quiet_minutes, #12161); nil: 15 minutes.
 	goalDoneQuietFn func(ctx context.Context) time.Duration
@@ -121,6 +122,8 @@ type BoardHandler struct {
 	liveSessionType func(ctx context.Context, sessionID string) (agentType string, ok bool, err error)
 	// clearBoardChatFlags removes the deleted board's mailbox flags from the separate sessions database.
 	clearBoardChatFlags func(ctx context.Context, project string) error
+	// memberRest says why a member's agent will not read a message now: asleep, terminal gone, ended or archived (SetMemberRestLookup, #13189). Nil: not known.
+	memberRest func(ctx context.Context, project, member string) string
 	// sessionAsleep reports whether a live session is asleep, ended or archived: an approval's message waits for it (SetSessionAsleepLookup). Nil: not known.
 	sessionAsleep func(ctx context.Context, sessionID string) bool
 	// needsYouAgents lists the agents waiting on the Operator for GET /api/needs-you (SetNeedsYouAgents). Nil: none.
@@ -215,6 +218,7 @@ func (h *BoardHandler) SetArtifactNudger(n *ClaudeArtifactNudger) { h.artifactNu
 func (h *BoardHandler) SetAutoAttacher(a *AutoAttacher) { h.autoAttach = a }
 
 func (h *BoardHandler) SetTaskArtifactWriter(coralDir string, fn func(context.Context, *board.Task, string) error) {
+	bindArtifactRevisions(coralDir, h.bs)
 	h.coralDir = coralDir
 	h.writeTaskArtifact = fn
 }
@@ -268,6 +272,8 @@ func (h *BoardHandler) persistTaskArtifact(ctx context.Context, task *board.Task
 	}
 	if err := h.writeTaskArtifact(ctx, task, h.taskArtifactPath(task.BoardID, task.ID)); err != nil {
 		slog.Warn("persist task changes artifact failed", "task_id", task.ID, "board", task.BoardID, "error", err)
+	} else if h.bs != nil {
+		h.bs.NoteArtifactsChanged(task.BoardID)
 	}
 }
 

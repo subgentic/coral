@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -105,6 +106,7 @@ func (h *SessionsHandler) OrchestratorGrant(w http.ResponseWriter, r *http.Reque
 		errInternalServer(w, "could not save the grant")
 		return
 	}
+	noteSettingsChange(h.bs, r, project, orchGrantShown(cur), orchGrantShown(g)) // what the Orchestrator is told changed (#13173)
 	if cur.Enabled != g.Enabled || cur.SeatSession != g.SeatSession || cur.MaxPerHour != g.MaxPerHour || cur.MaxLive != g.MaxLive || cur.IdleMin != g.IdleMin {
 		if id, err := h.bs.ReserveLifecycle(r.Context(), project, "grant", "Operator", h.orchGrantWords(r.Context(), g), nil); err == nil {
 			_ = h.bs.FinishLifecycle(r.Context(), id, "ok", "")
@@ -189,7 +191,11 @@ func (h *SessionsHandler) orchSeat(w http.ResponseWriter, r *http.Request, proje
 
 // orchTarget resolves the agent to act on from the BOARD'S OWN seats, by member, never from a session name the caller supplies, and refuses what is not a plain agent of this board.
 func (h *SessionsHandler) orchTarget(w http.ResponseWriter, r *http.Request, project string, seat *store.LiveSession) (*store.LiveSession, string, bool) {
-	member := strings.TrimSpace(chi.URLParam(r, "subscriber"))
+	member := chi.URLParam(r, "subscriber")
+	if un, err := url.PathUnescape(member); err == nil { // chi routes on the escaped path, so a name with a slash or a space (UX%2FUX%20Engineer) arrives escaped (#13415)
+		member = un
+	}
+	member = strings.TrimSpace(member)
 	if member == "" || strings.EqualFold(member, "Operator") {
 		orchRefusal(w, http.StatusBadRequest, "bad_target", "name an agent of this board")
 		return nil, "", false
@@ -237,8 +243,16 @@ func (h *SessionsHandler) OrchestratorWake(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if target.IsSleeping != 1 {
-		orchRefusal(w, http.StatusConflict, "not_asleep", "that agent is not asleep")
-		return
+		// A row still awake whose CLI has ended and left a plain shell (a killed process the reconciler has not marked yet, #13413) is Ended: it is put to sleep as the reconciler would and woken now,
+		// instead of refused as awake. A running CLI, or a terminal that cannot be read, is still awake.
+		name := naming.SessionName(target.AgentType, target.SessionID)
+		if !h.markEndedAfterFailedSend(r.Context(), name, target.AgentType, target.SessionID) {
+			orchRefusal(w, http.StatusConflict, "not_asleep", "that agent is not asleep")
+			return
+		}
+		ended := *target
+		ended.IsSleeping = 1
+		target = &ended
 	}
 	actor, who := h.orchActor(seat), orchName(member)
 	id, err := h.reserveForBoard(r.Context(), project, board.LifecycleWake, actor, who, g)
@@ -478,4 +492,9 @@ func launcherWords(name string) string {
 		return "An agent"
 	}
 	return name
+}
+
+// orchGrantShown is a grant as the settings notice compares it: its settings, not who set it or when.
+func orchGrantShown(g board.OrchGrant) map[string]any {
+	return map[string]any{"orchestrator_grant.enabled": g.Enabled, "orchestrator_grant.seat_session": g.SeatSession, "orchestrator_grant.max_per_hour": g.MaxPerHour, "orchestrator_grant.max_live": g.MaxLive, "orchestrator_grant.idle_minutes": g.IdleMin}
 }

@@ -7,7 +7,7 @@ import { state } from './state.js';
 import { LAUNCH_CARDS, goalDesc, refreshGoalCardSoon } from './launch_cards.js';
 import './settings_lists.js';
 import './hub_access.js';
-import { sessionServer, noteBoardLabels, sessionTeamKey } from './server_base.js';
+import { sessionServer, noteBoardLabels, sessionTeamKey, contextServer } from './server_base.js';
 import './sleeping_view.js';
 import './knowledge_distill.js';
 import { escapeHtml, showToast } from './utils.js';
@@ -44,7 +44,7 @@ import { _renderSidebarRail } from './sidebar_rail.js';
 import { _passesFilters, _pinMatchesFilter } from './list_filter_match.js';
 import { _renderGroups } from './group_cards.js';
 import { UPDOWN, W, dirOf, menu, withAgent, withBoard } from './action_helpers.js';
-export { KILL_LOG_NOTE, KILL_LOG_NOTE_MANY, RESET_LOG_NOTE, attachDirect, killSessionDirect, restartDirect, restartSameDirect, showInfoDirect, toggleAgentArchive, toggleAgentSleep, setAgentAutoSleep } from './agent_actions.js';
+export { KILL_LOG_NOTE, KILL_LOG_NOTE_MANY, RESET_LOG_NOTE, attachDirect, killSessionDirect, restartDirect, restartSameDirect, showInfoDirect, toggleAgentArchive, toggleAgentSleep, sleepTerminalGone, setAgentAutoSleep } from './agent_actions.js';
 export { copyFolderPath, hideAlertModal, hidePromptModal, showAlertModal, showPromptModal } from './prompt_modals.js';
 export { killBoard, killGroup, saveTeamFromSidebar, shareAgentTeam, toggleTeamSleep } from './team_actions.js';
 export { expandSleepingGroup, toggleGroupByServer, toggleGroupByTeam, toggleShowServer, toggleRowLine } from './list_display_settings.js';
@@ -158,7 +158,19 @@ export function agentSearchKey(e) {
 
 /** Render the agent list now (user actions, which may read the DOM right after).
  *  A pending scheduled render is dropped: this one shows the latest list. */
+// Chief's entry in the Agents sidebar (#13167) is asked for by the first live-list render after the start has settled (8 s of uptime), never at the start: no request, timer or listener joins the startup sequence
+// (page_weight and its golden stay as they were); a test sets window.__chiefAfterMs to ask at once.
+let _chiefFor = null; // the computer the entry was last asked for: switching computers asks again (an answer for the one left is dropped by chief_entry.js)
+function paintChiefLater() {
+    if (performance.now() < (window.__chiefAfterMs ?? 8000)) return;
+    const at = contextServer();
+    if (_chiefFor === at) return;
+    _chiefFor = at;
+    importOnce('./chief_entry.js').then(m => m.paintSidebarChief()).catch(() => {});
+}
+
 export function renderLiveSessions(sessions) {
+    paintChiefLater();
     if (_scheduledRender) { cancelAnimationFrame(_scheduledRender); _scheduledRender = 0; }
     followServerOrder(sessions); // a replaced agent's place was moved to its new id on the server (#4943)
     noteBoardLabels(sessions); // board_label beside board_project (#3536): what keyLabel shows
@@ -462,6 +474,7 @@ registerActions({
     'agent-icon': withAgent('setAgentIcon'),
     'agent-attach': withAgent('attachDirect'),
     'agent-sleep': withAgent('toggleAgentSleep', ['sleep', 'wake']),
+    'agent-sleep-gone': menu(el => { const ids = String(el.dataset.ids || '').split(',').filter(x => /^[A-Za-z0-9_.:-]{1,128}$/.test(x)).slice(0, 500); if (ids.length) W('sleepTerminalGone')(ids); }), // Sleep all terminal-gone (#13171)
     'agent-auto-sleep': withAgent('setAgentAutoSleep', ['off', 'on']), // the Operator's per-agent switch for auto-sleep (#12111)
     'agent-archive': withAgent('toggleAgentArchive', ['archive', 'unarchive']),
     'agent-move': menu(el => { const sid = textOf(el.dataset.sessionId); if (sid && UPDOWN[el.dataset.dir]) W(el.dataset.dir === 'up' ? 'moveSessionUp' : 'moveSessionDown')(sid); }),
@@ -478,7 +491,7 @@ registerActions({
     'team-add-agent': menu(el => { const b = textOf(el.dataset.board); if (b) W('showAddAgentToBoard')(b, dirOf(el) || ''); }),
     'team-add-terminal': menu(el => { const b = textOf(el.dataset.board); if (b) W('launchTerminalToBoard')(b, dirOf(el) || ''); }),
     'team-accent': (el, event) => { event.stopPropagation(); const b = textOf(el.dataset.board); if (b) window.setBoardAccentColor(b); window.closeSidebarKebabs(); },
-    'team-health': (el, event) => { event.stopPropagation(); const b = textOf(el.dataset.board); if (b) window.showTeamAvailabilityWorkspace(b); }, // the team's health is its Agents tab (#7453); the check's settings are the Settings tab's Health check
+    'team-health': (el, event) => { event.stopPropagation(); const b = textOf(el.dataset.board); if (b) window.showTeamWorkingModeWorkspace(b, { section: 'health' }); }, // open the setting represented by the pulse icon
     'group-move': menu(el => { const g = textOf(el.dataset.group); if (g && UPDOWN[el.dataset.dir]) W(el.dataset.dir === 'up' ? 'moveGroupUp' : 'moveGroupDown')(g); }),
     'group-kill': menu(el => { const g = textOf(el.dataset.group); if (g) W('killGroup')(g); }),
     'group-collapse': el => { const g = textOf(el.dataset.group); if (g) window.toggleGroupCollapse(g); },

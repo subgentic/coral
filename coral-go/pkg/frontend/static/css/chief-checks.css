@@ -1,0 +1,39 @@
+/* Configurator cards follow the approved Sources / Checks / Recent triggers layout. */
+dialog.chief-checks { position: fixed; inset: 0; margin: auto; height: fit-content; max-width: var(--dlg-max); max-height: calc(100dvh - 32px); overflow: auto; padding: 24px; color: var(--text-primary); background: var(--bg-primary); }
+dialog.chief-check-editor { position: fixed; inset: 0; margin: auto; height: fit-content; max-width: var(--dlg-max); max-height: calc(100dvh - 32px); overflow: auto; padding: 24px; background: var(--bg-primary); color: var(--text-primary); }
+.chief-checks::backdrop, .chief-check-editor::backdrop { background: var(--modal-backdrop); }
+.chief-checks-head, .chief-check-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.chief-checks-head { position: sticky; top: -24px; z-index: 1; padding-block: 12px; background: var(--bg-primary); }
+.chief-checks-head h2 { flex: 1 1 12rem; margin: 0; font-size: var(--fs-lg); }
+.chief-checks-head button, .chief-check-actions button, .chief-checks-sources button, .chief-checks-recent button { min-height: 44px; white-space: normal; }
+.chief-checks-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 24px; margin-top: 20px; }
+.chief-checks-main, .chief-checks-sources, .chief-checks-list, .chief-checks-recent { min-width: 0; display: grid; align-content: start; gap: 12px; }
+.chief-checks-main { gap: 24px; }
+.chief-checks h3, .chief-checks h4 { margin: 0; }
+.chief-checks h3 { font-size: var(--fs-lg); }
+.chief-checks h4 { font-size: var(--fs-md); }
+.chief-check-source-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: 12px; }
+.chief-check-card { display: flex; flex-direction: column; align-items: start; gap: 10px; padding: var(--card-pad); border: var(--card-border); border-radius: var(--card-radius); background: var(--bg-secondary); min-width: 0; overflow-wrap: anywhere; }
+.chief-check-card p { margin: 0; }
+.chief-check-hint { color: var(--text-secondary); font-size: var(--fs-md); }
+.chief-checks-notice { margin-block: 12px; }
+.chief-check-error { color: var(--error); overflow-wrap: anywhere; }
+.chief-check-instruction, .chief-check-summary { white-space: pre-wrap; overflow-wrap: anywhere; }
+.chief-check-state { font-weight: var(--fw-strong); }
+.chief-check-form { display: grid; gap: 12px; }
+.chief-check-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.chief-check-field input, .chief-check-field select, .chief-check-field textarea { width: 100%; box-sizing: border-box; min-height: 44px; font: inherit; }
+.chief-check-field textarea { resize: vertical; }
+.chief-check-editor .chief-check-checkbox { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.chief-check-editor .chief-check-checkbox input { width: auto; }
+.chief-check-editor .chief-check-actions { position: sticky; bottom: -24px; padding-block: 12px; background: var(--bg-primary); }
+@media (max-width: 900px) { .chief-checks-layout { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 500px) {
+    dialog.chief-checks, dialog.chief-check-editor { position: fixed; inset: 0; margin: auto; height: fit-content; max-height: calc(100dvh - 16px); padding: 16px; }
+    .chief-checks-head { top: -16px; }
+    .chief-check-editor .chief-check-actions { bottom: -16px; }
+}
+
+.chief-checks [hidden], .chief-check-editor [hidden] { display: none; }
+
+.chief-check-editor .chief-check-error { flex-basis: 100%; margin: 0; }

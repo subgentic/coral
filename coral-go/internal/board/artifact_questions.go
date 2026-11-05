@@ -59,6 +59,7 @@ func (s *Store) SetArtifactQuestion(ctx context.Context, boardID, hex, question,
 		boardID, hex, question, session, at.UTC().Format(time.RFC3339)); err != nil {
 		return false, err
 	}
+	s.NoteArtifactsChanged(boardID)
 	var got string
 	if err := s.db.GetContext(ctx, &got, `SELECT question FROM artifact_questions WHERE board_id = ? AND hex = ?`, boardID, hex); err != nil {
 		return false, err
@@ -80,4 +81,19 @@ func (s *Store) ArtifactQuestions(ctx context.Context, boardID string) (map[stri
 		out[r.Hex] = r.ArtifactQuestion
 	}
 	return out, nil
+}
+
+// OperatorQuestionSession is the session recorded for a question the Operator wrote (#13217): not an agent's, so a later upload of the same bytes by an agent does not change it, and the Operator's own later edit may.
+const OperatorQuestionSession = "operator"
+
+// SetArtifactQuestionByOperator records question (already cleaned) for the object on the board as the Operator's, replacing any question there, whoever asked it: the Operator sending a file for review says what they
+// want decided about it (#13217). SetArtifactQuestion is for an agent and leaves another session's question alone.
+func (s *Store) SetArtifactQuestionByOperator(ctx context.Context, boardID, hex, question string, at time.Time) error {
+	_, err := s.db.ExecContext(ctx, `INSERT INTO artifact_questions (board_id, hex, question, session_id, asked_at) VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(board_id, hex) DO UPDATE SET question = excluded.question, session_id = excluded.session_id, asked_at = excluded.asked_at`,
+		boardID, hex, question, OperatorQuestionSession, at.UTC().Format(time.RFC3339))
+	if err == nil {
+		s.NoteArtifactsChanged(boardID) // the question is on the row of the list (#13522: the kept list is built again when the revision moves)
+	}
+	return err
 }

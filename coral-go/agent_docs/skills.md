@@ -4,7 +4,7 @@ A skill is an Agent Skills folder (`SKILL.md` and optional `scripts/`, `referenc
 
 ## Coral's example skills
 
-Coral ships three skills of its own, approved and published by "Coral (example)": `creating-coral-skills` (how to write a skill), `working-in-a-coral-team` (the board, tasks, files for review, asking and waiting) and `creating-a-coral-automation` (designing a workflow and a scheduled job for the Operator to create). They are Markdown only, are put in the store on every start, and are refreshed when Coral's text changes (a new version; an agent pinned to the old one keeps it). They cannot be removed. A skill of the same name that a person or an agent published is left alone.
+Coral ships four skills of its own, approved and published by "Coral (example)": `creating-coral-skills` (how to write a skill), `using-coral` (what Coral gives any agent: docs, skills, files, reaching the person, your own to-do list; attached to every agent at launch, and its short form is part of every agent's launch text), `working-in-a-coral-team` (the board, tasks, files for review, asking and waiting) and `creating-a-coral-automation` (designing a workflow and a scheduled job for the Operator to create). They are Markdown only, are put in the store on every start, and are refreshed when Coral's text changes (a new version; an agent pinned to the old one keeps it). They cannot be removed. A skill of the same name that a person or an agent published is left alone.
 
 ## Find and read one
 

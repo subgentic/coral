@@ -253,6 +253,7 @@
 .tt-state-needs-input       { color: var(--warning); font-weight: var(--fw-strong); }
 .tt-state-done              { color: var(--success); font-weight: var(--fw-strong); }
 .tt-state-stuck             { color: var(--danger); font-weight: var(--fw-strong); }
+.tt-state[class*="tt-state-blocked"] { color: var(--danger); font-weight: var(--fw-strong); } /* "Blocked: Codex refuses its model ..." (#13486): the class is built from the whole label */
 .tt-state-idle              { color: var(--text-muted); }
 .tt-unread                   { color: var(--warning); font-weight: var(--fw-strong); }
 
@@ -1493,7 +1494,9 @@ body .terminal-header { flex-wrap: wrap; height: auto; min-height: 36px; row-gap
     border: 1px solid currentColor;
 }
 .server-update-badge.server-update-required { color: var(--warning); }
-.server-update-badge:hover { text-decoration: underline; }
+button.server-update-badge:hover, a.server-update-badge:hover { text-decoration: underline; }
+span.server-update-badge { cursor: default; }
+button.server-update-badge { background: transparent; font: inherit; cursor: pointer; } /* the Update button (#13258): the badge look, not the browser's grey button */
 .cs-update-required { color: var(--warning); }
 /* The hub relaunch's "Updating" badge (#5355): read-only, a word, not a link or a control; the row keeps its height. */
 .server-relaunch-badge { margin-left: var(--space-xs); white-space: nowrap; color: var(--text-primary); background: var(--bg-hover); border: 1px solid var(--border); cursor: default; }

@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/subgentic/coral/internal/board"
@@ -24,11 +25,13 @@ func (h *BoardHandler) SetWorkingMode(w http.ResponseWriter, r *http.Request) {
 	if refuseGuestNewBoard(w, r, h.bs, urlParam(r, "project")) {
 		return
 	}
+	priorMode, _ := h.bs.GetWorkingMode(r.Context(), urlParam(r, "project")) // what the Orchestrator is told changed (#13173)
 	result, err := h.bs.SetWorkingMode(r.Context(), urlParam(r, "project"), mode)
 	if err != nil {
 		errBadRequest(w, err.Error())
 		return
 	}
+	noteSettingsChange(h.bs, r, urlParam(r, "project"), workingModeShown(priorMode), workingModeShown(result))
 	writeJSON(w, http.StatusOK, result)
 }
 
@@ -65,6 +68,7 @@ func (h *BoardHandler) SaveWorkflowPreset(w http.ResponseWriter, r *http.Request
 	if create {
 		id = body.ID
 	}
+	priorPreset := h.presetBefore(r.Context(), urlParam(r, "project"), id)
 	p, err := h.bs.SaveWorkflowPreset(r.Context(), urlParam(r, "project"), id, body.Name, body.Instructions, create)
 	if err != nil {
 		if errors.Is(err, board.ErrPresetExists) {
@@ -74,6 +78,7 @@ func (h *BoardHandler) SaveWorkflowPreset(w http.ResponseWriter, r *http.Request
 		}
 		return
 	}
+	noteSettingsChange(h.bs, r, urlParam(r, "project"), priorPreset, presetShown(p))
 	status := http.StatusOK
 	if create {
 		status = http.StatusCreated
@@ -81,10 +86,36 @@ func (h *BoardHandler) SaveWorkflowPreset(w http.ResponseWriter, r *http.Request
 	writeJSON(w, status, p)
 }
 func (h *BoardHandler) ResetWorkflowPreset(w http.ResponseWriter, r *http.Request) {
+	priorPreset := h.presetBefore(r.Context(), urlParam(r, "project"), chi.URLParam(r, "presetID"))
 	p, err := h.bs.ResetWorkflowPreset(r.Context(), urlParam(r, "project"), chi.URLParam(r, "presetID"))
 	if err != nil {
 		errBadRequest(w, err.Error())
 		return
 	}
+	noteSettingsChange(h.bs, r, urlParam(r, "project"), priorPreset, presetShown(p))
 	writeJSON(w, http.StatusOK, p)
+}
+
+// workingModeShown is a working mode as the settings notice compares it: the choices, not the instruction text built from them.
+func workingModeShown(m board.WorkingMode) map[string]any {
+	return map[string]any{"working_mode.mode": m.Mode, "working_mode.dependency_guidance": m.DependencyGuidance, "working_mode.asks_are_tasks": m.AsksAreTasks, "working_mode.custom_instructions": m.CustomInstructions}
+}
+
+// presetShown is a workflow preset as the settings notice compares it: its name and instructions.
+func presetShown(p board.WorkflowPreset) map[string]any {
+	return map[string]any{"workflow_preset." + p.ID + ".name": p.Name, "workflow_preset." + p.ID + ".instructions": p.Instructions}
+}
+
+// presetBefore is the preset id as it is now (nothing when it does not exist yet: a create).
+func (h *BoardHandler) presetBefore(ctx context.Context, project, id string) map[string]any {
+	presets, err := h.bs.ListWorkflowPresets(ctx, project)
+	if err != nil {
+		return nil
+	}
+	for _, p := range presets {
+		if p.ID == id {
+			return presetShown(p)
+		}
+	}
+	return nil
 }

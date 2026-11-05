@@ -7,8 +7,19 @@ const HOST = new URL(BASE).host;
 const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self'", "style-src-attr 'unsafe-inline'", "font-src 'self'", "img-src 'self' data: blob:", `connect-src 'self' ws://${HOST}`, "object-src 'none'", "base-uri 'none'", "form-action 'self'", "frame-ancestors 'none'"].join('; ');
 
 /** Set the page up as the Hub's before the first navigation: the viewport, the cloud boot flag with the hub's CSP, and the stubbed API. */
-async function setupHubWorld({ client, Page, Emulation, width, height, mobile, inbox, hubPages }) {
+async function setupHubWorld({ client, Page, Emulation, width, height, mobile, inbox, needs, hubPages, hubFeed = false, bootExtra = '' }) {
     const { Fetch, Network } = client;
+    if (hubFeed) {
+        // Fetch.fulfillRequest below replaces the document with a synthetic response:
+        // Chromium's ProcessResponseOverride makes a fresh response head without the
+        // loopback remote endpoint. LNA can therefore block this fixture's real socket.
+        // Grant only this isolated origin; a real Hub uses its public same-origin feed.
+        // Chrome 156 exposes split permissions: the legacy grant alone no longer
+        // authorizes loopback. Older runner Chromes advertise only the legacy name.
+        const networkPermissions = ['localNetworkAccess', 'localNetwork', 'loopbackNetwork']
+            .filter(name => client.Browser.PermissionType.enum.includes(name));
+        if (networkPermissions.length) await client.Browser.grantPermissions({ origin: new URL(BASE).origin, permissions: networkPermissions });
+    }
     await Promise.all([Page.enable(), Network.enable()]);
     await Network.setBypassServiceWorker({ bypass: true });
     await Emulation.setDeviceMetricsOverride({ width, height, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
@@ -22,7 +33,7 @@ async function setupHubWorld({ client, Page, Emulation, width, height, mobile, i
             }
             if (e.responseStatusCode !== 200) return Fetch.continueRequest({ requestId: e.requestId });
             const b = await Fetch.getResponseBody({ requestId: e.requestId });
-            const html = (b.base64Encoded ? Buffer.from(b.body, 'base64').toString('utf8') : b.body).replace('"mode":"local"', '"mode":"cloud"' + ((typeof inbox === 'function' ? inbox() : inbox) ? ',"inbox":"native"' : '')); // inbox: the boot value the Hub sets per release pin (#9100 Goal #100); a function is read at each load
+            const html = (b.base64Encoded ? Buffer.from(b.body, 'base64').toString('utf8') : b.body).replace('"mode":"local"', '"mode":"cloud"' + ((typeof inbox === 'function' ? inbox() : inbox) ? ',"inbox":"native"' : '') + ((typeof needs === 'function' ? needs() : needs) ? ',"needs":"native"' : '')+ (bootExtra ? ',' + bootExtra : '')); // needs: the Hub's boot value that moves Needs you off its frame (#13446); inbox: the boot value the Hub sets per release pin (#9100 Goal #100); a function is read at each load
             await Fetch.fulfillRequest({ requestId: e.requestId, responseCode: 200, responseHeaders: (e.responseHeaders || []).filter(h => !/^content-(security-policy|length)$/i.test(h.name)).concat([{ name: 'Content-Security-Policy', value: CSP }]), body: Buffer.from(html).toString('base64') });
         });
   await Page.addScriptToEvaluateOnNewDocument({source:`(() => {
@@ -31,6 +42,25 @@ async function setupHubWorld({ client, Page, Emulation, width, height, mobile, i
    const original=window.fetch; window.__remoteRequests=[];
    const computers=window.__computers=[{id:'m1',label:'Laptop',status:'online',online:true,access_mode:'view',local_mode:'launch',effective_mode:'view'},{id:'m2',label:'Desktop',status:'online',online:true,access_mode:'interact',local_mode:'launch',effective_mode:'interact'}];
    const json=x=>Promise.resolve(new Response(JSON.stringify(x),{headers:{'content-type':'application/json'}}));
+   const hubSessions=()=>window.__noComputers?[]:[['m1','Review agent'],['m1','Docs agent'],['m2','Build agent']].map(([server,name],i)=>({session_id:'hub-agent-'+i,name:'hub-agent-'+i,display_name:name,agent_type:'claude',working_directory:'/tmp/hub-agent-'+i,server,sleeping:false,archived:false,status:'idle'}));
+   if (${JSON.stringify(hubFeed)}) {
+    // Keep the real handshake, close and reconnect lifecycle, but use the same
+    // Hub inventory as HTTP: this isolated Go server has no remote computers.
+    const RealWebSocket=window.WebSocket;
+    window.WebSocket=class extends RealWebSocket {
+     constructor(url,...args) {
+      super(url,...args);
+      if(new URL(url,location.href).pathname==='/ws/coral')this.addEventListener('message',event=>{
+       const data=JSON.parse(event.data);
+       if(data.type==='coral_update') {
+        data.servers=window.__noComputers?[]:computers; data.sessions=hubSessions();
+        Object.defineProperty(event,'data',{value:JSON.stringify(data)});
+       }
+      });
+     }
+    };
+   }
+
    window.fetch=(u,o={})=>{
     const p=new URL(String(u),location.href); const m=(o.method||'GET').toUpperCase();
     if(p.pathname==='/auth/session')return json({authenticated:true,email:'tester@example.com',csrf:'test'});

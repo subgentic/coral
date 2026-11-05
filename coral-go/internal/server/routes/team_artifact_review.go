@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -13,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/tracking"
 )
 
@@ -84,11 +87,16 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 	}
 	var body struct {
 		Decision string `json:"decision"`
+		Quiet    bool   `json:"quiet"`  // automatic settlement of older versions; ignore only
 		Reason   string `json:"reason"` // deny only: the Operator's one line to the uploader
 		Note     string `json:"note"`   // approve only: the Operator's one short comment to the uploader (#11888)
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
+		return
+	}
+	if body.Quiet && body.Decision != "ignore" {
+		errBadRequest(w, "quiet applies only to automatic older-version settlement (ignore)")
 		return
 	}
 	if strings.TrimSpace(body.Note) != "" && body.Decision != "approve" {
@@ -112,6 +120,10 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	case "ignore", "unignore":
+		if body.Quiet {
+			h.settleSupersededArtifact(w, r, project, id)
+			return
+		}
 		h.ignoreArtifact(w, r, project, id, body.Decision == "ignore")
 		return
 	case "save", "unsave":
@@ -126,13 +138,26 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 		errNotFound(w, "this team has no such artifact")
 		return
 	}
+	// Through a hub (Coral Hub's tunnel, or the self-hosted hub's signed stamp) a verdict is on a file this computer can PROVE is the one named (#13493, Security on coral-hub's #169685): an artifact's id is the SHA-256 of its stored bytes (storeArtifactVia names the object by
+	// the hash and never replaces it), so "approve this id" is "approve these bytes". A row whose stored record does not say so (no digest, or one that is not sha256:<id>: a link to an object this computer does not hold,
+	// a record from before digests) cannot be decided through the Hub by id alone: it is refused, and a person decides it on this computer.
+	if throughAHub(r) && !h.storedDigestMatches(id) { // the tunnel, or the self-hosted hub's stamp (Security's INFO 4)
+		commentRefuse(w, http.StatusConflict, "digest_unknown", "this computer cannot confirm what is in this file, so it cannot be decided through Coral Hub: open it on this computer")
+		return
+	}
 	note := ""
 	if state == board.ReviewDenied {
 		note = body.Reason
 	}
+	if throughAHub(r) { // a hub caller (the tunnel, or the self-hosted hub: its stamp or its API key) never changes a decision already made on the file (#13494); this computer's own dashboard still may
+		r = r.WithContext(board.WithOneDecision(r.Context()))
+	}
 	r = r.WithContext(board.WithActivity(r.Context(), activityMetaFor(r, item.Name, note))) // the Activity record: the decision and its row are one transaction (#12069)
 	change, tags, err := h.bs.DecideArtifactReview(r.Context(), project, id, state, time.Now())
 	switch {
+	case errors.Is(err, board.ErrAlreadyDecided):
+		commentRefuse(w, http.StatusConflict, "already_decided", alreadyDecidedWords)
+		return
 	case err == board.ErrNotForReview:
 		commentRefuse(w, http.StatusConflict, "not_for_review", h.notForReviewWords(r.Context(), project, item))
 		return
@@ -155,6 +180,21 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 	}
 	// Tell the uploader: one board message from the Operator, on the path every board notice takes (the agent is nudged when its recorded CLI is at a prompt; an agent that is asleep or ended finds it
 	// unread when it wakes: nothing is woken). An artifact with no recorded uploader is approved with no message.
+	if project == noTeamBoardID { // an agent on no team has no board: the notice is typed into the session that uploaded the file (#13539)
+		decision := map[string]string{board.ReviewApproved: board.ActApprove, board.ReviewDenied: board.ActDeny}[state]
+		notice := typedNoTeamApproved(item.Name, id, body.Note)
+		if state == board.ReviewDenied {
+			notice = typedNoTeamDenied(item.Name, id, body.Reason)
+		}
+		delivered, why := h.tellNoTeamUploaderOf(r.Context(), id, notice)
+		h.tellChief(context.WithoutCancel(r.Context()), decision, "file", project, item.Name, "")
+		out["delivered"] = delivered
+		if !delivered {
+			out["reason"] = why
+		}
+		writeJSON(w, http.StatusOK, out)
+		return
+	}
 	subs, err := h.bs.ListSubscribers(r.Context(), project)
 	if err != nil {
 		_ = h.bs.UndoArtifactReview(r.Context(), change)
@@ -282,4 +322,85 @@ func (h *BoardHandler) notForReviewWords(ctx context.Context, project string, it
 		return "A newer version replaced this one, so it is no longer waiting for your review. Open the newest version to decide."
 	}
 	return plain
+}
+
+// settleSupersededArtifact is an automatic older-version cleanup on the same
+// owner/person-protected review route. It is neither a dismissal nor an Inbox
+// action by the Operator, and sends no notice to the uploader.
+func (h *BoardHandler) settleSupersededArtifact(w http.ResponseWriter, r *http.Request, project, id string) {
+	item, ok := h.teamManagedArtifact(r.Context(), project, id)
+	if !ok {
+		errNotFound(w, "this team has no such artifact")
+		return
+	}
+	var newer []string
+	if sid, n, ok := digestSeriesOnBoard(h.coralDir, artifactStoreID(item), project); ok {
+		for _, m := range seriesMembers(h.coralDir, sid) {
+			if m.Board == project && m.N > n && m.Digest != artifactStoreID(item) {
+				newer = append(newer, m.Digest)
+			}
+		}
+	}
+	r = r.WithContext(board.WithActivity(r.Context(), activityMetaFor(r, item.Name, "Automatic settlement of an older version")))
+	changed, err := h.bs.SettleOlderArtifactReview(r.Context(), project, id, newer, time.Now())
+	if errors.Is(err, board.ErrNotOlderReview) {
+		commentRefuse(w, http.StatusConflict, "not_older_version", "Only an older version with a newer review or an approved/denied version in the same team and series can be settled automatically")
+		return
+	}
+	if err != nil {
+		errInternalServer(w, "could not settle that version")
+		return
+	}
+	if !changed {
+		commentRefuse(w, http.StatusConflict, "not_for_review", h.notForReviewWords(r.Context(), project, item))
+		return
+	}
+	tags, err := h.bs.ArtifactTags(r.Context(), project)
+	if err != nil {
+		errInternalServer(w, "could not read the settled version")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"id": id, "state": board.ReviewSuperseded, "changed": true, "tags": tags[id], "delivered": false})
+}
+
+// storedDigestMatches says this computer holds the object named id (a regular file) and its stored record says its digest is sha256:<id> (#13493): the record is written with the object, from the hash of its bytes, so a match is what "the
+// id is the content" rests on. No object, no record, or a record that names another digest is a no.
+func (h *BoardHandler) storedDigestMatches(id string) bool {
+	dir := h.artifactObjectDir()
+	if dir == "" || !objectNameRe.MatchString(id) {
+		return false
+	}
+	fi, err := os.Lstat(filepath.Join(dir, id))
+	if err != nil || !fi.Mode().IsRegular() {
+		return false
+	}
+	meta, ok := readArtifactSidecar(filepath.Join(dir, id+".json"))
+	return ok && meta.Digest == "sha256:"+id
+}
+
+// throughAHub says the request came through a hub: the tunnel's connector, or the self-hosted hub (its signed owner stamp, or its API key: a key-only request is refused by the person check elsewhere, but is counted here so the rule never depends on that).
+func throughAHub(r *http.Request) bool {
+	if cloud.Tunneled(r) {
+		return true
+	}
+	kind, _ := r.Context().Value(callerKindKey{}).(string)
+	return kind == callerHubOwner || kind == callerAPIKey
+}
+
+// alreadyDecidedWords is what a hub is told when it tries to change, re-send or take off a file that already has a decision (#13494).
+const alreadyDecidedWords = "this file already has a decision: it is final through a hub; a person can change it on this computer"
+
+// readArtifactReviews is the read of a team's decisions; a seam, so a test can make it fail.
+var readArtifactReviews = func(h *BoardHandler, ctx context.Context, project string) (map[string]board.ArtifactReview, error) {
+	return h.bs.ArtifactReviews(ctx, project)
+}
+
+// hasDecision says the file has an approve, changes or deny decision on record. A read that fails is an error, never "no decision": the caller (a hub) refuses then, so a broken read cannot let a decided file be changed (#13494).
+func (h *BoardHandler) hasDecision(ctx context.Context, project, id string) (bool, error) {
+	reviews, err := readArtifactReviews(h, ctx, project)
+	if err != nil {
+		return false, err
+	}
+	rv, ok := reviews[id]
+	return ok && (rv.State == board.ReviewApproved || rv.State == board.ReviewChangesRequested || rv.State == board.ReviewDenied), nil
 }

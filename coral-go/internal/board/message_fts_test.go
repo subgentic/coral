@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -371,7 +372,7 @@ func TestMessageIndexBuiltBeforeTheWatermarkIsComplete(t *testing.T) {
 func TestMessageSearchIndexIsRepairedWhenItDoesNotMatchTheMessages(t *testing.T) {
 	s := ftsStoreWithMessages(t, ftsTexts, 60)
 	ctx := context.Background()
-	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	buildAfterOpenBuild(t, s, ctx)
 	t.Setenv(messageSearchIndexEnv, "on") // the repair looks at the setting just before it rebuilds
 	healthy, err := s.CheckMessageSearchIndex(ctx)
 	require.NoError(t, err)
@@ -403,7 +404,7 @@ func TestMessageSearchIndexIsRepairedWhenItDoesNotMatchTheMessages(t *testing.T)
 func TestMessageSearchIndexCheckLeavesABigBoardAlone(t *testing.T) {
 	s := ftsStoreWithMessages(t, ftsTexts, 30)
 	ctx := context.Background()
-	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	buildAfterOpenBuild(t, s, ctx)
 	t.Setenv(messageSearchIndexEnv, "on") // the repair looks at the setting just before it rebuilds
 	old := messageIndexCheckMaxMessages
 	messageIndexCheckMaxMessages = 10
@@ -431,7 +432,7 @@ func TestMessageSearchIndexIsCheckedAfterOpen(t *testing.T) {
 		_, err := s.PostMessage(ctx, "proj", "dev", fmt.Sprintf("%s #%d", ftsTexts[i%len(ftsTexts)], i), nil)
 		require.NoError(t, err)
 	}
-	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	buildAfterOpenBuild(t, s, ctx)
 	for _, q := range []string{`DROP TRIGGER board_messages_fts_au`, `UPDATE board_messages SET content = 'edited later: heron' WHERE id = 5`, messageFTSTriggers[2]} {
 		_, err := s.db.ExecContext(ctx, q)
 		require.NoError(t, err)
@@ -439,12 +440,23 @@ func TestMessageSearchIndexIsCheckedAfterOpen(t *testing.T) {
 	require.NoError(t, s.Close())
 
 	defer func(d time.Duration) { messageIndexCheckDelay = d }(messageIndexCheckDelay)
-	messageIndexCheckDelay = 400 * time.Millisecond
+	messageIndexCheckDelay = 10 * time.Millisecond
+	defer func(q, p time.Duration) { messageIndexQuiet, messageIndexQuietPoll = q, p }(messageIndexQuiet, messageIndexQuietPoll)
+	messageIndexQuiet, messageIndexQuietPoll = 10*time.Millisecond, 10*time.Millisecond // this test reads the board every 50 ms while it waits: a quiet gap is 10 ms
+	// The check is held at its hook until the test lets it go, so "it has not run yet" is a fact and not a race with a clock: on a loaded run the first query used to come more than the delay after the open, and the
+	// check had run (the flake of a full ./internal/board run, #13310).
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	letGo := func() { releaseOnce.Do(func() { close(release) }) }
+	defer letGo()
+	defer func() { messageIndexCheckHook = func() {} }()
+	messageIndexCheckHook = func() { <-release }
 	s, err = NewStoreWithKey(path, "")
 	require.NoError(t, err)
 	defer s.Close()
 	a, b := queryBoth(t, s, MessageQueryParams{Q: []string{"heron"}, Limit: []string{"50"}})
 	require.NotEqual(t, b.Total, a.Total, "just after open the stale index still misses the edited word (the check has not run yet)")
+	letGo() // now the check may run: it does, without anyone asking
 	// A read that lands while the rebuild drops and makes the index again can answer with an error ("database schema has changed"): the poll treats an error as "not yet", and only the answer after it counts.
 	// 60 s, not 10: on a loaded runner the check's own wait and the rebuild are slow, and the wait is for an event, not a speed.
 	require.Eventually(t, func() bool {
@@ -484,7 +496,7 @@ func TestMessageSearchIndexRepairNeedsRoomOnTheDisk(t *testing.T) {
 		_, err := s.PostMessage(ctx, "proj", "dev", fmt.Sprintf("%s #%d", ftsTexts[i%len(ftsTexts)], i), nil)
 		require.NoError(t, err)
 	}
-	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	buildAfterOpenBuild(t, s, ctx)
 	for _, q := range []string{`DROP TRIGGER board_messages_fts_au`, `UPDATE board_messages SET content = 'edited later: ibis' WHERE id = 5`, messageFTSTriggers[2]} {
 		_, err := s.db.ExecContext(ctx, q)
 		require.NoError(t, err)
@@ -511,7 +523,7 @@ func TestMessageSearchIndexTurnedOffDuringTheCheckStaysOff(t *testing.T) {
 	t.Setenv(messageSearchIndexEnv, "on")
 	s := ftsStoreWithMessages(t, ftsTexts, 40)
 	ctx := context.Background()
-	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	buildAfterOpenBuild(t, s, ctx)
 	for _, q := range []string{`DROP TRIGGER board_messages_fts_au`, `UPDATE board_messages SET content = 'edited later: kiwi' WHERE id = 5`, messageFTSTriggers[2]} {
 		_, err := s.db.ExecContext(ctx, q)
 		require.NoError(t, err)
@@ -526,4 +538,117 @@ func TestMessageSearchIndexTurnedOffDuringTheCheckStaysOff(t *testing.T) {
 	require.False(t, repaired, "turned off: not rebuilt")
 	require.Equal(t, "off", s.MessageSearchIndexState())
 	require.False(t, s.messageIndexExists(ctx), "and no index table came back")
+}
+
+// #13310: the one-time index check is not run while the board is being read: it waits for a quiet moment (and runs after the longest wait whatever happens).
+func TestTheIndexCheckWaitsForAQuietBoard(t *testing.T) {
+	t.Setenv(messageSearchIndexEnv, "on")
+	path := filepath.Join(t.TempDir(), "board_quiet.db")
+	s, err := NewStoreWithKey(path, "")
+	require.NoError(t, err)
+	ctx := context.Background()
+	_, err = sub(s, ctx, "proj", "dev", "Backend Dev")
+	require.NoError(t, err)
+	for i := 0; i < 10; i++ {
+		_, err := s.PostMessage(ctx, "proj", "dev", fmt.Sprintf("%s #%d", ftsTexts[i%len(ftsTexts)], i), nil)
+		require.NoError(t, err)
+	}
+	buildAfterOpenBuild(t, s, ctx)
+	require.NoError(t, s.Close())
+
+	defer func(d, q, p, m time.Duration) {
+		messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = d, q, p, m
+		messageIndexCheckHook = func() {}
+	}(messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax)
+	messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = time.Millisecond, 250*time.Millisecond, 20*time.Millisecond, time.Hour
+	var ran atomic.Int64
+	messageIndexCheckHook = func() { ran.Add(1) }
+	s, err = NewStoreWithKey(path, "")
+	require.NoError(t, err)
+	defer s.Close()
+	// somebody reads the board every 20 ms for a second: the check does not run meanwhile
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		var n int
+		require.NoError(t, s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM board_messages`))
+		time.Sleep(20 * time.Millisecond) // sleep-ok: a reader that keeps the board busy
+	}
+	require.EqualValues(t, 0, ran.Load(), "the board was being read: the check waited")
+	// nobody reads any more: it runs once the quiet time has passed
+	require.Eventually(t, func() bool { return ran.Load() == 1 }, 10*time.Second, 25*time.Millisecond, "a quiet board is checked")
+}
+
+// A board that is never quiet is still checked, after the longest wait.
+func TestTheIndexCheckRunsAfterTheLongestWaitOnABoardThatIsNeverQuiet(t *testing.T) {
+	t.Setenv(messageSearchIndexEnv, "on")
+	path := filepath.Join(t.TempDir(), "board_busy.db")
+	s, err := NewStoreWithKey(path, "")
+	require.NoError(t, err)
+	ctx := context.Background()
+	_, err = sub(s, ctx, "proj", "dev", "Backend Dev")
+	require.NoError(t, err)
+	for i := 0; i < 10; i++ {
+		_, err := s.PostMessage(ctx, "proj", "dev", fmt.Sprintf("%s #%d", ftsTexts[i%len(ftsTexts)], i), nil)
+		require.NoError(t, err)
+	}
+	buildAfterOpenBuild(t, s, ctx)
+	require.NoError(t, s.Close())
+	defer func(d, q, p, m time.Duration) {
+		messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = d, q, p, m
+		messageIndexCheckHook = func() {}
+	}(messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax)
+	messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = time.Millisecond, time.Hour, 10*time.Millisecond, 300*time.Millisecond
+	var ran atomic.Int64
+	messageIndexCheckHook = func() { ran.Add(1) }
+	s, err = NewStoreWithKey(path, "")
+	require.NoError(t, err)
+	defer s.Close()
+	require.Eventually(t, func() bool { _ = s.reader(); return ran.Load() == 1 }, 10*time.Second, 20*time.Millisecond, "never quiet: checked after the longest wait")
+}
+
+// QA Reviewer 2's SHOULD on #13310: a check never runs on a store that was closed (its context ended) during the quiet wait, even when the board is already quiet at that moment.
+func TestTheIndexCheckNeverRunsOnAStoreClosedDuringTheQuietWait(t *testing.T) {
+	// the wait itself: a context that has ended is a stop, whatever the quiet says
+	s := &Store{}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	defer func(q time.Duration) { messageIndexQuiet = q }(messageIndexQuiet)
+	messageIndexQuiet = 0 // quiet already: the case that ran the check
+	require.False(t, s.waitForQuietBoard(ctx), "a cancelled wait stops")
+
+	// the whole path: the store is closed while the check waits; the hook is never called
+	t.Setenv(messageSearchIndexEnv, "on")
+	path := filepath.Join(t.TempDir(), "board_closed.db")
+	st, err := NewStoreWithKey(path, "")
+	require.NoError(t, err)
+	bg := context.Background()
+	_, err = sub(st, bg, "proj", "dev", "Backend Dev")
+	require.NoError(t, err)
+	for i := 0; i < 10; i++ {
+		_, err := st.PostMessage(bg, "proj", "dev", fmt.Sprintf("%s #%d", ftsTexts[i%len(ftsTexts)], i), nil)
+		require.NoError(t, err)
+	}
+	require.NoError(t, st.BuildMessageSearchIndex(bg))
+	require.NoError(t, st.Close())
+	defer func(d, q, p, m time.Duration) {
+		messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = d, q, p, m
+		messageIndexCheckHook = func() {}
+	}(messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax)
+	messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = 5*time.Millisecond, time.Hour, 20*time.Millisecond, time.Hour
+	var ran atomic.Int64
+	messageIndexCheckHook = func() { ran.Add(1) }
+	st, err = NewStoreWithKey(path, "")
+	require.NoError(t, err)
+	messageIndexQuiet = 0 // from now the board counts as quiet at every look
+	require.NoError(t, st.Close())
+	time.Sleep(300 * time.Millisecond) // sleep-ok: nothing should happen; wait out several looks to show no run follows the close
+	require.EqualValues(t, 0, ran.Load(), "closed during the wait: no check")
+}
+
+// A store opened with the index on and none built starts a build of its own in the background (applyMessageSearchIndexSetting): a test's own BuildMessageSearchIndex made while that one runs drops
+// and creates the same tables under it ("table already exists", "no such table: board_message_fts_meta"), which a slow machine (Windows) shows (#13389). Wait for the open's build to be over first.
+func buildAfterOpenBuild(t *testing.T, s *Store, ctx context.Context) {
+	t.Helper()
+	require.Eventually(t, func() bool { return s.MessageSearchIndexState() != "building" }, 30*time.Second, 2*time.Millisecond, "the build the open started is over")
+	require.NoError(t, s.BuildMessageSearchIndex(ctx))
 }

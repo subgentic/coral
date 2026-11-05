@@ -896,6 +896,12 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     line-height: var(--lh-ui);
 }
 
+/* The Info dialog's Memory row (#13209): one file per line, opened read-only on a click into a scrolling block under the list */
+.info-memory-open { display: block; width: 100%; min-height: 36px; padding: 6px 0; background: none; border: 0; font: inherit; text-align: left; color: var(--accent); text-decoration: underline; cursor: pointer; overflow-wrap: anywhere; }
+@media (max-width: 767px), (pointer: coarse) { .info-memory-open { min-height: 44px; } } /* a touch size, as the shared buttons have (UI Reviewer, #13245) */
+.info-memory-open[aria-pressed="true"] { font-weight: var(--fw-strong); }
+.info-memory-text { margin: 6px 0 0; padding: 10px 12px; max-height: 40vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid var(--border); background: var(--bg-secondary); }
+
 .info-token-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3134,6 +3140,10 @@ button.terminal-gone-header { margin: 0 4px 0 0; font-size: var(--fs-sm); line-h
     padding: 0;
     overflow: hidden;
 }
+/* A steady height on a computer (#13179): a three-line note no longer opens a short, wide box with Comments squeezed; the dialog is most of the window whatever the document's length and the body scrolls. The phone's own rules are unchanged (the query is the one the Comments panel uses for a computer). */
+@media (min-width: 768px) and (min-height: 501px), (min-width: 768px) and (pointer: fine), (min-width: 951px) {
+    .artifact-viewer-content { height: 88vh; }
+}
 .artifact-viewer-header {
     display: flex;
     align-items: center;
@@ -3757,7 +3767,7 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 #settings-cloud .cloud-command-row .btn { flex: none; margin: 0; }
 @container settingspane (max-width: 40rem) { .net-level-row { grid-template-columns: minmax(0, 1fr); } }
 /* New Agent (#5990): a Launch that is off (the CLI it needs is missing) looks off; the line under the folder is its reason. */
-.launch-dir-note { margin: 6px 0 0; }
+.launch-dir-note { margin: 6px 0 0; overflow-wrap: anywhere; }
 
 /* Default models (#6042): four short boxes, two by two, not four full-width boxes stacked (the loudest block of Settings > Agents for a rarely changed setting); one column on a phone. */
 /* The whole deletion-request identifier stays readable on a narrow Settings row. */

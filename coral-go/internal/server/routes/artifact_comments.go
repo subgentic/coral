@@ -122,6 +122,8 @@ func commentRefuse(w http.ResponseWriter, status int, code, msg string) {
 
 // commentView is one comment as the client sees it. Mine and the can* flags are for the UI only (the server decides again on every write).
 type commentView struct {
+	AtS        *float64       `json:"at_s,omitempty"`
+	EndS       *float64       `json:"end_s,omitempty"`
 	SentTo     string         `json:"sent_to,omitempty"` // the agent the Operator's comment was sent to on its own (#11420): set only on the answer to the comment's creation
 	ID         int64          `json:"id"`
 	ArtifactID string         `json:"artifact_id"`
@@ -204,7 +206,7 @@ func viewAuthor(viewer commentCaller, kind, issuer, subject, name string) commen
 }
 
 func (h *SessionsHandler) commentView(c commentCaller, t store.ArtifactComment, locked, hubWrite bool) commentView {
-	v := commentView{ID: t.ID, ArtifactID: t.ArtifactID, Board: t.Board, ParentID: t.ParentID, Body: t.Body, CreatedAt: t.CreatedAt, EditedAt: t.EditedAt, ResolvedAt: t.ResolvedAt, Deleted: t.DeletedAt != nil,
+	v := commentView{AtS: t.AtS, EndS: t.EndS, ID: t.ID, ArtifactID: t.ArtifactID, Board: t.Board, ParentID: t.ParentID, Body: t.Body, CreatedAt: t.CreatedAt, EditedAt: t.EditedAt, ResolvedAt: t.ResolvedAt, Deleted: t.DeletedAt != nil,
 		Author: viewAuthor(c, t.AuthorKind, t.AuthorIssuer, t.AuthorSubject, t.AuthorName), Images: parseCommentImages(t.ImagesJSON)}
 	if t.AnchorJSON != "" {
 		var a commentAnchor
@@ -363,7 +365,9 @@ func (h *SessionsHandler) listArtifactComments(w http.ResponseWriter, r *http.Re
 		_ = h.ss.MarkAsksSeen(r.Context(), id, caller.Subject, time.Now())
 	}
 	if caller.Kind == commentCallerOwner { // the Operator opened the file's comments: an agent's replies in their threads are seen, and the file's row stops saying "new comments" (#12026)
-		_ = h.ss.MarkThreadsSeen(r.Context(), id, time.Now())
+		if changed, err := h.ss.MarkThreadsSeenChanged(r.Context(), id, time.Now()); err == nil && changed && h.bs != nil {
+			h.bs.NoteAllArtifactsChanged()
+		}
 	}
 	state := r.URL.Query().Get("state")
 	switch state {
@@ -375,7 +379,7 @@ func (h *SessionsHandler) listArtifactComments(w http.ResponseWriter, r *http.Re
 		return
 	}
 	board := r.URL.Query().Get("board")
-	if board != "" && !commentBoardRe.MatchString(board) {
+	if board != "" && !validCommentBoard(board) {
 		errBadRequest(w, "invalid board")
 		return
 	}
@@ -514,7 +518,13 @@ func viewerName(c commentCaller) string {
 // PGPASSWORD=, Cookie:, --password VALUE: a value the scanner would keep). The keyword rules apply regardless of the Hub setting and of whether a hub is
 // connected; only the owner's own switch, CORAL_REDACT_KEYWORDS=off in the environment, still turns them off, as everywhere else. A comment is at most 8 KB,
 // so the cost is nothing, and a typed secret should not sit in sessions.db.
+// redactCommentFailsFor is a test seam: when it is set and says true for a text, the redactor is "unavailable" for it (ok false), as it is when the real one errors.
+var redactCommentFailsFor func(text string) bool
+
 func redactComment(text string) (string, bool) {
+	if redactCommentFailsFor != nil && redactCommentFailsFor(text) {
+		return "", false
+	}
 	b, err := secrets.HubRedactor(func() bool { return true }).Text([]byte(text))
 	if err != nil {
 		return "", false
@@ -578,6 +588,8 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 		return
 	}
 	var in struct {
+		AtS      *float64       `json:"at_s"`
+		EndS     *float64       `json:"end_s"`
 		Body     string         `json:"body"`
 		Anchor   *commentAnchor `json:"anchor"`
 		ParentID *int64         `json:"parent_id"`
@@ -628,7 +640,7 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 	if team := diffTeamOf(r); team != "" {
 		in.Board = team // so does a comment on a diff (#12536)
 	}
-	if in.Board != "" && !commentBoardRe.MatchString(in.Board) {
+	if in.Board != "" && !validCommentBoard(in.Board) {
 		errBadRequest(w, "invalid board")
 		return
 	}
@@ -641,6 +653,13 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 	if len(in.Body) > store.MaxArtifactCommentBody {
 		errPayloadTooLarge(w, "a comment is at most "+strconv.Itoa(store.MaxArtifactCommentBody)+" bytes")
 		return
+	}
+	if in.AtS != nil || in.EndS != nil {
+		if !store.ValidArtifactCommentTime(in.AtS, in.EndS) || in.ParentID != nil || !h.videoCommentArtifact(id) || (in.Anchor != nil && !in.Anchor.Whole) {
+			errBadRequest(w, "times require a video thread, at_s from 0 to 604800, and end_s greater than at_s and at most 604800")
+			return
+		}
+		in.Anchor = &commentAnchor{Whole: true}
 	}
 	anchorJSON := ""
 	if team, sid, _, isDiff := parseDiffSubject(id); isDiff {
@@ -693,7 +712,7 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 	if !h.commentRate(w, caller) {
 		return
 	}
-	c, err := h.ss.CreateArtifactComment(r.Context(), store.ArtifactComment{ArtifactID: id, Board: in.Board, ParentID: in.ParentID, AnchorJSON: anchorJSON, Body: body,
+	c, err := h.ss.CreateArtifactComment(r.Context(), store.ArtifactComment{AtS: in.AtS, EndS: in.EndS, ArtifactID: id, Board: in.Board, ParentID: in.ParentID, AnchorJSON: anchorJSON, Body: body,
 		AuthorIssuer: caller.Issuer, AuthorSubject: caller.Subject, AuthorName: caller.Name, AuthorKind: caller.Kind, ImagesJSON: imagesJSON})
 	switch {
 	case errors.Is(err, store.ErrCommentEmpty):
@@ -708,6 +727,9 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 		slog.Warn("[artifact comments] create failed", "error", err)
 		errInternalServer(w, "could not save the comment")
 	default:
+		if h.bs != nil {
+			h.bs.NoteAllArtifactsChanged()
+		}
 		view := h.commentView(caller, c, locked, hubWrite)
 		if _, isGuide := guideOf(r); !isGuide && (in.NotifyAgent == nil || *in.NotifyAgent) {
 			if d := h.deliverOperatorComment(r, caller, c, id, in.Board); d.To != "" {
@@ -794,6 +816,9 @@ func (h *SessionsHandler) editArtifactComment(w http.ResponseWriter, r *http.Req
 	case !found:
 		errNotFound(w, "comment not found")
 	default:
+		if h.bs != nil {
+			h.bs.NoteAllArtifactsChanged()
+		}
 		writeJSON(w, http.StatusOK, h.commentView(caller, c, locked, hubWrite))
 	}
 }
@@ -823,6 +848,9 @@ func (h *SessionsHandler) deleteArtifactComment(w http.ResponseWriter, r *http.R
 	if _, err := h.ss.DeleteArtifactComment(r.Context(), id, t.ID); err != nil {
 		errInternalServer(w, "could not delete the comment")
 		return
+	}
+	if h.bs != nil {
+		h.bs.NoteAllArtifactsChanged()
 	}
 	_ = h.ss.CloseArtifactAsks(r.Context(), t.ID, time.Now()) // a deleted comment is no thread an agent may still reply into
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
@@ -863,6 +891,9 @@ func (h *SessionsHandler) resolveArtifactComment(resolved bool) http.HandlerFunc
 		case !found:
 			errNotFound(w, "comment not found")
 		default:
+			if h.bs != nil {
+				h.bs.NoteAllArtifactsChanged()
+			}
 			if resolved {
 				_ = h.ss.CloseArtifactAsks(r.Context(), t.ID, time.Now()) // a resolved thread takes no more agent replies
 			}
@@ -893,7 +924,7 @@ func (h *SessionsHandler) lockArtifactComments(on bool) http.HandlerFunc {
 		case "", "artifact":
 			scope = "artifact"
 		case "board":
-			if !commentBoardRe.MatchString(in.Board) {
+			if !validCommentBoard(in.Board) {
 				errBadRequest(w, "a board lock needs the board")
 				return
 			}
@@ -970,3 +1001,6 @@ func redactCommentViews(views []commentView) bool {
 	}
 	return true
 }
+
+// validCommentBoard is whether a comment's board is one a comment may be made on: a team's key, or the reserved key of the files of agents on no team, whose review rows the Operator comments on too (#13532).
+func validCommentBoard(b string) bool { return commentBoardRe.MatchString(b) || b == noTeamBoardID }

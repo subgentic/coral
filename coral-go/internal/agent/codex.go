@@ -390,7 +390,7 @@ func codexStart(params LaunchParams) (parts, raw []string) {
 // The temp file path is from os.TempDir() (safe), and the content sources are trusted internal strings.
 func codexInstructions(files *launchFiles, params LaunchParams) string {
 	var sysParts []string
-	if proto := readProtocolFile(params.ProtocolPath); proto != "" {
+	if proto := protocolText(params); proto != "" {
 		sysParts = append(sysParts, proto)
 	}
 	if boardSysPrompt := BuildBoardSystemPrompt(params.BoardName, params.Role, "", params.PromptOverrides, params.BoardType); boardSysPrompt != "" {

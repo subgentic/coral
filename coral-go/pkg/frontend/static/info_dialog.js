@@ -3,6 +3,7 @@ import { state } from './state.js';
 import { showToast } from './utils.js';
 import { setHidden } from './dom_write.js';
 import { serverFetch, currentServer, identityKey, keyLabel, isCloud, isLocalServer } from './server_base.js';
+import { importOnce } from './import_once.js';
 
 /** The lines the Info dialog shows for an agent's MCP servers (#9769): one per server, "name: transport, scope"; [] when the CLI is not one Coral reads, and one line saying none when it reads it and finds none. */
 export function mcpLines(result) {
@@ -33,7 +34,19 @@ async function showMcpServers(name, sid) {
     setHidden(label, false); setHidden(val, false);
 }
 
+let sectionsGen = 0; // bumped on EVERY open and close of the dialog, eligible or not: an answer that arrives after that belongs to an earlier look and is dropped (UI Reviewer, #13245)
+/** The dialog's Skills and Memory rows (#13209, goal #218), beside the MCP row. `gen` and `server` are what showInfoModal took when it opened, before any await; the rows themselves are agent_info_sections.js's. */
+async function showAgentSections(name, sid, gen, server) {
+    const rows = { skills: ['info-skills-label', 'info-skills'], memory: ['info-memory-label', 'info-memory'] };
+    for (const [label, val] of Object.values(rows)) { setHidden(document.getElementById(label), true); setHidden(document.getElementById(val), true); }
+    if (!sid || isCloud() || !isLocalServer(server)) return;
+    const { loadAgentSections } = await importOnce('./agent_info_sections.js'); // a lazy module loads the others through importOnce, so a failed load is retried
+    await loadAgentSections({ name, sid, server, current: () => gen === sectionsGen, fetchJson: getJson, rows: { skills: ['info-skills-label', 'info-skills'], memory: ['info-memory-label', 'info-memory'] } });
+}
+const getJson = async (server, path) => { try { const r = await serverFetch(server, path); return r.ok ? await r.json() : null; } catch { return null; } };
+
 export async function showInfoModal() {
+    const gen = ++sectionsGen, server = currentServer(); // every open drops the answers still pending for an earlier one, before any early return and any await
     if (!state.currentSession || state.currentSession.type !== "live") {
         showToast("No live session selected", true);
         return;
@@ -110,6 +123,7 @@ export async function showInfoModal() {
 
         document.getElementById("info-modal").style.display = "flex";
         showMcpServers(name, sid);
+        showAgentSections(name, sid, gen, server);
     } catch (e) {
         showToast("Failed to load session info", true);
         console.error("showInfoModal exception:", e);
@@ -117,6 +131,7 @@ export async function showInfoModal() {
 }
 
 export function hideInfoModal() {
+    sectionsGen++; // a close drops what is still pending
     document.getElementById("info-modal").style.display = "none";
 }
 

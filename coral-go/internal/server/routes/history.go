@@ -142,6 +142,11 @@ func (h *HistoryHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
 		"page":      page,
 		"page_size": pageSize,
 	}
+	if chatType == "all" && page*pageSize > maxMergedWindow {
+		// The merged list reads at most maxMergedWindow agent chats to put the group chats among them by time: a page past that is not served (it is empty or short). Say so, and the last page that is (#13289).
+		out["window_capped"] = true
+		out["max_page"] = maxMergedWindow / pageSize
+	}
 	if h.indexing() {
 		out["indexing"] = true
 	}
@@ -457,12 +462,23 @@ func (h *HistoryHandler) GetSessionTags(w http.ResponseWriter, r *http.Request) 
 func (h *HistoryHandler) GetSessionGit(w http.ResponseWriter, r *http.Request) {
 	sid := chi.URLParam(r, "sessionID")
 	limit := clampLimit(queryInt(r, "limit", 20), 20, 200)
-	snaps, err := h.gs.GetGitSnapshotsForSession(r.Context(), sid, limit)
+	snaps, err := h.gs.GetGitSnapshotsForSession(r.Context(), sid, limit+1) // one more than asked says whether the rest are cut
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"session_id": sid, "commits": emptyIfNil(snaps)})
+	hasMore := len(snaps) > limit
+	if hasMore {
+		snaps = snaps[:limit]
+	}
+	total := len(snaps)
+	if hasMore {
+		if n, cerr := h.gs.CountGitSnapshotsForSession(r.Context(), sid); cerr == nil {
+			total = n
+		}
+	}
+	// total and has_more beside commits (#13289): oldest first, the first `limit` as always; there is no cursor (the list has a time-range fallback)
+	writeJSON(w, http.StatusOK, map[string]any{"session_id": sid, "commits": emptyIfNil(snaps), "total": total, "has_more": hasMore})
 }
 
 // GetSessionEvents returns events for a historical session, newest first; with type, q, since, until, sort or cursor it is a search, with
