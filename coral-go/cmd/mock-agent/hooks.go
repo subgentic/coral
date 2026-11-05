@@ -89,9 +89,12 @@ func newHookRunner(settingsFile, sessionID string) *hookRunner {
 }
 
 // fire runs event's hooks with Claude Code's JSON on stdin; failures are reported, never fatal.
-func (h *hookRunner) fire(event string, extra map[string]any) {
+func (h *hookRunner) fire(event string, extra map[string]any) { h.fireResult(event, extra) }
+
+// fireResult is fire, answering what the hooks said: the reason when one of them denies the tool call (a PreToolUse hook's permissionDecision "deny", as Claude Code reads it), or "".
+func (h *hookRunner) fireResult(event string, extra map[string]any) (denied string) {
 	if h == nil {
-		return
+		return ""
 	}
 	in := map[string]any{"session_id": h.sessionID, "hook_event_name": event, "cwd": h.cwd, "transcript_path": ""}
 	for k, v := range extra {
@@ -106,9 +109,28 @@ func (h *hookRunner) fire(event string, extra map[string]any) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		cmd := exec.CommandContext(ctx, words[0], words[1:]...)
 		cmd.Stdin = bytes.NewReader(payload)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			sayErrf("[mock-agent] %s hook failed: %v %s\r\n", event, err, bytes.TrimSpace(out))
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout, cmd.Stderr = &stdout, &stderr
+		if err := cmd.Run(); err != nil {
+			sayErrf("[mock-agent] %s hook failed: %v %s\r\n", event, err, bytes.TrimSpace(append(stdout.Bytes(), stderr.Bytes()...)))
+		} else if reason := denial(stdout.Bytes()); reason != "" {
+			denied = reason
 		}
 		cancel()
 	}
+	return denied
+}
+
+// denial is the reason in a PreToolUse hook's output when it stops the tool call.
+func denial(out []byte) string {
+	var o struct {
+		Specific struct {
+			Decision string `json:"permissionDecision"`
+			Reason   string `json:"permissionDecisionReason"`
+		} `json:"hookSpecificOutput"`
+	}
+	if json.Unmarshal(bytes.TrimSpace(out), &o) == nil && o.Specific.Decision == "deny" {
+		return o.Specific.Reason
+	}
+	return ""
 }
