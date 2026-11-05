@@ -97,12 +97,12 @@ const testKeyHeader = "X-Test-Api-Key"
 const testHubOwnerHeader = "X-Test-Hub-Owner"
 
 var (
-	cmtAsOwner  = map[string]string{testDashboardHeader: "1"}
-	cmtAsKey    = map[string]string{testKeyHeader: "1"}
+	cmtAsOwner   = map[string]string{testDashboardHeader: "1"}
+	cmtAsKey     = map[string]string{testKeyHeader: "1"}
 	cmtAsStamped = map[string]string{testHubOwnerHeader: "1"}
-	cmtAsHub    = map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: cmtHubUser}
-	cmtAsHubTwo = map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: cmtHubTwo}
-	cmtAsForged = map[string]string{tunnel.ViaHeader: "not-the-secret", tunnel.HubUserHeader: cmtHubUser}
+	cmtAsHub     = map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: cmtHubUser}
+	cmtAsHubTwo  = map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: cmtHubTwo}
+	cmtAsForged  = map[string]string{tunnel.ViaHeader: "not-the-secret", tunnel.HubUserHeader: cmtHubUser}
 	// The operator's own credential and the tunnel's stamp on one request: through the tunnel it is a hub viewer, whoever's credential it carries.
 	cmtAsOwnerThroughTunnel = map[string]string{testDashboardHeader: "1", tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: cmtHubUser}
 	cmtAsAgent              = map[string]string{testAgentHeader: "s1"}

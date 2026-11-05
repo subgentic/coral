@@ -17,7 +17,9 @@ func TestARemoteComputersAgentRepliesToACommentSentThroughTheHubWithTheKey(t *te
 	rig.agent(1, "Dev", false)
 	rig.agent(2, "QA", false)
 	key := func(method, path string, body any) (int, map[string]any) { return rig.do(method, path, cmtAsKey, body) }
-	stamped := func(method, path string, body any) (int, map[string]any) { return rig.do(method, path, cmtAsStamped, body) } // the send is the one stamped route
+	stamped := func(method, path string, body any) (int, map[string]any) {
+		return rig.do(method, path, cmtAsStamped, body)
+	} // the send is the one stamped route
 
 	code, out := key("POST", cp(cmtDoc), map[string]any{"body": "Is this 1-2x slower?", "anchor": anchorOf("the lock"), "board": "team-a"})
 	require.Equal(t, http.StatusCreated, code, fmt.Sprint(out))
