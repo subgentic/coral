@@ -3,8 +3,8 @@
 .artifact-viewer-chips .av-bar { position: static; padding: 0; border: 0; background: none; min-height: 0; flex-wrap: nowrap; display: inline-flex; align-items: center; gap: 4px; }
 .artifact-viewer-chips .av-bar[hidden] { display: none; }
 @media (min-width: 769px) and (pointer: fine) { .artifact-viewer-header .btn { min-height: var(--control-compact-height, 32px); padding-block: 0; } } /* a mouse on a computer: compact; a phone or a touch screen keeps its 44 px targets */
-.artifact-viewer-morewrap { position: relative; }
-.artifact-viewer-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 7; min-width: 13rem; display: flex; flex-direction: column; }
+.artifact-viewer-morewrap { position: static; } /* the menu hangs from the full header, within the dialog edges */
+.artifact-viewer-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 7; box-sizing: border-box; min-width: min(13rem, 100%); max-width: 100%; display: flex; flex-direction: column; }
 .artifact-viewer-menu[hidden] { display: none; }
 .artifact-viewer-menu .menu-item { display: flex; align-items: center; justify-content: flex-start; text-align: left; text-decoration: none; color: var(--text-primary); cursor: pointer; }
 .artifact-viewer-menu .menu-item[hidden] { display: none; }
