@@ -97,7 +97,8 @@ if (typeof document !== 'undefined' && typeof document.addEventListener === 'fun
         if (!/^[a-f0-9]{64}$/.test(hex || '')) return;
         e.preventDefault();
         const server = a.dataset.server || undefined;
+        const board = a.dataset.board || undefined;
         const resume = suspendNativeDialog(a);
-        importOnce('./artifact_viewer.js').then(m => { if (m.openArtifactViewer(hex, { server, unattributed: !server, filename: '', ...(resume ? { onClose: resume } : {}) }) === false) resume?.(); }).catch(() => { resume?.(); showToast('The file viewer could not be opened. Please try again.', true); });
+        importOnce('./artifact_viewer.js').then(m => { if (m.openArtifactViewer(hex, { server, ...(board ? { board } : {}), unattributed: !server, filename: '', ...(resume ? { onClose: resume } : {}) }) === false) resume?.(); }).catch(() => { resume?.(); showToast('The file viewer could not be opened. Please try again.', true); });
     });
 }

@@ -2,7 +2,7 @@
  * still carry them. Here a short ref in a board message's text (not in a link, code or a code block) is asked of the server, which answers the one artifact the person may read that it
  * means; it becomes the same link a full reference is (the board's artifact pass then binds it). One that matches none or several stays the text it was.
  * Only this computer's messages are asked: another Coral's artifacts are not ours to look up. */
-import { serverUrl } from './server_base.js';
+import { serverUrl, normServer } from './server_base.js';
 
 // 8 to 63 hex digits after the scheme, then optionally an ellipsis (… or ...) and the end of the id; the same shape the server reads.
 const SHORT_REF = /(^|[^A-Za-z0-9/])coral:\/\/artifacts\/([a-f0-9]{8,63})(?:(?:…|\.\.\.)([a-f0-9]{1,63}))?(?![A-Za-z0-9])/g;
@@ -58,7 +58,7 @@ function textNodesWithShortRefs(root) {
 }
 
 /** Turns the short refs under root into links where the server resolves them; resolves to whether anything changed. `after` runs on root when it did (the artifact pass that binds the links). */
-export async function upgradeShortArtifactRefs(root, server, after) {
+export async function upgradeShortArtifactRefs(root, server, after, board = '') {
     if (!root || typeof document === 'undefined' || (server && server !== 'local' && server !== '')) return false;
     const nodes = textNodesWithShortRefs(root);
     if (!nodes.length) return false;
@@ -83,6 +83,9 @@ export async function upgradeShortArtifactRefs(root, server, after) {
             a.setAttribute('href', `coral://artifacts/${id}`);
             a.setAttribute('rel', 'noopener noreferrer');
             a.className = 'mb-artifact-ref';
+            a.dataset.artifact = id;
+            a.dataset.server = normServer(server);
+            if (board) a.dataset.board = board;
             a.textContent = f.worded ? text.slice(f.start, f.end) : `artifact ${id.slice(0, 8)}`; // a worded id keeps the digits it was written with
             a.title = `coral://artifacts/${id}`;
             if (f.worded) a.setAttribute('aria-label', `Open artifact ${a.textContent}`); // the visible words are only the digits: the name says what the link is and contains them

@@ -78,7 +78,7 @@
       "linkArtifactRefsHtml": 2
     },
     "policy": "board-bound",
-    "decision": "Sanitized message HTML defaults to currentBoardServer; Board window/chat subsequently bind every artifact to their own source before interaction."
+    "decision": "Production message callers pass their own team key; full refs carry data-server/data-board before binding, and cache identity includes computer and board. Legacy direct calls default to currentBoardServer."
   },
   "goal_editor.js": {
     "calls": {
@@ -89,10 +89,11 @@
   },
   "board_chat.js": {
     "calls": {
-      "resolveBoardArtifacts": 1
+      "resolveBoardArtifacts": 1,
+      "renderBoardMessageBody": 1
     },
-    "policy": "conditional",
-    "decision": "Board chat binds with splitKey(_activeBoardChat).server. The no-active-chat fallback is local; no remote feed is active then."
+    "policy": "named",
+    "decision": "Active Board chat renders and binds using its own qualified _activeBoardChat team key. The empty fallback has no active remote feed."
   },
   "team_task_artifacts.js": {
     "calls": {
@@ -103,10 +104,11 @@
   },
   "board_window.js": {
     "calls": {
-      "resolveBoardArtifacts": 3
+      "resolveBoardArtifacts": 3,
+      "renderBoardMessageBody": 1
     },
     "policy": "named",
-    "decision": "Board feeds bind artifact links after insertion with state.currentBoardServer."
+    "decision": "Board feed render/cache and binding both use the feed team key bs.currentProject, including local."
   },
   "task_detail_html.js": {
     "calls": {

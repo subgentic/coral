@@ -11,7 +11,7 @@ const hex='a'.repeat(64),base='b'.repeat(64);let calls=[];
 globalThis.fetch=window.fetch=async(url,options={})=>{calls.push({url:String(url),...options});const p=new URL(String(url),location.href).pathname;if(p.endsWith('/edit/send'))return Response.json({can_send_edit:true,base_digest:base,base_version:1,version:2,sent_to:[]});if(p.endsWith('/edit'))return Response.json({can_edit:true});if(/\/api\/artifacts\/[a-f0-9]{64}$/.test(p)||/\/api\/remote\/ws1\/api\/artifacts\/[a-f0-9]{64}$/.test(p))return new Response('# Report\n\nSaved words.\n',{headers:{'Content-Type':'text/markdown','Content-Disposition':'attachment; filename="report.md"'}});return new Response('',{status:404});};
 const viewer=await importUi('artifact_viewer');
 const { state } = await importUi('state');
-state.servers=[{id:'ws1',label:'Laptop'},{id:'ws2',label:'Desktop'}];
+state.serversKnown=true;state.servers=[{id:'ws1',label:'Laptop'},{id:'ws2',label:'Desktop'}];
 // which computer a request went to: the prefix of the route
 const computerOf = url => { const m = /^\/api\/remote\/([^/]+)\//.exec(new URL(url, location.href).pathname); return m ? m[1] : 'local'; };
 const asked = () => calls.filter(c => !/\/api\/(saved|board\/projects)/.test(c.url)).map(c => `${computerOf(c.url)} ${new URL(c.url, location.href).pathname.replace(hex, '<hex>')}`);

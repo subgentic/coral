@@ -15,7 +15,7 @@
     "note": "Call supplies the source computer, including local, from its own row/team"
   },
   "artifact_viewer.js": {
-    "calls": 8,
+    "calls": 9,
     "policy": "frozen",
     "note": "Frozen pair survives internal navigation"
   },

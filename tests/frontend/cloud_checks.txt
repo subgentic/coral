@@ -364,3 +364,7 @@ node ask_subject_links.test.mjs
 node artifact_source.test.mjs
 
 node artifact_viewer_callers.test.mjs
+
+node artifact_message_source.test.mjs
+
+node artifact_inventory_wait.test.mjs

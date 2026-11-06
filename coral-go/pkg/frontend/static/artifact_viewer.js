@@ -20,7 +20,7 @@ import { browserLocal } from './safe_storage.js';
 import { loadStyles } from './lazy_styles.js';
 import { state } from './state.js';
 import { showToast } from './notifications.js';
-const { resolveArtifactSource } = await importOnce('./artifact_source.js');
+const { resolveArtifactSource, loadArtifactInventory } = await importOnce('./artifact_source.js');
 
 await loadStyles('artifact_viewer_header.css'); // the one-row header's rules load with the viewer, not at start (page_weight)
 const { readersAllowed, readersBlock } = await importOnce('./artifact_readers.js'); // lazy: its failure is retried
@@ -36,6 +36,7 @@ let _dialog = null;
 let _onClose = null;
 let _abort = null;
 let _gen = 0;
+let _openIntent = 0;
 let _returnFocus = null;
 let _comments = null;    // the comments panel of the viewer (#5182)
 let _versions = null;    // the version bar of the viewer (#6472)
@@ -279,15 +280,34 @@ async function startMarkdownEdit(d) {
     } finally { if (gen === _gen) { _editOpening = false; d.querySelector('.artifact-edit-send-action').disabled = !!_editSend || _sendOpening; d.querySelectorAll('.artifact-viewer-edit,.artifact-viewer-edit-item').forEach(b => { b.disabled = false; }); button.textContent = 'Edit text'; } }
 }
 
+function captureBoard(opts) {
+    return { ...opts, board: Object.hasOwn(opts, 'board') ? opts.board : normServer(contextServer()) === opts.server ? (commentBoard(opts) || '') : '' };
+}
+function openAfterInventory(hex, opts, intent) {
+    let timer;
+    const cancel = () => { if (intent === _openIntent) _openIntent++; };
+    window.addEventListener('popstate', cancel);
+    document.addEventListener('coral:route-changed', cancel);
+    const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('The computer list is still loading. Please try opening the file again.')), 10000); }); // bounded startup wait; never polls or probes an unknown computer
+    showToast('Loading computers before opening the file…');
+    Promise.race([loadArtifactInventory(), timeout]).then(() => {
+        if (intent !== _openIntent) return;
+        if (openArtifactViewer(hex, opts) === false) opts.onClose?.();
+    }).catch(error => { if (intent === _openIntent) { showToast(error.message, true); opts.onClose?.(); } }).finally(() => { clearTimeout(timer); window.removeEventListener('popstate', cancel); document.removeEventListener('coral:route-changed', cancel); });
+}
 /** Open the artifact `hex` (64 lowercase hex). opts: { server, filename, mediaType }. */
 export function openArtifactViewer(hex, opts = {}) {
+    const intent = ++_openIntent;
     hex = String(hex || '').toLowerCase();
     if (!HEX_RE.test(hex)) return false;
     try { opts = resolveArtifactSource(opts); }
-    catch (error) { showToast(error.message, true); return false; }
+    catch (error) {
+        if (error.code === 'artifact_inventory_pending') { openAfterInventory(hex, captureBoard(error.source), intent); return true; }
+        showToast(error.message, true); return false;
+    }
     // Also capture the team now: an async reply or a later version must not borrow
     // whichever team the person selects while this viewer remains open.
-    opts = { ...opts, board: Object.hasOwn(opts, 'board') ? opts.board : normServer(contextServer()) === opts.server ? (commentBoard(opts) || '') : '' };
+    opts = captureBoard(opts);
     if (_editor?.beforeLeave(() => openArtifactViewer(hex, opts))) return false;
     if (_editSend?.beforeLeave()) return false;
     stopEditSend(); stopMarkdownEdit();
@@ -391,6 +411,7 @@ export function openArtifactViewer(hex, opts = {}) {
 }
 
  function closeArtifactViewer(opts = {}) {
+    _openIntent++;
     if (!_dialog || _dialog.hidden) return;
     const active = _editor || _editSend;
     if (active && !opts.confirmed) {

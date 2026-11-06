@@ -16,10 +16,10 @@ function plainClick(e) {
     return !e.defaultPrevented && e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
 }
 
-function openInViewer(e, hex, server, filename) {
+function openInViewer(e, hex, server, filename, board) {
     if (!plainClick(e)) return;
     e.preventDefault();
-    importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(hex, { server: normServer(server), filename }), () => {
+    importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(hex, { server: normServer(server), ...(board ? { board } : {}), filename }), () => {
         showToast('The file viewer could not be opened. Please try again.', true);
     });
 }
@@ -33,7 +33,7 @@ function markNotHere(el, label) {
     el.replaceWith(note);
 }
 
-export function resolveBoardArtifacts(root, server) {
+export function resolveBoardArtifacts(root, server, board = '') {
     if (!root) return;
     for (const msg of root.querySelectorAll('.mb-message[data-inbound]')) {
         const here = new Set((msg.dataset.attached || '').split(' ').filter(Boolean));
@@ -65,7 +65,7 @@ export function resolveBoardArtifacts(root, server) {
         }
         if (!chip.dataset.viewerBound) {
             chip.dataset.viewerBound = '1';
-            chip.addEventListener('click', e => openInViewer(e, hex, server, chip.dataset.filename || ''));
+            chip.addEventListener('click', e => openInViewer(e, hex, server, chip.dataset.filename || '', board));
         }
     }
     for (const img of root.querySelectorAll('.mb-message-body img[data-artifact]')) {
@@ -75,7 +75,7 @@ export function resolveBoardArtifacts(root, server) {
         img.classList.add('board-artifact-image');
         if (!img.dataset.viewerBound) {
             img.dataset.viewerBound = '1';
-            img.addEventListener('click', e => openInViewer(e, hex, server, img.getAttribute('alt') || ''));
+            img.addEventListener('click', e => openInViewer(e, hex, server, img.getAttribute('alt') || '', board));
         }
     }
     for (const a of root.querySelectorAll('.mb-message-body a[href]')) {
@@ -85,13 +85,15 @@ export function resolveBoardArtifacts(root, server) {
         a.target = '_blank';
         a.rel = 'noopener noreferrer';
         a.dataset.artifact = hex;
+        a.dataset.server = normServer(server);
+        if (board) a.dataset.board = board;
         a.classList.add('board-artifact-link');
         if (!a.dataset.viewerBound) {
             a.dataset.viewerBound = '1';
-            a.addEventListener('click', e => openInViewer(e, hex, server, a.textContent.trim()));
+            a.addEventListener('click', e => openInViewer(e, hex, server, a.textContent.trim(), board));
         }
     }
     linkCoralSubjectRefsIn(root, { server });
     // a shortened link in an older message becomes a link once the server says which artifact it is (#9841); the links it makes are bound by this same pass
-    importOnce('./short_artifact_refs.js').then(m => m.upgradeShortArtifactRefs(root, server, r => resolveBoardArtifacts(r, server))).catch(() => {}); // loaded on first use, not at start (#10218): a post that names no short ref never asks
+    importOnce('./short_artifact_refs.js').then(m => m.upgradeShortArtifactRefs(root, server, r => resolveBoardArtifacts(r, server, board), board)).catch(() => {}); // loaded on first use, not at start (#10218): a post that names no short ref never asks
 }
