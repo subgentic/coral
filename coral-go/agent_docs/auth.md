@@ -179,7 +179,7 @@ The routes only an agent's own tools call need its token in every mode (401 `ses
 
 ### Dashboard sign-in links
 
-At startup Coral mints a single-use sign-in token, valid 10 minutes, writes it to `<data>/login_token` (0600) and opens the browser with `http://localhost:<port>/?login_token=…`. With no display (`--no-browser`, a Linux box without `DISPLAY`) it prints the link instead. Opening the link trades the token for the dashboard's session cookie (HttpOnly, SameSite=Strict) and redirects to the same page without it. A used or expired link answers 403.
+At startup Coral mints a single-use sign-in token, valid 10 minutes, writes it to `<data>/login_token` (0600) and opens the browser with `http://localhost:<port>/?login_token=…`. With no display (`--no-browser`, a Linux box without `DISPLAY`), or when no browser opener started (WSLg sets `DISPLAY` on a distro with no `xdg-open`), it prints the link instead. Opening the link trades the token for the dashboard's session cookie (HttpOnly, SameSite=Strict) and redirects to the same page without it. A used or expired link answers 403.
 
 `coral open` asks the running Coral for a fresh link (through the same handshake as `coral cloud`) and opens it, or prints it with `--print` or without a display. `--path` makes the link land on a dashboard page, for example `coral open --path /chats` or `coral open --path /team/<board>`. Without strict local auth the dashboard also works on this computer without the cookie; with it, the cookie is required.
 

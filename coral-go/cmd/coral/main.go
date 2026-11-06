@@ -325,11 +325,10 @@ func announceDashboard(cfg *config.Config, rs *startup.RunningServer, sf *server
 				tracking.HoldFunnelStep(tracking.EventFunnelDashboardOpen, tracking.OpenPrintedNoDisplay)
 			}
 		} else {
-			tracking.HoldFunnelStep(tracking.EventFunnelDashboardOpen, tracking.OpenBrowser)
 			go func() {
 				defer safego.Recover("coral/main:272")
 				time.Sleep(500 * time.Millisecond)
-				openDashboard(os.Stderr, link, true)
+				openDashboardAtStart(os.Stderr, link) // the funnel step says what happened, opened or printed
 			}()
 		}
 	} else if !*sf.noBrowser {

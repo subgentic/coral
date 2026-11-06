@@ -15,6 +15,7 @@ import (
 	"github.com/subgentic/coral/internal/executil"
 	"github.com/subgentic/coral/internal/hooks"
 	"github.com/subgentic/coral/internal/loginlink"
+	"github.com/subgentic/coral/internal/tracking"
 )
 
 // canOpenBrowser reports whether this machine can show a browser: false on a Linux
@@ -26,17 +27,35 @@ func canOpenBrowser() bool {
 	return true
 }
 
+// openLogin opens a sign-in link in the browser and says whether the opener started (a test seam).
+var openLogin = executil.TryOpenLogin
+
 // openDashboard opens the dashboard sign-in link in a browser, or prints it when there
-// is none to open (#3387).
-func openDashboard(out io.Writer, link string, browse bool) {
-	if browse && canOpenBrowser() {
-		executil.OpenLogin(link)
-		return
+// is none to open (#3387). A display is no proof of a browser: WSLg sets DISPLAY on a
+// distro with no xdg-open, so when the opener did not start the link is printed too.
+// It reports whether a browser was opened (false: the link was printed).
+func openDashboard(out io.Writer, link string, browse bool) (opened bool) {
+	if browse && canOpenBrowser() && openLogin(link) {
+		return true
 	}
 	fmt.Fprintf(out, "  Open the dashboard (sign-in link, single use, 10 minutes):\n  %s\n\n", link)
 	if inAgentTerminal() {
 		fmt.Fprintln(out, "  Warning: this looks like an agent's terminal (or a tmux pane an agent can read). Anything shown here can read this link and sign in as you: run 'coral open' in your own terminal instead.")
 		fmt.Fprintln(out)
+	}
+	return false
+}
+
+// holdFunnelStep records a first-start funnel step (a test seam).
+var holdFunnelStep = tracking.HoldFunnelStep
+
+// openDashboardAtStart opens the sign-in link at startup and records what happened: "opened" only when a browser was asked to open it,
+// "printed_no_display" when the link was printed instead (no opener started, as under WSLg with no xdg-open).
+func openDashboardAtStart(out io.Writer, link string) {
+	if openDashboard(out, link, true) {
+		holdFunnelStep(tracking.EventFunnelDashboardOpen, tracking.OpenBrowser)
+	} else {
+		holdFunnelStep(tracking.EventFunnelDashboardOpen, tracking.OpenPrintedNoDisplay)
 	}
 }
 
