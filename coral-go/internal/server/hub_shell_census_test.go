@@ -374,7 +374,6 @@ var shellBareFetches = map[string]string{
 	"job_form.js GET /api/workflows":                               "unreviewed: a bare fetch asks the page's own origin, which through a Hub is the Hub (#13860 worklist)",
 	"job_form.js POST /api/scheduled/jobs/init-repo":               "unreviewed: a bare fetch asks the page's own origin, which through a Hub is the Hub (#13860 worklist)",
 	"job_form.js POST /api/scheduled/validate-cron":                "unreviewed: a bare fetch asks the page's own origin, which through a Hub is the Hub (#13860 worklist)",
-	"operator_asks.js GET /api/board/{}/subscribers":               "unreviewed: a bare fetch asks the page's own origin, which through a Hub is the Hub (#13860 worklist)",
 	"resume_dialog.js POST /api/sessions/launch":                   "unreviewed: a bare fetch asks the page's own origin, which through a Hub is the Hub (#13860 worklist)",
 	"scheduler.js DELETE /api/scheduled/jobs/{}":                   "unreviewed: a bare fetch asks the page's own origin, which through a Hub is the Hub (#13860 worklist)",
 	"scheduler.js GET /api/scheduled/jobs":                         "unreviewed: a bare fetch asks the page's own origin, which through a Hub is the Hub (#13860 worklist)",
