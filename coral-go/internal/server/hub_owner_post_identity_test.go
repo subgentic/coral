@@ -43,6 +43,7 @@ var ownerBoardPosts = map[string]ownerPost{
 	"POST /api/board/{}/proposals/{}/approve":       {"", "the Operator's decision on a proposal: person-gated, no name read"},
 	"POST /api/board/{}/proposals/{}/reject":        {"", "the Operator's decision on a proposal: person-gated, no name read"},
 	"POST /api/board/{}/goals/{}/driver":            {"", "who drives a goal: person-gated, no name read"},
+	"POST /api/board/{}/goals/{}/done-state":        {"", "a goal-looks-done row's Not yet, Dismiss, Undo and Mark read or unread: person-gated (operatorGoalCaller), no name read (#13834)"},
 	"POST /api/board/{}/goals/{}/move":              {"", "which team a goal is on: person-gated, no name read"},
 	"POST /api/board/{}/artifacts/{}/review":        {"", "approve or ask change on an artifact: person-gated, no name read"},
 	"POST /api/board/{}/artifacts/{}/edit":          {"", "the editor's save: person-gated, no name read"},

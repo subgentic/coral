@@ -58,7 +58,7 @@ var shellNeverRoutes = map[string]shellNever{
 	"automations_queue.js POST /api/resources/entries/{}/move":  {bExplains, `The queue is kept by each computer`, "no row loads through a Hub, and the folder says why (#13871)", 0},
 	"automations_queue.js DELETE /api/resources/entries/{}":     {bExplains, `The queue is kept by each computer`, "no row loads through a Hub, and the folder says why (#13871)", 0},
 	"artifact_source.js GET /api/servers":                       {bExplains, `The computer list could not be loaded`, "the viewer reads the computer list from this page's own Coral (LOCAL_SERVER) once at startup; where that read is refused or is not a list, opening a file says 'The computer list could not be loaded. Please try opening the file again.' (#13838)", 0},
-	"needs_skills.js GET /api/skills":                           {bHidden, `the Hub's Inbox`, "no pending-skills row from this read through a Hub; the Hub's skill rows come from GET /api/needs-you (kind skill), read-only", 0},
+	"needs_skills.js GET /api/skills":                           {bExplains, `approve at the computer`, "through a Hub the skills come from one read of GET /api/needs-you?kind=skill, drawn as plain rows that say to approve at the computer, with no buttons; this read is the computer's own list (#13841)", 0},
 }
 
 // shellNeverFiles: every other never call of a script that nobody has read yet for what it does through a Hub. This is the starting list of #13860 ("what is true today"): it is a worklist, and
