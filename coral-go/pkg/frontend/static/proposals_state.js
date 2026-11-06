@@ -1,6 +1,7 @@
 /* What agents asked to add to a team, and have not been decided (#11389): the list, read from GET /api/proposals, and the decisions. No page here, so the Inbox's badge can count them without loading the table:
  * like the review rows it reads only after the Inbox was first opened, then keeps itself current (at most one read in 20 seconds). The Operator's alone: a guest or a grantee is answered 403, and has no rows. */
 import { serverFetch, identityKey, splitKey } from './server_base.js';
+import { readOutcome } from './needs_incomplete.js';
 import { inboxSources } from './inbox_servers.js';
 import { browserLocal } from './safe_storage.js';
 import { visibleName } from './artifact_names.js';
@@ -27,18 +28,24 @@ export function refreshProposals(force = false) {
             // Every computer the Inbox reads is asked on its own (#13454): a Hub-served page has none of its own, and a linked computer's teams are there. One that refuses (a grantee there, 403) has no
             // rows, one that fails keeps the rows it had; neither blanks the others.
             const sources = inboxSources(), hide = dismissed();
-            const settled = await Promise.allSettled(sources.map(async server => {
-                const r = await serverFetch(server, '/api/proposals?state=pending,approving,expired');
-                if (r.status === 403) return { server, rows: [] };
-                if (!r.ok) throw new Error(`${server}: ${r.status}`);
-                return { server, rows: (await r.json()).proposals || [] };
+            // A computer's read is rows only when it answered 200 with a proposals list (an empty one too); a refusal (401, 403: access was taken away) drops that computer's rows, and a missing route (404), any other status, a failure or a body that is not a list keeps them as
+            // they were; every one of them tells the Inbox it is not everything (#13841). The warning is cleared only after the body was checked.
+            const settled = await Promise.all(sources.map(async server => {
+                try {
+                    const r = await serverFetch(server, '/api/proposals?state=pending,approving,expired');
+                    if (!r.ok) { readOutcome('proposals', server, false); return r.status === 401 || r.status === 403 ? { server, rows: [] } : { server, keep: true }; } // access was taken away (401, 403): no rows, and the note says so (#13454, #13841); a missing route (404), a server error, a failure or a bad body keeps the rows
+                    const got = (await r.json()).proposals;
+                    if (!Array.isArray(got)) { readOutcome('proposals', server, false); return { server, keep: true }; }
+                    readOutcome('proposals', server, true);
+                    return { server, rows: got };
+                } catch { readOutcome('proposals', server, false); return { server, keep: true }; }
             }));
             lastRead = Date.now();
             const next = [];
-            settled.forEach((res, i) => {
-                const server = sources[i];
-                if (res.status === 'rejected') { next.push(...items.filter(p => p.server === server)); return; } // an error keeps what was shown for that computer
-                for (const p of res.value.rows) {
+            settled.forEach(res => {
+                const server = res.server;
+                if (res.keep) { next.push(...items.filter(p => p.server === server)); return; } // what was shown for that computer stays
+                for (const p of res.rows) {
                     const board = identityKey(server, p.board_id);
                     if (p.state === 'expired' && hide.has(`${board}:${p.id}`)) continue;
                     next.push({ ...p, server, board_id: board, rowKey: `proposal:${board}:${p.id}`, proposer: visibleName(p.proposer) ? String(p.proposer) : 'An agent' });

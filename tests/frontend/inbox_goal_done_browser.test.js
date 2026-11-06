@@ -99,12 +99,13 @@ const B = 'goal-done-' + Date.now().toString(36);
         assert.ok(asked.json.items.some(i => i.kind === 'goal_done' && i.id === `goal_done:${B}:${gid}`), 'the phone-push read has it too');
 
         // Not yet: gone here and on the machine, until a task is added
+        await root('PUT', '/api/settings', { goal_done_hidden: JSON.stringify(['other|9|9']) }); // another browser hid something since this page read the list (#13841): the page's copy is stale, and pressing Not yet must not erase it
         await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('button[aria-label^="Not yet"]').click(); true`);
         await waitFor(`!/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the item gone after Not yet', 8000);
         await waitFor(`Number((document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0) === ${withItem - 1}`, 'and out of the Inbox number', 10000);
         assert.equal(await badge(), withItem - 1, 'and out of the Inbox number');
         const saved = (await root('GET', '/api/settings')).json.settings.goal_done_hidden;
-        assert.deepEqual(JSON.parse(saved), [`${B}|${gid}|1`], 'kept on the machine at the total it was pressed at');
+        assert.deepEqual(JSON.parse(saved), ['other|9|9', `${B}|${gid}|1`], 'kept on the machine at the total it was pressed at, and another browser\'s entry survives (one entry is edited there, the list is not overwritten, #13841)');
         assert.ok(!(await root('GET', '/api/needs-you?limit=50')).json.items.some(i => i.id === `goal_done:${B}:${gid}`), 'the phone push does not keep announcing it');
         await task(gid, true);
         await openNeeds();
