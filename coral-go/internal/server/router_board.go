@@ -288,6 +288,8 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/artifacts/{id}/review", boardHandler.ReviewArtifact)                        // the Operator approves an artifact tagged for review, or asks changes (#136584); local only, no tunnel row
 	r.With(routes.RefuseSignInLink).Put("/api/board/{project}/artifacts/{id}/review", boardHandler.MarkArtifactForReview)                  // the Operator sends a file for review: the tag and a question (#13217)
 	r.Delete("/api/board/{project}/artifacts/{id}/review", boardHandler.UnmarkArtifactForReview)                                           // and takes it out again (#13217)
+	r.Get("/api/board/{project}/artifacts/{digest}/edit", boardHandler.GetArtifactEdit)                                                    // the Markdown editor: can this file be edited, and the newest version (#13757)
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/artifacts/{digest}/edit", boardHandler.SaveArtifactEdit)                    // and its save: a new version, compare-and-swap on the newest
 	r.Post("/api/board/{project}/operator-artifacts", boardHandler.UploadOperatorArtifact)                                                 // the Operator shares a file with an agent: stored on the agent's team (#11376; owner-only through Coral Hub)
 	r.Post("/api/board/{project}/operator-artifacts/message", boardHandler.ShareOperatorArtifacts)                                         // and the one message that tells the agent
 	r.With(routes.RefuseSignInLink).Put("/api/board/{project}/subscribers/{subscriberID}/review-settings", boardHandler.SetReviewSettings) // an agent's Reviews only switch and areas: the Operator's (#8957); no tunnel row

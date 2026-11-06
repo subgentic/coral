@@ -83,6 +83,7 @@ const (
 	ActFileRelease    = "file_release"
 	ActFileDelete     = "file_delete"
 	ActFileShare      = "file_share" // a file shared with an agent
+	ActFileEdit       = "file_edit"  // a Markdown file saved from the dashboard's editor as a new version (#13757)
 	ActSavedAdd       = "saved_add"
 	ActSavedUpdate    = "saved_update" // Done or Reopen on a saved message
 	ActSavedRemove    = "saved_remove"

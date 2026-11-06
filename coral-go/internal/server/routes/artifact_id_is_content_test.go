@@ -94,7 +94,7 @@ func TestOnlyTheReviewedFilesWriteIntoTheObjectsFolder(t *testing.T) {
 		}
 	}
 	sort.Strings(got)
-	want := []string{"artifact_comment_images.go", "artifacts.go", "artifacts_store.go", "cross_team_pending.go", "operator_artifacts.go"}
+	want := []string{"artifact_comment_images.go", "artifacts.go", "artifacts_store.go", "board_artifact_edit.go", "cross_team_pending.go", "operator_artifacts.go"}
 	assert.Equal(t, want, got, "the files of this package that name the objects folder and write a file changed: review how the new one names and writes an object")
 }
 

@@ -17,6 +17,7 @@ GET /api/artifacts/{id}/private view owner-only
 GET /api/artifacts/{id}/readers view owner-only
 GET /api/artifacts/{id}/versions view owner-only
 GET /api/board/{project}/artifacts view owner-only
+GET /api/board/{project}/artifacts/{digest}/edit view owner-only
 GET /api/board/{project}/cross-team/settings view owner-only-hub
 GET /api/board/{project}/guide-roster launch owner-only
 GET /api/board/{project}/lifecycle-log launch owner-only
@@ -43,6 +44,7 @@ POST /api/artifacts/{id}/comments interact owner-only
 POST /api/artifacts/{id}/comments/{cid}/reopen interact owner-only
 POST /api/artifacts/{id}/comments/{cid}/resolve interact owner-only
 POST /api/artifacts/{id}/comments/{cid}/send launch owner-only
+POST /api/board/{project}/artifacts/{digest}/edit interact owner-only
 POST /api/board/{project}/artifacts/{id}/review interact owner-only
 POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim interact owner-only
 POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle interact owner-only

@@ -4,6 +4,7 @@
 # open for now (reads, review verdicts, cosmetic names, hub-only routes). A new route fails
 # TestAgentRouteCensus until it gets a line here: decide, then add it.
 b GET /api/automations/runs
+b GET /api/board/{project}/artifacts/{digest}/edit
 b CONNECT /api/remote/{server}/*
 a DELETE /api/agent/ui/{id}
 b DELETE /api/artifacts/series/{series_id}
@@ -476,6 +477,7 @@ b PUT /api/artifacts/{id}/private
 b PUT /api/artifacts/{id}/star
 b PUT /api/auth/hub-origins
 b PUT /api/auth/hub-signin
+b POST /api/board/{project}/artifacts/{digest}/edit
 b POST /api/board/{project}/artifacts/{id}/review
 b POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim
 b POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle
