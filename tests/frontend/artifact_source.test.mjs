@@ -19,4 +19,20 @@ test('body links inherit the frozen pair after selection changes and ignore inje
 test('manifest downloads and opened entries inherit the same source and board',async()=>{state.selectedTeam='@ws2/other';viewer.openArtifactViewer(manifest,{server:'ws1',board:'dev',filename:'manifest.json'});await pause();assert.match(document.querySelector('.artifact-manifest-download').getAttribute('href'),/^\/api\/remote\/ws1\//);calls=[];document.querySelector('.artifact-manifest-open').click();await pause();assert.ok(sourceCalls().every(c=>c.url.startsWith('/api/remote/ws1/')),JSON.stringify(calls));assert.ok(sourceCalls().some(c=>c.url.includes('/board/dev/')));close();});
 test('dirty-editor deferred navigation captures source before the selection changes',async()=>{state.selectedTeam='@ws1/dev';viewer.openArtifactViewer(hex,{server:'ws1',board:'dev',filename:'report.md'});await pause();document.querySelector('.artifact-viewer-edit').click();await pause();const text=[...document.querySelectorAll('.amd-text')].find(e=>e.textContent==='Original sentence.');assert.ok(text);text.textContent='Changed';text.dispatchEvent(new Event('blur'));viewer.openArtifactViewer(child,{filename:'report.md'});assert.ok(document.querySelector('.amd-discard[open]'));state.selectedTeam='@ws2/other';calls=[];document.querySelector('.amd-discard .btn-danger').click();await pause();assert.ok(sourceCalls().length>0);assert.ok(sourceCalls().every(c=>c.url.startsWith('/api/remote/ws1/')),JSON.stringify(calls));assert.match(document.querySelector('.artifact-viewer-source').textContent,/Laptop.*read only/);close();});
 test('raw manifest rendering retains its resolved computer for reference producers',async()=>{const {renderArtifact}=await importUi('artifact_preview');const host=document.createElement('div');let source,entrySource;await renderArtifact(host,'coral://artifacts/'+manifest,{server:'ws1',filename:'bundle.json'},{setMeta:()=>{},isStale:()=>false,renderContent:(node,text,path,server)=>{source=server;},openEntry:(entry,server)=>{entrySource=server;}});assert.ok(host.querySelector('.artifact-manifest-raw'));host.querySelector('.artifact-manifest-open').click();assert.equal(entrySource,'ws1');host.querySelector('.artifact-manifest-raw').click();assert.equal(source,'ws1');host.querySelector('.artifact-manifest-back').click();assert.match(host.querySelector('.artifact-manifest-download').getAttribute('href'),/^\/api\/remote\/ws1\//);});
+test('delegated artifact click forwards its stamped board instead of the selected board',async()=>{
+  state.selectedTeam='@ws1/selected-board';
+  const host=document.createElement('div');
+  host.append((await importUi('artifact_refs')).linkedText('coral://artifacts/'+hex,{server:'ws1'}));
+  host.querySelector('a').dataset.board='@ws1/message-board';
+  document.body.append(host);
+  calls=[];
+  try{
+    host.querySelector('a').click();
+    await pause();
+    const boardCalls=sourceCalls().filter(c=>c.url.includes('/board/'));
+    assert.ok(boardCalls.length>0,JSON.stringify(calls));
+    assert.ok(boardCalls.every(c=>c.url.startsWith('/api/remote/ws1/api/board/message-board/')),JSON.stringify(boardCalls));
+    assert.equal(boardCalls.some(c=>c.url.includes('/selected-board/')),false);
+  }finally{close();host.remove();}
+});
 test.after(()=>{close();dom.window.close();});
