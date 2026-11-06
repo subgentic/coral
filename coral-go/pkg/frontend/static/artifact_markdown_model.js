@@ -1,5 +1,7 @@
 // Rendered text editing. Keep original source bytes; the lexer is used for positions, never serialization.
-export const HIDDEN = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u061c\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/;
+export const HIDDEN = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u061c\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060-\u206f\ufeff\u{E0000}-\u{E007F}]/u;
+// Keep visible markers on exactly the same code-point policy as refusal/warnings.
+const ALL_HIDDEN = new RegExp(HIDDEN.source, 'gu');
 export const MAX_BYTES = 2 * 1024 * 1024;
 export function normalizeSource(source) {
     let text = ''; const offsets = []; let i = source.charCodeAt(0) === 0xfeff ? 1 : 0;
@@ -250,7 +252,7 @@ export function editRun(source, run, text) {
 
 /** Visible names for invisible characters; the source itself is never changed. */
 export function visibleSpecials(text) {
-    return String(text).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u061c\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/g, c => `⟦U+${c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}⟧`);
+    return String(text).replace(ALL_HIDDEN, c => `⟦U+${c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}⟧`);
 }
 
 // A textarea normalizes line endings. Splice only its changed logical range back

@@ -164,3 +164,28 @@ test('mode switches never serialize DOM or normalize untouched source bytes',asy
  change(ui.body,'Old words.\nTail.','New words.\nTail.');for(let i=0;i<2;i++){ui.body.querySelector('.amd-mode-raw').click();ui.body.querySelector('.amd-mode-rendered').click();}ui.body.querySelector('.amd-mode-raw').click();ui.footer.querySelector('.amd-save').click();await saved;assert.equal(Buffer.from(sent).toString(),source.replace('Old','New'));ui.close();
  const noOp=setup(source);noOp.body.querySelector('.amd-mode-raw').click();const input=noOp.body.querySelector('.amd-raw');input.dispatchEvent(new Event('input'));noOp.body.querySelector('.amd-mode-rendered').click();assert.equal(noOp.editor.dirty,false);assert.equal(noOp.footer.querySelector('.amd-save').disabled,true);noOp.close();
 });
+
+test('tag and separator characters are visible/read-only, rejected on typing/paste, and only warned in raw mode',async()=>{
+ for(const cp of [0xe0000,0xe001f,0xe0020,0xe0041,0xe007f,0x2028,0x2029]) {
+  const char=String.fromCodePoint(cp),label='U+'+cp.toString(16).toUpperCase(),source='\ufeff# Title\r\n\r\nBefore'+char+'after.\r\n';let sent,done;const saved=new Promise(r=>{done=r;});
+  globalThis.fetch=window.fetch=async(url,options)=>{sent=options.body;return Response.json({id:next,version:2});};const ui=setup(source,done);
+  assert.ok(ui.body.textContent.includes(label),label+' code point is shown');assert.equal([...ui.body.querySelectorAll('.amd-text')].some(e=>e.textContent.includes('Before')),false,label+' block is read-only');
+  const field=ui.body.querySelector('.amd-text'),before=field.textContent;
+  const typed=new window.InputEvent('beforeinput',{inputType:'insertText',data:char,bubbles:true,cancelable:true});field.dispatchEvent(typed);assert.equal(typed.defaultPrevented,true,label+' typing refused');assert.equal(field.textContent,before);
+  const paste=new Event('paste',{bubbles:true,cancelable:true});Object.defineProperty(paste,'clipboardData',{value:{getData:()=>char}});field.dispatchEvent(paste);assert.equal(field.textContent,before,label+' paste refused');assert.match(ui.body.querySelector('.amd-status').textContent,/hidden/i);
+  ui.body.querySelector('.amd-mode-raw').click();const raw=ui.body.querySelector('.amd-raw');assert.equal(ui.body.querySelector('.amd-raw-warning').hidden,false,label+' raw warning');assert.ok(raw.value.includes(char));raw.value+='Changed.';raw.dispatchEvent(new Event('input'));ui.footer.querySelector('.amd-save').click();await saved;assert.deepEqual(Buffer.from(sent),Buffer.from(source+'Changed.'),label+' raw save preserves exact bytes');ui.close();
+ }
+});
+
+test('read-only notices name hidden code points even inside Markdown link destinations',()=>{
+ for(const cp of [0xe0041,0x2028,0x2029]) {
+  const char=String.fromCodePoint(cp),label='U+'+cp.toString(16).toUpperCase(),source='[Visible label](https://example.com/'+char+')\n',ui=setup(source);
+  assert.ok(ui.body.querySelector('.amd-readonly'));assert.ok(ui.body.querySelector('.amd-readonly').textContent.includes(label),label+' is named when it is absent from visible link text');assert.equal(ui.body.querySelectorAll('.amd-text').length,0);assert.equal(ui.editor.dirty,false);ui.close();
+ }
+});
+
+test('multiline native insertion cannot put a tag into a continuation-capable rendered field',()=>{
+ const ui=setup('- Safe words.\n'),field=ui.body.querySelector('.amd-text');field.focus();const range=document.createRange();range.selectNodeContents(field);range.collapse(false);getSelection().removeAllRanges();getSelection().addRange(range);
+ field.dispatchEvent(new window.InputEvent('beforeinput',{inputType:'insertText',data:'More\n'+String.fromCodePoint(0xe0041),bubbles:true,cancelable:true}));
+ assert.equal(field.textContent,'Safe words.','hidden text is refused before any DOM insertion, not merely on blur');assert.match(ui.body.querySelector('.amd-status').textContent,/hidden/i);assert.equal(ui.editor.dirty,false);ui.close();
+});

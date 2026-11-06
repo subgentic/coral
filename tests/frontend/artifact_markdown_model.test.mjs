@@ -132,3 +132,14 @@ test('table code spans refuse a backslash before a pipe before rendering',()=>{
  for(const value of ['a\\|b','a\\\\|b','a|b\\|c'])assert.throws(()=>editRun(source,code,value),/backslash.*pipe/);
  assert.equal(editRun(source,code,'a|b|c').source,source.replace('`a\\|b`','`a\\|b\\|c`'));
 });
+
+test('all tag characters and Unicode line separators are read-only, visible, and refused in rendered edits',async()=>{
+ const {HIDDEN,visibleSpecials}=await import('../../coral-go/pkg/frontend/static/artifact_markdown_model.js');
+ const points=[...Array.from({length:128},(_,i)=>0xe0000+i),0x2028,0x2029];
+ for(const cp of points){const char=String.fromCodePoint(cp),label='U+'+cp.toString(16).toUpperCase(),source='\ufeffSafe words.\r\n\r\nHidden'+char+'words.\r\n';
+  assert.equal(HIDDEN.test(char),true,label+' is detected');const model=analyze(source,marked),block=model.blocks.find(b=>b.raw.includes(char));assert.ok(block.reason,label+' block is read-only');assert.equal(block.runs.length,0);assert.equal(model.source,source);
+  assert.equal(visibleSpecials(char),'⟦'+label+'⟧',label+' is one code-point marker, never two surrogate markers');
+  const clean='Safe words.\r\n',run=mapped(clean)[0];assert.throws(()=>editRun(clean,run,'Safe'+char+'words.'),/Hidden/,label+' cannot be inserted');
+ }
+ assert.equal(visibleSpecials('Plain 🍊\r\n\twords.'),'Plain 🍊\r\n\twords.');
+});

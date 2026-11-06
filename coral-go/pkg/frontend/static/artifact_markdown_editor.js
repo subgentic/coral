@@ -83,7 +83,10 @@ export function createMarkdownEditor({ body, footer, dialog, context, source: in
             const map = block.reason ? { exact: false, entries: [] } : M.mapRenderedBlock(block, prose);
             const editable = map.exact && map.entries.some(e => e.run.editable);
             if (!editable) {
-                const label = el('p', 'amd-readonly', `${block.reason || (prose.querySelector('img') ? 'Image' : 'Text mapping unavailable')} — read-only`); section.append(label); showSpecials(prose);
+                // A hidden character may live in a destination/attribute, outside text nodes.
+                const hidden = new Set(); if (M.HIDDEN.test(block.raw)) for (const char of block.raw) if (M.HIDDEN.test(char)) hidden.add(char);
+                const codes = [...hidden].map(char => M.visibleSpecials(char)).join(' ');
+                const label = el('p', 'amd-readonly', `${block.reason || (prose.querySelector('img') ? 'Image' : 'Text mapping unavailable')}${codes ? ' ' + codes : ''} — read-only`); section.append(label); showSpecials(prose);
             } else {
                 for (const { node, run } of map.entries) {
                     if (!run.editable) continue;
@@ -101,9 +104,10 @@ export function createMarkdownEditor({ body, footer, dialog, context, source: in
                     };
                     span.addEventListener('beforeinput', event => {
                         const line = ['insertParagraph','insertLineBreak'].includes(event.inputType);
+                        if ((line && run.newlinePrefix == null) || event.inputType === 'insertFromDrop' || M.HIDDEN.test(event.data || '')) { event.preventDefault(); say('Use plain words without hidden characters; structural markers stay unchanged.', true); return; }
                         if (event.inputType === 'insertText' && /[\r\n]/.test(event.data || '')) { event.preventDefault(); if (run.newlinePrefix != null) insertPlain(event.data.replace(/\r\n?/g,'\n')); else say('Edit words within one text run; changing line breaks is not supported.', true); return; }
                         if (line && run.newlinePrefix != null) { event.preventDefault(); insertPlain('\n'); return; }
-                        if (line || event.inputType === 'insertFromDrop' || M.HIDDEN.test(event.data || '')) { event.preventDefault(); say('Use plain words without hidden characters; structural markers stay unchanged.', true); }
+
                     });
                     span.addEventListener('paste', event => {
                         event.preventDefault(); const text = event.clipboardData.getData('text/plain').replace(/\r\n?/g,'\n');
