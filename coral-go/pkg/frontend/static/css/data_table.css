@@ -622,14 +622,15 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .inbox-kind-icon[data-kind="review"] { color: var(--needs-icon-green-fg); background: var(--needs-icon-green-bg); }
 .inbox-kind-icon[data-kind="proposal"], .inbox-kind-icon[data-kind="goal_done"] { color: var(--needs-icon-purple-fg); background: var(--needs-icon-purple-bg); }
 .inbox-kind-icon[data-kind="permission"], .inbox-kind-icon[data-kind="run"] { color: var(--needs-icon-amber-fg); background: var(--needs-icon-amber-bg); }
-.inbox-kind-icon[data-kind="other"], .inbox-kind-icon[data-kind="welcome"] { color: var(--needs-icon-blue-fg); background: var(--needs-icon-blue-bg); }
+.inbox-kind-icon[data-kind="other"], .inbox-kind-icon[data-kind="ask"], .inbox-kind-icon[data-kind="welcome"] { color: var(--needs-icon-blue-fg); background: var(--needs-icon-blue-bg); }
 @media (forced-colors: active) { .material-icons.inbox-kind-icon { color: CanvasText; background: Canvas; outline: 1px solid CanvasText; } }
 .inbox-kind-icon::before { content: 'help_outline'; }
 .inbox-kind-icon[data-kind="permission"]::before { content: 'lock'; }
-.inbox-kind-icon[data-kind="other"]::before { content: 'input'; }
-.inbox-kind-icon[data-kind="review"]::before { content: 'rate_review'; }
+.inbox-kind-icon[data-kind="other"]::before { content: 'edit_note'; }
+.inbox-kind-icon[data-kind="ask"]::before { content: 'help_outline'; }
+.inbox-kind-icon[data-kind="review"]::before { content: 'description'; }
 .inbox-kind-icon[data-kind="run"]::before { content: 'error_outline'; }
-.inbox-kind-icon[data-kind="proposal"]::before { content: 'task'; }
+.inbox-kind-icon[data-kind="proposal"]::before { content: 'checklist'; }
 .inbox-kind-icon[data-kind="goal_done"]::before { content: 'flag'; }
 .inbox-kind-icon[data-kind="skill_review"]::before { content: 'auto_awesome'; }
 .inbox-kind-icon[data-kind="welcome"]::before { content: 'info'; }

@@ -71,8 +71,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
         // a question's name may take two lines on a phone by design (#11894), so an icon that takes width can push a title near the wrap point onto its second line: a question row may be at most ONE line taller (a runaway change still fails); every other kind keeps its height exactly
         for (const r of tall) {
             if (r.kind === 'review') check(r.sameLine === true, `390 px: in a review row the file name is line one and the sender line two, under it: ${r.text}`);
-            const room = r.kind === 'other' ? r.line + 1 : 0.5;
-            check(r.withIcon >= r.without - 0.5 && r.withIcon - r.without < room, `390 px: a ${r.kind} row keeps its height with the icon${r.kind === 'other' ? ' (a question: at most one more line)' : ''} (${r.withIcon} with, ${r.without} without): ${r.text}`);
+            const room = r.kind === 'other' || r.kind === 'ask' ? r.line + 1 : 0.5;
+            check(r.withIcon >= r.without - 0.5 && r.withIcon - r.without < room, `390 px: a ${r.kind} row keeps its height with the icon${r.kind === 'other' || r.kind === 'ask' ? ' (a question: at most one more line)' : ''} (${r.withIcon} with, ${r.without} without): ${r.text}`);
         }
         const { themeJs } = require('./helpers/theme');
         for (const theme of ['dark', 'light']) {
