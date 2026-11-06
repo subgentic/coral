@@ -25,7 +25,8 @@ const (
 	// The test logs the room left, warns under 32 KiB, and names the ten files that grew most since the checked-in baseline (static_budget_baseline.txt; regenerate it with STATIC_BUDGET_UPDATE=1).
 	// 5,729,280 bytes: the tree after the agent docs went gzipped (5,663,162; it was 6,195,883 with them plain) plus 64 KiB.
 	// 5,824,512 bytes (trial-249): the tree with the batch's pages (video comments, the Chief screen and entry, the Agent tab, the Hub review stack, #13486) at 5,758,515 plus 64 KiB.
-	staticBudget = 5_824_512
+	// #13756: lazy Markdown editor assets bring the tree to 5,826,723 bytes; plus 64 KiB, rounded up. Startup CSS and page-weight caps are unchanged.
+	staticBudget = 5_893_120
 	// fileBudget is the most one embedded file may hold (the CodeMirror bundle, the largest, is ~1 MB).
 	fileBudget = 1536 << 10
 	// budgetWarnRoom is the room under which the test warns, and budgetPolicyRoom the room a raise leaves.

@@ -22,6 +22,13 @@ assert.ok(subset.size < 400, `the subset is ${subset.size} icons: the full set i
 // the scanner itself: the places an icon name is written, and what is not a name
 assert.deepEqual([...candidates(`<span class="material-icons">close</span> el.textContent = 'arrow_back'; icon: "folder_open"; x = 'not a name'`)].sort(), ['arrow_back', 'close', 'folder_open']);
 assert.ok(candidates('<i class="material-icons"> add </i>').has('add'), 'element text with spaces');
+const modelFile = '/repo/static/artifact_markdown_model.js';
+const lexerChecks = "type === 'list'; x.type === 'list'";
+assert.equal(candidates(lexerChecks, modelFile).has('list'), false, 'only the model lexer comparisons are excluded');
+assert.equal(candidates(lexerChecks, '/repo/static/another.js').has('list'), true, 'the same string elsewhere stays in the conservative scan');
+assert.equal(candidates(lexerChecks + "; icon.textContent = 'list'", modelFile).has('list'), true, 'a real list icon in the model still counts');
+assert.equal(candidates('<i class="material-icons">list</i>', modelFile).has('list'), true, 'model icon markup still counts');
+
 assert.deepEqual([...codePoints('a { content: "\\e5cd"; } &#xe5ce; \\ue5cf plain')].sort(), [0xe5cd, 0xe5ce, 0xe5cf]);
 assert.equal(codePoints('no private use here').size, 0);
 console.log(`PASS icon_subset: ${names.length} icons used, ${subset.size} in the subset, ${points.length} private-use code points`);

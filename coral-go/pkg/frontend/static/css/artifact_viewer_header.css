@@ -74,7 +74,7 @@
 .av-col:last-child { border-right: 0; }
 .av-colhead { margin: 0 0 6px; font-size: var(--fs-sm, .8125rem); color: var(--text-secondary); }
 /* comparing: the comments are of the version, not of the changes */
-.artifact-viewer.av-comparing .ac-panel, .artifact-viewer.av-comparing .ac-toggle { display: none !important; }
+.artifact-viewer.av-comparing .artifact-viewer-edit-item, .artifact-viewer.av-comparing .artifact-viewer-edit, .artifact-viewer.av-comparing .ac-panel, .artifact-viewer.av-comparing .ac-toggle { display: none !important; }
 .artifact-viewer.av-keep-wide .artifact-viewer-content { width: min(1240px, 96vw); }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     .artifact-viewer.av-keep-wide .artifact-viewer-content { width: 100vw; max-height: 100%; height: 100%; border-radius: 0; }
@@ -87,7 +87,7 @@
     .av-compare { padding: 8px 12px; }
 }
 /* Mark up (#12367): a button beside Comments on a computer, an item of the ⋯ menu on a phone, for a picture */
-@media (min-width: 769px) { .artifact-viewer-markup-item { display: none; } }
+@media (min-width: 769px) { .artifact-viewer-markup-item, .artifact-viewer-edit-item { display: none; } }
 @media (max-width: 768px) { .artifact-viewer-markup { display: none; } }
 
 /* Full screen means the available embedding viewport; no browser fullscreen permission

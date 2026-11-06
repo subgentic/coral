@@ -344,3 +344,8 @@ node remote_search_access.test.mjs
 node remote_goal_comments.test.mjs
 
 node remote_agent_identity.test.mjs
+
+node artifact_markdown_model.test.mjs
+node artifact_markdown_api.test.mjs
+node artifact_markdown_editor.test.mjs
+node artifact_markdown_viewer.test.mjs

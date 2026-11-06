@@ -95,7 +95,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     const syncToggle = () => { toggle.hidden = !st.shownNow; };
     // The drawn text changes after the comments were placed (a code block coloured once highlight.js has loaded): their ranges follow it, a moment after it settles (#5311).
     let relocateTimer = 0;
-    new MutationObserver(() => { clearTimeout(relocateTimer); relocateTimer = setTimeout(() => { if (st.data && st.text) paint(true); }, 150); }).observe(body, { childList: true, subtree: true, characterData: true });
+    new MutationObserver(() => { if (!shown()) return; clearTimeout(relocateTimer); relocateTimer = setTimeout(() => { if (st.data && st.text) paint(true); }, 150); }).observe(body, { childList: true, subtree: true, characterData: true });
 
     // ── the data
     const allThreads = () => {
@@ -431,6 +431,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         return a ? { anchor: a, rect: r.getBoundingClientRect() } : null;
     }
     function syncSelButton() {
+        if (!shown()) { selBtn.hidden = true; return; }
         const s = selectionAnchor();
         selBtn.hidden = !s;
         if (!s) return;

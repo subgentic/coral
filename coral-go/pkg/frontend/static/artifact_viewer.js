@@ -40,6 +40,9 @@ let _review = null;      // Approve and Request changes of a for-review artifact
 let _hex = '';           // the artifact on show and what it was opened with, for a version chosen from the bar
 let _lastOpts = {};
 let _details = null;     // the Details button and its panel (the readers' row)
+let _editor = null;
+let _editAbort = null;
+let _editCapability = null;
 let _overlay = 0;        // its entry in overlay_history.js while it is open on a phone (#5219)
 
 // Layout preferences are scoped by kind, not by artifact ID; browserLocal catches
@@ -63,6 +66,7 @@ function setFullScreen(d, on, remember = false) {
     if (remember && _layoutType) browserLocal.set('coral-artifact-fullscreen:' + _layoutType, String(on));
 }
 function escapeViewer(d) {
+    if (_editor) { _editor.cancel(); return; }
     if (d.classList.contains('av-fullscreen') && !isPhoneLayout()) {
         setFullScreen(d, false, true);
         d.querySelector('.artifact-viewer-fullscreen').focus();
@@ -93,11 +97,12 @@ function _build() {
             <h2 id="artifact-viewer-title" class="artifact-viewer-title"></h2>
             <span class="artifact-viewer-from" hidden></span>
             <span class="artifact-viewer-chips"></span>
-            <span class="artifact-viewer-actions"><button type="button" class="btn artifact-viewer-markup" hidden>Mark up</button></span>
+            <span class="artifact-viewer-actions"><button type="button" class="btn artifact-viewer-edit" hidden>Edit text</button><button type="button" class="btn artifact-viewer-markup" hidden>Mark up</button></span>
             <button type="button" class="btn btn-icon artifact-viewer-fullscreen" aria-label="Full screen" aria-pressed="false" title="Full screen">⤢</button>
             <span class="artifact-viewer-morewrap">
                 <button type="button" class="btn btn-icon artifact-viewer-more" aria-haspopup="menu" aria-expanded="false" aria-controls="artifact-viewer-menu" aria-label="More actions" title="More actions">\u22ef</button>
                 <div class="menu artifact-viewer-menu" id="artifact-viewer-menu" role="menu" aria-label="More actions" hidden>
+                    <button type="button" class="menu-item artifact-viewer-edit-item" role="menuitem" hidden>Edit text</button>
                     <button type="button" class="menu-item artifact-viewer-markup-item" role="menuitem" hidden>Mark up</button>
                     <a class="menu-item artifact-viewer-newtab" role="menuitem" target="_blank" rel="noopener noreferrer" hidden>Open in new tab</a>
                     <a class="menu-item artifact-viewer-download" role="menuitem" rel="noopener noreferrer" download>Download</a>
@@ -138,6 +143,7 @@ function _build() {
             if (!(await _comments.composeWithPicture(out, `${base}-marked.png`))) say('You can read the comments on this file but not write them.');
         } catch { say('The markup editor could not be opened.'); }
     };
+    d.querySelectorAll('.artifact-viewer-edit,.artifact-viewer-edit-item').forEach(b => b.addEventListener('click', () => startMarkdownEdit(d)));
     d.querySelector('.artifact-viewer-markup').addEventListener('click', markUp); d.querySelector('.artifact-viewer-markup-item').addEventListener('click', markUp);
     d.addEventListener('click', (e) => { if (e.target === d) closeArtifactViewer(); });
     d.querySelector('.artifact-viewer-close').addEventListener('click', closeArtifactViewer);
@@ -161,7 +167,7 @@ function _build() {
     let _isPicture = false, _canWrite = false;
     const syncMarkUp = () => { d.querySelector('.artifact-viewer-markup').hidden = d.querySelector('.artifact-viewer-markup-item').hidden = !(_isPicture && _canWrite); };
     d._markUp = { picture: on => { _isPicture = on; syncMarkUp(); }, write: on => { _canWrite = on; syncMarkUp(); } };
-    _comments = attachComments(d, d.querySelector('.artifact-viewer-body'), d.querySelector('.artifact-viewer-main'), { onCanWrite: ok => d._markUp.write(ok), preferenceKey: () => _layoutType ? 'coral-artifact-comments:' + _layoutType : null });
+    _comments = attachComments(d, d.querySelector('.artifact-viewer-body'), d.querySelector('.artifact-viewer-main'), { shown: () => !d.hidden && !_editor, onCanWrite: ok => d._markUp.write(ok), preferenceKey: () => _layoutType ? 'coral-artifact-comments:' + _layoutType : null });
     _versions = attachVersions(d, {
         version: n => { const t = d.querySelector('.artifact-viewer-title'); t.querySelector('.artifact-viewer-version')?.remove(); if (n > 1) t.append(Object.assign(document.createElement('span'), { className: 'artifact-viewer-version', textContent: ` · version ${n}` })); }, // Coral numbers the versions: the name is the agent's (#11865)
         body: () => d.querySelector('.artifact-viewer-body'),
@@ -196,10 +202,48 @@ function syncSandbox(d, body) {
     if (!seen) browserLocal.set('coral-sandbox-note', '1');
 }
 
+function stopMarkdownEdit() {
+    _editAbort?.abort(); _editAbort = null; _editor?.destroy(); _editor = null;
+}
+async function offerMarkdownEdit(d, hex, opts, gen) {
+    const button = d.querySelector('.artifact-viewer-edit'), item = d.querySelector('.artifact-viewer-edit-item'); button.hidden = item.hidden = true;
+    try {
+        const api = await importOnce('./artifact_markdown_api.js');
+        const context = api.editContext(opts.server, commentBoard(opts), hex);
+        const capability = await api.editCapability(context, { signal: _abort?.signal });
+        if (gen !== _gen || d.hidden || _editor) return;
+        _editCapability = capability ? { context, capability } : null; button.hidden = item.hidden = !capability;
+    } catch { /* no owner capability, no Edit button */ }
+}
+async function startMarkdownEdit(d) {
+    const granted = _editCapability; if (!granted || _editor) return;
+    const commentDraft = d.querySelector('.ac-composer');
+    if (commentDraft) { _comments.setSheet(true); commentDraft.querySelector('textarea')?.focus(); importOnce('./notifications.js').then(n => n.showToast('Send or cancel your comment before editing this document.', true)).catch(() => {}); return; }
+    const gen = _gen, button = d.querySelector('.artifact-viewer-edit');
+    d.querySelectorAll('.artifact-viewer-edit,.artifact-viewer-edit-item').forEach(b => { b.disabled = true; }); button.textContent = 'Opening editor…'; _editAbort?.abort(); _editAbort = new AbortController();
+    try {
+        const api = await importOnce('./artifact_markdown_api.js');
+        const source = await api.readEditSource(granted.context, { signal: _editAbort.signal });
+        const module = await importOnce('./artifact_markdown_editor.js');
+        if (gen !== _gen || d.hidden) return;
+        const commentsWereOpen = _comments.sheetOpen(); _comments.setSheet(false);
+        const restore = (base = granted.context.hex) => { stopMarkdownEdit(); if (gen === _gen && !d.hidden) { if (base !== granted.context.hex) openArtifactViewer(base, { ..._lastOpts, switched: false }); else { const preview = source.replace(/^\ufeff/, ''); renderArtifactText(d.querySelector('.artifact-viewer-body'), preview, 'artifact.md', granted.context.server); _comments.docRendered(preview, true); } _comments.setSheet(commentsWereOpen); } };
+        _editor = module.createMarkdownEditor({ body: d.querySelector('.artifact-viewer-body'), footer: d.querySelector('.artifact-viewer-foot'), dialog: d, context: granted.context, source,
+            onExit: restore,
+            onSaved: saved => { if (gen !== _gen) return; openArtifactViewer(saved.digest, { ..._lastOpts, filename: saved.name || _lastOpts.filename, switched: false }); },
+        });
+    } catch (error) {
+        if (gen !== _gen || error.name === 'AbortError') return;
+        const note = document.createElement('p'); note.className = 'field-error'; note.setAttribute('role', 'alert'); note.textContent = error.message || 'The editor could not be opened.'; d.querySelector('.artifact-viewer-body').prepend(note);
+    } finally { if (gen === _gen) { d.querySelectorAll('.artifact-viewer-edit,.artifact-viewer-edit-item').forEach(b => { b.disabled = false; }); button.textContent = 'Edit text'; } }
+}
+
 /** Open the artifact `hex` (64 lowercase hex). opts: { server, filename, mediaType }. */
 export function openArtifactViewer(hex, opts = {}) {
     hex = String(hex || '').toLowerCase();
     if (!HEX_RE.test(hex)) return false;
+    if (_editor?.beforeLeave(() => openArtifactViewer(hex, opts))) return false;
+    stopMarkdownEdit();
     const d = _dialog || (_dialog = _build());
     if (d.hidden) _returnFocus = document.activeElement;
     d.style.display = ''; // display-ok: clears an inline display:none an older page-wide Escape set; the viewer shows and hides with `hidden`
@@ -207,6 +251,7 @@ export function openArtifactViewer(hex, opts = {}) {
     _abort = new AbortController();
     const gen = ++_gen;
     _server = opts.server; _hex = hex; _lastOpts = opts;
+    _editCapability = null; const editButton = d.querySelector('.artifact-viewer-edit'); editButton.hidden = true; d.querySelector('.artifact-viewer-edit-item').hidden = true; d.querySelector('.artifact-viewer-edit-item').disabled = false; editButton.disabled = false; editButton.textContent = 'Edit text';
     _layoutType = null;
     setFullScreen(d, false);
     d.querySelector('.artifact-viewer-fullscreen').disabled = true;
@@ -244,11 +289,14 @@ export function openArtifactViewer(hex, opts = {}) {
         const link = document.createElement('button'); link.type = 'button'; link.className = 'dt-link detail-chip-link';
         link.textContent = markHidden(opts.goal, { strict: true }); wrap.title = link.textContent;
         const team = String(opts.goalTeam), goalId = String(opts.goalId);
-        link.addEventListener('click', async () => {
+        link.addEventListener('click', () => {
+          const leave = async () => {
             // a phone's viewer has its own history entry: closing it goes Back, and that lands after the click: the goal's page is opened once it has, or the Back would undo it
             const settled = _overlay ? new Promise(res => { window.addEventListener('popstate', () => res(), { once: true }); setTimeout(res, 600); }) : Promise.resolve();
-            closeArtifactViewer(); await settled;
+            closeArtifactViewer({ confirmed: true }); await settled;
             importOnce('./nav.js').then(n => n.go({ view: 'inbox-goals', sub: 'goals', id: team, item: goalId })).catch(() => {});
+          };
+          if (!_editor?.beforeLeave(leave)) leave();
         });
         wrap.append('Goal: ', link); chips.append(wrap);
     } else if (opts.goal) { const g = document.createElement('span'); g.className = 'chip detail-chip'; g.textContent = `Goal: ${markHidden(opts.goal, { strict: true })}`; g.title = g.textContent; chips.append(g); }
@@ -266,7 +314,7 @@ export function openArtifactViewer(hex, opts = {}) {
             setFullScreen(d, browserLocal.get('coral-artifact-fullscreen:' + _layoutType) === 'true');
             d.querySelector('.artifact-viewer-fullscreen').disabled = false;
         },
-        renderContent: (el, content, path, server) => { textShown = true; renderArtifactText(el, content, path, server); _comments.docRendered(content, true); },
+        renderContent: (el, content, path, server) => { textShown = true; renderArtifactText(el, content, path, server); _comments.docRendered(content, true); if (/\.(?:md|markdown|mdown)$/i.test(path || '')) offerMarkdownEdit(d, hex, opts, gen); },
         openEntry: (entry) => {
             const m = /^coral:\/\/artifacts\/([a-f0-9]{64})$/i.exec(entry.uri || '');
             if (m) openArtifactViewer(m[1], { server: opts.server, filename: entry.name, mediaType: entry.media_type });
@@ -290,8 +338,16 @@ export function openArtifactViewer(hex, opts = {}) {
     return true;
 }
 
- function closeArtifactViewer(opts) {
+ function closeArtifactViewer(opts = {}) {
     if (!_dialog || _dialog.hidden) return;
+    if (_editor && !opts.confirmed) {
+        const confirmed = { ...opts, confirmed: true };
+        if (_editor.beforeLeave(() => closeArtifactViewer(confirmed))) {
+            if (opts.popped) { _overlay = pushOverlay(() => closeArtifactViewer({ popped: true })); confirmed.popped = false; }
+            return;
+        }
+    }
+    stopMarkdownEdit();
     _versions?.close();
     _review?.close();
     _comments?.close(); // the sheet (above it) goes first, so Back's order and ours agree

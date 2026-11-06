@@ -24,7 +24,13 @@ function walk(dir, out = []) {
 }
 
 /** Everything in `src` that is a whole string literal or the whole text of an element: the places an icon name is written. */
-export function candidates(src) {
+export function candidates(src, filename = '') {
+    // #13756: Marked's lexer token comparison is not icon text. Exclude only these
+    // comparisons in the Markdown model; a list icon in any file (including this
+    // model's textContent or markup) must still count. Keep the startup font intact.
+    if (filename.replaceAll('\\', '/').endsWith('/static/artifact_markdown_model.js')) {
+        src = src.replace(/\b(?:[a-zA-Z_$][\w$]*\.)?type\s*===\s*(['"])list\1/g, match => match.replace(/(['"])list\1/, "''"));
+    }
     // An ARIA role or attribute value is never an icon's text (role="list", setAttribute('role', 'list'), setAttribute('aria-autocomplete', 'list')): left out, so the roles the pages need do not pull the icons named like them into the font (#5813).
     src = src.replace(/\baria-autocomplete\s*=\s*(["'])[a-z]+\1/g, 'aria-autocomplete=').replace(/\brole\s*=\s*(["'])[a-z]+\1/g, 'role=').replace(/(['"])role\1\s*,\s*(['"])[a-z]+\2/g, "'role', ''").replace(/(['"])aria-[a-z]+\1\s*,\s*(['"])[a-z]+\2/g, "'aria-', ''");
     const found = new Set();
@@ -52,7 +58,7 @@ export function scanIcons(root = FRONTEND) {
     const all = allNames(), names = new Set(), points = new Set();
     for (const f of walk(root)) {
         const src = fs.readFileSync(f, 'utf8');
-        for (const c of candidates(src)) if (all.has(c)) names.add(c);
+        for (const c of candidates(src, f)) if (all.has(c)) names.add(c);
         for (const p of codePoints(src)) points.add(p);
     }
     return { names: [...names].sort(), codePoints: [...points].sort((a, b) => a - b) };
