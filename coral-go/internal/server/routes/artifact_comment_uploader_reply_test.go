@@ -1,8 +1,11 @@
 package routes
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -124,4 +127,39 @@ func TestTheUploaderOnARemoteComputerRepliesToACommentTheOperatorNeverSent(t *te
 	code, list := rig.do("GET", cp(cmtDoc), cmtAsKey, nil)
 	require.Equal(t, http.StatusOK, code)
 	assert.Len(t, list["comments"], 2, "the Operator reads the agent's reply through the Hub's key")
+}
+
+// Security's SHOULD on #13762 (the record that was read must be the one that counts): the upload record must name the comment's own board, and a version the Operator saved in the editor (#13757 stores those under the
+// agent's session with an Operator uploader and source) does not make the agent that file's uploader.
+func TestTheUploadRecordMustBeTheAgentsOwnAndOnTheCommentsBoard(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	// a record that is NOT the agent's own upload: saved by the Operator (UploadedBy owner, Source edit)
+	rig.uploadedBySession(sendSid(1), "team-a")
+	path := filepath.Join(uploadsDir(rig.h.cfg.CoralDir(), sendSid(1)), cmtDoc+".json")
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err)
+	var rec map[string]any
+	require.NoError(t, json.Unmarshal(raw, &rec))
+	cid := rig.reviewComment("is this right?")
+
+	rec["uploaded_by"], rec["source"] = "owner", "edit"
+	edited, _ := json.Marshal(rec)
+	require.NoError(t, os.WriteFile(path, edited, 0o644))
+	code, out := rig.reply(cid, asAgentSession(1), "an Operator-saved version does not make me its uploader")
+	assert.Equal(t, http.StatusForbidden, code, fmt.Sprint(out))
+
+	// the agent's own upload, but made on ANOTHER board: not this comment's team
+	rec["uploaded_by"], rec["source"], rec["board"] = "", "", "team-b"
+	other, _ := json.Marshal(rec)
+	require.NoError(t, os.WriteFile(path, other, 0o644))
+	code, out = rig.reply(cid, asAgentSession(1), "wrong board")
+	assert.Equal(t, http.StatusForbidden, code, fmt.Sprint(out))
+
+	// restored to the agent's own record on this board: it answers
+	rec["board"] = "team-a"
+	own, _ := json.Marshal(rec)
+	require.NoError(t, os.WriteFile(path, own, 0o644))
+	code, out = rig.reply(cid, asAgentSession(1), "mine")
+	assert.Equal(t, http.StatusCreated, code, fmt.Sprint(out))
 }

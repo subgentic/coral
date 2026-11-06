@@ -152,7 +152,8 @@ func (h *SessionsHandler) uploaderMayReply(r *http.Request, id string, ls store.
 	if t.ResolvedAt != nil || t.DeletedAt != nil || t.ParentID != nil || t.Board == "" || h.bs == nil {
 		return false
 	}
-	if _, ok := readUploadRecord(h.cfg.CoralDir(), ls.SessionID, id); !ok {
+	rec, ok := readUploadRecord(h.cfg.CoralDir(), ls.SessionID, id)
+	if !ok || !isAgentUploadRecord(rec) || rec.Board != t.Board { // the record read must be the agent's OWN upload (not an Operator-saved version or a pasted image, which the Operator's edit stores under the agent's session, #13757) made on THIS comment's board
 		return false
 	}
 	subs, err := h.bs.ListSubscribers(r.Context(), t.Board)
