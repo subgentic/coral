@@ -180,7 +180,7 @@ function _build() {
     let _isPicture = false, _canWrite = false;
     const syncMarkUp = () => { d.querySelector('.artifact-viewer-markup').hidden = d.querySelector('.artifact-viewer-markup-item').hidden = !(_isPicture && _canWrite); };
     d._markUp = { picture: on => { _isPicture = on; syncMarkUp(); }, write: on => { _canWrite = on; syncMarkUp(); } };
-    _comments = attachComments(d, d.querySelector('.artifact-viewer-body'), d.querySelector('.artifact-viewer-main'), { shown: () => !d.hidden && !_editor, readOnly: () => _lastOpts.sourceNamed === false, onCanWrite: ok => d._markUp.write(ok), preferenceKey: () => _layoutType ? 'coral-artifact-comments:' + _layoutType : null });
+    _comments = attachComments(d, d.querySelector('.artifact-viewer-body'), d.querySelector('.artifact-viewer-main'), { shown: () => !d.hidden && !_editor, readOnly: () => _lastOpts.sourceNamed === false, uploader: () => _lastOpts.uploader, onCanWrite: ok => d._markUp.write(ok), preferenceKey: () => _layoutType ? 'coral-artifact-comments:' + _layoutType : null });
     _versions = attachVersions(d, {
         version: n => { const t = d.querySelector('.artifact-viewer-title'); t.querySelector('.artifact-viewer-version')?.remove(); if (n > 1) t.append(Object.assign(document.createElement('span'), { className: 'artifact-viewer-version', textContent: ` · version ${n}` })); }, // Coral numbers the versions: the name is the agent's (#11865)
         body: () => d.querySelector('.artifact-viewer-body'),
