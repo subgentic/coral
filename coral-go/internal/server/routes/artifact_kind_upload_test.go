@@ -458,3 +458,43 @@ func TestAChainJoinOntoAFileThatIsNoLongerTheNewestIsRefusedBeforeAnythingIsWrit
 	assert.Equal(t, "coral://artifacts/"+v4, out["uri"])
 	assert.Len(t, seriesMembers(k.coralDir, sid), 4, "nothing was added")
 }
+
+// #13908: two follow-ups of one parent are different deliverables. UI/UX's settings page (a follow-up of #13891) joined Developer experience's skill (another follow-up of #13891) as versions 5 to 7, because the chain's file was
+// kept under the chain's ROOT. A file is kept under the task that made it now, and a task joins the nearest open file of its own line.
+func TestSiblingFollowUpsNeverShareAFileAndEachKeepsItsOwnSeries(t *testing.T) {
+	k := newKindRig(t)
+	ctx := context.Background()
+	parent, err := k.h.bs.CreateTask(ctx, "alpha", "OPERATOR the draft", "", "medium", "lead", "Backend")
+	require.NoError(t, err)
+	skill := k.followUp("Skill", "Backend", parent.ID)
+	settings := k.followUp("Settings page", "Frontend", parent.ID)
+
+	code, out := k.upTask("s1", skill, "the skill, version one", "&name=skill.md")
+	require.Equal(t, 201, code, out)
+	skillV1 := out["uri"].(string)
+	code, out = k.upTask("s2", settings, "the settings page, version one", "&name=settings.md")
+	require.Equal(t, 201, code, out)
+	assert.Nil(t, out["series_id"], "a sibling's file is not the skill's series")
+	settingsV1 := out["uri"].(string)
+	require.NotEqual(t, skillV1, settingsV1)
+
+	// each sibling's next upload continues its OWN file
+	code, out = k.upTask("s2", settings, "the settings page, version two", "&name=settings.md")
+	require.Equal(t, 201, code, out)
+	assert.EqualValues(t, 2, out["version"])
+	settingsSeries := out["series_id"]
+	code, out = k.upTask("s1", skill, "the skill, version two", "&name=skill.md")
+	require.Equal(t, 201, code, "the skill's own upload is not refused as stale by the sibling's: %v", out)
+	assert.EqualValues(t, 2, out["version"])
+	assert.NotEqual(t, settingsSeries, out["series_id"], "two series")
+
+	// a follow-up of the skill is in the skill's line, not the settings page's
+	kid := k.followUp("Skill fix", "Backend", skill)
+	code, out = k.upTask("s1", kid, "the skill, version three", "&name=skill.md")
+	require.Equal(t, 201, code, out)
+	assert.EqualValues(t, 3, out["version"], "the line (task, follow-up) shares one growing file")
+	// and the skill task itself continues the file its follow-up extended
+	code, out = k.upTask("s1", skill, "the skill, version four", "&name=skill.md")
+	require.Equal(t, 201, code, "the parent after its follow-up is not stale: %v", out)
+	assert.EqualValues(t, 4, out["version"])
+}
