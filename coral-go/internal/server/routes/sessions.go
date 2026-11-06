@@ -105,6 +105,7 @@ type SessionsHandler struct {
 	// editPost posts the message of Send to agent with the diff; nil is the board store's own post (a test sets it to make the post fail, #13802).
 	editPost     func(ctx context.Context, project, content string) error
 	commentLimit commentLimiter
+	changeLocks  sync.Map    // artifact id -> *sync.Mutex: the lock of one artifact's Request changes words (#13976)
 	sendLimit    sendLimiter // Send to agent: asks per owner per hour (#6443)
 	// wsHeartbeat overrides wsHeartbeatInterval when set (nanoseconds; tests).
 	wsHeartbeat  atomic.Int64

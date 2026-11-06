@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -90,6 +91,9 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 		Quiet    bool   `json:"quiet"`  // automatic settlement of older versions; ignore only
 		Reason   string `json:"reason"` // deny only: the Operator's one line to the uploader
 		Note     string `json:"note"`   // approve only: the Operator's one short comment to the uploader (#11888)
+		// Text is changes only (#13976): the Operator's words, made the thread comment and the agent's notice in the same step as the decision. Images is no part of this slice: its key is refused, not ignored.
+		Text   string          `json:"text"`
+		Images json.RawMessage `json:"images"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -99,11 +103,19 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "quiet applies only to automatic older-version settlement (ignore)")
 		return
 	}
+	if body.Images != nil {
+		commentRefuse(w, http.StatusBadRequest, "images_not_in_this_slice", "pictures do not go with a decision yet: comment with them, then decide")
+		return
+	}
+	if strings.TrimSpace(body.Text) != "" && body.Decision != "changes" {
+		commentRefuse(w, http.StatusBadRequest, "text_only_for_changes", "text goes with Request changes; Approve has its note and Deny its reason")
+		return
+	}
 	if strings.TrimSpace(body.Note) != "" && body.Decision != "approve" {
 		commentRefuse(w, http.StatusBadRequest, "note_only_for_approve", "a note goes with Approve; Changes has its own comment and Deny its reason")
 		return
 	}
-	state := ""
+	state, words := "", ""
 	switch body.Decision {
 	case "approve":
 		state = board.ReviewApproved
@@ -113,6 +125,14 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 		}
 	case "changes":
 		state = board.ReviewChangesRequested
+		if strings.TrimSpace(body.Text) != "" {
+			clean, werr := changeWordsClean(body.Text)
+			if werr != nil {
+				commentRefuse(w, werr.Status, werr.Code, werr.Msg)
+				return
+			}
+			words = clean
+		}
 	case "deny":
 		state = board.ReviewDenied
 		if hasSignInLink(body.Reason) {
@@ -149,6 +169,9 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 	if state == board.ReviewDenied {
 		note = body.Reason
 	}
+	if words != "" {
+		note = words // the Activity row carries the redacted words, cut by the record itself at board.ActivityNoteCap (the Hub lists these rows)
+	}
 	if throughAHub(r) { // a hub caller (the tunnel, or the self-hosted hub: its stamp or its API key) never changes a decision already made on the file (#13494); this computer's own dashboard still may
 		r = r.WithContext(board.WithOneDecision(r.Context()))
 	}
@@ -168,9 +191,39 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "could not record the review")
 		return
 	}
+	var wordsDone ChangeWords
+	if words != "" && h.changeWords != nil {
+		var werr error
+		if wordsDone, werr = h.changeWords(r, project, id, words); werr != nil {
+			wordsDone.Undo()
+			if uerr := h.bs.UndoArtifactReview(context.WithoutCancel(r.Context()), change); uerr != nil {
+				slog.Error("[artifact review] changes: the decision of a failed request could not be undone", "board", project, "artifact", id, "error", uerr)
+			}
+			var ce *changeWordsError
+			if errors.As(werr, &ce) {
+				commentRefuse(w, ce.Status, ce.Code, ce.Msg)
+			} else {
+				errInternalServer(w, "the words could not be kept, so the decision was not recorded")
+			}
+			return
+		}
+	}
 	inboxActioned(r, tracking.InboxReview, "", body.Decision, inboxTime(item.CreatedAt)) // the Inbox's numbers (#7512): a person's own decision, by kind and action only
 	reviews, _ := h.bs.ArtifactReviews(r.Context(), project)
 	out := map[string]any{"id": id, "state": state, "changed": change.Changed, "tags": tags, "review": reviews[id], "delivered": false}
+	if words != "" && h.changeWords != nil { // text_kept is how a client knows this computer took the words: one that predates them ignores the field and says nothing
+		out["text_kept"], out["comment_id"], out["delivered"] = true, wordsDone.CommentID, wordsDone.Delivery.To != ""
+		if wordsDone.Delivery.To != "" {
+			out["to"] = wordsDone.Delivery.To
+		} else if wordsDone.Delivery.Reason != "" {
+			out["reason"] = wordsDone.Delivery.Reason
+		}
+		if state == board.ReviewChangesRequested && change.Changed {
+			h.tellChief(context.WithoutCancel(r.Context()), board.ActChanges, "file", project, item.Name, wordsDone.Delivery.To)
+		}
+		writeJSON(w, http.StatusOK, out)
+		return
+	}
 	if (state != board.ReviewApproved && state != board.ReviewDenied) || !change.Changed {
 		if state == board.ReviewChangesRequested && change.Changed { // no message goes to the agent from here, but Chief hears the Operator's decision (#12171)
 			h.tellChief(context.WithoutCancel(r.Context()), board.ActChanges, "file", project, item.Name, "")
