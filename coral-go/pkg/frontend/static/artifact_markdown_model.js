@@ -73,6 +73,44 @@ function listRuns(token, view, runs, units, source) {
     }
     return true;
 }
+// GFM table separators are unescaped pipes. The only cell-text transform made
+// here is the lexer's escaped-pipe transform, recorded for exact source validation.
+function tableRuns(token, view, runs, units) {
+    const lines = view.text.split('\n'), rows = [token.header, ...token.rows]; let lineStart = 0;
+    for (let lineIndex = 0, rowIndex = 0; lineIndex < lines.length; lineStart += lines[lineIndex++].length + 1) {
+        const line = lines[lineIndex]; if (lineIndex === 1) continue;
+        if (rowIndex >= rows.length) { if (line.trim()) return false; continue; }
+        const boundaries = [-1]; let slashes = 0;
+        for (let i = 0; i < line.length; i++) {
+            if (line[i] === '|' && slashes % 2 === 0) boundaries.push(i);
+            slashes = line[i] === '\\' ? slashes + 1 : 0;
+        }
+        boundaries.push(line.length);
+        let cells = boundaries.slice(0,-1).map((left,i)=>({from:left+1,to:boundaries[i+1]}));
+        if (cells.length && !line.slice(cells[0].from,cells[0].to).trim() && boundaries[1] < line.length) cells.shift();
+        if (cells.length && !line.slice(cells.at(-1).from,cells.at(-1).to).trim() && boundaries.at(-2) >= 0) cells.pop();
+        const expected = rows[rowIndex++]; if (cells.length !== expected.length) return false;
+        for (let i = 0; i < cells.length; i++) {
+            let {from,to} = cells[i]; while(from<to && /[ \t]/.test(line[from]))from++;while(to>from && /[ \t]/.test(line[to-1]))to--;
+            let text = ''; const positions = [], escapes = {};
+            for (let j=from;j<to;j++) {
+                positions.push(view.positions[lineStart+j]);
+                if(line[j] === '\\' && line[j+1] === '|') {escapes[text.length]='\\|';text+='|';j++;} else text+=line[j];
+            }
+            positions.push(view.positions[lineStart+to]);
+            if(text !== expected[i].text) return false;
+            const local = []; if(!inlineRuns(expected[i].tokens,text,0,local))return false;
+            const first = runs.length;
+            for(const run of local) {
+                const pos=positions.slice(run.start,run.end+1), sourceEscapes={};
+                for(const [where,value] of Object.entries(escapes))if(Number(where)>=run.start&&Number(where)<run.end)sourceEscapes[Number(where)-run.start]=value;
+                runs.push({...run,start:pos[0],end:pos.at(-1),sourceOffsets:pos,sourceEscapes,tableCell:true});
+            }
+            units.push({start:view.positions[lineStart+from],end:view.positions[lineStart+to],first,count:runs.length-first});
+        }
+    }
+    return true;
+}
 export function analyze(source, marked) {
     if (new TextEncoder().encode(source).length > MAX_BYTES) throw new Error('Markdown editing is limited to 2 MiB.');
     const { text, offsets } = normalizeSource(source); const blocks = []; let offset = 0;
@@ -84,7 +122,8 @@ export function analyze(source, marked) {
         else if (type === 'paragraph' || type === 'heading') {
             if (!inlineRuns(tokens.tokens, raw, start, block.runs)) block.reason = 'Text does not map exactly';
             block.units.push({ start, end: start + raw.length, first: 0, count: block.runs.length });
-        } else if (type === 'list') { if (!listRuns(tokens, { text: raw, positions: Array.from({length:raw.length+1},(_,i)=>start+i) }, block.runs, block.units, text)) block.reason = 'Nested or indented list'; }
+        } else if (type === 'table') { if (!tableRuns(tokens, {text:raw,positions:Array.from({length:raw.length+1},(_,i)=>start+i)}, block.runs, block.units)) block.reason = 'Table cells do not map exactly'; }
+        else if (type === 'list') { if (!listRuns(tokens, { text: raw, positions: Array.from({length:raw.length+1},(_,i)=>start+i) }, block.runs, block.units, text)) block.reason = 'Nested or indented list'; }
         else block.reason = ({ table: 'Table', code: 'Code block', html: 'Raw HTML', frontmatter: 'Front matter', definition: 'Reference definition', blockquote: 'Quoted block', hr: 'Divider' })[type] || 'Unsupported block';
         if (block.reason) block.runs = [];
         block.runs = block.runs.map(run => ({ ...run, start: offsets[run.start], end: offsets[run.end], ...(run.sourceOffsets ? {sourceOffsets:run.sourceOffsets.map(i=>offsets[i])} : {}) }));
@@ -115,7 +154,7 @@ export function mapRenderedBlock(block, element) {
     const nodes = []; const walker = document.createTreeWalker(element, 4);
     while (walker.nextNode()) {
         const node = walker.currentNode;
-        if (node.parentElement.closest('p,h1,h2,h3,h4,h5,h6,li') && !node.parentElement.closest('pre')) nodes.push(node);
+        if (node.parentElement.closest('p,h1,h2,h3,h4,h5,h6,li,td,th') && !node.parentElement.closest('pre')) nodes.push(node);
     }
     const planned = new Map(); let index = 0, at = 0;
     for (const run of block.runs) {
@@ -147,7 +186,7 @@ export function mapRenderedBlock(block, element) {
 const escapeInserted = s => s.replace(/[\\\x60*_[\]<>~!|#()+.\-]/g, '\\$&');
 export function editRun(source, run, text) {
     const original = normalizeSource(source.slice(run.start, run.end));
-    const mapped = run.sourceOffsets ? run.text.split('').every((c,i)=>(source[run.sourceOffsets[i]]==='\r'?'\n':source[run.sourceOffsets[i]])===c) : original.text === run.text;
+    const mapped = run.sourceOffsets ? run.text.split('').every((c,i)=>(run.sourceEscapes?.[i] ? source.slice(run.sourceOffsets[i],run.sourceOffsets[i]+run.sourceEscapes[i].length)===run.sourceEscapes[i] : (source[run.sourceOffsets[i]]==='\r'?'\n':source[run.sourceOffsets[i]])===c)) : original.text === run.text;
     if (!run.editable || !mapped) throw new Error('This text cannot be changed without affecting its Markdown.');
     if (HIDDEN.test(text)) throw new Error('Hidden and bidirectional characters cannot be inserted here.');
     // Work in Unicode code points so an emoji is never split between surrogate halves.
@@ -159,7 +198,7 @@ export function editRun(source, run, text) {
     if (run.kind === 'code' && /\x60/.test(inserted)) throw new Error('A code-span delimiter cannot be edited.');
     const positions = run.sourceOffsets || original.offsets.map(i=>run.start+i);
     const start = positions[before.slice(0, a).join('').length], end = positions[run.text.length - before.slice(before.length - b).join('').length];
-    let replacement = run.kind === 'code' ? inserted : escapeInserted(inserted);
+    let replacement = run.kind === 'code' ? (run.tableCell ? inserted.replace(/\|/g,'\\|') : inserted) : escapeInserted(inserted);
     if (run.newlinePrefix != null) replacement = replacement.replace(/\r?\n/g, (source.includes('\r\n')?'\r\n':'\n') + run.newlinePrefix);
     return { source: source.slice(0, start) + replacement + source.slice(end), patch: { start, end, removed: source.slice(start, end), inserted: replacement } };
 }

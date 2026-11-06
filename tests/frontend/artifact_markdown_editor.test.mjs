@@ -87,3 +87,17 @@ test('a multiline plain-text paste into a list retains the same items',()=>{
  const ui=setup('- First words\n  - Nested words\n- Last words\n');const span=[...ui.body.querySelectorAll('.amd-text')].find(e=>e.textContent==='Nested words');assert.ok(span);assert.equal(span.getAttribute('aria-multiline'),'true','Enter continues this textbox');span.focus();const range=document.createRange();range.selectNodeContents(span);const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);
  const paste=new Event('paste',{bubbles:true,cancelable:true});Object.defineProperty(paste,'clipboardData',{value:{getData:()=> 'New words\n1. literal'}});span.dispatchEvent(paste);assert.equal(span.textContent,'New words\n1. literal');span.blur();assert.equal(ui.body.querySelectorAll('li').length,3);assert.equal(ui.footer.querySelector('.amd-save').disabled,false);ui.close();
 });
+
+test('table edits escape typed pipes and reject a pasted row break',async()=>{
+ const source='\ufeff| Item | Owner |\r\n|---|---|\r\n| Report | Operator |\r\n';let sent;let done;const saved=new Promise(r=>{done=r;});globalThis.fetch=window.fetch=async(u,o)=>{sent=o.body;return Response.json({id:next,version:2});};const ui=setup(source,done);
+ const span=[...ui.body.querySelectorAll('.amd-text')].find(e=>e.textContent==='Operator');assert.ok(span);assert.equal(span.getAttribute('aria-multiline'),null);span.focus();const range=document.createRange();range.selectNodeContents(span);getSelection().removeAllRanges();getSelection().addRange(range);const paste=new Event('paste',{bubbles:true,cancelable:true});Object.defineProperty(paste,'clipboardData',{value:{getData:()=> 'New\nRow'}});span.dispatchEvent(paste);assert.equal(span.textContent,'Operator');
+ change(ui.body,'Operator','New | Owner');assert.equal(ui.body.querySelectorAll('td').length,2);ui.footer.querySelector('.amd-save').click();await saved;assert.equal(Buffer.from(sent).toString(),source.replace('Operator','New \\| Owner'));ui.close();
+});
+
+test('table drafts survive either stale refusal without an automatic second POST',async()=>{
+ for(const code of ['stale_version','stale_base']){
+  const source='| Item | Owner |\n|---|---|\n| Report | Operator |\n',theirs=source.replace('Operator','Agent');let posts=0;
+  globalThis.fetch=window.fetch=async(u,o={})=>{if(o.method==='POST'){posts++;return Response.json({code,latest_digest:latest,latest_version:2},{status:409});}return new Response(theirs);};const ui=setup(source);change(ui.body,'Operator','My words');const ready=observeUntil(ui.body,()=>!!ui.body.querySelector('.amd-open-latest'));ui.footer.querySelector('.amd-save').click();await ready;
+  const opened=observeUntil(ui.body,()=>!!ui.body.querySelector('.amd-kept:not([hidden])'));ui.body.querySelector('.amd-open-latest').click();await opened;assert.equal(posts,1);assert.match(ui.body.querySelector('.amd-kept').textContent,/My words/);assert.match(ui.body.querySelector('.amd-document').textContent,/Agent/);assert.equal(ui.footer.querySelector('.amd-save').disabled,true);ui.close();
+ }
+});

@@ -13,6 +13,7 @@ const shape = element => [...element.querySelectorAll('*')].map(e => [e.tagName,
 function render(raw, references) {
     const body = el('div', 'prose prose-doc amd-prose');
     body.innerHTML = renderMarkdownStrict(raw + (references ? '\n\n' + references : ''));
+    if (body.querySelector('table')) body.classList.add('md');
     return body;
 }
 function showSpecials(host) {

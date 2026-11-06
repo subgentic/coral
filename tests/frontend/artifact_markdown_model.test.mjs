@@ -46,7 +46,7 @@ test('inserted Markdown characters are literal text and no old punctuation is re
 });
 test('readonly categories, ambiguous escapes and hidden characters never become editable', () => {
     const source = '---\ntitle: Keep\n---\n\n| A | B |\n| - | - |\n| x | y |\n\n```js\nconst x = 1;\n```\n\n<div>raw</div>\n\nHidden\u202e text\n';
-    const model = analyze(source, marked); for (const block of model.blocks) if (['frontmatter','table','code','html'].includes(block.type) || block.raw.includes('\u202e')) assert.equal(block.runs.length, 0);
+    const model = analyze(source, marked); for (const block of model.blocks) if (['frontmatter','code','html'].includes(block.type) || block.raw.includes('\u202e')) assert.equal(block.runs.length, 0);
     assert.equal(mapped('A &amp; B \\*escaped\\* word.\n').length, 0);
     const run = mapped('Keep these words.\n')[0]; assert.throws(() => editRun('Keep these words.\n', run, 'Keep\nthese words.'), /line breaks/);
     assert.throws(() => editRun('Keep these words.\n', run, 'Keep\u202ethese words.'), /Hidden/);
@@ -87,4 +87,14 @@ test('numbered, loose and task-list labels retain numbering, checkbox state and 
   assert.equal(editRun(source,run,run.text.replace('First','New')).source,source.replace('First','New'));
   const next=editRun(source,run,run.text+'\n# literal').source;const host=document.createElement('div');host.innerHTML=renderMarkdownStrict(next);assert.equal(host.querySelectorAll('li').length,2);assert.equal(host.querySelectorAll('h1,h2,h3').length,0);assert.ok(next.includes('\\# literal'));assert.equal(next.includes('[x]'),source.includes('[x]'));
  }
+});
+
+test('table cells preserve delimiters, alignment, escaped pipes, code spans and untouched CRLF bytes',()=>{
+ const source='\ufeff| A | B |\r\n|:---|---:|\r\n| x \\| y | `a\\|b` |\r\n';
+ let runs=mapped(source),cell=runs.find(r=>r.text==='x | y'),code=runs.find(r=>r.text==='a|b');assert.ok(cell&&code,'table cells are editable');
+ assert.equal(editRun(source,cell,'x | revised').source,source.replace('x \\| y','x \\| revised'));
+ assert.equal(editRun(source,code,'a|b|c').source,source.replace('`a\\|b`','`a\\|b\\|c`'));
+ const changed=editRun(source,cell,'x | y | extra').source;assert.ok(changed.includes('x \\| y \\| extra'));const host=document.createElement('div');host.innerHTML=renderMarkdownStrict(changed.replace(/^\ufeff/,''));assert.equal(host.querySelectorAll('td').length,2);assert.equal(host.querySelectorAll('tr').length,2);
+ const again=mapped(changed).find(r=>r.text==='x | y | extra');assert.ok(again);assert.equal(editRun(changed,again,'x y extra').source,changed.replace('x \\| y \\| extra','x y extra'));
+ assert.throws(()=>editRun(source,cell,'x\nnew row'),/line breaks/);
 });

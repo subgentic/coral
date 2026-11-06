@@ -59,6 +59,14 @@ const hexOf = data => String(data.digest || data.hex || data.id || '').replace(/
             assert.ok(await ev(`document.querySelector('.amd-kept').textContent.includes('My unsaved parent')`));assert.equal(await ev(`document.querySelector('.amd-save').disabled`),true);
             await shot(`lists-stale-${w}`);await nativeClick('.amd-cancel');await waitFor(`!!document.querySelector('.amd-discard[open]')`,'old draft guarded',5000);await nativeClick('.amd-discard .btn-danger');await waitFor(`!document.querySelector('.amd-editor')`,'discard explicit',5000);await nativeClick('.artifact-viewer-close');
             console.log(`PASS nested/continued lists, literal continuation, exact saved bytes and no stale auto-save ${w}px ${font}px`);
+            const tableName=`table-${w}.md`,tableSource=`\ufeff# Tables ${w}\r\n\r\n| Item | Owner |\r\n|:---|---:|\r\n| Report | Operator |\r\n| Code | \x60a\\|b\x60 |\r\n`;
+            const tableHex=await upload(tableName,tableSource);await open(tableHex,tableName);await waitFor(`!document.querySelector('.artifact-viewer-edit').hidden`,'table edit capability',8000);await shot(`tables-before-${w}`);await edit();await waitFor(`!!document.querySelector('.amd-document table .amd-text')`,'mapped table cells',8000);
+            assert.equal(await ev(`getComputedStyle(document.querySelector('.amd-document td')).borderTopWidth`),'1px','shared content table borders remain in the editor');await type('Operator','New | Owner');await ev(`document.activeElement.blur()`);await type('a|b','a|b|c');await ev(`document.activeElement.blur()`);
+            assert.equal(await ev(`document.querySelectorAll('.amd-document td').length`),4);assert.equal(await ev(`document.querySelectorAll('.amd-document tr').length`),3);await shot(`tables-draft-${w}`);await nativeClick('.amd-save');await waitFor(`!document.querySelector('.amd-editor') && !!document.querySelector('.artifact-viewer-version')`,'table version saved',10000);
+            const tableVersions=(await person('GET',`/api/artifacts/${tableHex}/versions`)).data;assert.equal(tableVersions.length,2);const tableSaved=hexOf(tableVersions.find(v=>v.is_latest)||tableVersions.at(-1));
+            const tableExpected=tableSource.replace('Operator','New \\| Owner').replace('`a\\|b`','`a\\|b\\|c`');assert.equal(Buffer.from(await bytes(tableSaved)).toString(),tableExpected,'table edits keep bars, alignment, code delimiters and untouched bytes');assert.equal(await ev(`document.querySelectorAll('.artifact-viewer-markdown td').length`),4);await shot(`tables-saved-${w}`);await nativeClick('.artifact-viewer-close');
+            console.log(`PASS table cell/code pipes, fixed shape and exact saved bytes ${w}px ${font}px`);
+
         }
     } finally { if(author)await author.stop().catch(()=>{});await removeBoards(ev,[B]);await client.close(); }
 })().catch(error=>{console.error(error);process.exit(1);});
