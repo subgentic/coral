@@ -8,7 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -353,4 +355,75 @@ func TestAnyoneButTheOwnerGetsOwnerOnlyAndNothingIsWritten(t *testing.T) {
 	asks, err := c.ss.ListArtifactAsks(context.Background(), c.id)
 	require.NoError(t, err)
 	assert.Empty(t, asks, "no ask")
+}
+
+// #13998: the notice is claimed under the artifact's lock and delivered outside it. A slow delivery holds no other request for the same artifact, and still one comment and one notice come of it.
+func TestASlowDeliveryDoesNotHoldASecondRequestAndStillMakesOneNotice(t *testing.T) {
+	c := newChangesEnv(t)
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var once sync.Once
+	c.sh.changeDelivering = func() {
+		once.Do(func() {
+			close(entered)
+			<-release // the first request's delivery is slow
+		})
+	}
+	words := `{"decision":"changes","text":"Use 5,000 rows per batch."}`
+	firstDone := make(chan int, 1)
+	go func() { code, _ := c.changesNoT(words); firstDone <- code }()
+	<-entered // the first has made the comment, claimed the notice and let go of the lock
+	secondDone := make(chan map[string]any, 1)
+	go func() { _, out := c.changesNoT(words); secondDone <- out }()
+	select {
+	case out := <-secondDone:
+		assert.Equal(t, true, out["text_kept"])
+		assert.Equal(t, "already_sent", out["reason"], "the notice is the first request's to deliver")
+	case <-time.After(10 * time.Second):
+		close(release)
+		t.Fatal("the second request waited for the first one's delivery")
+	}
+	assert.Empty(t, c.messages(t), "nothing is delivered yet")
+	close(release)
+	assert.Equal(t, http.StatusOK, <-firstDone)
+	assert.Len(t, c.comments(t), 1, "one comment")
+	assert.Len(t, c.messages(t), 1, "one notice")
+	// the claim is dropped when the delivery is done: the same words again find the ask and send nothing more
+	code, again := c.changes(t, words)
+	require.Equal(t, http.StatusOK, code, again)
+	assert.Len(t, c.messages(t), 1)
+}
+
+// A delivery that fails drops its claim: the retry delivers (the half-failure retry of #13976 still works).
+func TestAFailedDeliveryDropsItsClaimSoTheRetryDelivers(t *testing.T) {
+	c := newChangesEnv(t)
+	_, err := c.sh.db.ExecContext(context.Background(), `ALTER TABLE artifact_comment_asks RENAME TO asks_away`)
+	require.NoError(t, err)
+	words := `{"decision":"changes","text":"Use 5,000 rows."}`
+	code, out := c.changes(t, words)
+	assert.GreaterOrEqual(t, code, 500, out)
+	assert.Empty(t, c.comments(t))
+	_, err = c.sh.db.ExecContext(context.Background(), `ALTER TABLE asks_away RENAME TO artifact_comment_asks`)
+	require.NoError(t, err)
+	code, out = c.changes(t, words)
+	require.Equal(t, http.StatusOK, code, out)
+	assert.Equal(t, true, out["delivered"], "the claim of the failed attempt did not stay")
+	assert.Len(t, c.messages(t), 1)
+}
+
+// A delivery that ended with nobody to tell (the agent was gone) keeps its comment; its claim is dropped, so the same words again, once the agent is back, deliver the notice that never went.
+func TestTheClaimOfADeliveryToNobodyIsDroppedSoALaterRetryTellsTheAgent(t *testing.T) {
+	c := newChangesEnv(t)
+	require.NoError(t, c.ss.SetSessionArchived(context.Background(), sessAlice, true))
+	words := `{"decision":"changes","text":"Use 5,000 rows."}`
+	code, out := c.changes(t, words)
+	require.Equal(t, http.StatusOK, code, out)
+	assert.Equal(t, false, out["delivered"])
+	assert.Empty(t, c.messages(t))
+	require.NoError(t, c.ss.SetSessionArchived(context.Background(), sessAlice, false))
+	code, out = c.changes(t, words)
+	require.Equal(t, http.StatusOK, code, out)
+	assert.Equal(t, true, out["delivered"], "the claim of the first attempt did not stay")
+	assert.Len(t, c.messages(t), 1)
+	assert.Len(t, c.comments(t), 1, "still one comment")
 }
