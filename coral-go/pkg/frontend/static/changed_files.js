@@ -291,9 +291,9 @@ export async function loadChangedFiles(agentName, sessionId, quiet = false) { //
         if (!resp.ok) { dropBody(resp); throw new Error(`files fetch failed: ${resp.status}`); }
         const data = await resp.json();
         if (staleRead()) return; // the answer is for an agent that is no longer open
-        const wasPaused = JSON.stringify(pausedNow()), wasTotal = _totalChanged;
+        const wasPaused = JSON.stringify(pausedNow()), wasTotal = _totalChanged, wasTimedOut = timedOutNow();
         readPause(data, mine);
-        if (quiet && JSON.stringify(data.files || []) === JSON.stringify(_currentFiles) && JSON.stringify(data.worktree || null) === JSON.stringify(_worktree) && wasPaused === JSON.stringify(pausedNow()) && wasTotal === _totalChanged) return;
+        if (quiet && JSON.stringify(data.files || []) === JSON.stringify(_currentFiles) && JSON.stringify(data.worktree || null) === JSON.stringify(_worktree) && wasPaused === JSON.stringify(pausedNow()) && wasTotal === _totalChanged && wasTimedOut === timedOutNow()) return;
         _currentFiles = data.files || [];
         _worktree = data.worktree && typeof data.worktree === 'object' ? data.worktree : null; paintWhere();
         _notGit = data.is_git === false;
@@ -324,9 +324,11 @@ const FOLLOW_DELAY_MS = 300;
 const MIN_REFRESH_GAP_MS = 2000;
 let _refreshBusy = false, _refreshQueued = false, _queuedQuiet = true, _refreshAt = 0;
 // A folder git is too slow for is paused by the server (#13079): live updates stop, the list is the last one, and Refresh asks for one pass. The page makes no automatic request for it meanwhile.
-let _paused = null, _pausedFor = '', _totalChanged = 0, _wantLive = false;
+let _paused = null, _pausedFor = '', _totalChanged = 0, _wantLive = false, _timedOut = false;
 const pausedNow = () => (_paused && _pausedFor === _keyOf(state.currentSession) ? _paused : null);
-const readPause = (data, key) => { _paused = data && data.paused && typeof data.paused === 'object' ? data.paused : null; _pausedFor = key; _totalChanged = Number(data && data.total_changed) || 0; };
+// git ran out of time for the pass (the server's timed_out): the list is the last good one, or empty when there never was one, and the panel says so instead of '0 files changed'.
+const timedOutNow = () => _timedOut && _pausedFor === _keyOf(state.currentSession);
+const readPause = (data, key) => { _paused = data && data.paused && typeof data.paused === 'object' ? data.paused : null; _pausedFor = key; _totalChanged = Number(data && data.total_changed) || 0; _timedOut = !!(data && data.timed_out); };
 async function followRead(quiet = false) {
     const cur = state.currentSession;
     if (cur && cur.hubReadOnly) { loadChangedFiles(cur.name, cur.session_id, quiet); return; }
@@ -596,7 +598,8 @@ const refreshViewKey = (agentName, sessionId) => `${currentServer()}|${agentName
 function staleNoteHtml() {
     const pz = pausedNow();
     const paused = pz ? `<div class="files-stale-note files-paused-note" role="status"><span>Live updates paused: this repo is large (${escapeHtml(String(Math.max(pz.changes || 0, _currentFiles.length)).replace(/\B(?=(\d{3})+(?!\d))/g, ','))} changes) and reading it takes a while.</span> <button type="button" class="btn btn-small" data-on-click="files-refresh">Refresh</button> <button type="button" class="btn btn-small btn-quiet" data-on-click="files-live-on">Turn on live updates</button></div>` : '';
-    return paused + (_refreshBlock ? '<div class="files-stale-note">This computer is in View mode, so Coral does not re-check its files from here: the list may be out of date.</div>' : '');
+    const timedOut = timedOutNow() ? `<div class="files-stale-note files-timedout-note" role="status"><span>Git took too long on this folder${_currentFiles.length > 0 ? '; showing the last list' : ''}.</span> <button type="button" class="btn btn-small" data-on-click="files-refresh">Refresh</button></div>` : '';
+    return timedOut + paused + (_refreshBlock ? '<div class="files-stale-note">This computer is in View mode, so Coral does not re-check its files from here: the list may be out of date.</div>' : '');
 }
 /** 'Turn on live updates' for a paused folder: one pass that also lets the poller and the page's follow take the folder up again (they pause it again if git is still slow). */
 export function turnOnLiveFiles() { _wantLive = true; return refreshChangedFiles(); }
@@ -642,9 +645,9 @@ export async function refreshChangedFiles(quiet = false, auto = false) { // quie
         if (resp.ok) {
             const data = await resp.json();
             if (_keyOf(state.currentSession) !== mine) { if (btn) btn.classList.remove('refreshing'); return; } // the answer is for an agent that is no longer open
-            const wasPaused = JSON.stringify(pausedNow()), wasTotal = _totalChanged;
+            const wasPaused = JSON.stringify(pausedNow()), wasTotal = _totalChanged, wasTimedOut = timedOutNow();
             readPause(data, mine);
-            if (quiet && JSON.stringify(data.files || []) === JSON.stringify(_currentFiles) && JSON.stringify(data.worktree || null) === JSON.stringify(_worktree) && wasPaused === JSON.stringify(pausedNow()) && wasTotal === _totalChanged) return;
+            if (quiet && JSON.stringify(data.files || []) === JSON.stringify(_currentFiles) && JSON.stringify(data.worktree || null) === JSON.stringify(_worktree) && wasPaused === JSON.stringify(pausedNow()) && wasTotal === _totalChanged && wasTimedOut === timedOutNow()) return;
             _currentFiles = data.files || [];
             _worktree = data.worktree && typeof data.worktree === 'object' ? data.worktree : null; paintWhere();
             _notGit = data.is_git === false;
@@ -733,7 +736,7 @@ document.addEventListener('keydown', e => {
             ? `<span class="file-adds">+${totals.adds}</span><span class="file-dels">-${totals.dels}</span>`
             : '';
         const cut = _totalChanged > files.length && !pausedNow() ? ` Showing ${files.length.toLocaleString('en-US')} of ${_totalChanged.toLocaleString('en-US')} changed files` : '';
-        const html = `<span class="changed-files-count">${cut ? escapeHtml(cut.trim()) : `${files.length} file${files.length !== 1 ? 's' : ''} changed`}</span>
+        const html = `<span class="changed-files-count">${cut ? escapeHtml(cut.trim()) : timedOutNow() && files.length === 0 ? 'Changes not read' : `${files.length} file${files.length !== 1 ? 's' : ''} changed`}</span>
             ${stats}
             ${modeSelect}${compareNote}`;
         // The list is redrawn on every poll: the header is written only when it says something new, so its select and counts are not replaced under a person's pointer or a layout pass (#7671).
@@ -757,7 +760,7 @@ document.addEventListener('keydown', e => {
         // The comparison choice is in the header above, with the count: not drawn a second time under "No changed files" (#5991).
         list.innerHTML = staleNoteHtml() + (_filesRefused
             ? '<div class="empty-state empty-state-tight">Too many changed files to show through Coral Hub; open the agent on the computer.</div>'
-            : `<div class="empty-state empty-state-tight">No changed files</div>`);
+            : (timedOutNow() ? '' : `<div class="empty-state empty-state-tight">No changed files</div>`)); // a pass that timed out says so in the note above, not 'No changed files'
         return;
     }
 
