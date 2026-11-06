@@ -40,6 +40,8 @@ EXTRA = {
     # The Team Artifacts list's query (#4572): parseTeamArtifactQuery reads these from a url.Values it is handed, not from the request,
     # which the scan above does not follow. Search, filters, sort and cursor paging on the existing route.
     'GET /api/board/{}/artifacts': {'q', 'kind', 'origin', 'by', 'board', 'kept', 'starred', 'task', 'goal', 'tag', 'since', 'until', 'sort', 'cursor', 'versions', 'read', 'facets', 'muted', 'waiting'},
+    # The version bar's team (#13999): artifactVersions reads board (the team whose series of the bytes is meant) in a registration the scan above does not follow (RegisterAgentArtifacts).
+    'GET /api/artifacts/{}/versions': {'board'},
     # The cross-team artifact list (Goal #62): ListAllTeamArtifacts hands the team route's query parser a url.Values it parsed itself, plus team, limit and offset, which the scan above does not follow.
     'GET /api/team-artifacts': {'team', 'q', 'kind', 'origin', 'by', 'board', 'kept', 'starred', 'starred_first', 'task', 'goal', 'tag', 'since', 'until', 'sort', 'cursor', 'limit', 'offset', 'versions', 'read', 'facets', 'muted', 'waiting'},
     # The board message search (#4745): SearchMessages reads these from a url.Values it parsed itself (a mistyped query string is refused,
