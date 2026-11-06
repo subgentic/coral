@@ -185,6 +185,7 @@ export function dataTable(cfg) {
     const st = cfg.state || tableState();
     const columns = cfg.columns, sel = cfg.selectable || null, ctx = cfg.ctx || {};
     const foldKind = cfg.oneLine ? 'none' : cfg.fold || 'column', foldAt = cfg.foldAt || 40;
+    const foldThreshold = () => typeof foldAt === 'function' ? foldAt() : foldAt; // a numeric callback can follow the viewport while a table stays mounted
     if (sel && sel.contextKey !== undefined && st.ctx !== String(sel.contextKey)) { st.selected.clear(); st.rowCache?.clear(); st.confirming = -1; st.choices = null; st.anchor = null; st.ctx = String(sel.contextKey); }
     const hasContent = cfg.columns.some(c => c.width === 'content');
     const box = el('div', `dt-box${cfg.compact ? ' dt-compact' : ''}${foldAt === 'fit' ? ' dt-fit' : ''}${hasContent ? ' dt-has-content' : ''}${cfg.bare ? ' dt-bare' : ''}${cfg.scroll ? ' dt-scroll' : ''} ${foldKind === 'labeled' ? 'dt-fold-labeled' : foldKind === 'always' ? 'dt-fold-column' : foldKind === 'none' ? 'dt-fold-none' : 'dt-fold-column'}`);
@@ -681,13 +682,13 @@ export function dataTable(cfg) {
 
     // before the box has a width (it is built apart from the page) a window narrower than THIS table's fold starts it folded: a first paint of the wide table would scroll the page sideways (#7868). Only that window: one that is wider
     // than the fold (a 481-760 px one among them) is left unfolded, or the observer below would unfold it a frame later, a flash (#7994). A box that already has a width is judged by it. The observer then settles every case.
-    if (cfg.fold !== 'none') { const root0 = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16; const known = box.clientWidth; if (cfg.fold === 'always' || (known ? known : window.innerWidth) < foldAt * root0) box.classList.add('dt-folded'); }
+    if (cfg.fold !== 'none') { const root0 = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16; const known = box.clientWidth; if (cfg.fold === 'always' || (known ? known : window.innerWidth) < foldThreshold() * root0) box.classList.add('dt-folded'); }
     // folded: the table's own box narrower than foldAt rem (the root font size is read, so a larger text size folds sooner); set before the first paint
     if (cfg.fold !== 'none' && typeof ResizeObserver === 'function') {
         const root = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
         const syncFold = () => {
             const w = box.clientWidth; if (!w) return;
-            let on = cfg.fold === 'always' || w < foldAt * root();
+            let on = cfg.fold === 'always' || w < foldThreshold() * root();
             if (foldAt === 'fit' && cfg.fold !== 'always') {
                 // Measure the actual table in its available width, before paint. Names may
                 // ellipsize; headers and metadata must fit without clipping or sideways scroll.
