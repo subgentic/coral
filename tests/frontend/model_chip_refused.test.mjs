@@ -5,7 +5,7 @@ import { installDom, importUi } from './helpers/jsdom_env.mjs';
 installDom({ mode: 'local' });
 const { state } = await importUi('state');
 state.servers = [{ id: 'm1', label: 'build-box', owner_stamp: true, transport: 'ssh' }, { id: 'm2', label: 'evil\nname with a very long label that goes on and on and on for ever', owner_stamp: true }, { id: 'm3', label: 'by-address', transport: 'http', owner_stamp: false }, { id: 'm4', label: 'fresh-ssh', transport: 'ssh', owner_stamp: false }, { id: 'm5', label: 'unknown-shape' }];
-const { refusedWords } = await importUi('model_chip');
+const { refusedWords } = await importUi('model_chip_refusal');
 const refusal = { code: 'operator_only', error: 'this computer changes an agent\'s model only for a person at its own dashboard' };
 const m1 = refusedWords('m1', 403, refusal);
 assert.ok(m1.startsWith('build-box did not take the change:') && /signed-in person/.test(m1) && /update Coral on build-box/.test(m1) && !/Set up approvals/.test(m1), 'an SSH computer that holds the secret is told: sign in, update it; never set up approvals: ' + m1);
