@@ -460,3 +460,66 @@ func TestAHeldStepWhoseSendFailsIsHeldAgain(t *testing.T) {
 		t.Fatalf("sent %d times", n)
 	}
 }
+
+// #13895 (Security): with analytics off, the second call of a funnel step costs a map lookup: no goroutine, no read of the milestones file. Observed by removing the file after the first call: a second call that reached
+// the file would write it again.
+func TestAFunnelStepReachedWithAnalyticsOffTouchesNoFileTheSecondTime(t *testing.T) {
+	_, dir := newFunnelTracking(t)
+	SetTelemetryEnabled(false)
+	t.Cleanup(func() { SetTelemetryEnabled(true) })
+	path := filepath.Join(dir, milestonesFileName)
+	TrackFunnelStep(EventFunnelLaunchDialogOpened, nil)
+	waitForAsync()
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("the first call should have reached the file: %v", err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	TrackFunnelStep(EventFunnelLaunchDialogOpened, nil)
+	TrackFunnelStep(EventFunnelLaunchDialogOpened, nil)
+	waitForAsync()
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("a later call with analytics off went to the milestones file again (%v)", err)
+	}
+}
+
+// With analytics ON a step whose delivery failed is still tried again by a later call: the cheap path is only for when nothing can be sent.
+func TestAFunnelStepWhoseDeliveryFailedIsStillTriedAgainWhileAnalyticsIsOn(t *testing.T) {
+	c, _ := newFunnelTracking(t)
+	c.mu.Lock()
+	c.status = http.StatusServiceUnavailable
+	c.mu.Unlock()
+	TrackFunnelStep(EventFunnelLaunchDialogOpened, nil)
+	waitForAsync()
+	c.mu.Lock()
+	c.status = 0
+	c.mu.Unlock()
+	TrackFunnelStep(EventFunnelLaunchDialogOpened, nil)
+	waitForAsync()
+	if n := len(c.named(EventFunnelLaunchDialogOpened)); n != 1 {
+		t.Fatalf("the retry after a failed delivery was lost: %d events", n)
+	}
+}
+
+// INFO from Security (#13895): the held list is written before consent, so CORAL_TELEMETRY_DISABLED must stop the write too.
+func TestNoHeldStepIsWrittenWhenTheEnvironmentDisablesTelemetry(t *testing.T) {
+	_, dir := newFunnelTracking(t)
+	t.Setenv(envTelemetryDisabled, "1")
+	path := filepath.Join(dir, milestonesFileName)
+	before, _ := os.ReadFile(path)
+	HoldFunnelStep(EventFunnelAppStarted, AppStartCLI)
+	waitForAsync()
+	after, _ := os.ReadFile(path)
+	if string(before) != string(after) {
+		t.Fatalf("the milestones file changed with telemetry disabled by the environment: %s", after)
+	}
+	t.Setenv(envTelemetryDisabled, "")
+	HoldFunnelStep(EventFunnelAppStarted, AppStartCLI)
+	var s milestoneState
+	data, _ := os.ReadFile(path)
+	_ = json.Unmarshal(data, &s)
+	if len(s.Held) != 1 {
+		t.Fatalf("with telemetry on a step is held as before: %+v", s.Held)
+	}
+}

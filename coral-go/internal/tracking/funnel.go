@@ -223,6 +223,11 @@ func trackFunnel(key, event string, props map[string]string, at time.Time) {
 	if _, done := firedHere.Load(firedHereKey(key)); done {
 		return
 	}
+	// Reached here and nothing can be sent (analytics off, or no key): a later call is a map lookup, not a goroutine that takes the milestone lock and reads the file (Security, #13895: the sign-in page and the
+	// refused-link step are unauthenticated, so a scanner would trigger that per request for an opted-out user). While sending IS possible a step whose delivery failed is still tried again.
+	if _, reached := reachedHere.Load(firedHereKey(key)); reached && !(posthogKeyPresent() && telemetryEnabled()) {
+		return
+	}
 	gen := telemetryGen.Load()
 	asyncGo(func() { sendFunnel(key, event, props, at, gen) })
 }
@@ -332,7 +337,7 @@ var consentKnown atomic.Bool
 // FlushHeldFunnel once the Terms are accepted and analytics is on, and deleted if analytics is off then. value must be on the step's closed list, or nothing is held.
 func HoldFunnelStep(event, value string) {
 	field, ok := heldSpecs[event]
-	if !ok || !stateDirReady() {
+	if !ok || !stateDirReady() || TelemetryEnvDisabled() { // with the environment's opt-out nothing is kept on disk for a later send, not even a value and a time (#13895)
 		return
 	}
 	if typed, _ := sanitizeProps(event, map[string]string{field: value}); typed[field] == nil {
