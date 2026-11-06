@@ -168,6 +168,8 @@ func TestTheOrchestratorOfANewTeamStartsFiveHelpersAndTheSixthIsRefused(t *testi
 func TestAnAgentsLaunchStaysInTheTeamsFolder(t *testing.T) {
 	r := newOrchRig(t)
 	r.usualBoard()
+	code, _ := r.operatorGrant("Orchestrator", nil) // the rule is for a board whose grant is on
+	require.Equal(t, http.StatusOK, code)
 	outside := t.TempDir()
 	inside := filepath.Join(r.work, "sub")
 	require.NoError(t, os.MkdirAll(inside, 0o755))
@@ -197,4 +199,53 @@ func TestAnAgentsLaunchStaysInTheTeamsFolder(t *testing.T) {
 	// the Operator picks any folder
 	code, out = launch(outside, operatorClient, "")
 	assert.Equal(t, http.StatusOK, code, "the Operator is not held to the team's folder: %v", out)
+}
+
+// The upgrade rule: a board with no grant row, or a grant that is off, keeps what it had. An agent starts agents in any folder there.
+func TestTheFolderRuleDoesNotApplyWhereTheGrantIsOffOrAbsent(t *testing.T) {
+	r := newOrchRig(t)
+	r.usualBoard() // no grant row
+	// a launched helper's folder becomes one of the team's, so each step names a folder of its own
+	launch := func(dir string) (int, map[string]any) {
+		b, _ := json.Marshal(map[string]any{"working_dir": dir, "agent_type": "claude", "board_id": orchBoard, "display_name": "Helper"})
+		return r.do("POST", "/api/sessions/launch", string(b), nil, r.tok["Dev2"])
+	}
+	code, out := launch(t.TempDir())
+	assert.Equal(t, http.StatusOK, code, "no row: today's behaviour: %v", out)
+	code, _ = r.operatorGrant("Orchestrator", nil)
+	require.Equal(t, http.StatusOK, code)
+	code, out = launch(t.TempDir())
+	assert.Equal(t, http.StatusForbidden, code, "on: held to the team's folder: %v", out)
+	code, _ = r.do("PUT", "/api/board/"+orchBoard+"/orchestrator-grant", `{"enabled":false,"max_live":8,"max_per_hour":10,"idle_minutes":5}`, operatorClient, "")
+	require.Equal(t, http.StatusOK, code)
+	code, out = launch(t.TempDir())
+	assert.Equal(t, http.StatusOK, code, "off again: today's behaviour: %v", out)
+}
+
+// A session's repo and its worktree folder are the team's: a helper in a sibling worktree of the team's repo is accepted, a folder outside the repo is not.
+func TestASiblingWorktreeOfTheTeamsRepoIsTheTeamsFolder(t *testing.T) {
+	r := newOrchRig(t)
+	ctx := context.Background()
+	repo := t.TempDir()
+	wt := filepath.Join(repo, ".worktrees", "dev3")
+	sibling := filepath.Join(repo, ".worktrees", "dev4")
+	require.NoError(t, os.MkdirAll(wt, 0o755))
+	require.NoError(t, os.MkdirAll(sibling, 0o755))
+	r.usualBoard()
+	// Dev3 works in a worktree of the repo, recorded as a team launch records it
+	sid := r.seat("Dev3", "Developer", orchBoard, "claude", false, 4)
+	require.NoError(t, r.ss.UpdateWorktreeInfo(ctx, sid, wt, repo))
+	_, err := r.h.db.ExecContext(ctx, `UPDATE live_sessions SET working_dir = ? WHERE session_id = ?`, wt, sid)
+	require.NoError(t, err)
+	code, _ := r.operatorGrant("Orchestrator", nil)
+	require.Equal(t, http.StatusOK, code)
+	launch := func(dir string) (int, map[string]any) {
+		b, _ := json.Marshal(map[string]any{"working_dir": dir, "agent_type": "claude", "board_id": orchBoard, "display_name": "Helper"})
+		return r.do("POST", "/api/sessions/launch", string(b), nil, r.tok["Dev3"])
+	}
+	code, out := launch(sibling)
+	assert.Equal(t, http.StatusOK, code, "a sibling worktree of the team's repo: %v", out)
+	code, out = launch(t.TempDir())
+	assert.Equal(t, http.StatusForbidden, code, "a folder outside the repo: %v", out)
+	assert.Equal(t, "outside_team_folder", out["code"])
 }
