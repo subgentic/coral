@@ -34,10 +34,11 @@ const (
 )
 
 type cmtRig struct {
-	t   *testing.T
-	srv *httptest.Server
-	h   *SessionsHandler
-	ss  *store.SessionStore
+	t          *testing.T
+	lastHeader http.Header // the headers of the answer rig.do last got
+	srv        *httptest.Server
+	h          *SessionsHandler
+	ss         *store.SessionStore
 }
 
 func newCmtRig(t *testing.T) *cmtRig {
@@ -130,6 +131,7 @@ func (rig *cmtRig) do(method, path string, header map[string]string, body any) (
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(rig.t, err)
 	defer resp.Body.Close()
+	rig.lastHeader = resp.Header
 	var out map[string]any
 	_ = json.NewDecoder(resp.Body).Decode(&out)
 	return resp.StatusCode, out
@@ -529,6 +531,7 @@ func TestArtifactCommentsRateLimitIsAMarkedActionLimit(t *testing.T) {
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()
+	rig.lastHeader = resp.Header
 	assert.Equal(t, 429, resp.StatusCode)
 	assert.Equal(t, "action", resp.Header.Get("X-Coral-Limit"))
 	assert.Equal(t, "60", resp.Header.Get("Retry-After"))

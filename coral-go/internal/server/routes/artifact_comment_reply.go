@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptr"
 	"github.com/subgentic/coral/internal/store"
@@ -112,7 +113,7 @@ func (h *SessionsHandler) agentReplyArtifactComment(w http.ResponseWriter, r *ht
 			commentRefuse(w, http.StatusConflict, "reply_limit", "this agent has left the most replies it may in that thread")
 			return
 		case errors.Is(err, store.ErrUploaderHourCap):
-			commentRefuse(w, http.StatusTooManyRequests, "reply_rate", "this agent has left the most replies it may on that file in an hour: wait, or ask the Operator to press Send to agent on a comment")
+			httputil.WriteActionLimit(w, 300, "reply_rate", "this agent has left the most replies it may on that file in an hour: wait, or ask the Operator to press Send to agent on a comment")
 			return
 		}
 	} else {
