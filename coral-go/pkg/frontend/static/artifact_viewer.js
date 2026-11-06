@@ -6,7 +6,7 @@
  * Download button keeps the original bytes one click away, through Coral Hub too. */
 import { isPhoneLayout } from './phone_layout.js';
 import { markHidden } from './visible_marks.js';
-import { escapeHtml, renderMarkdownStrict, highlightCodeIn, keepFragmentsInside, showToast } from './utils.js';
+import { escapeHtml, renderMarkdownStrict, highlightCodeIn, keepFragmentsInside } from './utils.js';
 import { serverUrl, artifactPath, isCloud, boardTeamKey, contextServer, normServer } from './server_base.js';
 import { renderArtifact, manifestDownload } from './artifact_preview.js';
 import { downloadArtifact, sanitizeDownloadName } from './artifact_download.js';
