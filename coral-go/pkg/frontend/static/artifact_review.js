@@ -34,8 +34,8 @@ export async function reviewStateOf(team, hex) {
 
 const timeWords = at => { const t = Date.parse(at); return Number.isNaN(t) ? '' : new Date(t).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }); };
 
-async function decide(team, row, decision, reason, note, quiet = false) {
-    const r = await boardFetch(team, `/artifacts/${encodeURIComponent(row.id)}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, ...(reason ? { reason } : {}), ...(note ? { note } : {}), ...(quiet ? { quiet: true } : {}) }) });
+async function decide(team, row, decision, reason, note, quiet = false, words = '') {
+    const r = await boardFetch(team, `/artifacts/${encodeURIComponent(row.id)}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, ...(reason ? { reason } : {}), ...(note ? { note } : {}), ...(quiet ? { quiet: true } : {}), ...(words ? { text: words } : {}) }) });
     const body = await r.json().catch(() => ({}));
     if (!r.ok) { const error = new Error(body.message || body.error || `Could not save the review (HTTP ${r.status}).`); error.status = r.status; error.code = body.code; throw error; }
     return body;
@@ -180,6 +180,7 @@ export function attachReview(d, { reload }) {
             <label for="artifact-review-text">What should change?</label>
             <textarea id="artifact-review-text" rows="3" maxlength="2000" placeholder="This goes to the agent that uploaded it, as a change request in the comments."></textarea>
             <span class="artifact-review-error" role="alert"></span>
+            <p class="artifact-review-pending" role="status" hidden></p>
             <button type="submit" class="btn btn-primary">Send request</button>
             <button type="button" class="btn artifact-review-cancel">Cancel</button>
         </form>`;
@@ -198,10 +199,12 @@ export function attachReview(d, { reload }) {
     (d.querySelector('.artifact-viewer-chips') || bar).append(stateEl); (d.querySelector('.artifact-viewer-actions') || bar).append(approve, changes); (d.querySelector('.artifact-viewer-menu') || bar).prepend(approveNote);
     const $ = s => bar.querySelector(s);
     const form = $('.artifact-review-form'), text = $('#artifact-review-text'), error = $('.artifact-review-error');
-    let cur = null, gen = 0, sending = false, done = false;
+    let cur = null, gen = 0, sending = false, done = false, inProgress = false, progressTimer = null;
+    const progress = $('.artifact-review-pending');
+    const clearProgress = () => { clearTimeout(progressTimer); progressTimer = null; inProgress = false; progress.hidden = true; };
     const submitBtn = form.querySelector('button[type=submit]');
     const tray = imgs.createImageTray({ upload: (blob, versionOf) => uploadCommentImage(cur.hex, cur.server, blob, versionOf, cur.name) });
-    const syncSend = () => { submitBtn.disabled = sending || tray.busy() || tray.failed(); }; // Send waits for a picture still going up, and for a failed one to be removed
+    const syncSend = () => { submitBtn.disabled = sending || inProgress || tray.busy() || tray.failed(); }; // Send waits for a picture still going up, and for a failed one to be removed
     error.before(tray.picker(), tray.node, tray.hint()); tray.attach(form, text); tray.listen(syncSend);
     const show = (s) => {
         cur = s;
@@ -254,26 +257,63 @@ export function attachReview(d, { reload }) {
     });
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (sending) return; // a second tap while the first request is on its way sends nothing
+        if (sending || inProgress) return;
         const body = text.value.trim();
         if (!body || !cur) { error.textContent = 'Say what should change.'; return; }
-        const submit = submitBtn; sending = true; submit.disabled = true; text.readOnly = true; error.textContent = '';
+        const was = cur, g = gen, current = () => g === gen && cur?.team === was.team && cur?.hex === was.hex;
+        clearProgress(); sending = true; syncSend(); text.readOnly = true; error.textContent = '';
         try {
-            const who = cur.row.produced_by;
-            if (!who) throw new Error('No agent is recorded for this artifact, so there is nobody to ask: use a comment.');
-            const c = await createComment(cur.hex, cur.server, { body: `Changes requested: ${body}`, anchor: { whole: true }, board: cur.name, images: tray.hexes() });
-            const sent = await sendComment(cur.hex, cur.server, c.id, [who]);
-            const r = sent.results[0];
-            if (!sent.ok || !r || (r.state !== 'sent' && r.state !== 'already_asked')) throw new Error(r ? `${who}: ${resultWords(r)}. The request is in the comments.` : (sent.error || 'The agent could not be asked.'));
-            await decide(cur.team, cur.row, 'changes');
+            const who = was.row.produced_by, images = tray.hexes();
+            let out = null, decided = false;
+            if (!images.length) {
+                try { out = await decide(was.team, was.row, 'changes', undefined, undefined, false, body); decided = true; }
+                catch (err) { if (err.status !== 400 || err.code !== 'images_not_in_this_slice') throw err; }
+                if (!current()) return;
+                if (out && Object.hasOwn(out, 'text_kept') && out.text_kept !== true) throw new Error('The computer did not confirm that your words were kept. Your draft is still here.');
+            }
+            if (!out?.text_kept) {
+                // Pictures retain their existing comment route. An older computer
+                // already applied the decision but ignored text: do not decide twice.
+                if (!who) throw new Error('No agent is recorded for this artifact, so there is nobody to ask: use a comment.');
+                const c = await createComment(was.hex, was.server, { body: `Changes requested: ${body}`, anchor: { whole: true }, board: was.name, images });
+                if (!current()) return;
+                const sent = await sendComment(was.hex, was.server, c.id, [who]);
+                if (!current()) return;
+                const r = sent.results[0];
+                if (!sent.ok || !r || (r.state !== 'sent' && r.state !== 'already_asked')) throw new Error(r ? `${who}: ${resultWords(r)}. The request is in the comments.` : (sent.error || 'The agent could not be asked.'));
+                if (!decided) await decide(was.team, was.row, 'changes');
+                out = { delivered: true, to: who };
+            }
+            if (!current()) return;
             importOnce('./inbox_reviews.js').then(m => { m.reviewsChangedOnServer(); return m.refreshReviews(true); }).catch(() => {});
-            showToast(`Changes requested. ${who} was asked.`);
-            text.value = ''; tray.clear(); done = true; openForm(false); show({ ...cur, state: 'changes' }); changes.focus({ preventScroll: true }); reload();
-        } catch (err) { error.textContent = err.message; } finally { sending = false; syncSend(); text.readOnly = false; }
+            const recipient = shown(out.to || who || 'The agent');
+            const reason = { no_uploader: 'no agent is recorded for this artifact', board_paused: 'the board is paused', rate_limited: 'the sending limit was reached', not_owner: 'only the owner can send this', redaction_unavailable: 'the words could not be checked', failed: 'delivery failed' }[out.reason] || String(out.reason || 'delivery was not confirmed').replaceAll('_', ' ');
+            const notice = out.delivered ? `${recipient} was asked.` : out.reason === 'already_sent' ? `${recipient} was already told.` : `${recipient} was not told: ${reason}.`;
+            showToast(`Changes requested. ${notice}`);
+            text.value = ''; tray.clear(); done = true; openForm(false); show({ ...was, state: 'changes' }); changes.focus({ preventScroll: true }); reload();
+        } catch (err) {
+            if (!current()) return;
+            if (err.status === 409 && err.code === 'already_in_progress') {
+                inProgress = true; progress.hidden = false;
+                progress.textContent = 'Still sending. Your words are kept here while the status is checked.';
+                // One read, never an automatic resend: the earlier delivery may
+                // still fail and undo its comment and decision.
+                progressTimer = setTimeout(async () => {
+                    try {
+                        if (!current()) return;
+                        const latest = await reviewStateOf(was.team, was.hex);
+                        if (current() && latest) show({ ...latest, team: was.team, hex: was.hex, server: was.server, name: was.name });
+                    } catch { /* keep the draft and allow an explicit retry */ }
+                    finally {
+                        if (current()) { inProgress = false; progressTimer = null; text.readOnly = false; syncSend(); progress.textContent = 'Sending is not yet confirmed. Your words are kept here; you can retry.'; }
+                    }
+                }, 1000);
+            } else error.textContent = err.message;
+        } finally { if (current()) { sending = false; syncSend(); text.readOnly = inProgress; } }
     });
     return {
         async open(hex, opts = {}) {
-            const g = ++gen; show(null); sendCtx = null; syncSendItem(); if (!opts.switched) done = false;
+            const g = ++gen; clearProgress(); sending = false; text.readOnly = false; syncSend(); show(null); sendCtx = null; syncSendItem(); if (!opts.switched) done = false;
             if (!opts.board || opts.sourceNamed === false) return;
             const team = identityKey(opts.server, opts.board);
             let s = null;
@@ -284,6 +324,6 @@ export function attachReview(d, { reload }) {
             show({ ...s, team, hex, server: opts.server, name: opts.board });
             if (opts.requestChanges && !opts.switched && !done && (s.state === 'pending' || s.state === 'changes')) openForm(true); // not on the reload after a send: the form stays closed
         },
-        close() { gen++; show(null); sendCtx = null; syncSendItem(); form.hidden = true; tray.clear(); },
+        close() { gen++; clearProgress(); show(null); sendCtx = null; syncSendItem(); form.hidden = true; tray.clear(); },
     };
 }
