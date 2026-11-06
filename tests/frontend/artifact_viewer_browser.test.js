@@ -147,7 +147,7 @@ const MD = [
             };
         })()`);
         check('root-relative and relative links are text with their target shown', links.blocked.includes('k (/api/system/api-key)') && links.blocked.includes('r (../x.md)'), JSON.stringify(links));
-        check('mailto, web (new tab), #fragment and artifact links stay links', ['mailto:a@b.test', 'https://example.test/p', '#sec', 'coral://artifacts/' + 'c'.repeat(64)].every(h => links.anchors.some(a => a.href === h)) && links.anchors.find(a => a.href === 'https://example.test/p').target === '_blank', JSON.stringify(links.anchors));
+        check('mailto, web (new tab), #fragment and artifact links stay links', ['mailto:a@b.test', 'https://example.test/p', '#sec', '/api/artifacts/' + IMG_HEX + '?v=2'].every(h => links.anchors.some(a => a.href === h)) && links.anchors.find(a => a.href === 'https://example.test/p').target === '_blank', JSON.stringify(links.anchors));
         const before = await ev('location.href');
         const moved = await ev(`(async () => {
             const b = document.querySelector('#artifact-viewer .artifact-viewer-body');
@@ -171,8 +171,8 @@ const MD = [
 
         console.log('An artifact link inside the file opens that artifact in the viewer');
         await ev(`(() => { const a = [...document.querySelectorAll('#qa-3540 a.board-artifact-link')][0]; a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })); return true; })()`);
-        for (let i = 0; i < 50 && !(await ev(`!!document.querySelector('#artifact-viewer:not([hidden]) .artifact-viewer-body a[href^="coral://artifacts/"]')`)); i++) await new Promise(r => setTimeout(r, 100)); // sleep-ok: polls for the render
-        await ev(`document.querySelector('#artifact-viewer .artifact-viewer-body a[href^="coral://artifacts/"]').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))`);
+        for (let i = 0; i < 50 && !(await ev(`!!document.querySelector('#artifact-viewer:not([hidden]) .artifact-viewer-body a.mb-artifact-ref[data-artifact="cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]')`)); i++) await new Promise(r => setTimeout(r, 100)); // sleep-ok: polls for the render
+        await ev(`document.querySelector('#artifact-viewer .artifact-viewer-body a.mb-artifact-ref[data-artifact="cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))`);
         let inner = null;
         for (let i = 0; i < 50 && !(inner && inner.img); i++) { await new Promise(r => setTimeout(r, 100)); inner = await ev(`(() => { const i = document.querySelector('#artifact-viewer:not([hidden]) .artifact-viewer-body img'); return { img: !!(i && i.naturalWidth), title: document.querySelector('#artifact-viewer .artifact-viewer-title').textContent, url: location.href }; })()`); } // sleep-ok: polls for the render
         check('it shows the linked image, the page URL unchanged', inner && inner.img && inner.title === 'img' && inner.url === before, JSON.stringify(inner));

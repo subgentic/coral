@@ -7,7 +7,7 @@ import { pushOverlay, popOverlay } from './overlay_history.js';
 import { browserLocal } from './safe_storage.js';
 import { revealSideways } from './reveal_sideways.js';
 
-export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath, _onToolbarClick }) {
+export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath, onReturn, _onToolbarClick }) {
 
     let _paneHeight = null;
     let _paneWidth = null;
@@ -139,7 +139,7 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
 
         // A task's expand button, in the sidebar, does what a file's dock button does (#9076, the Operator): the preview goes to the full-height column beside the chat, with the column's handle and its width kept; one more press maximises it as for a file.
         document.getElementById('preview-max-btn')?.addEventListener('click', () => { if (_isMobile()) _setPhoneFull(!_phoneFull); else if (isTaskPreview() && _dock === 'bottom') _toggleDock(true); else _setMaximised(!_maximised); });
-        document.getElementById('preview-full-back')?.addEventListener('click', () => _setPhoneFull(false));
+        document.getElementById('preview-full-back')?.addEventListener('click', () => { _setPhoneFull(false); onReturn?.(); });
         // Escape gives the maximised pane back its place, unless something in it (the editor's own search box) already used the key.
         document.addEventListener('keydown', (e) => {
             if (_phoneFull && e.key === 'Tab' && !e.defaultPrevented) { trapTab(document.getElementById('preview-pane'), e); return; } // focus stays inside the full-screen preview
@@ -211,7 +211,7 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
         if (on) {
             pane.setAttribute('role', 'dialog'); pane.setAttribute('aria-modal', 'true'); pane.setAttribute('aria-label', 'Preview');
             _fullOpener = document.activeElement; _fullOpenerPath = _pathOf(_fullOpener) || getLastOpenedPath();
-            _fullOverlay = pushOverlay(() => _setPhoneFull(false, { popped: true })); // Back closes it, in its order among the overlays (overlay_history.js)
+            _fullOverlay = pushOverlay(() => { _setPhoneFull(false, { popped: true }); onReturn?.(); }); // Back closes it, in its order among the overlays (overlay_history.js)
         } else {
             pane.setAttribute('role', 'region'); pane.removeAttribute('aria-modal'); pane.setAttribute('aria-label', 'Preview'); // beside the chat it is a named region (#8830)
             if (_fullOverlay) { const id = _fullOverlay; _fullOverlay = 0; if (!popped) popOverlay(id); }

@@ -1,6 +1,7 @@
 /* Shared native app initialization — health check, link intercept, body classes.
    Extracted from coral-app/main.go injected JS. */
 
+import { isManagedCoralLink } from './coral_links.js';
 import { platform } from './detect.js';
 import { importOnce } from '../import_once.js';
 
@@ -98,10 +99,9 @@ function initHealthCheck() {
 // Link interceptor — open external links in system browser instead of webview.
 function initLinkInterceptor() {
     document.addEventListener('click', function(e) {
+        if (e.defaultPrevented) return;
         const a = e.target.closest('a');
-        if (!a) return;
-        // A native download was consumed by the injected saver; do not reopen it.
-        if (e.defaultPrevented && a.hasAttribute('download')) return;
+        if (!a || isManagedCoralLink(a, location)) return;
         const href = a.getAttribute('href');
         if (!href) return;
         // Single-agent popout links: prefer a second in-app window when the

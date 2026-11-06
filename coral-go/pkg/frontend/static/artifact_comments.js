@@ -16,7 +16,7 @@ import { scrollBehavior } from './motion.js';
 const { agentLink, linkAvatar } = await importOnce('./agent_link.js'); // lazy, like the rest of the thread (#12168)
 import { pushOverlay, popOverlay } from './overlay_history.js';
 import { state } from './state.js';
-import { boardKeyName, sessionTeamKey, contextServer, boardTeamKey } from './server_base.js';
+import { boardKeyName, sessionTeamKey, contextServer, boardTeamKey, LOCAL_SERVER } from './server_base.js';
 import { browserLocal } from './safe_storage.js';
 import { storeKey } from './local_store.js';
 import { boardOfPage } from './dock_page.js';
@@ -297,7 +297,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         }
         if (resolveBtn) { const row = el('div', 'ac-headrow'); row.append(m, resolveBtn); main.append(row); } // Resolve at the top right: the name line wraps beside it, never under it
         else main.append(m);
-        main.append(editing(c) || (c.deleted ? el('p', 'ac-body ac-deleted', 'Comment deleted') : linkArtifactRefsIn(el('p', 'ac-body', c.body))));
+        main.append(editing(c) || (c.deleted ? el('p', 'ac-body ac-deleted', 'Comment deleted') : linkArtifactRefsIn(el('p', 'ac-body', c.body), { server: st.server })));
         if (!c.deleted && c.images && c.images.length && !editing(c)) main.append(pictures(c));
         if (top && c.fromVersion != null && groupOf(c) !== 'main') main.append(el('p', 'ac-from ac-from-note', groupOf(c) === 'look' ? `From v${c.fromVersion}. The quote is in this version more than once, so it is not pinned to either.` : `On v${c.fromVersion}. Its text is not in this version.`));
         main.append(actions(c, top));
@@ -309,7 +309,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     function pictures(c) {
         const ul = el('ul', 'ac-pics'); ul.setAttribute('aria-label', 'Pictures in this comment');
         for (const p of c.images) {
-            const li = el('li', 'ac-pic'), a = el('a', 'ac-pic-link'); a.href = api.commentImageUrl(p.hex, st.server); a.target = '_blank'; a.rel = 'noopener';
+            const li = el('li', 'ac-pic'), a = el('a', 'ac-pic-link'); a.href = api.commentImageUrl(p.hex, st.server); a.target = '_blank'; a.rel = 'noopener'; a.classList.add('mb-artifact-ref'); a.dataset.artifact = p.hex; a.dataset.server = st.server || LOCAL_SERVER;
             const img = el('img', 'ac-pic-img'); img.src = api.commentImageUrl(p.hex, st.server); img.alt = p.name || 'Picture in the comment'; img.loading = 'lazy'; img.decoding = 'async';
             a.append(img); li.append(a); ul.append(li);
         }

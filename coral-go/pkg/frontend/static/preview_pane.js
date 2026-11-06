@@ -64,7 +64,7 @@ let _sessionKey = null;   // agent whose tabs are showing
 const _stash = new Map(); // session key -> { tabs, activeId } for agents in the background
 let _lastOpenedPath = '';
 
-const layout = createPreviewLayout({ getTabs: () => _tabs, isTaskPreview: () => _activeTab()?.kind === 'task', getLastOpenedPath: () => _lastOpenedPath, _onToolbarClick });
+const layout = createPreviewLayout({ getTabs: () => _tabs, isTaskPreview: () => _activeTab()?.kind === 'task', getLastOpenedPath: () => _lastOpenedPath, onReturn: () => { const tab = _activeTab(), close = tab?.onPreviewClose; if (tab) tab.onPreviewClose = null; close?.(); }, _onToolbarClick });
 const { _setMaximised, _setPhoneFull, _placePane, _showPane, _isMobile } = layout;
 const { _destroyEditor, _captureEditor, _mountEditor, _mountDiff } = createPreviewEditor({ _activeTab, _isDirty, _renderTabs, _fileUrl, _setBody });
 
@@ -257,6 +257,7 @@ export function openPreviewTab(filepath, line, opts = {}) {
         tab = _newTab({ filepath, line: line || 0, mode, canDiff: !!opts.diff, pinned: mode === 'edit' });
         _addTab(tab);
     }
+    if (typeof opts.onClose === 'function') tab.onPreviewClose = opts.onClose;
     if (tab.mode === 'diff' && !tab.canDiff) tab.mode = 'preview';
     _activate(tab);
 }
@@ -326,7 +327,7 @@ function closeTab(tabId) {
 function _closeTabNow(tabId) {
     const idx = _tabs.findIndex(t => t.id === tabId);
     if (idx === -1) return;
-    const tab = _tabs[idx];
+    const tab = _tabs[idx], onPreviewClose = tab.onPreviewClose; tab.onPreviewClose = null;
     const keyboard = (() => { const a = document.activeElement; try { return !!a && a !== document.body && a.matches(':focus-visible'); } catch { return false; } })(); // a keyboard close: the focus ring is on what was focused (read before the task page is cleared)
     if (tab.id === _activeId) { _destroyEditor(); _clearTaskPreview(); }
     _disposeTab(tab, { keyboard });
@@ -338,6 +339,7 @@ function _closeTabNow(tabId) {
         _renderToolbar(null);
         _body()?.replaceChildren(); // drop frames/media so nothing keeps running in the hidden pane
         _hidePane();
+        onPreviewClose?.();
         return;
     }
 
@@ -349,6 +351,7 @@ function _closeTabNow(tabId) {
     } else {
         _renderTabs();
     }
+    onPreviewClose?.();
 }
 
 export function closeAllTabs() {

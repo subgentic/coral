@@ -344,3 +344,7 @@ node remote_search_access.test.mjs
 node remote_goal_comments.test.mjs
 
 node remote_agent_identity.test.mjs
+
+node coral_ref.test.mjs
+node coral_subject_refs.test.mjs
+node native_coral_links.test.mjs

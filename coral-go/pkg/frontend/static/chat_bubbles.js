@@ -1,3 +1,5 @@
+import { parseCoralRef } from './coral_ref.js';
+import { linkCoralSubjectRefsIn } from './coral_subject_refs.js';
 /* The chat's bubble builder and file-reference links (#3837). Moved out of live_chat.js as it was; no behaviour change.
  * makeBubble(className, html) is how every feature builds a row: it returns a div of that class with the html in it, code blocks
  * labelled and copy buttons and file references wired. Pair it with appendContent (chat_content.js) to put the row in the chat. */
@@ -132,6 +134,7 @@ export function linkifyRefs(root) {
         }
     }
     for (const a of root.querySelectorAll("a[href]")) {
+        if (parseCoralRef(a.getAttribute("href"))?.kind && parseCoralRef(a.getAttribute("href")).kind !== 'artifact') continue;
         if (a.hasAttribute("data-route")) continue; // a dashboard page link the router accepted
         const href = a.getAttribute("href");
         const artifactHref = /^\/api\/artifacts\/([a-f0-9]{64})$/i.exec(href || '');
@@ -197,6 +200,7 @@ export function linkifyRefs(root) {
         frag.append(node.nodeValue.slice(last));
         node.replaceWith(frag);
     }
+    linkCoralSubjectRefsIn(root, { server: currentServer() });
     linkifyBarePaths(root);
 }
 

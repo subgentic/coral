@@ -5,6 +5,9 @@
 import { artifactLabel, learnArtifactNames } from './artifact_names.js';
 import { serverUrl, artifactPath } from './server_base.js';
 import { importOnce } from './import_once.js';
+import { linkCoralSubjectRefsIn } from './coral_subject_refs.js';
+import { suspendNativeDialog } from './suspend_native_dialog.js';
+import { showToast } from './notifications.js';
 import { escapeHtml, escapeAttr } from './html_escape.js';
 
 export const ARTIFACT_REF = /(^|[^A-Za-z0-9/])coral:\/\/artifacts\/([a-f0-9]{64})(?![A-Za-z0-9])/gi; // upper-case hex is the same id (the board has always read it so); the hex used is lower-cased
@@ -51,6 +54,10 @@ export function linkedText(text, { server, asWritten = false } = {}) {
 /** Links the references in text already on the page (a Markdown render, a pre): every text node under `root` outside a link, code or script is split into words and links. A code block under the root is left alone; a root that is itself a pre is not. */
 export function linkArtifactRefsIn(root, { server, asWritten = false } = {}) {
     if (!root) return root;
+    for (const a of root.querySelectorAll('a[href^="coral://artifacts/"]')) {
+        const m = /^coral:\/\/artifacts\/([a-f0-9]{64})$/i.exec(a.getAttribute('href'));
+        if (m) a.replaceWith(linkFor(m[1].toLowerCase(), server, a.textContent));
+    }
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT), nodes = [];
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
         if (!n.nodeValue.includes('coral://artifacts/')) continue;
@@ -65,7 +72,7 @@ export function linkArtifactRefsIn(root, { server, asWritten = false } = {}) {
         const frag = linkedText(n.nodeValue, { server, asWritten });
         n.replaceWith(frag);
     }
-    return root;
+    return linkCoralSubjectRefsIn(root, { server });
 }
 
 /** The text as HTML for a surface that builds strings: the words escaped, each reference an anchor the delegated click below opens. */
@@ -74,7 +81,7 @@ export function linkedHtml(text, server) {
     const html = splitArtifactRefs(text).map(p => {
         if (!p.hex) return escapeHtml(p.text);
         seen.add(p.hex);
-        return `<a href="${escapeAttr(serverUrl(artifactPath(p.hex)))}" target="_blank" rel="noopener noreferrer" class="mb-artifact-ref" data-artifact="${escapeAttr(p.hex)}" title="${escapeAttr(`coral://artifacts/${p.hex}`)}">${escapeHtml(artifactLabel(p.hex))}</a>`;
+        return `<a href="${escapeAttr(serverUrl(artifactPath(p.hex), server))}" target="_blank" rel="noopener noreferrer" class="mb-artifact-ref" data-artifact="${escapeAttr(p.hex)}"${server ? ` data-server="${escapeAttr(server)}"` : ''} title="${escapeAttr(`coral://artifacts/${p.hex}`)}">${escapeHtml(artifactLabel(p.hex))}</a>`;
     }).join('');
     if (seen.size) learnArtifactNames(seen, server);
     return html;
@@ -85,11 +92,12 @@ if (typeof document !== 'undefined' && typeof document.addEventListener === 'fun
     globalThis.__artifactRefClick = true;
     document.addEventListener('click', e => {
         const a = e.target && e.target.closest && e.target.closest('a.mb-artifact-ref[data-artifact]');
-        if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        if (!a || e.defaultPrevented || e.button !== 0 || (!globalThis.__CORAL_APP__ && (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey))) return;
         const hex = a.dataset.artifact;
         if (!/^[a-f0-9]{64}$/.test(hex || '')) return;
         e.preventDefault();
         const server = a.dataset.server || undefined;
-        importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(hex, { server, filename: '' }), () => globalThis.open(serverUrl(artifactPath(hex), server), '_blank', 'noopener,noreferrer'));
+        const resume = suspendNativeDialog(a);
+        importOnce('./artifact_viewer.js').then(m => { if (m.openArtifactViewer(hex, { server, filename: '', ...(resume ? { onClose: resume } : {}) }) === false) resume?.(); }).catch(() => { resume?.(); showToast('The file viewer could not be opened. Please try again.', true); });
     });
 }
