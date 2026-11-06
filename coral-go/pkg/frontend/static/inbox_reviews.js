@@ -365,6 +365,10 @@ export const loadMoreSavedFiles = server => appendReviews(savedPager, server);
 async function refreshActiveQuery() {
     const mine = fview;
     if (!mine) return;
+    if (mine.pager.status().some(page => page.loading)) {
+        await mine.promise;
+        return fview === mine ? refreshActiveQuery() : undefined;
+    }
     const started = revision;
     mine.at = Date.now();
     mine.promise = mine.pager.refresh().then(() => {
