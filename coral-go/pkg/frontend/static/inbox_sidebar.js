@@ -172,7 +172,13 @@ const teamOf = s => s.board_project ? teamLabel(identityKey(sessionServer(s), s.
 const fromOf = (s, withTeam) => { if (s.operatorAsk) return [`from ${markHidden(s.operatorAsk.asker, { strict: true }).trim() || 'an agent'}`, teamOf(s)].filter(Boolean).join(' \u00b7 '); if (!s.review) return ''; const who = markHidden(s.review.produced_by, { strict: true }).trim(), team = withTeam ? teamOf(s) : ''; const n = (s.review.earlier || []).length; return [who ? `from ${who}` : 'sender unknown', team, n ? `${n} earlier version${n === 1 ? '' : 's'}` : ''].filter(Boolean).join(' \u00b7 '); }; // who uploaded a file for review, from the upload's record, what hides or reorders the name written out (markHidden strict), and its team (#11456)
 /** The line under a review row that says who sent it: "from <agent> · <earlier versions>", the agent's name the shared link (#12168). */
 /** The wait, again, inside the item cell (#13795): a phone's row puts it at the right of the sender's line, so the Waiting column is hidden there; hidden everywhere else (the column says it). */
-const waitMark = s => { const t = waitingText(s.waiting_since); if (!t) return []; const e = DT.el('span', 'inbox-review-wait', t); e.setAttribute('aria-hidden', 'true'); return [e]; }; // the Waiting cell says it to a screen reader
+const waitMark = s => {
+    const text = waitingText(s.waiting_since); if (!text) return [];
+    const elapsed = text.replace(/^waiting /, '').replace('under 1 min', '<1m').replace(/ min/g, 'm').replace(/ h/g, 'h').replace(/ d/g, 'd').replace(/ /g, '');
+    const mark = DT.el('span', 'inbox-review-wait'); mark.title = text;
+    const visible = DT.el('span', 'inbox-review-elapsed', elapsed); visible.setAttribute('aria-hidden', 'true');
+    mark.append(DT.el('span', 'sr-only', text), visible); return [mark];
+}; // every phone kind uses one compact time; desktop's Waiting cell keeps the full words
 /** One phone row for every kind (#13911, the Operator: "Layout A"): the sender or the intro on line one with the time since at its right, then the description, at most two lines; the same grid whatever the kind, so the icon, the time and the line count are the same in every row. `from` is the element that names the sender or the intro. */
 const phoneRow = (s, from, desc, extra = []) => { const wrap = DT.el('span', 'inbox-review-item inbox-agent-first'), name = DT.el('span', 'inbox-review-name', desc); DT.tipIf(name, desc, () => name.scrollHeight > name.clientHeight + 1); if (extra.length) name.append(' ', ...extra); wrap.append(from, name, ...waitMark(s)); return wrap; }; // a badge that is words (New comments) goes on the description's own line, after it; a row is three lines at most (#13911)
 const introNode = text => DT.el('span', 'inbox-review-from', text);
@@ -1078,7 +1084,7 @@ registerGroupSource('hub-inbox', {
     if (isPhoneLayout()) {
         const tags = DT.el('span', 'inbox-review-tags');
         if (versionOf(s.review) > 1) { const version = DT.el('span', 'inbox-review-version', `${hasNewVersion(s.review) ? 'New ' : ''}v${versionOf(s.review)}`); version.title = hasNewVersion(s.review) ? `New version v${versionOf(s.review)}` : `Version ${versionOf(s.review)}`; tags.append(version); }
-        wrap.append(sender, name); if (tags.childNodes.length) wrap.append(tags);
+        wrap.append(sender, name); if (tags.childNodes.length) name.append(' · ', tags);
         wrap.append(DT.el('span', 'sr-only', `${earlierWords(s.review) ? `, ${earlierWords(s.review)}` : ''}${readWords}`), ...waitMark(s)); return wrap;
     }
     const ver = DT.el('span', 'inbox-review-version', versionOf(s.review) > 1 ? ` · version ${versionOf(s.review)}` : ''); ver.hidden = !(versionOf(s.review) > 1);
