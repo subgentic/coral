@@ -245,12 +245,35 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
         await select('write lock on large databases'); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the selection button waits a beat after the selection changes
         check('a read-only viewer gets the reason, no action buttons, no composer, no whole-document button, no lock', /view only/.test(ro.reason) && !ro.composer && ro.acts === 0 && !ro.whole && !ro.lock, JSON.stringify(ro));
         check('and a selection shows no Comment button', await ev(`document.querySelector('.ac-selbtn').hidden`));
-        // #13979: a long file name is cut with an ellipsis; its whole name is on hover and one click shows it whole
-        await load(390, 800, true, 'light');
+        // #13979: a long file name is cut with an ellipsis; a name that is cut is a button (Tab, Enter, Space, a tap, a click) that shows it whole; a name that fits has no extra Tab stop; the dialog is still named by the whole text
         const LONG = 'release-notes-for-the-quarterly-security-review-of-the-hub-2026-q4-final-v2.md';
-        await open(`true`, { filename: LONG });
-        const nm = await ev(`(() => { const t = document.querySelector('#artifact-viewer .artifact-viewer-title'); const before = t.getBoundingClientRect().height; t.click(); return { title: t.title, cut: t.scrollWidth > t.clientWidth || before < t.getBoundingClientRect().height, after: t.getBoundingClientRect().height, before, open: t.classList.contains('is-open'), name: t.textContent }; })()`);
-        check('a long name has its whole text as hover title and accessible name, and a click opens it whole', nm.title === LONG && nm.name === LONG && nm.open && nm.after >= nm.before, JSON.stringify(nm));
+        const nameInfo = () => ev(`(() => { const h = document.querySelector('#artifact-viewer .artifact-viewer-title'), n = h.querySelector('.artifact-viewer-title-name'), r = h.getBoundingClientRect(); return { heading: h.tagName, title: h.title, role: n.getAttribute('role'), tab: n.tabIndex, expanded: n.getAttribute('aria-expanded'), open: h.classList.contains('is-open'), h: Math.round(r.height), right: Math.round(r.right), vw: innerWidth, sideways: document.documentElement.scrollWidth > innerWidth + 1, label: n.getAttribute('aria-label'), dialogName: document.getElementById('artifact-viewer').getAttribute('aria-labelledby') === 'artifact-viewer-title' && h.textContent.startsWith(${JSON.stringify(LONG)}) }; })()`);
+        const key = async (k, code, vk) => { await Input.dispatchKeyEvent({ type: 'keyDown', key: k, code, windowsVirtualKeyCode: vk }); await Input.dispatchKeyEvent({ type: 'keyUp', key: k, code, windowsVirtualKeyCode: vk }); };
+        for (const [w, h, mobile, tag] of [[390, 800, true, 'phone 390'], [640, 800, false, '200% text (a 640 px window)']]) {
+            await load(w, h, mobile, 'light');
+            await open(`true`, { filename: LONG });
+            await ev(`new Promise(r => setTimeout(r, 300))`); // sleep-ok: the viewer settles its layout
+            let n = await nameInfo();
+            await shot(`long-name-closed-${w}`);
+            check(`${tag}: a cut name is a heading holding a focusable button, collapsed, with the whole name as its tooltip and as the dialog's name`, n.heading === 'H2' && n.role === 'button' && n.tab === 0 && n.expanded === 'false' && !n.open && n.title === LONG && n.dialogName, JSON.stringify(n));
+            const h0 = n.h;
+            await ev(`document.querySelector('#artifact-viewer .artifact-viewer-title-name').focus(); true`);
+            await key('Enter', 'Enter', 13);
+            n = await nameInfo();
+            check(`${tag}: Enter opens the whole name (aria-expanded true, taller, nothing sideways)`, n.open && n.expanded === 'true' && n.h > h0 && !n.sideways && n.right <= n.vw, JSON.stringify(n));
+            await shot(`long-name-open-${w}`);
+            await key(' ', 'Space', 32);
+            n = await nameInfo();
+            check(`${tag}: Space closes it again`, !n.open && n.expanded === 'false' && n.h === h0, JSON.stringify(n));
+            const box = await ev(`(() => { const r = document.querySelector('#artifact-viewer .artifact-viewer-title-name').getBoundingClientRect(); return { x: r.left + 10, y: r.top + r.height / 2 }; })()`);
+            if (mobile) { await Input.dispatchTouchEvent({ type: 'touchStart', touchPoints: [{ x: box.x, y: box.y }] }); await Input.dispatchTouchEvent({ type: 'touchEnd', touchPoints: [] }); }
+            else { await Input.dispatchMouseEvent({ type: 'mousePressed', x: box.x, y: box.y, button: 'left', clickCount: 1 }); await Input.dispatchMouseEvent({ type: 'mouseReleased', x: box.x, y: box.y, button: 'left', clickCount: 1 }); }
+            n = await nameInfo();
+            check(`${tag}: a ${mobile ? 'tap' : 'click'} opens it`, n.open && n.expanded === 'true', JSON.stringify(n));
+        }
+        await load(1280, 800, false, 'light');
+        await open(`true`, { filename: 'plan.md' });
+        check('a name that fits is not a button and takes no Tab stop', await ev(`(() => { const n = document.querySelector('#artifact-viewer .artifact-viewer-title-name'); return !n.getAttribute('role') && n.tabIndex === -1; })()`));
         // #13979: a toast (Approve's "Approved. Planner was told.") must not sit over the viewer's Close
         await load(1280, 800, false, 'light');
         await open(`true`);
@@ -258,12 +281,14 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
         await waitFor(`!!document.querySelector('#toast-host > .toast')`, 'the toast', 4000);
         await new Promise(r => setTimeout(r, 500)); // sleep-ok: the toast slides in over 0.3 s
         const over = await ev(`(() => { const t = document.querySelector('#toast-host > .toast').getBoundingClientRect(), c = document.querySelector('#artifact-viewer .artifact-viewer-close').getBoundingClientRect(); return { toast: [t.left, t.top, t.right, t.bottom].map(Math.round), close: [c.left, c.top, c.right, c.bottom].map(Math.round), overlap: !(t.right <= c.left || t.left >= c.right || t.bottom <= c.top || t.top >= c.bottom) }; })()`);
+        await shot('toast-vs-close');
         check('the toast does not cover the viewer\'s Close', over.overlap === false, JSON.stringify(over));
         // #13979: a viewer who cannot write, with nothing to read yet, gets one message (the reason), not the reason AND "Select some text to add one"
         await load(1280, 800, false, 'light');
         await open(`window.__role = 'hubview'; window.__cs = []; true`);
         await waitFor(`!!document.querySelector('.ac-readonly')`, 'the read-only reason', 5000);
         const emptyRo = await ev(`({ reason: document.querySelector('.ac-readonly').textContent, panel: document.querySelector('.ac-readonly').parentElement.textContent })`);
+        await shot('comments-readonly-empty');
         check('a read-only viewer with no comments is told once, and never to select text', /view only|computer itself/.test(emptyRo.reason) && !/Select some text to add one/.test(emptyRo.panel) && /No open comments\./.test(emptyRo.panel), JSON.stringify(emptyRo));
         await load(1280, 800, false, 'dark');
         await open(`window.__locked = true; true`);
