@@ -198,12 +198,6 @@ export function serverForSession(name, sessionId) {
 const SERVER_ID_RE = /^(?:[a-z0-9-]{1,32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 
 /** Unpack a key made by identityKey(): {server, name}. */
-/** The server of a team key when it is another computer's, else undefined: a link to a file of this computer carries no server of its own (#12583). */
-export function remoteServer(key) {
-    const { server } = splitKey(key);
-    return server === LOCAL_SERVER ? undefined : server;
-}
-
 export function splitKey(key) {
     const k = String(key ?? '');
     if (k.startsWith('@')) {

@@ -57,10 +57,10 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
     // a box's place once it has stayed the same for 150 ms (a sheet that slides in): waits for the movement to end instead of sleeping a fixed time. waitStable is bounded by time (5 s), so a page that runs no frames cannot hang it
     const settled = sel => waitStable(ev, `(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return ''; const r = e.getBoundingClientRect(); return [r.top, r.bottom, r.left, r.right].map(Math.round).join(); })()`, `${sel} to stop moving`, 150);
     const rect = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return { l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), b: Math.round(r.bottom), w: Math.round(r.width), h: Math.round(r.height) }; })()`);
-    const open = async (extra) => {
+    const open = async (extra, opts = {}) => {
         await ev(STUB);
         if (extra) await ev(extra);
-        await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'plan.md' }); return true; })()`);
+        await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(HEX)}, ${JSON.stringify({filename:'plan.md',...opts})}); return true; })()`);
         await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown')`, 'the document', 8000);
     };
     const load = async (w, h, mobile, theme) => {
@@ -222,8 +222,8 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
         await waitFor(`document.querySelectorAll('.ac-card').length >= 3`, 'cards', 5000);
         check('opened with no team context the requests carry no board', !(await ev(`window.__calls.some(c => /board=/.test(c.url) || (c.body && c.body.board))`)));
         await load(1280, 800, false, 'dark');
-        await ev(`import(${S} + 'state.js').then(m => { m.state.selectedTeam = '@box/team-x'; return true; })`);
-        await open();
+        await ev(`import(${S} + 'state.js').then(m => { m.state.servers=[{id:'box',label:'Box'}];m.state.selectedTeam = '@box/team-x'; return true; })`);
+        await open('', {server:'box',board:'team-x'});
         await waitFor(`document.querySelectorAll('.ac-card').length >= 3`, 'cards', 5000);
         await click('.ac-whole');
         await ev(`(() => { const t = document.querySelector('.ac-composer .ac-input'); t.value = 'On the team'; t.dispatchEvent(new Event('input')); document.querySelector('.ac-composer').requestSubmit(); return true; })()`);

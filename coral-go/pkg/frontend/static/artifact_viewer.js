@@ -113,6 +113,7 @@ function _build() {
                 </div>
             </span>
         </div>
+        <p class="artifact-viewer-source" role="note" hidden></p>
         <div class="artifact-viewer-readers" hidden></div>
         <p class="artifact-edit-send-note" role="status" hidden></p>
         <div class="artifact-viewer-main"><div class="artifact-viewer-body"></div></div>
@@ -307,7 +308,8 @@ export function openArtifactViewer(hex, opts = {}) {
     const title = d.querySelector('.artifact-viewer-title');
     title.textContent = visibleName(opts.filename) || 'Artifact'; // the uploader's text, without what hides or reorders it (Security on #220)
     const fromLine = d.querySelector('.artifact-viewer-from'); fromLine.textContent = visibleName(opts.from) || ''; fromLine.hidden = !fromLine.textContent; fromLine.title = fromLine.textContent; fromLine.classList.remove('is-open'); fromLine.setAttribute('aria-expanded', 'false'); d.querySelector('.artifact-viewer-sandbox').hidden = true; d._markUp.picture(false); d._markUp.write(false); // who uploaded a file opened for review (#11456), as text
-    if (!opts.sourceNamed) { const computer = opts.server === 'local' ? 'this computer' : ((state.servers || []).find(s => s.id === opts.server)?.label || opts.server); fromLine.textContent = [visibleName(opts.from), `Viewing from ${markHidden(computer, { strict: true })}. Source inferred; read only.`].filter(Boolean).join(' · '); fromLine.hidden = false; fromLine.title = fromLine.textContent; }
+    const sourceNote = d.querySelector('.artifact-viewer-source'); sourceNote.hidden = !!opts.sourceNamed; sourceNote.textContent = '';
+    if (!opts.sourceNamed) { const computer = (state.servers || []).find(s => s.id === opts.server), name = opts.server === 'local' ? 'this computer' : (computer?.label || computer?.name || opts.server); sourceNote.textContent = `Viewing from ${markHidden(name, { strict: true })}. Source inferred; read only.`; }
     const dl = d.querySelector('.artifact-viewer-download');
     const newTab = d.querySelector('.artifact-viewer-newtab');
     newTab.hidden = true; newTab.removeAttribute('href'); // its address comes with the kind (typeKnown): a manifest's own bytes are a list, not what to open

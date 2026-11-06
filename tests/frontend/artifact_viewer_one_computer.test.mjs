@@ -25,7 +25,7 @@ for (const [label, opts] of [['no board and no server named', {}], ['a board nam
   assert.deepEqual([...computers], [opts.board ? 'local' : 'ws1'], 'every request uses the expected computer:\n  '+asked().join('\n  '));
   assert.equal(document.querySelector('.artifact-viewer-edit').hidden,true,'inferred source cannot expose Edit');
   assert.equal(document.querySelector('.artifact-edit-send-action').hidden,true,'inferred source cannot expose Send');
-  assert.match(document.querySelector('.artifact-viewer-from').textContent,/Source inferred; read only/);
+  assert.match(document.querySelector('.artifact-viewer-source').textContent,/Source inferred; read only/);
  } finally { document.querySelector('.artifact-viewer-close')?.click(); state.selectedTeam = ''; }
 });
 test('control: the server named, everything goes to it', async () => {
