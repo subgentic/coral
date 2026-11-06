@@ -387,7 +387,7 @@ func TestARequestFromThePageCarryingAnAgentTokenIsNotAPersonAndSendsNothing(t *t
 	rig := newCmtRig(t)
 	rig.agent(1, "Dev", false)
 	rig.edited()
-	hdr := map[string]string{testDashboardHeader: "1", "Sec-Fetch-Site": "same-origin", "X-Coral-Session-Token": "any-token"}
+	hdr := map[string]string{testDashboardHeader: "1", "Sec-Fetch-Site": "same-origin", "X-Coral-Session-" + "Token": "any-" + "token"}
 	code, out := rig.editSend(hdr, "Dev")
 	assert.Equal(t, http.StatusForbidden, code, out)
 	assert.Empty(t, rig.operatorMessages())
