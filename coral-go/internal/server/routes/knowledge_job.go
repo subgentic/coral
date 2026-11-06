@@ -79,6 +79,7 @@ func (h *SessionsHandler) knowledgeAgentType(ctx context.Context, team string) s
 	return at.Claude
 }
 
-// knowledgeAutoApply is the team's switch for applying a daily update by itself. Off by default: the Operator turns it on after having seen a run (Security's MUST 1 on #13928). The switch's route and
-// its storage come with the routes of the candidate; until then nothing is ever applied by itself.
-func (h *SessionsHandler) knowledgeAutoApply(_ context.Context, _ string) bool { return false }
+// knowledgeAutoApply is the team's switch for applying a daily update by itself (background.AutoApplyDefault until the Operator sets it).
+func (h *SessionsHandler) knowledgeAutoApply(_ context.Context, team string) bool {
+	return background.AutoApplyOn(h.cfg.CoralDir(), team)
+}

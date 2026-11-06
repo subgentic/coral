@@ -665,6 +665,12 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	// Team knowledge distillation
 	r.Post("/api/teams/detail/{name}/distill-knowledge", sessHandler.DistillKnowledge)
 	r.Get("/api/teams/detail/{name}/distill-knowledge", sessHandler.GetKnowledgeStatus)
+	// The team's daily knowledge (#13928): the switch, the waiting candidate and its accept and revert.
+	r.Get("/api/teams/detail/{name}/daily-knowledge", sessHandler.DailyKnowledgeStatus)
+	r.With(routes.RefuseSignInLink).Put("/api/teams/detail/{name}/daily-knowledge", sessHandler.SetDailyKnowledge)
+	r.With(routes.RefuseSignInLink).Put("/api/teams/detail/{name}/daily-knowledge/auto-apply", sessHandler.SetDailyKnowledgeAutoApply)
+	r.With(routes.RefuseSignInLink).Post("/api/teams/detail/{name}/daily-knowledge/accept", sessHandler.AcceptDailyKnowledge)
+	r.With(routes.RefuseSignInLink).Post("/api/teams/detail/{name}/daily-knowledge/revert", sessHandler.RevertDailyKnowledge)
 	r.Get("/api/teams/detail/{name}/knowledge", sessHandler.GetTeamKnowledge)
 	r.Get("/api/teams/detail/{name}/knowledge/{agentName}", sessHandler.GetAgentKnowledge)
 	r.With(routes.RefuseSignInLink).Put("/api/teams/detail/{name}/knowledge/{agentName}", sessHandler.SaveAgentKnowledge)

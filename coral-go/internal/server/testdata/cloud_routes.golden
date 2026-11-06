@@ -243,6 +243,7 @@ GET /api/team-artifacts view
 GET /api/teams/all view
 GET /api/teams/detail/{name} view
 GET /api/teams/detail/{name}/availability view
+GET /api/teams/detail/{name}/daily-knowledge view
 GET /api/teams/detail/{name}/distill-knowledge view
 GET /api/teams/detail/{name}/knowledge view
 GET /api/teams/detail/{name}/knowledge/{agentName} view
@@ -472,6 +473,8 @@ POST /api/system/update/relaunch-local never
 POST /api/tags never
 POST /api/tasks/run launch
 POST /api/tasks/runs/{runID}/kill never
+POST /api/teams/detail/{name}/daily-knowledge/accept interact
+POST /api/teams/detail/{name}/daily-knowledge/revert interact
 POST /api/teams/detail/{name}/distill-knowledge launch
 POST /api/teams/detail/{name}/resurrect launch
 POST /api/teams/generate launch
@@ -528,6 +531,8 @@ PUT /api/system/identity-actor never
 PUT /api/system/terminal-backend never
 PUT /api/system/update/settings never
 PUT /api/team-members/{memberID}/search-access never
+PUT /api/teams/detail/{name}/daily-knowledge interact
+PUT /api/teams/detail/{name}/daily-knowledge/auto-apply interact
 PUT /api/teams/detail/{name}/home-folder never
 PUT /api/teams/detail/{name}/knowledge/{agentName} never
 PUT /api/themes/{name} never
