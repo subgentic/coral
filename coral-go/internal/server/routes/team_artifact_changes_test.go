@@ -332,3 +332,25 @@ func (c *changesEnv) changesNoT(body string) (int, map[string]any) {
 	_ = json.NewDecoder(resp.Body).Decode(&out)
 	return resp.StatusCode, out
 }
+
+// QA's pin: the words' half is the owner's alone, whoever reaches it. A caller that is no owner (an agent's session, a Hub viewer, nobody) gets owner_only and nothing is written: no comment, no notice, no ask.
+func TestAnyoneButTheOwnerGetsOwnerOnlyAndNothingIsWritten(t *testing.T) {
+	c := newChangesEnv(t)
+	agent := httptest.NewRequest(http.MethodPost, "/x", nil)
+	agent = agent.WithContext(context.WithValue(agent.Context(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: sessAlice, SessionName: "claude-" + sessAlice})) // status 0, kind agent
+	nobody := httptest.NewRequest(http.MethodPost, "/x", nil)                                                                                                               // no caller at all
+	hub := httptest.NewRequest(http.MethodPost, "/x", nil)
+	hub.Header.Set("X-Coral-Via", "x") // a hub viewer's request, never the owner's
+	for name, req := range map[string]*http.Request{"an agent's session": agent, "nobody": nobody, "a hub viewer": hub} {
+		_, err := c.sh.ChangeRequestWords(req, "alpha", c.id, "Use 5,000 rows.")
+		var ce *changeWordsError
+		require.ErrorAs(t, err, &ce, name)
+		assert.Equal(t, "owner_only", ce.Code, name)
+		assert.Equal(t, http.StatusForbidden, ce.Status, name)
+	}
+	assert.Empty(t, c.comments(t), "no comment")
+	assert.Empty(t, c.messages(t), "no notice")
+	asks, err := c.ss.ListArtifactAsks(context.Background(), c.id)
+	require.NoError(t, err)
+	assert.Empty(t, asks, "no ask")
+}
