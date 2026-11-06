@@ -122,6 +122,7 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 	var items []teamArtifact
 	var refs []teamArtifactTeamRef
 	truncated, cut := false, false
+	var failedBoards []string
 	walked := 0
 	for _, p := range projects {
 		label := p.BoardLabel
@@ -138,8 +139,8 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 		walked++
 		rows, scanCut, err := h.projectArtifactItems(r, p.Project, "")
 		if err != nil {
-			errInternalServer(w, "could not list artifacts")
-			return
+			failedBoards = append(failedBoards, p.Project)
+			continue
 		}
 		truncated = truncated || scanCut
 		for i := range rows {
@@ -181,6 +182,12 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 		"artifacts_rev": artifactsRev,
 		"artifacts":     sel.page, "limit": limit, "offset": sel.start, "has_more": sel.hasMore, "truncated": truncated || cut,
 		"total": sel.total, "all": all, "teams": refs,
+	}
+	if tq.starredFirst {
+		resp["starred_total"] = sel.starredTotal
+	}
+	if len(failedBoards) > 0 { // a team whose rows could not be read: the list says so and carries the others (#13910), never a quietly short list
+		resp["partial"], resp["failed_boards"] = true, failedBoards
 	}
 	if sel.next != "" {
 		resp["next_cursor"] = sel.next
