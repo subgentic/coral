@@ -362,6 +362,19 @@ async function appendReviews(pager, server) {
 }
 export const loadMoreReviews = server => appendReviews(reviewPager, server);
 export const loadMoreSavedFiles = server => appendReviews(savedPager, server);
+async function refreshActiveQuery() {
+    const mine = fview;
+    if (!mine) return;
+    const started = revision;
+    mine.at = Date.now();
+    mine.promise = mine.pager.refresh().then(() => {
+        if (fview !== mine || started !== revision) return;
+        mine.started = started;
+        mine.invalidCounts = false;
+        changed();
+    });
+    return mine.promise;
+}
 export function refreshReviews(force = false, { reuse = false } = {}) {
     if (force) activated = true;
     if (!activated) return null;
@@ -372,7 +385,7 @@ export function refreshReviews(force = false, { reuse = false } = {}) {
     lastSources = sources; pendingStarted = revision; lastRead = Date.now();
     const started = revision;
     syncPageSources();
-    pending = Promise.all([reviewPager.refresh(), savedPager.refresh()]).then(() => {
+    pending = Promise.all([reviewPager.refresh(), savedPager.refresh(), refreshActiveQuery()]).then(() => {
         if (started !== revision) return;
         publishPages();
         if (typeof document !== 'undefined') importOnce('./operator_asks.js').then(m => m.refreshReviewAskVisibility()).catch(() => {});

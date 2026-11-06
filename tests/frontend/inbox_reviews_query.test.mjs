@@ -117,4 +117,12 @@ M.settleReview({ team: 'a', id: 'a-60', reviewKey: 'a:' + hex(60), name: 'x' });
 release2(); hold = null; await more;
 assert.ok(!keys().includes('a:' + hex(60)), 'the settled row did not come back with the Show more that was in flight');
 assert.ok(keys().includes('a:' + hex(61)), 'the rest of the page did arrive');
+// A forced refresh must also refresh the active filtered window: writes and
+// newly arrived rows cannot wait for its thirty-second query cache to expire.
+TEAMS.a.unshift(art(9000));
+M.reviewsChangedOnServer();
+await M.refreshReviews(true);
+assert.ok(keys().includes('a:' + hex(9000)), 'a newly inserted row is visible in the active query after refresh');
+assert.ok(keys().includes('a:' + hex(3)), 'a restored row can return after a fresh authoritative query');
+assert.equal(M.reviewQueryState().total, 241, 'filtered metadata is renewed with its rows');
 console.log('inbox_reviews_query: ok');
