@@ -119,6 +119,11 @@ func (h *SessionsHandler) getAgentArtifactMeta(w http.ResponseWriter, r *http.Re
 			out["series_id"], out["version"], out["versions"], out["is_latest"] = sid, n, len(ms), len(ms) > 0 && ms[len(ms)-1].Digest == id
 		}
 	}
+	if _, isAgent := agentSessionOf(r); !isAgent && !isGuideCaller(r) { // the owner only: a delete by digest removes the one object every team shares, and the confirmation says how many others hold it (Security, #13949)
+		if n := teamsHolding(h.cfg.CoralDir(), id); n > 1 {
+			out["held_by_teams"] = n
+		}
+	}
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Del("X-Coral-Build")
 	writeJSON(w, http.StatusOK, out)

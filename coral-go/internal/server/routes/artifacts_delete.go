@@ -5,6 +5,7 @@ package routes
 import (
 	"errors"
 	"github.com/go-chi/chi/v5"
+	"github.com/subgentic/coral/internal/board"
 	"log/slog"
 	"net/http"
 	"os"
@@ -126,6 +127,7 @@ func (h *SessionsHandler) deleteArtifactCore(w http.ResponseWriter, r *http.Requ
 		errBadRequest(w, "invalid artifact id")
 		return
 	}
+	teams := teamsHolding(h.cfg.CoralDir(), id) // counted before the delete: the object and every team's record of it go together (#13949)
 	freed, removed, found, err := deleteArtifactFiles(h.cfg.CoralDir(), id)
 	if h.bs != nil && (found || freed > 0 || removed > 0) {
 		h.bs.NoteAllArtifactsChanged()
@@ -145,5 +147,10 @@ func (h *SessionsHandler) deleteArtifactCore(w http.ResponseWriter, r *http.Requ
 	}
 	h.dropArtifactComments(r.Context(), id) // and the comments on it (#5176)
 	slog.Info("[artifacts] deleted by the Operator", "digest", id, "bytes", freed, "upload_records", removed)
-	writeJSON(w, http.StatusOK, map[string]any{"deleted": true, "bytes": freed})
+	out := map[string]any{"deleted": true, "bytes": freed}
+	if teams > 1 {
+		out["also_in_teams"] = teams - 1 // the confirmation and the Activity row say the file was in other teams too (Security, #13949)
+		noteActivity(r, board.ActFileDelete, "file", id, "", "", alsoInTeamsNote(teams))
+	}
+	writeJSON(w, http.StatusOK, out)
 }

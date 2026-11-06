@@ -1,17 +1,23 @@
 package routes
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -99,4 +105,65 @@ func TestAPruneNeverTakesAVersionOfAnyTeamsSeries(t *testing.T) {
 	protected, err := k.h.isProtected(context.Background(), strings.Repeat("e", 64))
 	require.NoError(t, err)
 	assert.False(t, protected, "bytes in no series")
+}
+
+// Security's follow-ups on #13949: the delete's reply and its Activity row say the file was also held by other teams, the metadata of a digest tells the owner how many teams hold it, and a circle that cannot place an
+// agent is logged once, not silently shown as a file with no series.
+func TestDeletingSharedBytesSaysTheyWereInOtherTeamsToo(t *testing.T) {
+	k, d, _, _ := twoTeamsSameBytes(t)
+	pend := &activityPending{}
+	req := httptest.NewRequest(http.MethodDelete, "/api/artifacts/"+d[0], nil)
+	req = req.WithContext(context.WithValue(req.Context(), activityPendingKey{}, pend))
+	req = withChiParam(req, "id", d[0])
+	rec := httptest.NewRecorder()
+	k.h.deleteArtifactCore(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), `"also_in_teams":1`)
+	assert.True(t, pend.set, "the Activity row is asked for")
+	assert.Equal(t, board.ActFileDelete, pend.action)
+	assert.Contains(t, pend.note, "also held by 1 other team", "the row says the file was in another team too")
+
+	// bytes only one team holds: no such words
+	pend2 := &activityPending{}
+	req2 := httptest.NewRequest(http.MethodDelete, "/api/artifacts/"+d[2], nil)
+	req2 = req2.WithContext(context.WithValue(req2.Context(), activityPendingKey{}, pend2))
+	req2 = withChiParam(req2, "id", d[2])
+	rec2 := httptest.NewRecorder()
+	k.h.deleteArtifactCore(rec2, req2)
+	require.Equal(t, http.StatusOK, rec2.Code)
+	assert.NotContains(t, rec2.Body.String(), "also_in_teams")
+	assert.False(t, pend2.set)
+}
+
+func TestTeamsHoldingCountsEachTeamOnce(t *testing.T) {
+	k, d, _, _ := twoTeamsSameBytes(t)
+	assert.Equal(t, 2, teamsHolding(k.coralDir, d[0]), "alpha and beta")
+	assert.Equal(t, 1, teamsHolding(k.coralDir, d[2]), "alpha only")
+	assert.Equal(t, 0, teamsHolding(k.coralDir, strings.Repeat("e", 64)))
+	assert.Equal(t, "", alsoInTeamsNote(1))
+}
+
+func TestACircleThatCannotPlaceAnAgentIsLoggedOnceAndShowsNoSeries(t *testing.T) {
+	k, d, _, _ := twoTeamsSameBytes(t)
+	useCircle(t, ArtifactCircle{
+		SessionBoard: func(context.Context, string) (string, error) { return "", errors.New("the session store is down") },
+		BoardOwner:   func(context.Context, string) (artifactPrincipal, error) { return operatorPrincipal, nil },
+	})
+	var buf bytes.Buffer
+	old := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(old) })
+	circleWarn = sync.Once{}
+	for i := 0; i < 3; i++ {
+		_, _, ok := callerSeries(asSession("sa"), k.coralDir, d[0])
+		assert.False(t, ok)
+	}
+	assert.Equal(t, 1, strings.Count(buf.String(), "could not be placed"), "one warning, however many reads: %s", buf.String())
+}
+
+// withChiParam sets one URL parameter of the route on a request.
+func withChiParam(req *http.Request, key, val string) *http.Request {
+	rc := chi.NewRouteContext()
+	rc.URLParams.Add(key, val)
+	return req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rc))
 }
