@@ -179,6 +179,7 @@ func (h *SessionsHandler) deliverGoalComment(r *http.Request, caller commentCall
 		_ = h.ss.CloseArtifactAsk(ctx, rootID, sessionID, time.Now())
 		return autoDelivery{Reason: "failed"}
 	}
+	h.operatorPosted(team, msg)
 	if h.boardHandler != nil && h.boardHandler.notifyFn != nil {
 		h.boardHandler.notifyFn(team)
 	}

@@ -108,6 +108,7 @@ func (h *SessionsHandler) deliverOperatorComment(r *http.Request, caller comment
 			reason = firstReason(reason, "failed")
 			continue
 		}
+		h.operatorPosted(b, msg)
 		sent = append(sent, title)
 		slog.Info("[artifact comments] the Operator's comment sent to an agent", "artifact", id, "comment", c.ID, "agent", title, "board", b)
 	}

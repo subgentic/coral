@@ -408,5 +408,8 @@ func (h *SessionsHandler) postEditMessage(ctx context.Context, project, body str
 		return h.editPost(ctx, project, body)
 	}
 	_, err := h.bs.PostDefusedMessage(ctx, project, board.OperatorName, body)
+	if err == nil {
+		h.operatorPosted(project, body)
+	}
 	return err
 }
