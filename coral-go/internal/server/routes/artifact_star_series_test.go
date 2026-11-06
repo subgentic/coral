@@ -386,3 +386,113 @@ func TestThePersonKeyFromARealStampedHubRequest(t *testing.T) {
 	}
 	assert.Equal(t, "owner", openedPersonKey(req), "the Hub owner of a personal computer is the local owner's key")
 }
+
+// QA's three pins on #13910, each against a mutant no test failed.
+
+// 1. The opened version is never above the series' newest: on the write (the digest's own record says version 3, the series index has two) and on the read (a row left over from a version since gone).
+func TestTheOpenedVersionIsNeverAboveTheSeriesNewest(t *testing.T) {
+	p := newPinnedRig(t)
+	k := p.k
+	_, d := threeVersions(t, k)
+	dir := k.coralDir
+	sid, _, ok := digestSeries(dir, d[0])
+	require.True(t, ok)
+	idx, found := readSeriesIndex(dir, sid)
+	require.True(t, found)
+	require.Len(t, idx.Versions, 3)
+	idx.Versions = idx.Versions[:2] // the series says two versions while the third's own record says it is version 3
+	require.NoError(t, writeSeriesIndex(dir, idx))
+	req := httptest.NewRequest(http.MethodPost, "/api/artifacts/"+d[2]+"/opened", nil)
+	req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+	rc := chi.NewRouteContext()
+	rc.URLParams.Add("id", d[2])
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rc))
+	rec := httptest.NewRecorder()
+	k.h.openedArtifactRoute(rec, req)
+	require.Equal(t, 200, rec.Code, rec.Body.String())
+	var out map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+	assert.EqualValues(t, 2, out["opened_version"], "never above the newest version the series has")
+
+	// the read: a stored value above the row's version is shown as the row's version
+	idx.Versions = append(idx.Versions, seriesVersionRow{Digest: d[2], N: 3, Session: idx.Versions[0].Session, At: idx.Versions[0].At})
+	require.NoError(t, writeSeriesIndex(dir, idx))
+	_, err := k.h.db.ExecContext(context.Background(), `UPDATE artifact_series_opened SET version = 9`)
+	require.NoError(t, err)
+	_, list := p.get(t, "/api/team-artifacts?tag=for+review", nil)
+	row := list["artifacts"].([]any)[0].(map[string]any)
+	assert.EqualValues(t, 3, row["versions"])
+	assert.EqualValues(t, 3, row["opened_version"], "a stored 9 is shown as the series' 3")
+}
+
+// 2. Deleting an artifact drops every person's star of it, not the owner key's alone.
+func TestDeletingAnArtifactDropsEveryPersonsStarOfIt(t *testing.T) {
+	p := newPinnedRig(t)
+	k := p.k
+	_, d := threeVersions(t, k)
+	ctx := context.Background()
+	_, err := k.h.star(ctx, ownerPersonKey, d[2])
+	require.NoError(t, err)
+	_, err = k.h.star(ctx, "hub:org-1:u1", d[2])
+	require.NoError(t, err)
+	_, err = k.h.star(ctx, "hub:org-1:u2", d[2])
+	require.NoError(t, err)
+	_, err = k.h.star(ctx, "hub:org-1:u1", d[1]) // another version of the series: stays
+	require.NoError(t, err)
+	req := httptest.NewRequest(http.MethodDelete, "/api/artifacts/"+d[2], nil)
+	req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+	rc := chi.NewRouteContext()
+	rc.URLParams.Add("id", d[2])
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rc))
+	rec := httptest.NewRecorder()
+	k.h.deleteAgentArtifact(rec, req)
+	require.Equal(t, 200, rec.Code, rec.Body.String())
+	var n int
+	require.NoError(t, k.h.db.Reader().GetContext(ctx, &n, "SELECT COUNT(*) FROM artifact_stars WHERE hex = ?", d[2]))
+	assert.Zero(t, n, "the owner key's star")
+	require.NoError(t, k.h.db.Reader().GetContext(ctx, &n, "SELECT COUNT(*) FROM artifact_person_stars WHERE hex = ?", d[2]))
+	assert.Zero(t, n, "and every person's")
+	require.NoError(t, k.h.db.Reader().GetContext(ctx, &n, "SELECT COUNT(*) FROM artifact_person_stars WHERE hex = ?", d[1]))
+	assert.Equal(t, 1, n, "another version's star is not touched")
+}
+
+// 3. The privacy guard: what the Operator opened is not put on a row for an agent's token, nor a Hub caller that is not the owner (attachOpenedVersions asks starVisible).
+func TestWhatTheOperatorOpenedIsNotPutOnARowForAnAgentToken(t *testing.T) {
+	p := newPinnedRig(t)
+	k := p.k
+	_, d := threeVersions(t, k)
+	_, err := k.h.db.ExecContext(context.Background(), `INSERT INTO artifact_series_opened (person, board_id, series_id, version, opened_at) VALUES ('owner', 'alpha', ?, 2, '2026-11-06T10:00:00Z')`, mustSeriesOf(t, k, d[0]))
+	require.NoError(t, err)
+	_, list := p.get(t, "/api/team-artifacts?tag=for+review", nil)
+	require.NotEmpty(t, list["artifacts"])
+	raw, err := json.Marshal(list["artifacts"])
+	require.NoError(t, err)
+	var rowsFor []teamArtifact
+	require.NoError(t, json.Unmarshal(raw, &rowsFor))
+	for i := range rowsFor {
+		rowsFor[i].SeriesID, rowsFor[i].OpenedVersion = "", 0
+	}
+	operator := httptest.NewRequest("GET", "/x", nil)
+	p.bh.attachOpenedVersions(operator, rowsFor)
+	require.NotEmpty(t, rowsFor[0].SeriesID, "the Operator's request gets the fields")
+	assert.EqualValues(t, 2, rowsFor[0].OpenedVersion)
+	for i := range rowsFor {
+		rowsFor[i].SeriesID, rowsFor[i].OpenedVersion = "", 0
+	}
+	agent := withActor(httptest.NewRequest("GET", "/x", nil), Actor{Kind: ActorToken, Name: "Backend", Session: "s1"})
+	p.bh.attachOpenedVersions(agent, rowsFor)
+	assert.Empty(t, rowsFor[0].SeriesID, "an agent's token gets neither")
+	assert.Zero(t, rowsFor[0].OpenedVersion)
+	hub := httptest.NewRequest("GET", "/x", nil)
+	hub.Header.Set(tunnel.ViaHeader, "x")
+	p.bh.attachOpenedVersions(hub, rowsFor)
+	assert.Empty(t, rowsFor[0].SeriesID, "nor a Hub caller with no owner stamp")
+	assert.Zero(t, rowsFor[0].OpenedVersion)
+}
+
+func mustSeriesOf(t *testing.T, k *kindRig, digest string) string {
+	t.Helper()
+	sid, _, ok := digestSeries(k.coralDir, digest)
+	require.True(t, ok)
+	return sid
+}
