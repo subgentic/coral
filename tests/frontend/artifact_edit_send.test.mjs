@@ -22,5 +22,5 @@ test('closing during metadata lookup ignores a late response and never fetches r
  globalThis.fetch=window.fetch=async(url,options={})=>{calls.push({url:String(url),...options});return pending;};
  const h=openEditSend({context:ctx,filename:'report.md'});assert.equal(h.close(),true);
  finish(Response.json(cap));await pending;await new Promise(resolve=>setImmediate(resolve));
- assert.equal(document.querySelector('.artifact-edit-send-dialog'),null);assert.equal(calls.length,1);assert.equal(calls[0].method,undefined);
+ assert.equal(document.querySelector('.artifact-edit-send-dialog'),null);assert.equal(calls.length,1,JSON.stringify(calls));assert.equal(calls[0].method,undefined);
 });

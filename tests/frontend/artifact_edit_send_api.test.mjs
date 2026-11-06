@@ -20,3 +20,7 @@ test('HTTP 200 server result needs no extra success flag and exposes its existin
 test('explicit save invalidation keeps the qualified team and clears freshness without faking a revision',()=>{
  const events=[];const off=onArtifactsRev((...args)=>events.push(args));invalidateArtifacts('@m1/dev');off();assert.deepEqual(events,[['@m1/dev',null,true,true]]);
 });
+
+test('a saved version invalidation carries both immutable digests on its qualified team',()=>{
+ const events=[];const off=onArtifactsRev((...args)=>events.push(args));invalidateArtifacts('@m1/dev',{previous:base,digest:hex});off();assert.deepEqual(events,[['@m1/dev',null,true,{previous:base,digest:hex}]]);
+});

@@ -266,7 +266,7 @@ async function startMarkdownEdit(d) {
         const restore = (base = granted.context.hex) => { stopMarkdownEdit(); if (gen === _gen && !d.hidden) { if (base !== granted.context.hex) openArtifactViewer(base, { ..._lastOpts, switched: false }); else { const preview = source.replace(/^\ufeff/, ''); renderArtifactText(d.querySelector('.artifact-viewer-body'), preview, 'artifact.md', granted.context.server); _comments.docRendered(preview, true); } _comments.setSheet(commentsWereOpen); } };
         _editor = module.createMarkdownEditor({ body: d.querySelector('.artifact-viewer-body'), footer: d.querySelector('.artifact-viewer-foot'), dialog: d, context: granted.context, source,
             onExit: restore,
-            onSaved: saved => { if (gen !== _gen) return; importOnce('./artifacts_feed.js').then(m => m.invalidateArtifacts(granted.context.key)).catch(() => {}); openArtifactViewer(saved.digest, { ..._lastOpts, filename: saved.name || _lastOpts.filename, switched: false, editSaved: true }); },
+            onSaved: saved => { if (gen !== _gen) return; importOnce('./artifacts_feed.js').then(m => m.invalidateArtifacts(granted.context.key, { previous: granted.context.hex, digest: saved.digest })).catch(() => {}); openArtifactViewer(saved.digest, { ..._lastOpts, filename: saved.name || _lastOpts.filename, switched: false, editSaved: true }); },
         });
     } catch (error) {
         if (gen !== _gen || error.name === 'AbortError') return;

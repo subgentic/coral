@@ -51,10 +51,11 @@ export function createArtifactsList({ inbox = false } = {}) {
 
     const PAGE = 50; // a computer answers at most 50 a request (#13161)
     const model = { project: '', scope: null, key: '', loaded: false, items: [], hasMore: false, cursor: '', counts: null, truncated: false, loading: false, error: '', loadingMore: false, filters: { ...F.EMPTY }, kept: new Set(), tagCounts: {}, gen: 0, controller: null, teams: [] };
-    let loadedToken = null, loadedKey = '', loadedSnapshot = null, refreshNeeded = false, localRefresh = false;
+    let loadedToken = null, loadedKey = '', loadedSnapshot = null, refreshNeeded = false, localRefresh = false, latestSavedEdit = null;
     onArtifactsRev((team, rev, reconnect, mutation) => {
         if (team !== null && !inbox && team !== model.project) return;
-        localRefresh ||= mutation === true;
+        localRefresh ||= !!mutation;
+        if (mutation && typeof mutation === 'object' && HEX_RE.test(mutation.previous) && HEX_RE.test(mutation.digest)) latestSavedEdit = mutation;
         if (reconnect) { loadedToken = null; loadedSnapshot = null; }
         refreshNeeded = true;
         refreshQuiet();
@@ -150,9 +151,11 @@ export function createArtifactsList({ inbox = false } = {}) {
 
     // ── reading the list ─────────────────────────────────────────────────────
 
-    async function loadArtifacts({ append = false, keep = false } = {}) {
+    async function loadArtifacts({ append = false, keep = false, retain = 0 } = {}) {
         const { project, key } = model; if (!key || (append && (model.controller || !model.hasMore))) return;
         const scope = model.scope;
+        const savedEdit = latestSavedEdit;
+        const previousDetail = retain > 0 ? model.items.find(it => itemKey(it) === detailKey()) : null;
         clearPendingBoard(); retryLabels = false;
         model.controller?.abort();
         const gen = ++model.gen, ctrl = model.controller = new AbortController();
@@ -167,13 +170,12 @@ export function createArtifactsList({ inbox = false } = {}) {
             if (!append) params.set('offset', '0'); else if (model.cursor) params.set('cursor', model.cursor); else params.set('offset', String(model.items.length));
             if (!(scope && scope.standalone)) params.set('versions', 'newest'); // one row per file: the newest version, its earlier ones counted (#11700)
             if (scope) params.set('session_id', scope.session); // one agent's list: the same query, scoped to the agent (its totals are the agent's)
-            const inboxData = inbox ? await readInboxArtifacts(params, model.filters, ctrl.signal) : null;
-            const fetchList = () => (inbox ? Promise.resolve({ ok: true, json: async () => inboxData }) : scope && scope.standalone ? fetch(serverUrl(`/api/session-artifacts?${params}`, scope.server), { signal: ctrl.signal }) : boardFetch(project, `/artifacts?${params}`, { signal: ctrl.signal }));
+            const fetchList = async () => (inbox ? { ok: true, json: async () => readInboxArtifacts(params, model.filters, ctrl.signal) } : scope && scope.standalone ? fetch(serverUrl(`/api/session-artifacts?${params}`, scope.server), { signal: ctrl.signal }) : boardFetch(project, `/artifacts?${params}`, { signal: ctrl.signal }));
             let r = await fetchList();
             if (r.status === 400 && !inbox && params.has('versions')) { params.delete('versions'); r = await fetchList(); } // a computer on an older Coral does not know versions: its list is whole;
             if (!r.ok && r.status === 404 && !inbox && !scope && ((await r.clone().json().catch(() => null)) || {}).code === 'board_not_found') { model.notFound = true; throw new Error(`No team named ${splitKey(project).name}`); } // a mistyped team name is not an empty team (#8821)
             if (!r.ok) { if (await isOwnerLabelRefusal(r)) throw new Error(OWNER_LABEL_TEXT); throw new Error(`Unable to load ${inbox ? '' : scope ? 'agent ' : 'team '}artifacts (${r.status}).`); }
-            const data = await r.json();
+            let data = await r.json();
             if (gen !== model.gen || key !== model.key) return;
             if (!Array.isArray(data.artifacts) || (scope && data.session_id !== scope.session)) throw new Error('Unable to load artifacts: unexpected response scope.');
             if (!inbox && !(scope && scope.standalone) && !isBoardAnswer(project, data.project)) {
@@ -188,6 +190,20 @@ export function createArtifactsList({ inbox = false } = {}) {
                     return;
                 }
                 throw new Error('Unable to load artifacts: unexpected response scope.');
+            }
+            // A save must not shrink a paginated list even for one frame: doing so clamps
+            // its scroll before Load more can restore the rows. Read the loaded extent first.
+            while (data.has_more && data.artifacts.length < retain) {
+                if (data.next_cursor) { params.set('cursor', data.next_cursor); params.delete('offset'); }
+                else { params.delete('cursor'); params.set('offset', String(data.artifacts.length)); }
+                const page = await fetchList();
+                if (!page.ok) throw new Error(`Unable to refresh artifacts (${page.status}).`);
+                const next = await page.json();
+                if (gen !== model.gen || key !== model.key) return;
+                if (!Array.isArray(next.artifacts) || (scope && next.session_id !== scope.session) ||
+                    (!inbox && !(scope && scope.standalone) && !isBoardAnswer(project, next.project))) throw new Error('Unable to refresh artifacts: unexpected response scope.');
+                if (!next.artifacts.length && next.has_more) throw new Error('Unable to refresh artifacts: the next page made no progress.');
+                data = { ...next, artifacts: data.artifacts.concat(next.artifacts) };
             }
             if (inbox && data.waiting) { model.waiting = true; return; } // the list of computers has not loaded: the read is not finished, so nothing is said of the artifacts (the page keeps saying it is loading, and the next read asks again)
             model.partial = inbox && data.expected > data.answered ? { failed: data.failed || [], answered: data.answered, expected: data.expected, all: data.all } : null; // some computers did not answer: the count is of the others, and the page says so (#12672)
@@ -207,7 +223,14 @@ export function createArtifactsList({ inbox = false } = {}) {
             if (gen !== model.gen || e.name === 'AbortError') return;
             model.error = e.message || 'Unable to load artifacts.';
         } finally {
-            if (gen === model.gen) { model.controller = null; model.loading = false; model.loadingMore = false; draw(); if (refreshNeeded && !reading) queueMicrotask(refreshQuiet); }
+            if (gen === model.gen) { model.controller = null; model.loading = false; model.loadingMore = false; draw();
+                // Follow this same series only; a late refresh cannot replace another file's pane.
+                if (previousDetail && detailKey() === itemKey(previousDetail) && !model.error) {
+                    const latest = model.items.find(it => serverOf(it) === serverOf(previousDetail) && it.board_id === previousDetail.board_id &&
+                        ((savedEdit?.previous === managedHex(previousDetail) && managedHex(it) === savedEdit.digest) || (previousDetail.series_id && it.series_id === previousDetail.series_id)));
+                    if (latest && itemKey(latest) !== itemKey(previousDetail)) openArtifactSheet(latest, root?.querySelector(`[data-artifact-id="${CSS.escape(itemKey(latest))}"] .dt-primary`), { focus: false });
+                }
+                if (refreshNeeded && !reading) queueMicrotask(refreshQuiet); }
         }
     }
 
@@ -246,7 +269,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             const dirty = refreshNeeded, userRefresh = localRefresh; refreshNeeded = false; localRefresh = false;
             const unchanged = !dirty && loadedKey === key && (inbox ? await inboxArtifactsUnchanged(loadedSnapshot) : !(model.scope && model.scope.standalone) && await artifactsUnchanged(model.project, loadedToken));
             if (key !== model.key) return;
-            if (!unchanged || refreshNeeded) { refreshNeeded = false; await loadArtifacts({ keep: true }); if (model.error) localRefresh ||= userRefresh; }
+            if (!unchanged || refreshNeeded) { refreshNeeded = false; await loadArtifacts({ keep: true, retain: userRefresh ? model.items.length : 0 }); if (model.error) localRefresh ||= userRefresh; }
         } finally { reading = false; if (refreshNeeded) refreshQuiet(); }
     }
     function watch() {
@@ -502,7 +525,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         draw();
     }
 
-    function openArtifactSheet(item, opener) {
+    function openArtifactSheet(item, opener, { focus = true } = {}) {
         const key = itemKey(item), link = linkOf(item), un = isUnverified(item), name = readableName(item);
         const hex = link && link.hex;
         const received = item.source === 'received';
@@ -546,7 +569,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         }
         const dropped = ['team', 'goal'].filter(k => { const th = root?.querySelector(`th[data-key="${k}"]`); return !!th && getComputedStyle(th).display === 'none'; }).length; // a narrow box drops the row's Team and Task columns: their facts are behind Details, and the button says how many
         openDetailPane({
-            key, opener, note, hiddenFacts: dropped, title: name, host: hooks.detailHost || null, extra: head, backLabel: inbox ? 'Artifacts' : '', focusClose: inbox, resizable: true, mainMin: inbox ? 0 : 380, // the team page's pane wears the same handle as the Inbox's (detail_pane.js: drag, keys, double click, the width kept; the agent's Artifacts sheet has a host and no handle) (#9410)
+            key, opener, note, hiddenFacts: dropped, title: name, host: hooks.detailHost || null, extra: head, backLabel: inbox ? 'Artifacts' : '', focus, focusClose: inbox, resizable: true, mainMin: inbox ? 0 : 380, // the team page's pane wears the same handle as the Inbox's (detail_pane.js: drag, keys, double click, the width kept; the agent's Artifacts sheet has a host and no handle) (#9410)
             sub: [un ? '' : typeText(item), un ? '' : sizeText(item.size), whenText(item.created_at)].filter(Boolean).join(' · '), subTitle: createdText(item), // the exact time behind the one in words
             facts: facts.filter(([, v]) => v != null && v !== ''),
             details: link && link.preview && hex ? (h, { isStale }) => { // the Operator's "Who can read this" (#5577) is behind Details with the facts, for a stored artifact
