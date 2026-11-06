@@ -5,8 +5,10 @@
  * image opens the artifact in the dashboard's viewer (#3540: Markdown is previewed, not
  * downloaded); a modified or middle click keeps the link's new tab (served with a sandbox
  * CSP; images inline, other types as a download). */
+import { linkCoralSubjectRefsIn } from './coral_subject_refs.js';
 import { serverUrl, artifactPath } from './server_base.js';
 import { artifactRefHex } from './utils.js';
+import { showToast } from './notifications.js';
 import { importOnce } from './import_once.js';
 
 /** Whether a click is a plain left click the viewer should take over. */
@@ -18,8 +20,7 @@ function openInViewer(e, hex, server, filename) {
     if (!plainClick(e)) return;
     e.preventDefault();
     importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(hex, { server, filename }), () => {
-        // The viewer could not load: fall back to the artifact itself.
-        window.open(serverUrl(artifactPath(hex), server), '_blank', 'noopener,noreferrer');
+        showToast('The file viewer could not be opened. Please try again.', true);
     });
 }
 
@@ -90,6 +91,7 @@ export function resolveBoardArtifacts(root, server) {
             a.addEventListener('click', e => openInViewer(e, hex, server, a.textContent.trim()));
         }
     }
+    linkCoralSubjectRefsIn(root, { server });
     // a shortened link in an older message becomes a link once the server says which artifact it is (#9841); the links it makes are bound by this same pass
     importOnce('./short_artifact_refs.js').then(m => m.upgradeShortArtifactRefs(root, server, r => resolveBoardArtifacts(r, server))).catch(() => {}); // loaded on first use, not at start (#10218): a post that names no short ref never asks
 }

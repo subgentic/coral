@@ -350,3 +350,6 @@ node artifact_markdown_api.test.mjs
 node artifact_markdown_editor.test.mjs
 node artifact_markdown_viewer.test.mjs
 node model_chip_refused.test.mjs
+node coral_ref.test.mjs
+node coral_subject_refs.test.mjs
+node native_coral_links.test.mjs

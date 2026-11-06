@@ -1,0 +1,12 @@
+import fs from 'node:fs';import assert from 'node:assert/strict';
+const parser=fs.readFileSync(new URL('../../coral-go/pkg/frontend/static/coral_ref.js',import.meta.url),'utf8');
+const policy=fs.readFileSync(new URL('../../coral-go/pkg/frontend/static/platform/coral_links.js',import.meta.url),'utf8').replace("'../coral_ref.js'",JSON.stringify('data:text/javascript;base64,'+Buffer.from(parser).toString('base64')));
+const {isManagedCoralLink}=await import('data:text/javascript;base64,'+Buffer.from(policy).toString('base64'));
+const h='a'.repeat(64),page=new URL('http://localhost:8420/inbox');
+const a=(href,attrs={})=>({getAttribute:n=>n==='href'?href:attrs[n]||null,hasAttribute:n=>Object.hasOwn(attrs,n)});
+for(const href of ['/api/artifacts/'+h+'?v=2','/api/remote/r1/api/artifacts/'+h+'?v=2'])assert.ok(isManagedCoralLink(a(href,{'data-artifact':h}),page));
+for(const href of ['https://example.invalid/api/artifacts/'+h,'http://localhost:8420@evil.invalid/api/artifacts/'+h,'/api/artifacts/'+h+'?download=1','/api/artifacts/'+h+'#x','/api/artifacts/'+h.slice(1),'javascript:alert(1)'])assert.equal(isManagedCoralLink(a(href,{'data-artifact':h}),page),false,href);
+assert.equal(isManagedCoralLink(a('/api/artifacts/'+h,{'data-artifact':h,download:''}),page),false);
+assert.ok(isManagedCoralLink(a('coral://goals/team/1',{'data-coral-ref':'coral://goals/team/1'}),page));
+assert.equal(isManagedCoralLink(a('coral://goals/../1',{'data-coral-ref':'coral://goals/../1'}),page),false);
+console.log('PASS native link metadata preserves origin, identity, download and closed-scheme boundaries');

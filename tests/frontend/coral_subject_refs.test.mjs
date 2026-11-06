@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+process.env.CORAL_TELEMETRY_DISABLED='1';
+import { installDom, importUi } from './helpers/jsdom_env.mjs';
+installDom({mode:'local'});
+const {linkCoralSubjectRefsIn}=await importUi('coral_subject_refs');
+const root=document.createElement('div');
+root.innerHTML='<p>Read coral://goals/team-a/12 and coral://diffs/team-a/abc123/0123456789abcdef. <code>coral://goals/team-a/9</code> <a href="coral://goals/team-a/7">the goal</a> coral://goals/team-a/012 coral://diffs/team-a/abc123/0123456789abcdef0</p>';
+linkCoralSubjectRefsIn(root,{server:'source-computer'});
+const links=[...root.querySelectorAll('a.coral-subject-ref')];
+assert.equal(links.length,3);assert.ok(links.every(a=>a.dataset.server==='source-computer'));
+assert.equal(root.querySelector('code a'),null);assert.ok(links.some(a=>a.textContent==='the goal'&&a.dataset.coralRef==='coral://goals/team-a/7'));
+assert.ok(links.some(a=>a.dataset.coralRef==='coral://goals/team-a/12'));
+const pre=document.createElement('pre');pre.textContent='coral://goals/team-a/3';linkCoralSubjectRefsIn(pre,{server:'local'});assert.equal(pre.querySelectorAll('a').length,1);
+console.log('PASS subject links preserve explicit computer, labels, strict subjects and code boundaries');

@@ -30,6 +30,7 @@ const { attachReview } = await importOnce('./artifact_review.js');
 
 const HEX_RE = /^[a-f0-9]{64}$/;
 let _dialog = null;
+let _onClose = null;
 let _abort = null;
 let _gen = 0;
 let _returnFocus = null;
@@ -150,11 +151,13 @@ function _build() {
     // A Coral artifact linked inside the shown file opens here too (the strict renderer keeps
     // only web, mailto and coral://artifacts links, #3540).
     d.querySelector('.artifact-viewer-body').addEventListener('click', (e) => {
-        const a = e.target.closest && e.target.closest('a[href^="coral://artifacts/"]');
-        const m = a && /^coral:\/\/artifacts\/([a-f0-9]{64})$/i.exec(a.getAttribute('href'));
-        if (!m) return;
+        const a = e.target.closest && e.target.closest('a.mb-artifact-ref[data-artifact], a[href^="coral://artifacts/"]');
+        if (!a || e.defaultPrevented || e.button !== 0 || (!globalThis.__CORAL_APP__ && (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey))) return;
+        const raw = /^coral:\/\/artifacts\/([a-f0-9]{64})$/i.exec(a.getAttribute('href'));
+        const hex = a.dataset.artifact || raw?.[1];
+        if (!/^[a-f0-9]{64}$/i.test(hex || '')) return;
         e.preventDefault();
-        openArtifactViewer(m[1], { server: _server, filename: a.textContent.trim() });
+        openArtifactViewer(hex.toLowerCase(), { server: a.dataset.server || _server, filename: a.textContent.trim() });
     });
     setDialogHide(d, () => escapeViewer(d)); // modal_chrome's Escape (with the focus anywhere on the page) closes it through its own close, not by display:none, which left it open and every later open a no-op (#12290)
     d.addEventListener('keydown', (e) => {
@@ -274,6 +277,8 @@ export function openArtifactViewer(hex, opts = {}) {
     dl.onclick = isCloud() ? (e) => { e.preventDefault(); if (dl.getAttribute('aria-disabled') === 'true') return; downloadArtifact(url, sanitizeDownloadName(opts.filename || 'artifact')).catch(err => { title.textContent = err.message; }); } : null;
     const body = d.querySelector('.artifact-viewer-body');
     const wasOpen = !d.hidden;
+    if (typeof opts.onClose === 'function') _onClose = opts.onClose;
+    else if (!wasOpen) _onClose = null;
     d.hidden = false;
     if (!wasOpen && isPhoneLayout()) document.querySelectorAll('#toast-host > .toast:not(.error):not(.has-action)').forEach(t => t.remove()); // a plain toast was announced and sat over the viewer's header and versions at the top of a phone (#11621)
     if (!wasOpen && isPhoneLayout() && !_overlay) _overlay = pushOverlay(() => closeArtifactViewer({ popped: true })); // Back closes it, above the preview's full screen, under its comments sheet
@@ -360,6 +365,8 @@ export function openArtifactViewer(hex, opts = {}) {
     _dialog.querySelector('.artifact-viewer-body').replaceChildren(); // stop media, drop frames
     const back = _returnFocus;
     _returnFocus = null;
+    const closed = _onClose; _onClose = null;
+    if (closed) closed();
     if (back && back.isConnected) back.focus();
 }
 

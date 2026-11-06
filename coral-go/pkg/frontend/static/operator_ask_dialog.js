@@ -1,4 +1,6 @@
 /* The question's reply box, pictures and offered actions; loaded when opened, not for the Inbox badge. */
+import { LOCAL_SERVER, boardTeamKey } from './server_base.js';
+import { openWithQuestionReturn } from './suspend_native_dialog.js';
 import { markHidden } from './visible_marks.js';
 import { renderMarkdownStrict } from './utils.js';
 import { whenText } from './when_text.js';
@@ -12,6 +14,7 @@ await loadStyles('operator_ask_dialog.css');
 const isReply = action => /^reply$/.test(action);
 
 export function openAskDialog(a, onDone, runners = {}) {
+    a = { ...a, server: a.server || LOCAL_SERVER }; // freeze the question's computer across navigation
     const dlg = document.createElement('dialog');
     dlg.className = 'modal-content dlg-flow inbox-ask-dialog'; // shared flow size on wide screens; narrow CSS keeps the form size and phone sheet
     dlg.setAttribute('aria-labelledby', 'inbox-ask-title');
@@ -20,20 +23,20 @@ export function openAskDialog(a, onDone, runners = {}) {
     const sub = document.createElement('p'); sub.className = 'inbox-ask-sub';
     const who = markHidden(a.asker, { strict: true }); // the title and its link use the same visible name
     sub.textContent = whenText(a.at) + (a.kind === 'wait' ? ', waiting for your reply' : '');
-    importOnce('./agent_link.js').then(m => { if (title.isConnected) title.replaceChildren(m.agentLink(who, { board: a.board }), ` · ${markHidden(a.board_label || a.board || 'Team', { strict: true })}`); }); // the asker still opens their chat
+    importOnce('./agent_link.js').then(m => { if (title.isConnected) title.replaceChildren(m.agentLink(who, { board: boardTeamKey(a.server, a.board) }), ` · ${markHidden(a.board_label || a.board || 'Team', { strict: true })}`); }); // the asker still opens their chat
     const subjects = askSubjects(a), links = document.createElement('p'); links.className = 'inbox-ask-subjects'; links.hidden = !subjects.length; if (subjects.length) loadStyles('pictures.css'); // its links are drawn by the lazy picture rules // the goal and task it is about, each a link that opens it in the Inbox
     if (subjects.length) links.append(document.createTextNode('About ')); // the asker names them: the line says so (Security's INFO on #12164)
     subjects.forEach((x, i) => {
         if (i) links.append(document.createTextNode(' \u00b7 '));
         const word = `${x.kind === 'goal' ? 'Goal' : 'Task'} #${x.id}`;
-        if (fromAnotherComputer(a) || !runners[x.kind]) { const name = document.createElement('span'); name.textContent = word; name.title = `${word}${x.title ? `: ${x.title}` : ''} (named by ${who})`; links.append(name); return; } // from another computer the ids are that computer's: shown, not opened
+        if (!['goal', 'task'].includes(x.kind)) { const name = document.createElement('span'); name.textContent = word; name.title = `${word}${x.title ? `: ${x.title}` : ''} (named by ${who})`; links.append(name); return; }
         const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-quiet btn-small inbox-ask-subject'; b.textContent = word; b.dataset.kind = x.kind; b.title = `${word}${x.title ? `: ${x.title}` : ''} (named by ${who})`; b.setAttribute('aria-label', b.title);
-        b.addEventListener('click', () => { finish(); runners[x.kind](a, String(x.id)); });
+        b.addEventListener('click', () => { openWithQuestionReturn(b, async () => { const nav = await importOnce('./nav.js'); await nav.go({ view: x.kind === 'goal' ? 'inbox-goals' : 'inbox-tasks', sub: x.kind === 'goal' ? 'goals' : 'tasks', id: boardTeamKey(a.server, a.board), item: Number(x.id) }); }).catch(e => { err.textContent = e.message || 'The item could not be opened.'; }); });
         links.append(b);
     });
     const whole = document.createElement('div'); whole.className = 'inbox-ask-text prose'; whole.setAttribute('role', 'region'); whole.setAttribute('aria-label', 'The question');
     whole.innerHTML = renderMarkdownStrict(parts.body + (a.cut ? '\n\n\u2026 (cut: the board has the rest)' : '')); // raw HTML in the words is written out as text; links keep the page's link policy
-    importOnce('./artifact_refs.js').then(m => { if (whole.isConnected) m.linkArtifactRefsIn(whole, { asWritten: true }); }).catch(() => {}); // a file named in the question opens in the viewer, the words as written (#12361); plain text until the helper is there
+    importOnce('./artifact_refs.js').then(m => { if (whole.isConnected) m.linkArtifactRefsIn(whole, { asWritten: true, server: a.server }); }).catch(() => {}); // a file named in the question opens in the viewer, the words as written (#12361); plain text until the helper is there
     whole.hidden = !parts.body && !a.cut; // an empty question has no body
     const label = document.createElement('label'); label.className = 'inbox-ask-label'; label.textContent = 'Your reply';
     const box = document.createElement('textarea'); box.className = 'field inbox-ask-box'; box.rows = 6; box.placeholder = 'Write a reply…'; box.maxLength = 8000; label.append(box);
@@ -107,7 +110,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     if (!fromAnotherComputer(a)) { // the picture is stored on the question's own team, as a goal's pictures are
         Promise.all([importOnce('./artifact_comment_images.js'), importOnce('./artifact_comments_api.js')]).then(([m, api]) => {
             if (!dlg.isConnected) return;
-            tray = m.createImageTray({ upload: (blob, versionOf) => api.uploadCommentImage(null, undefined, blob, versionOf, a.board) });
+            tray = m.createImageTray({ upload: (blob, versionOf) => api.uploadCommentImage(null, a.server, blob, versionOf, a.board) });
             tray.attach(dlg, box); tray.listen(sync);
             const picker = tray.picker(), add = picker.querySelector('button');
             add.textContent = ''; const icon = document.createElement('span'); icon.className = 'material-icons'; icon.setAttribute('aria-hidden', 'true'); icon.textContent = 'image'; add.append(icon); add.title = 'Add image';

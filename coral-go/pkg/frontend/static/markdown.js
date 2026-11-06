@@ -1,3 +1,4 @@
+import { parseCoralRef } from './coral_ref.js';
 /* Markdown and HTML for the dashboard: the sanitizer, links, code highlighting and the renderers (moved out of utils.js, #5065; no behaviour change). */
 import { parse, normalize, build as buildRoute } from './routes.js';
 import { loadHighlight } from './vendor_loader.js';
@@ -167,8 +168,8 @@ function unblockAsLinks(frag) {
  *           CANDIDATE with no href (live_chat's linkifyRefs turns it into a file reference, or
  *           text), so no click, middle click or "open in new tab" can navigate to the raw path.
  * Everything else becomes text with its target shown: /api/..., ../x, a #fragment or hash
- * route on a board or in chat, file:, data:, javascript:, vbscript:, a coral: link that isn't an
- * exact artifact link, and any other scheme. */
+ * route on a board or in chat, file:, data:, javascript:, vbscript:, unsupported
+ * coral: references, and any other scheme. */
 const LINK_MODES = new Set(['file', 'board', 'chat']);
 
 function linkAsText(a, href) {
@@ -194,7 +195,7 @@ export function routeHref(href) {
 // data-* attributes, so text an agent wrote could carry them; they are stripped before the policy
 // adds its own. data-knowledge-link too, unless the caller is the team knowledge view, which puts
 // its own links into the Markdown before it is sanitized (and only acts on a team member's name).
-const OWN_MARKERS = ['data-file-ref', 'data-file-ref-raw', 'data-fragment', 'data-route'];
+const OWN_MARKERS = ['data-coral-ref', 'data-file-ref', 'data-file-ref-raw', 'data-fragment', 'data-route'];
 
 function stripOwnMarkers(frag, keepKnowledgeLinks) {
     const names = keepKnowledgeLinks ? OWN_MARKERS : [...OWN_MARKERS, 'data-knowledge-link'];
@@ -220,7 +221,7 @@ function applyLinkPolicy(frag, mode, keepKnowledgeLinks) {
             a.rel = 'noopener noreferrer';
             continue;
         }
-        if (/^mailto:/i.test(href) || /^coral:\/\/artifacts\/[a-f0-9]{64}$/i.test(href)) continue;
+        if (/^mailto:/i.test(href) || parseCoralRef(href)) continue;
         if (mode === 'file') {
             // A #fragment stays a link inside the shown file; keepFragmentsInside scrolls to it there.
             if (/^#[^#\s]+$/.test(href)) { a.setAttribute('data-fragment', href.slice(1)); continue; }
