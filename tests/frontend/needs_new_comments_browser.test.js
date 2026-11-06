@@ -54,7 +54,7 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`window.switchNavTab('hub-inbox');true`);
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
                 await waitFor(`!!(${row('Replied file.txt')})&&!!(${row('Quiet file.txt')})&&!!(${row('Decided file.txt')})&&!!(${row('Changes file.txt')})`, 'the four files in Needs you', 15000);
-                assert.ok(!(await ev(`!!(${row('Waiting file.txt')})`)), 'a file with changes requested and no news is the agent\'s turn: not in Needs you');
+                assert.ok(await ev(`!!(${row('Waiting file.txt')}) && (${row('Waiting file.txt')}).classList.contains('dt-read')`), 'a sent-back file remains visible and uncounted while waiting on its agent');
                 assert.ok(await marker('Changes file.txt'), 'with changes requested AND an agent reply in the thread it is back, marked');
                 // the read file with news is unread again, as the same row: the marker, the unread look, and ONE number (3 = this row, the quiet one and the decided one)
                 assert.equal(await badge(), '4', 'the file with new comments counts again, once: ' + await badge());

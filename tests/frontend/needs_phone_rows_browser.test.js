@@ -53,9 +53,9 @@ const { coralReady } = require('./helpers/wait');
             const pressBar = label => ev(`[...document.querySelectorAll('.dt-bar button')].find(x => (x.getAttribute('aria-label') || x.textContent) === ${JSON.stringify(label)}).click(); true`);
             const selected = () => ev(`[...document.querySelectorAll('${T} tbody tr.dt-selected')].map(r => r.textContent.slice(0, 60))`);
 
-            // no button is on a phone row
+            // Phone rows keep navigation and the approved review star; other actions stay in selection.
             const visible = await ev(`[...document.querySelectorAll('${T} tbody tr button')].filter(b => { const c = (b.closest('.dt-td') || b).getBoundingClientRect(); return c.width > 2 && c.height > 2 && getComputedStyle(b).visibility !== 'hidden'; }).map(b => b.getAttribute('aria-label') || b.textContent)`);
-            assert.deepEqual(visible.filter(l => !/^(Open |Task: )/.test(l)), [], at + 'a phone row carries no action button (only its name and its task link, which open things): ' + JSON.stringify(visible));
+            assert.deepEqual(visible.filter(l => !/^(Open |Task: |Star |Remove the star from )/.test(l)), [], at + 'a phone row carries only navigation and the review star: ' + JSON.stringify(visible));
             // a tap opens the question
             await tap('Which port should the test server use?');
             await waitFor(`!!document.querySelector('dialog[open]')`, at + 'a tap opens the question', 6000);

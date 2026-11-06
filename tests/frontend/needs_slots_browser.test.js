@@ -31,7 +31,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 return true; })()`);
             await ev(`localStorage.setItem('coral-inbox-needs-filters', JSON.stringify({ sort: 'oldest' })); window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length === 6`, at + 'five reviews and a question', 15000);
+            await waitFor(`document.querySelectorAll('${T} tbody tr.dt-row').length === 6`, at + 'five reviews and a question', 15000);
             await ev(framesJs(4));
             const xs = await ev(`(() => { const slot = (b) => { const t = b.textContent.trim(); return b.classList.contains('inbox-row-more-toggle') ? 'more' : t === 'Approve' || t === 'Answer' ? 'approve' : t === 'Dismiss' ? 'dismiss' : /^Request changes/.test(b.getAttribute('aria-label') || '') ? 'changes' : b.classList.contains('inbox-bookmark') ? 'save' : ''; };
                 const out = {}; for (const tr of document.querySelectorAll('${T} tbody tr')) for (const b of tr.querySelectorAll('button')) { if (!b.getClientRects().length) continue; const s = slot(b); if (s) (out[s] = out[s] || []).push(Math.round(b.getBoundingClientRect().left)); } return out; })()`);

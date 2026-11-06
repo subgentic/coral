@@ -18,7 +18,7 @@ const { coralReady } = require('./helpers/wait');
             const hexOf = i => (i + 1).toString(16).padStart(64, '0');
             const rows = Array.from({ length: N }, (_, i) => ({ id: hexOf(i), name: 'file-' + (i % 50) + '.md', session_id: 's' + (i % 7), produced_by: 'Agent ' + (i % 7), created_at: new Date(Date.now() - (N - i) * 60000).toISOString(), available: true, tags: ['for review'], uri: 'coral://artifacts/' + hexOf(i), media_type: 'text/markdown' }));
             const orig = window.fetch, json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
-            window.fetch = (u, o) => { const s = String(u);
+            window.fetch = (u, o) => { const s = window.__reviewFixtureURL(String(u), location.href).href;
                 if (s.includes('/api/board/projects')) return json([{ project: team }]);
                 if (s.includes('/api/board/' + team + '/artifacts') && s.includes('/tags')) { const id = s.split('/artifacts/')[1].split('/')[0], hit = rows.find(x => x.id === id); if (hit && o && o.method === 'PUT') hit.tags = JSON.parse(o.body).tags; return json({ tags: hit ? hit.tags : [] }); }
                 if (s.includes('/api/board/' + team + '/artifacts')) return json({ artifacts: rows, has_more: false });

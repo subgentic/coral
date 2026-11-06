@@ -40,8 +40,11 @@ const hexOf = i => String(i + 1).padStart(64, 'a').replace(/^a+/, m => m.replace
             assert.deepEqual(found, { n: N, distinct: N, saved: N, savedDistinct: N }, `${mode} computer: the scan finds all ${N} files for review and all ${N} saved files, each once: ${JSON.stringify(found)}`);
             const sizes = await ev(`window.__calls.filter(c => /tag=for/.test(c)).length`);
             const asked = await ev(`window.__calls.map(c => (/limit=(\\d+)/.exec(c) || [])[1])`);
-            assert.ok(asked.length > 0 && asked.every(l => l === '200'), `${mode} computer: every page is asked for 200 (the old walk's size; asking for 50 made the first read of a 10,000-file board four times the requests): ${JSON.stringify(asked)}`);
-            if (mode === 'old') assert.equal(sizes, 1, `an older computer answers the 200 asked: 130 files are one read of for review, not ${sizes}`);
+            assert.ok(asked.length > 0 && asked.every(l => l === '50' || l === '200'), `${mode}: private review pages use 50; legacy Saved pages use 200: ${JSON.stringify(asked)}`);
+            const requests = await ev(`window.__calls.map(c => { const p=new URLSearchParams(c); return {tag:p.get('tag'),limit:p.get('limit')}; })`);
+            assert.ok(requests.filter(r=>r.tag==='for review').every(r=>r.limit==='50'), 'private review walk uses its starred-first 50-row contract');
+            assert.ok(requests.filter(r=>r.tag==='saved').every(r=>r.limit==='200'), 'Saved retains its existing walk size');
+            if (mode === 'old') assert.equal(sizes, 3, `private review pages stay bounded at 50 even when an old fixture can return 200: ${sizes}`);
             if (mode === 'new') assert.ok(sizes >= 3, `a computer of 50 a page took ${sizes} reads of for review for 130 files`);
             assert.ok(sizes <= 6, `${mode} computer: the walk ended, no page was asked for again and again: ${sizes} reads of for review`);
             const state = await ev(`(async () => { const R = await import(${S} + 'artifact_review.js'); const s = await R.reviewStateOf('t1', '${'0'.repeat(61)}120'); return s ? s.state : null; })()`);

@@ -23,7 +23,7 @@ export function ensureStarredArtifacts(done) {
     (async () => {
         const rows = new Map(), failures = new Set(); let cursor = '', total = null, incomplete = false;
         for (let page = 0; page < 200; page++) {
-            const d = await readInboxArtifacts(new URLSearchParams({ starred: 'true', versions: 'newest', limit: '100', ...(cursor ? { cursor } : {}) }));
+            const d = await readInboxArtifacts(new URLSearchParams({ starred: 'true', starred_first: 'true', limit: '100', ...(cursor ? { cursor } : {}) }));
             if (d.waiting) { state.error = 'The computer list is still loading. Press Retry to try again.'; return; }
             for (const a of d.artifacts || []) if (a.starred !== false) rows.set(JSON.stringify([a.server, a.series_id || a.id]), a);
             for (const server of d.failed || []) failures.add(server);

@@ -6,7 +6,7 @@ globalThis.fetch=window.fetch=async url=>{const u=new URL(String(url),location.h
 const stars=await importUi('mailbox_starred_artifacts');
 const read=()=>new Promise(resolve=>stars.ensureStarredArtifacts(resolve));
 test('Hub Starred reads every source page and uses newest-series semantics',async()=>{
- await read();assert.equal(calls.length,2);assert.ok(calls.every(p=>p.startsWith('/api/remote/m1/api/team-artifacts?')&&p.includes('starred=true')&&p.includes('versions=newest')));assert.equal(stars.starredArtifactCount(),2);assert.equal(stars.starredArtifactsSection().querySelectorAll('.dt-row').length,2);
+ await read();assert.equal(calls.length,2);assert.ok(calls.every(p=>p.startsWith('/api/remote/m1/api/team-artifacts?')&&p.includes('starred=true')&&p.includes('starred_first=true')&&!p.includes('versions=')));assert.equal(stars.starredArtifactCount(),2);assert.equal(stars.starredArtifactsSection().querySelectorAll('.dt-row').length,2);
 });
 test('a failed refresh retains rows, exposes Retry and does not automatically loop',async()=>{
  fail=true;document.dispatchEvent(new Event('artifact-star-changed'));await read();const count=calls.length;

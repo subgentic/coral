@@ -17,6 +17,7 @@ globalThis.fetch = async (url) => {
     const u = reviewFixtureURL(String(url), 'https://hub.example/');
     reads.push(u.pathname + u.search);
     if (u.pathname.endsWith('/api/board/projects') || u.pathname === '/api/board/projects') return Response.json([{ project: 'a' }]);
+    if (u.pathname.endsWith('/api/team-artifacts')) return Response.json({artifacts:[],has_more:false});
     if (u.pathname.endsWith('/artifacts')) {
         if (!asOwner) return Response.json({ code: 'owner_only', error: 'through Coral Hub only the account this computer is linked to can read artifacts' }, { status: 403 });
         assert.equal(u.searchParams.get('tag'), 'for review');

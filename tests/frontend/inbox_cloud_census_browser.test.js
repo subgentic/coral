@@ -15,7 +15,7 @@ const HISTORY_KEYS = ['type', 'source_types', 'date_from', 'date_to', 'q', 'page
 // What the plan adds (section 3, rows 1 to 6).
 const ADDED_ROUTE = '/api/sessions/history/counts';
 // The Hub-served Inbox's Goals and Artifacts folders (#11071): two more View routes, each read once a computer with their own query keys. A route outside these is still a stray.
-const FOLDER_ROUTES = { '/api/goals': ['limit'], '/api/team-artifacts': ['limit', 'offset', 'sort', 'versions'] };
+const FOLDER_ROUTES = { '/api/goals': ['limit'], '/api/team-artifacts': ['limit', 'offset', 'sort', 'versions', 'starred', 'starred_first'] };
 const ADDED_KEYS = ['active', 'agent_name', 'archived', 'starred', 'with_notes'];
 // The plan's "not called in cloud mode" list: none of these is asked for through the Hub by this Inbox.
 // GET /api/goals and GET /api/team-artifacts left this list with #11071: coral-hub asked for the Goals and Artifacts folders in the native Inbox (coral-hub #132368, the Orchestrator's task); both are View routes of the Hub's tier (cloud_routes.golden).
@@ -172,7 +172,7 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
         const stray = [], newKeys = new Set(), newRoutes = new Set();
         for (const [route, keys] of keysByPath(proxied)) {
             const base = baseline.get(route);
-            if (!base) { if (route === `GET ${ADDED_ROUTE}`) { newRoutes.add(route); if (keys.size) stray.push(`${route} sent keys ${[...keys]}`); } else if (route.startsWith('GET ') && FOLDER_ROUTES[route.slice(4)]) { for (const k of keys) if (!FOLDER_ROUTES[route.slice(4)].includes(k)) stray.push(`${route} ?${k} is not a key of the Goals or Artifacts folder`); } else stray.push(`${route} is not a route the Chats and Board tabs call, nor the plan's`); continue; }
+            if (!base) { if (route === `GET ${ADDED_ROUTE}`) { newRoutes.add(route); if (keys.size) stray.push(`${route} sent keys ${[...keys]}`); } else if (route.startsWith('GET ') && FOLDER_ROUTES[route.slice(4)]) { for (const k of keys) if (!FOLDER_ROUTES[route.slice(4)].includes(k)) stray.push(`${route} ?${k} is not a key of the Goals, Artifacts or Starred folder`); } else stray.push(`${route} is not a route the Chats and Board tabs call, nor the plan's`); continue; }
             for (const k of keys) if (!base.has(k)) { if (route === 'GET /api/sessions/history' && ADDED_KEYS.includes(k)) newKeys.add(k); else stray.push(`${route} ?${k} is not a key of the baseline or the plan`); }
         }
         assert.deepEqual(stray, [], 'every request is the baseline or the plan\'s: ' + JSON.stringify(stray));

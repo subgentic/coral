@@ -20,7 +20,7 @@ const hex = n => n.toString(16).padStart(64, '0');
     const STUB = `(() => { const real = window.fetch, json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } })), at = new Date(Date.now() - 600000).toISOString();
         const art = (n, tags) => ({ id: '${hex(0)}'.slice(0, 63) + n, name: 'plan-' + n + '.md', media_type: 'text/markdown', size: 30, created_at: at, source: 'upload', available: true, tags, produced_by: 'Orchestrator' });
         const lists = { 'for review': [art(1, ['for review'])], approved: [art(2, ['approved'])], reviewed: [] };
-        window.fetch = (url, opts = {}) => { const u = new URL(String(url && url.url || url), location.origin), m = (opts.method || 'GET').toUpperCase();
+        window.fetch = (url, opts = {}) => { const u = window.__reviewFixtureURL(String(url && url.url || url), location.origin), m = (opts.method || 'GET').toUpperCase();
             if (m === 'GET' && u.pathname === '/api/board/${team}/artifacts') return json({ project: '${team}', artifacts: lists[u.searchParams.get('tag')] || [], has_more: false });
             if (m === 'GET' && u.pathname === '/api/board/projects') return json([{ project: '${team}', board_id: '${team}', board_label: 'North Wind' }, { project: 'twin-a', board_id: 'twin-a', board_label: 'Twin' }, { project: 'twin-b', board_id: 'twin-b', board_label: 'Twin' }]);
             if (m === 'GET' && u.pathname === '/api/operator-asks') return json([{ board: '${team}', kind: 'ask', id: 41, asker: 'Lead', text: 'Which port should the test server use?', at: at }]);

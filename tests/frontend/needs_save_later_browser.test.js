@@ -45,8 +45,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(framesJs(3));
             const dots = file => ev(`(() => { document.querySelector('${T} button[aria-label="More actions for ${file}"]').click(); return true; })()`);
             // the three dots: Save for later
-            if (!mobile) { // a wide row's star slot is the bookmark (#11672); the row's dots have no such item
-                check(await ev(`!document.querySelector('${T} .dt-star') && !!document.querySelector('${T} button.inbox-bookmark[aria-label="Save for later: plan-1.md"]')`), at + 'the row has a Save for later bookmark and no star');
+            if (!mobile) { // Save for later remains separate from the review pin.
+                check(await ev(`!!document.querySelector('${T} .dt-star') && !!document.querySelector('${T} button.inbox-bookmark[aria-label="Save for later: plan-1.md"]')`), at + 'the row has separate Save for later and review star controls');
                 await ev(`document.querySelector('${T} button.inbox-bookmark[aria-label="Save for later: plan-1.md"]').click(); true`);
             } else { // a phone's row has it in the three dots
                 await dots('plan-1.md');
