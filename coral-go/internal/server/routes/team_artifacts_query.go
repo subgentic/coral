@@ -28,10 +28,10 @@ import (
 // (so % and _ are ordinary characters), the rest are enum words, names compared for equality, and times.
 
 var teamArtifactParamNames = map[string]bool{"limit": true, "offset": true, "session_id": true,
-	"q": true, "kind": true, "origin": true, "by": true, "board": true, "kept": true, "starred": true, "task": true, "goal": true, "tag": true, "since": true, "until": true, "sort": true, "cursor": true, "versions": true, "read": true, "facets": true, "muted": true, "waiting": true, "starred_first": true}
+	"q": true, "kind": true, "origin": true, "by": true, "board": true, "kept": true, "starred": true, "task": true, "goal": true, "tag": true, "since": true, "until": true, "sort": true, "cursor": true, "versions": true, "read": true, "facets": true, "muted": true, "waiting": true, "starred_first": true, "digest": true}
 
 // teamArtifactQueryParams are the parameters that make the reply a query (the others are the list's original ones).
-var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "kept", "starred", "task", "goal", "tag", "since", "until", "sort", "cursor", "versions", "read", "facets", "muted", "waiting", "starred_first"}
+var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "kept", "starred", "task", "goal", "tag", "since", "until", "sort", "cursor", "versions", "read", "facets", "muted", "waiting", "starred_first", "digest"}
 
 var (
 	teamArtifactKinds   = []string{"image", "pdf", "text", "other"}
@@ -65,10 +65,11 @@ type teamArtifactQuery struct {
 	muted        *bool // muted=1|0 (#13172): the files the Operator's inbox settings mute (#12144), or the ones they do not; only the Operator's own read marks any row muted
 	read         *bool // read=1: the files the Operator has read (a read tag and no news in their thread); read=0: the ones still unread (#13162, Needs you's unread filter, applied by the computer before the page is cut)
 	starred      *bool
-	starredFirst bool     // starred_first=true (#13910): the starred series first, one row each at its newest version, then the rest in the sort; paged by position (the cursor carries it)
-	tags         []string // any of these tags (#8583), normalised
-	goal         int64    // 0: any; a goal's number: only what the tasks that work toward it hold (#8579)
-	task         int64    // 0: any; a task's number: only what is attached to or linked to that task (#7739, the task page's Artifacts)
+	digests      map[string]bool // digest=<64 hex> (repeatable, at most maxDigestFilter): exactly these stored files, for one file's review state without scanning pages (#13971); the cross-team list alone
+	starredFirst bool            // starred_first=true (#13910): the starred series first, one row each at its newest version, then the rest in the sort; paged by position (the cursor carries it)
+	tags         []string        // any of these tags (#8583), normalised
+	goal         int64           // 0: any; a goal's number: only what the tasks that work toward it hold (#8579)
+	task         int64           // 0: any; a task's number: only what is attached to or linked to that task (#7739, the task page's Artifacts)
 	since        *time.Time
 	until        *time.Time
 	sortName     string
@@ -284,6 +285,14 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 			return nil, taErr("starred must be true or false")
 		}
 	}
+	if ds, derr := taDigests(vals["digest"]); derr != nil {
+		return nil, derr
+	} else if len(ds) > 0 {
+		if vals.Get(crossTeamScopeParam) == "" {
+			return nil, taErr("digest is only on the cross-team list (GET /api/team-artifacts)")
+		}
+		q.digests = ds
+	}
 	if v, ok, serr := taSingle("starred_first", vals["starred_first"]); serr != nil {
 		return nil, serr
 	} else if ok {
@@ -354,6 +363,7 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 	fp := sha256.New()
 	fmt.Fprintf(fp, "%s|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%s|%s|%v|%v|%v", q.q, q.kinds, q.origins, q.by, q.boards, q.kept, q.starred, q.task, q.goal, q.tags, q.since, q.until, q.collapse, q.sortName, vals.Get("session_id"), q.read, q.muted, q.waiting)
 	fmt.Fprintf(fp, "|sf=%v", q.starredFirst)
+	fmt.Fprintf(fp, "|dg=%v", sortedDigestKeys(q.digests))
 	if scope := vals.Get(crossTeamScopeParam); scope != "" { // the cross-team list: its cursors are its own (a team route's is refused there) and tied to the teams asked for
 		fmt.Fprintf(fp, "|%s|%v", scope, vals["team"])
 	}
@@ -487,6 +497,9 @@ func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept map[string]bool, st
 	}
 	if len(q.boards) > 0 && !teamArtifactMatchesBoard(it, q.boards) {
 		return false
+	}
+	if len(q.digests) > 0 && !q.digests[artifactStoreID(it)] {
+		return false // exactly the files asked for (#13971): a row with no stored object has no digest and never matches
 	}
 	if q.task != 0 && it.TaskID != q.task {
 		return false
@@ -1212,5 +1225,39 @@ func starFollowIf(coralDir string, times map[string]string, follow bool) map[str
 	for d, at := range times {
 		out["|"+d] = starInfo{At: at, Latest: true}
 	}
+	return out
+}
+
+// maxDigestFilter is how many digests one list may ask for.
+const maxDigestFilter = 20
+
+// taDigests reads digest=<64 hex> (repeatable, or comma-separated) into the set asked for: each exactly 64 hex characters (case folded), at most maxDigestFilter of them, nothing else (#13971).
+func taDigests(vals []string) (map[string]bool, error) {
+	var out map[string]bool
+	for _, v := range vals {
+		for _, p := range strings.Split(v, ",") {
+			p = strings.ToLower(strings.TrimSpace(p))
+			if !objectNameRe.MatchString(p) {
+				return nil, taErr("digest must be the 64 hex characters of a stored file")
+			}
+			if out == nil {
+				out = map[string]bool{}
+			}
+			out[p] = true
+			if len(out) > maxDigestFilter {
+				return nil, taErr("digest has more than %d values", maxDigestFilter)
+			}
+		}
+	}
+	return out, nil
+}
+
+// sortedDigestKeys is the set in a fixed order, for the cursor's fingerprint.
+func sortedDigestKeys(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
 	return out
 }
