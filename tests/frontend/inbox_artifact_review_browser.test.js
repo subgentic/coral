@@ -79,8 +79,8 @@ const { coralReady } = require('./helpers/wait');
                     assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr').length`),before+1,'a question with words of its own that links the file is still a question');
                     await ev(`window.__asks=[];import((window.__coralStatic||'/static/')+'operator_asks.js').then(m=>m.refreshOperatorAsks(true)).then(()=>true)`);
                 }
-                assert.equal(await ev(`${rows}.length`),12,'ten from Writer A and two from Writer B');
-                assert.match(await ev(`document.getElementById('group-table-view').textContent`),/1 more/,'overflow remains discoverable');
+                assert.equal(await ev(`${rows}.length`),13,'the pinned Writer A file does not consume the ten-unstarred cap; all thirteen fit');
+                assert.equal(await ev(`document.querySelectorAll('.inbox-review-more').length`),0,'a pinned file does not create false producer overflow');
                 assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'9+','all pending artifacts count: the pill reads 9+ past nine (#9821)');
                 assert.match(await ev(`document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label')`),/^Inbox, 13 /,'and the tab\'s accessible name keeps the exact count');
                 assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth+1`),'no horizontal overflow');
@@ -128,14 +128,14 @@ const { coralReady } = require('./helpers/wait');
                     }
                     { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, `needs-review-${width}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } } // the picture of the sizing
                 }
-                assert.equal(await ev(`document.querySelector('#group-table-view .inbox-folder-head .session-group-count').textContent`),'12 of 13','heading explains the cap');
+                assert.equal(await ev(`document.querySelector('#group-table-view .inbox-folder-head .session-group-count').textContent`),'13','heading counts the pinned file once and all thirteen visible documents');
                 const names = await ev(`(() => {const r=${row('Review file 01.txt')},name=r.querySelector('.inbox-review-name');name.dispatchEvent(new Event('pointerenter'));return {cut:name.scrollWidth>name.clientWidth,title:name.title,text:name.textContent,open:name.getAttribute('aria-label')};})()`);
                 assert.equal(names.title,names.cut?'Review file 01.txt':'','a cut filename keeps its full name in its tooltip, one that fits has none (#11566)');
                 assert.equal(names.text,'Review file 01.txt','assistive text keeps the same full filename');
                 assert.equal(names.open,'Open '+names.text,'the row\'s name button (it opens the file, there is no Open button) keeps the full filename');
                 { const st = await ev(`(() => { const r = ${row('Review file 01.txt')}, b = r.querySelector('.inbox-review-actions .inbox-bookmark'); return { star: !!r.querySelector('.dt-star'), mark: b ? b.getAttribute('aria-label') : null }; })()`);
-                  assert.ok(!st.star && (innerWidth_ => innerWidth_ >= 768 ? st.mark === 'Save for later: Review file 01.txt' : st.mark === null)(width), `${width}: a review row has no star; a wide one has the Save for later bookmark named for the file, a phone's is in its three dots (#11672): ` + JSON.stringify(st)); }
-                // the star is not on a Needs you row any more (#11672): its slot is the Save for later bookmark; starring an artifact is in the Artifacts list (artifact_star_browser)
+                  assert.ok(st.star && (innerWidth_ => innerWidth_ >= 768 ? st.mark === 'Save for later: Review file 01.txt' : st.mark === null)(width), `${width}: a review row has its document star; Save for later remains a separate action with its existing placement: ` + JSON.stringify(st)); }
+                // #13889: the document star pins the review; Save for later retains its separate meaning.
                 const layout = await ev(`(() => {const r=${row('Review file 01.txt')}, buttons=[...r.querySelectorAll('.inbox-review-actions button:not(.dt-star):not(.inbox-bookmark)')], rects=buttons.map(b=>b.getBoundingClientRect());const team=r.querySelector('.inbox-review-team');return {actionsBesideName:rects[0].left>r.querySelector('.inbox-review-name').getBoundingClientRect().right-1&&Math.abs(rects[0].top+rects[0].height/2-(r.querySelector('.inbox-review-name').getBoundingClientRect().top+r.querySelector('.inbox-review-name').getBoundingClientRect().height/2))<2,team:team?team.textContent:null,height:r.getBoundingClientRect().height,sameLine:Math.abs((rects[0].top+rects[0].height/2)-(rects[1].top+rects[1].height/2))<2,standard:buttons.every(b=>!b.classList.contains('dt-quiet')&&!b.disabled)};})()`);
                 assert.ok(layout.sameLine,'both actions stay on one line');
                 assert.equal(layout.team,null,'the team is not on the row any more (#11719)');

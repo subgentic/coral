@@ -17,7 +17,7 @@ onArtifactsRev((team, rev, reconnect) => {
     if (pending) refreshAgain = true; else refreshReviews();
 });
 // One row per artifact (#11533): versions (same uploader, team, name) are one item, the newest, with `earlier`.
-const vkey = a => (a.session_id || a.produced_by) ? JSON.stringify([a.team, a.session_id, a.produced_by, a.name]) : a.reviewKey; // a JSON array: no name or id can run into the next field
+const vkey = a => a.series_id ? JSON.stringify([a.team, 'series', a.series_id]) : (a.session_id || a.produced_by) ? JSON.stringify([a.team, a.session_id, a.produced_by, a.name]) : a.reviewKey; // a JSON array: no name or id can run into the next field
 const byAge = (a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.reviewKey.localeCompare(b.reviewKey);
 /** The versions older than `row`, still for review. */
 export const earlierVersions = row => { const key = row.reviewKey || `${row.team}:${row.id}`, pool = saved.some(a => a.reviewKey === key) ? saved : items, me = pool.find(a => a.reviewKey === key) || row; return pool.filter(a => a.reviewKey !== key && vkey(a) === vkey(me) && byAge(a, me) < 0); }; // in the list the row is in: Needs you's, or Saved's (#11937)
@@ -54,6 +54,13 @@ export const savedFiles = () => {
 };
 export const isRead = a => !!(a.tags && a.tags.includes('read')) && !(a.new_comments > 0); // a read file whose Operator-started thread has agent replies not yet opened is unread again, counted once as itself (#12026)
 export const unreadReviewItems = () => reviewItems().filter(a => !isRead(a));
+/** Reflect an acknowledged server write across cached versions, including collapsed copies. */
+export function reviewStarChanged(row, on) {
+    const key = vkey(row);
+    for (const a of [...items, ...saved, ...muted]) if (vkey(a) === key) a.starred = on;
+    row.starred = on; revision++;
+}
+
 /** The kinds of a file for review, in the words of the quiet Muted line: a count and its noun, singular and plural (#12144). */
 const KIND_NOUNS = [['file', 'file for review', 'files for review'], ['done', 'finished request', 'finished requests'], ['release', 'release summary', 'release summaries'], ['decided', 'decision made for you', 'decisions made for you'], ['digest', 'daily digest', 'daily digests']];
 /** "2 release summaries, 1 finished request": what the Operator's switches keep out, by kind, from the muted rows; '' for none. */
