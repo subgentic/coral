@@ -306,10 +306,12 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 				return
 			}
 		}
-		if plan != nil && autoChain && plan.same == nil { // the server joined this upload to the chain's file (#13792, Security's SHOULD): a chain file that is no longer the newest of its series (a person saved after it, or another agent) is not joined, the upload starts a new series, and the later version is never buried
-			if _, stale := plan.staleBase(); stale {
+		if plan != nil && autoChain && plan.same == nil { // the server joined this upload to the chain's file (#13792, the Operator: refuse right away, same behaviour regardless): when that file is no longer the newest of its series (a person or another agent saved after it) the upload is REFUSED, before the object, its record, its for-review tag, its task link or any Needs you row is written, so nothing is left half done. Only a stale base refuses: the other reasons a join stops (another team's file, an older version's bytes, another kind) still start a new series.
+			if sb, stale := plan.staleBase(); stale {
+				sb.chain = true
+				staleBaseRefusal(w, plan, sb)
 				plan.unlock()
-				plan = nil
+				return
 			}
 		}
 		if plan != nil {

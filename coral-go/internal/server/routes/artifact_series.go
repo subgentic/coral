@@ -442,6 +442,7 @@ type staleBase struct {
 	newest      seriesMember
 	newestByMan bool // a person made the newest version (the editor's save, an Operator share)
 	seriesLink  bool
+	chain       bool // the server joined the upload to its task chain's file; the agent named no base (#13792)
 }
 
 func (p *seriesPlan) staleBase() (staleBase, bool) {
@@ -530,6 +531,9 @@ func staleSentence(sb staleBase) string {
 	who := "another agent"
 	if sb.newestByMan {
 		who = "a person"
+	}
+	if sb.chain {
+		return fmt.Sprintf("This file continues the earlier file of its task chain, and %s has saved a newer version (version %d) since. Download the newest (coral-agent artifact download %s), redo your change on it, and upload with --new-version-of %s. Nothing was stored.", who, sb.newest.N, newest, newest)
 	}
 	return fmt.Sprintf("A newer version (version %d) of this file was saved by %s since the one you edited. Download the newest (coral-agent artifact download %s), redo your change on it, and upload again with --new-version-of %s. Nothing was stored.", sb.newest.N, who, newest, newest)
 }

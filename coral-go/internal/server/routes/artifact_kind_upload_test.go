@@ -382,45 +382,71 @@ func TestNoSettingsReaderMutesNothing(t *testing.T) {
 	assert.Nil(t, e.needsYou(t)["muted"])
 }
 
-// #13792 (Security's SHOULD): the server's own join of a for-review upload to its chain's file must not bury a later version. A chain file that is no longer the newest of its series is not joined.
-func TestAChainJoinNeverBuriesAnOperatorsSaveAndStartsANewSeriesInstead(t *testing.T) {
+// #13792 (the Operator: refuse right away, Security's three conditions): the server's own join of a for-review upload to its chain's file is refused when that file is no longer the newest of its series;
+// nothing is written; the sentence fits an agent that never passed --new-version-of; the other reasons a join stops still start a new series.
+func TestAChainJoinOntoAFileThatIsNoLongerTheNewestIsRefusedBeforeAnythingIsWritten(t *testing.T) {
 	k := newKindRig(t)
 	ctx := context.Background()
 	root, err := k.h.bs.CreateTask(ctx, "alpha", "OPERATOR the plan", "", "medium", "lead", "Backend")
 	require.NoError(t, err)
 	code, out := k.upTask("s1", root.ID, "plan, version one", "")
 	require.Equal(t, 201, code, out)
-	v1 := strings.TrimPrefix(out["uri"].(string), "coral://artifacts/")
 	code, out = k.upTask("s1", root.ID, "plan, version two", "")
 	require.Equal(t, 201, code, out)
 	v2 := strings.TrimPrefix(out["uri"].(string), "coral://artifacts/")
 	sid, _ := out["series_id"].(string)
 	require.NotEmpty(t, sid)
+	// the agent's own latest is the newest: an auto-join onto it still goes through
+	code, out = k.upTask("s1", root.ID, "plan, version three, still on the agent's own newest", "")
+	require.Equal(t, 201, code, out)
+	assert.EqualValues(t, 3, out["version"])
+	v3 := strings.TrimPrefix(out["uri"].(string), "coral://artifacts/")
 
 	// the Operator saves a version of that file in the editor: the server's own record of it says so
-	save := "plan, version two with the Operator's words"
+	save := "plan, version three with the Operator's words"
 	sum := sha256.Sum256([]byte(save))
-	v3 := hex.EncodeToString(sum[:])
+	v4 := hex.EncodeToString(sum[:])
 	dir := filepath.Join(k.coralDir, "artifacts", "objects")
-	tmp := filepath.Join(dir, artifactUploadTempP+v3)
+	tmp := filepath.Join(dir, artifactUploadTempP+v4)
 	require.NoError(t, os.WriteFile(tmp, []byte(save), 0o600))
-	plan, perr := planNewVersion(k.coralDir, "coral://artifacts/"+v2, "alpha", v3)
+	plan, perr := planNewVersion(k.coralDir, "coral://artifacts/"+v3, "alpha", v4)
 	require.NoError(t, perr)
-	_, _, serr := storeArtifactFileAs(k.coralDir, "s1", "plan.txt", "text/plain", tmp, v3, int64(len(save)), &plan.stamp, 0, func(rec *agentUploadRecord) {
+	_, _, serr := storeArtifactFileAs(k.coralDir, "s1", "plan.txt", "text/plain", tmp, v4, int64(len(save)), &plan.stamp, 0, func(rec *agentUploadRecord) {
 		rec.Board, rec.Uploader, rec.Role, rec.UploadedBy, rec.Source = "alpha", board.OperatorName, "operator", "owner", sourceOperatorEdit
 	})
 	require.NoError(t, serr)
-	_, cerr := plan.commit(k.coralDir, v3, "s1")
+	_, cerr := plan.commit(k.coralDir, v4, "s1")
 	require.NoError(t, cerr)
 	plan.unlock()
-	require.Len(t, seriesMembers(k.coralDir, sid), 3)
+	require.Len(t, seriesMembers(k.coralDir, sid), 4)
+	objectsBefore, _ := os.ReadDir(dir)
+	text := "plan, version four by the agent from its own copy"
+	sum2 := sha256.Sum256([]byte(text))
+	refused := hex.EncodeToString(sum2[:])
 
-	// the agent's next upload for the same task would have joined the chain's file (v2, no longer the newest): it must not be added to the series
-	code, out = k.upTask("s1", root.ID, "plan, version three by the agent from its own copy", "")
-	require.Equal(t, 201, code, out)
-	assert.Nil(t, out["series_id"], "a new series: the join stopped")
-	assert.NotEqual(t, v1, strings.TrimPrefix(out["uri"].(string), "coral://artifacts/"))
+	// the agent never passed --new-version-of: the chain's file is v3, the newest is the Operator's v4
+	code, out = k.upTask("s1", root.ID, text, "")
+	assert.Equal(t, http.StatusConflict, code, "%v", out)
+	assert.Equal(t, "stale_base", out["code"])
+	assert.Equal(t, v4, out["latest_digest"])
+	assert.EqualValues(t, 4, out["latest_version"])
+	assert.Equal(t, true, out["latest_by_person"])
+	assert.Equal(t, "coral://artifacts/"+v4, out["uri"])
+	assert.Contains(t, out["error"], "continues the earlier file of its task chain", "a sentence that fits an agent that named no base")
+	assert.Contains(t, out["error"], "coral-agent artifact download coral://artifacts/"+v4)
+	assert.Contains(t, out["error"], "--new-version-of coral://artifacts/"+v4)
+	// nothing half done: no object, no record, no for-review tag, no task link, no new series
+	_, statErr := os.Stat(filepath.Join(dir, refused))
+	assert.True(t, os.IsNotExist(statErr), "no orphan object")
+	objectsAfter, _ := os.ReadDir(dir)
+	assert.Equal(t, len(objectsBefore), len(objectsAfter))
+	_, recOK := readUploadRecord(k.coralDir, "s1", refused)
+	assert.False(t, recOK, "no upload record")
+	tags, terr := k.h.bs.ArtifactTags(ctx, "alpha")
+	require.NoError(t, terr)
+	assert.Empty(t, tags[refused], "no for-review tag, so no pending review in Needs you")
 	ms := seriesMembers(k.coralDir, sid)
-	require.Len(t, ms, 3, "the old series is as it was")
-	assert.Equal(t, v3, ms[2].Digest, "the Operator's version is still the newest of it")
+	require.Len(t, ms, 4)
+	assert.Equal(t, v4, ms[3].Digest, "the Operator's version is still the newest")
+	_ = v2
 }
