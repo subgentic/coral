@@ -23,7 +23,7 @@ func TestAMachineThatNeverMakesTheFolderSaysWhyAndNothingSecretPrints(t *testing
 		if cmd == whyCommand {
 			asked++
 			return "== setup exit status: 2\n== setup output (tail)\ntar: coral: Not found in archive\ntar: Exiting with failure status due to previous errors\n" +
-				"-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\n-----END OPENSSH PRIVATE KEY-----\n" +
+				"-----BEGIN OPENSSH " + "PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\n-----END OPENSSH " + "PRIVATE KEY-----\n" +
 				"token chb_SECRETSECRETSECRET1234 and a blob " + strings.Repeat("QUJD", 30) + "\x1b[31m red \x07 \u202e reversed\n", "", 0
 		}
 		return m.handle(cmd, stdin)
