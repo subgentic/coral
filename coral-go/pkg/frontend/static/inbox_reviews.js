@@ -159,7 +159,7 @@ async function readTeam(team, mutedOut = null, stamp = {}) {
 let fview = null;
 const settledAt = new Map();
 const viewParts = f => ({ q: f.q || '', team: f.team || '', agent: f.agent || '', goal: f.goal || '', longer: f.longer || '', server: f.server || '', oldest: f.sort === 'oldest' });
-export const reviewQueryKey = f => { const v = viewParts(f); return (v.q || v.team || v.agent || v.goal || v.longer || v.server) ? JSON.stringify(v) : ''; };
+export const reviewQueryKey = f => { const v = viewParts(f); return (v.q || v.team || v.agent || v.goal || v.longer || v.server || v.oldest) ? JSON.stringify(v) : ''; };
 /** Choices describe all server matches, including files beyond the loaded rows. */
 export function reviewFilterOptions() {
     const pages = fview ? fview.pager.status() : reviewPages();
@@ -194,16 +194,21 @@ export function reviewQueryParams(f, now = Date.now()) {
 }
 const filterRows = mine => mine.pager.snapshot().flatMap(s => s.artifacts).filter(a => {
     const tags = a.tags || [];
-    return a.available && !a.muted && !tags.includes('saved') && !tags.includes('ignored') && !tags.includes('superseded') && !(settledAt.get(a.reviewKey) > mine.started);
+    return (mine.filters.agent !== UNKNOWN_AGENT || !a.produced_by) && (!mine.filters.goal || mine.goal || (a.goal_title || 'No goal') === mine.filters.goal) && a.available && !a.muted && !tags.includes('saved') && !tags.includes('ignored') && !tags.includes('superseded') && !(settledAt.get(a.reviewKey) > mine.started);
 });
 export const queriedReviews = f => fview && fview.key === reviewQueryKey(f) ? filterRows(fview) : null;
 export const reviewQueryState = () => {
     if (!fview) return null;
-    const pages = fview.pager.status(), known = !fview.localFilters && !fview.invalidCounts && pages.every(p => p.loaded && !p.error && Number.isSafeInteger(p.total));
-    return { total: known ? pages.reduce((n, p) => n + p.total, 0) : null, shown: filterRows(fview).length,
+    const pages = fview.pager.status(), rows = filterRows(fview);
+    const hasSources = pages.length > 0 || fview.emptyScope;
+    const completeWindow = hasSources && !fview.invalidCounts && pages.every(p => p.loaded && !p.error && !p.has_more && !p.truncated && p.total === p.loadedCount);
+    const known = hasSources && !fview.localFilters && !fview.invalidCounts && pages.every(p => p.loaded && !p.error && !p.truncated && Number.isSafeInteger(p.total));
+    const attentionKnown = hasSources && !fview.localFilters && !fview.invalidCounts && pages.every(p => Number.isSafeInteger(p.attentionTotal) && !p.error && !p.truncated);
+    return { total: fview.localFilters ? completeWindow ? rows.length : null : known ? pages.reduce((n, p) => n + p.total, 0) : null, shown: rows.length,
         more: pages.some(p => p.has_more), loading: pages.some(p => p.loading),
-        attentionTotal: !fview.localFilters && !fview.invalidCounts && pages.every(p => Number.isSafeInteger(p.attentionTotal) && !p.error) ? pages.reduce((n, p) => n + p.attentionTotal, 0) : null, goalFiltered: !!fview.goal, localFilters: fview.localFilters,
-        error: pages.some(p => p.error) ? 'Some computers could not be asked.' : '', failed: pages.filter(p => p.error).length };
+        attentionTotal: fview.localFilters ? completeWindow ? rows.filter(needsReviewAttention).length : null : attentionKnown ? pages.reduce((n, p) => n + p.attentionTotal, 0) : null,
+        goalFiltered: !!fview.goal, localFilters: fview.localFilters,
+        error: !hasSources ? 'No selected computer is online.' : pages.some(p => p.error) ? 'Some computers could not be asked.' : pages.some(p => p.truncated) ? 'A computer returned an incomplete list. Narrow the filters to find other files.' : '', failed: pages.filter(p => p.error).length + (hasSources ? 0 : 1) };
 };
 export const clearReviewQuery = () => { if (fview) { const old = fview; fview = null; old.pager.reset([]); changed(); } };
 export function queryReviews(f) {
@@ -217,12 +222,12 @@ export function queryReviews(f) {
         if (!options.cursor && !data.ownerOnly) {
             const query = new URLSearchParams(options.query);
             query.set('waiting', '1'); query.set('muted', '0'); query.delete('facets');
-            try { const count = await readComputerPage(server, { ...options, query: query.toString(), limit: 1 }); data.attention_total = count.total; }
+            try { const count = await readComputerPage(server, { ...options, query: query.toString(), limit: 1 }); data.attention_total = count.truncated ? null : count.total; }
             catch { data.attention_total = null; }
         }
         return data;
     };
-    const mine = { key, goal, sources: JSON.stringify(inboxSources()), localFilters: !!(f.goal && !goal) || f.agent === UNKNOWN_AGENT, started: revision, at: Date.now(), promise: null };
+    const mine = { key, goal, emptyScope: !!(f.server && goal && f.server !== goal.server), filters: viewParts(f), sources: JSON.stringify(inboxSources()), localFilters: !!(f.goal && !goal) || f.agent === UNKNOWN_AGENT, started: revision, at: Date.now(), promise: null };
     mine.pager = createReviewPages({ read, key: pageKey, changed: () => { if (fview === mine) changed(); } });
     fview = mine;
     const sources = inboxSources().filter(server => (!f.server || server === f.server) && (!goal || goal.server === server));
@@ -249,8 +254,7 @@ export async function reviewOfTeam(team, digest, { anyState = false } = {}) {
     const hex = String(digest || '').toLowerCase();
     if (!/^[a-f0-9]{64}$/.test(hex)) throw new Error('The review file has no valid digest.');
     const source = splitKey(team);
-    const params = new URLSearchParams({ team: source.name, digest: hex });
-    if (!anyState) params.set('tag', 'for review');
+    const params = new URLSearchParams({ team: source.name, digest: hex, ...(!anyState ? { tag: 'for review' } : {}) });
     const query = params.toString();
     const data = await readComputerPage(source.server, { query, cursor: '', limit: 50 });
     if (data.ownerOnly) throw new Error('Review files are available only to this computer’s owner.');
@@ -298,19 +302,34 @@ function syncPageSources() {
 }
 export const reviewPages = () => reviewPager.status();
 export const savedReviewPages = () => savedPager.status();
+/** Saved is an intersection: the saved query's for-review tag count covers off-page review files. */
+export function countSavedReviews() {
+    const pages = savedReviewPages(), loaded = Object.create(null);
+    for (const row of savedFiles()) { const server = splitKey(row.team).server; loaded[server] = (loaded[server] || 0) + 1; }
+    let value = 0, complete = pages.length > 0;
+    for (const page of pages) {
+        if (page.ownerOnly) continue;
+        const n = page.total === 0 ? 0 : page.tag_counts ? ('for review' in page.tag_counts ? page.tag_counts['for review'] : 0) : null;
+        if (page.loaded && !page.error && !page.truncated && Number.isSafeInteger(n) && n >= 0) value += n;
+        else { value += loaded[page.server] || 0; complete = false; }
+    }
+    return { value, complete };
+}
 /** Query totals and tags describe the server query, not its attention policy. */
 export function reviewPageSummary() {
     if (!activated) return null;
-    const sources = reviewPages().filter(s => !s.ownerOnly), ready = sources.length > 0 && sources.every(s => s.loaded && !s.error);
+    const sources = reviewPages().filter(s => !s.ownerOnly), ready = sources.length > 0 && sources.every(s => s.loaded && !s.error && !s.truncated);
     const totalKnown = ready && sources.every(s => Number.isSafeInteger(s.total));
     const completeWindow = ready && sources.every(s => !s.has_more && !s.truncated && s.total === s.loadedCount);
     const tagsKnown = ready && sources.every(s => s.tag_counts && Object.values(s.tag_counts).every(n => Number.isSafeInteger(n) && n >= 0));
     const tags = tagsKnown ? Object.create(null) : null;
     if (tags) for (const source of sources) for (const [tag, n] of Object.entries(source.tag_counts)) tags[tag] = (tags[tag] || 0) + n;
+    const unread = unreadReviewItems(), loadedBySource = Object.create(null);
+    for (const row of unread) { const server = splitKey(row.team).server; loadedBySource[server] = (loadedBySource[server] || 0) + 1; }
     return { sources, expected: sources.length, answered: sources.filter(s => s.loaded && !s.error).length,
-        loadedBySource: Object.fromEntries(sources.map(s => [s.server, unreadReviewItems().filter(a => splitKey(a.team).server === s.server).length])),
+        loadedBySource,
         queryTotal: totalKnown ? sources.reduce((n, s) => n + s.total, 0) : null, tag_counts: tags,
-        attentionTotal: completeWindow ? unreadReviewItems().length : null, loadedUnread: unreadReviewItems().length,
+        attentionTotal: completeWindow ? unread.length : null, loadedUnread: unread.length,
         hasMore: sources.some(s => s.has_more), partial: !ready || sources.some(s => s.truncated),
         failed: sources.filter(s => s.error).map(s => s.server) };
 }
@@ -318,6 +337,7 @@ function publishPages() {
     const next = [], nextSaved = [], nextMuted = [], failed = [];
     for (const source of reviewPager.snapshot()) {
         if (source.error) failed.push(`${source.server} review artifacts could not be refreshed: ${source.error}`);
+        else if (source.truncated) failed.push(`${serverLabel(source.server)} returned an incomplete review list. Narrow the filters to find other files.`);
         for (const a of source.artifacts) {
             const tags = a.tags || [], decidedWithNews = a.new_comments > 0 && (tags.includes('approved') || tags.includes('denied')) && !tags.includes('for review');
             if (!(tags.includes('for review') || decidedWithNews) || tags.includes('saved') || tags.includes('ignored') || tags.includes('superseded') || !a.available) continue;

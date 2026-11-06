@@ -22,7 +22,11 @@ globalThis.fetch = async input => {
         assert.equal(url.searchParams.has('cursor'), false);
         return Response.json({ artifacts: rows.filter(r => r.id === url.searchParams.get('digest')), has_more: false });
     }
-    if (tag === 'saved') return Response.json({ artifacts: [], total: 0, has_more: false, tag_counts: {} });
+    if (tag === 'saved') {
+        const all = rows.map((r, i) => ({ ...r, id: (i + 1001).toString(16).padStart(64, '0'), name: 'Saved ' + i, tags: ['saved', 'for review'] }));
+        const cursor = url.searchParams.get('cursor');
+        return Response.json({ artifacts: all.slice(cursor ? 50 : 0, cursor ? 100 : 50), total: 65, has_more: !cursor, ...(cursor ? {} : { next_cursor: server + ':50' }), tag_counts: { saved: 65, 'for review': 65 } });
+    }
     const cursor = url.searchParams.get('cursor');
     if (cursor) {
         assert.equal(cursor, `${server}:50`, 'a cursor belongs to its source computer');
@@ -77,3 +81,23 @@ assert.ok(calls.slice(beforeQuery).every(c => c.server === 'box-b'));
 assert.equal(M.reviewQueryState().attentionTotal, 125, 'filtered attention comes from the server, independent of loaded rows');
 assert.equal(M.reviewQueryState().shown, 50);
 assert.equal(M.reviewQueryState().goalFiltered, true);
+
+await M.queryReviews({ goal: 'No goal' });
+assert.equal(M.reviewQueryState().attentionTotal, null, 'client-only criteria remain a lower bound while pages remain');
+await M.moreQueriedReviews({ goal: 'No goal' });
+assert.equal(M.reviewQueryState().attentionTotal, 130, 'a complete window can count the client-only criterion exactly');
+await M.queryReviews({ agent: 'Unknown agent' });
+assert.equal(M.reviewQueryState().shown, 0);
+assert.equal(M.reviewQueryState().more, true, 'no match in a loaded page does not hide access to later pages');
+assert.ok(M.reviewQueryKey({ sort: 'oldest' }), 'oldest sort starts its own server window, even without a text filter');
+
+await M.queryReviews({ server: 'offline-computer' });
+assert.equal(M.reviewQueryState().attentionTotal, null, 'an unavailable selected source is unknown, not zero');
+assert.equal(M.reviewQueryState().total, null);
+assert.match(M.reviewQueryState().error, /not.*online|No selected computer is online/);
+
+assert.equal(M.savedFiles().length, 100);
+assert.deepEqual(M.countSavedReviews(), { value: 130, complete: true }, 'Saved uses tag-count metadata for its review-file total, not the loaded page length');
+await M.loadMoreSavedFiles('box-b');
+assert.equal(M.savedFiles().length, 115);
+assert.equal(M.countSavedReviews().value, 130);
