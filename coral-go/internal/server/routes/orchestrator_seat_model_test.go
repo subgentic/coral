@@ -105,3 +105,20 @@ func TestTheThinkingLevelFollowsTheSameSeatAsTheModel(t *testing.T) {
 	assert.NotContains(t, worker, "high")
 	assert.Contains(t, run("Orchestrator", ""), "high")
 }
+
+// A look-alike that already holds the seat stands in the way of the next one (QA's gap on #13964): the holder check is the board's, so it counts a holder by its name or title, whatever the case.
+func TestASecondLookAlikeOnATeamWhoseSeatIsHeldByOneIsAWorker(t *testing.T) {
+	r := seatRig(t)
+	launch := func(name string) []string {
+		before := len(r.term.sentCommands())
+		b, _ := json.Marshal(map[string]any{"working_dir": r.work, "agent_type": "claude", "display_name": name, "board_id": orchBoard})
+		code, out := r.do("POST", "/api/sessions/launch", string(b), operatorClient, "")
+		require.Equal(t, http.StatusOK, code, out)
+		return r.modelsSince(before)
+	}
+	// the team's only holder is a look-alike (no member named just Orchestrator)
+	r.seat("Orchestrator helper", "Helper", orchBoard, "claude", false, 1)
+	assert.Equal(t, []string{"worker"}, launch("Orchestrator helper two"), "the seat is held, by a look-alike")
+	assert.Equal(t, []string{"worker"}, launch("ORCHESTRATOR backup"), "whatever the case")
+	assert.Equal(t, []string{"worker"}, launch("Dev9"))
+}

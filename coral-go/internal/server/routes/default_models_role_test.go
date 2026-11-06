@@ -87,6 +87,8 @@ func TestTheSeatOfATeamLaunchIsTheGrantSeedsRule(t *testing.T) {
 	}
 	assert.Equal(t, 0, teamSeatIndex(names("Orchestrator", "Dev")))
 	assert.Equal(t, 1, teamSeatIndex(names("Dev", "Team Orchestrator", "Orchestrator helper")), "the first that claims the role")
+	assert.Equal(t, 1, teamSeatIndex(names("Dev", "ORCHESTRATOR")), "the role is read as the board reads it, whatever the case (board.ClaimsOrchestrator, not a plain contains)")
+	assert.Equal(t, 0, teamSeatIndex(names("Team ORCHESTRATOR Lead", "Orchestrator")))
 	assert.Equal(t, -1, teamSeatIndex(names("Dev", "Dev2")))
 	assert.Equal(t, 1, teamSeatIndex(names("", "Orchestrator")), "a nameless entry is skipped")
 	assert.Equal(t, -1, teamSeatIndex(nil))
