@@ -68,7 +68,7 @@ const HEX = t => (t.charCodeAt(1).toString(16) + 'a').padEnd(64, 'c').slice(0, 6
         await reset();
         await ev(`(async () => { const M = await import(${S} + 'inbox_reviews.js'); const a = M.refreshReviews(true), b = M.refreshReviews(true); await Promise.all([a, b]); return true; })()`);
         const reads = await ev(`window.__r.reads`);
-        assert.deepEqual(reads, {'for review':1,saved:1}, 'two forced refreshes share the review and Saved page requests');
+        assert.deepEqual(reads, {'for review':1,saved:1,attention:1}, 'two forced refreshes share the review and Saved page requests');
         assert.equal(await ev(`window.__r.legacy`), 0, 'refresh never scans boards');
 
         // 4: with the Inbox loaded, a link opens at once (the scan after it is in the background)

@@ -26,7 +26,7 @@ const HEX = n => String(n).repeat(64);
             };
         })()` });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await coralReady(ev, 'startup', 'liveList', 'settings');
-        const lists = () => ev(`window.__requests.filter(r => /\\/api\\/team-artifacts\\?/.test(r)).length`);
+        const lists = () => ev(`window.__requests.filter(r => /\\/api\\/team-artifacts\\?/.test(r) && !new URL(r, location.href).searchParams.has('waiting') && !new URL(r, location.href).searchParams.has('team')).length`);
         const mark = () => ev(`window.__requests.length = 0; true`);
         await ev(`import(${S}+'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true)`);
         assert.equal(await ev(`import(${S}+'inbox_reviews.js').then(m => m.reviewItems().length)`), 2, 'both files are for review after a scan');
