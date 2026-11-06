@@ -1276,6 +1276,10 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 #toast-host { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: max-content; max-width: min(380px, 100%); pointer-events: none; } /* as wide as the widest toast, and every toast that wide: two stacked toasts were two widths (#9452 item 14) */
 #toast-host > .toast { position: static; pointer-events: auto; animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s; }
 #toast-host > .toast.has-action { animation: slideIn 0.3s ease; }
+/* A toast over a window with its own buttons (#13979, Hub beta): the file viewer's and a dialog's Close and Approve are at the bottom right, where the toasts are, and Approve's toast hid Close for its three seconds. While one is open the column moves to the bottom left, where those footers are empty. A phone has its own place (below). */
+@media (min-width: 768px) and (pointer: fine) {
+    body:has(#artifact-viewer:not([hidden]), dialog[open]) #notices { right: auto; left: 20px; align-items: flex-start; }
+}
 /* On a phone the notices and the short toasts are at the top: at the bottom they sat over the composer, Send, Wake and a dialog's buttons (#6162, found on a Windows run where the data-folder warning covered Wake). The column scrolls when several are open. */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     #notices { top: var(--notice-top, calc(env(safe-area-inset-top, 0px) + 8px)); bottom: auto; left: 8px; right: 8px; max-width: none; justify-content: flex-start; align-items: stretch; }
