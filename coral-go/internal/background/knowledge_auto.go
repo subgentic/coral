@@ -54,6 +54,14 @@ const (
 	AutoCodeNoTeam      = "team_not_found"
 )
 
+// The refusals of an accept or a revert that is bound to what the person was shown (Security's MUST on #13928).
+var (
+	ErrCandidateChanged = errors.New("the candidate changed since it was shown")
+	ErrHeldNeedsConfirm = errors.New("this candidate is held: confirm it to accept it")
+	ErrNoCandidate      = errors.New("there is no candidate to accept")
+	ErrNothingToRevert  = errors.New("there is no earlier version to go back to")
+)
+
 // The errors a call runner answers with, so the run can say why in fixed words.
 var (
 	ErrAutoNotSignedIn = errors.New("the agent CLI is not signed in")
@@ -462,6 +470,10 @@ func ReadCandidate(coralDir, team string) (*Candidate, error) {
 func AcceptKnowledgeCandidate(coralDir, team string) error {
 	autoFilesMu.Lock()
 	defer autoFilesMu.Unlock()
+	return acceptLocked(coralDir, team)
+}
+
+func acceptLocked(coralDir, team string) error {
 	d := teamDir(coralDir, team)
 	if d == "" {
 		return ErrBadKnowledgeTeam
@@ -469,7 +481,7 @@ func AcceptKnowledgeCandidate(coralDir, team string) error {
 	cdir := filepath.Join(d, candidateDirName)
 	entries, err := os.ReadDir(cdir)
 	if err != nil {
-		return errors.New("there is no candidate to accept")
+		return ErrNoCandidate
 	}
 	pdir := filepath.Join(d, previousDirName)
 	if err := os.RemoveAll(pdir); err != nil {
@@ -507,6 +519,10 @@ func AcceptKnowledgeCandidate(coralDir, team string) error {
 func RevertKnowledge(coralDir, team string) error {
 	autoFilesMu.Lock()
 	defer autoFilesMu.Unlock()
+	return revertLocked(coralDir, team)
+}
+
+func revertLocked(coralDir, team string) error {
 	d := teamDir(coralDir, team)
 	if d == "" {
 		return ErrBadKnowledgeTeam
@@ -514,7 +530,7 @@ func RevertKnowledge(coralDir, team string) error {
 	pdir := filepath.Join(d, previousDirName)
 	entries, err := os.ReadDir(pdir)
 	if err != nil || len(entries) == 0 {
-		return errors.New("there is no earlier version to go back to")
+		return ErrNothingToRevert
 	}
 	for _, e := range entries {
 		name := e.Name()
@@ -634,4 +650,114 @@ func SetAutoApply(coralDir, team string, on bool) error {
 		return ErrBadKnowledgeTeam
 	}
 	return writeJSONFile(filepath.Join(d, settingsName), dailySettings{AutoApply: &on})
+}
+
+// hashDir is a stable id of the .md files in dir (their names and bytes) and of extra: "" when there are none.
+func hashDir(dir string, extra string) string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return ""
+	}
+	h := sha256.New()
+	h.Write([]byte(extra))
+	n := 0
+	for _, e := range entries { // ReadDir is sorted by name
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
+			continue
+		}
+		b, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		if err != nil {
+			continue
+		}
+		n++
+		h.Write([]byte{0})
+		h.Write([]byte(e.Name()))
+		h.Write([]byte{0})
+		h.Write(b)
+	}
+	if n == 0 {
+		return ""
+	}
+	return hex.EncodeToString(h.Sum(nil))[:24]
+}
+
+// CandidateID identifies the waiting candidate by what it says: a new daily run that replaces it has another id. "" when none waits. Taken under the files lock by the caller that needs it to be current.
+func CandidateID(coralDir, team string) string {
+	autoFilesMu.Lock()
+	defer autoFilesMu.Unlock()
+	return candidateIDLocked(coralDir, team)
+}
+
+func candidateIDLocked(coralDir, team string) string {
+	d := teamDir(coralDir, team)
+	if d == "" {
+		return ""
+	}
+	var meta CandidateMeta
+	if !readJSONFile(filepath.Join(d, candidateDirName, candidateMetaMD), &meta) {
+		return ""
+	}
+	return hashDir(filepath.Join(d, candidateDirName), meta.CreatedAt)
+}
+
+// PreviousID identifies the version an accepted update replaced (what a revert would put back): "" when there is none.
+func PreviousID(coralDir, team string) string {
+	autoFilesMu.Lock()
+	defer autoFilesMu.Unlock()
+	return previousIDLocked(coralDir, team)
+}
+
+func previousIDLocked(coralDir, team string) string {
+	d := teamDir(coralDir, team)
+	if d == "" {
+		return ""
+	}
+	entries, err := os.ReadDir(filepath.Join(d, previousDirName))
+	if err != nil || len(entries) == 0 {
+		return ""
+	}
+	// the .md.new marks count too: a revert that only removes files is still a version
+	h := sha256.New()
+	for _, e := range entries {
+		b, _ := os.ReadFile(filepath.Join(d, previousDirName, e.Name()))
+		h.Write([]byte(e.Name()))
+		h.Write([]byte{0})
+		h.Write(b)
+		h.Write([]byte{0})
+	}
+	return hex.EncodeToString(h.Sum(nil))[:24]
+}
+
+// AcceptShownCandidate accepts the candidate the person was shown: wantID is the id the status gave, a held candidate also needs confirmHeld. If a newer run has replaced the candidate since, it is
+// ErrCandidateChanged and nothing is written. The check and the write are one step under the files lock.
+func AcceptShownCandidate(coralDir, team, wantID string, confirmHeld bool) error {
+	autoFilesMu.Lock()
+	defer autoFilesMu.Unlock()
+	id := candidateIDLocked(coralDir, team)
+	if id == "" {
+		return ErrNoCandidate
+	}
+	if wantID == "" || wantID != id {
+		return ErrCandidateChanged
+	}
+	var meta CandidateMeta
+	readJSONFile(filepath.Join(teamDir(coralDir, team), candidateDirName, candidateMetaMD), &meta)
+	if meta.Held && !confirmHeld {
+		return ErrHeldNeedsConfirm
+	}
+	return acceptLocked(coralDir, team)
+}
+
+// RevertShownUpdate takes back the update the person was shown (wantID is PreviousID as the status gave it); ErrCandidateChanged if another update has been accepted since.
+func RevertShownUpdate(coralDir, team, wantID string) error {
+	autoFilesMu.Lock()
+	defer autoFilesMu.Unlock()
+	id := previousIDLocked(coralDir, team)
+	if id == "" {
+		return ErrNothingToRevert
+	}
+	if wantID == "" || wantID != id {
+		return ErrCandidateChanged
+	}
+	return revertLocked(coralDir, team)
 }

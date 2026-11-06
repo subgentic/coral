@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"sort"
 	"sync"
@@ -97,6 +98,9 @@ func (h *SessionsHandler) DailyKnowledgeStatus(w http.ResponseWriter, r *http.Re
 			out["next_run_at"] = sch.Next(time.Now().In(loc)).UTC().Format(time.RFC3339)
 		}
 	}
+	if id := background.PreviousID(h.cfg.CoralDir(), team); id != "" {
+		out["previous"] = map[string]any{"id": id} // what a revert would put back
+	}
 	st := background.ReadAutoState(h.cfg.CoralDir(), team)
 	if st.LastRunAt != "" {
 		out["last_distilled_at"], out["approx_tokens"], out["calls"] = st.LastRunAt, st.ApproxTokens, st.Calls
@@ -122,7 +126,7 @@ func (h *SessionsHandler) DailyKnowledgeStatus(w http.ResponseWriter, r *http.Re
 			}
 			files = append(files, d)
 		}
-		out["candidate"] = map[string]any{"created_at": cand.Meta.CreatedAt, "held": cand.Meta.Held, "held_reason": cand.Meta.HeldReason, "approx_tokens": cand.Meta.ApproxTokens, "files": files}
+		out["candidate"] = map[string]any{"id": background.CandidateID(h.cfg.CoralDir(), team), "created_at": cand.Meta.CreatedAt, "held": cand.Meta.Held, "held_reason": cand.Meta.HeldReason, "approx_tokens": cand.Meta.ApproxTokens, "files": files}
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -204,27 +208,62 @@ func (h *SessionsHandler) SetDailyKnowledgeAutoApply(w http.ResponseWriter, r *h
 	h.DailyKnowledgeStatus(w, r)
 }
 
-// AcceptDailyKnowledge answers POST .../daily-knowledge/accept: the waiting candidate is written (that is the person's decision).
+// AcceptDailyKnowledge answers POST .../daily-knowledge/accept {candidate: id, confirm_held?: bool}: the candidate the person was shown becomes the live knowledge (that is the person's decision). A candidate
+// a newer run has replaced since is 409 candidate_changed and nothing is written; a held one needs confirm_held.
 func (h *SessionsHandler) AcceptDailyKnowledge(w http.ResponseWriter, r *http.Request) {
 	team, ok := h.knowledgePerson(w, r)
 	if !ok {
 		return
 	}
-	if err := background.AcceptKnowledgeCandidate(h.cfg.CoralDir(), team); err != nil {
+	var b struct {
+		Candidate   string `json:"candidate"`
+		ConfirmHeld bool   `json:"confirm_held"`
+	}
+	if err := decodeJSONStrict(r, &b); err != nil || b.Candidate == "" {
+		errBadRequest(w, `the body is {"candidate": "<the id the status gave>"} and, for a held candidate, "confirm_held": true`)
+		return
+	}
+	switch err := background.AcceptShownCandidate(h.cfg.CoralDir(), team, b.Candidate, b.ConfirmHeld); {
+	case err == nil:
+	case errors.Is(err, background.ErrNoCandidate):
 		writeError(w, http.StatusConflict, "no_candidate", "there is no candidate waiting for this team")
+		return
+	case errors.Is(err, background.ErrCandidateChanged):
+		writeError(w, http.StatusConflict, "candidate_changed", "a newer run replaced the candidate you were shown: look at the new one")
+		return
+	case errors.Is(err, background.ErrHeldNeedsConfirm):
+		writeError(w, http.StatusConflict, "held_needs_confirm", "this candidate is held for a person to look at: read why, and accept it with confirm_held")
+		return
+	default:
+		errInternalServer(w, "could not apply the candidate")
 		return
 	}
 	h.DailyKnowledgeStatus(w, r)
 }
 
-// RevertDailyKnowledge answers POST .../daily-knowledge/revert: the last accepted update is taken back.
+// RevertDailyKnowledge answers POST .../daily-knowledge/revert {previous: id}: the update the person was shown is taken back; another update accepted since is 409 candidate_changed.
 func (h *SessionsHandler) RevertDailyKnowledge(w http.ResponseWriter, r *http.Request) {
 	team, ok := h.knowledgePerson(w, r)
 	if !ok {
 		return
 	}
-	if err := background.RevertKnowledge(h.cfg.CoralDir(), team); err != nil {
+	var b struct {
+		Previous string `json:"previous"`
+	}
+	if err := decodeJSONStrict(r, &b); err != nil || b.Previous == "" {
+		errBadRequest(w, `the body is {"previous": "<the id the status gave>"}`)
+		return
+	}
+	switch err := background.RevertShownUpdate(h.cfg.CoralDir(), team, b.Previous); {
+	case err == nil:
+	case errors.Is(err, background.ErrNothingToRevert):
 		writeError(w, http.StatusConflict, "nothing_to_revert", "there is no earlier version of this team's knowledge to go back to")
+		return
+	case errors.Is(err, background.ErrCandidateChanged):
+		writeError(w, http.StatusConflict, "candidate_changed", "another update was accepted since you looked: look at the current state")
+		return
+	default:
+		errInternalServer(w, "could not take the update back")
 		return
 	}
 	h.DailyKnowledgeStatus(w, r)

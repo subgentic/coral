@@ -27,6 +27,7 @@ const fakeCLI = `#!/bin/sh
   echo "CORAL_TOKEN:${CORAL_TOKEN:-unset}"
   echo "CORAL_SESSION:${CORAL_SESSION_ID:-unset}"
   echo "GITHUB_TOKEN:${GITHUB_TOKEN:-unset}"
+  echo "AWS_SECRET_ACCESS_KEY:${AWS_SECRET_ACCESS_KEY:-unset}"
   echo "ANTHROPIC_API_KEY:${ANTHROPIC_API_KEY:-unset}"
   echo "STDIN:"
   cat
@@ -53,6 +54,7 @@ func runFake(t *testing.T, agentType, model string) (answer, notes string) {
 	t.Setenv("CORAL_TOKEN", "board-token")
 	t.Setenv("CORAL_SESSION_ID", "sess")
 	t.Setenv("GITHUB_TOKEN", "gh")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "aws")
 	t.Setenv("ANTHROPIC_API_KEY", "the-clis-own-key")
 	c := &AutoCLI{AgentType: agentType, Path: path, Model: model, Timeout: 20 * time.Second,
 		signIn: func(context.Context) error { return nil }, extraEnv: []string{"FAKE_NOTES=" + notesPath}}
@@ -78,6 +80,7 @@ func TestClaudeIsRunWithNoToolsNoSettingsNoSecretsAndTheTextOnStdin(t *testing.T
 	assert.Contains(t, notes, "CORAL_TOKEN:unset")
 	assert.Contains(t, notes, "CORAL_SESSION:unset")
 	assert.Contains(t, notes, "GITHUB_TOKEN:unset", "a token that is not the CLI's own sign-in is removed")
+	assert.Contains(t, notes, "AWS_SECRET_ACCESS_KEY:unset", "so is any variable not on the allowlist")
 	assert.Contains(t, notes, "ANTHROPIC_API_KEY:the-clis-own-key", "the CLI's own sign-in stays")
 	pwd := strings.TrimSpace(strings.Split(strings.Split(notes, "PWD:")[1], "\n")[0])
 	assert.Contains(t, pwd, "coral-knowledge-", "it ran in an empty temp folder")
@@ -130,10 +133,10 @@ func TestAFailingCLIsWordsAreNotKeptAndATimeoutIsSaid(t *testing.T) {
 	assert.ErrorIs(t, err, ErrAutoTimedOut)
 }
 
-func TestTheEnvironmentOfTheCallHasNoCoralVariableAndNoForeignToken(t *testing.T) {
-	got := authorityFreeEnv([]string{"PATH=/bin", "CORAL_URL=http://x", "CORAL_SESSION_TOKEN=t", "GH_TOKEN=g", "AWS_SECRET=s", "MY_API_KEY=k",
-		"ANTHROPIC_API_KEY=a", "CLAUDE_CODE_OAUTH_TOKEN=o", "OPENAI_API_KEY=oa", "CODEX_API_KEY=c", "HOME=/h", "coral_lower=1"})
-	assert.ElementsMatch(t, []string{"PATH=/bin", "ANTHROPIC_API_KEY=a", "CLAUDE_CODE_OAUTH_TOKEN=o", "OPENAI_API_KEY=oa", "CODEX_API_KEY=c", "HOME=/h"}, got)
+func TestTheEnvironmentOfTheCallIsAnAllowlist(t *testing.T) {
+	got := authorityFreeEnv([]string{"PATH=/bin", "CORAL_URL=http://x", "CORAL_SESSION_TOKEN=t", "GH_TOKEN=g", "AWS_SECRET_ACCESS_KEY=s", "AWS_ACCESS_KEY_ID=k", "DATABASE_URL=postgres://x", "MY_API_KEY=k",
+		"ANTHROPIC_API_KEY=a", "CLAUDE_CODE_OAUTH_TOKEN=o", "CLAUDE_CONFIG_DIR=/c", "OPENAI_API_KEY=oa", "CODEX_HOME=/h2", "HOME=/h", "LC_ALL=C", "https_proxy=http://p", "SSH_AUTH_SOCK=/s", "coral_lower=1", "SomethingNew=1"})
+	assert.ElementsMatch(t, []string{"PATH=/bin", "ANTHROPIC_API_KEY=a", "CLAUDE_CODE_OAUTH_TOKEN=o", "CLAUDE_CONFIG_DIR=/c", "OPENAI_API_KEY=oa", "CODEX_HOME=/h2", "HOME=/h", "LC_ALL=C", "https_proxy=http://p"}, got)
 }
 
 func TestOnlyClaudeAndCodexCanDistill(t *testing.T) {

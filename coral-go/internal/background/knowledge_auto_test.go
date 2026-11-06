@@ -273,3 +273,40 @@ func TestAnAutomaticRunWithNoCLIFailsInFixedWords(t *testing.T) {
 	assert.Equal(t, AutoCodeCLIMissing, res.Code)
 	assert.Equal(t, "failed", autoFor(f, &fakeModel{}).Run(f.ctx, "../evil").State, "a team name that cannot name a folder")
 }
+
+// Security's MUST on #13928: an accept is bound to the candidate that was shown, and a held one needs the person's word.
+func TestAcceptAndRevertAreBoundToWhatWasShown(t *testing.T) {
+	f := newAutoTeam(t, "autob")
+	a := autoFor(f, &fakeModel{})
+	require.Equal(t, "completed", a.Run(f.ctx, "autob").State)
+	id := CandidateID(f.dir, "autob")
+	require.NotEmpty(t, id)
+	assert.ErrorIs(t, AcceptShownCandidate(f.dir, "autob", "", false), ErrCandidateChanged)
+	assert.ErrorIs(t, AcceptShownCandidate(f.dir, "autob", "nope", false), ErrCandidateChanged)
+	// a newer run replaces the candidate: the old id is stale
+	f.transcript("aaaaaaaa-0001", "something new was said")
+	a.Now = func() time.Time { return time.Date(2026, 11, 7, 4, 0, 0, 0, time.UTC) } // the later run
+	require.Equal(t, "completed", a.Run(f.ctx, "autob").State)
+	newID := CandidateID(f.dir, "autob")
+	require.NotEmpty(t, newID)
+	assert.NotEqual(t, id, newID)
+	assert.ErrorIs(t, AcceptShownCandidate(f.dir, "autob", id, false), ErrCandidateChanged)
+	assert.Equal(t, "", liveFile(f, "lead.md"), "nothing was written")
+	require.NoError(t, AcceptShownCandidate(f.dir, "autob", newID, false))
+	assert.Contains(t, liveFile(f, "lead.md"), "A plain note")
+	assert.ErrorIs(t, AcceptShownCandidate(f.dir, "autob", newID, false), ErrNoCandidate)
+	prev := PreviousID(f.dir, "autob")
+	require.NotEmpty(t, prev)
+	assert.ErrorIs(t, RevertShownUpdate(f.dir, "autob", "nope"), ErrCandidateChanged)
+	require.NoError(t, RevertShownUpdate(f.dir, "autob", prev))
+	assert.ErrorIs(t, RevertShownUpdate(f.dir, "autob", prev), ErrNothingToRevert)
+	// held: needs confirm
+	f2 := newAutoTeam(t, "autoc")
+	a2 := autoFor(f2, &fakeModel{okf: "---\ntype: agent\n---\n$ rm -rf build\n"})
+	require.Equal(t, "completed", a2.Run(f2.ctx, "autoc").State)
+	hid := CandidateID(f2.dir, "autoc")
+	assert.ErrorIs(t, AcceptShownCandidate(f2.dir, "autoc", hid, false), ErrHeldNeedsConfirm)
+	assert.Equal(t, "", liveFile(f2, "lead.md"))
+	require.NoError(t, AcceptShownCandidate(f2.dir, "autoc", hid, true))
+	assert.Contains(t, liveFile(f2, "lead.md"), "rm -rf")
+}

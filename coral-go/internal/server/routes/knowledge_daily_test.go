@@ -118,7 +118,7 @@ func TestAnAgentCannotChangeATeamsDailyKnowledge(t *testing.T) {
 	r := newDailyRig(t)
 	for _, c := range [][3]string{
 		{"PUT", dailyBase, `{"enabled":true}`}, {"PUT", dailyBase + "/auto-apply", `{"enabled":true}`},
-		{"POST", dailyBase + "/accept", ``}, {"POST", dailyBase + "/revert", ``},
+		{"POST", dailyBase + "/accept", `{"candidate":"x"}`}, {"POST", dailyBase + "/revert", `{"previous":"x"}`},
 	} {
 		code, out := r.call(c[0], c[1], c[2], true)
 		assert.Equal(t, http.StatusForbidden, code, "%s %s: %v", c[0], c[1], out)
@@ -177,27 +177,63 @@ func TestTheWaitingCandidateShowsItsDiffAndAcceptAndRevertAreAPersonsDecisions(t
 	assert.Equal(t, "lead.md", lead["file"])
 	assert.Contains(t, lead["diff"], "-old line")
 	assert.Contains(t, lead["diff"], "+new line")
+	cid := cand["id"].(string)
+	require.NotEmpty(t, cid)
 	// accept is the write, and is a person's
-	code, _ = r.call("POST", dailyBase+"/accept", ``, true)
+	code, _ = r.call("POST", dailyBase+"/accept", `{"candidate":"`+cid+`","confirm_held":true}`, true)
 	require.Equal(t, http.StatusForbidden, code)
 	b, _ := os.ReadFile(filepath.Join(team, "lead.md"))
 	assert.Contains(t, string(b), "old line", "an agent's accept wrote nothing")
-	code, out = r.call("POST", dailyBase+"/accept", ``, false)
+	// it is bound to the candidate that was shown: no id, a wrong id and a stale id write nothing
+	for name, body := range map[string]string{"no id": `{}`, "empty id": `{"candidate":""}`, "an extra field": `{"candidate":"` + cid + `","x":1}`} {
+		code, _ = r.call("POST", dailyBase+"/accept", body, false)
+		assert.Equal(t, http.StatusBadRequest, code, name)
+	}
+	code, out = r.call("POST", dailyBase+"/accept", `{"candidate":"0000000000000000000000aa","confirm_held":true}`, false)
+	assert.Equal(t, http.StatusConflict, code)
+	assert.Equal(t, "candidate_changed", out["code"])
+	// a held candidate needs the person's confirmation
+	code, out = r.call("POST", dailyBase+"/accept", `{"candidate":"`+cid+`"}`, false)
+	assert.Equal(t, http.StatusConflict, code)
+	assert.Equal(t, "held_needs_confirm", out["code"])
+	b, _ = os.ReadFile(filepath.Join(team, "lead.md"))
+	assert.Contains(t, string(b), "old line", "nothing was written by any of the refusals")
+	// a newer run replaces the candidate between the diff and the click: the id the person saw is stale
+	require.NoError(t, os.WriteFile(filepath.Join(team, ".candidate", "lead.md"), []byte("line one\nnewer still\nline three\n"), 0o600))
+	code, out = r.call("POST", dailyBase+"/accept", `{"candidate":"`+cid+`","confirm_held":true}`, false)
+	assert.Equal(t, http.StatusConflict, code)
+	assert.Equal(t, "candidate_changed", out["code"])
+	b, _ = os.ReadFile(filepath.Join(team, "lead.md"))
+	assert.Contains(t, string(b), "old line")
+	_, out = r.call("GET", dailyBase, "", false)
+	cid = out["candidate"].(map[string]any)["id"].(string)
+	code, out = r.call("POST", dailyBase+"/accept", `{"candidate":"`+cid+`","confirm_held":true}`, false)
 	require.Equal(t, http.StatusOK, code, out)
 	assert.Nil(t, out["candidate"], "the candidate is gone once accepted")
 	b, _ = os.ReadFile(filepath.Join(team, "lead.md"))
-	assert.Contains(t, string(b), "new line")
-	code, out = r.call("POST", dailyBase+"/accept", ``, false)
+	assert.Contains(t, string(b), "newer still")
+	code, out = r.call("POST", dailyBase+"/accept", `{"candidate":"`+cid+`","confirm_held":true}`, false)
 	assert.Equal(t, http.StatusConflict, code)
 	assert.Equal(t, "no_candidate", out["code"])
-	// revert takes it back, once
-	code, _ = r.call("POST", dailyBase+"/revert", ``, false)
+	// revert is bound to the update that was shown, and takes it back once
+	pid := out["previous"]
+	_ = pid
+	_, st := r.call("GET", dailyBase, "", false)
+	prev := st["previous"].(map[string]any)["id"].(string)
+	code, out = r.call("POST", dailyBase+"/revert", `{}`, false)
+	assert.Equal(t, http.StatusBadRequest, code)
+	code, out = r.call("POST", dailyBase+"/revert", `{"previous":"0000000000000000000000bb"}`, false)
+	assert.Equal(t, http.StatusConflict, code)
+	assert.Equal(t, "candidate_changed", out["code"])
+	code, _ = r.call("POST", dailyBase+"/revert", `{"previous":"`+prev+`"}`, true)
+	require.Equal(t, http.StatusForbidden, code)
+	code, _ = r.call("POST", dailyBase+"/revert", `{"previous":"`+prev+`"}`, false)
 	require.Equal(t, http.StatusOK, code)
 	b, _ = os.ReadFile(filepath.Join(team, "lead.md"))
 	assert.Contains(t, string(b), "old line")
 	_, err := os.Stat(filepath.Join(team, "dev.md"))
 	assert.True(t, os.IsNotExist(err), "the file the update made is removed again")
-	code, out = r.call("POST", dailyBase+"/revert", ``, false)
+	code, out = r.call("POST", dailyBase+"/revert", `{"previous":"`+prev+`"}`, false)
 	assert.Equal(t, http.StatusConflict, code)
 	assert.Equal(t, "nothing_to_revert", out["code"])
 }

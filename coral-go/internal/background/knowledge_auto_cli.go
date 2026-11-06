@@ -72,20 +72,36 @@ func mapSignInError(err error) error {
 	return err
 }
 
-// authorityFreeEnv is env without every CORAL_ variable and without any *_TOKEN, *_SECRET or *_API_KEY variable that is not the CLI's own sign-in (ANTHROPIC_, CLAUDE_CODE_, OPENAI_, CODEX_).
+// The environment of a call is an ALLOWLIST (Security's SHOULD 3 on #13928): the names the CLI needs to start and to sign in, and nothing else, so a variable nobody thought of (AWS_SECRET_ACCESS_KEY, a
+// database URL, a Coral variable) never reaches a process that reads a transcript. Names are compared in upper case (Windows folds them).
+var autoEnvNames = map[string]bool{
+	"PATH": true, "HOME": true, "USER": true, "LOGNAME": true, "LANG": true, "LANGUAGE": true, "TZ": true, "TERM": true,
+	"TMPDIR": true, "TEMP": true, "TMP": true,
+	"USERPROFILE": true, "APPDATA": true, "LOCALAPPDATA": true, "PROGRAMDATA": true, "PROGRAMFILES": true, "PROGRAMFILES(X86)": true,
+	"SYSTEMROOT": true, "SYSTEMDRIVE": true, "WINDIR": true, "COMSPEC": true, "PATHEXT": true, "HOMEDRIVE": true, "HOMEPATH": true,
+	"XDG_CONFIG_HOME": true, "XDG_DATA_HOME": true, "XDG_CACHE_HOME": true, "XDG_STATE_HOME": true, "XDG_RUNTIME_DIR": true,
+	"HTTP_PROXY": true, "HTTPS_PROXY": true, "NO_PROXY": true, "ALL_PROXY": true,
+	"SSL_CERT_FILE": true, "SSL_CERT_DIR": true, "NODE_EXTRA_CA_CERTS": true, "REQUESTS_CA_BUNDLE": true, "CURL_CA_BUNDLE": true,
+}
+
+// autoEnvPrefixes are the CLIs' own variables (their sign-in, their config folder), by prefix. CORAL_ is not among them.
+var autoEnvPrefixes = []string{"LC_", "ANTHROPIC_", "CLAUDE_", "OPENAI_", "CODEX_"}
+
+// authorityFreeEnv is env reduced to the allowlist.
 func authorityFreeEnv(env []string) []string {
 	out := make([]string, 0, len(env))
 	for _, kv := range env {
 		name, _, _ := strings.Cut(kv, "=")
 		up := strings.ToUpper(name)
-		if strings.HasPrefix(up, "CORAL_") {
-			continue
+		ok := autoEnvNames[up]
+		for _, p := range autoEnvPrefixes {
+			if strings.HasPrefix(up, p) {
+				ok = true
+			}
 		}
-		own := strings.HasPrefix(up, "ANTHROPIC_") || strings.HasPrefix(up, "CLAUDE_CODE_") || strings.HasPrefix(up, "OPENAI_") || strings.HasPrefix(up, "CODEX_")
-		if !own && (strings.HasSuffix(up, "_TOKEN") || strings.HasSuffix(up, "_SECRET") || strings.HasSuffix(up, "_API_KEY") || up == "TOKEN" || up == "SECRET") {
-			continue
+		if ok {
+			out = append(out, kv)
 		}
-		out = append(out, kv)
 	}
 	return out
 }
