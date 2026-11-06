@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -154,4 +155,19 @@ func TestArchivedAgentWithNoChatYetIsCountedInArchived(t *testing.T) {
 	require.NoError(t, s.SetSessionArchived(ctx, "quiet-one", false))
 	all, archived = count()
 	assert.Equal(t, []int{0, 0}, []int{all, archived}, "unarchived, it is gone from Archived")
+}
+
+// #13910: deleting a board takes the opened-version rows of its files with it (they are the sessions database's, keyed by board).
+func TestDeletingABoardDropsTheVersionsOpenedOfItsFiles(t *testing.T) {
+	db := openTestDB(t)
+	ss := NewSessionStore(db)
+	ctx := context.Background()
+	for _, board := range []string{"alpha", "beta"} {
+		_, err := db.ExecContext(ctx, `INSERT INTO artifact_series_opened (person, board_id, series_id, version, opened_at) VALUES ('owner', ?, ?, 2, '2026-11-06T10:00:00Z')`, board, strings.Repeat("a", 32))
+		require.NoError(t, err)
+	}
+	require.NoError(t, ss.DeleteBoardChatFlags(ctx, "alpha"))
+	var boards []string
+	require.NoError(t, db.SelectContext(ctx, &boards, `SELECT board_id FROM artifact_series_opened`))
+	assert.Equal(t, []string{"beta"}, boards, "alpha's rows are gone, beta's stay")
 }

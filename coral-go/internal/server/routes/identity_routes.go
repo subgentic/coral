@@ -189,6 +189,7 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/artifacts/resolve":                                           "resolve a shortened artifact link",
 	"PUT /api/artifacts/{id}/star":                                         "star an artifact",
 	"DELETE /api/artifacts/{id}/star":                                      "unstar an artifact",
+	"POST /api/artifacts/{id}/opened":                                      "record the version of a file the Operator opened",
 	"POST /api/artifacts/{id}/comments":                                    "comment on an artifact",
 	"PATCH /api/artifacts/{id}/comments/{cid}":                             "edit a comment on an artifact",
 	"DELETE /api/artifacts/{id}/comments/{cid}":                            "delete a comment on an artifact",

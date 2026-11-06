@@ -11,7 +11,7 @@ import { syncWelcome } from './welcome_items.js';
 
 import { state } from './state.js';
 import { reportInboxOpened } from './dashboard_analytics.js';
-import { unreadReviewItems, refreshReviews, reviewAttentionCount } from './ask_filter.js';
+import { unreadReviewItems, refreshReviews, reviewAttentionCount, setReviewCounter } from './ask_filter.js';
 import { failedUnread, refreshRuns, onRunsChanged } from './automation_runs.js';
 import { pendingProposals, refreshProposals, onProposalsChanged } from './proposals_state.js';
 import { goalDoneCount } from './goal_done.js';
@@ -52,6 +52,19 @@ function tellAttention(n) {
     importOnce('./attention.js').then(m => { attentionReady = true; m.setAttentionTotal(n); });
 }
 
+// The files waiting for the Operator are counted by each computer after the first paint, at idle (#13172): the badge shows them without the Inbox having been opened and without reading a page of any team. The module is loaded then, not at startup.
+let countsAsked = false, countsRefresh = null;
+function scheduleReviewCounts() {
+    if (countsRefresh) { countsRefresh(); return; }
+    if (countsAsked) return;
+    countsAsked = true;
+    const go = () => importOnce('./review_counts.js').then(m => {
+        setReviewCounter(m.countedUnread);
+        countsRefresh = () => m.refreshCounts().then(changed => { if (changed) updateInboxTab(); }).catch(() => {});
+        countsRefresh();
+    }).catch(() => {});
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(go, { timeout: 4000 }); else setTimeout(go, 2000);
+}
 /** Keep the tab's badge (and, where the dashboard builds its own Inbox, the Needs you list) in step with the live list. Safe to call often (after each list update). */
 export function updateInboxTab() {
     const tab = document.getElementById('nav-tab-hub-inbox');
@@ -60,6 +73,7 @@ export function updateInboxTab() {
     const badge = document.getElementById('nav-tab-hub-inbox-badge');
     if (!badge) return;
     refreshReviews();
+    scheduleReviewCounts();
     if (!isCloud() || nativeNeeds()) refreshOperatorAsks(); // Coral's own Needs you table on the Hub reads them from each online computer too (#13450); the questions asked of the Operator are read from this Coral too (#11417)
     syncWelcome(); // a welcome step seen is remembered (#11443); the items are not in the badge
     refreshProposals(); // after the Inbox was first opened, and at most once in 20 seconds (proposals_state.js)

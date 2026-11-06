@@ -5,13 +5,17 @@ export const hideAsksWhen = fn => { hidden = fn; };
 export const isHiddenAsk = a => hidden(a);
 
 /* The badge can read a view's existing cache without loading the review routes at startup. */
-let read = () => [], refresh = () => null, summary = () => null;
+let read = () => [], refresh = () => null, summary = () => null, counted = () => null;
 export const unreadReviewItems = () => read();
 export const refreshReviews = () => refresh();
 /** Exact server attention totals are distinct from the loaded page's unread rows. */
 export function reviewAttentionCount() {
-    const metadata = summary(), n = metadata?.attentionTotal;
+    const metadata = summary(), n = counted() ?? metadata?.attentionTotal;
     return Number.isSafeInteger(n) && n >= 0 ? { value: n, complete: true }
         : { value: read().length, complete: metadata === null };
 }
 export function setReviewCacheReader(reader, refresher, summarizer = () => null) { read = reader; refresh = refresher; summary = summarizer; }
+
+/** The background counter uses the same per-person attention policy as the list. */
+export function setReviewCounter(fn) { counted = fn; }
+export const unreadReviewCount = () => reviewAttentionCount().value;

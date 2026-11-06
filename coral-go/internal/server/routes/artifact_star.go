@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"context"
+	"database/sql"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -27,14 +29,26 @@ func (h *SessionsHandler) starArtifactRoute(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	var err error
+	seriesID := ""
+	if sid, ok := soleTeamSeriesOf(h.cfg.CoralDir(), id); ok { // the series of the ONE team that holds this digest in a series (#13910); bytes two teams hold in series are two files, and the digest alone is starred or cleared
+		seriesID = sid
+	}
+	person := openedPersonKey(r) // a star is a person's (#13910): the owner key's are the original table's, another person's their own
 	if r.Method == http.MethodDelete {
-		_, err = h.db.ExecContext(r.Context(), "DELETE FROM artifact_stars WHERE hex = ?", id)
+		_, err = h.unstar(r.Context(), person, id)
+		if err == nil && seriesID != "" { // the star follows the series, so an unstar clears every version's: the document is no longer pinned. The same bytes in another team's series are another series and stay as they are.
+			for _, m := range seriesMembersOfBoard(h.cfg.CoralDir(), seriesID, id) {
+				if _, err = h.unstar(r.Context(), person, m.Digest); err != nil {
+					break
+				}
+			}
+		}
 	} else {
 		if _, statErr := os.Stat(filepath.Join(h.cfg.CoralDir(), "artifacts", "objects", id)); statErr != nil {
 			errNotFound(w, "artifact not found")
 			return
 		}
-		_, err = h.db.ExecContext(r.Context(), "INSERT INTO artifact_stars (hex, starred_at) VALUES (?, ?) ON CONFLICT(hex) DO NOTHING", id, time.Now().UTC().Format(time.RFC3339))
+		_, err = h.star(r.Context(), person, id)
 	}
 	if err != nil {
 		errInternalServer(w, "could not update the star")
@@ -43,5 +57,26 @@ func (h *SessionsHandler) starArtifactRoute(w http.ResponseWriter, r *http.Reque
 	if h.bs != nil {
 		h.bs.NoteAllArtifactsChanged()
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"id": id, "starred": r.Method != http.MethodDelete})
+	out := map[string]any{"id": id, "starred": r.Method != http.MethodDelete}
+	if seriesID != "" {
+		out["series_id"] = seriesID
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// star records the person's star of a digest (idempotent): the owner key's in artifact_stars, as always, another person's in artifact_person_stars.
+func (h *SessionsHandler) star(ctx context.Context, person, id string) (sql.Result, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	if person == ownerPersonKey {
+		return h.db.ExecContext(ctx, "INSERT INTO artifact_stars (hex, starred_at) VALUES (?, ?) ON CONFLICT(hex) DO NOTHING", id, now)
+	}
+	return h.db.ExecContext(ctx, "INSERT INTO artifact_person_stars (person, hex, starred_at) VALUES (?, ?, ?) ON CONFLICT(person, hex) DO NOTHING", person, id, now)
+}
+
+// unstar removes the person's star of a digest (idempotent), and no one else's.
+func (h *SessionsHandler) unstar(ctx context.Context, person, id string) (sql.Result, error) {
+	if person == ownerPersonKey {
+		return h.db.ExecContext(ctx, "DELETE FROM artifact_stars WHERE hex = ?", id)
+	}
+	return h.db.ExecContext(ctx, "DELETE FROM artifact_person_stars WHERE person = ? AND hex = ?", person, id)
 }

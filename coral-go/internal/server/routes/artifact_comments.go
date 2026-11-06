@@ -407,7 +407,7 @@ func (h *SessionsHandler) listArtifactComments(w http.ResponseWriter, r *http.Re
 	var own *int
 	var members []seriesMember
 	if r.URL.Query().Get("series") == "1" { // the earlier versions' comments, marked (#6459); without the flag the answer is exactly as it was
-		if sid, n, in := digestSeries(h.cfg.CoralDir(), id); in {
+		if sid, n, in := callerSeries(r, h.cfg.CoralDir(), id); in {
 			own, members = &n, seriesMembers(h.cfg.CoralDir(), sid)
 		}
 	}

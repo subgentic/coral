@@ -306,6 +306,7 @@ POST /api/artifacts/{id}/comments/{cid}/reopen interact
 POST /api/artifacts/{id}/comments/{cid}/reply never
 POST /api/artifacts/{id}/comments/{cid}/resolve interact
 POST /api/artifacts/{id}/comments/{cid}/send launch
+POST /api/artifacts/{id}/opened interact
 POST /api/auth/hub-signin/dismiss never
 POST /api/auth/password/change never
 POST /api/auth/password/reset never
