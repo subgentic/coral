@@ -80,6 +80,19 @@ const { coralReady } = require('./helpers/wait');
         assert.deepEqual((await ev(`window.__downloads`)).sort(),['Alpha.txt','Beta.txt']);
         await search(P,''); await waitFor(`${q(P+' tbody')}?.children.length===3`,'clear artifact filter');
         await ev(`[...document.querySelectorAll('${P} tbody .dt-check input:not(:disabled)')].forEach(c=>c.click());true`);
+        // #13949: the metadata route says which files other teams hold too (held_by_teams, 2 or more): the confirmation counts them; with none, its words are as they were
+        await ev(`(()=>{const prev=window.fetch;window.__held={};window.fetch=(u,o={})=>{const m=new URL(String(u),location.origin).pathname.match(/^\\/api\\/artifacts\\/([0-9a-f]{64})\\/meta$/);if(m)return Promise.resolve(new Response(JSON.stringify(window.__held[m[1]]?{held_by_teams:window.__held[m[1]]}:{}),{status:200,headers:{'Content-Type':'application/json'}}));return prev(u,o);};return true;})()`);
+        await artifactAction('Delete');
+        await new Promise(r => setTimeout(r, 400)); // sleep-ok: the reads settle and the words are updated in place
+        assert.ok(!/other teams/.test(await ev(`${q(P+' .dt-bar-confirm')}.textContent`)), 'with no shared file the confirmation says nothing about other teams');
+        await ev(`${q(P+' .dt-bar-keep')}.click();true`);
+        await ev(`window.__held['${A}']=3;true`);
+        await new Promise(r => setTimeout(r, 2200)); // sleep-ok: the first answer's two seconds pass, so the next confirmation reads again
+        await artifactAction('Delete');
+        await waitFor(`/1 of these is also in other teams and goes there too/.test(${q(P+' .dt-bar-confirm')}?.textContent || '')`, 'the confirmation counts the shared file', 8000);
+        assert.match(await ev(`${q(P+' .dt-bar-confirm')}.textContent`), /^Delete 2 artifacts\? 1 of these is also in other teams and goes there too\. Their links will become unavailable\./);
+        await ev(`${q(P+' .dt-bar-keep')}.click();true`);
+        await ev(`window.__held={};true`); await new Promise(r => setTimeout(r, 2200)); // sleep-ok: as above
         await artifactAction('Delete');
         assert.deepEqual(await ev(`window.__deletes`),[],'Delete first asks');
         await ev(`${q(P+' .dt-bar-keep')}.click();true`); assert.deepEqual(await ev(`window.__deletes`),[],'Keep does not delete');

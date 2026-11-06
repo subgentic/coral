@@ -136,6 +136,24 @@ export function createArtifactsList({ inbox = false } = {}) {
         try { const r = await serverFetch(server(), `/api/artifacts/${hex}/meta`); if (!r.ok) return 0; const n = Number((await r.json()).held_by_teams); return Number.isInteger(n) && n >= 2 ? n : 0; } catch { return 0; }
     }
 
+    // A bulk delete says how many of the selected files other teams hold too (#13949): the counts are read when the confirmation is drawn (at most BULK_HELD_READS files) and kept for two seconds, so the redraws of one confirmation share the reads and the next confirmation reads again; the confirmation's words are updated in place when they arrive.
+    const BULK_HELD_READS = 20, HELD_LIFE_MS = 2000, heldCache = new Map();
+    const heldNow = h => { const e = heldCache.get(h); return e && Date.now() - e.at < HELD_LIFE_MS ? e : null; };
+    function heldWords(rows) {
+        const hexes = rows.map(managedHex).filter(Boolean), shared = hexes.filter(h => (heldNow(h)?.n ?? 0) >= 2).length;
+        if (!shared) return '';
+        return ` ${shared} of these ${shared === 1 ? 'is' : 'are'} also in other teams and ${shared === 1 ? 'goes' : 'go'} there too.${hexes.length > BULK_HELD_READS ? ` (Checked the first ${BULK_HELD_READS}.)` : ''}`;
+    }
+    function warmHeld(rows) {
+        const todo = rows.map(managedHex).filter(h => h && !heldNow(h)).slice(0, BULK_HELD_READS);
+        if (!todo.length) return;
+        for (const h of todo) heldCache.set(h, { n: null, at: Date.now() });
+        Promise.all(todo.map(async h => { heldCache.set(h, { n: await heldByTeams(h), at: Date.now() }); })).then(() => {
+            const el = root?.querySelector('.dt-bar-confirm'); if (el && /^Delete \d+ artifacts\?/.test(el.textContent)) el.textContent = bulkDeleteWords(rows.length, rows);
+        });
+    }
+    const bulkDeleteWords = (n, rows) => `Delete ${n} artifacts?${heldWords(rows)} Their links will become unavailable. This cannot be undone.`;
+
     async function deleteArtifact(hex, name, size) {
         const held = await heldByTeams(hex), also = held >= 2 ? ` This file is also in ${held - 1} other team${held - 1 === 1 ? '' : 's'}; deleting it removes it there too.` : '';
         window.showConfirmModal?.('Delete artifact',
@@ -369,7 +387,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                 disabled: rows => rows.every(item => !managedHex(item) || (item.tags || []).includes(REVIEW) === !remove),
                 run: async rows => { const key = model.key, r = await changeReview(reviewFiles(rows.filter(item => (item.tags || []).includes(REVIEW) === !!remove)), remove); if (r) finish(key, r.ok, r.failed, remove ? 'Removed from review:' : 'Sent for review:'); } })),
             ...(local() ? [{ label: 'Delete', danger: true, disabled: rows => rows.some(item => !managedHex(item) || !linkOf(item)?.preview),
-                confirm: n => `Delete ${n} artifacts? Their links will become unavailable. This cannot be undone.`, run: async rows => {
+                confirm: (n, rows = []) => { warmHeld(rows); return bulkDeleteWords(n, rows); }, run: async rows => {
                     if (model.bulkBusy || !local() || rows.some(item => !managedHex(item) || !linkOf(item)?.preview)) return;
                     model.bulkBusy = true; const key = model.key, origin = server(), ok = []; let failed = 0;
                     for (const item of rows) { const hex = managedHex(item); try {
