@@ -102,6 +102,8 @@ type SessionsHandler struct {
 	waitsMemo waitsOnMemo
 	// commentOwner names the owner on new artifact comments (nil: this computer's user, #5176); commentLimit is the per-author write rate limit.
 	commentOwner commentOwnerIdentity
+	// editPost posts the message of Send to agent with the diff; nil is the board store's own post (a test sets it to make the post fail, #13802).
+	editPost     func(ctx context.Context, project, content string) error
 	commentLimit commentLimiter
 	sendLimit    sendLimiter // Send to agent: asks per owner per hour (#6443)
 	// wsHeartbeat overrides wsHeartbeatInterval when set (nanoseconds; tests).

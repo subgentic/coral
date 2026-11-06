@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -136,7 +137,7 @@ func (h *SessionsHandler) editRootThread(r *http.Request, caller commentCaller, 
 	cs, err := h.ss.ListArtifactComments(r.Context(), t.digest, "", []string{t.project})
 	if err == nil {
 		for _, c := range cs {
-			if c.ParentID == nil && c.DeletedAt == nil && c.Body == marker {
+			if c.ParentID == nil && c.DeletedAt == nil && c.Body == marker && c.AuthorKind == commentCallerOwner { // the owner's own root, not deleted: an agent's or a viewer's comment with the same words is not the thread
 				return c, true
 			}
 		}
@@ -355,9 +356,9 @@ func (h *SessionsHandler) sendEditDiff(w http.ResponseWriter, r *http.Request) {
 			}
 			body, noted := editSendBody(sendBuilder(sendOnEdit, title, "the authors of the file", version, sendReplyCommand(t.digest, root.ID), "", mentionNames, nil), diff, limited, prevLink, newLink)
 			shownAsNote = shownAsNote || noted
-			if _, err := h.bs.PostDefusedMessage(r.Context(), project, board.OperatorName, body); err != nil {
+			if err := h.postEditMessage(r.Context(), project, body); err != nil {
 				slog.Warn("[edit send] message not posted", "board", project, "error", err)
-				_ = h.ss.CloseArtifactAsk(r.Context(), root.ID, ls.SessionID, time.Now())
+				_ = h.ss.DeleteArtifactAsk(r.Context(), root.ID, ls.SessionID) // no row is left: a retry is a first send, not "already sent" for an agent that never got it (QA)
 				res.State = "failed"
 				break
 			}
@@ -399,4 +400,13 @@ func editSendBody(build func(c string) string, diff string, limited bool, prevLi
 func (h *SessionsHandler) RegisterEditSend(r chi.Router) {
 	r.Get("/api/board/{project}/artifacts/{digest}/edit/send", h.getEditSend)                          // is Send offered for this saved edit, and who already has it
 	r.With(RefuseSignInLink).Post("/api/board/{project}/artifacts/{digest}/edit/send", h.sendEditDiff) // the send: names only; the server makes the diff
+}
+
+// postEditMessage posts the Operator's message to the board (a seam of the handler for a test that makes the post fail).
+func (h *SessionsHandler) postEditMessage(ctx context.Context, project, body string) error {
+	if h.editPost != nil {
+		return h.editPost(ctx, project, body)
+	}
+	_, err := h.bs.PostDefusedMessage(ctx, project, board.OperatorName, body)
+	return err
 }

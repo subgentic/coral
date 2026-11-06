@@ -152,6 +152,12 @@ func (s *SessionStore) CloseArtifactAsk(ctx context.Context, commentID int64, ag
 	return err
 }
 
+// DeleteArtifactAsk takes one agent's ask of a comment away altogether (#13802): a message that could not be posted leaves no row behind, so a retry is a first send and not "already sent".
+func (s *SessionStore) DeleteArtifactAsk(ctx context.Context, commentID int64, agentSession string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM artifact_comment_asks WHERE comment_id = ? AND agent_session = ?`, commentID, agentSession)
+	return err
+}
+
 // ListArtifactAsks are the asks of an artifact's comments, oldest first (the owner's comment list shows them).
 func (s *SessionStore) ListArtifactAsks(ctx context.Context, artifactID string) ([]ArtifactAsk, error) {
 	var out []ArtifactAsk
