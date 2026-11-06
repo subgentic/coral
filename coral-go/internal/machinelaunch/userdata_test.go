@@ -436,6 +436,7 @@ func TestTheSetupScriptInstallsFromAnArchiveWhoseMembersAreDotSlashNames(t *test
 		o, err := exec.Command("tar", append([]string{"-xzf", archive, "-C", out, "--no-same-owner"}, releasePrograms...)...).CombinedOutput()
 		assert.Error(t, err, "GNU tar does not find a bare name in an archive that stores ./name: %s", o)
 		assert.Contains(t, string(o), "Not found in archive")
+		t.Logf("before: the v2.0.56 extraction on %s: exit error %v, tar said: %s", strings.TrimSpace(strings.SplitN(string(tarOut), "\n", 2)[0]), err, strings.TrimSpace(string(o)))
 	}
 
 	// the AFTER: the script itself, with curl and uname stubbed, its install folder moved into the test, and root's ownership left out (the test is not root)
