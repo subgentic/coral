@@ -128,16 +128,16 @@ const { settle, coralReady } = require('./helpers/wait');
         assert.deepEqual(await row(), custom, 'the choice survives a reload');
         ok('a reload keeps the hidden tab and the order');
 
-        // A hidden tab that is open falls back to the first tab: open Notes, hide it.
-        await ev(`window.switchAgenticTab('notes', 'top'); true`);
-        assert.equal(await ev(`document.querySelector('#agentic-block-top .agentic-tab.active').dataset.tab`), 'notes');
+        // A hidden tab that is open falls back to the first tab: open Info (a tab of the row; Notes is behind More, which carries the open state itself), hide it.
+        await ev(`window.switchAgenticTab('info', 'top'); true`);
+        assert.equal(await ev(`document.querySelector('#agentic-block-top .agentic-tab.active').dataset.tab`), 'info');
         await open();
-        await ev(`document.querySelector('#tab-customize .tc-check[data-tab="notes"]').click(); true`);
+        await ev(`document.querySelector('#tab-customize .tc-check[data-tab="info"]').click(); true`);
         const act = await ev(`document.querySelector('#agentic-block-top .agentic-tab.active')?.dataset.tab`);
         assert.equal(act, first, 'falls back to ' + first);
-        assert.equal(await ev(`document.getElementById('agentic-panel-notes').classList.contains('active')`), false);
+        assert.equal(await ev(`document.getElementById('agentic-panel-info').classList.contains('active')`), false);
         // And asking for a hidden tab by code opens the first tab too.
-        await ev(`window.switchAgenticTab('tasks', 'top'); true`);
+        await ev(`window.switchAgenticTab('info', 'top'); true`);
         assert.equal(await ev(`document.querySelector('#agentic-block-top .agentic-tab.active').dataset.tab`), first);
         ok('a hidden open tab (and a request for a hidden tab) falls back to the first tab');
 

@@ -312,6 +312,7 @@ export async function selectLiveSession(name, agentType, sessionId, server, opts
     const input = _leaveCurrentAgent();
 
     const { agentData, displayName } = _enterAgent(name, agentType, sessionId, srv);
+    document.dispatchEvent(new CustomEvent('coral:agent-selected')); // the Info tab drops the last agent's fields and reads this one's (info_tab.js, #13917)
 
     syncFilesViewerSession();
     refreshAgentUI();

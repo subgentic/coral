@@ -90,7 +90,6 @@ export const NOT_PHOTOGRAPHED = {
         'prompt-modal': 'a generic question the code asks with its own text; each is seen in the page that asks it',
         'alert-modal': 'a generic message the code shows with its own text',
         'confirm-modal': 'a generic confirmation the code asks with its own text',
-        'info-modal': 'a generic help card the code fills with its own text',
         'restart-modal': 'the update dialog (dialog-update-ready) is this dialog',
         'resume-modal': 'opened from a History chat that has ended: needs an ended session',
         'mb-export-modal': 'a download dialog of the Board tab, one button',

@@ -1,5 +1,5 @@
 // The agent's side panel tabs say their words (UI/UX's 170 list, item 1, #7621): at 1280 px and up each tab shows its word beside its icon when all the words fit the row on one line (a panel dragged
-// narrow, or text at 200%, falls back to icons alone: no word clipped, no wrapped row), the Tasks count stays a badge, and the three rarely used tabs (Browse, Activity, Agent UI) are behind one More menu that
+// narrow, or text at 200%, falls back to icons alone: no word clipped, no wrapped row), the Tasks count stays a badge, and the four rarely used tabs (Browse, Notes, Activity, Agent UI) are behind one More menu that
 // opens them with the keyboard and carries the open one's word. Below 1280 the tabs are icons alone with their names as title and aria-label. Drives the real dashboard over CDP; an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -32,10 +32,10 @@ const { settle, coralReady } = require('./helpers/wait');
         await waitFor(`document.querySelector('${ROW}').hasAttribute('data-words')`, 'the words show at the default panel width', 4000);
         let r = await row();
         const named = r.shown.filter(([t]) => t !== 'customize'); // the Customize button at the row's end is an icon alone, as it was
-        assert.deepEqual(named.map(([t, w]) => [t, w]), [['files', 'Files'], ['artifacts', 'Artifacts'], ['tasks', 'Tasks'], ['notes', 'Notes'], ['saved', 'Saved'], ['more', 'More']], 'each shown tab says its word: ' + JSON.stringify(r.shown));
+        assert.deepEqual(named.map(([t, w]) => [t, w]), [['files', 'Files'], ['artifacts', 'Artifacts'], ['tasks', 'Tasks'], ['info', 'Info'], ['saved', 'Saved'], ['more', 'More']], 'each shown tab says its word: ' + JSON.stringify(r.shown));
         assert.deepEqual([r.tops.length, r.clipped], [1, false], 'one line, nothing clipped: ' + JSON.stringify(r));
-        assert.ok(!r.shown.some(([t]) => ['browse', 'activity', 'agent-ui'].includes(t)), 'the three rare tabs are not in the row: ' + JSON.stringify(r.shown));
-        assert.equal(r.more[0], 'More tabs'); ok('Files, Artifacts, Tasks, Notes, Saved and More with their words, on one line');
+        assert.ok(!r.shown.some(([t]) => ['browse', 'notes', 'activity', 'agent-ui'].includes(t)), 'the four rare tabs are not in the row: ' + JSON.stringify(r.shown));
+        assert.equal(r.more[0], 'More tabs'); ok('Files, Artifacts, Tasks, Info, Saved and More with their words, on one line');
         await shot('dock-tabs-1280');
 
         // UI/UX's #7621 small points: the customizer icon is named, only the selected tab looks selected (a hovered one is not blue with an underline), and the files line is sentence case
@@ -53,9 +53,9 @@ const { settle, coralReady } = require('./helpers/wait');
         await key('ArrowDown');
         await waitFor(`!document.getElementById('agentic-more-menu').hidden && document.activeElement.getAttribute('role') === 'menuitem'`, 'the menu opens on ArrowDown with the focus in it', 4000);
         const items = await ev(`[...document.querySelectorAll('#agentic-more-menu [role=menuitem]')].map(i => i.dataset.tab + ':' + i.textContent.trim())`);
-        assert.deepEqual(items, ['browse:folder_openBrowse', 'activity:timelineActivity', 'agent-ui:widgetsAgent UI'], JSON.stringify(items));
+        assert.deepEqual(items, ['browse:folder_openBrowse', 'notes:edit_noteNotes', 'activity:timelineActivity', 'agent-ui:widgetsAgent UI'], JSON.stringify(items));
         await shot('dock-tabs-more-open');
-        await key('ArrowDown'); await key('Enter');
+        await key('ArrowDown'); await key('ArrowDown'); await key('Enter'); // the menu opens on Browse: two steps down is Activity (Notes is the second item)
         await waitFor(`document.getElementById('agentic-panel-activity').classList.contains('active')`, 'Enter opens Activity', 4000);
         r = await row();
         assert.deepEqual(r.more, ['More: Activity, open', true, 'false'], 'More carries the open tab: ' + JSON.stringify(r.more));

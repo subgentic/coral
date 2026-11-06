@@ -4197,3 +4197,14 @@ dialog.team-link-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 .ic-delete::before { content: 'delete'; }
 /* One More icon (#11564): three dots drawn in CSS from the control's own colour, not a typed ⋯ or … (two glyphs at two weights). 15 x 5 px, centred; the button keeps its size. */
 .ic-more::before { content: ''; display: block; width: 15px; height: 5px; background: radial-gradient(circle at center, currentColor 1.5px, transparent 1.7px) 0 0 / 5px 5px repeat-x; }
+
+/* The Info tab (#13917): the session's fields and the MCP servers, skills and memory under them, one column in the narrow side panel (the dialog's two columns would leave the values under 150 px). The file buttons and the text block are the old Memory classes above. */
+.agent-sections { padding: 12px; min-width: 0; }
+.agent-sections-note { margin: 0; color: var(--text-secondary); line-height: var(--lh-ui); }
+.agent-sections .session-info-grid { grid-template-columns: minmax(0, 1fr); gap: 2px 0; }
+.agent-sections .session-info-grid dt { padding-top: 12px; }
+.agent-sections .session-info-grid > dt:first-child { padding-top: 0; }
+.agent-sections .session-info-grid dd { margin: 0; }
+.agent-sections .info-command-row { flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; }
+.agent-sections .info-command-row .copy-btn { width: auto; align-self: flex-start; opacity: 1; background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--control-border); }
+@media (max-width: 767px), (pointer: coarse) { .agent-sections .info-command-row .copy-btn { min-height: 44px; } } /* a touch size, as the shared buttons have */
