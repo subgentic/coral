@@ -66,6 +66,12 @@ const hexOf = data => String(data.digest || data.hex || data.id || '').replace(/
             const tableVersions=(await person('GET',`/api/artifacts/${tableHex}/versions`)).data;assert.equal(tableVersions.length,2);const tableSaved=hexOf(tableVersions.find(v=>v.is_latest)||tableVersions.at(-1));
             const tableExpected=tableSource.replace('Operator','New \\| Owner').replace('`a\\|b`','`a\\|b\\|c`');assert.equal(Buffer.from(await bytes(tableSaved)).toString(),tableExpected,'table edits keep bars, alignment, code delimiters and untouched bytes');assert.equal(await ev(`document.querySelectorAll('.artifact-viewer-markdown td').length`),4);await shot(`tables-saved-${w}`);await nativeClick('.artifact-viewer-close');
             console.log(`PASS table cell/code pipes, fixed shape and exact saved bytes ${w}px ${font}px`);
+            const codeName=`code-${w}.md`,codeSource=`\ufeff# Code ${w}\r\n\r\n\x60\x60\x60bash\r\nprintf old\r\n\x60\x60\x60\r\n`;
+            const codeHex=await upload(codeName,codeSource);await open(codeHex,codeName);await waitFor(`!document.querySelector('.artifact-viewer-edit').hidden`,'code edit capability',8000);await shot(`code-before-${w}`);await edit();await waitFor(`!!document.querySelector('.amd-document pre .amd-text')`,'mapped code body',8000);
+            await type('printf old','printf new\n<b>literal</b>');await ev(`document.activeElement.blur()`);assert.equal(await ev(`document.querySelectorAll('.amd-document pre').length`),1);assert.equal(await ev(`!!document.querySelector('.amd-document b')`),false);await shot(`code-draft-${w}`);await nativeClick('.amd-save');await waitFor(`!document.querySelector('.amd-editor') && !!document.querySelector('.artifact-viewer-version')`,'code version saved',10000);
+            const codeVersions=(await person('GET',`/api/artifacts/${codeHex}/versions`)).data;assert.equal(codeVersions.length,2);const codeSaved=hexOf(codeVersions.find(v=>v.is_latest)||codeVersions.at(-1));assert.equal(Buffer.from(await bytes(codeSaved)).toString(),codeSource.replace('printf old','printf new\r\n<b>literal</b>'));await shot(`code-saved-${w}`);await nativeClick('.artifact-viewer-close');
+            console.log(`PASS literal fenced code and exact saved bytes ${w}px ${font}px`);
+
 
         }
     } finally { if(author)await author.stop().catch(()=>{});await removeBoards(ev,[B]);await client.close(); }

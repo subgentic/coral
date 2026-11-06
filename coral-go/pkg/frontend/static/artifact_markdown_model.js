@@ -111,6 +111,20 @@ function tableRuns(token, view, runs, units) {
     }
     return true;
 }
+// Fences and language metadata remain source-only. Map only an exact body;
+// indented or unterminated blocks stay read-only until their bytes can be proven.
+function codeRuns(token, raw, start, runs) {
+    const open = /^( {0,3})(`{3,}|~{3,})[^\n]*\n/.exec(raw);
+    if (!open || open[1]) return false;
+    const lines = raw.slice(open[0].length).split('\n');
+    let close = lines.length - 1; if (!lines[close]) close--;
+    const ending = /^( {0,3})(`+|~+)[ \t]*$/.exec(lines[close] || '');
+    if (!ending || ending[2][0] !== open[2][0] || ending[2].length < open[2].length) return false;
+    const body = lines.slice(0,close).join('\n');
+    if (!body || body !== token.text) return false;
+    runs.push({text:body,start:start+open[0].length,end:start+open[0].length+body.length,editable:true,kind:'blockcode',newlinePrefix:''});
+    return true;
+}
 export function analyze(source, marked) {
     if (new TextEncoder().encode(source).length > MAX_BYTES) throw new Error('Markdown editing is limited to 2 MiB.');
     const { text, offsets } = normalizeSource(source); const blocks = []; let offset = 0;
@@ -122,7 +136,8 @@ export function analyze(source, marked) {
         else if (type === 'paragraph' || type === 'heading') {
             if (!inlineRuns(tokens.tokens, raw, start, block.runs)) block.reason = 'Text does not map exactly';
             block.units.push({ start, end: start + raw.length, first: 0, count: block.runs.length });
-        } else if (type === 'table') { if (!tableRuns(tokens, {text:raw,positions:Array.from({length:raw.length+1},(_,i)=>start+i)}, block.runs, block.units)) block.reason = 'Table cells do not map exactly'; }
+        } else if (type === 'code') { if (!codeRuns(tokens, raw, start, block.runs)) block.reason = 'Code body does not map exactly'; }
+        else if (type === 'table') { if (!tableRuns(tokens, {text:raw,positions:Array.from({length:raw.length+1},(_,i)=>start+i)}, block.runs, block.units)) block.reason = 'Table cells do not map exactly'; }
         else if (type === 'list') { if (!listRuns(tokens, { text: raw, positions: Array.from({length:raw.length+1},(_,i)=>start+i) }, block.runs, block.units, text)) block.reason = 'Nested or indented list'; }
         else block.reason = ({ table: 'Table', code: 'Code block', html: 'Raw HTML', frontmatter: 'Front matter', definition: 'Reference definition', blockquote: 'Quoted block', hr: 'Divider' })[type] || 'Unsupported block';
         if (block.reason) block.runs = [];
@@ -154,7 +169,7 @@ export function mapRenderedBlock(block, element) {
     const nodes = []; const walker = document.createTreeWalker(element, 4);
     while (walker.nextNode()) {
         const node = walker.currentNode;
-        if (node.parentElement.closest('p,h1,h2,h3,h4,h5,h6,li,td,th') && !node.parentElement.closest('pre')) nodes.push(node);
+        if (block.type === 'code' ? node.parentElement.closest('pre code') : node.parentElement.closest('p,h1,h2,h3,h4,h5,h6,li,td,th') && !node.parentElement.closest('pre')) nodes.push(node);
     }
     const planned = new Map(); let index = 0, at = 0;
     for (const run of block.runs) {
@@ -196,9 +211,10 @@ export function editRun(source, run, text) {
     const removed = before.slice(a, before.length - b).join(''), inserted = after.slice(a, after.length - b).join('');
     if (/[\r\n]/.test(removed + inserted) && run.newlinePrefix == null) throw new Error('Edit words within one text run; changing line breaks is not supported.');
     if (run.kind === 'code' && /\x60/.test(inserted)) throw new Error('A code-span delimiter cannot be edited.');
+    if (run.kind === 'blockcode' && text.split(/\r?\n/).some(line => { const fence = /^ {0,3}(`+|~+)/.exec(line); return fence && fence[1].length >= 3; })) throw new Error('A closing code fence cannot be inserted.');
     const positions = run.sourceOffsets || original.offsets.map(i=>run.start+i);
     const start = positions[before.slice(0, a).join('').length], end = positions[run.text.length - before.slice(before.length - b).join('').length];
-    let replacement = run.kind === 'code' ? (run.tableCell ? inserted.replace(/\|/g,'\\|') : inserted) : escapeInserted(inserted);
+    let replacement = run.kind === 'blockcode' ? inserted : run.kind === 'code' ? (run.tableCell ? inserted.replace(/\|/g,'\\|') : inserted) : escapeInserted(inserted);
     if (run.newlinePrefix != null) replacement = replacement.replace(/\r?\n/g, (source.includes('\r\n')?'\r\n':'\n') + run.newlinePrefix);
     return { source: source.slice(0, start) + replacement + source.slice(end), patch: { start, end, removed: source.slice(start, end), inserted: replacement } };
 }

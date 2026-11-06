@@ -101,3 +101,19 @@ test('table drafts survive either stale refusal without an automatic second POST
   const opened=observeUntil(ui.body,()=>!!ui.body.querySelector('.amd-kept:not([hidden])'));ui.body.querySelector('.amd-open-latest').click();await opened;assert.equal(posts,1);assert.match(ui.body.querySelector('.amd-kept').textContent,/My words/);assert.match(ui.body.querySelector('.amd-document').textContent,/Agent/);assert.equal(ui.footer.querySelector('.amd-save').disabled,true);ui.close();
  }
 });
+
+test('code body edits remain literal, save exact source, and reject a closing fence',async()=>{
+ const source='\ufeff```bash\r\nprintf old\r\n```\r\n';let sent;globalThis.fetch=window.fetch=async(url,options)=>{sent=options.body;return Response.json({id:next,version:2});};let done;const saved=new Promise(r=>{done=r;});const ui=setup(source,done);
+ const field=ui.body.querySelector('pre .amd-text');assert.ok(field);assert.equal(field.getAttribute('aria-multiline'),'true');
+ change(ui.body,'printf old','printf old\n```');assert.equal(ui.body.querySelector('pre .amd-text').textContent,'printf old');assert.equal(ui.editor.dirty,false);
+ change(ui.body,'printf old','printf new\n<b>literal</b>');assert.equal(ui.body.querySelectorAll('pre').length,1);assert.equal(ui.body.querySelector('b'),null);ui.footer.querySelector('.amd-save').click();await saved;
+ assert.equal(Buffer.from(sent).toString(),source.replace('printf old','printf new\r\n<b>literal</b>'));ui.close();
+});
+
+test('code drafts survive both stale refusals without resend',async()=>{
+ for(const code of ['stale_version','stale_base']) {
+  const source='```bash\nold words\n```\n',theirs=source.replace('old','agent');let posts=0;globalThis.fetch=window.fetch=async(url,options={})=>{if(options.method==='POST'){posts++;return Response.json({code,latest_digest:latest,latest_version:2},{status:409});}return new Response(theirs);};
+  const ui=setup(source);change(ui.body,'old words','my words');ui.footer.querySelector('.amd-save').click();await observeUntil(ui.body,()=>!!ui.body.querySelector('.amd-open-latest'));ui.body.querySelector('.amd-open-latest').click();await observeUntil(ui.body,()=>!ui.body.querySelector('.amd-kept').hidden);
+  assert.equal(posts,1);assert.match(ui.body.querySelector('.amd-kept').textContent,/my words/);assert.equal(ui.footer.querySelector('.amd-save').disabled,true);assert.equal(ui.body.querySelector('.amd-reapply,.amd-save-after'),null);ui.close();
+ }
+});

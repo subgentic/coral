@@ -27,7 +27,7 @@ export function createMarkdownEditor({ body, footer, dialog, context, source: in
     let source = initialSource, original = initialSource, busy = false, dead = false, composing = false, confirmOpen = false, latest = null, pendingText = false, baseDigest = context.hex;
     const keptDrafts = [];
     const status = el('p', 'amd-status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
-    const hint = el('p', 'amd-hint', 'Edit words in the highlighted text. Enter continues a list item or applies a change elsewhere; Escape cancels it. Formatting and read-only blocks stay in place.');
+    const hint = el('p', 'amd-hint', 'Edit words in the highlighted text. Enter adds a line where supported or applies a change elsewhere; Escape cancels it. Formatting and read-only blocks stay in place.');
     const documentHost = el('div', 'amd-document'), conflict = el('section', 'amd-conflict'); conflict.hidden = true; conflict.setAttribute('aria-label', 'A newer document version');
     const kept = el('section', 'amd-kept'); kept.hidden = true; kept.setAttribute('aria-label', 'Your unsaved drafts');
     const wrapper = el('div', 'amd-editor'); wrapper.append(hint, status, conflict, documentHost, kept);

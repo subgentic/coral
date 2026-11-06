@@ -46,7 +46,7 @@ test('inserted Markdown characters are literal text and no old punctuation is re
 });
 test('readonly categories, ambiguous escapes and hidden characters never become editable', () => {
     const source = '---\ntitle: Keep\n---\n\n| A | B |\n| - | - |\n| x | y |\n\n```js\nconst x = 1;\n```\n\n<div>raw</div>\n\nHidden\u202e text\n';
-    const model = analyze(source, marked); for (const block of model.blocks) if (['frontmatter','code','html'].includes(block.type) || block.raw.includes('\u202e')) assert.equal(block.runs.length, 0);
+    const model = analyze(source, marked); for (const block of model.blocks) if (['frontmatter','html'].includes(block.type) || block.raw.includes('\u202e')) assert.equal(block.runs.length, 0);
     assert.equal(mapped('A &amp; B \\*escaped\\* word.\n').length, 0);
     const run = mapped('Keep these words.\n')[0]; assert.throws(() => editRun('Keep these words.\n', run, 'Keep\nthese words.'), /line breaks/);
     assert.throws(() => editRun('Keep these words.\n', run, 'Keep\u202ethese words.'), /Hidden/);
@@ -97,4 +97,15 @@ test('table cells preserve delimiters, alignment, escaped pipes, code spans and 
  const changed=editRun(source,cell,'x | y | extra').source;assert.ok(changed.includes('x \\| y \\| extra'));const host=document.createElement('div');host.innerHTML=renderMarkdownStrict(changed.replace(/^\ufeff/,''));assert.equal(host.querySelectorAll('td').length,2);assert.equal(host.querySelectorAll('tr').length,2);
  const again=mapped(changed).find(r=>r.text==='x | y | extra');assert.ok(again);assert.equal(editRun(changed,again,'x y extra').source,changed.replace('x \\| y \\| extra','x y extra'));
  assert.throws(()=>editRun(source,cell,'x\nnew row'),/line breaks/);
+});
+
+test('fenced code edits keep fence and language bytes, allow literal lines, and refuse closing fences',()=>{
+ for(const fence of ['```','~~~~']) {
+  const source='\ufeffBefore.\r\n\r\n'+fence+'bash\r\nprintf "old"\r\n# unchanged\r\n'+fence+'\r\n\r\nAfter.\r\n';
+  const run=mapped(source).find(r=>r.kind==='blockcode');assert.ok(run,'fenced code is editable');
+  const next=editRun(source,run,'printf "new"\n# unchanged\n<b>literal</b>').source;
+  assert.equal(next,source.replace('printf "old"\r\n# unchanged','printf "new"\r\n# unchanged\r\n<b>literal</b>'));
+  const host=document.createElement('div');host.innerHTML=renderMarkdownStrict(next.replace(/^\ufeff/,''));assert.equal(host.querySelectorAll('pre').length,1);assert.equal(host.querySelector('b'),null);
+  for(const closing of ['```','````','~~~~','~~~~~'])assert.throws(()=>editRun(source,run,run.text+'\n'+closing),/fence/);
+ }
 });
