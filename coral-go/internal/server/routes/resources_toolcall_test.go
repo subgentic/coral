@@ -173,3 +173,36 @@ func TestTheCallsInFlightAreThoseRecordedAndTheStopEventFreesAHandClaim(t *testi
 	st, _ = mgr.Queue().Status("mac-heavy")
 	assert.Len(t, st.Holders, 0, "the Stop event reached the hook through the server's own event path")
 }
+
+// #13833, through the route: two agents of two boards share a name, and a claim from one shows its own board's task, not the other board's more important one.
+func TestAClaimOverHTTPShowsTheTaskOfTheCallersOwnBoard(t *testing.T) {
+	g := newResRig(t)
+	ctx := context.Background()
+	for _, p := range [][2]string{{"go-team", "sess-go"}, {"hub-team", "sess-hub"}} {
+		_, err := g.bs.Subscribe(ctx, p[0], "Dev A", "Developer", p[1], nil, "")
+		require.NoError(t, err)
+	}
+	var own int64
+	for _, p := range [][2]string{{"go-team", "medium"}, {"hub-team", "critical"}} {
+		tk, err := g.bs.CreateTask(ctx, p[0], "work on "+p[0], "", p[1], "Dev A", "Dev A")
+		require.NoError(t, err)
+		_, err = g.bs.ClaimTask(ctx, p[0], "Dev A", tk.ID)
+		require.NoError(t, err)
+		if p[0] == "go-team" {
+			own = tk.ID
+		}
+	}
+	g.do("operator", "PUT", "/api/resources/mac-heavy", map[string]any{"slots": 1})
+	var buf bytes.Buffer
+	require.NoError(t, json.NewEncoder(&buf).Encode(map[string]any{"subscriber_id": "Dev A"}))
+	req := httptest.NewRequest("POST", "/api/resources/mac-heavy/claim", &buf)
+	req.Header.Set("Content-Type", "application/json")
+	req = withActor(req, Actor{Kind: ActorToken, Name: "Dev A", Session: "sess-go"})
+	rec := httptest.NewRecorder()
+	g.r.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	_, st := g.do("operator", "GET", "/api/resources/mac-heavy", nil)
+	holder := st["holders"].([]any)[0].(map[string]any)
+	assert.EqualValues(t, own, holder["task"], "the task of the board the caller's session is on")
+	assert.Equal(t, "go-team", holder["project"])
+}

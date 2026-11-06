@@ -323,3 +323,47 @@ func TestAnOpenCallInsideItsFirstLeaseNeverReadsTheProcessList(t *testing.T) {
 	assert.Greater(t, past, 0, "past it the list is read: only matching work keeps the claim")
 	assert.Equal(t, []string{"Agent A"}, g.holders(), "and the matching work it shows keeps it")
 }
+
+// goal #227, Frontend Dev's report: the hook told an agent to run `coral-board resource claim mac-heavy --wait` alone and then the command again, but a hand claim goes back when its own tool call ends, so
+// the next command was held again, and a command that began with its own claim was refused before the claim could run.
+func TestTheStandaloneClaimTheRefusalAsksForKeepsTheSlotForTheNextCommand(t *testing.T) {
+	g := newHookRig(t)
+	g.handClaim("s-a", "Agent A", "call-a") // A holds
+	assert.NotEmpty(t, g.h.Before(context.Background(), "s-b", "s-b", "call-b1", "go test ./..."), "B is held in line")
+	g.h.After("s-a", "call-a")               // A is done: the slot comes to B
+	g.handClaim("s-b", "Agent B", "call-b2") // B follows the advice: claim --wait alone, in a call of its own
+	g.h.After("s-b", "call-b2")
+	assert.Equal(t, []string{"Agent B"}, g.holders(), "the claim that was the answer to the refusal is not undone when its call ends: the command is about to come")
+	assert.Equal(t, "", g.h.Before(context.Background(), "s-b", "s-b", "call-b3", "go test ./..."), "and the command runs")
+	g.h.After("s-b", "call-b3")
+	assert.Empty(t, g.holders(), "that call ended: the slot goes back")
+	// nobody comes with the command: the slot passes on after the claim window
+	g.handClaim("s-a", "Agent A", "call-a2")
+	assert.NotEmpty(t, g.h.Before(context.Background(), "s-b", "s-b", "call-b4", "go test ./..."))
+	g.h.After("s-a", "call-a2")
+	g.handClaim("s-b", "Agent B", "call-b5")
+	g.h.After("s-b", "call-b5")
+	g.add(3 * time.Minute)
+	assert.Empty(t, g.holders(), "an agent that never comes back does not hold the line")
+}
+
+func TestACommandThatBeginsWithItsOwnWaitingClaimIsNotRefusedBeforeTheClaimRuns(t *testing.T) {
+	g := newHookRig(t)
+	g.handClaim("s-a", "Agent A", "call-a") // A holds
+	ctx := context.Background()
+	for _, ok := range []string{
+		"coral-board resource claim mac-heavy --wait && go test ./...",
+		"coral-board resource claim mac-heavy --wait --timeout 20m && cd coral-go && go test -count=1 ./... 2>&1 | tail",
+		"cd x && coral-board resource claim mac-heavy --wait; go test ./...",
+	} {
+		assert.Equal(t, "", g.h.Before(ctx, "s-b", "s-b", "call-ok", ok), ok)
+	}
+	for _, held := range []string{
+		"coral-board resource claim mac-heavy && go test ./...",             // does not wait: the test would run without the slot
+		"coral-board resource claim mini --wait && go test ./...",           // another resource
+		`echo "coral-board resource claim mac-heavy --wait"; go test ./...`, // text, not a command
+		"go test ./... && coral-board resource claim mac-heavy --wait",      // the claim comes after the work
+	} {
+		assert.NotEmpty(t, g.h.Before(ctx, "s-b", "s-b", "call-held", held), held)
+	}
+}

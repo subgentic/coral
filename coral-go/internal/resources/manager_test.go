@@ -134,3 +134,34 @@ func TestTheReaperEndsLeasesAndDropsAgentsThatAreGone(t *testing.T) {
 		return len(st.Holders) == 0
 	}, 2*time.Second, 5*time.Millisecond, "a lease that ran out ends")
 }
+
+// #13833: two agents of two boards can share a name. A claim from one is never ranked by, nor shows, the other board's task: the task is read from the boards the claiming SESSION is on.
+func TestAClaimShowsOnlyATaskFromTheBoardTheClaimingSessionIsOn(t *testing.T) {
+	s, err := board.NewStoreWithKey(filepath.Join(t.TempDir(), "board.db"), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { s.Close() })
+	ctx := context.Background()
+	_, err = s.Subscribe(ctx, "go-team", "Frontend Dev", "Frontend Dev", "sess-go", nil, "")
+	require.NoError(t, err)
+	_, err = s.Subscribe(ctx, "hub-team", "Frontend Dev", "Frontend Dev", "sess-hub", nil, "")
+	require.NoError(t, err)
+	own, err := s.CreateTask(ctx, "go-team", "markdown editor", "", "medium", "Frontend Dev", "Frontend Dev")
+	require.NoError(t, err)
+	_, err = s.ClaimTask(ctx, "go-team", "Frontend Dev", own.ID)
+	require.NoError(t, err)
+	other, err := s.CreateTask(ctx, "hub-team", "the hub's own task", "", "critical", "Frontend Dev", "Frontend Dev")
+	require.NoError(t, err)
+	_, err = s.ClaimTask(ctx, "hub-team", "Frontend Dev", other.ID)
+	require.NoError(t, err)
+	pri := BoardPriorities{Store: s}
+
+	task, project, rank, err := pri.Of(WithSession(ctx, "sess-go"), "Frontend Dev")
+	require.NoError(t, err)
+	assert.Equal(t, [3]any{int(own.ID), "go-team", TaskRank("medium")}, [3]any{task, project, rank}, "the task of the board this session is on, though the other is more important")
+	task, project, _, err = pri.Of(WithSession(ctx, "sess-hub"), "Frontend Dev")
+	require.NoError(t, err)
+	assert.Equal(t, [2]any{int(other.ID), "hub-team"}, [2]any{task, project})
+	task, project, rank, err = pri.Of(WithSession(ctx, "sess-nowhere"), "Frontend Dev")
+	require.NoError(t, err)
+	assert.Equal(t, [3]any{0, "", 0}, [3]any{task, project, rank}, "a session on no board: no task shown, rather than a wrong one")
+}
