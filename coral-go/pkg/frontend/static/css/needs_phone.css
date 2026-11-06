@@ -8,10 +8,10 @@
 .inbox-review-wait { display: none; } /* the Waiting column says it; only a phone's item cell shows it */
 @media (max-width: 760px) {
     /* A phone's review and question rows (#13829, the Operator on #13795/#13818: too bunched): line one the agent's name, line two the ask with the time since at its right; the kind's words, the goal and the task are not drawn */
-    .inbox-needs-results .inbox-review-item.inbox-agent-first { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "from from" "name wait" "more more"; align-items: baseline; gap: 2px 8px; }
+    .inbox-needs-results .inbox-review-item.inbox-agent-first { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "from from" "name wait" "more more"; align-items: baseline; gap: 2px 8px; line-height: var(--lh-ui); } /* one line-height for every line (#13882): a button's own "normal" is the font's metric, so a row was a pixel taller or shorter by the font that drew it (Windows, with the web fonts not yet in) */
     .inbox-needs-results .inbox-review-item.inbox-agent-first > .inbox-review-from { grid-area: from; max-width: none; min-width: 0; }
     .inbox-needs-results .inbox-review-item.inbox-agent-first > .inbox-review-from::after { content: none; }
-    .inbox-needs-results .inbox-review-item.inbox-agent-first > .inbox-review-name { grid-area: name; min-width: 0; max-width: 100%; white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; text-align: start; }
+    .inbox-needs-results .inbox-review-item.inbox-agent-first > .inbox-review-name { grid-area: name; line-height: inherit; min-width: 0; max-width: 100%; white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; text-align: start; }
     .inbox-needs-results .inbox-kind-words { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); } /* "For review", "Needs your answer": in the page for a screen reader, not drawn (display: none would take the row's menu anchor with it) */
     .inbox-needs-results .inbox-ask-subject-links { display: none; } /* Goal and Task links are the computer's (#13818); not drawn, so no tap target is left behind */
     .inbox-needs-results .inbox-review-item.inbox-agent-first > .inbox-review-wait { display: block; grid-area: wait; white-space: nowrap; color: var(--text-muted); }
