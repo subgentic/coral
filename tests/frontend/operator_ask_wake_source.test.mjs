@@ -1,0 +1,13 @@
+// #13863: Wake must stay on the question's computer, including duplicate agent/session IDs.
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {installDom,importUi} from './helpers/jsdom_env.mjs';
+const dom=installDom({mode:'cloud'});const {state}=await importUi('state');const {wakeMember}=await importUi('operator_asks');
+let calls=[];const name='Planner',id='same-id',member={subscriber_id:name,session_name:'claude-'+id};
+const agent=(server,sleeping=true)=>({server,agent_type:'claude',session_id:id,sleeping});
+const mock=(source,refusal=false)=>{calls=[];globalThis.fetch=window.fetch=async(url,opts={})=>{calls.push({url:String(url),method:opts.method||'GET'});if(String(url)===source+'/api/board/team%20a/subscribers')return Response.json([member]);if(String(url)===source+'/api/sessions/live/'+id+'/wake')return refusal?Response.json({error:'This computer needs a configured CLI.'},{status:409}):Response.json({ok:true});return Response.json({error:'Wrong computer'},{status:403});};};
+test('remote question reads its own team and wakes its own sleeping member',async()=>{state.selectedTeam='@m2/other';state.liveSessions=[agent('local',false),agent('m2',false),agent('m1')];mock('/api/remote/m1');await wakeMember({server:'m1',board:'team a'},name);assert.deepEqual(calls,[{url:'/api/remote/m1/api/board/team%20a/subscribers',method:'GET'},{url:'/api/remote/m1/api/sessions/live/'+id+'/wake',method:'POST'}]);});
+test('explicit local question stays local with another computer selected',async()=>{state.selectedTeam='@m1/other';state.liveSessions=[agent('m1',false),agent('local')];mock('');await wakeMember({server:'local',board:'team a'},name);assert.equal(calls[1].url,'/api/sessions/live/'+id+'/wake');});
+test('legacy untagged question means local, independent of selected computer',async()=>{state.liveSessions=[agent(undefined)];mock('');await wakeMember({board:'team a'},name);assert.equal(calls[1].url,'/api/sessions/live/'+id+'/wake');});
+test('remote wake refusal keeps the source computer reason',async()=>{state.liveSessions=[agent('m1')];mock('/api/remote/m1',true);await assert.rejects(wakeMember({server:'m1',board:'team a'},name),/Could not wake Planner: This computer needs a configured CLI/);assert.equal(calls[1]?.url,'/api/remote/m1/api/sessions/live/'+id+'/wake');});
+test.after(()=>dom.window.close());

@@ -359,3 +359,5 @@ node artifact_edit_send_api.test.mjs
 node artifact_edit_send.test.mjs
 node artifact_edit_send_viewer.test.mjs
 node ask_subject_links.test.mjs
+
+node operator_ask_wake_source.test.mjs
