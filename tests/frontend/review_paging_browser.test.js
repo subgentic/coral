@@ -81,7 +81,7 @@ function installReviews() {
         await ev(`(async () => { window.__C = await import(${S} + 'review_counts.js'); await window.__C.refreshCounts(true); (await import(${S} + 'inbox_tab.js')).updateInboxTab(); return true; })()`);
         await waitFor(`/33 need your attention/.test(document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label') || '')`, 'badge uses 33 server attention items, not loaded unread rows');
         assert.equal(await ev(`window.__R.unreadReviewItems().length`), 4, 'loaded page attention includes the new unopened version and news, excludes quiet changes requests');
-        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => /^For review\\s*33$/.test(b.textContent.trim()))`, 'For review pill uses the same server total');
+        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => /^For review\\s*33 of 130$/.test(b.textContent.trim()))`, 'For review pill uses the same server total');
         await ev(`window.__hiddenReviewTab = true; Object.defineProperty(document, 'hidden', { configurable: true, get: () => window.__hiddenReviewTab }); document.dispatchEvent(new Event('visibilitychange')); true`);
         await waitFor(`/^\\(33\\) /.test(document.title)`, 'background title uses the server total');
         await ev(`window.__hiddenReviewTab = false; document.dispatchEvent(new Event('visibilitychange')); true`);
@@ -103,7 +103,7 @@ function installReviews() {
         assert.equal(await ev(`document.activeElement.id`), 'group-table-title', 'exhausting a keyboard paging button preserves a useful focus target');
         await ev(`(() => { const q = document.getElementById('inbox-search'); q.value = 'Entry 064'; q.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
         await waitFor(`window.__R.reviewQueryState()?.shown === 2`, 'off-page search is answered by the computers, not a loaded-page filter');
-        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.includes('For review') && b.textContent.trim().endsWith('1'))`, 'filtered pill uses filtered server attention');
+        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.trim() === 'For review 1 of 2')`, 'filtered pill uses filtered server attention');
         await ev(`(() => { const q = document.getElementById('inbox-search'); q.value = ''; q.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
         await waitFor(`document.querySelector('[data-review-more="local"][data-review-stream="review"]') && window.__R.reviewQueryState() === null`, 'clearing a query restores its retained unfiltered window and cursor');
         for (const [width, font, theme] of [[1280, 16, 'dark'], [390, 32, 'light']]) {
