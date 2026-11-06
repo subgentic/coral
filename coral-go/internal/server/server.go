@@ -341,6 +341,9 @@ func (s *Server) SetScheduler(sched *background.JobScheduler) {
 	if s.schedHandler != nil {
 		s.schedHandler.SetScheduler(sched)
 	}
+	if s.sessHandler != nil {
+		s.sessHandler.SetKnowledgeScheduler(sched)
+	}
 }
 
 // OpencodeManager is the manager of the opencode servers (the history indexer reads their sessions through it).

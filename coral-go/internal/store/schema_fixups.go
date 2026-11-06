@@ -76,6 +76,8 @@ var columnMigrations = []struct {
 	{"live_sessions", "mcp_servers", "TEXT"},
 	{"scheduled_jobs", "job_type", "TEXT DEFAULT 'prompt'"},
 	{"scheduled_jobs", "workflow_id", "INTEGER"},
+	// The team a "knowledge" job distills the knowledge of (#13928); empty for every other kind.
+	{"scheduled_jobs", "team_name", "TEXT DEFAULT ''"},
 	// Why the scheduler paused a job itself (failing repeatedly); cleared when it is resumed (#3171).
 	{"scheduled_jobs", "paused_reason", "TEXT DEFAULT ''"},
 	// When the job was last enabled again (0 -> 1): the auto-pause counts only runs after it (#3171).

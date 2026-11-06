@@ -168,7 +168,7 @@ func (a *AutoKnowledge) Run(ctx context.Context, teamName string) AutoResult {
 		return out, err
 	}
 	if _, err := distillAgentsWith(bundle, todo, callKeep, a.CoralDir, writeCandidateBundle, nil); err != nil {
-		return failedResult(lastCallErr)
+		return AutoFailureResult(lastCallErr)
 	}
 	tokens := chars / 4
 
@@ -221,7 +221,8 @@ func (a *AutoKnowledge) Run(ctx context.Context, teamName string) AutoResult {
 }
 
 // failedResult is a failed run's fixed words, by what the call runner said.
-func failedResult(err error) AutoResult {
+// AutoFailureResult is a failed run's fixed words, by what the call runner said.
+func AutoFailureResult(err error) AutoResult {
 	switch {
 	case errors.Is(err, ErrAutoNotSignedIn):
 		return AutoResult{State: "failed", Reason: "the agent CLI is signed out", Code: AutoCodeNotSignedIn}

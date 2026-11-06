@@ -26,6 +26,13 @@ type ScheduleHandler struct {
 	sched     *store.ScheduleStore
 	cfg       *config.Config
 	scheduler *background.JobScheduler // Run now; nil until the server hands it over
+	// knowledgeTeam says a team of this computer exists: a "knowledge" job (#13928) is made only for one.
+	knowledgeTeam func(ctx context.Context, name string) bool
+}
+
+// SetKnowledgeTeamCheck gives the handler the check that a team exists.
+func (h *ScheduleHandler) SetKnowledgeTeamCheck(f func(ctx context.Context, name string) bool) {
+	h.knowledgeTeam = f
 }
 
 // SetScheduler gives the handler the job scheduler Run now goes through.
@@ -127,9 +134,25 @@ func (h *ScheduleHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 		Flags           string `json:"flags"`
 		JobType         string `json:"job_type"`
 		WorkflowID      *int64 `json:"workflow_id"`
+		TeamName        string `json:"team_name"` // a "knowledge" job's team (#13928)
+		Model           string `json:"model"`     // refused for a knowledge job, which takes the team and nothing else
+		Command         string `json:"command"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
+		return
+	}
+	if body.JobType == "knowledge" {
+		if body.Prompt != "" || body.RepoPath != "" || body.BaseBranch != "" || body.Flags != "" || body.AgentType != "" || body.WorkflowID != nil || body.Model != "" || body.Command != "" ||
+			body.Name != "" || body.Description != "" || body.MaxDurationS != nil || body.CleanupWorktree != nil || body.NoWorktree != nil {
+			errBadRequest(w, "a knowledge job takes its team, and optionally when it runs and whether it is on: nothing else")
+			return
+		}
+		h.createKnowledgeJob(w, r, body.TeamName, body.CronExpr, body.Timezone, body.Enabled)
+		return
+	}
+	if body.TeamName != "" {
+		errBadRequest(w, "'team_name' is for a knowledge job only")
 		return
 	}
 
@@ -251,6 +274,15 @@ func (h *ScheduleHandler) UpdateJob(w http.ResponseWriter, r *http.Request) {
 	if fields["job_type"] == "check" {
 		errBadRequest(w, "use Chief checks to create a check")
 		return
+	}
+	if _, ok := fields["team_name"]; ok {
+		errBadRequest(w, "a job's team cannot be changed")
+		return
+	}
+	if existing, _ := h.sched.GetScheduledJob(r.Context(), jobID); existing != nil && existing.JobType == "knowledge" {
+		if !h.knowledgeJobEditOK(w, existing, fields) {
+			return
+		}
 	}
 	// Validate cron expression if provided (matches Python behavior)
 	if cronExpr, ok := fields["cron_expr"]; ok {
@@ -407,6 +439,10 @@ func (h *ScheduleHandler) ToggleJob(w http.ResponseWriter, r *http.Request) {
 	}
 	fields := map[string]interface{}{"enabled": newEnabled}
 	if newEnabled == 1 {
+		if job.JobType == "knowledge" && job.PausedReason != "" {
+			writePausedKnowledge(w)
+			return
+		}
 		fields["paused_reason"] = "" // resumed: the scheduler's pause reason no longer applies
 	}
 	updated, err := h.sched.UpdateScheduledJob(r.Context(), jobID, fields)
@@ -653,4 +689,67 @@ func (h *ScheduleHandler) isChiefJob(w http.ResponseWriter, r *http.Request) boo
 		return true
 	}
 	return false
+}
+
+// writePausedKnowledge answers an attempt to switch on a knowledge job the scheduler paused after repeated failures: only a good run resumes it, so the pause is never cleared by a switch (#13928).
+func writePausedKnowledge(w http.ResponseWriter) {
+	writeError(w, http.StatusConflict, "paused_needs_run", "this job was paused after repeated failures: run it now once, and a good run turns it back on")
+}
+
+// knowledgeJobEditOK checks an edit of a knowledge job: only when it runs and whether it is on may change (never its kind, its team or anything it would run), and it cannot be switched on while the
+// scheduler's pause holds. It answers the refusal itself.
+func (h *ScheduleHandler) knowledgeJobEditOK(w http.ResponseWriter, job *store.ScheduledJob, fields map[string]interface{}) bool {
+	for k := range fields {
+		switch k {
+		case "enabled", "cron_expr", "timezone":
+		default:
+			errBadRequest(w, "a knowledge job's team, kind and what it runs are fixed: only when it runs and whether it is on can change")
+			return false
+		}
+	}
+	if en, ok := fields["enabled"]; ok && (en == true || en == float64(1)) && job.PausedReason != "" {
+		writePausedKnowledge(w)
+		return false
+	}
+	return true
+}
+
+// createKnowledgeJob makes the one job of a team that distills its knowledge daily (#13928). The server builds the job itself: its kind, the team it loaded, a name, and the default schedule (a quiet
+// hour of this computer's day, a minute of its own per team) unless a valid one was given. Nothing else comes from the body.
+func (h *ScheduleHandler) createKnowledgeJob(w http.ResponseWriter, r *http.Request, team, cronExpr, tz string, enabled *int) {
+	if h.knowledgeTeam == nil || !h.knowledgeTeam(r.Context(), team) {
+		errNotFound(w, "no such team on this computer")
+		return
+	}
+	if jobs, err := h.sched.ListScheduledJobs(r.Context(), false); err == nil {
+		for _, j := range jobs {
+			if j.JobType == "knowledge" && j.TeamName == team {
+				writeError(w, http.StatusConflict, "knowledge_job_exists", "this team already has its knowledge job")
+				return
+			}
+		}
+	}
+	job := background.NewKnowledgeJob(team)
+	if cronExpr != "" {
+		parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+		if _, err := parser.Parse(cronExpr); err != nil {
+			errBadRequest(w, "Invalid cron expression: "+cronExpr)
+			return
+		}
+		job.CronExpr = cronExpr
+	}
+	if tz != "" {
+		if msg := jobTimezoneError(tz); msg != "" {
+			errBadRequest(w, msg)
+			return
+		}
+		job.Timezone = tz
+	}
+	job.Enabled = intPtrOr(enabled, 1)
+	created, err := h.sched.CreateScheduledJob(r.Context(), &job)
+	if err != nil {
+		errInternalServer(w, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, created)
 }

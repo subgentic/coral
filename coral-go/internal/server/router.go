@@ -306,6 +306,7 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 	}
 	sysHandler.SetSavedPresence(savedBoardHas, histHandler.SavedAgentPresence)
 	schedHandler := routes.NewScheduleHandler(s.db, s.cfg)
+	schedHandler.SetKnowledgeTeamCheck(sessHandler.TeamHasKnowledgeToDistill)
 	s.schedHandler = schedHandler
 	s.chiefChecks = routes.NewChiefChecksHandler(s.db, sessHandler)
 	workflowHandler := routes.NewWorkflowHandler(s.db, s.cfg)
