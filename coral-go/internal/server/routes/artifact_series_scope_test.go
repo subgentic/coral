@@ -3,7 +3,10 @@ package routes
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -18,7 +21,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/ptr"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // #13949: the remaining digest-only series lookups, each with two teams that hold the same bytes (twoTeamsSameBytes: alpha's series d[0], d[1], d[2]; beta's series d[0], betaTwo).
@@ -166,4 +171,162 @@ func withChiParam(req *http.Request, key, val string) *http.Request {
 	rc := chi.NewRouteContext()
 	rc.URLParams.Add(key, val)
 	return req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rc))
+}
+
+// QA's request on #13949: each leak pinned at the HANDLER, over HTTP, with two teams holding the same bytes. alpha's series is d[0], d[1], d[2]; beta holds the SAME bytes as d[0] as the SECOND version of a series of
+// its own (a beta v1 first), so the two teams give different answers about d[0] (version 1 of 3 on alpha, version 2 of 2 on beta). An agent of each team and a guide of each team's board ask the same route.
+type scopeRig struct {
+	*kindRig
+	srv        *httptest.Server
+	d          []string
+	betaSeries string
+}
+
+func newScopeRig(t *testing.T) *scopeRig {
+	t.Helper()
+	k := newKindRig(t)
+	_, d := threeVersions(t, k)
+	dir := k.coralDir
+	ctx := context.Background()
+	rec, ok := readUploadRecord(dir, "s1", d[0])
+	require.True(t, ok)
+	betaDir := uploadsDir(dir, "s3")
+	require.NoError(t, os.MkdirAll(betaDir, 0o700))
+	betaSeries := strings.Repeat("b", 32)
+	betaOne := strings.Repeat("c", 64)
+	one := rec
+	one.Board, one.SeriesID, one.Version, one.Previous, one.Digest = "beta", betaSeries, 1, "", "sha256:"+betaOne
+	two := rec
+	two.Board, two.SeriesID, two.Version, two.Previous = "beta", betaSeries, 2, betaOne
+	for _, r := range []struct {
+		digest string
+		rec    agentUploadRecord
+	}{{betaOne, one}, {d[0], two}} {
+		b, _ := json.Marshal(r.rec)
+		require.NoError(t, os.WriteFile(filepath.Join(betaDir, r.digest+".json"), b, 0o600))
+	}
+	require.NoError(t, writeSeriesIndex(dir, seriesIndex{ID: betaSeries, Board: "beta", CreatedAt: rec.CreatedAt, Versions: []seriesVersionRow{{Digest: betaOne, N: 1, Session: "s3", At: rec.CreatedAt}, {Digest: d[0], N: 2, Session: "s3", At: rec.CreatedAt}}}))
+	// the agents: alpha's is the uploader session s1, beta's is s3; each is placed on its team as a launch does
+	prev := artifactCircle
+	SetArtifactCircle(NewArtifactCircle(k.ss, k.h.bs))
+	t.Cleanup(func() { SetArtifactCircle(prev) })
+	require.NoError(t, k.ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: "s1", AgentName: "a1", AgentType: "claude", WorkingDir: t.TempDir(), BoardName: ptr.NonEmpty("alpha")}))
+	require.NoError(t, k.ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: "s3", AgentName: "a3", AgentType: "claude", WorkingDir: t.TempDir(), BoardName: ptr.NonEmpty("beta")}))
+	k.h.commentOwner = func(*http.Request) (string, string, string) { return "local", "install-owner-id", "" }
+	r := chi.NewRouter()
+	ident := testIdentity(k.h.db)
+	r.Use(func(next http.Handler) http.Handler {
+		withIdent := ident(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			if req.Header.Get(testDashboardHeader) != "" {
+				next.ServeHTTP(w, req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie)))
+				return
+			}
+			withIdent.ServeHTTP(w, req)
+		})
+	})
+	k.h.RegisterAgentArtifacts(r)
+	k.h.RegisterArtifactComments(r)
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+	return &scopeRig{kindRig: k, srv: srv, d: d, betaSeries: betaSeries}
+}
+
+func (g *scopeRig) get(path string, hdr map[string]string) (int, map[string]any, []any) {
+	g.t.Helper()
+	req, err := http.NewRequest(http.MethodGet, g.srv.URL+path, nil)
+	require.NoError(g.t, err)
+	for k, v := range hdr {
+		req.Header.Set(k, v)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(g.t, err)
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	var obj map[string]any
+	var arr []any
+	if json.Unmarshal(body, &obj) != nil {
+		_ = json.Unmarshal(body, &arr)
+	}
+	return resp.StatusCode, obj, arr
+}
+
+func scopeGuide(board string) map[string]string {
+	g := gaGuide(gaDana)
+	g[tunnel.HubGuideBoardHeader] = board
+	return g
+}
+
+func (g *scopeRig) alphaAgent() map[string]string { return map[string]string{testAgentHeader: "s1"} }
+func (g *scopeRig) betaAgent() map[string]string  { return map[string]string{testAgentHeader: "s3"} }
+
+func TestGETMetadataTellsEachTeamOnlyItsOwnSeriesOfTheSameBytes(t *testing.T) {
+	g := newScopeRig(t)
+	path := "/api/artifacts/" + g.d[0] + "/meta"
+	alphaSeries, _, _ := digestSeriesOnBoard(g.coralDir, g.d[0], "alpha")
+	for who, c := range map[string]struct {
+		hdr     map[string]string
+		series  string
+		version int
+		of      int
+	}{
+		"alpha's agent": {g.alphaAgent(), alphaSeries, 1, 3}, "beta's agent": {g.betaAgent(), g.betaSeries, 2, 2},
+		"a guide of alpha": {scopeGuide("alpha"), alphaSeries, 1, 3}, "a guide of beta": {scopeGuide("beta"), g.betaSeries, 2, 2},
+	} {
+		code, out, _ := g.get(path, c.hdr)
+		require.Equal(t, http.StatusOK, code, who+": "+fmt.Sprint(out))
+		assert.Equal(t, c.series, out["series_id"], who)
+		assert.EqualValues(t, c.version, out["version"], who)
+		assert.EqualValues(t, c.of, out["versions"], who+": the count is its own team's")
+	}
+}
+
+func TestGETVersionsOfADigestListsOnlyTheCallersOwnTeamsSeries(t *testing.T) {
+	g := newScopeRig(t)
+	path := "/api/artifacts/" + g.d[0] + "/versions"
+	digests := func(arr []any) []string {
+		var out []string
+		for _, a := range arr {
+			out = append(out, a.(map[string]any)["digest"].(string))
+		}
+		return out
+	}
+	code, _, arr := g.get(path, g.alphaAgent())
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, []string{g.d[0], g.d[1], g.d[2]}, digests(arr), "alpha's agent: alpha's three versions")
+	code, _, arr = g.get(path, g.betaAgent())
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, []string{g.d[0]}, digests(arr), "beta's agent: beta's series (its first version has no stored copy here), and none of alpha's other versions")
+	code, _, arr = g.get(path, scopeGuide("beta"))
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, []string{g.d[0]}, digests(arr), "a guide of beta the same")
+}
+
+func TestCommentsWithSeriesOneNameTheCallersOwnTeamsVersionOnly(t *testing.T) {
+	g := newScopeRig(t)
+	ctx := context.Background()
+	for _, board := range []string{"alpha", "beta"} {
+		_, err := g.ss.CreateArtifactComment(ctx, store.ArtifactComment{ArtifactID: g.d[0], Board: board, AnchorJSON: `{"quote":"x"}`, Body: "on the document, " + board, AuthorIssuer: "local", AuthorSubject: "install-owner-id", AuthorKind: commentCallerOwner})
+		require.NoError(t, err)
+	}
+	path := "/api/artifacts/" + g.d[0] + "/comments?series=1"
+	versions := func(hdr map[string]string) []any {
+		code, out, _ := g.get(path, hdr)
+		require.Equal(t, http.StatusOK, code, fmt.Sprint(out))
+		var vs []any
+		for _, c := range out["comments"].([]any) {
+			vs = append(vs, c.(map[string]any)["version"])
+		}
+		return vs
+	}
+	for who, c := range map[string]struct {
+		hdr  map[string]string
+		want int
+	}{"alpha's agent": {g.alphaAgent(), 1}, "beta's agent": {g.betaAgent(), 2}, "a guide of beta": {scopeGuide("beta"), 2}} {
+		got := versions(c.hdr)
+		require.NotEmpty(t, got, who)
+		for _, v := range got {
+			assert.EqualValues(t, c.want, v, who+": the version in its own team's series")
+		}
+	}
 }
