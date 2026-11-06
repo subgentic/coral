@@ -3,3 +3,15 @@
     .inbox-needs-results .inbox-review-item > .inbox-review-name:not(.inbox-ask-name) { margin: -12px 0; } /* the 44 px target stays, the line is the text's: only a name inside an item row, and not a question's (a plain span that may take two lines on a phone, #11894: the negative margin dragged its second line onto the line under it, #13144); a bare title span (a goal that looks done, #12029) is not hit, so it keeps its height */
     .inbox-needs-results [data-key=waiting] { align-self: flex-start; line-height: 20px; } /* on the name line: its 20 px, from the row's top padding */
 }
+
+/* A phone's review and question rows (#13795, matching coral-hub's phone frames; reverses #11857's 'sender and name on line one', which cut both at 390): the title is line one, whole (two lines at most), the sender's full name is line two with the wait at its right, and the kind's own words ('For review', 'Needs your answer') are left to the icon, which names the kind; a question the uploader put on the file still shows under the sender. */
+.inbox-review-wait { display: none; } /* the Waiting column says it; only a phone's item cell shows it */
+@media (max-width: 760px) {
+    .inbox-needs-results .inbox-review-item.inbox-title-first { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name name" "from wait" "more more"; align-items: baseline; gap: 2px 8px; }
+    .inbox-needs-results .inbox-review-item.inbox-title-first > .inbox-review-name { grid-area: name; min-width: 0; max-width: 100%; white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; text-align: start; }
+    .inbox-needs-results .inbox-review-item.inbox-title-first > .inbox-review-from { grid-area: from; max-width: none; min-width: 0; font-weight: var(--fw-regular); color: var(--text-secondary); }
+    .inbox-needs-results .inbox-review-item.inbox-title-first > .inbox-review-from::after { content: none; }
+    .inbox-needs-results .inbox-kind-words { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); } /* in the page for a screen reader, not drawn */
+    .inbox-needs-results .inbox-review-item.inbox-title-first > .inbox-review-wait { display: block; grid-area: wait; white-space: nowrap; color: var(--text-muted); }
+    .inbox-needs-results .inbox-review-item.inbox-title-first > :is(.inbox-review-earlier, .inbox-new-comments) { grid-column: 1 / -1; }
+}
