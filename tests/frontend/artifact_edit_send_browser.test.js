@@ -6,7 +6,7 @@ const { connect } = require('./agent_view_harness');
 const { launchStandIn } = require('./helpers/stand_in_agent');
 const { guardSettings } = require('./helpers/settings_guard');
 const { removeBoards } = require('./helpers/board_cleanup');
-const { coralReady } = require('./helpers/wait');
+const { coralReady, waitStable, framesJs } = require('./helpers/wait');
 const BASE = require('./test_base').BASE;
 const hexOf = data => String(data.digest || data.hex || data.id || '').replace(/^sha256:/,'');
 (async () => {
@@ -17,7 +17,22 @@ const hexOf = data => String(data.digest || data.hex || data.id || '').replace(/
     const person = (method,p,body) => ev(`fetch(${JSON.stringify(p)},{method:${JSON.stringify(method)},headers:{'Content-Type':'application/json'},body:${body===undefined?'undefined':JSON.stringify(JSON.stringify(body))}}).then(async r=>({status:r.status,data:await r.json().catch(()=>({}))}))`);
     const upload = async (name, text, previous) => { const r=await fetch(BASE+`/api/agent/artifacts?session_id=${author.sid}`,{method:'POST',headers:{'X-Coral-Session-Token':author.token,'Content-Type':'application/octet-stream','X-Artifact-Name':name,'X-Artifact-Media-Type':'text/markdown',...(previous?{'X-Artifact-New-Version-Of':previous}:{})},body:Buffer.from(text)});const data=await r.json();assert.equal(r.status,201,JSON.stringify(data));return hexOf(data); };
     const bytes = hex => ev(`fetch('/api/artifacts/${hex}?v=2').then(r=>r.arrayBuffer()).then(b=>Array.from(new Uint8Array(b)))`);
-    const nativeClick = async selector => { await waitFor(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});const p=e&&e.closest('.ac-panel');return !p||getComputedStyle(p).transform==='none';})()`,'the comments sheet has slid in under '+selector,3000);const r=await ev(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e)throw Error('Missing '+${JSON.stringify(selector)});e.scrollIntoView({block:'nearest',inline:'nearest'});const r=e.getBoundingClientRect();const x=r.x+r.width/2,y=r.y+r.height/2;if(!e.contains(document.elementFromPoint(x,y)))throw Error('Covered '+${JSON.stringify(selector)}+' by '+document.elementFromPoint(x,y)?.outerHTML);return{x,y};})()`);await client.Input.dispatchMouseEvent({type:'mousePressed',...r,button:'left',clickCount:1});await client.Input.dispatchMouseEvent({type:'mouseReleased',...r,button:'left',clickCount:1}); };
+    const nativeClick = async selector => {
+        await waitFor(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});const p=e&&e.closest('.ac-panel');return !p||getComputedStyle(p).transform==='none';})()`,'the comments sheet has slid in under '+selector,3000);
+        // An already hittable item must not be scrolled: at phone200% that can
+        // move the dialog horizontally and dismiss its menu before mouse-up.
+        await ev(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e)throw Error('Missing '+${JSON.stringify(selector)});const r=e.getBoundingClientRect();if(!e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)))e.scrollIntoView({block:'nearest',inline:'nearest'});})()`);
+        await waitStable(ev,`(()=>{const e=document.querySelector(${JSON.stringify(selector)}),r=e.getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height,disabled:!!e.disabled};})()`,'stable enabled '+selector,40,{timeout:5000,accept:r=>!r.disabled&&r.w>0&&r.h>0});
+        const r=await ev(`(()=>{const e=document.querySelector(${JSON.stringify(selector)}),r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2;if(!e.contains(document.elementFromPoint(x,y)))throw Error('Covered '+${JSON.stringify(selector)}+' by '+document.elementFromPoint(x,y)?.outerHTML);return{x,y};})()`);
+        await client.Input.dispatchMouseEvent({type:'mousePressed',...r,button:'left',clickCount:1});
+        if(selector==='.artifact-viewer-edit-item') {
+            // Hold one native press across two frames so a delayed scroll cannot
+            // close the menu unnoticed between its mouse-down and mouse-up.
+            await ev(framesJs(2));
+            assert.equal(await ev(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});return !!e&&e.contains(document.elementFromPoint(${r.x},${r.y}));})()`),true,'Edit stays under the pointer until release');
+        }
+        await client.Input.dispatchMouseEvent({type:'mouseReleased',...r,button:'left',clickCount:1});
+    };
     const edit = async () => { if(await ev(`document.querySelector('.artifact-viewer-edit').getClientRects().length > 0`)) await nativeClick('.artifact-viewer-edit'); else { await nativeClick('.artifact-viewer-more'); await waitFor(`!document.querySelector('.artifact-viewer-menu').hidden`,'phone More actions',5000); await nativeClick('.artifact-viewer-edit-item'); } };
     const type = async (oldText,newText) => { await ev(`(()=>{const e=[...document.querySelectorAll('.amd-text')].find(e=>e.textContent===${JSON.stringify(oldText)});if(!e)throw Error('No editable words');e.focus();const r=document.createRange();r.selectNodeContents(e);const s=getSelection();s.removeAllRanges();s.addRange(r);})()`);await client.Input.insertText({text:newText}); };
     const shot = async name => { const dir=process.env.CORAL_SCREENSHOT_DIR;if(!dir)return;fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,name+'.png'),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64')); };
@@ -35,7 +50,7 @@ const hexOf = data => String(data.digest || data.hex || data.id || '').replace(/
         for(const [w,theme,font] of [[1280,'dark',16],[390,'light',16],[390,'dark',32],[1280,'light',32]]) {
             await Emulation.setDeviceMetricsOverride({width:w,height:900,deviceScaleFactor:1,mobile:w===390});
             await ev(`document.documentElement.dataset.theme='${theme}';document.documentElement.style.fontSize='${font}px';true`);
-            const name=`edit-send-${w}-${font}.md`,source=`# Delivery report ${w}/${font}\n\nA **careful sentence** remains.\n\nUnchanged words.${w===1280&&font===32?' x'.repeat(1000):''}\n`;
+            const name=`edit-send-${w}-${font}.md`,source=`# Delivery report ${w}/${font}\n\nA **careful sentence** remains.\n\nUnchanged words. Run ${B}.${w===1280&&font===32?' x'.repeat(1000):''}\n`;
             const original=await upload(name,source);await open(original,name);
             await waitFor(`!document.querySelector('.artifact-viewer-edit').hidden`,'owner Edit',10000);
             await shot(`edit-send-before-${w}-${font}`);
