@@ -449,4 +449,12 @@ func TestAChainJoinOntoAFileThatIsNoLongerTheNewestIsRefusedBeforeAnythingIsWrit
 	require.Len(t, ms, 4)
 	assert.Equal(t, v4, ms[3].Digest, "the Operator's version is still the newest")
 	_ = v2
+
+	// the same bytes as the newest (QA's SHOULD): there is nothing to add, which is not a stale base; the answer is the newest version, as for any upload of the newest bytes
+	code, out = k.upTask("s1", root.ID, save, "")
+	assert.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Equal(t, true, out["same"])
+	assert.EqualValues(t, 4, out["version"])
+	assert.Equal(t, "coral://artifacts/"+v4, out["uri"])
+	assert.Len(t, seriesMembers(k.coralDir, sid), 4, "nothing was added")
 }
