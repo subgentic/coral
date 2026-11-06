@@ -36,7 +36,7 @@ import { _handleTeamFolderImport, _importTeamFromFolder } from './team_folder_im
 import { closeSidebarKebabs, closeTopBarSettings, toggleSidebarKebab, toggleTopBarSettings } from './sidebar_menus.js';
 import { loadHistoryPage } from './history_filters.js';
 import { switchNavTab } from './app_navigation.js';
-import { selectWorkflow, selectWorkflowRun, showWorkflowCreateModal, hideWorkflowCreateModal, launchWorkflowAgent, showCostDashboard, _refreshCostDashboard, _costTimeRangeChanged, openTeamPage, exitTeamPage, showTeamWorkingModeWorkspace, showTeamLinkDialog, showDocsTab, selectDoc, showThemeConfigurator, hideThemeConfigurator, showLaunchModal, hideLaunchModal, launchSession, hideInfoModal, copyInfoCommand, showSettingsModal, hideSettingsModal, applySettings, toggleFlag, showAddAgentToBoard, launchTerminalToBoard, launchDefaultAgent, showAddStandaloneAgent, launchStandaloneTerminal, exportPersonas, importPersonas, importTeamTemplates, exportTeamTemplate, showResumeModal, hideResumeModal, resumeLaunchNew, syncResumeModeNote, showDefaultPromptsModal, hideDefaultPromptsModal, resetDefaultPrompt, saveDefaultPrompts } from './app_panels.js';
+import { selectWorkflow, selectWorkflowRun, showWorkflowCreateModal, hideWorkflowCreateModal, launchWorkflowAgent, showCostDashboard, _refreshCostDashboard, _costTimeRangeChanged, openTeamPage, exitTeamPage, showTeamWorkingModeWorkspace, showTeamLinkDialog, showDocsTab, selectDoc, showThemeConfigurator, hideThemeConfigurator, showLaunchModal, hideLaunchModal, launchSession, showSettingsModal, hideSettingsModal, applySettings, toggleFlag, showAddAgentToBoard, launchTerminalToBoard, launchDefaultAgent, showAddStandaloneAgent, launchStandaloneTerminal, exportPersonas, importPersonas, importTeamTemplates, exportTeamTemplate, showResumeModal, hideResumeModal, resumeLaunchNew, syncResumeModeNote, showDefaultPromptsModal, hideDefaultPromptsModal, resetDefaultPrompt, saveDefaultPrompts } from './app_panels.js';
 import { MENU_KEYS, menuMove } from './menu_keys.js';
 
 // The New job form (job_form.js, about 28 KB) loads when a person first opens it, not at start (#10218): these are the same calls, answered once the file is in.
@@ -102,13 +102,12 @@ registerActions({
     'm-browser-use': el => { window.browserUse(); },
     'm-confirm-restart': el => { window.confirmRestart(); },
     'm-confirm-save-template': el => { window._confirmSaveTemplate(); },
-    'm-copy-info-command': el => { window.copyInfoCommand(); },
+    'm-copy-info-command': () => { importOnce('./info_tab.js').then(m => m.copyInfoCommand()); },
     'm-export-personas': el => { window.exportPersonas(); },
     'm-generate-team-from-wizard': el => { window.generateTeamFromWizard(); },
     'm-handle-team-folder-import': el => { _handleTeamFolderImport(el); },
     'm-hide-confirm-modal': el => { window.hideConfirmModal(); },
     'm-hide-default-prompts-modal': el => { window.hideDefaultPromptsModal(); },
-    'm-hide-info-modal': el => { window.hideInfoModal(); },
     'm-hide-launch-modal': el => { window.hideLaunchModal(); },
     'm-hide-launch-modal-then-show-job-modal': el => { window.hideLaunchModal(); window.showJobModal(); },
     'm-hide-mobile-connect-modal': el => { window._hideMobileConnectModal(); },
@@ -210,7 +209,7 @@ registerActions({
     'toggle-group-by-server': () => window.toggleGroupByServer(),
 });
 
-const AGENTIC_TABS = new Set(['board', 'files', 'browse', 'artifacts', 'tasks', 'notes', 'activity', 'agent-ui', 'saved']);
+const AGENTIC_TABS = new Set(['board', 'files', 'browse', 'artifacts', 'tasks', 'notes', 'activity', 'info', 'agent-ui', 'saved']);
 
 registerActions({
     'mobile-back': () => window.mobileBack(),
@@ -305,7 +304,6 @@ Object.assign(window, {
     showSettingsModal, hideSettingsModal, applySettings,
     showDefaultPromptsModal, hideDefaultPromptsModal, resetDefaultPrompt, saveDefaultPrompts,
     showLaunchModal, hideLaunchModal, launchSession, toggleFlag,
-    hideInfoModal, copyInfoCommand,
     hideResumeModal, resumeLaunchNew, syncResumeModeNote,
     showAddAgentToBoard, launchTerminalToBoard,
     launchDefaultAgent, showAddStandaloneAgent, launchStandaloneTerminal,

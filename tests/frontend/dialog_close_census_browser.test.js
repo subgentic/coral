@@ -10,7 +10,6 @@ const { coralReady } = require('./helpers/wait');
 const MODAL = id => ({ root: `#${id}`, isOpen: `(() => { const m = document.getElementById('${id}'); return !!m && getComputedStyle(m).display !== 'none'; })()` });
 const DIALOGS = {
     'launch-modal': { ...MODAL('launch-modal'), open: `window.showLaunchModal()` },
-    'info-modal': { ...MODAL('info-modal'), open: `__M('modals.js').then(async () => { (await __M('state.js')).state.currentSession = { type: 'live', name: 'a', session_id: 'a', agent_type: 'claude' }; return (await __M('info_dialog.js')).showInfoModal(); })` },
     'resume-modal': { ...MODAL('resume-modal'), open: `(async () => { (await __M('state.js')).state.currentSession = { type: 'history', name: 'a', session_id: 'a', agent_type: 'claude' }; return (await __M('resume_dialog.js')).showResumeModal(); })()` },
     'settings-modal': { ...MODAL('settings-modal'), open: `window.showSettingsModal()` },
     'macro-modal': { ...MODAL('macro-modal'), open: `__M('controls.js').then(m => m.showMacroModal())` },

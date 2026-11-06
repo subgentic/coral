@@ -340,7 +340,7 @@
  "dashboard_tracking_route_browser.test.js": 0.6,
  "hub_cross_team_owner_browser.test.js": 0.6,
  "idle_dom_writes_browser.test.js": 0.6,
- "info_dialog_browser.test.js": 0.6,
+ "info_tab_browser.test.js": 6,
  "launch_inline_errors_browser.test.js": 0.6,
  "live_chat_trim_browser.test.js": 0.6,
  "privacy_verification_e2e.test.js": 0.6,

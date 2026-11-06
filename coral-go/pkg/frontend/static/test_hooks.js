@@ -44,7 +44,7 @@ const { triggerWorkflow, showWorkflowCreateModal, editWorkflow, saveWorkflow, wo
     lazyFns(loadWorkflows, ['triggerWorkflow', 'showWorkflowCreateModal', 'editWorkflow', 'saveWorkflow', 'workflowsBackToList']);
 const { showTemplateBrowser } = lazyFns(loadTemplateBrowser, ['showTemplateBrowser']);
 const { searchChats } = lazyFns(loadChatSearch, ['searchChats']);
-const { showInfoModal, exportTeamTemplates } = lazyFns(loadModals, ['showInfoModal', 'exportTeamTemplates']);
+const { exportTeamTemplates } = lazyFns(loadModals, ['exportTeamTemplates']);
 const { showResumeModal } = lazyFns(loadResumeDialog, ['showResumeModal']);
 
 // What the suites called as window functions.
@@ -61,7 +61,7 @@ const windowHooks = {
     ...Object.fromEntries(['cancelSelectMode', 'deleteMessageBoardProject', 'showExportBoardModal', 'showMessageBoardProjects', 'postBoardMessage', 'toggleSelectMode'].map(n => [n, (...args) => importOnce('./message_board.js').then(m => m[n](...args))])),
     hideFolderTagDropdown, buildSessionTooltip, showTeamAvailability, showTeamWorkingMode,
     triggerWorkflow, showWorkflowCreateModal, editWorkflow, saveWorkflow, workflowsBackToList,
-    showTemplateBrowser, searchChats, showInfoModal, exportTeamTemplates, showResumeModal,
+    showTemplateBrowser, searchChats, exportTeamTemplates, showResumeModal,
 };
 
 // What the suites read or reset inside the page's modules.

@@ -35,8 +35,8 @@ function fillRow(row, nodes) {
     setHidden(label, false); setHidden(val, false);
 }
 
-/** Reads what the agent loaded (loaded-skills) and its instruction and memory files (memory) and fills `rows` ({skills: [labelId, valueId], memory: [...]}); a row whose answer is missing stays as it is (hidden). `current()` says whether this look is still the newest: every await is followed by it, so an answer for an earlier look (another agent, another computer, a closed dialog) writes nothing. `server` and `sid` were captured by the caller before its first await. A click on a file marks it (aria-pressed), shows "Loading..." and owns the text block: the newest click wins whatever order the answers arrive in, and the block names the file it shows (data-file). */
-export async function loadAgentSections({ name, sid, server, current, fetchJson, rows }) {
+/** (#13917: the Info tab uses these rows; `textId` names the block a file opens in.) Reads what the agent loaded (loaded-skills) and its instruction and memory files (memory) and fills `rows` ({skills: [labelId, valueId], memory: [...]}); a row whose answer is missing stays as it is (hidden). `current()` says whether this look is still the newest: every await is followed by it, so an answer for an earlier look (another agent, another computer, a closed dialog) writes nothing. `server` and `sid` were captured by the caller before its first await. A click on a file marks it (aria-pressed), shows "Loading..." and owns the text block: the newest click wins whatever order the answers arrive in, and the block names the file it shows (data-file). */
+export async function loadAgentSections({ name, sid, server, current, fetchJson, rows, textId = 'info-memory-text' }) {
     const q = `session_id=${encodeURIComponent(sid)}`, base = `/api/sessions/live/${encodeURIComponent(name)}`;
     const [skills, memory] = await Promise.all([fetchJson(server, `${base}/loaded-skills?${q}`), fetchJson(server, `${base}/memory?${q}`)]);
     if (!current()) return;
@@ -45,7 +45,7 @@ export async function loadAgentSections({ name, sid, server, current, fetchJson,
     const items = memoryItems(memory);
     if (!items.length) return;
     const buttons = [];
-    const pre = Object.assign(document.createElement('pre'), { id: 'info-memory-text', className: 'info-memory-text', hidden: true });
+    const pre = Object.assign(document.createElement('pre'), { id: textId, className: 'info-memory-text', hidden: true });
     const nodes = items.map(it => {
         if (!it.id) return Object.assign(document.createElement('div'), { textContent: it.label });
         const b = Object.assign(document.createElement('button'), { type: 'button', className: 'info-memory-open', textContent: it.label });

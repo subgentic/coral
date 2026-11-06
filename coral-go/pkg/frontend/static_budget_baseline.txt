@@ -1,6 +1,6 @@
 975731 vendor/codemirror/codemirror-bundle.js
 289714 vendor/xterm/xterm.min.js
-143094 css/components.css
+143694 css/components.css
 121727 vendor/hljs/highlight.min.js
 94607 vendor/xterm/addon-canvas.min.js
 76847 inbox_sidebar.js
@@ -21,7 +21,7 @@
 28237 team_artifacts_page.js
 27617 team_dialogs.js
 27272 vendor/fonts/jakarta-latin.woff2
-25091 app_actions.js
+25638 app_actions.js
 24634 agent_config_form.js
 23613 controls.js
 22926 changed_files.js
@@ -110,7 +110,7 @@
 10925 waiting.js
 10847 analytics_efficiency.js
 10775 css/workflows.css
-10700 routes.js
+10899 routes.js
 10659 launch_provider_cards.js
 10638 css/cloud.css
 10512 css/variables.css
@@ -221,7 +221,7 @@
 5437 operator_share.js
 5427 board_export_render.js
 5405 goal_words.js
-5393 agent_actions.js
+6780 agent_actions.js
 5378 media_panes.js
 5369 notes.js
 5328 team_form.js
@@ -246,7 +246,7 @@
 4716 inbox_agent_card.js
 4689 inbox_tab.js
 4688 agent_docs/saved-messages.md.gz
-4657 dock_tabs.js
+4665 dock_tabs.js
 4629 app_wiring.js
 4615 artifact_tags.js
 4561 agent_docs/jobs.md.gz
@@ -266,9 +266,9 @@
 4336 machine_health.js
 4328 goal_artifacts.js
 4311 image_markup.js
-4277 test_hooks.js
+4227 test_hooks.js
 4246 app.js
-4219 agentic_state.js
+4304 agentic_state.js
 4214 agent_docs/hooks.md.gz
 4209 chat_thumbs.js
 4176 view_sandbox.js
@@ -295,7 +295,7 @@
 3735 artifact_comments_api.js
 3727 custom_model_add.js
 3696 tags.js
-3690 info_dialog.js
+3687 info_tab.js
 3661 agent_list_bar.js
 3655 automation_runs.js
 3642 api.js
@@ -309,7 +309,7 @@
 3580 css/settings.css
 3547 event_row.js
 3483 agent_docs/README.md.gz
-3453 modal_chrome.js
+3402 modal_chrome.js
 3441 agent_docs/scheduled-jobs.md.gz
 3434 task_goals.js
 3429 icon-192-maskable.png
@@ -372,7 +372,7 @@
 2742 board_artifacts.js
 2728 signin_line.js
 2728 team_remind_dialog.js
-2718 modals.js
+2624 modals.js
 2710 settings_saved_words.js
 2695 artifact_refs.js
 2685 update_banner.js
@@ -416,7 +416,7 @@
 2307 history_pages.js
 2305 artifact_comment_composer.js
 2300 dialog_focus.js
-2284 app_panels.js
+2220 app_panels.js
 2277 actions.js
 2277 launch_models.js
 2265 initial_load.js

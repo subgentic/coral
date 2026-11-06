@@ -12,7 +12,7 @@ const CDP = require('chrome-remote-interface');
 const BASE = require('./test_base').BASE;
 const { TOUCH_AFTER } = require('./helpers/phone_scan');
 
-const LAZY = ['settings-modal', 'launch-modal', 'job-modal', 'create-task-modal', 'info-modal', 'default-prompts-modal', 'custom-view-modal', 'top-bar-settings-menu'];
+const LAZY = ['settings-modal', 'launch-modal', 'job-modal', 'create-task-modal', 'default-prompts-modal', 'custom-view-modal', 'top-bar-settings-menu'];
 
 // Controls in `root` that are shown and smaller than 44px either way (a checkbox or radio counts through its label), as
 // touch_targets_browser measures the page.
@@ -89,7 +89,6 @@ const undersized = sel => `(() => {
                 ['launch-modal', `window.showLaunchModal()`],
                 ['job-modal', `window.showJobModal()`],
                 ['create-task-modal', `window.showCreateTaskModal()`],
-                ['info-modal', `(async () => { const st = (await import(${S} + 'state.js')).state; st.currentSession = { type: 'live', name: 'qa-info', agent_type: 'claude', session_id: 'qa-info-id' }; return window.showInfoModal(); })()`],
                 ['default-prompts-modal', `window.showDefaultPromptsModal()`],
                 ['custom-view-modal', `(async () => { await (await import(${S} + 'custom_views.js')).loadCustomViews();
                     const w = document.createElement('div'); const b = document.createElement('button'); b.dataset.onClick = 'custom-view-edit'; b.dataset.viewId = ${JSON.stringify(String(viewId))};
