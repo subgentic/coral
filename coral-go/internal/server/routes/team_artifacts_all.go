@@ -153,7 +153,7 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 	}
 	// The files of agents that belong to no team (their own Artifacts tab lists them, GET /api/session-artifacts) are one more "team" of this list, so the Inbox does not say 0 artifacts for a pasted
 	// screenshot that the agent's tab shows (#10312). Each file is listed once: one a team's list already holds is not repeated.
-	if len(teams) == 0 || wanted[noTeamLabel] || wanted["No team"] {
+	if len(teams) == 0 || wanted[noTeamLabel] || wanted["No team"] || wanted[noTeamBoardID] { // the no-team files are asked for by their label or by the key they are kept under (#13910: a client that walks by board id)
 		if rows := h.standaloneUploadItems(r, items, projects); len(rows) > 0 {
 			for i := range rows {
 				rows[i].Team, rows[i].BoardID = noTeamLabel, noTeamBoardID // the board key a file for review is kept under (#13527): the Inbox reads the row as a review of that key
@@ -171,6 +171,7 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 	}
 	h.addWaitsOnThis(r, "", sel.page) // each row names its own board
 	h.attachSeriesVersions(sel.page, "")
+	h.attachOpenedVersions(r, sel.page)
 	if refs == nil {
 		refs = []teamArtifactTeamRef{}
 	}

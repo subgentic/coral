@@ -96,8 +96,9 @@ func (h *SessionsHandler) RegisterAgentArtifacts(r chi.Router) {
 	r.Delete("/api/artifacts/{id}/keep", h.keepArtifactRoute)    // #3554
 	r.Get("/api/artifacts/{id}/private", h.artifactPrivateRoute) // #11457: the manager's private mark: a guide never reads a private artifact
 	r.Put("/api/artifacts/{id}/private", h.artifactPrivateRoute)
-	r.Put("/api/artifacts/{id}/star", h.starArtifactRoute)    // #9819
-	r.Delete("/api/artifacts/{id}/star", h.starArtifactRoute) // #9819
+	r.Put("/api/artifacts/{id}/star", h.starArtifactRoute)      // #9819
+	r.Delete("/api/artifacts/{id}/star", h.starArtifactRoute)   // #9819
+	r.Post("/api/artifacts/{id}/opened", h.openedArtifactRoute) // #13910: the Operator opened this version
 	r.Get("/api/system/artifact-store", h.getArtifactStore)
 }
 

@@ -252,6 +252,32 @@ func (s *Store) StarredArtifactTimes(ctx context.Context) (map[string]string, er
 	return out, nil
 }
 
+// OpenedVersions is the newest version of each series the person has opened (#13910), keyed "board_id|series_id", for the given series. Empty when the sessions database is not attached or none was opened.
+func (s *Store) OpenedVersions(ctx context.Context, person string, seriesIDs []string) (map[string]int, error) {
+	out := map[string]int{}
+	if s.sessionsDB == nil || len(seriesIDs) == 0 {
+		return out, nil
+	}
+	marks := make([]string, len(seriesIDs))
+	args := []any{person}
+	for i, id := range seriesIDs {
+		marks[i] = "?"
+		args = append(args, id)
+	}
+	var rows []struct {
+		Board   string `db:"board_id"`
+		Series  string `db:"series_id"`
+		Version int    `db:"version"`
+	}
+	if err := s.sessionsDB.SelectContext(ctx, &rows, "SELECT board_id, series_id, version FROM artifact_series_opened WHERE person = ? AND series_id IN ("+strings.Join(marks, ",")+")", args...); err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		out[r.Board+"|"+r.Series] = r.Version
+	}
+	return out, nil
+}
+
 // StarredArtifactIDs is the set of artifact ids (64 hex) the Operator starred (the artifact_stars table of the main sessions database, #9819). Empty when that database is not attached.
 func (s *Store) StarredArtifactIDs(ctx context.Context) (map[string]bool, error) {
 	starred := map[string]bool{}

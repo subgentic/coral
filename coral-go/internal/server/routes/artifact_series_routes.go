@@ -166,6 +166,9 @@ func (h *SessionsHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
 	if p := seriesPath(coralDir, id); p != "" {
 		_ = os.Remove(p)
 	}
+	if h.db != nil {
+		_, _ = h.db.ExecContext(r.Context(), "DELETE FROM artifact_series_opened WHERE series_id = ?", id) // the opened-version rows follow their series (#13910)
+	}
 	slog.Info("[artifacts] a series deleted by the Operator", "series", id, "versions", len(members), "bytes", freed)
 	writeJSON(w, http.StatusOK, map[string]any{"deleted": true, "versions": len(members), "bytes": freed})
 }
