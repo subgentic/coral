@@ -22,6 +22,7 @@ for(const [width,theme] of [[1280,'light'],[390,'light'],[1280,'dark'],[390,'dar
  assert.ok(targets.every(t=>t.width>=44&&t.height>=44&&t.pointer!=='none'),JSON.stringify(targets));
  const overlap=await ev(`(()=>{const intersect=(a,b)=>a.left<b.right-1&&a.right>b.left+1&&a.top<b.bottom-1&&a.bottom>b.top+1;return [...document.querySelectorAll('.inbox-review-star')].flatMap(b=>{const row=b.closest('tr'),icon=row.querySelector('.inbox-kind-icon'),text=row.querySelector('.inbox-review-name'),wait=row.querySelector('.inbox-review-wait');return [icon&&text&&intersect(icon.getBoundingClientRect(),text.getBoundingClientRect()),wait&&getComputedStyle(wait).display!=='none'&&intersect(b.getBoundingClientRect(),wait.getBoundingClientRect())].filter(Boolean);});})()`);
  assert.deepEqual(overlap,[],'icon, star and visible waiting text do not overlap at '+width+' '+theme);
+ if(width===390)assert.ok(await ev(`[...document.querySelectorAll('.inbox-pinned-context')].every(e=>getComputedStyle(e).display==='none')&&[...document.querySelectorAll('.inbox-pinned-inline-context')].every(e=>getComputedStyle(e).display==='inline'&&!e.textContent.includes('Goal #'))`),'phone pin context stays inline with no extra Goal metadata line');
  assert.equal(await ev(`document.querySelectorAll('#artifact-viewer:not([hidden])').length`),0);
  await ev(`document.querySelector('.inbox-review-star[aria-pressed="false"]').click();true`);
  await waitFor(`window.__groupCalls.length===1`,'one star write');
