@@ -98,7 +98,7 @@ const { coralReady } = require('./helpers/wait');
                 assert.equal(await ev(`window.__tagWrites.length`),writes3,'an artifact that is not for review is never tagged');
                 await ev(`document.querySelector('.artifact-viewer-close')?.click();true`);
                 assert.ok(writes3 === before3 + 1, 'one write for the open, however many places render the artifact: ' + (writes3 - before3));
-                await ev(`window.__reviewItems[2].tags=['for review'];true`);
+                // Keep file 3's acknowledged read and team tags on the fixture server.
                 // mark unread: it counts again
                 await click('Read me 1.txt','Mark unread');
                 await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent==='2'`,'the badge counts it again (the viewer-opened item stays read)');
