@@ -68,6 +68,21 @@ assert.deepEqual(await M.currentTags(offPage), ['for review']);
 ignoreDigest = true;
 await assert.rejects(M.reviewOfTeam('@box-b/alpha', rows[64].id), /scoped review file/, 'a server ignoring digest never turns into a false missing-file result');
 await assert.rejects(M.reviewOfTeam('alpha', 'invalid'), /valid digest/);
+const originalFetch = globalThis.fetch;
+let releaseViewer;
+globalThis.fetch = async (...args) => {
+    const response = await originalFetch(...args);
+    await new Promise(resolve => { releaseViewer = resolve; });
+    return response;
+};
+ignoreDigest = false;
+const viewerState = M.reviewOfTeam('@box-b/alpha', rows[64].id, { anyState: true });
+while (!releaseViewer) await new Promise(resolve => setImmediate(resolve));
+M.reviewsChangedOnServer(); // the viewer's mark-read write can finish before its state read
+releaseViewer();
+assert.equal((await viewerState).team, '@box-b/alpha', 'viewer state survives a concurrent tag revision and retains its captured source');
+globalThis.fetch = originalFetch;
+
 console.log('review_loading: bounded protected reads, metadata, source-qualified rows and explicit retryable paging pass');
 
 ignoreDigest = false;

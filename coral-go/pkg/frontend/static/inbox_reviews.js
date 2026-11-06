@@ -256,7 +256,7 @@ export async function reviewOfTeam(team, digest, { anyState = false } = {}) {
     const source = splitKey(team);
     const params = new URLSearchParams({ team: source.name, digest: hex, ...(!anyState ? { tag: 'for review' } : {}) });
     const query = params.toString();
-    const data = await readComputerPage(source.server, { query, cursor: '', limit: 50 });
+    const data = await readComputerPage(source.server, { query, cursor: '', limit: 50, revisionBound: !anyState }); // viewer state can overlap its own mark-read write
     if (data.ownerOnly) throw new Error('Review files are available only to this computer’s owner.');
     if (data.has_more || data.artifacts.some(a => a.team !== team || a.hex !== hex)) throw new Error('The computer did not return a scoped review file.');
     return data.artifacts.find(a => a.available && !a.tags?.includes('ignored') && !a.tags?.includes('superseded')) || null;
