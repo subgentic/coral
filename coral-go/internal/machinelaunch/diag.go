@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
+
+	"github.com/subgentic/coral/internal/safego"
 )
 
 // #13876: when the machine's setup does not make the credential folder, the launcher says WHY before it cleans up, because the machine (and its log) is deleted with the launch. The launch key logs in as the unprivileged
@@ -86,6 +88,7 @@ func whyNotReady(ctx context.Context, client *ssh.Client, keys *BootKeys) string
 	out := &capBuffer{max: whyReadMax}
 	done := make(chan struct{})
 	go func() {
+		defer safego.Recover("machinelaunch-why")
 		defer close(done)
 		_ = run(client, whyCommand, nil, out)
 	}()
