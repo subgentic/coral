@@ -49,6 +49,7 @@ export function decorateKindRow(tr) {
     const icon = tr.querySelector('.inbox-kind-icon');
     if (!icon || tr.classList.contains('dt-mailed')) return;
     tr.classList.add('inbox-kind-row');
+    const words = tr.querySelector('.dt-subtitle'); if (words && /^(For review|Needs your answer)$/.test(words.textContent.trim())) words.classList.add('inbox-kind-words'); // the kind's own words under the sender: a phone leaves them to the icon (#13795)
     const cell = icon.closest('td'), column = document.createElement('span');
     column.className = 'inbox-kind-column'; column.append(icon); cell.append(column);
 }
