@@ -15,12 +15,14 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const S = `(window.__coralStatic || '/static/')`;
     const STUB = `(() => {
-        const real = window.fetch; window.__up = []; window.__posts = []; window.__cs = []; window.__next = 1; window.__n = 0; window.__slow = false; window.__fail = false; window.__release = null;
+        const real = window.fetch; window.__up = []; window.__inventoryReads = 0; window.__documentReads = []; window.__posts = []; window.__cs = []; window.__next = 1; window.__n = 0; window.__slow = false; window.__fail = false; window.__release = null;
         const png = Uint8Array.from(atob(${JSON.stringify(PNG)}), c => c.charCodeAt(0));
         const json = (o, status) => Promise.resolve(new Response(JSON.stringify(o), { status: status || 200, headers: { 'Content-Type': 'application/json' } }));
         const can = c => ({ reply: false, edit: true, delete: true, resolve: true });
         window.fetch = (u, o) => {
             const url = String(u), method = (o && o.method) || 'GET';
+            if (url === '/api/servers') window.__inventoryReads++;
+            if (method === 'GET' && url.split('?')[0].endsWith('/api/artifacts/${HEX}')) window.__documentReads.push(url);
             if (url.includes('/api/artifacts/${HEX}/comment-images')) {
                 const ct = o && o.headers && o.headers['Content-Type'];
                 window.__up.push({ method, url, ct, size: o && o.body && o.body.size });
@@ -48,7 +50,18 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
         await ev(STUB);
         if (team) await ev(`import(${S} + 'state.js').then(m => { m.state.selectedTeam = ${JSON.stringify(team)}; return true; })`);
         await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'plan.md' }); return true; })()`);
-        await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown')`, 'the document', 8000);
+        await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown')`, 'the document', 8000).catch(async error => {
+            const context = await ev(`import(${S} + 'state.js').then(({state})=>({selectedTeam:state.selectedTeam,serversKnown:state.serversKnown,servers:state.servers,viewer:document.querySelector('#artifact-viewer')?.textContent.slice(0,160),toasts:[...document.querySelectorAll('.toast')].map(e=>e.textContent)}))`);
+            throw new Error(error.message+'; source context: '+JSON.stringify(context));
+        });
+        // On this plain local Coral, close and open the same source-less file
+        // again before composing. A second open must not borrow remote context.
+        await ev(`document.querySelector('.artifact-viewer-close').click();true`);
+        await ev(`import(${S} + 'artifact_viewer.js').then(v=>{v.openArtifactViewer(${JSON.stringify(HEX)},{filename:'plan.md'});return true;})`);
+        await waitFor(`!!document.querySelector('#artifact-viewer:not([hidden]) .artifact-viewer-markdown')`, 'the document on its second open', 8000);
+        assert.equal(await ev(`window.__documentReads.length`), 2, 'both local opens loaded their document');
+        assert.equal(await ev(`window.__inventoryReads`), 0, 'reopening a local file does not wait for remote inventory');
+        assert.ok(await ev(`window.__documentReads.every(u=>!u.startsWith('/api/remote/'))`), 'both opens stay on the local computer');
         await waitFor(`!document.querySelector('.ac-toggle').hidden`, 'the Comments button', 5000);
         if (mobile || !(await ev(`document.querySelector('.ac-panel').getClientRects().length > 0`))) { await ev(`document.querySelector('.ac-toggle').click(); true`); await new Promise(r => setTimeout(r, 400)); } // sleep-ok: the sheet slides in
         await waitFor(`!!document.querySelector('.ac-whole')`, 'the whole-document button', 5000);
@@ -162,7 +175,9 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             console.log(`   ✓ ${w} px`);
         }
         // opened from a team, the upload names the team (the route needs it when several teams hold the file)
-        await load(1280, 800, false, '@box/team-x');
+        // The assertion is about a local team's board query. An unregistered @box
+        // would name another computer, which source isolation must refuse (#13838).
+        await load(1280, 800, false, 'team-x');
         await pick([['named.png', 'image/png']]);
         await waitFor(`window.__up.length === 1`, 'the upload', 5000);
         assert.match(await ev(`window.__up[0].url`), /\/comment-images\?board=team-x$/, 'the upload carries the team\'s bare board name');
