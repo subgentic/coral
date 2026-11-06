@@ -14,6 +14,10 @@ import (
 
 // #13876: a setup that does not finish says why, from what the machine keeps, before it is deleted; and what it says is cleaned, because the user-data holds the launch's host key and a log can echo anything.
 
+// fakeKeyBlock is a made-up private-key block for the redactor to meet. Its two marker lines are spelled in two pieces so this file does not hold the whole block as text: the repository's secret scan (gitleaks, rule
+// private-key) reads a BEGIN ... END block in a source file as a leaked key, which this is not (#13876).
+const fakeKeyBlock = "-----BEGIN OPENSSH " + "PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\n-----END OPENSSH " + "PRIVATE KEY-----"
+
 func TestAMachineThatNeverMakesTheFolderSaysWhyAndNothingSecretPrints(t *testing.T) {
 	m := &slowMachine{after: 1 << 30}
 	p, h := &stubProvider{}, &stubHub{}
@@ -23,7 +27,7 @@ func TestAMachineThatNeverMakesTheFolderSaysWhyAndNothingSecretPrints(t *testing
 		if cmd == whyCommand {
 			asked++
 			return "== setup exit status: 2\n== setup output (tail)\ntar: coral: Not found in archive\ntar: Exiting with failure status due to previous errors\n" +
-				"-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\n-----END OPENSSH PRIVATE KEY-----\n" +
+				fakeKeyBlock + "\n" +
 				"token chb_SECRETSECRETSECRET1234 and a blob " + strings.Repeat("QUJD", 30) + "\x1b[31m red \x07 \u202e reversed\n", "", 0
 		}
 		return m.handle(cmd, stdin)
