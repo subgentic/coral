@@ -986,7 +986,21 @@ registerGroupSource('hub-inbox', {
                         const star = starControl(s.review, { hex: s.review.hex, name: markHidden(s.review.name, { strict: true }), reviewPin: true, onChange: on => { const focused = document.activeElement === star; reviewStarChanged(s.review, on); needsOrder = null; needsState.shown = null; renderInboxNav(true); if (focused) requestAnimationFrame(() => document.querySelector(`#group-table-view tr[data-key="${CSS.escape(needsKey(s))}"] .inbox-review-star`)?.focus({ preventScroll: true })); } });
                         let anchor = null;
                         if (cell && star) { anchor = cell.querySelector('.inbox-review-item'); if (anchor) { anchor.classList.add('inbox-review-star-anchor'); star.classList.add('inbox-review-star'); anchor.append(star); } }
-                        if (anchor && s.review.starred) { const context = DT.el('span', 'inbox-pinned-context', `${s.review.goal_id ? `Goal #${s.review.goal_id} · ${markHidden(s.review.goal_title || '', { strict: true })} · ` : ''}${reviewSourceLabel(s.review.team)}`); anchor.after(context); const filename = anchor.querySelector('.inbox-review-name'); if (filename) { filename.append(DT.el('span', 'inbox-pinned-inline-context', ` · ${reviewSourceLabel(s.review.team)}`)); filename.setAttribute('aria-label', `${filename.getAttribute('aria-label')}, ${reviewSourceLabel(s.review.team)}`); } }
+                        if (anchor && s.review.starred) {
+                        const goalContext = s.review.goal_id ? `Goal #${s.review.goal_id} · ${markHidden(s.review.goal_title || '', { strict: true })}` : '';
+                        const fullContext = [goalContext, reviewSourceLabel(s.review.team)].filter(Boolean).join(' · ');
+                        anchor.after(DT.el('span', 'inbox-pinned-context', fullContext));
+                        const filename = anchor.querySelector('.inbox-review-name');
+                        if (filename) {
+                            const computer = splitKey(s.review.team).server === LOCAL_SERVER ? 'Local' : serverLabel(splitKey(s.review.team).server);
+                            const inline = DT.el('span', 'inbox-pinned-inline-context', s.review.goal_id ? `Goal #${s.review.goal_id} · ${computer} · ` : ` · ${reviewSourceLabel(s.review.team)}`);
+                            inline.title = fullContext;
+                            // A pin is outside its goal group. Lead with its compact identity
+                            // inside the existing clamp, even with enlarged phone text.
+                            if (s.review.goal_id) filename.prepend(inline); else filename.append(inline);
+                            filename.setAttribute('aria-label', `${filename.getAttribute('aria-label')}, ${fullContext}`);
+                        }
+                    }
                     } if (s.review && !decisionNeedsPerson(splitKey(s.review.team).server)) { tr.draggable = true; tr.addEventListener('dragstart', e => { e.dataTransfer.setData('application/x-coral-review', s.review.reviewKey); e.dataTransfer.effectAllowed = 'move'; dragging = s.review; }); tr.addEventListener('dragend', () => { dragging = null; }); } }, state: needsState, rowName: s => s.review ? `${s.review.name}${earlierWords(s.review) ? `, ${earlierWords(s.review)}` : ''}, for review, ${teamOf(s)}` : s.autorun ? `${s.autorun.name}, run failed` : s.operatorAsk ? `${s.operatorAsk.asker}, asks you` : s.welcome ? s.welcome.title : resolveSessionIdentity(s),
                     open: s => { if (s.skillReview) { openSkill(s.skillReview); return; } if (s.goalDone) { openGoalDone(s.goalDone, false, `${sessionServer(s)}:${s.session_id}`); return; } if (s.proposal) { openProposalDialog(s.proposal, 'view'); return; } if (s.review) { openReview(s.review); return; } if (s.autorun) { openRun(s.autorun); return; } if (s.operatorAsk) { openAskDialog(s.operatorAsk, undefined, askRunners); return; } if (s.unrecorded) { recordAllAgents(); return; } if (s.welcome) { runWelcome(s.welcome.id); return; } if (!s.review && !s.autorun && s.waiting_kind === 'permission') { importOnce('./inbox_agent_card.js').then(m => { if (m.canOpenCard(s)) m.openAgentCard(s); else openInAgents(s); }); return; } openInAgents(s); }, // a row that needs an answer shows the chat card, not the terminal saved last (#10141)
                     columns: [

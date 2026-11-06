@@ -1,6 +1,6 @@
 // #13888/#13889: real Needs you table, grouping, source identity and accessible pin control.
 const assert=require('node:assert/strict');const fs=require('node:fs');
-const {connect}=require('./agent_view_harness');const {coralReady}=require('./helpers/wait');
+const {connect}=require('./agent_view_harness');const {coralReady,framesJs}=require('./helpers/wait');
 const {setupHubWorld}=require('./helpers/hub_world');
 const {removeBoards}=require('./helpers/board_cleanup');const BASE=require('./test_base').BASE;
 (async()=>{const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();const team='goal-groups-'+Date.now().toString(36);
@@ -22,7 +22,7 @@ for(const [width,theme] of [[1280,'light'],[390,'light'],[320,'light'],[1280,'da
  assert.ok(targets.every(t=>t.width>=44&&t.height>=44&&t.pointer!=='none'),JSON.stringify(targets));
  const overlap=await ev(`(()=>{const intersect=(a,b)=>a.left<b.right-1&&a.right>b.left+1&&a.top<b.bottom-1&&a.bottom>b.top+1;return [...document.querySelectorAll('.inbox-review-star')].flatMap(b=>{const row=b.closest('tr'),icon=row.querySelector('.inbox-kind-icon'),text=row.querySelector('.inbox-review-name'),wait=row.querySelector('.inbox-review-wait');return [icon&&text&&intersect(icon.getBoundingClientRect(),text.getBoundingClientRect()),text&&intersect(b.getBoundingClientRect(),text.getBoundingClientRect()),wait&&getComputedStyle(wait).display!=='none'&&intersect(b.getBoundingClientRect(),wait.getBoundingClientRect())].filter(Boolean);});})()`);
  assert.deepEqual(overlap,[],'icon, star and visible waiting text do not overlap at '+width+' '+theme);
- if(width<=760)assert.ok(await ev(`[...document.querySelectorAll('.inbox-pinned-context')].every(e=>getComputedStyle(e).display==='none')&&[...document.querySelectorAll('.inbox-pinned-inline-context')].every(e=>getComputedStyle(e).display==='inline'&&!e.textContent.includes('Goal #'))`),'phone pin context stays inline with no extra Goal metadata line');
+ if(width<=760)assert.ok(await ev(`[...document.querySelectorAll('.inbox-pinned-context')].every(e=>getComputedStyle(e).display==='none')&&[...document.querySelectorAll('.inbox-pinned-inline-context')].every(e=>getComputedStyle(e).display==='inline'&&!e.textContent.includes('Goal #'))`),'goal-less phone pin context stays inline without extra metadata lines');
  if(width<=760){
   const geometry=await ev(`(()=>{const visible=e=>e&&getComputedStyle(e).display!=='none';return [...document.querySelectorAll('.inbox-review-star-anchor.inbox-agent-first')].map(row=>{const from=row.querySelector('.inbox-review-from').getBoundingClientRect(),wait=row.querySelector('.inbox-review-wait'),name=row.querySelector('.inbox-review-name'),rect=name.getBoundingClientRect(),lh=parseFloat(getComputedStyle(name).lineHeight);return {lines:rect.height/lh,aligned:!visible(wait)||Math.abs(from.top-wait.getBoundingClientRect().top)<4,below:rect.top>=from.bottom-1};});})()`);
   assert.ok(geometry.length>0&&geometry.every(r=>r.lines<=2.1&&r.aligned&&r.below),'review pins keep canonical sender/time then at most two description lines: '+JSON.stringify(geometry));
@@ -33,6 +33,18 @@ for(const [width,theme] of [[1280,'light'],[390,'light'],[320,'light'],[1280,'da
  assert.equal(await ev(`window.__groupCalls[0].method`),'PUT');
  assert.equal(await ev(`document.querySelectorAll('#artifact-viewer:not([hidden])').length`),0,'star does not open row');
  assert.equal(await ev(`localStorage.getItem('coral-inbox-group-review-goal')`),'true');
+ const goalPin='1'.padStart(64,'0');
+ assert.match(await ev(`document.querySelector('[data-review-artifact="${goalPin}"] .inbox-pinned-inline-context').textContent`),/Goal #1/,'a pinned goal remains identified outside its group');
+ const pinLabel=await ev(`document.querySelector('[data-review-artifact="${goalPin}"]').getAttribute('aria-label')`);
+ assert.match(pinLabel,/Goal #1.*Update reliability/,'goal ID/title remain accessible');assert.ok(pinLabel.includes('This computer')&&pinLabel.includes(team),'full team/computer remain accessible');
+ if(width<=760)for(const font of [16,32]){
+  await ev(`document.documentElement.style.fontSize='${font}px';true`);await ev(framesJs(6));
+  const g=await ev(`(()=>{const n=document.querySelector('[data-review-artifact="${goalPin}"]'),c=n.querySelector('.inbox-pinned-inline-context'),s=n.closest('tr').querySelector('.inbox-review-star'),r=n.getBoundingClientRect(),cr=c.getBoundingClientRect(),sr=s.getBoundingClientRect(),rg=document.createRange();rg.setStart(c.firstChild,0);rg.setEnd(c.firstChild,7);const gr=rg.getBoundingClientRect(),lh=parseFloat(getComputedStyle(n).lineHeight);return{lines:r.height/lh,contextLines:cr.height/parseFloat(getComputedStyle(c).lineHeight),goalVisible:gr.right<=cr.right+1&&gr.top>=r.top-1&&gr.bottom<=r.bottom+1,inside:cr.left>=r.left-1&&cr.right<=r.right+1&&cr.bottom<=r.bottom+1,separate:r.right<=sr.left+1,sourceWhole:${font===32}||(()=>{const q=document.createRange();q.selectNodeContents(c);return q.getBoundingClientRect().right<=cr.right+1;})()};})()`);
+  assert.ok(g.lines<=2.1&&g.contextLines<=2.1&&g.goalVisible&&g.inside&&g.separate&&g.sourceWhole,'goal pin keeps the cap, goal visibility and separate star at '+width+' / '+font+': '+JSON.stringify(g));
+  if(process.env.CORAL_SCREENSHOT_DIR){await ev(`document.querySelector('[data-review-artifact="${goalPin}"]').scrollIntoView({block:'center'});true`);fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true});fs.writeFileSync(process.env.CORAL_SCREENSHOT_DIR+'/goal-pin-'+width+'-'+font+'-'+theme+'.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}
+ }
+ await ev(`document.documentElement.style.fontSize='16px';true`);await ev(framesJs(4));
+
  const waitingId='e'.padStart(64,'0');assert.equal(await ev(`document.querySelector('[data-review-artifact="${waitingId}"]').closest('tr').classList.contains('dt-read')`),true,'sent-back row without news is visible and uncounted');
  const versionId='3'.padStart(64,'0');assert.match(await ev(`document.querySelector('[data-review-artifact="${versionId}"]').getAttribute('aria-label')`),/New version v3/);
  await ev(`document.querySelector('[data-review-artifact="${versionId}"]').click();true`);
