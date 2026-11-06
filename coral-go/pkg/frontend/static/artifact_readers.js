@@ -40,8 +40,7 @@ function lines(data) {
         if (!o || typeof o !== 'object') continue;
         const who = KINDS[o.kind] ? `${KINDS[o.kind]}${o.kind === 'hub_user' ? ' ' + clean(o.id) : ''}` : clean(o.id) || 'an owner';
         const teams = (Array.isArray(o.teams) ? o.teams : []).slice(0, 50).map(t => clean(t && (t.label || t.id))).filter(Boolean);
-        const n = Number(o.records) || 0;
-        out.push(`Held by ${who}${n ? ` (${n} ${n === 1 ? 'record' : 'records'})` : ''}${teams.length ? `, on ${teams.join(', ')}` : ''}. ${clean(o.reason) ? clean(o.reason).replace(/^./, c => c.toUpperCase()) + '.' : ''}`.trim());
+        out.push(`Owned by ${who}${teams.length ? `, in ${teams.join(', ')}` : ''}. ${clean(o.reason) ? clean(o.reason).replace(/^./, c => c.toUpperCase()) + '.' : ''}`.trim());
     }
     const linked = (Array.isArray(data.linked_teams) ? data.linked_teams : []).slice(0, 50).map(t => clean(t && (t.label || t.id))).filter(Boolean);
     if (linked.length) out.push(`Teams linked through Coral Hub that can read it: ${linked.join(', ')}.`);
