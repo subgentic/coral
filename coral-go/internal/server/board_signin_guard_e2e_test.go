@@ -278,6 +278,7 @@ var writeRoutesWithoutTheGuard = map[string]string{
 	"POST /api/sessions/live/{sessionID}/wake":                             "a control: no text is kept",
 	"PUT /api/artifacts/{id}/comments/lock":                                "a control: no text is kept",
 	"PUT /api/artifacts/{id}/keep":                                         "a control: no text is kept",
+	"POST /api/artifacts/{id}/opened":                                      "a control: no text is kept",
 	"PUT /api/artifacts/{id}/star":                                         "a control: no text is kept",
 	"PUT /api/sessions/live/{name}/file-content":                           "a file's contents (code may quote the parameter): files are warned of on the client, not refused (#232)",
 	"PUT /api/sessions/live/{name}/icon":                                   "an icon's name: no text for others",
