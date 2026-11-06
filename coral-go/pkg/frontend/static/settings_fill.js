@@ -259,6 +259,9 @@ export function _fillCliAndModels(s) {
     if (defClaude) defClaude.value = s.default_model_claude || "";
     const defThinkingClaude = document.getElementById("settings-default-thinking-claude");
     if (defThinkingClaude) defThinkingClaude.value = s.default_thinking_claude || "";
+    for (const [id, key] of [...['codex', 'agy', 'pi'].map(t => [`settings-default-thinking-${t}`, `default_thinking_${t}`]), ...['claude', 'codex', 'agy', 'pi'].flatMap(t => [[`settings-orchestrator-model-${t}`, `default_orchestrator_model_${t}`], [`settings-orchestrator-thinking-${t}`, `default_orchestrator_thinking_${t}`]])]) {
+        const el = document.getElementById(id); if (el) el.value = s[key] || ""; // #13899: empty is the CLI's own default for the workers and "same as workers" for the Orchestrator
+    }
     if (defCodex) defCodex.value = s.default_model_codex || "";
     const agyModel = s.default_model_agy || s.default_model_gemini || "";
     if (defAgy) defAgy.value = agyModel;

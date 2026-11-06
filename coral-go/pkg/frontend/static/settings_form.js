@@ -48,6 +48,14 @@ export function readSettingsForm() {
     const cliPathPi = document.getElementById("settings-cli-path-pi")?.value.trim() || "";
     const defaultModelClaude = document.getElementById("settings-default-model-claude")?.value.trim() || "";
     const defaultThinkingClaude = document.getElementById("settings-default-thinking-claude")?.value || "";
+    const pick = id => document.getElementById(id)?.value; // undefined: the row is not on this page (the Hub's), so the key is not sent
+    const typedDefaults = {};
+    for (const t of ['codex', 'agy', 'pi']) { const v = pick(`settings-default-thinking-${t}`); if (v !== undefined) typedDefaults[`default_thinking_${t}`] = v; }
+    for (const t of ['claude', 'codex', 'agy', 'pi']) {
+        const m = pick(`settings-orchestrator-model-${t}`), th = pick(`settings-orchestrator-thinking-${t}`);
+        if (m !== undefined) typedDefaults[`default_orchestrator_model_${t}`] = m.trim();
+        if (th !== undefined) typedDefaults[`default_orchestrator_thinking_${t}`] = th;
+    }
     const defaultModelCodex = document.getElementById("settings-default-model-codex")?.value.trim() || "";
     const defaultModelAgy = document.getElementById("settings-default-model-agy")?.value.trim() || "";
     const defaultModelPi = document.getElementById("settings-default-model-pi")?.value.trim() || "";
@@ -110,6 +118,7 @@ export function readSettingsForm() {
         cli_path_pi: cliPathPi,
         default_model_claude: defaultModelClaude,
         default_thinking_claude: defaultThinkingClaude,
+        ...typedDefaults,
         default_model_codex: defaultModelCodex,
         default_model_agy: defaultModelAgy,
         default_model_gemini: defaultModelAgy,
