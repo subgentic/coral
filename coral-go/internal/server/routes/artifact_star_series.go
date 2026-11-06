@@ -2,6 +2,7 @@ package routes
 
 import (
 	"net/http"
+	"sort"
 
 	"github.com/subgentic/coral/internal/cloud"
 )
@@ -11,9 +12,10 @@ import (
 
 // starInfo is what the star state says of one digest.
 type starInfo struct {
-	At     string // when the series was last starred (RFC 3339): the newest star of any of its versions
-	Series string // the series' id, "" for a file in none
-	Latest bool   // this digest is its series' newest version (true for a file in no series)
+	At      string   // when the series was last starred (RFC 3339): the newest star of any of its versions
+	Series  string   // the series' id, "" for a file in none
+	Latest  bool     // this digest is its series' newest version (true for a file in no series)
+	Earlier []string // on the newest version: the older versions' digests, oldest first (at most maxEarlierDigests), so a decision on the one row shown can settle them (#13910)
 }
 
 // starFollow works out, from the starred digests and their times, every digest that counts as starred and what it says: each starred digest itself, and every version of its series. A digest that is a version of a
@@ -38,8 +40,18 @@ func starFollow(coralDir string, stars map[string]string) map[string]starInfo {
 				best, newest = m.N, m.Digest
 			}
 		}
+		var earlier []string
+		for _, m := range sortedByVersion(members) {
+			if m.Digest != newest && len(earlier) < maxEarlierDigests {
+				earlier = append(earlier, m.Digest)
+			}
+		}
 		for _, m := range members {
-			out[m.Digest] = starInfo{At: at, Series: sid, Latest: m.Digest == newest}
+			info := starInfo{At: at, Series: sid, Latest: m.Digest == newest}
+			if info.Latest {
+				info.Earlier = earlier
+			}
+			out[m.Digest] = info
 		}
 	}
 	// a starred digest whose series has no readable members (an index lost, a record gone) still counts as starred itself
@@ -61,4 +73,14 @@ func starVisible(r *http.Request) bool {
 		return hubOwnerRequest(r).owner
 	}
 	return true
+}
+
+// maxEarlierDigests bounds the older versions a pinned row carries.
+const maxEarlierDigests = 50
+
+// sortedByVersion is the members oldest first.
+func sortedByVersion(ms []seriesMember) []seriesMember {
+	out := append([]seriesMember(nil), ms...)
+	sort.Slice(out, func(i, j int) bool { return out[i].N < out[j].N })
+	return out
 }
