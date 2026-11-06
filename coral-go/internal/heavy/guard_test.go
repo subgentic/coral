@@ -3,6 +3,7 @@ package heavy
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -34,7 +35,9 @@ func TestTheRootIsMadePrivateAndTheCleanupRemovesExactlyOneRunFolder(t *testing.
 	require.NoError(t, err)
 	fi, err := os.Stat(root)
 	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0o700), fi.Mode().Perm(), "the root is 0700")
+	if runtime.GOOS != "windows" { // Windows has no owner/group/world bits to check
+		assert.Equal(t, os.FileMode(0o700), fi.Mode().Perm(), "the root is 0700")
+	}
 	other, err := MakeRunDir(root, "dev", "fedcba9876543210fedcba9876543210")
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(d, "f"), []byte("x"), 0o600))

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -59,9 +60,12 @@ func TestFileListIsGitsOwnMinusIgnoredFilesLinksOutAndSecrets(t *testing.T) {
 	put(t, dir, "docs/credentials_flow.md", "# docs")
 	outside := t.TempDir()
 	put(t, outside, "secret", "x")
-	require.NoError(t, os.Symlink(filepath.Join(outside, "secret"), filepath.Join(dir, "leaks")))
-	require.NoError(t, os.Symlink("src/main.go", filepath.Join(dir, "inside")))
-	require.NoError(t, os.Symlink("../../../../etc/passwd", filepath.Join(dir, "up")))
+	links := runtime.GOOS != "windows" // links need a privilege on Windows and git there does not make them; the wrapper is for a Mac or Linux client
+	if links {
+		require.NoError(t, os.Symlink(filepath.Join(outside, "secret"), filepath.Join(dir, "leaks")))
+		require.NoError(t, os.Symlink("src/main.go", filepath.Join(dir, "inside")))
+		require.NoError(t, os.Symlink("../../../../etc/passwd", filepath.Join(dir, "up")))
+	}
 	c := exec.Command("git", "-C", dir, "add", "src/main.go", ".gitignore", "internal/background/token_poller.go", "docs/credentials_flow.md")
 	require.NoError(t, c.Run())
 
@@ -74,7 +78,9 @@ func TestFileListIsGitsOwnMinusIgnoredFilesLinksOutAndSecrets(t *testing.T) {
 	assert.Contains(t, names, "src/main.go")
 	assert.Contains(t, names, "untracked.txt", "untracked and not ignored: sent")
 	assert.Contains(t, names, ".gitignore")
-	assert.Contains(t, names, "inside", "a link inside the worktree is kept")
+	if links {
+		assert.Contains(t, names, "inside", "a link inside the worktree is kept")
+	}
 	assert.Contains(t, names, "internal/background/token_poller.go", "a TRACKED source file is not a secret because of its name")
 	assert.Contains(t, names, "docs/credentials_flow.md", "nor is tracked text")
 	for _, no := range []string{"scripts/credentials.sh", "notes/token.md", "tools/tokens.py", "ignored.txt", "build/out.bin", ".env", ".env.local", "deploy/server.pem", "deploy/server.key", "id_rsa", "credentials.json", "notes/my_token.txt", "leaks", "up"} {
@@ -86,8 +92,10 @@ func TestFileListIsGitsOwnMinusIgnoredFilesLinksOutAndSecrets(t *testing.T) {
 	}
 	joined := strings.Join(said, "\n")
 	assert.Contains(t, joined, ".env: a name that looks like a secret")
-	assert.Contains(t, joined, "leaks: a link that leaves the worktree")
-	assert.Contains(t, joined, "up: a link that leaves the worktree")
+	if links {
+		assert.Contains(t, joined, "leaks: a link that leaves the worktree")
+		assert.Contains(t, joined, "up: a link that leaves the worktree")
+	}
 	assert.NotContains(t, joined, "ignored.txt", "what git ignores is not even listed")
 }
 

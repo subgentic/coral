@@ -69,6 +69,14 @@ const miniGrant = `{"granted":true,"place":0,"entry":{"id":1,"member":"mini","ma
 
 func runHeavy(t *testing.T, s *heavyStub, args ...string) (out string, code int) {
 	t.Helper()
+	if heavyUnsupportedHere() != "" {
+		t.Skip("coral-board heavy run does not run on Windows (it says so; see TestHeavyRunOnWindowsSaysSoAndStartsNothing)")
+	}
+	return runHeavyAnyOS(t, s, args...)
+}
+
+func runHeavyAnyOS(t *testing.T, s *heavyStub, args ...string) (out string, code int) {
+	t.Helper()
 	isolateBoardEnv(t)
 	t.Setenv("CORAL_SUBSCRIBER_ID", "Me")
 	srv := httptest.NewServer(http.HandlerFunc(s.handler))
