@@ -23,7 +23,7 @@ func TestAMachineThatNeverMakesTheFolderSaysWhyAndNothingSecretPrints(t *testing
 			asked++
 			return "== setup exit status: 2\n== setup output (tail)\ntar: coral: Not found in archive\ntar: Exiting with failure status due to previous errors\n" +
 				"-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\n-----END OPENSSH PRIVATE KEY-----\n" +
-				"token chb_SECRETSECRETSECRET1234 and a blob " + strings.Repeat("QUJD", 30) + "\x1b[31m red \x07 ‮ reversed\n" + "", "", 0
+				"token chb_SECRETSECRETSECRET1234 and a blob " + strings.Repeat("QUJD", 30) + "\x1b[31m red \x07 \u202e reversed\n", "", 0
 		}
 		return m.handle(cmd, stdin)
 	}
@@ -36,7 +36,7 @@ func TestAMachineThatNeverMakesTheFolderSaysWhyAndNothingSecretPrints(t *testing
 	assert.Contains(t, msg, "tar: coral: Not found in archive", "the reason is printed")
 	assert.Contains(t, msg, "setup exit status: 2")
 	assert.Contains(t, msg, credentialDir)
-	for _, secret := range []string{"chb_SECRETSECRET", "b3BlbnNzaC1rZXkt", "BEGIN OPENSSH PRIVATE KEY", strings.Repeat("QUJD", 30), "\x1b", "\x07", "‮"} {
+	for _, secret := range []string{"chb_SECRETSECRET", "b3BlbnNzaC1rZXkt", "BEGIN OPENSSH PRIVATE KEY", strings.Repeat("QUJD", 30), "\x1b", "\x07", "\u202e"} {
 		assert.NotContains(t, msg, secret)
 	}
 	assert.Less(t, len(msg), 3600, "capped")
