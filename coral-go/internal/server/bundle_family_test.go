@@ -17,6 +17,8 @@ func TestBundleBuildReturnsItsMemory(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := &Server{staticVersion: "build"}
+	resetBundleCache() // a real build, not one an earlier test kept
+	t.Cleanup(resetBundleCache)
 	realFree, realDelay := freeOSMemory, releaseDelay
 	t.Cleanup(func() { freeOSMemory, releaseDelay = realFree, realDelay })
 	releaseDelay = 10 * time.Millisecond
@@ -72,6 +74,8 @@ func TestPrebuiltBundleIsNotFollowedByFreeOSMemory(t *testing.T) {
 	}
 	realFree, realDelay, realSource := freeOSMemory, releaseDelay, bundleSource
 	t.Cleanup(func() { freeOSMemory, releaseDelay, bundleSource = realFree, realDelay, realSource })
+	resetBundleCache() // the swapped source is asked, not a family an earlier test kept
+	t.Cleanup(resetBundleCache)
 	releaseDelay = time.Millisecond
 	ran := make(chan struct{}, 4)
 	freeOSMemory = func() { ran <- struct{}{} }
@@ -85,6 +89,7 @@ func TestPrebuiltBundleIsNotFollowedByFreeOSMemory(t *testing.T) {
 		t.Errorf("FreeOSMemory ran after a prebuilt family: %d", len(ran))
 	}
 	// and a build that fails still gets the call (its garbage is the same), and serves the original files
+	resetBundleCache()
 	bundleSource = func(fs.FS, []byte) (*frontend.Bundle, string, error) { return nil, "built", errBundle }
 	s2 := &Server{staticVersion: "build"}
 	if fsys := s2.buildBundleFamily(staticSub); fsys != nil || s2.bundleBase != "" {
@@ -98,3 +103,48 @@ func TestPrebuiltBundleIsNotFollowedByFreeOSMemory(t *testing.T) {
 }
 
 var errBundle = errors.New("the build failed")
+
+// Two servers in one process build the family once (a test binary starts hundreds; each one ran esbuild over the same tree): the second
+// reuses the first's family, with the same build id, and nothing is freed for it since nothing was built. One server builds once, as before. A
+// different tree (here, another shell) is built again, and a failed build is not kept.
+func TestServersInOneProcessBuildTheBundleOnce(t *testing.T) {
+	staticSub, _ := fs.Sub(frontend.Static, "static")
+	index, _ := fs.ReadFile(frontend.Templates, "templates/index.html")
+	realSource, realFree := bundleSource, freeOSMemory
+	t.Cleanup(func() { bundleSource, freeOSMemory = realSource, realFree; resetBundleCache() })
+	resetBundleCache()
+	freeOSMemory = func() {}
+	calls := 0
+	stub := &frontend.Bundle{Files: map[string][]byte{"app.js": []byte("x")}}
+	bundleSource = func(fs.FS, []byte) (*frontend.Bundle, string, error) { calls++; return stub, "built", nil }
+
+	s1 := &Server{staticVersion: "build"}
+	if s1.buildBundleFamily(staticSub) == nil {
+		t.Fatal("the first server built no family")
+	}
+	if calls != 1 {
+		t.Fatalf("one server: %d builds, want 1", calls)
+	}
+	s2 := &Server{staticVersion: "build"}
+	if s2.buildBundleFamily(staticSub) == nil {
+		t.Fatal("the second server got no family")
+	}
+	if calls != 1 {
+		t.Errorf("two servers: %d builds, want 1", calls)
+	}
+	if s1.bundleBase == "" || s1.bundleBase != s2.bundleBase {
+		t.Errorf("the second server's family is not the first's: %q vs %q", s1.bundleBase, s2.bundleBase)
+	}
+
+	if _, how, _ := cachedBundle(staticSub, append(append([]byte{}, index...), []byte("<!-- another shell -->")...)); how != "built" || calls != 2 {
+		t.Errorf("another tree: %q after %d builds, want a build", how, calls)
+	}
+
+	resetBundleCache()
+	bundleSource = func(fs.FS, []byte) (*frontend.Bundle, string, error) { calls++; return nil, "built", errBundle }
+	cachedBundle(staticSub, index)
+	cachedBundle(staticSub, index)
+	if calls != 4 {
+		t.Errorf("a failed build was kept: %d builds after two failing starts, want 4", calls)
+	}
+}

@@ -20,7 +20,7 @@ func exportNamesBatch(static fs.FS, modules []string) (map[string][]string, erro
 	for i, m := range modules {
 		entries[i] = api.EntryPoint{InputPath: "./" + m, OutputPath: strings.TrimSuffix(m, ".js")}
 	}
-	res := api.Build(api.BuildOptions{
+	res := build(api.BuildOptions{
 		EntryPointsAdvanced: entries,
 		Bundle:              true,
 		Format:              api.FormatESModule,
