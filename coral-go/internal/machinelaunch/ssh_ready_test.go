@@ -142,5 +142,69 @@ func TestDeliveryFailureKeepsStderrBoundedAndRedacted(t *testing.T) {
 	if len(msg) > 2000 {
 		t.Fatalf("the error is %d bytes: stderr is not bounded", len(msg))
 	}
-	_ = fmt.Sprint
+}
+
+// QA Reviewer 2's SHOULDs on #13776.
+
+// The probe is the one literal command, read-only, on the one folder: a change to either is a decision, not a drift.
+func TestTheProbeIsTheLiteralReadOnlyTestOfTheCredentialFolder(t *testing.T) {
+	if credentialDir != "/run/coral/bootstrap.d" {
+		t.Fatalf("the credential folder is %q", credentialDir)
+	}
+	if readyCommand != "test -d /run/coral/bootstrap.d" {
+		t.Fatalf("the probe is %q", readyCommand)
+	}
+	for _, bad := range []string{"mkdir", "install", "chmod", "chown", ">", "touch", "mv", "cat"} {
+		if strings.Contains(readyCommand, bad) {
+			t.Fatalf("the probe %q contains %q: it must read and create nothing", readyCommand, bad)
+		}
+	}
+}
+
+// What a failing command says may hold escape sequences, NULs, carriage returns and other control bytes: none reaches the error (it is printed to a terminal), line breaks become spaces, and text stays readable.
+func TestStderrNoteDropsControlCharactersAndKeepsTheWords(t *testing.T) {
+	got := stderrNote("cat: \x1b[31mwrite error\x1b[0m\r\nNo space\x00 left\ton device\x07\x7f\n", launchTestCredential)
+	for _, r := range got {
+		if r < 0x20 || r == 0x7f {
+			t.Fatalf("a control character %q is in %q", r, got)
+		}
+	}
+	if !strings.Contains(got, "No space left on device") || !strings.Contains(got, "write error") {
+		t.Fatalf("the words were lost: %q", got)
+	}
+	if stderrNote("  \n\t ", "x") != "" {
+		t.Fatal("whitespace only is not a note")
+	}
+	if got := stderrNote("tok chb_ABC-def_123 end", ""); strings.Contains(got, "chb_ABC") {
+		t.Fatalf("a credential-shaped word was kept: %q", got)
+	}
+}
+
+// A machine that answers a failed delivery with a megabyte of standard error cannot grow the launcher's memory: only the first stderrMaxBytes are kept, the session still ends with the exit status, and the error stays short.
+func TestAFloodOfStderrIsCappedAndTheFailureStillComesBack(t *testing.T) {
+	m := &slowMachine{}
+	p, h := &stubProvider{}, &stubHub{}
+	o, d, _, srv := setupWith(t, p, h)
+	flood := "first words " + strings.Repeat("Z", 1<<20)
+	srv.handle = func(cmd, stdin string) (string, string, uint32) {
+		if cmd == deliverCommand {
+			return "", flood, 1
+		}
+		return m.handle(cmd, stdin)
+	}
+	d.Bootstrap.(*SSHBootstrap).ReadyWait = time.Second
+	_, err := Launch(context.Background(), o, d)
+	if err == nil || !strings.Contains(err.Error(), "first words") || len(err.Error()) > 1500 {
+		t.Fatalf("err (%d bytes): %v", len(fmt.Sprint(err)), err)
+	}
+	if stderrMaxBytes != 4<<10 {
+		t.Fatalf("the stderr cap is %d", stderrMaxBytes)
+	}
+	c := newStderrCap() // the buffer the delivery collects into
+	for i := 0; i < 300; i++ {
+		c.Write([]byte(strings.Repeat("y", 10_000)))
+	}
+	if len(c.String()) != stderrMaxBytes {
+		t.Fatalf("kept %d bytes, want %d", len(c.String()), stderrMaxBytes)
+	}
 }

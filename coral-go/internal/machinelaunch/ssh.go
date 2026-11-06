@@ -189,7 +189,7 @@ func (s *SSHBootstrap) Bootstrap(ctx context.Context, req BootRequest) (BootResu
 	if err != nil {
 		return BootResult{}, err
 	}
-	stderr := &capBuffer{max: stderrMaxBytes}
+	stderr := newStderrCap()
 	if err := runErr(client, deliverCommand, strings.NewReader(credential), nil, stderr); err != nil {
 		reason := sshReason(err) + stderrNote(stderr.String(), credential)
 		credential = ""
@@ -380,6 +380,9 @@ const (
 	stderrMaxBytes = 4 << 10
 	stderrShown    = 400
 )
+
+// newStderrCap is the buffer a failing command's standard error is collected in: a machine that writes without end cannot grow the launcher's memory.
+func newStderrCap() *capBuffer { return &capBuffer{max: stderrMaxBytes} }
 
 var credentialLike = regexp.MustCompile(`chb_[A-Za-z0-9_\-]+`)
 
