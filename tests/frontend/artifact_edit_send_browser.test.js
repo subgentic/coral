@@ -39,7 +39,7 @@ const hexOf = data => String(data.digest || data.hex || data.id || '').replace(/
             const original=await upload(name,source);await open(original,name);
             await waitFor(`!document.querySelector('.artifact-viewer-edit').hidden`,'owner Edit',10000);
             await shot(`edit-send-before-${w}-${font}`);
-            await edit();await waitFor(`!!document.querySelector('.amd-text')`,'editable words',8000);await type('careful sentence','clear sentence');await nativeClick('.amd-save');
+            await edit();await waitFor(`!!document.querySelector('.amd-text')`,'editable words',8000,`(()=>{const v=document.querySelector('.artifact-viewer');const b=document.querySelector('.artifact-viewer-edit');return{vw:innerWidth,editHidden:b&&b.hidden,editDisabled:b&&b.disabled,hasEditor:!!document.querySelector('.amd-editor'),text:(document.querySelector('.artifact-viewer-body')||{}).textContent&&document.querySelector('.artifact-viewer-body').textContent.slice(0,80),err:[...document.querySelectorAll('[role=status],.artifact-viewer-note')].map(e=>e.textContent.slice(0,80)),open:v&&!v.hidden}})()`);await type('careful sentence','clear sentence');await nativeClick('.amd-save');
             await waitFor(`!document.querySelector('.amd-editor') && !document.querySelector('.artifact-edit-send-action').hidden`,'saved version offers separate Send',12000);
             const versions=(await person('GET',`/api/artifacts/${original}/versions`)).data;assert.equal(versions.length,2);const savedHex=hexOf(versions.find(v=>v.is_latest)||versions[versions.length-1]);
             assert.deepEqual(Buffer.from(await bytes(savedHex)),Buffer.from(source.replace('careful sentence','clear sentence')));
