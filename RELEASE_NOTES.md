@@ -1,5 +1,130 @@
 # Release Notes
 
+## v2.0.58 — Hub buttons for a goal that looks done, a Markdown editor for lists, tables and code, and a machine launch that can finish setup
+
+### Changes
+
+#### What you will notice first
+
+- **`coral machine launch` setup now works on a real machine.** Setup unpacked Coral's release archive with names GNU tar could not find (the archive stores `./coral`), so it stopped before the machine was ready and the launch never completed on any real droplet. It now unpacks into its own folder and installs the named programs, and when setup does not finish the launcher reads the machine's setup log over its open SSH session and prints the end of it (host keys, key blocks, credentials and long encoded runs are replaced).
+- **Windows `.cmd` agents start with a board prompt.** A CLI installed by npm is started through the program its shim runs; any other `.cmd` gets a plain prompt when it can carry one and otherwise starts without it, with a notice in the pane and the log.
+- **Hub buttons.** A "Goal looks done" row's buttons (Not yet, Dismiss, Undo, read, unread) work through a Coral Hub, as do Record for all agents, Dismiss and Undo of a question, read-only skills, and a note that not everything is shown when a computer's list is partial.
+- **A plain upload joins only its own agent's line.** A follow-up by another agent, or a sibling task's follow-up, starts its own series and names the other's with `--new-version-of`.
+- **The Markdown editor** edits lists and nested items, table cells, fenced code bodies, quotes and the whole file as raw text with a strict preview, and refuses edits it cannot make exactly.
+- **Phone rows and menus:** the Inbox search has its own full-width row, the artifact menu stays inside the phone dialog at enlarged text, and Needs you kind icons stay clear of selection and action controls.
+- **The queue** claims only a task from a board the claiming session is on, and the hook's advice about a standalone claim is true now.
+
+#### Fixed
+
+- **A Markdown file's rendered text** refuses hidden Unicode tags and extends the invisible-character policy while keeping variation selectors.
+- **The artifact viewer** on a remote computer, bare links on a plain local Coral and an artifact's source note are separated from the controls, and a question's Wake and guide rosters are scoped to its source computer.
+- **The funnel's telemetry** returns early when analytics is off or no key is built in, instead of reading the milestone file on each call.
+- Dependency table: the machine launch digest table holds the row for v2.0.57.
+
+#### Through Coral Hub
+
+- **One route was added and reaches the tunnel, owner only:** `POST /api/board/{project}/goals/{goalID}/done-state`. **One route changed:** `POST /api/sessions/record-agents` is now owner only.
+
+#### Known issues
+
+- **macOS: the tmux change (#12836) can make macOS ask once more, only after tmux restarts (a full restart of your agents or a reboot).** Coral's tmux server and guardian are now their own responsible process, so macOS may ask, per folder, whether `tmux` (or `coral`) may reach Documents, Desktop or Downloads. Full Disk Access you gave Coral.app does not carry over: if you gave Coral Full Disk Access, add `tmux` and `coral` too (both in `Coral.app/Contents/MacOS`). The staged tmux copy (each Coral version keeps its own under `tmux-bin/`) asks again after a tmux change. Say yes once; if you say no, nothing is lost, the agent just cannot read that folder.
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For Coral Hub
+
+- **`release-diff` output** (`go run ./internal/releasediff/cmd/release-diff v2.0.57 d9eaa0f98`):
+
+  ### Tunnel routes, v2.0.57 to d9eaa0f98
+
+  Added, reachable through the tunnel (1)
+
+  - `POST /api/board/{project}/goals/{goalID}/done-state`: interact, owner-only
+
+  Changed (1)
+
+  - `POST /api/sessions/record-agents`: never to interact owner-only
+
+  ### Board settings keys (BoardSettings, HealthSettings included), v2.0.57 to d9eaa0f98
+
+  No key was added, removed or changed.
+
+  ### What Coral Hub compiles in or embeds, v2.0.57 to d9eaa0f98
+
+  `pkg/hubowner`: 1 file of Go code changed (+4, -2)
+
+  - `coral-go/pkg/hubowner/hubowner.go`: +4, -2
+  - test files, not compiled by the Hub: 1 file (+15, -2)
+
+  `pkg/tunnel`: 2 files of Go code changed (+7, -2)
+
+  - `coral-go/pkg/tunnel/routes.go`: +5, -1
+  - `coral-go/pkg/tunnel/routes_query.go`: +2, -1
+  - test files, not compiled by the Hub: 1 file (+4, -0)
+
+  `pkg/frontend`: 43 files the Hub embeds changed (+567, -211)
+
+  - `coral-go/pkg/frontend/static/artifact_comments.js`: +3, -2
+  - `coral-go/pkg/frontend/static/artifact_markdown_editor.js`: +64, -31
+  - `coral-go/pkg/frontend/static/artifact_markdown_model.js`: +176, -43
+  - `coral-go/pkg/frontend/static/artifact_preview.js`: +8, -8
+  - `coral-go/pkg/frontend/static/artifact_refs.js`: +2, -1
+  - `coral-go/pkg/frontend/static/artifact_review.js`: +1, -1
+  - `coral-go/pkg/frontend/static/artifact_source.js`: +33, -0
+  - `coral-go/pkg/frontend/static/artifact_viewer.js`: +50, -17
+  - `coral-go/pkg/frontend/static/automations_queue.js`: +8, -4
+  - `coral-go/pkg/frontend/static/board_artifacts.js`: +10, -8
+  - `coral-go/pkg/frontend/static/board_chat.js`: +2, -2
+  - `coral-go/pkg/frontend/static/board_message_text.js`: +12, -9
+  - `coral-go/pkg/frontend/static/board_window.js`: +5, -6
+  - `coral-go/pkg/frontend/static/changed_files.js`: +1, -1
+  - `coral-go/pkg/frontend/static/chat_bubbles.js`: +6, -1
+  - `coral-go/pkg/frontend/static/css/artifact_markdown_editor.css`: +2, -0
+  - `coral-go/pkg/frontend/static/css/artifact_viewer_header.css`: +4, -2
+  - `coral-go/pkg/frontend/static/css/chat.css`: +1, -0
+  - `coral-go/pkg/frontend/static/css/data_table.css`: +7, -0
+  - `coral-go/pkg/frontend/static/css/mobile.css`: +10, -0
+  - `coral-go/pkg/frontend/static/css/needs_phone.css`: +2, -2
+  - `coral-go/pkg/frontend/static/css/team_page.css`: +2, -0
+  - `coral-go/pkg/frontend/static/data_table.js`: +3, -2
+  - `coral-go/pkg/frontend/static/goal_artifacts.js`: +2, -2
+  - `coral-go/pkg/frontend/static/goal_done.js`: +18, -9
+  - `coral-go/pkg/frontend/static/goal_editor.js`: +2, -2
+  - `coral-go/pkg/frontend/static/goal_view.js`: +3, -3
+  - `coral-go/pkg/frontend/static/guide_names.js`: +3, -2
+  - `coral-go/pkg/frontend/static/hub_blocked_controls.js`: +8, -2
+  - `coral-go/pkg/frontend/static/inbox_proposals.js`: +2, -2
+  - `coral-go/pkg/frontend/static/inbox_sidebar.js`: +7, -5
+  - `coral-go/pkg/frontend/static/launch_skills.js`: +5, -2
+  - `coral-go/pkg/frontend/static/needs_incomplete.js`: +23, -0
+  - `coral-go/pkg/frontend/static/needs_skills.js`: +29, -11
+  - `coral-go/pkg/frontend/static/operator_ask_dialog.js`: +2, -2
+  - `coral-go/pkg/frontend/static/operator_asks.js`: +21, -6
+  - `coral-go/pkg/frontend/static/phone_bar.js`: +4, -1
+  - `coral-go/pkg/frontend/static/preview_pane.js`: +1, -1
+  - `coral-go/pkg/frontend/static/proposals_state.js`: +16, -9
+  - `coral-go/pkg/frontend/static/server_base.js`: +0, -6
+  - `coral-go/pkg/frontend/static/short_artifact_refs.js`: +5, -2
+  - `coral-go/pkg/frontend/static/team_artifacts_page.js`: +1, -1
+  - `coral-go/pkg/frontend/static/team_tasks_page.js`: +3, -3
+
+  `agent_docs`: 1 file the Hub embeds changed (+2, -2)
+
+  - `coral-go/agent_docs/resource-queue.md`: +2, -2
+
+  Unchanged: `pkg/hubproxy`, `pkg/redact`.
+
+  ### Coral packages compiled into the Hub through its imports, v2.0.57 to d9eaa0f98
+
+  Unchanged: `internal/fsreplace`, `internal/httputil`, `internal/logsafe`, `internal/safego`, `internal/secfile`, `internal/secrets`, `pkg/redact/betterleaks`.
+
+#### For developers and releases
+
+- Test-only fixes after the first gates: the redaction test's fake key block is spelled in pieces and its one history finding is accepted by fingerprint in `.gitleaksignore`, the comment-image and Saved Inbox suites follow the new scopes, the Windows launch tests use a small stand-in program, and several source-scan tests skip comments.
+
 ## v2.0.57 — Answer a question with its Recommended option, a timeout for dialogs nobody answers, and Send to agent with the diff
 
 ### Changes
