@@ -479,6 +479,14 @@ export function attachComments(dialog, body, host, opts = {}) {
     return {
         /** The Comments button in either layout: the owner places it when toggleHost was given. */
         toggle,
+        /** Open a newly sent edit's existing artifact thread without discarding a composer. */
+        async showThread(id) {
+            const hex = st.hex, gen = ctxGen; await refresh();
+            if (hex !== st.hex || gen !== ctxGen || !st.data?.comments.some(c => c.id === id)) return false;
+            setSheet(true); activate(id, false); render();
+            const card = panel.querySelector(`.ac-card[data-id="${id}"]`); if (card) { card.tabIndex = -1; card.focus(); }
+            return true;
+        },
         /** Whether the panel (a phone's sheet) is open, and open or close it without remembering a choice: the version compare closes the sheet that would hide the document from the keyboard. */
         sheetOpen: () => isOpen(), setSheet: (open) => setSheet(open),
         /** A new artifact is on show. */

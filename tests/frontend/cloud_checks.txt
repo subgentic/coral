@@ -354,3 +354,7 @@ node coral_ref.test.mjs
 node coral_subject_refs.test.mjs
 node native_coral_links.test.mjs
 node cloud_account_flags.test.mjs
+
+node artifact_edit_send_api.test.mjs
+node artifact_edit_send.test.mjs
+node artifact_edit_send_viewer.test.mjs

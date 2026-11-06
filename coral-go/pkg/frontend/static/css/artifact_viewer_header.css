@@ -99,3 +99,5 @@
     .artifact-viewer-fullscreen { flex: none; }
 }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .artifact-viewer-fullscreen { display: none; } }
+
+.artifact-edit-send-note{font-size:var(--fs-sm);line-height:var(--lh-body);color:var(--text-secondary);padding:8px 12px;margin:0;border-bottom:1px solid var(--border)}.artifact-edit-send-note[hidden],.artifact-edit-send-action[hidden]{display:none}.av-markdown-edit .artifact-edit-send-note,.av-markdown-edit .artifact-edit-send-action{display:none!important}.artifact-edit-send-action{white-space:normal;min-width:0}@media(max-width:768px){.artifact-viewer-foot .artifact-edit-send-action{flex:1;min-height:44px}}

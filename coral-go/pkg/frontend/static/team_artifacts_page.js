@@ -51,9 +51,10 @@ export function createArtifactsList({ inbox = false } = {}) {
 
     const PAGE = 50; // a computer answers at most 50 a request (#13161)
     const model = { project: '', scope: null, key: '', loaded: false, items: [], hasMore: false, cursor: '', counts: null, truncated: false, loading: false, error: '', loadingMore: false, filters: { ...F.EMPTY }, kept: new Set(), tagCounts: {}, gen: 0, controller: null, teams: [] };
-    let loadedToken = null, loadedKey = '', loadedSnapshot = null, refreshNeeded = false;
-    onArtifactsRev((team, rev, reconnect) => {
-        if (!reconnect && !inbox && team !== model.project) return;
+    let loadedToken = null, loadedKey = '', loadedSnapshot = null, refreshNeeded = false, localRefresh = false;
+    onArtifactsRev((team, rev, reconnect, mutation) => {
+        if (team !== null && !inbox && team !== model.project) return;
+        localRefresh ||= mutation === true;
         if (reconnect) { loadedToken = null; loadedSnapshot = null; }
         refreshNeeded = true;
         refreshQuiet();
@@ -235,17 +236,17 @@ export function createArtifactsList({ inbox = false } = {}) {
         else bar.setHeader(title, []);
     }
 
-    // The tab keeps itself current (it had a Refresh icon, #7686): when the window comes back to the front and on a slow read while it is on screen; a list the person paged further is left as it is.
+    // Background reads leave a paged list steady. An explicit save/send refreshes the first page so its newly saved version is current.
     let watching = false, reading = false;
     async function refreshQuiet() {
-        if (!root || !root.isConnected || !root.getClientRects().length || document.hidden || reading || retryLabels || !model.key || model.loading || model.loadingMore || model.items.length > PAGE) return;
+        if (!root || !root.isConnected || !root.getClientRects().length || document.hidden || reading || retryLabels || !model.key || model.loading || model.loadingMore || (model.items.length > PAGE && !localRefresh)) return;
         reading = true;
         const key = model.key;
         try {
-            const dirty = refreshNeeded; refreshNeeded = false;
+            const dirty = refreshNeeded, userRefresh = localRefresh; refreshNeeded = false; localRefresh = false;
             const unchanged = !dirty && loadedKey === key && (inbox ? await inboxArtifactsUnchanged(loadedSnapshot) : !(model.scope && model.scope.standalone) && await artifactsUnchanged(model.project, loadedToken));
             if (key !== model.key) return;
-            if (!unchanged || refreshNeeded) { refreshNeeded = false; await loadArtifacts({ keep: true }); }
+            if (!unchanged || refreshNeeded) { refreshNeeded = false; await loadArtifacts({ keep: true }); if (model.error) localRefresh ||= userRefresh; }
         } finally { reading = false; if (refreshNeeded) refreshQuiet(); }
     }
     function watch() {

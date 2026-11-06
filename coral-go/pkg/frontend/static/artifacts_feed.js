@@ -32,3 +32,11 @@ export async function artifactsUnchanged(team, loaded, all = false) {
         return rev === loaded;
     } catch { return false; }
 }
+
+/** An explicit local save/send invalidates only its qualified team's lists, even
+ * on an older server that has not returned an artifact revision yet. */
+export function invalidateArtifacts(team) {
+    if (!team) return;
+    revisions.delete(team);
+    for (const fn of [...listeners]) fn(team, null, true, true);
+}
