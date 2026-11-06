@@ -7,7 +7,7 @@ const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const { launchStandIn } = require('./helpers/stand_in_agent');
 const { removeBoards } = require('./helpers/board_cleanup');
-const { coralReady } = require('./helpers/wait');
+const { coralReady, waitStable, framesJs } = require('./helpers/wait');
 const BASE = require('./test_base').BASE;
 const hexOf = data => String(data.digest || data.hex || data.id || '').replace(/^sha256:/,'');
 (async () => {
@@ -18,23 +18,16 @@ const hexOf = data => String(data.digest || data.hex || data.id || '').replace(/
     const upload = async (name, text, previous) => { const r=await fetch(BASE+`/api/agent/artifacts?session_id=${author.sid}`,{method:'POST',headers:{'X-Coral-Session-Token':author.token,'Content-Type':'application/octet-stream','X-Artifact-Name':name,'X-Artifact-Media-Type':'text/markdown',...(previous?{'X-Artifact-New-Version-Of':previous}:{})},body:Buffer.from(text)});const data=await r.json();assert.equal(r.status,201,JSON.stringify(data));return hexOf(data); };
     const bytes = hex => ev(`fetch('/api/artifacts/${hex}?v=2').then(r=>r.arrayBuffer()).then(b=>Array.from(new Uint8Array(b)))`);
     const nativeClick = async selector => {
-        // Scroll first, then observe a stable, enabled hit target across layout frames.
-        const r = await ev(`new Promise((resolve,reject)=>{
-            const e=document.querySelector(${JSON.stringify(selector)});if(!e)return reject(Error('Missing '+${JSON.stringify(selector)}));
-            e.scrollIntoView({block:'nearest',inline:'nearest'});
-            let previous='',stable=0;
-            const frame=()=>{const box=e.getBoundingClientRect(),now=[box.x,box.y,box.width,box.height].join(',');
-                stable=!e.disabled&&now===previous?stable+1:0;previous=now;
-                if(stable<2)return requestAnimationFrame(frame);
-                const x=box.x+box.width/2,y=box.y+box.height/2;
-                if(!e.contains(document.elementFromPoint(x,y)))return reject(Error('Covered '+${JSON.stringify(selector)}+' by '+document.elementFromPoint(x,y)?.outerHTML));
-                resolve({x,y});};requestAnimationFrame(frame);
-        })`);
+        // Scroll only an off-target control, then wait on its enabled, stable geometry.
+        await ev(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e)throw Error('Missing '+${JSON.stringify(selector)});const r=e.getBoundingClientRect();if(!e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)))e.scrollIntoView({block:'nearest',inline:'nearest'});})()`);
+        await waitStable(ev, `(()=>{const e=document.querySelector(${JSON.stringify(selector)}),r=e.getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height,disabled:!!e.disabled};})()`, selector+' enabled stable rectangle', 40, {timeout:5000,accept:r=>!r.disabled&&r.w>0&&r.h>0});
+        const r=await ev(`(()=>{const e=document.querySelector(${JSON.stringify(selector)}),b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2;if(!e.contains(document.elementFromPoint(x,y)))throw Error('Covered '+${JSON.stringify(selector)}+' by '+document.elementFromPoint(x,y)?.outerHTML);return{x,y};})()`);
         // The controlled late response lands after measurement in the old helper.
         if (selector === '.artifact-viewer-edit-item' && await ev(`!!window.__mdVersionGate?.release`)) {
             await ev(`window.__mdVersionGate.release();window.__mdVersionGate.release=null;true`);
             await waitFor(`!!document.querySelector('.av-current')`, 'injected version chip lands', 8000);
-            const moved=await ev(`new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>{const b=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();resolve({x:b.x+b.width/2,y:b.y+b.height/2});})))`);
+            await ev(framesJs(2));
+            const moved=await ev(`(()=>{const b=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();return{x:b.x+b.width/2,y:b.y+b.height/2};})()`);
             console.log('CONTROLLED VERSION RESPONSE: measured',JSON.stringify(r),'after chip',JSON.stringify(moved));
         }
         await client.Input.dispatchMouseEvent({type:'mousePressed',...r,button:'left',clickCount:1});await client.Input.dispatchMouseEvent({type:'mouseReleased',...r,button:'left',clickCount:1}); };
