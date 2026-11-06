@@ -62,7 +62,7 @@ func (h *BoardHandler) editTargetOf(w http.ResponseWriter, project, digest strin
 		errNotFound(w, "this team has no such file")
 		return editTarget{}, false
 	}
-	if sid, _, in := digestSeries(coralDir, digest); in {
+	if sid, _, in := digestSeriesOnBoard(coralDir, digest, project); in { // this team's series of the bytes: the same bytes a second team uploaded on its own are that team's file, not this one's (#13942)
 		ms := seriesMembers(coralDir, sid)
 		if len(ms) == 0 || ms[0].Board != project {
 			return notFound()

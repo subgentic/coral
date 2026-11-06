@@ -66,7 +66,7 @@ func (h *SessionsHandler) editSendTargetOf(w http.ResponseWriter, project, diges
 		return t, false
 	}
 	coralDir := h.cfg.CoralDir()
-	sid, _, in := digestSeries(coralDir, digest)
+	sid, _, in := digestSeriesOnBoard(coralDir, digest, project) // this team's series (#13942)
 	if !in {
 		commentRefuse(w, http.StatusConflict, "not_an_edit", "this version is not a saved edit of the Operator")
 		return t, false
@@ -206,7 +206,7 @@ func (h *SessionsHandler) getEditSend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := map[string]any{"can_send_edit": true, "base_digest": t.prev, "version": t.version, "base_version": 0, "sent_to": []string{}, "thread_id": 0}
-	if sid, _, in := digestSeries(h.cfg.CoralDir(), t.digest); in {
+	if sid, _, in := digestSeriesOnBoard(h.cfg.CoralDir(), t.digest, chi.URLParam(r, "project")); in { // this team's series (#13942)
 		for _, m := range seriesMembers(h.cfg.CoralDir(), sid) {
 			if m.Digest == t.prev {
 				out["base_version"] = m.N
