@@ -42,7 +42,7 @@ const BASE = require('./test_base').BASE;
         assert.equal(await asked(), 2, 'opened: the answer is read, once');
         const body = await ev(`[...document.querySelectorAll('#agentic-detail-pane .artifact-readers-body p')].map(p => p.textContent)`);
         assert.match(body[0], /^On this computer, the Operator reads, manages and deletes every artifact/, JSON.stringify(body));
-        assert.ok(body.some(t => /^Held by the Operator on this computer/.test(t)), JSON.stringify(body));
+        assert.ok(body.some(t => /^Owned by the Operator on this computer/.test(t)), JSON.stringify(body));
         assert.match(body[body.length - 1], /not an operating-system boundary.*its own shell\.$/, 'the whole plain note is last: ' + body[body.length - 1]);
         await shot('readers-row', { x: 980, y: 90, width: 420, height: 800 }); // the panel only: the terminal beside it shows the operator's own prompt
 

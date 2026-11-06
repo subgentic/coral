@@ -25,6 +25,7 @@
     /* two thin rows: the name and the ⋯ button, then the chips (version, status, Comments); Approve and Request changes are in the bar at the bottom (#12226) */
     .artifact-viewer-header { flex-wrap: wrap; align-items: center; row-gap: 2px; }
     .artifact-viewer-title { order: 0; flex: 1 1 0; min-width: 120px; padding-bottom: 0; } /* the name keeps room to read: at 320 px Comments wraps to the next row (#12226 review) */
+    .artifact-viewer-header:has(.artifact-viewer-title.is-open) > .artifact-viewer-title { flex: 1 0 100%; } /* an opened name takes the whole header width: the buttons wrap to the next row instead of leaving it a narrow column (#13989) */
     .artifact-viewer-header > .ac-toggle { order: 1; flex: none; }
     .artifact-viewer-morewrap { order: 2; }
     .artifact-viewer-chips { order: 3; flex: 1 0 100%; max-width: 100%; gap: 4px; flex-wrap: wrap; }
@@ -103,3 +104,6 @@
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .artifact-viewer-fullscreen { display: none; } }
 
 .artifact-edit-send-note{font-size:var(--fs-sm);line-height:var(--lh-body);color:var(--text-secondary);padding:8px 12px;margin:0;border-bottom:1px solid var(--border)}.artifact-edit-send-note[hidden],.artifact-edit-send-action[hidden]{display:none}.av-markdown-edit .artifact-edit-send-note,.av-markdown-edit .artifact-edit-send-action{display:none!important}.artifact-edit-send-action{white-space:normal;min-width:0}@media(max-width:768px){.artifact-viewer-foot .artifact-edit-send-action{flex:1;min-height:44px}}
+
+/* A long name is cut with an ellipsis; a tap or click on it shows the whole name (#13979) */
+.artifact-viewer-header .artifact-viewer-title.is-open { white-space: normal; overflow-wrap: anywhere; }

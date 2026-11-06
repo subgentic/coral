@@ -110,7 +110,7 @@ const MD = [
                 const body = d.querySelector('.artifact-viewer-body');
                 return {
                     title: d.querySelector('.artifact-viewer-title').textContent,
-                    titleElements: d.querySelector('.artifact-viewer-title').children.length,
+                    titleElements: d.querySelector('.artifact-viewer-title').querySelectorAll(':scope > :not(span.artifact-viewer-title-name), .artifact-viewer-title-name *').length, // the viewer's own one span holds the name (#13979); anything else, or anything inside it, would be markup from the file's name
                     h1: body.querySelector('h1')?.textContent || null,
                     bold: !!body.querySelector('strong'),
                     code: body.querySelector('pre code')?.textContent || null,
