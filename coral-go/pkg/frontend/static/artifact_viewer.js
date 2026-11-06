@@ -6,7 +6,7 @@
  * Download button keeps the original bytes one click away, through Coral Hub too. */
 import { isPhoneLayout } from './phone_layout.js';
 import { markHidden } from './visible_marks.js';
-import { escapeHtml, renderMarkdownStrict, highlightCodeIn, keepFragmentsInside } from './utils.js';
+import { escapeHtml, renderMarkdownStrict, highlightCodeIn, keepFragmentsInside, showToast } from './utils.js';
 import { serverUrl, artifactPath, isCloud, boardTeamKey, contextServer, normServer } from './server_base.js';
 import { renderArtifact, manifestDownload } from './artifact_preview.js';
 import { downloadArtifact, sanitizeDownloadName } from './artifact_download.js';
@@ -109,6 +109,7 @@ function _build() {
                 <div class="menu artifact-viewer-menu" id="artifact-viewer-menu" role="menu" aria-label="More actions" hidden>
                     <button type="button" class="menu-item artifact-viewer-edit-item" role="menuitem" hidden>Edit text</button>
                     <button type="button" class="menu-item artifact-viewer-markup-item" role="menuitem" hidden>Mark up</button>
+                    <button type="button" class="menu-item artifact-viewer-copy-id" role="menuitem">Copy artifact ID</button>
                     <a class="menu-item artifact-viewer-newtab" role="menuitem" target="_blank" rel="noopener noreferrer" hidden>Open in new tab</a>
                     <a class="menu-item artifact-viewer-download" role="menuitem" rel="noopener noreferrer" download>Download</a>
                 </div>
@@ -134,6 +135,7 @@ function _build() {
     d.querySelector('.artifact-viewer-fullscreen').addEventListener('click', () => setFullScreen(d, !d.classList.contains('av-fullscreen'), true));
     const more = d.querySelector('.artifact-viewer-more'), menu = d.querySelector('.artifact-viewer-menu');
     more.addEventListener('click', async (e) => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(more); });
+    d.querySelector('.artifact-viewer-copy-id').addEventListener('click', () => { const hex = _hex; importOnce('./artifact_clipboard.js').then(m => m.copyArtifactId(hex)).catch(() => showToast('Could not copy artifact ID', true)); });
     menu.addEventListener('click', async () => { (await importOnce('./menu_button.js')).closeMenus(); }); // a choice closes the menu
     // Mark up (#12367, the operator: "I don't see any way to markup the image in the window"): for a picture, the comment composer's drawing tool opens on the file's own image, and Done starts a comment on the file with the marked copy attached; the file itself is not changed
     const markUp = async () => {
