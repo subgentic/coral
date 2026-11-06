@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/subgentic/coral/internal/gitutil"
 	"github.com/subgentic/coral/internal/safego"
 	"io"
 	"os"
@@ -70,13 +71,13 @@ func looksSecret(base string, tracked bool) bool {
 // caps. It never lists what git ignores, and never .git.
 func FileList(root string, lim ClientLimits) (FileSet, error) {
 	var fs FileSet
-	cmd := exec.Command("git", "-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard")
+	cmd := gitutil.Command(context.Background(), root, "ls-files", "-z", "--cached", "--others", "--exclude-standard")
 	out, err := cmd.Output()
 	if err != nil {
 		return fs, fmt.Errorf("heavy: git ls-files: %w", err)
 	}
 	tracked := map[string]bool{}
-	if tout, err := exec.Command("git", "-C", root, "ls-files", "-z", "--cached").Output(); err == nil {
+	if tout, err := gitutil.Command(context.Background(), root, "ls-files", "-z", "--cached").Output(); err == nil {
 		for _, n := range bytes.Split(tout, []byte{0}) {
 			tracked[string(n)] = true
 		}
