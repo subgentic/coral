@@ -249,8 +249,9 @@ func TestAnAgentsLaunchIsNotStartedInAutoByDefault(t *testing.T) {
 	_, h, _, ss := setupSessionsTestServer(t)
 	stubCLIPaths(t, ss)
 	ctx := context.Background()
+	parentDir := t.TempDir() // an agent starts agents in its team's folder (#13891)
 	const parent = "11111111-2222-4333-8444-555555555555"
-	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: parent, AgentType: "claude", AgentName: "parent", WorkingDir: t.TempDir()}))
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: parent, AgentType: "claude", AgentName: "parent", WorkingDir: parentDir}))
 	asAgent := func(r *http.Request) *http.Request { // a request with an agent's verified session token
 		return r.WithContext(context.WithValue(r.Context(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: parent, SessionName: "claude-" + parent}))
 	}
@@ -263,7 +264,7 @@ func TestAnAgentsLaunchIsNotStartedInAutoByDefault(t *testing.T) {
 	}
 	launch := func(agentCaller bool) string {
 		t.Helper()
-		b, _ := json.Marshal(map[string]any{"agent_type": at.Claude, "working_dir": t.TempDir()})
+		b, _ := json.Marshal(map[string]any{"agent_type": at.Claude, "working_dir": parentDir})
 		req := httptest.NewRequest(http.MethodPost, "/api/sessions/launch", bytes.NewReader(b))
 		if agentCaller {
 			req = asAgent(req)
@@ -277,7 +278,7 @@ func TestAnAgentsLaunchIsNotStartedInAutoByDefault(t *testing.T) {
 	}
 	team := func(agentCaller bool, member map[string]any) string {
 		t.Helper()
-		b, _ := json.Marshal(map[string]any{"board_name": "ag" + strings.ReplaceAll(t.Name(), "/", "") + fmt.Sprint(len(member)), "new_board": true, "working_dir": t.TempDir(), "agent_type": at.Claude,
+		b, _ := json.Marshal(map[string]any{"board_name": "ag" + strings.ReplaceAll(t.Name(), "/", "") + fmt.Sprint(len(member)), "new_board": true, "working_dir": parentDir, "agent_type": at.Claude,
 			"agents": []map[string]any{member}})
 		req := httptest.NewRequest(http.MethodPost, "/api/sessions/launch-team", bytes.NewReader(b))
 		if agentCaller {
@@ -306,7 +307,7 @@ func TestAnAgentsLaunchIsNotStartedInAutoByDefault(t *testing.T) {
 	require.NoError(t, ss.SetSetting(ctx, "default_permission_mode", "default"))
 	assert.Equal(t, "default", launch(true))
 	require.NoError(t, ss.SetSetting(ctx, "default_permission_mode", "acceptEdits"))
-	b, _ := json.Marshal(map[string]any{"agent_type": at.Claude, "working_dir": t.TempDir()})
+	b, _ := json.Marshal(map[string]any{"agent_type": at.Claude, "working_dir": parentDir})
 	rec := httptest.NewRecorder()
 	h.Launch(rec, asAgent(httptest.NewRequest(http.MethodPost, "/api/sessions/launch", bytes.NewReader(b))))
 	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())

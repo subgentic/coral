@@ -90,6 +90,10 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "working_dir is required")
 		return
 	}
+	// An agent that names no board starts the agent on its own team's board where that team's grant is on (#13903). Whatever it names, the launch is held to that team's caps and log below.
+	if body.BoardName == "" && body.BoardID == "" && (body.BoardServer == "" || body.BoardServer == "local") {
+		body.BoardID = h.callersBoardWithGrant(r)
+	}
 	// Which board on this Coral the agent joins or starts (#3536); a remote board's Coral decides its own.
 	if (body.BoardName != "" || body.BoardID != "") && (body.BoardServer == "" || body.BoardServer == "local") {
 		key, ok := h.launchBoard(w, r, body.BoardID, body.BoardName, body.NewBoard)
@@ -98,6 +102,11 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		body.BoardName = key
+	}
+	// An agent on a team whose grant is on starts agents in that team's folders, wherever the agent is placed (#13891, #13903).
+	if h.refuseAgentLaunchOutsideTeam(w, r, body.WorkingDir) {
+		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+		return
 	}
 	// An unknown agent_type used to fall through to Claude and return 200
 	// ok:true, silently starting an agent the caller never asked for.
@@ -205,8 +214,9 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	// Everything before this could be refused with nothing made; from here the terminal is made and the agent started whatever the request does (#5213).
 	// An agent's launch onto a board is logged (the switch on or off) and, with the Operator's switch on, held to the board's caps (#11432).
 	var lifeID int64
-	if agentCaller(r) && body.BoardName != "" && (body.BoardServer == "" || body.BoardServer == "local") {
-		id, ok := h.beginAgentLaunch(w, r, body.BoardName, launchTargetName(body.DisplayName, body.AgentType))
+	acct := h.accountingBoard(r, body.BoardName, body.BoardServer) // the team the launch is held to, wherever the agent is placed (#13903)
+	if agentCaller(r) && acct != "" {
+		id, ok := h.beginAgentLaunch(w, r, acct, launchTargetName(body.DisplayName, body.AgentType))
 		if !ok {
 			attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
 			return
@@ -228,7 +238,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		AutoByDefault: !agentCaller(r) && autoDefaultAllowed(lctx, r, h.ss), // not for an agent's launch (it may not start a less-restricted agent, #4032), and a Hub request the owner does not let skip prompts asks instead (#5836)
 	})
 	if err != nil {
-		h.endAgentLaunch(r.Context(), body.BoardName, lifeID, false, "")
+		h.endAgentLaunch(r.Context(), acct, lifeID, false, "", "")
 		var refused *modelRefusedError
 		if errors.As(err, &refused) { // a model Pi does not list: the request's fault, refused before anything was made (#11105)
 			attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
@@ -244,7 +254,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	attempt.Finish(tracking.OutcomeSuccess, "", 1, 0)
-	h.endAgentLaunch(r.Context(), body.BoardName, lifeID, true, launcherWords(h.orchActorOf(r))+" started "+orchName(launchTargetName(body.DisplayName, body.AgentType)))
+	h.endAgentLaunch(r.Context(), acct, lifeID, true, launcherWords(h.orchActorOf(r))+" started "+orchName(launchTargetName(body.DisplayName, body.AgentType)), fmt.Sprint(result["session_id"]))
 
 	// Setup board subscription in background (prompt is passed as CLI arg, not via tmux send-keys)
 	if body.BoardName != "" {
