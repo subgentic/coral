@@ -136,3 +136,13 @@ func seriesMembersFor(rig *artifactRig, digest string) []seriesMember {
 	}
 	return seriesMembers(rig.coralDir, sid)
 }
+
+// The base is the digest in its one lower-case form: an upper-case digest names nothing and is a bad request (400), so it can neither be a way round the check nor mean a different artifact.
+func TestAnUpperCaseDigestIsABadRequestNotAWayRoundTheCheck(t *testing.T) {
+	rig, _ := ownerRig(t)
+	v1, _ := personSeries(t, rig)
+	before := len(seriesMembersFor(rig, v1))
+	code, out := rig.uploadVersion("a1", "plan.txt", "from an upper-case base", "coral://artifacts/"+strings.ToUpper(v1))
+	assert.Equal(t, http.StatusBadRequest, code, "%v", out)
+	assert.Equal(t, before, len(seriesMembersFor(rig, v1)), "nothing stored")
+}
