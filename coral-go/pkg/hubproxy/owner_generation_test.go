@@ -250,3 +250,37 @@ func TestTheModelSwitchIsSignedOnlyForAGenerationThreeRemoteAndASession(t *testi
 	assert.Empty(t, s3b.header.Get(hubowner.Header), "not the person: not signed")
 	s3b.mu.Unlock()
 }
+
+// #13757/#13761 (Backend Dev's SHOULD 4): an editor save over 64 KB through the Hub is refused WHOLE with the words about saving a file, only where it would have been signed (a generation 3 remote); an older remote
+// gets it unstamped, as before, never refused.
+func TestAnEditorSaveOver64KBIsRefusedWithTheFileWordsOnlyForAGenerationThreeRemote(t *testing.T) {
+	const editPath = "/api/board/team/artifacts/" + "abc123" + "/edit"
+	big := `{"text":"` + strings.Repeat("x", hubowner.MaxBody) + `"}`
+	send := func(hub *httptest.Server) (int, string) {
+		req, _ := http.NewRequest("POST", hub.URL+"/api/remote/a"+editPath, strings.NewReader(big))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Test-Person", "1")
+		req.Header.Set("X-Test-Session", "1")
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		b, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		return resp.StatusCode, string(b)
+	}
+	rem3, s3, _ := remoteAt(t, 3)
+	code, body := send(hubOver(t, rem3))
+	assert.Equal(t, http.StatusRequestEntityTooLarge, code)
+	assert.Contains(t, body, "hub_file_too_large", "the code of a file")
+	assert.Contains(t, body, "too large to save through the Hub", "the words of a file, not of a message")
+	assert.NotContains(t, body, "message")
+	s3.mu.Lock()
+	assert.Empty(t, s3.body, "nothing of it reached the remote")
+	s3.mu.Unlock()
+
+	rem2, s2, _ := remoteAt(t, 2)
+	code, _ = send(hubOver(t, rem2))
+	assert.Equal(t, http.StatusOK, code, "a generation 2 remote does not list the edit route: sent unstamped, not refused")
+	s2.mu.Lock()
+	assert.Empty(t, s2.header.Get(hubowner.Header))
+	s2.mu.Unlock()
+}
