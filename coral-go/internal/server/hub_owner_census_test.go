@@ -50,7 +50,7 @@ var neverStamped = []string{
 
 // stampedAnyway: routes that are not an Activity row of their own but are on the list on purpose (tier B, Security's answer on #13694): a person's decision gated like the Activity ones.
 var stampedAnyway = map[string]string{
-	"POST /api/sessions/live/{name}/model": "the chat box's model and thinking-level switch (#13761, Security): a person's choice on their own agent, person-gated, so it must carry the stamp or it answers 403 through the Hub; it types only a validated value",
+	"POST /api/sessions/live/{name}/model":                                 "the chat box's model and thinking-level switch (#13761, Security): a person's choice on their own agent, person-gated, so it must carry the stamp or it answers 403 through the Hub; it types only a validated value",
 	"POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle": "the second half of an ask button's click (claim is the Activity row); person-gated, so it must carry the stamp or it answers 403 through the Hub",
 }
 
