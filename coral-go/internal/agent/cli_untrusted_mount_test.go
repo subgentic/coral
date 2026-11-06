@@ -106,11 +106,12 @@ func TestValidateCLIPathExplainsAnUntrustedMount(t *testing.T) {
 	}
 }
 
-// Security's note on #150: only a bare name is looked up along PATH; a path (with a separator) is skipped before the join.
+// Security's note on #150: only a bare name is looked up along PATH; a path (with a separator) is skipped before the join, and so is a name with a
+// colon: a drive-relative name or an alternate stream is not a bare name either.
 func TestUntrustedMountDirSkipsAnythingButABareName(t *testing.T) {
 	stat := func(string) (os.FileInfo, error) { return nil, syscall.Errno(448) }
 	dir := t.TempDir()
-	for _, name := range []string{"", `C:\x\codex.exe`, "a/b", `..\codex`, "sub/codex"} {
+	for _, name := range []string{"", `C:\x\codex.exe`, "a/b", `..\codex`, "sub/codex", "c:codex", "codex:stream", ":"} {
 		if got, ok := untrustedMountDir(name, dir, "", stat); ok {
 			t.Errorf("%q is not a bare name, got %q", name, got)
 		}
