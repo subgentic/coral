@@ -11,7 +11,7 @@ const { coralReady } = require('./helpers/wait');
     const team = 'new-comments-' + Date.now().toString(36), failures = [];
     const row = name => `[...document.querySelectorAll('#group-table-view tbody tr')].find(r=>r.textContent.includes(${JSON.stringify(name)}))`;
     const badge = () => ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`);
-    const marker = name => ev(`!![...(${row(name)}).querySelectorAll('.dt-tag')].find(t => t.textContent.trim() === 'New comments')`);
+    const marker = name => ev(`!![...(${row(name)}).querySelectorAll('.inbox-new-comments')].find(t => /[1-9][0-9]* new comments?/.test(t.textContent))`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const width of [1280, 390]) {

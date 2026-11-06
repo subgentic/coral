@@ -6,7 +6,7 @@ import { fetchReviewProjects, sourcesKey } from './board_fetch.js';
 import { boardFetch, boardArtifactPage, nextArtifactPage, keyLabel, splitKey, serverFetch, identityKey, normServer } from './server_base.js';
 import { hideAsksWhen } from './ask_filter.js';
 import { importOnce } from './import_once.js';
-const { needsReviewAttention, hasNewVersion } = await importOnce('./inbox_review_state.js');
+const { needsReviewAttention, hasNewVersion, waitingOnAgent } = await importOnce('./inbox_review_state.js');
 
 let items = [], saved = [], muted = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => { if (typeof document !== 'undefined') document.dispatchEvent(new Event('coral:reviews-changed')); };
 let activated = false, refreshAgain = false;
@@ -93,7 +93,7 @@ async function readTeam(team, mutedOut = null, stamp = {}) {
     for (let at = { cursor: '', offset: 0 }, pages = 0; pages < 200; pages++) { // 50 a page, by the computer's cursor (#13161)
         const key = splitKey(team), query = new URLSearchParams({ team: key.name, tag: 'for review', starred_first: 'true', limit: '50', ...(at.cursor ? { cursor: at.cursor } : at.offset ? { offset: String(at.offset) } : {}) });
         const r = await serverFetch(key.server, `/api/team-artifacts?${query}`);
-        if (r.status === 403 || r.status === 404) break; // owner-only lists never fall back to a less private board route
+        if (r.status === 403) break; // owner-only lists never fall back to a less private board route
         if (!r.ok) throw new Error('Could not read review artifacts');
         const data = await r.json();
         if (!Array.isArray(data.artifacts)) throw new Error('Review documents could not be read.');
@@ -266,7 +266,7 @@ export function markOpenedRead(hex, team = '') {
         let own = null; // the file's own row, read from its own team alone when the Inbox's scan of every team has not run (a file opened through the Hub): one team's list, not nine (#13489)
         if (!activated && team) own = (await readTeam(team)).find(a => a.hex.toLowerCase() === hex) || null;
         else if (!activated) await refreshReviews(true, { reuse: true }); else if (pending) await pending;
-        const row = own ? (needsReviewAttention(own) || !isRead(own) ? own : undefined) : items.find(a => a.hex.toLowerCase() === hex && (!team || a.team === team) && (needsReviewAttention(a) || !isRead(a))); // a file the Operator asked changes of waits on the agent: the viewer and the preview redraw it after the request, and that is not reading it again (#11860); it stays counted until the agent answers
+        const row = own ? (needsReviewAttention(own) || (!isRead(own) && !waitingOnAgent(own)) ? own : undefined) : items.find(a => a.hex.toLowerCase() === hex && (!team || a.team === team) && (needsReviewAttention(a) || (!isRead(a) && !waitingOnAgent(a)))); // a file the Operator asked changes of waits on the agent: the viewer and the preview redraw it after the request, and that is not reading it again (#11860); it stays counted until the agent answers
         if (row) {
             if (row.new_comments > 0) { // opening the file is opening its thread: the server marks the Operator's threads seen when the comments are read (#12026), so the row is read, and the count follows
                 const { listComments } = await importOnce('./artifact_comments_api.js');

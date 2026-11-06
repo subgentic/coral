@@ -170,9 +170,9 @@ const { coralReady } = require('./helpers/wait');
                     assert.match(await ev(`document.querySelector('.artifact-review-state').textContent`),/waiting for a new version from .*Approving now approves this version as it is/,'and the state says what is waited for');
                     assert.equal(await ev(`window.__decisions.filter(d=>d.decision==='changes').length`),1,'two taps sent one request');
                     assert.equal(await ev(`window.__comments.filter(c=>c.body).length`),1,'and made one comment');
-                    // #11985 (the operator): after Request changes the file LEAVES Needs you (it is the agent's turn; nothing waits on the person) and its count; the agent's next version comes back as a NEW item, unread and counted
+                    // #13916: Request changes keeps the document visible, waiting on the agent and uncounted; a new version returns it to active review.
                     const needsCount = () => ev(`Number(document.querySelector('#inbox-nav-list .view-list-item[data-key="needs"] .view-list-count')?.textContent || 0)`);
-                    await waitFor(`!(${row('Review file 01.txt')})`,'after Request changes the file leaves Needs you',8000);
+                    await waitFor(`!!(${row('Review file 01.txt')}) && (${row('Review file 01.txt')}).textContent.includes('Changes requested') && (${row('Review file 01.txt')}).classList.contains('dt-read')`,'after Request changes the file remains visible and uncounted',8000);
                     // #11860 (Beta #8): the viewer reloads itself after the request, and that reload is not a new opening: the file is not marked read again
                     await require('./helpers/wait').settle(ev, 400, 300);
                     assert.equal(await ev(`window.__reviewItems.find(a=>a.id==='${(1).toString(16).padStart(64,'0')}').tags.includes('read')`),false,'Request changes leaves the file unread: the viewer reloading does not read it again: ' + await ev(`JSON.stringify(window.__reviewWrites)`));

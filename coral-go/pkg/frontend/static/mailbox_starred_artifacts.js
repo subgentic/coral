@@ -21,14 +21,15 @@ export function ensureStarredArtifacts(done) {
     if (state.busy || (state.at && Date.now() - state.at < STALE_MS)) return;
     state.busy = true;
     (async () => {
-        const rows = new Map(), failures = new Set(); let cursor = '', total = null;
+        const rows = new Map(), failures = new Set(); let cursor = '', total = null, incomplete = false;
         for (let page = 0; page < 200; page++) {
             const d = await readInboxArtifacts(new URLSearchParams({ starred: 'true', versions: 'newest', limit: '100', ...(cursor ? { cursor } : {}) }));
             if (d.waiting) { state.error = 'The computer list is still loading. Press Retry to try again.'; return; }
             for (const a of d.artifacts || []) if (a.starred !== false) rows.set(JSON.stringify([a.server, a.series_id || a.id]), a);
             for (const server of d.failed || []) failures.add(server);
+            incomplete ||= !!d.partial || !!d.failed_boards?.length;
             total = Number.isFinite(d.total) ? d.total : total;
-            if (!d.has_more) { state.rows = [...rows.values()]; state.total = total ?? rows.size; state.error = failures.size ? 'Some computers could not be read. Press Retry to try again.' : ''; return; }
+            if (!d.has_more) { state.rows = [...rows.values()]; state.total = total ?? rows.size; state.error = failures.size || incomplete ? 'Some starred documents could not be read. Press Retry to try again.' : ''; return; }
             if (!d.next_cursor || d.next_cursor === cursor) break;
             cursor = d.next_cursor;
         }

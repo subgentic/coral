@@ -19,7 +19,7 @@
 }
 
 .inbox-review-reason { font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-secondary); }
-.inbox-review-inline-version { display: none; }
+.inbox-review-inline-version { display: none; font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-secondary); }
 @media (max-width: 760px) {
     .inbox-review-star-anchor .inbox-review-item.inbox-agent-first { grid-template-areas: "from wait" "name name" "more more"; }
     .inbox-review-star-anchor .inbox-review-name:has(.inbox-review-reason) { -webkit-line-clamp: unset; line-clamp: unset; }
