@@ -1099,7 +1099,10 @@ func (h *BoardHandler) attachSeriesVersions(rows []teamArtifact, project string)
 		}
 		board := project // the same bytes can be uploaded by two teams into two series: the row is its own team's (all-teams rows say theirs)
 		if board == "" {
-			board = rows[i].Team
+			board = rows[i].BoardID // the board's id, never its display label (#13988: a board called Product that is alpha has its series under alpha)
+		}
+		if board == "" {
+			board = rows[i].Team // a row that names only its team
 		}
 		sid, n, ok := digestSeriesOnBoard(h.coralDir, id, board)
 		if !ok {
