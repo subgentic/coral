@@ -21,7 +21,7 @@ const { coralReady } = require('./helpers/wait');
                 const hex = c => c.repeat(64), at = i => new Date(Date.now() - i * 3600000).toISOString();
                 const file = (c, name, extra) => ({ id: hex(c), name, uri: 'coral://artifacts/' + hex(c), digest: hex(c), available: true, tags: ['for review'], created_at: at(3), ...extra });
                 const files = window.__mutedFiles = [file('b', 'release-notes.md', { kind: 'release', muted: true }), file('d', 'decisions.md', { kind: 'decided', muted: true })];
-                window.fetch = (u, o = {}) => { const url = window.__reviewFixtureURL(String(u), location.href);
+                window.fetch = (u, o = {}) => { const pageURL = new URL(String(u), location.href), page = pageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(pageURL, location.href, {'alpha': files}) : null; if (page) return new Promise(done => setTimeout(() => done(json(page)), 900)); /* sleep-ok: fixture response delay preserves the stale-read ordering */ const url = window.__reviewFixtureURL(String(u), location.href);
                     if (url.pathname === '/api/board/projects') return json([{ project: 'alpha' }]);
                     if (url.pathname === '/api/board/alpha/artifacts' && url.searchParams.get('tag') === 'for review') return new Promise(r => setTimeout(() => r(json({ artifacts: files, has_more: false })), 900)); // the read ends AFTER the folder first drew (nothing to show yet)
                     if (url.pathname === '/api/board/alpha/artifacts') return json({ artifacts: [], has_more: false });

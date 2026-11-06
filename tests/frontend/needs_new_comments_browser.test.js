@@ -30,7 +30,7 @@ const { coralReady } = require('./helpers/wait');
                     window.__commentsFail = false; window.__tagReads = [];
                     const original = window.fetch, json = (body, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }));
                     window.fetch = (url, opts = {}) => {
-                        const u = window.__reviewFixtureURL(String(url), location.origin);
+                        const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, {'${team}': window.__reviewItems}) : null; if (reviewPage) return json(reviewPage); const u = window.__reviewFixtureURL(String(url), location.origin);
                         if (u.pathname === '/api/board/${team}/artifacts') {
                             const tag = u.searchParams.get('tag'); window.__tagReads.push(tag);
                             const items = window.__reviewItems.filter(a => !tag || a.tags.includes(tag) || (tag === 'for review' && a.new_comments > 0 && /approved|denied/.test(a.tags.join(' ')) && !a.tags.some(x => ['saved', 'ignored', 'superseded'].includes(x)))); // the server's rule (#12097): the for-review list also holds a decided file with news

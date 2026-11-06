@@ -15,12 +15,22 @@ const HEX = t => (t.charCodeAt(1).toString(16) + 'a').padEnd(64, 'c').slice(0, 6
         await Page.enable(); await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const real = window.fetch, TEAMS = ${JSON.stringify(TEAMS)}, HEX = t => (t.charCodeAt(1).toString(16) + 'a').padEnd(64, 'c').slice(0, 64);
-            window.__r = { inflight: 0, max: 0, reads: {}, projects: 0 };
+            window.__r = { inflight: 0, max: 0, reads: {}, projects: 0, legacy: 0 };
             const later = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: the stub team answers after a fixed time, as a team through the Hub does
             const json = b => new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } });
-            window.fetch = (u, o) => { const url = window.__reviewFixtureURL(String(u), location.href), p = url.pathname;
+            window.fetch = (u, o) => { const originalURL = new URL(String(u), location.href);
+                if (originalURL.pathname === '/api/team-artifacts') {
+                    const key = originalURL.searchParams.has('team') || originalURL.searchParams.has('digest') ? 'target' : originalURL.searchParams.get('tag');
+                    window.__r.reads[key] = (window.__r.reads[key] || 0) + 1;
+                    const boards = Object.fromEntries(TEAMS.map(t => [t, [{id:'a-'+t,uri:'coral://artifacts/'+HEX(t),tags:['for review'],name:t+'.html',created_at:'2026-11-04T00:00:0'+t.slice(1)+'Z',available:true}]]));
+                    const page = window.__reviewFixturePage(originalURL, location.href, boards);
+                    window.__r.inflight++; window.__r.max = Math.max(window.__r.max, window.__r.inflight);
+                    return later(500).then(() => { window.__r.inflight--; return json(page); });
+                }
+                const url = window.__reviewFixtureURL(String(u), location.href), p = url.pathname;
                 if (p === '/api/board/projects') { window.__r.projects++; return Promise.resolve(json(TEAMS.map(t => ({ project: t })))); }
                 const m = /^\\/api\\/board\\/(t\\d)\\/artifacts$/.exec(p);
+                if(m) window.__r.legacy++;
                 if (m && url.searchParams.get('tag') === 'saved') return Promise.resolve(json({ artifacts: [], has_more: false }));
                 if (m && url.searchParams.get('tag') === 'for review') { const t = m[1]; window.__r.reads[t] = (window.__r.reads[t] || 0) + 1; window.__r.inflight++; window.__r.max = Math.max(window.__r.max, window.__r.inflight);
                     return later(500).then(() => { window.__r.inflight--; return json({ has_more: false, artifacts: [{ id: 'a-' + t, uri: 'coral://artifacts/' + HEX(t), tags: ['for review'], name: t + '.html', created_at: '2026-11-04T00:00:0' + t.slice(1) + 'Z', available: true }] }); }); }
@@ -43,24 +53,23 @@ const HEX = t => (t.charCodeAt(1).toString(16) + 'a').padEnd(64, 'c').slice(0, 6
         assert.ok(cold >= 0, "the requested file's viewer is on screen");
         assert.ok(cold < 1500, `a link opens from its own team's read, not a scan of eight teams (500 ms each): ${cold} ms`);
         await waitFor(`!window.__r.inflight`, 'the background scan ends', 15000);
-        assert.ok((await ev(`window.__r.reads.t3`)) >= 1, 'the named team was read');
-        // the click joined the scan in flight: no team but the clicked one was read twice (the click's own team read and the viewer's reads of its file are on t3 only)
-        const counts = await ev(`window.__r.reads`);
-        for (const t of TEAMS.filter(t => t !== 't3')) assert.equal(counts[t], 1, `${t} was read once: a click during the first scan did not start a second scan behind it: ${JSON.stringify(counts)}`);
+        assert.equal(await ev(`window.__r.reads['for review']`), 1, 'cold click joins one protected review window');
+        assert.equal(await ev(`window.__r.legacy`), 0, 'no per-board scans');
 
-        // 2: a scan reads at most four teams at once and takes about two rounds, not eight
+        // 2: one computer reads review and Saved pages concurrently, independent of team count
         await reset();
         const scan = await time(`(async () => { const M = await import(${S} + 'inbox_reviews.js'); await M.refreshReviews(true); })()`);
         const max = await ev(`window.__r.max`);
         console.log(`scan ${scan} ms, at most ${max} teams at once`);
-        assert.ok(max <= 4 && max >= 2, `teams are read a few at a time, at most four: ${max}`);
+        assert.equal(max, 2, 'review and Saved use two protected page windows for one computer');
         assert.ok(scan < 2400, `eight teams at 500 ms take about two rounds, not eight (4 s serial): ${scan} ms`);
 
-        // 3: a scan in flight is joined: two forced refreshes at once read each team once
+        // 3: concurrent forced refreshes share the two protected windows
         await reset();
         await ev(`(async () => { const M = await import(${S} + 'inbox_reviews.js'); const a = M.refreshReviews(true), b = M.refreshReviews(true); await Promise.all([a, b]); return true; })()`);
         const reads = await ev(`window.__r.reads`);
-        assert.deepEqual(Object.values(reads), TEAMS.map(() => 1), `each team is read once for two requests made together: ${JSON.stringify(reads)}`);
+        assert.deepEqual(reads, {'for review':1,saved:1}, 'two forced refreshes share the review and Saved page requests');
+        assert.equal(await ev(`window.__r.legacy`), 0, 'refresh never scans boards');
 
         // 4: with the Inbox loaded, a link opens at once (the scan after it is in the background)
         await reset();

@@ -22,7 +22,7 @@ const { coralReady } = require('./helpers/wait');
                 const art = { id: '1'.padStart(64, '0'), name: 'Review file.txt', media_type: 'text/plain', size: 30, created_at: new Date(Date.now() - 60000).toISOString(), tags: ['for review'], available: true, uri: 'coral://artifacts/' + '1'.padStart(64, '0') };
                 const original = window.fetch, json = (body, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }));
                 const run = { id: 7, job_id: 3, job_name: 'Nightly', display_name: 'Nightly report', status: 'failed', started_at: new Date(Date.now() - 120000).toISOString(), finished_at: new Date(Date.now() - 110000).toISOString(), error: 'exit 2' };
-                window.fetch = (url, opts = {}) => { const u = window.__reviewFixtureURL(String(url), location.origin);
+                window.fetch = (url, opts = {}) => { const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, {'${team}': [art]}) : null; if (reviewPage) return json(reviewPage); const u = window.__reviewFixtureURL(String(url), location.origin);
                     if (u.pathname === '/api/board/${team}/artifacts') return json({ project: '${team}', artifacts: [art], has_more: false });
                     if (u.pathname === '/api/scheduled/runs/recent') return json({ runs: [run] });
                     if (u.pathname === '/api/workflows/runs/recent') return json({ runs: [] });
