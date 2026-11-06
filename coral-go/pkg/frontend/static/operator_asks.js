@@ -8,7 +8,7 @@ import { importOnce } from './import_once.js';
 import { OPERATOR_ID } from './utils.js';
 import { state } from './state.js';
 import { showToast } from './notifications.js';
-import { isCloud, isLocalServer, serverFetch, LOCAL_SERVER } from './server_base.js';
+import { isCloud, isLocalServer, serverFetch, LOCAL_SERVER, normServer, sessionServer } from './server_base.js';
 import { inboxSources } from './inbox_servers.js';
 
 const FRESH_MS = 15000, LINE_MAX = 140;
@@ -133,14 +133,16 @@ export const settleButton = (a, b, outcome) => buttonCall(a, b, 'settle', { outc
  * "<cli>-<session id>"), never by name alone across teams. Rejects in words when there is nothing to wake. */
 export async function wakeMember(a, name) {
     const who = markHidden(name, { strict: true });
-    const r = await fetch(`/api/board/${encodeURIComponent(a.board)}/subscribers`);
-    const subs = r.ok ? await r.json().catch(() => []) : [];
+    const server = normServer(a.server);
+    const r = await serverFetch(server, `/api/board/${encodeURIComponent(a.board)}/subscribers`);
+    if (!r.ok) throw new Error(`Could not read this team's members (HTTP ${r.status}).`);
+    const subs = await r.json().catch(() => []);
     const sub = (Array.isArray(subs) ? subs : []).find(x => x && x.subscriber_id === name);
     if (!sub || !sub.session_name) throw new Error(`${who} is not a member of this team that Coral can wake.`);
-    const live = (state.liveSessions || []).find(s => `${s.agent_type}-${s.session_id}` === sub.session_name);
+    const live = (state.liveSessions || []).find(s => sessionServer(s) === server && `${s.agent_type}-${s.session_id}` === sub.session_name);
     if (!live) throw new Error(`${who} is not running on this computer.`);
     if (!live.sleeping) throw new Error(`${who} is not asleep.`);
-    const resp = await fetch(`/api/sessions/live/${encodeURIComponent(live.session_id)}/wake`, { method: 'POST' });
+    const resp = await serverFetch(server, `/api/sessions/live/${encodeURIComponent(live.session_id)}/wake`, { method: 'POST' });
     if (!resp.ok) { // the server says why in a sentence (a CLI not installed, a path it cannot run: cli_not_found, cli_path_unusable, cli_untrusted_mount) and what to set: show it, not the status code (#12049)
         const why = await resp.json().then(b => (b && typeof b.error === 'string' ? b.error.trim() : ''), () => '');
         throw new Error(why ? `Could not wake ${who}: ${markHidden(why, { strict: true })}` : `Could not wake ${who} (HTTP ${resp.status}).`);
