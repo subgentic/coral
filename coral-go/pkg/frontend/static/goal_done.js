@@ -2,6 +2,7 @@
  * task is added; Dismiss hides it for good, with Undo. What is hidden is kept on the machine in the goal_done_hidden setting, a JSON list of "<team>|<goal>|<tasks>" (Not yet, at the all-done total it was pressed at)
  * and "<team>|<goal>|*" (Dismiss), so the Hub's phone push and every browser agree. This computer's goals only (the Operator's alone: a goal on another computer is closed there). */
 import { state } from './state.js';
+import { serverFetch, splitKey, pathId, LOCAL_SERVER } from './server_base.js';
 
 // goal_words.js's rule (readyToClose, allTasksOf), written out here: the Inbox tab's badge imports this file at start, and the goal words are not loaded until a goal is shown.
 const tasksOf = r => ['active', 'blocked', 'queued', 'done'].reduce((n, k) => n + Math.max(0, Number((r || {})[k]) || 0), 0);
@@ -55,11 +56,17 @@ export function nextQuietEnd(goals, teamOf, settings = state.settings, now = Dat
     return next;
 }
 
-async function save(list, setting = SETTING) {
-    const r = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [setting]: JSON.stringify(list.slice(-MAX)) }) });
+/** What a row's buttons do to a goal's item, by the route that edits ONE entry on the computer the goal is on (#13834): POST /api/board/<team>/goals/<id>/done-state {state}, local or through the Hub. The old way PUT
+ *  the whole list (goal_done_hidden, goal_done_read), so an open page's stale copy could overwrite another browser's edit, and no Hub may write that setting. The computer builds the entry itself; the page keeps
+ *  its own copy in step (the same edit on the saved list) so the row moves at once. */
+const STATE_WORD = { 'not-yet': 'not_yet', ignore: 'dismiss', show: 'show', read: 'read', unread: 'unread' };
+async function post(team, g, mode) {
+    const k = splitKey((g && g.board_id) || ''), server = (g && g.board_id && k.server) || LOCAL_SERVER, project = (g && g.board_id && k.name) || team;
+    const r = await serverFetch(server, `/api/board/${encodeURIComponent(project)}/goals/${pathId(g.id)}/done-state`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ state: STATE_WORD[mode] }) });
     if (!r.ok) throw new Error(`could not save it (HTTP ${r.status})`);
-    state.settings = { ...(state.settings || {}), [setting]: JSON.stringify(list.slice(-MAX)) };
 }
+const keep = (setting, list) => { state.settings = { ...(state.settings || {}), [setting]: JSON.stringify(list.slice(-MAX)) }; };
+const withoutGoal = (list, team, g) => list.filter(e => !e.startsWith(`${team}|${g.id}|`));
 
 /* Opening a goal's item reads it (#11983, the Operator): it stays listed and stops counting, as an opened file does, so the Inbox number, the tab badge, the phone push and /api/needs-you say one number. It is kept in
  * goal_done_read as "<team>|<goal>|<tasks>|<updated_at>", the all-done total and the goal's last change it was opened at: a goal that gets another task done has a new total, and one that is reopened or edited a new last
@@ -74,18 +81,20 @@ export const isGoalDoneRead = (team, g, settings = state.settings) => readList(s
 /** Marks the goal's item read (nothing is written when it already is). */
 export async function markGoalDoneRead(team, g) {
     if (isGoalDoneRead(team, g)) return;
-    await save([...readList(), readKeyOf(team, g)], READ_SETTING);
+    await post(team, g, 'read');
+    keep(READ_SETTING, [...readList(), readKeyOf(team, g)]);
 }
 /** Counts the goal's item again. */
 export async function markGoalDoneUnread(team, g) {
-    const entry = readKeyOf(team, g);
-    if (!readList().includes(entry)) return;
-    await save(readList().filter(e => e !== entry), READ_SETTING);
+    if (!readList().some(e => e.startsWith(`${team}|${g.id}|`))) return;
+    await post(team, g, 'unread');
+    keep(READ_SETTING, withoutGoal(readList(), team, g));
 }
 
 /** Hides a goal's item: mode 'not-yet' (until a task is added) or 'ignore'. Resolves to a function that puts it back. */
 export async function hideGoalDone(team, g, mode) {
     const entry = mode === 'ignore' ? starOf(team, g) : keyOf(team, g);
-    await save([...hiddenList().filter(e => e !== entry), entry]);
-    return () => save(hiddenList().filter(e => e !== entry));
+    await post(team, g, mode);
+    keep(SETTING, [...hiddenList().filter(e => e !== entry), entry]);
+    return async () => { await post(team, g, 'show'); keep(SETTING, withoutGoal(hiddenList(), team, g)); };
 }

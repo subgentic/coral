@@ -3,6 +3,7 @@
  * on one line, and opens whole in a dialog with a Reply box. The reply is the board post the dashboard already makes (POST /api/board/{board}/messages as the Operator, with the asker's @name, and reply_to
  * for an ask): it answers the ask, ends a wait, and tells the asker by the post itself. The text is the agent's, so it is written out through markHidden (strict) before it is drawn, then cut. */
 import { markHidden } from './visible_marks.js';
+import { readOutcome } from './needs_incomplete.js';
 import { isHiddenAsk } from './ask_filter.js';
 import { importOnce } from './import_once.js';
 import { OPERATOR_ID } from './utils.js';
@@ -51,7 +52,19 @@ export function refreshOperatorAsks(force = false) {
     // Every computer the page reads (this one, and each registered computer that is online through the Hub; through the Hub itself only those): a bare /api path through the Hub is the Hub's own, which has no questions (#12612, coral-hub #156454).
     // A row from another computer carries that computer's id, so the dialog and the row know it is not this one's; a computer that cannot be read keeps the rows it had.
     const sources = inboxSources(), asked = sources.length ? sources : [LOCAL_SERVER];
-    pending = Promise.all(asked.map(server => serverFetch(server === LOCAL_SERVER ? undefined : server, '/api/operator-asks').then(r => (r.ok ? r.json() : null)).then(rows => (Array.isArray(rows) ? rows.map(a => (server === LOCAL_SERVER || !a || typeof a !== 'object' ? a : { ...a, server })) : null), () => null))).then(results => {
+    // One computer's read: a list only when the answer was a 200 with an array (an empty one too: nothing is waiting there); anything else (refused, no route, a failure, a body that is not a list) is null, which keeps the rows
+    // that were drawn and tells the Inbox it is not everything (#13841). The warning is cleared only after the body was checked.
+    const readAsks = async server => {
+        try {
+            const r = await serverFetch(server === LOCAL_SERVER ? undefined : server, '/api/operator-asks');
+            if (!r.ok) { readOutcome('questions', server, false); return r.status === 401 || r.status === 403 ? [] : null; } // access taken away (401, 403): none drawn, and the note says so; anything else keeps the rows
+            const rows = await r.json();
+            if (!Array.isArray(rows)) { readOutcome('questions', server, false); return null; }
+            readOutcome('questions', server, true);
+            return rows.map(a => (server === LOCAL_SERVER || !a || typeof a !== 'object' ? a : { ...a, server }));
+        } catch { readOutcome('questions', server, false); return null; }
+    };
+    pending = Promise.all(asked.map(readAsks)).then(results => {
         const next = [];
         results.forEach((rows, k) => {
             const server = asked[k];

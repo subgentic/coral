@@ -49,7 +49,7 @@ const out = await decide(first, 'approve');
 assert.equal(out.ok, true, out.text);
 assert.ok(asked.includes('POST /api/remote/srv1/api/board/team/proposals/3/approve'), `the decision goes to the computer it is on (${asked.join(', ')})`);
 
-// a computer that refuses now (the person is a grantee there) has no rows; a computer that fails keeps the rows it had
+// a computer that refuses now (the person is a grantee there) has no rows, and the note says so (#13454, #13841); a computer that fails keeps the rows it had
 srv1Refuses = true; srv3Fails = true;
 await refreshProposals(true);
 assert.deepEqual(proposalItems().map(r => r.id).sort(), [4, 5], 'a 403 means no rows for that computer; a computer that fails keeps the rows it had');

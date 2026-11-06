@@ -31,7 +31,8 @@ const BASELINE = Object.fromEntries(Object.entries({
 }).map(([k, v]) => [`GET ${k}`, v]));
 // What the dashboard itself asks the Hub (not through a computer) at boot and while a tab is open: counted and pinned too, so a new one from the Inbox shows. Keys are none but the ones listed.
 const CHROME = {
-    'GET /auth/session': [], 'GET /api/account': [], 'GET /api/folder-tags': [], 'GET /api/pinned-folders': [], 'GET /api/scheduled/jobs': [], 'GET /api/servers': [], 'GET /api/sessions/live': [], 'GET /api/settings': [],
+    'GET /auth/session': [], 'GET /api/account': [], 'GET /api/folder-tags': [], 'GET /api/needs-you': ['kind'], // the Hub's own list of what waits: the skills that wait for approval at a computer (#13841)
+     'GET /api/pinned-folders': [], 'GET /api/scheduled/jobs': [], 'GET /api/servers': [], 'GET /api/sessions/live': [], 'GET /api/settings': [],
     'GET /api/system/status': [], 'GET /api/system/update-check': [], 'GET /api/views': [], 'POST /api/tracking/event': [],
 };
 
