@@ -27,10 +27,10 @@ import (
 // (so % and _ are ordinary characters), the rest are enum words, names compared for equality, and times.
 
 var teamArtifactParamNames = map[string]bool{"limit": true, "offset": true, "session_id": true,
-	"q": true, "kind": true, "origin": true, "by": true, "board": true, "kept": true, "starred": true, "task": true, "goal": true, "tag": true, "since": true, "until": true, "sort": true, "cursor": true, "versions": true, "read": true}
+	"q": true, "kind": true, "origin": true, "by": true, "board": true, "kept": true, "starred": true, "task": true, "goal": true, "tag": true, "since": true, "until": true, "sort": true, "cursor": true, "versions": true, "read": true, "starred_first": true}
 
 // teamArtifactQueryParams are the parameters that make the reply a query (the others are the list's original ones).
-var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "kept", "starred", "task", "goal", "tag", "since", "until", "sort", "cursor", "versions", "read"}
+var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "kept", "starred", "task", "goal", "tag", "since", "until", "sort", "cursor", "versions", "read", "starred_first"}
 
 var (
 	teamArtifactKinds   = []string{"image", "pdf", "text", "other"}
@@ -54,24 +54,25 @@ const (
 )
 
 type teamArtifactQuery struct {
-	q         string // lower-cased
-	kinds     []string
-	origins   []string
-	by        []string // lower-cased
-	boards    []string // lower-cased
-	kept      *bool
-	read      *bool // read=1: the files the Operator has read (a read tag and no news in their thread); read=0: the ones still unread (#13162, Needs you's unread filter, applied by the computer before the page is cut)
-	starred   *bool
-	tags      []string // any of these tags (#8583), normalised
-	goal      int64    // 0: any; a goal's number: only what the tasks that work toward it hold (#8579)
-	task      int64    // 0: any; a task's number: only what is attached to or linked to that task (#7739, the task page's Artifacts)
-	since     *time.Time
-	until     *time.Time
-	sortName  string
-	crossTeam bool // the owner-only cross-team list (GET /api/team-artifacts): the one list that carries the star-following fields (#13910)
-	collapse  bool // versions=newest (#11700): the versions of one file are one row, the newest; the totals and the tag counts follow
-	cursor    *teamArtifactCursor
-	finger    string
+	q            string // lower-cased
+	kinds        []string
+	origins      []string
+	by           []string // lower-cased
+	boards       []string // lower-cased
+	kept         *bool
+	read         *bool // read=1: the files the Operator has read (a read tag and no news in their thread); read=0: the ones still unread (#13162, Needs you's unread filter, applied by the computer before the page is cut)
+	starred      *bool
+	starredFirst bool     // starred_first=true (#13910): the starred series first, one row each at its newest version, then the rest in the sort; paged by position (the cursor carries it)
+	tags         []string // any of these tags (#8583), normalised
+	goal         int64    // 0: any; a goal's number: only what the tasks that work toward it hold (#8579)
+	task         int64    // 0: any; a task's number: only what is attached to or linked to that task (#7739, the task page's Artifacts)
+	since        *time.Time
+	until        *time.Time
+	sortName     string
+	crossTeam    bool // the owner-only cross-team list (GET /api/team-artifacts): the one list that carries the star-following fields (#13910)
+	collapse     bool // versions=newest (#11700): the versions of one file are one row, the newest; the totals and the tag counts follow
+	cursor       *teamArtifactCursor
+	finger       string
 }
 
 type teamArtifactCursor struct {
@@ -242,6 +243,19 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 			return nil, taErr("starred must be true or false")
 		}
 	}
+	if v, ok, serr := taSingle("starred_first", vals["starred_first"]); serr != nil {
+		return nil, serr
+	} else if ok {
+		switch v {
+		case "true", "false":
+			if v == "true" && vals.Get(crossTeamScopeParam) == "" {
+				return nil, taErr("starred_first is only on the cross-team list (GET /api/team-artifacts)")
+			}
+			q.starredFirst = v == "true"
+		default:
+			return nil, taErr("starred_first must be true or false")
+		}
+	}
 	if v, ok, serr := taSingle("task", vals["task"]); serr != nil {
 		return nil, serr
 	} else if ok {
@@ -298,6 +312,7 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 	// What a cursor is tied to: every filter and the sort (not limit, offset or the cursor itself).
 	fp := sha256.New()
 	fmt.Fprintf(fp, "%s|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%s|%s|%v", q.q, q.kinds, q.origins, q.by, q.boards, q.kept, q.starred, q.task, q.goal, q.tags, q.since, q.until, q.collapse, q.sortName, vals.Get("session_id"), q.read)
+	fmt.Fprintf(fp, "|sf=%v", q.starredFirst)
 	if scope := vals.Get(crossTeamScopeParam); scope != "" { // the cross-team list: its cursors are its own (a team route's is refused there) and tied to the teams asked for
 		fmt.Fprintf(fp, "|%s|%v", scope, vals["team"])
 	}
@@ -678,12 +693,13 @@ func clipKey(s string, n int) string {
 
 // teamArtifactSelection is one page of a query over a collected list.
 type teamArtifactSelection struct {
-	page    []teamArtifact
-	total   int            // the rows the filters matched
-	start   int            // where the page starts in them
-	hasMore bool           // another page follows
-	next    string         // its cursor ("" when none)
-	tags    map[string]int // the tag words of the whole list, with their counts (the Tag filter's choices)
+	page         []teamArtifact
+	total        int            // the rows the filters matched
+	start        int            // where the page starts in them
+	hasMore      bool           // another page follows
+	next         string         // its cursor ("" when none)
+	tags         map[string]int // the tag words of the whole list, with their counts (the Tag filter's choices)
+	starredTotal int            // starred_first: the starred series the filters matched, before paging (#13910)
 }
 
 // selectTeamArtifacts filters, sorts and pages items (the collected, merged list) by q: the one rule behind a team's list and the cross-team list.
@@ -726,7 +742,8 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 	}
 	// A list with no text match, kind filter, name-like sort or collapse (the Operator's walk of the for-review tag, a page after a page) keeps the matching rows as positions in items: a copy of every matching row, for every page of a
 	// big board, was 20,000 rows allocated 400 times (#13614: the walk at the 50 cap). Only the page's own rows are copied out below.
-	fast := !q.needsEnrichment() && !q.collapse
+	pinMode := q.crossTeam && (q.starredFirst || (q.starred != nil && *q.starred)) // a pinned list shows each starred series once, at its newest version (#13910)
+	fast := !q.needsEnrichment() && !q.collapse && !pinMode
 	var set []teamArtifact
 	var idx []int
 	if fast {
@@ -762,6 +779,16 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 	}
 	if q.collapse {
 		set = collapseVersions(set) // after the filters: a version that matches stands for its file, as Needs you does (#11700)
+	}
+	if pinMode { // one row per starred series: its newest version; the older versions of a starred series are the same document
+		kept := set[:0:0]
+		for _, it := range set {
+			if info, ok := follow[it.managed]; it.managed != "" && ok && !info.Latest {
+				continue
+			}
+			kept = append(kept, it)
+		}
+		set = kept
 	}
 	n := len(set)
 	if fast {
@@ -808,9 +835,25 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 	if !fast {
 		n = len(set)
 	}
-	sel := &teamArtifactSelection{total: n, tags: counts}
+	pinned := 0
+	if pinMode && q.starredFirst { // the starred series first, the newest star first, then everything else in the order asked for; paged by position, which the cursor carries
+		var pins, rest []teamArtifact
+		for _, it := range set {
+			if info, ok := follow[it.managed]; it.managed != "" && ok && info.Latest {
+				pins = append(pins, it)
+			} else {
+				rest = append(rest, it)
+			}
+		}
+		sort.SliceStable(pins, func(i, j int) bool { return follow[pins[i].managed].At > follow[pins[j].managed].At })
+		pinned = len(pins)
+		set = append(pins, rest...)
+	}
+	sel := &teamArtifactSelection{total: n, tags: counts, starredTotal: pinned}
 	start := offset
-	if q.cursor != nil {
+	if q.cursor != nil && q.starredFirst {
+		start = q.cursor.Index // the pinned order is not a sort order: the cursor is a position in it
+	} else if q.cursor != nil {
 		ck := artifactSortKey{At: q.cursor.At, Name: q.cursor.Name, Size: q.cursor.Size, Type: q.cursor.Type, Tags: q.cursor.Tags, Uploader: q.cursor.Uploader, TaskID: q.cursor.TaskID, Source: q.cursor.Source, Index: q.cursor.Index, ID: q.cursor.ID}
 		start = sort.Search(n, func(i int) bool { return artifactAfter(q.sortName, keyOfP(rowAt(i)), ck) })
 	}
@@ -864,6 +907,9 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 		}
 		if q.sortName != "uploader" && q.sortName != "uploader_desc" {
 			k.Uploader = ""
+		}
+		if q.starredFirst {
+			k.Index = end
 		}
 		sel.next = teamArtifactCursor{Uploader: k.Uploader, Sort: q.sortName, Finger: q.finger, At: k.At, Name: k.Name, Size: k.Size, Type: k.Type, Tags: k.Tags, TaskID: k.TaskID, Source: k.Source, Index: k.Index, ID: k.ID}.encode()
 	}
