@@ -114,8 +114,10 @@ func TestSetupPinsItsDefaultToolchainChecksumsAndWillNotTrustAVersionWithoutOne(
 }
 
 func TestSetupNeverWritesTheHostKeyToASharedFolder(t *testing.T) {
-	out, err := runSetup(t, t.TempDir(), "--pubkey", goodKey, "--wrapper", fakeWrapper(t), "--skip-toolchains", "--dry-run")
+	home := t.TempDir() // the test's own HOME may sit under /tmp or /private/tmp (a TMPDIR there is the Mac's default for agents); only a fixed name the SCRIPT writes counts
+	out, err := runSetup(t, home, "--pubkey", goodKey, "--wrapper", fakeWrapper(t), "--skip-toolchains", "--dry-run")
 	require.NoError(t, err, out)
+	out = strings.ReplaceAll(out, home, "<HOME>")
 	assert.NotContains(t, out, "/tmp/", "a fixed name in a shared folder lets another user swap the key between the two commands")
 	assert.Contains(t, out, "known_hosts")
 	assert.Contains(t, out, "compare", "the fingerprint is compared before the key is added")

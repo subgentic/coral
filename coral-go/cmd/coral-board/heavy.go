@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/clihelp"
+	"github.com/subgentic/coral/internal/gitutil"
 	"github.com/subgentic/coral/internal/heavy"
 	"github.com/subgentic/coral/internal/safego"
 )
@@ -223,7 +224,7 @@ func heavyRunRemote(ctx context.Context, command string, timeout time.Duration) 
 		fmt.Fprintln(os.Stderr, "[heavy] "+err.Error())
 		return 1
 	}
-	topOut, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
+	topOut, err := gitutil.Command(ctx, "", "rev-parse", "--show-toplevel").Output()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "[heavy] the mini runs a copy of a git worktree: run this from inside one (or claim mac-heavy)")
 		return 1
