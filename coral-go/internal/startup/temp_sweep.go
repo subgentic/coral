@@ -2,7 +2,6 @@ package startup
 
 import (
 	"context"
-	"errors"
 	"github.com/subgentic/coral/internal/logsafe"
 	"log"
 	"os"
@@ -70,6 +69,7 @@ func setupLaunchTempDir(db *store.DB, dataDir string) <-chan struct{} {
 				MinAge:  staleTempAge,
 				Live:    func(id string) bool { return live[id] },
 				Running: func() (string, error) { return listRunningCommandLines(ctx) },
+				Ctx:     ctx, // the sweep's minute bounds the per-file checks too
 			}
 			if dir == os.TempDir() {
 				// The shared temp folder (also when <data dir>/tmp couldn't be made): only files
@@ -104,7 +104,7 @@ func runningCommandLines(ctx context.Context) (string, error) {
 	var args []string
 	switch runtime.GOOS {
 	case "windows":
-		return "", errors.New("no process list on Windows")
+		return windowsCommandLines(ctx)
 	case "linux":
 		args = []string{"-e", "-ww", "-o", "args="} // procps
 	default:
