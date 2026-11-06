@@ -40,8 +40,13 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 return { from: from.textContent.replace(/\\s*\\u00b7$/, ''), fromCut: from.scrollWidth > from.clientWidth + 1, fromW: Math.round(from.getBoundingClientRect().width),
                     earlier: earlier ? earlier.textContent.replace(/\\s+/g, ' ').trim() : null, earlierSeen: earlier ? earlier.getBoundingClientRect().right <= item.getBoundingClientRect().right + 1 && earlier.getBoundingClientRect().width > 0 : false,
                     askText: ask.textContent.replace(/\\s+/g, ' '), askCount: (ask.textContent.match(/Which port should the test server use\\?/g) || []).length }; })()`);
+            if (w <= 760) {
+            const said = await ev(`(() => { const plan = [...document.querySelectorAll('${T} tbody tr')].find(r => r.textContent.includes('plan.md')), v = plan.querySelector('.inbox-review-version'), sr = [...plan.querySelectorAll('.sr-only')].map(e => e.textContent).join(' '); return { badge: v ? v.textContent.trim() : null, srEarlier: /2 earlier versions/.test(sr), badgeSeen: !!v && v.getBoundingClientRect().width > 0 && v.getBoundingClientRect().right <= plan.getBoundingClientRect().right + 1 }; })()`);
+            check(said.badge === 'v3' && said.badgeSeen && said.srEarlier, at + 'the row of three versions shows v3 on line one and says "2 earlier versions" to a screen reader (#13911: three lines at most): ' + JSON.stringify(said));
+            } else {
             check(m.earlier === '· 2 earlier versions' || /2 earlier versions/.test(String(m.earlier)), at + 'the row of three versions says "2 earlier versions": ' + JSON.stringify(m));
             check(m.earlierSeen, at + 'and the words are inside the row, not pushed out of it: ' + JSON.stringify(m));
+            }
             check(m.from === 'Orchestrator' && !m.fromCut, at + 'the sender is not cut: ' + JSON.stringify([m.from, m.fromCut, m.fromW]));
             check(m.askCount === 1, at + `a short question is said once on its row (${m.askCount} times): ${m.askText.slice(0, 160)}`);
             await removeBoards(ev, [team]).catch(() => {});
