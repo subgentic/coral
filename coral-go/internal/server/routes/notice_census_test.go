@@ -37,6 +37,7 @@ var systemPostAllowed = map[string]struct {
 	"routes/orchestrator_agents.go sayLifecycle":        {1, "the seat's and the target's names (cleaned, no @, cut at 60) and a fixed sentence: no stored text is quoted (#11432)"},
 	"routes/orchestrator_agents.go tellWoken":           {1, "a live @member of the board (cleaned) and one constant sentence: never any text of the caller's (#11432)"},
 	"routes/board_goal_requests.go wakeForGoalRequest":  {1, "Coral's own how-to sentence with a request number"},
+	"routes/dialog_team_line.go postDialogLine":         {1, "a subscriber name through teamhealth.Name, task and goal numbers, minutes and fixed words (no title, no screen text)"},
 	"routes/sessions_start_refused.go markStartRefused": {1, "the agent's cleaned notice name (noticeName: capped, no @) and a fixed sentence by refusal code (startFailureSentence)"},
 	"routes/task_park.go ParkTask":                      {2, "teamhealth.Name of who, a time, task numbers; the park reason stays on the task"},
 	"background/board_health_roster.go escalateWaits":   {1, "two cleaned names and an age"},
