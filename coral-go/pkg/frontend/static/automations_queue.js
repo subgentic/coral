@@ -8,12 +8,14 @@ import { compactDuration } from './format.js';
 import { announceNotice } from './notifications.js';
 import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
+import { isCloud } from './server_base.js';
+const HUB_WORDS = 'The queue is kept by each computer: open this computer\'s own Coral to see it, and move or remove an entry there.';
 const DT = await importOnce('./data_table.js');
 const { agentLink } = await importOnce('./agent_link.js');
 const { liveAgentOf, openAgent } = await importOnce('./agent_live.js'); // the one way an agent's name opens its chat (#12168); a task and a goal open where their own links do (opened when clicked)
 
 const POLL_MS = 5000;
-let resources = [], loaded = false, denied = false, timer = 0, tickTimer = 0, listeners = new Set(), wanted = false, reading = null, pendingFocus = null;
+let unavailable = '', resources = [], loaded = false, denied = false, timer = 0, tickTimer = 0, listeners = new Set(), wanted = false, reading = null, pendingFocus = null;
 const TICK_MS = (typeof window !== 'undefined' && Number(window.__queueTickMs)) || 30000; // the lease and the wait are said again at least this often, with no data change (#13651)
 
 /** Tell the folder the data or the clock changed. A button of the table that has the keyboard keeps it: the table is drawn again, so the same entry's same button is focused after (restoreFocus). */
@@ -33,8 +35,10 @@ export async function refreshQueue() {
     if (reading) return reading;
     reading = (async () => {
         try {
+            if (isCloud()) { unavailable = HUB_WORDS; loaded = false; emit(); return; } // the Hub has no queue: each computer keeps its own (a bare read would ask the Hub itself, #13871)
             const r = await fetch('/api/resources');
-            if (!r.ok) return;
+            if (!r.ok) { const was = unavailable; unavailable = `The queue could not be read from this computer (HTTP ${r.status}).`; if (was !== unavailable) emit(); return; } // said, not left on 'Reading the queue.' (#13871)
+            unavailable = '';
             const body = await r.json();
             const next = Array.isArray(body && body.resources) ? body.resources : [];
             const same = loaded && JSON.stringify(next) === JSON.stringify(resources);
@@ -166,8 +170,8 @@ const linkActions = r => (r.state === 'free' ? [] : [
 /** The Queue folder's table. */
 export function queueTable(rows, narrowed) {
     return { title: 'Queue (experimental)', noun: ['entry', 'entries'], rows,
-        empty: { line: narrowed ? 'No entry matches the search.' : loaded ? 'No resource is defined.' : 'Reading the queue.', hint: narrowed || !loaded ? '' : 'An Orchestrator defines a resource with coral-board resource; agents claim a slot before a heavy run and wait in line when it is taken.' },
-        signature: JSON.stringify([denied, rows.map(r => [r.key, r.state, r.place, r.agent, r.project, r.goal_id, r.goal_title, r.stuck, r.stuck_min, r.member, r.heldOn, r.note, r.used, r.slots, r.waiting, r.lease_until, r.first, r.last, r.state === 'holding' ? leaseWords(r) : r.state === 'waiting' ? waitWords(r) : ''])]), // the words of the clock are in it: the table is drawn again when they change
+        empty: { line: narrowed ? 'No entry matches the search.' : unavailable ? unavailable : loaded ? 'No resource is defined.' : 'Reading the queue.', hint: narrowed || !loaded || unavailable ? '' : 'An Orchestrator defines a resource with coral-board resource; agents claim a slot before a heavy run and wait in line when it is taken.' },
+        signature: JSON.stringify([denied, unavailable, rows.map(r => [r.key, r.state, r.place, r.agent, r.project, r.goal_id, r.goal_title, r.stuck, r.stuck_min, r.member, r.heldOn, r.note, r.used, r.slots, r.waiting, r.lease_until, r.first, r.last, r.state === 'holding' ? leaseWords(r) : r.state === 'waiting' ? waitWords(r) : ''])]), // the words of the clock are in it: the table is drawn again when they change
         node: () => DT.dataTable({
             label: `Queue, ${rows.length}`, rows, oneLine: true, resize: true, keepOrder: true, rowKey: r => r.key, rowName: r => (r.state === 'free' ? `${r.resource}, all free` : `${r.agent}, ${stateWord(r)}, ${r.resource}`),
             groupBy: groupOf,

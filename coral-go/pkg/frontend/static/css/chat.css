@@ -789,6 +789,7 @@ body:has(.model-chip-menu:not([hidden])) .chat-jump-latest-btn { visibility: hid
     z-index: 300;
     max-width: 360px;
 } /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
+.chat-file-menu-why { padding: 0 10px 6px 38px; font-size: var(--fs-sm); color: var(--text-muted); white-space: normal; } /* why Open in editor is not offered here (#13871) */
 .chat-file-menu-path {
     padding: 4px 10px 6px;
     font-family: var(--font-mono, monospace);
