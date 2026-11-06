@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/proctree"
+	"github.com/subgentic/coral/pkg/resourcequeue"
 )
 
 // #13718, the Operator's design: a slot an agent claims by hand belongs to the tool call it was claimed in, and Coral gives it back when that call ends (or the agent's turn or session does): a forgotten release cannot hold the line.
@@ -417,4 +418,38 @@ func TestARenewedClaimStopsAtTheHeavyRunCap(t *testing.T) {
 		g.add(20 * time.Minute) // 200 minutes: the last renewal was inside the cap, its lease has run out since
 	}
 	assert.Empty(t, g.holders(), "a process that never ends does not hold the slot for ever")
+}
+
+// QA's two pins on #13951. The realistic end: the work is gone while the call has not reported its end (a crashed ssh, a killed job): the renewals stop and the lease ends the claim.
+func TestAClaimStopsBeingRenewedWhenItsWorkEndsBeforeItsCallDoes(t *testing.T) {
+	g := newHookRig(t)
+	g.setProcs(proctree.Proc{PID: agentPID, PPID: 1, Command: "claude"}, proctree.Proc{PID: 500, PPID: agentPID, Command: "bash -c claim; ssh mini run"},
+		proctree.Proc{PID: 501, PPID: 500, Command: "coral-board resource claim mac-heavy"})
+	g.bgClaim("s-a", "Agent A", "call-1", 500)
+	g.dropProc(501)
+	g.addProc(proctree.Proc{PID: 502, PPID: 500, Command: "ssh mini run"})
+	for i := 0; i < 5; i++ {
+		g.add(20 * time.Minute) // 100 minutes of work: renewed the whole time
+	}
+	require.Equal(t, []string{"Agent A"}, g.holders())
+	g.dropProc(502) // the work ends; the tool call never says so
+	g.add(20 * time.Minute)
+	assert.Equal(t, []string{"Agent A"}, g.holders(), "still inside the last renewal's lease")
+	g.add(20 * time.Minute) // past the lease with no renewal in between
+	assert.Empty(t, g.holders(), "the work is gone: nothing renews it, and the lease ends the claim")
+}
+
+// Only the claiming agent's own claim is renewed: another agent's claim on the same resource, whose own work is gone, is not kept by this agent's work.
+func TestOnlyTheClaimingAgentsClaimIsRenewedByItsWork(t *testing.T) {
+	g := newHookRig(t)
+	require.NoError(t, g.m.Queue().Define(resourcequeue.Resource{Key: "mac-heavy", Slots: 2, MaxLease: 30 * time.Minute, Match: []string{"go test ./...", "node run_cdp_suites.mjs"}}))
+	g.setProcs(proctree.Proc{PID: agentPID, PPID: 1, Command: "claude"}, proctree.Proc{PID: 500, PPID: agentPID, Command: "bash -c claim; go test ./..."},
+		proctree.Proc{PID: 600, PPID: agentPID, Command: "bash -c claim; sleep 1"})
+	g.bgClaim("s-a", "Agent A", "call-1", 500)
+	g.bgClaim("s-b", "Agent B", "call-2", 600)
+	g.addProc(proctree.Proc{PID: 502, PPID: 500, Command: "go test ./..."}) // A's work only; nothing started under B's shell
+	for i := 0; i < 4; i++ {
+		g.add(20 * time.Minute)
+	}
+	assert.Equal(t, []string{"Agent A"}, g.holders(), "A's work keeps A's slot; B, with no work of its own, is left to its lease and went")
 }
