@@ -20,7 +20,7 @@ const HEX = t => (t.charCodeAt(1).toString(16) + 'a').padEnd(64, 'c').slice(0, 6
             const json = b => new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } });
             window.fetch = (u, o) => { const originalURL = new URL(String(u), location.href);
                 if (originalURL.pathname === '/api/team-artifacts') {
-                    const key = originalURL.searchParams.has('team') || originalURL.searchParams.has('digest') ? 'target' : originalURL.searchParams.get('tag');
+                    const key = originalURL.searchParams.has('waiting') ? 'attention' : originalURL.searchParams.has('team') || originalURL.searchParams.has('digest') ? 'target' : originalURL.searchParams.get('tag');
                     window.__r.reads[key] = (window.__r.reads[key] || 0) + 1;
                     const boards = Object.fromEntries(TEAMS.map(t => [t, [{id:'a-'+t,uri:'coral://artifacts/'+HEX(t),tags:['for review'],name:t+'.html',created_at:'2026-11-04T00:00:0'+t.slice(1)+'Z',available:true}]]));
                     const page = window.__reviewFixturePage(originalURL, location.href, boards);
