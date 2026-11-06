@@ -6,12 +6,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -99,30 +97,25 @@ func TestAnUnstarOfAnyVersionClearsTheWholeSeriesAndNothingElse(t *testing.T) {
 type pinnedRig struct {
 	k    *kindRig
 	bh   *BoardHandler
-	db   *sqlx.DB
 	rout http.Handler
 }
 
 func newPinnedRig(t *testing.T) *pinnedRig {
 	t.Helper()
 	k := newKindRig(t)
-	db, err := sqlx.Open("sqlite", filepath.Join(t.TempDir(), "sessions.db"))
-	require.NoError(t, err)
-	t.Cleanup(func() { db.Close() })
-	_, err = db.Exec(`CREATE TABLE artifact_stars (hex TEXT PRIMARY KEY, starred_at TEXT NOT NULL)`)
-	require.NoError(t, err)
+	db := k.h.db.Reader() // the board store reads the same sessions database the handler writes, as in the server (server.go: SetSessionsDB(db.Reader()))
 	k.h.bs.SetSessionsDB(db)
 	bh := NewBoardHandler(k.h.bs)
 	bh.SetTaskArtifactWriter(k.coralDir, nil)
 	r := chi.NewRouter()
 	r.Get("/api/team-artifacts", bh.ListAllTeamArtifacts)
 	r.Get("/api/board/{project}/artifacts", bh.ListTeamArtifacts)
-	return &pinnedRig{k: k, bh: bh, db: db, rout: r}
+	return &pinnedRig{k: k, bh: bh, rout: r}
 }
 
 func (p *pinnedRig) star(t *testing.T, digest, at string) {
 	t.Helper()
-	_, err := p.db.Exec(`INSERT INTO artifact_stars (hex, starred_at) VALUES (?, ?)`, digest, at)
+	_, err := p.k.h.db.ExecContext(context.Background(), `INSERT INTO artifact_stars (hex, starred_at) VALUES (?, ?)`, digest, at)
 	require.NoError(t, err)
 }
 
@@ -233,5 +226,89 @@ func TestTheStarFieldsAreTheOperatorsAloneAndOnlyOnTheCrossTeamList(t *testing.T
 	for _, a := range perBoard["artifacts"].([]any) {
 		assert.NotContains(t, a.(map[string]any), "starred_at")
 		assert.NotContains(t, a.(map[string]any), "series_id")
+	}
+}
+
+// #13910 (the row's "New version v3"): the newest version the Operator has opened, per person, team and series; only ever raised, never above the series' newest, from the server's own records.
+func TestOpenedRecordsTheNewestVersionTheOperatorOpenedAndOnlyRaisesIt(t *testing.T) {
+	p := newPinnedRig(t)
+	k := p.k
+	_, d := threeVersions(t, k)
+	post := func(id string, actor *Actor) (int, map[string]any) {
+		req := httptest.NewRequest(http.MethodPost, "/api/artifacts/"+id+"/opened", nil)
+		if actor != nil { // an agent's token: no dashboard cookie
+			req = withActor(req, *actor)
+		} else {
+			req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+		}
+		rc := chi.NewRouteContext()
+		rc.URLParams.Add("id", id)
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rc))
+		rec := httptest.NewRecorder()
+		k.h.openedArtifactRoute(rec, req)
+		var out map[string]any
+		_ = json.Unmarshal(rec.Body.Bytes(), &out)
+		return rec.Code, out
+	}
+	code, out := post(d[0], nil)
+	require.Equal(t, 200, code, out)
+	assert.EqualValues(t, 1, out["opened_version"])
+	assert.NotEmpty(t, out["series_id"])
+	code, out = post(d[2], nil)
+	require.Equal(t, 200, code, out)
+	assert.EqualValues(t, 3, out["opened_version"])
+	code, out = post(d[1], nil) // an older version opened later never lowers it
+	require.Equal(t, 200, code, out)
+	assert.EqualValues(t, 3, out["opened_version"], "only ever raised")
+
+	// the cross-team row says it: series id and the opened version, for the Operator
+	_, list := p.get(t, "/api/team-artifacts?tag=for+review", nil)
+	require.NotEmpty(t, list["artifacts"], list)
+	row := list["artifacts"].([]any)[0].(map[string]any)
+	assert.EqualValues(t, 3, row["versions"])
+	assert.EqualValues(t, 3, row["opened_version"])
+	assert.Equal(t, out["series_id"], row["series_id"])
+	// not on the per-board list
+	_, perBoard := p.get(t, "/api/board/alpha/artifacts?tag=for+review", nil)
+	assert.NotContains(t, perBoard["artifacts"].([]any)[0].(map[string]any), "opened_version")
+
+	// an agent's token is refused, a file in no series and an unknown digest are 404, a bad id is 400
+	code, _ = post(d[0], &Actor{Kind: ActorToken, Name: "Backend", Session: "s1"})
+	assert.Equal(t, http.StatusForbidden, code, "an agent never records what the Operator opened")
+	code, _ = post(strings.Repeat("c", 64), nil)
+	assert.Equal(t, http.StatusNotFound, code, "no such artifact says the same as one in no series")
+	code, _ = post("nope", nil)
+	assert.Equal(t, http.StatusBadRequest, code)
+	var n int
+	require.NoError(t, k.h.db.Reader().GetContext(context.Background(), &n, "SELECT COUNT(*) FROM artifact_series_opened"))
+	assert.Equal(t, 1, n, "one row per person, team and series")
+}
+
+func TestThePersonKeyIsTheOwnersOnAPersonalComputerAndTheHubUserOnATeams(t *testing.T) {
+	assert.Equal(t, "owner", personKeyOf(callerIdentity{owner: true}), "the local dashboard and the Hub owner are one person")
+	assert.Equal(t, "owner", personKeyOf(callerIdentity{owner: true, hubUserID: "u1"}), "a personal computer: the Hub user label is not a different person")
+	assert.Equal(t, "hub:org-1:u1", personKeyOf(callerIdentity{owner: true, team: true, org: "org-1", hubUserID: "u1"}))
+	assert.NotEqual(t, personKeyOf(callerIdentity{owner: true, team: true, org: "org-1", hubUserID: "u2"}), personKeyOf(callerIdentity{owner: true, team: true, org: "org-1", hubUserID: "u1"}), "two people of one organisation each have their own")
+	local := httptest.NewRequest("GET", "/x", nil)
+	assert.Equal(t, "owner", openedPersonKey(local))
+}
+
+// #13910 (Frontend Dev Teams UI): the cross-team list's team filter takes real board ids, a renamed team by its id, and the no-team files by their key as well as by their label.
+func TestTheTeamFilterTakesBoardIdsIncludingTheNoTeamKey(t *testing.T) {
+	p := newPinnedRig(t)
+	_, doc := threeVersions(t, p.k)
+	_, all := p.get(t, "/api/team-artifacts?tag=for+review", nil)
+	require.NotEmpty(t, all["artifacts"])
+	_, byID := p.get(t, "/api/team-artifacts?tag=for+review&team=alpha", nil)
+	require.NotEmpty(t, byID["artifacts"], "a team by its board id")
+	assert.Equal(t, doc[2], strings.TrimPrefix(byID["artifacts"].([]any)[0].(map[string]any)["digest"].(string), "sha256:"))
+	_, other := p.get(t, "/api/team-artifacts?tag=for+review&team=beta", nil)
+	assert.Empty(t, other["artifacts"], "another team's id finds none of alpha's")
+	for _, q := range []string{"team=~no-team", "team=No+team", "team=Not+on+a+team"} {
+		code, out := p.get(t, "/api/team-artifacts?"+q, nil)
+		assert.Equal(t, 200, code, q)
+		for _, a := range out["artifacts"].([]any) {
+			assert.NotEqual(t, "alpha", a.(map[string]any)["board_id"], "the no-team key asks for the no-team files only: "+q)
+		}
 	}
 }

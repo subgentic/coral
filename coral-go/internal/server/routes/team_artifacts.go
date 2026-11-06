@@ -51,7 +51,9 @@ type teamArtifact struct {
 	// whose star it follows. The Operator's own attention: never on the per-board list an agent reads.
 	StarredAt string `json:"starred_at,omitempty"`
 	SeriesID  string `json:"series_id,omitempty"`
-	CreatedAt string `json:"created_at"`
+	// OpenedVersion (#13910): the newest version of this row's series the Operator has opened on this computer; absent when none. The row says "New version" when Version is above it. The owner-only cross-team list alone.
+	OpenedVersion int    `json:"opened_version,omitempty"`
+	CreatedAt     string `json:"created_at"`
 	// ReviewSentAt is when the file was sent for review (RFC 3339, UTC), present only while it carries the tag "for review" and was sent after the time was kept (#13231): "waiting for review" counts from it, a re-send starts it again.
 	ReviewSentAt string `json:"review_sent_at,omitempty"`
 	TaskID       int64  `json:"task_id"`
