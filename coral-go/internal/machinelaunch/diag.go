@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"golang.org/x/crypto/ssh"
 
@@ -46,8 +47,19 @@ func (k *BootKeys) hostKeySecrets() []string {
 	return out
 }
 
-// cleanDiagnostic is text from the machine made safe to print.
+// cleanDiagnostic is text from the machine made safe to print. Control and bidi characters go FIRST, so one placed inside a secret (chb_AB\x00CD) cannot keep it from being found; then the secrets are replaced; then the
+// text is cut, on a character boundary.
 func cleanDiagnostic(text string, secrets []string) string {
+	text = strings.ToValidUTF8(text, "")
+	text = strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\t' {
+			return r
+		}
+		if r < 0x20 || r == 0x7f || (r >= 0x80 && r < 0xa0) || r == 0x2028 || r == 0x2029 || (r >= 0x202a && r <= 0x202e) || (r >= 0x2066 && r <= 0x2069) || r == 0xfeff || (r >= 0x200b && r <= 0x200f) {
+			return -1
+		}
+		return r
+	}, strings.ReplaceAll(text, "\r", ""))
 	for _, s := range secrets {
 		if s != "" {
 			text = strings.ReplaceAll(text, s, "[host key]")
@@ -56,28 +68,42 @@ func cleanDiagnostic(text string, secrets []string) string {
 	text = privateKeyBlock.ReplaceAllString(text, "[private key]")
 	text = credentialLike.ReplaceAllString(text, "[credential]")
 	text = longBase64.ReplaceAllString(text, "[redacted]")
-	text = strings.Map(func(r rune) rune {
-		if r == '\n' || r == '\t' {
-			return r
-		}
-		if r < 0x20 || r == 0x7f || (r >= 0x80 && r < 0xa0) || r == 0x2028 || r == 0x2029 || (r >= 0x202a && r <= 0x202e) || (r >= 0x2066 && r <= 0x2069) {
-			return -1
-		}
-		return r
-	}, text)
-	lines := strings.Split(strings.ReplaceAll(text, "\r", ""), "\n")
+	lines := strings.Split(text, "\n")
 	for i, l := range lines {
 		l = strings.TrimRight(l, " \t")
 		if len(l) > whyLineShown {
-			l = l[:whyLineShown] + "…"
+			l = cutRunes(l, whyLineShown) + "…"
 		}
 		lines[i] = l
 	}
 	text = strings.TrimSpace(strings.Join(lines, "\n"))
 	if len(text) > whyShown {
-		text = "…" + text[len(text)-whyShown:]
+		text = "…" + tailRunes(text, whyShown)
 	}
 	return text
+}
+
+// cutRunes is the first n bytes of s or fewer, never ending inside a character.
+func cutRunes(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return s[:n]
+}
+
+// tailRunes is the last n bytes of s or fewer, never starting inside a character.
+func tailRunes(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	i := len(s) - n
+	for i < len(s) && !utf8.RuneStart(s[i]) {
+		i++
+	}
+	return s[i:]
 }
 
 // whyNotReady asks the machine over the open session why its setup has not finished, and returns the cleaned answer ("" when it said nothing or the session is gone). It never fails the launch further: it runs once, on

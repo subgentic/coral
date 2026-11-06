@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -83,4 +84,31 @@ func TestAMachineThatCannotBeAskedStillFailsClearly(t *testing.T) {
 	_, err := Launch(context.Background(), o, d)
 	require.True(t, errors.Is(err, ErrMachineNotReady))
 	assert.Contains(t, err.Error(), "could not be asked why")
+}
+
+// Security's SHOULD on #13876: a control character placed inside a secret must not keep it from being found, and a cut never splits a character.
+func TestAControlCharacterInsideASecretDoesNotDodgeItsRedaction(t *testing.T) {
+	keys, err := NewBootKeys()
+	require.NoError(t, err)
+	line := strings.Split(strings.TrimSpace(string(marshalHostKey(keys.hostPriv))), "\n")[1]
+	split := line[:10] + "\x00\x1b" + line[10:]
+	out := cleanDiagnostic("token chb_AB\x00CD\u202eEF1234 and "+split+"\n", keys.hostKeySecrets())
+	assert.NotContains(t, out, "chb_")
+	assert.NotContains(t, out, "ABCDEF1234")
+	assert.NotContains(t, out, line[:20])
+	assert.Contains(t, out, "[credential]")
+}
+
+func TestACutNeverSplitsACharacter(t *testing.T) {
+	long := cleanDiagnostic("x"+strings.Repeat("é", 400), nil) // two bytes each after one byte: the cap falls inside a character
+	assert.True(t, utf8.ValidString(long))
+	assert.LessOrEqual(t, len(long), whyLineShown+4)
+	var b strings.Builder
+	for i := 0; i < 1500; i++ {
+		b.WriteString("é\n") // 3 bytes a line, the tail cut falls inside one for some lengths
+	}
+	for n := 0; n < 4; n++ {
+		tail := cleanDiagnostic(strings.Repeat("x", n)+b.String(), nil)
+		assert.True(t, utf8.ValidString(tail), n)
+	}
 }
