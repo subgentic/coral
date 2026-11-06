@@ -212,8 +212,14 @@ write_files:
       cd "$work"
       curl -fsSL --proto '=https' --tlsv1.2 -o "$tarball" "$base/$tarball"
       echo "${want}  ${tarball}" | sha256sum -c -
-      # Only the named programs are taken from the archive (nothing else in it can land anywhere), and owned by root whatever the archive says.
-      tar -xzf "$tarball" -C /usr/local/bin/ --no-same-owner coral launch-coral coral-board coral-agent coral-hook-agentic-state coral-hook-message-check coral-hook-session-start coral-hook-task-sync coral-update
+      # The archive is unpacked in a private folder of this script (its members are stored as ./coral and so on, and GNU tar matches a name literally: asking it for `coral` finds nothing, #13876), and only the named programs are
+      # taken from there, as plain files, and owned by root whatever the archive says. Nothing else in the archive can land anywhere.
+      mkdir "$work/unpacked"
+      tar -xzf "$tarball" -C "$work/unpacked" --no-same-owner
+      for prog in coral launch-coral coral-board coral-agent coral-hook-agentic-state coral-hook-message-check coral-hook-session-start coral-hook-task-sync coral-update; do
+        if [ ! -f "$work/unpacked/$prog" ] || [ -L "$work/unpacked/$prog" ]; then echo "coral-machine-setup: $prog is not in the release archive as a plain file" >&2; exit 1; fi
+        install -m 0755 -o root -g root "$work/unpacked/$prog" "/usr/local/bin/$prog"
+      done
       test -x /usr/local/bin/coral
   - path: /usr/local/sbin/coral-machine-finish
     owner: root:root
@@ -310,8 +316,13 @@ runcmd:
   - |
     (
       set -eu
-      /usr/local/sbin/coral-machine-setup
       install -d -m 0755 -o root -g root /run/coral
+      # The setup's own output and exit status are kept where the launch key's user can read them (the cloud-init log is root's), so a setup that does not finish can say why (#13876).
+      rc=0
+      /usr/local/sbin/coral-machine-setup > /run/coral/setup.log 2>&1 || rc=$?
+      echo "$rc" > /run/coral/setup.status
+      chmod 0644 /run/coral/setup.log /run/coral/setup.status
+      [ "$rc" = 0 ] || exit "$rc"
       install -d -m 0700 -o coral -g coral /run/coral/bootstrap.d
       systemctl daemon-reload
       systemctl reload ssh || systemctl restart ssh || true

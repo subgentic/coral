@@ -181,7 +181,7 @@ func (s *SSHBootstrap) Bootstrap(ctx context.Context, req BootRequest) (BootResu
 
 	// sshd answers well before the machine's setup has made the folder the credential goes in (#13776: cloud-init runs coral-machine-setup, a download, before its last block makes /run/coral/bootstrap.d), so the
 	// launcher waits for the folder first, and mints only once the machine can take the credential: a one-time credential does not age while setup runs.
-	if err := s.waitReady(ctx, client); err != nil {
+	if err := s.waitReady(ctx, client, req.Keys); err != nil {
 		return BootResult{}, err
 	}
 
@@ -278,7 +278,7 @@ func dialContext(ctx context.Context, addr string, cfg *ssh.ClientConfig) (*ssh.
 
 // waitReady asks the machine, over the open session, whether the credential folder exists yet, until it does or ReadyWait is over. The probe is a `test -d`: it reads nothing and creates nothing, so the folder's owner and mode
 // are only ever the ones the machine's own setup gave it.
-func (s *SSHBootstrap) waitReady(ctx context.Context, client *ssh.Client) error {
+func (s *SSHBootstrap) waitReady(ctx context.Context, client *ssh.Client, keys *BootKeys) error {
 	deadline := time.Now().Add(orDefault(s.ReadyWait, 10*time.Minute))
 	every := orDefault(s.Every, 3*time.Second)
 	for {
@@ -289,7 +289,13 @@ func (s *SSHBootstrap) waitReady(ctx context.Context, client *ssh.Client) error 
 			return ctx.Err()
 		}
 		if time.Now().Add(every).After(deadline) {
-			return fmt.Errorf("%w: %s was not there after %s, so nothing was sent to it (its setup may have failed: check the machine's cloud-init log)", ErrMachineNotReady, credentialDir, orDefault(s.ReadyWait, 10*time.Minute))
+			msg := fmt.Sprintf("%s was not there after %s, so nothing was sent to it", credentialDir, orDefault(s.ReadyWait, 10*time.Minute))
+			if why := whyNotReady(ctx, client, keys); why != "" {
+				msg += ". What the machine says (cleaned, from its setup and cloud-init; the machine is deleted next):\n" + why
+			} else {
+				msg += " (the machine could not be asked why: its setup may have failed, but the machine is deleted with its log)"
+			}
+			return fmt.Errorf("%w: %s", ErrMachineNotReady, msg)
 		}
 		select {
 		case <-ctx.Done():
