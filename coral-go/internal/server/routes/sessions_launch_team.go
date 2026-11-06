@@ -710,6 +710,7 @@ func (h *SessionsHandler) launchTeamMember(ctx context.Context, body launchTeamR
 	}
 	effectiveThinking := defaultThinkingFromSettings(userSettings, agentType, def.Thinking)
 	skillRows, _ := h.resolveSkillIDs(ctx, unionSkillIDs(body.Skills, def.Skills)) // checked before the launch started; one that changed since is simply not told
+	skillRows = h.withTeamBuilderSkill(ctx, skillRows, def.Name)                   // the Orchestrator seat also gets the team-builder skill (#13894)
 	result, err := h.launchSession(ctx, launchSpec{
 		WorkDir: workingDir, AgentType: agentType, DisplayName: def.Name, Flags: agentFlags,
 		Prompt:    withSkillNote(InjectKnowledgeIntoPrompt(h.cfg.CoralDir(), body.BoardName, def.Name, def.Prompt), launchSkillNote(skillRows)),
