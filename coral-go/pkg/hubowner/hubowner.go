@@ -121,6 +121,7 @@ var routes = []route{
 	{"POST /api/board/{project}/operator-artifacts/message", 2},
 	// Generation 3 (#13757): the Markdown editor's save (a new version of a file). Its expected_latest digest is in the query, which the stamp binds; a body over MaxBody is refused by the hub, never sent unstamped.
 	{"POST /api/board/{project}/artifacts/{id}/edit", 3},
+	{"POST /api/sessions/live/{name}/model", 3}, // #13761 (Security): the chat box's model and thinking-level switch: a person's own choice on their own agent; the value typed passed ValidModelValue / validateAgentModel / ValidThinking
 }
 
 // MustBeSigned reports whether a request is one whose words are the person's own and become automation on the remote when no stamp goes with it: the owner's message to an agent (#13456) and, since

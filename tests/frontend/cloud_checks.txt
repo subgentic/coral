@@ -344,3 +344,4 @@ node remote_search_access.test.mjs
 node remote_goal_comments.test.mjs
 
 node remote_agent_identity.test.mjs
+node model_chip_refused.test.mjs

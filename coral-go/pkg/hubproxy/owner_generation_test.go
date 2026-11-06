@@ -219,3 +219,34 @@ func TestAHealthBodyThatSaysZeroRoutesIsGenerationOne(t *testing.T) {
 	assert.NotEmpty(t, s.header.Get(hubowner.Header), "and the original eight are still signed")
 	s.mu.Unlock()
 }
+
+// #13761: the model and thinking-level switch is generation 3. A signed-in session's click is signed for a remote that reports generation 3, goes unstamped (not refused) to one that reports 2, and a grantee or a
+// browser without a session is never signed.
+const modelPath = "/api/sessions/live/dev/model"
+
+func TestTheModelSwitchIsSignedOnlyForAGenerationThreeRemoteAndASession(t *testing.T) {
+	rem3, s3, _ := remoteAt(t, 3)
+	post(t, hubOver(t, rem3), modelPath, `{"session_id":"s","agent_type":"claude","model":"opus"}`, true, person)
+	s3.mu.Lock()
+	stamp := s3.header.Get(hubowner.Header)
+	require.NotEmpty(t, stamp, "a generation 3 remote: the switch is signed")
+	require.NoError(t, verifier().Verify(stamp, s3.method, modelPath, s3.target, []byte(s3.body)))
+	s3.mu.Unlock()
+
+	rem2, s2, _ := remoteAt(t, 2)
+	post(t, hubOver(t, rem2), modelPath, `{"model":"opus"}`, true, person) // post requires a 200: not refused
+	s2.mu.Lock()
+	assert.Empty(t, s2.header.Get(hubowner.Header), "a generation 2 remote does not list it: sent unstamped, as before")
+	s2.mu.Unlock()
+
+	rem3b, s3b, health := remoteAt(t, 3)
+	post(t, hubOver(t, rem3b), modelPath, `{"model":"opus"}`, true, nil) // sign-in off: this computer's own browser
+	s3b.mu.Lock()
+	assert.Empty(t, s3b.header.Get(hubowner.Header), "no sign-in session: not signed")
+	s3b.mu.Unlock()
+	assert.EqualValues(t, 0, health.Load(), "and the remote was not asked")
+	post(t, hubOver(t, rem3b), modelPath, `{"model":"opus"}`, false, person)
+	s3b.mu.Lock()
+	assert.Empty(t, s3b.header.Get(hubowner.Header), "not the person: not signed")
+	s3b.mu.Unlock()
+}
