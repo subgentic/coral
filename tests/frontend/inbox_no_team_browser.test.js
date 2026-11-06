@@ -49,7 +49,7 @@ const BASE = require('./test_base').BASE;
             await ev(`document.querySelector('#group-table-view .inbox-review-name').click(); true`);
             await waitFor(`!document.getElementById('artifact-viewer')?.hidden`, 'solo file opens');
             await waitFor(`window.__soloWrites.some(tags=>tags.includes('read'))`, 'opening marks read');
-            await waitFor(`Array.from(document.querySelectorAll('.artifact-review-approve,.artifact-review-changes,.ac-toggle')).filter(e=>!e.hidden && e.getClientRects().length).length===3`, 'viewer decisions and comments available');
+            await waitFor(`Array.from(document.querySelectorAll('.artifact-review-approve,.artifact-review-changes,.ac-toggle')).filter(e=>!e.hidden && e.getClientRects().length).length===3`, 'viewer decisions and comments available').catch(async error => { console.error('no-team diagnostic', remote, await ev(`JSON.stringify({controls:[...document.querySelectorAll('.artifact-review-approve,.artifact-review-changes,.ac-toggle')].map(e=>({class:e.className,hidden:e.hidden,rects:e.getClientRects().length})),state:document.querySelector('.artifact-review')?.textContent,reads:window.__soloReads})`)); throw error; });
         }
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
