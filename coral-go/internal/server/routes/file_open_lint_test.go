@@ -17,6 +17,7 @@ import (
 // safefs or is reviewed and listed here; a listed site that no longer exists fails too, so the
 // list stays true. Keyed file:function:call, never by line.
 var reviewedFileOpens = map[string]string{
+	"edit_send.go:SessionsHandler.editSendDiff:Open":                      "the two versions of a saved edit, read for the diff (#13802): objects of the server's artifact store, named by 64-hex digests that the series records give (never a request path), read-only, regular files, at most 2 MiB each (io.LimitReader), nothing written",
 	"wake_resume_gone.go:logHasSince:Open":                                "the agent's own terminal log in the server's log folder (the path is built from the session name, not a request): Lstat-checked regular file first (never a link), read-only, at most the last 64 KiB (#12714)",
 	"history_resume_cwd.go:transcriptStart:OpenNoFollow":                  "a session's history file (session_index.source_file, written by the indexer from the CLIs' own history folders, not a request path): read-only, never through a link, the first 256 KiB only, to find the folder it ran in (#10291)",
 	"telemetry_install_id.go:telemetryInstallID:OpenNoFollow":             "fixed .install_id in the server instance data folder, not a request path; read-only, no-follow, regular file, 128-byte cap and 36-character UUID validation (#6047)",

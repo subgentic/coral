@@ -163,6 +163,7 @@ func (s *Server) registerBoardAPI(r *chi.Mux, boardHandler *routes.BoardHandler,
 		r.With(routes.RefuseSignInLink).Get("/api/board/{project}/orchestrator-grant", sessHandler.OrchestratorGrant)
 		r.With(routes.RefuseSignInLink).Put("/api/board/{project}/orchestrator-grant", sessHandler.OrchestratorGrant)
 		r.Get("/api/board/{project}/lifecycle-log", sessHandler.LifecycleLog)
+		sessHandler.RegisterEditSend(r)                                                                    // Send to agent with the diff (#13802)
 		r.With(routes.RefuseSignInLink).Get("/api/board/{project}/guide-roster", boardHandler.GuideRoster) // #11457: which name goes with which guide: the Operator's, the owner's through Coral Hub
 		r.With(routes.RefuseSignInLink).Put("/api/board/{project}/guide-roster", boardHandler.GuideRoster)
 		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/wake", sessHandler.OrchestratorWake)

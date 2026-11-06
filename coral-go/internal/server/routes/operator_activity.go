@@ -144,7 +144,7 @@ var activityActions = map[string]bool{
 	board.ActAnswer: true, board.ActDismiss: true, board.ActGoalDone: true, board.ActProposal: true, board.ActMarkRead: true, board.ActGoalReview: true, board.ActSendReview: true, board.ActUnsendReview: true, board.ActHubUpdateCheck: true, board.ActHubUpdateRelaunch: true,
 	board.ActTaskCreate: true, board.ActTaskComplete: true, board.ActTaskCancel: true, board.ActTaskPublish: true, board.ActTaskEdit: true, board.ActTaskRemind: true, board.ActTaskPark: true, board.ActTaskReply: true,
 	board.ActPromptAnswer: true, board.ActPromptAllow: true, board.ActPromptReject: true, board.ActWaitDismiss: true, board.ActWaitSend: true, board.ActMessage: true,
-	board.ActMarkUnread: true, board.ActFileTags: true, board.ActFileStar: true, board.ActFileUnstar: true, board.ActFileKeep: true, board.ActFileRelease: true, board.ActFileDelete: true, board.ActFileShare: true, board.ActFileEdit: true,
+	board.ActMarkUnread: true, board.ActFileTags: true, board.ActFileStar: true, board.ActFileUnstar: true, board.ActFileKeep: true, board.ActFileRelease: true, board.ActFileDelete: true, board.ActFileShare: true, board.ActFileEdit: true, board.ActFileEditSend: true,
 	board.ActSavedAdd: true, board.ActSavedUpdate: true, board.ActSavedRemove: true, board.ActChatFlag: true, board.ActChatSend: true, board.ActRunSeen: true, board.ActAgentsRecord: true,
 	board.ActGoalCreate: true, board.ActGoalEdit: true, board.ActGoalDriver: true, board.ActGoalMove: true, board.ActGoalRequestAdd: true, board.ActGoalRequestNo: true, board.ActInboxHide: true,
 	board.ActSkillApprove: true, board.ActSkillReject: true, board.ActSkillRemove: true, board.ActSkillImport: true, board.ActSkillScriptsAck: true, board.ActSkillSecretAck: true,

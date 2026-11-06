@@ -161,7 +161,7 @@ func cleanCommentName(s string) string {
 func ownerCommentRequest(r *http.Request) bool {
 	if r.Method == http.MethodGet {
 		pattern, mode := tunnel.OwnerRoute(r.Method, r.URL.Path)
-		return mode != tunnel.OwnerNone && mode.Refuses() && pattern == "/api/artifacts/{hex64}/comments"
+		return mode != tunnel.OwnerNone && mode.Refuses() && (pattern == "/api/artifacts/{hex64}/comments" || pattern == "/api/board/{project}/artifacts/{digest}/edit/send")
 	}
 	return ownerCommentWrite(r)
 }
@@ -172,7 +172,8 @@ func ownerCommentWrite(r *http.Request) bool {
 	pattern, mode := tunnel.OwnerRoute(r.Method, r.URL.Path)
 	switch pattern {
 	case "/api/artifacts/{hex64}/comments", "/api/artifacts/{hex64}/comments/{id}/resolve", "/api/artifacts/{hex64}/comments/{id}/reopen",
-		"/api/artifacts/{hex64}/comments/lock", "/api/artifacts/{hex64}/comments/{id}/send", "/api/artifacts/{hex64}/comment-images":
+		"/api/artifacts/{hex64}/comments/lock", "/api/artifacts/{hex64}/comments/{id}/send", "/api/artifacts/{hex64}/comment-images",
+		"/api/board/{project}/artifacts/{digest}/edit/send": // Send to agent with the diff (#13802): the owner's alone, as the comment send
 		return mode != tunnel.OwnerNone && mode.Refuses()
 	case "/api/artifacts/{hex64}/comments/{id}": // the edit and delete: the owner's (the stamped marker) or the author's, the comment policy decides which (#11354)
 		return mode == tunnel.OwnerSees

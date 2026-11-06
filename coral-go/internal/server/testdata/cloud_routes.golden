@@ -87,6 +87,7 @@ GET /api/board/tasks view
 GET /api/board/{project} view
 GET /api/board/{project}/artifacts view
 GET /api/board/{project}/artifacts/{digest}/edit view
+GET /api/board/{project}/artifacts/{digest}/edit/send view
 GET /api/board/{project}/cross-team-candidates never
 GET /api/board/{project}/cross-team-links never
 GET /api/board/{project}/cross-team-state never
@@ -315,6 +316,7 @@ POST /api/board/remotes never
 POST /api/board/{project}/agents/{subscriber}/sleep never
 POST /api/board/{project}/agents/{subscriber}/wake never
 POST /api/board/{project}/artifacts/{digest}/edit interact
+POST /api/board/{project}/artifacts/{digest}/edit/send interact
 POST /api/board/{project}/artifacts/{id}/review interact
 POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim interact
 POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle interact

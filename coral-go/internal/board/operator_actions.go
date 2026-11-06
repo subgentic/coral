@@ -82,8 +82,9 @@ const (
 	ActFileKeep       = "file_keep"
 	ActFileRelease    = "file_release"
 	ActFileDelete     = "file_delete"
-	ActFileShare      = "file_share" // a file shared with an agent
-	ActFileEdit       = "file_edit"  // a Markdown file saved from the dashboard's editor as a new version (#13757)
+	ActFileShare      = "file_share"     // a file shared with an agent
+	ActFileEditSend   = "file_edit_send" // the Operator sent a saved edit of a file, as a diff, to agents (#13802)
+	ActFileEdit       = "file_edit"      // a Markdown file saved from the dashboard's editor as a new version (#13757)
 	ActSavedAdd       = "saved_add"
 	ActSavedUpdate    = "saved_update" // Done or Reopen on a saved message
 	ActSavedRemove    = "saved_remove"

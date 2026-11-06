@@ -147,6 +147,8 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"POST /api/sessions/live/{name}/dismiss-wait":                          "owner-only",
 		"POST /api/sessions/live/{name}/auto-sleep":                            "owner-only", // an agent's auto-sleep switch (#12111)
 		"GET /api/board/{project}/artifacts/{digest}/edit":                     "owner-only",
+		"GET /api/board/{project}/artifacts/{digest}/edit/send":                "owner-only",
+		"POST /api/board/{project}/artifacts/{digest}/edit/send":               "owner-only",
 		"POST /api/board/{project}/artifacts/{digest}/edit":                    "owner-only",
 		"POST /api/board/{project}/operator-artifacts":                         "owner-only",
 		"POST /api/board/{project}/operator-artifacts/message":                 "owner-only",

@@ -321,6 +321,9 @@ var routeTable = cat(
 	// The Markdown editor (#13757): the owner's alone through the hub. What a file allows is a view of the owner's artifacts; the save writes a new version, Interact.
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/board/{project}/artifacts/{digest}/edit")),
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/artifacts/{digest}/edit")),
+	// Send to agent with the diff (#13802): the owner's alone; the read says whether Send is offered, the send tells agents (Interact).
+	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/board/{project}/artifacts/{digest}/edit/send")),
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/artifacts/{digest}/edit/send")),
 	// Saved for later (#4510) is the OWNER's alone through the hub (#5753, Shared Inbox, Security's condition 3): the list holds the bookmarks of the owner's chats, and the whole
 	// message of a bookmark (the text of its source, redacted and cut to 64 KiB; the source is the stored bookmark's, never a ref from the request) is read from its own route. The
 	// changes (POST, PATCH, DELETE) stay as they were (Interact).
