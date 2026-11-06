@@ -166,10 +166,7 @@ func (h *BoardHandler) SaveArtifactEdit(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusUnsupportedMediaType, "not_markdown", "only a Markdown file can be edited here")
 		return
 	}
-	if h.isPaused(project) {
-		commentRefuse(w, http.StatusConflict, "board_paused", "the board is paused: nothing is sent to its agents until it is resumed")
-		return
-	}
+	// A paused board does not stop the save (the Operator's decision, #13757): a save sends nothing to any agent, so the "nothing reaches a paused board's agents" rule has nothing to hold.
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxMarkdownEdit+1))
 	var tooBig *http.MaxBytesError
 	if errors.As(err, &tooBig) || len(body) > maxMarkdownEdit {

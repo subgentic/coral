@@ -317,10 +317,10 @@ var routeTable = cat(
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/sessions/live/{name}/dismiss-wait")),
 	// The Operator's per-agent auto-sleep switch (#12111) is the OWNER's alone through the hub: it changes Coral's own record and types and kills nothing, so Interact.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/sessions/live/{name}/auto-sleep")),
-	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/operator-artifacts", "/api/board/{project}/operator-artifacts/message")),
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/operator-artifacts", "/api/board/{project}/operator-artifacts/message")), // a file the Operator shares with an agent (#11376)
 	// The Markdown editor (#13757): the owner's alone through the hub. What a file allows is a view of the owner's artifacts; the save writes a new version, Interact.
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/board/{project}/artifacts/{digest}/edit")),
-	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/artifacts/{digest}/edit")), // a file the Operator shares with an agent (#11376)
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/artifacts/{digest}/edit")),
 	// Saved for later (#4510) is the OWNER's alone through the hub (#5753, Shared Inbox, Security's condition 3): the list holds the bookmarks of the owner's chats, and the whole
 	// message of a bookmark (the text of its source, redacted and cut to 64 KiB; the source is the stored bookmark's, never a ref from the request) is read from its own route. The
 	// changes (POST, PATCH, DELETE) stay as they were (Interact).

@@ -170,7 +170,9 @@ func (h *Handler) proxyHTTP(w http.ResponseWriter, r *http.Request, id string, t
 			// with the reason, and nothing of it is sent. The person shortens it or sends it as a file.
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusRequestEntityTooLarge)
-			_, _ = io.WriteString(w, `{"error":"This message is too long to send through the Hub (the limit is 64 KB): shorten it or send it as a file.","code":"hub_message_too_long","not_sent":true}`)
+			code, sentence := hubowner.TooLong(r.Method, dec)
+			body, _ := json.Marshal(map[string]any{"error": sentence, "code": code, "not_sent": true})
+			_, _ = w.Write(body)
 			return
 		} else {
 			r.Body = struct {

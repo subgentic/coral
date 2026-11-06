@@ -9,6 +9,7 @@ export function activityWords(row) {
     if (row.action === 'prompt_reject') return `You refused ${row.title || row.item_id || 'an agent'}’s permission request${quote}`;
     if (row.action === 'prompt_answer') return `You answered ${row.title || row.item_id || 'an agent'}’s permission prompt${quote}`;
     if (TASK_VERB[row.action]) return `You ${TASK_VERB[row.action]} task #${row.item_id}${row.title ? ` ${row.title}` : ''}${quote}`;
+    if (row.action === 'file_edit') return `You saved a new version of ${row.title || 'a file'}${quote}`;
     if (row.action === 'wait_dismiss') return `You dismissed ${row.title || row.item_id || 'an agent'}’s waiting card`;
     if (row.action === 'wait_send') return `You sent held words to ${row.title || row.item_id || 'an agent'}`;
     return `${ACTION_LABEL[row.action] || row.action}${quote}`;

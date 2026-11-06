@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/hubowner"
@@ -82,6 +83,11 @@ func TestTheMarkdownSaveWorksThroughAStampedProxyAndATunnelledOwnerAndRefusesEve
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &saved))
 	assert.EqualValues(t, 2, saved["version"])
 	v2, _ := saved["id"].(string)
+	rows, aerr := r.srv.boardStore.ListActivity(ctx, board.ActivityFilter{Team: "team", Action: board.ActFileEdit, Limit: 10})
+	require.NoError(t, aerr)
+	require.Len(t, rows, 1, "the owner's stamped save is one row of the Activity record")
+	assert.Equal(t, v2, rows[0].ItemID)
+	// NOT asserted: the row's source and actor. activityMetaFor marks only a tunnelled request as a Hub's; a stamped self-hosted-Hub request is recorded as "local" today (reported on #13757 as a follow-up).
 	// the signed query is the compare-and-swap: a stamp over ?expected_latest=v1 cannot be replayed for another value, and a stale one is a 409
 	m, target = req(v1, v1)
 	rec = bare(h, m, target, "# plan, again\n", stamp(m, target, "# plan, again\n"))

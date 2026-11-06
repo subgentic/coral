@@ -133,6 +133,15 @@ func MustBeSigned(method, path string) bool {
 	return strings.HasPrefix(strings.Trim(path, "/"), "api/sessions/live/") || since(method, path) > 1
 }
 
+// TooLong is the hub's refusal of a stamped request whose body is over MaxBody (it is never sent unstamped): the code and the sentence, in the words of what the person was doing. An agent message and an
+// editor's save are told apart by their route; the editor's words say where the file CAN be saved (#13757).
+func TooLong(method, path string) (code, sentence string) {
+	if strings.HasSuffix(strings.Trim(path, "/"), "/edit") {
+		return "hub_file_too_large", "This file is too large to save through the Hub (the limit is 64 KB): save it on the computer itself, or shorten it."
+	}
+	return "hub_message_too_long", "This message is too long to send through the Hub (the limit is 64 KB): shorten it or send it as a file."
+}
+
 // Routes lists the allowlist, for census tests on both sides.
 func Routes() []string {
 	out := make([]string, len(routes))

@@ -337,3 +337,15 @@ func TestTheSecretFileIsPrivateReadBackAndNeverThroughALink(t *testing.T) {
 		t.Errorf("junk accepted: %v %v", ok, err)
 	}
 }
+
+// #13757 (QA's SHOULD): the hub's refusal of a body too big to stamp says what the person was doing: an editor's save says where the file can be saved, an agent message keeps its own words.
+func TestTheTooLongSentenceIsInTheWordsOfWhatThePersonWasDoing(t *testing.T) {
+	code, text := TooLong("POST", "/api/board/t/artifacts/abc/edit")
+	if code != "hub_file_too_large" || !strings.Contains(text, "save it on the computer") || strings.Contains(text, "message") {
+		t.Errorf("an editor's save: %s %q", code, text)
+	}
+	code, text = TooLong("POST", "/api/sessions/live/x/send")
+	if code != "hub_message_too_long" || !strings.Contains(text, "This message is too long") {
+		t.Errorf("an agent message: %s %q", code, text)
+	}
+}

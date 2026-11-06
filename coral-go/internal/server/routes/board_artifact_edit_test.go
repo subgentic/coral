@@ -310,3 +310,11 @@ func TestWhatAFileAllowsIsReadableByThePersonAndTheHubsKey(t *testing.T) {
 		assert.Equal(t, 404, code, "another team's file looks like no file")
 	}
 }
+
+func TestAPausedBoardDoesNotStopTheOperatorsSave(t *testing.T) {
+	e := newEditEnv(t, "person")
+	v1 := e.seed(t, sessAlice, "plan.md", "text/markdown", "", "one")
+	e.h.SetPaused("alpha", true)
+	code, out := e.save(t, "alpha", v1, v1, "two", nil)
+	assert.Equal(t, http.StatusCreated, code, "a save sends nothing to an agent, so a paused board does not hold it: %v", out)
+}
