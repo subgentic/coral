@@ -128,6 +128,7 @@ function _build() {
     d.querySelector('.artifact-viewer-chips').append(chip);
     chip.addEventListener('click', () => { const note = d.querySelector('.artifact-linked-notice'); if (!note) return; note.hidden = !note.hidden; chip.setAttribute('aria-expanded', String(!note.hidden)); });
     // the line under the header (who sent it, what they ask) is one cut line; a tap, Enter or Space shows all of it
+    d.querySelector('.artifact-viewer-title').addEventListener('click', e => { const t = e.currentTarget; if (t.scrollWidth > t.clientWidth || t.classList.contains('is-open')) t.classList.toggle('is-open'); });
     const fromEl = d.querySelector('.artifact-viewer-from'); fromEl.tabIndex = 0; fromEl.setAttribute('role', 'button'); fromEl.setAttribute('aria-expanded', 'false');
     const flipFrom = () => { const on = !fromEl.classList.contains('is-open'); fromEl.classList.toggle('is-open', on); fromEl.setAttribute('aria-expanded', String(on)); };
     fromEl.addEventListener('click', flipFrom); fromEl.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flipFrom(); } });
@@ -327,6 +328,7 @@ export function openArtifactViewer(hex, opts = {}) {
     const url = serverUrl(artifactPath(hex), opts.server);
     const title = d.querySelector('.artifact-viewer-title');
     title.textContent = visibleName(opts.filename) || 'Artifact'; // the uploader's text, without what hides or reorders it (Security on #220)
+    title.title = title.textContent; title.classList.remove('is-open'); // a long name is cut with an ellipsis: the whole name on hover, and a tap or click shows it whole (#13979; its accessible name was always the whole text)
     const fromLine = d.querySelector('.artifact-viewer-from'); fromLine.textContent = visibleName(opts.from) || ''; fromLine.hidden = !fromLine.textContent; fromLine.title = fromLine.textContent; fromLine.classList.remove('is-open'); fromLine.setAttribute('aria-expanded', 'false'); d.querySelector('.artifact-viewer-sandbox').hidden = true; d._markUp.picture(false); d._markUp.write(false); // who uploaded a file opened for review (#11456), as text
     const sourceNote = d.querySelector('.artifact-viewer-source'); sourceNote.hidden = !!opts.sourceNamed; sourceNote.textContent = '';
     if (!opts.sourceNamed) { const computer = (state.servers || []).find(s => s.id === opts.server), name = opts.server === 'local' ? 'this computer' : (computer?.label || computer?.name || opts.server); sourceNote.textContent = `Viewing from ${markHidden(name, { strict: true })}. Source inferred; read only.`; }
