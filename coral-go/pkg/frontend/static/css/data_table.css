@@ -610,10 +610,15 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
  * The data and fixed action columns retain their existing layout and widths. */
 .dt-row.inbox-kind-row { position: relative; }
 .dt-table .inbox-kind-row > td[data-key="agent"] { padding-left: 3.5rem; }
+/* An unfolded row can have a selection cell before Item: its icon belongs to Item, never that checkbox. */
+.dt-box:not(.dt-folded) .inbox-kind-row > td[data-key="agent"] { position: relative; }
 .inbox-kind-column { position: absolute; inset: 0 auto 0 0; width: 3rem; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .dt-box.dt-folded .inbox-kind-row { padding-left: 3.5rem; }
 .dt-box.dt-folded .inbox-kind-column { justify-content: flex-start; padding-left: 16px; box-sizing: border-box; }
 .dt-box.dt-folded .inbox-kind-row > td[data-key="agent"] { padding-left: 0; }
+/* A narrow dashboard panel can fold while desktop action slots are active. Wrap the buttons inside their cell instead of letting the fixed grid spill into the icon gutter. */
+.dt-box.dt-folded .inbox-review-actions.inbox-slots { display: flex; flex-wrap: wrap; }
+.dt-box.dt-folded .inbox-review-actions.inbox-slots > .btn { width: auto; }
 /* Choices keep the full row width (#10874); only title/excerpt share the icon gutter. */
 .dt-box.dt-mail-on tr.dt-mailed:has(.dt-mail-kind) { padding-left: 0; }
 .dt-box.dt-mail-on tr.dt-mailed > td.dt-mail-kind { display: grid; grid-template-columns: 3rem minmax(0, 1fr) auto; }
