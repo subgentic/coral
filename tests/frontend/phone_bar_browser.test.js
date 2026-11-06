@@ -37,6 +37,8 @@ const BASE = require('./test_base').BASE;
             assert.ok(home && home.pill.h === 48 && home.menu.w === 44 && home.acct.w === 44 && home.pill.border === '0px' && home.pill.inside, `${tag}: Home's bar is the reference (48 px pill, 44 px ☰ and avatar, no border): ` + JSON.stringify(home));
             for (const [name, g] of Object.entries(got)) {
                 assert.ok(g, `${tag}: ${name} draws the bar`);
+                // #13811: Inbox's approved second-row search geometry is pinned by inbox_phone_search_full_width_browser.
+                if (name === 'Inbox') { assert.ok(g.menu.w === 44 && g.acct.w === 44 && !g.titled, `${tag}: Inbox keeps the named controls without a tooltip`); continue; }
                 assert.deepEqual({ ...g, text: 0, titled: 0 }, { ...home, text: 0, titled: 0 }, `${tag}: ${name}'s bar is Home's bar (boxes, pill style, avatar): ${JSON.stringify(g)} vs ${JSON.stringify(home)}`);
                 assert.ok(!g.titled && (name === 'Home' || g.text.length > 0), `${tag}: ${name}'s pill has its title in it and no title attribute (no tooltip) above it: ` + JSON.stringify(g));
             }

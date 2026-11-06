@@ -46,10 +46,13 @@ export const repaintPhoneBarSearch = () => paintTitle(_pageName || _lastWords ||
 
 /** The title in every bar's pill, and where the view has a search, the field in it: the title stays for a screen reader and the field's placeholder says what it searches. */
 function paintTitle(words) {
+    const inbox = document.querySelector('.top-nav-tab.active')?.dataset.arg === 'hub-inbox';
     for (const t of document.querySelectorAll('.phone-bar-title')) {
+        t.closest('.phone-bar').classList.toggle('phone-inbox-bar', inbox);
         let txt = t.querySelector('.phone-bar-title-text');
         if (!txt) { txt = document.createElement('span'); txt.className = 'phone-bar-title-text'; t.replaceChildren(txt); }
-        if (txt.textContent !== words) txt.textContent = words;
+        const title = inbox ? 'Inbox' : words;
+        if (txt.textContent !== title) txt.textContent = title;
         const target = searchTarget();
         let input = t.querySelector('.phone-bar-search');
         for (const w of document.querySelectorAll('.list-bar-search-wrap.phone-searched')) if (!target || target.closest('.list-bar-search-wrap') !== w) w.classList.remove('phone-searched'); // the page box the pill stands in for is not drawn
