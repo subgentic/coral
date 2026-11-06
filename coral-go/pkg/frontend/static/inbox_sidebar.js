@@ -17,7 +17,7 @@ import { doneGoals, nextQuietEnd, quietEndsAt, hideGoalDone, setGoalDoneCount, i
 import { state } from './state.js';
 import { isPhoneBar } from './phone_layout.js';
 
-const { mutedReviewItems, mutedWords, reviewItems, reviewStarChanged, unreadReviewItems, reviewErrors, refreshReviews, reviewsChangedOnServer, reviewGroups, setReviewRead, markOpenedReadVisibly, isRead, savedFiles, reviewPages, savedReviewPages, loadMoreReviews, loadMoreSavedFiles, queryReviews, queriedReviews, moreQueriedReviews, retryQueriedReviews, reviewQueryState, reviewQueryKey, reviewFilterOptions, countSavedReviews } = await importOnce('./inbox_reviews.js');
+const { mutedReviewItems, mutedWords, reviewItems, reviewStarChanged, unreadReviewItems, reviewErrors, refreshReviews, reviewsChangedOnServer, reviewGroups, setReviewRead, markOpenedReadVisibly, isRead, savedFiles, reviewPages, savedReviewPages, loadMoreReviews, loadMoreSavedFiles, queryReviews, queriedReviews, moreQueriedReviews, retryQueriedReviews, reviewQueryState, reviewQueryKey, reviewFilterOptions, countSavedReviews, reviewPageSummary } = await importOnce('./inbox_reviews.js');
 import { failedUnread, finishedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
 import { operatorAsks, refreshOperatorAsks, askLine, askPlain, askKey, openAskDialog, askSubjects } from './operator_asks.js';
 import { go, note, backIs, currentRoute } from './nav.js';
@@ -283,11 +283,19 @@ function inboxNeedsToolbar() {
     const completeCount = reviewFilters() ? Number.isSafeInteger(reviewQueryState()?.attentionTotal) : countState.complete;
     const counts = NF.KINDS.filter(kindShown).map(k => k === 'review' && attention !== null && attention !== undefined ? attention : rows.filter(s => NF.kindOf(s) === k && (k === 'welcome' || needsUnread(s))).length); // a pill counts what the badge counts (the Welcome pill its own items)
     const listed = NF.KINDS.filter(kindShown).map(k => rows.filter(s => NF.kindOf(s) === k).length), said = (n, m) => (n === m ? n : `${n} of ${m}`); // the rows read ones are listed too: 'For review 0 of 4', one number (the unread) and the list's size when they differ (#11886)
+    const pageSummary = reviewFilters() ? reviewQueryState() : reviewPageSummary();
+    const serverListed = reviewFilters() ? pageSummary?.total : pageSummary?.queryTotal;
+    const listedReviews = Number.isSafeInteger(serverListed) ? serverListed : rows.filter(s => s.review).length;
+    const listedComplete = Number.isSafeInteger(serverListed);
+    const pillCount = (n, m) => {
+        const value = `${completeCount ? '' : 'at least '}${n}`;
+        return completeCount && listedComplete && n === m ? value : `${value} of ${listedComplete ? '' : 'at least '}${m}`;
+    };
     const node = needsBar.draw({
         filters: needsFilters,
         options: { team: { values: teams, labels: {} }, agent: { values: names, labels: {} }, goal: { values: goalNames, labels: {} } },
         pills: { label: 'Show agents waiting on', current: needsFilters.kind || 'all',
-            items: [{ key: 'all', label: 'All', count: attention !== null && attention !== undefined ? `${completeCount ? '' : 'at least '}${rows.filter(s => !s.review && needsUnread(s)).length + attention}` : said(rows.filter(needsUnread).length, rows.length) }, ...NF.KINDS.filter(kindShown).map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: k === 'review' && attention !== null && attention !== undefined ? `${completeCount ? '' : 'at least '}${attention}` : said(counts[i], listed[i]) }))],
+            items: [{ key: 'all', label: 'All', count: attention !== null && attention !== undefined ? pillCount(rows.filter(s => !s.review && needsUnread(s)).length + attention, rows.filter(s => !s.review).length + listedReviews) : said(rows.filter(needsUnread).length, rows.length) }, ...NF.KINDS.filter(kindShown).map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: k === 'review' && attention !== null && attention !== undefined ? pillCount(attention, listedReviews) : said(counts[i], listed[i]) }))],
             onPick: key => { needsFilters = { ...needsFilters, kind: key === 'all' ? '' : key }; NF.saveFilters(needsFilters); renderInboxNav(true); } },
     });
     if (!node.querySelector('.inbox-group-review-toggle')) {
@@ -297,7 +305,7 @@ function inboxNeedsToolbar() {
         label.append(input, document.createTextNode('Group by goal')); node.append(label);
     }
     node.querySelector('.inbox-group-review-toggle').hidden = (!!needsFilters.kind && needsFilters.kind !== 'review') || (!reviewItems().length && needsFilters.kind !== 'review');
-    return { node, signature: JSON.stringify([groupReviews, needsFilters, teams, names, goalNames, counts, completeCount, rows.length, rows.filter(needsUnread).length]) };
+    return { node, signature: JSON.stringify([groupReviews, needsFilters, teams, names, goalNames, counts, completeCount, listedReviews, listedComplete, rows.length, rows.filter(needsUnread).length]) };
 }
 
 // ── Tasks ────────────────────────────────────────────────────────────────

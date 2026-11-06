@@ -135,7 +135,7 @@ const { coralReady } = require('./helpers/wait');
                 const hex = c => c.repeat(64), at = i => new Date(Date.now() - i * 3600000).toISOString();
                 const file = (c, name, extra) => ({ id: hex(c), name, uri: 'coral://artifacts/' + hex(c), digest: hex(c), available: true, tags: ['for review'], created_at: at(3), ...extra });
                 const files = [file('a', 'plan.md'), file('e', 'old-notes.md', { muted: true, created_at: at(50) })];
-                window.fetch = (u, o = {}) => { const url = window.__reviewFixtureURL(String(u), location.href);
+                window.fetch = (u, o = {}) => { const page = window.__reviewFixturePage(u, location.href, { alpha: files }); if (page) return json(page); const url = window.__reviewFixtureURL(String(u), location.href);
                     if (url.pathname === '/api/board/projects') return json([{ project: 'alpha' }]);
                     if (url.pathname === '/api/board/alpha/artifacts' && url.searchParams.get('tag') === 'for review') return json({ artifacts: files, has_more: false });
                     if (url.pathname === '/api/board/alpha/artifacts') return json({ artifacts: [], has_more: false });
