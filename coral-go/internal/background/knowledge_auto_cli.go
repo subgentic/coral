@@ -25,6 +25,9 @@ import (
 //   - the sign-in checked before the run and before each call (#5469), and no browser or login ever started by it.
 // The model is the Workers default for the agent type (default_model_<type>); none set means the CLI's own default.
 
+// codexOffFeatures are the Codex features (`codex features list`) an automatic run switches off: every one that lets the model act or reach outside the prompt.
+var codexOffFeatures = []string{"shell_tool", "unified_exec", "hooks", "apps", "plugins", "browser_use", "browser_use_external", "computer_use", "image_generation", "view_image"}
+
 // AutoCLI is one agent CLI the automatic run distills with.
 type AutoCLI struct {
 	AgentType string // claude or codex
@@ -111,6 +114,11 @@ func (c *AutoCLI) args(dir, last string) []string {
 	model, _ := agentmodels.ModelArgs(c.Model) // "" and an invalid value both give none
 	if c.AgentType == at.Codex {
 		a := []string{"exec", "--ephemeral", "--skip-git-repo-check", "--sandbox", "read-only", "--ignore-user-config", "--ignore-rules", "-C", dir, "--output-last-message", last}
+		// Codex's own tools are switched off for this call (Security's SHOULD 2): its shell and exec tools (the read-only sandbox still lets a model read any file the user can), hooks, apps, plugins, the
+		// browser and computer use, and image generation. What is left is the model's answer.
+		for _, feature := range codexOffFeatures {
+			a = append(a, "--disable", feature)
+		}
 		a = append(a, model...)
 		return append(a, "-") // the prompt is read from stdin
 	}
