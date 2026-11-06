@@ -617,8 +617,10 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-box.dt-folded .inbox-kind-column { justify-content: flex-start; padding-left: 16px; box-sizing: border-box; }
 .dt-box.dt-folded .inbox-kind-row > td[data-key="agent"] { padding-left: 0; }
 /* A narrow dashboard panel can fold while desktop action slots are active. Wrap the buttons inside their cell instead of letting the fixed grid spill into the icon gutter. */
-.dt-box.dt-folded .inbox-review-actions.inbox-slots { display: flex; flex-wrap: wrap; }
-.dt-box.dt-folded .inbox-review-actions.inbox-slots > .btn { width: auto; }
+@media (min-width: 768px) and (min-height: 501px), (min-width: 768px) and (pointer: fine), (min-width: 951px) {
+    .dt-box.dt-folded .inbox-review-actions.inbox-slots { display: flex; flex-wrap: wrap; }
+    .dt-box.dt-folded .inbox-review-actions.inbox-slots > .btn { width: auto; }
+}
 /* Choices keep the full row width (#10874); only title/excerpt share the icon gutter. */
 .dt-box.dt-mail-on tr.dt-mailed:has(.dt-mail-kind) { padding-left: 0; }
 .dt-box.dt-mail-on tr.dt-mailed > td.dt-mail-kind { display: grid; grid-template-columns: 3rem minmax(0, 1fr) auto; }
