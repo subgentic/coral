@@ -25,17 +25,22 @@ function showSpecials(host) {
  * rendered original; onSaved opens the server's newly stored version. */
 export function createMarkdownEditor({ body, footer, dialog, context, source: initialSource, onExit, onSaved }) {
     let source = initialSource, original = initialSource, busy = false, dead = false, composing = false, confirmOpen = false, latest = null, pendingText = false, baseDigest = context.hex;
+    let mode = 'rendered', previewShown = false;
     const keptDrafts = [];
     const status = el('p', 'amd-status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
     const hint = el('p', 'amd-hint', 'Edit words in the highlighted text. Enter adds a line where supported or applies a change elsewhere; Escape cancels it. Formatting and read-only blocks stay in place.');
     const documentHost = el('div', 'amd-document'), conflict = el('section', 'amd-conflict'); conflict.hidden = true; conflict.setAttribute('aria-label', 'A newer document version');
     const kept = el('section', 'amd-kept'); kept.hidden = true; kept.setAttribute('aria-label', 'Your unsaved drafts');
-    const wrapper = el('div', 'amd-editor'); wrapper.append(hint, status, conflict, documentHost, kept);
+    const modes=el('div','amd-modes');modes.setAttribute('role','group');modes.setAttribute('aria-label','Editing mode');
+    const renderedButton=makeButton('Rendered text','amd-mode-rendered',()=>switchMode('rendered'));
+    const rawButton=makeButton('Raw text','amd-mode-raw',()=>switchMode('raw'));
+    const previewButton=makeButton('Preview','amd-preview-toggle',()=>{previewShown=!previewShown;draw();});modes.append(renderedButton,rawButton,previewButton);
+    const wrapper = el('div', 'amd-editor'); wrapper.append(modes, hint, status, conflict, documentHost, kept);
     const cancelButton = makeButton('Cancel', 'amd-cancel', () => cancel());
     const saveButton = makeButton('Save as new version', 'btn-primary amd-save', () => save(baseDigest));
     footer.prepend(cancelButton, saveButton); dialog.classList.add('av-markdown-edit'); body.replaceChildren(wrapper);
     const say = (text, error = false) => { status.textContent = text; status.classList.toggle('is-error', error); };
-    const sync = () => { saveButton.disabled = busy || !!latest || (!pendingText && source === original); cancelButton.disabled = busy; documentHost.inert = busy; };
+    const sync = () => { saveButton.disabled = busy || !!latest || (!pendingText && source === original); cancelButton.disabled = busy; documentHost.inert = busy; modes.inert = busy; };
     const flush = () => { if (documentHost.contains(document.activeElement)) document.activeElement.blur(); };
     const beforeLeave = next => {
         flush(); if (dead) return false;
@@ -54,9 +59,25 @@ export function createMarkdownEditor({ body, footer, dialog, context, source: in
     };
     const exit = () => onExit(baseDigest);
     const cancel = () => { if (!beforeLeave(exit)) exit(); };
+    function switchMode(next) {flush();if(dead||busy||mode===next)return;mode=next;draw();documentHost.querySelector('.amd-raw,.amd-text')?.focus();}
     function draw() {
         if (dead) return;
-        const model = M.analyze(source, marked); documentHost.replaceChildren();
+        renderedButton.setAttribute('aria-pressed',String(mode==='rendered'));rawButton.setAttribute('aria-pressed',String(mode==='raw'));
+        previewButton.hidden=mode!=='raw';previewButton.setAttribute('aria-pressed',String(previewShown));
+        documentHost.replaceChildren();
+        if(mode==='raw') {
+            hint.textContent='Edit the whole Markdown file. Preview shows how it will render. Save creates a new version.';
+            const input=el('textarea','amd-raw');input.setAttribute('aria-label','Markdown source');input.spellcheck=false;input.value=M.normalizeSource(source).text;
+            const warning=el('p','amd-raw-warning');warning.setAttribute('role','status');
+            const preview=el('div','amd-preview');preview.hidden=!previewShown;
+            const update=()=>{warning.hidden=!M.HIDDEN.test(M.normalizeSource(source).text);warning.textContent=warning.hidden?'':'This source contains hidden or bidirectional characters. They are preserved in the file.';if(previewShown){preview.replaceChildren(wholeDocument(source));}};
+            input.addEventListener('input',()=>{source=M.editRaw(source,input.value);pendingText=false;update();sync();});
+            documentHost.append(input,warning,preview);update();sync();return;
+        }
+        hint.textContent='Edit words in the highlighted text. Enter adds a line where supported or applies a change elsewhere; Escape cancels it. Formatting and read-only blocks stay in place.';
+        let model;
+        try {model=M.analyze(source,marked);} catch(error) {documentHost.append(el('p','amd-readonly',error.message+' Use Raw text to continue editing.'));if(new TextEncoder().encode(source).length<=M.MAX_BYTES)documentHost.append(wholeDocument(source));sync();return;}
+
         for (const block of model.blocks) {
             const section = el('section', 'amd-block'), prose = render(block.raw, model.references);
             const map = block.reason ? { exact: false, entries: [] } : M.mapRenderedBlock(block, prose);
@@ -115,7 +136,9 @@ export function createMarkdownEditor({ body, footer, dialog, context, source: in
     function keepDraft() {
         if (!keptDrafts.includes(source)) keptDrafts.push(source);
         kept.hidden = false; kept.replaceChildren(el('h3', null, 'Your unsaved draft'), el('p', null, 'Your words are kept here. Redo your edits in the latest version above; nothing was saved.'));
-        for (const draft of keptDrafts) kept.append(wholeDocument(draft));
+        for (const draft of keptDrafts) {
+            if(mode==='raw'){const copy=el('textarea','amd-kept-source');copy.readOnly=true;copy.setAttribute('aria-label','Your unsaved Markdown source');copy.value=draft;kept.append(copy);}else kept.append(wholeDocument(draft));
+        }
     }
     async function showTheirs() {
         const choice = latest; if (!choice || dead) return;
@@ -138,7 +161,7 @@ export function createMarkdownEditor({ body, footer, dialog, context, source: in
             opened = true;
         } catch (error) { if (!dead) say(error.message || 'The latest version could not be opened. Your draft is kept.', true); }
         finally { busy = false; if (!dead) { sync(); conflict.querySelectorAll('button').forEach(b => { b.disabled = false; }); } }
-        if (opened && !dead) documentHost.querySelector('.amd-text')?.focus();
+        if (opened && !dead) documentHost.querySelector('.amd-raw,.amd-text')?.focus();
     }
     function showConflict(data) {
         const digest = data.latest_digest || data.latest?.digest;

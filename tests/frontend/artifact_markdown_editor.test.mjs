@@ -9,9 +9,9 @@ dom.window.HTMLDialogElement.prototype.showModal = function () { this.open = tru
 dom.window.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new Event('close')); };
 const { createMarkdownEditor } = await importUi('artifact_markdown_editor'); const api = await importUi('artifact_markdown_api');
 const hex = 'a'.repeat(64), next = 'b'.repeat(64), latest = 'c'.repeat(64);
-function setup(source, onSaved = () => {}) {
+function setup(source, onSaved = () => {}, contextOverride = null) {
     const dialog = document.createElement('div'), body = document.createElement('div'), footer = document.createElement('div'); dialog.append(body, footer); document.body.append(dialog); let exited = 0, exitDigest;
-    const editor = createMarkdownEditor({ body, footer, dialog, context: api.editContext('local', 'dev', hex), source, onExit: digest => { exited++; exitDigest = digest; }, onSaved });
+    const editor = createMarkdownEditor({ body, footer, dialog, context: contextOverride || api.editContext('local', 'dev', hex), source, onExit: digest => { exited++; exitDigest = digest; }, onSaved });
     return { editor, body, footer, dialog, get exited() { return exited; }, get exitDigest() { return exitDigest; }, close() { editor.destroy(); dialog.remove(); } };
 }
 const change = (body, oldText, value) => { const node = [...body.querySelectorAll('.amd-text')].find(e => e.textContent === oldText); assert.ok(node); node.textContent = value; node.dispatchEvent(new Event('blur')); };
@@ -128,4 +128,39 @@ test('quote drafts survive both stale refusals without resend',async()=>{
   const source='> old words\n',theirs=source.replace('old','agent');let posts=0;globalThis.fetch=window.fetch=async(url,options={})=>{if(options.method==='POST'){posts++;return Response.json({code,latest_digest:latest,latest_version:2},{status:409});}return new Response(theirs);};
   const ui=setup(source);change(ui.body,'old words','my words');ui.footer.querySelector('.amd-save').click();await observeUntil(ui.body,()=>!!ui.body.querySelector('.amd-open-latest'));ui.body.querySelector('.amd-open-latest').click();await observeUntil(ui.body,()=>!ui.body.querySelector('.amd-kept').hidden);assert.equal(posts,1);assert.match(ui.body.querySelector('.amd-kept').textContent,/my words/);assert.equal(ui.footer.querySelector('.amd-save').disabled,true);ui.close();
  }
+});
+
+test('raw editing changes structure through plain text, uses strict preview, and saves exact bytes',async()=>{
+ const source='\ufeff# Old\r\n\r\nKeep.\r\n';let sent;globalThis.fetch=window.fetch=async(url,options)=>{sent=options.body;return Response.json({id:next,version:2});};let done;const saved=new Promise(r=>{done=r;});const ui=setup(source,done);
+ assert.ok(ui.body.querySelector('.amd-mode-raw'));ui.body.querySelector('.amd-mode-raw').click();const text=ui.body.querySelector('.amd-raw');assert.equal(text.value,'# Old\n\nKeep.\n');
+ const inserted='<script>window.BAD=1</script>\n[bad](javascript:alert(1))\n![remote](https://example.com/x.png)\n[local](coral://artifacts/'+hex+')\n\u202e';text.value=text.value.replace('Keep.',inserted);text.dispatchEvent(new Event('input'));
+ assert.match(ui.body.querySelector('.amd-raw-warning').textContent,/bidirectional/);ui.body.querySelector('.amd-preview-toggle').click();const preview=ui.body.querySelector('.amd-preview');assert.equal(preview.querySelector('script'),null);assert.ok(preview.textContent.includes('<script>'));assert.equal(preview.querySelector('[href^="javascript:"],img[src^="https:"]'),null);assert.ok(preview.querySelector('[href^="coral:"]'));
+ ui.body.querySelector('.amd-mode-rendered').click();assert.ok(ui.body.textContent.includes('<script>'));ui.body.querySelector('.amd-mode-raw').click();assert.ok(ui.body.querySelector('.amd-raw').value.includes(inserted));ui.footer.querySelector('.amd-save').click();await saved;assert.equal(Buffer.from(sent).toString(),source.replace('Keep.',inserted.replace(/\n/g,'\r\n')));ui.close();
+});
+
+test('raw mode retains the exact draft after either stale refusal and never auto-posts',async()=>{
+ for(const code of ['stale_version','stale_base']) {
+  const source='\ufeff# Old\r\n',theirs='# Agent\r\n';let posts=0;globalThis.fetch=window.fetch=async(url,options={})=>{if(options.method==='POST'){posts++;return Response.json({code,latest_digest:latest,latest_version:2},{status:409});}return new Response(theirs);};
+  const ui=setup(source);ui.body.querySelector('.amd-mode-raw').click();const input=ui.body.querySelector('.amd-raw');input.value='# My draft\n[link](https://example.com)\n';input.dispatchEvent(new Event('input'));ui.footer.querySelector('.amd-save').click();await observeUntil(ui.body,()=>!!ui.body.querySelector('.amd-open-latest'));assert.equal(input.value,'# My draft\n[link](https://example.com)\n');ui.body.querySelector('.amd-open-latest').click();await observeUntil(ui.body,()=>!ui.body.querySelector('.amd-kept').hidden);
+  assert.equal(posts,1);assert.equal(ui.body.querySelector('.amd-kept-source').value,'\ufeff# My draft\n[link](https://example.com)\n');assert.equal(ui.body.querySelector('.amd-raw').value,'# Agent\n');assert.equal(ui.footer.querySelector('.amd-save').disabled,true);ui.close();
+ }
+});
+
+test('raw oversize refusal keeps the entire draft and does not call fetch',async()=>{
+ const ui=setup('Old.\n');let posts=0;globalThis.fetch=window.fetch=async()=>{posts++;throw Error('must not call');};ui.body.querySelector('.amd-mode-raw').click();const input=ui.body.querySelector('.amd-raw'),value='x'.repeat(2*1024*1024+1);input.value=value;input.dispatchEvent(new Event('input'));ui.footer.querySelector('.amd-save').click();await observeUntil(ui.body,()=>ui.body.querySelector('.amd-status').textContent.includes('2 MiB'));assert.equal(posts,0);assert.equal(input.value,value);assert.equal(ui.editor.dirty,true);ui.close();
+});
+
+test('raw Hub save accepts exactly 64 KiB with expected-latest and retains 64 KiB plus one without fallback',async()=>{
+ const {state}=await importUi('state');state.hub=true;
+ try {
+  let calls=[];globalThis.fetch=window.fetch=async(url,options)=>{calls.push({url,...options});return Response.json({id:next,version:2});};
+  let done;const saved=new Promise(r=>{done=r;});let ui=setup('Old.',done,api.editContext('m1','dev',hex));ui.body.querySelector('.amd-mode-raw').click();let input=ui.body.querySelector('.amd-raw');input.value='x'.repeat(64*1024);input.dispatchEvent(new Event('input'));ui.footer.querySelector('.amd-save').click();await saved;assert.equal(calls.length,1);assert.equal(calls[0].body.byteLength,64*1024);assert.ok(String(calls[0].url).includes('expected_latest='+hex));assert.ok(String(calls[0].url).includes('/remote/m1/'));ui.close();
+  calls=[];ui=setup('Old.',()=>{},api.editContext('m1','dev',hex));ui.body.querySelector('.amd-mode-raw').click();input=ui.body.querySelector('.amd-raw');const value='x'.repeat(64*1024+1);input.value=value;input.dispatchEvent(new Event('input'));ui.footer.querySelector('.amd-save').click();await observeUntil(ui.body,()=>ui.body.querySelector('.amd-status').textContent.includes('64 KiB'));assert.equal(calls.length,0);assert.equal(input.value,value);assert.equal(ui.editor.dirty,true);ui.close();
+ }finally{state.hub=false;}
+});
+
+test('mode switches never serialize DOM or normalize untouched source bytes',async()=>{
+ const source='\ufeff# Title\r\n\r\nOld words.\nTail.\r\n';let sent;globalThis.fetch=window.fetch=async(url,options)=>{sent=options.body;return Response.json({id:next,version:2});};let done;const saved=new Promise(r=>{done=r;});const ui=setup(source,done);
+ change(ui.body,'Old words.\nTail.','New words.\nTail.');for(let i=0;i<2;i++){ui.body.querySelector('.amd-mode-raw').click();ui.body.querySelector('.amd-mode-rendered').click();}ui.body.querySelector('.amd-mode-raw').click();ui.footer.querySelector('.amd-save').click();await saved;assert.equal(Buffer.from(sent).toString(),source.replace('Old','New'));ui.close();
+ const noOp=setup(source);noOp.body.querySelector('.amd-mode-raw').click();const input=noOp.body.querySelector('.amd-raw');input.dispatchEvent(new Event('input'));noOp.body.querySelector('.amd-mode-rendered').click();assert.equal(noOp.editor.dirty,false);assert.equal(noOp.footer.querySelector('.amd-save').disabled,true);noOp.close();
 });

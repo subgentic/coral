@@ -252,3 +252,14 @@ export function editRun(source, run, text) {
 export function visibleSpecials(text) {
     return String(text).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u061c\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/g, c => `⟦U+${c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}⟧`);
 }
+
+// A textarea normalizes line endings. Splice only its changed logical range back
+// into the original bytes, keeping the BOM and all untouched mixed endings.
+export function editRaw(source, value) {
+    const {text,offsets}=normalizeSource(source), before=Array.from(text), after=Array.from(value.replace(/\r\n?/g,'\n'));let a=0,b=0;
+    while(a<before.length&&a<after.length&&before[a]===after[a])a++;
+    while(b<before.length-a&&b<after.length-a&&before.at(-1-b)===after.at(-1-b))b++;
+    const start=offsets[before.slice(0,a).join('').length],end=offsets[text.length-before.slice(before.length-b).join('').length];
+    const inserted=after.slice(a,after.length-b).join('').replace(/\n/g,source.includes('\r\n')?'\r\n':'\n');
+    return source.slice(0,start)+inserted+source.slice(end);
+}

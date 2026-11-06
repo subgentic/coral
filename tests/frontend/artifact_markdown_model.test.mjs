@@ -118,6 +118,15 @@ test('quoted text and nested quoted paragraphs retain every prefix and CRLF byte
  const next=editRun(source,nested,'Nested changed\n- literal').source;const host=document.createElement('div');host.innerHTML=renderMarkdownStrict(next.replace(/^\ufeff/,''));assert.equal(host.querySelectorAll('blockquote').length,2);assert.equal(host.querySelectorAll('li').length,0);
 });
 
+test('raw text edits retain BOM, untouched mixed line endings and Unicode boundaries',async()=>{
+ const {editRaw}=await import('../../coral-go/pkg/frontend/static/artifact_markdown_model.js');
+ const source='\ufeff# Heading\r\n\r\nOld 😀 words.\nTail.\r\n';
+ assert.equal(editRaw(source,'# Heading\n\nNew 😀 words.\nTail.\n'),source.replace('Old','New'));
+ assert.equal(editRaw(source,'# Heading\n\nOld 😀 words.\nTail.\n'),source);
+ assert.equal(editRaw(source,'# Heading\n\nOld 😀 words.\nAdded\nTail.\n'),source.replace('Tail.','Added\r\nTail.'));
+ assert.ok(editRaw(source,'<script>x</script>\n\u202e').includes('\u202e'),'raw is not a hidden-character filter');
+});
+
 test('table code spans refuse a backslash before a pipe before rendering',()=>{
  const source='| A | B |\n|---|---|\n| x | `a\\|b` |\n';const code=mapped(source).find(r=>r.text==='a|b');assert.ok(code);
  for(const value of ['a\\|b','a\\\\|b','a|b\\|c'])assert.throws(()=>editRun(source,code,value),/backslash.*pipe/);
