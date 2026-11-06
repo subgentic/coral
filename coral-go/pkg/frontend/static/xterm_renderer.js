@@ -737,7 +737,7 @@ function _reportFocus() {
     if (terminalWs && terminalWs.readyState === WebSocket.OPEN && !_paneClosed) {
         try { terminalWs.send(JSON.stringify({ type: 'terminal_focus', focused: on })); } catch { /* the socket is closing: the next one reports */ }
     }
-    if (on && !_focusTimer) _focusTimer = setInterval(_reportFocus, FOCUS_REPORT_MS);
+    if (on && !_focusTimer) _focusTimer = setInterval(_reportFocus, FOCUS_REPORT_MS); // interval-ok: a heartbeat that runs only while this view has focus and is cleared the moment it loses it
     if (!on && _focusTimer) { clearInterval(_focusTimer); _focusTimer = null; }
 }
 document.addEventListener('visibilitychange', _reportFocus);
