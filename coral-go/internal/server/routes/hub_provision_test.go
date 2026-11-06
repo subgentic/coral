@@ -970,7 +970,9 @@ func TestProvisionTwoHeldKeysAreConfirmedAsTheSetNotACount(t *testing.T) {
 // #13709: a test that starts a run and ends does not leave it writing into the folder that is removed: the env waits for the run before the removal. The install step here finishes 300 ms after the test body is over.
 func TestProvEnvWaitsForARunBeforeItsFolderIsRemoved(t *testing.T) {
 	var finished atomic.Bool
+	var sub *testing.T
 	t.Run("a run is left going", func(t *testing.T) {
+		sub = t
 		pe := newProvEnv(t, "known", "Linux x86_64", true)
 		pe.p.install = func(_ context.Context, p *provisionPlan, _ sshprov.Arch) error {
 			time.Sleep(300 * time.Millisecond)
@@ -985,5 +987,8 @@ func TestProvEnvWaitsForARunBeforeItsFolderIsRemoved(t *testing.T) {
 		code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{})
 		require.Equal(t, 202, code)
 	})
+	if sub.Skipped() {
+		t.Skip("the run was not started: its subtest skipped (where the fake ssh can't run)")
+	}
 	assert.True(t, finished.Load(), "the run was waited for before the test's folder went")
 }
