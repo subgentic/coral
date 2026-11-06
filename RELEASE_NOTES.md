@@ -1,5 +1,116 @@
 # Release Notes
 
+## v2.0.57 — Answer a question with its Recommended option, a timeout for dialogs nobody answers, and Send to agent with the diff
+
+### Changes
+
+#### What you will notice first
+
+- **Answer a question with its Recommended option** (a team setting, off unless you turn it on). When an agent's question has a Recommended option and nobody has answered after a grace period, Coral picks it, and it tells the agent that the operator did not review the question. A person's unsent text holds the pick, and the pick is bound to the live question.
+- **A timeout for dialogs nobody answers** (a team setting in the Health check, off by default; 15 minutes, 10 to 1440). A dialog left unanswered is closed the safe way and the agent is told to ask the Operator on the board. A person typing in their own terminal window outside Coral holds it, a digit that answered a dialog is not counted as unsent text, and the team is told which task and goal wait and when the timeout closed the dialog.
+- **Send to agent with the diff.** Saving an edit to a Markdown file offers to send the agent what changed: the line diff against the previous version is redacted, mentions are defused, whole hunks up to a limit, else a note with both version links.
+- **Needs you rows on a phone** put the agent's name on line one and the ask with its time on line two; the kind's words, Goal and Task are not drawn on a phone. A question put to the Operator has a question-mark icon, and a row's subject links to the source team's item.
+- **The Files panel** says when git ran out of time and keeps the last list, instead of showing "0 files changed" for a very large folder on a slow disk.
+- **Windows and WSL2:** the dashboard-open step says the sign-in link was printed when no browser opened, the Remote Access prompt no longer tells WSL2 users to turn it on, and `coral-board heavy run` says at once that it does not run on Windows.
+
+#### Fixed
+
+- **Queue match** tolerates a package path's other spellings.
+- **A Markdown edit saved from a phone** keeps its Edit click on its target at large text sizes, and a paginated Inbox keeps its position and follows a saved version in details.
+- **Viewer comments** on an unnamed server fall back to the selected computer again.
+- Several Windows tests no longer assume git is fast or POSIX paths.
+
+#### Through Coral Hub
+
+- **Two routes were added and reach the tunnel, owner only:** `GET` and `POST /api/board/{project}/artifacts/{digest}/edit/send` (Send to agent with the diff). The dialog timeout and the auto-recommend settings are new team Health settings.
+
+#### Known issues
+
+- **macOS: the tmux change (#12836) can make macOS ask once more, only after tmux restarts (a full restart of your agents or a reboot).** Coral's tmux server and guardian are now their own responsible process, so macOS may ask, per folder, whether `tmux` (or `coral`) may reach Documents, Desktop or Downloads. Full Disk Access you gave Coral.app does not carry over: if you gave Coral Full Disk Access, add `tmux` and `coral` too (both in `Coral.app/Contents/MacOS`). The staged tmux copy (each Coral version keeps its own under `tmux-bin/`) asks again after a tmux change. Say yes once; if you say no, nothing is lost, the agent just cannot read that folder.
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For Coral Hub
+
+- **`release-diff` output** (`go run ./internal/releasediff/cmd/release-diff v2.0.56 517207a8c`):
+
+  ### Tunnel routes, v2.0.56 to 517207a8c
+
+  Added, reachable through the tunnel (2)
+
+  - `GET /api/board/{project}/artifacts/{digest}/edit/send`: view, owner-only
+  - `POST /api/board/{project}/artifacts/{digest}/edit/send`: interact, owner-only
+
+  ### Board settings keys (BoardSettings, HealthSettings included), v2.0.56 to 517207a8c
+
+  Added (6)
+
+  - `health.auto_recommend`: object HealthAutoRecommend
+  - `health.auto_recommend.grace_min`: int
+  - `health.auto_recommend.on`: bool
+  - `health.dialog_timeout`: object HealthDialogTimeout
+  - `health.dialog_timeout.after_min`: int
+  - `health.dialog_timeout.on`: bool
+
+  ### What Coral Hub compiles in or embeds, v2.0.56 to 517207a8c
+
+  `pkg/hubowner`: 1 file of Go code changed (+4, -2)
+
+  - `coral-go/pkg/hubowner/hubowner.go`: +4, -2
+  - test files, not compiled by the Hub: 1 file (+4, -2)
+
+  `pkg/tunnel`: 1 file of Go code changed (+3, -0)
+
+  - `coral-go/pkg/tunnel/routes.go`: +3, -0
+  - test files, not compiled by the Hub: 1 file (+1, -1)
+  - other files (data, docs), not compiled by the Hub: 1 file (+1, -0)
+
+  `pkg/frontend`: 25 files the Hub embeds changed (+320, -58)
+
+  - `coral-go/pkg/frontend/static/activity_filters.js`: +1, -1
+  - `coral-go/pkg/frontend/static/artifact_comment_send.js`: +3, -2
+  - `coral-go/pkg/frontend/static/artifact_comments.js`: +8, -0
+  - `coral-go/pkg/frontend/static/artifact_edit_send.js`: +69, -0
+  - `coral-go/pkg/frontend/static/artifact_edit_send_api.js`: +21, -0
+  - `coral-go/pkg/frontend/static/artifact_viewer.js`: +48, -12
+  - `coral-go/pkg/frontend/static/artifacts_feed.js`: +8, -0
+  - `coral-go/pkg/frontend/static/ask_subject_links.js`: +25, -0
+  - `coral-go/pkg/frontend/static/changed_files.js`: +12, -9
+  - `coral-go/pkg/frontend/static/css/artifact_edit_send.css`: +2, -0
+  - `coral-go/pkg/frontend/static/css/artifact_viewer_header.css`: +2, -0
+  - `coral-go/pkg/frontend/static/css/data_table.css`: +9, -4
+  - `coral-go/pkg/frontend/static/css/needs_phone.css`: +14, -0
+  - `coral-go/pkg/frontend/static/event_icons.js`: +3, -1
+  - `coral-go/pkg/frontend/static/inbox_sidebar.js`: +6, -3
+  - `coral-go/pkg/frontend/static/needs_filters.js`: +3, -2
+  - `coral-go/pkg/frontend/static/operator_activity_filters.js`: +1, -1
+  - `coral-go/pkg/frontend/static/operator_activity_words.js`: +1, -0
+  - `coral-go/pkg/frontend/static/operator_asks.js`: +0, -3
+  - `coral-go/pkg/frontend/static/team_artifacts_page.js`: +38, -14
+  - `coral-go/pkg/frontend/static/team_health_fields.js`: +11, -2
+  - `coral-go/pkg/frontend/static/team_health_settings.js`: +3, -1
+  - `coral-go/pkg/frontend/static/team_launch_settings.js`: +1, -1
+  - `coral-go/pkg/frontend/static/team_settings_page.js`: +2, -2
+  - `coral-go/pkg/frontend/static/xterm_renderer.js`: +29, -0
+
+  `agent_docs`: 2 files the Hub embeds changed (+2, -2)
+
+  - `coral-go/agent_docs/auth.md`: +1, -1
+  - `coral-go/agent_docs/telemetry.md`: +1, -1
+
+  Unchanged: `pkg/hubproxy`, `pkg/redact`.
+
+  ### Coral packages compiled into the Hub through its imports, v2.0.56 to 517207a8c
+
+  Unchanged: `internal/fsreplace`, `internal/httputil`, `internal/logsafe`, `internal/safego`, `internal/secfile`, `internal/secrets`, `pkg/redact/betterleaks`.
+
+#### For developers and releases
+
+- Test-only fixes after the first gates: the Health check suite lists its eighth section, the Edit-click suite waits for its target, the join census lists the new send route, and the machine launch digest table now holds the rows for v2.0.41 to v2.0.56 with a read-only `tools/devops/pin-check.sh` that fails release prep when the previous release has no row.
+
 ## v2.0.56 — Edit Markdown files in place, a pool of machines for heavy runs, and a refused stale edit
 
 ### Changes
