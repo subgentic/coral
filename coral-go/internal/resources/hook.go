@@ -9,6 +9,7 @@ import (
 
 	heavypkg "github.com/subgentic/coral/internal/heavy"
 	"github.com/subgentic/coral/internal/proctree"
+	"github.com/subgentic/coral/internal/shellkill"
 	"github.com/subgentic/coral/pkg/resourcequeue"
 )
 
@@ -94,8 +95,15 @@ func (h *Hook) BindHand(session, agent, resource string, toolCalls []string, she
 		}
 	}
 	h.mu.Lock()
+	defer h.mu.Unlock()
+	if ah := h.hold[holdKey{resource, agent}]; ah != nil && ah.calls != nil && len(ah.refused) > 0 {
+		// the hook refused this agent's command and told it to wait for its turn with a claim of its own: that claim is the answer, so it is not tied to the call it was made in (the call ends, then the command
+		// comes). The slot is the hook's: it is kept for the claim window from the grant and goes on when nothing runs (sweepLocked), as for a slot that came to a waiting command.
+		ah.session = session
+		delete(h.hand, holdKey{resource, agent})
+		return
+	}
 	h.hand[holdKey{resource, agent}] = b
-	h.mu.Unlock()
 }
 
 // findBelow finds pid among the processes below root.
@@ -320,6 +328,9 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 		}
 		return ""
 	}
+	if claimsFirst(command, res) { // `coral-board resource claim X --wait && <work>`: the claim waits for the turn and is made in this very call, which is the supported shape; holding the command would stop the claim from running
+		return ""
+	}
 	snap := h.snapshot()
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -434,8 +445,8 @@ func (h *Hook) attachHeavyRun(session, agent, toolUseID string) {
 }
 
 func refusal(resource string, place int) string {
-	return fmt.Sprintf("Coral held this command: %s is busy and you are number %d in line. Run: coral-board resource claim %s --wait   (it waits for your turn; then run the command again). "+
-		"Or run the same command again later: your place in line is kept. Do not retry in a loop.", resource, place, resource)
+	return fmt.Sprintf("Coral held this command: %s is busy and you are number %d in line. Your place is kept. Either run the same command again later (it runs when it is your turn), or wait and run in ONE command: coral-board resource claim %s --wait && <your command>   "+
+		"(a claim made alone goes back when its own command ends). Do not retry in a loop.", resource, place, resource)
 }
 
 func entryOf(st resourcequeue.Status, agent string) (*resourcequeue.Entry, bool) {
@@ -687,4 +698,27 @@ func (h *Hook) releaseLocked(k holdKey, ah *autoHold, why string) {
 	_ = h.m.Queue().Release(k.resource, k.agent)
 	delete(h.hold, k)
 	h.event(HookEvent{Kind: "released", Resource: k.resource, Pattern: ah.pattern, Agent: k.agent, Session: ah.session, Why: why})
+}
+
+// claimsFirst says whether the call waits for the resource with a claim of its own BEFORE the work the resource is about: `coral-board resource claim <the resource or a member> --wait` as a simple command that comes
+// first. Without --wait the claim does not hold the work back, and after the work it is too late.
+func claimsFirst(command string, res resourcequeue.Resource) bool {
+	cmds, ok := shellkill.Programs(command)
+	if !ok {
+		return false
+	}
+	names := append([]string{res.Key}, res.Members...)
+	for _, words := range cmds {
+		for _, n := range names {
+			if inOrder(words, []string{"coral-board", "resource", "claim", n, "--wait"}) {
+				return true
+			}
+		}
+		for _, p := range res.Match {
+			if inOrder(words, strings.Fields(p)) {
+				return false // the work comes first
+			}
+		}
+	}
+	return false
 }
