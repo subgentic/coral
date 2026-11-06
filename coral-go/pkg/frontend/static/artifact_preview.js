@@ -98,7 +98,7 @@ function _entryType(entry) {
     return 'Artifact';
 }
 
-function _renderManifest(body, manifest, filename, ctx) {
+function _renderManifest(body, manifest, filename, ctx, server) {
     const rows = manifest.entries.map((entry, index) => {
         const digest = CORAL_ARTIFACT_URI_RE.exec(entry.uri)[1];
         const name = visibleName(entry.name); // a manifest's entry names are the uploader's text (Security on #220)
@@ -106,7 +106,7 @@ function _renderManifest(body, manifest, filename, ctx) {
         <div class="artifact-manifest-main"><button type="button" class="artifact-manifest-open" data-manifest-index="${Number(index)}">
             <span class="artifact-manifest-name">${escapeHtml(name)}</span>
             <span class="artifact-manifest-type">${escapeHtml(_entryType(entry))}</span>
-        </button><a class="artifact-manifest-download" href="${escapeAttr(serverUrl(artifactPath(digest), contextServer()))}" download="${escapeAttr(name)}" data-artifact-download="${escapeAttr(serverUrl(artifactPath(digest), contextServer()))}" data-artifact-name="${escapeAttr(name)}" aria-label="Download ${escapeAttr(name)}">Download</a></div>
+        </button><a class="artifact-manifest-download" href="${escapeAttr(serverUrl(artifactPath(digest), server))}" download="${escapeAttr(name)}" data-artifact-download="${escapeAttr(serverUrl(artifactPath(digest), server))}" data-artifact-name="${escapeAttr(name)}" aria-label="Download ${escapeAttr(name)}">Download</a></div>
         <span class="artifact-manifest-uri">${escapeHtml(entry.uri)}</span>
     </li>`;
     }).join('');
@@ -197,7 +197,7 @@ export async function renderArtifact(body, uri, options, ctx) {
 async function _renderArtifactInto(body, uri, options, ctx, source, kind) {
     const { url, externalURL } = source;
     const opened = CORAL_ARTIFACT_URI_RE.exec(uri);
-    if (opened) importOnce('./inbox_reviews.js').then(m => m.markOpenedReadVisibly(opened[1], undefined, options && options.board ? boardTeamKey(options.server, options.board) : '')).catch(() => {}); // a for-review artifact opened in a preview is read (#9277); any other is never tagged; with its board known only that team is read (#13489)
+    if (opened && options?.sourceNamed !== false) importOnce('./inbox_reviews.js').then(m => m.markOpenedReadVisibly(opened[1], undefined, options && options.board ? boardTeamKey(options.server, options.board) : '')).catch(() => {}); // inferred-source viewers never write review state
     body.innerHTML = '<div class="inline-preview-loading">Loading...</div>';
     if (externalURL) {
         if (ctx.isStale()) return;
@@ -272,7 +272,7 @@ async function _renderArtifactInto(body, uri, options, ctx, source, kind) {
             if (manifest) {
                 ctx.setMeta({ title: 'Artifact manifest', filename: filename || 'manifest.json' });
                 kind(manifest.entries);
-                _renderManifest(body, manifest, filename || 'manifest.json', ctx);
+                _renderManifest(body, manifest, filename || 'manifest.json', ctx, source.server);
             } else if (!isMarkdown && isJSON && renderJSONReport(body, content, filename)) {
                 // Recognized reports keep their original bytes in the raw view.
             } else {

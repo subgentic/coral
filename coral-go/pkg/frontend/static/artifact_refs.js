@@ -98,6 +98,6 @@ if (typeof document !== 'undefined' && typeof document.addEventListener === 'fun
         e.preventDefault();
         const server = a.dataset.server || undefined;
         const resume = suspendNativeDialog(a);
-        importOnce('./artifact_viewer.js').then(m => { if (m.openArtifactViewer(hex, { server, filename: '', ...(resume ? { onClose: resume } : {}) }) === false) resume?.(); }).catch(() => { resume?.(); showToast('The file viewer could not be opened. Please try again.', true); });
+        importOnce('./artifact_viewer.js').then(m => { if (m.openArtifactViewer(hex, { server, sourceNamed: !!server, filename: '', ...(resume ? { onClose: resume } : {}) }) === false) resume?.(); }).catch(() => { resume?.(); showToast('The file viewer could not be opened. Please try again.', true); });
     });
 }

@@ -1,0 +1,42 @@
+{
+  "board_artifacts.js": {
+    "calls": 1,
+    "policy": "named",
+    "note": "Call supplies the source computer, including local, from its own row/team"
+  },
+  "goal_artifacts.js": {
+    "calls": 1,
+    "policy": "named",
+    "note": "Call supplies the source computer, including local, from its own row/team"
+  },
+  "inbox_sidebar.js": {
+    "calls": 3,
+    "policy": "named",
+    "note": "Call supplies the source computer, including local, from its own row/team"
+  },
+  "artifact_viewer.js": {
+    "calls": 8,
+    "policy": "frozen",
+    "note": "Frozen pair survives internal navigation"
+  },
+  "artifact_refs.js": {
+    "calls": 1,
+    "policy": "unattributed-allowed",
+    "note": "data-server records known origin; missing origin is explicitly unattributed/read-only"
+  },
+  "team_task_artifacts.js": {
+    "calls": 1,
+    "policy": "named",
+    "note": "Call supplies the source computer, including local, from its own row/team"
+  },
+  "mailbox_starred_artifacts.js": {
+    "calls": 1,
+    "policy": "named",
+    "note": "Call supplies the source computer, including local, from its own row/team"
+  },
+  "team_artifacts_page.js": {
+    "calls": 1,
+    "policy": "named",
+    "note": "Call supplies the source computer, including local, from its own row/team"
+  }
+}

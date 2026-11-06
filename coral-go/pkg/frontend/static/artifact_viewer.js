@@ -7,7 +7,7 @@
 import { isPhoneLayout } from './phone_layout.js';
 import { markHidden } from './visible_marks.js';
 import { escapeHtml, renderMarkdownStrict, highlightCodeIn, keepFragmentsInside } from './utils.js';
-import { serverUrl, artifactPath, isCloud, boardTeamKey } from './server_base.js';
+import { serverUrl, artifactPath, isCloud, boardTeamKey, contextServer, normServer } from './server_base.js';
 import { renderArtifact, manifestDownload } from './artifact_preview.js';
 import { downloadArtifact, sanitizeDownloadName } from './artifact_download.js';
 import { trapTab } from './dialog_focus.js';
@@ -18,6 +18,9 @@ import { pushOverlay, popOverlay } from './overlay_history.js';
 import { setDialogHide } from './modal_chrome.js';
 import { browserLocal } from './safe_storage.js';
 import { loadStyles } from './lazy_styles.js';
+import { state } from './state.js';
+import { showToast } from './notifications.js';
+const { resolveArtifactSource } = await importOnce('./artifact_source.js');
 
 await loadStyles('artifact_viewer_header.css'); // the one-row header's rules load with the viewer, not at start (page_weight)
 const { readersAllowed, readersBlock } = await importOnce('./artifact_readers.js'); // lazy: its failure is retried
@@ -34,7 +37,6 @@ let _onClose = null;
 let _abort = null;
 let _gen = 0;
 let _returnFocus = null;
-let _server = undefined; // the server of the artifact on show, for the artifacts it links
 let _comments = null;    // the comments panel of the viewer (#5182)
 let _versions = null;    // the version bar of the viewer (#6472)
 let _review = null;      // Approve and Request changes of a for-review artifact (#136584)
@@ -160,7 +162,9 @@ function _build() {
         const hex = a.dataset.artifact || raw?.[1];
         if (!/^[a-f0-9]{64}$/i.test(hex || '')) return;
         e.preventDefault();
-        openArtifactViewer(hex.toLowerCase(), { server: a.dataset.server || _server, filename: a.textContent.trim() });
+        // The file cannot choose another computer through a data attribute. The sanitized
+        // document's own artifact links inherit the frozen source and attribution.
+        openArtifactViewer(hex.toLowerCase(), { server: _lastOpts.server, board: _lastOpts.board, sourceNamed: _lastOpts.sourceNamed, onClose: _lastOpts.onClose, filename: a.textContent.trim() });
     });
     setDialogHide(d, () => escapeViewer(d)); // modal_chrome's Escape (with the focus anywhere on the page) closes it through its own close, not by display:none, which left it open and every later open a no-op (#12290)
     d.addEventListener('keydown', (e) => {
@@ -173,7 +177,7 @@ function _build() {
     let _isPicture = false, _canWrite = false;
     const syncMarkUp = () => { d.querySelector('.artifact-viewer-markup').hidden = d.querySelector('.artifact-viewer-markup-item').hidden = !(_isPicture && _canWrite); };
     d._markUp = { picture: on => { _isPicture = on; syncMarkUp(); }, write: on => { _canWrite = on; syncMarkUp(); } };
-    _comments = attachComments(d, d.querySelector('.artifact-viewer-body'), d.querySelector('.artifact-viewer-main'), { shown: () => !d.hidden && !_editor, onCanWrite: ok => d._markUp.write(ok), preferenceKey: () => _layoutType ? 'coral-artifact-comments:' + _layoutType : null });
+    _comments = attachComments(d, d.querySelector('.artifact-viewer-body'), d.querySelector('.artifact-viewer-main'), { shown: () => !d.hidden && !_editor, readOnly: () => _lastOpts.sourceNamed === false, onCanWrite: ok => d._markUp.write(ok), preferenceKey: () => _layoutType ? 'coral-artifact-comments:' + _layoutType : null });
     _versions = attachVersions(d, {
         version: n => { const t = d.querySelector('.artifact-viewer-title'); t.querySelector('.artifact-viewer-version')?.remove(); if (n > 1) t.append(Object.assign(document.createElement('span'), { className: 'artifact-viewer-version', textContent: ` · version ${n}` })); }, // Coral numbers the versions: the name is the agent's (#11865)
         body: () => d.querySelector('.artifact-viewer-body'),
@@ -214,13 +218,13 @@ async function offerEditSend(d, hex, opts, gen) {
     try {
         const [api, contextApi] = await Promise.all([importOnce('./artifact_edit_send_api.js'), importOnce('./artifact_markdown_api.js')]);
         if (gen !== _gen || d.hidden) return;
-        const context = contextApi.editContext(opts.server, commentBoard(opts), hex);
+        const context = contextApi.editContext(opts.server, opts.board, hex);
         const capability = await api.editSendCapability(context, { signal });
         if (gen !== _gen || d.hidden) return;
-        _sendCapability = capability ? { context, capability } : null;
-        d.querySelector('.artifact-edit-send-action').hidden = !capability;
+        _sendCapability = capability && opts.sourceNamed ? { context, capability } : null;
+        d.querySelector('.artifact-edit-send-action').hidden = !_sendCapability;
         const note = d.querySelector('.artifact-edit-send-note');
-        if (capability) { note.textContent = `Your edit is saved (v${capability.base_version} → v${capability.version}). Sending to an agent is a separate step.`; note.hidden = false; }
+        if (_sendCapability) { note.textContent = `Your edit is saved (v${capability.base_version} → v${capability.version}). Sending to an agent is a separate step.`; note.hidden = false; }
     } catch { /* older or unauthorized server: no Send action */ }
 }
 async function startEditSend(d) {
@@ -245,10 +249,10 @@ async function offerMarkdownEdit(d, hex, opts, gen) {
     const button = d.querySelector('.artifact-viewer-edit'), item = d.querySelector('.artifact-viewer-edit-item'); button.hidden = item.hidden = true;
     try {
         const api = await importOnce('./artifact_markdown_api.js');
-        const context = api.editContext(opts.server, commentBoard(opts), hex);
+        const context = api.editContext(opts.server, opts.board, hex);
         const capability = await api.editCapability(context, { signal: _abort?.signal });
         if (gen !== _gen || d.hidden || _editor) return;
-        _editCapability = capability ? { context, capability } : null; button.hidden = item.hidden = !capability;
+        _editCapability = capability && opts.sourceNamed ? { context, capability } : null; button.hidden = item.hidden = !_editCapability;
     } catch { /* no owner capability, no Edit button */ }
 }
 async function startMarkdownEdit(d) {
@@ -278,6 +282,11 @@ async function startMarkdownEdit(d) {
 export function openArtifactViewer(hex, opts = {}) {
     hex = String(hex || '').toLowerCase();
     if (!HEX_RE.test(hex)) return false;
+    try { opts = resolveArtifactSource(opts); }
+    catch (error) { showToast(error.message, true); return false; }
+    // Also capture the team now: an async reply or a later version must not borrow
+    // whichever team the person selects while this viewer remains open.
+    opts = { ...opts, board: Object.hasOwn(opts, 'board') ? opts.board : normServer(contextServer()) === opts.server ? (commentBoard(opts) || '') : '' };
     if (_editor?.beforeLeave(() => openArtifactViewer(hex, opts))) return false;
     if (_editSend?.beforeLeave()) return false;
     stopEditSend(); stopMarkdownEdit();
@@ -287,17 +296,18 @@ export function openArtifactViewer(hex, opts = {}) {
     _abort?.abort();
     _abort = new AbortController();
     const gen = ++_gen;
-    _server = opts.server; _hex = hex; _lastOpts = opts;
+    _hex = hex; _lastOpts = opts;
     _sendCapability = null; const sendButton = d.querySelector('.artifact-edit-send-action'); sendButton.hidden = true; sendButton.disabled = false; const sendNote = d.querySelector('.artifact-edit-send-note'); sendNote.hidden = !opts.editSaved; sendNote.textContent = opts.editSaved ? 'Saved as a new version. Nothing was sent to an agent automatically.' : '';
     _editCapability = null; const editButton = d.querySelector('.artifact-viewer-edit'); editButton.hidden = true; d.querySelector('.artifact-viewer-edit-item').hidden = true; d.querySelector('.artifact-viewer-edit-item').disabled = false; editButton.disabled = false; editButton.textContent = 'Edit text';
     _layoutType = null;
     setFullScreen(d, false);
     d.querySelector('.artifact-viewer-fullscreen').disabled = true;
-    importOnce('./inbox_reviews.js').then(m => m.markOpenedReadVisibly(hex, undefined, opts.board ? boardTeamKey(opts.server, opts.board) : '')).catch(() => {}); // opening a for-review artifact reads it, wherever it is opened from (#9277); with its board known, only that team is read (#13489)
+    if (opts.sourceNamed) importOnce('./inbox_reviews.js').then(m => m.markOpenedReadVisibly(hex, undefined, opts.board ? boardTeamKey(opts.server, opts.board) : '')).catch(() => {}); // inferred-source viewers remain read only
     const url = serverUrl(artifactPath(hex), opts.server);
     const title = d.querySelector('.artifact-viewer-title');
     title.textContent = visibleName(opts.filename) || 'Artifact'; // the uploader's text, without what hides or reorders it (Security on #220)
     const fromLine = d.querySelector('.artifact-viewer-from'); fromLine.textContent = visibleName(opts.from) || ''; fromLine.hidden = !fromLine.textContent; fromLine.title = fromLine.textContent; fromLine.classList.remove('is-open'); fromLine.setAttribute('aria-expanded', 'false'); d.querySelector('.artifact-viewer-sandbox').hidden = true; d._markUp.picture(false); d._markUp.write(false); // who uploaded a file opened for review (#11456), as text
+    if (!opts.sourceNamed) { const computer = opts.server === 'local' ? 'this computer' : ((state.servers || []).find(s => s.id === opts.server)?.label || opts.server); fromLine.textContent = [visibleName(opts.from), `Viewing from ${markHidden(computer, { strict: true })}. Source inferred; read only.`].filter(Boolean).join(' · '); fromLine.hidden = false; fromLine.title = fromLine.textContent; }
     const dl = d.querySelector('.artifact-viewer-download');
     const newTab = d.querySelector('.artifact-viewer-newtab');
     newTab.hidden = true; newTab.removeAttribute('href'); // its address comes with the kind (typeKnown): a manifest's own bytes are a list, not what to open
@@ -317,9 +327,9 @@ export function openArtifactViewer(hex, opts = {}) {
     d.hidden = false;
     if (!wasOpen && isPhoneLayout()) document.querySelectorAll('#toast-host > .toast:not(.error):not(.has-action)').forEach(t => t.remove()); // a plain toast was announced and sat over the viewer's header and versions at the top of a phone (#11621)
     if (!wasOpen && isPhoneLayout() && !_overlay) _overlay = pushOverlay(() => closeArtifactViewer({ popped: true })); // Back closes it, above the preview's full screen, under its comments sheet
-    _comments.open(hex, opts.server, commentBoard(opts), true); // true: the comments of earlier versions of a series too (the server answers the plain list for an artifact in none)
+    _comments.open(hex, opts.server, opts.board, true); // true: the comments of earlier versions of a series too (the server answers the plain list for an artifact in none)
     _versions.open(hex, opts.server, { switched: !!opts.switched });
-    _review.open(hex, { ...opts, board: commentBoard(opts) });
+    _review.open(hex, opts);
     // "Who can read this", for the Operator (the owner through Coral Hub): drawn only when the machine answers it; anyone else sees nothing.
     _details.clear();
     // The goal and the task the file serves, behind Details as chips in one wrapped row (#12725; #12025, #11751): the goal's chip is the link back to it (one click closes the viewer and opens the goal's page); the viewer's header is one line
@@ -342,10 +352,10 @@ export function openArtifactViewer(hex, opts = {}) {
     } else if (opts.goal) { const g = document.createElement('span'); g.className = 'chip detail-chip'; g.textContent = `Goal: ${markHidden(opts.goal, { strict: true })}`; g.title = g.textContent; chips.append(g); }
     if (opts.task) { const t = document.createElement('span'); t.className = 'chip detail-chip'; t.textContent = `Task: ${markHidden(opts.task, { strict: true })}`; t.title = t.textContent; chips.append(t); }
     if (chips.children.length) _details.add(chips);
-    readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) { _details.add(readersBlock(hex, opts.server, _details)); _details.add(privateBlock(hex, opts.server, _details)); } }).catch(() => {});
+    readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) { _details.add(readersBlock(hex, opts.server, _details)); if (opts.sourceNamed) _details.add(privateBlock(hex, opts.server, _details)); } }).catch(() => {});
     if (!opts.switched) d.querySelector('.artifact-viewer-close').focus(); // a version chosen from the bar keeps the keyboard on the bar
     let textShown = false; // the strict text view drew it: comments can point into it. Anything else (a frame, a picture, a PDF, a table, a video, a download) takes whole-document comments (#11444).
-    Promise.resolve(renderArtifact(body, `coral://artifacts/${hex}`, { server: opts.server, board: opts.board, filename: opts.filename, mediaType: opts.mediaType }, {
+    Promise.resolve(renderArtifact(body, `coral://artifacts/${hex}`, { server: opts.server, board: opts.board, sourceNamed: opts.sourceNamed, filename: opts.filename, mediaType: opts.mediaType }, {
         signal: _abort.signal,
         isStale: () => gen !== _gen || d.hidden,
         typeResolved: metadata => {
@@ -357,7 +367,7 @@ export function openArtifactViewer(hex, opts = {}) {
         renderContent: (el, content, path, server) => { textShown = true; renderArtifactText(el, content, path, server); _comments.docRendered(content, true); if (/\.(?:md|markdown|mdown)$/i.test(path || '')) { offerMarkdownEdit(d, hex, opts, gen); offerEditSend(d, hex, opts, gen); } },
         openEntry: (entry) => {
             const m = /^coral:\/\/artifacts\/([a-f0-9]{64})$/i.exec(entry.uri || '');
-            if (m) openArtifactViewer(m[1], { server: opts.server, filename: entry.name, mediaType: entry.media_type });
+            if (m) openArtifactViewer(m[1], { server: opts.server, board: opts.board, sourceNamed: opts.sourceNamed, onClose: opts.onClose, filename: entry.name, mediaType: entry.media_type });
         },
         setMeta: ({ title: t, filename }) => {
             if (gen !== _gen) return;

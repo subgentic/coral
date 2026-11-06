@@ -274,7 +274,7 @@ export function attachReview(d, { reload }) {
     return {
         async open(hex, opts = {}) {
             const g = ++gen; show(null); sendCtx = null; syncSendItem(); if (!opts.switched) done = false;
-            if (!opts.board) return;
+            if (!opts.board || opts.sourceNamed === false) return;
             const team = identityKey(opts.server, opts.board);
             let s = null;
             try { s = await reviewStateOf(team, hex); } catch { s = null; }

@@ -6,7 +6,7 @@
  * downloaded); a modified or middle click keeps the link's new tab (served with a sandbox
  * CSP; images inline, other types as a download). */
 import { linkCoralSubjectRefsIn } from './coral_subject_refs.js';
-import { serverUrl, artifactPath } from './server_base.js';
+import { serverUrl, artifactPath, normServer } from './server_base.js';
 import { artifactRefHex } from './utils.js';
 import { showToast } from './notifications.js';
 import { importOnce } from './import_once.js';
@@ -19,7 +19,7 @@ function plainClick(e) {
 function openInViewer(e, hex, server, filename) {
     if (!plainClick(e)) return;
     e.preventDefault();
-    importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(hex, { server, filename }), () => {
+    importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(hex, { server: normServer(server), filename }), () => {
         showToast('The file viewer could not be opened. Please try again.', true);
     });
 }
