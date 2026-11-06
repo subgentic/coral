@@ -23,6 +23,7 @@ var activityByHandler = map[string]string{
 	"POST /api/board/{project}/artifacts/{id}/review":                     "a file's review: approve, changes, deny, ignore, unignore, save, unsave, supersede (board.DecideArtifactReview and friends)",
 	"POST /api/board/{project}/artifacts/{digest}/edit/send":              "a saved edit sent to agents as a diff (file_edit_send, #13802): the handler asks the recorder for the row",
 	"POST /api/board/{project}/artifacts/{digest}/edit":                   "a Markdown file saved from the editor as a new version (file_edit, #13757): the handler asks the recorder for the row",
+	"POST /api/board/{project}/goals/{goalID}/done-state":                 "a goal-looks-done row's Not yet or Dismiss (inbox_hide, #13834): the handler asks the recorder for the row; read, unread and Undo are not Operator decisions to record",
 	"POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim": "an ask button's click (answer)",
 	"POST /api/board/{project}/asks/{messageID}/close":                    "a question's Ignore and Put back (ignore, unignore)",
 	"POST /api/board/{project}/goal-images":                               "a picture for the goal being written: the goal's own row (goal_create or goal_edit) is the click",

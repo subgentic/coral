@@ -20,6 +20,7 @@ import (
 	"github.com/subgentic/coral/internal/inputlog"
 	"github.com/subgentic/coral/internal/ptymanager"
 	setreg "github.com/subgentic/coral/internal/settings"
+	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/tracking"
 )
 
@@ -333,19 +334,7 @@ func settingStrings(body map[string]any) map[string]string {
 
 // saveSettings writes the settings in one transaction.
 func (h *SystemHandler) saveSettings(ctx context.Context, values map[string]string) error {
-	tx, err := h.db.BeginTxx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	for k, s := range values {
-		if _, err := tx.ExecContext(ctx,
-			"INSERT INTO user_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-			k, s); err != nil {
-			return err
-		}
-	}
-	return tx.Commit()
+	return store.NewSessionStore(h.db).SaveSettings(ctx, values) // under the lock the Inbox's list edits take (#13834)
 }
 
 // applyLiveSettings applies the settings that take effect at once (new WebSocket attaches, agents started from now
