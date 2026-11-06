@@ -77,9 +77,11 @@ const SKILLS = [
         sent = await take(2, 'the team launch').catch(async e => { throw new Error(e.message + ' :: ' + await why()); });
         assert.deepEqual(sent.body.skills, [SKILLS[0].id, SKILLS[1].id], 'the team request carries the skills for every member');
 
-        // another computer's launch has no row, and nothing is sent from it
+        // another computer's launch (or the Hub's) has a row that says where the skills are, with nothing to tick, and nothing is sent from it (#13871: it was a row that was missing)
         await ev(`import((window.__coralStatic || '/static/') + 'launch_skills.js').then(m => m.mountLaunchSkills('launch-skills', false))`);
-        assert.equal(await ev(`document.getElementById('launch-skills-row').hidden`), true);
+        assert.equal(await ev(`document.getElementById('launch-skills-row').hidden`), false);
+        assert.match(await ev(`document.getElementById('launch-skills-host').textContent`), /Skills stay on the computer/);
+        assert.equal(await ev(`document.querySelectorAll('#launch-skills-host input[type=checkbox]').length`), 0);
         assert.deepEqual(await ev(`import((window.__coralStatic || '/static/') + 'launch_skills.js').then(m => m.launchSkillIds('launch-skills'))`), []);
         // The most that can be ticked is ten (the server's limit for one launch): an eleventh is refused, and nothing past ten is sent (#12260, QA's SHOULD on #12104)
         const MANY = Array.from({ length: 12 }, (_, i) => ({ id: String(i + 1).padStart(2, '0').repeat(16), name: 'skill-' + String(i + 1).padStart(2, '0'), version: 1, description: 'Skill number ' + (i + 1) + '.', status: 'approved', has_scripts: false, not_reviewable: false }));

@@ -4,6 +4,7 @@ import { loadStyles } from './lazy_styles.js';
 import { requestJson } from './api.js';
 await loadStyles('skills.css');
 
+const SKILLS_STAY = 'Skills stay on the computer: open New agent from its own Coral to choose one.'; // the @skill row's pattern (skill_mention.js)
 const MAX = 10; // the server's limit for one launch
 const picked = new Map(); // row id -> Set of skill ids
 const generation = new Map(); // row id -> the latest mount: an answer that arrives after a newer mount began is dropped
@@ -23,9 +24,11 @@ export async function mountLaunchSkills(rowId, local) {
     const mine = (generation.get(rowId) || 0) + 1; generation.set(rowId, mine);
     picked.set(rowId, new Set());
     row.hidden = true; host.replaceChildren();
-    if (!local) return;
+    const say = words => { row.hidden = false; host.replaceChildren(el('p', 'skills-note skills-unavailable', words)); }; // a row that says why, not a row that is missing (#13871)
+    if (!local) { say(SKILLS_STAY); return; } // another computer's launch, or through the Hub: its skills are its own, and the Hub has no list to read
     let list = [];
-    try { list = (await requestJson('GET', '/api/skills?status=approved')).skills || []; } catch { return; }
+    try { list = (await requestJson('GET', '/api/skills?status=approved')).skills; } catch { if (generation.get(rowId) === mine) say('Skills could not be read from this computer, so none can be chosen now.'); return; }
+    if (!Array.isArray(list)) { if (generation.get(rowId) === mine) say('Skills could not be read from this computer, so none can be chosen now.'); return; }
     if (!list.length || generation.get(rowId) !== mine) return;
     const chosen = picked.get(rowId);
     const search = el('input', 'skills-pick-search'); search.type = 'search'; search.placeholder = 'Search skills'; search.setAttribute('aria-label', 'Search skills');

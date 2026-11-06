@@ -8,7 +8,8 @@
  *
  * Agent rows and their menus use that row's machine; the command pane and the sleeping bar use the agent on
  * screen, which is also marked read-only when the hub told the terminal socket so. Controls are found by their
- * action name after any redraw, so the many places that draw them need no change. Not on a local dashboard. */
+ * action name after any redraw, so the many places that draw them need no change. Not on a local dashboard.
+ * A control marked data-hub-closed="<reason>" is dimmed with that reason whatever the tier: the Hub closes it for everyone (#13871). */
 import { state } from './state.js';
 import { isCloud, sessionServer, splitKey } from './server_base.js';
 import { blockedReason } from './hub_access.js';
@@ -32,7 +33,11 @@ const BOARD = new Set(['mb-post', 'team-sleep', 'board-chat-pause', 'mb-pause', 
 // The sleeping bar's buttons name their action in data-action.
 const BAR = { wake: 'launch', restart: 'launch', unarchive: 'interact' };
 
+/* A control the Hub closes for EVERYONE (#13871): its route is never through a Hub, whatever the access tier (the tunnel's table is an allowlist: opening an editor, the Queue, the skills store stay on the computer). The tier lists
+ * above dim what a LOW tier cannot do; this one dims what no tier can, by the reason the control carries itself in data-hub-closed (the words say where to do it). It stays clickable, as the others do, so the click can say why. */
+const CLOSED = 'closed';
 function tierOf(el) {
+    if (el.dataset.hubClosed) return CLOSED;
     if (el.closest('#sleeping-composer')) return BAR[el.dataset.action] || '';
     const a = el.dataset.onClick;
     if (NEEDS_LAUNCH_ANYWHERE.has(a)) return 'launch-any';
@@ -68,6 +73,7 @@ function noComputerLaunches() {
 }
 
 function reasonFor(el, tier) {
+    if (tier === CLOSED) return el.dataset.hubClosed;
     if (tier === 'launch-any') return noComputerLaunches();
     const a = el.dataset.onClick;
     if (BOARD.has(a)) return blockedReason(boardServerOf(el), tier);
@@ -81,7 +87,7 @@ function reasonFor(el, tier) {
 
 /** Mark (or unmark) every control under `root` by what its agent's machine allows. */
 export function markBlockedControls(root = document) {
-    for (const el of root.querySelectorAll('[data-on-click], #sleeping-composer button[data-action], .mobile-send-btn')) {
+    for (const el of root.querySelectorAll('[data-on-click], [data-hub-closed], [data-hub-blocked-tip], #sleeping-composer button[data-action], .mobile-send-btn')) {
         const tier = tierOf(el);
         const was = el.classList.contains('hub-blocked');
         // A control with no tier of its own is another module's to dim (the launch dialog's buttons, #4586): only what this scan marked is cleared.

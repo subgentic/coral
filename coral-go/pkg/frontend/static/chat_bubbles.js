@@ -4,7 +4,7 @@ import { linkCoralSubjectRefsIn } from './coral_subject_refs.js';
  * makeBubble(className, html) is how every feature builds a row: it returns a div of that class with the html in it, code blocks
  * labelled and copy buttons and file references wired. Pair it with appendContent (chat_content.js) to put the row in the chat. */
 import { escapeHtml, labelCodeBlocks, showToast, copyText } from './utils.js';
-import { serverFetch, sessionServer, serverUrl, currentServer } from './server_base.js';
+import { serverFetch, sessionServer, serverUrl, currentServer, isCloud, isLocalServer } from './server_base.js';
 import { state } from './state.js';
 
 export function makeBubble(className, html) {
@@ -257,7 +257,11 @@ async function resolveFileRef(ref) {
 // Desktop editors installed on the Coral host. Empty when this browser is on
 // another machine (the server only offers them to a local client).
 let editorsPromise = null;
+/** Opening an editor happens on the computer itself: through the Hub, or on another computer's agent, it is closed for everyone (the route is never), so the menu says so instead of leaving the item out in silence. */
+const editorsClosed = () => isCloud() || !isLocalServer(currentServer());
+const EDITOR_WORDS = 'Opening an editor happens on the computer itself: use that computer\'s own Coral.';
 function installedEditors() {
+    if (editorsClosed()) return Promise.resolve([]); // no request: the Hub never opens an editor (#13871)
     if (!editorsPromise) {
         editorsPromise = fetch(serverUrl("/api/system/editors", currentServer()))
             .then(r => (r.ok ? r.json() : { editors: [] }))
@@ -320,6 +324,7 @@ async function showFileRefMenu(el) {
     menu.innerHTML = `<div class="chat-file-menu-path" title="${escapeHtml(displayPath)}">${escapeHtml(displayPath)}</div>
         <button type="button" class="menu-item" role="menuitem" data-action="preview"><span class="material-icons" aria-hidden="true">visibility</span>Preview in Coral${line > 0 ? ` (line ${line})` : ""}</button>
         ${artifactRef ? '' : `<button type="button" class="menu-item" role="menuitem" data-action="edit"><span class="material-icons" aria-hidden="true">edit</span>Edit in Coral${line > 0 ? ` (line ${line})` : ""}</button>
+        ${editorsClosed() ? `<button type="button" class="menu-item hub-blocked" role="menuitem" aria-disabled="true" data-action="editor-closed" data-hub-closed="${escapeHtml(EDITOR_WORDS)}" title="${escapeHtml(EDITOR_WORDS)}"><span class="material-icons" aria-hidden="true">open_in_new</span>Open in editor</button><div class="chat-file-menu-why" role="note">${escapeHtml(EDITOR_WORDS)}</div>` : ''}
         ${editors.map((ed, i) => `<button type="button" class="menu-item" role="menuitem" data-action="editor" data-editor="${Number(i)}"><span class="material-icons" aria-hidden="true">open_in_new</span>Open in ${escapeHtml(ed.name)}</button>`).join("")}`}
         <button type="button" class="menu-item" role="menuitem" data-action="copy"><span class="material-icons" aria-hidden="true">content_copy</span>${artifactRef ? 'Copy artifact URI' : 'Copy path'}</button>`;
     document.body.appendChild(menu);
