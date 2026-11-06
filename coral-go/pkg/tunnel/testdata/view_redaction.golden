@@ -107,6 +107,7 @@ GET /api/team-artifacts redact
 GET /api/teams/all redact
 GET /api/teams/detail/{name} redact
 GET /api/teams/detail/{name}/availability redact
+GET /api/teams/detail/{name}/daily-knowledge redact
 GET /api/teams/detail/{name}/distill-knowledge redact
 GET /api/teams/detail/{name}/knowledge redact
 GET /api/teams/detail/{name}/knowledge/{agent} redact

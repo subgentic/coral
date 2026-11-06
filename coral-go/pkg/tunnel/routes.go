@@ -218,6 +218,7 @@ var routeTable = cat(
 		"/api/teams/detail/{name}/knowledge/{agent}",
 		// A distillation run's status (#3518): fixed keys, bounded text, no paths.
 		"/api/teams/detail/{name}/distill-knowledge",
+		"/api/teams/detail/{name}/daily-knowledge", // the team's daily knowledge: the switch, the last run, the waiting candidate with its diff (#13928)
 		"/api/token-usage", "/api/token-usage/summary", "/api/token-usage/timeseries",
 		"/api/token-usage/by-team", "/api/token-usage/by-branch", "/api/token-usage/session/{id}/turns", "/api/token-usage/turns",
 		"/api/goals/metrics", "/api/call-metrics/summary",
@@ -343,6 +344,9 @@ var routeTable = cat(
 	// Record for all agents (#13834, Security): the bulk route only, after the dry run (?dry_run=1, two signed targets). The OWNER's alone; the machine refuses a request through the Hub with no list of the agents shown (and ?all=1, which the query table drops). The single record-agent, which carries acknowledge_nested, stays never.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/sessions/record-agents")),
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/goals/{id}/driver", "/api/board/{project}/goals/{id}/move")), // the Operator's own two changes to a goal, who drives it and which team it is on (#12693, #13517): a person's, as the question buttons are
+	// The team's daily knowledge (#13928): what every agent of the team is told at its start, and what spends the person's model usage each day. The owner's alone, a person's click, refused before the handler for anyone else.
+	owner(OwnerRefuse, rules(http.MethodPut, TierInteract, "/api/teams/detail/{name}/daily-knowledge", "/api/teams/detail/{name}/daily-knowledge/auto-apply")),
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/teams/detail/{name}/daily-knowledge/accept", "/api/teams/detail/{name}/daily-knowledge/revert")),
 	owner(OwnerRefuse, rules(http.MethodPatch, TierInteract, "/api/saved/{id}")),
 	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/saved/{id}")),
 	// What a viewer sees of a board's settings is the machine's to decide (the health setup is the owner's, #5307): the marker is stamped, the handler gives a non-owner less.

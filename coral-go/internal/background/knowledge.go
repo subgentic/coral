@@ -298,6 +298,11 @@ func redactedTranscript(t string) string {
 // the bundle. An agent whose extraction fails is reported in FailedAgents and keeps its
 // earlier knowledge; when every extraction fails, the run fails and nothing is written.
 func distillAgents(bundle *KnowledgeBundle, agents []agentMeta, call func(prompt, content string) (string, error), coralDir string, progressFn func(DistillProgress)) (*KnowledgeBundle, error) {
+	return distillAgentsWith(bundle, agents, call, coralDir, writeKnowledgeBundle, progressFn)
+}
+
+// distillAgentsWith is distillAgents with the place the finished bundle goes: the team's live knowledge for a person's run, a candidate beside it for an automatic one (#13928).
+func distillAgentsWith(bundle *KnowledgeBundle, agents []agentMeta, call func(prompt, content string) (string, error), coralDir string, write func(coralDir string, bundle *KnowledgeBundle) error, progressFn func(DistillProgress)) (*KnowledgeBundle, error) {
 	teamName := bundle.TeamName
 	total := len(agents)
 
@@ -405,7 +410,7 @@ func distillAgents(bundle *KnowledgeBundle, agents []agentMeta, call func(prompt
 	bundle.IndexMD = buildIndexMD(teamName, now, indexed, bundle)
 
 	// Write to disk
-	if err := writeKnowledgeBundle(coralDir, bundle); err != nil {
+	if err := write(coralDir, bundle); err != nil {
 		return bundle, fmt.Errorf("knowledge distilled but failed to write: %w", err)
 	}
 

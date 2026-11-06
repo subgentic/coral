@@ -173,6 +173,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodPost && regexp.MustCompile(`^/api/board/[^/]+/goals/[^/]+/(driver|move)$`).MatchString(p) {
 				continue
 			}
+			// A team's daily knowledge (#13928): its switch, the apply-by-itself switch, accepting a candidate and taking an update back are the owner's alone through the hub: the old list never had them.
+			if (m == http.MethodPut || m == http.MethodPost) && regexp.MustCompile(`^/api/teams/detail/[^/]+/daily-knowledge(/auto-apply|/accept|/revert)?$`).MatchString(p) {
+				continue
+			}
 			// Asking this computer to check for an update (#13258) is the owner's alone through the hub: the old list never had it.
 			if m == http.MethodPost && p == UpdateCheckPath {
 				continue
