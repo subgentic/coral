@@ -1,5 +1,107 @@
 # Release Notes
 
+## v2.0.55 — Queue claims that follow the work, remote computers named by their team, and yes/no answers beside the composer
+
+### Changes
+
+#### What you will notice first
+
+- **A queue slot you claim by hand follows the work.** It belongs to the tool call it was claimed in, also when the call starts a background job, and goes back when the call, the turn or the session ends; a slot that comes while an agent is away goes to the next one who is here, and the absent one keeps its place at the front for ten minutes.
+- **A holder stuck at a prompt or idle is noticed.** The Orchestrator is told at five minutes and again at ten; a phone card says Stuck, and an agent whose background job holds the slot counts as working.
+- **The Queue folder's agent, task and goal are links** that open the session, the computer, the task or the goal.
+- **Yes/No answers sit beside the composer** with Approve and Deny named for assistive tools; a drafted text and pictures are kept when you answer.
+- **Needs you kind icons have a full-height tinted gutter**, the text clears it, and phone Inbox answer labels stay on one line and wrap whole choices.
+- **Remote computers are told apart by their team.** Agent links, task assignees, exports, search access and goal comments keep to the team's own computer, a team's colour is looked up by its key, and the comment picker asks for a team's agents on the computer the file is on, naming why when it is empty.
+- **The Health check** tells a wait behind the holder in a resource line from a wait on a person.
+
+#### Fixed
+
+- **A Codex command that outlives its yield** no longer holds a queue slot for ever.
+- **A remote board poll** carries the server's key to the exact address only, never over plain http to another host.
+- **`coral-board goal brief`** refuses a goal link that names another computer instead of reading it as this one's.
+- **Hooks honour `CORAL_HOST`.**
+- **Windows:** several test-only fixes so more of the suite runs there, and a failing GUI test in `windows-tests` no longer skips the package and smoke steps.
+- Dependency updates.
+
+#### Through Coral Hub
+
+- **No route the Hub reaches was added or changed.** The Hub's owner and proxy packages changed (see below).
+
+#### Known issues
+
+- **Through Coral Hub, a computer on v2.0.54 or v2.0.55 shows only the first 50 artifacts per list until the Hub's paging update deploys.** No data is lost.
+- **macOS: the tmux change (#12836) can make macOS ask once more, only after tmux restarts (a full restart of your agents or a reboot).** Coral's tmux server and guardian are now their own responsible process, so macOS may ask, per folder, whether `tmux` (or `coral`) may reach Documents, Desktop or Downloads. Full Disk Access you gave Coral.app does not carry over: if you gave Coral Full Disk Access, add `tmux` and `coral` too (both in `Coral.app/Contents/MacOS`). The staged tmux copy (each Coral version keeps its own under `tmux-bin/`) asks again after a tmux change. Say yes once; if you say no, nothing is lost, the agent just cannot read that folder.
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For Coral Hub
+
+- **`release-diff` output** (`go run ./internal/releasediff/cmd/release-diff v2.0.54 945d1cbcb`):
+
+  ### Tunnel routes, v2.0.54 to 945d1cbcb
+
+  No route was added, removed or changed.
+
+  ### Board settings keys (BoardSettings, HealthSettings included), v2.0.54 to 945d1cbcb
+
+  No key was added, removed or changed.
+
+  ### What Coral Hub compiles in or embeds, v2.0.54 to 945d1cbcb
+
+  `pkg/hubproxy`: 2 files of Go code changed (+102, -1)
+
+  - `coral-go/pkg/hubproxy/handler.go`: +6, -1
+  - `coral-go/pkg/hubproxy/owner.go`: +96, -0
+  - test files, not compiled by the Hub: 2 files (+225, -0)
+
+  `pkg/hubowner`: 1 file of Go code changed (+101, -19)
+
+  - `coral-go/pkg/hubowner/hubowner.go`: +101, -19
+  - test files, not compiled by the Hub: 1 file (+45, -9)
+
+  `pkg/frontend`: 20 files the Hub embeds changed (+176, -73)
+
+  - `coral-go/pkg/frontend/static/agent_live.js`: +3, -4
+  - `coral-go/pkg/frontend/static/artifact_comment_ask.js`: +6, -4
+  - `coral-go/pkg/frontend/static/artifact_comment_send.js`: +9, -1
+  - `coral-go/pkg/frontend/static/artifact_comments.js`: +3, -3
+  - `coral-go/pkg/frontend/static/automations_queue.js`: +29, -11
+  - `coral-go/pkg/frontend/static/board_export.js`: +3, -3
+  - `coral-go/pkg/frontend/static/css/data_table.css`: +23, -7
+  - `coral-go/pkg/frontend/static/css/operator_ask_dialog.css`: +8, -0
+  - `coral-go/pkg/frontend/static/css/variables.css`: +25, -0
+  - `coral-go/pkg/frontend/static/data_table.js`: +3, -3
+  - `coral-go/pkg/frontend/static/goal_comments.js`: +4, -3
+  - `coral-go/pkg/frontend/static/inbox_proposals.js`: +2, -2
+  - `coral-go/pkg/frontend/static/inbox_sidebar.js`: +5, -5
+  - `coral-go/pkg/frontend/static/needs_filters.js`: +9, -1
+  - `coral-go/pkg/frontend/static/operator_ask_dialog.js`: +26, -16
+  - `coral-go/pkg/frontend/static/operator_asks.js`: +8, -1
+  - `coral-go/pkg/frontend/static/search_access.js`: +6, -6
+  - `coral-go/pkg/frontend/static/team_availability.js`: +1, -0
+  - `coral-go/pkg/frontend/static/team_names.js`: +1, -1
+  - `coral-go/pkg/frontend/static/team_tasks_page.js`: +2, -2
+
+  `agent_docs`: 2 files the Hub embeds changed (+10, -5)
+
+  - `coral-go/agent_docs/board.md`: +2, -0
+  - `coral-go/agent_docs/resource-queue.md`: +8, -5
+
+  Unchanged: `pkg/redact`, `pkg/tunnel`.
+
+  ### Coral packages compiled into the Hub through its imports, v2.0.54 to 945d1cbcb
+
+  Unchanged: `internal/fsreplace`, `internal/httputil`, `internal/logsafe`, `internal/safego`, `internal/secfile`, `internal/secrets`, `pkg/redact/betterleaks`.
+
+- **No tunnel route, board settings key, ready signal, hook, token or framed path changed.** `pkg/hubproxy` and `pkg/hubowner` changed in Go code (+102 and +101 lines); `pkg/frontend` and two agent docs the Hub embeds changed.
+
+#### For developers and releases
+
+- Test-only fixes after the first gates: the phone Inbox suites follow the answer pair spanning the row, the Actions-menu check no longer depends on the pointer, source-scan tests tolerate a vanishing temp folder, the guardian and provision helpers wait for their child under load, and `board_controls` waits for the page's answer.
+
 ## v2.0.54 — Long artifact lists in pages, a Resource queue view in Analytics, and a steadier Files list
 
 ### Changes
