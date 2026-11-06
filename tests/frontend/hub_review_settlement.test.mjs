@@ -1,3 +1,4 @@
+import { reviewFixtureURL } from './helpers/review_fixture.js';
 import assert from 'node:assert/strict';
 import cp from './helpers/child_process.js';
 const { spawnSync } = cp;
@@ -12,7 +13,7 @@ const ids=['a'.repeat(64),'b'.repeat(64)];
 const rows=ids.map((id,i)=>({id,name:'Film',session_id:'writer',produced_by:'Writer',uri:'coral://artifacts/'+id,tags:['for review'],available:true,created_at:`2026-11-03T10:0${i}:00Z`}));
 let mode='ok',calls=[];
 globalThis.fetch=async(url,opts={})=>{
- const u=new URL(String(url),'https://hub.example/');
+ const u=reviewFixtureURL(String(url),'https://hub.example/');
  if(u.pathname.endsWith('/api/board/projects'))return Response.json([{project:'team'}]);
  if(u.pathname.endsWith('/artifacts'))return Response.json({artifacts:rows,has_more:false});
  if(u.pathname.endsWith('/tags') && opts.method==='PUT')return Response.json({error:'local write failed'},{status:404});

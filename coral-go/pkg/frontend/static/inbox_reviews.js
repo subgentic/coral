@@ -3,9 +3,10 @@ import { setReviewCacheReader } from './ask_filter.js';
 /* Review artifacts use the same owner-protected team list and tags routes as Artifacts.
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
 import { fetchReviewProjects, sourcesKey } from './board_fetch.js';
-import { boardFetch, boardArtifactPage, nextArtifactPage, keyLabel, splitKey } from './server_base.js';
+import { boardFetch, boardArtifactPage, nextArtifactPage, keyLabel, splitKey, serverFetch, identityKey, normServer } from './server_base.js';
 import { hideAsksWhen } from './ask_filter.js';
 import { importOnce } from './import_once.js';
+const { needsReviewAttention, hasNewVersion } = await importOnce('./inbox_review_state.js');
 
 let items = [], saved = [], muted = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => { if (typeof document !== 'undefined') document.dispatchEvent(new Event('coral:reviews-changed')); };
 let activated = false, refreshAgain = false;
@@ -52,8 +53,8 @@ export const savedFiles = () => {
     savedView = collapseVersions(saved); savedFor = saved; savedRev = revision;
     return savedView;
 };
-export const isRead = a => !!(a.tags && a.tags.includes('read')) && !(a.new_comments > 0); // a read file whose Operator-started thread has agent replies not yet opened is unread again, counted once as itself (#12026)
-export const unreadReviewItems = () => reviewItems().filter(a => !isRead(a));
+export const isRead = a => !!(a.tags && a.tags.includes('read')) && !(a.new_comments > 0) && !hasNewVersion(a); // a read file whose Operator-started thread has agent replies not yet opened is unread again, counted once as itself (#12026)
+export const unreadReviewItems = () => reviewItems().filter(needsReviewAttention);
 /** Reflect an acknowledged server write across cached versions, including collapsed copies. */
 export function reviewStarChanged(row, on) {
     const key = vkey(row);
@@ -90,23 +91,27 @@ export function reviewGroups(rows) {
 async function readTeam(team, mutedOut = null, stamp = {}) {
     const rows = [], seen = new Set();
     for (let at = { cursor: '', offset: 0 }, pages = 0; pages < 200; pages++) { // 50 a page, by the computer's cursor (#13161)
-        const r = await boardArtifactPage(team, 'for%20review', at);
-        if (r.status === 403 || r.status === 404) break; // inaccessible teams never contribute rows
+        const key = splitKey(team), query = new URLSearchParams({ team: key.name, tag: 'for review', starred_first: 'true', limit: '50', ...(at.cursor ? { cursor: at.cursor } : at.offset ? { offset: String(at.offset) } : {}) });
+        const r = await serverFetch(key.server, `/api/team-artifacts?${query}`);
+        if (r.status === 403 || r.status === 404) break; // owner-only lists never fall back to a less private board route
         if (!r.ok) throw new Error('Could not read review artifacts');
         const data = await r.json();
+        if (!Array.isArray(data.artifacts)) throw new Error('Review documents could not be read.');
+        if (data.partial || data.failed_boards?.length) throw new Error('Some review documents could not be read.');
         const token = artifactRevision(data.artifacts_rev);
         stamp.rev = pages === 0 ? token : stamp.rev === token ? token : null;
         for (const a of data.artifacts || []) {
             if (splitKey(team).name === '~no-team' && a.board_id !== '~no-team') continue;
             const decidedWithNews = a.new_comments > 0 && (a.tags?.includes('approved') || a.tags?.includes('denied')) && !a.tags.includes('for review'); // a file the Operator decided that agents replied about in their thread: the server puts it in this list (#12097), marked and counted once
-            if (!(a.tags?.includes('for review') || decidedWithNews) || a.tags.includes('saved') || a.tags.includes('ignored') || a.tags.includes('superseded') || (a.tags.includes('changes requested') && !(a.new_comments > 0)) || !a.available || seen.has(a.id)) continue; // changes requested without news is the agent's turn (needsYouFile's rule, #11985, #12026); // changes requested: the agent's turn, so the file leaves Needs you and its counts; its next version comes back as a new item (#11985). Artifacts and the goal still show it as changes requested // a saved file stays tagged for review (its decisions work) but is not in Needs you (#11641)
+            if (!(a.tags?.includes('for review') || decidedWithNews) || a.tags.includes('saved') || a.tags.includes('ignored') || a.tags.includes('superseded') || !a.available || seen.has(a.id)) continue; // Sent-back files remain visible, uncounted without news; saved, ignored and superseded files stay out.
             const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
             if (!hex) continue;
             seen.add(a.id);
-            if (a.muted === true) { if (mutedOut) mutedOut.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` }); continue; } // the Operator's settings keep this kind (or team) out of Needs you (#12144): not a row, not counted, listed under the Muted line
-            rows.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
+            if (a.muted === true) { if (mutedOut) mutedOut.push({ ...a, team, server: splitKey(team).server, hex, reviewKey: `${team}:${a.id}` }); continue; } // the Operator's settings keep this kind (or team) out of Needs you (#12144): not a row, not counted, listed under the Muted line
+            rows.push({ ...a, team, server: splitKey(team).server, hex, reviewKey: `${team}:${a.id}` });
         }
         if (!nextArtifactPage(at, data)) break;
+        if (pages === 199) throw new Error('Review documents exceed the scan limit; the list is incomplete.');
     }
     return rows;
 }
@@ -156,7 +161,7 @@ export function refreshReviews(force = false, { reuse = false } = {}) { // reuse
                             if (pages === 0) loadedRevisions.set(team, stamp.rev === artifactRevision(data.artifacts_rev) ? stamp.rev : null);
                             for (const a of data.artifacts || []) {
                                 const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
-                                if ((splitKey(team).name !== '~no-team' || a.board_id === '~no-team') && a.tags?.includes('saved') && a.tags.includes('for review') && a.available && hex) got.saved.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
+                                if ((splitKey(team).name !== '~no-team' || a.board_id === '~no-team') && a.tags?.includes('saved') && a.tags.includes('for review') && a.available && hex) got.saved.push({ ...a, team, server: splitKey(team).server, hex, reviewKey: `${team}:${a.id}` });
                             }
                             if (!nextArtifactPage(at, data)) break;
                         }
@@ -255,12 +260,13 @@ const reading = new Map(); // hex -> the write in flight, so the viewer and the 
 export function markOpenedRead(hex, team = '') {
     hex = String(hex || '').toLowerCase();
     if (!hex) return Promise.resolve();
-    if (reading.has(hex)) return reading.get(hex);
+    const readKey = JSON.stringify([team, hex]);
+    if (reading.has(readKey)) return reading.get(readKey);
     const p = (async () => {
         let own = null; // the file's own row, read from its own team alone when the Inbox's scan of every team has not run (a file opened through the Hub): one team's list, not nine (#13489)
         if (!activated && team) own = (await readTeam(team)).find(a => a.hex.toLowerCase() === hex) || null;
         else if (!activated) await refreshReviews(true, { reuse: true }); else if (pending) await pending;
-        const row = own ? (!isRead(own) && !(own.tags || []).includes('changes requested') ? own : undefined) : items.find(a => a.hex.toLowerCase() === hex && !isRead(a) && !(a.tags || []).includes('changes requested')); // a file the Operator asked changes of waits on the agent: the viewer and the preview redraw it after the request, and that is not reading it again (#11860); it stays counted until the agent answers
+        const row = own ? (needsReviewAttention(own) || !isRead(own) ? own : undefined) : items.find(a => a.hex.toLowerCase() === hex && (!team || a.team === team) && (needsReviewAttention(a) || !isRead(a))); // a file the Operator asked changes of waits on the agent: the viewer and the preview redraw it after the request, and that is not reading it again (#11860); it stays counted until the agent answers
         if (row) {
             if (row.new_comments > 0) { // opening the file is opening its thread: the server marks the Operator's threads seen when the comments are read (#12026), so the row is read, and the count follows
                 const { listComments } = await importOnce('./artifact_comments_api.js');
@@ -271,10 +277,28 @@ export function markOpenedRead(hex, team = '') {
             }
             await setReviewRead(row, true, { fresh: !!own });
         }
-    })().finally(() => reading.delete(hex));
-    reading.set(hex, p);
+    })().finally(() => reading.delete(readKey));
+    reading.set(readKey, p);
     return p;
 }
 
+
+const openingVersions = new Map();
+/** Record only a successfully loaded viewer version, on its frozen computer.
+ * Older/refusing sources leave the baseline unknown, without a success claim. */
+export function recordOpenedVersion(hex, { server, board = '' }) {
+    const key = JSON.stringify([normServer(server), board, hex]);
+    if (openingVersions.has(key)) return openingVersions.get(key);
+    const work = (async () => {
+        const response = await serverFetch(server, `/api/artifacts/${hex}/opened`, { method: 'POST' });
+        if (!response.ok) return false;
+        const data = await response.json();
+        if (!data.series_id || !Number.isSafeInteger(data.opened_version) || data.opened_version < 1) return false;
+        const team = board ? identityKey(server, board) : '';
+        for (const row of [...items, ...saved, ...muted]) if (row.series_id === data.series_id && splitKey(row.team).server === normServer(server) && (!team || row.team === team)) row.opened_version = Math.max(row.opened_version || 0, data.opened_version);
+        revision++; changed(); return true;
+    })().catch(() => false).finally(() => openingVersions.delete(key));
+    openingVersions.set(key, work); return work;
+}
 
 setReviewCacheReader(unreadReviewItems, refreshReviews);

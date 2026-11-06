@@ -13,7 +13,7 @@ const { coralReady } = require('./helpers/wait');
         await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const real = window.fetch; window.__asked = [];
             const json = b => new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } });
             const HEX = 'ab'.repeat(32);
-            window.fetch = (u, o) => { const url = new URL(String(u), location.href), p = url.pathname; window.__asked.push(p + url.search);
+            window.fetch = (u, o) => { const url = window.__reviewFixtureURL(String(u), location.href), p = url.pathname; window.__asked.push(p + url.search);
                 if (p === '/api/remote/box-2/api/board/projects') return Promise.resolve(json([{ project: 'alpha' }]));
                 if (p === '/api/remote/box-2/api/board/alpha/artifacts') { const tag = url.searchParams.get('tag');
                     return Promise.resolve(json(tag === 'for review' ? { has_more: false, artifacts: [{ id: 'a-1', uri: 'coral://artifacts/' + HEX, tags: ['for review'], name: 'remote-report.md', created_at: '2026-11-04T00:00:01Z', available: true, produced_by: 'Dev', session_id: 's-1' }] } : { has_more: false, artifacts: [] })); }

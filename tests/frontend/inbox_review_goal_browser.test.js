@@ -28,7 +28,7 @@ const { coralReady } = require('./helpers/wait');
                     window.__reviewItems=Array.from({length:13},(_,i)=>({id:(i+1).toString(16).padStart(64,'0'),name:'Review file '+String(i+1).padStart(2,'0')+'.txt',media_type:'text/plain',size:30,created_at:new Date(Date.now()-(20-i)*60000).toISOString(),task_id:i<3?11:i===3?12:i===4?13:0,task_title:i<3?'Build the installer':i===3?'Write the docs for the whole installer and the update flow, every section, with a screenshot of each step':i===4?'Loose task':'',goal_id:i<3?7:i===3?8:null,goal_title:i<3?'Ship the installer':i===3?'Docs sweep':'',source:'upload',available:true,session_id:i<11?'writer-a':'writer-b',produced_by:i<11?'Writer A':'Writer B',tags:['for review','internal'],uri:'coral://artifacts/'+(i+1).toString(16).padStart(64,'0')}));
                     const original=window.fetch, json=(body,status=200)=>Promise.resolve(new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}}));
                     window.fetch=(url,opts={})=>{
-                        const u=new URL(String(url),location.origin);
+                        const u=window.__reviewFixtureURL(String(url), location.origin);
                         if(u.pathname==='/api/board/${team}/artifacts'){
                             const items=window.__reviewItems.filter(a=>!u.searchParams.has('tag')||a.tags.includes(u.searchParams.get('tag'))),offset=Number(u.searchParams.get('offset')||0),limit=Number(u.searchParams.get('limit')||100);
                             return json({project:'${team}',artifacts:items.slice(offset,offset+limit),has_more:offset+limit<items.length});

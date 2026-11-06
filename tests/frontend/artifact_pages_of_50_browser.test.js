@@ -19,7 +19,7 @@ const hexOf = i => String(i + 1).padStart(64, 'a').replace(/^a+/, m => m.replace
             const art = i => ({ id: 'a-' + i, uri: 'coral://artifacts/' + hex(i), tags: ['for review'], name: 'file-' + String(i).padStart(3, '0') + '.html', created_at: new Date(Date.UTC(2026, 10, 4, 0, 0, 0) - i * 1000).toISOString(), available: true, produced_by: 'Dev', session_id: 's-' + i });
             const savedArt = i => ({ ...art(i), id: 's-' + i, uri: 'coral://artifacts/' + hex(i + 1000), name: 'saved-' + String(i).padStart(3, '0') + '.html', tags: ['saved', 'for review'], session_id: 'ss-' + i });
             const json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
-            window.fetch = (u, o) => { const url = new URL(String(u), location.href), p = url.pathname;
+            window.fetch = (u, o) => { const url = window.__reviewFixtureURL(String(u), location.href), p = url.pathname;
                 if (p === '/api/board/projects') return json([{ project: 't1' }]);
                 if (p === '/api/board/t1/artifacts') { const tag = url.searchParams.get('tag'); window.__calls.push(url.search);
                     if (tag !== 'for review' && tag !== 'saved') return json({ has_more: false, artifacts: [] });

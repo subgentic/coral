@@ -1,3 +1,4 @@
+import { reviewFixtureURL } from './helpers/review_fixture.js';
 // #11354: through Coral Hub the owner's Inbox reads the For-review rows (it returned early under isCloud() until then), and a non-owner (a guest or a grantee: the machine answers 403 owner_only on the team's
 // artifact list) sees no rows and no error. Run: node inbox_reviews_cloud.test.mjs
 import assert from 'node:assert/strict';
@@ -13,7 +14,7 @@ const M = await importUi('inbox_reviews');
 let asOwner = true, reads = [];
 const row = i => ({ id: i.toString(16).padStart(64, '0'), name: `File ${i}`, session_id: 'writer', produced_by: 'Writer', tags: ['for review'], available: true, created_at: '2026-10-30T10:00:00Z' });
 globalThis.fetch = async (url) => {
-    const u = new URL(String(url), 'https://hub.example/');
+    const u = reviewFixtureURL(String(url), 'https://hub.example/');
     reads.push(u.pathname + u.search);
     if (u.pathname.endsWith('/api/board/projects') || u.pathname === '/api/board/projects') return Response.json([{ project: 'a' }]);
     if (u.pathname.endsWith('/artifacts')) {

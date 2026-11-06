@@ -637,3 +637,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .inbox-kind-icon[data-kind="goal_done"]::before { content: 'flag'; }
 .inbox-kind-icon[data-kind="skill_review"]::before { content: 'auto_awesome'; }
 .inbox-kind-icon[data-kind="welcome"]::before { content: 'info'; }
+
+/* Needs you goal dividers and document pins (#13888/#13889). */
+.inbox-needs-results .dt-group th { white-space: pre-line; text-transform: none; letter-spacing: normal; font-size: var(--fs-sm); line-height: var(--lh-body); overflow-wrap: anywhere; color: var(--text-secondary); padding-block: 10px; }
+.inbox-needs-results .inbox-review-star.dt-star-on { color: var(--accent); }

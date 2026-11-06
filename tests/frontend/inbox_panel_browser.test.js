@@ -27,7 +27,7 @@ const STUB = `(() => {
     const MSG = { 11: { text: 'The **whole** message\\n\\n- a\\n- b\\n\\n<b>not bold</b>', partial: false, reason: '' }, 12: { text: '', partial: false, reason: 'gone' },
         13: { text: 'Part of a very long message', partial: true, reason: '' }, 14: null };
     window.fetch = (u, o = {}) => {
-        const url = new URL(String(u), location.origin), m = (o.method || 'GET').toUpperCase(), p = url.pathname;
+        const url = window.__reviewFixtureURL(String(u), location.origin), m = (o.method || 'GET').toUpperCase(), p = url.pathname;
         window.__reqs.push({ m, p, q: url.search, body: o.body ? String(o.body) : null });
         if (p === '/api/board/tasks' && m === 'GET') return json({ tasks: TASKS, total: TASKS.length });
         let r = /^\\/api\\/board\\/([^/]+)\\/tasks\\/(\\d+)$/.exec(p);

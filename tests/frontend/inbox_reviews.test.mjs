@@ -1,3 +1,4 @@
+import { reviewFixtureURL } from './helpers/review_fixture.js';
 // #8628: the Inbox review data source pages, groups producers, and cannot resurrect a review from a stale read (an approved one, #136584).
 import assert from 'node:assert/strict';
 const M = await import('../../coral-go/pkg/frontend/static/inbox_reviews.js');
@@ -11,7 +12,8 @@ let release, entered, slow = false, reads = 0;
 const started = new Promise(resolve => { entered = resolve; });
 globalThis.fetch = async (url, options = {}) => {
     reads++;
-    const u = new URL(url, 'http://localhost');
+    const u = reviewFixtureURL(url, 'http://localhost');
+    if (u.pathname.endsWith('/board/~no-team/artifacts')) return Response.json({artifacts:[],has_more:false});
     if (u.pathname === '/api/team-artifacts') return Response.json({artifacts:[],has_more:false});
     if(u.pathname==='/api/board/projects')return Response.json([{project:'a'}]);
     if(u.pathname.endsWith('/tags')) {
@@ -50,7 +52,7 @@ console.log('inbox_reviews: ok');
 let token = 100, rows = [row(301)], hold = false, resolveList, sawList;
 let heldList = new Promise(resolve => { sawList = resolve; });
 globalThis.fetch = async url => {
-    const u = new URL(url, 'http://localhost');
+    const u = reviewFixtureURL(url, 'http://localhost');
     if (u.pathname === '/api/team-artifacts') return Response.json({artifacts:[],has_more:false});
     if (u.pathname === '/api/board/projects') return Response.json([{ project: 'a' }]);
     if (u.pathname.endsWith('/status')) return Response.json({ artifacts_rev: token });
@@ -83,7 +85,7 @@ let projectScans = 0, unblock, inList;
 const listStarted = new Promise(resolve => { inList = resolve; });
 let pauseFirst = true;
 globalThis.fetch = async url => {
-    const u = new URL(url, 'http://localhost');
+    const u = reviewFixtureURL(url, 'http://localhost');
     if (u.pathname === '/api/team-artifacts') return Response.json({artifacts:[],has_more:false});
     if (u.pathname === '/api/board/projects') { projectScans++; return Response.json([]); }
     if (u.pathname.endsWith('/projects')) return Response.json([{ project: 'alpha' }]);
@@ -113,7 +115,7 @@ state.serversKnown = true;
 state.servers = [{ id: 'old-box', status: 'online' }];
 const oldSourceReads = [];
 globalThis.fetch = async url => {
-    const u = new URL(url, 'http://localhost');
+    const u = reviewFixtureURL(url, 'http://localhost');
     if (u.pathname.endsWith('/projects')) return Response.json([]);
     if (u.pathname.endsWith('/team-artifacts')) {
         oldSourceReads.push(u.pathname);

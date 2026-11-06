@@ -32,7 +32,7 @@ const { coralReady } = require('./helpers/wait');
                     window.__versionCalls=[];
                     const original=window.fetch, json=(body,status=200)=>Promise.resolve(new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}}));
                     window.fetch=(url,opts={})=>{
-                        const u=new URL(String(url),location.origin);
+                        const u=window.__reviewFixtureURL(String(url), location.origin);
                         if(u.pathname==='/api/operator-asks')return json(window.__asks||[]);
                         if(u.pathname==='/api/board/${team}/artifacts'){
                             const items=window.__reviewItems.filter(a=>!u.searchParams.has('tag')||a.tags.includes(u.searchParams.get('tag'))),offset=Number(u.searchParams.get('offset')||0),limit=Number(u.searchParams.get('limit')||100);

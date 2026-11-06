@@ -32,7 +32,7 @@ const { coralReady } = require('./helpers/wait');
                     window.__reviewItems=[1,2,3].map(i=>({id:i.toString(16).padStart(64,'0'),name:'Read me '+i+'.txt',media_type:'text/plain',size:30,created_at:new Date(Date.now()-(10-i)*60000).toISOString(),task_id:0,source:'upload',available:true,session_id:'writer-a',produced_by:'Writer A',tags:['for review']}));
                     const original=window.fetch, json=(body,status=200)=>Promise.resolve(new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}}));
                     window.fetch=(url,opts={})=>{
-                        const u=new URL(String(url),location.origin);
+                        const u=window.__reviewFixtureURL(String(url), location.origin);
                         if(u.pathname==='/api/board/${team}/artifacts'){
                             const items=window.__reviewItems.filter(a=>!u.searchParams.has('tag')||a.tags.includes(u.searchParams.get('tag')));
                             return json({project:'${team}',artifacts:items,has_more:false});

@@ -18,7 +18,7 @@ const { safePaused } = require('./helpers/paused');
         await ev(`localStorage.removeItem('coral-inbox-needs-filters');
             const id = (1).toString(16).padStart(64, '0'), item = { id, name: 'Design note.md', media_type: 'text/plain', size: 30, created_at: new Date(Date.now() - 600000).toISOString(), task_id: 0, source: 'upload', available: true, session_id: 'w-s', produced_by: 'Writer', tags: ['for review', 'internal'], uri: 'coral://artifacts/' + id };
             const R = window.fetch, json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } }));
-            window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin);
+            window.fetch = (url, opts = {}) => { const u = window.__reviewFixtureURL(String(url), location.origin);
                 if (u.pathname === '/api/board/${team}/artifacts' && (opts.method || 'GET') === 'GET') return json({ project: '${team}', artifacts: [item], has_more: false });
                 if (u.pathname.startsWith('/api/artifacts/') && /^[0-9a-f]{64}$/.test(u.pathname.split('/')[3]) && (u.pathname.split('/').length === 4 || u.pathname.split('/')[4] === 'content')) return Promise.resolve(new Response('preview text', { headers: { 'Content-Type': 'text/plain' } }));
                 return R(url, opts); };

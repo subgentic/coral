@@ -24,7 +24,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 const hex = n => n.toString(16).padStart(64, '0'), ago = m => new Date(Date.now() - m * 60000).toISOString();
                 const f = (i, by, name, q, min, read) => ({ id: hex(i), name, media_type: 'text/markdown', size: 30, created_at: ago(min), source: 'upload', available: true, tags: read ? ['for review', 'read'] : ['for review'], produced_by: by, review_question: q, uri: 'coral://artifacts/' + hex(i) });
                 const items = [f(1, 'A very long agent name', 'A very long file name that has to be cut off somewhere', 'Ready to ship?', 5), f(2, 'Designer', 'Phone layout for the Goals list', 'Approve this phone layout for the Goals list?', 42), f(3, 'Writer', 'Billing page copy', 'Is this wording right for the billing page? It has to match the pricing page.', 190), f(4, 'Lead', 'Release notes v2.0.23', 'Anything to add before this goes out?', 1440, true), f(5, 'QA', 'Plan', 'Is the test plan complete?', 2880, true)];
-                window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin);
+                window.fetch = (url, opts = {}) => { const u = window.__reviewFixtureURL(String(url), location.origin);
                     if ((opts.method || 'GET') === 'GET' && u.pathname === '/api/board/${team}/artifacts') return json({ project: '${team}', artifacts: items.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))), has_more: false });
                     return original(url, opts); };
                 return true; })()`);

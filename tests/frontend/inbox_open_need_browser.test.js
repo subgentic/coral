@@ -18,7 +18,7 @@ const HEX = t => (t.charCodeAt(1).toString(16) + 'a').padEnd(64, 'c').slice(0, 6
             window.__r = { inflight: 0, max: 0, reads: {}, projects: 0 };
             const later = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: the stub team answers after a fixed time, as a team through the Hub does
             const json = b => new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } });
-            window.fetch = (u, o) => { const url = new URL(String(u), location.href), p = url.pathname;
+            window.fetch = (u, o) => { const url = window.__reviewFixtureURL(String(u), location.href), p = url.pathname;
                 if (p === '/api/board/projects') { window.__r.projects++; return Promise.resolve(json(TEAMS.map(t => ({ project: t })))); }
                 const m = /^\\/api\\/board\\/(t\\d)\\/artifacts$/.exec(p);
                 if (m && url.searchParams.get('tag') === 'saved') return Promise.resolve(json({ artifacts: [], has_more: false }));

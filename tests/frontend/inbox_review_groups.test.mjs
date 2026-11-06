@@ -16,7 +16,7 @@ test('pins precede goal groups, which keep selected order and separate source id
  assert.match(first.label,/2 shown · 2 unread/);
  assert.match(first.label,/@m1\/dev/);
  assert.equal(reviewGroupFor(a,input,false,()=>false,k=>k),null);
- assert.match(reviewGroupFor(p,input,false,()=>false,k=>k).label,/Starred for review/);
+ assert.match(reviewGroupFor(p,input,false,()=>false,k=>k).label,/Starred/);
 });
 test('single documents have a heading and read documents do not inflate unread counts',()=>{
  const a=row('a','dev',7),b=row('b','dev',7);b.review.tags=['read'];
@@ -51,5 +51,14 @@ test('review star writes only to the document computer, blocks double submission
   button.click();release(new Response('',{status:503}));await new Promise(resolve=>setImmediate(resolve));
   assert.equal(item.starred,true);assert.equal(changed,1);assert.equal(button.disabled,false);
  }finally{host.remove();}
+});
+test('waiting rows keep a separate visible group, with pins first and attention counts independent of the read tag',async()=>{
+ const {needsReviewAttention,reviewChangeLabels}=await importUi('inbox_review_state');
+ const active=row('active','dev',1),waiting=row('waiting','dev',1),pin=row('pin','dev',1,true);waiting.review.tags=['for review','changes requested'];pin.review.tags=waiting.review.tags;
+ const rows=[waiting,active,pin];assert.deepEqual(arrangeReviewRows(rows,true),[pin,active,waiting]);assert.deepEqual(arrangeReviewRows(rows,false),[pin,active,waiting]);
+ assert.equal(needsReviewAttention(waiting.review),false);
+ assert.match(reviewGroupLookup(rows,false,r=>!needsReviewAttention(r),k=>k)(waiting).label,/Waiting on agent · 1 shown · 0 unread/);
+ waiting.review.new_comments=2;assert.equal(needsReviewAttention(waiting.review),true);assert.deepEqual(reviewChangeLabels(waiting.review),['2 new comments']);
+ assert.equal(needsReviewAttention({tags:['read'],version:3,opened_version:1}),true);
 });
 test.after(()=>dom.window.close());
