@@ -95,9 +95,11 @@ func TestCodexIsRunReadOnlyEphemeralWithItsConfigIgnoredAndTheTextOnStdin(t *tes
 		assert.Contains(t, notes, want)
 	}
 	args := notes[:strings.Index(notes, "PWD:")]
-	for _, feature := range codexOffFeatures {
+	// A literal list, not codexOffFeatures: a name taken out of the code's list must fail here (QA's SHOULD on #13928).
+	for _, feature := range []string{"shell_tool", "unified_exec", "hooks", "apps", "plugins", "browser_use", "browser_use_external", "computer_use", "image_generation", "view_image"} {
 		assert.Contains(t, args, "[--disable]\n["+feature+"]", "Codex's %s is switched off", feature)
 	}
+	assert.Equal(t, 10, strings.Count(args, "[--disable]"), "no switch is dropped, none is added unreviewed")
 	assert.Contains(t, args, "[--disable]\n[shell_tool]")
 	assert.True(t, strings.HasSuffix(strings.TrimSpace(args), "[-]"), "the prompt comes from stdin: %s", args)
 	assert.NotContains(t, args, "SYSTEM PROMPT")
