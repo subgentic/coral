@@ -84,6 +84,6 @@ test('nested list editing preserves markers and permits a literal continuation w
 });
 
 test('a multiline plain-text paste into a list retains the same items',()=>{
- const ui=setup('- First words\n  - Nested words\n- Last words\n');const span=[...ui.body.querySelectorAll('.amd-text')].find(e=>e.textContent==='Nested words');assert.ok(span);span.focus();const range=document.createRange();range.selectNodeContents(span);const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);
+ const ui=setup('- First words\n  - Nested words\n- Last words\n');const span=[...ui.body.querySelectorAll('.amd-text')].find(e=>e.textContent==='Nested words');assert.ok(span);assert.equal(span.getAttribute('aria-multiline'),'true','Enter continues this textbox');span.focus();const range=document.createRange();range.selectNodeContents(span);const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);
  const paste=new Event('paste',{bubbles:true,cancelable:true});Object.defineProperty(paste,'clipboardData',{value:{getData:()=> 'New words\n1. literal'}});span.dispatchEvent(paste);assert.equal(span.textContent,'New words\n1. literal');span.blur();assert.equal(ui.body.querySelectorAll('li').length,3);assert.equal(ui.footer.querySelector('.amd-save').disabled,false);ui.close();
 });

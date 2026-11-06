@@ -65,7 +65,7 @@ export function createMarkdownEditor({ body, footer, dialog, context, source: in
             } else {
                 for (const { node, run } of map.entries) {
                     if (!run.editable) continue;
-                    const span = el('span', 'amd-text', node.data); span.contentEditable = 'plaintext-only'; span.setAttribute('role', 'textbox'); span.setAttribute('aria-label', 'Edit document text'); span.tabIndex = 0; span.spellcheck = true; node.replaceWith(span);
+                    const span = el('span', 'amd-text', node.data); span.contentEditable = 'plaintext-only'; span.setAttribute('role', 'textbox'); span.setAttribute('aria-label', 'Edit document text'); if (run.newlinePrefix != null) span.setAttribute('aria-multiline', 'true'); span.tabIndex = 0; span.spellcheck = true; node.replaceWith(span);
                     const before = span.textContent;
                     span.addEventListener('input', () => { pendingText = span.textContent !== before; sync(); });
                     span.addEventListener('compositionstart', () => { composing = true; }); span.addEventListener('compositionend', () => { composing = false; });
