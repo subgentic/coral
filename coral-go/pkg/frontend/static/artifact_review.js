@@ -47,7 +47,7 @@ async function decisionEarlier(m, row) {
     if (!row.series_id || !Number.isSafeInteger(row.version) || row.version <= older.length + 1) return older;
     // earlier_digests is capped at 50. Expand only on a decision, and never
     // settle a version uploaded after the one the person actually reviewed.
-    const hex = row.hex || rowHex(row), response = await serverFetch(splitKey(row.team).server, `/api/artifacts/${hex}/versions`);
+    const hex = row.hex || rowHex(row), response = await serverFetch(splitKey(row.team).server, `/api/artifacts/series/${encodeURIComponent(row.series_id)}/versions`);
     if (!response.ok) throw new Error('Earlier versions could not be read.');
     const versions = await response.json();
     if (!Array.isArray(versions)) throw new Error('Earlier versions could not be read.');
