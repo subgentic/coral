@@ -49,7 +49,9 @@ export function decorateKindRow(tr) {
     const icon = tr.querySelector('.inbox-kind-icon');
     if (!icon || tr.classList.contains('dt-mailed')) return;
     tr.classList.add('inbox-kind-row');
-    const words = tr.querySelector('.dt-subtitle'); if (words && /^(For review|Needs your answer)$/.test(words.textContent.trim())) words.classList.add('inbox-kind-words'); // the kind's own words under the sender: a phone leaves them to the icon (#13795)
+    const words = tr.querySelector('.dt-subtitle'); const wrap = tr.querySelector('.inbox-agent-first'), kindWord = words && /^(For review|Needs your answer)$/.test(words.textContent.trim());
+    if (words && wrap && !kindWord && tr.querySelector('[data-review-artifact]') && words.textContent.trim()) { wrap.classList.add('has-question'); words.classList.add('inbox-file-question'); } // the question put on a file (#11555) is what the person is to decide: it stays, as the one line under the file's name
+    else if (words && (wrap || kindWord)) words.classList.add('inbox-kind-words'); // a phone's one row has its own two lines: the second line of the old row is for a screen reader only (#13911) // the kind's own words under the sender: a phone leaves them to the icon (#13795)
     const cell = icon.closest('td'), column = document.createElement('span');
     column.className = 'inbox-kind-column'; column.append(icon); cell.append(column);
 }

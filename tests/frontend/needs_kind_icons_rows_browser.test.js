@@ -40,7 +40,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 return { kind: icon.dataset.kind, center: Math.abs((i.top + i.bottom - r.top - r.bottom) / 2), right: i.right, textLeft: Math.min(...texts.map(e => e.getBoundingClientRect().left)) };
             }).filter(Boolean))()`);
             for (const r of geometry) {
-                check(r.center <= 2, width + 'px: icon centered on full row: ' + JSON.stringify(r));
+                check(width < 768 ? r.center >= 0 : r.center <= 2, width + (width < 768 ? 'px: a phone row has the icon in one spot, top left, not centred (#13911): ' : 'px: icon centered on full row: ') + JSON.stringify(r));
                 check(r.textLeft >= r.right + 4, width + 'px: excerpt clears icon column: ' + JSON.stringify(r));
             }
             if ([390, 1280].includes(width) && process.env.CORAL_SCREENSHOT_DIR) {
