@@ -714,7 +714,7 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 	var starred map[string]bool
 	var follow map[string]starInfo
 	if starVisible(r) { // the Operator's own attention: an agent's token and a Hub caller that is not the owner see no bookmark, and a starred filter finds none
-		times, err := h.bs.StarredArtifactTimes(r.Context()) // a small set: read for every list, the rows say whether they are starred
+		times, err := h.bs.StarredArtifactTimes(r.Context(), openedPersonKey(r)) // a small set: read for every list, the rows say whether they are starred
 		switch {
 		case err != nil && q.starred != nil:
 			return nil, err // the Starred view cannot be answered without it
@@ -888,6 +888,9 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 		if q.crossTeam && sel.page[i].Starred { // the star-following fields, on the owner-only cross-team list alone (#13910)
 			if info, ok := follow[sel.page[i].managed]; ok {
 				sel.page[i].StarredAt, sel.page[i].SeriesID = info.At, info.Series
+				if info.Latest {
+					sel.page[i].EarlierDigests = info.Earlier
+				}
 			}
 		}
 	}

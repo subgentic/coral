@@ -166,6 +166,7 @@ func TestStarredFirstPutsTheStarredSeriesAtItsNewestVersionOnTheFirstPage(t *tes
 	assert.Equal(t, "2026-11-06T10:00:00Z", first["starred_at"])
 	assert.NotEmpty(t, first["series_id"])
 	assert.EqualValues(t, 1, out["starred_total"])
+	assert.Equal(t, []any{doc[0], doc[1]}, first["earlier_digests"], "the older versions, oldest first, so a decision on this row can settle them")
 	assert.Len(t, rows, 2, "the page is the limit: the pin and the newest of the rest")
 	cursor, _ := out["next_cursor"].(string)
 	require.NotEmpty(t, cursor)
@@ -311,4 +312,49 @@ func TestTheTeamFilterTakesBoardIdsIncludingTheNoTeamKey(t *testing.T) {
 			assert.NotEqual(t, "alpha", a.(map[string]any)["board_id"], "the no-team key asks for the no-team files only: "+q)
 		}
 	}
+}
+
+// #13910, per-person stars (the Operator approved a mock with them): the owner key's stars are the original table's and an upgrade loses none; another person's are their own and never shown to the owner key, nor the
+// owner key's to them. The person is the verified one the opened version uses.
+func TestStarsArePerPersonAndTheOwnerKeysAreTheOriginalTable(t *testing.T) {
+	p := newPinnedRig(t)
+	k := p.k
+	_, d := threeVersions(t, k)
+	ctx := context.Background()
+	other := "hub:org-1:u1"
+	_, err := k.h.star(ctx, ownerPersonKey, d[0])
+	require.NoError(t, err)
+	_, err = k.h.star(ctx, other, d[2])
+	require.NoError(t, err)
+	var n int
+	require.NoError(t, k.h.db.Reader().GetContext(ctx, &n, "SELECT COUNT(*) FROM artifact_stars"))
+	assert.Equal(t, 1, n, "the owner key's star is in the original table")
+	require.NoError(t, k.h.db.Reader().GetContext(ctx, &n, "SELECT COUNT(*) FROM artifact_person_stars"))
+	assert.Equal(t, 1, n)
+
+	own, err := k.h.bs.StarredArtifactTimes(ctx, ownerPersonKey)
+	require.NoError(t, err)
+	assert.Equal(t, 1, len(own))
+	assert.Contains(t, own, d[0])
+	mine, err := k.h.bs.StarredArtifactTimes(ctx, other)
+	require.NoError(t, err)
+	assert.Equal(t, 1, len(mine))
+	assert.Contains(t, mine, d[2], "another person sees only their own")
+	nobody, err := k.h.bs.StarredArtifactTimes(ctx, "hub:org-1:u2")
+	require.NoError(t, err)
+	assert.Empty(t, nobody, "and a third person sees none of either")
+
+	// the lists read the caller's: the local dashboard is the owner key
+	ids, err := k.h.starredArtifactIDs(ctx, ownerPersonKey)
+	require.NoError(t, err)
+	assert.Len(t, ids, 3, "the owner key's star on version one follows the series")
+	ids, err = k.h.starredArtifactIDs(ctx, "hub:org-1:u2")
+	require.NoError(t, err)
+	assert.Empty(t, ids)
+
+	// an unstar by one person clears only theirs
+	_, err = k.h.unstar(ctx, other, d[2])
+	require.NoError(t, err)
+	own, _ = k.h.bs.StarredArtifactTimes(ctx, ownerPersonKey)
+	assert.Contains(t, own, d[0], "the owner key's star is untouched by another person's unstar")
 }

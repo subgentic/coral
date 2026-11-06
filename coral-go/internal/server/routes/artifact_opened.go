@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/cloud"
 )
 
@@ -65,7 +66,7 @@ func (h *SessionsHandler) openedArtifactRoute(w http.ResponseWriter, r *http.Req
 }
 
 // ownerPersonKey is the person key of the machine's owner on a personal computer: the local dashboard and the Hub owner are the same person, so opening a file at either says the same thing.
-const ownerPersonKey = "owner"
+const ownerPersonKey = board.OwnerPersonKey
 
 // openedPersonKey is who an opened version belongs to, from the VERIFIED identity only, never a body or a query value. On a personal computer the local dashboard or command line and the Hub owner share one constant key
 // (ownerPersonKey). On a team's computer (where the owner check passes for the organisation) it is the Hub user's stable id inside the organisation the machine's own record matched, so two people of one organisation

@@ -277,7 +277,7 @@ func (h *SessionsHandler) listAllArtifacts(w http.ResponseWriter, r *http.Reques
 		starredFilter = &b
 	}
 	rows := listAllArtifactRows(h.cfg.CoralDir())
-	stars, serr := h.starredArtifactIDs(r.Context())
+	stars, serr := h.starredArtifactIDs(r.Context(), openedPersonKey(r))
 	if serr != nil { // a failed star read is an error, never a list that quietly shows nothing starred (#13910)
 		errInternalServer(w, "could not read the stars")
 		return
@@ -334,7 +334,7 @@ func (h *SessionsHandler) listAllArtifacts(w http.ResponseWriter, r *http.Reques
 }
 
 // starredArtifactIDs is the set of artifact ids that count as starred (#9819): each starred artifact and, since the star follows the series (#13910), every version of its series. An error means the answer is unknown.
-func (h *SessionsHandler) starredArtifactIDs(ctx context.Context) (map[string]bool, error) {
+func (h *SessionsHandler) starredArtifactIDs(ctx context.Context, person string) (map[string]bool, error) {
 	out := map[string]bool{}
 	if h.db == nil {
 		return out, nil
@@ -343,7 +343,13 @@ func (h *SessionsHandler) starredArtifactIDs(ctx context.Context) (map[string]bo
 		Hex string `db:"hex"`
 		At  string `db:"starred_at"`
 	}
-	if err := h.db.Reader().SelectContext(ctx, &rows, "SELECT hex, starred_at FROM artifact_stars"); err != nil {
+	var err error
+	if person == "" || person == ownerPersonKey {
+		err = h.db.Reader().SelectContext(ctx, &rows, "SELECT hex, starred_at FROM artifact_stars")
+	} else {
+		err = h.db.Reader().SelectContext(ctx, &rows, "SELECT hex, starred_at FROM artifact_person_stars WHERE person = ?", person)
+	}
+	if err != nil {
 		return nil, err
 	}
 	times := make(map[string]string, len(rows))
