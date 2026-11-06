@@ -27,7 +27,7 @@ const id = n => n.toString(16).padStart(64, '0');
                 const mk = (n, name, mins, extra) => ({ id: '' + n.toString(16).padStart(64, '0'), name, media_type: 'text/plain', size: 30, created_at: new Date(Date.now() - mins * 60000).toISOString(), task_id: 0, source: 'upload', available: true, session_id: 'w' + n, produced_by: 'Writer ' + n, tags: ['for review', 'internal'], uri: 'coral://artifacts/' + n.toString(16).padStart(64, '0'), ...extra });
                 window.__items = [mk(1, 'With goal.md', 20, { goal_id: ${global.GID}, goal_title: 'Ship the pilot' }), mk(2, 'No goal.md', 10, {})];
                 const R = window.fetch, json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } }));
-                window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin);
+                window.fetch = (url, opts = {}) => { const u = window.__reviewFixtureURL(String(url), location.origin);
                     if (u.pathname === '/api/board/${team}/artifacts' && (opts.method || 'GET') === 'GET') { const t = u.searchParams.get('tag'); return json({ project: '${team}', artifacts: window.__items.filter(a => !t || a.tags.includes(t)), has_more: false }); }
                     if (u.pathname.startsWith('/api/artifacts/') && /^[0-9a-f]{64}$/.test(u.pathname.split('/')[3]) && (u.pathname.split('/').length === 4 || u.pathname.split('/')[4] === 'content')) return Promise.resolve(new Response('preview text', { headers: { 'Content-Type': 'text/plain' } }));
                     return R(url, opts); };

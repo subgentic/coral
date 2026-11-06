@@ -19,7 +19,7 @@ const { coralReady } = require('./helpers/wait');
             const hex = n => n.toString(16).padStart(64, '0');
             const item = i => ({ id: hex(i), name: 'bulk-0' + i + '.md', media_type: 'text/markdown', size: 30, created_at: new Date(Date.now() - (9 - i) * 60000).toISOString(), source: 'upload', available: true, tags: ['for review', 'internal'], uri: 'coral://artifacts/' + hex(i), produced_by: 'Writer', session_id: 's' + i });
             window.__items = [1, 2, 3].map(item); window.__ntDelay = 0;
-            window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin), method = (opts.method || 'GET').toUpperCase();
+            window.fetch = (url, opts = {}) => { const u = window.__reviewFixtureURL(String(url), location.origin), method = (opts.method || 'GET').toUpperCase();
                 if (u.pathname.startsWith('/api/artifacts/')) return Promise.resolve(new Response('Review preview text', { headers: { 'Content-Type': 'text/plain' } }));
                 if (u.pathname === '/api/team-artifacts') return new Promise(done => setTimeout(() => done(json({ artifacts: [], has_more: false })), window.__ntDelay || 0));
                 const m = u.pathname.match(/^\\/api\\/board\\/bulk\\/artifacts(?:\\/([0-9a-f]{64})\\/review)?$/);

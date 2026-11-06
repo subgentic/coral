@@ -1,12 +1,13 @@
-/* The star on an artifact row (#9834, #9819): a bookmark, find it again in Starred only. At a mouse a row shows the empty star as a button when it is hovered or has the keyboard, and a starred row always
- * shows the filled one; on a phone the row has no control (the star is in the item) and a starred row keeps the glyph, which is not a button there. The glyph is hidden from a screen reader: the row's name
- * ends ", starred". The call is the one the detail pane makes: PUT or DELETE /api/artifacts/<digest>/star (on this computer's store, and the owner's through Coral Hub). */
+/* One artifact bookmark: the Starred folder and, while the document needs
+ * review, a pin above Needs you's goal groups (#13889). Review rows expose a
+ * 44px button on phones too; other artifact lists retain their existing layout.
+ * Writes use the document's source computer and the existing star endpoint. */
 import { showToast } from './utils.js';
 import { serverFetch } from './server_base.js';
 import { serverOf } from './inbox_servers.js';
 
 /** One row's star control. item.starred is read and kept; `name` is the artifact's name for the button's words and the failure. onChange(on) runs after the server says yes. */
-export function starControl(item, { hex, name, onChange } = {}) {
+export function starControl(item, { hex, name, onChange, reviewPin = false } = {}) {
     if (!hex) return null;
     const b = document.createElement('button');
     b.type = 'button';
@@ -15,15 +16,18 @@ export function starControl(item, { hex, name, onChange } = {}) {
         b.className = `dt-star${on ? ' dt-star-on' : ''}`;
         b.setAttribute('aria-pressed', String(on));
         b.setAttribute('aria-label', `${on ? 'Remove the star from' : 'Star'} ${name}`);
-        b.title = on ? 'Starred (click to remove the star)' : 'Star: find this again in Starred only';
+        b.title = on ? 'Starred (click to remove the star)' : reviewPin ? 'Star: keep this document at the top of Needs you' : 'Star: find this again in Starred';
         b.replaceChildren(Object.assign(document.createElement('span'), { className: 'material-icons', textContent: 'star' })); // one glyph for both (the icon font has no outline star): a starred row's is brighter, and aria-pressed says it
         b.firstChild.setAttribute('aria-hidden', 'true');
     };
     paint();
     b.addEventListener('click', async (e) => {
         e.stopPropagation(); // the row opens on a click: the star is not the row
+        if (b.disabled) return;
+        b.disabled = true;
         const on = !item.starred;
         const r = await serverFetch(serverOf(item), `/api/artifacts/${hex}/star`, { method: on ? 'PUT' : 'DELETE' }).catch(() => null); // on the computer the file is on: a bare path through the Hub is the Hub's own (#12617)
+        b.disabled = false;
         if (!r || !r.ok) { showToast(`Couldn't ${on ? 'star' : 'unstar'} ${name}.`, true); return; }
         item.starred = on; paint(); onChange?.(on);
         document.dispatchEvent(new CustomEvent('artifact-star-changed')); // the Inbox's Starred folder reads its artifacts again (#10258)

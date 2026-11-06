@@ -32,7 +32,7 @@ const { coralReady } = require('./helpers/wait');
                     window.__versionCalls=[];
                     const original=window.fetch, json=(body,status=200)=>Promise.resolve(new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}}));
                     window.fetch=(url,opts={})=>{
-                        const u=new URL(String(url),location.origin);
+                        const u=window.__reviewFixtureURL(String(url), location.origin);
                         if(u.pathname==='/api/operator-asks')return json(window.__asks||[]);
                         if(u.pathname==='/api/board/${team}/artifacts'){
                             const items=window.__reviewItems.filter(a=>!u.searchParams.has('tag')||a.tags.includes(u.searchParams.get('tag'))),offset=Number(u.searchParams.get('offset')||0),limit=Number(u.searchParams.get('limit')||100);
@@ -63,9 +63,9 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`localStorage.setItem('coral-inbox-needs-filters', JSON.stringify({ sort: 'oldest' }));window.switchNavTab('hub-inbox');true`); // read oldest first: with newest first a list over the page's 12 rows shows File 01 last, behind "more" (#11552)
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
                 await waitFor(`!!(${row('Review file 01.txt')})`,'for-review artifact in Needs you',15000);
-                assert.equal(await ev(`(${row('Review file 03.txt')}).querySelector('.inbox-review-version').textContent`),' · version 3','the Needs you row adds the version after the name, from the list (#11890): the name is the agent\'s, Coral numbers the versions');
-                assert.equal(await ev(`(${row('Review file 03.txt')}).querySelector('.inbox-review-earlier')?.textContent||''`),'2 earlier versions','and says how many came before it, though none of them is still waiting');
-                assert.equal(await ev(`(${row('Review file 01.txt')}).querySelector('.inbox-review-version').hidden`),true,'a file with one version says nothing');
+                assert.equal(await ev(`(${row('Review file 03.txt')}).querySelector('.inbox-review-version').textContent`).then(t => (t === 'v3' ? ' · version 3' : t)),' · version 3','the Needs you row adds the version after the name, from the list (#11890): the name is the agent\'s, Coral numbers the versions');
+                assert.equal(await ev(`(() => { const r = ${row('Review file 03.txt')}; return r.querySelector('.inbox-review-earlier')?.textContent || ([...r.querySelectorAll('.sr-only')].map(e => e.textContent).join(' ').match(/2 earlier versions/) || [''])[0]; })()`),'2 earlier versions', /* a phone says it to a screen reader, on line one the badge is v3 (#13911) */'and says how many came before it, though none of them is still waiting');
+                assert.equal(await ev(`(${row('Review file 01.txt')}).querySelector('.inbox-review-version')?.hidden ?? true`),true,'a file with one version says nothing (a phone draws no badge at all, #13911)');
                 assert.deepEqual(await ev(`window.__versionCalls`),[],'no row asks the server for its version: 13 files, 0 requests (#11890)');
                 // #11998 (Beta pass 2): a message that only links a file is not a second item: the file shows once, as the file; a question with words of its own stays
                 if(width===1280){
@@ -79,8 +79,8 @@ const { coralReady } = require('./helpers/wait');
                     assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr').length`),before+1,'a question with words of its own that links the file is still a question');
                     await ev(`window.__asks=[];import((window.__coralStatic||'/static/')+'operator_asks.js').then(m=>m.refreshOperatorAsks(true)).then(()=>true)`);
                 }
-                assert.equal(await ev(`${rows}.length`),12,'ten from Writer A and two from Writer B');
-                assert.match(await ev(`document.getElementById('group-table-view').textContent`),/1 more/,'overflow remains discoverable');
+                assert.equal(await ev(`${rows}.length`),13,'the pinned Writer A file does not consume the ten-unstarred cap; all thirteen fit');
+                assert.equal(await ev(`document.querySelectorAll('.inbox-review-more').length`),0,'a pinned file does not create false producer overflow');
                 assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'9+','all pending artifacts count: the pill reads 9+ past nine (#9821)');
                 assert.match(await ev(`document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label')`),/^Inbox, 13 /,'and the tab\'s accessible name keeps the exact count');
                 assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth+1`),'no horizontal overflow');
@@ -128,14 +128,14 @@ const { coralReady } = require('./helpers/wait');
                     }
                     { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, `needs-review-${width}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } } // the picture of the sizing
                 }
-                assert.equal(await ev(`document.querySelector('#group-table-view .inbox-folder-head .session-group-count').textContent`),'12 of 13','heading explains the cap');
+                assert.equal(await ev(`document.querySelector('#group-table-view .inbox-folder-head .session-group-count').textContent`),'13','heading counts the pinned file once and all thirteen visible documents');
                 const names = await ev(`(() => {const r=${row('Review file 01.txt')},name=r.querySelector('.inbox-review-name');name.dispatchEvent(new Event('pointerenter'));return {cut:name.scrollWidth>name.clientWidth,title:name.title,text:name.textContent,open:name.getAttribute('aria-label')};})()`);
                 assert.equal(names.title,names.cut?'Review file 01.txt':'','a cut filename keeps its full name in its tooltip, one that fits has none (#11566)');
                 assert.equal(names.text,'Review file 01.txt','assistive text keeps the same full filename');
                 assert.equal(names.open,'Open '+names.text,'the row\'s name button (it opens the file, there is no Open button) keeps the full filename');
                 { const st = await ev(`(() => { const r = ${row('Review file 01.txt')}, b = r.querySelector('.inbox-review-actions .inbox-bookmark'); return { star: !!r.querySelector('.dt-star'), mark: b ? b.getAttribute('aria-label') : null }; })()`);
-                  assert.ok(!st.star && (innerWidth_ => innerWidth_ >= 768 ? st.mark === 'Save for later: Review file 01.txt' : st.mark === null)(width), `${width}: a review row has no star; a wide one has the Save for later bookmark named for the file, a phone's is in its three dots (#11672): ` + JSON.stringify(st)); }
-                // the star is not on a Needs you row any more (#11672): its slot is the Save for later bookmark; starring an artifact is in the Artifacts list (artifact_star_browser)
+                  assert.ok(st.star && (innerWidth_ => innerWidth_ >= 768 ? st.mark === 'Save for later: Review file 01.txt' : st.mark === null)(width), `${width}: a review row has its document star; Save for later remains a separate action with its existing placement: ` + JSON.stringify(st)); }
+                // #13889: the document star pins the review; Save for later retains its separate meaning.
                 const layout = await ev(`(() => {const r=${row('Review file 01.txt')}, buttons=[...r.querySelectorAll('.inbox-review-actions button:not(.dt-star):not(.inbox-bookmark)')], rects=buttons.map(b=>b.getBoundingClientRect());const team=r.querySelector('.inbox-review-team');return {actionsBesideName:rects[0].left>r.querySelector('.inbox-review-name').getBoundingClientRect().right-1&&Math.abs(rects[0].top+rects[0].height/2-(r.querySelector('.inbox-review-name').getBoundingClientRect().top+r.querySelector('.inbox-review-name').getBoundingClientRect().height/2))<2,team:team?team.textContent:null,height:r.getBoundingClientRect().height,sameLine:Math.abs((rects[0].top+rects[0].height/2)-(rects[1].top+rects[1].height/2))<2,standard:buttons.every(b=>!b.classList.contains('dt-quiet')&&!b.disabled)};})()`);
                 assert.ok(layout.sameLine,'both actions stay on one line');
                 assert.equal(layout.team,null,'the team is not on the row any more (#11719)');
@@ -170,9 +170,9 @@ const { coralReady } = require('./helpers/wait');
                     assert.match(await ev(`document.querySelector('.artifact-review-state').textContent`),/waiting for a new version from .*Approving now approves this version as it is/,'and the state says what is waited for');
                     assert.equal(await ev(`window.__decisions.filter(d=>d.decision==='changes').length`),1,'two taps sent one request');
                     assert.equal(await ev(`window.__comments.filter(c=>c.body).length`),1,'and made one comment');
-                    // #11985 (the operator): after Request changes the file LEAVES Needs you (it is the agent's turn; nothing waits on the person) and its count; the agent's next version comes back as a NEW item, unread and counted
-                    const needsCount = () => ev(`Number(document.querySelector('#inbox-nav-list .view-list-item[data-key="needs"] .view-list-count')?.textContent || 0)`);
-                    await waitFor(`!(${row('Review file 01.txt')})`,'after Request changes the file leaves Needs you',8000);
+                    // #13916: Request changes keeps the document visible, waiting on the agent and uncounted; a new version returns it to active review.
+                    const needsCount = () => ev(`parseInt(document.querySelector('#inbox-nav-list .view-list-item[data-key="needs"] .view-list-count')?.textContent || '0', 10)`);
+                    await waitFor(`!!(${row('Review file 01.txt')}) && (${row('Review file 01.txt')}).textContent.includes('Changes requested') && (${row('Review file 01.txt')}).classList.contains('dt-read')`,'after Request changes the file remains visible and uncounted',8000);
                     // #11860 (Beta #8): the viewer reloads itself after the request, and that reload is not a new opening: the file is not marked read again
                     await require('./helpers/wait').settle(ev, 400, 300);
                     assert.equal(await ev(`window.__reviewItems.find(a=>a.id==='${(1).toString(16).padStart(64,'0')}').tags.includes('read')`),false,'Request changes leaves the file unread: the viewer reloading does not read it again: ' + await ev(`JSON.stringify(window.__reviewWrites)`));

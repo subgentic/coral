@@ -15,7 +15,7 @@ const HEX = n => String(n).repeat(64);
             window.__requests = [];
             window.__files = [1, 2].map(n => ({ id: String(n).repeat(64), uri: 'coral://artifacts/' + String(n).repeat(64), name: 'plan-' + n + '.md', media_type: 'text/markdown', source: 'upload', available: true, size: 32, produced_by: 'Writer ' + n, session_id: 's' + n, tags: ['for review'], created_at: new Date(Date.now() - n * 1000).toISOString() }));
             window.fetch = (u, o = {}) => {
-                const url = new URL(String(u), location.href), p = url.pathname; window.__requests.push(p + url.search);
+                const url = window.__reviewFixtureURL(String(u), location.href), p = url.pathname; window.__requests.push(p + url.search);
                 if (p === '/api/board/projects') return json([1, 2].map(n => ({ project: 'team-' + n, board_label: 'team-' + n, message_count: 1, subscriber_count: 1 })));
                 const t = /^\\/api\\/board\\/team-(\\d)\\/artifacts$/.exec(p);
                 if (t) { const tag = url.searchParams.get('tag'); const rows = window.__files.filter(a => a.id[0] === t[1] && (!tag || a.tags.includes(tag))); return json({ project: 'team-' + t[1], artifacts: rows, has_more: false, total: rows.length }); }

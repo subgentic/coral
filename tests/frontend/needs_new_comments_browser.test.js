@@ -11,7 +11,7 @@ const { coralReady } = require('./helpers/wait');
     const team = 'new-comments-' + Date.now().toString(36), failures = [];
     const row = name => `[...document.querySelectorAll('#group-table-view tbody tr')].find(r=>r.textContent.includes(${JSON.stringify(name)}))`;
     const badge = () => ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`);
-    const marker = name => ev(`!![...(${row(name)}).querySelectorAll('.dt-tag')].find(t => t.textContent.trim() === 'New comments')`);
+    const marker = name => ev(`!![...(${row(name)}).querySelectorAll('.inbox-new-comments')].find(t => /[1-9][0-9]* new comments?/.test(t.textContent))`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const width of [1280, 390]) {
@@ -30,7 +30,7 @@ const { coralReady } = require('./helpers/wait');
                     window.__commentsFail = false; window.__tagReads = [];
                     const original = window.fetch, json = (body, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }));
                     window.fetch = (url, opts = {}) => {
-                        const u = new URL(String(url), location.origin);
+                        const u = window.__reviewFixtureURL(String(url), location.origin);
                         if (u.pathname === '/api/board/${team}/artifacts') {
                             const tag = u.searchParams.get('tag'); window.__tagReads.push(tag);
                             const items = window.__reviewItems.filter(a => !tag || a.tags.includes(tag) || (tag === 'for review' && a.new_comments > 0 && /approved|denied/.test(a.tags.join(' ')) && !a.tags.some(x => ['saved', 'ignored', 'superseded'].includes(x)))); // the server's rule (#12097): the for-review list also holds a decided file with news
@@ -54,7 +54,7 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`window.switchNavTab('hub-inbox');true`);
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
                 await waitFor(`!!(${row('Replied file.txt')})&&!!(${row('Quiet file.txt')})&&!!(${row('Decided file.txt')})&&!!(${row('Changes file.txt')})`, 'the four files in Needs you', 15000);
-                assert.ok(!(await ev(`!!(${row('Waiting file.txt')})`)), 'a file with changes requested and no news is the agent\'s turn: not in Needs you');
+                assert.ok(await ev(`!!(${row('Waiting file.txt')}) && (${row('Waiting file.txt')}).classList.contains('dt-read')`), 'a sent-back file remains visible and uncounted while waiting on its agent');
                 assert.ok(await marker('Changes file.txt'), 'with changes requested AND an agent reply in the thread it is back, marked');
                 // the read file with news is unread again, as the same row: the marker, the unread look, and ONE number (3 = this row, the quiet one and the decided one)
                 assert.equal(await badge(), '4', 'the file with new comments counts again, once: ' + await badge());

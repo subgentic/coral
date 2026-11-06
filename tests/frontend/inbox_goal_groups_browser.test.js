@@ -1,0 +1,80 @@
+// #13888/#13889: real Needs you table, grouping, source identity and accessible pin control.
+const assert=require('node:assert/strict');const fs=require('node:fs');
+const {connect}=require('./agent_view_harness');const {coralReady,framesJs}=require('./helpers/wait');
+const {setupHubWorld}=require('./helpers/hub_world');
+const {removeBoards}=require('./helpers/board_cleanup');const BASE=require('./test_base').BASE;
+(async()=>{const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();const team='goal-groups-'+Date.now().toString(36);
+try{await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});await Page.addScriptToEvaluateOnNewDocument({source:"localStorage.removeItem('coral-inbox-group-review-goal');"});
+for(const [width,theme] of [[1280,'light'],[390,'light'],[320,'light'],[1280,'dark'],[390,'dark'],[320,'dark']]){
+ await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width<=760});await Emulation.setTouchEmulationEnabled({enabled:width<=760});
+ await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev,'startup','settings');await ev(`document.documentElement.setAttribute('data-theme',${JSON.stringify(theme)});true`);
+ await ev(`fetch('/api/board/${team}/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriber_id:'Dev',job_title:'Developer'})}).then(r=>r.status)`);
+ await ev(`(()=>{localStorage.removeItem('coral-inbox-group-review-goal');const original=window.fetch.bind(window),json=b=>Promise.resolve(Response.json(b)),hex=n=>n.toString(16).padStart(64,'0');window.__groupCalls=[];window.__groupRows=Array.from({length:13},(_,i)=>({id:hex(i+1),name:'Document '+(i+1)+'.md',uri:'coral://artifacts/'+hex(i+1),produced_by:'Developer',session_id:'same-producer',created_at:new Date(Date.now()-i*60000).toISOString(),media_type:'text/markdown',available:true,tags:['for review'],goal_id:i<2?1:i===2?2:null,goal_title:i<2?'Update reliability':i===2?'Accessibility':'',starred:i===12,series_id:'series-'+i,version:i===2?3:1,opened_version:i===2?1:undefined}));window.__openedCalls=[];for(const n of [14,15])window.__groupRows.push({id:hex(n),name:'Waiting '+n+'.md',uri:'coral://artifacts/'+hex(n),produced_by:'Waiting agent '+n,session_id:'waiting-'+n,series_id:'waiting-series-'+n,created_at:new Date(Date.now()-n*60000).toISOString(),media_type:'text/markdown',available:true,tags:['for review','changes requested'],new_comments:n===15?2:0});window.fetch=(url,opts={})=>{const u=new URL(String(url),location.href);if(u.pathname==='/api/team-artifacts'&&u.searchParams.get('team')==='${team}'&&u.searchParams.get('starred_first')==='true')return json({artifacts:u.searchParams.get('tag')==='for review'?window.__groupRows:[],has_more:false});if(u.pathname.startsWith('/api/artifacts/')&&u.pathname.endsWith('/star')){window.__groupCalls.push({path:u.pathname,method:opts.method});const a=window.__groupRows.find(a=>u.pathname.includes(a.id));a.starred=opts.method==='PUT';return json({starred:a.starred});}if(u.pathname==='/api/board/${team}/artifacts')return json({artifacts:window.__groupRows,has_more:false});if(u.pathname.startsWith('/api/board/${team}/artifacts/')&&u.pathname.endsWith('/tags')){const a=window.__groupRows.find(a=>u.pathname.includes(a.id));a.tags=JSON.parse(opts.body).tags;return json({tags:a.tags});}if(u.pathname.startsWith('/api/artifacts/')&&u.pathname.endsWith('/opened')){const a=window.__groupRows.find(a=>u.pathname.includes(a.id));window.__openedCalls.push(u.pathname);a.opened_version=a.version;return json({series_id:a.series_id,opened_version:a.version});}if(u.pathname.startsWith('/api/artifacts/')&&u.pathname.split('/').length===4)return Promise.resolve(new Response('# Loaded document',{headers:{'Content-Type':'text/markdown'}}));return original(url,opts);};return true;})()`);
+ await ev(`window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
+ await waitFor(`document.querySelectorAll('.inbox-review-star').length>=11`,'pins bypass producer cap');
+ assert.equal(await ev(`document.querySelector('.inbox-needs-results .dt-row [data-review-artifact]')?.dataset.reviewArtifact`),'d'.padStart(64,'0'),'old pinned document comes first');
+ assert.equal(await ev(`document.querySelector('.inbox-group-review-toggle input').checked`),false,'grouping initially off');
+ await ev(`document.querySelector('.inbox-group-review-toggle input').click();true`);
+ await waitFor(`document.querySelectorAll('.inbox-needs-results .dt-group').length===5`,'pins plus two goals and No goal');
+ const headings=await ev(`[...document.querySelectorAll('.inbox-needs-results .dt-group')].map(r=>r.textContent)`);
+ assert.match(headings[0],/Starred/);assert.match(headings[1],/Goal #1/);assert.match(headings[2],/Goal #2/);assert.match(headings[3],/No goal/);assert.match(headings[4],/Waiting on agent · 2 shown · 1 unread/);
+ const targets=await ev(`[...document.querySelectorAll('.inbox-review-star')].map(b=>{const r=b.getBoundingClientRect();return {width:r.width,height:r.height,pressed:b.getAttribute('aria-pressed'),pointer:getComputedStyle(b).pointerEvents};})`);
+ assert.ok(targets.every(t=>t.width>=44&&t.height>=44&&t.pointer!=='none'),JSON.stringify(targets));
+ const overlap=await ev(`(()=>{const intersect=(a,b)=>a.left<b.right-1&&a.right>b.left+1&&a.top<b.bottom-1&&a.bottom>b.top+1;return [...document.querySelectorAll('.inbox-review-star')].flatMap(b=>{const row=b.closest('tr'),icon=row.querySelector('.inbox-kind-icon'),text=row.querySelector('.inbox-review-name'),wait=row.querySelector('.inbox-review-wait');return [icon&&text&&intersect(icon.getBoundingClientRect(),text.getBoundingClientRect()),text&&intersect(b.getBoundingClientRect(),text.getBoundingClientRect()),wait&&getComputedStyle(wait).display!=='none'&&intersect(b.getBoundingClientRect(),wait.getBoundingClientRect())].filter(Boolean);});})()`);
+ assert.deepEqual(overlap,[],'icon, star and visible waiting text do not overlap at '+width+' '+theme);
+ if(width<=760)assert.ok(await ev(`[...document.querySelectorAll('.inbox-pinned-context')].every(e=>getComputedStyle(e).display==='none')&&[...document.querySelectorAll('.inbox-pinned-inline-context')].every(e=>getComputedStyle(e).display==='inline'&&!e.textContent.includes('Goal #'))`),'goal-less phone pin context stays inline without extra metadata lines');
+ if(width<=760){
+  const geometry=await ev(`(()=>{const visible=e=>e&&getComputedStyle(e).display!=='none';return [...document.querySelectorAll('.inbox-review-star-anchor.inbox-agent-first')].map(row=>{const from=row.querySelector('.inbox-review-from').getBoundingClientRect(),wait=row.querySelector('.inbox-review-wait'),name=row.querySelector('.inbox-review-name'),rect=name.getBoundingClientRect(),lh=parseFloat(getComputedStyle(name).lineHeight);return {lines:rect.height/lh,aligned:!visible(wait)||Math.abs(from.top-wait.getBoundingClientRect().top)<4,below:rect.top>=from.bottom-1};});})()`);
+  assert.ok(geometry.length>0&&geometry.every(r=>r.lines<=2.1&&r.aligned&&r.below),'review pins keep canonical sender/time then at most two description lines: '+JSON.stringify(geometry));
+ }
+ assert.equal(await ev(`document.querySelectorAll('#artifact-viewer:not([hidden])').length`),0);
+ await ev(`document.querySelector('.inbox-review-star[aria-pressed="false"]').click();true`);
+ await waitFor(`window.__groupCalls.length===1`,'one star write');
+ assert.equal(await ev(`window.__groupCalls[0].method`),'PUT');
+ assert.equal(await ev(`document.querySelectorAll('#artifact-viewer:not([hidden])').length`),0,'star does not open row');
+ assert.equal(await ev(`localStorage.getItem('coral-inbox-group-review-goal')`),'true');
+ const goalPin='1'.padStart(64,'0');
+ assert.match(await ev(`document.querySelector('[data-review-artifact="${goalPin}"] .inbox-pinned-inline-context').textContent`),/Goal #1/,'a pinned goal remains identified outside its group');
+ const pinLabel=await ev(`document.querySelector('[data-review-artifact="${goalPin}"]').getAttribute('aria-label')`);
+ assert.match(pinLabel,/Goal #1.*Update reliability/,'goal ID/title remain accessible');assert.ok(pinLabel.includes('This computer')&&pinLabel.includes(team),'full team/computer remain accessible');
+ if(width<=760)for(const font of [16,32]){
+  await ev(`document.documentElement.style.fontSize='${font}px';true`);await ev(framesJs(6));
+  const g=await ev(`(()=>{const n=document.querySelector('[data-review-artifact="${goalPin}"]'),c=n.querySelector('.inbox-pinned-inline-context'),s=n.closest('tr').querySelector('.inbox-review-star'),r=n.getBoundingClientRect(),cr=c.getBoundingClientRect(),sr=s.getBoundingClientRect(),rg=document.createRange();rg.setStart(c.firstChild,0);rg.setEnd(c.firstChild,7);const gr=rg.getBoundingClientRect(),file=n.querySelector('.inbox-pinned-filename')?.firstChild||[...n.childNodes].find(x=>x.nodeType===3&&x.textContent.startsWith('Document 1.md')),frg=document.createRange();frg.setStart(file,0);frg.setEnd(file,3);const fr=frg.getBoundingClientRect(),lh=parseFloat(getComputedStyle(n).lineHeight);return{fileVisible:fr.left>=r.left-1&&fr.right<=r.right+1&&fr.top>=r.top-1&&fr.bottom<=r.bottom+1,lines:r.height/lh,contextLines:cr.height/parseFloat(getComputedStyle(c).lineHeight),goalVisible:gr.right<=cr.right+1&&gr.top>=r.top-1&&gr.bottom<=r.bottom+1,inside:cr.left>=r.left-1&&cr.right<=r.right+1&&cr.bottom<=r.bottom+1,separate:r.right<=sr.left+1,sourceWhole:${font===32}||(()=>{const q=document.createRange();q.selectNodeContents(c);return q.getBoundingClientRect().right<=cr.right+1;})()};})()`);
+  assert.ok(g.fileVisible&&g.lines<=2.1&&g.contextLines<=2.1&&g.goalVisible&&g.inside&&g.separate&&g.sourceWhole,'goal pin keeps the cap, goal visibility and separate star at '+width+' / '+font+': '+JSON.stringify(g));
+  if(process.env.CORAL_SCREENSHOT_DIR){await ev(`document.querySelector('[data-review-artifact="${goalPin}"]').scrollIntoView({block:'center'});true`);fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true});fs.writeFileSync(process.env.CORAL_SCREENSHOT_DIR+'/goal-pin-'+width+'-'+font+'-'+theme+'.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}
+ }
+ await ev(`document.documentElement.style.fontSize='16px';true`);await ev(framesJs(4));
+
+ const waitingId='e'.padStart(64,'0');assert.equal(await ev(`document.querySelector('[data-review-artifact="${waitingId}"]').closest('tr').classList.contains('dt-read')`),true,'sent-back row without news is visible and uncounted');
+ const versionId='3'.padStart(64,'0');assert.match(await ev(`document.querySelector('[data-review-artifact="${versionId}"]').getAttribute('aria-label')`),/New version v3/);
+ await ev(`document.querySelector('[data-review-artifact="${versionId}"]').click();true`);
+ await waitFor(`window.__openedCalls.length===1`,'successfully rendered version is recorded');
+ await ev(`document.querySelector('.artifact-viewer-close').click();true`);
+ await waitFor(`!document.querySelector('[data-review-artifact="${versionId}"]')?.getAttribute('aria-label').includes('New version v3')`,'new version mark clears after actual open');
+ await ev(`document.querySelector('[data-review-artifact="${waitingId}"]').closest('tr').querySelector('.inbox-review-star').click();true`);
+ await waitFor(`window.__groupCalls.length===2`,'waiting document can be starred too');
+ assert.equal(await ev(`document.querySelector('[data-review-artifact="${waitingId}"]').closest('tr').classList.contains('dt-read')`),true,'pinning a waiting document does not count it');
+ assert.ok(await ev(`[...document.querySelectorAll('.inbox-needs-results .dt-row')].findIndex(r=>r.querySelector('[data-review-artifact="${waitingId}"]'))<3`),'starred waiting document is in the top pinned section');
+ const overflow=await ev(`document.documentElement.scrollWidth>innerWidth+1`);assert.equal(overflow,false,'no horizontal overflow at '+width);
+ if(process.env.CORAL_SCREENSHOT_DIR){fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true});fs.writeFileSync(process.env.CORAL_SCREENSHOT_DIR+'/goal-groups-'+width+'-'+theme+'.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));await ev(`[...document.querySelectorAll('.inbox-needs-results .dt-group')].find(g=>g.textContent.startsWith('Waiting on agent'))?.scrollIntoView({block:'center'});true`);fs.writeFileSync(process.env.CORAL_SCREENSHOT_DIR+'/waiting-on-agent-'+width+'-'+theme+'.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}
+}
+await setupHubWorld({client,Page,Emulation,width:1280,height:900,mobile:false,inbox:'native',needs:true,hubPages:true});
+for(const width of [1280,390,320]){
+ await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width<=760});await Emulation.setTouchEmulationEnabled({enabled:width<=760});
+ await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev,'startup','settings');
+ await ev(`(()=>{const original=window.fetch.bind(window),json=b=>Promise.resolve(Response.json(b));window.__remoteStars=[];window.fetch=(url,opts={})=>{const u=new URL(String(url),location.href),source=u.pathname.includes('/remote/m1/')?'m1':u.pathname.includes('/remote/m2/')?'m2':null;if(source&&u.pathname.endsWith('/api/team-artifacts')&&u.searchParams.get('team')==='same-team'&&u.searchParams.get('starred_first')==='true')return json({artifacts:u.searchParams.get('tag')==='for review'?[{id:'a'.repeat(64),uri:'coral://artifacts/'+'a'.repeat(64),name:'Same title.md',series_id:'same-series-id',produced_by:'Developer',session_id:'same-producer',available:true,tags:['for review'],created_at:new Date().toISOString(),goal_id:1,goal_title:'Same goal',version:3,opened_version:source==='m1'?1:3,new_comments:source==='m1'?2:0}]:[],has_more:false});if(source&&u.pathname.endsWith('/star')){window.__remoteStars.push({path:u.pathname,method:opts.method});return json({starred:true});}return original(url,opts);};return true;})()`);
+ await ev(`window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
+ await waitFor(`document.querySelectorAll('.inbox-review-star').length===2`,'both source rows in native Hub Needs you');
+ await ev(`document.querySelector('.inbox-group-review-toggle input').click();true`);
+ await waitFor(`document.querySelectorAll('.inbox-needs-results .dt-group').length===2`,'same goal id remains two source groups');
+ const sourceNews=await ev(`[...document.querySelectorAll('.inbox-needs-results .dt-row')].map(r=>({source:r.dataset.key.split(':')[0],text:r.querySelector('.inbox-review-name').getAttribute('aria-label')}))`);
+ assert.match(sourceNews.find(r=>r.source==='m1').text,/New version v3.*2 new comments/,'Laptop keeps its own newness baseline');
+ assert.doesNotMatch(sourceNews.find(r=>r.source==='m2').text,/New version|new comments/,'Desktop stays independently opened and without news');
+ const labels=await ev(`[...document.querySelectorAll('.inbox-needs-results .dt-group')].map(g=>g.textContent)`);
+ assert.ok(labels.some(t=>t.includes('Laptop'))&&labels.some(t=>t.includes('Desktop')),JSON.stringify(labels));
+ await ev(`document.querySelector('tr[data-key^="m2:"] .inbox-review-star').click();true`);
+ await waitFor(`window.__remoteStars.length===1`,'Hub source-scoped star');
+ assert.deepEqual(await ev(`window.__remoteStars`),[{path:'/api/remote/m2/api/artifacts/'+'a'.repeat(64)+'/star',method:'PUT'}]);
+}
+console.log('PASS grouping and star pins on desktop/phone plus two-computer Hub routing, producer overflow and row isolation');
+}finally{await removeBoards(ev,[team]).catch(()=>{});await client.close();}})().catch(e=>{console.error(e);process.exit(1);});

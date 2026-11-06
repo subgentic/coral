@@ -26,7 +26,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 const hex = n => n.toString(16).padStart(64, '0');
                 const item = i => ({ id: hex(i), name: 'plan-' + i + '.md', media_type: 'text/markdown', size: 30, created_at: new Date(Date.now() - (9 - i) * 60000).toISOString(), source: 'upload', available: true, tags: ['for review'], uploader: 'Plan Writer', produced_by: 'Plan Writer', review_question: 'Ship plan ' + i + '?' });
                 window.__items = [1, 2, 3].map(item); window.__calls = [];
-                window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin), method = (opts.method || 'GET').toUpperCase(), m = u.pathname.match(/^\\/api\\/board\\/${team}\\/artifacts(?:\\/([0-9a-f]{64})\\/(review|tags))?$/);
+                window.fetch = (url, opts = {}) => { const u = window.__reviewFixtureURL(String(url), location.origin), method = (opts.method || 'GET').toUpperCase(), m = u.pathname.match(/^\\/api\\/board\\/${team}\\/artifacts(?:\\/([0-9a-f]{64})\\/(review|tags))?$/);
                     if (method !== 'GET' && /^\\/api\\/board\\//.test(u.pathname)) window.__calls.push({ method, path: u.pathname.replace('/api/board/${team}', ''), body: opts.body ? JSON.parse(opts.body) : null });
                     if (!m) return original(url, opts);
                     if (!m[1]) return json({ project: '${team}', artifacts: window.__items.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))), has_more: false });
@@ -45,8 +45,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(framesJs(3));
             const dots = file => ev(`(() => { document.querySelector('${T} button[aria-label="More actions for ${file}"]').click(); return true; })()`);
             // the three dots: Save for later
-            if (!mobile) { // a wide row's star slot is the bookmark (#11672); the row's dots have no such item
-                check(await ev(`!document.querySelector('${T} .dt-star') && !!document.querySelector('${T} button.inbox-bookmark[aria-label="Save for later: plan-1.md"]')`), at + 'the row has a Save for later bookmark and no star');
+            if (!mobile) { // Save for later remains separate from the review pin.
+                check(await ev(`!!document.querySelector('${T} .dt-star') && !!document.querySelector('${T} button.inbox-bookmark[aria-label="Save for later: plan-1.md"]')`), at + 'the row has separate Save for later and review star controls');
                 await ev(`document.querySelector('${T} button.inbox-bookmark[aria-label="Save for later: plan-1.md"]').click(); true`);
             } else { // a phone's row has it in the three dots
                 await dots('plan-1.md');

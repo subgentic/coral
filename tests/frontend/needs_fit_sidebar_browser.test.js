@@ -22,7 +22,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
                 window.__reviewItems = [1, 2, 3, 4].map(mk);
                 window.__asks = [1, 2, 3].map(n => ({ board: '${team}', board_label: 'A team with a long name ' + n, kind: n === 2 ? 'wait' : 'ask', id: 40 + n, asker: 'Review Writer With A Long Name', goal_id: 7, goal_title: 'Ship the beta', task_id: 12, task_title: 'Fix the login page', text: '@Operator may I go ahead with the whole of the launch plan including the budget lines and the press release, or hold until Friday? ' + n, at: new Date(Date.now() - n * 3600000).toISOString() }));
                 const original = window.fetch, json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } }));
-                window.fetch = (url, o = {}) => { const u = new URL(String(url), location.origin);
+                window.fetch = (url, o = {}) => { const u = window.__reviewFixtureURL(String(url), location.origin);
                     if (u.pathname === '/api/operator-asks') return json(window.__asks);
                     if (u.pathname === '/api/board/${team}/artifacts') return json({ project: '${team}', artifacts: window.__reviewItems.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))), has_more: false });
                     return original(url, o); };

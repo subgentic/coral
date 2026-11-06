@@ -377,3 +377,15 @@ node artifact_viewer_callers.test.mjs
 node artifact_message_source.test.mjs
 
 node artifact_inventory_wait.test.mjs
+node inbox_review_groups.test.mjs
+node inbox_review_star_cache.test.mjs
+
+node starred_review_pages.test.mjs
+
+node inbox_review_waiting.test.mjs
+
+node review_fixture_url.test.mjs
+
+node artifact_opened_version.test.mjs
+
+node artifact_pinned_cleanup.test.mjs

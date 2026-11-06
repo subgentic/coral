@@ -24,7 +24,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 const hex = n => n.toString(16).padStart(64, '0');
                 const item = (i, read) => ({ id: hex(i), name: 'plan-' + i + '.md', media_type: 'text/markdown', size: 30, created_at: new Date(Date.now() - (9 - i) * 60000).toISOString(), source: 'upload', available: true, tags: read ? ['for review', 'read'] : ['for review'], produced_by: 'Plan Writer', review_question: 'Ship plan ' + i + '?' });
                 const items = [item(1, false), item(2, true), item(3, false), item(4, true)];
-                window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin);
+                window.fetch = (url, opts = {}) => { const u = window.__reviewFixtureURL(String(url), location.origin);
                     if ((opts.method || 'GET') === 'GET' && u.pathname === '/api/board/${team}/artifacts') return json({ project: '${team}', artifacts: items.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))), has_more: false });
                     return original(url, opts); };
                 return true; })()`);

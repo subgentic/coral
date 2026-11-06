@@ -4,12 +4,13 @@ import { setReviewCacheReader } from './ask_filter.js';
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
 import { sourcesKey, fetchProjects } from './board_fetch.js';
 import { inboxSources } from './inbox_servers.js';
-import { boardFetch, boardArtifactPage, nextArtifactPage, splitKey, serverFetch, identityKey, noteBoardLabels } from './server_base.js';
+import { boardFetch, nextArtifactPage, splitKey, serverFetch, identityKey, noteBoardLabels, normServer } from './server_base.js';
 import { teamLabel } from './server_status.js';
 import { SORT_PARAM } from './filter_model.js';
 import { hideAsksWhen } from './ask_filter.js';
 import { importOnce } from './import_once.js';
 const { createReviewPages } = await importOnce('./review_pages.js');
+const { needsReviewAttention, hasNewVersion, waitingOnAgent } = await importOnce('./inbox_review_state.js');
 
 let items = [], saved = [], muted = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => { if (typeof document !== 'undefined') document.dispatchEvent(new Event('coral:reviews-changed')); };
 let activated = false, refreshAgain = false;
@@ -19,11 +20,18 @@ onArtifactsRev(() => {
     if (pending) refreshAgain = true; else refreshReviews();
 });
 // One row per artifact (#11533): versions (same uploader, team, name) are one item, the newest, with `earlier`.
-const vkey = a => (a.session_id || a.produced_by) ? JSON.stringify([a.team, a.session_id, a.produced_by, a.name]) : a.reviewKey; // a JSON array: no name or id can run into the next field
-const UNKNOWN_AGENT = 'Unknown agent'; // what the page calls a file's producer when it has none (the group and the agent filter)
+const vkey = a => a.series_id ? JSON.stringify([a.team, 'series', a.series_id]) : (a.session_id || a.produced_by) ? JSON.stringify([a.team, a.session_id, a.produced_by, a.name]) : a.reviewKey; // a JSON array: no name or id can run into the next field
+const UNKNOWN_AGENT = 'Unknown agent';
 const byAge = (a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.reviewKey.localeCompare(b.reviewKey);
 /** The versions older than `row`, still for review. */
-export const earlierVersions = row => { const key = row.reviewKey || `${row.team}:${row.id}`, pool = saved.some(a => a.reviewKey === key) ? saved : items, me = pool.find(a => a.reviewKey === key) || row; return pool.filter(a => a.reviewKey !== key && vkey(a) === vkey(me) && byAge(a, me) < 0); }; // in the list the row is in: Needs you's, or Saved's (#11937)
+export const earlierVersions = row => {
+    const key = row.reviewKey || `${row.team}:${row.id}`, pool = saved.some(a => a.reviewKey === key) ? saved : items, me = pool.find(a => a.reviewKey === key) || row;
+    const older = new Map(pool.filter(a => a.reviewKey !== key && vkey(a) === vkey(me) && byAge(a, me) < 0).map(a => [a.hex, a]));
+    // Starred-first returns only the newest row; its authoritative older ids
+    // preserve the existing decision cleanup without fetching every version.
+    for (const hex of me.earlier_digests || []) if (/^[a-f0-9]{64}$/.test(hex) && hex !== me.hex && !older.has(hex)) older.set(hex, { ...me, id: hex, hex, version: 0, reviewKey: `${me.team}:${hex}`, earlier: undefined, earlier_digests: undefined });
+    return [...older.values()];
+};
 // Worked out once per change, not once per call (#11633): this is asked for by the badge, the folder count, the pills, the rows and the labels on every update, and the old way compared every item with every other
 // (a JSON key built for each pair): with a few hundred files for review one call took a tenth of a second, a few dozen calls a redraw, and an Approve (which redraws three times) froze the Inbox for seconds.
 // The list is rebuilt when `items` is replaced or `revision` moves (a tag written in place, a row settled), and shared between callers in between.
@@ -55,8 +63,15 @@ export const savedFiles = () => {
     savedView = collapseVersions(saved); savedFor = saved; savedRev = revision;
     return savedView;
 };
-export const isRead = a => !!(a.tags && a.tags.includes('read')) && !(a.new_comments > 0); // a read file whose Operator-started thread has agent replies not yet opened is unread again, counted once as itself (#12026)
-export const unreadReviewItems = () => reviewItems().filter(a => !isRead(a));
+export const isRead = a => !!(a.tags && a.tags.includes('read')) && !(a.new_comments > 0) && !hasNewVersion(a); // a read file whose Operator-started thread has agent replies not yet opened is unread again, counted once as itself (#12026)
+export const unreadReviewItems = () => reviewItems().filter(needsReviewAttention);
+/** Reflect an acknowledged server write across cached versions, including collapsed copies. */
+export function reviewStarChanged(row, on) {
+    const key = vkey(row);
+    for (const a of [...items, ...saved, ...muted]) if (vkey(a) === key) a.starred = on;
+    row.starred = on; revision++;
+}
+
 /** The kinds of a file for review, in the words of the quiet Muted line: a count and its noun, singular and plural (#12144). */
 const KIND_NOUNS = [['file', 'file for review', 'files for review'], ['done', 'finished request', 'finished requests'], ['release', 'release summary', 'release summaries'], ['decided', 'decision made for you', 'decisions made for you'], ['digest', 'daily digest', 'daily digests']];
 /** "2 release summaries, 1 finished request": what the Operator's switches keep out, by kind, from the muted rows; '' for none. */
@@ -86,7 +101,7 @@ export function reviewGroups(rows) {
 function reviewRowOf(a, team, seen, mutedOut = null) {
     if (splitKey(team).name === '~no-team' && a.board_id !== '~no-team') return null; // the No team list also holds files of teams with a board: only the ones with no board are its own
     const decidedWithNews = a.new_comments > 0 && (a.tags?.includes('approved') || a.tags?.includes('denied')) && !a.tags.includes('for review'); // a file the Operator decided that agents replied about in their thread: the server puts it in this list (#12097), marked and counted once
-    if (!(a.tags?.includes('for review') || decidedWithNews) || a.tags.includes('saved') || a.tags.includes('ignored') || a.tags.includes('superseded') || (a.tags.includes('changes requested') && !(a.new_comments > 0)) || !a.available || seen.has(a.id)) return null; // changes requested without news is the agent's turn (needsYouFile's rule, #11985, #12026)
+    if (!(a.tags?.includes('for review') || decidedWithNews) || a.tags.includes('saved') || a.tags.includes('ignored') || a.tags.includes('superseded') || !a.available || seen.has(a.id)) return null; // changes requested without news is the agent's turn (needsYouFile's rule, #11985, #12026)
     const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
     if (!hex) return null;
     seen.add(a.id);
@@ -97,10 +112,13 @@ function reviewRowOf(a, team, seen, mutedOut = null) {
 async function readTeam(team, mutedOut = null, stamp = {}) {
     const rows = [], seen = new Set();
     for (let at = { cursor: '', offset: 0 }, pages = 0; pages < 200; pages++) { // 50 a page, by the computer's cursor (#13161)
-        const r = await boardArtifactPage(team, 'for%20review', at);
-        if (r.status === 403 || r.status === 404) break; // inaccessible teams never contribute rows
+        const key = splitKey(team), query = new URLSearchParams({ team: key.name, tag: 'for review', starred_first: 'true', limit: '50', ...(at.cursor ? { cursor: at.cursor } : at.offset ? { offset: String(at.offset) } : {}) });
+        const r = await serverFetch(key.server, `/api/team-artifacts?${query}`);
+        if (r.status === 403) break; // owner-only lists never fall back to a less private board route
         if (!r.ok) throw new Error('Could not read review artifacts');
         const data = await r.json();
+        if (!Array.isArray(data.artifacts)) throw new Error('Review documents could not be read.');
+        if (data.partial || data.failed_boards?.length) throw new Error('Some review documents could not be read.');
         const token = artifactRevision(data.artifacts_rev);
         stamp.rev = pages === 0 ? token : stamp.rev === token ? token : null;
         for (const a of data.artifacts || []) {
@@ -108,6 +126,7 @@ async function readTeam(team, mutedOut = null, stamp = {}) {
             if (row) rows.push(row);
         }
         if (!nextArtifactPage(at, data)) break;
+        if (pages === 199) throw new Error('Review documents exceed the scan limit; the list is incomplete.');
     }
     return rows;
 }
@@ -218,7 +237,7 @@ export async function reviewOfTeam(team, digest) {
 // The Inbox owns two bounded windows per computer, not a scan of every team.
 // Facets/attention policy is layered on this metadata when its server contract is
 // present. A raw for-review total is not an authoritative attention count.
-const reviewQuery = new URLSearchParams({ tag: 'for review', versions: 'newest' }).toString();
+const reviewQuery = new URLSearchParams({ tag: 'for review', starred_first: 'true' }).toString();
 const savedQuery = new URLSearchParams({ tag: 'saved', versions: 'newest' }).toString();
 let pagesReady = false, pendingStarted = 0, finishedAt = 0, finishedRev = -1, lastSources = null, rescans = 0;
 async function readComputerPage(server, { query, cursor, limit, signal }) {
@@ -276,7 +295,7 @@ function publishPages() {
         if (source.error) failed.push(`${source.server} review artifacts could not be refreshed: ${source.error}`);
         for (const a of source.artifacts) {
             const tags = a.tags || [], decidedWithNews = a.new_comments > 0 && (tags.includes('approved') || tags.includes('denied')) && !tags.includes('for review');
-            if (!(tags.includes('for review') || decidedWithNews) || tags.includes('saved') || tags.includes('ignored') || tags.includes('superseded') || (tags.includes('changes requested') && !(a.new_comments > 0)) || !a.available) continue;
+            if (!(tags.includes('for review') || decidedWithNews) || tags.includes('saved') || tags.includes('ignored') || tags.includes('superseded') || !a.available) continue;
             (a.muted === true ? nextMuted : next).push(a);
         }
     }
@@ -378,12 +397,13 @@ const reading = new Map(); // hex -> the write in flight, so the viewer and the 
 export function markOpenedRead(hex, team = '') {
     hex = String(hex || '').toLowerCase();
     if (!hex) return Promise.resolve();
-    if (reading.has(hex)) return reading.get(hex);
+    const readKey = JSON.stringify([team, hex]);
+    if (reading.has(readKey)) return reading.get(readKey);
     const p = (async () => {
         let own = null; // the file's own row, read from its own team alone when the Inbox's scan of every team has not run (a file opened through the Hub): one team's list, not nine (#13489)
         if (!activated && team) own = await reviewOfTeam(team, hex);
         else if (!activated) await refreshReviews(true, { reuse: true }); else if (pending) await pending;
-        const row = own ? (!isRead(own) && !(own.tags || []).includes('changes requested') ? own : undefined) : items.find(a => a.hex.toLowerCase() === hex && !isRead(a) && !(a.tags || []).includes('changes requested')); // a file the Operator asked changes of waits on the agent: the viewer and the preview redraw it after the request, and that is not reading it again (#11860); it stays counted until the agent answers
+        const row = own ? (needsReviewAttention(own) || (!isRead(own) && !waitingOnAgent(own)) ? own : undefined) : items.find(a => a.hex.toLowerCase() === hex && (!team || a.team === team) && (needsReviewAttention(a) || (!isRead(a) && !waitingOnAgent(a)))); // A sent-back file with no news is visible but uncounted; automatic viewer reloads leave its read tag alone. Unseen replies can be read normally.
         if (row) {
             if (row.new_comments > 0) { // opening the file is opening its thread: the server marks the Operator's threads seen when the comments are read (#12026), so the row is read, and the count follows
                 const { listComments } = await importOnce('./artifact_comments_api.js');
@@ -394,10 +414,28 @@ export function markOpenedRead(hex, team = '') {
             }
             await setReviewRead(row, true, { fresh: !!own });
         }
-    })().finally(() => reading.delete(hex));
-    reading.set(hex, p);
+    })().finally(() => reading.delete(readKey));
+    reading.set(readKey, p);
     return p;
 }
 
+
+const openingVersions = new Map();
+/** Record only a successfully loaded viewer version, on its frozen computer.
+ * Older/refusing sources leave the baseline unknown, without a success claim. */
+export function recordOpenedVersion(hex, { server, board = '' }) {
+    const key = JSON.stringify([normServer(server), board, hex]);
+    if (openingVersions.has(key)) return openingVersions.get(key);
+    const work = (async () => {
+        const response = await serverFetch(server, `/api/artifacts/${hex}/opened`, { method: 'POST' });
+        if (!response.ok) return false;
+        const data = await response.json();
+        if (!data.series_id || !Number.isSafeInteger(data.opened_version) || data.opened_version < 1) return false;
+        const team = board ? identityKey(server, board) : '';
+        for (const row of [...items, ...saved, ...muted]) if (row.series_id === data.series_id && splitKey(row.team).server === normServer(server) && (!team || row.team === team)) row.opened_version = Math.max(row.opened_version || 0, data.opened_version);
+        revision++; changed(); return true;
+    })().catch(() => false).finally(() => openingVersions.delete(key));
+    openingVersions.set(key, work); return work;
+}
 
 setReviewCacheReader(unreadReviewItems, refreshReviews, reviewPageSummary);

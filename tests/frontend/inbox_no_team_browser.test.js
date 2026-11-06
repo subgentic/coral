@@ -20,7 +20,7 @@ const BASE = require('./test_base').BASE;
                 const original = window.fetch;
                 const json = body => Promise.resolve(new Response(JSON.stringify(body), {headers:{'Content-Type':'application/json'}}));
                 window.fetch = (url, opts = {}) => {
-                    const u = new URL(String(url), location.origin);
+                    const u = window.__reviewFixtureURL(String(url), location.origin);
                     const target = ${remote ? "'/api/remote/solo-pc'" : "''"};
                     const p = u.pathname.startsWith(target) ? u.pathname.slice(target.length) : u.pathname;
                     const item = {id:'${'ab'.repeat(32)}',name:'Solo report.txt',team:'No team',board_id:'~no-team',available:true,media_type:'text/plain',size:12,created_at:new Date().toISOString(),produced_by:'Solo writer',session_id:'solo',tags:window.__soloTags,review_question:'Is this ready to ship?'};
