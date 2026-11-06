@@ -330,6 +330,8 @@
 /* The Inbox's Artifacts folder (Goal #62): the list and, to its right, the document pane (a sheet over the page on a phone, like the team page's) */
 .inbox-artifacts-row { display: flex; align-items: flex-start; gap: var(--space-xl); min-width: 0; }
 .inbox-artifacts-main { flex: 1 1 0; min-width: 0; }
+/* The paginated list restores its own scroll on refresh; browser anchoring to a replaced detail action must not shift it afterward. */
+.group-table-view:has(.inbox-artifacts-row) { overflow-anchor: none; }
 .inbox-artifacts-list .goals-table-page { padding: 0; } /* the group page has its own padding */
 @media (min-width: 761px) {
     /* The document pane is the folder's right sidebar (#8925), not a card: it is as tall as the view, flush to its right and bottom edges (the view's padding goes while it is open), resized by its grip on the left edge

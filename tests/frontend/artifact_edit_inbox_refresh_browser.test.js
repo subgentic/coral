@@ -6,7 +6,7 @@ const { connect } = require('./agent_view_harness');
 const { launchStandIn } = require('./helpers/stand_in_agent');
 const { guardSettings } = require('./helpers/settings_guard');
 const { removeBoards } = require('./helpers/board_cleanup');
-const { coralReady } = require('./helpers/wait');
+const { coralReady, framesJs } = require('./helpers/wait');
 const BASE = require('./test_base').BASE;
 const hexOf = data => String(data.digest || data.hex || data.id || '').replace(/^sha256:/,'');
 (async () => {
@@ -49,18 +49,29 @@ const hexOf = data => String(data.digest || data.hex || data.id || '').replace(/
         await ev(`window.__listScroller=()=>{let e=document.querySelector('.inbox-artifacts-list [data-artifact-id]');while(e&&!(e.scrollHeight>e.clientHeight+20&&/(auto|scroll)/.test(getComputedStyle(e).overflowY)))e=e.parentElement;return e;};true`);
         const before=await ev(`({count:document.querySelectorAll('${rows}').length,top:window.__listScroller().scrollTop})`);assert.ok(before.top>500,'the real paginated list is scrolled');await shot('inbox-edit-paged-before');
         await nativeClick('.inbox-detail-pane .btn-primary');await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown')`,'Inbox opens stored Markdown',10000);
-        await waitFor(`!document.querySelector('.artifact-viewer-edit').hidden`,'owner edit available',10000);await edit();await waitFor(`!!document.querySelector('.amd-text')`,'editor loaded',8000);await type('careful sentence','clear sentence');await nativeClick('.amd-save');
+        await waitFor(`!document.querySelector('.artifact-viewer-edit').hidden`,'owner edit available',10000);await edit();await waitFor(`!!document.querySelector('.amd-text')`,'editor loaded',8000);await type('careful sentence','clear sentence');
+        // Hold the real post-save list read: Close must return focus before that read replaces its opener.
+        // Otherwise a fast response removes the Open button first and skips the focus-restoration branch.
+        await ev(`(()=>{const real=window.fetch;window.__releaseEditRefresh=null;const gate=new Promise(r=>window.__releaseEditRefresh=r);window.__restoreEditFetch=()=>{window.fetch=real;window.__releaseEditRefresh();};window.fetch=async(...args)=>{const u=new URL(typeof args[0]==='string'?args[0]:args[0].url,location.href);const r=await real(...args);if(u.pathname==='/api/team-artifacts'&&u.searchParams.get('q')==='${B}-inbox-report-'&&u.searchParams.get('limit')==='50'){window.__editRefreshHeld=true;await gate;}return r;};})()`);
+        await nativeClick('.amd-save');
         await waitFor(`!document.querySelector('.amd-editor') && !!document.querySelector('.artifact-viewer-version')`,'new saved version opens',10000);
         const original=target.key.match(/[a-f0-9]{64}/)?.[0];assert.ok(original,JSON.stringify(target));
         const versions=(await person('GET',`/api/artifacts/${original}/versions`)).data;assert.equal(versions.length,2);const saved=hexOf(versions.find(v=>v.is_latest)||versions[versions.length-1]);
+        await waitFor(`window.__editRefreshHeld`,'post-save list refresh held while viewer closes',10000);
         await nativeClick('.artifact-viewer-close');
+        await ev(framesJs(2));
+        const closedTop=await ev(`window.__listScroller().scrollTop`);
+        assert.ok(await ev(`document.activeElement===document.querySelector('.inbox-detail-pane .btn-primary')`),'Close restored the still-connected detail Open button');
+        await ev(`window.__restoreEditFetch()`);
+        assert.ok(Math.abs(closedTop-before.top)<2,`closing viewer retains list place before refresh: ${before.top} -> ${closedTop}`);
         await waitFor(`!![...document.querySelectorAll('${rows}')].find(r=>r.dataset.artifactId.includes('${saved}'))`,'Inbox row uses saved digest without a reload',10000);
         assert.equal(await ev(`window.__pageLifetime`),'same-page','the document was never reloaded');
+        await ev(framesJs(2)); // include the browser scroll-anchoring pass after the pane replaces its focused action
         const after=await ev(`({count:document.querySelectorAll('${rows}').length,top:window.__listScroller().scrollTop,keys:[...document.querySelectorAll('${rows}')].map(r=>r.dataset.artifactId)})`);
         assert.equal(after.count,66,'saving must keep every already-loaded page');assert.equal(new Set(after.keys).size,66,'one row per immutable series, no duplicates');assert.ok(!after.keys.some(k=>k.includes(original)),'old digest is replaced by saved version');assert.ok(Math.abs(after.top-before.top)<2,`list place retained: ${before.top} -> ${after.top}`);
         await waitFor(`document.querySelector('.inbox-detail-pane')?.textContent.includes('A clear sentence')`,'returning detail pane shows the newly saved words',8000);
         assert.ok(!await ev(`document.querySelector('.inbox-detail-pane')?.textContent.includes('A careful sentence')`),'old preview is replaced');
         await shot('inbox-edit-paged-after');
         console.log('PASS real owner save: new digest replaces old Inbox row, all 66 loaded files and scroll position retained without reload');
-    } finally { if(author)await author.stop().catch(()=>{});await removeBoards(ev,[B]);await guard.restore();await client.close(); }
+    } finally { await ev(`window.__restoreEditFetch?.()`).catch(()=>{}); if(author)await author.stop().catch(()=>{});await removeBoards(ev,[B]);await guard.restore();await client.close(); }
 })().catch(error=>{console.error(error);process.exit(1);});
