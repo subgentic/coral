@@ -211,6 +211,7 @@ node artifact_sort_words.test.mjs
 node automation_filters.test.mjs
 node inbox_servers.test.mjs
 node inbox_reviews.test.mjs
+node review_fixture.test.js
 node review_pages.test.mjs
 node review_loading.test.mjs
 node review_attention_count.test.mjs
