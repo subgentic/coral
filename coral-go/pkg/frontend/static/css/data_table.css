@@ -622,6 +622,15 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
     .dt-box.dt-folded .inbox-review-actions.inbox-slots { display: flex; flex-wrap: wrap; }
     .dt-box.dt-folded .inbox-review-actions.inbox-slots > .btn { width: auto; }
 }
+/* Folded desktop panels give Item its own line; time and actions follow below.
+ * The desktop query also excludes a touch phone turned sideways (phone_layout.js). */
+@media (min-width: 768px) and (min-height: 501px), (min-width: 768px) and (pointer: fine), (min-width: 951px) {
+    .inbox-needs-results .dt-box.dt-fold-column.dt-folded .inbox-kind-row > td[data-key="agent"] { flex: 1 1 100%; }
+    .inbox-needs-results .dt-box.dt-folded .inbox-kind-row > [data-key="waiting"],
+    .inbox-needs-results .dt-box.dt-folded .inbox-kind-row > td:has(> .inbox-review-actions) { order: 4; min-width: 0; }
+    .inbox-needs-results .dt-box.dt-folded .inbox-kind-row > [data-key="waiting"] { flex: 0 1 auto; white-space: normal; }
+    .inbox-needs-results .dt-box.dt-folded .inbox-kind-row > td:has(> .inbox-review-actions) { flex: 1 1 auto; }
+}
 /* Choices keep the full row width (#10874); only title/excerpt share the icon gutter. */
 .dt-box.dt-mail-on tr.dt-mailed:has(.dt-mail-kind) { padding-left: 0; }
 .dt-box.dt-mail-on tr.dt-mailed > td.dt-mail-kind { display: grid; grid-template-columns: 3rem minmax(0, 1fr) auto; }
