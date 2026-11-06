@@ -249,19 +249,21 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
         const LONG = 'release-notes-for-the-quarterly-security-review-of-the-hub-2026-q4-final-v2.md';
         const nameInfo = () => ev(`(() => { const h = document.querySelector('#artifact-viewer .artifact-viewer-title'), n = h.querySelector('.artifact-viewer-title-name'), r = h.getBoundingClientRect(); return { heading: h.tagName, title: h.title, role: n.getAttribute('role'), tab: n.tabIndex, expanded: n.getAttribute('aria-expanded'), open: h.classList.contains('is-open'), h: Math.round(r.height), right: Math.round(r.right), vw: innerWidth, sideways: document.documentElement.scrollWidth > innerWidth + 1, label: n.getAttribute('aria-label'), dialogName: document.getElementById('artifact-viewer').getAttribute('aria-labelledby') === 'artifact-viewer-title' && h.textContent.startsWith(${JSON.stringify(LONG)}) }; })()`);
         const key = async (k, code, vk) => { await Input.dispatchKeyEvent({ type: 'keyDown', key: k, code, windowsVirtualKeyCode: vk }); await Input.dispatchKeyEvent({ type: 'keyUp', key: k, code, windowsVirtualKeyCode: vk }); };
-        for (const [w, h, mobile, tag] of [[390, 800, true, 'phone 390'], [640, 800, false, '200% text (a 640 px window)']]) {
+        for (const [w, h, mobile, tag, rootPx] of [[390, 800, true, 'phone 390', 16], [390, 800, true, 'phone 390 at 200% text (root font size 32px)', 32], [1280, 800, false, 'desktop 1280 at 200% text (root font size 32px)', 32]]) {
             await load(w, h, mobile, 'light');
             await open(`true`, { filename: LONG });
-            await ev(`new Promise(r => setTimeout(r, 300))`); // sleep-ok: the viewer settles its layout
+            await ev(`document.documentElement.style.fontSize = '${rootPx}px'; new Promise(r => setTimeout(r, 300))`); // sleep-ok: the viewer settles its layout
+            check(`${tag}: the root font size really is ${rootPx}px`, await ev(`getComputedStyle(document.documentElement).fontSize`) === `${rootPx}px`);
+            await ev(`window.dispatchEvent(new Event('resize')); true`);
             let n = await nameInfo();
-            await shot(`long-name-closed-${w}`);
+            await shot(`long-name-closed-${w}-${rootPx}`);
             check(`${tag}: a cut name is a heading holding a focusable button, collapsed, with the whole name as its tooltip and as the dialog's name`, n.heading === 'H2' && n.role === 'button' && n.tab === 0 && n.expanded === 'false' && !n.open && n.title === LONG && n.dialogName, JSON.stringify(n));
             const h0 = n.h;
             await ev(`document.querySelector('#artifact-viewer .artifact-viewer-title-name').focus(); true`);
             await key('Enter', 'Enter', 13);
             n = await nameInfo();
             check(`${tag}: Enter opens the whole name (aria-expanded true, taller, nothing sideways)`, n.open && n.expanded === 'true' && n.h > h0 && !n.sideways && n.right <= n.vw, JSON.stringify(n));
-            await shot(`long-name-open-${w}`);
+            await shot(`long-name-open-${w}-${rootPx}`);
             await key(' ', 'Space', 32);
             n = await nameInfo();
             check(`${tag}: Space closes it again`, !n.open && n.expanded === 'false' && n.h === h0, JSON.stringify(n));
