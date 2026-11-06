@@ -17,11 +17,42 @@ const hexOf = data => String(data.digest || data.hex || data.id || '').replace(/
     const person = (method,p,body) => ev(`fetch(${JSON.stringify(p)},{method:${JSON.stringify(method)},headers:{'Content-Type':'application/json'},body:${body===undefined?'undefined':JSON.stringify(JSON.stringify(body))}}).then(async r=>({status:r.status,data:await r.json().catch(()=>({}))}))`);
     const upload = async (name, text, previous) => { const r=await fetch(BASE+`/api/agent/artifacts?session_id=${author.sid}`,{method:'POST',headers:{'X-Coral-Session-Token':author.token,'Content-Type':'application/octet-stream','X-Artifact-Name':name,'X-Artifact-Media-Type':'text/markdown',...(previous?{'X-Artifact-New-Version-Of':previous}:{})},body:Buffer.from(text)});const data=await r.json();assert.equal(r.status,201,JSON.stringify(data));return hexOf(data); };
     const bytes = hex => ev(`fetch('/api/artifacts/${hex}?v=2').then(r=>r.arrayBuffer()).then(b=>Array.from(new Uint8Array(b)))`);
-    const nativeClick = async selector => { const r=await ev(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e)throw Error('Missing '+${JSON.stringify(selector)});e.scrollIntoView({block:'nearest',inline:'nearest'});const r=e.getBoundingClientRect();const x=r.x+r.width/2,y=r.y+r.height/2;if(!e.contains(document.elementFromPoint(x,y)))throw Error('Covered '+${JSON.stringify(selector)}+' by '+document.elementFromPoint(x,y)?.outerHTML);return{x,y};})()`);await client.Input.dispatchMouseEvent({type:'mousePressed',...r,button:'left',clickCount:1});await client.Input.dispatchMouseEvent({type:'mouseReleased',...r,button:'left',clickCount:1}); };
+    const nativeClick = async selector => {
+        // Scroll first, then observe a stable, enabled hit target across layout frames.
+        const r = await ev(`new Promise((resolve,reject)=>{
+            const e=document.querySelector(${JSON.stringify(selector)});if(!e)return reject(Error('Missing '+${JSON.stringify(selector)}));
+            e.scrollIntoView({block:'nearest',inline:'nearest'});
+            let previous='',stable=0;
+            const frame=()=>{const box=e.getBoundingClientRect(),now=[box.x,box.y,box.width,box.height].join(',');
+                stable=!e.disabled&&now===previous?stable+1:0;previous=now;
+                if(stable<2)return requestAnimationFrame(frame);
+                const x=box.x+box.width/2,y=box.y+box.height/2;
+                if(!e.contains(document.elementFromPoint(x,y)))return reject(Error('Covered '+${JSON.stringify(selector)}+' by '+document.elementFromPoint(x,y)?.outerHTML));
+                resolve({x,y});};requestAnimationFrame(frame);
+        })`);
+        // The controlled late response lands after measurement in the old helper.
+        if (selector === '.artifact-viewer-edit-item' && await ev(`!!window.__mdVersionGate?.release`)) {
+            await ev(`window.__mdVersionGate.release();window.__mdVersionGate.release=null;true`);
+            await waitFor(`!!document.querySelector('.av-current')`, 'injected version chip lands', 8000);
+            const moved=await ev(`new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>{const b=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();resolve({x:b.x+b.width/2,y:b.y+b.height/2});})))`);
+            console.log('CONTROLLED VERSION RESPONSE: measured',JSON.stringify(r),'after chip',JSON.stringify(moved));
+        }
+        await client.Input.dispatchMouseEvent({type:'mousePressed',...r,button:'left',clickCount:1});await client.Input.dispatchMouseEvent({type:'mouseReleased',...r,button:'left',clickCount:1}); };
     const edit = async () => { if(await ev(`document.querySelector('.artifact-viewer-edit').getClientRects().length > 0`)) await nativeClick('.artifact-viewer-edit'); else { await nativeClick('.artifact-viewer-more'); await waitFor(`!document.querySelector('.artifact-viewer-menu').hidden`,'phone More actions',5000); await nativeClick('.artifact-viewer-edit-item'); } };
     const type = async (oldText,newText) => { await ev(`(()=>{const e=[...document.querySelectorAll('.amd-text')].find(e=>e.textContent===${JSON.stringify(oldText)});if(!e)throw Error('No editable words');e.focus();const r=document.createRange();r.selectNodeContents(e);const s=getSelection();s.removeAllRanges();s.addRange(r);})()`);await client.Input.insertText({text:newText}); };
     const shot = async name => { const dir=process.env.CORAL_SCREENSHOT_DIR;if(!dir)return;fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,name+'.png'),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64')); };
-    const open = async (hex,name) => { await ev(`import((window.__coralStatic||'/static/')+'artifact_viewer.js').then(v=>v.openArtifactViewer('${hex}',{board:'${B}',server:'local',filename:${JSON.stringify(name)},mediaType:'text/markdown'}))`);await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown')`,'the real Markdown document',10000); };
+    const open = async (hex,name,version=0) => { await ev(`import((window.__coralStatic||'/static/')+'artifact_viewer.js').then(v=>v.openArtifactViewer('${hex}',{board:'${B}',server:'local',filename:${JSON.stringify(name)},mediaType:'text/markdown'}))`);await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown')`,'the real Markdown document',10000);
+        if(version) {
+            // A cold versions read can add a header row and move the phone menu.
+            // Release the real response before hit-testing; the mutation proof removes this readiness block.
+            if(await ev(`!!window.__mdVersionGate`)) {
+                await waitFor(`!!window.__mdVersionGate.release`,'real versions response is held',8000);
+                await ev(`window.__mdVersionGate.release();window.__mdVersionGate.release=null;true`);
+            }
+            await waitFor(`document.querySelector('.av-current')?.getAttribute('aria-label')?.startsWith('Version: v${version} of ')`,'version header ready before Edit',8000);
+            await ev(`delete window.__mdVersionGate;true`);
+        }
+    };
     try {
         assert.ok(process.env.CORAL_TEST_DATA_DIR,'isolated runner only');
         await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
@@ -58,7 +89,12 @@ const hexOf = data => String(data.digest || data.hex || data.id || '').replace(/
             assert.deepEqual(await ev(`[...document.querySelectorAll('.av-add ins,.av-del del')].map(e=>e.textContent)`),['A **careful sentence** stays in this report.\r','A **clear sentence** stays in this report.\r']);
             await shot(`markdown-edit-saved-diff-${w}-${font}${reference?'-reference':''}`);
             // Return to the stored file, then verify a newer agent version cannot be overwritten.
-            await open(savedHex,name);await waitFor(`!!document.querySelector('.artifact-viewer-edit') && !document.querySelector('.artifact-viewer-edit').hidden`,'Edit saved version',8000);await edit();await waitFor(`!!document.querySelector('.amd-text')`,'edit before conflict',8000);
+            if(w===390 && font===32) {
+                // Force a genuinely cold read on the already-saved file. The response bytes are untouched.
+                await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev,'startup','liveList','liveListLoaded','settings');
+                await ev(`document.documentElement.dataset.theme='${theme}';document.documentElement.style.fontSize='${font}px';(()=>{const real=window.fetch,gate=window.__mdVersionGate={};window.fetch=async(u,o)=>{const r=await real(u,o);if(new URL(String(u),location.href).pathname==='/api/artifacts/${savedHex}/versions'&&!gate.used){gate.used=true;await new Promise(resolve=>gate.release=resolve);}return r;};})()`);
+            }
+            await open(savedHex,name,2);await waitFor(`!!document.querySelector('.artifact-viewer-edit') && !document.querySelector('.artifact-viewer-edit').hidden`,'Edit saved version',8000);await edit();await waitFor(`!!document.querySelector('.amd-text')`,'edit before conflict',8000);
             await type('clear sentence','my sentence');await ev(`document.activeElement.blur()`);
             const theirs=expected.replace('Unchanged second line.','Another agent changed this line.');const newer=await upload(name,theirs,savedHex);
             await nativeClick('.amd-save');await waitFor(`!!document.querySelector('.amd-reapply,.amd-save-after')`,'server-side 409 keeps the draft',10000);
@@ -69,7 +105,7 @@ const hexOf = data => String(data.digest || data.hex || data.id || '').replace(/
             const latestList=(await person('GET',`/api/artifacts/${original}/versions`)).data;assert.equal(latestList.length,4);let final=latestList.find(v=>v.is_latest)||latestList[latestList.length-1];assert.deepEqual(Buffer.from(await bytes(hexOf(final))),Buffer.from(theirs.replace('clear sentence','my sentence')),'reapply retains the agent change in the other block');
             // A changed edited block must never be overwritten: no second POST until the person redoes it on latest.
             const merged=theirs.replace('clear sentence','my sentence');
-            await open(hexOf(final),name);await waitFor(`!!document.querySelector('.artifact-viewer-edit') && !document.querySelector('.artifact-viewer-edit').hidden`,'Edit for same-block conflict',8000);await edit();await waitFor(`!!document.querySelector('.amd-text')`,'same-block editor',8000);await type('my sentence','my unsaved sentence');await ev(`document.activeElement.blur()`);
+            await open(hexOf(final),name,final.version);await waitFor(`!!document.querySelector('.artifact-viewer-edit') && !document.querySelector('.artifact-viewer-edit').hidden`,'Edit for same-block conflict',8000);await edit();await waitFor(`!!document.querySelector('.amd-text')`,'same-block editor',8000);await type('my sentence','my unsaved sentence');await ev(`document.activeElement.blur()`);
             const changedBlock=merged.replace('my sentence','agent sentence'), changedHex=await upload(name,changedBlock,hexOf(final));
             await nativeClick('.amd-save');await waitFor(`!!document.querySelector('.amd-reapply,.amd-save-after')`,'same-block 409',8000);await nativeClick('.amd-reapply,.amd-save-after');
             await waitFor(`!!document.querySelector('.amd-kept:not([hidden])')`,'changed block keeps the draft and opens latest for redo',8000);
@@ -84,7 +120,7 @@ const hexOf = data => String(data.digest || data.hex || data.id || '').replace(/
             // Agent token is rejected by the real owner write route, even with a correct expected digest.
             const refused=await fetch(BASE+`/api/board/${B}/artifacts/${original}/edit?expected_latest=${hexOf(final)}`,{method:'POST',headers:{'X-Coral-Session-Token':author.token,'Content-Type':'text/markdown',Origin:BASE},body:Buffer.from('no permission')});assert.equal(refused.status,403);
             // Cancel and Escape must not silently discard a draft.
-            await open(hexOf(final),name);await waitFor(`!!document.querySelector('.artifact-viewer-edit') && !document.querySelector('.artifact-viewer-edit').hidden`,'Edit for guard',8000);await edit();await waitFor(`!!document.querySelector('.amd-text')`,'guard editor',8000);await type('redone sentence','unsaved sentence');
+            await open(hexOf(final),name,final.version);await waitFor(`!!document.querySelector('.artifact-viewer-edit') && !document.querySelector('.artifact-viewer-edit').hidden`,'Edit for guard',8000);await edit();await waitFor(`!!document.querySelector('.amd-text')`,'guard editor',8000);await type('redone sentence','unsaved sentence');
             await ev(`document.querySelector('.amd-save').focus()`);await client.Input.dispatchKeyEvent({type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});await client.Input.dispatchKeyEvent({type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});await waitFor(`!!document.querySelector('.amd-discard[open]')`,'discard prompt',5000);await nativeClick('.amd-discard .btn:not(.btn-danger)');await waitFor(`!document.querySelector('.amd-discard')`,'Keep editing closes only the prompt',5000);assert.ok(await ev(`document.querySelector('.amd-document').textContent.includes('unsaved sentence')`));
             await nativeClick('.amd-cancel');await waitFor(`!!document.querySelector('.amd-discard[open]')`,'Cancel asks before discarding',5000);await nativeClick('.amd-discard .btn-danger');await waitFor(`!document.querySelector('.amd-editor')`,'discard only after confirmation',5000);await nativeClick('.artifact-viewer-close');
             console.log(`PASS real save/byte diff, conflict, safe reapply, same-block refusal/redo, agent refusal and discard guard ${w}px ${theme} ${font}px${reference?' with repeated reference definition':''}`);
