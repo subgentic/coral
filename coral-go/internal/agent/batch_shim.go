@@ -256,14 +256,14 @@ func withoutPromptForBatch(parts, raw []string) (outParts, outRaw []string, noti
 // maxPlainLineLen is the most the arguments of a .cmd may total (cmd.exe's line is 8191 characters; this leaves a wide margin for what PowerShell adds).
 const maxPlainLineLen = 3000
 
-// plainPromptChar reports whether cmd.exe reads c as itself inside double quotes, and as itself outside them: an ASCII letter or digit, a space, or one of . , : ; - _ + = / ? ( ).
+// plainPromptChar reports whether c is one cmd.exe reads as itself inside double quotes (plainPromptFileLen requires the prompt to hold a space, so PowerShell always quotes it): an ASCII letter or digit, a space, or one of the ten marks . , : ; - _ + = / ? (no parenthesis: a wrapper that runs %* inside an IF ( ) block would end the block at a ")").
 // Never a quote, backslash, % ^ & | < > ! $ ` ' @ # ~, a line break, any other control character, or a character beyond ASCII.
 func plainPromptChar(c rune) bool {
 	switch {
 	case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9', c == ' ':
 		return true
 	}
-	return strings.ContainsRune(".,:;-_+=/?()", c)
+	return strings.ContainsRune(".,:;-_+=/?", c)
 }
 
 // plainPromptFileLen reads the prompt file that the prompt argument arg (the syntax promptArg wrote) names, and returns its length and whether every character is plain (plainPromptChar).
@@ -288,12 +288,15 @@ func plainPromptFileLen(arg string) (int, bool) {
 	if n == 0 || n > maxPlainLineLen {
 		return n, false
 	}
+	// At least one space: PowerShell wraps an argument in double quotes only when it holds a space or a tab, and inside quotes these marks are literal to cmd.exe.
+	spaced := false
 	for _, c := range string(buf[:n]) {
 		if !plainPromptChar(c) {
 			return n, false
 		}
+		spaced = spaced || c == ' '
 	}
-	return n, true
+	return n, spaced
 }
 
 func fileExists(p string) bool {

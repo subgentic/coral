@@ -288,7 +288,7 @@ func TestAPlainPromptStillReachesAWrapperThatIsNotNpms(t *testing.T) {
 	if p := os.Getenv("CORAL_TEST_PWSH7"); p != "" {
 		shells["pwsh"] = p
 	}
-	plain := "Summarize the open tasks (all of them), then list: first, second; third = done? yes/no - 100 + 20_5."
+	plain := "Summarize the open tasks, all of them, then list: first, second; third = done? yes/no - 100 + 20_5."
 	for shellName, ps := range shells {
 		t.Run(shellName, func(t *testing.T) {
 			t.Setenv("CORAL_SHELL", ps)
@@ -297,7 +297,11 @@ func TestAPlainPromptStillReachesAWrapperThatIsNotNpms(t *testing.T) {
 				reaches    bool
 			}{
 				{"plain", plain, true},
-				{"one word", "hello", true},
+				{"one word", "hello", false},
+				{"one word with parentheses", "done)", false},
+				{"one word with = and ,", "a=b,c", false},
+				{"one word with a semicolon", "a;b", false},
+				{"two words", "hello there", true},
 				{"board join prompt", BuildBoardActionPrompt("diagnostic-board", "", "", nil, ""), false},
 				{"a quote", `say "hi"`, false},
 				{"a percent", "use 50% of it", false},
@@ -306,6 +310,7 @@ func TestAPlainPromptStillReachesAWrapperThatIsNotNpms(t *testing.T) {
 				{"a pipe", "a | b", false},
 				{"less and greater", "a < b > c", false},
 				{"an exclamation mark", "hello!", false},
+				{"a parenthesis", "a (b) c", false},
 				{"a backslash", `C:\x`, false},
 				{"a line break", "one\ntwo", false},
 				{"a tab", "one\ttwo", false},
