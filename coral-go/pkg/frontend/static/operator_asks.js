@@ -176,9 +176,6 @@ export function askSubjects(a) {
     if (a && Number(a.task_id) > 0) out.push({ kind: 'task', id: Number(a.task_id), title: markHidden(a.task_title || '', { strict: true }) });
     return out;
 }
-/** "Goal #7 · Task #12", the short words of a question's subjects (a Needs you row's marker). */
-export const askSubjectWords = a => askSubjects(a).map(x => `${x.kind === 'goal' ? 'Goal' : 'Task'} #${x.id}`).join(' \u00b7 ');
-
 /** The question whole, with a Reply box: a modal dialog (focus kept inside it, Escape closes it). */
 /** Load the reply/action UI only when the person opens a question. Resolves to its dialog. */
 export async function openAskDialog(a, onDone, runners = {}) {

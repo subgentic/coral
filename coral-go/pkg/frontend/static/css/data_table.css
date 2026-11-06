@@ -529,6 +529,9 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .inbox-review-from::after { content: " \00b7"; font-weight: var(--fw-regular); color: var(--text-muted); }
 .inbox-review-earlier { flex: none; color: var(--text-muted); font-weight: var(--fw-regular); white-space: nowrap; }
 .inbox-review-earlier::before { content: "\00b7  "; }
+.inbox-review-earlier.inbox-ask-subject-links { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px; min-width: 0; white-space: normal; font-weight: var(--fw-strong); color: var(--text-primary); }
+.inbox-ask-subject-link { display: inline-flex; align-items: center; color: var(--text-primary); font-weight: var(--fw-strong); text-decoration: underline; text-underline-offset: 2px; }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .inbox-ask-subject-link { min-height: var(--control-touch-height); } }
 .inbox-needs-results .dt-row.dt-read .inbox-review-from { font-weight: var(--fw-regular); }
 @media (max-width: 480px) {
     .inbox-needs-results .dt-row:has(.inbox-review-item > .inbox-review-from) > [data-key=waiting] { order: 4; flex: 1 1 100%; align-self: auto; text-align: start; line-height: var(--lh-label); } /* a narrow phone's review row (#13144, the Operator: give the file name room): "waiting N min" goes under the file name and the line under it, so the name has the whole first line beside the sender; the row may be one line taller. Permission rows and questions (no sender span) keep theirs on the right. */
