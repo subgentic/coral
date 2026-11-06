@@ -16,7 +16,7 @@ globalThis.fetch = async (url) => {
     const u = new URL(url, 'http://localhost'), p = u.pathname;
     assert.ok(p.endsWith('/api/team-artifacts'), 'only the protected cross-team list is read');
     const team = p.startsWith('/api/remote/box-b/') ? 'b' : 'a', tag = u.searchParams.get('tag');
-    if (u.searchParams.get('limit') === '1') return Response.json({ artifacts: [], total: 120, has_more: false });
+    if (u.searchParams.get('limit') === '1') return Response.json({ artifacts: [], total: TEAMS[team].filter(row => !row.tags.includes('read')).length, has_more: false });
     if (tag === 'saved') return Response.json({ artifacts: [], has_more: false });
     const cursor = u.searchParams.get('cursor') || '', until = u.searchParams.get('until') || '';
     asked.push({ team, cursor, until, params: [...u.searchParams].filter(([k]) => k !== 'cursor').map(([k, v]) => k + '=' + v).sort().join('&') });
@@ -125,4 +125,21 @@ await M.refreshReviews(true);
 assert.ok(keys().includes('a:' + hex(9000)), 'a newly inserted row is visible in the active query after refresh');
 assert.ok(keys().includes('a:' + hex(3)), 'a restored row can return after a fresh authoritative query');
 assert.equal(M.reviewQueryState().total, 241, 'filtered metadata is renewed with its rows');
+const protectedFetch = globalThis.fetch;
+globalThis.fetch = async (input, options = {}) => {
+    if (options.method === 'PUT') {
+        const path = new URL(input, 'http://localhost').pathname;
+        const id = path.split('/').at(-2);
+        const row = TEAMS.a.find(row => hex(Number(row.id.slice(2))) === id);
+        assert.ok(row, 'the tag write remains on the owning board');
+        row.tags = JSON.parse(options.body).tags;
+        return Response.json({ tags: row.tags });
+    }
+    return protectedFetch(input, options);
+};
+const toRead = M.queriedReviews(F).find(row => row.hex === hex(4));
+await M.setReviewRead(toRead, true, { fresh: true });
+await settle();
+assert.equal(M.reviewQueryState().attentionTotal, 240, 'a read write renews the active query attention total');
+globalThis.fetch = protectedFetch;
 console.log('inbox_reviews_query: ok');
