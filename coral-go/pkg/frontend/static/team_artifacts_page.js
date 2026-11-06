@@ -1,5 +1,4 @@
 import { artifactRevision, artifactsUnchanged, onArtifactsRev } from './artifacts_feed.js';
-import { heldChecker } from './artifact_held.js';
 import { serverColumns, serverOf, serverLabel, multipleServers, readInboxArtifacts, inboxArtifactsUnchanged } from './inbox_servers.js';
 import { teamLabel } from './server_status.js';
 import { state } from './state.js';
@@ -20,6 +19,7 @@ import { showToast } from './utils.js';
 const placeOf = item => { const a = (item.team === 'No team' || item.team === 'Not on a team') && item.session_id && (state.liveSessions || []).find(s => s.session_id === item.session_id); return a ? (a.display_name || a.name) : teamLabel(item.board_id, item.team); };
 const DT = await importOnce('./data_table.js');
 const { artifactTable, serverArtifactSort, tableSortOf } = await importOnce('./artifact_table.js');
+const { heldChecker } = await importOnce('./artifact_held.js');
 const { starControl } = await importOnce('./artifact_star.js');
 const SORT_PARAM = 'so' + 'rt'; // the query word, spelled in two parts: the icon-name lint reads that quoted word as an icon name
 const Toolbar = await importOnce('./team_toolbar.js');
