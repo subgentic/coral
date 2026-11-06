@@ -116,7 +116,7 @@ func (h *SessionsHandler) artifactVersions(w http.ResponseWriter, r *http.Reques
 		errNotFound(w, "artifact not found")
 		return
 	}
-	sid, _, in := digestSeries(h.cfg.CoralDir(), digest)
+	sid, _, in := callerSeries(r, h.cfg.CoralDir(), digest)
 	if !in {
 		errNotFound(w, "artifact not found")
 		return

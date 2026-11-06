@@ -114,7 +114,7 @@ func (h *SessionsHandler) getAgentArtifactMeta(w http.ResponseWriter, r *http.Re
 		out["name"] = meta.Name
 	}
 	if h.anySeries() { // #6357: additive, only on a version of a series (the walk is skipped while the store has none)
-		if sid, n, in := digestSeries(h.cfg.CoralDir(), id); in {
+		if sid, n, in := callerSeries(r, h.cfg.CoralDir(), id); in { // the caller's own team's series: another team's id and counts never reach it (#13949)
 			ms := seriesMembers(h.cfg.CoralDir(), sid)
 			out["series_id"], out["version"], out["versions"], out["is_latest"] = sid, n, len(ms), len(ms) > 0 && ms[len(ms)-1].Digest == id
 		}

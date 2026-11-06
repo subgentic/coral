@@ -22,12 +22,18 @@ func deleteArtifactFiles(coralDir, id string) (freed int64, records int, found b
 		return 0, 0, false, nil
 	}
 	// A version of a series is deleted under its series' lock first, the digest's second (#6357), and the series' index forgets it.
-	if sid, _, in := digestSeries(coralDir, id); in {
-		defer lockSeries(sid)()
+	// The object is one file of bytes that every team holding them shares (the Operator's delete removes the object and every row that lists it, #4379), so the digest is forgotten in EVERY team's series that has it,
+	// not in the first one's alone (#13949); another version of any of those series is untouched. The series locks are taken in id order (a second delete of other bytes cannot take them the other way round).
+	if sids := seriesOfDigest(coralDir, id); len(sids) > 0 {
+		for _, sid := range sids {
+			defer lockSeries(sid)()
+		}
 		defer lockArtifact(id)()
 		freed, records, found, err = deleteArtifactFilesLocked(coralDir, id)
 		if found && err == nil {
-			forgetVersion(coralDir, sid, id)
+			for _, sid := range sids {
+				forgetVersion(coralDir, sid, id)
+			}
 		}
 		return freed, records, found, err
 	}
