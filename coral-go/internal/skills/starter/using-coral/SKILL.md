@@ -44,7 +44,7 @@ coral-agent artifact upload report.md      # prints a coral://artifacts/<digest>
 coral-agent artifact download <link>       # prints the local path of a verified copy
 ```
 
-Show the person the `coral://artifacts/<digest>` link, never a path on this computer: the link opens the file in Coral. Long output (a log, a diff, a report) belongs in a file with a short message that links it. A new version of a file you uploaded before is `--new-version-of <link>`.
+Show the person the `coral://artifacts/<digest>` link, never a path on this computer: the link opens the file in Coral. Long output (a log, a diff, a report) belongs in a file with a short message that links it. A new version of a file you uploaded before is `--new-version-of <link>`, where the link is the NEWEST version: download it first, edit that, and upload (a stale link is refused and the answer names the newest).
 
 ## Reaching the person
 

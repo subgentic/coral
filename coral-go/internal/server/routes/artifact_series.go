@@ -221,6 +221,12 @@ type seriesMember struct {
 	Uploader string
 	Role     string
 	Board    string
+	Source   string // the server's own record of how the version came: "edit" (the Operator's editor), "share" (the Operator's file), empty for an agent's upload (#13792)
+}
+
+// byPerson says a person made this version, from the server's own record of it (the editor's save or an Operator share), never from anything a request said (#13792).
+func (m seriesMember) byPerson() bool {
+	return m.Source == sourceOperatorEdit || m.Source == sourceOperatorShare
 }
 
 // seriesMembers returns the versions of series id as their upload records say, in version order. The index is only where to look first: an entry whose record is gone or says
@@ -264,7 +270,7 @@ func membersOfSeries(coralDir, id string, full bool) []seriesMember {
 }
 
 func memberOf(digest, session string, rec agentUploadRecord) seriesMember {
-	return seriesMember{Digest: digest, N: rec.Version, Session: session, At: rec.CreatedAt, Uploader: rec.Uploader, Role: rec.Role, Board: rec.Board}
+	return seriesMember{Digest: digest, N: rec.Version, Session: session, At: rec.CreatedAt, Uploader: rec.Uploader, Role: rec.Role, Board: rec.Board, Source: rec.Source}
 }
 
 // seriesMemberSet is every artifact that belongs to a series: they count as kept for pruning (pick 4, keep all: only an explicit delete removes a version).
@@ -305,15 +311,16 @@ type seriesStamp struct {
 
 // seriesPlan is a new version worked out under the series lock, which the caller holds until it has stored the artifact and written the index: unlock ends it.
 type seriesPlan struct {
-	id      string
-	board   string
-	create  bool
-	rows    []seriesMember // the versions before this one (for a new series: the artifact it is a version of)
-	base    seriesRecord   // for a new series: the record that becomes version 1
-	stamp   seriesStamp
-	same    *seriesMember // set when the bytes are the newest version: nothing to add
-	unlock  func()
-	created string
+	id        string
+	board     string
+	create    bool
+	rows      []seriesMember // the versions before this one (for a new series: the artifact it is a version of)
+	base      seriesRecord   // for a new series: the record that becomes version 1
+	stamp     seriesStamp
+	same      *seriesMember // set when the bytes are the newest version: nothing to add
+	refDigest string        // the version the upload names as the one it edited (a 64-hex digest link); empty for a series link, which names no base (#13792)
+	unlock    func()
+	created   string
 }
 
 type seriesRefusal struct {
@@ -344,6 +351,9 @@ func planNewVersion(coralDir, ref, callerBoard, newDigest string) (*seriesPlan, 
 		return nil, errSeriesNoBoard
 	}
 	p := &seriesPlan{board: callerBoard}
+	if series == "" {
+		p.refDigest = digest
+	}
 	var unlockCreate func() // a first version holds the create lock from before the artifact's series is looked up until the version is committed (or refused)
 	if series != "" {
 		p.id = series
@@ -425,6 +435,29 @@ func planNewVersion(coralDir, ref, callerBoard, newDigest string) (*seriesPlan, 
 	return p, nil
 }
 
+// staleBase is what the base an upload names says about it (#13792, the Operator: refuse at once, whoever made the newer version), read from the versions the plan walked under the series lock (so the newest is
+// the newest NOW). A digest link is the version the agent edited: stale when versions came after it. A series link names no version at all, so it is refused as a new version. byPerson comes from the server's
+// own record of the newest version, never from the request.
+type staleBase struct {
+	newest      seriesMember
+	newestByMan bool // a person made the newest version (the editor's save, an Operator share)
+	seriesLink  bool
+}
+
+func (p *seriesPlan) staleBase() (staleBase, bool) {
+	var out staleBase
+	if len(p.rows) == 0 {
+		return out, false
+	}
+	out.newest = p.rows[len(p.rows)-1]
+	out.newestByMan = out.newest.byPerson()
+	if p.refDigest == "" { // a series link: no base
+		out.seriesLink = true
+		return out, true
+	}
+	return out, out.newest.Digest != p.refDigest
+}
+
 // commit records the new version after its object and upload record are stored: for a new series the artifact it is a version of becomes version 1, and the index is written. It is the
 // last step under the series lock; a failure leaves the records, which win, to be found by the next read.
 func (p *seriesPlan) commit(coralDir, newDigest, session string) (versions int, err error) {
@@ -487,4 +520,24 @@ func forgetVersion(coralDir, id, digest string) {
 	}
 	idx.Versions = rest
 	_ = writeSeriesIndex(coralDir, idx)
+}
+
+func staleSentence(sb staleBase) string {
+	newest := "coral://artifacts/" + sb.newest.Digest
+	if sb.seriesLink {
+		return fmt.Sprintf("A series link names no version, so it cannot be the base of a new version. Download the newest (version %d: coral-agent artifact download %s), edit that, and upload with --new-version-of %s. Nothing was stored.", sb.newest.N, newest, newest)
+	}
+	who := "another agent"
+	if sb.newestByMan {
+		who = "a person"
+	}
+	return fmt.Sprintf("A newer version (version %d) of this file was saved by %s since the one you edited. Download the newest (coral-agent artifact download %s), redo your change on it, and upload again with --new-version-of %s. Nothing was stored.", sb.newest.N, who, newest, newest)
+}
+
+// staleBaseRefusal answers an upload whose base is stale: 409 with the newest version and one sentence, no text of any file (#13792). Nothing is stored.
+func staleBaseRefusal(w http.ResponseWriter, plan *seriesPlan, sb staleBase) {
+	writeJSON(w, http.StatusConflict, map[string]any{
+		"error": staleSentence(sb), "code": "stale_base", "latest_digest": sb.newest.Digest, "latest_version": sb.newest.N, "latest_by_person": sb.newestByMan,
+		"uri": "coral://artifacts/" + sb.newest.Digest, "series_id": plan.id,
+	})
 }

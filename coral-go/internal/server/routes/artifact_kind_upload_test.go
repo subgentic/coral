@@ -124,10 +124,15 @@ func TestAKindBelongsToTheSeries(t *testing.T) {
 	code, out := k.up("s1", "&kind=done", taskHeader12144(op))
 	require.Equal(t, 201, code, out)
 	v1 := out["uri"].(string)
+	base := v1 // the version each upload edits is the newest (#13792: a stale base is refused)
 	ver := func(extra string) (int, map[string]any) {
 		h := taskHeader12144(op)
-		h["X-Artifact-New-Version-Of"] = v1
-		return k.up("s1", extra, h)
+		h["X-Artifact-New-Version-Of"] = base
+		code, out := k.up("s1", extra, h)
+		if code == 201 {
+			base = out["uri"].(string)
+		}
+		return code, out
 	}
 	code, out = ver("")
 	require.Equal(t, 201, code, out)
