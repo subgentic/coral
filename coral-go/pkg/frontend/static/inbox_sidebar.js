@@ -207,7 +207,7 @@ const earlierWords = r => { const n = Math.max((r.earlier || []).length, (r.vers
 const needsName = s => s.skillReview ? skillName(s.skillReview) : s.goalDone ? `Goal #${s.goalDone.id}` : s.proposal ? markedText(s.proposal.proposer) : s.review ? s.review.produced_by || 'Unknown agent' : s.autorun ? s.autorun.name : s.operatorAsk ? s.operatorAsk.asker : s.welcome ? s.welcome.title : s.unrecorded ? s.display_name : resolveSessionIdentity(s);
 // With a filter on, the file rows are what the computers answer for it (#13162, Stage 1): the first 50 matches of each team with Show more; until the answer is in, the rows of the whole list the page already holds, matched as before.
 const reviewFilters = () => { const f = NF.clean(needsFilters); return reviewQueryKey(f) ? f : null; };
-const reviewRows = () => { const f = reviewFilters(); if (f) queryReviews(f); const asked = f ? queriedReviews(f) : null; return (asked || reviewItems()).map(a => ({ queried: !!asked, review: a, goal: a.goal_id && a.goal_title ? { id: a.goal_id, title: String(a.goal_title), board: a.team } : null, task: a.task_id ? { id: a.task_id, title: String(a.task_title || '') } : null, session_id: a.reviewKey, display_name: a.name, board_project: splitKey(a.team).name, server: splitKey(a.team).server, waiting_kind: 'review', waiting_summary: 'For review', waiting_since: a.created_at })); };
+const reviewRows = () => { const f = reviewFilters(); queryReviews(f || needsFilters); const asked = f ? queriedReviews(f) : null; return (asked || reviewItems()).map(a => ({ queried: !!asked, review: a, goal: a.goal_id && a.goal_title ? { id: a.goal_id, title: String(a.goal_title), board: a.team } : null, task: a.task_id ? { id: a.task_id, title: String(a.task_title || '') } : null, session_id: a.reviewKey, display_name: a.name, board_project: splitKey(a.team).name, server: splitKey(a.team).server, waiting_kind: 'review', waiting_summary: 'For review', waiting_since: a.created_at })); };
 /** A failed run of a job or workflow that nobody has opened (#9296): a row of Needs you like a review, opened on its job's or workflow's page, dismissed (marked opened) without opening it. */
 const runRows = () => failedUnread().map(r => ({ autorun: r, session_id: `automation-run:${r.key}`, display_name: r.name, board_project: '', server: '', waiting_kind: 'run', waiting_summary: failureWords(r) ? `Run failed: ${failureWords(r)}` : 'Run failed', waiting_since: r.finishedAt || r.at }));
 /** What agents asked to add to a team, waiting for the Operator (#11389): a row of Needs you like a review, opened in its dialog. */
@@ -278,7 +278,9 @@ function inboxNeedsToolbar() {
     const teams = [...new Set([...all.map(teamOf).filter(Boolean), ...facets.teams])].sort(), names = [...new Set([...all.map(needsName), ...facets.agents])].sort();
     const goalNames = [...new Set([...all.filter(s => s.review || s.goal).map(goalLabel).filter(title => !facets.goals.some(g => g.title === title)), ...facets.goals.map(g => g.value)])].sort((a, b) => (a === NO_GOAL) - (b === NO_GOAL) || a.localeCompare(b)); // review rows and rows with a goal: "No goal" last
     const rows = all.filter(s => matchesNeeds(s, { ...needsFilters, kind: '' }));
-    const attention = reviewFilters() ? reviewQueryState()?.attentionTotal : reviewAttentionCount().complete ? unreadReviewCount() : null;
+    const countState = reviewAttentionCount();
+    const attention = reviewFilters() ? reviewQueryState()?.attentionTotal : countState.value;
+    const completeCount = reviewFilters() ? Number.isSafeInteger(attention) : countState.complete;
     const summary = reviewPageSummary();
     const counts = NF.KINDS.filter(kindShown).map(k => k === 'review' && attention !== null && attention !== undefined ? attention : rows.filter(s => NF.kindOf(s) === k && (k === 'welcome' || needsUnread(s))).length); // a pill counts what the badge counts (the Welcome pill its own items)
     const listed = NF.KINDS.filter(kindShown).map(k => rows.filter(s => NF.kindOf(s) === k).length), said = (n, m) => (n === m ? n : `${n} of ${m}`); // the rows read ones are listed too: 'For review 0 of 4', one number (the unread) and the list's size when they differ (#11886)
@@ -286,7 +288,7 @@ function inboxNeedsToolbar() {
         filters: needsFilters,
         options: { team: { values: teams, labels: {} }, agent: { values: names, labels: {} }, goal: { values: goalNames, labels: {} } },
         pills: { label: 'Show agents waiting on', current: needsFilters.kind || 'all',
-            items: [{ key: 'all', label: 'All', count: attention !== null && attention !== undefined ? rows.filter(s => !s.review && needsUnread(s)).length + attention : said(rows.filter(needsUnread).length, rows.length) }, ...NF.KINDS.filter(kindShown).map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: k === 'review' && attention !== null && attention !== undefined ? attention : said(counts[i], listed[i]) }))],
+            items: [{ key: 'all', label: 'All', count: attention !== null && attention !== undefined ? `${completeCount ? '' : 'at least '}${rows.filter(s => !s.review && needsUnread(s)).length + attention}` : said(rows.filter(needsUnread).length, rows.length) }, ...NF.KINDS.filter(kindShown).map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: k === 'review' && attention !== null && attention !== undefined ? `${completeCount ? '' : 'at least '}${attention}` : said(counts[i], listed[i]) }))],
             onPick: key => { needsFilters = { ...needsFilters, kind: key === 'all' ? '' : key }; NF.saveFilters(needsFilters); renderInboxNav(true); } },
     });
     if (!node.querySelector('.inbox-group-review-toggle')) {
@@ -296,7 +298,7 @@ function inboxNeedsToolbar() {
         label.append(input, document.createTextNode('Group by goal')); node.append(label);
     }
     node.querySelector('.inbox-group-review-toggle').hidden = (!!needsFilters.kind && needsFilters.kind !== 'review') || (!reviewItems().length && needsFilters.kind !== 'review');
-    return { node, signature: JSON.stringify([groupReviews, needsFilters, teams, names, goalNames, counts, summary, rows.length, rows.filter(needsUnread).length]) };
+    return { node, signature: JSON.stringify([groupReviews, needsFilters, teams, names, goalNames, counts, completeCount, summary, rows.length, rows.filter(needsUnread).length]) };
 }
 
 // ── Tasks ────────────────────────────────────────────────────────────────
@@ -812,7 +814,7 @@ function renderInboxNav(force = false) {
     const here = navCurrent(), sections = folderSections();
     // what the tables show is part of the key too: the folder list is drawn from the counts, but the table on screen is refreshed (refreshGroupTable below) only when a row of it changed
     const needs = needsRows(), tk = taskRows(), sv = saved.savedView().shown.map(saved.savedItemFacts);
-    const key = JSON.stringify([reviewPagingSignature(), here, sections, queries.needs, queries.tasks, page && `${page.kind}:${page.project || ''}#${page.id}`,
+    const key = JSON.stringify([reviewAttentionCount(), reviewPagingSignature(), here, sections, queries.needs, queries.tasks, page && `${page.kind}:${page.project || ''}#${page.id}`,
         needs.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, teamOf(s), askOf(s)]), tk.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count]), sv.map(f => [f.id, f.which, f.saved, f.state]), savedFiles().map(a => a.reviewKey), mutedWords(mutedReviewItems()), dayOldMutedFiles().map(a => a.hex)]); // the quiet Muted line is part of what the table shows: a change that only moves muted files redraws it (#12881)
     if (!force && key === _navKey) return;
     _navKey = key;
@@ -859,10 +861,15 @@ function appendReviewPaging(host, savedPage = false) {
         button.dataset.reviewStream = savedPage ? 'saved' : 'review';
         button.setAttribute('aria-label', `${page.error ? 'Retry' : 'Show more'} ${savedPage ? 'saved files' : 'review files'} from ${pagingServerLabel(page.server)}`);
         button.addEventListener('click', async () => {
+            const heldFocus = document.activeElement === button, folder = group;
             button.disabled = true;
             try { await (savedPage ? loadMoreSavedFiles : loadMoreReviews)(page.server); }
             catch (error) { sayLive(error.message); }
             renderInboxNav(true);
+            if (heldFocus && folder === group && document.activeElement === document.body) {
+                const replacement = [...document.querySelectorAll('[data-review-more]')].find(b => b.dataset.reviewMore === page.server && b.dataset.reviewStream === (savedPage ? 'saved' : 'review'));
+                (replacement || $('group-table-title'))?.focus({ preventScroll: true });
+            }
         });
         line.append(button); host.append(line);
     }

@@ -5,13 +5,13 @@ import { serverFetch, isCloud } from './server_base.js';
 
 export const COUNT_PATH = '/api/team-artifacts?tag=for%20review&waiting=1&muted=0&versions=newest&limit=1';
 const EVERY_MS = 30000;
-let unread = null, summary = null, at = 0, pending = null, lastSources = '';
+let unread = null, summary = null, at = 0, pending = null, lastSources = '', refreshAgain = false;
 const sources = () => [...new Set([...(isCloud() ? [] : ['local']), ...(state.hub ? (state.servers || []).filter(s => s.id && s.id !== 'local' && s.status === 'online').map(s => s.id) : [])])];
 export const countedUnread = () => unread;
 export const countSummary = () => summary;
 export function refreshCounts(force = false) {
     const list = sources(), key = JSON.stringify(list);
-    if (pending) return pending;
+    if (pending) { if (force) refreshAgain = true; return pending; }
     if (!force && key === lastSources && at && Date.now() - at < EVERY_MS) return Promise.resolve(false);
     lastSources = key; at = Date.now();
     pending = (async () => {
@@ -30,6 +30,10 @@ export function refreshCounts(force = false) {
         const changed = JSON.stringify(next) !== JSON.stringify(summary);
         summary = next; unread = next.complete ? next.knownTotal : null;
         return changed;
-    })().finally(() => { pending = null; });
+    })().then(async changed => {
+        pending = null;
+        if (refreshAgain) { refreshAgain = false; return (await refreshCounts(true)) || changed; }
+        return changed;
+    });
     return pending;
 }

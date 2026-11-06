@@ -205,13 +205,13 @@ export const reviewQueryState = () => {
         attentionTotal: !fview.localFilters && !fview.invalidCounts && pages.every(p => Number.isSafeInteger(p.attentionTotal) && !p.error) ? pages.reduce((n, p) => n + p.attentionTotal, 0) : null, goalFiltered: !!fview.goal, localFilters: fview.localFilters,
         error: pages.some(p => p.error) ? 'Some computers could not be asked.' : '', failed: pages.filter(p => p.error).length };
 };
-export const clearReviewQuery = () => { if (fview) { fview.pager.reset([]); fview = null; changed(); } };
+export const clearReviewQuery = () => { if (fview) { const old = fview; fview = null; old.pager.reset([]); changed(); } };
 export function queryReviews(f) {
     const key = reviewQueryKey(f);
     if (!key) { clearReviewQuery(); return null; }
-    if (fview && fview.key === key && (fview.pager.status().some(p => p.loading) || Date.now() - fview.at < 30000)) return fview.promise;
-    if (fview) fview.pager.reset([]);
+    if (fview && fview.key === key && fview.sources === JSON.stringify(inboxSources()) && (fview.pager.status().some(p => p.loading) || Date.now() - fview.at < 30000)) return fview.promise;
     const goal = resolveGoalFilter(f.goal), params = reviewQueryParams(f).toString();
+    if (fview) { const old = fview; fview = null; old.pager.reset([]); }
     const read = async (server, options) => {
         const data = await readComputerPage(server, { ...options, revisionBound: false });
         if (!options.cursor && !data.ownerOnly) {
@@ -222,7 +222,8 @@ export function queryReviews(f) {
         }
         return data;
     };
-    const mine = { key, goal, localFilters: !!(f.goal && !goal) || f.agent === UNKNOWN_AGENT, started: revision, pager: createReviewPages({ read, key: pageKey, changed }), at: Date.now(), promise: null };
+    const mine = { key, goal, sources: JSON.stringify(inboxSources()), localFilters: !!(f.goal && !goal) || f.agent === UNKNOWN_AGENT, started: revision, at: Date.now(), promise: null };
+    mine.pager = createReviewPages({ read, key: pageKey, changed: () => { if (fview === mine) changed(); } });
     fview = mine;
     const sources = inboxSources().filter(server => (!f.server || server === f.server) && (!goal || goal.server === server));
     mine.pager.reset(sources, params);

@@ -5,6 +5,17 @@ const { coralReady, framesJs } = require('./helpers/wait');
 
 function installReviews() {
     const real = window.fetch;
+    const computers = [{ id: 'box-b', label: 'Other computer', status: 'online', owner_stamp: true }];
+    const RealSocket = window.WebSocket;
+    window.WebSocket = class extends RealSocket {
+        constructor(url, ...args) {
+            super(url, ...args);
+            if (new URL(url, location.href).pathname === '/ws/coral') this.addEventListener('message', event => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'coral_update') { data.servers = computers; data.sessions = []; Object.defineProperty(event, 'data', { value: JSON.stringify(data) }); }
+            });
+        }
+    };
     window.__reviewRequests = [];
     window.__failReviewMore = false;
     window.__failReviewCount = false;
@@ -17,6 +28,8 @@ function installReviews() {
     window.fetch = (input, options) => {
         const url = new URL(String(input), location.href), path = url.pathname;
         const server = path.startsWith('/api/remote/box-b/') ? 'box-b' : 'local';
+        if (path === '/api/health') return json({ hub: true });
+        if (path === '/api/sessions/live') return json({ sessions: [], servers: computers });
         if (path.endsWith('/api/board/projects')) return json([{ project: 'alpha', board_label: 'Product' }]);
         if (path.endsWith('/api/operator-asks')) return json([]);
         if (path.endsWith('/api/team-artifacts') || path.endsWith('/api/board/alpha/artifacts') || path.endsWith('/api/board/~no-team/artifacts')) {
@@ -49,9 +62,9 @@ function installReviews() {
     const S = `(window.__coralStatic || '/static/')`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.addScriptToEvaluateOnNewDocument({ source: `(${installReviews.toString()})()` });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
-        await ev(`(${installReviews.toString()})()`);
         const first = await ev(`(async () => {
             localStorage.removeItem('coral-inbox-needs-filters'); localStorage.removeItem('coral-inbox-group-review-goal');
             const { state } = await import(${S} + 'state.js'); state.hub = true; state.serversKnown = true;
@@ -77,14 +90,22 @@ function installReviews() {
         assert.equal(new Set(goals).size, 2, 'same goal title and number on two computers stays two choices');
         await ev(`window.__failReviewCount = true; window.__C.refreshCounts(true).then(() => import(${S} + 'inbox_tab.js')).then(m => m.updateInboxTab())`);
         await waitFor(`/at least 18 need your attention/.test(document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label') || '')`, 'partial count adds only failed-source loaded rows');
+        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.includes('For review') && b.textContent.includes('at least 18'))`, 'partial pill uses the same lower bound');
         await ev(`window.__failReviewCount = false; window.__C.refreshCounts(true).then(() => import(${S} + 'inbox_tab.js')).then(m => m.updateInboxTab())`);
         await ev(`window.__failReviewMore = true; document.querySelector('[data-review-more="box-b"][data-review-stream="review"]').click(); true`);
         await waitFor(`/Retry/.test(document.querySelector('[data-review-more="box-b"][data-review-stream="review"]')?.textContent || '')`, 'failed cursor offers Retry');
         assert.equal(await ev(`window.__R.reviewItems().length`), 100, 'append failure preserves loaded rows');
-        await ev(`window.__failReviewMore = false; document.querySelector('[data-review-more="box-b"][data-review-stream="review"]').click(); true`);
+        await ev(`window.__failReviewMore = false; document.querySelector('[data-review-more="box-b"][data-review-stream="review"]').focus(); document.querySelector('[data-review-more="box-b"][data-review-stream="review"]').click(); true`);
         await waitFor(`window.__R.reviewItems().length === 115`, 'only the selected computer appends its next page');
         assert.equal(await ev(`window.__R.reviewPages().find(p => p.server === 'local').next_cursor`), 'local:50');
         assert.ok(await ev(`window.__reviewRequests.filter(r => r.cursor).every(r => r.server === 'box-b' && r.cursor === 'box-b:50')`), 'failure and retry reuse only the selected source cursor');
+        await ev(framesJs(2));
+        assert.equal(await ev(`document.activeElement.id`), 'group-table-title', 'exhausting a keyboard paging button preserves a useful focus target');
+        await ev(`(() => { const q = document.getElementById('inbox-search'); q.value = 'Entry 064'; q.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+        await waitFor(`window.__R.reviewQueryState()?.shown === 2`, 'off-page search is answered by the computers, not a loaded-page filter');
+        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.includes('For review') && b.textContent.trim().endsWith('1'))`, 'filtered pill uses filtered server attention');
+        await ev(`(() => { const q = document.getElementById('inbox-search'); q.value = ''; q.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+        await waitFor(`document.querySelector('[data-review-more="local"][data-review-stream="review"]') && window.__R.reviewQueryState() === null`, 'clearing a query restores its retained unfiltered window and cursor');
         for (const [width, font, theme] of [[1280, 16, 'dark'], [390, 32, 'light']]) {
             await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: width < 500 });
             await ev(`document.documentElement.style.fontSize = '${font}px'; document.documentElement.dataset.theme = '${theme}'; true`);

@@ -70,3 +70,17 @@ assert.equal(C.countSummary().knownTotal, 9);
 assert.deepEqual(C.countSummary().sources.find(s => s.server === 'box-2'), { server: 'box-2', total: null });
 answers['box-2'] = { total: 2.5 }; await C.refreshCounts(true);
 assert.equal(C.countedUnread(), null, 'fractional metadata never becomes an authoritative count');
+
+state.hub = false; C = await fresh();
+let releaseOld; let countReads = 0;
+globalThis.fetch = async () => {
+    countReads++;
+    if (countReads === 1) return new Promise(resolve => { releaseOld = () => resolve(Response.json({ total: 1 })); });
+    return Response.json({ total: 9 });
+};
+const beforeWrite = C.refreshCounts(true);
+await Promise.resolve();
+const afterWrite = C.refreshCounts(true);
+releaseOld(); await Promise.all([beforeWrite, afterWrite]);
+assert.equal(countReads, 2, 'a write during an older count schedules one fresh read after it');
+assert.equal(C.countedUnread(), 9, 'the pre-write reply never becomes the final certified count');
