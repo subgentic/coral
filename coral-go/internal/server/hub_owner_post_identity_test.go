@@ -114,7 +114,7 @@ func readsName(bodies map[string]string, typ, name string, depth int, seen map[s
 		return false
 	}
 	// only methods called on the receiver itself: h.bs.CloseAsk( is the store's, not the handler's
-	for _, m := range regexp.MustCompile(`(?:^|[^.\w])` + recv[1] + `\.(\w+)\(`).FindAllStringSubmatch(body, -1) {
+	for _, m := range regexp.MustCompile(`(?:^|[^.\w])`+recv[1]+`\.(\w+)\(`).FindAllStringSubmatch(body, -1) {
 		if readsName(bodies, typ, m[1], depth-1, seen) {
 			return true
 		}
