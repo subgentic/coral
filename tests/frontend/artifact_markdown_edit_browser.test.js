@@ -66,7 +66,9 @@ const hexOf = data => String(data.digest || data.hex || data.id || '').replace(/
             await waitFor(`!!document.querySelector('.artifact-viewer-edit') && !document.querySelector('.artifact-viewer-edit').hidden`,'owner Edit text action',12000);
             await edit();await waitFor(`!!document.querySelector('.amd-text')`,'in-place editor',10000,`({body:document.querySelector('.artifact-viewer-body')?.textContent,menu:document.querySelector('.artifact-viewer-menu')?.outerHTML,edit:document.querySelector('.artifact-viewer-edit')?.outerHTML,items:[...document.querySelectorAll('.artifact-viewer-edit-item')].map(e=>({html:e.outerHTML,rect:e.getBoundingClientRect().toJSON(),display:getComputedStyle(e).display}))})`);
             assert.ok(await ev(`document.querySelector('.amd-editor').textContent.includes('U+202E')`),'hidden marker is visible in editing mode');
-            assert.equal(await ev(`document.querySelectorAll('.amd-block pre [contenteditable],.amd-block table [contenteditable]').length`),0);
+            assert.equal(await ev(`document.querySelectorAll('.amd-block pre [contenteditable]').length`),1,'the verified CRLF fenced-code body is now editable');
+            assert.equal(await ev(`document.querySelector('.amd-block pre [contenteditable]').textContent`),'const unchanged = true;');
+            assert.equal(await ev(`[...document.querySelectorAll('.amd-text')].some(e=>e.textContent.includes('Hidden'))`),false,'hidden-character block remains read-only');
             await type('careful sentence','clear sentence');
             assert.equal(await ev(`document.querySelector('.amd-save').disabled`),false,'Save enables before blur');
             assert.ok(await ev(`document.querySelector('.amd-editor').scrollWidth <= document.querySelector('.amd-editor').clientWidth + 1`),'editor fits without horizontal overflow');
