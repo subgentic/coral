@@ -406,8 +406,9 @@ func (h *BoardHandler) needsYouItems(r *http.Request) (items []NeedsYouItem, unr
 			if len(questionLinks) > 0 {
 				reviewFiles = reviewedFileIDs(files)
 			}
+			newVersion := h.newVersionUnopened(r, p.Project, files) // the person's own opened versions: a file read on an earlier version still waits while a newer one is unopened (#13959)
 			for _, f := range files {
-				if seen[f.ID] || !needsYouFile(f.Tags, f.NewComments) {
+				if seen[f.ID] || !needsYouFileV(f.Tags, f.NewComments, newVersion[attentionKey(f.BoardID, artifactStoreID(f))]) {
 					continue // by tags first: only a row that could count is checked against the stored file
 				}
 				if f.Muted {
