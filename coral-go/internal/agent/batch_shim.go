@@ -64,6 +64,9 @@ func shimTarget(shim, dir string, exists func(string) bool, lookNode func() (str
 	for j, w := range words {
 		w = expandShimDir(w, prog)
 		if w == "%_prog%" {
+			if !shimSetsProgToNode(shim) {
+				return nil, false
+			}
 			// SET "_prog=%dp0%\node.exe" if that exists, else node from PATH.
 			local := filepath.Join(dir, "node.exe")
 			if exists(local) {
@@ -105,6 +108,27 @@ func shimTarget(shim, dir string, exists func(string) bool, lookNode func() (str
 		}
 	}
 	return nil, false
+}
+
+// shimSetsProgToNode reports whether the shim sets _prog, and only to node (its own node.exe or the one on PATH), as npm's does.
+func shimSetsProgToNode(shim string) bool {
+	found := false
+	for _, l := range strings.Split(shim, "\n") {
+		l = strings.TrimSpace(l)
+		i := strings.Index(strings.ToLower(l), "set ")
+		if i < 0 || !strings.Contains(strings.ToLower(l), "_prog=") {
+			continue
+		}
+		v := l[strings.Index(strings.ToLower(l), "_prog=")+len("_prog="):]
+		v = strings.TrimSuffix(strings.TrimSpace(v), `"`)
+		switch strings.ToLower(v) {
+		case "node", `%dp0%\node.exe`, `%~dp0\node.exe`:
+			found = true
+		default:
+			return false // set to anything else somewhere
+		}
+	}
+	return found
 }
 
 // expandShimDir writes the shim's own folder (%dp0% or %~dp0) into w.
@@ -234,6 +258,10 @@ func withoutPromptForBatch(parts, raw []string) (outParts, outRaw []string, noti
 	for i, p := range parts {
 		if i > prog && isPrompt(p) {
 			changed = true
+			// The option that introduced it goes too, or the next option would be read as its value.
+			if n := len(outParts); n > prog+1 && (outParts[n-1] == "-c" || outParts[n-1] == "--append-system-prompt") {
+				outParts = outParts[:n-1]
+			}
 			continue
 		}
 		outParts = append(outParts, p)
