@@ -113,8 +113,8 @@ func TestTheUploadersRepliesAreCappedPerThreadAndPerFilePerHour(t *testing.T) {
 	code, rep = rig.reply(last, asAgentSession(1), "over the hour's cap")
 	assert.Equal(t, http.StatusTooManyRequests, code, fmt.Sprint(rep))
 	assert.Equal(t, "reply_rate", rep["code"])
-	assert.Equal(t, "action", rig.lastHeader.Get(httputil.ActionLimitHeader), "marked as a per-action limit, so the dashboard shows the sentence and does not pause its polling (#13762)")
-	assert.NotEmpty(t, rig.lastHeader.Get("Retry-After"))
+	assert.Equal(t, "action", rig.lastHeaders().Get(httputil.ActionLimitHeader), "marked as a per-action limit, so the dashboard shows the sentence and does not pause its polling (#13762)")
+	assert.NotEmpty(t, rig.lastHeaders().Get("Retry-After"))
 }
 
 // The same, as the remote computer sees the Hub path (#13762): the owner's comment and read arrive as API-key callers; the agent calls its own computer.
