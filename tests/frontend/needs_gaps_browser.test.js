@@ -37,7 +37,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             return { seen, n: rows.length, count: sk.skillCount(), line: rows[0] && sk.skillLine(rows[0].skillReview), summary: rows[0] && rows[0].waiting_summary, hub: rows[0] && rows[0].skillReview.hub, id: rows[0] && rows[0].session_id, note: g.incompleteNote() }; })()`);
         check(hub.seen.length === 1 && hub.seen[0] === '/api/needs-you?kind=skill', 'one read, of the one list of what waits: ' + JSON.stringify(hub.seen));
         check(hub.n === 1 && hub.count === 3 && hub.hub === true, 'the rows and the count the computer gave: ' + JSON.stringify(hub));
-        check(/dep<U\+202E>loy/.test(hub.line) && !/‮/.test(hub.line), 'the line is plain text, the reordering character written out: ' + JSON.stringify(hub.line));
+        check(/dep<U\+202E>loy/.test(hub.line) && !/\u202e/.test(hub.line), 'the line is plain text, the reordering character written out: ' + JSON.stringify(hub.line));
         check(/approve at the computer/.test(hub.summary) && hub.id === 'skill_review:7' && hub.note === '', 'it says approve at the computer: ' + JSON.stringify(hub));
         // a failed hub read (a server error) keeps the rows and says it is not everything; a refused one (403: access was taken away) drops them and still says so (the Orchestrator's decision on #13841)
         const refused = await ev(`(async () => { const g = await import(${S} + 'needs_incomplete.js'), sk = await import(${S} + 'needs_skills.js'), original = window.fetch; const out = {};
