@@ -1,5 +1,5 @@
 // A question shows the goal and task it was asked about (#12194, the operator's comment on #12143; the board carries them since #12164): the dialog has a "Goal #7: Ship the beta · Task #12: Fix login" line under who asked, each a
-// link that opens that goal or task in the Inbox in place; the question's Needs you row says "Goal #7 · Task #12" after its name (the titles in its tooltip); a question about neither shows nothing. A question from another
+// link that opens that goal or task in the Inbox in place, preserving its question/draft until Back; the question's Needs you row says "Goal #7 · Task #12" after its name (the titles in its tooltip); a question about neither shows nothing. A question from another
 // computer shows the words without a link. 1280 and 390 px; the question route is stubbed (as in operator_asks_browser).
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -42,10 +42,16 @@ const OPERATOR_TEXT = '@Operator TEST ITEM, safe to answer any way: this is a te
                 assert.ok(d.shown && d.below && JSON.stringify(d.buttons) === JSON.stringify([['goal', 'Goal #7'], ['task', 'Task #12']]), at + 'the dialog has the goal and the task as links under who asked: ' + JSON.stringify(d));
                 assert.ok(/^About Goal #7 \u00b7 Task #12$/.test(d.text), at + 'the line says the asker named them: ' + d.text);
                     if (what === 'task' && process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/ask-subjects-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
-            await ev(`document.querySelector('dialog.inbox-ask-dialog .inbox-ask-subject[data-kind="${what}"]').click(); true`);
-                await waitFor(`!document.querySelector('dialog.inbox-ask-dialog')`, at + 'opening it closes the dialog', 4000);
+            await ev(`window.__subjectDialog=document.querySelector('dialog.inbox-ask-dialog');window.__subjectDialog.querySelector('textarea').value='Keep my subject draft';window.__subjectDialog.querySelector('.inbox-ask-subject[data-kind="${what}"]').click();true`);
+                await waitFor(`window.__subjectDialog.hidden&&!window.__subjectDialog.open`, at + 'opening it suspends the question', 4000);
+                assert.ok(await ev(`window.__subjectDialog===document.querySelector('dialog.inbox-ask-dialog')&&window.__subjectDialog.querySelector('textarea').value==='Keep my subject draft'`), at + 'the same question DOM and draft are retained');
                 await waitFor(`/\\/${what}s/.test(location.pathname)`, at + `the ${what} opens in the Inbox in place (` + await ev('location.pathname') + ')', 6000);
                 assert.ok(await ev(`location.pathname.includes(${what === 'task' ? "'12'" : "'7'"}) || location.search.includes(${what === 'task' ? "'12'" : "'7'"}) || location.hash.includes(${what === 'task' ? "'12'" : "'7'"})`), at + `it is the ${what} the question named: ` + await ev('location.pathname + location.search + location.hash'));
+                const history=await Page.getNavigationHistory();
+                await Page.navigateToHistoryEntry({entryId:history.entries[history.currentIndex-1].id});
+                await waitFor(`window.__subjectDialog.open&&!window.__subjectDialog.hidden`,at+'Back restores the question',6000);
+                assert.ok(await ev(`window.__subjectDialog.querySelector('textarea').value==='Keep my subject draft'&&window.__subjectDialog.contains(document.activeElement)`),at+'Back keeps the draft and restores focus');
+                await ev(`window.__subjectDialog.querySelector('.inbox-ask-buttons .btn').click();true`);
                 continue;
             }
             if (what !== 'none') continue;

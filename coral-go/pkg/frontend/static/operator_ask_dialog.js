@@ -29,7 +29,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     subjects.forEach((x, i) => {
         if (i) links.append(document.createTextNode(' \u00b7 '));
         const word = `${x.kind === 'goal' ? 'Goal' : 'Task'} #${x.id}`;
-        if (!['goal', 'task'].includes(x.kind)) { const name = document.createElement('span'); name.textContent = word; name.title = `${word}${x.title ? `: ${x.title}` : ''} (named by ${who})`; links.append(name); return; }
+        if (fromAnotherComputer(a) || !['goal', 'task'].includes(x.kind)) { const name = document.createElement('span'); name.textContent = word; name.title = `${word}${x.title ? `: ${x.title}` : ''} (named by ${who})`; links.append(name); return; }
         const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-quiet btn-small inbox-ask-subject'; b.textContent = word; b.dataset.kind = x.kind; b.title = `${word}${x.title ? `: ${x.title}` : ''} (named by ${who})`; b.setAttribute('aria-label', b.title);
         b.addEventListener('click', () => { openWithQuestionReturn(b, async () => { const nav = await importOnce('./nav.js'); await nav.go({ view: x.kind === 'goal' ? 'inbox-goals' : 'inbox-tasks', sub: x.kind === 'goal' ? 'goals' : 'tasks', id: boardTeamKey(a.server, a.board), item: Number(x.id) }); }).catch(e => { err.textContent = e.message || 'The item could not be opened.'; }); });
         links.append(b);
