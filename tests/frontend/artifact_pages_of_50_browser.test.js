@@ -1,57 +1,66 @@
-// #13161: a computer answers at most 50 artifacts a request, and the page asks for the next 50: every walk of a team's artifacts (the Needs you scan, the viewer's review state, the tags read before a write) advances by
-// what the computer returned and its cursor, not by the 200 an older page asked for. A stub team of 130 files for review answers 50 at a time with a cursor (a new computer) or whole pages of up to 200 with no cursor
-// (an older one): every file is found either way, none twice.
+// #13161/#13958: protected computer windows read 50, append explicitly, and
+// resolve an off-page file by digest. A missing cursor is an incomplete read,
+// retaining the prior window; it never starts a legacy whole-list/offset walk.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
-
 const N = 130;
-const hexOf = i => String(i + 1).padStart(64, 'a').replace(/^a+/, m => m.replace(/a/g, '0')).slice(-64);
+const hexOf = i => String(i + 1).padStart(64, '0');
 
 (async () => {
-    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
+    const S = `(window.__coralStatic || '/static/')`;
     try {
         await Page.enable(); await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const real = window.fetch, N = ${N}; window.__mode = 'new'; window.__calls = [];
+        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => {
+            const real = window.fetch, N = ${N}; window.__mode = 'cursor'; window.__calls = [];
             const hex = i => String(i + 1).padStart(64, '0');
-            const art = i => ({ id: 'a-' + i, uri: 'coral://artifacts/' + hex(i), tags: ['for review'], name: 'file-' + String(i).padStart(3, '0') + '.html', created_at: new Date(Date.UTC(2026, 10, 4, 0, 0, 0) - i * 1000).toISOString(), available: true, produced_by: 'Dev', session_id: 's-' + i });
-            const savedArt = i => ({ ...art(i), id: 's-' + i, uri: 'coral://artifacts/' + hex(i + 1000), name: 'saved-' + String(i).padStart(3, '0') + '.html', tags: ['saved', 'for review'], session_id: 'ss-' + i });
-            const json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
-            window.fetch = (u, o) => { const url = window.__reviewFixtureURL(String(u), location.href), p = url.pathname;
-                if (p === '/api/board/projects') return json([{ project: 't1' }]);
-                if (p === '/api/board/t1/artifacts') { const tag = url.searchParams.get('tag'); window.__calls.push(url.search);
-                    if (tag !== 'for review' && tag !== 'saved') return json({ has_more: false, artifacts: [] });
-                    const asked = Number(url.searchParams.get('limit') || 100), cursor = url.searchParams.get('cursor'), start = cursor ? Number(cursor) : Number(url.searchParams.get('offset') || 0);
-                    // what a computer answers: 'new' 50 with a cursor; 'old' what was asked (up to 200) with none; 'odd' 70 a page whatever was asked, none; 'mixed' 50 with a cursor first, then 40 a page with none
-                    const size = window.__mode === 'new' ? Math.min(asked, 50) : window.__mode === 'old' ? Math.min(asked, 200) : window.__mode === 'odd' ? 70 : (start === 0 && !cursor ? 50 : 40);
-                    const withCursor = window.__mode === 'new' || (window.__mode === 'mixed' && start === 0 && !cursor);
-                    const make = tag === 'saved' ? savedArt : art, page = []; for (let i = start; i < Math.min(N, start + size); i++) page.push(make(i));
-                    const more = start + page.length < N;
-                    return json({ artifacts: page, limit: size, offset: start, has_more: more, ...(withCursor && more ? { next_cursor: String(start + page.length) } : {}), total: N }); }
-                return real(u, o); }; })();` });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
-        const S = `(window.__coralStatic || '/static/')`;
-        for (const mode of ['new', 'old', 'odd', 'mixed']) {
-            await ev(`window.__mode = '${mode}'; window.__calls.length = 0; true`);
-            const found = await ev(`(async () => { const M = await import(${S} + 'inbox_reviews.js'); await M.refreshReviews(true); const names = M.reviewItems().map(a => a.name), sv = M.savedFiles().map(a => a.name); return { n: names.length, distinct: new Set(names).size, saved: sv.length, savedDistinct: new Set(sv).size }; })()`);
-            assert.deepEqual(found, { n: N, distinct: N, saved: N, savedDistinct: N }, `${mode} computer: the scan finds all ${N} files for review and all ${N} saved files, each once: ${JSON.stringify(found)}`);
-            const sizes = await ev(`window.__calls.filter(c => /tag=for/.test(c)).length`);
-            const asked = await ev(`window.__calls.map(c => (/limit=(\\d+)/.exec(c) || [])[1])`);
-            assert.ok(asked.length > 0 && asked.every(l => l === '50' || l === '200'), `${mode}: private review pages use 50; legacy Saved pages use 200: ${JSON.stringify(asked)}`);
-            const requests = await ev(`window.__calls.map(c => { const p=new URLSearchParams(c); return {tag:p.get('tag'),limit:p.get('limit')}; })`);
-            assert.ok(requests.filter(r=>r.tag==='for review').every(r=>r.limit==='50'), 'private review walk uses its starred-first 50-row contract');
-            assert.ok(requests.filter(r=>r.tag==='saved').every(r=>r.limit==='200'), 'Saved retains its existing walk size');
-            if (mode === 'old') assert.equal(sizes, 3, `private review pages stay bounded at 50 even when an old fixture can return 200: ${sizes}`);
-            if (mode === 'new') assert.ok(sizes >= 3, `a computer of 50 a page took ${sizes} reads of for review for 130 files`);
-            assert.ok(sizes <= 6, `${mode} computer: the walk ended, no page was asked for again and again: ${sizes} reads of for review`);
-            const state = await ev(`(async () => { const R = await import(${S} + 'artifact_review.js'); const s = await R.reviewStateOf('t1', '${'0'.repeat(61)}120'); return s ? s.state : null; })()`);
-            assert.equal(state, 'pending', `${mode} computer: a file on page 3 has its review state read (it was past page 1 and 2)`);
-            const tags = await ev(`(async () => { const M = await import(${S} + 'inbox_reviews.js'); return M.currentTags({ team: 't1', id: 'a-119' }); })()`);
-            assert.deepEqual(tags, ['for review'], `${mode} computer: the tags of file 119 are read (on page 3)`);
-        }
-        console.log('PASS');
-    } finally { try { client.close(); } catch (e) {} }
-})().catch(e => { console.error(e); process.exit(1); });
+            const art = i => ({ id: hex(i), uri: 'coral://artifacts/' + hex(i), tags: ['for review'], name: 'file-' + String(i).padStart(3, '0') + '.html', created_at: new Date(Date.UTC(2026, 10, 4) - i * 1000).toISOString(), available: true, produced_by: 'Dev', session_id: 's-' + i });
+            const savedArt = i => ({ ...art(i), id: hex(i + 1000), uri: 'coral://artifacts/' + hex(i + 1000), name: 'saved-' + String(i).padStart(3, '0') + '.html', tags: ['saved', 'for review'], session_id: 'ss-' + i });
+            const reviews = Array.from({length: N}, (_, i) => art(i)), saved = Array.from({length: N}, (_, i) => savedArt(i));
+            window.fetch = (input, options) => {
+                const url = new URL(String(input), location.href);
+                // Each independent stream supplies its complete fixture population.
+                const collection = url.searchParams.get('tag') === 'saved' ? saved : url.searchParams.get('tag') === 'for review' ? reviews : [...reviews, ...saved];
+                const body = window.__reviewFixturePage(url, location.href, { t1: collection });
+                if (body) {
+                    window.__calls.push(url.search);
+                    if (window.__mode === 'missing-cursor' && body.has_more && url.searchParams.get('limit') === '50') delete body.next_cursor;
+                    return Promise.resolve(Response.json(body));
+                }
+                return real(input, options);
+            };
+        })();` });
+        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
+        const first = await ev(`(async () => { window.__M = await import(${S} + 'inbox_reviews.js'); await window.__M.refreshReviews(true); return { review: window.__M.reviewItems().length, saved: window.__M.savedFiles().length }; })()`);
+        assert.deepEqual(first, { review: 50, saved: 50 }, 'one first page per independent stream');
+        assert.ok(await ev(`window.__calls.every(c => !new URLSearchParams(c).has('cursor'))`), 'opening never drains cursor pages');
+        const before = await ev(`window.__calls.length`);
+        assert.equal(await ev(`import(${S} + 'artifact_review.js').then(m => m.reviewStateOf('t1', '${hexOf(119)}')).then(s => s && s.state)`), 'pending');
+        assert.deepEqual(await ev(`window.__M.currentTags({team: 't1', id: '${hexOf(119)}'})`), ['for review']);
+        const exact = await ev(`window.__calls.slice(${before}).map(c => Object.fromEntries(new URLSearchParams(c)))`);
+        assert.equal(exact.length, 2, 'viewer state and fresh tags each use one targeted read');
+        assert.ok(exact.every(q => q.digest === hexOf(119) && q.team === 't1' && !q.cursor), 'off-page lookups are source/team/digest scoped, without a scan');
+
+        await ev(`window.__mode = 'missing-cursor'; window.__M.refreshReviews(true)`);
+        assert.equal(await ev(`window.__M.reviewItems().length`), 50, 'an unusable refresh keeps the review window');
+        assert.equal(await ev(`window.__M.savedFiles().length`), 50, 'and the Saved window');
+        assert.match(await ev(`window.__M.reviewPages()[0].error`), /cursor/, 'the incomplete answer is reported');
+        await ev(`window.__mode = 'cursor'; window.__M.refreshReviews(true)`);
+        assert.equal(await ev(`window.__M.reviewPages()[0].error`), '', 'a valid refresh recovers');
+
+        await ev(`window.__M.loadMoreReviews('local')`);
+        assert.equal(await ev(`window.__M.reviewItems().length`), 100);
+        assert.equal(await ev(`window.__M.savedFiles().length`), 50, 'review append does not advance Saved');
+        await ev(`window.__M.loadMoreSavedFiles('local')`);
+        assert.equal(await ev(`window.__M.savedFiles().length`), 100);
+        await ev(`Promise.all([window.__M.loadMoreReviews('local'), window.__M.loadMoreSavedFiles('local')])`);
+        const all = await ev(`({review: window.__M.reviewItems().length, saved: window.__M.savedFiles().length, unique: new Set(window.__M.reviewItems().map(r=>r.reviewKey)).size, savedCount: window.__M.countSavedReviews().value, more: window.__M.reviewPages()[0].has_more})`);
+        assert.deepEqual(all, { review: N, saved: N, unique: N, savedCount: N, more: false }, 'explicit pages find each file once and retain authoritative metadata');
+        const requests = await ev(`window.__calls.map(c => Object.fromEntries(new URLSearchParams(c)))`);
+        assert.ok(requests.every(q => q.limit === '50' || q.limit === '1'), 'no 200-row requests');
+        assert.ok(requests.every(q => !q.offset), 'no automatic legacy offset fallback');
+        console.log('PASS protected 50-row windows, explicit independent append, retained failed refresh and exact off-page lookups');
+    } finally { await client.close(); }
+})().catch(error => { console.error(error); process.exitCode = 1; });
