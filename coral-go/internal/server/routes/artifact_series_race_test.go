@@ -79,7 +79,7 @@ func TestAReadWithAGoodIndexWalksNoUploadRecords(t *testing.T) {
 	}
 	idx.Versions = idx.Versions[:2]
 	require.NoError(t, writeSeriesIndex(rig.coralDir, idx))
-	code, out := rig.uploadVersion("a1", "plan.txt", "plan, fourth draft", "coral://artifacts/series/"+sid)
+	code, out := rig.uploadVersion("a1", "plan.txt", "plan, fourth draft", "coral://artifacts/"+d[2])
 	require.Equal(t, http.StatusCreated, code, "%v", out)
 	healed, _ := readSeriesIndex(rig.coralDir, sid)
 	assert.Len(t, healed.Versions, 4, "the version the stale index lacked is in it now")

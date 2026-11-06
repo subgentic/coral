@@ -65,7 +65,7 @@ func seriesOf(t *testing.T, rig *artifactRig) (string, [3]string) {
 	assert.EqualValues(t, 2, out["version"])
 	assert.EqualValues(t, 2, out["versions"])
 	v2 := strings.TrimPrefix(out["uri"].(string), "coral://artifacts/")
-	code, out = rig.uploadVersion("a2", "plan.txt", "plan, third draft", "coral://artifacts/series/"+sid)
+	code, out = rig.uploadVersion("a2", "plan.txt", "plan, third draft", "coral://artifacts/"+v2)
 	require.Equal(t, http.StatusCreated, code, out)
 	assert.EqualValues(t, 3, out["version"])
 	assert.Equal(t, sid, out["series_id"])
@@ -167,47 +167,51 @@ func TestASeriesHoldsAtMostTheCap(t *testing.T) {
 	prev := seriesVersionCap
 	seriesVersionCap = 3
 	t.Cleanup(func() { seriesVersionCap = prev })
-	sid, _ := seriesOf(t, rig) // three versions: full
-	code, out := rig.uploadVersion("a1", "plan.txt", "plan, fourth draft", "coral://artifacts/series/"+sid)
+	sid, d := seriesOf(t, rig) // three versions: full
+	code, out := rig.uploadVersion("a1", "plan.txt", "plan, fourth draft", "coral://artifacts/"+d[2])
 	assert.Equal(t, http.StatusConflict, code, out)
 	assert.Equal(t, "series_full", out["code"])
 	assert.Len(t, seriesMembers(rig.coralDir, sid), 3)
 }
 
-func TestTwoAgentsAddingVersionsAtOnceGetDistinctNumbers(t *testing.T) {
+// #13792: many agents uploading at once from the newest version: one wins and gets the next number, the others are told the base is stale (their base is no longer the newest); the series never forks and no number is given twice.
+func TestManyAgentsAddingVersionsAtOnceFromTheSameBaseAreOneWinnerAndTheRestStale(t *testing.T) {
 	rig, _ := ownerRig(t)
-	sid, _ := seriesOf(t, rig)
+	sid, d := seriesOf(t, rig)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	got := map[int]bool{}
+	created, refused := 0, 0
 	for i := 0; i < 12; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			who := []string{"a1", "a2"}[i%2]
-			code, out := rig.uploadVersion(who, "plan.txt", fmt.Sprintf("a concurrent draft %d", i), "coral://artifacts/series/"+sid)
-			if code != http.StatusCreated {
-				t.Errorf("upload %d: %d %v", i, code, out)
-				return
-			}
+			code, out := rig.uploadVersion(who, "plan.txt", fmt.Sprintf("a concurrent draft %d", i), "coral://artifacts/"+d[2])
 			mu.Lock()
 			defer mu.Unlock()
-			n := int(out["version"].(float64))
-			if got[n] {
-				t.Errorf("version %d given twice", n)
+			switch code {
+			case http.StatusCreated:
+				created++
+				assert.EqualValues(t, 4, out["version"])
+			case http.StatusConflict:
+				refused++
+				assert.Equal(t, "stale_base", out["code"])
+			default:
+				t.Errorf("upload %d: %d %v", i, code, out)
 			}
-			got[n] = true
 		}()
 	}
 	wg.Wait()
+	assert.Equal(t, 1, created, "one winner")
+	assert.Equal(t, 11, refused, "the rest are stale")
 	ms := seriesMembers(rig.coralDir, sid)
-	require.Len(t, ms, 15, "three and twelve")
+	require.Len(t, ms, 4, "three and the winner")
 	for i, m := range ms {
 		assert.Equal(t, i+1, m.N, "numbers are consecutive, none twice")
 	}
 	idx, ok := readSeriesIndex(rig.coralDir, sid)
 	require.True(t, ok)
-	assert.Len(t, idx.Versions, 15, "the index agrees")
+	assert.Len(t, idx.Versions, 4, "the index agrees")
 }
 
 func TestTheSeriesLinkRedirectsToTheNewestVersionTheCallerCanRead(t *testing.T) {
@@ -322,7 +326,7 @@ func TestTheRecordsWinOverTheIndex(t *testing.T) {
 		assert.Equal(t, i+1, m.N)
 		assert.Equal(t, "team-a", m.Board, "owner and uploader come from the records, not the index")
 	}
-	code, out := rig.uploadVersion("a1", "plan.txt", "plan, fourth draft", "coral://artifacts/series/"+sid)
+	code, out := rig.uploadVersion("a1", "plan.txt", "plan, fourth draft", "coral://artifacts/"+d[2])
 	assert.Equal(t, http.StatusCreated, code, "the index says team-b owns it; the records say team-a: team-a may add: %v", out)
 }
 
@@ -346,7 +350,7 @@ func TestDeletingAVersionLeavesTheOthersTheirNumbersAndASeriesDeleteTakesAllOfTh
 	require.True(t, ok)
 	assert.Len(t, idx.Versions, 2, "the index forgot it")
 	// a new version after the gap numbers on from the newest
-	code, out := rig.uploadVersion("a1", "plan.txt", "plan, fourth draft", "coral://artifacts/series/"+sid)
+	code, out := rig.uploadVersion("a1", "plan.txt", "plan, fourth draft", "coral://artifacts/"+d[2])
 	require.Equal(t, http.StatusCreated, code, out)
 	assert.EqualValues(t, 4, out["version"])
 

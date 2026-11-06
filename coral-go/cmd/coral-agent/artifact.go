@@ -34,9 +34,14 @@ another task of yours instead; --no-task links it to none. A task that is not yo
 nothing is stored.
 
 --new-version-of adds the file as a new version of an artifact this agent's board uploaded (its
-coral://artifacts/<digest> link, or a series link coral://artifacts/series/<id>): the reply carries
+coral://artifacts/<digest> link): the reply carries
 series_id, version and versions. Same bytes as the newest version add nothing (exit 0); same
 bytes as an older version are refused (non-zero), so nobody takes it for the newest.
+Name the version you EDITED: fetch the newest version first, edit it,
+and pass ITS link to --new-version-of. If a newer version exists (a person's save in the editor, or
+another agent's upload), nothing is stored and Coral answers 409 with the newest link and the
+download line to run: fetch it, redo your change on it, upload again. A series link names no version,
+so it is refused too. A first upload that is a version of nothing needs no --new-version-of.
 
 --tag puts a word on the file in your team's Artifacts tab (repeat it, at most 5 in all; lowercase letters, digits, spaces and
 hyphens, 24 characters at most): tag a file "for review" when a person must look at it, decide, or approve it, and logs and

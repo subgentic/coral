@@ -313,6 +313,12 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 				return
 			}
 			stamp = &plan.stamp
+			if !autoChain { // the base the upload names must be the newest, whoever made the newer version (#13792); nothing is stored, and the series lock is let go by the defer
+				if sb, stale := plan.staleBase(); stale {
+					staleBaseRefusal(w, plan, sb)
+					return
+				}
+			}
 		}
 	}
 	meta, fresh, err := storeArtifactFile(coralDir, sid, name, mediaType, tmpPath, hexID, size, stamp, taskID)

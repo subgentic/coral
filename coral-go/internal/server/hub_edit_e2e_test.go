@@ -122,7 +122,6 @@ func TestTheMarkdownSaveWorksThroughAStampedProxyAndATunnelledOwnerAndRefusesEve
 	assert.Equal(t, 403, rec.Code, rec.Body.String())
 }
 
-
 // #13694: every stamped click of the self-hosted Hub is recorded in the Activity record as the Hub's: the original eight routes (generation 1: a message to an agent), the Activity clicks of generation 2 (a
 // task is created) and the editor's save (3), and a click of this computer's own page stays local.
 func TestEveryStampedClickIsRecordedAsComingThroughTheHub(t *testing.T) {
