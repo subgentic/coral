@@ -3,6 +3,8 @@
 package agent
 
 import (
+	"log/slog"
+	"path/filepath"
 	"strings"
 
 	"github.com/subgentic/coral/internal/psquote"
@@ -54,6 +56,16 @@ func shellSafeByte(c byte) bool {
 // part that is the command gets PowerShell's call operator (&), since a bare quoted
 // string is an expression, not a command.
 func ShellJoin(parts []string, raw ...string) string {
+	parts = unwrapBatchShim(resolveBareProgram(parts, raw), raw) // a .cmd would read the prompt again with cmd's rules
+	notice := ""
+	if p, r, n, changed := withoutPromptForBatch(parts, raw); changed {
+		parts, raw, notice = p, r, n
+		slog.Warn("agent CLI is a .cmd that is not npm's: it is started without the first message", "cli", filepath.Base(p[programIndex(p, r)]))
+	}
 	legacy := legacyNativeArgs()
-	return joinQuoted(parts, raw, func(s string) string { return psQuote(s, legacy) }, true)
+	line := joinQuoted(parts, raw, func(s string) string { return psQuote(s, legacy) }, true)
+	if notice != "" {
+		line = "Write-Host " + psquote.Literal(notice) + " -ForegroundColor Yellow; " + line
+	}
+	return line
 }
