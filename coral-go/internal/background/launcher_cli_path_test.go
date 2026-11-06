@@ -16,6 +16,7 @@ import (
 
 	"github.com/subgentic/coral/internal/agent"
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -253,7 +254,10 @@ func cliStubsOnPath(t *testing.T, names ...string) {
 	for _, n := range names {
 		file, body := n, "#!/bin/sh\nexit 0\n"
 		if runtime.GOOS == "windows" {
-			file, body = n+".cmd", "@exit /b 0\r\n"
+			// A CLI installed by npm: its .cmd runs a program, here a tiny one that exits 0 (never this test binary: a CLI probe that started it would run the suite again, and probe again).
+			// A plain wrapper script is a CLI that Coral starts without the launch prompt.
+			exe := consoletest.StubProgram(t)
+			file, body = n+".cmd", "@ECHO off\r\nSETLOCAL\r\n\""+exe+"\"   %*\r\n"
 		}
 		require.NoError(t, os.WriteFile(filepath.Join(dir, file), []byte(body), 0o755))
 	}

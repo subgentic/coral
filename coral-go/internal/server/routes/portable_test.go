@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 // stubCLI is a harmless stand-in for an agent CLI, for a test that launches or restarts an agent but must
@@ -15,8 +17,11 @@ func stubCLI(t *testing.T) string {
 	if runtime.GOOS != "windows" {
 		return "/usr/bin/true"
 	}
+	// A CLI installed by npm: its .cmd runs a program, here a tiny one that exits 0 (never this test binary: a CLI probe that started it would run the suite again, and probe again). A plain wrapper script
+	// would be a CLI that Coral starts without the launch prompt, which is not what these tests are about.
+	exe := consoletest.StubProgram(t)
 	p := filepath.Join(t.TempDir(), "true.cmd")
-	if err := os.WriteFile(p, []byte("@exit /b 0\r\n"), 0o755); err != nil {
+	if err := os.WriteFile(p, []byte("@ECHO off\r\nSETLOCAL\r\n\""+exe+"\"   %*\r\n"), 0o755); err != nil {
 		t.Fatalf("write the stub CLI: %v", err)
 	}
 	return p
