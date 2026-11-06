@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -85,6 +86,19 @@ func TestHelperUse(t *testing.T) {
 // The child's Use must leave those values alone (QA's cause of #177's failures); the same child started with go test's flag and no marker would be changed.
 func TestAHelperChildKeepsTheEnvironmentItsParentGaveIt(t *testing.T) {
 	data, home := t.TempDir(), t.TempDir()
+	// The child runs with HOME=home, and the Go runtime of any process writes its telemetry counters under the user's config folder (HOME/Library/Application Support/go/telemetry, or HOME/.config/go/telemetry)
+	// as it starts and ends. On a loaded machine that write can still be going while the TempDir cleanup lists the folder, which then fails "directory not empty" (#13925). So the folders are emptied here, trying again
+	// until nothing is being written, before the TempDir cleanup (which runs after this one) removes them.
+	t.Cleanup(func() {
+		for _, dir := range []string{home, data} {
+			for i := 0; i < 100; i++ {
+				if err := os.RemoveAll(dir); err == nil {
+					break
+				}
+				time.Sleep(50 * time.Millisecond) // sleep-ok: waiting for a child's last telemetry write to land, bounded by the loop
+			}
+		}
+	})
 	run := func(extraArg string, env ...string) string {
 		args := []string{"-test.run=^TestHelperUse$", "-test.v"}
 		if extraArg != "" {
