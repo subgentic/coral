@@ -149,6 +149,11 @@ func (h *SessionsHandler) LifecycleLog(w http.ResponseWriter, r *http.Request) {
 	if rows == nil {
 		rows = []board.LifecycleEntry{}
 	}
+	for i := range rows { // the session id a finished launch row keeps for the live cap is bookkeeping, never a sentence for a person (#13903)
+		if strings.HasPrefix(rows[i].Note, board.LaunchedSessionNotePrefix) {
+			rows[i].Note = ""
+		}
+	}
 	writeJSON(w, http.StatusOK, rows)
 }
 

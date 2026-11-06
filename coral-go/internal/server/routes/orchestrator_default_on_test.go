@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -366,6 +367,21 @@ func TestEverySpellingOfSomewhereElseIsHeldToTheCallersTeam(t *testing.T) {
 	code, out = launch(map[string]any{"working_dir": t.TempDir(), "board_name": "elsewhere4", "new_board": true})
 	assert.Equal(t, http.StatusForbidden, code, out)
 	assert.Equal(t, "outside_team_folder", out["code"])
+	// a launch placed on another computer's board, or a team launch placed there, with a folder outside the team is refused the same way
+	code, out = launch(map[string]any{"working_dir": t.TempDir(), "board_name": "far", "board_server": "faraway"})
+	assert.Equal(t, http.StatusForbidden, code, "another computer's board, outside the team's folder: %v", out)
+	assert.Equal(t, "outside_team_folder", out["code"])
+	bf, _ := json.Marshal(map[string]any{"board_name": "far2", "board_server": "faraway", "working_dir": t.TempDir(), "agent_type": "claude", "agents": []map[string]any{{"name": "R1", "prompt": "work"}}})
+	code, out = r.do("POST", "/api/sessions/launch-team", string(bf), nil, r.tok["Dev2"])
+	assert.Equal(t, http.StatusForbidden, code, "a team launch placed on another computer, outside the team's folder: %v", out)
+	assert.Equal(t, "outside_team_folder", out["code"])
+	// the log the Operator reads carries no "session <id>" note: that is bookkeeping for the cap
+	code, rawLog := r.doList("GET", "/api/board/"+orchBoard+"/lifecycle-log", operatorClient)
+	require.Equal(t, http.StatusOK, code)
+	require.NotEmpty(t, rawLog)
+	for _, e := range rawLog {
+		assert.NotContains(t, fmt.Sprint(e["note"]), "session ", "the launch row's session note is not shown: %v", e)
+	}
 	// a team launch: raise the cap to leave room for one, two members go to a new board: one starts, one is refused with the cap named
 	code, _ = r.operatorGrant("Orchestrator", map[string]any{"max_live": 4, "max_per_hour": 50})
 	require.Equal(t, http.StatusOK, code)
@@ -424,4 +440,16 @@ func TestOnlyTheHubOwnersTeamLaunchSeedsTheGrant(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, g.Enabled, "a Hub user at the Launch tier is not the Operator: no grant")
 	assert.Empty(t, g.SeatSession)
+}
+
+// doList is r.do for an answer that is a JSON list.
+func (r *orchRig) doList(method, path string, client *http.Client) (int, []map[string]any) {
+	r.t.Helper()
+	req, _ := http.NewRequest(method, r.server+path, nil)
+	resp, err := client.Do(req)
+	require.NoError(r.t, err)
+	defer resp.Body.Close()
+	var out []map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&out)
+	return resp.StatusCode, out
 }
