@@ -25,16 +25,51 @@ function inlineRuns(tokens, raw, base, out) {
     }
     return true;
 }
-function listRuns(token, base, runs, units) {
+// Each logical character keeps its verified original position while container prefixes
+// are removed. Only leading marker/indent bytes may disappear; prose is never searched past.
+function itemView(raw, text, positions) {
+    const lines = raw.split('\n'), wanted = text.split('\n'), out = []; let offset = 0;
+    if (wanted.length > lines.length) return null;
+    for (let i = 0; i < wanted.length; i++) {
+        const line = lines[i], content = wanted[i], cut = line.length - content.length;
+        if (cut < 0 || line.slice(cut) !== content) return null;
+        const prefix = line.slice(0, cut);
+        if (i === 0 ? !/^ {0,3}(?:[-+*]|\d{1,9}[.)])[ \t]+(?:\[[ xX]\][ \t]*)?$/.test(prefix) : !/^[ \t]*$/.test(prefix)) return null;
+        for (let j = 0; j < content.length; j++) out.push(positions[offset + cut + j]);
+        if (i < wanted.length - 1) out.push(positions[offset + line.length]);
+        if (i === wanted.length - 1) out.push(positions[offset + line.length]);
+        offset += line.length + 1;
+    }
+    if (lines.slice(wanted.length).some(line => line.trim())) return null;
+    return { text, positions: out };
+}
+function listRuns(token, view, runs, units, source) {
     let cursor = 0;
     for (const item of token.items) {
-        const at = token.raw.indexOf(item.raw, cursor); if (at < 0) return false;
+        const at = view.text.indexOf(item.raw, cursor); if (at < 0 || view.text.slice(cursor, at).trim()) return false;
         cursor = at + item.raw.length;
-        // Nested/multiline lists need an indentation-aware source map; leave the block alone for now.
-        if (item.tokens.some(t => !['text', 'paragraph'].includes(t.type))) return false;
-        const first = runs.length;
-        if (!inlineRuns(item.tokens, item.raw, base + at, runs)) return false;
-        units.push({ start: base + at, end: base + at + item.raw.length, first, count: runs.length - first });
+        const content = itemView(item.raw, item.text, view.positions.slice(at, at + item.raw.length + 1)); if (!content) return false;
+        const lineStart = source.lastIndexOf('\n', content.positions[0] - 1) + 1;
+        const prefix = source.slice(lineStart, content.positions[0]).replace(/(?:[-+*]|\d{1,9}[.)])[ \t]+(?:\[[ xX]\][ \t]*)?$/, marker => ' '.repeat(marker.replace(/\[[ xX]\][ \t]*$/,'').length));
+        const first = runs.length; let inner = 0;
+        for (const child of item.tokens) {
+            // Marked text.raw can duplicate a continuation newline; text is the verified item-content spelling.
+            const childRaw = child.type === 'text' ? child.text : child.raw;
+            const where = content.text.indexOf(childRaw, inner); if (where < 0 || content.text.slice(inner, where).trim()) return false;
+            inner = where + childRaw.length;
+            if (child.type === 'space') continue;
+            if (child.type === 'list') {
+                if (!listRuns(child, { text: child.raw, positions: content.positions.slice(where, inner + 1) }, runs, units, source)) return false;
+            } else if (['text','paragraph'].includes(child.type)) {
+                const local = []; if (!inlineRuns(child.tokens, childRaw, where, local)) return false;
+                if (!local.length && child.text) return false;
+                for (const run of local) {
+                    const pos = content.positions.slice(run.start, run.end + 1);
+                    runs.push({ ...run, start: pos[0], end: pos[pos.length - 1], sourceOffsets: pos, newlinePrefix: run.kind === 'text' ? prefix : null });
+                }
+            } else return false;
+        }
+        units.push({ start: view.positions[at], end: view.positions[cursor], first, count: runs.length - first });
     }
     return true;
 }
@@ -49,10 +84,10 @@ export function analyze(source, marked) {
         else if (type === 'paragraph' || type === 'heading') {
             if (!inlineRuns(tokens.tokens, raw, start, block.runs)) block.reason = 'Text does not map exactly';
             block.units.push({ start, end: start + raw.length, first: 0, count: block.runs.length });
-        } else if (type === 'list') { if (!listRuns(tokens, start, block.runs, block.units)) block.reason = 'Nested or indented list'; }
+        } else if (type === 'list') { if (!listRuns(tokens, { text: raw, positions: Array.from({length:raw.length+1},(_,i)=>start+i) }, block.runs, block.units, text)) block.reason = 'Nested or indented list'; }
         else block.reason = ({ table: 'Table', code: 'Code block', html: 'Raw HTML', frontmatter: 'Front matter', definition: 'Reference definition', blockquote: 'Quoted block', hr: 'Divider' })[type] || 'Unsupported block';
         if (block.reason) block.runs = [];
-        block.runs = block.runs.map(run => ({ ...run, start: offsets[run.start], end: offsets[run.end] }));
+        block.runs = block.runs.map(run => ({ ...run, start: offsets[run.start], end: offsets[run.end], ...(run.sourceOffsets ? {sourceOffsets:run.sourceOffsets.map(i=>offsets[i])} : {}) }));
         blocks.push(block);
     };
     if (front) { add(front[0], 0, 'frontmatter'); offset = front[0].length; }
@@ -82,54 +117,54 @@ export function mapRenderedBlock(block, element) {
         const node = walker.currentNode;
         if (node.parentElement.closest('p,h1,h2,h3,h4,h5,h6,li') && !node.parentElement.closest('pre')) nodes.push(node);
     }
-    // No search/guess through repeated prose: every visible node must align, in order.
-    if (nodes.length !== block.runs.length || nodes.some((n, i) => n.data !== block.runs[i].text)) return { exact: false, entries: [] };
-    return { exact: true, entries: nodes.map((node, i) => ({ node, run: block.runs[i] })) };
+    const planned = new Map(); let index = 0, at = 0;
+    for (const run of block.runs) {
+        if (!run.text) return {exact:false,entries:[]};
+        for (;;) {
+            const node = nodes[index]; if (!node) return {exact:false,entries:[]};
+            let rest = node.data.slice(at);
+            if (!rest.startsWith(run.text)) { const leading = /^\s*/.exec(rest)[0]; if (leading && rest.slice(leading.length).startsWith(run.text)) { at += leading.length; rest = node.data.slice(at); } }
+            if (rest.startsWith(run.text)) { if (!planned.has(node)) planned.set(node,[]); planned.get(node).push({node,start:at,end:at+run.text.length,run}); at += run.text.length; break; }
+            if (!rest.trim()) { index++; at = 0; continue; }
+            return {exact:false,entries:[]};
+        }
+    }
+    if (nodes.slice(index).some((node,i)=>node.data.slice(i===0?at:0).trim())) return {exact:false,entries:[]};
+    // Split only after the complete mapping is verified, leaving renderer whitespace intact.
+    const entries = [];
+    for (const node of nodes) {
+        const parts = planned.get(node) || []; if (!parts.length) continue;
+        const fragment = document.createDocumentFragment(); let cursor = 0;
+        for (const part of parts) {
+            if (part.start > cursor) fragment.append(document.createTextNode(node.data.slice(cursor,part.start)));
+            const text = document.createTextNode(node.data.slice(part.start,part.end)); fragment.append(text); entries.push({node:text,run:part.run}); cursor = part.end;
+        }
+        if (cursor < node.data.length) fragment.append(document.createTextNode(node.data.slice(cursor)));
+        node.replaceWith(fragment);
+    }
+    return {exact:true,entries};
 }
 const escapeInserted = s => s.replace(/[\\\x60*_[\]<>~!|#()+.\-]/g, '\\$&');
 export function editRun(source, run, text) {
     const original = normalizeSource(source.slice(run.start, run.end));
-    if (!run.editable || original.text !== run.text) throw new Error('This text cannot be changed without affecting its Markdown.');
+    const mapped = run.sourceOffsets ? run.text.split('').every((c,i)=>(source[run.sourceOffsets[i]]==='\r'?'\n':source[run.sourceOffsets[i]])===c) : original.text === run.text;
+    if (!run.editable || !mapped) throw new Error('This text cannot be changed without affecting its Markdown.');
     if (HIDDEN.test(text)) throw new Error('Hidden and bidirectional characters cannot be inserted here.');
     // Work in Unicode code points so an emoji is never split between surrogate halves.
     const before = Array.from(run.text), after = Array.from(text); let a = 0, b = 0;
     while (a < before.length && a < after.length && before[a] === after[a]) a++;
     while (b < before.length - a && b < after.length - a && before[before.length - 1 - b] === after[after.length - 1 - b]) b++;
     const removed = before.slice(a, before.length - b).join(''), inserted = after.slice(a, after.length - b).join('');
-    if (/[\r\n]/.test(removed + inserted)) throw new Error('Edit words within one text run; changing line breaks is not supported.');
+    if (/[\r\n]/.test(removed + inserted) && run.newlinePrefix == null) throw new Error('Edit words within one text run; changing line breaks is not supported.');
     if (run.kind === 'code' && /\x60/.test(inserted)) throw new Error('A code-span delimiter cannot be edited.');
-    const start = run.start + original.offsets[before.slice(0, a).join('').length], end = run.start + original.offsets[run.text.length - before.slice(before.length - b).join('').length];
-    const replacement = run.kind === 'code' ? inserted : escapeInserted(inserted);
+    const positions = run.sourceOffsets || original.offsets.map(i=>run.start+i);
+    const start = positions[before.slice(0, a).join('').length], end = positions[run.text.length - before.slice(before.length - b).join('').length];
+    let replacement = run.kind === 'code' ? inserted : escapeInserted(inserted);
+    if (run.newlinePrefix != null) replacement = replacement.replace(/\r?\n/g, (source.includes('\r\n')?'\r\n':'\n') + run.newlinePrefix);
     return { source: source.slice(0, start) + replacement + source.slice(end), patch: { start, end, removed: source.slice(start, end), inserted: replacement } };
 }
 
 /** Visible names for invisible characters; the source itself is never changed. */
 export function visibleSpecials(text) {
     return String(text).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u061c\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/g, c => `⟦U+${c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}⟧`);
-}
-
-/** Reapply only whole edited blocks whose original bytes have one unambiguous match
- * in the newest source. Construct from newest bytes; never serialize or replace a
- * block the agent changed. Ambiguous blocks are left for the person to redo. */
-export function reapplyEdits(base, draft, newest, marked) {
-    const before = analyze(base, marked).blocks, after = analyze(draft, marked).blocks, current = analyze(newest, marked).blocks;
-    if (before.length !== after.length) return { ok: false };
-    const counts = new Map(), locations = new Map(), edits = []; let left = 0, right = 0;
-    for (const b of before) { const raw = base.slice(b.start, b.end); counts.set(raw, (counts.get(raw) || 0) + 1); }
-    for (const b of current) { const raw = newest.slice(b.start, b.end), list = locations.get(raw) || []; list.push(b); locations.set(raw, list); }
-    for (let i = 0; i < before.length; i++) {
-        const b = before[i], d = after[i];
-        if (b.type !== d.type || base.slice(left, b.start) !== draft.slice(right, d.start)) return { ok: false };
-        const raw = base.slice(b.start, b.end), changed = draft.slice(d.start, d.end);
-        if (raw !== changed) {
-            const matches = locations.get(raw) || [];
-            if (b.reason || d.reason || counts.get(raw) !== 1 || matches.length !== 1 || matches[0].type !== b.type) return { ok: false };
-            edits.push({ start: matches[0].start, end: matches[0].end, text: changed });
-        }
-        left = b.end; right = d.end;
-    }
-    if (base.slice(left) !== draft.slice(right)) return { ok: false };
-    let source = newest;
-    for (const edit of edits.sort((a, b) => b.start - a.start)) source = source.slice(0, edit.start) + edit.text + source.slice(edit.end);
-    return { ok: true, source, changed: edits.length > 0 };
 }

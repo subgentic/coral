@@ -26,7 +26,7 @@ export function createMarkdownEditor({ body, footer, dialog, context, source: in
     let source = initialSource, original = initialSource, busy = false, dead = false, composing = false, confirmOpen = false, latest = null, pendingText = false, baseDigest = context.hex;
     const keptDrafts = [];
     const status = el('p', 'amd-status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
-    const hint = el('p', 'amd-hint', 'Edit words in the highlighted text. Enter applies a change; Escape cancels it. Formatting and read-only blocks stay in place.');
+    const hint = el('p', 'amd-hint', 'Edit words in the highlighted text. Enter continues a list item or applies a change elsewhere; Escape cancels it. Formatting and read-only blocks stay in place.');
     const documentHost = el('div', 'amd-document'), conflict = el('section', 'amd-conflict'); conflict.hidden = true; conflict.setAttribute('aria-label', 'A newer document version');
     const kept = el('section', 'amd-kept'); kept.hidden = true; kept.setAttribute('aria-label', 'Your unsaved drafts');
     const wrapper = el('div', 'amd-editor'); wrapper.append(hint, status, conflict, documentHost, kept);
@@ -69,14 +69,26 @@ export function createMarkdownEditor({ body, footer, dialog, context, source: in
                     const before = span.textContent;
                     span.addEventListener('input', () => { pendingText = span.textContent !== before; sync(); });
                     span.addEventListener('compositionstart', () => { composing = true; }); span.addEventListener('compositionend', () => { composing = false; });
-                    span.addEventListener('beforeinput', event => { if (['insertParagraph', 'insertLineBreak', 'insertFromDrop'].includes(event.inputType) || M.HIDDEN.test(event.data || '')) { event.preventDefault(); say('Text only: line breaks, hidden characters and formatting stay unchanged.', true); } });
-                    span.addEventListener('paste', event => {
-                        event.preventDefault(); const text = event.clipboardData.getData('text/plain');
-                        if (/[\r\n]/.test(text) || M.HIDDEN.test(text)) { say('Paste words without line breaks or hidden characters.', true); return; }
-                        const selection = getSelection(); if (!selection.rangeCount) return; const range = selection.getRangeAt(0); if (!span.contains(range.commonAncestorContainer)) return;
-                        range.deleteContents(); const textNode = document.createTextNode(text); range.insertNode(textNode); range.setStartAfter(textNode); range.collapse(true); selection.removeAllRanges(); selection.addRange(range); pendingText = span.textContent !== before; sync();
+                    const insertPlain = text => {
+                        const selection = getSelection(); if (!selection.rangeCount) return;
+                        const range = selection.getRangeAt(0); if (!span.contains(range.commonAncestorContainer)) return;
+                        range.deleteContents(); const textNode = document.createTextNode(text); range.insertNode(textNode);
+                        // Chrome needs a trailing placeholder to keep a caret after a final newline.
+                        if (span.textContent.endsWith('\n') && !span.querySelector('[data-amd-caret]')) { const br=document.createElement('br'); br.dataset.amdCaret=''; span.append(br); }
+                        range.setStartAfter(textNode); range.collapse(true); selection.removeAllRanges(); selection.addRange(range); pendingText = span.textContent !== before; sync();
+                    };
+                    span.addEventListener('beforeinput', event => {
+                        const line = ['insertParagraph','insertLineBreak'].includes(event.inputType);
+                        if (event.inputType === 'insertText' && /[\r\n]/.test(event.data || '')) { event.preventDefault(); if (run.newlinePrefix != null) insertPlain(event.data.replace(/\r\n?/g,'\n')); else say('Edit words within one text run; changing line breaks is not supported.', true); return; }
+                        if (line && run.newlinePrefix != null) { event.preventDefault(); insertPlain('\n'); return; }
+                        if (line || event.inputType === 'insertFromDrop' || M.HIDDEN.test(event.data || '')) { event.preventDefault(); say('Use plain words without hidden characters; structural markers stay unchanged.', true); }
                     });
-                    span.addEventListener('keydown', event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); span.textContent = before; span.blur(); } else if (event.key === 'Enter' && !composing && !event.isComposing) { event.preventDefault(); span.blur(); } });
+                    span.addEventListener('paste', event => {
+                        event.preventDefault(); const text = event.clipboardData.getData('text/plain').replace(/\r\n?/g,'\n');
+                        if ((/[\r\n]/.test(text) && run.newlinePrefix == null) || M.HIDDEN.test(text)) { say('Paste words without line breaks or hidden characters.', true); return; }
+                        insertPlain(text);
+                    });
+                    span.addEventListener('keydown', event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); span.textContent = before; span.blur(); } else if (event.key === 'Enter' && !composing && !event.isComposing) { event.preventDefault(); event.stopPropagation(); if (run.newlinePrefix != null) insertPlain('\n'); else span.blur(); } });
                     span.addEventListener('blur', event => {
                         pendingText = false;
                         if (span.textContent === before || dead) { sync(); return; }
@@ -113,37 +125,30 @@ export function createMarkdownEditor({ body, footer, dialog, context, source: in
             heading.tabIndex = -1; heading.focus();
         } catch (error) { if (!dead) say(error.message || 'The latest version could not be read.', true); }
     }
-    async function reapply() {
+    async function openLatest() {
         flush(); const choice = latest; if (!choice || dead || busy) return;
-        busy = true; sync(); conflict.querySelectorAll('button').forEach(b => { b.disabled = true; }); say('Reading the latest version to check your edited blocks…');
-        let saveReapplied = false, focusLatest = false;
+        let opened = false;
+        busy = true; sync(); conflict.querySelectorAll('button').forEach(b => { b.disabled = true; }); say('Reading the latest version; your draft will be kept…');
         try {
             const theirs = await API.readEditSource({ ...context, hex: choice.digest }); if (dead || latest !== choice) return;
-            const result = M.reapplyEdits(original, source, theirs, marked);
-            if (result.ok && new TextEncoder().encode(result.source).length > API.MAX_MARKDOWN_BYTES) throw new Error('Markdown editing is limited to 2 MiB. Shorten your edit before reapplying.');
-            if (!result.ok) keepDraft();
-            original = theirs; source = result.ok ? result.source : theirs; baseDigest = choice.digest;
+            keepDraft(); original = theirs; source = theirs; baseDigest = choice.digest;
             latest = null; conflict.hidden = true; conflict.replaceChildren(); draw();
-            if (!result.ok) {
-                say('An edited block changed or could not be matched safely. Nothing was saved. You are editing the latest version; your old draft is kept below.', true);
-                focusLatest = true;
-            } else if (result.changed) saveReapplied = true;
-            else say('The latest version is open. There are no text edits to save.');
-        } catch (error) { if (!dead) say(error.message || 'Your edits could not be reapplied. Your draft is kept.', true); }
+            say('The latest version is open. Nothing was saved. Your old draft is kept below; redo your changes here before saving.', true);
+            opened = true;
+        } catch (error) { if (!dead) say(error.message || 'The latest version could not be opened. Your draft is kept.', true); }
         finally { busy = false; if (!dead) { sync(); conflict.querySelectorAll('button').forEach(b => { b.disabled = false; }); } }
-        if (focusLatest && !dead) documentHost.querySelector('.amd-text')?.focus();
-        if (saveReapplied && !dead) await save(baseDigest);
+        if (opened && !dead) documentHost.querySelector('.amd-text')?.focus();
     }
     function showConflict(data) {
         const digest = data.latest_digest || data.latest?.digest;
         if (!HEX.test(String(digest))) { say('A newer version exists. Reload it before saving your changes.', true); return; }
         latest = { digest, version: data.latest_version || data.latest?.version || data.version };
-        const title = el('h3', null, 'A newer version was saved'), words = el('p', null, 'Your draft is still here. Reapply your edits only if those blocks are unchanged in the latest version. Other changes stay in place. If an edited block changed, your draft is kept so you can redo it.');
-        conflict.replaceChildren(title, words, makeButton('See theirs', 'amd-see-theirs', showTheirs), makeButton('Reapply my edits and save', 'amd-reapply', reapply));
+        const title = el('h3', null, 'A newer version was saved'), words = el('p', null, 'Nothing was saved. Your draft is still here. Open the latest version and redo your changes; there is no override or automatic retry.');
+        conflict.replaceChildren(title, words, makeButton('See theirs', 'amd-see-theirs', showTheirs), makeButton('Open latest and keep draft', 'amd-open-latest', openLatest));
         conflict.hidden = false; title.tabIndex = -1; title.focus();
     }
     async function save(expected) {
-        flush(); if (dead || busy || source === original) return;
+        flush(); if (dead || busy || latest || source === original) return;
         busy = true; sync(); conflict.querySelectorAll('button').forEach(b => { b.disabled = true; }); say('Saving a new version…');
         try {
             const saved = await API.saveMarkdown({ ...context, hex: baseDigest }, source, expected);

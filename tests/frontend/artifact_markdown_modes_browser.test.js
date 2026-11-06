@@ -1,0 +1,64 @@
+// Real artifact bytes + real person-only version route on the isolated server. No save stubs.
+// Native typing saves one sentence, keeps BOM/CRLF/marks, and the existing version diff
+// shows one changed line. A newer agent upload produces 409; only an explicit choice retries.
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { connect } = require('./agent_view_harness');
+const { launchStandIn } = require('./helpers/stand_in_agent');
+const { removeBoards } = require('./helpers/board_cleanup');
+const { coralReady, waitStable } = require('./helpers/wait');
+const BASE = require('./test_base').BASE;
+const hexOf = data => String(data.digest || data.hex || data.id || '').replace(/^sha256:/,'');
+(async () => {
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const B = 'mdmodes-' + Date.now().toString(36); let author;
+    const httpJson = async (method, p, body, headers = {}) => { const r = await fetch(BASE+p,{method,headers:{'Content-Type':'application/json',...headers},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,data:await r.json().catch(()=>({}))}; };
+    const person = (method,p,body) => ev(`fetch(${JSON.stringify(p)},{method:${JSON.stringify(method)},headers:{'Content-Type':'application/json'},body:${body===undefined?'undefined':JSON.stringify(JSON.stringify(body))}}).then(async r=>({status:r.status,data:await r.json().catch(()=>({}))}))`);
+    const upload = async (name, text, previous) => { const r=await fetch(BASE+`/api/agent/artifacts?session_id=${author.sid}`,{method:'POST',headers:{'X-Coral-Session-Token':author.token,'Content-Type':'application/octet-stream','X-Artifact-Name':name,'X-Artifact-Media-Type':'text/markdown',...(previous?{'X-Artifact-New-Version-Of':previous}:{})},body:Buffer.from(text)});const data=await r.json();assert.equal(r.status,201,JSON.stringify(data));return hexOf(data); };
+    const bytes = hex => ev(`fetch('/api/artifacts/${hex}?v=2').then(r=>r.arrayBuffer()).then(b=>Array.from(new Uint8Array(b)))`);
+    const nativeClick = async selector => {
+        // Scroll only an off-target control, then wait on its enabled, stable geometry.
+        await ev(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e)throw Error('Missing '+${JSON.stringify(selector)});const r=e.getBoundingClientRect();if(!e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)))e.scrollIntoView({block:'nearest',inline:'nearest'});})()`);
+        await waitStable(ev, `(()=>{const e=document.querySelector(${JSON.stringify(selector)}),r=e.getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height,disabled:!!e.disabled};})()`, selector+' enabled stable rectangle', 40, {timeout:5000,accept:r=>!r.disabled&&r.w>0&&r.h>0});
+        const r=await ev(`(()=>{const e=document.querySelector(${JSON.stringify(selector)}),b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2;if(!e.contains(document.elementFromPoint(x,y)))throw Error('Covered '+${JSON.stringify(selector)}+' by '+document.elementFromPoint(x,y)?.outerHTML);return{x,y};})()`);
+        await client.Input.dispatchMouseEvent({type:'mousePressed',...r,button:'left',clickCount:1});await client.Input.dispatchMouseEvent({type:'mouseReleased',...r,button:'left',clickCount:1}); };
+    const edit = async () => { if(await ev(`document.querySelector('.artifact-viewer-edit').getClientRects().length > 0`)) await nativeClick('.artifact-viewer-edit'); else { await nativeClick('.artifact-viewer-more'); await waitFor(`!document.querySelector('.artifact-viewer-menu').hidden`,'phone More actions',5000); await nativeClick('.artifact-viewer-edit-item'); } };
+    const type = async (oldText,newText) => { await ev(`(()=>{const e=[...document.querySelectorAll('.amd-text')].find(e=>e.textContent===${JSON.stringify(oldText)});if(!e)throw Error('No editable words');e.focus();const r=document.createRange();r.selectNodeContents(e);const s=getSelection();s.removeAllRanges();s.addRange(r);})()`);await client.Input.insertText({text:newText}); };
+    const shot = async name => { const dir=process.env.CORAL_SCREENSHOT_DIR;if(!dir)return;fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,name+'.png'),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64')); };
+    const open = async (hex,name,version=0) => { await ev(`import((window.__coralStatic||'/static/')+'artifact_viewer.js').then(v=>v.openArtifactViewer('${hex}',{board:'${B}',server:'local',filename:${JSON.stringify(name)},mediaType:'text/markdown'}))`);await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown')`,'the real Markdown document',10000);
+        if(version) {
+            await waitFor(`document.querySelector('.av-current')?.getAttribute('aria-label')?.startsWith('Version: v${version} of ')`,'version header ready before Edit',8000);
+        }
+    };
+    try {
+        assert.ok(process.env.CORAL_TEST_DATA_DIR,'isolated runner only');
+        await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
+        await Emulation.setDeviceMetricsOverride({width:1280,height:900,deviceScaleFactor:1,mobile:false});
+        await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev,'startup','liveList','liveListLoaded','settings');
+        author=await launchStandIn(httpJson,{displayName:'Markdown Writer'});assert.ok(author.sid && author.token,'real stand-in agent token');
+        const liveReply=await (await fetch(BASE+'/api/sessions/live')).json();const live=(Array.isArray(liveReply)?liveReply:liveReply.sessions||[]).find(s=>s.session_id===author.sid);assert.ok(live);
+        assert.ok((await httpJson('POST',`/api/board/${B}/subscribe`,{subscriber_id:'Markdown Writer',job_title:'Writer',session_name:`${live.agent_type}-${author.sid}`})).status<300);
+
+        for(const [w,theme,font] of [[1280,'dark',16],[390,'light',32]]) {
+            await Emulation.setDeviceMetricsOverride({width:w,height:900,deviceScaleFactor:1,mobile:w===390});
+            await ev(`document.documentElement.dataset.theme='${theme}';document.documentElement.style.fontSize='${font}px';true`);
+            const name=`nested-list-${w}.md`,source=`\ufeff# Lists ${w}\r\n\r\n- Parent words\r\n  - Nested words\r\n    Continued words\r\n- Last words\r\n\r\nUnchanged tail.\r\n`;
+            const original=await upload(name,source);await open(original,name);await waitFor(`!document.querySelector('.artifact-viewer-edit').hidden`,'owner edit ready',10000);await shot(`lists-before-${w}`);await edit();await waitFor(`!!document.querySelector('.amd-text')`,'rendered editor',8000);await shot(`lists-edit-${w}`);
+            await type('Nested words\nContinued words','Revised nested\nContinued words');await ev(`document.activeElement.blur()`);
+            assert.equal(await ev(`document.querySelectorAll('.amd-document li').length`),3);assert.equal(await ev(`document.querySelectorAll('.amd-document li .amd-text').length`),3);
+            await type('Revised nested\nContinued words','Revised nested\nContinued words');
+            await ev(`(()=>{const s=getSelection();s.collapseToEnd();})()`);await client.Input.dispatchKeyEvent({type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});await client.Input.dispatchKeyEvent({type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});await client.Input.insertText({text:'- literal'});await ev(`document.activeElement.blur()`);
+            await shot(`lists-draft-${w}`);await nativeClick('.amd-save');await waitFor(`!document.querySelector('.amd-editor') && !!document.querySelector('.artifact-viewer-version')`,'new list version',10000);
+            let versions=(await person('GET',`/api/artifacts/${original}/versions`)).data;assert.equal(versions.length,2);let saved=versions.find(v=>v.is_latest)||versions.at(-1),hex=hexOf(saved);
+            const expected=source.replace('Nested words\r\n    Continued words','Revised nested\r\n    Continued words\r\n    \\- literal');assert.equal(Buffer.from(await bytes(hex)).toString(),expected,'BOM/CRLF, markers and all untouched bytes retained');assert.deepEqual(Buffer.from(await bytes(original)),Buffer.from(source));
+            await open(hex,name,2);await waitFor(`!document.querySelector('.artifact-viewer-edit').hidden`,'edit saved list',8000);await edit();await waitFor(`!!document.querySelector('.amd-text')`,'saved list editor',8000);await type('Parent words','My unsaved parent');await ev(`document.activeElement.blur()`);
+            const theirs=expected.replace('Unchanged tail.','Agent updated tail.');const latestHex=await upload(name,theirs,hex);await nativeClick('.amd-save');await waitFor(`!!document.querySelector('.amd-open-latest')`,'stale save refused',10000);
+            assert.equal((await person('GET',`/api/artifacts/${original}/versions`)).data.length,3,'stale draft makes no version');assert.equal(await ev(`!!document.querySelector('.amd-reapply,.amd-save-after')`),false);
+            await nativeClick('.amd-open-latest');await waitFor(`!!document.querySelector('.amd-kept:not([hidden])')`,'draft kept for manual redo',8000);assert.equal((await person('GET',`/api/artifacts/${original}/versions`)).data.length,3,'opening latest never saves');assert.deepEqual(Buffer.from(await bytes(latestHex)),Buffer.from(theirs));
+            assert.ok(await ev(`document.querySelector('.amd-kept').textContent.includes('My unsaved parent')`));assert.equal(await ev(`document.querySelector('.amd-save').disabled`),true);
+            await shot(`lists-stale-${w}`);await nativeClick('.amd-cancel');await waitFor(`!!document.querySelector('.amd-discard[open]')`,'old draft guarded',5000);await nativeClick('.amd-discard .btn-danger');await waitFor(`!document.querySelector('.amd-editor')`,'discard explicit',5000);await nativeClick('.artifact-viewer-close');
+            console.log(`PASS nested/continued lists, literal continuation, exact saved bytes and no stale auto-save ${w}px ${font}px`);
+        }
+    } finally { if(author)await author.stop().catch(()=>{});await removeBoards(ev,[B]);await client.close(); }
+})().catch(error=>{console.error(error);process.exit(1);});

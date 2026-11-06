@@ -5,7 +5,6 @@ import { installDom, STATIC } from './helpers/jsdom_env.mjs';
 const dom = installDom({ mode: 'local' });
 dom.window.eval(fs.readFileSync(STATIC + 'vendor/marked.min.js', 'utf8')); globalThis.marked = dom.window.marked;
 dom.window.eval(fs.readFileSync(STATIC + 'vendor/purify.min.js', 'utf8')); globalThis.DOMPurify = dom.window.DOMPurify;
-import * as modelApi from '../../coral-go/pkg/frontend/static/artifact_markdown_model.js';
 import { analyze, mapRenderedBlock, editRun } from '../../coral-go/pkg/frontend/static/artifact_markdown_model.js';
 import { renderMarkdownStrict } from '../../coral-go/pkg/frontend/static/markdown.js';
 function bytePatch(before, after) {
@@ -74,15 +73,18 @@ test('reference labels retain their definition URL and original source syntax', 
 });
 
 
-test('block reapply preserves every newest byte outside the Operator-edited block', () => {
-    assert.equal(typeof modelApi.reapplyEdits,'function');
-    const base='\ufeff# Report\r\n\r\nOld sentence.\r\n\r\nOld second block.\r\n', draft=base.replace('Old sentence.','My sentence.'), theirs=base.replace('Old second block.','Agent second block.');
-    const result=modelApi.reapplyEdits(base,draft,theirs,marked);assert.equal(result.ok,true);assert.equal(result.source,theirs.replace('Old sentence.','My sentence.'));
-    const inserted=theirs+'\r\nA new agent paragraph.\r\n';assert.equal(modelApi.reapplyEdits(base,draft,inserted,marked).source,inserted.replace('Old sentence.','My sentence.'));
+test('nested and continued list text maps exactly without editing markers or neighbouring items',()=>{
+ const source='\ufeff- Parent **words**\r\n  - Nested words\r\n    continued words\r\n- Last words\r\n';
+ const runs=mapped(source);assert.ok(runs.some(r=>r.text==='Parent '));const child=runs.find(r=>r.text.includes('Nested'));assert.ok(child,'nested list is editable');
+ const next=editRun(source,child,child.text.replace('continued','revised')).source;assert.equal(next,source.replace('continued','revised'));
+ const more=editRun(source,child,child.text+'\n- literal').source;assert.ok(more.includes('\r\n    \\- literal'));assert.ok(more.endsWith('- Last words\r\n'));
+ const host=document.createElement('div');host.innerHTML=renderMarkdownStrict(more.replace(/^\ufeff/,''));assert.equal(host.querySelectorAll('li').length,3,'typed marker did not add an item');
 });
-test('block reapply refuses changed or ambiguous edited blocks instead of dropping agent work', () => {
-    assert.equal(typeof modelApi.reapplyEdits,'function');
-    const base='Old sentence.\n\nOld second block.\n',draft=base.replace('Old sentence.','My sentence.');
-    assert.equal(modelApi.reapplyEdits(base,draft,base.replace('Old sentence.','Agent sentence.'),marked).ok,false);
-    const duplicate='Same words.\n\nSame words.\n\n';assert.equal(modelApi.reapplyEdits(duplicate,duplicate.replace('Same words.','My words.'),duplicate,marked).ok,false);
+
+test('numbered, loose and task-list labels retain numbering, checkbox state and continuation indentation',()=>{
+ for(const source of ['7. First words\n   continued words\n8. Last words\n','- First words\n\n- Last words\n','- [x] First words\n  continued words\n- [ ] Last words\n']) {
+  const runs=mapped(source),run=runs.find(r=>r.text.includes('First words'));assert.ok(run,source);
+  assert.equal(editRun(source,run,run.text.replace('First','New')).source,source.replace('First','New'));
+  const next=editRun(source,run,run.text+'\n# literal').source;const host=document.createElement('div');host.innerHTML=renderMarkdownStrict(next);assert.equal(host.querySelectorAll('li').length,2);assert.equal(host.querySelectorAll('h1,h2,h3').length,0);assert.ok(next.includes('\\# literal'));assert.equal(next.includes('[x]'),source.includes('[x]'));
+ }
 });
