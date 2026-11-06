@@ -21,15 +21,16 @@ func TestAnAgentCannotStartATypeThatNeverAsks(t *testing.T) {
 	_, h, term, ss := setupSessionsTestServer(t)
 	stubCLIPaths(t, ss)
 	ctx := context.Background()
+	parentDir := t.TempDir() // an agent starts agents in its team's folder (#13891)
 	const parent = "11111111-2222-4333-8444-555555555555"
-	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: parent, AgentType: "claude", AgentName: "parent", WorkingDir: t.TempDir()}))
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: parent, AgentType: "claude", AgentName: "parent", WorkingDir: parentDir}))
 	asAgent := func(r *http.Request) *http.Request {
 		return r.WithContext(context.WithValue(r.Context(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: parent, SessionName: "claude-" + parent}))
 	}
 	same := func(r *http.Request) *http.Request { return r }
 	launch := func(agentType string, req func(*http.Request) *http.Request) *httptest.ResponseRecorder {
 		t.Helper()
-		b, _ := json.Marshal(map[string]any{"agent_type": agentType, "working_dir": t.TempDir()})
+		b, _ := json.Marshal(map[string]any{"agent_type": agentType, "working_dir": parentDir})
 		rec := httptest.NewRecorder()
 		h.Launch(rec, req(httptest.NewRequest(http.MethodPost, "/api/sessions/launch", bytes.NewReader(b))))
 		return rec
@@ -38,7 +39,7 @@ func TestAnAgentCannotStartATypeThatNeverAsks(t *testing.T) {
 	team := func(req func(*http.Request) *http.Request, members ...map[string]any) (code int, agents []map[string]any) {
 		t.Helper()
 		n++
-		b, _ := json.Marshal(map[string]any{"board_name": "unsup" + string(rune('a'+n)), "new_board": true, "working_dir": t.TempDir(), "agent_type": "claude", "agents": members})
+		b, _ := json.Marshal(map[string]any{"board_name": "unsup" + string(rune('a'+n)), "new_board": true, "working_dir": parentDir, "agent_type": "claude", "agents": members})
 		rec := httptest.NewRecorder()
 		h.LaunchTeam(rec, req(httptest.NewRequest(http.MethodPost, "/api/sessions/launch-team", bytes.NewReader(b))))
 		var out struct {
@@ -78,7 +79,7 @@ func TestAnAgentCannotStartATypeThatNeverAsks(t *testing.T) {
 	assert.Equal(t, agentLaunchUnsupervisedCode, byName["B"]["code"])
 	assert.Contains(t, byName["B"]["error"], "ask the Operator")
 	// a team whose members take the team's type: Pi
-	b, _ := json.Marshal(map[string]any{"board_name": "unsupteam", "new_board": true, "working_dir": t.TempDir(), "agent_type": "pi", "agents": []map[string]any{{"name": "P"}}})
+	b, _ := json.Marshal(map[string]any{"board_name": "unsupteam", "new_board": true, "working_dir": parentDir, "agent_type": "pi", "agents": []map[string]any{{"name": "P"}}})
 	trec := httptest.NewRecorder()
 	h.LaunchTeam(trec, asAgent(httptest.NewRequest(http.MethodPost, "/api/sessions/launch-team", bytes.NewReader(b))))
 	assert.NotEqual(t, http.StatusOK, trec.Code, "every member refused: the team is a failure, not a success")

@@ -28,7 +28,7 @@ func TestTheStarterSkillsAreValidMarkdownOnlyAndStable(t *testing.T) {
 		assert.NotContains(t, sk.Description, "\n", z.Name)
 		assert.True(t, strings.HasPrefix(sk.Description, "How"), "%s: a description that says what it is for", z.Name)
 	}
-	assert.Equal(t, []string{"creating-a-coral-automation", "creating-coral-skills", "using-coral", "working-in-a-coral-team"}, names)
+	assert.Equal(t, []string{"creating-a-coral-automation", "creating-coral-skills", "orchestrator-team-builder", "using-coral", "working-in-a-coral-team"}, names)
 	b, err := StarterZips()
 	require.NoError(t, err)
 	for i := range a {

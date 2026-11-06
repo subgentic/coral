@@ -73,6 +73,10 @@ func IsStarterName(name string) bool {
 // UsingCoralName is the starter skill that tells any agent what Coral gives it.
 const UsingCoralName = "using-coral"
 
+// TeamBuilderName is the starter skill for a team's Orchestrator: the person describes the teammates they want, a plan is approved, then the team is launched (#13894). It is attached to the member that
+// takes the Orchestrator seat when a team is launched.
+const TeamBuilderName = "orchestrator-team-builder"
+
 const (
 	launchSectionStart = "<!-- launch-section:start -->"
 	launchSectionEnd   = "<!-- launch-section:end -->"

@@ -18,9 +18,14 @@ const (
 	DefaultOrchMaxPerHour = 10 // launches and wakes per hour on the board
 	DefaultOrchMaxLive    = 8  // live agents on the board
 	DefaultOrchIdleMin    = 5  // minutes an agent must have been idle before it may be put to sleep
-	MaxOrchMaxPerHour     = 100
-	MaxOrchMaxLive        = 50
-	MaxOrchIdleMin        = 120
+	// TeamLaunchOrchMaxLive is the live cap of the grant a team launch seeds (#13891): five helpers besides the seat. The default of a board that has no row stays DefaultOrchMaxLive, and a
+	// board with no row stays OFF: only a row written at creation turns the grant on by itself.
+	TeamLaunchOrchMaxLive = 5
+	// TeamLaunchSetBy is what the row of a seeded grant says wrote it.
+	TeamLaunchSetBy   = "team launch"
+	MaxOrchMaxPerHour = 100
+	MaxOrchMaxLive    = 50
+	MaxOrchIdleMin    = 120
 )
 
 // Lifecycle kinds in the log.
@@ -138,6 +143,41 @@ func (s *Store) SetOrchGrant(ctx context.Context, g OrchGrant, by string) error 
 		ON CONFLICT(project) DO UPDATE SET enabled = excluded.enabled, seat_session = excluded.seat_session, max_per_hour = excluded.max_per_hour, max_live = excluded.max_live, idle_min = excluded.idle_min, set_by = excluded.set_by, set_at = excluded.set_at`,
 		g.Project, enabled, g.SeatSession, g.MaxPerHour, g.MaxLive, g.IdleMin, by, nowUTC())
 	return err
+}
+
+// SeedOrchGrant writes the grant a new team starts with (#13891): the switch ON, the Orchestrator the Operator's own launch started as the seat, five live helpers and the usual hourly and idle caps, set by "team
+// launch". It is ONE insert that does nothing when the board already has a row, so it never overwrites a grant the Operator saved (off included) or a seat they chose, and a re-launch, a join or a title never
+// changes the seat. It reports whether it wrote the row. The caller has decided the launch is the Operator's own (a person, never an agent token) and that the team is new.
+func (s *Store) SeedOrchGrant(ctx context.Context, project, seatSession string) (bool, error) {
+	seatSession = strings.TrimSpace(seatSession)
+	if project == "" || seatSession == "" {
+		return false, nil
+	}
+	res, err := s.db.ExecContext(ctx, `INSERT INTO board_orch_grant (project, enabled, seat_session, max_per_hour, max_live, idle_min, set_by, set_at) VALUES (?, 1, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(project) DO NOTHING`, project, seatSession, DefaultOrchMaxPerHour, TeamLaunchOrchMaxLive, DefaultOrchIdleMin, TeamLaunchSetBy, nowUTC())
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
+// LaunchedSessionNotePrefix starts the note of a finished launch row that names the session the launch made (#13903), so a team's live cap can count the agents its members started wherever they were placed.
+const LaunchedSessionNotePrefix = "session "
+
+// LaunchedSessionIDs are the sessions the team's finished launches made, newest first (at most limit): the ids in the notes of its 'ok' launch rows.
+func (s *Store) LaunchedSessionIDs(ctx context.Context, project string, limit int) ([]string, error) {
+	var notes []string
+	if err := s.reader().SelectContext(ctx, &notes, `SELECT note FROM board_lifecycle_log WHERE project = ? AND kind = 'launch' AND status = 'ok' AND note LIKE ? ORDER BY id DESC LIMIT ?`, project, LaunchedSessionNotePrefix+"%", limit); err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(notes))
+	for _, n := range notes {
+		if id := strings.TrimSpace(strings.TrimPrefix(n, LaunchedSessionNotePrefix)); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return ids, nil
 }
 
 // LifecycleEntry is one row of the log.

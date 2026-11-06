@@ -38,7 +38,7 @@ func cmdLaunch(args []string) {
 	name := fs.String("name", "", "Display name")
 	model := fs.String("model", "", "Model (default: your Coral setting for the agent type)")
 	prompt := fs.String("prompt", "", "Initial prompt")
-	boardID := fs.String("board", "", "Join this board: its id (coral-board's state, or GET /api/board/projects)")
+	boardID := fs.String("board", "", "Join this board: its id (coral-board's state, or GET /api/board/projects). An agent seated on a team whose Orchestrator access is on joins its own team when this is not given")
 	fs.Usage = func() {
 		fmt.Fprintln(os.Stderr, `Usage: coral-agent launch [dir] [--type T] [--name N] [--model M] [--prompt P] [--board ID]`)
 		fs.PrintDefaults()

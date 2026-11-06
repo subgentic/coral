@@ -33,6 +33,7 @@ type orchRig struct {
 	sid    map[string]string // member -> session id
 	tok    map[string]string // member -> token
 	term   *mockSessionTerminal
+	work   string // the folder the seated agents work in: an agent starts agents inside it (#13891)
 }
 
 const orchBoard = "team"
@@ -62,7 +63,7 @@ func newOrchRig(t *testing.T) *orchRig {
 	rt.Post("/api/sessions/launch-team", h.LaunchTeam)
 	own := httptest.NewServer(rt)
 	t.Cleanup(func() { own.Close(); srv.Close() })
-	return &orchRig{t: t, server: own.URL, h: h, ss: ss, sid: map[string]string{}, tok: map[string]string{}, term: term}
+	return &orchRig{t: t, server: own.URL, h: h, ss: ss, sid: map[string]string{}, tok: map[string]string{}, term: term, work: t.TempDir()}
 }
 
 // seat registers an agent session on a board (its live row and its subscription), asleep or awake.
@@ -70,7 +71,7 @@ func (r *orchRig) seat(member, title, boardName, agentType string, sleeping bool
 	r.t.Helper()
 	ctx := context.Background()
 	sid := "eeeeeeee-1432-1b00-0000-" + strings.Repeat("0", 11) + string(rune('0'+n))
-	ls := &store.LiveSession{SessionID: sid, AgentType: agentType, AgentName: member, WorkingDir: "/w", BoardName: &boardName}
+	ls := &store.LiveSession{SessionID: sid, AgentType: agentType, AgentName: member, WorkingDir: r.work, BoardName: &boardName}
 	if sleeping {
 		ls.IsSleeping = 1
 	}
@@ -292,10 +293,10 @@ func TestCapsStopTheSeatAndNameWhichOne(t *testing.T) {
 	assert.Equal(t, http.StatusOK, code)
 
 	// the live cap: raise the hourly one, lower the live one to what is live now
-	code, _ = r.operatorGrant("Orchestrator", map[string]any{"max_per_hour": 50, "max_live": 3})
+	code, _ = r.operatorGrant("Orchestrator", map[string]any{"max_per_hour": 50, "max_live": 2})
 	require.Equal(t, http.StatusOK, code)
 	code, out = r.agentPost("Orchestrator", "wake", "Dev4", "")
-	assert.Equal(t, http.StatusTooManyRequests, code, "Orchestrator, Dev, Dev2 are live: three")
+	assert.Equal(t, http.StatusTooManyRequests, code, "Dev and Dev2 are live besides the seat: two")
 	assert.Equal(t, "board_live_limit", out["code"])
 }
 
@@ -479,7 +480,7 @@ func TestAnAgentsLaunchIsLoggedAndHeldToTheCapsWhenTheSwitchIsOn(t *testing.T) {
 	r := newOrchRig(t)
 	ctx := context.Background()
 	r.usualBoard()
-	work := t.TempDir()
+	work := r.work
 	launch := func(who, boardName string) (int, map[string]any) {
 		b, _ := json.Marshal(map[string]any{"working_dir": work, "agent_type": "claude", "board_id": boardName, "display_name": "Helper"})
 		return r.do("POST", "/api/sessions/launch", string(b), nil, r.tok[who])
@@ -544,7 +545,7 @@ func TestAnAgentsTeamLaunchIsLoggedAndCountedMemberByMember(t *testing.T) {
 	r := newOrchRig(t)
 	ctx := context.Background()
 	r.usualBoard()
-	work := t.TempDir()
+	work := r.work
 	team := func(who string, names ...string) (int, map[string]any) {
 		agents := make([]map[string]any, len(names))
 		for i, n := range names {
@@ -596,10 +597,10 @@ func TestAnAgentsTeamLaunchIsLoggedAndCountedMemberByMember(t *testing.T) {
 func TestAnAgentsTeamLaunchIsHeldToTheLiveCap(t *testing.T) {
 	r := newOrchRig(t)
 	ctx := context.Background()
-	r.usualBoard() // Orchestrator and Dev2 awake, Dev asleep: two live
-	code, _ := r.operatorGrant("Orchestrator", map[string]any{"max_per_hour": 50, "max_live": 3})
+	r.usualBoard() // Orchestrator and Dev2 awake, Dev asleep: two live, the seat not counted (#13891)
+	code, _ := r.operatorGrant("Orchestrator", map[string]any{"max_per_hour": 50, "max_live": 2})
 	require.Equal(t, http.StatusOK, code)
-	b, _ := json.Marshal(map[string]any{"board_id": orchBoard, "working_dir": t.TempDir(), "agent_type": "claude", "agents": []map[string]any{{"name": "LiveA", "prompt": "work"}, {"name": "LiveB", "prompt": "work"}}})
+	b, _ := json.Marshal(map[string]any{"board_id": orchBoard, "working_dir": r.work, "agent_type": "claude", "agents": []map[string]any{{"name": "LiveA", "prompt": "work"}, {"name": "LiveB", "prompt": "work"}}})
 	before, _ := r.ss.CountActiveLiveSessions(ctx)
 	code, out := r.do("POST", "/api/sessions/launch-team", string(b), nil, r.tok["Orchestrator"])
 	require.Equal(t, http.StatusOK, code, out)
@@ -608,7 +609,7 @@ func TestAnAgentsTeamLaunchIsHeldToTheLiveCap(t *testing.T) {
 	assert.Nil(t, ms[0].(map[string]any)["error"], "one fits under the live cap of 3")
 	refused := ms[1].(map[string]any)
 	assert.Equal(t, "board_live_limit", refused["code"])
-	assert.Contains(t, refused["error"], "3 live agents")
+	assert.Contains(t, refused["error"], "2 live agents")
 	after, _ := r.ss.CountActiveLiveSessions(ctx)
 	assert.Equal(t, before+1, after)
 }

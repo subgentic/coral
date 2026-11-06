@@ -191,6 +191,11 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 		body.BoardName = key
 		boardCreated = created
 	}
+	// An agent on a team whose grant is on starts agents in that team's folders, wherever they are placed (#13891, #13903).
+	if h.refuseAgentLaunchOutsideTeam(w, r, body.WorkingDir) {
+		h.rollBackTeamLaunch(context.WithoutCancel(r.Context()), body, 0, "", false, boardCreated)
+		return
+	}
 	h.restoreTeamTemplate(r.Context(), &body)
 
 	memberTypes, skippedMembers := teamMemberTypes(body)
@@ -261,6 +266,9 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 	if fromAgent {
 		body.Flags = keepAgentLaunchFlags(body.Flags)
 	}
+	// A team the Operator launches starts with its Orchestrator holding the grant, on (#13891). Only when the Operator made the call and the team is new: an agent's launch-team, a relaunch of a team
+	// that has a board, and a board that already has a grant row never get one.
+	seedGrant := h.bs != nil && body.BoardName != "" && boardCreated && !fromAgent && launchedByOperator(r)
 	var launched []map[string]any
 	var categories []string // the analytics category of each member that failed
 	firstFailure := ""
@@ -302,7 +310,7 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		// An agent's team launch is logged and held to the board's caps one member at a time, in the same statement as a single launch (#11432): a team is not a way round them.
-		lifeID, lifeGrant, lifeErr := h.reserveAgentLaunch(r, body.BoardName, agentDef.Name)
+		lifeID, lifeGrant, lifeErr := h.reserveAgentLaunch(r, h.accountingBoard(r, body.BoardName, body.BoardServer), agentDef.Name)
 		if lifeErr != nil {
 			code, msg := capRefusal(lifeErr, lifeGrant)
 			launched = append(launched, map[string]any{"name": agentDef.Name, "error": msg, "code": code})
@@ -313,7 +321,8 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 		// widens an empty member to Auto (#5836 still applies to a single launch). What the person chose (flags, capabilities, a saved default) is used as before.
 		entry, category := h.launchTeamMember(ctx, body, agentDef, userSettings, workingDir, worktreePath, teamID, false)
 		_, memberFailed := entry["error"]
-		h.endAgentLaunch(ctx, body.BoardName, lifeID, !memberFailed, launcherWords(h.orchActorOf(r))+" started "+orchName(agentDef.Name))
+		sidMade, _ := entry["session_id"].(string)
+		h.endAgentLaunch(ctx, h.accountingBoard(r, body.BoardName, body.BoardServer), lifeID, !memberFailed, launcherWords(h.orchActorOf(r))+" started "+orchName(agentDef.Name), sidMade)
 		if category != "" && firstFailure == "" {
 			firstFailure = category
 		}
@@ -323,6 +332,12 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 		if _, bad := entry["error"]; !bad && worktreePath != "" {
 			if sid, _ := entry["session_id"].(string); sid != "" {
 				h.recordWorktreeRow(ctx, sid, worktreePath)
+			}
+		}
+		if _, bad := entry["error"]; !bad && seedGrant && board.ClaimsOrchestrator(agentDef.Name, "") {
+			if sid, _ := entry["session_id"].(string); sid != "" {
+				h.seedTeamGrant(ctx, body.BoardName, sid)
+				seedGrant = false // the first Orchestrator the launch started is the seat
 			}
 		}
 		launched = append(launched, entry)
@@ -695,6 +710,7 @@ func (h *SessionsHandler) launchTeamMember(ctx context.Context, body launchTeamR
 	}
 	effectiveThinking := defaultThinkingFromSettings(userSettings, agentType, def.Thinking)
 	skillRows, _ := h.resolveSkillIDs(ctx, unionSkillIDs(body.Skills, def.Skills)) // checked before the launch started; one that changed since is simply not told
+	skillRows = h.withTeamBuilderSkill(ctx, skillRows, def.Name)                   // the Orchestrator seat also gets the team-builder skill (#13894)
 	result, err := h.launchSession(ctx, launchSpec{
 		WorkDir: workingDir, AgentType: agentType, DisplayName: def.Name, Flags: agentFlags,
 		Prompt:    withSkillNote(InjectKnowledgeIntoPrompt(h.cfg.CoralDir(), body.BoardName, def.Name, def.Prompt), launchSkillNote(skillRows)),

@@ -8,6 +8,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/skills"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -119,4 +120,22 @@ func (h *SessionsHandler) withDefaultSkills(ctx context.Context, rows []store.Sk
 		}
 	}
 	return append(append([]store.SkillRow{}, rows...), *def)
+}
+
+// withTeamBuilderSkill adds the team-builder skill (#13894) to the skills of a team member that takes the Orchestrator seat, so it is attached and named in that member's launch note: the person describes the
+// team they want and the Orchestrator builds it with the skill. Any other member, a store without the skill (not seeded), and a launch that already names it are unchanged.
+func (h *SessionsHandler) withTeamBuilderSkill(ctx context.Context, rows []store.SkillRow, member string) []store.SkillRow {
+	if !board.ClaimsOrchestrator(member, "") {
+		return rows
+	}
+	sk, err := h.ss.LatestApprovedSkill(ctx, skills.TeamBuilderName)
+	if err != nil || sk == nil {
+		return rows
+	}
+	for _, r := range rows {
+		if r.Name == sk.Name {
+			return rows
+		}
+	}
+	return append(append([]store.SkillRow{}, rows...), *sk)
 }
