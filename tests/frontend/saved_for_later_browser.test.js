@@ -397,7 +397,11 @@ const hex = i => i.toString(16).padStart(20, '0');
         await ev(`document.querySelector('#inbox-nav-list .view-list-item[data-key="saved"]').click(); true`);
         await waitFor(`${INBOX_SAVED} && true`, 'the Inbox folder to open Saved', 8000);
         await ev(`document.documentElement.style.fontSize = ''; true`);
-        await waitFor(`(b => !!b && b.getBoundingClientRect().height <= 64)(document.getElementById('top-phone-bar'))`, 'the top bar to be one row at normal text (the shared bar never wraps: it is one row at 200% too)', 6000);
+        // #13811: Saved is an Inbox folder. The approved Inbox bar keeps its
+        // controls on row one and full-width search on row two, unlike other views.
+        await waitFor(`!!document.querySelector('#top-phone-bar.phone-inbox-bar input')`, 'the Saved folder uses the Inbox two-row bar', 6000);
+        const savedBar = await ev(`(() => { const b=document.getElementById('top-phone-bar'),m=b.querySelector('.phone-menu-btn').getBoundingClientRect(),a=b.querySelector('.phone-account-btn').getBoundingClientRect(),s=b.querySelector('input').getBoundingClientRect(),r=b.getBoundingClientRect();return{menu:m.height,account:a.height,sameRow:Math.abs(m.top-a.top)<=2,searchBelow:s.top>=Math.max(m.bottom,a.bottom)-1,fullWidth:Math.abs(s.left)<=1&&Math.abs(s.right-innerWidth)<=1,searchHeight:s.height,twoRows:r.height>=88&&r.height<=128,inside:s.bottom<=r.bottom+1,overflow:document.documentElement.scrollWidth>innerWidth};})()`);
+        assert.ok(savedBar.menu>=44&&savedBar.account>=44&&savedBar.sameRow&&savedBar.searchBelow&&savedBar.fullWidth&&savedBar.searchHeight>=44&&savedBar.twoRows&&savedBar.inside&&!savedBar.overflow,'Saved keeps the approved Inbox controls/search rows: '+JSON.stringify(savedBar));
         console.log('   ✓');
 
         await Emulation.setTouchEmulationEnabled({ enabled: false });
