@@ -11,7 +11,9 @@ export const unreadReviewItems = () => read();
 export const refreshReviews = () => refresh();
 /** Exact server attention totals are distinct from the loaded page's unread rows. */
 export function reviewAttentionCount() {
-    const metadata = summary(), server = countMetadata(), n = counted() ?? metadata?.attentionTotal;
+    const server = countMetadata(), authoritative = counted();
+    if (Number.isSafeInteger(authoritative) && authoritative >= 0 && (!server || server.complete)) return { value: authoritative, complete: true };
+    const metadata = summary(), n = metadata?.attentionTotal;
     if (server && !server.complete) {
         const fallback = server.sources.filter(s => s.total === null).reduce((total, s) => total + (metadata?.loadedBySource?.[s.server] || 0), 0);
         return { value: server.knownTotal + fallback, complete: false };

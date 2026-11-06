@@ -304,15 +304,15 @@ export const reviewPages = () => reviewPager.status();
 export const savedReviewPages = () => savedPager.status();
 /** Saved is an intersection: the saved query's for-review tag count covers off-page review files. */
 export function countSavedReviews() {
-    const pages = savedReviewPages(), loaded = Object.create(null);
-    for (const row of savedFiles()) { const server = splitKey(row.team).server; loaded[server] = (loaded[server] || 0) + 1; }
+    const pages = savedReviewPages(), unknown = new Set();
     let value = 0, complete = pages.length > 0;
     for (const page of pages) {
         if (page.ownerOnly) continue;
         const n = page.total === 0 ? 0 : page.tag_counts ? ('for review' in page.tag_counts ? page.tag_counts['for review'] : 0) : null;
         if (page.loaded && !page.error && !page.truncated && Number.isSafeInteger(n) && n >= 0) value += n;
-        else { value += loaded[page.server] || 0; complete = false; }
+        else { unknown.add(page.server); complete = false; }
     }
+    if (unknown.size) for (const row of savedFiles()) if (unknown.has(splitKey(row.team).server)) value++;
     return { value, complete };
 }
 /** Query totals and tags describe the server query, not its attention policy. */
