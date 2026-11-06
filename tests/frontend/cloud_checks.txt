@@ -138,6 +138,7 @@ node alerts_offer.test.js
 node feed_pacing.test.mjs
 node password_rules.test.mjs
 node icon_subset.test.mjs
+node artifact_held.test.mjs
 node model_names.test.mjs
 node auth_redirect.test.mjs
 node board_labels_unit.test.mjs

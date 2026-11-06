@@ -19,6 +19,7 @@ import { showToast } from './utils.js';
 const placeOf = item => { const a = (item.team === 'No team' || item.team === 'Not on a team') && item.session_id && (state.liveSessions || []).find(s => s.session_id === item.session_id); return a ? (a.display_name || a.name) : teamLabel(item.board_id, item.team); };
 const DT = await importOnce('./data_table.js');
 const { artifactTable, serverArtifactSort, tableSortOf } = await importOnce('./artifact_table.js');
+const { heldChecker } = await importOnce('./artifact_held.js');
 const { starControl } = await importOnce('./artifact_star.js');
 const SORT_PARAM = 'so' + 'rt'; // the query word, spelled in two parts: the icon-name lint reads that quoted word as an icon name
 const Toolbar = await importOnce('./team_toolbar.js');
@@ -131,9 +132,23 @@ export function createArtifactsList({ inbox = false } = {}) {
         say(`${on ? 'Starred' : 'Unstarred'} ${name}`);
     }
 
-    function deleteArtifact(hex, name, size) {
+    /** How many teams hold the file's bytes, from the owner's metadata (held_by_teams, 2 or more, #13949); 0 when the read fails or says nothing: the confirmation then stays as it was. */
+    async function heldByTeams(hex) {
+        try { const r = await serverFetch(server(), `/api/artifacts/${hex}/meta`); if (!r.ok) return 0; const n = Number((await r.json()).held_by_teams); return Number.isInteger(n) && n >= 2 ? n : 0; } catch { return 0; }
+    }
+
+    // A bulk delete says how many of the selected files other teams hold too (#13949): artifact_held.js keeps the answers for one confirmation and drops a late one; the confirmation's words are updated in place when an answer arrives.
+    let heldRows = [];
+    let selectionBar = null; // the table's own selection bar: on the team page it sits inside the page, in the Inbox it is mounted on the folder toolbar, outside it, so it is found through its own node
+    const heldFiles = heldChecker({ read: heldByTeams, changed: () => { const el = selectionBar?.querySelector('.dt-bar-confirm'); if (el && /^Delete \d+ artifacts\?/.test(el.textContent)) el.textContent = bulkDeleteWords(heldRows.length, heldRows); } });
+    const heldWords = rows => { heldRows = rows; return heldFiles.words(rows.map(managedHex).filter(Boolean)); };
+    const wireHeld = node => { if (node && !node.dataset.heldWired) { node.dataset.heldWired = '1'; node.addEventListener('click', e => { if (e.target.closest?.('button')) heldFiles.end(); }, true); } }; // any press in the selection bar ends the confirmation that was drawn (Keep, Delete, Cancel, a new action)
+    const bulkDeleteWords = (n, rows) => `Delete ${n} artifacts?${heldWords(rows)} Their links will become unavailable. This cannot be undone.`;
+
+    async function deleteArtifact(hex, name, size) {
+        const held = await heldByTeams(hex), also = held >= 2 ? ` This file is also in ${held - 1} other team${held - 1 === 1 ? '' : 's'}; deleting it removes it there too.` : '';
         window.showConfirmModal?.('Delete artifact',
-            `Delete ${name}${size ? ` (${size})` : ''}? It is removed from Coral, and links to it in board posts and task results will show "unavailable". A copy a browser already cached may remain. This can't be undone.`,
+            `Delete ${name}${size ? ` (${size})` : ''}? It is removed from Coral, and links to it in board posts and task results will show "unavailable".${also} A copy a browser already cached may remain. This can't be undone.`,
             async () => {
                 try {
                     const r = await serverFetch(server(), `/api/artifacts/${hex}`, { method: 'DELETE' });
@@ -363,7 +378,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                 disabled: rows => rows.every(item => !managedHex(item) || (item.tags || []).includes(REVIEW) === !remove),
                 run: async rows => { const key = model.key, r = await changeReview(reviewFiles(rows.filter(item => (item.tags || []).includes(REVIEW) === !!remove)), remove); if (r) finish(key, r.ok, r.failed, remove ? 'Removed from review:' : 'Sent for review:'); } })),
             ...(local() ? [{ label: 'Delete', danger: true, disabled: rows => rows.some(item => !managedHex(item) || !linkOf(item)?.preview),
-                confirm: n => `Delete ${n} artifacts? Their links will become unavailable. This cannot be undone.`, run: async rows => {
+                confirm: (n, rows = []) => bulkDeleteWords(n, rows), run: async rows => {
                     if (model.bulkBusy || !local() || rows.some(item => !managedHex(item) || !linkOf(item)?.preview)) return;
                     model.bulkBusy = true; const key = model.key, origin = server(), ok = []; let failed = 0;
                     for (const item of rows) { const hex = managedHex(item); try {
@@ -440,6 +455,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                 footer: { auto: !model.truncated && !model.error, text: `Showing ${model.items.length} of ${model.counts?.matched ?? model.items.length}${model.truncated ? '+' : ''}`,
                     more: model.hasMore ? { label: 'Load more', busy: !!model.controller, run: () => { if (!model.loadingMore) loadArtifacts({ append: true }); } } : null },
             });
+            if (selectionBar !== table.bar) { heldFiles.end(); selectionBar = table.bar; wireHeld(table.bar); } // a new table is a new selection bar: the confirmation of the old one is over
             // This table never folds: optional columns disappear as its container narrows.
             if (phoneTeam) { const bleed = document.createElement('div'); bleed.className = 'goals-bleed'; bleed.append(table.el); body.append(bleed); } else body.append(table.el); Toolbar.mountSelection(toolbarRow, artifactState.selected.size ? table.bar : null);
             if (!model.scope && !phoneTeam && matchMedia('(max-width: 760px)').matches) toolbarRow?.append(table.selectButton); // a team's list on a phone selects by long press, with no Select button
@@ -588,6 +604,7 @@ export function createArtifactsList({ inbox = false } = {}) {
     function initModel(project, scope, key) {
         clearPendingBoard(); retryLabels = false;
         artifactState = DT.tableState();
+        heldFiles.end(); // a new model or context: no answer asked for the old one counts here (#13949)
         forgetChoices();
         model.controller?.abort();
         Object.assign(model, { project, scope, key, loaded: false, waiting: false, partial: null, versionless: [], items: [], hasMore: false, cursor: '', counts: null, tagCounts: {}, truncated: false, loading: false, error: '', loadingMore: false, filters: scope && scope.standalone ? { ...F.EMPTY } : F.load(scope ? `${project}::agent::${scope.session}` : project), kept: new Set() });

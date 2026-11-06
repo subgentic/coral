@@ -63,8 +63,20 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         const dlg = await ev(`({ text: document.getElementById('confirm-modal-message').textContent, focus: document.activeElement.textContent.trim() })`);
         check('the confirmation names the file, says links show "unavailable" and a cached copy may remain, focus on Cancel',
             dlg.text.includes('delete-me.txt') && dlg.text.includes('unavailable') && /a browser already cached may remain/.test(dlg.text) && dlg.focus === 'Cancel', JSON.stringify(dlg));
+        check('without held_by_teams the confirmation does not mention other teams (#13949)', !/other team/.test(dlg.text), dlg.text);
         // Cancel keeps it.
         await ev(`document.activeElement.click(); true`);
+        // With held_by_teams (the owner's metadata, 2 or more): the confirmation says the file is also in the other teams, singular and plural; a refused or odd read leaves the text as it was (#13949).
+        for (const [meta, want, label] of [[`{ held_by_teams: 3 }`, 'This file is also in 2 other teams; deleting it removes it there too.', 'three teams hold it'], [`{ held_by_teams: 2 }`, 'This file is also in 1 other team; deleting it removes it there too.', 'two teams hold it'], [`{ held_by_teams: 1 }`, '', 'one team (nothing to say)'], [`{ held_by_teams: 'x' }`, '', 'a value that is not a number'], [`null`, '', 'the read is refused']]) {
+            await ev(`window.__origFetch = window.__origFetch || window.fetch; window.fetch = (u, o) => (/\\/api\\/artifacts\\/[0-9a-f]{64}\\/meta/.test(String(u)) ? Promise.resolve(${meta} === null ? new Response('{}', { status: 403 }) : new Response(JSON.stringify(${meta}), { status: 200, headers: { 'Content-Type': 'application/json' } })) : window.__origFetch(u, o)); true`);
+            await ev(`(${del}).click(); true`);
+            await until(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirmation: ' + label);
+            const t = await ev(`document.getElementById('confirm-modal-message').textContent`);
+            check(`${label}: ` + (want ? 'the confirmation says it is also in the other teams' : 'the confirmation is unchanged'), want ? t.includes(want) && t.includes('delete-me.txt') && /A copy a browser already cached may remain/.test(t) : !/other team/.test(t) && /can't be undone/.test(t), t);
+            await ev(`document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)').click(); true`);
+            await until(`getComputedStyle(document.getElementById('confirm-modal')).display === 'none'`, 'closed');
+        }
+        await ev(`window.fetch = window.__origFetch; true`);
         let st = await ev(`fetch('/api/artifacts/${hex}').then(r => r.status)`);
         check('Cancel deletes nothing', st === 200 && (await ev(`!!(${row})`)), String(st));
 
