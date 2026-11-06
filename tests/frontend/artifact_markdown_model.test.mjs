@@ -109,3 +109,9 @@ test('fenced code edits keep fence and language bytes, allow literal lines, and 
   for(const closing of ['```','````','~~~~','~~~~~'])assert.throws(()=>editRun(source,run,run.text+'\n'+closing),/fence/);
  }
 });
+
+test('table code spans refuse a backslash before a pipe before rendering',()=>{
+ const source='| A | B |\n|---|---|\n| x | `a\\|b` |\n';const code=mapped(source).find(r=>r.text==='a|b');assert.ok(code);
+ for(const value of ['a\\|b','a\\\\|b','a|b\\|c'])assert.throws(()=>editRun(source,code,value),/backslash.*pipe/);
+ assert.equal(editRun(source,code,'a|b|c').source,source.replace('`a\\|b`','`a\\|b\\|c`'));
+});

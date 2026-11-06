@@ -212,6 +212,7 @@ export function editRun(source, run, text) {
     if (/[\r\n]/.test(removed + inserted) && run.newlinePrefix == null) throw new Error('Edit words within one text run; changing line breaks is not supported.');
     if (run.kind === 'code' && /\x60/.test(inserted)) throw new Error('A code-span delimiter cannot be edited.');
     if (run.kind === 'blockcode' && text.split(/\r?\n/).some(line => { const fence = /^ {0,3}(`+|~+)/.exec(line); return fence && fence[1].length >= 3; })) throw new Error('A closing code fence cannot be inserted.');
+    if (run.kind === 'code' && run.tableCell && /\\\|/.test(text)) throw new Error('A backslash before a pipe cannot be inserted into a table code span.');
     const positions = run.sourceOffsets || original.offsets.map(i=>run.start+i);
     const start = positions[before.slice(0, a).join('').length], end = positions[run.text.length - before.slice(before.length - b).join('').length];
     let replacement = run.kind === 'blockcode' ? inserted : run.kind === 'code' ? (run.tableCell ? inserted.replace(/\|/g,'\\|') : inserted) : escapeInserted(inserted);
