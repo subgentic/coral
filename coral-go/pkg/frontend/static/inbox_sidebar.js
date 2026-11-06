@@ -724,14 +724,15 @@ const boardSection = () => (isPhoneLayout() && boardList.length ? [{ title: 'Boa
 const navCurrent = () => (isPhoneLayout() && page?.kind === BOARDS_SUB ? BOARD_ITEM + page.project : pageGroup());
 const FOLDER_TIPS = { needs: 'Agents waiting for you: a question, a permission or a review', tasks: 'Tasks assigned to you', goals: 'The open goals of your teams', saved: 'Messages you saved for later', artifacts: 'Files agents shared', activity: 'What you did in Needs you' }; // one line each (#10074)
 // The Needs you number is the unread ones, and when the list holds more (read files are listed, not counted: #9277) it says so as the kind pills do, "1 of 4" (#12789, the Operator: "Needs you 0" over a table of read files). The welcome items are listed and never counted (#11622): they do not make it "0 of 5" on a new install.
-const needsCountSaid = () => { const unread = countOf('needs'), listed = allNeeds().filter(s => !s.welcome).length; return listed > unread ? `${unread} of ${listed}` : unread; };
+// #13979 (Hub beta: "0 of 1" meant nothing to a person, and the Operator kept the unread number): the badge is the unread count alone; when the list holds more, its tooltip and its spoken name say "1 unread, 4 in the list".
+const needsCountWords = () => { const unread = countOf('needs'), listed = allNeeds().filter(s => !s.welcome).length; return listed > unread ? `${unread} unread, ${listed} in the list` : ''; };
 /** The sidebar's groups, one list for this dashboard and the Hub-served one (#13256): Needs attention (Needs you, Tasks, Goals, Saved), Files (Artifacts), History (Activity), the same order and words. Under the Hub an entry shows only where the Hub serves it
  *  (a native group in GROUPS: Artifacts not for a grantee, Activity not served today) and a Hub-frame page keeps no number of its own (the page says it). */
 const folderSections = () => {
     const hub = nativeInbox(), shown = key => !hub || (GROUPS.some(g => g.key === key) && (key !== 'artifacts' || !IA.artifactsOwnerOnly())), framed = key => hub && !!GROUPS.find(g => g.key === key)?.frame;
     const item = (key, label, count, extra) => shown(key) ? [{ key, label, count: framed(key) ? undefined : count, ...extra }] : [];
     const sections = [
-        { title: 'Needs attention', items: [...item('needs', 'Needs you', needsCountSaid(), { alert: !hub && countOf('needs') > 0 }), ...item('tasks', 'Tasks', countOf('tasks')), ...item('goals', 'Goals', countOf('goals')), ...item('saved', 'Saved', countOf('saved'))] },
+        { title: 'Needs attention', items: [...item('needs', 'Needs you', countOf('needs'), { alert: !hub && countOf('needs') > 0, words: needsCountWords() }), ...item('tasks', 'Tasks', countOf('tasks')), ...item('goals', 'Goals', countOf('goals')), ...item('saved', 'Saved', countOf('saved'))] },
         { title: 'Files', items: item('artifacts', 'Artifacts', countOf('artifacts')) },
         { title: 'History', items: item('activity', 'Activity') },
     ].filter(section => section.items.length);
