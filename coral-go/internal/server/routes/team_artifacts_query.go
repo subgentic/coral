@@ -414,7 +414,7 @@ func parseArtifactTime(s string) (time.Time, bool) {
 }
 
 // cheapMatch applies the filters that need no file system: origin, by, board, kept and the time range.
-func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept, starred map[string]bool) bool {
+func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept map[string]bool, starred map[string]starInfo) bool {
 	if len(q.origins) > 0 {
 		o, ok := teamArtifactOrigin(it), false
 		for _, w := range q.origins {
@@ -457,7 +457,7 @@ func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept, starred map[string
 		}
 	}
 	if q.starred != nil {
-		isStarred := it.managed != "" && starred[it.managed]
+		_, isStarred := starOf(starred, it.BoardID, it.managed)
 		if isStarred != *q.starred {
 			return false
 		}
@@ -711,7 +711,6 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 			return nil, err
 		}
 	}
-	var starred map[string]bool
 	var follow map[string]starInfo
 	if starVisible(r) { // the Operator's own attention: an agent's token and a Hub caller that is not the owner see no bookmark, and a starred filter finds none
 		times, err := h.bs.StarredArtifactTimes(r.Context(), openedPersonKey(r)) // a small set: read for every list, the rows say whether they are starred
@@ -722,13 +721,10 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 			times = map[string]string{} // a star is a bookmark: the list still answers, its rows unstarred
 		}
 		follow = starFollowIf(h.coralDir, times, q.crossTeam)
-		starred = make(map[string]bool, len(follow))
-		for d := range follow {
-			starred[d] = true
-		}
 	} else {
-		starred = map[string]bool{}
+		follow = map[string]starInfo{}
 	}
+	starred := follow
 	dir := h.artifactObjectDir()
 	tunneled := cloud.Tunneled(r)
 	if tunneled {
@@ -783,7 +779,7 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 	if pinMode { // one row per starred series: its newest version; the older versions of a starred series are the same document
 		kept := set[:0:0]
 		for _, it := range set {
-			if info, ok := follow[it.managed]; it.managed != "" && ok && !info.Latest {
+			if info, ok := starOf(follow, it.BoardID, it.managed); ok && !info.Latest {
 				continue
 			}
 			kept = append(kept, it)
@@ -839,13 +835,17 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 	if pinMode && q.starredFirst { // the starred series first, the newest star first, then everything else in the order asked for; paged by position, which the cursor carries
 		var pins, rest []teamArtifact
 		for _, it := range set {
-			if info, ok := follow[it.managed]; it.managed != "" && ok && info.Latest {
+			if info, ok := starOf(follow, it.BoardID, it.managed); ok && info.Latest {
 				pins = append(pins, it)
 			} else {
 				rest = append(rest, it)
 			}
 		}
-		sort.SliceStable(pins, func(i, j int) bool { return follow[pins[i].managed].At > follow[pins[j].managed].At })
+		sort.SliceStable(pins, func(i, j int) bool {
+			a, _ := starOf(follow, pins[i].BoardID, pins[i].managed)
+			b, _ := starOf(follow, pins[j].BoardID, pins[j].managed)
+			return a.At > b.At
+		})
 		pinned = len(pins)
 		set = append(pins, rest...)
 	}
@@ -884,9 +884,9 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 		}
 	}
 	for i := range sel.page {
-		sel.page[i].Starred = sel.page[i].managed != "" && starred[sel.page[i].managed]
+		_, sel.page[i].Starred = starOf(starred, sel.page[i].BoardID, sel.page[i].managed)
 		if q.crossTeam && sel.page[i].Starred { // the star-following fields, on the owner-only cross-team list alone (#13910)
-			if info, ok := follow[sel.page[i].managed]; ok {
+			if info, ok := starOf(follow, sel.page[i].BoardID, sel.page[i].managed); ok {
 				sel.page[i].StarredAt, sel.page[i].SeriesID = info.At, info.Series
 				if info.Latest {
 					sel.page[i].EarlierDigests = info.Earlier
@@ -1034,7 +1034,7 @@ func starFollowIf(coralDir string, times map[string]string, follow bool) map[str
 	}
 	out := make(map[string]starInfo, len(times))
 	for d, at := range times {
-		out[d] = starInfo{At: at, Latest: true}
+		out["|"+d] = starInfo{At: at, Latest: true}
 	}
 	return out
 }

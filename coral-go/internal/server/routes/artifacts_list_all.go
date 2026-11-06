@@ -277,13 +277,13 @@ func (h *SessionsHandler) listAllArtifacts(w http.ResponseWriter, r *http.Reques
 		starredFilter = &b
 	}
 	rows := listAllArtifactRows(h.cfg.CoralDir())
-	stars, serr := h.starredArtifactIDs(r.Context(), openedPersonKey(r))
+	stars, serr := h.starredArtifacts(r.Context(), openedPersonKey(r))
 	if serr != nil { // a failed star read is an error, never a list that quietly shows nothing starred (#13910)
 		errInternalServer(w, "could not read the stars")
 		return
 	}
 	for i := range rows {
-		rows[i].Starred = stars[rows[i].ID]
+		_, rows[i].Starred = starOf(stars, rows[i].Board, rows[i].ID)
 	}
 	if starredFilter != nil {
 		kept := rows[:0]
@@ -333,11 +333,10 @@ func (h *SessionsHandler) listAllArtifacts(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, out)
 }
 
-// starredArtifactIDs is the set of artifact ids that count as starred (#9819): each starred artifact and, since the star follows the series (#13910), every version of its series. An error means the answer is unknown.
-func (h *SessionsHandler) starredArtifactIDs(ctx context.Context, person string) (map[string]bool, error) {
-	out := map[string]bool{}
+// starredArtifacts is what counts as starred (#9819) per row, "board|id": each starred artifact and, since the star follows the series (#13910), every version of the SAME TEAM's series. An error means the answer is unknown.
+func (h *SessionsHandler) starredArtifacts(ctx context.Context, person string) (map[string]starInfo, error) {
 	if h.db == nil {
-		return out, nil
+		return map[string]starInfo{}, nil
 	}
 	var rows []struct {
 		Hex string `db:"hex"`
@@ -356,10 +355,7 @@ func (h *SessionsHandler) starredArtifactIDs(ctx context.Context, person string)
 	for _, r := range rows {
 		times[r.Hex] = r.At
 	}
-	for d := range starFollow(h.cfg.CoralDir(), times) {
-		out[d] = true
-	}
-	return out, nil
+	return starFollow(h.cfg.CoralDir(), times), nil
 }
 
 // labelAllArtifactBoards fills BoardLabel from the board names, for the boards the page names.

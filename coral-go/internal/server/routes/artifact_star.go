@@ -30,14 +30,14 @@ func (h *SessionsHandler) starArtifactRoute(w http.ResponseWriter, r *http.Reque
 	}
 	var err error
 	seriesID := ""
-	if sid, _, ok := digestSeries(h.cfg.CoralDir(), id); ok { // the series of the digest's first upload record, as the lists find it (#13910)
+	if sid, ok := soleTeamSeriesOf(h.cfg.CoralDir(), id); ok { // the series of the ONE team that holds this digest in a series (#13910); bytes two teams hold in series are two files, and the digest alone is starred or cleared
 		seriesID = sid
 	}
 	person := openedPersonKey(r) // a star is a person's (#13910): the owner key's are the original table's, another person's their own
 	if r.Method == http.MethodDelete {
 		_, err = h.unstar(r.Context(), person, id)
 		if err == nil && seriesID != "" { // the star follows the series, so an unstar clears every version's: the document is no longer pinned. The same bytes in another team's series are another series and stay as they are.
-			for _, m := range seriesMembers(h.cfg.CoralDir(), seriesID) {
+			for _, m := range seriesMembersOfBoard(h.cfg.CoralDir(), seriesID, id) {
 				if _, err = h.unstar(r.Context(), person, m.Digest); err != nil {
 					break
 				}

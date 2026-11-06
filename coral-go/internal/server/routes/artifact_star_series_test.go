@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -38,25 +40,26 @@ func TestAStarOnAnyVersionStarsTheSeriesAndTheNewestIsTheLatest(t *testing.T) {
 	_, d := threeVersions(t, k)
 	dir := k.coralDir
 	got := starFollow(dir, map[string]string{d[0]: "2026-11-06T10:00:00Z"})
-	require.Len(t, got, 3, "the star on v1 is on every version of the series")
-	assert.Equal(t, 3, len(got))
-	sid := got[d[2]].Series
+	sid := got["alpha|"+d[2]].Series
 	require.NotEmpty(t, sid)
 	for _, x := range d {
-		assert.Equal(t, sid, got[x].Series)
-		assert.Equal(t, "2026-11-06T10:00:00Z", got[x].At)
+		info, ok := starOf(got, "alpha", x)
+		require.True(t, ok, "the star on v1 is on every version of the series")
+		assert.Equal(t, sid, info.Series)
+		assert.Equal(t, "2026-11-06T10:00:00Z", info.At)
 	}
-	assert.True(t, got[d[2]].Latest, "the newest version is the one a pinned list shows")
-	assert.False(t, got[d[0]].Latest)
-	assert.False(t, got[d[1]].Latest)
+	assert.True(t, got["alpha|"+d[2]].Latest, "the newest version is the one a pinned list shows")
+	assert.False(t, got["alpha|"+d[0]].Latest)
+	assert.False(t, got["alpha|"+d[1]].Latest)
 	// two versions starred at different times: the series says the newer star
 	got = starFollow(dir, map[string]string{d[0]: "2026-11-06T10:00:00Z", d[1]: "2026-11-06T12:00:00Z"})
-	assert.Equal(t, "2026-11-06T12:00:00Z", got[d[2]].At)
+	assert.Equal(t, "2026-11-06T12:00:00Z", got["alpha|"+d[2]].At)
 	// a file in no series is starred as itself
 	got = starFollow(dir, map[string]string{strings.Repeat("a", 64): "2026-11-06T09:00:00Z"})
-	require.Len(t, got, 1)
-	assert.True(t, got[strings.Repeat("a", 64)].Latest)
-	assert.Empty(t, got[strings.Repeat("a", 64)].Series)
+	info, ok := starOf(got, "", strings.Repeat("a", 64))
+	require.True(t, ok)
+	assert.True(t, info.Latest)
+	assert.Empty(t, info.Series)
 }
 
 func TestAnUnstarOfAnyVersionClearsTheWholeSeriesAndNothingElse(t *testing.T) {
@@ -345,10 +348,13 @@ func TestStarsArePerPersonAndTheOwnerKeysAreTheOriginalTable(t *testing.T) {
 	assert.Empty(t, nobody, "and a third person sees none of either")
 
 	// the lists read the caller's: the local dashboard is the owner key
-	ids, err := k.h.starredArtifactIDs(ctx, ownerPersonKey)
+	ids, err := k.h.starredArtifacts(ctx, ownerPersonKey)
 	require.NoError(t, err)
-	assert.Len(t, ids, 3, "the owner key's star on version one follows the series")
-	ids, err = k.h.starredArtifactIDs(ctx, "hub:org-1:u2")
+	for _, x := range d {
+		_, ok := starOf(ids, "alpha", x)
+		assert.True(t, ok, "the owner key's star on version one follows the series")
+	}
+	ids, err = k.h.starredArtifacts(ctx, "hub:org-1:u2")
 	require.NoError(t, err)
 	assert.Empty(t, ids)
 
@@ -495,4 +501,76 @@ func mustSeriesOf(t *testing.T, k *kindRig, digest string) string {
 	sid, _, ok := digestSeries(k.coralDir, digest)
 	require.True(t, ok)
 	return sid
+}
+
+// Security's INFO after #13942: the star, the unstar and the opened version never reach into another team's series. Team alpha has a series of three versions; team beta holds the SAME bytes as alpha's first version
+// in a series of its own.
+func twoTeamsSameBytes(t *testing.T) (*kindRig, []string, string, string) {
+	t.Helper()
+	k := newKindRig(t)
+	_, d := threeVersions(t, k) // alpha's series: d[0], d[1], d[2]
+	dir := k.coralDir
+	// beta: the same bytes as d[0], then a version of its own, as a series of beta's
+	rec, ok := readUploadRecord(dir, "s1", d[0])
+	require.True(t, ok)
+	betaDir := uploadsDir(dir, "s3")
+	require.NoError(t, os.MkdirAll(betaDir, 0o700))
+	betaSeries := strings.Repeat("b", 32)
+	own := rec
+	own.Board, own.SeriesID, own.Version, own.Previous = "beta", betaSeries, 1, ""
+	b1, _ := json.Marshal(own)
+	require.NoError(t, os.WriteFile(filepath.Join(betaDir, d[0]+".json"), b1, 0o600))
+	betaTwo := strings.Repeat("d", 64)
+	two := rec
+	two.Board, two.SeriesID, two.Version, two.Previous, two.Digest = "beta", betaSeries, 2, d[0], "sha256:"+betaTwo
+	b2, _ := json.Marshal(two)
+	require.NoError(t, os.WriteFile(filepath.Join(betaDir, betaTwo+".json"), b2, 0o600))
+	require.NoError(t, writeSeriesIndex(dir, seriesIndex{ID: betaSeries, Board: "beta", CreatedAt: rec.CreatedAt, Versions: []seriesVersionRow{{Digest: d[0], N: 1, Session: "s3", At: rec.CreatedAt}, {Digest: betaTwo, N: 2, Session: "s3", At: rec.CreatedAt}}}))
+	return k, d, betaSeries, betaTwo
+}
+
+func TestAStarOnOneTeamsVersionNeverFollowsIntoAnotherTeamsSeries(t *testing.T) {
+	k, d, betaSeries, betaTwo := twoTeamsSameBytes(t)
+	got := starFollow(k.coralDir, map[string]string{d[0]: "2026-11-06T10:00:00Z"})
+	// the digest itself is starred on both teams (it is one file's bytes), and each team's OWN series follows there and only there
+	_, a2 := starOf(got, "alpha", d[2])
+	_, b2 := starOf(got, "beta", betaTwo)
+	assert.True(t, a2, "alpha's series follows on alpha")
+	assert.True(t, b2, "beta's series follows on beta")
+	info, _ := starOf(got, "alpha", d[2])
+	assert.NotEqual(t, betaSeries, info.Series)
+	_, crossed := got["alpha|"+betaTwo]
+	assert.False(t, crossed, "beta's second version is not starred on alpha")
+	_, crossed = got["beta|"+d[2]]
+	assert.False(t, crossed, "alpha's third version is not starred on beta")
+	_, crossed = got["beta|"+d[1]]
+	assert.False(t, crossed, "nor alpha's second")
+}
+
+func TestAnUnstarOfBytesTwoTeamsHoldInSeriesClearsTheDigestAndNothingOfEitherSeries(t *testing.T) {
+	k, d, _, betaTwo := twoTeamsSameBytes(t)
+	ctx := context.Background()
+	for _, id := range []string{d[0], d[1], betaTwo} {
+		_, err := k.h.star(ctx, ownerPersonKey, id)
+		require.NoError(t, err)
+	}
+	_, err := k.h.unstar(ctx, ownerPersonKey, d[0])
+	require.NoError(t, err)
+	sid, ok := soleTeamSeriesOf(k.coralDir, d[0])
+	assert.False(t, ok, "two teams hold these bytes in a series: no series is the action's scope (%s)", sid)
+	assert.Empty(t, seriesMembersOfBoard(k.coralDir, "x", d[0]), "and no team's members are followed")
+	for _, id := range []string{d[1], betaTwo} {
+		var n int
+		require.NoError(t, k.h.db.Reader().GetContext(ctx, &n, "SELECT COUNT(*) FROM artifact_stars WHERE hex = ?", id))
+		assert.Equal(t, 1, n, "another version's star stays: nothing of either team's series is cleared")
+	}
+}
+
+func TestOpenedForBytesTwoTeamsHoldInSeriesIsNotRecordedForEither(t *testing.T) {
+	k, d, _, _ := twoTeamsSameBytes(t)
+	_, _, _, ok := digestSeriesBoard(k.coralDir, d[0])
+	assert.False(t, ok, "which team's file was opened cannot be said from a digest both hold in a series")
+	_, _, board, ok := digestSeriesBoard(k.coralDir, d[2])
+	require.True(t, ok, "a digest only one team holds is recorded for that team")
+	assert.Equal(t, "alpha", board)
 }

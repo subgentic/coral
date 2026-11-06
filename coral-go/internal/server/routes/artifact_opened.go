@@ -2,7 +2,6 @@ package routes
 
 import (
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -86,11 +85,16 @@ func personKeyOf(id callerIdentity) string {
 	return ownerPersonKey
 }
 
-// digestSeriesBoard is digestSeries with the board the record belongs to and the version of that record: the first upload record of the digest that names a series. Records decide.
+// digestSeriesBoard is the series of the digest with its team and the version of that record, when exactly ONE team holds the digest in a series: the same bytes in two teams' series are two files, and this route names
+// only a digest, so it cannot say which one was opened (not recorded, rather than recorded for the wrong team). Records decide.
 func digestSeriesBoard(coralDir, digest string) (seriesID string, n int, board string, ok bool) {
+	sid, b, one := soleTeamSeries(coralDir, digest)
+	if !one {
+		return "", 0, "", false
+	}
 	for _, r := range recordsOfDigest(coralDir, digest) {
-		if seriesIDRe.MatchString(r.rec.SeriesID) && strings.TrimSpace(r.rec.Board) != "" {
-			return r.rec.SeriesID, r.rec.Version, r.rec.Board, true
+		if r.rec.SeriesID == sid && r.rec.Board == b {
+			return sid, r.rec.Version, b, true
 		}
 	}
 	return "", 0, "", false
