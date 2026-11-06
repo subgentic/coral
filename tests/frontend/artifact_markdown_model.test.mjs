@@ -143,3 +143,14 @@ test('all tag characters and Unicode line separators are read-only, visible, and
  }
  assert.equal(visibleSpecials('Plain 🍊\r\n\twords.'),'Plain 🍊\r\n\twords.');
 });
+
+test('rendered policy exposes additional invisible controls but retains variation selectors',async()=>{
+ const {HIDDEN,visibleSpecials}=await import('../../coral-go/pkg/frontend/static/artifact_markdown_model.js');
+ for(const cp of [0xad,0x34f,0x85,0x180e,0x115f,0x1160,0x3164,0xfff9,0xfffa,0xfffb]) {
+  const c=String.fromCodePoint(cp),label='U+'+cp.toString(16).toUpperCase().padStart(4,'0'),source='Before'+c+'after.\n';
+  assert.equal(HIDDEN.test(c),true,label);assert.equal(visibleSpecials(c),'⟦'+label+'⟧');assert.ok(analyze(source,marked).blocks[0].reason);assert.throws(()=>editRun('Safe words.\n',mapped('Safe words.\n')[0],'Safe'+c+'words.'),/Hidden/);
+ }
+ const selectors=[0x180b,0x180c,0x180d,0x180f,...Array.from({length:16},(_,i)=>0xfe00+i),...Array.from({length:240},(_,i)=>0xe0100+i)];
+ for(const cp of selectors){const c=String.fromCodePoint(cp);assert.equal(HIDDEN.test(c),false);assert.equal(visibleSpecials(c),c);const source='Words'+c+'.\n';assert.ok(mapped(source).length);assert.equal(editRun(source,mapped(source)[0],'New'+c+'.').source,'New'+c+'.\n');}
+ for(const source of ['Heart ❤️.\n','Mongolian ᠠ\u180b.\n','Ideograph 禰\u{e0100}.\n'])assert.ok(!analyze(source,marked).blocks[0].reason);
+});

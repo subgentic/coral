@@ -1,5 +1,6 @@
 // Rendered text editing. Keep original source bytes; the lexer is used for positions, never serialization.
-export const HIDDEN = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u061c\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060-\u206f\ufeff\u{E0000}-\u{E007F}]/u;
+// Variation selectors stay editable: Mongolian, emoji and CJK glyph selection is legitimate text.
+export const HIDDEN = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u0085\u00ad\u034f\u061c\u115f\u1160\u180e\u3164\ufff9-\ufffb\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060-\u206f\ufeff\u{E0000}-\u{E007F}]/u;
 // Keep visible markers on exactly the same code-point policy as refusal/warnings.
 const ALL_HIDDEN = new RegExp(HIDDEN.source, 'gu');
 export const MAX_BYTES = 2 * 1024 * 1024;

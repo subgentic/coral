@@ -42,11 +42,11 @@ const hexOf = data => String(data.digest || data.hex || data.id || '').replace(/
         for(const [w,theme,font] of [[390,'dark',32],[1280,'light',16]]) {
             await Emulation.setDeviceMetricsOverride({width:w,height:900,deviceScaleFactor:1,mobile:w===390});
             await ev(`document.documentElement.dataset.theme='${theme}';document.documentElement.style.fontSize='${font}px';true`);
-            for(const cp of [0xe0041,0x2028,0x2029]) {
-                const char=String.fromCodePoint(cp),code=cp.toString(16).toUpperCase(),label='U+'+code,name=`hidden-${w}-${code}.md`;
+            for(const cp of [0xad,0x34f,0x85,0x180e,0x115f,0x1160,0x3164,0xfff9,0xfffa,0xfffb]) {
+                const char=String.fromCodePoint(cp),code=cp.toString(16).toUpperCase().padStart(4,'0'),label='U+'+code,name=`hidden-${w}-${code}.md`;
                 const source=`\ufeff# Hidden character ${w}/${code}\r\n\r\nSafe words.\r\n\r\nBefore${char}after.\r\n\r\n[Visible link](https://example.com/${char})\r\n\r\n- Editable item.\r\n`;
                 const original=await upload(name,source);await open(original,name);await waitFor(`!document.querySelector('.artifact-viewer-edit').hidden`,'owner Edit for hidden source',8000);await edit();await waitFor(`!!document.querySelector('.amd-text')`,'rendered editor ready',8000);
-                await ev(`[...document.querySelectorAll('.amd-block')].find(e=>e.textContent.includes('Before'))?.scrollIntoView({block:'center'});true`);await shot(`hidden-rendered-${w}-${code}`);
+                await ev(`[...document.querySelectorAll('.amd-block')].find(e=>e.textContent.includes('Before'))?.scrollIntoView({block:'center'});true`);if(cp===0xad)await shot(`hidden-rendered-${w}-${code}`);
                 assert.ok(await ev(`document.querySelector('.amd-document').textContent.includes(${JSON.stringify(label)})`),label+' code point is visible');
                 assert.equal(await ev(`[...document.querySelectorAll('.amd-text')].some(e=>e.textContent.includes('Before'))`),false,label+' block stays read-only');
                 assert.ok(await ev(`[...document.querySelectorAll('.amd-block')].find(e=>e.textContent.includes('Visible link'))?.querySelector('.amd-readonly')?.textContent.includes(${JSON.stringify(label)})`),label+' is also named for a source-only destination');
@@ -58,7 +58,7 @@ const hexOf = data => String(data.digest || data.hex || data.id || '').replace(/
                 await client.Input.insertText({text:'More\n'+char});assert.ok(await ev(`[...document.querySelectorAll('.amd-text')].some(e=>e.textContent==='Editable item.')`),'multiline native insertion refuses hidden text immediately');
                 await nativeClick('.amd-mode-raw');await waitFor(`!!document.querySelector('.amd-raw')`,'raw source ready',5000);assert.equal(await ev(`document.querySelector('.amd-raw-warning').hidden`),false,'raw mode warns');
                 await ev(`(()=>{const e=document.querySelector('.amd-raw');e.focus();e.setSelectionRange(e.value.length,e.value.length);return true;})()`);const tail=' Raw'+char+' words.';await client.Input.insertText({text:tail});assert.equal(await ev(`document.querySelector('.amd-raw-warning').hidden`),false);
-                await ev(`document.querySelector('.amd-raw-warning').scrollIntoView({block:'center'});true`);await shot(`hidden-raw-warning-${w}-${code}`);await nativeClick('.amd-save');await waitFor(`!document.querySelector('.amd-editor')&&!!document.querySelector('.artifact-viewer-version')`,'raw hidden source saved',10000);
+                await ev(`document.querySelector('.amd-raw-warning').scrollIntoView({block:'center'});true`);if(cp===0xad)await shot(`hidden-raw-warning-${w}-${code}`);await nativeClick('.amd-save');await waitFor(`!document.querySelector('.amd-editor')&&!!document.querySelector('.artifact-viewer-version')`,'raw hidden source saved',10000);
                 const versions=(await person('GET',`/api/artifacts/${original}/versions`)).data;assert.equal(versions.length,2);const saved=hexOf(versions.find(v=>v.is_latest)||versions.at(-1));assert.deepEqual(Buffer.from(await bytes(saved)),Buffer.from(source+tail),'raw source retains original BOM/CRLF and every hidden code point');assert.deepEqual(Buffer.from(await bytes(original)),Buffer.from(source));await nativeClick('.artifact-viewer-close');
                 console.log(`PASS ${label}: read-only marker, native typing/paste refusal, raw warning and exact saved bytes ${w}px`);
             }

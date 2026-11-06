@@ -166,8 +166,8 @@ test('mode switches never serialize DOM or normalize untouched source bytes',asy
 });
 
 test('tag and separator characters are visible/read-only, rejected on typing/paste, and only warned in raw mode',async()=>{
- for(const cp of [0xe0000,0xe001f,0xe0020,0xe0041,0xe007f,0x2028,0x2029]) {
-  const char=String.fromCodePoint(cp),label='U+'+cp.toString(16).toUpperCase(),source='\ufeff# Title\r\n\r\nBefore'+char+'after.\r\n';let sent,done;const saved=new Promise(r=>{done=r;});
+ for(const cp of [0xe0000,0xe001f,0xe0020,0xe0041,0xe007f,0x2028,0x2029,0xad,0x34f,0x85,0x180e,0x115f,0x1160,0x3164,0xfff9,0xfffa,0xfffb]) {
+  const char=String.fromCodePoint(cp),label='U+'+cp.toString(16).toUpperCase().padStart(4,'0'),source='\ufeff# Title\r\n\r\nBefore'+char+'after.\r\n';let sent,done;const saved=new Promise(r=>{done=r;});
   globalThis.fetch=window.fetch=async(url,options)=>{sent=options.body;return Response.json({id:next,version:2});};const ui=setup(source,done);
   assert.ok(ui.body.textContent.includes(label),label+' code point is shown');assert.equal([...ui.body.querySelectorAll('.amd-text')].some(e=>e.textContent.includes('Before')),false,label+' block is read-only');
   const field=ui.body.querySelector('.amd-text'),before=field.textContent;
@@ -179,7 +179,7 @@ test('tag and separator characters are visible/read-only, rejected on typing/pas
 
 test('read-only notices name hidden code points even inside Markdown link destinations',()=>{
  for(const cp of [0xe0041,0x2028,0x2029]) {
-  const char=String.fromCodePoint(cp),label='U+'+cp.toString(16).toUpperCase(),source='[Visible label](https://example.com/'+char+')\n',ui=setup(source);
+  const char=String.fromCodePoint(cp),label='U+'+cp.toString(16).toUpperCase().padStart(4,'0'),source='[Visible label](https://example.com/'+char+')\n',ui=setup(source);
   assert.ok(ui.body.querySelector('.amd-readonly'));assert.ok(ui.body.querySelector('.amd-readonly').textContent.includes(label),label+' is named when it is absent from visible link text');assert.equal(ui.body.querySelectorAll('.amd-text').length,0);assert.equal(ui.editor.dirty,false);ui.close();
  }
 });
