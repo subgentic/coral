@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/store"
 )
 
 // #13802: Send to agent with the diff. The Operator's saved edit goes to chosen agents as a diff the SERVER makes (the request carries names only), through the comment thread and ask rows.
@@ -41,6 +42,8 @@ func (rig *cmtRig) editSeries(v1Text, v2Text string, v2Source string) {
 		prev             string
 	}{{editV1, v1Text, "", 1, ""}, {editV2, v2Text, v2Source, 2, editV1}} {
 		require.NoError(rig.t, os.WriteFile(filepath.Join(dir, v.id), []byte(v.text), 0o644))
+		meta, _ := json.Marshal(agentArtifactMeta{Name: "plan.md", MediaType: "text/markdown", Size: int64(len(v.text)), Digest: "sha256:" + v.id})
+		require.NoError(rig.t, os.WriteFile(filepath.Join(dir, v.id+".json"), meta, 0o644)) // the sidecar, so the artifact is readable (comments can be deleted)
 		rec := agentUploadRecord{agentArtifactMeta: agentArtifactMeta{Name: "plan.md", MediaType: "text/markdown", Size: int64(len(v.text)), Digest: "sha256:" + v.id}, CreatedAt: time.Now().UTC().Format(time.RFC3339),
 			Board: "team-a", SeriesID: "abababababababababababababababab", Version: v.n, Previous: v.prev, Source: v.source}
 		if v.source == sourceOperatorEdit {
@@ -134,14 +137,20 @@ func TestManyClicksAtOnceMakeOneThreadAndOneMessage(t *testing.T) {
 	rig := newCmtRig(t)
 	rig.agent(1, "Dev", false)
 	rig.edited()
-	var wg sync.WaitGroup
+	var ready, wg sync.WaitGroup
+	start := make(chan struct{})
 	for i := 0; i < 8; i++ {
+		ready.Add(1)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			ready.Done()
+			<-start // released together: the clicks race for the thread
 			rig.editSend(editAsPage, "Dev")
 		}()
 	}
+	ready.Wait()
+	close(start)
 	wg.Wait()
 	cs, _ := rig.ss.ListArtifactComments(context.Background(), editV2, "", []string{"team-a"})
 	assert.Len(t, cs, 1, "one root comment")
@@ -252,4 +261,100 @@ func TestADiffOverOneKiBIsNotShownEvenWhenTheMessageWouldHaveFit(t *testing.T) {
 	assert.Equal(t, true, out["limited"])
 	assert.NotContains(t, rig.operatorMessages()[0].Content, "@​@​", "no hunk")
 	assert.NotContains(t, rig.operatorMessages()[0].Content, "-old line number 00")
+}
+
+// QA's SHOULD (4): a message that could not be posted leaves no ask behind, so the retry is a first send and not "already sent" for an agent that never got it.
+func TestAFailedPostLeavesNoAskAndTheRetryDelivers(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	rig.edited()
+	rig.h.editPost = func(context.Context, string, string) error { return fmt.Errorf("the board is down") }
+	code, out := rig.editSend(editAsPage, "Dev")
+	assert.Equal(t, http.StatusConflict, code, out)
+	assert.Equal(t, map[string]string{"Dev": "failed"}, states(out))
+	rootID := int64(out["thread_id"].(float64))
+	_, found, err := rig.ss.GetArtifactAsk(context.Background(), rootID, sendSid(1))
+	require.NoError(t, err)
+	assert.False(t, found, "no ask row is left")
+	assert.Empty(t, rig.operatorMessages())
+	rig.h.editPost = nil
+	code, out = rig.editSend(editAsPage, "Dev")
+	require.Equal(t, 200, code, out)
+	assert.Equal(t, map[string]string{"Dev": "sent"}, states(out), "the retry is a first send")
+	assert.Len(t, rig.operatorMessages(), 1)
+}
+
+// QA's SHOULD (7): the thread is the owner's own root and not a deleted one; an agent's comment with the same words is not it.
+func TestAnotherAuthorsOrADeletedRootIsNotTheThread(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	rig.edited()
+	marker := fmt.Sprintf(editSendThreadTag, 2)
+	_, err := rig.ss.CreateArtifactComment(context.Background(), store.ArtifactComment{ArtifactID: editV2, Board: "team-a", AnchorJSON: `{"whole":true}`, Body: marker,
+		AuthorIssuer: "agent", AuthorSubject: "s1", AuthorName: "Dev", AuthorKind: commentCallerAgent})
+	require.NoError(t, err)
+	code, out := rig.editSend(editAsPage, "Dev")
+	require.Equal(t, 200, code, out)
+	cs, _ := rig.ss.ListArtifactComments(context.Background(), editV2, "", []string{"team-a"})
+	require.Len(t, cs, 2, "the agent's look-alike is left alone and the owner's own root is made")
+	var owners int
+	for _, c := range cs {
+		if c.AuthorKind == commentCallerOwner {
+			owners++
+			assert.EqualValues(t, c.ID, out["thread_id"])
+		}
+	}
+	assert.Equal(t, 1, owners)
+	// delete the owner's root: the next send makes a new thread
+	oldRoot := int64(out["thread_id"].(float64))
+	code, rep := rig.do("POST", cp(editV2), cmtAsOwner, map[string]any{"body": "a reply, so the deleted root stays as a tombstone", "parent_id": oldRoot, "board": "team-a"})
+	require.Equal(t, http.StatusCreated, code, rep)
+	code, _ = rig.do("DELETE", fmt.Sprintf("%s/%d", cp(editV2), oldRoot), cmtAsOwner, nil)
+	require.Equal(t, 200, code)
+	tombs, _ := rig.ss.ListArtifactComments(context.Background(), editV2, "", []string{"team-a"})
+	var tomb bool
+	for _, c := range tombs {
+		tomb = tomb || (c.ID == oldRoot && c.DeletedAt != nil)
+	}
+	require.True(t, tomb, "the deleted root is still listed, as a tombstone")
+	rig.agent(2, "QA", false)
+	code, out = rig.editSend(editAsPage, "QA")
+	require.Equal(t, 200, code, out)
+	assert.NotEqual(t, float64(oldRoot), out["thread_id"], "a deleted root is not reused")
+}
+
+// QA's SHOULD (6): an agent's token cannot send, and nothing is delivered or made.
+func TestAnAgentTokenCannotSendAnEditAndNothingIsMade(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	rig.edited()
+	code, out := rig.do("POST", editSendPath(editV2), cmtAsAgent, map[string]any{"agents": []string{"Dev"}})
+	assert.Equal(t, http.StatusForbidden, code, out)
+	code, _ = rig.do("GET", editSendPath(editV2), cmtAsAgent, nil)
+	assert.Equal(t, http.StatusForbidden, code, "an agent is not offered Send either")
+	assert.Empty(t, rig.operatorMessages())
+	cs, _ := rig.ss.ListArtifactComments(context.Background(), editV2, "", []string{"team-a"})
+	assert.Empty(t, cs, "no thread was made")
+}
+
+// QA's SHOULD (8): an edit with nothing visible as lines (only line endings changed) and an object over the editor's size are both sent as the note with the two links, never as a diff.
+func TestAnEmptyDiffAndAnOversizedVersionAreSentAsTheNoteWithBothLinks(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	rig.editSeries("a\r\nb\r\n", "a\nb\n", sourceOperatorEdit)
+	code, out := rig.editSend(editAsPage, "Dev")
+	require.Equal(t, 200, code, out)
+	assert.Equal(t, true, out["limited"], "line endings alone: nothing to show as lines")
+	m := rig.operatorMessages()[0].Content
+	assert.Contains(t, m, "too large to show")
+	assert.Contains(t, m, "coral://artifacts/"+editV1)
+	assert.Contains(t, m, "coral://artifacts/"+editV2)
+
+	rig2 := newCmtRig(t)
+	rig2.agent(1, "Dev", false)
+	rig2.editSeries(strings.Repeat("x\n", maxMarkdownEdit/2+10), "short\n", sourceOperatorEdit) // the predecessor is over 2 MiB
+	code, out = rig2.editSend(editAsPage, "Dev")
+	require.Equal(t, 200, code, out)
+	assert.Equal(t, true, out["limited"], "an object over the editor's size is not read into a diff")
+	assert.Contains(t, rig2.operatorMessages()[0].Content, "coral://artifacts/"+editV1)
 }
