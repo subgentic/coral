@@ -45,15 +45,15 @@ type BoardHandler struct {
 	bs                            *board.Store
 	terminal                      ptymanager.SessionTerminal
 	mu                            sync.RWMutex
-	paused                        map[string]bool                                                                     // in-memory set of paused project names
-	touches                       *operatortouch.Recorder                                                             // the Operator's touches, counted for the Analytics tab (#11225); nil: not recorded
-	sleepPausedAt                 map[string]time.Time                                                                // when each sleep pause was made in this process (zero for one restored at startup): a lift on what an agent was seen doing earlier must not undo a later one (#11204)
-	sleepPaused                   map[string]bool                                                                     // the paused boards whose pause sleep or Coral's restart put there, which auto-wake lifts (#286)
-	pauseMu                       sync.Mutex                                                                          // one pause change at a time, its check, maps and stored row together (Security on #119)
-	keepQuestion                  func(ctx context.Context, project string, old *board.RegisteredWait) error          // keeps an operator question as an ask (#11919); nil: postKeptQuestion. A seam for tests
-	notifyFn                      func(project string)                                                                // triggers an immediate notification pass for project's board
-	changeWords                   func(r *http.Request, project, hex, text string, decided bool) (ChangeWords, error) // the thread comment and the agent's notice of a Request changes with words (#13976)
-	reviewPost                    func(ctx context.Context, project, msg string) error                                // a test's replacement for posting the approval message (team_artifact_review.go)
+	paused                        map[string]bool                                                            // in-memory set of paused project names
+	touches                       *operatortouch.Recorder                                                    // the Operator's touches, counted for the Analytics tab (#11225); nil: not recorded
+	sleepPausedAt                 map[string]time.Time                                                       // when each sleep pause was made in this process (zero for one restored at startup): a lift on what an agent was seen doing earlier must not undo a later one (#11204)
+	sleepPaused                   map[string]bool                                                            // the paused boards whose pause sleep or Coral's restart put there, which auto-wake lifts (#286)
+	pauseMu                       sync.Mutex                                                                 // one pause change at a time, its check, maps and stored row together (Security on #119)
+	keepQuestion                  func(ctx context.Context, project string, old *board.RegisteredWait) error // keeps an operator question as an ask (#11919); nil: postKeptQuestion. A seam for tests
+	notifyFn                      func(project string)                                                       // triggers an immediate notification pass for project's board
+	changeWords                   func(r *http.Request, project, hex, text string) (ChangeWords, error)      // the thread comment and the agent's notice of a Request changes with words (#13976)
+	reviewPost                    func(ctx context.Context, project, msg string) error                       // a test's replacement for posting the approval message (team_artifact_review.go)
 	coralDir                      string
 	alsoMu                        sync.Mutex    // serialises adding a later receipt to a received row (#4449)
 	autoAttach                    *AutoAttacher // #3515: an agent's linked images and Markdown
@@ -178,7 +178,7 @@ func (h *BoardHandler) SetLiveSessionLookup(fn func(ctx context.Context, session
 }
 
 // SetChangeWords wires the words' half of Request changes (#13976): the thread comment and the agent's notice.
-func (h *BoardHandler) SetChangeWords(fn func(r *http.Request, project, hex, text string, decided bool) (ChangeWords, error)) {
+func (h *BoardHandler) SetChangeWords(fn func(r *http.Request, project, hex, text string) (ChangeWords, error)) {
 	h.changeWords = fn
 }
 

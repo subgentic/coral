@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/subgentic/coral/internal/store"
 )
@@ -43,10 +44,16 @@ func (c ChangeWords) Undo() {
 	}
 }
 
-// ChangeRequestWords is the words' half of "changes": text is already redacted and checked by the caller. decided says this call changed the file's state (false: it was already at changes requested). Idempotent:
-// the comment is keyed to the decision it belongs to (the owner's own top-level comment with the same words on this artifact and board is the one reused), so a retry after a half failure makes no second comment,
-// and the notice goes once: when the decision is new, or when the comment is.
-func (h *SessionsHandler) ChangeRequestWords(r *http.Request, project, hex, text string, decided bool) (ChangeWords, error) {
+// changeLock is the lock of one artifact's words: the lookup of an earlier comment and the making of a new one are one step, so two requests at once (a double tap, a retry racing its first) make one comment.
+func (h *SessionsHandler) changeLock(hex string) *sync.Mutex {
+	m, _ := h.changeLocks.LoadOrStore(hex, &sync.Mutex{})
+	return m.(*sync.Mutex)
+}
+
+// ChangeRequestWords is the words' half of "changes": text is already redacted and checked by the caller. Idempotent: the comment is keyed to its words (the owner's own top-level comment with the same words on
+// this artifact and board is the one reused), and the notice goes once per comment: a comment that already has an ask was told to the agent, whoever made it. So a retry after a half failure makes no second
+// comment, finishes a notice that never went, and never sends one twice.
+func (h *SessionsHandler) ChangeRequestWords(r *http.Request, project, hex, text string) (ChangeWords, error) {
 	var out ChangeWords
 	ctx := r.Context()
 	if h.ss == nil {
@@ -68,6 +75,9 @@ func (h *SessionsHandler) ChangeRequestWords(r *http.Request, project, hex, text
 	if allowed, why := commentPolicy(caller, commentCreate, nil, locked, h.hubWriteOn(r)); !allowed {
 		return out, &changeWordsError{http.StatusForbidden, "comments_forbidden", why}
 	}
+	lock := h.changeLock(hex)
+	lock.Lock()
+	defer lock.Unlock()
 	body := changeWordsPrefix + text
 	existing, err := h.ss.ListArtifactComments(ctx, hex, "", []string{project})
 	if err != nil {
@@ -109,7 +119,7 @@ func (h *SessionsHandler) ChangeRequestWords(r *http.Request, project, hex, text
 		}
 	}
 	out.CommentID = c.ID
-	if !out.Created && !decided {
+	if !out.Created && h.commentWasTold(ctx, hex, c.ID) {
 		out.Delivery = autoDelivery{Reason: "already_sent"} // an earlier request of the same words did both halves
 		return out, nil
 	}
@@ -137,4 +147,18 @@ func changeWordsClean(text string) (clean string, err *changeWordsError) {
 		return "", &changeWordsError{http.StatusServiceUnavailable, "redaction_unavailable", "the words could not be checked for secrets, so the decision was not recorded"}
 	}
 	return clean, nil
+}
+
+// commentWasTold says the comment has an ask: the notice of it reached an agent (the ask is made with it).
+func (h *SessionsHandler) commentWasTold(ctx context.Context, hex string, commentID int64) bool {
+	asks, err := h.ss.ListArtifactAsks(ctx, hex)
+	if err != nil {
+		return false
+	}
+	for _, a := range asks {
+		if a.CommentID == commentID {
+			return true
+		}
+	}
+	return false
 }

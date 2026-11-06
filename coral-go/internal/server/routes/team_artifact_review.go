@@ -194,7 +194,7 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 	var wordsDone ChangeWords
 	if words != "" && h.changeWords != nil {
 		var werr error
-		if wordsDone, werr = h.changeWords(r, project, id, words, change.Changed); werr != nil {
+		if wordsDone, werr = h.changeWords(r, project, id, words); werr != nil {
 			wordsDone.Undo()
 			if uerr := h.bs.UndoArtifactReview(context.WithoutCancel(r.Context()), change); uerr != nil {
 				slog.Error("[artifact review] changes: the decision of a failed request could not be undone", "board", project, "artifact", id, "error", uerr)

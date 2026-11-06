@@ -268,3 +268,67 @@ func TestTheLongestWordsFitTheHubsSignedBody(t *testing.T) {
 const changesSecret = "ghp_a1B2c3D4a1B2c3D4a1B2c3D4a1B2c3D4a1B2c3D4"
 
 func chgJSON(v any) string { b, _ := json.Marshal(v); return string(b) }
+
+// Orchestrator's point 1: a file already at changes requested, a new request whose comment then fails, keeps the earlier decision (undoing an unchanged decision is a no-op) and what it had made.
+func TestAFailedRetryOnAFileAlreadyAtChangesKeepsTheEarlierDecision(t *testing.T) {
+	c := newChangesEnv(t)
+	code, first := c.changes(t, `{"decision":"changes","text":"First words."}`)
+	require.Equal(t, http.StatusOK, code, first)
+	afterFirst := c.state(t)
+	require.Contains(t, afterFirst, "changes requested")
+	for i := 0; i < store.MaxArtifactComments; i++ { // the artifact cannot take another comment
+		if len(c.comments(t)) >= store.MaxArtifactComments {
+			break
+		}
+		_, err := c.ss.CreateArtifactComment(context.Background(), store.ArtifactComment{ArtifactID: c.id, Board: "alpha", AnchorJSON: `{"quote":"","whole":true}`, Body: "x", AuthorIssuer: "local", AuthorSubject: "someone", AuthorName: "x", AuthorKind: "owner"})
+		require.NoError(t, err)
+	}
+	code, out := c.changes(t, `{"decision":"changes","text":"Second words."}`)
+	assert.Equal(t, http.StatusConflict, code, out)
+	assert.Equal(t, "too_many_comments", out["code"])
+	assert.Equal(t, afterFirst, c.state(t), "the earlier decision is still there")
+	var first1 bool
+	for _, cm := range c.comments(t) {
+		first1 = first1 || cm.Body == "Changes requested: First words."
+		assert.NotEqual(t, "Changes requested: Second words.", cm.Body)
+	}
+	assert.True(t, first1, "and the earlier comment")
+	assert.Len(t, c.messages(t), 1, "no second notice")
+}
+
+// Orchestrator's point 2: the lookup of an earlier comment and the making of a new one are one step per artifact: requests at once make one comment and one notice.
+func TestRequestsAtOnceMakeOneCommentAndOneNotice(t *testing.T) {
+	c := newChangesEnv(t)
+	const n = 12
+	codes := make(chan int, n)
+	start := make(chan struct{})
+	for i := 0; i < n; i++ {
+		go func() {
+			<-start
+			code, _ := c.changesNoT(`{"decision":"changes","text":"Use 5,000 rows per batch."}`)
+			codes <- code
+		}()
+	}
+	close(start)
+	for i := 0; i < n; i++ {
+		assert.Equal(t, http.StatusOK, <-codes)
+	}
+	assert.Len(t, c.comments(t), 1, "one comment")
+	assert.Len(t, c.messages(t), 1, "one notice")
+}
+
+func (c *changesEnv) changesNoT(body string) (int, map[string]any) {
+	req, err := http.NewRequest(http.MethodPost, c.srv.URL+"/api/board/alpha/artifacts/"+c.id+"/review", strings.NewReader(body))
+	if err != nil {
+		return 0, nil
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return 0, nil
+	}
+	defer resp.Body.Close()
+	var out map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&out)
+	return resp.StatusCode, out
+}
