@@ -15,6 +15,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/cloud"
 )
 
 // The Markdown editor's save (#13757, #13756): the Operator edits a team's Markdown file in the dashboard and the result is a NEW VERSION of its series, never a change of the old bytes (a digest always
@@ -33,8 +34,8 @@ const maxMarkdownEdit = 2 << 20
 // sourceOperatorEdit is the record's Source for a version the Operator saved from the editor.
 const sourceOperatorEdit = "edit"
 
-// editExpectedParam names the digest the editor believed to be the newest version when it opened (or last saved): the save only goes through when it still is.
-const editExpectedParam = "expected_latest"
+// The save reads ?expected_latest= (spelled out in the handler: the tunnel's query table is generated from the handlers' own Query().Get calls): the digest the editor believed to be the newest version
+// when it opened (or last saved); the save only goes through when it still is.
 
 var editDigestRe = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
@@ -126,7 +127,12 @@ func editOnly(w http.ResponseWriter, r *http.Request) bool {
 		commentRefuse(w, http.StatusForbidden, "owner_only", "only the person at this computer can edit a file")
 		return false
 	}
-	if r.Method != http.MethodGet && !sameOriginFetch(r) {
+	// The browser's own headers (Origin, Referer, Sec-Fetch-Site) say a dashboard fetch comes from this server's page. A Hub does not carry them: the self-hosted Hub's proxy strips the browser's, and the
+	// tunnel's request is the connector's. Those two are checked by what they ARE: a genuine owner stamp (the identity layer verified the MAC, the route, the query and the body) or an authentic tunnel
+	// request; the check stays for the dashboard's cookie and for no cookie at this computer.
+	kind, _ := r.Context().Value(callerKindKey{}).(string)
+	hubCaller := kind == callerHubOwner || (kind == callerHub && cloud.TunneledAuthentic(r))
+	if r.Method != http.MethodGet && !hubCaller && !sameOriginFetch(r) {
 		commentRefuse(w, http.StatusForbidden, "cross_site", "a file is saved from this server's own page")
 		return false
 	}
@@ -140,12 +146,12 @@ func (h *BoardHandler) SaveArtifactEdit(w http.ResponseWriter, r *http.Request) 
 	}
 	project := urlParam(r, "project")
 	opened := strings.ToLower(urlParam(r, "digest"))
-	expected := strings.ToLower(strings.TrimSpace(r.URL.Query().Get(editExpectedParam)))
+	expected := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("expected_latest")))
 	if expected == "" {
 		expected = opened
 	}
 	if !editDigestRe.MatchString(expected) {
-		errBadRequest(w, "?"+editExpectedParam+"= is the 64-hex digest of the newest version the editor saw")
+		errBadRequest(w, "?expected_latest= is the 64-hex digest of the newest version the editor saw")
 		return
 	}
 	if r.ContentLength > maxMarkdownEdit {
