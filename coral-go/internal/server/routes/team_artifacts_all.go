@@ -162,6 +162,7 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 		}
 	}
 	all := filesOrVersions(tq, items) // with versions=newest the unfiltered count is files, as the total and the team route's own all are (#11700, #13151)
+	tq.crossTeam = true
 	sel, err := h.selectTeamArtifacts(r, items, limit, offset, tq)
 	if err != nil {
 		errInternalServer(w, "could not list artifacts")

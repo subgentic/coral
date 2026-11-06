@@ -46,7 +46,11 @@ type teamArtifact struct {
 	MediaType  string `json:"media_type,omitempty"`
 	Size       *int64 `json:"size"`
 	// Starred: the Operator starred this stored object on this computer (#9819); false for a row with no stored object.
-	Starred   bool   `json:"starred"`
+	Starred bool `json:"starred"`
+	// StarredAt and SeriesID (#13910): only on the owner-only cross-team list (GET /api/team-artifacts), only on a starred row. StarredAt is when the row's series was last starred (RFC 3339); SeriesID is the series
+	// whose star it follows. The Operator's own attention: never on the per-board list an agent reads.
+	StarredAt string `json:"starred_at,omitempty"`
+	SeriesID  string `json:"series_id,omitempty"`
 	CreatedAt string `json:"created_at"`
 	// ReviewSentAt is when the file was sent for review (RFC 3339, UTC), present only while it carries the tag "for review" and was sent after the time was kept (#13231): "waiting for review" counts from it, a re-send starts it again.
 	ReviewSentAt string `json:"review_sent_at,omitempty"`
@@ -224,7 +228,7 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 	page := append([]teamArtifact(nil), items[offset:end]...) // this page's own rows: the list it was cut from may be the kept one
 	dir := h.artifactObjectDir()
 	starred, serr := h.bs.StarredArtifactIDs(r.Context()) // a bookmark: an unreadable set leaves the rows unstarred
-	if serr != nil {
+	if serr != nil || !starVisible(r) {                   // and an agent's token, or a Hub caller that is not the owner, sees none (#13910)
 		starred = map[string]bool{}
 	}
 	for i := range page {

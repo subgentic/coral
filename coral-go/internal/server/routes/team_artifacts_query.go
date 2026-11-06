@@ -54,23 +54,24 @@ const (
 )
 
 type teamArtifactQuery struct {
-	q        string // lower-cased
-	kinds    []string
-	origins  []string
-	by       []string // lower-cased
-	boards   []string // lower-cased
-	kept     *bool
-	read     *bool // read=1: the files the Operator has read (a read tag and no news in their thread); read=0: the ones still unread (#13162, Needs you's unread filter, applied by the computer before the page is cut)
-	starred  *bool
-	tags     []string // any of these tags (#8583), normalised
-	goal     int64    // 0: any; a goal's number: only what the tasks that work toward it hold (#8579)
-	task     int64    // 0: any; a task's number: only what is attached to or linked to that task (#7739, the task page's Artifacts)
-	since    *time.Time
-	until    *time.Time
-	sortName string
-	collapse bool // versions=newest (#11700): the versions of one file are one row, the newest; the totals and the tag counts follow
-	cursor   *teamArtifactCursor
-	finger   string
+	q         string // lower-cased
+	kinds     []string
+	origins   []string
+	by        []string // lower-cased
+	boards    []string // lower-cased
+	kept      *bool
+	read      *bool // read=1: the files the Operator has read (a read tag and no news in their thread); read=0: the ones still unread (#13162, Needs you's unread filter, applied by the computer before the page is cut)
+	starred   *bool
+	tags      []string // any of these tags (#8583), normalised
+	goal      int64    // 0: any; a goal's number: only what the tasks that work toward it hold (#8579)
+	task      int64    // 0: any; a task's number: only what is attached to or linked to that task (#7739, the task page's Artifacts)
+	since     *time.Time
+	until     *time.Time
+	sortName  string
+	crossTeam bool // the owner-only cross-team list (GET /api/team-artifacts): the one list that carries the star-following fields (#13910)
+	collapse  bool // versions=newest (#11700): the versions of one file are one row, the newest; the totals and the tag counts follow
+	cursor    *teamArtifactCursor
+	finger    string
 }
 
 type teamArtifactCursor struct {
@@ -694,12 +695,23 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 			return nil, err
 		}
 	}
-	starred, err := h.bs.StarredArtifactIDs(r.Context()) // a small set: read for every list, the rows say whether they are starred
-	if err != nil {
-		if q.starred != nil {
+	var starred map[string]bool
+	var follow map[string]starInfo
+	if starVisible(r) { // the Operator's own attention: an agent's token and a Hub caller that is not the owner see no bookmark, and a starred filter finds none
+		times, err := h.bs.StarredArtifactTimes(r.Context()) // a small set: read for every list, the rows say whether they are starred
+		switch {
+		case err != nil && q.starred != nil:
 			return nil, err // the Starred view cannot be answered without it
+		case err != nil:
+			times = map[string]string{} // a star is a bookmark: the list still answers, its rows unstarred
 		}
-		starred = map[string]bool{} // a star is a bookmark: the list still answers, its rows unstarred
+		follow = starFollowIf(h.coralDir, times, q.crossTeam)
+		starred = make(map[string]bool, len(follow))
+		for d := range follow {
+			starred[d] = true
+		}
+	} else {
+		starred = map[string]bool{}
 	}
 	dir := h.artifactObjectDir()
 	tunneled := cloud.Tunneled(r)
@@ -830,6 +842,11 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 	}
 	for i := range sel.page {
 		sel.page[i].Starred = sel.page[i].managed != "" && starred[sel.page[i].managed]
+		if q.crossTeam && sel.page[i].Starred { // the star-following fields, on the owner-only cross-team list alone (#13910)
+			if info, ok := follow[sel.page[i].managed]; ok {
+				sel.page[i].StarredAt, sel.page[i].SeriesID = info.At, info.Series
+			}
+		}
 	}
 	if sel.page == nil {
 		sel.page = []teamArtifact{}
@@ -959,4 +976,16 @@ func artifactIsRead(it teamArtifact) bool {
 		}
 	}
 	return false
+}
+
+// starFollowIf is the stars with their series followed on the cross-team list, and as plain digests everywhere else (the per-board list keeps its one-digest star).
+func starFollowIf(coralDir string, times map[string]string, follow bool) map[string]starInfo {
+	if follow && coralDir != "" {
+		return starFollow(coralDir, times)
+	}
+	out := make(map[string]starInfo, len(times))
+	for d, at := range times {
+		out[d] = starInfo{At: at, Latest: true}
+	}
+	return out
 }
