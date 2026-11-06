@@ -190,6 +190,10 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 		}
 		body.BoardName = key
 		boardCreated = created
+		if h.refuseAgentLaunchOutsideTeam(w, r, body.BoardName, body.WorkingDir) {
+			h.rollBackTeamLaunch(context.WithoutCancel(r.Context()), body, 0, "", false, boardCreated)
+			return
+		}
 	}
 	h.restoreTeamTemplate(r.Context(), &body)
 
@@ -261,6 +265,9 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 	if fromAgent {
 		body.Flags = keepAgentLaunchFlags(body.Flags)
 	}
+	// A team the Operator launches starts with its Orchestrator holding the grant, on (#13891). Only when the Operator made the call and the team is new: an agent's launch-team, a relaunch of a team
+	// that has a board, and a board that already has a grant row never get one.
+	seedGrant := h.bs != nil && body.BoardName != "" && boardCreated && !fromAgent && launchedByOperator(r)
 	var launched []map[string]any
 	var categories []string // the analytics category of each member that failed
 	firstFailure := ""
@@ -323,6 +330,12 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 		if _, bad := entry["error"]; !bad && worktreePath != "" {
 			if sid, _ := entry["session_id"].(string); sid != "" {
 				h.recordWorktreeRow(ctx, sid, worktreePath)
+			}
+		}
+		if _, bad := entry["error"]; !bad && seedGrant && board.ClaimsOrchestrator(agentDef.Name, "") {
+			if sid, _ := entry["session_id"].(string); sid != "" {
+				h.seedTeamGrant(ctx, body.BoardName, sid)
+				seedGrant = false // the first Orchestrator the launch started is the seat
 			}
 		}
 		launched = append(launched, entry)

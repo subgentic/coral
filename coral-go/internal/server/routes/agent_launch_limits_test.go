@@ -38,10 +38,12 @@ func TestAgentCannotLaunchALessRestrictedAgent(t *testing.T) {
 			stubCLIPaths(t, store.NewSessionStore(db))
 			terminal := newMockTerminal()
 			h := NewSessionsHandler(db, cfg, nil, terminal, nil)
-			body := map[string]any{"working_dir": t.TempDir(), "agent_type": "claude", "flags": bypassFlags}
+			work := t.TempDir() // an agent starts agents in its team's folder (#13891)
+			require.NoError(t, store.NewSessionStore(db).RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: "sid-a", AgentType: "claude", AgentName: "a", WorkingDir: work}))
+			body := map[string]any{"working_dir": work, "agent_type": "claude", "flags": bypassFlags}
 			path, handle := "/api/sessions/launch", h.Launch
 			if team {
-				body = map[string]any{"board_name": "t", "working_dir": t.TempDir(),
+				body = map[string]any{"board_name": "t", "working_dir": work,
 					"agents": []map[string]any{{"name": "Dev", "agent_type": "claude", "flags": bypassFlags}}}
 				path, handle = "/api/sessions/launch-team", h.LaunchTeam
 			}
@@ -134,7 +136,9 @@ func TestAgentLaunchOfASavedTemplateKeepsItsChoices(t *testing.T) {
 		require.NoError(t, store.NewSessionStore(db).SetSetting(context.Background(), "saved_team_templates", saved))
 		terminal := newMockTerminal()
 		h := NewSessionsHandler(db, cfg, nil, terminal, nil)
-		b, _ := json.Marshal(map[string]any{"board_name": "t", "working_dir": t.TempDir(), "agents": []map[string]any{tc.member}})
+		work := t.TempDir() // an agent starts agents in its team's folder (#13891)
+		require.NoError(t, store.NewSessionStore(db).RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: "sid-a", AgentType: "claude", AgentName: "a", WorkingDir: work}))
+		b, _ := json.Marshal(map[string]any{"board_name": "t", "working_dir": work, "agents": []map[string]any{tc.member}})
 		req := httptest.NewRequest(http.MethodPost, "/api/sessions/launch-team", bytes.NewReader(b))
 		req = req.WithContext(context.WithValue(req.Context(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: "sid-a", SessionName: "claude-a"}))
 		rec := httptest.NewRecorder()

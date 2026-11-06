@@ -98,6 +98,10 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		body.BoardName = key
+		if h.refuseAgentLaunchOutsideTeam(w, r, body.BoardName, body.WorkingDir) {
+			attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+			return
+		}
 	}
 	// An unknown agent_type used to fall through to Claude and return 200
 	// ok:true, silently starting an agent the caller never asked for.

@@ -15,6 +15,7 @@ import (
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/clitext"
+	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptr"
@@ -358,7 +359,7 @@ func (h *SessionsHandler) reserveForBoard(ctx context.Context, project, kind, ac
 	live := 0
 	if rows, err := h.ss.GetBoardSessions(ctx, project); err == nil {
 		for _, s := range rows {
-			if s.IsSleeping == 0 && s.IsArchived == 0 {
+			if s.IsSleeping == 0 && s.IsArchived == 0 && s.SessionID != g.SeatSession { // the seat is not counted: "five" means five helpers besides the Orchestrator (#13891)
 				live++
 			}
 		}
@@ -444,9 +445,9 @@ func (h *SessionsHandler) reserveAgentLaunch(r *http.Request, project, target st
 func capRefusal(err error, g board.OrchGrant) (code, msg string) {
 	switch {
 	case errors.Is(err, board.ErrLifecycleCapHour):
-		return "board_hourly_limit", fmt.Sprintf("this board's limit of %d launches and wakes an hour is used up: wait, or the Operator can raise it", g.MaxPerHour)
+		return "board_hourly_limit", fmt.Sprintf("this board's limit of %d launches and wakes an hour is used up: wait, or ask the Operator to raise it in the team's settings (Orchestrator access)", g.MaxPerHour)
 	case errors.Is(err, board.ErrLifecycleCapLive):
-		return "board_live_limit", fmt.Sprintf("this board already has %d live agents: put some to sleep, or the Operator can raise the limit", g.MaxLive)
+		return "board_live_limit", fmt.Sprintf("this board already has %d live agents: put some to sleep, or ask the Operator to raise the limit in the team's settings (Orchestrator access)", g.MaxLive)
 	}
 	return "lifecycle_log_failed", "could not write the log"
 }
@@ -497,4 +498,40 @@ func launcherWords(name string) string {
 // orchGrantShown is a grant as the settings notice compares it: its settings, not who set it or when.
 func orchGrantShown(g board.OrchGrant) map[string]any {
 	return map[string]any{"orchestrator_grant.enabled": g.Enabled, "orchestrator_grant.seat_session": g.SeatSession, "orchestrator_grant.max_per_hour": g.MaxPerHour, "orchestrator_grant.max_live": g.MaxLive, "orchestrator_grant.idle_minutes": g.IdleMin}
+}
+
+// launchedByOperator says a launch is the Operator's own (#13891): a person at the dashboard, the command line or an API key, or the Coral Hub owner. Never an agent's token or session, and never a Hub
+// user who only holds the Launch tier: a team an agent makes does not start with a grant for its Orchestrator.
+func launchedByOperator(r *http.Request) bool {
+	if agentCaller(r) || callerActor(r).Kind == ActorToken {
+		return false
+	}
+	if callerActor(r).IsOperator() {
+		return true
+	}
+	return cloud.TunneledAuthentic(r) && hubOwnerRequest(r).owner
+}
+
+// seedTeamGrant writes the grant a NEW team starts with, when the Operator launched it and the member just started is its Orchestrator: the switch on, that session the seat, five helpers (#13891). It is
+// a single insert-if-absent, so a board that has any row keeps it; it is said on the board and in the log like a change the Operator makes.
+func (h *SessionsHandler) seedTeamGrant(ctx context.Context, project, seatSession string) {
+	if h.bs == nil {
+		return
+	}
+	wrote, err := h.bs.SeedOrchGrant(ctx, project, seatSession)
+	if err != nil {
+		slog.Warn("the team's Orchestrator grant was not written", "board", project, "error", err)
+		return
+	}
+	if !wrote {
+		return
+	}
+	g, err := h.bs.GetOrchGrant(ctx, project)
+	if err != nil {
+		return
+	}
+	if id, err := h.bs.ReserveLifecycle(ctx, project, "grant", "Operator", h.orchGrantWords(ctx, g), nil); err == nil {
+		_ = h.bs.FinishLifecycle(ctx, id, "ok", "")
+	}
+	h.sayLifecycle(ctx, project, fmt.Sprintf("this team's Orchestrator may start, wake and put to sleep agents here, up to %d at a time besides itself. The Operator can change or turn it off in the team's settings (Orchestrator access).", g.MaxLive))
 }

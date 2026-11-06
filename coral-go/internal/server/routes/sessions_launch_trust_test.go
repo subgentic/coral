@@ -149,6 +149,10 @@ func TestOnlyThePersonsOwnDashboardTrustsAFolder(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			r := newTrustRig(t)
 			dir := filepath.Join(r.home, "Coral", "proj")
+			if name == "an agent" { // an agent starts agents in its team's folder (#13891): this one works in the Coral folder the new one goes under
+				require.NoError(t, os.MkdirAll(filepath.Join(r.home, "Coral"), 0o755))
+				require.NoError(t, r.h.ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: "11111111-2222-4333-8444-555555555555", AgentType: "claude", AgentName: "parent", WorkingDir: filepath.Join(r.home, "Coral")}))
+			}
 			out := r.launch(t, dir, true, true, as)
 			tf, _ := out["trust_folder"].(map[string]any)
 			if tf != nil {
