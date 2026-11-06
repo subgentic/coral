@@ -22,10 +22,19 @@ const $ = id => document.getElementById(id);
 let tabGen = 0;
 const getJson = async (server, path) => { try { const r = await serverFetch(server, path); return r.ok ? await r.json() : null; } catch { return null; } };
 
+const FIELD_IDS = ['info-agent-name', 'info-agent-type', 'info-tmux-session', 'info-tmux-command', 'info-working-dir', 'info-log-path', 'info-pane-title', 'info-git-branch', 'info-git-commit', 'info-prompt'];
+/** Nothing of an earlier agent stays on screen while the next one is read: every field emptied and the whole grid hidden (UI Reviewer, #13917). */
+function clearFields() {
+    for (const id of FIELD_IDS) { const el = $(id); if (el) el.textContent = ''; }
+    $('info-board')?.replaceChildren();
+    for (const id of ['info-prompt-label', 'info-prompt', 'info-board-label', 'info-board', 'info-attach-note']) setHidden($(id), true);
+    setHidden($('info-tab-grid'), true);
+}
 function clearRows() {
     for (const [label, val] of Object.values(ROWS)) { $(val)?.replaceChildren(); setHidden($(label), true); setHidden($(val), true); }
 }
-function say(words) { const note = $('info-tab-note'), grid = $('info-tab-grid'); if (note) { setText(note, words); setHidden(note, !words); } if (grid) setHidden(grid, !!words); }
+function say(words) { const note = $('info-tab-note'); if (note) { setText(note, words); setHidden(note, !words); } }
+const showGrid = () => setHidden($('info-tab-grid'), false);
 
 async function loadMcp(name, sid, server, current) {
     const result = await getJson(server, `/api/sessions/live/${encodeURIComponent(name)}/mcp-servers?session_id=${encodeURIComponent(sid)}`);
@@ -66,7 +75,7 @@ function fillFields(info, server) {
 export async function showInfoTab() {
     const mine = ++tabGen, server = currentServer(), s = state.currentSession; // before any await: this look's agent and computer
     const current = () => mine === tabGen;
-    clearRows();
+    clearRows(); clearFields(); say(''); // the grid stays hidden until THIS agent's answer is in
     if (!s || s.type !== 'live') { say('Pick an agent to see its info.'); return; }
     const name = s.name, sid = s.session_id;
     try {
@@ -78,7 +87,7 @@ export async function showInfoTab() {
         const info = await resp.json();
         if (!current()) return;
         if (info.error) { showToast(info.error, true); say(info.error); return; }
-        say(''); fillFields(info, server);
+        say(''); fillFields(info, server); showGrid();
     } catch (e) {
         if (!current()) return;
         showToast('Failed to load session info', true); say('Could not load this agent\'s info.');
@@ -90,6 +99,13 @@ export async function showInfoTab() {
     if (!current()) return;
     await Promise.all([loadMcp(name, sid, server, current), loadAgentSections({ name, sid, server, current, fetchJson: getJson, rows: { skills: ROWS.skills, memory: ROWS.memory } })]);
 }
+
+/** Another agent (or computer) was picked: what is on screen or still on its way belongs to the one before, so it is dropped now, and the tab, when it is the open one, reads the new agent. showInfoTab is not called only by switching to the tab (UI Reviewer, #13917). */
+export function onAgentSelected() {
+    tabGen++; clearRows(); clearFields(); say('');
+    if ($('agentic-panel-info')?.classList.contains('active')) showInfoTab();
+}
+document.addEventListener('coral:agent-selected', onAgentSelected); // listener-ok: this module loads when the tab is first shown, and stays; one listener for the page's life
 
 /** The Info button: the dock open (a phone's is a sheet) on the Info tab, which fills itself. */
 export function openInfoTab() {

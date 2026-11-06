@@ -4201,3 +4201,6 @@ dialog.team-link-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 .agent-sections .session-info-grid dt { padding-top: 12px; }
 .agent-sections .session-info-grid > dt:first-child { padding-top: 0; }
 .agent-sections .session-info-grid dd { margin: 0; }
+.agent-sections .info-command-row { flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; }
+.agent-sections .info-command-row .copy-btn { width: auto; align-self: flex-start; opacity: 1; background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--control-border); }
+@media (max-width: 767px), (pointer: coarse) { .agent-sections .info-command-row .copy-btn { min-height: 44px; } } /* a touch size, as the shared buttons have */

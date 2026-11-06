@@ -31,7 +31,7 @@ const { coralReady } = require('./helpers/wait');
             window.fetch = (u, o) => { const url = String(u);
                 if (/\\/api\\/sessions\\/live\\/[^/]+\\/info\\?/.test(url)) { window.__reqs.push(url); return reply(window.__answer); }
                 if (/\\/api\\/sessions\\/live\\/[^/]+\\/mcp-servers\\?/.test(url)) { window.__reqs.push(url); return reply(window.__mcp); }
-                if (/\\/loaded-skills\\?/.test(url)) { window.__reqs.push(url); return (window.__gateSk || Promise.resolve()).then(() => reply(window.__sk)); }
+                if (/\\/loaded-skills\\?/.test(url)) { window.__reqs.push(url); const snap = window.__sk; return (window.__gateSk || Promise.resolve()).then(() => reply(snap)); } // the answer is the one given when it was asked: a held answer for an earlier agent still says that agent's skills
                 if (/\\/memory\\/[0-9a-f]{32}\\?/.test(url)) { window.__reqs.push(url); const id = url.match(/memory\\/([0-9a-f]{32})\\?/)[1], f = window.__files && window.__files[id]; return f ? f.gate.then(() => reply({ body: { text: f.text }, status: 200 })) : reply(window.__file); }
                 if (/\\/memory\\?/.test(url)) { window.__reqs.push(url); return reply(window.__mem); }
                 return prev(u, o); };
@@ -138,6 +138,41 @@ const { coralReady } = require('./helpers/wait');
         await show(); // the tab shown again: the newest look
         await ev(`window.__releaseSk(); true`); await first; await turns();
         assert.deepEqual(await ev(`[...document.querySelectorAll('#info-skills div')].map(d => d.textContent)`), ['newer v9, loaded 9 times'], 'the older look\'s answer does not overwrite the newer');
+
+        console.log('Real selection with Info open (UI Reviewer, #13917): picking agent B through selectLiveSession drops A at once and reads B, and A\'s late answers never land under B');
+        await ev(`window.__m.add('sel-a', 'A', 3, { sleeping: false }); window.__m.add('sel-b', 'A', 3, { sleeping: false }); true`);
+        await waitFor(`!!window.selectLiveSession`, 'the page\'s live view');
+        const infoOf = name => ({ agent_name: name, agent_type: 'claude', tmux_session_name: 'tm-' + name, tmux_command: 'tmux attach -t tm-' + name, working_directory: '/work/' + name, prompt: 'prompt of ' + name, board_name: 'team-' + name, board_label: 'Board ' + name });
+        await ev(`window.__held = {}; window.__infoBy = ${JSON.stringify({ 'sel-a': infoOf('sel-a'), 'sel-b': infoOf('sel-b') })};
+            window.__sk = { body: { skills: [{ name: 'skill-of-a', version: 1, loads: 1, status: 'approved' }] }, status: 200 };
+            window.__mem = { body: { files: [{ id: 'a'.repeat(32), file: 'A-memory.md', kind: 'memory', level: 'user' }] }, status: 200 };
+            { const prev = window.fetch; window.fetch = (u, o) => { const m = String(u).match(/\\/api\\/sessions\\/live\\/([^/]+)\\/info\\?/); if (m && window.__infoBy[decodeURIComponent(m[1])]) { const body = window.__infoBy[decodeURIComponent(m[1])], gate = window.__held[decodeURIComponent(m[1])] || Promise.resolve(); return gate.then(() => new Response(JSON.stringify(body), { status: 200 })); } return prev(u, o); }; } true`);
+        await ev(`window.selectLiveSession('sel-a', 'claude', 'sid-a', 'local'); window.switchAgenticTab('info', 'top'); true`);
+        await waitFor(`document.getElementById('info-agent-name').textContent === 'sel-a' && document.querySelectorAll('#info-memory button').length === 1`, 'A\'s fields and memory file');
+        assert.equal(await text('info-skills'), 'skill-of-a v1, loaded 1 time');
+        // B is picked while Info stays the open tab: A must be gone before B's answer is in, and A's held answers must not land
+        await ev(`window.__held['sel-b'] = new Promise(r => { window.__releaseB = r; }); window.__gateSk = new Promise(r => { window.__releaseSkA = r; }); true`);
+        await ev(`window.selectLiveSession('sel-b', 'claude', 'sid-b', 'local'); true`);
+        await waitFor(`document.getElementById('info-agent-name').textContent === '' && document.getElementById('info-tab-grid').hidden`, 'A dropped the moment B is picked (the grid hidden, no field left)');
+        assert.equal(await ev(`['info-mcp', 'info-skills', 'info-memory'].every(id => document.getElementById(id).hidden && document.getElementById(id).childElementCount === 0)`), true, 'no section of A is left');
+        assert.equal(await ev(`document.querySelector('#info-board a')`), null, 'A\'s board link is gone');
+        await ev(`window.__sk = { body: { skills: [{ name: 'skill-of-b', version: 2, loads: 2, status: 'approved' }] }, status: 200 }; window.__mem = { body: { files: [{ id: 'b'.repeat(32), file: 'B-memory.md', kind: 'memory', level: 'user' }] }, status: 200 }; window.__releaseSkA(); window.__gateSk = null; true`);
+        await turns();
+        assert.equal(await text('info-agent-name'), '', 'a late answer for A (the skills it had held) does not put A back under B');
+        await ev(`window.__releaseB(); true`);
+        await waitFor(`document.getElementById('info-agent-name').textContent === 'sel-b' && document.querySelectorAll('#info-memory button').length === 1`, 'B\'s fields and memory file');
+        assert.equal(await text('info-prompt'), 'prompt of sel-b'); assert.equal(await ev(`document.querySelector('#info-board a').textContent`), 'Board sel-b');
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#info-memory button')].map(b => b.textContent)`), ['B-memory.md: memory, user'], 'the memory files are B\'s');
+        assert.equal(await text('info-skills'), 'skill-of-b v2, loaded 2 times');
+        assert.equal(await ev(`document.getElementById('info-memory-text').hidden`), true, 'no file of A is open under B');
+        // A's own info answer, held and released after B is picked, is dropped too
+        await ev(`window.__held['sel-a'] = new Promise(r => { window.__releaseA = r; }); window.selectLiveSession('sel-a', 'claude', 'sid-a', 'local'); true`);
+        await waitFor(`document.getElementById('info-agent-name').textContent === ''`, 'cleared for the pick');
+        await ev(`window.__held['sel-b'] = Promise.resolve(); window.selectLiveSession('sel-b', 'claude', 'sid-b', 'local'); true`);
+        await waitFor(`document.getElementById('info-agent-name').textContent === 'sel-b'`, 'B again');
+        await ev(`window.__releaseA(); true`); await turns();
+        assert.equal(await text('info-agent-name'), 'sel-b', 'A\'s info answer arrives after B was picked and writes nothing');
+        await ev(`window.__held = {}; window.__infoBy = {}; true`);
 
         console.log('Out-of-order files: the file clicked last is the one shown, whatever order the answers come in; the block names it');
         await ev(`window.__sk = { body: { skills: [] }, status: 200 };

@@ -1,6 +1,6 @@
 975731 vendor/codemirror/codemirror-bundle.js
 289714 vendor/xterm/xterm.min.js
-143694 css/components.css
+144098 css/components.css
 121727 vendor/hljs/highlight.min.js
 94607 vendor/xterm/addon-canvas.min.js
 76847 inbox_sidebar.js
@@ -36,7 +36,7 @@
 21144 board_chat.js
 21080 settings_view.js
 20896 agent_docs/sessions.md.gz
-20649 sessions.js
+20713 sessions.js
 20646 launch_dialog.js
 19612 analytics_series.js
 19381 team_page.js
@@ -295,7 +295,7 @@
 3735 artifact_comments_api.js
 3727 custom_model_add.js
 3696 tags.js
-3687 info_tab.js
+4313 info_tab.js
 3661 agent_list_bar.js
 3655 automation_runs.js
 3642 api.js
