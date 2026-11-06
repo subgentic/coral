@@ -9,7 +9,7 @@ const askUi = await importOnce('./artifact_comment_send.js');
 const { agentLink } = await importOnce('./agent_link.js');
 
 /** The ask state and actions of one comments panel: `st` is the panel's state (`st.ask` is the open picker), the rest are its draw and announce hooks. */
-export function createAsk({ st, panel, render, announce, refresh, ownHex }) {
+export function createAsk({ st, panel, render, announce, refresh, ownHex, uploaderHint }) {
     const askedBy = new Map(); // comment id -> Map(agent role, lowercase -> words): who was asked into a thread from this panel (the server refuses a second ask of an open one, and says so)
     const canAsk = (c) => !decisionNeedsPerson(st.server) && !!st.board && !!st.data?.canLock && !c.deleted && !c.resolved && c.parentId == null;
     /** Why Send to agent is not offered on this computer's file, when the reason is the missing Approve secret (#13230): `{ id, ssh }` for the computer, null when nothing is wrong. A person who comments on a file from a computer set up
@@ -55,6 +55,18 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex }) {
         old.replaceWith(askBlock());
         if (focusRole) [...panel.querySelectorAll('.ac-ask input[type="checkbox"]')].find(i => i.value === focusRole)?.focus();
     }
+    /** The picker starts with the uploader of the version being viewed ticked: only when that agent is in the list, can be asked now (awake, running) and is not already asked into this thread; otherwise nothing is ticked, as before. The others stay listed and can still be added, and this one unticked. */
+    async function tickUploader(k) {
+        try {
+            if (!Array.isArray(k.agents)) return;
+            const { uploaderOf } = await importOnce('./artifact_uploader.js');
+            const who = String(await uploaderOf({ hex: k.context.hex, server: k.context.server, board: k.context.board }, uploaderHint?.()) /* the version DISPLAYED (captured at open), never the version the thread's comment was written on (#13995) */ || '').trim().toLowerCase();
+            if (!who || !current(k)) return;
+            const agent = k.agents.find(a => a.role.toLowerCase() === who);
+            if (!agent || !agent.can || (k.queue.length === 1 && askedNow(k.id).has(who)) || k.picked.size >= askUi.MAX_AGENTS) return;
+            k.picked.add(agent.role);
+        } catch { /* no uploader known: nothing is ticked */ }
+    }
     async function openAsk(c, queue = [c]) {
         const k = st.ask = { queue: queue.map(c => ({ ...c, artifactId: ownHex(c) })), context: { hex: st.hex, server: st.server, board: st.board }, lifetime: st.lifetime, id: c.id, hex: ownHex(c), agents: null, picked: new Set(), results: null, busy: false, error: '' };
         render();
@@ -66,6 +78,7 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex }) {
             k.agents = askUi.pickableAgents(data && data.agents);
             const named = normServer(k.context.server) === 'local' ? '' : String((state.servers || []).find(s => s.id === k.context.server)?.name || k.context.server);
             k.empty = askUi.emptyWords ? askUi.emptyWords(named, ((data && data.agents) || []).length, k.agents.length) : ''; // why it is empty, said on the picker (#13687)
+            await tickUploader(k); // the agent that uploaded this version starts ticked when it can be asked (#13995)
         } catch { if (!current(k)) return; k.agents = 'error'; }
         redrawAsk();
         panel.querySelector('.ac-ask input[type="checkbox"]:not(:disabled)')?.focus();
