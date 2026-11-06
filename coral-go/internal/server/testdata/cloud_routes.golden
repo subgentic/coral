@@ -335,6 +335,7 @@ POST /api/board/{project}/goal-requests/{requestID}/accept never
 POST /api/board/{project}/goal-requests/{requestID}/decline never
 POST /api/board/{project}/goals interact
 POST /api/board/{project}/goals/{goalID}/close interact
+POST /api/board/{project}/goals/{goalID}/done-state interact
 POST /api/board/{project}/goals/{goalID}/driver interact
 POST /api/board/{project}/goals/{goalID}/move interact
 POST /api/board/{project}/groups/{groupID}/members never
@@ -451,7 +452,7 @@ POST /api/sessions/live/{sessionID}/refresh-hooks launch
 POST /api/sessions/live/{sessionID}/sleep launch
 POST /api/sessions/live/{sessionID}/unarchive interact
 POST /api/sessions/live/{sessionID}/wake launch
-POST /api/sessions/record-agents never
+POST /api/sessions/record-agents interact
 POST /api/skills never
 POST /api/skills/{id}/approve never
 POST /api/skills/{id}/reject never

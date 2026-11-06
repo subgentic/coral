@@ -338,7 +338,11 @@ var routeTable = cat(
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/saved")),
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/board/{project}/proposals", "/api/proposals")),                                               // what agents asked to add: the Operator's (#11389)
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/proposals/{id}/approve", "/api/board/{project}/proposals/{id}/reject")), // and the Operator's decision
-	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/goals/{id}/driver", "/api/board/{project}/goals/{id}/move")),            // the Operator's own two changes to a goal, who drives it and which team it is on (#12693, #13517): a person's, as the question buttons are
+	// Not yet, Dismiss, Undo and Mark read or unread on a "Goal looks done" row (#13834): the OWNER's alone; the body is one word of a closed set and the machine builds the saved entry itself (PUT /api/settings stays never). Interact: it moves no work.
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/goals/{id}/done-state")),
+	// Record for all agents (#13834, Security): the bulk route only, after the dry run (?dry_run=1, two signed targets). The OWNER's alone; the machine refuses a request through the Hub with no list of the agents shown (and ?all=1, which the query table drops). The single record-agent, which carries acknowledge_nested, stays never.
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/sessions/record-agents")),
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/goals/{id}/driver", "/api/board/{project}/goals/{id}/move")), // the Operator's own two changes to a goal, who drives it and which team it is on (#12693, #13517): a person's, as the question buttons are
 	owner(OwnerRefuse, rules(http.MethodPatch, TierInteract, "/api/saved/{id}")),
 	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/saved/{id}")),
 	// What a viewer sees of a board's settings is the machine's to decide (the health setup is the owner's, #5307): the marker is stamped, the handler gives a non-owner less.

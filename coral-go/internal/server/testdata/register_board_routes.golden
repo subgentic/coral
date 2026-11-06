@@ -93,6 +93,7 @@ POST /api/board/{project}/goal-requests/{requestID}/accept | (*BoardHandler).Acc
 POST /api/board/{project}/goal-requests/{requestID}/decline | (*BoardHandler).DeclineGoalRequest-fm
 POST /api/board/{project}/goals | (*BoardHandler).CreateGoal-fm
 POST /api/board/{project}/goals/{goalID}/close | (*BoardHandler).CloseGoal-fm
+POST /api/board/{project}/goals/{goalID}/done-state | (*BoardHandler).SetGoalDoneState-fm
 POST /api/board/{project}/goals/{goalID}/driver | (*BoardHandler).SetGoalDriver-fm
 POST /api/board/{project}/goals/{goalID}/move | (*BoardHandler).MoveGoal-fm
 POST /api/board/{project}/groups/{groupID}/members | (*BoardHandler).AddGroupMember-fm

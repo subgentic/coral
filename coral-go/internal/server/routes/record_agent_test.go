@@ -74,6 +74,14 @@ func recordFixture(t *testing.T) (srv string, term *recordTerminal, ss *store.Se
 	term = &recordTerminal{fgSessionTerminal: newFGTerminal(mock), cand: map[string]ptymanager.AgentCandidate{}, why: map[string]string{}, recorded: map[string]ptymanager.AgentCandidate{}, paused: map[string]bool{}}
 	handler.terminal = term
 	r := chi.NewRouter()
+	r.Use(func(next http.Handler) http.Handler { // a test says who the caller is (#13834): X-Test-Kind is the caller kind, absent for the plain person
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			if k := req.Header.Get("X-Test-Kind"); k != "" {
+				req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, k))
+			}
+			next.ServeHTTP(w, req)
+		})
+	})
 	r.Get("/api/sessions/live/{sessionID}/agent-candidate", handler.AgentCandidate)
 	r.Post("/api/sessions/live/{sessionID}/record-agent", handler.RecordAgent)
 	r.Post("/api/sessions/record-agents", handler.RecordAgents)

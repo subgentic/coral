@@ -188,13 +188,24 @@ func TestAllowedIsTheListedDecisionsAndNothingElse(t *testing.T) {
 			t.Errorf("%v allowed", bad)
 		}
 	}
-	if n := len(Routes()); n != 59 { // 59 since generation 4 (#13802, Send to agent with the diff)
+	if n := len(Routes()); n != 60 { // 60 since generation 5 (#13834, the done-state of a goal)
 		t.Errorf("the allowlist has %d routes: a new one needs a reason and a review (Security's tiers, #13694)", n)
 	}
 	first := 0
 	for _, r := range routes {
 		if r.since == 1 {
 			first++
+		}
+	}
+	for gen, want := range map[int]int{3: 2, 4: 1, 5: 1} { // a released generation never gains a route (Security, #13834)
+		n := 0
+		for _, r := range routes {
+			if r.since == gen {
+				n++
+			}
+		}
+		if n != want {
+			t.Errorf("generation %d has %d routes, it is released with %d and never gains one", gen, n, want)
 		}
 	}
 	if first != 8 {
@@ -221,6 +232,8 @@ func TestARouteIsStampedOnlyForARemoteThatListsIt(t *testing.T) {
 		{"GET", "/api/board/t/artifacts/abc/edit", 3, false, false},
 		{"POST", "/api/board/t/artifacts/abc/edit/send", 3, false, true}, // Send to agent with the diff (#13802) is generation 4: a generation 3 remote gets it unstamped
 		{"POST", "/api/board/t/artifacts/abc/edit/send", 4, true, true},
+		{"POST", "/api/board/t/goals/12/done-state", 4, false, true}, // the done-state of a goal row (#13834) is generation 5: a generation 4 remote gets it unstamped
+		{"POST", "/api/board/t/goals/12/done-state", 5, true, true},
 		{"POST", "/api/board/t/asks/9/buttons/b/settle", 2, true, true},
 		{"POST", "/api/sessions/live/x/send", 1, true, true},
 		{"POST", "/api/skills/3/approve", 2, false, false},
@@ -234,7 +247,7 @@ func TestARouteIsStampedOnlyForARemoteThatListsIt(t *testing.T) {
 			t.Errorf("MustBeSigned(%s %s) = %v, want %v", c.m, c.p, got, c.must)
 		}
 	}
-	if RoutesVersion != 4 {
+	if RoutesVersion != 5 {
 		t.Errorf("RoutesVersion = %d: it moves with a widening, and the remote's health answer reports it", RoutesVersion)
 	}
 }

@@ -15,6 +15,7 @@ import (
 
 	"github.com/subgentic/coral/internal/agent"
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/safefs"
@@ -165,7 +166,16 @@ type leftAgent struct {
 // and listed. With ?dry_run=1 nothing is recorded: the answer lists what each agent WOULD be recorded as (its program and pid) and what would be left, so the Operator checks each one before confirming (#11415).
 func (h *SessionsHandler) RecordAgents(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	if refuseNonOwner(w, r) { // through Coral Hub the machine's owner alone (#13834)
+		return
+	}
 	dryRun := r.URL.Query().Get("dry_run") == "1"
+	// Through a Hub (Coral Hub's tunnel, or the self-hosted Hub's genuine owner stamp) a request is always the pairs the owner was shown: ?all=1, which records every match with no list, is refused here for both ways in,
+	// whatever the Hub's own query table lets through (#13834, Security MUST B). A request with no list answers 400 read_first below, and records nothing.
+	if kind, _ := r.Context().Value(callerKindKey{}).(string); (cloud.Tunneled(r) || kind == callerHubOwner) && r.URL.Query().Get("all") == "1" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "code": "all_not_from_hub", "error": "through the Hub, record the agents the dry run listed (send them), not every match"})
+		return
+	}
 	// The pairs the Operator was shown (session and pid, from a preview): with them, an agent is recorded only if its current candidate still has exactly that pid, and one not shown is not recorded (#11415, Security). No list: refused unless ?all=1 asks for every match.
 	var shown struct {
 		Agents []struct {
