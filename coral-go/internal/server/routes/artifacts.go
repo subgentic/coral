@@ -262,14 +262,23 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 	var plan *seriesPlan
 	var stamp *seriesStamp
 	ref := strings.TrimSpace(r.Header.Get(seriesHeader))
-	var chainRoot int64 // the root of this upload's task chain, when it is for review (#12144)
-	autoChain := false  // the version was joined by the server, not asked for: anything that stops the join starts a new series instead of refusing the upload
-	chainBoard, _, _ := uploaderOf(sid)
+	var chainRoot int64     // the root of this upload's task chain, when it is for review (#12144)
+	var chainJoined []int64 // the task the joined file was remembered under, so it follows the file to its new version
+	autoChain := false      // the version was joined by the server, not asked for: anything that stops the join starts a new series instead of refusing the upload
+	chainBoard, chainUploader, _ := uploaderOf(sid)
 	if forReviewUpload := hasTag(board.CleanArtifactTags(r.URL.Query()["tag"]), tagForReview); forReviewUpload && taskID > 0 && h.bs != nil && chainBoard != "" {
-		chainRoot = h.bs.RootTask(r.Context(), chainBoard, taskID)
-		if ref == "" { // one file per task chain: the chain's file that is still open for review gets this one as its next version, with no --new-version-of from the agent
-			if prev := h.bs.ChainFile(r.Context(), chainBoard, chainRoot); prev != "" && h.chainFileOpen(r.Context(), chainBoard, prev) {
-				ref, autoChain = "coral://artifacts/"+prev, true
+		chainRoot = taskID // a file is remembered under the task that made it (#13908), not under the chain's root: two follow-ups of one parent are different deliverables
+		if ref == "" {     // one file per line of tasks: the nearest file of this task's line (itself, its parent, ...) that is still open for review gets this one as its next version, with no --new-version-of from the agent
+			for _, e := range h.bs.ChainFilesNear(r.Context(), chainBoard, taskID) {
+				if h.chainFileOpen(r.Context(), chainBoard, e.Hex) {
+					// A plain upload joins the nearest open file of its line only when the SAME uploader made its newest version (QA and Security, #13908): another agent's follow-up, or a version the Operator made, is not
+					// joined, and the upload starts a series of its own (an agent that means another's series says so with --new-version-of). The uploader is the server's own record of the version, never a flag.
+					if chainFileIsTheUploaders(coralDir, chainBoard, e.Hex, chainUploader) {
+						ref, autoChain = "coral://artifacts/"+e.Hex, true
+						chainJoined = append(chainJoined, e.Task)
+					}
+					break
+				}
 			}
 		}
 	}
@@ -378,8 +387,10 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 		}
 	}
 	if chainRoot > 0 && h.bs != nil && hasTag(tags, tagForReview) { // the chain's latest file for review: the next upload for the chain becomes its next version while it is still open
-		if err := h.bs.SetChainFile(r.Context(), chainBoard, chainRoot, hexID, time.Now()); err != nil {
-			slog.Warn("[artifacts] the task chain's file was not recorded", "digest", hexID, "error", err)
+		for _, key := range append([]int64{chainRoot}, chainJoined...) { // this task's own entry, and the entry of the line's task whose file this is the next version of: that task's next upload continues THIS file
+			if err := h.bs.SetChainFile(r.Context(), chainBoard, key, hexID, time.Now()); err != nil {
+				slog.Warn("[artifacts] the task chain's file was not recorded", "digest", hexID, "error", err)
+			}
 		}
 	}
 	if kind != "" && h.bs != nil { // the checked kind of this file, written once (the same bytes uploaded again cannot change it)

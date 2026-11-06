@@ -62,3 +62,32 @@ func (s *Store) SetChainFile(ctx context.Context, boardID string, root int64, he
 		ON CONFLICT(board_id, root_task) DO UPDATE SET hex = excluded.hex, set_at = excluded.set_at`, boardID, root, hex, at.UTC().Format(time.RFC3339))
 	return err
 }
+
+// ChainEntry is a file remembered for a task of a chain, and the task it is remembered under.
+type ChainEntry struct {
+	Task int64
+	Hex  string
+}
+
+// ChainFilesNear are the files remembered for the task itself and for each of its follow-up parents up the chain (nearest first, at most maxChainDepth steps, never off the board). A file is remembered under the
+// task that made it (#13908): a task joins the file of its own line (itself, its parent, its parent's parent), and two follow-ups of one parent, which are different deliverables, no longer share one.
+func (s *Store) ChainFilesNear(ctx context.Context, boardID string, taskID int64) []ChainEntry {
+	var out []ChainEntry
+	cur := taskID
+	for i := 0; i < maxChainDepth && cur > 0; i++ {
+		if hex := s.ChainFile(ctx, boardID, cur); hex != "" {
+			out = append(out, ChainEntry{Task: cur, Hex: hex})
+		}
+		var parent int64
+		err := s.reader().GetContext(ctx, &parent, `SELECT COALESCE(w.lst_parent, 0) FROM task_workflows w JOIN board_tasks t ON t.id = w.task_id WHERE t.board_id = ? AND w.task_id = ?`, boardID, cur)
+		if err != nil || parent <= 0 || parent == cur {
+			break
+		}
+		var onBoard int
+		if err := s.reader().GetContext(ctx, &onBoard, `SELECT COUNT(*) FROM board_tasks WHERE board_id = ? AND id = ?`, boardID, parent); err != nil || onBoard == 0 {
+			break
+		}
+		cur = parent
+	}
+	return out
+}
