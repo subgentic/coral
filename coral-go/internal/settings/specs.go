@@ -79,6 +79,9 @@ const (
 	CLIPathPrefix         = "cli_path_"
 	DefaultModelPrefix    = "default_model_"
 	DefaultThinkingPrefix = "default_thinking_"
+	// The Orchestrator of a team starts on its own default, when one is set (#13899): empty means it starts like the workers.
+	DefaultOrchestratorModelPrefix    = "default_orchestrator_model_"
+	DefaultOrchestratorThinkingPrefix = "default_orchestrator_thinking_"
 )
 
 // AgentTypes are the agent types a default or a per-type setting may name.
@@ -283,6 +286,8 @@ func init() {
 		{Prefix: CLIPathPrefix, Kind: KindText, Apply: ApplyLive, Doc: "Path of an agent's CLI."},
 		{Prefix: DefaultModelPrefix, Kind: KindText, Apply: ApplyLive, Doc: "The model a launch of that agent type uses."},
 		{Prefix: DefaultThinkingPrefix, Kind: KindText, Apply: ApplyLive, Doc: "The thinking level a launch of that agent type uses."},
+		{Prefix: DefaultOrchestratorModelPrefix, Kind: KindText, Apply: ApplyLive, Doc: "The model the Orchestrator of a team starts on, for that agent type; empty means the same as the workers' (default_model_<type>)."},
+		{Prefix: DefaultOrchestratorThinkingPrefix, Kind: KindText, Apply: ApplyLive, Doc: "The thinking level the Orchestrator of a team starts on, for that agent type; empty means the same as the workers' (default_thinking_<type>)."},
 	}
 }
 
