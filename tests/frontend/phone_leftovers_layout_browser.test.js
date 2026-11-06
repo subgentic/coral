@@ -47,9 +47,10 @@ const TEAM = `plo-${Date.now() % 100000}`;
         await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: 1, y: 1 });
         await ev(`document.getElementById('team-page-more').click(); true`);
         await waitFor(`!document.getElementById('team-page-more-menu').hidden`, 'the Actions menu', 6000);
-        const rowsBox = await ev(`[...document.querySelectorAll('#team-page-more-menu > button')].filter(b => b.getClientRects().length).map(b => { const c = getComputedStyle(b); return { text: b.textContent.trim().slice(0, 24), border: c.borderTopWidth, bg: c.backgroundColor }; })`);
+        const rowsBox = await ev(`[...document.querySelectorAll('#team-page-more-menu > button')].filter(b => b.getClientRects().length).map(b => { const c = getComputedStyle(b); return { text: b.textContent.trim().slice(0, 24), border: c.borderTopWidth, bg: c.backgroundColor, live: b.matches(':hover, :focus-visible') }; })`); // live: the row the pointer or the keyboard focus is on (opening the menu focuses its first item, and Chrome shows that focus on Windows when a script opened it) has the menu's hover fill by design; the others are plain
         assert.ok(rowsBox.length >= 5, 'the menu has its rows: ' + JSON.stringify(rowsBox));
-        assert.ok(rowsBox.every(r => r.border === '0px' && r.bg === 'rgba(0, 0, 0, 0)'), 'every row of the Actions menu is plain, none boxed: ' + JSON.stringify(rowsBox));
+        assert.ok(rowsBox.every(r => r.border === '0px' && (r.bg === 'rgba(0, 0, 0, 0)' || r.live)), 'every row of the Actions menu is plain, none boxed (but the one the pointer or the focus is on, which has the hover fill): ' + JSON.stringify(rowsBox));
+        assert.ok(rowsBox.filter(r => r.bg !== 'rgba(0, 0, 0, 0)').length <= 1, 'at most one row has a fill (the one in use), none is left stuck: ' + JSON.stringify(rowsBox));
         console.log('PASS phone leftovers: day buttons, Edit member footer, Actions menu rows');
     } finally { await removeBoards(ev, [TEAM]).catch(() => {}); try { await client.close(); } catch (e) {} }
 })().catch(e => { console.error(e); process.exit(1); });
