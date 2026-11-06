@@ -429,7 +429,7 @@ func TestTheSetupScriptInstallsFromAnArchiveWhoseMembersAreDotSlashNames(t *test
 	require.NoError(t, os.WriteFile(filepath.Join(src, "licenses", "LICENSE"), []byte("x"), 0o644))
 	archive := filepath.Join(dir, "release.tar.gz")
 	require.NoError(t, exec.Command("tar", "czf", archive, "-C", src, ".").Run()) // the way installers/build-linux.sh packs it
-	if real := os.Getenv("CORAL_TEST_RELEASE_TARBALL"); real != "" { // optional: run the same checks against a real release's Linux tarball (a file the person downloaded and checked)
+	if real := os.Getenv("CORAL_TEST_RELEASE_TARBALL"); real != "" {              // optional: run the same checks against a real release's Linux tarball (a file the person downloaded and checked)
 		archive = real
 	}
 
