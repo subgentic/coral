@@ -463,7 +463,7 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 		// Bytes that are already a version of their own board's series say so (#6495): a script that uploaded v1 again needs not read the series back. Only the uploading board's own series
 		// (the first version's board is the caller's): another team's series id never leaves this computer for a caller who merely holds the same bytes.
 		if callerBoard, _, _ := uploaderOf(sid); callerBoard != "" {
-			if sidOf, n, in := digestSeries(coralDir, hexID); in {
+			if sidOf, n, in := digestSeriesOnBoard(coralDir, hexID, callerBoard); in {
 				if ms := seriesMembers(coralDir, sidOf); len(ms) > 0 && ms[0].Board == callerBoard {
 					reply["series_id"], reply["version"], reply["versions"] = sidOf, n, len(ms)
 				}
