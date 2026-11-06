@@ -1,5 +1,128 @@
 # Release Notes
 
+## v2.0.56 — Edit Markdown files in place, a pool of machines for heavy runs, and a refused stale edit
+
+### Changes
+
+#### What you will notice first
+
+- **Edit a Markdown file in place.** An Edit button on a Markdown artifact opens an editor; your save is a new version of the file's series, a newer version an agent made meanwhile is kept, and the editor works on a computer reached through the Hub.
+- **A change an agent makes to a file you have newer is refused at once.** An agent's new version names the version it edited (`--new-version-of`); when a newer version exists, whoever made it, nothing is stored and the agent is told the newest version, who made it and the line to download it and upload again. This changes how agents upload a file: an upload built on an old version no longer lands silently.
+- **Resource pools.** A resource may list members (for example `heavy` = `mac-heavy` + `mini`); a claim on it gets the first free member, and the Queue folder names the machine. The pool is not on by default: nothing is defined on the real queue until a person defines one.
+- **`coral-board heavy run`** runs a heavy command on the pool's machine through a restricted account and renews its slot while it runs.
+- **Send to agent and replies.** An agent that uploaded a file can reply in an open thread of it, up to a limit an hour, and Coral question links open inside the dashboard with a drafted text kept.
+- **Changing an agent's model and thinking level through the Hub** works for a computer that is signed in, with the words of every refusal said in plain terms; the settings tab is called Computers.
+- **Customize theme:** Load puts the loaded theme in use without saving it as a new one first.
+- **Needs you and goal preview flags** are read from the cloud account when it is reachable, and the boot choices are kept when it is not.
+
+#### Fixed
+
+- **`coral machine launch`** waits for the credential folder before it mints and delivers, and keeps the failing command's own error (bounded, redacted).
+- **A hand claim in the queue** follows its call, and a slot lost during a heavy run stops the run.
+- **Docs and tests:** several tests make no folder inside the source tree.
+- Dependency updates.
+
+#### Through Coral Hub
+
+- **Two routes were added and reach the tunnel, owner only:** `GET` and `POST /api/board/{project}/artifacts/{digest}/edit` (the editor's read and save).
+
+#### Known issues
+
+- **Through Coral Hub, a computer on v2.0.54, v2.0.55 or v2.0.56 shows only the first 50 artifacts per list until the Hub's paging update deploys.** No data is lost.
+- **macOS: the tmux change (#12836) can make macOS ask once more, only after tmux restarts (a full restart of your agents or a reboot).** Coral's tmux server and guardian are now their own responsible process, so macOS may ask, per folder, whether `tmux` (or `coral`) may reach Documents, Desktop or Downloads. Full Disk Access you gave Coral.app does not carry over: if you gave Coral Full Disk Access, add `tmux` and `coral` too (both in `Coral.app/Contents/MacOS`). The staged tmux copy (each Coral version keeps its own under `tmux-bin/`) asks again after a tmux change. Say yes once; if you say no, nothing is lost, the agent just cannot read that folder.
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- **Hermes agents are still experimental.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For Coral Hub
+
+- **`release-diff` output** (`go run ./internal/releasediff/cmd/release-diff v2.0.55 948a366be`):
+
+  ### Tunnel routes, v2.0.55 to 948a366be
+
+  Added, reachable through the tunnel (2)
+
+  - `GET /api/board/{project}/artifacts/{digest}/edit`: view, owner-only
+  - `POST /api/board/{project}/artifacts/{digest}/edit`: interact, owner-only
+
+  ### Board settings keys (BoardSettings, HealthSettings included), v2.0.55 to 948a366be
+
+  No key was added, removed or changed.
+
+  ### What Coral Hub compiles in or embeds, v2.0.55 to 948a366be
+
+  `pkg/hubproxy`: 1 file of Go code changed (+3, -1)
+
+  - `coral-go/pkg/hubproxy/handler.go`: +3, -1
+  - test files, not compiled by the Hub: 1 file (+65, -0)
+
+  `pkg/hubowner`: 1 file of Go code changed (+14, -2)
+
+  - `coral-go/pkg/hubowner/hubowner.go`: +14, -2
+  - test files, not compiled by the Hub: 1 file (+17, -2)
+
+  `pkg/tunnel`: 2 files of Go code changed (+4, -0)
+
+  - `coral-go/pkg/tunnel/routes.go`: +3, -0
+  - `coral-go/pkg/tunnel/routes_query.go`: +1, -0
+  - test files, not compiled by the Hub: 1 file (+4, -0)
+  - other files (data, docs), not compiled by the Hub: 1 file (+1, -0)
+
+  `pkg/frontend`: 32 files the Hub embeds changed (+778, -93)
+
+  - `coral-go/pkg/frontend/static/artifact_comments.js`: +5, -4
+  - `coral-go/pkg/frontend/static/artifact_markdown_api.js`: +50, -0
+  - `coral-go/pkg/frontend/static/artifact_markdown_editor.js`: +166, -0
+  - `coral-go/pkg/frontend/static/artifact_markdown_model.js`: +135, -0
+  - `coral-go/pkg/frontend/static/artifact_refs.js`: +12, -4
+  - `coral-go/pkg/frontend/static/artifact_viewer.js`: +73, -10
+  - `coral-go/pkg/frontend/static/automations.js`: +1, -1
+  - `coral-go/pkg/frontend/static/automations_queue.js`: +10, -5
+  - `coral-go/pkg/frontend/static/board_artifacts.js`: +4, -2
+  - `coral-go/pkg/frontend/static/chat_bubbles.js`: +4, -0
+  - `coral-go/pkg/frontend/static/cloud.js`: +2, -1
+  - `coral-go/pkg/frontend/static/coral_ref.js`: +12, -0
+  - `coral-go/pkg/frontend/static/coral_subject_open.js`: +37, -0
+  - `coral-go/pkg/frontend/static/coral_subject_refs.js`: +29, -0
+  - `coral-go/pkg/frontend/static/css/artifact_markdown_editor.css`: +4, -0
+  - `coral-go/pkg/frontend/static/css/artifact_viewer_header.css`: +2, -2
+  - `coral-go/pkg/frontend/static/goal_words.js`: +1, -1
+  - `coral-go/pkg/frontend/static/goal_write.js`: +7, -2
+  - `coral-go/pkg/frontend/static/markdown.js`: +5, -4
+  - `coral-go/pkg/frontend/static/model_chip.js`: +1, -1
+  - `coral-go/pkg/frontend/static/model_chip_refusal.js`: +17, -0
+  - `coral-go/pkg/frontend/static/operator_activity_filters.js`: +1, -1
+  - `coral-go/pkg/frontend/static/operator_activity_words.js`: +1, -0
+  - `coral-go/pkg/frontend/static/operator_ask_dialog.js`: +8, -5
+  - `coral-go/pkg/frontend/static/platform/coral_links.js`: +15, -0
+  - `coral-go/pkg/frontend/static/platform/native.js`: +3, -3
+  - `coral-go/pkg/frontend/static/preview_layout.js`: +3, -3
+  - `coral-go/pkg/frontend/static/preview_pane.js`: +5, -2
+  - `coral-go/pkg/frontend/static/server_base.js`: +26, -8
+  - `coral-go/pkg/frontend/static/settings_core.js`: +19, -13
+  - `coral-go/pkg/frontend/static/suspend_native_dialog.js`: +37, -0
+  - `coral-go/pkg/frontend/static/theme_config.js`: +83, -21
+  - test files, not compiled by the Hub: 1 file (+2, -1)
+
+  `agent_docs`: 2 files the Hub embeds changed (+6, -1)
+
+  - `coral-go/agent_docs/artifacts.md`: +1, -1
+  - `coral-go/agent_docs/resource-queue.md`: +5, -0
+
+  Unchanged: `pkg/redact`.
+
+  ### Coral packages compiled into the Hub through its imports, v2.0.55 to 948a366be
+
+  Unchanged: `internal/fsreplace`, `internal/httputil`, `internal/logsafe`, `internal/safego`, `internal/secfile`, `internal/secrets`, `pkg/redact/betterleaks`.
+
+- **Added, reachable:** the two `/edit` routes above (view and interact, owner only). **Changed:** the Hub's owner stamp covers the editor save and the model switch (the allowlist is 58 routes, generation 3); `pkg/hubproxy` and `pkg/hubowner` changed in Go code; `pkg/tunnel` gained the two routes and one query name. No board settings key, ready signal, hook, token or framed path changed.
+
+#### For developers and releases
+
+- Test-only fixes after the first gates: the ask dialog's remote subjects stay text, the editor suite waits for the version header, the keyboard census waits for the app, the page-weight budget is raised, and the Windows tests follow.
+
 ## v2.0.55 — Queue claims that follow the work, remote computers named by their team, and yes/no answers beside the composer
 
 ### Changes
