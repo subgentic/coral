@@ -87,7 +87,7 @@ func TestUserDataSaysWhatItMustAlwaysSay(t *testing.T) {
 	assert.Equal(t, "no-port-forwarding,no-agent-forwarding,no-X11-forwarding "+testClientKey(), keys[0])
 	// the firewall: deny incoming, SSH only from the launcher's address, before anything is downloaded
 	i := strings.Index(got, "[ ufw, default, deny, incoming ]")
-	j := strings.Index(got, "      /usr/local/sbin/coral-machine-setup\n")
+	j := strings.Index(got, "      /usr/local/sbin/coral-machine-setup > /run/coral/setup.log 2>&1 || rc=$?\n")
 	require.True(t, i > 0 && j > i, "deny incoming comes before the setup step")
 	assert.Contains(t, got, "[ ufw, allow, from, '203.0.113.9', to, any, port, '22', proto, tcp ]", "SSH is open to the launcher's address only")
 	assert.NotContains(t, got, "[ ufw, allow, 22/tcp ]", "never open to everyone")
@@ -388,21 +388,96 @@ func TestTheSetupScriptAbortsOnADigestMismatch(t *testing.T) {
 // Slice 6 (coral-go Security): only the named programs are extracted from the Coral archive, owned by root; the npm agents are installed by the coral user into a folder only it writes, never by root.
 func TestSetupScriptExtractsOnlyTheNamedProgramsAsRoot(t *testing.T) {
 	script := setupScript("2.0.3", testDigests())
-	var tarLine string
+	// the archive is unpacked into a private folder, and only the named programs are installed from it: plain files, root's, mode 0755 (#13876: GNU tar does not find `coral` in an archive that stores ./coral)
+	assert.Contains(t, script, `tar -xzf "$tarball" -C "$work/unpacked" --no-same-owner`+"\n")
+	assert.Contains(t, script, "for prog in "+strings.Join(releasePrograms, " ")+"; do\n")
+	assert.Contains(t, script, `install -m 0755 -o root -g root "$work/unpacked/$prog" "/usr/local/bin/$prog"`)
+	assert.Contains(t, script, `[ -L "$work/unpacked/$prog" ]`, "a link in the archive is refused, not followed")
 	for _, l := range strings.Split(script, "\n") {
 		if strings.HasPrefix(l, "tar ") {
-			tarLine = l
+			assert.NotContains(t, l, "/usr/local/bin", "nothing is unpacked straight into the programs' folder")
+			assert.True(t, strings.HasSuffix(l, "--no-same-owner"), "no member names after the options: %s", l)
 		}
 	}
-	require.NotEmpty(t, tarLine)
-	assert.Contains(t, tarLine, "--no-same-owner")
-	assert.True(t, strings.HasSuffix(tarLine, strings.Join(releasePrograms, " ")), "the members are named after the options: %s", tarLine)
 	for _, want := range []string{"coral", "coral-board", "coral-agent", "coral-update"} {
 		assert.Contains(t, releasePrograms, want)
 	}
 	for _, m := range releasePrograms {
 		assert.Regexp(t, `^[a-z][a-z0-9-]*$`, m, "a member name is a plain program name: no path, no wildcard")
 	}
+}
+
+// #13876, the proof: a release archive is packed the way installers/build-linux.sh packs it (tar czf … -C dir .), so its members are ./coral and so on. The setup script of v2.0.56 asked tar for the bare names; GNU tar (a Debian or
+// Ubuntu droplet's) answers "Not found in archive" and, under set -eu, the machine never makes /run/coral/bootstrap.d. This test runs on a machine with GNU tar (the Linux CI runners) and shows both: the old
+// extraction fails, the script's own passes. With another tar (bsdtar strips ./) only the second is asserted.
+func TestTheSetupScriptInstallsFromAnArchiveWhoseMembersAreDotSlashNames(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("needs sh")
+	}
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("no sh")
+	}
+	tarOut, _ := exec.Command("tar", "--version").CombinedOutput()
+	gnu := strings.Contains(string(tarOut), "GNU tar")
+	dir := t.TempDir()
+	src := filepath.Join(dir, "src")
+	require.NoError(t, os.MkdirAll(filepath.Join(src, "licenses"), 0o755))
+	for _, prog := range releasePrograms {
+		require.NoError(t, os.WriteFile(filepath.Join(src, prog), []byte("#!/bin/sh\necho "+prog+"\n"), 0o755))
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(src, "licenses", "LICENSE"), []byte("x"), 0o644))
+	archive := filepath.Join(dir, "release.tar.gz")
+	require.NoError(t, exec.Command("tar", "czf", archive, "-C", src, ".").Run()) // the way installers/build-linux.sh packs it
+
+	if gnu { // the BEFORE: the v2.0.56 extraction
+		out := filepath.Join(dir, "old")
+		require.NoError(t, os.MkdirAll(out, 0o755))
+		o, err := exec.Command("tar", append([]string{"-xzf", archive, "-C", out, "--no-same-owner"}, releasePrograms...)...).CombinedOutput()
+		assert.Error(t, err, "GNU tar does not find a bare name in an archive that stores ./name: %s", o)
+		assert.Contains(t, string(o), "Not found in archive")
+	}
+
+	// the AFTER: the script itself, with curl and uname stubbed, its install folder moved into the test, and root's ownership left out (the test is not root)
+	sum := sha256.Sum256(mustRead(t, archive))
+	pin := ReleaseDigests{AMD64: hex.EncodeToString(sum[:]), ARM64: strings.Repeat("0", 64)}
+	bin := filepath.Join(dir, "bin")
+	inst := filepath.Join(dir, "usr-local-bin")
+	require.NoError(t, os.MkdirAll(bin, 0o755))
+	require.NoError(t, os.MkdirAll(inst, 0o755))
+	stub := func(name, body string) {
+		require.NoError(t, os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\n"+body+"\n"), 0o755))
+	}
+	stub("curl", `while [ $# -gt 0 ]; do if [ "$1" = -o ]; then cp '`+archive+`' "$2"; fi; shift; done`)
+	stub("uname", "echo x86_64")
+	if _, e1 := os.Stat("/usr/bin/sha256sum"); e1 != nil {
+		if _, e2 := os.Stat("/bin/sha256sum"); e2 != nil {
+			stub("sha256sum", `exec /usr/bin/shasum -a 256 "$@"`)
+		}
+	}
+	script := setupScript("2.0.3", pin)
+	script = strings.ReplaceAll(script, "install -m 0755 -o root -g root", "install -m 0755")
+	script = strings.ReplaceAll(script, "/usr/local/bin/", inst+"/")
+	script = strings.ReplaceAll(script, "/usr/local/bin", inst)
+	path := filepath.Join(dir, "setup.sh")
+	require.NoError(t, os.WriteFile(path, []byte(script), 0o755))
+	cmd := exec.Command(sh, path)
+	cmd.Env = []string{"PATH=" + bin + ":/usr/bin:/bin", "HOME=" + dir, "TMPDIR=" + dir}
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	for _, prog := range releasePrograms {
+		fi, err := os.Stat(filepath.Join(inst, prog))
+		require.NoError(t, err, prog+" was installed")
+		assert.Equal(t, os.FileMode(0o755), fi.Mode().Perm())
+	}
+	assert.NoFileExists(t, filepath.Join(inst, "licenses"), "nothing but the named programs is installed")
+}
+
+func mustRead(t *testing.T, path string) []byte {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return b
 }
 
 func TestAgentsScriptNeverRunsNpmAsRoot(t *testing.T) {
