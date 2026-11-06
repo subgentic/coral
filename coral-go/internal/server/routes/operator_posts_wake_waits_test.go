@@ -60,17 +60,45 @@ func TestEveryPostTheOperatorMakesToAnAgentEndsTheWaitsThatMatchIt(t *testing.T)
 		},
 	} {
 		for kind, target := range map[string]string{"a plain wait": "", "a wait from the Operator": "Operator"} {
+			t.Run(name+"/"+kind, func(t *testing.T) { // a failure names its post and its kind of wait
+				rig := newCmtRig(t)
+				rig.agent(1, "Dev", false)
+				bh := NewBoardHandler(rig.h.bs)
+				rig.h.boardHandler = bh
+				_, err := rig.h.bs.RegisterWait(context.Background(), "team-a", dev, "", "message", target, "waiting for the Operator", time.Hour)
+				require.NoError(t, err)
+				require.True(t, waitActive(t, rig.h.bs, "team-a", dev))
+				fire(t, rig)
+				bh.WaitBackground()
+				assert.False(t, waitActive(t, rig.h.bs, "team-a", dev), "the agent's wait ended")
+			})
+		}
+	}
+}
+
+// QA's SHOULD: the Operator's post to team-a ends team-a's waits and no other team's. An agent of team-b with the same name and a wait of its own is not woken by a comment sent to team-a's Dev.
+func TestAnOperatorPostToOneTeamDoesNotWakeAnotherTeamsWait(t *testing.T) {
+	for kind, target := range map[string]string{"a plain wait": "", "a wait from the Operator": "Operator"} {
+		t.Run(kind, func(t *testing.T) {
 			rig := newCmtRig(t)
 			rig.agent(1, "Dev", false)
+			dev := naming.SubscriberID("Dev", "claude")
+			ctx := context.Background()
+			_, err := rig.h.bs.Subscribe(ctx, "team-b", dev, "Dev", naming.SessionName("claude", sendSid(9)), nil, "mentions")
+			require.NoError(t, err)
 			bh := NewBoardHandler(rig.h.bs)
 			rig.h.boardHandler = bh
-			_, err := rig.h.bs.RegisterWait(context.Background(), "team-a", dev, "", "message", target, "waiting for the Operator", time.Hour)
+			_, err = rig.h.bs.RegisterWait(ctx, "team-a", dev, "", "message", target, "team-a's wait", time.Hour)
 			require.NoError(t, err)
-			require.True(t, waitActive(t, rig.h.bs, "team-a", dev), name)
-			fire(t, rig)
+			_, err = rig.h.bs.RegisterWait(ctx, "team-b", dev, "", "message", target, "team-b's wait", time.Hour)
+			require.NoError(t, err)
+			cid := rig.ownerComment("Try 5,000 rows per batch.")
+			code, out := rig.send(cid, "Dev")
+			require.Equal(t, http.StatusOK, code, fmt.Sprint(out))
 			bh.WaitBackground()
-			assert.False(t, waitActive(t, rig.h.bs, "team-a", dev), name+", "+kind+": the agent's wait ended")
-		}
+			assert.False(t, waitActive(t, rig.h.bs, "team-a", dev), "team-a's wait ended")
+			assert.True(t, waitActive(t, rig.h.bs, "team-b", dev), "team-b's wait is not another team's post's to end")
+		})
 	}
 }
 
