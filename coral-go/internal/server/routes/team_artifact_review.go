@@ -238,7 +238,7 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 	// An agent that waits for the Operator's decision wakes on it (#13947): the notice is the Operator's message to the agent, so the waits that match it (a plain wait, a wait from the Operator, one for the agent's name) end
 	// as they do for any other message the Operator posts, and the waiting agent is nudged. Before this only the board message route, an ask button and the cross-team routes ended a wait, so an agent waiting on a
 	// review the Operator denied sat until its timeout.
-	h.goBG(func() { h.resolveMessageWaits(project, board.OperatorName, notice) })
+	h.resolveOperatorWaits(project, notice)
 	h.tellChief(context.WithoutCancel(r.Context()), decision, "file", project, item.Name, title) // after the agent was told: a decision rolled back above (the undone row) never reaches Chief
 	slog.Info("[artifact review] decided", "surface", "local", "decision", state, "artifact", id, "agent", title, "board", project)
 	out["delivered"], out["to"] = true, title

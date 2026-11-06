@@ -381,6 +381,7 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 					res.State = "failed"
 					break
 				}
+				h.operatorPosted(t.Board, msg)
 				res.State, res.AskID = "sent", ask.ID
 				sent++
 				// One audit line per ask: who, where, what; never the text.
