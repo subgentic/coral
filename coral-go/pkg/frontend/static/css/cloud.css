@@ -152,5 +152,5 @@ body.native-inbox [data-native-inbox-hides] { display: none !important; }
 
 /* Hub access, the line under the select saying what the choice allows (#12878) */
 .cs-access-wrap { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.cs-access-line { display: none; font-size: var(--fs-sm); color: var(--text-muted); max-width: 100%; white-space: normal; overflow-wrap: anywhere; } /* wraps inside its column: never cut off at the table's edge */
-.cs-access-wrap:focus-within .cs-access-line { display: block; } /* shown only while that computer's access is being changed (focus, and the focus returns to the select after a change), not on every row at rest; the select's title and describedby carry it always (#12878) */
+.cs-access-line { display: block; font-size: var(--fs-sm); color: var(--text-muted); max-width: 100%; white-space: normal; overflow-wrap: anywhere; } /* wraps inside its column: never cut off at the table's edge */
+/* the line is shown on every row at rest (#13921, coral-hub's beta finding H5: a closed computer must say what its access mode means); #12878's follow-up had hidden it until focus to keep the Computers page's word budget low, and that budget went back up with this */
