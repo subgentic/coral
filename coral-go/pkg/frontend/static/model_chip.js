@@ -333,8 +333,7 @@ async function _apply(change) {
         _local = null;
         const out = await resp.json().catch(() => ({}));
         if (resp.status === 409 && out.code === 'needs_restart') { _viaRestart(change); return; }
-        const words = (resp.status === 403 && out && out.code === 'operator_only') ? (await importOnce('./model_chip_refusal.js')).refusedWords(_cur && _cur.server, resp.status, out) : (out.error || 'The change was not made.'); // the words by case are a lazy module: only a refusal reads them (#13761; the page_weight start budget)
-        showToast(words, true);
+        showToast((await importOnce('./model_chip_refusal.js')).refusedWords(_cur && _cur.server, resp.status, out), true); // lazy: only a failed change reads the words (#13761)
     } catch {
         _local = null;
         showToast('Could not reach Coral to make the change.', true);
