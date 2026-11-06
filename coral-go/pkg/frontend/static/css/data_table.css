@@ -615,7 +615,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .inbox-kind-column { position: absolute; inset: 0 auto 0 0; width: 3rem; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .dt-box.dt-folded .inbox-kind-row { padding-left: 3.5rem; }
 .dt-box.dt-folded .inbox-kind-column { justify-content: flex-start; align-items: flex-start; padding: 10px 0 0 16px; box-sizing: border-box; } /* one spot for the icon in every row, top left, not centred on rows of different heights (#13911) */
-@media (max-width: 760px) { .inbox-needs-results .dt-row:has(.inbox-agent-first) > td:not([data-key=agent]):not([data-key=waiting]):not([data-key=review]):not([data-key=blocks]) { display: none; } } /* Blocks stays, as the row's last line */ /* the old row's chips (the CLI, the folder, the team) are not part of a phone's two lines */
+@media (max-width: 760px) { .inbox-needs-results .dt-row:has(.inbox-agent-first) > td:not([data-key=agent]):not([data-key=waiting]):not([data-key=review]) { display: none; } } /* what a row holds up is moved onto the description's lines, so its own cell is empty */ /* the old row's chips (the CLI, the folder, the team) are not part of a phone's two lines */
 .dt-box.dt-folded .inbox-kind-row > td[data-key="agent"] { padding-left: 0; }
 /* A narrow dashboard panel can fold while desktop action slots are active. Wrap the buttons inside their cell instead of letting the fixed grid spill into the icon gutter. */
 @media (min-width: 768px) and (min-height: 501px), (min-width: 768px) and (pointer: fine), (min-width: 951px) {

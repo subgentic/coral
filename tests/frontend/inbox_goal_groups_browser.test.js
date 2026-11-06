@@ -34,11 +34,11 @@ for(const [width,theme] of [[1280,'light'],[390,'light'],[320,'light'],[1280,'da
  assert.equal(await ev(`document.querySelectorAll('#artifact-viewer:not([hidden])').length`),0,'star does not open row');
  assert.equal(await ev(`localStorage.getItem('coral-inbox-group-review-goal')`),'true');
  const waitingId='e'.padStart(64,'0');assert.equal(await ev(`document.querySelector('[data-review-artifact="${waitingId}"]').closest('tr').classList.contains('dt-read')`),true,'sent-back row without news is visible and uncounted');
- const versionId='3'.padStart(64,'0');assert.match(await ev(`document.querySelector('[data-review-artifact="${versionId}"]').textContent`),/New version v3/);
+ const versionId='3'.padStart(64,'0');assert.match(await ev(`document.querySelector('[data-review-artifact="${versionId}"]').getAttribute('aria-label')`),/New version v3/);
  await ev(`document.querySelector('[data-review-artifact="${versionId}"]').click();true`);
  await waitFor(`window.__openedCalls.length===1`,'successfully rendered version is recorded');
  await ev(`document.querySelector('.artifact-viewer-close').click();true`);
- await waitFor(`!document.querySelector('[data-review-artifact="${versionId}"]')?.textContent.includes('New version v3')`,'new version mark clears after actual open');
+ await waitFor(`!document.querySelector('[data-review-artifact="${versionId}"]')?.getAttribute('aria-label').includes('New version v3')`,'new version mark clears after actual open');
  await ev(`document.querySelector('[data-review-artifact="${waitingId}"]').closest('tr').querySelector('.inbox-review-star').click();true`);
  await waitFor(`window.__groupCalls.length===2`,'waiting document can be starred too');
  assert.equal(await ev(`document.querySelector('[data-review-artifact="${waitingId}"]').closest('tr').classList.contains('dt-read')`),true,'pinning a waiting document does not count it');
@@ -55,7 +55,7 @@ for(const width of [1280,390,320]){
  await waitFor(`document.querySelectorAll('.inbox-review-star').length===2`,'both source rows in native Hub Needs you');
  await ev(`document.querySelector('.inbox-group-review-toggle input').click();true`);
  await waitFor(`document.querySelectorAll('.inbox-needs-results .dt-group').length===2`,'same goal id remains two source groups');
- const sourceNews=await ev(`[...document.querySelectorAll('.inbox-needs-results .dt-row')].map(r=>({source:r.dataset.key.split(':')[0],text:r.querySelector('.inbox-review-name').textContent}))`);
+ const sourceNews=await ev(`[...document.querySelectorAll('.inbox-needs-results .dt-row')].map(r=>({source:r.dataset.key.split(':')[0],text:r.querySelector('.inbox-review-name').getAttribute('aria-label')}))`);
  assert.match(sourceNews.find(r=>r.source==='m1').text,/New version v3.*2 new comments/,'Laptop keeps its own newness baseline');
  assert.doesNotMatch(sourceNews.find(r=>r.source==='m2').text,/New version|new comments/,'Desktop stays independently opened and without news');
  const labels=await ev(`[...document.querySelectorAll('.inbox-needs-results .dt-group')].map(g=>g.textContent)`);
