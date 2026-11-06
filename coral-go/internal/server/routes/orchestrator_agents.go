@@ -357,9 +357,23 @@ func (h *SessionsHandler) reserveForBoard(ctx context.Context, project, kind, ac
 		return h.bs.ReserveLifecycle(ctx, project, kind, actor, target, nil)
 	}
 	live := 0
+	onBoard := map[string]bool{}
 	if rows, err := h.ss.GetBoardSessions(ctx, project); err == nil {
 		for _, s := range rows {
+			onBoard[s.SessionID] = true
 			if s.IsSleeping == 0 && s.IsArchived == 0 && s.SessionID != g.SeatSession { // the seat is not counted: "five" means five helpers besides the Orchestrator (#13891)
+				live++
+			}
+		}
+	}
+	// The agents the team's members started somewhere else (another board, no board, another computer's) count too: placement is only placement (#13903).
+	if ids, err := h.bs.LaunchedSessionIDs(ctx, project, 500); err == nil {
+		for _, id := range ids {
+			if onBoard[id] || id == g.SeatSession {
+				continue
+			}
+			onBoard[id] = true
+			if ls, err := h.ss.GetLiveSession(ctx, id); err == nil && ls != nil && ls.IsSleeping == 0 && ls.IsArchived == 0 {
 				live++
 			}
 		}
@@ -453,11 +467,14 @@ func capRefusal(err error, g board.OrchGrant) (code, msg string) {
 }
 
 // endAgentLaunch records how an agent's launch went and, when the switch is on, says it on the board.
-func (h *SessionsHandler) endAgentLaunch(ctx context.Context, project string, id int64, started bool, actorTarget string) {
+func (h *SessionsHandler) endAgentLaunch(ctx context.Context, project string, id int64, started bool, actorTarget, sessionID string) {
 	if id == 0 {
 		return
 	}
 	status, note := "ok", ""
+	if started && sessionID != "" {
+		note = board.LaunchedSessionNotePrefix + sessionID // what the team's live cap counts wherever the agent was placed (#13903)
+	}
 	if !started {
 		status, note = "failed", "the launch failed"
 	}
@@ -534,4 +551,16 @@ func (h *SessionsHandler) seedTeamGrant(ctx context.Context, project, seatSessio
 		_ = h.bs.FinishLifecycle(ctx, id, "ok", "")
 	}
 	h.sayLifecycle(ctx, project, fmt.Sprintf("this team's Orchestrator may start, wake and put to sleep agents here, up to %d at a time besides itself. The Operator can change or turn it off in the team's settings (Orchestrator access).", g.MaxLive))
+}
+
+// accountingBoard is the board an agent's launch is logged and held to the caps of (#13903): the team the calling session is seated on when that team's grant is on, wherever the agent is placed (another
+// board, none, another computer's), else the board the launch names on this computer, else "" (nothing is logged). The Operator and a caller with no session are never asked.
+func (h *SessionsHandler) accountingBoard(r *http.Request, named, server string) string {
+	if team := h.callersBoardWithGrant(r); team != "" {
+		return team
+	}
+	if named != "" && (server == "" || server == "local") {
+		return named
+	}
+	return ""
 }

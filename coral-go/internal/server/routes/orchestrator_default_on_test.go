@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -248,9 +249,18 @@ func TestASiblingWorktreeOfTheTeamsRepoIsTheTeamsFolder(t *testing.T) {
 	code, out = launch(t.TempDir())
 	assert.Equal(t, http.StatusForbidden, code, "a folder outside the repo: %v", out)
 	assert.Equal(t, "outside_team_folder", out["code"])
+	// a link inside the team's worktree that leads out of it does not count
+	outside := t.TempDir()
+	link := filepath.Join(wt, "escape")
+	if err := os.Symlink(outside, link); err == nil {
+		code, out = launch(link)
+		assert.Equal(t, http.StatusForbidden, code, "a link out of the worktree is refused: %v", out)
+		assert.Equal(t, "outside_team_folder", out["code"])
+	}
 }
 
-// #13903: an agent's launch that names no board goes onto its own team's board where the grant is on, so the cap and the log apply; no_board says none is meant; a board with no grant or an off one is as it was.
+// #13903: a launch by a verified session seated on a team whose grant is ON is held to THAT team's cap and log wherever the agent is placed: on no board, on a new board, on another computer's board, as a member of
+// a team launch. A launch that names no board goes onto the team's own board. Off or absent grants, the Operator and callers with no session are as they were.
 func TestAnAgentsLaunchWithNoBoardGoesOntoItsOwnTeamWhereTheGrantIsOn(t *testing.T) {
 	r := newOrchRig(t)
 	ctx := context.Background()
@@ -296,10 +306,6 @@ func TestAnAgentsLaunchWithNoBoardGoesOntoItsOwnTeamWhereTheGrantIsOn(t *testing
 	code, out = launch(nil)
 	assert.Equal(t, http.StatusTooManyRequests, code, "the cap holds for a launch that forgot the board: %v", out)
 	assert.Equal(t, "board_live_limit", out["code"])
-	// no_board is how an agent starts one on no board on purpose
-	code, out = launch(map[string]any{"no_board": true})
-	require.Equal(t, http.StatusOK, code, out)
-	assert.Equal(t, "", boardOf(out))
 	// off again: as it was
 	code, _ = r.do("PUT", "/api/board/"+orchBoard+"/orchestrator-grant", `{"enabled":false,"max_live":2,"max_per_hour":50,"idle_minutes":5}`, operatorClient, "")
 	require.Equal(t, http.StatusOK, code)
@@ -311,4 +317,111 @@ func TestAnAgentsLaunchWithNoBoardGoesOntoItsOwnTeamWhereTheGrantIsOn(t *testing
 	code, out = r.do("POST", "/api/sessions/launch", string(b), operatorClient, "")
 	require.Equal(t, http.StatusOK, code, out)
 	assert.Equal(t, "", boardOf(out))
+}
+
+// Every spelling of "somewhere else" is held to the calling team's cap, log and folders (the Orchestrator's rule on #13903): a new board, another computer's board and the members of a team launch.
+func TestEverySpellingOfSomewhereElseIsHeldToTheCallersTeam(t *testing.T) {
+	r := newOrchRig(t)
+	ctx := context.Background()
+	r.usualBoard() // Dev2 is live besides the seat
+	code, _ := r.operatorGrant("Orchestrator", map[string]any{"max_live": 3, "max_per_hour": 50})
+	require.Equal(t, http.StatusOK, code)
+	launch := func(extra map[string]any) (int, map[string]any) {
+		body := map[string]any{"working_dir": r.work, "agent_type": "claude", "display_name": "Helper"}
+		for k, v := range extra {
+			body[k] = v
+		}
+		b, _ := json.Marshal(body)
+		return r.do("POST", "/api/sessions/launch", string(b), nil, r.tok["Dev2"])
+	}
+	logged := func() int {
+		log, err := r.h.bs.LifecycleLog(ctx, orchBoard, 50)
+		require.NoError(t, err)
+		n := 0
+		for _, e := range log {
+			if e.Kind == board.LifecycleLaunch {
+				n++
+			}
+		}
+		return n
+	}
+	// a new board: allowed as before, and it is the team's launch: logged to the team, counted against its cap
+	code, out := launch(map[string]any{"board_name": "elsewhere", "new_board": true})
+	require.Equal(t, http.StatusOK, code, out)
+	assert.Equal(t, 1, logged(), "a launch on a new board is logged to the caller's team")
+	// a second one fills the team (Dev2 and two helpers: three), the third is the live cap: the agents placed elsewhere count
+	code, out = launch(map[string]any{"board_name": "elsewhere2", "new_board": true})
+	require.Equal(t, http.StatusOK, code, out)
+	code, out = launch(map[string]any{"board_name": "elsewhere3", "new_board": true})
+	assert.Equal(t, http.StatusTooManyRequests, code, "the agents started on other boards count: %v", out)
+	assert.Equal(t, "board_live_limit", out["code"])
+	// another computer's board and no board at all are held the same way
+	code, out = launch(map[string]any{"board_name": "far", "board_server": "faraway"})
+	assert.Equal(t, http.StatusTooManyRequests, code, "a remote board is the caller's team's launch: %v", out)
+	assert.Equal(t, "board_live_limit", out["code"])
+	code, out = launch(nil)
+	assert.Equal(t, http.StatusTooManyRequests, code, out)
+	assert.Equal(t, "board_live_limit", out["code"])
+	// the folder rule is the caller's team's wherever the agent goes
+	code, out = launch(map[string]any{"working_dir": t.TempDir(), "board_name": "elsewhere4", "new_board": true})
+	assert.Equal(t, http.StatusForbidden, code, out)
+	assert.Equal(t, "outside_team_folder", out["code"])
+	// a team launch: raise the cap to leave room for one, two members go to a new board: one starts, one is refused with the cap named
+	code, _ = r.operatorGrant("Orchestrator", map[string]any{"max_live": 4, "max_per_hour": 50})
+	require.Equal(t, http.StatusOK, code)
+	b, _ := json.Marshal(map[string]any{"board_name": "newteam", "new_board": true, "working_dir": r.work, "agent_type": "claude", "agents": []map[string]any{{"name": "M1", "prompt": "work"}, {"name": "M2", "prompt": "work"}}})
+	code, out = r.do("POST", "/api/sessions/launch-team", string(b), nil, r.tok["Dev2"])
+	require.Equal(t, http.StatusOK, code, out)
+	ms := out["agents"].([]any)
+	require.Len(t, ms, 2)
+	assert.Nil(t, ms[0].(map[string]any)["error"], "one fits")
+	assert.Equal(t, "board_live_limit", ms[1].(map[string]any)["code"], "the member over the cap is refused: %v", ms[1])
+	// a team launch outside the team's folder is refused whole
+	b, _ = json.Marshal(map[string]any{"board_name": "newteam2", "new_board": true, "working_dir": t.TempDir(), "agent_type": "claude", "agents": []map[string]any{{"name": "M3", "prompt": "work"}}})
+	code, out = r.do("POST", "/api/sessions/launch-team", string(b), nil, r.tok["Dev2"])
+	assert.Equal(t, http.StatusForbidden, code, out)
+	assert.Equal(t, "outside_team_folder", out["code"])
+	// a board with no grant, and the Operator, are not held to any team
+	other := r.seat("Loner", "Developer", "lonely-board", "claude", false, 9)
+	_ = other
+	bo, _ := json.Marshal(map[string]any{"working_dir": t.TempDir(), "agent_type": "claude", "display_name": "Free", "board_name": "free", "new_board": true})
+	code, out = r.do("POST", "/api/sessions/launch", string(bo), nil, r.tok["Loner"])
+	assert.Equal(t, http.StatusOK, code, "a team with no grant is as it was: %v", out)
+	code, out = r.do("POST", "/api/sessions/launch", string(bo), operatorClient, "")
+	assert.Equal(t, http.StatusOK, code, "the Operator is never held: %v", out)
+}
+
+// QA's SHOULD on #13891: only the Coral Hub OWNER's team launch seeds the grant; a Hub user who holds the Launch tier (a grantee) launches the same team and gets none.
+func TestOnlyTheHubOwnersTeamLaunchSeedsTheGrant(t *testing.T) {
+	r := newOrchRig(t)
+	resetOwnerState(t)
+	withLabel(t, ownerLabel, nil)
+	hub := func(boardName string, hdr map[string]string) map[string]any {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodPost, "/api/sessions/launch-team", strings.NewReader(defTeamBody(boardName, r.work, "Orchestrator", "Dev")))
+		req.Header.Set("Content-Type", "application/json")
+		for k, v := range hdr {
+			req.Header.Set(k, v)
+		}
+		actor, ok := actorFor(req, callerHub)
+		require.True(t, ok)
+		req = withActor(req, actor)
+		req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerHub))
+		rec := httptest.NewRecorder()
+		r.h.LaunchTeam(rec, req)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		var out map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+		return out
+	}
+	ctx := context.Background()
+	out := hub("viaowner", ownerHeaders(ownerLabel))
+	g, err := r.h.bs.GetOrchGrant(ctx, out["board_id"].(string))
+	require.NoError(t, err)
+	assert.True(t, g.Enabled, "the Hub owner's launch seeds the grant")
+	out = hub("viagrantee", granteeHeaders())
+	g, err = r.h.bs.GetOrchGrant(ctx, out["board_id"].(string))
+	require.NoError(t, err)
+	assert.False(t, g.Enabled, "a Hub user at the Launch tier is not the Operator: no grant")
+	assert.Empty(t, g.SeatSession)
 }

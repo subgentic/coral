@@ -162,6 +162,24 @@ func (s *Store) SeedOrchGrant(ctx context.Context, project, seatSession string) 
 	return n > 0, err
 }
 
+// LaunchedSessionNotePrefix starts the note of a finished launch row that names the session the launch made (#13903), so a team's live cap can count the agents its members started wherever they were placed.
+const LaunchedSessionNotePrefix = "session "
+
+// LaunchedSessionIDs are the sessions the team's finished launches made, newest first (at most limit): the ids in the notes of its 'ok' launch rows.
+func (s *Store) LaunchedSessionIDs(ctx context.Context, project string, limit int) ([]string, error) {
+	var notes []string
+	if err := s.reader().SelectContext(ctx, &notes, `SELECT note FROM board_lifecycle_log WHERE project = ? AND kind = 'launch' AND status = 'ok' AND note LIKE ? ORDER BY id DESC LIMIT ?`, project, LaunchedSessionNotePrefix+"%", limit); err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(notes))
+	for _, n := range notes {
+		if id := strings.TrimSpace(strings.TrimPrefix(n, LaunchedSessionNotePrefix)); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return ids, nil
+}
+
 // LifecycleEntry is one row of the log.
 type LifecycleEntry struct {
 	ID      int64  `db:"id" json:"id"`

@@ -8,26 +8,18 @@ import (
 	"github.com/subgentic/coral/internal/safefs"
 )
 
-// An agent starts agents in the team's folder or below it (#13891, Security's MUST 3): a launch by an agent's verified session onto a board whose grant is ON is refused when its working_dir is outside every folder
+// An agent starts agents in the team's folder or below it (#13891, Security's MUST 3): a launch by an agent's verified session seated on a team whose grant is ON, wherever it places the agent, is refused when its working_dir is outside every folder
 // the caller's team works in. The folders are the launching session's own and those of the sessions on the board it launches onto, with the repo and the worktree folder of each (a helper in a sibling worktree of
 // the team's repo is the team's), resolved with symlinks (safefs.Within), so a link out of the team's folder does not count. A board with no grant row or a grant that is off keeps what it had: an agent starts
 // agents anywhere there (Orchestrator's decision on the upgrade risk: nothing on an existing team changes without its owner). The Operator, the dashboard and the command line pick any folder, as before. A board on another computer is that computer's to judge, and a launch that names no board is unchanged.
-func (h *SessionsHandler) refuseAgentLaunchOutsideTeam(w http.ResponseWriter, r *http.Request, boardName, dir string) bool {
+func (h *SessionsHandler) refuseAgentLaunchOutsideTeam(w http.ResponseWriter, r *http.Request, dir string) bool {
 	owner, ok := VerifiedSession(r.Context())
-	if !ok || boardName == "" || h.ss == nil {
+	if !ok || h.ss == nil || h.bs == nil {
 		return false
 	}
 	ctx := r.Context()
-	if h.bs == nil {
-		return false
-	}
-	g, gerr := h.bs.GetOrchGrant(ctx, boardName)
-	if gerr != nil {
-		// A grant that cannot be read does not stop a launch on an existing team (nothing there may break on a store hiccup): the rule is skipped, and said in the log with the reason.
-		slog.Warn("the folder rule of an agent's launch was skipped: the board's grant could not be read", "board", boardName, "error", gerr)
-		return false
-	}
-	if !g.Enabled {
+	boardName := h.callersBoardWithGrant(r) // the caller's team, when its grant is on: any other caller, or a team with no grant or an off one, is as it was
+	if boardName == "" {
 		return false
 	}
 	var roots []string

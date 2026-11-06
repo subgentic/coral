@@ -190,10 +190,11 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 		}
 		body.BoardName = key
 		boardCreated = created
-		if h.refuseAgentLaunchOutsideTeam(w, r, body.BoardName, body.WorkingDir) {
-			h.rollBackTeamLaunch(context.WithoutCancel(r.Context()), body, 0, "", false, boardCreated)
-			return
-		}
+	}
+	// An agent on a team whose grant is on starts agents in that team's folders, wherever they are placed (#13891, #13903).
+	if h.refuseAgentLaunchOutsideTeam(w, r, body.WorkingDir) {
+		h.rollBackTeamLaunch(context.WithoutCancel(r.Context()), body, 0, "", false, boardCreated)
+		return
 	}
 	h.restoreTeamTemplate(r.Context(), &body)
 
@@ -309,7 +310,7 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		// An agent's team launch is logged and held to the board's caps one member at a time, in the same statement as a single launch (#11432): a team is not a way round them.
-		lifeID, lifeGrant, lifeErr := h.reserveAgentLaunch(r, body.BoardName, agentDef.Name)
+		lifeID, lifeGrant, lifeErr := h.reserveAgentLaunch(r, h.accountingBoard(r, body.BoardName, body.BoardServer), agentDef.Name)
 		if lifeErr != nil {
 			code, msg := capRefusal(lifeErr, lifeGrant)
 			launched = append(launched, map[string]any{"name": agentDef.Name, "error": msg, "code": code})
@@ -320,7 +321,8 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 		// widens an empty member to Auto (#5836 still applies to a single launch). What the person chose (flags, capabilities, a saved default) is used as before.
 		entry, category := h.launchTeamMember(ctx, body, agentDef, userSettings, workingDir, worktreePath, teamID, false)
 		_, memberFailed := entry["error"]
-		h.endAgentLaunch(ctx, body.BoardName, lifeID, !memberFailed, launcherWords(h.orchActorOf(r))+" started "+orchName(agentDef.Name))
+		sidMade, _ := entry["session_id"].(string)
+		h.endAgentLaunch(ctx, h.accountingBoard(r, body.BoardName, body.BoardServer), lifeID, !memberFailed, launcherWords(h.orchActorOf(r))+" started "+orchName(agentDef.Name), sidMade)
 		if category != "" && firstFailure == "" {
 			firstFailure = category
 		}
