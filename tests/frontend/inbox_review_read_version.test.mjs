@@ -9,7 +9,7 @@ globalThis.fetch = window.fetch = async (input, opts = {}) => {
     const url = new URL(String(input), location.href);
     if (url.pathname === '/api/board/projects') return Response.json([{ project: 'dev' }]);
     if (url.pathname.endsWith('/opened') && opts.method === 'POST') return Response.json({ series_id: base.series_id, opened_version: 3 });
-    return Response.json({ artifacts: url.pathname === '/api/team-artifacts' && url.searchParams.get('team') === 'dev' ? [{ ...base, opened_version: 2 }] : [], has_more: false });
+    return Response.json({ artifacts: url.pathname === '/api/team-artifacts' && url.searchParams.get('tag') !== 'saved' && (!url.searchParams.has('team') || url.searchParams.get('team') === 'dev') ? [{ ...base, opened_version: 2 }] : [], has_more: false });
 };
 const reviews = await importUi('inbox_reviews');
 

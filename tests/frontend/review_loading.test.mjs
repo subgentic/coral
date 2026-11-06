@@ -6,7 +6,7 @@ import { prepareAskReviews, isHiddenAsk } from '../../coral-go/pkg/frontend/stat
 import * as M from '../../coral-go/pkg/frontend/static/inbox_reviews.js';
 state.hub = true; state.serversKnown = true;
 state.servers = [{ id: 'box-b', status: 'online' }];
-const rows = Array.from({ length: 65 }, (_, i) => ({ id: (i + 1).toString(16).padStart(64, '0'), board_id: 'alpha', name: `File ${i}`, session_id: 'writer', produced_by: 'Writer', tags: ['for review'], available: true, created_at: '2026-11-06T12:00:00Z' }));
+const rows = Array.from({ length: 65 }, (_, i) => ({ id: (i + 1).toString(16).padStart(64, '0'), board_id: 'alpha', server: 'untrusted-payload-source', name: `File ${i}`, session_id: 'writer', produced_by: 'Writer', tags: ['for review'], available: true, created_at: '2026-11-06T12:00:00Z' }));
 const calls = [];
 let failMore = false, ignoreDigest = false;
 globalThis.fetch = async input => {
@@ -46,6 +46,7 @@ assert.equal(isHiddenAsk({ ...linkedAsk, server: 'local' }), false, 'the same di
 
 assert.ok(keyLabel('alpha').startsWith('Product'), 'team labels come from the same protected response, without a project scan');
 assert.equal(new Set(M.reviewItems().map(r => r.reviewKey)).size, 100, 'identical digests on two computers retain qualified identities');
+assert.ok(M.reviewItems().filter(r => r.team.startsWith('@box-b/')).every(r => r.server === 'box-b'), 'payload fields cannot replace the captured computer');
 assert.deepEqual(M.reviewPages().map(p => [p.server, p.total, p.has_more]), [['local', 65, true], ['box-b', 65, true]]);
 failMore = true; await M.loadMoreReviews('box-b');
 assert.equal(M.reviewItems().length, 100, 'a failed append retains loaded rows');

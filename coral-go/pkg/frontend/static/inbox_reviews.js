@@ -288,7 +288,7 @@ async function readComputerPage(server, { query, cursor, limit, signal, revision
         // a routing identity, and a missing source never becomes the Hub/local.
         if (!hex || !rawBoard(a.board_id)) continue;
         const team = identityKey(server, a.board_id);
-        artifacts.push({ ...a, id: hex, team, hex, reviewKey: `${team}:${hex}` });
+        artifacts.push({ ...a, id: hex, server: normServer(server), team, hex, reviewKey: `${team}:${hex}` });
     }
     return { ...data, artifacts };
 }
