@@ -44,9 +44,12 @@ const DATA_WORLD = `(() => {
     const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
     window.fetch = (url, opts = {}) => {
         const u = String(url && url.url || url).replace(/^https?:\\/\\/[^/]+/, ''), path = u.split('?')[0], m = (opts.method || 'GET').toUpperCase();
+        const CHANGED = { files: [{ filepath: 'src/main.go', status: 'M' }, { filepath: 'docs/README.md', status: '??' }], is_git: true };
+        // the same two files for the list's other read too (#13784): the panel's watch and every follow-up read POST /files/refresh, which went to the real server, so the list swapped to the folder's real file at a moment that depended on load
+        if (m === 'POST' && /^\\/api\\/sessions\\/live\\/[^/]+\\/files\\/refresh$/.test(path)) return json(CHANGED);
         if (m === 'GET') {
             // the agent's changed files: two, on every OS (the Files panel's rows must each name their buttons, which one row cannot show; #6152)
-            if (/^\\/api\\/sessions\\/live\\/[^/]+\\/files$/.test(path)) return json({ files: [{ filepath: 'src/main.go', status: 'M' }, { filepath: 'docs/README.md', status: '??' }], is_git: true });
+            if (/^\\/api\\/sessions\\/live\\/[^/]+\\/files$/.test(path)) return json(CHANGED);
             if (path === '/api/workflows') return json({ workflows: [${JSON.stringify(WF)}, ${JSON.stringify(WF2)}, ${JSON.stringify(WF3)}] });
             if (path === '/api/workflows/7') return json(${JSON.stringify(WF)});
             if (/^\\/api\\/workflows\\/7\\/runs/.test(path)) return json({ runs: [${JSON.stringify(RUN)}, ${JSON.stringify(RUN_OK)}] });
