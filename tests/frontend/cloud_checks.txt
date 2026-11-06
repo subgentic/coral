@@ -375,3 +375,5 @@ node inbox_review_groups.test.mjs
 node inbox_review_star_cache.test.mjs
 
 node starred_review_pages.test.mjs
+
+node inbox_review_waiting.test.mjs

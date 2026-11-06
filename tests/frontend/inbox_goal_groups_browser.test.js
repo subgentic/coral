@@ -1,6 +1,7 @@
 // #13888/#13889: real Needs you table, grouping, source identity and accessible pin control.
 const assert=require('node:assert/strict');const fs=require('node:fs');
 const {connect}=require('./agent_view_harness');const {coralReady}=require('./helpers/wait');
+const {setupHubWorld}=require('./helpers/hub_world');
 const {removeBoards}=require('./helpers/board_cleanup');const BASE=require('./test_base').BASE;
 (async()=>{const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();const team='goal-groups-'+Date.now().toString(36);
 try{await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});await Page.addScriptToEvaluateOnNewDocument({source:"localStorage.removeItem('coral-inbox-group-review-goal');"});
@@ -30,5 +31,20 @@ for(const [width,theme] of [[1280,'light'],[390,'light'],[1280,'dark'],[390,'dar
  const overflow=await ev(`document.documentElement.scrollWidth>innerWidth+1`);assert.equal(overflow,false,'no horizontal overflow at '+width);
  if(process.env.CORAL_SCREENSHOT_DIR){fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true});fs.writeFileSync(process.env.CORAL_SCREENSHOT_DIR+'/goal-groups-'+width+'-'+theme+'.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}
 }
-console.log('PASS grouping and star pins on desktop/phone, producer overflow, counts, identity and row isolation');
+await setupHubWorld({client,Page,Emulation,width:1280,height:900,mobile:false,inbox:'native',needs:true,hubPages:true});
+for(const width of [1280,390]){
+ await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});await Emulation.setTouchEmulationEnabled({enabled:width===390});
+ await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev,'startup','settings');
+ await ev(`(()=>{const original=window.fetch.bind(window),json=b=>Promise.resolve(Response.json(b));window.__remoteStars=[];window.fetch=(url,opts={})=>{const u=new URL(String(url),location.href),source=u.pathname.includes('/remote/m1/')?'m1':u.pathname.includes('/remote/m2/')?'m2':null;if(source&&u.pathname.endsWith('/api/board/same-team/artifacts'))return json({artifacts:u.searchParams.get('tag')==='for review'?[{id:'a'.repeat(64),uri:'coral://artifacts/'+'a'.repeat(64),name:'Same title.md',series_id:'same-series-id',produced_by:'Developer',session_id:'same-producer',available:true,tags:['for review'],created_at:new Date().toISOString(),goal_id:1,goal_title:'Same goal'}]:[],has_more:false});if(source&&u.pathname.endsWith('/star')){window.__remoteStars.push({path:u.pathname,method:opts.method});return json({starred:true});}return original(url,opts);};return true;})()`);
+ await ev(`window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
+ await waitFor(`document.querySelectorAll('.inbox-review-star').length===2`,'both source rows in native Hub Needs you');
+ await ev(`document.querySelector('.inbox-group-review-toggle input').click();true`);
+ await waitFor(`document.querySelectorAll('.inbox-needs-results .dt-group').length===2`,'same goal id remains two source groups');
+ const labels=await ev(`[...document.querySelectorAll('.inbox-needs-results .dt-group')].map(g=>g.textContent)`);
+ assert.ok(labels.some(t=>t.includes('Laptop'))&&labels.some(t=>t.includes('Desktop')),JSON.stringify(labels));
+ await ev(`document.querySelector('tr[data-key^="m2:"] .inbox-review-star').click();true`);
+ await waitFor(`window.__remoteStars.length===1`,'Hub source-scoped star');
+ assert.deepEqual(await ev(`window.__remoteStars`),[{path:'/api/remote/m2/api/artifacts/'+'a'.repeat(64)+'/star',method:'PUT'}]);
+}
+console.log('PASS grouping and star pins on desktop/phone plus two-computer Hub routing, producer overflow and row isolation');
 }finally{await removeBoards(ev,[team]).catch(()=>{});await client.close();}})().catch(e=>{console.error(e);process.exit(1);});
