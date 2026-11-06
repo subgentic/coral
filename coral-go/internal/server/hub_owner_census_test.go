@@ -38,7 +38,7 @@ var neverStamped = []string{
 	"POST /api/cloud/connect", "POST /api/cloud/redeem", "POST /api/cloud/disconnect", "POST /api/cloud/rekey", "PUT /api/cloud/hub-relaunch", "PUT /api/cloud/allow-auto-accept",
 	"PUT /api/system/hub-mode", "PUT /api/system/hub-operator", "PUT /api/system/terminal-backend", "POST /api/system/terminal-backend/end-leftover",
 	"POST /api/system/auto-wake/dismiss", "POST /api/artifacts/prune",
-	"POST /api/sessions/live/{name}/model", "POST /api/sessions/live/{name}/notices/pause", "POST /api/sessions/live/{name}/notices/resume",
+	"POST /api/sessions/live/{name}/notices/pause", "POST /api/sessions/live/{name}/notices/resume",
 	"POST /api/chief/checks", "POST /api/chief/checks/{checkID}/run", "PUT /api/chief/checks/{checkID}", "DELETE /api/chief/checks/{checkID}",
 	"POST /api/pinned-folders", "DELETE /api/pinned-folders", "DELETE /api/shared-images/{id}",
 	"POST /api/board/remotes", "DELETE /api/board/remotes", "PUT /api/custom-models", "POST /api/hub-auto-accept",
@@ -50,6 +50,7 @@ var neverStamped = []string{
 
 // stampedAnyway: routes that are not an Activity row of their own but are on the list on purpose (tier B, Security's answer on #13694): a person's decision gated like the Activity ones.
 var stampedAnyway = map[string]string{
+	"POST /api/sessions/live/{name}/model": "the chat box's model and thinking-level switch (#13761, Security): a person's choice on their own agent, person-gated, so it must carry the stamp or it answers 403 through the Hub; it types only a validated value",
 	"POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle": "the second half of an ask button's click (claim is the Activity row); person-gated, so it must carry the stamp or it answers 403 through the Hub",
 }
 
