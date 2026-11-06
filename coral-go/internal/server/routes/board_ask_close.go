@@ -11,6 +11,7 @@ import (
 
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/clitext"
+	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/tracking"
 )
 
@@ -40,6 +41,16 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 	// Who closes is the identity layer's verified actor in every mode, never the name the body claims: an agent that could name itself the Operator, or the asker, could hide a question from the Operator's
 	// Needs you (Security on #11417). A caller nothing backs (no credential) is refused.
 	actor, verified := actorName(callerActor(r))
+	// Through the Hub the account this computer is linked to is the Operator for this route (#13883). The close route is an owner route of the tunnel table, and TunnelIdentityGuard lets every owner POST
+	// pass without making it the Operator's, so the identity layer named the Hub user's label here and mayCloseAsk refused it. refuseNonOwner above has already admitted only the owner (a grantee, a viewer
+	// and a guide were answered owner_only); the authentic connector stamp and the owner check are asked again so this reads on its own. Only this route takes it: nothing else treats the owner's label as the Operator.
+	var hubOwner *callerIdentity
+	if a := callerActor(r); a.Kind == ActorHub && !strings.EqualFold(a.Name, "Operator") && cloud.TunneledAuthentic(r) {
+		if oid := hubOwnerRequest(r); oid.owner {
+			hubOwner = &oid
+			actor, verified = "Operator", true
+		}
+	}
 	if !verified {
 		writeError(w, http.StatusForbidden, "unverified", "closing a question needs a verified caller: an agent's token, the Operator, or the Hub")
 		return
@@ -80,6 +91,9 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.recordActivity(r, board.ActUnignore, "question", strconv.FormatInt(id, 10), project, "", "")
+		if hubOwner != nil {
+			recordHubOwnerAction(r.Context(), h.bs, *hubOwner, r.Method, r.URL.Path, project, http.StatusOK)
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "reopened": reopened})
 		return
 	}
@@ -94,6 +108,9 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 	if strings.EqualFold(actor, "Operator") && humanInputCaller(r) { // the Operator's own Ignore, not an agent closing its own question
 		h.recordActivity(r, board.ActIgnore, "question", strconv.FormatInt(id, 10), project, "", note)
 		inboxActioned(r, tracking.InboxAsk, "", "dismiss", time.Time{}) // the Inbox's numbers (#7512)
+	}
+	if hubOwner != nil {
+		recordHubOwnerAction(r.Context(), h.bs, *hubOwner, r.Method, r.URL.Path, project, http.StatusOK)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "closed_by": actor, "withdrawn": body.Withdraw})
 }
