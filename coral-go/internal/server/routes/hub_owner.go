@@ -119,6 +119,8 @@ var ownerRefusals = map[string]string{
 	tunnel.OwnerRouteKey("POST", "/api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim"):  "through Coral Hub only the account this computer is linked to can use a button an agent put on a question",
 	tunnel.OwnerRouteKey("POST", "/api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle"): "through Coral Hub only the account this computer is linked to can use a button an agent put on a question",
 	tunnel.OwnerRouteKey("GET", "/api/board/{project}/artifacts/{digest}/edit"):                     "through Coral Hub only the account this computer is linked to can edit a file",
+	tunnel.OwnerRouteKey("GET", "/api/board/{project}/artifacts/{digest}/edit/send"):                "through Coral Hub only the account this computer is linked to can send an edit to an agent",
+	tunnel.OwnerRouteKey("POST", "/api/board/{project}/artifacts/{digest}/edit/send"):               "through Coral Hub only the account this computer is linked to can send an edit to an agent",
 	tunnel.OwnerRouteKey("POST", "/api/board/{project}/artifacts/{digest}/edit"):                    "through Coral Hub only the account this computer is linked to can edit a file",
 	tunnel.OwnerRouteKey("POST", "/api/board/{project}/operator-artifacts"):                         "through Coral Hub only the account this computer is linked to can share a file with an agent",
 	tunnel.OwnerRouteKey("POST", "/api/board/{project}/operator-artifacts/message"):                 "through Coral Hub only the account this computer is linked to can share a file with an agent",

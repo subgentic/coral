@@ -46,10 +46,10 @@ const Skew = 30 * time.Second
 // secretBytes is the length of a secret, hex-encoded in its file and on the wire between the hub and the human act.
 const secretBytes = 32
 
-// RoutesVersion is the generation of the allowlist below: 1 is the first eight routes, 2 (#13694) adds every Operator click that writes an Activity row and the decisions that need a person, 3 (#13757) the Markdown editor's save. A remote says in
+// RoutesVersion is the generation of the allowlist below: 1 is the first eight routes, 2 (#13694) adds every Operator click that writes an Activity row and the decisions that need a person, 3 (#13757) the Markdown editor's save and the model switch, 4 (#13802) Send to agent with the diff. A remote says in
 // its health answer which generation it accepts; a hub stamps a route only when the remote's generation is at least the route's (a stamp on a route an older remote does not list is refused 403, where an
 // unstamped call still goes through as a key caller). The remote still checks every stamp against its own list, so a wrong number gets a 403 and never more power.
-const RoutesVersion = 3
+const RoutesVersion = 4
 
 type route struct {
 	pattern string
@@ -121,6 +121,8 @@ var routes = []route{
 	{"POST /api/board/{project}/operator-artifacts/message", 2},
 	// Generation 3 (#13757): the Markdown editor's save (a new version of a file). Its expected_latest digest is in the query, which the stamp binds; a body over MaxBody is refused by the hub, never sent unstamped.
 	{"POST /api/board/{project}/artifacts/{id}/edit", 3},
+	// Generation 4 (#13802, ships after generation 3): Send to agent with the diff. The body is the recipients' names, which the stamp binds; a body over MaxBody is refused by the hub.
+	{"POST /api/board/{project}/artifacts/{id}/edit/send", 4},
 }
 
 // MustBeSigned reports whether a request is one whose words are the person's own and become automation on the remote when no stamp goes with it: the owner's message to an agent (#13456) and, since

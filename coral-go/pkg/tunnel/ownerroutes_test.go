@@ -154,7 +154,7 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 				continue
 			}
 			// The Markdown editor's capability read and save (#13757) are the owner's alone through the hub: the old list never had them.
-			if strings.HasPrefix(p, "/api/board/") && strings.Contains(p, "/artifacts/") && strings.HasSuffix(p, "/edit") {
+			if strings.HasPrefix(p, "/api/board/") && strings.Contains(p, "/artifacts/") && (strings.HasSuffix(p, "/edit") || strings.HasSuffix(p, "/edit/send")) {
 				continue
 			}
 			// Pausing and resuming Coral's notices to an agent (#11387) are the owner's alone: the old list never had them.

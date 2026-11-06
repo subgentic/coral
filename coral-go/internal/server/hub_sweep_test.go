@@ -147,8 +147,8 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		"/api/activity":      true, // the record of what the Operator did in Needs you, read only, the owner's alone (#12070)
 		"/api/chief":         true, // which agent the Operator recorded as Chief is the owner's alone through the hub (#11470)
 		"/api/board/{project}/orchestrator-grant": true, "/api/board/{project}/lifecycle-log": true, "/api/board/{project}/guide-roster": true, "/api/artifacts/{id}/private": true, // the grant to a board's orchestrator and its log are the owner's alone (#11432)
-		"/api/board/{project}/artifacts/{digest}/edit": true, // what the Markdown editor may do with a file is the owner's alone (#13757)
-		"/api/custom-models":                           true} // the custom models are the owner's alone through the hub (#5996)
+		"/api/board/{project}/artifacts/{digest}/edit": true, "/api/board/{project}/artifacts/{digest}/edit/send": true, // what the Markdown editor may do with a file is the owner's alone (#13757)
+		"/api/custom-models": true} // the custom models are the owner's alone through the hub (#5996)
 
 	golden, err := os.ReadFile("testdata/cloud_routes.golden")
 	require.NoError(t, err)
@@ -220,7 +220,7 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		// The owner's version list and series reads (#11354) name an artifact in a series; the rig's is in none, so the owner's answer is the route's own 404 (the plain hub caller was refused above).
 		versionsAbsent := ownerOnly[f[1]] && (strings.HasSuffix(f[1], "/versions") || strings.HasPrefix(f[1], "/api/artifacts/series/")) && (rec.Code == 404 || rec.Code == 400)
 		// The editor's capability read (#13757) names a file of the board; the rig's artifact is on no team, so the owner's answer is the route's own 404 (the plain hub caller was refused above).
-		editAbsent := ownerOnly[f[1]] && strings.HasSuffix(f[1], "/edit") && rec.Code == 404
+		editAbsent := ownerOnly[f[1]] && (strings.HasSuffix(f[1], "/edit") || strings.HasSuffix(f[1], "/edit/send")) && (rec.Code == 404 || rec.Code == 409) // 409 not_an_edit: the rig's artifact is no saved edit
 		if rec.Code == 200 || versionsAbsent || editAbsent || resolveAnswered || updateOff || savedAbsent || (strings.HasPrefix(f[1], "/api/templates/") && rec.Code == 404 && strings.Contains(rec.Body.String(), "template_not_found")) {
 			answered++
 		}

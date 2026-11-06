@@ -21,6 +21,7 @@ import (
 var activityByHandler = map[string]string{
 	"DELETE /api/board/{project}/artifacts/{id}/review":                   "take out of review (unsend_review)",
 	"POST /api/board/{project}/artifacts/{id}/review":                     "a file's review: approve, changes, deny, ignore, unignore, save, unsave, supersede (board.DecideArtifactReview and friends)",
+	"POST /api/board/{project}/artifacts/{digest}/edit/send":              "a saved edit sent to agents as a diff (file_edit_send, #13802): the handler asks the recorder for the row",
 	"POST /api/board/{project}/artifacts/{digest}/edit":                   "a Markdown file saved from the editor as a new version (file_edit, #13757): the handler asks the recorder for the row",
 	"POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim": "an ask button's click (answer)",
 	"POST /api/board/{project}/asks/{messageID}/close":                    "a question's Ignore and Put back (ignore, unignore)",

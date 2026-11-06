@@ -10,6 +10,7 @@ assert.equal(activityWords({action:'prompt_answer',item_id:'old-agent'}), 'You a
 assert.equal(activityWords({action:'task_complete',item_id:'12',title:'Ship release'}), 'You completed task #12 Ship release');
 assert.equal(activityWords({action:'file_edit',item_kind:'file',item_id:'ab',title:'plan.md'}), 'You saved a new version of plan.md');
 assert.equal(activityWords({action:'file_edit',item_kind:'file',item_id:'ab'}), 'You saved a new version of a file');
+assert.equal(activityWords({action:'file_edit_send',item_kind:'file',item_id:'ab',title:'plan.md',note:'to 2 agent(s)'}), 'You sent your edit of plan.md to agents: “to 2 agent(s)”');
 const boardDir = new URL('../../coral-go/internal/board/',import.meta.url);
 const constants = fs.readdirSync(boardDir).filter(n=>n.endsWith('.go')&&!n.endsWith('_test.go')).map(n=>fs.readFileSync(new URL(n,boardDir),'utf8')).join('\n');
 const values = new Map([...constants.matchAll(/\b(Act\w+)\s*=\s*"([^"]+)"/g)].map(m=>[m[1],m[2]]));
