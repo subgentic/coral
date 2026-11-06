@@ -33,8 +33,9 @@ const hexOf = data => String(data.digest || data.hex || data.id || '').replace(/
         assert.ok((await httpJson('POST',`/api/board/${B}/subscribe`,{subscriber_id:'Markdown Writer',job_title:'Writer',session_name:`${live.agent_type}-${author.sid}`})).status<300);
 
 
+        // Content-addressed files need unique bytes too: names alone can reuse a prior run's version series.
         const originals=[];
-        for(let i=0;i<66;i++) originals.push(await upload(`${B}-inbox-report-${String(i).padStart(3,'0')}.md`,`# Report ${i}\n\nA **careful sentence** stays in report ${i}.\n`));
+        for(let i=0;i<66;i++) originals.push(await upload(`${B}-inbox-report-${String(i).padStart(3,'0')}.md`,`# Report ${i} (${B})\n\nA **careful sentence** stays in report ${i}.\n`));
         await ev(`window.__pageLifetime='same-page';window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('artifacts'))`);
         await waitFor(`!!document.querySelector('.inbox-artifacts-list')`,'Inbox file list mounted',10000);
         // Other suites can leave legitimate files in the shared server: search this fixture's unique names.
