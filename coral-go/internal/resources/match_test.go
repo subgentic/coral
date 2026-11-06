@@ -52,3 +52,37 @@ func TestACommandPastTheBoundsMatchesNothing(t *testing.T) {
 	_, ok = MatchCommand("go test ./...", nil)
 	assert.False(t, ok, "no patterns, no hook")
 }
+
+// #13719, goal #227: a package path has more than one spelling, and the pattern's own spelling is not the only one a command uses. QA Engineer's `go test ./internal/server/routes/` ran 9 minutes on the Mac
+// unclaimed because the pattern had no trailing slash.
+func TestAPackagePathMatchesInEverySpelling(t *testing.T) {
+	pats := []string{"go test ./internal/server/routes", "go test ./..."}
+	hit := []string{
+		"go test ./internal/server/routes/",
+		"go test internal/server/routes",
+		"go test internal/server/routes/",
+		"go test ./internal/server/routes/...",
+		"go test -count=1 -run X ./internal/server/routes/",
+		"go test -race -count=1 -p 4 ./internal/server/routes/ ./pkg/x",
+		"go -C coral-go test ./internal/server/routes/",
+		"cd coral-go && go test ./internal/server/routes/ 2>&1 | tail",
+		"cd /abs/coral-go; go test -v ./internal/server/routes/",
+		"go test ./.../",
+		"go test ./...",
+	}
+	for _, c := range hit {
+		_, ok := MatchCommand(c, pats)
+		assert.True(t, ok, c)
+	}
+	miss := []string{
+		"go test ./internal/server/routesx",
+		"go test ./internal/server/routes_other/",
+		"go test ./internal/board/",
+		"go test ./pkg/x/...",
+		`echo "go test ./internal/server/routes/"`,
+	}
+	for _, c := range miss {
+		p, ok := MatchCommand(c, pats)
+		assert.False(t, ok, c+" matched "+p)
+	}
+}
