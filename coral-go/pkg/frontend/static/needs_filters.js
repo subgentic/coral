@@ -7,7 +7,7 @@ import { browserLocal } from './safe_storage.js';
 
 /** What an agent waits on, as the pills say it: its permission, its question, or anything else (an input request, a plan, a prompt only the screen showed). */
 export const KINDS = ['permission', 'question', 'other', 'review', 'run', 'proposal', 'goal_done', 'skill_review', 'welcome'];
-export const KIND_LABEL = { permission: 'Permission', question: 'Question', other: 'Needs input', review: 'For review', run: 'Failed run', proposal: 'To approve', goal_done: 'Goal looks done', skill_review: 'Skill to approve', welcome: 'Welcome' };
+export const KIND_LABEL = { permission: 'Permission', question: 'Question', other: 'Needs input', review: 'For review', run: 'Failed run', proposal: 'To approve', goal_done: 'Goal looks done', skill_review: 'Skill to approve', welcome: 'Welcome', ask: 'Question' };
 /** How long it has waited, at least (minutes), as the Filters panel offers it. */
 export const LONGER = ['5', '15', '60', '240'];
 export const LONGER_LABEL = { 5: '5 minutes', 15: '15 minutes', 60: '1 hour', 240: '4 hours' };
@@ -34,7 +34,7 @@ export const saveFilters = f => kept.save('inbox-needs', { ...f, q: '' }, browse
 
 /** The leading icon of a Needs you row (#13144): one glyph per kind, drawn in a full-height gutter by css/data_table.css from data-kind (all from the icon subset, tests/frontend/fixtures/material-icons.names.txt), named by the kind's own word for a screen reader. The glyph is drawn by CSS (data-kind), so the row's text stays its words. */
 export function kindIcon(s) {
-    const k = kindOf(s), i = document.createElement('span');
+    const k = s && s.waiting_kind === 'ask' ? 'ask' : kindOf(s), i = document.createElement('span'); // a question put to the Operator is a question, not "needs input" (#13819); it is still the 'other' pill's, so no filter changes
     i.className = 'material-icons inbox-kind-icon'; i.dataset.kind = k; i.setAttribute('role', 'img'); i.setAttribute('aria-label', KIND_LABEL[k]); i.title = KIND_LABEL[k];
     return i;
 }
