@@ -5,11 +5,12 @@
  * helper treats a missing/empty server as "local", so single-server behaviour
  * and legacy stored keys are unchanged.
  *
- * Kept dependency-free (apart from the shared state object) so it can be
+ * Uses shared state and the dependency-free account reader, so it can be
  * imported from any module without creating import cycles. api.js re-exports
  * everything here. */
 
 import { state } from './state.js';
+import { readAccount } from './account_info.js';
 
 export const LOCAL_SERVER = 'local';
 
@@ -475,10 +476,29 @@ export function decisionNeedsPerson(server) {
     return !(live && live.owner_stamp === true);
 }
 
-/** The Hub asks for its goal preview before a goal create, close or update (#13503): one boot value `goal_preview: true`, set by the Hub's server for the accounts its goals gate allows, never from a request. The preview flow
- *  (goal_write.js) is used ONLY when this is true; on the self-hosted Hub and on a computer's own dashboard it is false and the goal writes go out as they always did. */
+// Explicit account booleans override the existing boot choices independently.
+// Missing/malformed fields and failed reads retain boot behavior for older Hubs.
+// Startup bounds this shared cached read; the Hub still authorizes every write.
+let _needsNative = null, _goalPreview = null, _accountFlagsInit = null;
+export function initCloudAccountFlags() {
+    if (!isCloud()) return Promise.resolve();
+    if (!_accountFlagsInit) _accountFlagsInit = (async () => {
+        let timer;
+        try {
+            const account = await Promise.race([
+                readAccount(),
+                new Promise(resolve => { timer = setTimeout(() => resolve(null), 4000); }),
+            ]);
+            _needsNative = typeof account?.needs_native === 'boolean' ? account.needs_native : null;
+            _goalPreview = typeof account?.goal_preview === 'boolean' ? account.goal_preview : null;
+        } finally { clearTimeout(timer); }
+    })();
+    return _accountFlagsInit; // a late account answer cannot change routing after startup timed out
+}
+
+/** The cloud account boolean selects preview-before-write, falling back to boot. Local writes stay unchanged. */
 export function goalPreviewOn() {
-    return isCloud() && bootConfig().goal_preview === true;
+    return isCloud() && (_goalPreview ?? (bootConfig().goal_preview === true));
 }
 
 /** The Hub-served dashboard draws its own Inbox (Chats folders and Boards) in place of the Hub's framed one, and the top row's Chats and Board tabs go (Goal #100). One switch, set by the Hub's
@@ -488,11 +508,9 @@ export function nativeInbox() {
     return isCloud() && bootConfig().inbox === 'native';
 }
 
-/** The Hub-served dashboard draws Coral's own Needs you table, not the Hub's framed page (#13446, #13450): the Hub's boot value `needs: 'native'`, read only together with `inbox: 'native'`. The Hub's own page config
- *  (a machine, a URL or a message cannot set it), so a folder can move off the frame, or back, without the others. The table is the owner's: every route it calls is owner-only through the Hub, so the Hub must
- *  set this value for the owner only: for a grantee or a viewer it would draw a table whose reads are refused (403 owner_only) and whose buttons answer 'Could not save (HTTP 403)'. */
+/** Native Needs you requires native Inbox; an account boolean wins, otherwise boot decides. */
 export function nativeNeeds() {
-    return nativeInbox() && bootConfig().needs === 'native';
+    return nativeInbox() && (_needsNative ?? (bootConfig().needs === 'native'));
 }
 
 /** Read /api/health once and cache the flag in state.hub. Safe to call often.

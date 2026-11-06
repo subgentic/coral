@@ -1,4 +1,4 @@
-/* A goal write through the Coral Hub's preview (#13503, coral-hub's contract): when the Hub's boot value goal_preview is true, a goal create, close or update is first PREVIEWED, and the write carries the token the preview gave.
+/* A goal write through the Coral Hub's preview (#13503, coral-hub's contract): when goal_preview is enabled by the account (or its boot fallback), a goal create, close or update is first PREVIEWED, and the write carries the token the preview gave.
  *   1. POST /api/remote/{server}/api/hub/goal-preview {board, action, goal?, body}: `body` is the EXACT text of the write (a JSON object as a string); the answer is {token, expires, tier}.
  *   2. The ordinary write, through the same computer, with X-Hub-Goal-Preview: <token> and the SAME bytes that were previewed (the Hub hashes them: one different byte is preview_invalid).
  * Before EVERY write, never once per page: one token, one write (a close or an update token works once). A preview that has run out (preview_expired) is asked for again, once, and the write sent again; anything else
@@ -110,7 +110,12 @@ export async function writeEach(list, one, { on = goalPreviewOn, say = () => {},
 /** goalWrite(project, action, goalId, path, method, body): the write as boardFetch would send it, previewed first when the Hub asks for it. `body` is the object; `goalId` is the goal for a close or an update (0/absent for a create). */
 export async function goalWrite(project, action, goalId, path, method, body, { boardFn = boardFetch, serverFn = serverFetch, on = goalPreviewOn } = {}) {
     const bodyText = JSON.stringify(body);
-    if (!on() || !GOAL_ACTIONS.includes(action)) return boardFn(project, path, { method, headers: JSON_HEADERS, body: bodyText });
+    if (!on() || !GOAL_ACTIONS.includes(action)) {
+        const resp = await boardFn(project, path, { method, headers: JSON_HEADERS, body: bodyText });
+        // A failed/timed-out account read may miss the gate; the Hub still refuses the write.
+        if (!resp.ok && GOAL_ACTIONS.includes(action) && await wordOf(resp) === 'preview_required') return refused(resp.status, 'preview_required');
+        return resp;
+    }
     const bad = checkGoalBody(action, body); // a body outside the Hub's shapes would be bad_request: it is not sent
     if (bad) return refused(400, 'bad_request');
     const { server, name } = splitKey(project);

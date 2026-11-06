@@ -353,3 +353,4 @@ node model_chip_refused.test.mjs
 node coral_ref.test.mjs
 node coral_subject_refs.test.mjs
 node native_coral_links.test.mjs
+node cloud_account_flags.test.mjs
