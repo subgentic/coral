@@ -52,7 +52,7 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle').click(); true`);
                 await waitFor(`!document.querySelector('.inbox-folder-toolbar .list-bar-menu').hidden`, 'the Filters panel', 6000);
                 const opts = await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-menu select')].filter(s => /^Goal/.test((s.labels[0] || {}).textContent || s.getAttribute('aria-label') || '')).map(s => [...s.options].map(o => o.textContent))[0]`);
-                assert.deepEqual(opts, ['Any goal', 'Docs sweep', 'Ship the installer', 'No goal'], 'the Goal field offers the goals, No goal last: ' + JSON.stringify(opts));
+                assert.deepEqual(opts, ['Any goal', 'Docs sweep (#8 · This computer)', 'Ship the installer (#7 · This computer)', 'No goal'], 'the Goal field offers the goals, No goal last: ' + JSON.stringify(opts));
                 await ev(`(() => { const s = [...document.querySelectorAll('.inbox-folder-toolbar .list-bar-menu select')].find(x => /^Goal/.test((x.labels[0] || {}).textContent || '')); s.value = 'Docs sweep'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
                 await waitFor(`document.querySelectorAll('#group-table-view [data-review-artifact]').length === 1`, 'the filter narrows to one goal', 6000);
                 assert.match(await ev(`document.querySelector('.inbox-folder-toolbar').textContent`), /Goal: Docs sweep/, 'the chip says the goal');
