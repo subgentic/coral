@@ -81,19 +81,25 @@ const { coralReady } = require('./helpers/wait');
         await search(P,''); await waitFor(`${q(P+' tbody')}?.children.length===3`,'clear artifact filter');
         await ev(`[...document.querySelectorAll('${P} tbody .dt-check input:not(:disabled)')].forEach(c=>c.click());true`);
         // #13949: the metadata route says which files other teams hold too (held_by_teams, 2 or more): the confirmation counts them; with none, its words are as they were
-        await ev(`(()=>{const prev=window.fetch;window.__held={};window.fetch=(u,o={})=>{const m=new URL(String(u),location.origin).pathname.match(/^\\/api\\/artifacts\\/([0-9a-f]{64})\\/meta$/);if(m)return Promise.resolve(new Response(JSON.stringify(window.__held[m[1]]?{held_by_teams:window.__held[m[1]]}:{}),{status:200,headers:{'Content-Type':'application/json'}}));return prev(u,o);};return true;})()`);
+        await ev(`(()=>{const prev=window.fetch;window.__metaQueue=[];window.fetch=(u,o={})=>{const m=new URL(String(u),location.origin).pathname.match(/^\\/api\\/artifacts\\/([0-9a-f]{64})\\/meta$/);if(m)return new Promise(resolve=>window.__metaQueue.push({hex:m[1],answer:n=>resolve(new Response(JSON.stringify(n?{held_by_teams:n}:{}),{status:200,headers:{'Content-Type':'application/json'}}))}));return prev(u,o);};return true;})()`); // every metadata read waits until the test answers it
+        const confirmText = () => ev(`${q(P+' .dt-bar-confirm')}?.textContent || ''`);
+        const queued = () => ev(`window.__metaQueue.length`);
+        // 1) the confirmation asks once per file however often it is drawn; with nothing answered it says nothing about other teams
         await artifactAction('Delete');
-        await new Promise(r => setTimeout(r, 400)); // sleep-ok: the reads settle and the words are updated in place
-        assert.ok(!/other teams/.test(await ev(`${q(P+' .dt-bar-confirm')}.textContent`)), 'with no shared file the confirmation says nothing about other teams');
+        await waitFor(`window.__metaQueue.length===2`, 'one read for each selected file', 8000);
+        assert.ok(!/other teams/.test(await confirmText()), 'before any answer the confirmation says nothing about other teams');
+        // 2) cancel, reselect, THEN the old answer arrives: it must not show in the new confirmation
         await ev(`${q(P+' .dt-bar-keep')}.click();true`);
-        await ev(`window.__held['${A}']=3;true`);
-        await new Promise(r => setTimeout(r, 2200)); // sleep-ok: the first answer's two seconds pass, so the next confirmation reads again
         await artifactAction('Delete');
-        await waitFor(`/1 of these is also in other teams and goes there too/.test(${q(P+' .dt-bar-confirm')}?.textContent || '')`, 'the confirmation counts the shared file', 8000);
-        assert.match(await ev(`${q(P+' .dt-bar-confirm')}.textContent`), /^Delete 2 artifacts\? 1 of these is also in other teams and goes there too\. Their links will become unavailable\./);
-        await ev(`${q(P+' .dt-bar-keep')}.click();true`);
-        await ev(`window.__held={};true`); await new Promise(r => setTimeout(r, 2200)); // sleep-ok: as above
-        await artifactAction('Delete');
+        await waitFor(`window.__metaQueue.length===4`, 'the new confirmation asks again', 8000);
+        await ev(`window.__metaQueue[0].answer(3);window.__metaQueue[1].answer(3);true`); // the two answers to the cancelled confirmation, late
+        await new Promise(r => setTimeout(r, 300)); // sleep-ok: the late answers have had their turn
+        assert.ok(!/other teams/.test(await confirmText()), 'a late answer to the cancelled confirmation is dropped: ' + await confirmText());
+        // 3) the new confirmation's own answer shows
+        await ev(`window.__metaQueue[2].answer(3);window.__metaQueue[3].answer(0);true`);
+        await waitFor(`/1 of these is also in other teams and goes there too/.test(${q(P+' .dt-bar-confirm')}?.textContent || '')`, 'the new answer is counted', 8000);
+        assert.match(await confirmText(), /^Delete 2 artifacts\? 1 of these is also in other teams and goes there too\. Their links will become unavailable\./);
+        await ev(`window.__metaQueue=[];true`);
         assert.deepEqual(await ev(`window.__deletes`),[],'Delete first asks');
         await ev(`${q(P+' .dt-bar-keep')}.click();true`); assert.deepEqual(await ev(`window.__deletes`),[],'Keep does not delete');
         await artifactAction('Delete');
