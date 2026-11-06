@@ -40,7 +40,7 @@ const MD = ['# Plan', '', 'Backfill in batches of 500 rows.', ''].join('\n');
             await ev(STUB);
             await ev(`window.__localList = ${remote ? 'null' : JSON.stringify(NORO)}; true`);
             await ev(`import(${S} + 'state.js').then(m => { m.state.servers = [{ id: 'm1', name: 'build-box', owner_stamp: true }]; }); true`);
-            await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'plan.md', ${remote ? "server: 'm1'," : ''} board: '${TEAM}' }); return true; })()`);
+            await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'plan.md', ${remote ? "server: 'm1'," : "server: 'local',"} board: '${TEAM}' }); return true; })()`);
             await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown')`, 'the document', 8000);
             await waitFor(`document.querySelectorAll('.ac-card').length >= 1`, 'the threads', 8000);
             await ev(`(() => { const t = document.querySelector('.ac-toggle'); if (t && t.getAttribute('aria-expanded') !== 'true') t.click(); return true; })()`);

@@ -1,7 +1,7 @@
 // One goal's detail view, shared by the team Goals list and other page hosts.
 import { loadStyles } from './lazy_styles.js';
 import { openTask } from './task_navigation.js';
-import { boardFetch, keyLabel, serverUrl, splitKey, remoteServer, LOCAL_SERVER } from './server_base.js';
+import { boardFetch, keyLabel, serverUrl, splitKey, LOCAL_SERVER } from './server_base.js';
 const { goalWrite, offersOperatorChanges, operatorChangesNeedNewer, operatorChangesNote } = await importOnce('./goal_write.js'); // a goal close or update is previewed first when the Hub asks for it (#13503)
 import { OPERATOR_ID, copyText, showToast } from './utils.js';
 import { whenText } from './when_text.js';
@@ -201,10 +201,10 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         if (g.outcome || g.doneWhen || g.images.length) {
             const dl = el('dl', 'facts goals-facts');
             if (g.outcome) { // the outcome field, which the New goal screen's writing fills (#11653): plain words at once, then the same words as Markdown-lite (#12724); both look artifact names up on the goal's own computer (#12583)
-                const server = remoteServer(model.project), dd = linkedDd(g.outcome, server, false); dl.append(el('dt', null, 'Description'), dd);
+                const server = splitKey(model.project).server, dd = linkedDd(g.outcome, server, false); dl.append(el('dt', null, 'Description'), dd);
                 renderGoalText(g.outcome, { server }).then(node => { if (dd.isConnected) dd.replaceChildren(node); }).catch(() => { /* the plain words stay */ });
             }
-            if (g.doneWhen) dl.append(el('dt', null, 'Done when'), linkedDd(g.doneWhen, remoteServer(model.project)));
+            if (g.doneWhen) dl.append(el('dt', null, 'Done when'), linkedDd(g.doneWhen, splitKey(model.project).server));
             main.append(dl);
             if (g.images.length) main.append(goalPictures(g));
         }

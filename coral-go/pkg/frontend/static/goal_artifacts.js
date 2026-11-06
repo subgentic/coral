@@ -33,13 +33,13 @@ async function read(team, goalId, extra) {
 
 /** The file in the goal screen's own pane: its name, its facts behind Details, the document, Open and Copy link. `host` is the pane element, `onClose` runs when it is closed. */
 export function openArtifactInPane(item, { team, host, opener, onClose, backLabel = '' }) {
-    const link = linkOfItem(item, { server: undefined, project: team }), name = readableName(item), un = isUnverified(item);
+    const link = linkOfItem(item, { server: splitKey(team).server, project: team }), name = readableName(item), un = isUnverified(item);
     const actions = [];
     // A task's own result file has no link of its own (its text is read from the task): on the Hub an address into the team's server cannot be opened by a click or passed on, so Open and Copy link are not offered
     // for it there, and the pane says so (#11190); a file kept under a digest still has the viewer, which saves its bytes through the Hub.
     const noHubLink = isCloud() && !!link && !link.hex;
     if (link && !noHubLink) {
-        if (link.preview) actions.push({ label: 'Open', primary: true, run: () => importOnce('./artifact_viewer.js').then(m => (link.hex ? m.openArtifactViewer(link.hex, { server: link.server, filename: name, mediaType: item.media_type }) : window.open(link.url, '_blank', 'noopener,noreferrer'))) });
+        if (link.preview) actions.push({ label: 'Open', primary: true, run: () => importOnce('./artifact_viewer.js').then(m => (link.hex ? m.openArtifactViewer(link.hex, { server: link.server, board: splitKey(team).name, filename: name, mediaType: item.media_type }) : window.open(link.url, '_blank', 'noopener,noreferrer'))) });
         else actions.push({ label: 'Open link', primary: true, href: link.url });
         actions.push({ label: 'Copy link', run: () => { navigator.clipboard?.writeText(link.hex ? `coral://artifacts/${link.hex}` : new URL(link.url, location.href).href).then(() => showToast('Link copied'), () => showToast('The link could not be copied', true)); } });
     }

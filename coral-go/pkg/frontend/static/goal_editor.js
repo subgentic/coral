@@ -2,7 +2,7 @@
  * Markdown-lite toolbar), done when, the pictures, the team and the driver. It creates the same goal the old dialog did: POST /api/board/<team>/goals with createBody's body. Local rules only (no model, no
  * agent call). Lazy: goals_view.js openCreate imports it when New goal is pressed. Everything drawn is built with the DOM and textContent. */
 import { loadStyles } from './lazy_styles.js';
-import { boardFetch, keyLabel } from './server_base.js';
+import { boardFetch, keyLabel, splitKey } from './server_base.js';
 const { goalWrite } = await importOnce('./goal_write.js'); // a goal create is previewed first when the Hub asks for it (#13503)
 import { OPERATOR_ID, showToast } from './utils.js';
 import { toDrivers, createBody, errorOf } from './goals_adapter.js';
@@ -174,7 +174,7 @@ export function openGoalEditor(opts = {}) {
         const meta = el('p', 'goal-preview-meta', [who ? `Driver: ${who}` : 'No driver yet', teamName].join(' \u00b7 '));
         const dl = el('dl', 'facts goals-facts');
         const dd = el('dd'); dl.append(el('dt', null, 'Description'), dd);
-        if (desc.value.trim()) { const node = await renderGoalText(desc.value); dd.append(node); } else { dd.textContent = 'Nothing written yet.'; dd.classList.add('goal-preview-blank'); }
+        if (desc.value.trim()) { const node = await renderGoalText(desc.value, { server: splitKey(project).server }); dd.append(node); } else { dd.textContent = 'Nothing written yet.'; dd.classList.add('goal-preview-blank'); }
         const dd2 = el('dd', d.value.trim() ? null : 'goal-preview-blank', d.value.trim() || 'Not set yet.'); dl.append(el('dt', null, 'Done when'), dd2);
         const kids = [state, h, meta, dl];
         const shots = tray ? tray.items().filter(x => x.state === 'ready') : [];

@@ -5,6 +5,7 @@ import { artifactLabel, learnArtifactNames } from './artifact_names.js';
 import { ARTIFACT_REF } from './artifact_refs.js';
 import { state } from './state.js';
 import { isGuidePost, guideText } from './guide_names.js';
+import { normServer, splitKey } from './server_base.js';
 
 /** Board message text with literal "\n" escapes turned into line breaks,
  *  for messages with none (agents posting through a shell pass them). Same
@@ -97,9 +98,7 @@ export function boardMessageDisplayText(m) {
 // _renderMarkdownUncached, the same path as renderMarkdown, through DOMPurify.
 const BOARD_BODY_CACHE_BYTES = 16 * 1024 * 1024, BOARD_BODY_ENTRY_MAX_BYTES = 1024 * 1024, BOARD_BODY_ENTRY_OVERHEAD = 64;
 
-const _boardBodyCache = new Map(); // `${id}:${hash}` → { id, text, html, bytes, pass }
-
-// `${id}:${hash}` → { id, text, html, bytes, pass }
+const _boardBodyCache = new Map(); // source/team/id/text hash → { id, text, html, bytes, pass }
 let _boardBodyBytes = 0, _boardBodyPass = 0, _boardBodyPassScheduled = false;
 
 function textHash(s) { // FNV-1a, 32 bits: only spreads the keys, the stored text decides a hit
@@ -254,7 +253,7 @@ export function highlightMentionsIn(container) {
 // the rule is artifact_refs.js's, shared by every surface that shows team-written text (#11416): coral://artifacts/ and exactly 64 lowercase hex digits
 
 /** The sanitized HTML with each bare coral://artifacts/<64 hex> made a link. */
-export function linkArtifactRefsHtml(html, server = state.currentBoardServer) {
+export function linkArtifactRefsHtml(html, server = state.currentBoardServer, board = '') {
     if (typeof document === 'undefined' || !html || !html.includes('coral://artifacts/')) return html;
     const t = document.createElement('template');
     t.innerHTML = html;
@@ -282,6 +281,8 @@ export function linkArtifactRefsHtml(html, server = state.currentBoardServer) {
             a.setAttribute('rel', 'noopener noreferrer');
             a.className = 'mb-artifact-ref';
             a.dataset.artifact = hex;
+            a.dataset.server = normServer(server);
+            if (board) a.dataset.board = board;
             // The name it was stored under once known (#297), else "artifact 81b837f8"; as text only. No aria-label: the visible name is
             // what a screen reader reads (not 64 characters one by one); the full reference is the tooltip.
             a.textContent = artifactLabel(hex);
@@ -300,20 +301,22 @@ export function linkArtifactRefsHtml(html, server = state.currentBoardServer) {
 }
 
 /** A board message's body as sanitized HTML (board link policy). */
-export function renderBoardMessageBody(m) {
+export function renderBoardMessageBody(m, team = '') {
+    team = typeof team === 'string' ? team : ''; // Array.forEach also supplies its numeric index to legacy one-argument callers
+    const server = team ? splitKey(team).server : state.currentBoardServer;
     const text = boardMessageText(boardMessageDisplayText(m));
     const id = Number(m && m.id);
     if (!text || !Number.isFinite(id) || typeof marked === 'undefined' || typeof DOMPurify === 'undefined'
         || (typeof hljs === 'undefined' && FENCED_WITH_LANG.test(text))) {
-        return highlightMentionsHtml(linkArtifactRefsHtml(renderMarkdown(text, BOARD_MARKDOWN, 'board')));
+        return highlightMentionsHtml(linkArtifactRefsHtml(renderMarkdown(text, BOARD_MARKDOWN, 'board'), server, team));
     }
     const pass = boardBodyPass();
-    const key = id + ':' + textHash(text) + ':' + _mentionSig; // a change of the board's members draws a body again
+    const key = JSON.stringify([normServer(server), team, id, textHash(text), _mentionSig]); // cached routing metadata belongs to this team, even when another board has identical message IDs and text
     const hit = _boardBodyCache.get(key);
     if (hit && hit.text === text) { hit.pass = pass; return hit.html; }
-    const html = highlightMentionsHtml(linkArtifactRefsHtml(_renderMarkdownUncached(text, BOARD_MARKDOWN, 'board')));
+    const html = highlightMentionsHtml(linkArtifactRefsHtml(_renderMarkdownUncached(text, BOARD_MARKDOWN, 'board'), server, team));
     if (hit) { _boardBodyCache.delete(key); _boardBodyBytes -= hit.bytes; }
-    const bytes = 2 * (text.length + html.length) + BOARD_BODY_ENTRY_OVERHEAD; // UTF-16
+    const bytes = 2 * (key.length + text.length + html.length) + BOARD_BODY_ENTRY_OVERHEAD; // UTF-16
     if (bytes <= BOARD_BODY_ENTRY_MAX_BYTES && makeBoardBodyRoom(bytes, id, pass)) {
         _boardBodyCache.set(key, { id, text, html, bytes, pass });
         _boardBodyBytes += bytes;

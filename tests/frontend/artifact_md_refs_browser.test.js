@@ -51,6 +51,7 @@ const MD_B = '# The plan\n\nSecond file text.';
             check(q.length === 2 && q[0][0] === `coral://artifacts/${A}` && q[1][1] === B, at + 'the question dialog links its references too, the words as written: ' + JSON.stringify(q));
             // a file seen from ANOTHER computer: its references name files on that computer (#12373), not this one
             await ev(`(() => { window.__urls = []; const f = window.fetch; window.fetch = (u, o) => { window.__urls.push(String(u && u.url ? u.url : u)); return f(u, o); }; return true; })()`);
+            await ev(`import(${S} + 'state.js').then(m=>{m.state.servers=[{id:'ws1',label:'Source computer'}];return true;})`);
             await ev(`import(${S} + 'artifact_viewer.js').then(m => { m.openArtifactViewer('${A}', { server: 'ws1', filename: 'notes.md' }); return true; })`);
             await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown a.mb-artifact-ref')`, at + 'the references of a remote file are links', 10000);
             const rl = await ev(`(() => [...document.querySelectorAll('#artifact-viewer .artifact-viewer-markdown a.mb-artifact-ref')].map(a => ({ href: a.getAttribute('href'), server: a.dataset.server || '' })))()`);

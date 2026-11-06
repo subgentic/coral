@@ -67,6 +67,7 @@ function avatar(c) {
  *  size decides sheet(). */
 let panelSeq = 0; // one id per panel (the viewer's and the docked pane's)
 export function attachComments(dialog, body, host, opts = {}) {
+    const sourcePolicy = data => opts.readOnly?.() ? { ...data, canComment: false, canLock: false, reason: 'Open this file from its original team to write comments.', comments: data.comments.map(c => ({ ...c, can: { reply: false, edit: false, delete: false, resolve: false } })) } : data;
     const st = { lifetime: 0, video: null, videoTime: null, groupOpen: {}, series: false, hex: null, server: undefined, board: undefined, source: '', text: false, whole: false, data: null, showResolved: false, active: null, composing: null, busy: false, error: '', ranges: new Map(), orphan: new Set(), gone: false };
     const panel = el('aside', 'pane pane-aside ac-panel'); panel.setAttribute('aria-label', 'Comments'); panel.hidden = true;
     panel.id = `ac-panel-${++panelSeq}`; // the toggle names it (aria-controls): where the opened comments are
@@ -119,7 +120,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (!st.hex || (!st.text && !st.whole)) return;
         const hex = st.hex, gen = ctxGen;
         try {
-            const data = await api.listComments(hex, st.server, st.board, st.series);
+            const data = sourcePolicy(await api.listComments(hex, st.server, st.board, st.series));
             if (hex !== st.hex || gen !== ctxGen) return;
             st.data = data; st.gone = false;
             if (!st.visibilitySet) {
@@ -144,7 +145,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (liveBusyGen === ctxGen || !st.hex || !st.data || (!st.text && !st.whole) || !panel.getClientRects().length) return;
         const gen = ctxGen, hex = st.hex, server = st.server, board = st.board, series = st.series; liveBusyGen = gen;
         try {
-            const data = await api.listComments(hex, server, board, series);
+            const data = sourcePolicy(await api.listComments(hex, server, board, series));
             if (gen !== ctxGen || hex !== st.hex || server !== st.server || board !== st.board || series !== st.series || !st.data || sigOf(data) === sigOf(st.data)) return;
             const added = data.comments.filter(c => !c.deleted).length - st.data.comments.filter(c => !c.deleted).length, top = panel.scrollTop;
             const ta = document.activeElement && document.activeElement.matches?.('.ac-input') && panel.contains(document.activeElement) ? document.activeElement : null, sel = ta ? [ta.selectionStart, ta.selectionEnd, ta.selectionDirection] : null; // the caret of a comment being written

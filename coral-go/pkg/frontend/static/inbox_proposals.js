@@ -4,7 +4,7 @@
 import { importOnce } from './import_once.js';
 const { agentLink } = await importOnce('./agent_link.js');
 import { showToast } from './utils.js';
-import { decisionNeedsPerson, boardTeamKey } from './server_base.js';
+import { decisionNeedsPerson, boardTeamKey, normServer } from './server_base.js';
 import { loadStyles } from './lazy_styles.js';
 const { markHidden } = await importOnce('./visible_marks.js'); // lazy: its failure is retried
 const { proposalItems, pendingProposals, onProposalsChanged, refreshProposals, dismissExpired, decide } = await importOnce('./proposals_state.js'); // lazy: its failure is retried
@@ -108,7 +108,7 @@ export function openProposalDialog(p, mode = 'view') {
     if (decisionNeedsPerson(p.server)) { approve.hidden = rejectOpen.hidden = editOpen.hidden = true; status.textContent = 'This hub cannot sign your decision for that computer: decide it on that computer’s own dashboard.'; }
     row.append(close, rejectOpen, editOpen, approve);
     const carried = [];
-    if (facts.instructions) { const b = el('div', 'proposal-carried'); b.append(el('strong', null, 'Instructions it gives the assignee'), linkArtifactRefsIn(el('pre', 'proposal-pre', markedBlock(facts.instructions)))); carried.push(b); }
+    if (facts.instructions) { const b = el('div', 'proposal-carried'); b.append(el('strong', null, 'Instructions it gives the assignee'), linkArtifactRefsIn(el('pre', 'proposal-pre', markedBlock(facts.instructions)), { server: normServer(p.server) })); carried.push(b); }
     if (facts.outputs.length) { const b = el('div', 'proposal-carried'); b.append(el('strong', null, 'Outputs it requires')); const ul = el('ul', 'proposal-outputs'); for (const o of facts.outputs) ul.append(el('li', null, markedBlock(o))); b.append(ul); carried.push(b); }
     if (facts.also.length) carried.push(el('p', 'proposal-extra', markedBlock(`Also sets: ${facts.also.join('; ')}.`)));
     d.append(h, who, ...parts, ...carried, hidden, reasonRow, status, row);

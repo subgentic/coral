@@ -390,14 +390,14 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
                 <span class="mb-message-time">${_formatTime(m.created_at)}</span>
             </div>
             ${parts.tagsOpen}
-            <div class="mb-message-body" id="${escapeAttr(parts.bodyId)}">${renderBoardMessageBody(m)}</div>
+            <div class="mb-message-body" id="${escapeAttr(parts.bodyId)}">${renderBoardMessageBody(m, _activeBoardChat || '')}</div>
             ${messageAttachmentsHtml(m)}
             ${replyWithHtml(m)}
             ${parts.actions}
         </div>`;
     }).join(''));
     refreshReplies(msgsEl);
-    resolveBoardArtifacts(msgsEl, _activeBoardChat ? splitKey(_activeBoardChat).server : undefined);
+    resolveBoardArtifacts(msgsEl, _activeBoardChat ? splitKey(_activeBoardChat).server : undefined, _activeBoardChat || '');
     if (wasAtBottom) msgsEl.scrollTop = msgsEl.scrollHeight;
     msgsEl.dataset.rendered = '1';
     _syncScopeNote();

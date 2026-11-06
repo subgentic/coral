@@ -1,0 +1,19 @@
+import assert from 'node:assert/strict';import test from 'node:test';import fs from 'node:fs';import {installDom,importUi,STATIC} from './helpers/jsdom_env.mjs';
+const dom=installDom({mode:'cloud'});dom.window.eval(fs.readFileSync(STATIC+'vendor/marked.min.js','utf8'));globalThis.marked=dom.window.marked;dom.window.eval(fs.readFileSync(STATIC+'vendor/purify.min.js','utf8'));globalThis.DOMPurify=dom.window.DOMPurify;
+const hex='c'.repeat(64);globalThis.fetch=window.fetch=async url=>Response.json(String(url).includes('/resolve')?{refs:[{ref:'cccccccc',id:hex}]}:{});
+const {renderBoardMessageBody}=await importUi('board_message_text');const {upgradeShortArtifactRefs}=await importUi('short_artifact_refs');
+test('message references carry their own team computer and board, not selected-page context',()=>{const m={id:918,content:'Please read coral://artifacts/'+hex};for(const team of ['@ws1/dev','@ws2/dev','dev']){const root=document.createElement('div');root.innerHTML=renderBoardMessageBody(m,team);const a=root.querySelector('a.mb-artifact-ref');assert.ok(a);assert.equal(a.dataset.server,team.startsWith('@')?team.slice(1,4):'local');assert.equal(a.dataset.board,team);}});
+test('short local-store references carry their message source before any binding callback',async()=>{const root=document.createElement('div');root.innerHTML='<div class="mb-message-body">Read coral://artifacts/cccccccc</div>';document.body.append(root);try{await upgradeShortArtifactRefs(root,'local',null,'local-team');const a=root.querySelector('a.mb-artifact-ref');assert.ok(a);assert.equal(a.dataset.artifact,hex);assert.equal(a.dataset.server,'local');assert.equal(a.dataset.board,'local-team');}finally{root.remove();}});
+test('message-authored anchor routing attributes cannot choose a computer',()=>{
+  const content='<a href="coral://artifacts/'+hex+'" data-server="ws2" data-board="@ws2/forged">Open file</a>';
+  const root=document.createElement('div');
+  root.innerHTML=renderBoardMessageBody({id:919,content},'@ws1/dev');
+  // Board Markdown permits sanitized anchors: the label remains, but routing
+  // attributes supplied by the author must not survive into the DOM.
+  const a=root.querySelector('a');
+  assert.ok(a);
+  assert.equal(a.textContent,'Open file');
+  assert.equal(a.getAttribute('href'),'coral://artifacts/'+hex);
+  assert.equal(root.querySelector('[data-server], [data-board]'),null);
+});
+test.after(()=>dom.window.close());

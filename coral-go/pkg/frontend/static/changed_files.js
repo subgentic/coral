@@ -434,7 +434,7 @@ function splitPath(filepath) {
 export function openFilePreview(filepath, line, opts) {
     if (!state.currentSession || state.currentSession.type !== 'live') return;
     if (/^coral:\/\/artifacts\/[a-f0-9]{64}$/i.test(filepath || '')) {
-        openArtifactTab(filepath, { phoneFull: true });
+        openArtifactTab(filepath, { server: sessionServer(state.currentSession), phoneFull: true });
         return;
     }
     openPreviewTab(filepath, line, opts);

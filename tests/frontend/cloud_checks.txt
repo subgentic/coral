@@ -358,8 +358,16 @@ node cloud_account_flags.test.mjs
 node artifact_edit_send_api.test.mjs
 node artifact_edit_send.test.mjs
 node artifact_edit_send_viewer.test.mjs
+node artifact_viewer_one_computer.test.mjs
 node ask_subject_links.test.mjs
 
 node operator_ask_wake_source.test.mjs
 
 node guide_roster_source.test.mjs
+node artifact_source.test.mjs
+
+node artifact_viewer_callers.test.mjs
+
+node artifact_message_source.test.mjs
+
+node artifact_inventory_wait.test.mjs

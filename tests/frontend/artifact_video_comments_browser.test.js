@@ -64,6 +64,7 @@ const HEX = '9'.repeat(64), OLD = '8'.repeat(64);
      if(url.includes('/api/artifacts/${HEX}')){const r=new Response(bytes,{headers:{'Content-Type':'video/webm'}});Object.defineProperty(r,'url',{value:window.__videoURL});return r;}
      return real(u,o);
     };
+    if(${cloud}){const st=await import((window.__coralStatic||'/static/')+'state.js');st.state.servers=[{id:'video-remote',label:'Video computer'}];}
     const v=await import((window.__coralStatic||'/static/')+'artifact_viewer.js');v.openArtifactViewer('${HEX}',{filename:'review.webm',mediaType:'video/webm',board:'team-a',server:${cloud?"'video-remote'":"undefined"}});
    })()`);
    await waitFor(`!!document.querySelector('#artifact-viewer video')`,'video');

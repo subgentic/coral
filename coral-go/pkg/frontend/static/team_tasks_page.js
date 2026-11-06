@@ -1,7 +1,7 @@
 /* The team page's Tasks tab and a task's page (#7453): the right panel's Tasks tab moves here. The tab is a table of the whole team's tasks (Task, State, Assigned to, Goal, Priority) under filter chips with counts; a row's title opens the
  * task's own page (state, who, goal as a link, priority, description, when it started and ended), with a back link to the Tasks list and a pinned bar. Everything drawn is built with the DOM and
  * textContent: titles, bodies and names are written by agents. The task's own actions (Edit, Complete, Cancel, Publish, Nudge) stay in the task dialog for now ("Task actions"): they move onto this page with the Tasks build. Lazy: team_page.js imports it. */
-import { boardFetch, pathId, serverUrl, splitKey, remoteServer, inTeam, keyLabel } from './server_base.js';
+import { boardFetch, pathId, serverUrl, splitKey, inTeam, keyLabel } from './server_base.js';
 import { browserLocal } from './safe_storage.js';
 import { pollEvery } from './overload.js';
 import { whenText } from './when_text.js';
@@ -434,7 +434,7 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
     }
     page.append(factsOf(task, ctx));
  if (task.version) { const versions = el('div', 'task-version-slot'); page.append(versions); importOnce('./task_versions.js').then(m => m.taskVersionHistory(ctx.project, task, acts.reload)).then(section => { if (versions.isConnected) versions.append(section); }).catch(() => {}); }
-    if (task.body) { const b = el('div', 'team-task-body'), doc = Object.assign(el('pre', 'team-task-text'), { textContent: task.body }); linkArtifactRefsIn(doc, { server: ctx && ctx.project ? remoteServer(ctx.project) : undefined }); b.append(el('h3', 'goals-sub', 'Description'), doc); page.append(b); renderTaskText(doc, task.body, ctx && ctx.project ? remoteServer(ctx.project) : undefined); }
+    if (task.body) { const b = el('div', 'team-task-body'), doc = Object.assign(el('pre', 'team-task-text'), { textContent: task.body }); linkArtifactRefsIn(doc, { server: ctx && ctx.project ? splitKey(ctx.project).server : undefined }); b.append(el('h3', 'goals-sub', 'Description'), doc); page.append(b); renderTaskText(doc, task.body, ctx && ctx.project ? splitKey(ctx.project).server : undefined); }
     const followUps = followUpsSection(task, ctx); if (followUps) page.append(followUps);
     Promise.all([importOnce('./task_detail_html.js'), importOnce('./task_list.js')]).then(([m, list]) => { // the dialog's other sections, escaped as it escaped them
         if (!page.isConnected) return;
@@ -499,7 +499,7 @@ function factsOf(task, ctx) {
     if (task.completed_at) fact(dl, 'Finished', whenText(task.completed_at));
     if (task.completed_by) fact(dl, task.status === 'skipped' ? 'Cancelled by' : 'Finished by', task.completed_by);
     if (task.workflow && task.workflow.outcome === 'failed') fact(dl, 'Outcome', 'Failed'); // the dialog's "Result: Failed"
-    if (task.completion_message) fact(dl, 'Result', linkedText(task.completion_message, { server: ctx && ctx.project ? remoteServer(ctx.project) : undefined }));
+    if (task.completion_message) fact(dl, 'Result', linkedText(task.completion_message, { server: ctx && ctx.project ? splitKey(ctx.project).server : undefined }));
     else if (task.workflow && task.workflow.outcome === 'failed') fact(dl, 'Result details', 'No failure reason was provided.');
     return dl;
 }

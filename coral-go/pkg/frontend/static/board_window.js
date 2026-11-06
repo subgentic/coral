@@ -2,7 +2,7 @@
 import { importOnce } from './import_once.js';
 import { fetchMessages, PAGE_SIZE, mergeMessages } from './board_fetch.js';
 import { isBusyStatus, busyRetryingText, machineOf, afterPause } from './overload.js';
-import { isCloud, keyLabel } from './server_base.js';
+import { isCloud, keyLabel, splitKey } from './server_base.js';
 import { nameSaveButton, aboutRow, BOARD_SAVE_BUTTON } from './saved_marks.js';
 import { renderTaskQueueRun, groupTaskQueueRuns } from './board_system_lines.js';
 const { threadItems, hasThreads, answersLoaded } = await importOnce('./board_threads.js'); // a part of the board page's group: loaded with it
@@ -14,7 +14,6 @@ import { rowParts, toggleRow, revealRow, sameDay, dayDividerHtml, refreshReplies
 import { messageTimeHtml } from './message_time.js';
 import { messageAttachmentAttrs, messageAttachmentsHtml } from './board_attachments.js';
 import { resolveBoardArtifacts } from './board_artifacts.js';
-import { state } from './state.js';
 import { scrollBehavior } from './motion.js';
 import { highlightBoard } from './board_search.js';
 
@@ -184,7 +183,7 @@ function renderBoardItem(item, prev) {
                 <button type="button" class="mb-msg-more ic-more" data-on-click="mb-msg-more" aria-haspopup="dialog" title="Message actions" aria-label="${escapeAttr(moreLabel)}"></button>
             </div>
             ${parts.tagsOpen}
-            <div class="mb-message-body" id="mbd-${Number(m.id)}">${renderBoardMessageBody(m)}</div>
+            <div class="mb-message-body" id="mbd-${Number(m.id)}">${renderBoardMessageBody(m, bs.currentProject || '')}</div>
             ${messageAttachmentsHtml(m)}
             ${replyWithHtml(m)}
             ${parts.actions}
@@ -242,7 +241,7 @@ function prependEarlier(container, count) {
     first.className = first.className.replace(/mb-message-(first|grouped)/, grouped ? 'mb-message-grouped' : 'mb-message-first'); // in place: the same class order as a whole render
     const lead = first.previousElementSibling && first.previousElementSibling.classList.contains('mb-day') ? first.previousElementSibling : first; // the day line above the first row stays above the new rows
     lead.before(tmp.content);
-    for (const el of added) { nameBoardButtons(el); resolveBoardArtifacts(el, state.currentBoardServer); }
+    for (const el of added) { nameBoardButtons(el); resolveBoardArtifacts(el, splitKey(bs.currentProject || '').server, bs.currentProject || ''); }
     updateBoardHeader(container);
     return true; // (renderMessages draws the day dividers after it)
 }
@@ -329,7 +328,7 @@ export function renderMessages(messages, { keepAnchor = false, prepended = 0 } =
         const items = threadItems(groupTaskQueueRuns(messages, !isSelectMode()));
         container.innerHTML = boardHeaderHtml() + items.map((item, i) => renderBoardItem(item, i > 0 ? items[i - 1] : null)).join('');
         nameBoardButtons(container);
-        resolveBoardArtifacts(container, state.currentBoardServer);
+        resolveBoardArtifacts(container, splitKey(bs.currentProject || '').server, bs.currentProject || '');
     }
     syncDays(container);
     refreshReplies(container);
@@ -399,7 +398,7 @@ export function appendNewMessages(count) {
     tmp.innerHTML = items.map((item, i) => renderBoardItem(item, i > 0 ? items[i - 1] : prev)).join('');
     const added = [...tmp.content.children];
     if (replace) replace.replaceWith(tmp.content); else container.appendChild(tmp.content);
-    for (const el of added) { nameBoardButtons(el); resolveBoardArtifacts(el, state.currentBoardServer); }
+    for (const el of added) { nameBoardButtons(el); resolveBoardArtifacts(el, splitKey(bs.currentProject || '').server, bs.currentProject || ''); }
     if (wasAtBottom) trimBoardWindow(container);
     syncDays(container);
     refreshReplies(container);
