@@ -1,7 +1,8 @@
 /* A guide's name on their posts (#11457, the guide role): a guide is a person with a guide grant on ONE board; their board messages come with origin "hub_guide", subscriber_id and hub_user = their Coral Hub label
  * (hub-user-xxxxxxxx), and content that starts with the wrapper "[Guide <name> via Coral Hub, hub-user-xxxxxxxx] " (the name the roster had when it was written, else "a guide"). The Board shows who wrote it: the roster's
  * name now (the owner's GET /api/board/{project}/guide-roster, read once per board while the page lives; refused for anyone else), else the name in the wrapper, else "Guide hub-user-xxxxxxxx", with a "guide" tag so a
- * guide's post is never taken for the manager's or an agent's; the text is what comes after the wrapper. No imports: the board's renderers and the tests read it. */
+ * guide's post is never taken for the manager's or an agent's; the text is what comes after the wrapper. The board's renderers and the tests read it. */
+import { boardFetch } from './server_base.js';
 const WRAP = /^\[Guide ([^\]]*?) via Coral Hub, (hub-user-[0-9a-f]{8})\] /;
 const LABEL = /^hub-user-[0-9a-f]{8}$/;
 const roster = new Map();      // board -> { label: name }
@@ -20,7 +21,7 @@ export function ensureGuideRoster(board) {
     const key = String(board || '');
     if (!key || asked.has(key)) return;
     asked.add(key);
-    fetch(`/api/board/${encodeURIComponent(key)}/guide-roster`, { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(j => { if (j && j.roster && typeof j.roster === 'object') setGuideRoster(key, j.roster); }).catch(() => {});
+    boardFetch(key, '/guide-roster', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(j => { if (j && j.roster && typeof j.roster === 'object') setGuideRoster(key, j.roster); }).catch(() => {});
 }
 
 /** Who wrote it: the roster's name, else the wrapper's, else "Guide hub-user-xxxxxxxx". */

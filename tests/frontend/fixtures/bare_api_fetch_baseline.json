@@ -25,10 +25,6 @@
       "count": 8,
       "reason": "the Analytics page is this computer's: every one of its cost routes is a bare path, and the page has no computer switch"
     },
-    "guide_names.js": {
-      "count": 1,
-      "reason": "a guide's roster is the Hub's own route (the guide role is a Hub grant on a board), read by the owner there"
-    },
     "job_form.js": {
       "count": 5,
       "reason": "Automations (scheduled jobs and workflows) run on this computer: the page has no server for them"
@@ -36,10 +32,6 @@
     "needs_skills.js": {
       "count": 1,
       "reason": "by design, Hub: not enabled (Skills Store stays on the computer in v1)"
-    },
-    "operator_asks.js": {
-      "count": 2,
-      "reason": "waking a member is offered only on a question of this computer (fromAnotherComputer hides its buttons)"
     },
     "received_cap_notice.js": {
       "count": 1,

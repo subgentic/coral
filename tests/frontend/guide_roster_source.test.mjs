@@ -1,0 +1,8 @@
+// #13863 amendment: roster names are read from the team's computer and cached by qualified team key.
+import assert from 'node:assert/strict';import test from 'node:test';import {installDom,importUi} from './helpers/jsdom_env.mjs';
+const dom=installDom({mode:'cloud'});let calls=[];
+globalThis.fetch=window.fetch=async url=>{const path=String(url);calls.push(path);if(path.includes('refused'))return Response.json({error:'Denied'},{status:403});return Response.json({roster:{'hub-user-1234abcd':path.startsWith('/api/remote/m1/')?'Remote guide':'Local guide'}});};
+const {ensureGuideRoster,guideName}=await importUi('guide_names');const post={origin:'hub_guide',hub_user:'hub-user-1234abcd',content:'[Guide Wrapper name via Coral Hub, hub-user-1234abcd] Hello'};
+test('remote and local boards with the same name get their own current guide names',async()=>{ensureGuideRoster('@m1/team a');ensureGuideRoster('team a');await new Promise(r=>setImmediate(r));assert.deepEqual(calls,['/api/remote/m1/api/board/team%20a/guide-roster','/api/board/team%20a/guide-roster']);assert.equal(guideName(post,'@m1/team a'),'Remote guide');assert.equal(guideName(post,'team a'),'Local guide');ensureGuideRoster('@m1/team a');assert.equal(calls.length,2,'one read per qualified team');});
+test('a refused roster preserves the wrapper name without retrying locally',async()=>{calls=[];ensureGuideRoster('@m1/refused');await new Promise(r=>setImmediate(r));assert.deepEqual(calls,['/api/remote/m1/api/board/refused/guide-roster']);assert.equal(guideName(post,'@m1/refused'),'Wrapper name');});
+test.after(()=>dom.window.close());
