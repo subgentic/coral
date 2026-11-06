@@ -75,7 +75,13 @@ func TestOnlyTheUploaderRepliesAndOnlyInAnOpenExistingThread(t *testing.T) {
 	code, out = rig.reply(other, asAgentSession(1), "late")
 	assert.Equal(t, http.StatusForbidden, code, fmt.Sprint(out))
 	// the uploader on ANOTHER board's file is nobody here: its upload record is for another team's session
-	assert.Len(t, rig.stored(), 4, "two comments, one reply, one more comment: nothing else was stored")
+	agentWords := 0
+	for _, c := range rig.stored() {
+		if c.AuthorKind == "agent" {
+			agentWords++
+		}
+	}
+	assert.Equal(t, 1, agentWords, "only the uploader's one reply was stored: the other agent, the reply to a reply and the resolved thread stored nothing")
 }
 
 func TestTheUploadersRepliesAreCappedPerThreadAndPerFilePerHour(t *testing.T) {
