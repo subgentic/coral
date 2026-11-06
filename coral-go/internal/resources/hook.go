@@ -197,7 +197,9 @@ func (h *Hook) giveBack(keys []holdKey, why string) {
 
 // sweepHands gives back the hand claims that have ended and whose work is gone, and forgets those whose slot or place is no longer there (a lease ran out, a person kicked it).
 func (h *Hook) sweepHands() {
-	procs, known := h.handsWork(func(b handBind) bool { return b.ended })
+	// The process list is read when some bound claim has a shell to look at: an ended one asks whether its work is gone, a live one whether its work still runs (the lease is kept alive by it, #13951).
+	procs, known := h.handsWork(func(b handBind) bool { return b.shell > 1 })
+	now := h.o.Now()
 	h.mu.Lock()
 	var gone []holdKey
 	for k, b := range h.hand {
@@ -206,8 +208,19 @@ func (h *Hook) sweepHands() {
 			delete(h.hand, k)
 			continue
 		}
-		if st, err := h.m.Queue().Status(k.resource); err != nil || !hasEntry(st, k.agent) {
+		st, err := h.m.Queue().Status(k.resource)
+		if err != nil || !hasEntry(st, k.agent) {
 			delete(h.hand, k)
+			continue
+		}
+		// A claim whose work is still going stays held (#13951, the Hub Lead's 2 h pre-run kept running after its lease lapsed and the queue showed the mini free): while the work the claim's call started under its shell
+		// is alive, the lease is renewed, up to the longest a heavy run is kept. A claim whose work is gone, or that never had a shell to look at, is left to its lease as before.
+		if known && b.shell > 1 && b.workRuns(procs) {
+			for _, e := range st.Holders {
+				if e.Agent == k.agent && !e.Granted.IsZero() && now.Sub(e.Granted) <= remoteCap {
+					_, _ = h.m.Queue().Renew(k.resource, k.agent)
+				}
+			}
 		}
 	}
 	h.mu.Unlock()
