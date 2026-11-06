@@ -27,8 +27,19 @@ func (h *SessionsHandler) starArtifactRoute(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	var err error
+	seriesID := ""
+	if sid, _, ok := digestSeries(h.cfg.CoralDir(), id); ok { // the series of the digest's first upload record, as the lists find it (#13910)
+		seriesID = sid
+	}
 	if r.Method == http.MethodDelete {
 		_, err = h.db.ExecContext(r.Context(), "DELETE FROM artifact_stars WHERE hex = ?", id)
+		if err == nil && seriesID != "" { // the star follows the series, so an unstar clears every version's: the document is no longer pinned. The same bytes in another team's series are another series and stay as they are.
+			for _, m := range seriesMembers(h.cfg.CoralDir(), seriesID) {
+				if _, err = h.db.ExecContext(r.Context(), "DELETE FROM artifact_stars WHERE hex = ?", m.Digest); err != nil {
+					break
+				}
+			}
+		}
 	} else {
 		if _, statErr := os.Stat(filepath.Join(h.cfg.CoralDir(), "artifacts", "objects", id)); statErr != nil {
 			errNotFound(w, "artifact not found")
@@ -43,5 +54,9 @@ func (h *SessionsHandler) starArtifactRoute(w http.ResponseWriter, r *http.Reque
 	if h.bs != nil {
 		h.bs.NoteAllArtifactsChanged()
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"id": id, "starred": r.Method != http.MethodDelete})
+	out := map[string]any{"id": id, "starred": r.Method != http.MethodDelete}
+	if seriesID != "" {
+		out["series_id"] = seriesID
+	}
+	writeJSON(w, http.StatusOK, out)
 }

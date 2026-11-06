@@ -233,6 +233,25 @@ func (s *Store) ListTeamArtifactTasksQuery(ctx context.Context, q TeamArtifactQu
 	return tasks, truncated, nil
 }
 
+// StarredArtifactTimes is the artifacts the Operator starred with the time of each star (RFC 3339), for the series-following star (#13910). Empty when the sessions database is not attached.
+func (s *Store) StarredArtifactTimes(ctx context.Context) (map[string]string, error) {
+	out := map[string]string{}
+	if s.sessionsDB == nil {
+		return out, nil
+	}
+	var rows []struct {
+		Hex string `db:"hex"`
+		At  string `db:"starred_at"`
+	}
+	if err := s.sessionsDB.SelectContext(ctx, &rows, "SELECT hex, starred_at FROM artifact_stars"); err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		out[r.Hex] = r.At
+	}
+	return out, nil
+}
+
 // StarredArtifactIDs is the set of artifact ids (64 hex) the Operator starred (the artifact_stars table of the main sessions database, #9819). Empty when that database is not attached.
 func (s *Store) StarredArtifactIDs(ctx context.Context) (map[string]bool, error) {
 	starred := map[string]bool{}
