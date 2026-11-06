@@ -24,7 +24,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
                 const mk = (n, name, tags) => ({ id: String(n).padStart(64, '0'), name, media_type: 'text/plain', size: 30, created_at: new Date(Date.now() - n * 60000).toISOString(), tags, available: true, uri: 'coral://artifacts/' + String(n).padStart(64, '0') });
                 const arts = ${JSON.stringify(scenario)} === 'read' ? [mk(1, 'Details rail.md', ['for review', 'read']), mk(2, 'Files panel.md', ['for review', 'read'])] : [mk(1, 'Details rail.md', ['for review', 'read']), mk(2, 'Files panel.md', ['for review'])];
                 const original = window.fetch, json = (body, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }));
-                window.fetch = (url, opts = {}) => { const u = window.__reviewFixtureURL(String(url), location.origin);
+                window.fetch = (url, opts = {}) => { const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, {'${team}': arts}) : null; if (reviewPage) return json(reviewPage); const u = window.__reviewFixtureURL(String(url), location.origin);
                     if (u.pathname === '/api/board/${team}/artifacts') return json({ project: '${team}', artifacts: arts, has_more: false });
                     return original(url, opts); };
                 window.__m.agents = {}; return true; })()`);

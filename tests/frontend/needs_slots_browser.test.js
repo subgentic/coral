@@ -24,7 +24,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 const hex = n => n.toString(16).padStart(64, '0'), ago = m => new Date(Date.now() - m * 60000).toISOString();
                 const item = (i, extra) => ({ id: hex(i), name: 'file-' + i + '.png', media_type: 'image/png', size: 30, created_at: ago(30 + i), source: 'upload', available: true, tags: ['for review'], uploader: 'Frontend Dev', question: 'Approve file ' + i + '?', ...extra });
                 const items = [item(1, { tags: ['for review', 'read'] }), item(2, {}), item(3, { starred: true }), item(4, {}), item(5, { tags: ['for review', 'read'], starred: true })];
-                window.fetch = (url, opts = {}) => { const u = window.__reviewFixtureURL(String(url), location.origin), method = (opts.method || 'GET').toUpperCase();
+                window.fetch = (url, opts = {}) => { const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, {'${team}': items}) : null; if (reviewPage) return json(reviewPage); const u = window.__reviewFixtureURL(String(url), location.origin), method = (opts.method || 'GET').toUpperCase();
                     if (method === 'GET' && u.pathname === '/api/board/${team}/artifacts') return json({ project: '${team}', artifacts: items.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))), has_more: false });
                     if (u.pathname === '/api/operator-asks') return json([{ board: '${team}', kind: 'ask', id: 41, asker: 'Lead', text: 'Which port should the test server use?', at: ago(20) }]);
                     return original(url, opts); };

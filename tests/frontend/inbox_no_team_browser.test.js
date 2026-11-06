@@ -24,6 +24,9 @@ const BASE = require('./test_base').BASE;
                     const target = ${remote ? "'/api/remote/solo-pc'" : "''"};
                     const p = u.pathname.startsWith(target) ? u.pathname.slice(target.length) : u.pathname;
                     const item = {id:'${'ab'.repeat(32)}',name:'Solo report.txt',team:'No team',board_id:'~no-team',available:true,media_type:'text/plain',size:12,created_at:new Date().toISOString(),produced_by:'Solo writer',session_id:'solo',tags:window.__soloTags,review_question:'Is this ready to ship?'};
+                    const originalURL = new URL(String(url), location.href);
+                    if (originalURL.pathname === target + '/api/team-artifacts') { window.__soloReads.push(originalURL.pathname); return json(window.__reviewFixturePage(originalURL, location.href, {'~no-team':{team:'No team',artifacts:[item]}})); }
+                    if (${remote} && originalURL.pathname === '/api/team-artifacts') return json(window.__reviewFixturePage(originalURL, location.href, {}));
                     if (p.endsWith('/comments')) return json({comments:[],you:{can_comment:true,can_lock:true},locked:false});
                     if (p === '/api/board/projects') return json([]);
                     if (${remote} && u.pathname === '/api/team-artifacts') return json({artifacts:[],has_more:false});

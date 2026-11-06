@@ -26,7 +26,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 const hex = n => n.toString(16).padStart(64, '0'), made = n => new Date(Date.now() - n * 3600000).toISOString();
                 const item = (n, name, extra) => ({ id: hex(n), name, media_type: 'text/html', size: 30, created_at: made(n), source: 'upload', available: true, tags: ['for review', 'internal'], uri: 'coral://artifacts/' + hex(n), ...extra });
                 const items = { '${t1}': [item(1, 'checkout-mockup.html', { task_id: 5, task_title: 'Review the mockup', session_id: 'writer-a', produced_by: 'Lead Developer' }), item(2, 'guide-role-design.html', { session_id: 'writer-b', produced_by: 'Frontend\\u202e Dev\\u200b' })], '${t2}': [item(3, 'orphan-notes.html', { produced_by: null, session_id: null })] };
-                window.fetch = (url, opts = {}) => { const u = window.__reviewFixtureURL(String(url), location.origin), m = u.pathname.match(/^\\/api\\/board\\/([^/]+)\\/artifacts$/);
+                window.fetch = (url, opts = {}) => { const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, items) : null; if (reviewPage) return json(reviewPage); const u = window.__reviewFixtureURL(String(url), location.origin), m = u.pathname.match(/^\\/api\\/board\\/([^/]+)\\/artifacts$/);
                     if (m && items[m[1]]) return json({ project: m[1], artifacts: !u.searchParams.has('tag') || u.searchParams.get('tag') === 'for review' ? items[m[1]] : [], has_more: false });
                     return original(url, opts); };
                 return true; })()`);
