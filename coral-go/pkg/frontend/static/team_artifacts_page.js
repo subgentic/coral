@@ -131,9 +131,15 @@ export function createArtifactsList({ inbox = false } = {}) {
         say(`${on ? 'Starred' : 'Unstarred'} ${name}`);
     }
 
-    function deleteArtifact(hex, name, size) {
+    /** How many teams hold the file's bytes, from the owner's metadata (held_by_teams, 2 or more, #13949); 0 when the read fails or says nothing: the confirmation then stays as it was. */
+    async function heldByTeams(hex) {
+        try { const r = await serverFetch(server(), `/api/artifacts/${hex}/meta`); if (!r.ok) return 0; const n = Number((await r.json()).held_by_teams); return Number.isInteger(n) && n >= 2 ? n : 0; } catch { return 0; }
+    }
+
+    async function deleteArtifact(hex, name, size) {
+        const held = await heldByTeams(hex), also = held >= 2 ? ` This file is also in ${held - 1} other team${held - 1 === 1 ? '' : 's'}; deleting it removes it there too.` : '';
         window.showConfirmModal?.('Delete artifact',
-            `Delete ${name}${size ? ` (${size})` : ''}? It is removed from Coral, and links to it in board posts and task results will show "unavailable". A copy a browser already cached may remain. This can't be undone.`,
+            `Delete ${name}${size ? ` (${size})` : ''}? It is removed from Coral, and links to it in board posts and task results will show "unavailable".${also} A copy a browser already cached may remain. This can't be undone.`,
             async () => {
                 try {
                     const r = await serverFetch(server(), `/api/artifacts/${hex}`, { method: 'DELETE' });
