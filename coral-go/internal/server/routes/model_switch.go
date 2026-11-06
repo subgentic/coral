@@ -176,7 +176,7 @@ func (h *SessionsHandler) SwitchModel(w http.ResponseWriter, r *http.Request) {
 	}
 	if !humanInputCaller(r) {
 		writeError( // a person's choice: an agent or an API key does not change what another agent runs
-			w, http.StatusForbidden, "operator_only", "only the operator can switch an agent's model")
+			w, http.StatusForbidden, "operator_only", modelSwitchRefusal)
 		return
 	}
 	ls, status, message := h.validateExactLiveTarget(r.Context(), name, body.AgentType, body.SessionID, false)
@@ -515,3 +515,7 @@ func (h *SessionsHandler) addModelSwitch(entry map[string]any, sessionID string)
 		entry["model_switch"] = sw
 	}
 }
+
+// modelSwitchRefusal is what a caller that is not a person gets (#13761). Through the self-hosted Hub the person IS the operator, but this computer sees the Hub's key unless the Hub has signed the click for it: so the
+// words say what this computer needs, not that "only the operator" may. The Hub's page puts the computer's name in front of them.
+const modelSwitchRefusal = "this computer changes an agent's model or thinking level only for a person at its own dashboard, or at a Hub that has set up approvals for it and a Coral new enough to take it: open this computer's own dashboard, or open this computer's page in the Hub, set up approvals and update it"

@@ -349,3 +349,4 @@ node artifact_markdown_model.test.mjs
 node artifact_markdown_api.test.mjs
 node artifact_markdown_editor.test.mjs
 node artifact_markdown_viewer.test.mjs
+node model_chip_refused.test.mjs
