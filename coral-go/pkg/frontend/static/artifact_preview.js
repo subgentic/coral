@@ -115,13 +115,13 @@ function _renderManifest(body, manifest, filename, ctx, server) {
     // Entries open as their own tabs so the collection stays available.
     body.querySelectorAll('.artifact-manifest-open').forEach(button => button.addEventListener('click', () => {
         const entry = manifest.entries[Number(button.dataset.manifestIndex)];
-        if (entry) ctx.openEntry(entry);
+        if (entry) ctx.openEntry(entry, server);
     }));
     body.querySelector('.artifact-manifest-raw')?.addEventListener('click', () => {
-        ctx.renderContent(body, manifest.raw, filename);
+        ctx.renderContent(body, manifest.raw, filename, server);
         const back = document.createElement('button');
         back.type = 'button'; back.className = 'back-link artifact-manifest-back'; back.textContent = 'Back to file collection';
-        back.addEventListener('click', () => _renderManifest(body, manifest, filename, ctx));
+        back.addEventListener('click', () => _renderManifest(body, manifest, filename, ctx, server));
         body.prepend(back);
     });
     body.querySelector('.artifact-manifest-download-raw')?.addEventListener('click', () => {
@@ -182,7 +182,7 @@ export function resolveArtifactSource(uri, options = {}) {
 
 /**
  * Render an artifact into `body`.
- * ctx: { signal, isStale(), renderContent(body, content, path, server), openEntry({name, uri, media_type}),
+ * ctx: { signal, isStale(), renderContent(body, content, path, server), openEntry({name, uri, media_type}, server),
  *        setMeta({ title, filename }), typeResolved?({ mediaType, filename }), typeKnown?(entries|null) }  (typeKnown: once, when the kind is known: the files of a manifest, so a Download can name the file and not the manifest (#9925), or null for any other artifact; a host with a Download offers none before it, #9941)
  */
 export async function renderArtifact(body, uri, options, ctx) {

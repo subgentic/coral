@@ -441,7 +441,7 @@ async function _render(tab) {
                 else _renderContentView(el, content, path, 0, false);
                 if (comments && current()) comments.docRendered(content, true); // text the comments apply to (#5311)
             },
-            openEntry: (entry) => openArtifactTab(entry.uri, { filename: entry.name, mediaType: entry.media_type }),
+            openEntry: (entry, server) => openArtifactTab(entry.uri, { server, board: tab.options?.board, filename: entry.name, mediaType: entry.media_type }),
             setMeta: ({ title }) => { tab.title = title; _renderTabs(); },
             // the kind is known: the toolbar's Download is its one file for a manifest, none for several (#9925), the artifact's own link otherwise; before this there is none (#9941)
             typeKnown: (entries) => { tab.manifestDownload = entries ? (manifestDownload(entries, tab.options?.server) || false) : null; _renderToolbar(tab); },

@@ -1,0 +1,139 @@
+{
+  "goal_view.js": {
+    "calls": {
+      "linkedText": 1,
+      "linkArtifactRefsIn": 1,
+      "renderGoalText": 1
+    },
+    "policy": "named",
+    "decision": "Goal description and Done when use splitKey(model.project).server, including local."
+  },
+  "preview_pane.js": {
+    "calls": {
+      "linkArtifactRefsIn": 1,
+      "openArtifactTab": 1
+    },
+    "policy": "named",
+    "decision": "Rendered files receive the bytes source server; manifest children receive that resolved server explicitly."
+  },
+  "board_artifacts.js": {
+    "calls": {
+      "resolveBoardArtifacts": 1
+    },
+    "policy": "forwarded",
+    "decision": "Short-reference upgrades rebind using the same board source; viewer opener normalizes known local explicitly."
+  },
+  "goal_text.js": {
+    "calls": {
+      "linkArtifactRefsIn": 1
+    },
+    "policy": "forwarded",
+    "decision": "Generic renderer forwards its optional server. Its production callers are separately pinned as named; a new caller without one is intentionally unattributed."
+  },
+  "artifact_comments.js": {
+    "calls": {
+      "linkArtifactRefsIn": 1
+    },
+    "policy": "named",
+    "decision": "Comment text carries the comments panel snapshot st.server."
+  },
+  "changed_files.js": {
+    "calls": {
+      "openArtifactTab": 1
+    },
+    "policy": "named",
+    "decision": "Live-chat artifact Open names sessionServer(state.currentSession); this path only accepts the active live session."
+  },
+  "inbox_proposals.js": {
+    "calls": {
+      "linkArtifactRefsIn": 1
+    },
+    "policy": "named",
+    "decision": "Proposal instructions use normServer(p.server); legacy local records are explicitly local."
+  },
+  "team_tasks_page.js": {
+    "calls": {
+      "linkArtifactRefsIn": 2,
+      "linkedText": 1
+    },
+    "policy": "conditional",
+    "decision": "Known ctx.project uses splitKey(...).server, including local. Legacy no-project text is deliberately unattributed/read-only in a multi-computer context."
+  },
+  "artifact_viewer.js": {
+    "calls": {
+      "linkArtifactRefsIn": 1
+    },
+    "policy": "named",
+    "decision": "Document text gets the frozen viewer server supplied by renderArtifact."
+  },
+  "artifact_refs.js": {
+    "calls": {
+      "linkedText": 1
+    },
+    "policy": "forwarded",
+    "decision": "Text splitting preserves optional source; delegated opener marks missing source unattributed. Hub inference is read-only; plain local Coral remains writable."
+  },
+  "board_message_text.js": {
+    "calls": {
+      "linkArtifactRefsHtml": 2
+    },
+    "policy": "board-bound",
+    "decision": "Sanitized message HTML defaults to currentBoardServer; Board window/chat subsequently bind every artifact to their own source before interaction."
+  },
+  "goal_editor.js": {
+    "calls": {
+      "renderGoalText": 1
+    },
+    "policy": "named",
+    "decision": "New-goal preview names splitKey(project).server."
+  },
+  "board_chat.js": {
+    "calls": {
+      "resolveBoardArtifacts": 1
+    },
+    "policy": "conditional",
+    "decision": "Board chat binds with splitKey(_activeBoardChat).server. The no-active-chat fallback is local; no remote feed is active then."
+  },
+  "team_task_artifacts.js": {
+    "calls": {
+      "openArtifactTab": 1
+    },
+    "policy": "named",
+    "decision": "Task inline previews name their captured server and board."
+  },
+  "board_window.js": {
+    "calls": {
+      "resolveBoardArtifacts": 3
+    },
+    "policy": "named",
+    "decision": "Board feeds bind artifact links after insertion with state.currentBoardServer."
+  },
+  "task_detail_html.js": {
+    "calls": {
+      "linkedHtml": 1
+    },
+    "policy": "page-context",
+    "decision": "Classic task-detail text names contextServer at render time; source is the open task page computer."
+  },
+  "operator_ask_dialog.js": {
+    "calls": {
+      "linkArtifactRefsIn": 1
+    },
+    "policy": "named",
+    "decision": "Question text uses normServer(a.server); legacy local questions are explicitly local."
+  },
+  "artifact_item.js": {
+    "calls": {
+      "linkArtifactRefsIn": 1
+    },
+    "policy": "forwarded",
+    "decision": "Shared document renderer forwards the resolved artifact server; generic no-source use is unattributed."
+  },
+  "team_artifacts_page.js": {
+    "calls": {
+      "openArtifactTab": 2
+    },
+    "policy": "named",
+    "decision": "Managed and inline artifact previews name link.server plus the source board."
+  }
+}
