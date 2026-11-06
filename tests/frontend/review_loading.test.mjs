@@ -7,7 +7,7 @@ state.hub = true; state.serversKnown = true;
 state.servers = [{ id: 'box-b', status: 'online' }];
 const rows = Array.from({ length: 65 }, (_, i) => ({ id: (i + 1).toString(16).padStart(64, '0'), board_id: 'alpha', name: `File ${i}`, session_id: 'writer', produced_by: 'Writer', tags: ['for review'], available: true, created_at: '2026-11-06T12:00:00Z' }));
 const calls = [];
-let failMore = false;
+let failMore = false, ignoreDigest = false;
 globalThis.fetch = async input => {
     const url = new URL(String(input), 'http://localhost');
     assert.ok(url.pathname.endsWith('/api/team-artifacts'), `opening reviews must not scan boards: ${url.pathname}`);
@@ -15,6 +15,11 @@ globalThis.fetch = async input => {
     const tag = url.searchParams.get('tag');
     calls.push({ server, tag, cursor: url.searchParams.get('cursor') || '', limit: url.searchParams.get('limit') });
     assert.equal(url.searchParams.get('limit'), '50');
+    if (url.searchParams.has('digest') && !ignoreDigest) {
+        assert.equal(url.searchParams.get('team'), 'alpha');
+        assert.equal(url.searchParams.has('cursor'), false);
+        return Response.json({ artifacts: rows.filter(r => r.id === url.searchParams.get('digest')), has_more: false });
+    }
     if (tag === 'saved') return Response.json({ artifacts: [], total: 0, has_more: false, tag_counts: {} });
     const cursor = url.searchParams.get('cursor');
     if (cursor) {
@@ -42,4 +47,13 @@ assert.equal(M.reviewPageSummary().queryTotal, 130);
 assert.equal(M.reviewPageSummary().attentionTotal, null, 'query total cannot stand in for off-page attention facts');
 await M.loadMoreReviews('local');
 assert.equal(M.reviewPageSummary().attentionTotal, 130, 'a complete loaded window can be counted using the actual row policy');
+const beforeLookup = calls.length;
+const offPage = await M.reviewOfTeam('@box-b/alpha', rows[64].id);
+assert.equal(offPage.reviewKey, `@box-b/alpha:${rows[64].id}`);
+assert.equal(calls.length, beforeLookup + 1, 'an off-page file uses one protected targeted read');
+assert.equal(calls.at(-1).server, 'box-b');
+assert.deepEqual(await M.currentTags(offPage), ['for review']);
+ignoreDigest = true;
+await assert.rejects(M.reviewOfTeam('@box-b/alpha', rows[64].id), /scoped review file/, 'a server ignoring digest never turns into a false missing-file result');
+await assert.rejects(M.reviewOfTeam('alpha', 'invalid'), /valid digest/);
 console.log('review_loading: bounded protected reads, metadata, source-qualified rows and explicit retryable paging pass');

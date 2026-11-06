@@ -103,11 +103,21 @@ async function readTeam(team, mutedOut = null, stamp = {}) {
     }
     return rows;
 }
-/** The rows of one team, as Needs you has them (newest version of each file): a link to one file reads only its own team (#13116), not every team. */
-export async function reviewsOfTeam(team) { return collapseVersions((await readTeam(team)).sort(byAge)); }
 /** The files for review on one goal of one team that nobody decided (one row per file, as Needs you has them): a goal page asks only its own team, not every team (#11913). */
 export async function reviewsOfGoal(team, goalId) {
     return collapseVersions((await readTeam(team)).sort(byAge)).filter(a => String(a.goal_id) === String(goalId));
+}
+
+/** One protected, source-scoped read for a linked file or a fresh tag write. */
+export async function reviewOfTeam(team, digest) {
+    const hex = String(digest || '').toLowerCase();
+    if (!/^[a-f0-9]{64}$/.test(hex)) throw new Error('The review file has no valid digest.');
+    const source = splitKey(team);
+    const query = new URLSearchParams({ team: source.name, digest: hex, tag: 'for review' }).toString();
+    const data = await readComputerPage(source.server, { query, cursor: '', limit: 50 });
+    if (data.ownerOnly) throw new Error('Review files are available only to this computer’s owner.');
+    if (data.has_more || data.artifacts.some(a => a.team !== team || a.hex !== hex)) throw new Error('The computer did not return a scoped review file.');
+    return data.artifacts.find(a => a.available && !a.tags?.includes('ignored') && !a.tags?.includes('superseded')) || null;
 }
 
 // The Inbox owns two bounded windows per computer, not a scan of every team.
@@ -126,8 +136,9 @@ async function readComputerPage(server, { query, cursor, limit, signal }) {
     if (response.status === 403 && (data.code === 'owner_only' || data.error === 'owner_only')) return { artifacts: [], total: 0, tag_counts: {}, has_more: false, ownerOnly: true };
     if (!response.ok) throw new Error(`Review artifacts could not be read (HTTP ${response.status}).`);
     if (!Array.isArray(data.artifacts)) throw new Error('The review page was not a list.');
+    if (data.partial || data.failed_boards?.length) throw new Error('Some review files could not be read.');
     const rawBoard = id => typeof id === 'string' && !!id && !id.startsWith('@') && !id.includes('/');
-    noteBoardLabels((data.teams || []).filter(t => rawBoard(t.board_id)).map(t => ({ board_id: t.board_id, board_label: t.team })), 'board_id', server);
+    noteBoardLabels((Array.isArray(data.teams) ? data.teams : []).filter(t => rawBoard(t.board_id)).map(t => ({ board_id: t.board_id, board_label: t.team })), 'board_id', server);
     const artifacts = [];
     for (const a of data.artifacts) {
         const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1]?.toLowerCase();
@@ -218,15 +229,8 @@ if (typeof document !== 'undefined') document.addEventListener('coral:servers-up
 
 /** The artifact's tags as the server has them now, read right before a write: the tags route replaces the whole list, so a tag someone added since the last refresh would be lost from the row's copy. null when it is no longer a for-review artifact. */
 export async function currentTags(row) {
-    for (let at = { cursor: '', offset: 0 }, pages = 0; pages < 200; pages++) { // 50 a page, by the computer's cursor (#13161)
-        const r = await boardArtifactPage(row.team, 'for%20review', at);
-        if (!r.ok) throw new Error(`Could not read the current tags (HTTP ${r.status}).`);
-        const data = await r.json(), list = data.artifacts || [];
-        const hit = list.find(a => a.id === row.id);
-        if (hit) return hit.tags || [];
-        if (!nextArtifactPage(at, data)) return null;
-    }
-    return null;
+    const current = await reviewOfTeam(row.team, row.hex || row.id);
+    return current ? current.tags || [] : null;
 }
 
 /** Add or remove the 'read' tag, keeping the other tags as they are now; the row stays in the list and the counts follow at once. Throws with the server's words when the save fails (the row keeps its tags). */
@@ -280,7 +284,7 @@ export function markOpenedRead(hex, team = '') {
     if (reading.has(hex)) return reading.get(hex);
     const p = (async () => {
         let own = null; // the file's own row, read from its own team alone when the Inbox's scan of every team has not run (a file opened through the Hub): one team's list, not nine (#13489)
-        if (!activated && team) own = (await readTeam(team)).find(a => a.hex.toLowerCase() === hex) || null;
+        if (!activated && team) own = await reviewOfTeam(team, hex);
         else if (!activated) await refreshReviews(true, { reuse: true }); else if (pending) await pending;
         const row = own ? (!isRead(own) && !(own.tags || []).includes('changes requested') ? own : undefined) : items.find(a => a.hex.toLowerCase() === hex && !isRead(a) && !(a.tags || []).includes('changes requested')); // a file the Operator asked changes of waits on the agent: the viewer and the preview redraw it after the request, and that is not reading it again (#11860); it stays counted until the agent answers
         if (row) {

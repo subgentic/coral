@@ -14,7 +14,7 @@ let mode='ok',calls=[];
 globalThis.fetch=async(url,opts={})=>{
  const u=new URL(String(url),'https://hub.example/');
  if(u.pathname.endsWith('/api/board/projects'))return Response.json([{project:'team'}]);
- if(u.pathname.endsWith('/api/team-artifacts'))return Response.json({artifacts:u.searchParams.get('tag')==='saved'?[]:rows,total:u.searchParams.get('tag')==='saved'?0:rows.length,has_more:false});
+ if(u.pathname.endsWith('/api/team-artifacts'))return Response.json({artifacts:u.searchParams.get('tag')==='saved'?[]:rows.filter(r=>!u.searchParams.has('digest')||r.id===u.searchParams.get('digest')),total:u.searchParams.get('tag')==='saved'?0:rows.length,has_more:false});
  if(u.pathname.endsWith('/artifacts'))return Response.json({artifacts:rows,has_more:false});
  if(u.pathname.endsWith('/tags') && opts.method==='PUT')return Response.json({error:'local write failed'},{status:404});
  if(u.pathname.endsWith('/review')){
