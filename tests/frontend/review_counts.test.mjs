@@ -54,11 +54,19 @@ await C.refreshCounts();
 assert.equal(C.countedUnread(), null, 'one computer refused: the number is not known');
 assert.equal(F.unreadReviewCount(), 0, 'and with no full read the badge shows 0, as it always did');
 
-// once the full read has run, its rows are the count (the page's own rules), even while a counted number is there
+// The authoritative count remains independent of a bounded loaded window.
 answers['box-2'] = { total: 1 }; C = await fresh(); await C.refreshCounts();
 assert.equal(C.countedUnread(), 10);
-F.setReviewCacheReader(() => [1, 2, 3, 4], () => null, () => true);
-assert.equal(F.unreadReviewCount(), 4, 'the full read wins once it has run');
-F.setReviewCacheReader(() => [1, 2, 3, 4], () => null, () => false);
+F.setReviewCacheReader(() => [1, 2, 3, 4], () => null, () => ({ attentionTotal: null }));
+assert.equal(F.unreadReviewCount(), 10, 'the server total wins over four loaded rows');
+F.setReviewCacheReader(() => [1, 2, 3, 4], () => null, () => null);
 assert.equal(F.unreadReviewCount(), 10, 'before the full read it is the counted number (this computer 9 + box-2 1)');
 console.log('review_counts: ok');
+
+C = await fresh(); answers.local = { total: 9 }; answers['box-2'] = { status: 503 };
+await C.refreshCounts();
+assert.equal(C.countSummary().complete, false);
+assert.equal(C.countSummary().knownTotal, 9);
+assert.deepEqual(C.countSummary().sources.find(s => s.server === 'box-2'), { server: 'box-2', total: null });
+answers['box-2'] = { total: 2.5 }; await C.refreshCounts(true);
+assert.equal(C.countedUnread(), null, 'fractional metadata never becomes an authoritative count');

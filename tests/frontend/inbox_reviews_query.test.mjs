@@ -3,6 +3,8 @@
 //  2 a team whose page failed keeps its cursor, Show more and Retry ask it again, no gap and no repeat;
 //  3 a row the Operator settled while an answer was on its way does not come back from it.
 import assert from 'node:assert/strict';
+import { state } from '../../coral-go/pkg/frontend/static/state.js';
+state.hub = true; state.serversKnown = true; state.servers = [{ id: 'box-b', status: 'online' }];
 
 let clock = Date.UTC(2026, 10, 4, 12, 0, 0);
 Date.now = () => clock;
@@ -12,10 +14,9 @@ const TEAMS = { a: Array.from({ length: 120 }, (_, i) => art(i)), b: Array.from(
 let failOnce = new Set(), asked = [], hold = null;
 globalThis.fetch = async (url) => {
     const u = new URL(url, 'http://localhost'), p = u.pathname;
-    if (p === '/api/board/projects') return Response.json([{ project: 'a' }, { project: 'b' }]);
-    const m = /^\/api\/board\/(a|b)\/artifacts$/.exec(p);
-    if (!m) return Response.json({});
-    const team = m[1], tag = u.searchParams.get('tag');
+    assert.ok(p.endsWith('/api/team-artifacts'), 'only the protected cross-team list is read');
+    const team = p.startsWith('/api/remote/box-b/') ? 'b' : 'a', tag = u.searchParams.get('tag');
+    if (u.searchParams.get('limit') === '1') return Response.json({ artifacts: [], total: 120, has_more: false });
     if (tag === 'saved') return Response.json({ artifacts: [], has_more: false });
     const cursor = u.searchParams.get('cursor') || '', until = u.searchParams.get('until') || '';
     asked.push({ team, cursor, until, params: [...u.searchParams].filter(([k]) => k !== 'cursor').map(([k, v]) => k + '=' + v).sort().join('&') });
@@ -25,7 +26,7 @@ globalThis.fetch = async (url) => {
     if (cursor) { const [at, boundUntil] = cursor.split('|'); if (boundUntil !== until) return Response.json({ error: 'invalid cursor' }, { status: 400 }); start = Number(at); } // the server's fingerprint includes until
     const qq = u.searchParams.get('q') || '';
     let page = TEAMS[team].slice(start, start + 50); const more = start + 50 < TEAMS[team].length;
-    if (qq.startsWith('stale-')) page = page.map(a => ({ ...a, id: qq + '-' + a.id })); // a query's own files, so one answer can be told from another's
+    page = page.map(a => ({ ...a, board_id: team, ...(qq.startsWith('stale-') ? { name: qq + '-' + a.name } : {}) })); // a query's own files, so one answer can be told from another's
     const total = qq.startsWith('total-') && cursor ? 999 : TEAMS[team].length; // a later page that reports another total: the team's total is its first page's
     return Response.json({ artifacts: page, has_more: more, total, ...(more ? { next_cursor: `${start + 50}|${until}` } : {}) });
 };
@@ -61,13 +62,13 @@ let st = M.reviewQueryState();
 assert.equal(st.failed, 1, 'one team did not answer');
 assert.ok(st.more, 'Show more is still there (the failed team keeps its cursor, the other has more too)');
 assert.match(st.error, /could not be asked/);
-assert.equal(keys().filter(k => k.startsWith('b:')).length, 50, "team b is where it was: its failed page is not skipped");
+assert.equal(keys().filter(k => k.startsWith('@box-b/b:')).length, 50, "team b is where it was: its failed page is not skipped");
 assert.equal(keys().filter(k => k.startsWith('a:')).length, 100, 'team a moved on');
 await M.retryQueriedReviews(F);
 st = M.reviewQueryState();
 assert.equal(st.failed, 0, 'the retry was answered');
 assert.equal(st.error, '');
-assert.equal(keys().filter(k => k.startsWith('b:')).length, 100, 'b has its second page');
+assert.equal(keys().filter(k => k.startsWith('@box-b/b:')).length, 100, 'b has its second page');
 assert.equal(new Set(keys()).size, keys().length, 'no row twice');
 while (M.reviewQueryState().more) await M.moreQueriedReviews(F);
 assert.equal(keys().length, 240, 'every file of both teams once: no gap');
@@ -88,8 +89,8 @@ await settle();
 hold = null;
 await M.queryReviews({ q: 'stale-two' });
 releaseOne(); await first;
-const twoKeys = M.queriedReviews({ q: 'stale-two' }).map(r => r.reviewKey);
-assert.ok(twoKeys.length > 0 && twoKeys.every(k => k.includes('stale-two')), 'the second query holds only its own files: ' + twoKeys.filter(k => !k.includes('stale-two')).slice(0, 3));
+const twoRows = M.queriedReviews({ q: 'stale-two' });
+assert.ok(twoRows.length > 0 && twoRows.every(r => r.name.includes('stale-two')), 'the second query holds only its own files');
 assert.equal(M.reviewQueryState().total, 240, 'and its own total');
 // (c) a team's total is its first page's: a later page that reports another number does not change it
 F = { q: 'total-check' };
@@ -103,17 +104,17 @@ F = { q: 'settle-race' };
 let release; hold = { team: 'a', promise: new Promise(r => { release = r; }) };
 const pending = M.queryReviews(F);
 await settle();
-M.settleReview({ team: 'a', id: 'a-3', reviewKey: 'a:a-3', name: 'file-003.md' }); // the Operator approved it meanwhile
+M.settleReview({ team: 'a', id: 'a-3', reviewKey: 'a:' + hex(3), name: 'file-003.md' }); // the Operator approved it meanwhile
 release(); hold = null; await pending;
-assert.ok(!keys().includes('a:a-3'), 'the settled row did not reappear from the query that was in flight');
-assert.ok(keys().includes('a:a-4'), 'the others did arrive');
+assert.ok(!keys().includes('a:' + hex(3)), 'the settled row did not reappear from the query that was in flight');
+assert.ok(keys().includes('a:' + hex(4)), 'the others did arrive');
 // and a Show more in flight: hold team a's second page, settle one of its rows while it is on its way, release it
 let release2; hold = { team: 'a', cursor: '50|', promise: new Promise(r => { release2 = r; }) };
-assert.ok(keys().includes('a:a-4') && !keys().includes('a:a-60'), 'a-60 is on the second page of team a, not yet read');
+assert.ok(keys().includes('a:' + hex(4)) && !keys().includes('a:' + hex(60)), 'a-60 is on the second page of team a, not yet read');
 const more = M.moreQueriedReviews(F);
 await settle();
-M.settleReview({ team: 'a', id: 'a-60', reviewKey: 'a:a-60', name: 'x' }); // the Operator approved it while the page was on its way
+M.settleReview({ team: 'a', id: 'a-60', reviewKey: 'a:' + hex(60), name: 'x' }); // the Operator approved it while the page was on its way
 release2(); hold = null; await more;
-assert.ok(!keys().includes('a:a-60'), 'the settled row did not come back with the Show more that was in flight');
-assert.ok(keys().includes('a:a-61'), 'the rest of the page did arrive');
+assert.ok(!keys().includes('a:' + hex(60)), 'the settled row did not come back with the Show more that was in flight');
+assert.ok(keys().includes('a:' + hex(61)), 'the rest of the page did arrive');
 console.log('inbox_reviews_query: ok');

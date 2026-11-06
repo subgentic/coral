@@ -2,10 +2,9 @@ import { artifactRevision, onArtifactsRev } from './artifacts_feed.js';
 import { setReviewCacheReader } from './ask_filter.js';
 /* Review artifacts use the same owner-protected team list and tags routes as Artifacts.
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
-import { sourcesKey, fetchProjects } from './board_fetch.js';
-import { inboxSources } from './inbox_servers.js';
+import { sourcesKey } from './board_fetch.js';
+import { inboxSources, serverLabel } from './inbox_servers.js';
 import { boardFetch, nextArtifactPage, splitKey, serverFetch, identityKey, noteBoardLabels, normServer } from './server_base.js';
-import { teamLabel } from './server_status.js';
 import { SORT_PARAM } from './filter_model.js';
 import { hideAsksWhen } from './ask_filter.js';
 import { importOnce } from './import_once.js';
@@ -53,7 +52,32 @@ export const reviewItems = () => {
 /** The one file a message is only a link to: `coral://artifacts/<hex>` with at most a few words of its own, else ''. */
 const FILE_LINK = /coral:\/\/artifacts\/([0-9a-f]{64})/gi;
 export const onlyFileLink = text => { const m = [...String(text || '').matchAll(FILE_LINK)]; return m.length === 1 && String(text).replace(FILE_LINK, '').replace(/[\s\p{P}]+/gu, '').length <= 40 ? m[0][1].toLowerCase() : ''; };
-hideAsksWhen(a => { const hex = onlyFileLink(a.text); return !!hex && items.some(r => r.hex.toLowerCase() === hex); }); // the file is in Needs you once, as the file (#11998)
+const linkedReviews = new Set();
+const askReviewKey = a => { const hex = onlyFileLink(a.text); return hex && typeof a.board === 'string' && !a.board.startsWith('@') && !a.board.includes('/') ? `${identityKey(a.server, a.board)}:${hex}` : ''; };
+hideAsksWhen(a => { const key = askReviewKey(a); return !!key && (linkedReviews.has(key) || items.some(r => r.reviewKey === key)); }, async asks => {
+    if (!activated) return;
+    const started = revision, groups = new Map(), found = new Set();
+    for (const ask of asks) {
+        const hex = onlyFileLink(ask.text);
+        if (!hex || typeof ask.board !== 'string' || ask.board.startsWith('@') || ask.board.includes('/')) continue;
+        const team = identityKey(ask.server, ask.board);
+        if (!groups.has(team)) groups.set(team, new Set());
+        groups.get(team).add(hex);
+    }
+    for (const [team, digests] of groups) {
+        const source = splitKey(team), ids = [...digests];
+        for (let offset = 0; offset < ids.length; offset += 20) {
+            const batch = ids.slice(offset, offset + 20), query = new URLSearchParams({ team: source.name, digest: batch.join(','), tag: 'for review' }).toString();
+            try {
+                const data = await readComputerPage(source.server, { query, limit: 50 });
+                if (data.has_more || data.artifacts.some(a => a.team !== team || !batch.includes(a.hex))) continue;
+                for (const row of data.artifacts) if (row.available && !row.muted && !['saved', 'ignored', 'superseded'].some(tag => row.tags?.includes(tag))) found.add(row.reviewKey);
+            } catch { /* Keep an unverified question visible. */ }
+        }
+    }
+    if (started !== revision) return;
+    linkedReviews.clear(); for (const key of found) linkedReviews.add(key);
+});
 /** A review artifact the operator has opened carries the 'read' tag (#9277): it stays in Needs you, shown as read, but it is not counted (the Inbox badge, the Needs you count). Opening it again, or marking it unread, is the same tags route. */
 /** The files the Operator saved for later (#11641): tagged 'saved', out of Needs you and its counts, listed at the top of Saved with their decisions still there. */
 let savedFor = null, savedRev = -1, savedView = [];
@@ -131,103 +155,102 @@ async function readTeam(team, mutedOut = null, stamp = {}) {
     return rows;
 }
 
-// ── Needs you's filters are the computer's (#13162, Stage 1) ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-// With a filter on (the words, a team, an agent, how long a file has waited, a computer) the file rows are what each computer answers for that query: its first 50 matches, with Show more by its cursor, and its total.
-// A match that is item 897 of 900 is on page 1 of its filter. Nothing here changes what the page holds with no filter, nor the counts, pills and options, which keep reading the whole list (Stage 2).
-let fview = null; // { key, params, rows, totals, cursors: { team: next cursor }, failed: Map(team -> the cursor its last request used), more, loading, error, at, promise }
-const settledAt = new Map(); // reviewKey -> the revision at which the Operator settled it: an answer that was asked before that must not bring it back (#13162, UI Reviewer)
-const viewParts = f => ({ q: f.q || '', team: f.team || '', agent: f.agent === UNKNOWN_AGENT ? '' : f.agent || '', // 'Unknown agent' is the page's own word for a file with no producer: the computer cannot filter by it, so it is not a query
-    longer: f.longer || '', server: f.server || '', oldest: f.sort === 'oldest' });
-export const reviewQueryKey = f => { const v = viewParts(f); return (v.q || v.team || v.agent || v.longer || v.server) ? JSON.stringify(v) : ''; };
-/** The Needs you filters as the computer's artifact list takes them: q, by (the uploader), until (waited at least this long: created before), sort. */
+// Filtered and unfiltered windows use the same protected per-computer reader.
+let fview = null;
+const settledAt = new Map();
+const viewParts = f => ({ q: f.q || '', team: f.team || '', agent: f.agent || '', goal: f.goal || '', longer: f.longer || '', server: f.server || '', oldest: f.sort === 'oldest' });
+export const reviewQueryKey = f => { const v = viewParts(f); return (v.q || v.team || v.agent || v.goal || v.longer || v.server) ? JSON.stringify(v) : ''; };
+/** Choices describe all server matches, including files beyond the loaded rows. */
+export function reviewFilterOptions() {
+    const pages = fview ? fview.pager.status() : reviewPages();
+    const teams = new Set(), agents = new Set(), goals = new Map();
+    for (const source of pages) {
+        const facets = source.facets || {};
+        for (const f of facets.team || []) if (typeof f.v === 'string' && f.v) teams.add(f.v);
+        for (const f of facets.by || []) if (typeof f.v === 'string' && f.v) agents.add(f.v);
+        for (const f of facets.goal || []) if (typeof f.v === 'string' && f.v && Number.isSafeInteger(f.id) && f.id > 0) {
+            const value = `${f.v} (#${f.id} · ${serverLabel(source.server)})`;
+            goals.set(value, { value, title: f.v, server: source.server, id: f.id });
+        }
+    }
+    return { teams: [...teams].sort(), agents: [...agents].sort(), goals: [...goals.values()].sort((a, b) => a.value.localeCompare(b.value)) };
+}
+const resolveGoalFilter = value => {
+    const choices = reviewFilterOptions().goals, exact = choices.find(g => g.value === value);
+    if (exact) return exact;
+    const named = choices.filter(g => g.title === value);
+    return named.length === 1 ? named[0] : null;
+};
 export function reviewQueryParams(f, now = Date.now()) {
-    const v = viewParts(f), p = new URLSearchParams({ tag: 'for review', limit: '50', versions: 'newest' });
+    const v = viewParts(f), p = new URLSearchParams({ tag: 'for review', limit: '50', starred_first: 'true', facets: 'team,by,goal' });
     if (v.q) p.set('q', v.q);
-    if (v.agent) p.set('by', v.agent);
+    if (v.team) p.set('team', v.team);
+    const goal = resolveGoalFilter(v.goal);
+    if (goal) p.set('goal', String(goal.id));
+    if (v.agent && v.agent !== UNKNOWN_AGENT) p.set('by', v.agent);
     if (v.longer) p.set('until', new Date(now - Number(v.longer) * 60000).toISOString());
     if (v.oldest) p.set(SORT_PARAM, 'oldest');
     return p;
 }
-/** The rows the computers answered for filters `f`, or null when the query is not for these filters (not asked yet, or another one is current). */
-export const queriedReviews = f => (fview && fview.key === reviewQueryKey(f) && !fview.loading ? fview.rows : null);
-/** { total, shown, more, loading, error } of the current query, or null. */
-export const reviewQueryState = () => (fview ? { total: fview.total, shown: fview.rows.length, more: fview.more, loading: fview.loading, error: fview.error, failed: fview.failed.size } : null);
-export const clearReviewQuery = () => { if (fview) { fview = null; changed(); } };
-async function readQueryPage(team, params, cursor) {
-    const q = new URLSearchParams(params); if (cursor) q.set('cursor', cursor);
-    const r = await boardFetch(team, `/artifacts?${q}`);
-    if (r.status === 403 || r.status === 404) return { rows: [], total: 0, cursor: '' }; // an inaccessible team has nothing for this person
-    if (!r.ok) throw new Error('Could not read review artifacts');
-    const data = await r.json(), seen = new Set(), rows = [];
-    for (const a of data.artifacts || []) { const row = reviewRowOf(a, team, seen); if (row) rows.push(row); }
-    return { rows, total: Number(data.total) || 0, cursor: data.has_more && data.next_cursor ? data.next_cursor : '' };
-}
-const inFours = async (list, each) => { let at = 0; await Promise.all(Array.from({ length: Math.min(4, list.length) }, async () => { while (at < list.length) await each(list[at++]); })); };
-/** Asks each job's team for its page ({ team, cursor }) with the query's own frozen parameters, four at once, and folds the answers into `mine`: a team whose request failed keeps the cursor it used (so Show more and Retry ask it again, never skip it),
- *  and a row the Operator settled after the request began does not come back. */
-async function askTeams(mine, jobs) {
-    const began = revision;
-    const got = [];
-    await inFours(jobs, async job => {
-        try { got.push({ ...job, ...(await readQueryPage(job.team, mine.params, job.cursor)) }); } catch { got.push({ ...job, failed: true }); }
-    });
-    if (fview !== mine) return;
-    const have = new Set(mine.rows.map(r => r.reviewKey));
-    for (const g of got) {
-        if (g.failed) { mine.failed.set(g.team, g.cursor); continue; }
-        mine.failed.delete(g.team);
-        if (!(g.team in mine.totals)) mine.totals[g.team] = g.total; // a team's total is its first page's
-        for (const r of g.rows) if (!have.has(r.reviewKey) && !((settledAt.get(r.reviewKey) || 0) > began)) { have.add(r.reviewKey); mine.rows.push(r); }
-        if (g.cursor) mine.cursors[g.team] = g.cursor; else delete mine.cursors[g.team];
-    }
-    mine.total = Object.values(mine.totals).reduce((a, b) => a + b, 0);
-    mine.more = Object.keys(mine.cursors).length > 0;
-    mine.error = mine.failed.size ? 'Some computers could not be asked.' : '';
-    mine.rows.sort(byAge);
-}
-/** Asks the computers for the files matching `f` (the first 50 of each team that has any); a second call for the same filters joins it (and does not ask again within 30 seconds); a different filter starts over. */
+const filterRows = mine => mine.pager.snapshot().flatMap(s => s.artifacts).filter(a => {
+    const tags = a.tags || [];
+    return a.available && !a.muted && !tags.includes('saved') && !tags.includes('ignored') && !tags.includes('superseded') && !(settledAt.get(a.reviewKey) > mine.started);
+});
+export const queriedReviews = f => fview && fview.key === reviewQueryKey(f) ? filterRows(fview) : null;
+export const reviewQueryState = () => {
+    if (!fview) return null;
+    const pages = fview.pager.status(), known = !fview.localFilters && !fview.invalidCounts && pages.every(p => p.loaded && !p.error && Number.isSafeInteger(p.total));
+    return { total: known ? pages.reduce((n, p) => n + p.total, 0) : null, shown: filterRows(fview).length,
+        more: pages.some(p => p.has_more), loading: pages.some(p => p.loading),
+        attentionTotal: !fview.localFilters && !fview.invalidCounts && pages.every(p => Number.isSafeInteger(p.attentionTotal) && !p.error) ? pages.reduce((n, p) => n + p.attentionTotal, 0) : null, goalFiltered: !!fview.goal, localFilters: fview.localFilters,
+        error: pages.some(p => p.error) ? 'Some computers could not be asked.' : '', failed: pages.filter(p => p.error).length };
+};
+export const clearReviewQuery = () => { if (fview) { fview.pager.reset([]); fview = null; changed(); } };
 export function queryReviews(f) {
     const key = reviewQueryKey(f);
     if (!key) { clearReviewQuery(); return null; }
-    if (fview && fview.key === key && (fview.loading || Date.now() - fview.at < 30000)) return fview.promise;
-    // the parameters are made once and kept for every page of this walk: the server's cursor is bound to them (a waited-longer-than filter would otherwise send a new time with each Show more)
-    const mine = fview = { key, params: reviewQueryParams(f).toString(), rows: [], totals: {}, total: 0, cursors: {}, failed: new Map(), more: false, loading: true, error: '', at: Date.now(), promise: null };
-    mine.promise = (async () => {
-        try {
-            const v = viewParts(f), projects = await fetchProjects();
-            const teams = projects.filter(p => (!v.team || teamLabel(p.project, p.board_label || '') === v.team) && (!v.server || splitKey(p.project).server === v.server)).map(p => p.project);
-            await askTeams(mine, teams.map(team => ({ team, cursor: '' })));
-        } catch { if (fview === mine) mine.error = 'Review artifacts could not be read.'; }
-        if (fview === mine) { mine.loading = false; mine.at = Date.now(); changed(); }
-    })();
+    if (fview && fview.key === key && (fview.pager.status().some(p => p.loading) || Date.now() - fview.at < 30000)) return fview.promise;
+    if (fview) fview.pager.reset([]);
+    const goal = resolveGoalFilter(f.goal), params = reviewQueryParams(f).toString();
+    const read = async (server, options) => {
+        const data = await readComputerPage(server, { ...options, revisionBound: false });
+        if (!options.cursor && !data.ownerOnly) {
+            const query = new URLSearchParams(options.query);
+            query.set('waiting', '1'); query.set('muted', '0'); query.delete('facets');
+            try { const count = await readComputerPage(server, { ...options, query: query.toString(), limit: 1 }); data.attention_total = count.total; }
+            catch { data.attention_total = null; }
+        }
+        return data;
+    };
+    const mine = { key, goal, localFilters: !!(f.goal && !goal) || f.agent === UNKNOWN_AGENT, started: revision, pager: createReviewPages({ read, key: pageKey, changed }), at: Date.now(), promise: null };
+    fview = mine;
+    const sources = inboxSources().filter(server => (!f.server || server === f.server) && (!goal || goal.server === server));
+    mine.pager.reset(sources, params);
+    mine.promise = mine.pager.load();
     return mine.promise;
 }
-async function again(f, jobsOf) {
+async function again(f, failedOnly) {
     const mine = fview;
-    if (!mine || mine.loading || mine.key !== reviewQueryKey(f)) return;
-    const jobs = jobsOf(mine);
-    if (!jobs.length) return;
-    mine.loading = true; changed();
-    await askTeams(mine, jobs);
-    if (fview === mine) { mine.loading = false; mine.at = Date.now(); changed(); }
+    if (!mine || mine.key !== reviewQueryKey(f)) return;
+    await Promise.all(mine.pager.status().filter(p => failedOnly ? p.error : p.has_more).map(p => mine.pager.more(p.server)));
+    mine.at = Date.now();
 }
-/** The next 50 of each team that has more, for the current query (the same parameters as its first page). */
-export const moreQueriedReviews = f => again(f, m => Object.keys(m.cursors).map(team => ({ team, cursor: m.cursors[team] })));
-/** Asks again the teams whose last request failed, each with the cursor it used. */
-export const retryQueriedReviews = f => again(f, m => [...m.failed].map(([team, cursor]) => ({ team, cursor })));
+export const moreQueriedReviews = f => again(f, false);
+export const retryQueriedReviews = f => again(f, true);
 
-/** The rows of one team, as Needs you has them (newest version of each file): a link to one file reads only its own team (#13116), not every team. */
 /** The files for review on one goal of one team that nobody decided (one row per file, as Needs you has them): a goal page asks only its own team, not every team (#11913). */
 export async function reviewsOfGoal(team, goalId) {
     return collapseVersions((await readTeam(team)).sort(byAge)).filter(a => String(a.goal_id) === String(goalId));
 }
 
 /** One protected, source-scoped read for a linked file or a fresh tag write. */
-export async function reviewOfTeam(team, digest) {
+export async function reviewOfTeam(team, digest, { anyState = false } = {}) {
     const hex = String(digest || '').toLowerCase();
     if (!/^[a-f0-9]{64}$/.test(hex)) throw new Error('The review file has no valid digest.');
     const source = splitKey(team);
-    const query = new URLSearchParams({ team: source.name, digest: hex, tag: 'for review' }).toString();
+    const params = new URLSearchParams({ team: source.name, digest: hex });
+    if (!anyState) params.set('tag', 'for review');
+    const query = params.toString();
     const data = await readComputerPage(source.server, { query, cursor: '', limit: 50 });
     if (data.ownerOnly) throw new Error('Review files are available only to this computer’s owner.');
     if (data.has_more || data.artifacts.some(a => a.team !== team || a.hex !== hex)) throw new Error('The computer did not return a scoped review file.');
@@ -237,16 +260,16 @@ export async function reviewOfTeam(team, digest) {
 // The Inbox owns two bounded windows per computer, not a scan of every team.
 // Facets/attention policy is layered on this metadata when its server contract is
 // present. A raw for-review total is not an authoritative attention count.
-const reviewQuery = new URLSearchParams({ tag: 'for review', starred_first: 'true' }).toString();
+const reviewQuery = new URLSearchParams({ tag: 'for review', starred_first: 'true', facets: 'team,by,goal' }).toString();
 const savedQuery = new URLSearchParams({ tag: 'saved', versions: 'newest' }).toString();
 let pagesReady = false, pendingStarted = 0, finishedAt = 0, finishedRev = -1, lastSources = null, rescans = 0;
-async function readComputerPage(server, { query, cursor, limit, signal }) {
+async function readComputerPage(server, { query, cursor, limit, signal, revisionBound = true }) {
     const started = revision, params = new URLSearchParams(query);
     params.set('limit', String(limit));
     if (cursor) params.set('cursor', cursor); else params.delete('cursor');
     const response = await serverFetch(server, `/api/team-artifacts?${params}`, { signal });
     const data = await response.json().catch(() => ({}));
-    if (signal?.aborted || started !== revision) throw Object.assign(new Error('The review read was superseded.'), { name: 'AbortError' });
+    if (signal?.aborted || (revisionBound && started !== revision)) throw Object.assign(new Error('The review read was superseded.'), { name: 'AbortError' });
     if (response.status === 403 && (data.code === 'owner_only' || data.error === 'owner_only')) return { artifacts: [], total: 0, tag_counts: {}, has_more: false, ownerOnly: true };
     if (!response.ok) throw new Error(`Review artifacts could not be read (HTTP ${response.status}).`);
     if (!Array.isArray(data.artifacts)) throw new Error('The review page was not a list.');
@@ -284,6 +307,7 @@ export function reviewPageSummary() {
     const tags = tagsKnown ? Object.create(null) : null;
     if (tags) for (const source of sources) for (const [tag, n] of Object.entries(source.tag_counts)) tags[tag] = (tags[tag] || 0) + n;
     return { sources, expected: sources.length, answered: sources.filter(s => s.loaded && !s.error).length,
+        loadedBySource: Object.fromEntries(sources.map(s => [s.server, unreadReviewItems().filter(a => splitKey(a.team).server === s.server).length])),
         queryTotal: totalKnown ? sources.reduce((n, s) => n + s.total, 0) : null, tag_counts: tags,
         attentionTotal: completeWindow ? unreadReviewItems().length : null, loadedUnread: unreadReviewItems().length,
         hasMore: sources.some(s => s.has_more), partial: !ready || sources.some(s => s.truncated),
@@ -330,6 +354,7 @@ export function refreshReviews(force = false, { reuse = false } = {}) {
     pending = Promise.all([reviewPager.refresh(), savedPager.refresh()]).then(() => {
         if (started !== revision) return;
         publishPages();
+        if (typeof document !== 'undefined') importOnce('./operator_asks.js').then(m => m.refreshReviewAskVisibility()).catch(() => {});
         if (!errors.length) { finishedAt = Date.now(); finishedRev = revision; }
     }).catch(() => { errors = ['Review artifacts could not be refreshed.']; changed(); }).finally(() => {
         pending = null;
@@ -375,9 +400,9 @@ export function settleReview(row) {
     revision++;
     const gone = new Set([row.reviewKey || `${row.team}:${row.id}`, ...earlierVersions(row).map(a => a.reviewKey)]); // the versions before it were settled with it (settleEarlierVersions)
     reviewPager.remove(a => gone.has(a.reviewKey)); savedPager.remove(a => gone.has(a.reviewKey));
-    for (const k of gone) settledAt.set(k, revision);
+    for (const k of gone) { settledAt.set(k, revision); linkedReviews.delete(k); }
     items = items.filter(a => !gone.has(a.reviewKey)); saved = saved.filter(a => !gone.has(a.reviewKey));
-    if (fview) fview.rows = fview.rows.filter(a => !gone.has(a.reviewKey));
+    if (fview) fview.invalidCounts = true;
     changed();
 }
 

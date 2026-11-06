@@ -24,7 +24,7 @@ import { resolveSessionIdentity, sessionStateInfo, askWords } from './session_st
 import './safe_markdown.js'; // the shared Inbox renderer's wrapper: the lazy Inbox modules import it, and a lazy module imports only what loads at startup (import_hygiene)
 
 const INBOX_URL = '/inbox';
-document.addEventListener('coral:reviews-changed', () => updateInboxTab());
+document.addEventListener('coral:reviews-changed', () => { countsRefresh?.(true); updateInboxTab(); });
 onProposalsChanged(() => updateInboxTab()); // what agents asked to add and wait for the Operator's approval is a Needs you row (#11389)
 onRunsChanged(() => updateInboxTab()); // a failed run nobody has opened is a Needs you row (#9296)
 onOperatorAsksChanged(() => updateInboxTab()); // a question an agent asked the Operator is a Needs you row (#11417)
@@ -59,8 +59,8 @@ function scheduleReviewCounts() {
     if (countsAsked) return;
     countsAsked = true;
     const go = () => importOnce('./review_counts.js').then(m => {
-        setReviewCounter(m.countedUnread);
-        countsRefresh = () => m.refreshCounts().then(changed => { if (changed) updateInboxTab(); }).catch(() => {});
+        setReviewCounter(m.countedUnread, m.countSummary);
+        countsRefresh = force => m.refreshCounts(force).then(changed => { if (changed) updateInboxTab(); }).catch(() => {});
         countsRefresh();
     }).catch(() => {});
     if (typeof requestIdleCallback === 'function') requestIdleCallback(go, { timeout: 4000 }); else setTimeout(go, 2000);

@@ -5,8 +5,8 @@ export function createReviewPages({ read, key, changed = () => {} }) {
     if (typeof read !== 'function' || typeof key !== 'function') throw new TypeError('Review pages need a reader and a row key.');
     let generation = 0, query = '', sources = new Map();
     const make = server => ({ server, rows: new Map(), loaded: false, pending: null, abort: null,
-        total: null, tags: null, facets: null, cursor: '', more: false, error: '', pages: 0, ownerOnly: false, truncated: false });
-    const statusOf = s => ({ server: s.server, loadedCount: s.rows.size, total: s.total, tag_counts: s.tags, facets: s.facets,
+        total: null, attentionTotal: null, tags: null, facets: null, cursor: '', more: false, error: '', pages: 0, ownerOnly: false, truncated: false });
+    const statusOf = s => ({ server: s.server, loadedCount: s.rows.size, total: s.total, attentionTotal: s.attentionTotal, tag_counts: s.tags, facets: s.facets,
         loaded: s.loaded, loading: !!s.pending, has_more: s.more, next_cursor: s.cursor, error: s.error, ownerOnly: s.ownerOnly, truncated: s.truncated });
     const status = () => [...sources.values()].map(statusOf);
     const snapshot = () => [...sources.values()].map(s => ({ ...statusOf(s), artifacts: [...s.rows.values()] }));
@@ -44,6 +44,7 @@ export function createReviewPages({ read, key, changed = () => {} }) {
                 if (!page || !Array.isArray(page.artifacts)) throw new Error('The review page was not a list.');
                 const next = typeof page.next_cursor === 'string' ? page.next_cursor : '';
                 if (page.has_more && (!next || next === cursor || seen.has(next))) throw new Error('The review page did not provide a new cursor.');
+                if (page.ownerOnly) rows.clear();
                 const pairs = page.artifacts.map(row => {
                     const id = key(row, s.server);
                     if (typeof id !== 'string' || !id) throw new Error('A review row has no qualified identity.');
@@ -57,9 +58,12 @@ export function createReviewPages({ read, key, changed = () => {} }) {
             // page cannot clamp scroll by briefly replacing it with page one.
             s.rows = rows; s.loaded = true; s.more = hasMore; s.cursor = cursor;
             s.pages = append ? s.pages + count : count; s.ownerOnly = metadata.ownerOnly === true; s.truncated = metadata.truncated === true;
+            if (!append) {
+            if ('attention_total' in metadata) s.attentionTotal = Number.isSafeInteger(metadata.attention_total) && metadata.attention_total >= 0 ? metadata.attention_total : null;
             if (Number.isSafeInteger(metadata.total) && metadata.total >= 0) s.total = metadata.total;
             if (metadata.tag_counts && typeof metadata.tag_counts === 'object' && !Array.isArray(metadata.tag_counts)) s.tags = metadata.tag_counts;
             if (metadata.facets && typeof metadata.facets === 'object' && !Array.isArray(metadata.facets)) s.facets = metadata.facets;
+            }
         }).catch(error => {
             if (current(s, at) && error?.name !== 'AbortError') s.error = error?.message || 'The review page could not be read.';
         }).finally(() => {
@@ -80,7 +84,7 @@ export function createReviewPages({ read, key, changed = () => {} }) {
     function remove(predicate) {
         invalidate();
         for (const s of sources.values()) for (const [id, row] of s.rows) if (predicate(row, s.server)) {
-            s.rows.delete(id); s.total = null; s.tags = null; s.facets = null;
+            s.rows.delete(id); s.total = null; s.attentionTotal = null; s.tags = null; s.facets = null;
         }
     }
     return { reset, setSources, load, refresh, more, remove, status, snapshot };

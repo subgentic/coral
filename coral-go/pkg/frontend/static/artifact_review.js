@@ -1,7 +1,7 @@
 /* The Operator's review of an artifact a team tagged "for review" (#136584, #136588), in the artifact viewer: Approve (the row leaves Needs you, the uploading agent is told) and Request changes (a comment
  * on the whole document, sent to the uploader through the comments' own Send to agent, and the file remains visible, uncounted, while it is the agent's turn; its next version returns for review). The state is read from the team's artifact list (its tags and,
  * once decided, the time); the buttons show only for a pending one; through Coral Hub the owner has both: the change-request send is the owner's too (#11354). */
-import { boardFetch, boardArtifactPage, nextArtifactPage, identityKey, decisionNeedsPerson, isCloud, serverFetch, splitKey } from './server_base.js';
+import { boardFetch, identityKey, decisionNeedsPerson, isCloud, serverFetch, splitKey } from './server_base.js';
 import { showToast, announceNotice } from './notifications.js';
 import { markHidden } from './visible_marks.js';
 import { importOnce } from './import_once.js';
@@ -14,22 +14,13 @@ const rowHex = a => HEX.exec(a.uri || a.digest || a.id || '')?.[1]?.toLowerCase(
 
 /** The team's row for the artifact and the state of its review: pending, changes, approved or reviewed (the old Mark reviewed); null when it was never for review. */
 export async function reviewStateOf(team, hex) {
-    for (const tag of ['for%20review', 'approved', 'reviewed']) {
-        for (let at = { cursor: '', offset: 0 }, pages = 0; pages < 200; pages++) { // 50 a page, by the computer's cursor (#13161)
-            const r = await boardArtifactPage(team, tag, at);
-            if (!r.ok) return null;
-            const data = await r.json(), list = data.artifacts || [];
-            const row = list.find(a => rowHex(a) === hex);
-            if (row) {
-                const tags = row.tags || [];
-                if (!['approved', 'for review', 'reviewed'].some(t => tags.includes(t))) break; // the list is asked by tag, and a row without any of them is not a review (never "Reviewed" by default)
-                const state = tags.includes('approved') ? 'approved' : tags.includes('for review') ? (tags.includes('changes requested') ? 'changes' : 'pending') : 'reviewed';
-                return { row, state, at: row.review?.at || '' };
-            }
-            if (!nextArtifactPage(at, data)) break;
-        }
-    }
-    return null;
+    const { reviewOfTeam } = await importOnce('./inbox_reviews.js');
+    const row = await reviewOfTeam(team, hex, { anyState: true });
+    if (!row) return null;
+    const tags = row.tags || [];
+    if (!['approved', 'for review', 'reviewed'].some(t => tags.includes(t))) return null;
+    const state = tags.includes('approved') ? 'approved' : tags.includes('for review') ? (tags.includes('changes requested') ? 'changes' : 'pending') : 'reviewed';
+    return { row, state, at: row.review?.at || '' };
 }
 
 const timeWords = at => { const t = Date.parse(at); return Number.isNaN(t) ? '' : new Date(t).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }); };

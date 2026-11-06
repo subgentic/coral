@@ -17,11 +17,11 @@ import { doneGoals, nextQuietEnd, quietEndsAt, hideGoalDone, setGoalDoneCount, i
 import { state } from './state.js';
 import { isPhoneBar } from './phone_layout.js';
 
-const { mutedReviewItems, mutedWords, reviewItems, reviewStarChanged, unreadReviewItems, reviewErrors, refreshReviews, reviewsChangedOnServer, reviewGroups, setReviewRead, markOpenedReadVisibly, isRead, savedFiles, reviewPages, savedReviewPages, loadMoreReviews, loadMoreSavedFiles, queryReviews, queriedReviews, moreQueriedReviews, retryQueriedReviews, reviewQueryState, reviewQueryKey } = await importOnce('./inbox_reviews.js');
+const { mutedReviewItems, mutedWords, reviewItems, reviewStarChanged, unreadReviewItems, reviewErrors, refreshReviews, reviewsChangedOnServer, reviewGroups, setReviewRead, markOpenedReadVisibly, isRead, savedFiles, reviewPages, savedReviewPages, loadMoreReviews, loadMoreSavedFiles, queryReviews, queriedReviews, moreQueriedReviews, retryQueriedReviews, reviewQueryState, reviewQueryKey, reviewFilterOptions, reviewPageSummary } = await importOnce('./inbox_reviews.js');
 import { failedUnread, finishedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
 import { operatorAsks, refreshOperatorAsks, askLine, askPlain, askKey, openAskDialog, askSubjects } from './operator_asks.js';
 import { go, note, backIs, currentRoute } from './nav.js';
-import { unreadReviewCount } from './ask_filter.js'; // the files waiting: the full read's once it has run, else what the computers counted (#13172)
+import { unreadReviewCount, reviewAttentionCount } from './ask_filter.js'; // the files waiting: the full read's once it has run, else what the computers counted (#13172)
 
 import { build, keyRoute, parse as parseRoute, inboxFolderPath, BOARDS_FOLDER, BOARDS_SUB } from './routes.js';
 import { sessionServer, normServer, boardTeamKey, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox, nativeNeeds, decisionNeedsPerson, LOCAL_SERVER } from './server_base.js';
@@ -107,7 +107,7 @@ function mutedLine() {
 function moreFilesLine() {
     const f = reviewFilters(), st = f && reviewQueryState();
     if (!st || st.loading || (!st.more && !st.error)) return null;
-    const p = DT.el('p', 'goals-note inbox-more-files', st.error || `Showing ${st.shown} of ${st.total} files for review that match. `);
+    const p = DT.el('p', 'goals-note inbox-more-files', st.error || (st.total === null ? `${st.shown} files shown. Show more to check additional files. ` : `Showing ${st.shown} of ${st.total} files for review that match. `));
     if (st.more) { const b = DT.el('button', 'btn btn-quiet btn-small', 'Show more'); b.type = 'button'; b.addEventListener('click', () => { moreQueriedReviews(f); }); p.append(b); }
     if (st.failed) { const b = DT.el('button', 'btn btn-quiet btn-small', 'Retry'); b.type = 'button'; b.addEventListener('click', () => { retryQueriedReviews(f); }); p.append(' ', b); } // the computers that did not answer are asked again, each from where it stopped
     return p;
@@ -243,7 +243,8 @@ const NO_GOAL = 'No goal';
 const reviewSourceLabel = key => `${keyLabel(key)} · ${splitKey(key).server === LOCAL_SERVER ? 'This computer' : serverLabel(splitKey(key).server)}`;
 const goalLabel = s => (s.goal && s.goal.id && s.goal.title ? String(s.goal.title) : NO_GOAL); // the goal a row's task serves (a review's artifact roll-up, #8579; an agent's task, #7302), or the words for none
 const needsCtx = { text: needsText, teamOf, nameOf: needsName, goalOf: goalLabel };
-const orderedNeeds = () => NF.ordered(allNeeds().filter(s => NF.matches(s, s.queried ? { ...needsFilters, q: '', team: '', agent: needsFilters.agent === 'Unknown agent' ? needsFilters.agent : '', longer: '' } : needsFilters, needsCtx) && serverMatches(s, needsFilters)), needsFilters, s => (BL ? BL.weightOf(waitsOf(s)) : 0));
+const matchesNeeds = (s, filters) => NF.matches(s, s.queried ? { ...filters, q: '', team: '', agent: filters.agent === 'Unknown agent' ? filters.agent : '', longer: '', goal: reviewQueryState()?.goalFiltered ? '' : filters.goal } : filters, needsCtx) && serverMatches(s, filters);
+const orderedNeeds = () => NF.ordered(allNeeds().filter(s => matchesNeeds(s, needsFilters)), needsFilters, s => (BL ? BL.weightOf(waitsOf(s)) : 0));
 let needsOrder = null; // what the person has seen, in its order (#12636): a computer that answers late adds its rows at the end, it never moves the ones under the finger
 const needsKey = s => `${sessionServer(s)}:${s.session_id}`;
 const filteredNeeds = () => { const kept = NF.keepOrder(orderedNeeds(), needsKey, needsOrder, JSON.stringify([needsFilters, queries.needs])); needsOrder = kept.memory; return kept.rows; };
@@ -273,16 +274,19 @@ function inboxNeedsToolbar() {
         });
     }
     const all = allNeeds();
-    const teams = [...new Set(all.map(teamOf).filter(Boolean))].sort(), names = [...new Set(all.map(needsName))].sort();
-    const goalNames = [...new Set(all.filter(s => s.review || s.goal).map(goalLabel))].sort((a, b) => (a === NO_GOAL) - (b === NO_GOAL) || a.localeCompare(b)); // review rows and rows with a goal: "No goal" last
-    const rows = all.filter(s => NF.matches(s, { ...needsFilters, kind: '' }, needsCtx));
-    const counts = NF.KINDS.filter(kindShown).map(k => rows.filter(s => NF.kindOf(s) === k && (k === 'welcome' || needsUnread(s))).length); // a pill counts what the badge counts (the Welcome pill its own items)
+    const facets = reviewFilterOptions();
+    const teams = [...new Set([...all.map(teamOf).filter(Boolean), ...facets.teams])].sort(), names = [...new Set([...all.map(needsName), ...facets.agents])].sort();
+    const goalNames = [...new Set([...all.filter(s => s.review || s.goal).map(goalLabel).filter(title => !facets.goals.some(g => g.title === title)), ...facets.goals.map(g => g.value)])].sort((a, b) => (a === NO_GOAL) - (b === NO_GOAL) || a.localeCompare(b)); // review rows and rows with a goal: "No goal" last
+    const rows = all.filter(s => matchesNeeds(s, { ...needsFilters, kind: '' }));
+    const attention = reviewFilters() ? reviewQueryState()?.attentionTotal : reviewAttentionCount().complete ? unreadReviewCount() : null;
+    const summary = reviewPageSummary();
+    const counts = NF.KINDS.filter(kindShown).map(k => k === 'review' && attention !== null && attention !== undefined ? attention : rows.filter(s => NF.kindOf(s) === k && (k === 'welcome' || needsUnread(s))).length); // a pill counts what the badge counts (the Welcome pill its own items)
     const listed = NF.KINDS.filter(kindShown).map(k => rows.filter(s => NF.kindOf(s) === k).length), said = (n, m) => (n === m ? n : `${n} of ${m}`); // the rows read ones are listed too: 'For review 0 of 4', one number (the unread) and the list's size when they differ (#11886)
     const node = needsBar.draw({
         filters: needsFilters,
         options: { team: { values: teams, labels: {} }, agent: { values: names, labels: {} }, goal: { values: goalNames, labels: {} } },
         pills: { label: 'Show agents waiting on', current: needsFilters.kind || 'all',
-            items: [{ key: 'all', label: 'All', count: said(rows.filter(needsUnread).length, rows.length) }, ...NF.KINDS.filter(kindShown).map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: said(counts[i], listed[i]) }))],
+            items: [{ key: 'all', label: 'All', count: attention !== null && attention !== undefined ? rows.filter(s => !s.review && needsUnread(s)).length + attention : said(rows.filter(needsUnread).length, rows.length) }, ...NF.KINDS.filter(kindShown).map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: k === 'review' && attention !== null && attention !== undefined ? attention : said(counts[i], listed[i]) }))],
             onPick: key => { needsFilters = { ...needsFilters, kind: key === 'all' ? '' : key }; NF.saveFilters(needsFilters); renderInboxNav(true); } },
     });
     if (!node.querySelector('.inbox-group-review-toggle')) {
@@ -292,7 +296,7 @@ function inboxNeedsToolbar() {
         label.append(input, document.createTextNode('Group by goal')); node.append(label);
     }
     node.querySelector('.inbox-group-review-toggle').hidden = (!!needsFilters.kind && needsFilters.kind !== 'review') || (!reviewItems().length && needsFilters.kind !== 'review');
-    return { node, signature: JSON.stringify([groupReviews, needsFilters, teams, names, goalNames, counts, rows.length, rows.filter(needsUnread).length]) };
+    return { node, signature: JSON.stringify([groupReviews, needsFilters, teams, names, goalNames, counts, summary, rows.length, rows.filter(needsUnread).length]) };
 }
 
 // ── Tasks ────────────────────────────────────────────────────────────────
@@ -899,7 +903,7 @@ function savedListSpec(where = '') {
             ] }).el };
     if (!files.length) {
         if (dock) return spec;
-        return { ...spec, signature: JSON.stringify([spec.signature, reviewPagingSignature()]), node: () => { const wrap = DT.el('div', 'saved-files-wrap'); wrap.append(spec.node()); appendReviewPaging(wrap, true); return wrap; } };
+        return { ...spec, empty: savedReviewPages().some(p => p.has_more || p.error || p.loading) ? null : spec.empty, signature: JSON.stringify([spec.signature, reviewPagingSignature()]), node: () => { const wrap = DT.el('div', 'saved-files-wrap'); wrap.append(spec.node()); appendReviewPaging(wrap, true); return wrap; } };
     }
     return { ...spec, count: rows.length + files.length, empty: rows.length ? spec.empty : null, signature: JSON.stringify([spec.signature, reviewPagingSignature(), files.map(a => [a.reviewKey, a.name])]), node: () => { const wrap = DT.el('div', 'saved-files-wrap'), host = DT.el('div', 'saved-files'); wrap.append(host); appendReviewPaging(wrap, true); if (rows.length) wrap.append(DT.el('h3', 'saved-files-title', 'Saved messages'), spec.node()); importOnce('./saved_files.js').then(m => m.fillSavedFiles(host, files, { DT, reviewActions: a => hoverWrap(a, reviewActions(a, true)), openReview, shown: a => markHidden(a.name, { strict: true }), subtitleOf: a => subOf({ review: a, board_project: splitKey(a.team).name, server: splitKey(a.team).server }, true) })).catch(() => {}); return wrap; } };
 }
@@ -1010,8 +1014,13 @@ registerGroupSource('hub-inbox', {
             const goalOf = s => s.goal && s.goal.id && s.goal.title;
             const goal = rows.some(goalOf);
             const total = filteredNeeds().length, hidden = allNeeds().length - total, rowsCounted = rows.filter(needsUnread).length, totalCounted = filteredNeeds().filter(needsUnread).length; // what the filters hide is said above the list, with the way to show it (#10399)
+            const paging = reviewFilters() ? reviewQueryState() : null;
+            const openPages = paging ? paging.more || paging.loading || paging.failed : reviewPages().some(p => p.has_more || p.loading || p.error);
+            const attention = reviewFilters() ? { value: paging?.attentionTotal ?? filteredNeeds().filter(s => s.review && needsUnread(s)).length, complete: Number.isSafeInteger(paging?.attentionTotal) } : reviewAttentionCount();
+            const reviewCount = !needsFilters.kind || needsFilters.kind === 'review' ? attention.value : 0;
+            const totalAttention = filteredNeeds().filter(s => !s.review && needsUnread(s)).length + reviewCount;
             const manyTeams = new Set(allNeeds().map(teamOf).filter(Boolean)).size > 1; // with two or more teams waiting, a one-line row names its team
-            return { title: 'Needs you', noun: ['item', 'items'], rows, count: totalCounted > rowsCounted ? `${rowsCounted} of ${totalCounted}` : totalCounted, note: [...reviewErrors(), incompleteNote()].filter(Boolean).join(' '), empty: { line: reviewErrors().length ? 'Review documents could not be refreshed' : NF.isFiltered(needsFilters) ? 'Nothing that needs you matches the search and filters.' : 'Nothing needs you', hint: reviewErrors().length ? 'Some computers could not be read. Try again to check what needs you.' : NF.isFiltered(needsFilters) ? undefined : answered || 'An agent that asks a question or wants permission, and a review artifact, appear here. A task assigned to you is under Tasks.', go: reviewErrors().length ? undefined : NF.isFiltered(needsFilters) ? undefined : { action: 'inbox-go-agents', label: 'Go to Agents' } },
+            return { title: 'Needs you', noun: ['item', 'items'], rows, count: (!needsFilters.kind || needsFilters.kind === 'review') ? `${attention.complete ? '' : 'at least '}${totalAttention}` : totalCounted > rowsCounted ? `${rowsCounted} of ${totalCounted}` : totalCounted, note: [...reviewErrors(), incompleteNote()].filter(Boolean).join(' '), empty: openPages ? null : { line: reviewErrors().length ? 'Review documents could not be refreshed' : NF.isFiltered(needsFilters) ? 'Nothing that needs you matches the search and filters.' : 'Nothing needs you', hint: reviewErrors().length ? 'Some computers could not be read. Try again to check what needs you.' : NF.isFiltered(needsFilters) ? undefined : answered || 'An agent that asks a question or wants permission, and a review artifact, appear here. A task assigned to you is under Tasks.', go: reviewErrors().length ? undefined : NF.isFiltered(needsFilters) ? undefined : { action: 'inbox-go-agents', label: 'Go to Agents' } },
                 foot: needsFoot, signature: JSON.stringify([reviewPagingSignature(), reviewQueryState(), alertsOffered(), mutedWords(mutedReviewItems()), dayOldMutedFiles().map(a => a.hex), groupReviews, rows.map(s => !!s.review?.starred), hidden, finishedUnread().length, answered || '', manyTeams, needsOverflow().map(g => [g.name, g.more.map(a => a.reviewKey)]), reviewErrors(), incompleteNote(), rows.map(blocksOf), rows.map(s => [s.operatorAsk ? [s.operatorAsk.id, s.operatorAsk.text] : 0, sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, s.task ? [s.task.id, s.task.title] : 0, dirOf(s), s.review ? [needsReviewAttention(s.review), s.review.version, s.review.opened_version, s.review.new_comments, waitingOnAgent(s.review)] : 0, s.proposal ? s.proposal.state : 0])]), // the words move on with the clock: they are part of what was drawn
                 node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const groupFor = reviewGroupLookup(rows, groupReviews, r => !needsReviewAttention(r), reviewSourceLabel); const oneLineNeeds = !rows.some(isItem); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, ...(!oneLineNeeds ? { foldAt: () => isPhoneLayout() ? 48 : 40 } : {}), rows, orderRows: list => arrangeReviewRows(list, groupReviews), groupSorted: true, groupBy: groupFor, keepOrder: true, orderKey: JSON.stringify([needsFilters, queries.needs]), rowKey: s => `${sessionServer(s)}:${s.session_id}`, unread: needsUnread, ...(isPhoneLayout() ? { selectable: { contextKey: 'inbox-needs', longPress: true, iconBar: true, clearLabel: 'Cancel', canSelect: s => !!(s.review || s.operatorAsk || s.welcome || s.autorun || s.proposal || s.goalDone), actions: needsBulkActions(), onChange: keys => Toolbar.mountSelection(document.querySelector('#group-table-view .gt-toolbar'), keys.size ? table.bar : null) } } : {}), decorate: (s, tr) => { NF.decorateKindRow(tr); if (!needsUnread(s)) tr.classList.add('dt-read'); if (s.welcome && s.welcome.dismiss) tr.dataset.welcomeId = s.welcome.id; if (s.review && !decisionNeedsPerson(splitKey(s.review.team).server)) {
                         const cell = tr.querySelector('td[data-key="agent"]');
@@ -1087,7 +1096,8 @@ registerGroupSource('hub-inbox', {
                         { key: 'review', label: 'Actions', fixed: true, align: 'end', width: rows.some(s => s.goalDone) ? '17rem' : rows.some(s => s.proposal || s.review) ? '15rem' : '13.5rem', line: 1, cell: s => (!isItem(s) && s.agent_type && !s.review && !s.autorun ? answerCell(s) : s.welcome ? welcomeActions(s.welcome) : hoverWrap(s, s.proposal ? proposalActions(s.proposal) : s.skillReview ? skillActions(s.skillReview) : s.goalDone ? goalDoneActions(s.goalDone) : s.review ? reviewActions(s.review) : s.autorun ? runActions(s.autorun) : s.operatorAsk ? askActions(s.operatorAsk) : s.unrecorded ? unrecordedActions() : '')) },
                     ], ...(oneLineNeeds ? { oneLine: true, resize: true, sortBar: false } : {}), ...(oneLineNeeds ? { mail: s => ({ lead: { text: needsName(s), name: needsName(s) }, kindIcon: NF.kindIcon(s), title: needsName(s), medium: true, starred: !!(s.review && s.review.starred), team: teamOf(s), teamAlways: multipleServers() || manyTeams, nameTeam: true, snippetTip: true, snippet: [blocksShortOf(s), askOf(s) || sessionStateInfo(s).label].filter(Boolean).join(' \u00b7 '), snippetTitle: [blocksOf(s), askOf(s) || sessionStateInfo(s).label].filter(Boolean).join(' \u00b7 '), state: askOf(s) || sessionStateInfo(s).label, time: DT.shortTime(s.waiting_since), unread: true, mark: 'attention', answers: answerCell(s, { dismiss: false }), actions: rowActions(s) }) } : {}) }); // a phone's row is the mail row: the agent, then the ask on a second line, amber and bold (every row of Needs you is unanswered); a list with a review or a run keeps its own actions. One line a row (Goal #79) for a list of agents: the ask is the row's tooltip, a narrow list drops it, then the team, the folder and the CLI; a list with a review item or a failed run keeps its own folded rows
                     wrap.append(table.el); needsTable = table;
-                    if (!needsFilters.kind || needsFilters.kind === 'review') appendReviewPaging(wrap);
+                    if (!rows.length && openPages) wrap.append(DT.el('p', 'goals-note', (paging?.loading || reviewPages().some(p => p.loading)) ? 'Loading review files…' : 'More review files are available.'));
+                    if (!reviewFilters() && (!needsFilters.kind || needsFilters.kind === 'review')) appendReviewPaging(wrap);
                     if (groupReviews && rows.some(s => s.review)) wrap.append(DT.el('p', 'goals-note inbox-review-group-note', 'Counts describe the documents shown. More may appear as computers finish loading; additional documents are listed below when a producer has more than ten.'));
                     if (isPhoneLayout()) { const bar = document.querySelector('#group-table-view .gt-toolbar'); Toolbar.mountSelection(bar, needsState.selected.size ? table.bar : null); bar?.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); } // the bar takes the toolbar's line while rows are selected; no Select button: the long press is the way in
                     if (rows.some(r => r.welcome)) { const hide = DT.el('button', 'btn btn-quiet btn-small inbox-welcome-hide', 'Hide all welcome items'); hide.type = 'button'; hide.addEventListener('click', () => { hideAllWelcome(); sayLive('The welcome items are hidden.'); }); wrap.append(hide); } // one quiet way out (#11443)
