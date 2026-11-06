@@ -217,6 +217,20 @@ func withoutPromptForBatch(parts, raw []string) (outParts, outRaw []string, noti
 		i := strings.Index(s, promptFileMarker)
 		return i >= 0 && strings.HasSuffix(s, ")\"")
 	}
+	// A short prompt of plain characters is read by cmd.exe as it is: it goes on as it always did.
+	total, prompts, plain := 0, 0, true
+	for i, p := range parts {
+		total += len(p) + 1
+		if i > prog && isPrompt(p) {
+			prompts++
+			n, ok := plainPromptFileLen(p)
+			total += n
+			plain = plain && ok
+		}
+	}
+	if prompts > 0 && plain && total <= maxPlainLineLen {
+		return parts, raw, "", false
+	}
 	for i, p := range parts {
 		if i > prog && isPrompt(p) {
 			changed = true
@@ -237,6 +251,49 @@ func withoutPromptForBatch(parts, raw []string) (outParts, outRaw []string, noti
 		}
 	}
 	return outParts, outRaw, "Coral: " + filepath.Base(parts[prog]) + " is a .cmd wrapper Coral cannot read, and cmd.exe would change the first message, so this agent was started without it. Point the CLI path at the .exe (or at an npm-installed CLI), or type the first message yourself.", true
+}
+
+// maxPlainLineLen is the most the arguments of a .cmd may total (cmd.exe's line is 8191 characters; this leaves a wide margin for what PowerShell adds).
+const maxPlainLineLen = 3000
+
+// plainPromptChar reports whether cmd.exe reads c as itself inside double quotes, and as itself outside them: an ASCII letter or digit, a space, or one of . , : ; - _ + = / ? ( ).
+// Never a quote, backslash, % ^ & | < > ! $ ` ' @ # ~, a line break, any other control character, or a character beyond ASCII.
+func plainPromptChar(c rune) bool {
+	switch {
+	case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9', c == ' ':
+		return true
+	}
+	return strings.ContainsRune(".,:;-_+=/?()", c)
+}
+
+// plainPromptFileLen reads the prompt file that the prompt argument arg (the syntax promptArg wrote) names, and returns its length and whether every character is plain (plainPromptChar).
+// A file that cannot be read, is empty or is longer than maxPlainLineLen is not plain.
+func plainPromptFileLen(arg string) (int, bool) {
+	i := strings.Index(arg, promptFileMarker)
+	if i < 0 {
+		return 0, false
+	}
+	path := strings.TrimSuffix(arg[i+len(promptFileMarker):], `)"`)
+	if len(path) < 2 || path[0] != '\'' || path[len(path)-1] != '\'' {
+		return 0, false
+	}
+	path = strings.ReplaceAll(path[1:len(path)-1], "''", "'")
+	f, err := os.Open(path)
+	if err != nil {
+		return 0, false
+	}
+	defer f.Close()
+	buf := make([]byte, maxPlainLineLen+1)
+	n, _ := io.ReadFull(f, buf)
+	if n == 0 || n > maxPlainLineLen {
+		return n, false
+	}
+	for _, c := range string(buf[:n]) {
+		if !plainPromptChar(c) {
+			return n, false
+		}
+	}
+	return n, true
 }
 
 func fileExists(p string) bool {

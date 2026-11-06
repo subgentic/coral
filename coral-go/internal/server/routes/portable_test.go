@@ -15,8 +15,14 @@ func stubCLI(t *testing.T) string {
 	if runtime.GOOS != "windows" {
 		return "/usr/bin/true"
 	}
+	// A CLI installed by npm: its .cmd runs a program (here this test binary, which these tests never start). A plain wrapper script
+	// would be a CLI that Coral starts without the launch prompt, which is not what these tests are about.
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatalf("this test's program: %v", err)
+	}
 	p := filepath.Join(t.TempDir(), "true.cmd")
-	if err := os.WriteFile(p, []byte("@exit /b 0\r\n"), 0o755); err != nil {
+	if err := os.WriteFile(p, []byte("@ECHO off\r\nSETLOCAL\r\n\""+exe+"\"   %*\r\n"), 0o755); err != nil {
 		t.Fatalf("write the stub CLI: %v", err)
 	}
 	return p

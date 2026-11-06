@@ -263,7 +263,7 @@ func TestTheLogLineOfALaunchWithoutItsPromptNamesOnlyTheFile(t *testing.T) {
 	wrapper := filepath.Join(dir, "other.cmd")
 	require.NoError(t, os.WriteFile(wrapper, []byte("@echo off\r\nrealcli --wrapped %*\r\n"), 0o600))
 	files := &launchFiles{}
-	arg := files.promptArg("prompt489", "log", "txt", "", "hello")
+	arg := files.promptArg("prompt489", "log", "txt", "", "say \"hello\"")
 	_, err := files.done(ShellJoin([]string{wrapper, "--", arg}, arg))
 	require.NoError(t, err)
 	defer func() {
@@ -275,4 +275,74 @@ func TestTheLogLineOfALaunchWithoutItsPromptNamesOnlyTheFile(t *testing.T) {
 	assert.Contains(t, logged.String(), "cli=other.cmd")
 	assert.NotContains(t, logged.String(), "private folder name")
 	assert.NotContains(t, logged.String(), dir)
+}
+
+// A short prompt of plain characters goes to a .cmd that is not npm's as before (cmd.exe reads each character as itself); any other prompt is dropped with the notice.
+func TestAPlainPromptStillReachesAWrapperThatIsNotNpms(t *testing.T) {
+	native, err := os.Executable()
+	require.NoError(t, err)
+	dir := t.TempDir()
+	wrapper := filepath.Join(dir, "my cli.cmd")
+	require.NoError(t, os.WriteFile(wrapper, []byte("@echo off\r\n\""+native+"\" --wrapped %*\r\n"), 0o600))
+	shells := map[string]string{"powershell.exe": mustLook(t, "powershell.exe")}
+	if p := os.Getenv("CORAL_TEST_PWSH7"); p != "" {
+		shells["pwsh"] = p
+	}
+	plain := "Summarize the open tasks (all of them), then list: first, second; third = done? yes/no - 100 + 20_5."
+	for shellName, ps := range shells {
+		t.Run(shellName, func(t *testing.T) {
+			t.Setenv("CORAL_SHELL", ps)
+			for _, c := range []struct {
+				name, text string
+				reaches    bool
+			}{
+				{"plain", plain, true},
+				{"one word", "hello", true},
+				{"board join prompt", BuildBoardActionPrompt("diagnostic-board", "", "", nil, ""), false},
+				{"a quote", `say "hi"`, false},
+				{"a percent", "use 50% of it", false},
+				{"a caret", "a ^ b", false},
+				{"an ampersand", "a & b", false},
+				{"a pipe", "a | b", false},
+				{"less and greater", "a < b > c", false},
+				{"an exclamation mark", "hello!", false},
+				{"a backslash", `C:\x`, false},
+				{"a line break", "one\ntwo", false},
+				{"a tab", "one\ttwo", false},
+				{"a non-ASCII letter", "caf\u00e9", false},
+				{"too long", strings.Repeat("plain words ", 300), false},
+				{"empty", "", false},
+			} {
+				t.Run(c.name, func(t *testing.T) {
+					files := &launchFiles{}
+					arg := files.promptArg("prompt497", "plain", "txt", "", c.text)
+					line, err := files.done(ShellJoin([]string{wrapper, "--session-id", "s1", "--", arg}, arg))
+					require.NoError(t, err)
+					defer func() {
+						for _, f := range files.made {
+							_ = os.Remove(f)
+						}
+					}()
+					script := filepath.Join(t.TempDir(), "probe.ps1")
+					require.NoError(t, os.WriteFile(script, []byte("\ufeff"+line+"\nexit $LASTEXITCODE\n"), 0o600))
+					cmd := consoletest.HiddenCommand(ps, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script)
+					var out bytes.Buffer
+					cmd.Stdout, cmd.Stderr, cmd.Dir = &out, &out, dir
+					cmd.Env = append(os.Environ(), argvEchoEnv+"=1")
+					require.NoError(t, cmd.Start())
+					timer := time.AfterFunc(30*time.Second, func() { _ = cmd.Process.Kill() })
+					defer timer.Stop()
+					_ = cmd.Wait()
+					got := strings.ReplaceAll(out.String(), "\r\n", "\n")
+					if c.reaches {
+						assert.Equal(t, "[--wrapped]\n[--session-id]\n[s1]\n[--]\n["+c.text+"]\n--\n", got, "the prompt arrives whole")
+						assert.NotContains(t, line, "Write-Host", "and there is no notice")
+					} else {
+						assert.Contains(t, got, "Coral: my cli.cmd is a .cmd wrapper Coral cannot read", "the notice")
+						assert.True(t, strings.HasSuffix(got, "[--wrapped]\n[--session-id]\n[s1]\n--\n"), "and no prompt: %q", got[:min(len(got), 240)])
+					}
+				})
+			}
+		})
+	}
 }

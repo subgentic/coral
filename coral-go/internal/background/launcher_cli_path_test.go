@@ -253,7 +253,11 @@ func cliStubsOnPath(t *testing.T, names ...string) {
 	for _, n := range names {
 		file, body := n, "#!/bin/sh\nexit 0\n"
 		if runtime.GOOS == "windows" {
-			file, body = n+".cmd", "@exit /b 0\r\n"
+			// A CLI installed by npm (its .cmd runs a program, here this test binary, which these tests never start): a plain wrapper
+			// script is a CLI that Coral starts without the launch prompt.
+			exe, err := os.Executable()
+			require.NoError(t, err)
+			file, body = n+".cmd", "@ECHO off\r\nSETLOCAL\r\n\""+exe+"\"   %*\r\n"
 		}
 		require.NoError(t, os.WriteFile(filepath.Join(dir, file), []byte(body), 0o755))
 	}
