@@ -130,6 +130,8 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
         let tabbed = [];
         const fieldsTyped = [];
         await ev(`window.__census.push({ m: 'MARK', p: 'ui-open', keys: [] }); window.switchNavTab('hub-inbox'); true`); await ev(`window.__quiet()`);
+        await waitFor(`!!document.getElementById('inbox-frame') || document.querySelectorAll('#inbox-nav-list .view-list-item').length > 0`, 'the Inbox tab finishes mounting its folders', 15000);
+        await ev(`window.__quiet()`);
         const ui = await ev(`(() => ({ frame: !!document.getElementById('inbox-frame'), local: !!document.getElementById('inbox-local') && !document.getElementById('inbox-local').hidden, folders: [...document.querySelectorAll('#inbox-nav-list button')].length }))()`);
         if (ui.local && ui.folders > 0) {
             const n = ui.folders;
