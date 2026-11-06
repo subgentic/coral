@@ -19,9 +19,9 @@ assert.equal(server.decisionNeedsPerson(undefined), false);
 
 globalThis.fetch = async (url) => {
     const u = new URL(String(url), 'https://hub.example/');
-    if (u.pathname.endsWith('/artifacts')) {
+    if (u.pathname.endsWith('/api/team-artifacts')) {
         const hex = 'a'.repeat(64);
-        return Response.json({ artifacts: u.searchParams.get('tag') === 'for review' ? [{ id: hex, uri: `coral://artifacts/${hex}`, name: 'Plan', tags: ['for review'], available: true }] : [], has_more: false });
+        return Response.json({ artifacts: [{ board_id: 'team', id: hex, uri: `coral://artifacts/${hex}`, name: 'Plan', tags: ['for review'], available: true }], has_more: false });
     }
     return Response.json({}, { status: 404 });
 };
