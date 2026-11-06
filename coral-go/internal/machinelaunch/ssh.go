@@ -127,12 +127,15 @@ var (
 	ErrHostKeyMismatch = errors.New("the machine's SSH host key is not the one this launch pinned: nothing was sent to it")
 	// ErrSSHUnreachable is a droplet whose SSH did not answer within the window.
 	ErrSSHUnreachable = errors.New("could not reach the machine over SSH")
+	// ErrMachineNotReady is a machine whose SSH answered but whose setup never made the folder the credential goes in.
+	ErrMachineNotReady = errors.New("the machine's setup did not finish")
 )
 
 // Where the credential goes on the machine, and the commands the launcher runs there. None of them holds a secret: the credential travels on standard input.
 const (
 	credentialDir  = "/run/coral/bootstrap.d"
 	deliverCommand = "umask 077 && cat > " + credentialDir + "/credential.tmp && mv " + credentialDir + "/credential.tmp " + credentialDir + "/credential"
+	readyCommand   = "test -d " + credentialDir
 	statusCommand  = "/usr/local/bin/coral cloud status"
 	doneCommand    = "touch " + credentialDir + "/done"
 )
@@ -143,6 +146,8 @@ type SSHBootstrap struct {
 	Addr func(Instance) string
 	// Window is how long to wait for SSH to answer (0: 5 minutes); Every is the pause between tries (0: 3 seconds); EnrollWait is how long to wait for the droplet's Coral to enroll (0: 2 minutes).
 	Window, Every, EnrollWait time.Duration
+	// ReadyWait is how long to wait for the machine's setup to make the credential folder (0: 10 minutes).
+	ReadyWait time.Duration
 }
 
 var stateLine = regexp.MustCompile(`(?m)^State:\s+(\S+)`)
@@ -174,13 +179,21 @@ func (s *SSHBootstrap) Bootstrap(ctx context.Context, req BootRequest) (BootResu
 	defer client.Close()
 	fmt.Fprintf(req.Out, "Connected to the machine over SSH, its host key matches the pin.\n")
 
+	// sshd answers well before the machine's setup has made the folder the credential goes in (#13776: cloud-init runs coral-machine-setup, a download, before its last block makes /run/coral/bootstrap.d), so the
+	// launcher waits for the folder first, and mints only once the machine can take the credential: a one-time credential does not age while setup runs.
+	if err := s.waitReady(ctx, client); err != nil {
+		return BootResult{}, err
+	}
+
 	credential, err := req.Mint(ctx) // minted only now: the handshake proved this is the machine this launch made
 	if err != nil {
 		return BootResult{}, err
 	}
-	if err := run(client, deliverCommand, strings.NewReader(credential), nil); err != nil {
+	stderr := newStderrCap()
+	if err := runErr(client, deliverCommand, strings.NewReader(credential), nil, stderr); err != nil {
+		reason := sshReason(err) + stderrNote(stderr.String(), credential)
 		credential = ""
-		return BootResult{}, fmt.Errorf("could not write the credential on the machine: %s", sshReason(err))
+		return BootResult{}, fmt.Errorf("could not write the credential on the machine: %s", reason)
 	}
 	credential = ""
 
@@ -263,6 +276,29 @@ func dialContext(ctx context.Context, addr string, cfg *ssh.ClientConfig) (*ssh.
 	return ssh.NewClient(c, chans, reqs), nil
 }
 
+// waitReady asks the machine, over the open session, whether the credential folder exists yet, until it does or ReadyWait is over. The probe is a `test -d`: it reads nothing and creates nothing, so the folder's owner and mode
+// are only ever the ones the machine's own setup gave it.
+func (s *SSHBootstrap) waitReady(ctx context.Context, client *ssh.Client) error {
+	deadline := time.Now().Add(orDefault(s.ReadyWait, 10*time.Minute))
+	every := orDefault(s.Every, 3*time.Second)
+	for {
+		if err := run(client, readyCommand, nil, nil); err == nil {
+			return nil
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if time.Now().Add(every).After(deadline) {
+			return fmt.Errorf("%w: %s was not there after %s, so nothing was sent to it (its setup may have failed: check the machine's cloud-init log)", ErrMachineNotReady, credentialDir, orDefault(s.ReadyWait, 10*time.Minute))
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(every):
+		}
+	}
+}
+
 // waitEnrolled asks the droplet's own Coral over the still-open session whether it enrolled, until it says so or the wait is over. The answer is its own "coral cloud status" text; it holds no credential.
 func (s *SSHBootstrap) waitEnrolled(ctx context.Context, client *ssh.Client) (BootResult, error) {
 	deadline := time.Now().Add(orDefault(s.EnrollWait, 2*time.Minute))
@@ -323,6 +359,11 @@ func (c *capBuffer) String() string { return c.buf.String() }
 
 // run runs one command in a new session. stdin is its standard input (the only way a secret reaches the machine); stdout, when given, collects its output.
 func run(client *ssh.Client, command string, stdin io.Reader, stdout io.Writer) error {
+	return runErr(client, command, stdin, stdout, nil)
+}
+
+// runErr is run with the command's standard error collected too (nil: dropped).
+func runErr(client *ssh.Client, command string, stdin io.Reader, stdout, stderr io.Writer) error {
 	sess, err := client.NewSession()
 	if err != nil {
 		return err
@@ -330,7 +371,44 @@ func run(client *ssh.Client, command string, stdin io.Reader, stdout io.Writer) 
 	defer sess.Close()
 	sess.Stdin = stdin
 	sess.Stdout = stdout
+	sess.Stderr = stderr
 	return sess.Run(command)
+}
+
+// stderrMaxBytes is the most of a failing command's standard error that is collected; the error carries at most stderrShown of it.
+const (
+	stderrMaxBytes = 4 << 10
+	stderrShown    = 400
+)
+
+// newStderrCap is the buffer a failing command's standard error is collected in: a machine that writes without end cannot grow the launcher's memory.
+func newStderrCap() *capBuffer { return &capBuffer{max: stderrMaxBytes} }
+
+var credentialLike = regexp.MustCompile(`chb_[A-Za-z0-9_\-]+`)
+
+// stderrNote is what a failing command said, as a short suffix for an error: the credential (and anything shaped like one) replaced, control characters dropped, cut to stderrShown bytes. "" when it said nothing.
+func stderrNote(text, credential string) string {
+	if credential != "" {
+		text = strings.ReplaceAll(text, credential, "[credential]")
+	}
+	text = credentialLike.ReplaceAllString(text, "[credential]")
+	text = strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\t' {
+			return ' '
+		}
+		if r < 0x20 || r == 0x7f {
+			return -1
+		}
+		return r
+	}, text)
+	text = strings.Join(strings.Fields(text), " ")
+	if text == "" {
+		return ""
+	}
+	if len(text) > stderrShown {
+		text = strings.ToValidUTF8(text[:stderrShown], "") + "..."
+	}
+	return " (the machine said: " + text + ")"
 }
 
 // sshReason is an SSH error as a short sentence that never holds what was sent.

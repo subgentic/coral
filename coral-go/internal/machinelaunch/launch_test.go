@@ -106,6 +106,8 @@ type stubSSH struct {
 	authed     int // logins the server accepted: a key it knew
 	mintAuthed int // authed at the moment the credential was minted (-1: never minted)
 	status     string
+	// handle, when set, answers a command in place of the default (exit 0, the status text for the status command): its standard output, standard error and exit status. It runs with s.mu NOT held.
+	handle func(cmd, stdin string) (out, errOut string, code uint32)
 }
 
 func startStubSSH(t *testing.T, host ssh.Signer, login ssh.PublicKey) *stubSSH {
@@ -173,13 +175,20 @@ func (s *stubSSH) serve(c net.Conn, cfg *ssh.ServerConfig) {
 				s.mu.Lock()
 				s.commands = append(s.commands, cmd.Command)
 				s.stdins = append(s.stdins, string(in))
-				out := ""
+				out, errOut, code := "", "", uint32(0)
 				if cmd.Command == statusCommand {
 					out = s.status
 				}
+				h := s.handle
 				s.mu.Unlock()
+				if h != nil {
+					out, errOut, code = h(cmd.Command, string(in))
+				}
 				_, _ = io.WriteString(ch, out)
-				_, _ = ch.SendRequest("exit-status", false, binary.BigEndian.AppendUint32(nil, 0))
+				if errOut != "" {
+					_, _ = io.WriteString(ch.Stderr(), errOut)
+				}
+				_, _ = ch.SendRequest("exit-status", false, binary.BigEndian.AppendUint32(nil, code))
 				return
 			}
 		}()
@@ -387,7 +396,8 @@ func TestLaunchMintFailureAfterTheHandshakeDeletesTheMachine(t *testing.T) {
 	o, d, _, srv := setupWith(t, p, h)
 	_, err := Launch(context.Background(), o, d)
 	cmds, _, _ := srv.seen()
-	if err == nil || len(cmds) != 0 || !strings.Contains(strings.Join(p.calls, ","), "delete:42") {
+	// The one thing that may have run before the mint is the read-only probe for the credential folder (#13776); nothing was written.
+	if err == nil || len(cmds) != 1 || cmds[0] != readyCommand || !strings.Contains(strings.Join(p.calls, ","), "delete:42") {
 		t.Fatalf("err %v, commands %q, calls %v", err, cmds, p.calls)
 	}
 }
