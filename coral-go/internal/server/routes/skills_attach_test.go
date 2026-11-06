@@ -286,7 +286,8 @@ func TestEveryLaunchedAgentHasUsingCoralAttachedAndItIsNotInTheNote(t *testing.T
 	assert.Len(t, attached, 2, "the named skill and using-coral, once each")
 }
 
-var settingsFileRe = regexp.MustCompile(`--settings (\S+\.json)`)
+// The path may be single-quoted: a Windows launch line quotes a path that holds a backslash.
+var settingsFileRe = regexp.MustCompile(`--settings '?([^'\s]+\.json)'?`)
 
 // systemPromptOf is the system prompt of the Claude launch that made session sessionName ("" while its command has not been sent): the settings file its command names.
 func (e *launchEnv) systemPromptOf(sessionName string) string {
