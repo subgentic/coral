@@ -352,7 +352,7 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 		return ""
 	}
 	if mine == nil {
-		r, err := h.m.Claim(ctx, res.Key, agent, "auto: "+pattern)
+		r, err := h.m.Claim(WithSession(ctx, name), res.Key, agent, "auto: "+pattern)
 		if err != nil {
 			return "" // queue trouble never stops a command
 		}
