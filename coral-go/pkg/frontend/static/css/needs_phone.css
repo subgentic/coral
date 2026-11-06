@@ -32,6 +32,7 @@
 @media (max-width: 760px) {
     .inbox-needs-results .inbox-pinned-context { display: none; }
     .inbox-review-star-anchor .inbox-pinned-inline-context { display: inline; }
+    .inbox-review-star-anchor .inbox-pinned-filename { word-break: break-all; } /* keep a filename prefix beside its goal context at enlarged text sizes */
 }
 
 @media (max-width: 760px) {

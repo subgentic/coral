@@ -997,7 +997,7 @@ registerGroupSource('hub-inbox', {
                             inline.title = fullContext;
                             // A pin is outside its goal group. Lead with its compact identity
                             // inside the existing clamp, even with enlarged phone text.
-                            if (s.review.goal_id) filename.prepend(inline); else filename.append(inline);
+                            if (s.review.goal_id) { const title = DT.el('span', 'inbox-pinned-filename'), first = filename.firstChild; if (first) { first.replaceWith(title); title.append(first); } filename.prepend(inline); } else filename.append(inline);
                             filename.setAttribute('aria-label', `${filename.getAttribute('aria-label')}, ${fullContext}`);
                         }
                     }
