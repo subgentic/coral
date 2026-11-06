@@ -272,7 +272,8 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 	var launched []map[string]any
 	var categories []string // the analytics category of each member that failed
 	firstFailure := ""
-	for _, agentDef := range body.Agents {
+	seatAt := teamSeatIndex(body.Agents)
+	for memberAt, agentDef := range body.Agents {
 		if agentDef.Name == "" {
 			continue
 		}
@@ -319,7 +320,7 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 		}
 		// A member that names no mode, flags or capabilities starts in the CLI's normal confirm mode, the "Default" the team form shows (#6415, Codex Test's #6412): the server no longer
 		// widens an empty member to Auto (#5836 still applies to a single launch). What the person chose (flags, capabilities, a saved default) is used as before.
-		entry, category := h.launchTeamMember(ctx, body, agentDef, userSettings, workingDir, worktreePath, teamID, false)
+		entry, category := h.launchTeamMember(ctx, body, agentDef, userSettings, workingDir, worktreePath, teamID, false, !fromAgent && memberAt == seatAt)
 		_, memberFailed := entry["error"]
 		sidMade, _ := entry["session_id"].(string)
 		h.endAgentLaunch(ctx, h.accountingBoard(r, body.BoardName, body.BoardServer), lifeID, !memberFailed, launcherWords(h.orchActorOf(r))+" started "+orchName(agentDef.Name), sidMade)
@@ -676,12 +677,12 @@ func (h *SessionsHandler) createTeamRecord(ctx context.Context, body launchTeamR
 // default for its type), its own flags or the team's (without their permission flags: launchSession derives those),
 // the team's distilled knowledge in its prompt. It returns the member's entry for the reply ({name, error} when it
 // failed) and, for a launch that failed, its analytics category.
-func (h *SessionsHandler) launchTeamMember(ctx context.Context, body launchTeamRequest, def launchTeamAgent, userSettings map[string]string, workingDir, worktreePath string, teamID int64, autoByDefault bool) (map[string]any, string) {
+func (h *SessionsHandler) launchTeamMember(ctx context.Context, body launchTeamRequest, def launchTeamAgent, userSettings map[string]string, workingDir, worktreePath string, teamID int64, autoByDefault, seat bool) (map[string]any, string) {
 	agentType := body.AgentType
 	if def.AgentType != "" {
 		agentType = def.AgentType
 	}
-	effectiveModel := defaultModelFromSettings(userSettings, agentType, def.Model)
+	effectiveModel := defaultModelForRole(userSettings, agentType, def.Model, seat)
 	agentFlags := def.Flags
 	memberPermMode := "" // the mode the team's flags stand for, handed on so that it is the one stored (below)
 	if len(agentFlags) == 0 {
@@ -708,7 +709,7 @@ func (h *SessionsHandler) launchTeamMember(ctx context.Context, body launchTeamR
 	if modelArgs, _ := agentmodels.ModelArgs(effectiveModel); modelArgs != nil { // checked above
 		agentFlags = append(agentFlags, modelArgs...)
 	}
-	effectiveThinking := defaultThinkingFromSettings(userSettings, agentType, def.Thinking)
+	effectiveThinking := defaultThinkingForRole(userSettings, agentType, def.Thinking, seat)
 	skillRows, _ := h.resolveSkillIDs(ctx, unionSkillIDs(body.Skills, def.Skills)) // checked before the launch started; one that changed since is simply not told
 	skillRows = h.withTeamBuilderSkill(ctx, skillRows, def.Name)                   // the Orchestrator seat also gets the team-builder skill (#13894)
 	result, err := h.launchSession(ctx, launchSpec{

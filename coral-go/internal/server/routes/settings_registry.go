@@ -186,6 +186,20 @@ func lookupSetting(key string) (settingSpec, bool) {
 			}
 		}
 	}
+	if t, ok := strings.CutPrefix(key, "default_orchestrator_model_"); ok { // #13899
+		for _, known := range agentTypes {
+			if t == known {
+				return generic(textSetting), true
+			}
+		}
+	}
+	if t, ok := strings.CutPrefix(key, "default_orchestrator_thinking_"); ok {
+		for _, known := range agentTypes {
+			if t == known {
+				return generic(thinkingSetting(t)), true
+			}
+		}
+	}
 	return settingSpec{}, false
 }
 

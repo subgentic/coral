@@ -324,6 +324,11 @@ func (h *SessionsHandler) getDiffMode(ctx context.Context) string {
 // back to the user's default_model_<agentType> setting. Returns "" if
 // neither is set. Terminal agents never receive a model.
 func (h *SessionsHandler) resolveModel(ctx context.Context, agentType, requestModel string) string {
+	return h.resolveModelFor(ctx, agentType, requestModel, false)
+}
+
+// resolveModelFor is resolveModel for a launch whose role is known (#13899): the Orchestrator of a team falls back to default_orchestrator_model_<type> before the workers' default_model_<type>.
+func (h *SessionsHandler) resolveModelFor(ctx context.Context, agentType, requestModel string, orchestrator bool) string {
 	if agentType == at.Terminal {
 		return ""
 	}
@@ -337,13 +342,44 @@ func (h *SessionsHandler) resolveModel(ctx context.Context, agentType, requestMo
 	if err != nil {
 		return ""
 	}
-	return defaultModelFromSettings(settings, agentType, requestModel)
+	return defaultModelForRole(settings, agentType, requestModel, orchestrator)
 }
 
 // defaultModelFromSettings looks up default_model_<agentType> in an already-loaded
 // settings map. Used by LaunchTeam to avoid re-reading settings per agent.
 // Terminal agents never receive a model.
 func defaultModelFromSettings(settings map[string]string, agentType, requestModel string) string {
+	return defaultModelForRole(settings, agentType, requestModel, false)
+}
+
+// teamSeatIndex is the member of a team launch that is the team's Orchestrator seat: the first whose name claims the role, the rule the grant seed uses (#13891). -1 when none does. Only this member starts on
+// the Orchestrator's own default model and thinking level (#13964): a name with "orchestrator" in it is no longer enough, and a later member that has one is a worker.
+func teamSeatIndex(agents []launchTeamAgent) int {
+	for i, a := range agents {
+		if a.Name != "" && board.ClaimsOrchestrator(a.Name, "") {
+			return i
+		}
+	}
+	return -1
+}
+
+// launchTakesTheSeat says a single launch is its team's Orchestrator for the defaults (#13964): the Operator's own launch (never an agent's: it always starts workers' defaults), named as the role, on a team
+// that has no Orchestrator held by anyone else. A launch on no team, or on another computer's board the check cannot see, has no holder to stand in its way.
+func (h *SessionsHandler) launchTakesTheSeat(ctx context.Context, r *http.Request, displayName, agentType, boardName, boardServer string) bool {
+	subscriber := naming.SubscriberID(displayName, agentType)
+	if agentCaller(r) || displayName == "" || !board.ClaimsOrchestrator(subscriber, "") {
+		return false
+	}
+	if h.bs == nil || boardName == "" || (boardServer != "" && boardServer != "local") {
+		return true
+	}
+	holder, err := h.bs.OrchestratorSeatHeldBy(ctx, boardName, subscriber)
+	return err == nil && holder == ""
+}
+
+// defaultModelForRole is the model a launch starts on, first that is set winning: the one named in the launch, for an Orchestrator its type's default_orchestrator_model_<type>, the type's default_model_<type>
+// (the workers'), none (#13899). Terminal agents never receive a model.
+func defaultModelForRole(settings map[string]string, agentType, requestModel string, orchestrator bool) string {
 	if agentType == at.Terminal {
 		return ""
 	}
@@ -352,6 +388,11 @@ func defaultModelFromSettings(settings map[string]string, agentType, requestMode
 	}
 	if agentType == "" || settings == nil {
 		return ""
+	}
+	if orchestrator {
+		if m := setreg.TextFamily(settings, setreg.DefaultOrchestratorModelPrefix+agentType); m != "" {
+			return m
+		}
 	}
 	model := setreg.TextFamily(settings, setreg.DefaultModelPrefix+agentType)
 	if model == "" {
