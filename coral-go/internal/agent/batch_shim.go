@@ -167,6 +167,43 @@ func unwrapBatchShim(parts []string) []string {
 	return append(append([]string{}, cmd...), parts[1:]...)
 }
 
+// promptFileMarker starts every prompt argument promptArg makes for PowerShell (FormatPromptFileArg).
+const promptFileMarker = `"$(Get-Content -Raw -Encoding UTF8 -LiteralPath `
+
+// withoutPromptForBatch is for a launch whose program is a .cmd or .bat that unwrapBatchShim did not unwrap: cmd.exe would read the
+// prompt again with its own rules (it fails or changes it), so the launch goes without it. It returns parts and raw without the
+// prompt arguments (and the "--" that stood before one), and the notice the pane shows first; changed is false when parts holds
+// no such program or no prompt.
+func withoutPromptForBatch(parts, raw []string) (outParts, outRaw []string, notice string, changed bool) {
+	if len(parts) == 0 || !isBatchFile(parts[0]) {
+		return parts, raw, "", false
+	}
+	isPrompt := func(s string) bool {
+		i := strings.Index(s, promptFileMarker)
+		return i >= 0 && strings.HasSuffix(s, ")\"")
+	}
+	for i, p := range parts {
+		if i > 0 && isPrompt(p) {
+			changed = true
+			continue
+		}
+		outParts = append(outParts, p)
+	}
+	if !changed {
+		return parts, raw, "", false
+	}
+	// A "--" that was left last only separated the prompt from the options.
+	if n := len(outParts); n > 1 && outParts[n-1] == "--" {
+		outParts = outParts[:n-1]
+	}
+	for _, r := range raw {
+		if !isPrompt(r) {
+			outRaw = append(outRaw, r)
+		}
+	}
+	return outParts, outRaw, "Coral: " + filepath.Base(parts[0]) + " is a .cmd wrapper Coral cannot read, and cmd.exe would change the first message, so this agent was started without it. Point the CLI path at the .exe (or at an npm-installed CLI), or type the first message yourself.", true
+}
+
 func fileExists(p string) bool {
 	st, err := os.Stat(p)
 	return err == nil && !st.IsDir()

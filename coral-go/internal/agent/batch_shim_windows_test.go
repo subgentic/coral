@@ -156,3 +156,45 @@ func TestAPromptReachesTheProgramOfAnNpmCmdShimWhole(t *testing.T) {
 		})
 	}
 }
+
+// A .cmd that is not npm's cannot be unwrapped, and cmd.exe would read the prompt again: the agent is started without the prompt, and the pane says so.
+func TestAWrapperThatIsNotNpmsStartsWithoutThePromptAndSaysSo(t *testing.T) {
+	native, err := os.Executable()
+	require.NoError(t, err)
+	dir := t.TempDir()
+	wrapper := filepath.Join(dir, "my cli.cmd")
+	require.NoError(t, os.WriteFile(wrapper, []byte("@echo off\r\n\""+native+"\" --wrapped %*\r\n"), 0o600))
+	for shellName, ps := range map[string]string{"powershell.exe": mustLook(t, "powershell.exe")} {
+		t.Run(shellName, func(t *testing.T) {
+			t.Setenv("CORAL_SHELL", ps)
+			text := "Read \"words\"\nKeep > and < and & literal."
+			files := &launchFiles{}
+			arg := files.promptArg("prompt489", "wrapper", "txt", "", text)
+			line, err := files.done(ShellJoin([]string{wrapper, "--session-id", "s1", "--", arg}, arg))
+			require.NoError(t, err)
+			defer func() {
+				for _, f := range files.made {
+					_ = os.Remove(f)
+				}
+			}()
+			assert.NotContains(t, line, "Get-Content -Raw -Encoding UTF8 -LiteralPath '"+files.made[0], "the prompt file is not on the line")
+			script := filepath.Join(t.TempDir(), "probe.ps1")
+			require.NoError(t, os.WriteFile(script, []byte("\ufeff"+line+"\nexit $LASTEXITCODE\n"), 0o600))
+			cmd := consoletest.HiddenCommand(ps, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script)
+			var out bytes.Buffer
+			cmd.Stdout, cmd.Stderr, cmd.Dir = &out, &out, dir
+			cmd.Env = append(os.Environ(), argvEchoEnv+"=1")
+			require.NoError(t, cmd.Run(), out.String())
+			got := strings.ReplaceAll(out.String(), "\r\n", "\n")
+			assert.Contains(t, got, "Coral: my cli.cmd is a .cmd wrapper Coral cannot read")
+			assert.True(t, strings.HasSuffix(got, "[--wrapped]\n[--session-id]\n[s1]\n--\n"), "the program got its options and no prompt: %q", got)
+		})
+	}
+}
+
+func mustLook(t *testing.T, name string) string {
+	t.Helper()
+	p, err := exec.LookPath(name)
+	require.NoError(t, err)
+	return p
+}
