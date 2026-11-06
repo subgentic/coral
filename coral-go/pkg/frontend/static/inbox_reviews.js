@@ -497,7 +497,9 @@ export function recordOpenedVersion(hex, { server, board = '' }) {
         if (!data.series_id || !Number.isSafeInteger(data.opened_version) || data.opened_version < 1) return false;
         const team = board ? identityKey(server, board) : '';
         for (const row of [...items, ...saved, ...muted]) if (row.series_id === data.series_id && splitKey(row.team).server === normServer(server) && (!team || row.team === team)) row.opened_version = Math.max(row.opened_version || 0, data.opened_version);
-        revision++; changed(); return true;
+        revision++;
+        if (fview) { fview.invalidCounts = true; refreshActiveQuery().catch(() => {}); }
+        changed(); return true;
     })().catch(() => false).finally(() => openingVersions.delete(key));
     openingVersions.set(key, work); return work;
 }
