@@ -4,6 +4,7 @@ package agent
 
 import (
 	"bytes"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -248,4 +249,30 @@ func TestABareOrRelativeCLINameThatIsACmdIsNotRunWithThePrompt(t *testing.T) {
 		assert.NotContains(t, line, "Get-Content -Raw -Encoding UTF8 -LiteralPath", name+": no prompt")
 		assert.Contains(t, line, "Write-Host 'Coral: other.cmd is a .cmd wrapper", name)
 	}
+}
+
+// The log line of a launch started without its prompt names the CLI by its file name only, not the folder it is in.
+func TestTheLogLineOfALaunchWithoutItsPromptNamesOnlyTheFile(t *testing.T) {
+	var logged bytes.Buffer
+	old := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logged, nil)))
+	t.Cleanup(func() { slog.SetDefault(old) })
+
+	dir := filepath.Join(t.TempDir(), "private folder name")
+	require.NoError(t, os.MkdirAll(dir, 0o700))
+	wrapper := filepath.Join(dir, "other.cmd")
+	require.NoError(t, os.WriteFile(wrapper, []byte("@echo off\r\nrealcli --wrapped %*\r\n"), 0o600))
+	files := &launchFiles{}
+	arg := files.promptArg("prompt489", "log", "txt", "", "hello")
+	_, err := files.done(ShellJoin([]string{wrapper, "--", arg}, arg))
+	require.NoError(t, err)
+	defer func() {
+		for _, f := range files.made {
+			_ = os.Remove(f)
+		}
+	}()
+	assert.Contains(t, logged.String(), "started without the first message")
+	assert.Contains(t, logged.String(), "cli=other.cmd")
+	assert.NotContains(t, logged.String(), "private folder name")
+	assert.NotContains(t, logged.String(), dir)
 }
