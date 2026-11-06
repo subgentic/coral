@@ -50,6 +50,7 @@ func newGoalOpRig(t *testing.T) *goalOpRig {
 	})
 	r.Post("/api/board/{project}/goals/{goalID}/driver", h.SetGoalDriver)
 	r.Post("/api/board/{project}/goals/{goalID}/move", h.MoveGoal)
+	r.Post("/api/board/{project}/goals/{goalID}/done-state", h.SetGoalDoneState)
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)
 	g := &goalOpRig{t: t, h: h, bs: bs, srv: srv}

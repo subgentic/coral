@@ -38,7 +38,7 @@ var routeQueries = map[string]string{
 	"GET /api/goal-links":                         "cursor,limit,request_id",
 	"GET /api/goals":                              "board,cursor,limit,state",
 	"GET /api/goals/metrics":                      "hours",
-	"GET /api/needs-you":                          "after,limit",
+	"GET /api/needs-you":                          "after,kind=agent|question|wait|proposal|review|goal_done|skill,limit",
 	"GET /api/operator-asks":                      "cursor,limit,paged",
 	"GET /api/proposals":                          "cursor,limit,project,state",
 	"GET /api/saved":                              "agent,author,conv,kind,limit,q,sort,state,team",
@@ -101,5 +101,6 @@ var routeQueries = map[string]string{
 	"POST /api/sessions/live/{}/notes":            "session_id",
 	"POST /api/sessions/live/{}/share-file":       "filepath*,session_id",
 	"POST /api/sessions/live/{}/tasks":            "session_id",
+	"POST /api/sessions/record-agents":            "dry_run=1",
 	"PUT /api/sessions/live/{}/file-content":      "filepath*,session_id,worktree",
 }

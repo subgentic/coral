@@ -72,6 +72,7 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 		}
 		return routes.GoalDoneHiddenFrom(st)
 	})
+	boardHandler.SetGoalDoneEdit(sessStore.EditSettingList)
 	boardHandler.SetGoalDoneQuiet(func(ctx context.Context) time.Duration {
 		st, err := sessStore.GetSettings(ctx)
 		if err != nil {
@@ -267,10 +268,11 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	r.Get("/api/board/{project}/goals/{goalID}", boardHandler.GetGoal)
 	r.With(routes.RefuseSignInLink).Patch("/api/board/{project}/goals/{goalID}", boardHandler.UpdateGoal)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/goals/{goalID}/close", boardHandler.CloseGoal)
-	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/goals/{goalID}/driver", boardHandler.SetGoalDriver) // the Operator changes who drives a goal (#12693)
-	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/goals/{goalID}/move", boardHandler.MoveGoal)        // the Operator gives a goal to another team (#12693)
-	r.Get("/api/board/{project}/proposals", boardHandler.ListProposals)                                            // what agents asked to add and the Operator has not decided (#11389; owner-only through Coral Hub)
-	r.Get("/api/proposals", boardHandler.ListProposals)                                                            // every board's: the Needs you rows
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/goals/{goalID}/driver", boardHandler.SetGoalDriver)        // the Operator changes who drives a goal (#12693)
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/goals/{goalID}/done-state", boardHandler.SetGoalDoneState) // Not yet, Dismiss, Undo and Mark read or unread on a goal-looks-done row (#13834)
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/goals/{goalID}/move", boardHandler.MoveGoal)               // the Operator gives a goal to another team (#12693)
+	r.Get("/api/board/{project}/proposals", boardHandler.ListProposals)                                                   // what agents asked to add and the Operator has not decided (#11389; owner-only through Coral Hub)
+	r.Get("/api/proposals", boardHandler.ListProposals)                                                                   // every board's: the Needs you rows
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/proposals/{id}/approve", boardHandler.ApproveProposal)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/proposals/{id}/reject", boardHandler.RejectProposal)
 	r.Put("/api/board/{project}/tasks/{taskID}/goal", boardHandler.SetTaskGoal)

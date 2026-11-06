@@ -72,6 +72,8 @@ EXTRA = {
 # the agents' own history options and two the hub's tools stopped using. Remove a name here, with the reason, only when the
 # hub needs it.
 DROP = {
+    # Record for all agents (#13834, Security MUST B): ?all=1 records every match with no list shown to the Operator. The Hub never needs it (it sends the pairs the dry run listed); the handler also refuses it for a Hub caller.
+    'POST /api/sessions/record-agents': {'all'},
     # The check by path runs a binary the caller names: the Operator's, on this computer only (the handler refuses a tunneled one, and the table does not carry it either).
     'GET /api/system/cli-check': {'binary'},
     # An agent's own history search (coral-agent): another session, its ancestors, the excerpt size.
@@ -87,6 +89,10 @@ DROP = {
 # (internal/background and coral-hub internal/feed): a dashboard-less client that must not consume the machine's pending UI
 # notifications. Only that exact value is accepted through the tunnel; anything else (feed=, feed=Hub, feed=hub2, two values) is refused.
 ENUM = {
+    # Needs you filtered to one kind (#13834): only a kind the answer counts passes.
+    'GET /api/needs-you': {'kind': ['agent', 'question', 'wait', 'proposal', 'review', 'goal_done', 'skill']},
+    # The preview of Record for all agents (#13834): only dry_run=1 passes, so the dry run and the confirm are two signed targets.
+    'POST /api/sessions/record-agents': {'dry_run': ['1']},
     # diff=fields (#3281) only changes the feed's shape (partial rows for a dashboard); only that exact value passes.
     'GET /ws/coral': {'feed': ['hub'], 'diff': ['fields']},
     # One row per file (#11700, coral-hub's ask #11782): versions accepts only newest through the tunnel. The handler also takes "all", which the Hub has no use for; any other word is refused here as it is by the handler.

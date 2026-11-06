@@ -189,6 +189,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if (m == http.MethodPut || m == http.MethodDelete) && strings.HasPrefix(p, "/api/board/") && strings.HasSuffix(p, "/review") {
 				continue
 			}
+			// The done-state of a goal-looks-done row (#13834) and the bulk Record for all agents (#13834) are the owner's alone: the old list never had them.
+			if m == http.MethodPost && ((strings.HasPrefix(p, "/api/board/") && strings.HasSuffix(p, "/done-state")) || p == "/api/sessions/record-agents") {
+				continue
+			}
 			// The one difference of #5610: the table's {id} is any one segment, so a task artifact-content path with a non-number id is stamped too (its handler refuses it).
 			if strings.HasPrefix(p, "/api/board/") && strings.HasSuffix(p, "/artifact-content") && m == http.MethodGet {
 				continue
