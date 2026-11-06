@@ -555,8 +555,10 @@ func promptRemoteAccess(in io.Reader, out io.Writer, tlsOn bool) bool {
 		fmt.Fprintln(out, "  reverse proxy, or start Coral with --tls-cert and --tls-key.")
 	}
 	fmt.Fprintln(out)
-	fmt.Fprintln(out, "  Note: If you're running inside WSL2, you'll need to either enable remote")
-	fmt.Fprintln(out, "  access here or set up port forwarding from Windows to reach the dashboard.")
+	// WSL2 forwards localhost to Windows, and Coral handles that relay: a WSL2 user needs no remote access to use Coral from a
+	// Windows browser on the same computer (the WSL2 install walk, task #485).
+	fmt.Fprintln(out, "  Note: inside WSL2, a browser on this Windows computer reaches the dashboard at")
+	fmt.Fprintln(out, "  http://localhost without this. Turn it on only for other devices.")
 	fmt.Fprintln(out)
 	fmt.Fprint(out, "  Enable remote access? [y/N]: ")
 	scanner := bufio.NewScanner(in)
