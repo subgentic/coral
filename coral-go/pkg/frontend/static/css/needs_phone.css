@@ -7,11 +7,13 @@
 /* A phone's review and question rows (#13795, matching coral-hub's phone frames; reverses #11857's 'sender and name on line one', which cut both at 390): the title is line one, whole (two lines at most), the sender's full name is line two with the wait at its right, and the kind's own words ('For review', 'Needs your answer') are left to the icon, which names the kind; a question the uploader put on the file still shows under the sender. */
 .inbox-review-wait { display: none; } /* the Waiting column says it; only a phone's item cell shows it */
 @media (max-width: 760px) {
-    .inbox-needs-results .inbox-review-item.inbox-title-first { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name name" "from wait" "more more"; align-items: baseline; gap: 2px 8px; }
-    .inbox-needs-results .inbox-review-item.inbox-title-first > .inbox-review-name { grid-area: name; min-width: 0; max-width: 100%; white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; text-align: start; }
-    .inbox-needs-results .inbox-review-item.inbox-title-first > .inbox-review-from { grid-area: from; max-width: none; min-width: 0; font-weight: var(--fw-regular); color: var(--text-secondary); }
-    .inbox-needs-results .inbox-review-item.inbox-title-first > .inbox-review-from::after { content: none; }
-    .inbox-needs-results .inbox-kind-words { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); } /* in the page for a screen reader, not drawn */
-    .inbox-needs-results .inbox-review-item.inbox-title-first > .inbox-review-wait { display: block; grid-area: wait; white-space: nowrap; color: var(--text-muted); }
-    .inbox-needs-results .inbox-review-item.inbox-title-first > :is(.inbox-review-earlier, .inbox-new-comments) { grid-column: 1 / -1; }
+    /* A phone's review and question rows (#13829, the Operator on #13795/#13818: too bunched): line one the agent's name, line two the ask with the time since at its right; the kind's words, the goal and the task are not drawn */
+    .inbox-needs-results .inbox-review-item.inbox-agent-first { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "from from" "name wait" "more more"; align-items: baseline; gap: 2px 8px; }
+    .inbox-needs-results .inbox-review-item.inbox-agent-first > .inbox-review-from { grid-area: from; max-width: none; min-width: 0; }
+    .inbox-needs-results .inbox-review-item.inbox-agent-first > .inbox-review-from::after { content: none; }
+    .inbox-needs-results .inbox-review-item.inbox-agent-first > .inbox-review-name { grid-area: name; min-width: 0; max-width: 100%; white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; text-align: start; }
+    .inbox-needs-results .inbox-kind-words { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); } /* "For review", "Needs your answer": in the page for a screen reader, not drawn (display: none would take the row's menu anchor with it) */
+    .inbox-needs-results .inbox-ask-subject-links { display: none; } /* Goal and Task links are the computer's (#13818); not drawn, so no tap target is left behind */
+    .inbox-needs-results .inbox-review-item.inbox-agent-first > .inbox-review-wait { display: block; grid-area: wait; white-space: nowrap; color: var(--text-muted); }
+    .inbox-needs-results .inbox-review-item.inbox-agent-first > :is(.inbox-review-earlier, .inbox-new-comments) { grid-column: 1 / -1; }
 }
