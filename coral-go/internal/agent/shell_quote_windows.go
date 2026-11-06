@@ -55,7 +55,7 @@ func shellSafeByte(c byte) bool {
 // part that is the command gets PowerShell's call operator (&), since a bare quoted
 // string is an expression, not a command.
 func ShellJoin(parts []string, raw ...string) string {
-	parts = unwrapBatchShim(parts, raw) // a .cmd would read the prompt again with cmd's rules
+	parts = unwrapBatchShim(resolveBareProgram(parts, raw), raw) // a .cmd would read the prompt again with cmd's rules
 	notice := ""
 	if p, r, n, changed := withoutPromptForBatch(parts, raw); changed {
 		parts, raw, notice = p, r, n

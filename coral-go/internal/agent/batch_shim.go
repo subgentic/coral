@@ -169,6 +169,23 @@ func unwrapBatchShim(parts, raw []string) []string {
 	return append(out, parts[i+1:]...)
 }
 
+// resolveBareProgram returns parts with a program that is a bare name (claude, claude.cmd) replaced by the file PowerShell would run
+// for it (PATH and PATHEXT, never the current folder), when that is a .cmd or .bat file: the name alone would reach cmd.exe
+// through PowerShell as it is. A program that resolves to an .exe, or to nothing, is left as it was.
+func resolveBareProgram(parts, raw []string) []string {
+	i := programIndex(parts, raw)
+	if i < 0 || strings.ContainsAny(parts[i], `\/:`) {
+		return parts
+	}
+	p, err := exec.LookPath(parts[i])
+	if err != nil || !filepath.IsAbs(p) || !isBatchFile(p) {
+		return parts
+	}
+	out := append([]string{}, parts...)
+	out[i] = p
+	return out
+}
+
 // programIndex is where the program is in parts: the first part that is not shell syntax the builder wrote itself (an environment
 // prefix), the one joinQuoted starts as the command. -1 when there is none.
 func programIndex(parts, raw []string) int {

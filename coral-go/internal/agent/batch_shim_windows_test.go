@@ -224,3 +224,28 @@ func TestTheLaunchLineOfAnAgentWhoseCLIIsAnNpmShimRunsTheShimsProgram(t *testing
 	assert.NotContains(t, line, "Get-Content -Raw -Encoding UTF8 -LiteralPath", "no prompt goes to a wrapper that is not npm's")
 	assert.Contains(t, line, "Write-Host 'Coral: wrapped.cmd is a .cmd wrapper")
 }
+
+// A CLI named without a folder (claude) is the file PowerShell finds for it on PATH, which for an npm install is its .cmd: it is treated as that file, and a relative path to a .cmd is never run with the prompt.
+func TestABareOrRelativeCLINameThatIsACmdIsNotRunWithThePrompt(t *testing.T) {
+	native, err := os.Executable()
+	require.NoError(t, err)
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "claude.cmd"), []byte("@ECHO off\r\nSETLOCAL\r\n\""+native+"\"   %*\r\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "other.cmd"), []byte("@echo off\r\n\""+native+"\" --wrapped %*\r\n"), 0o600))
+	t.Setenv("PATH", dir+";"+os.Getenv("PATH"))
+	params := func(cli string) LaunchParams {
+		return LaunchParams{CLIPath: cli, SessionID: "11111111-2222-3333-4444-555555555555", BoardName: "b"}
+	}
+	for _, name := range []string{"claude", "claude.cmd"} {
+		line, err := (&ClaudeAgent{}).LaunchCommand(params(name))
+		require.NoError(t, err)
+		assert.Contains(t, line, "& "+psquote.Literal(native)+" --session-id", name+": the program the shim names runs")
+		assert.Contains(t, line, "Get-Content -Raw -Encoding UTF8", name+": with the prompt")
+	}
+	for _, name := range []string{"other", `.\other.cmd`, `..\` + filepath.Base(dir) + `\other.cmd`} {
+		line, err := (&ClaudeAgent{}).LaunchCommand(params(name))
+		require.NoError(t, err)
+		assert.NotContains(t, line, "Get-Content -Raw -Encoding UTF8 -LiteralPath", name+": no prompt")
+		assert.Contains(t, line, "Write-Host 'Coral: other.cmd is a .cmd wrapper", name)
+	}
+}
