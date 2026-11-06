@@ -39,7 +39,11 @@ func TestTmuxBackendLaggingSubscriberIsCutOff(t *testing.T) {
 	}()
 
 	require.Eventually(t, func() bool { return len(stuck) == cap(stuck) }, 30*time.Second, 10*time.Millisecond)
-	time.Sleep(300 * time.Millisecond)
+	// The cut-off happens when the tail next pushes into the FULL channel, so the viewer must keep reading nothing until that has happened. A fixed pause here and then draining raced it: on a
+	// loaded runner the tail did not push in that pause, the drain freed a slot, the next push fitted and the viewer was never cut off ("never cut off" after 10 s, #13389). Wait for the cut-off itself
+	// (Lagged reports it once), still reading nothing; only then read what is left, which ends because the channel is closed.
+	var cut bool
+	require.Eventually(t, func() bool { cut = cut || b.Lagged("lagger", "stuck"); return cut }, 30*time.Second, 10*time.Millisecond, "a viewer that read nothing was never cut off")
 	drained := make(chan struct{})
 	go func() {
 		for range stuck {
@@ -49,9 +53,9 @@ func TestTmuxBackendLaggingSubscriberIsCutOff(t *testing.T) {
 	select {
 	case <-drained:
 	case <-time.After(10 * time.Second):
-		t.Fatal("a viewer that read nothing was never cut off")
+		t.Fatal("a cut-off viewer's channel was never closed")
 	}
-	assert.True(t, b.Lagged("lagger", "stuck"))
+	assert.True(t, cut, "the cut-off is reported")
 	assert.False(t, b.Lagged("lagger", "stuck"), "reported once")
 	assert.False(t, b.Lagged("lagger", "reader"))
 	select {
