@@ -306,6 +306,12 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 				return
 			}
 		}
+		if plan != nil && autoChain && plan.same == nil { // the server joined this upload to the chain's file (#13792, Security's SHOULD): a chain file that is no longer the newest of its series (a person saved after it, or another agent) is not joined, the upload starts a new series, and the later version is never buried
+			if _, stale := plan.staleBase(); stale {
+				plan.unlock()
+				plan = nil
+			}
+		}
 		if plan != nil {
 			defer plan.unlock()
 			if plan.same != nil { // the bytes are the newest version: nothing is added, and that version is the answer (exit 0)
@@ -313,11 +319,9 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 				return
 			}
 			stamp = &plan.stamp
-			if !autoChain { // the base the upload names must be the newest, whoever made the newer version (#13792); nothing is stored, and the series lock is let go by the defer
-				if sb, stale := plan.staleBase(); stale {
-					staleBaseRefusal(w, plan, sb)
-					return
-				}
+			if sb, stale := plan.staleBase(); stale { // the base the upload names must be the newest, whoever made the newer version (#13792); nothing is stored, and the series lock is let go by the defer
+				staleBaseRefusal(w, plan, sb)
+				return
 			}
 		}
 	}

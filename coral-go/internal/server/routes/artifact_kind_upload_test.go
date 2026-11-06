@@ -2,9 +2,13 @@ package routes
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -376,4 +380,47 @@ func TestNoSettingsReaderMutesNothing(t *testing.T) {
 	e.h.SetInboxSettings(nil)
 	assert.Equal(t, 1, e.count(t), "no reader: the file counts")
 	assert.Nil(t, e.needsYou(t)["muted"])
+}
+
+// #13792 (Security's SHOULD): the server's own join of a for-review upload to its chain's file must not bury a later version. A chain file that is no longer the newest of its series is not joined.
+func TestAChainJoinNeverBuriesAnOperatorsSaveAndStartsANewSeriesInstead(t *testing.T) {
+	k := newKindRig(t)
+	ctx := context.Background()
+	root, err := k.h.bs.CreateTask(ctx, "alpha", "OPERATOR the plan", "", "medium", "lead", "Backend")
+	require.NoError(t, err)
+	code, out := k.upTask("s1", root.ID, "plan, version one", "")
+	require.Equal(t, 201, code, out)
+	v1 := strings.TrimPrefix(out["uri"].(string), "coral://artifacts/")
+	code, out = k.upTask("s1", root.ID, "plan, version two", "")
+	require.Equal(t, 201, code, out)
+	v2 := strings.TrimPrefix(out["uri"].(string), "coral://artifacts/")
+	sid, _ := out["series_id"].(string)
+	require.NotEmpty(t, sid)
+
+	// the Operator saves a version of that file in the editor: the server's own record of it says so
+	save := "plan, version two with the Operator's words"
+	sum := sha256.Sum256([]byte(save))
+	v3 := hex.EncodeToString(sum[:])
+	dir := filepath.Join(k.coralDir, "artifacts", "objects")
+	tmp := filepath.Join(dir, artifactUploadTempP+v3)
+	require.NoError(t, os.WriteFile(tmp, []byte(save), 0o600))
+	plan, perr := planNewVersion(k.coralDir, "coral://artifacts/"+v2, "alpha", v3)
+	require.NoError(t, perr)
+	_, _, serr := storeArtifactFileAs(k.coralDir, "s1", "plan.txt", "text/plain", tmp, v3, int64(len(save)), &plan.stamp, 0, func(rec *agentUploadRecord) {
+		rec.Board, rec.Uploader, rec.Role, rec.UploadedBy, rec.Source = "alpha", board.OperatorName, "operator", "owner", sourceOperatorEdit
+	})
+	require.NoError(t, serr)
+	_, cerr := plan.commit(k.coralDir, v3, "s1")
+	require.NoError(t, cerr)
+	plan.unlock()
+	require.Len(t, seriesMembers(k.coralDir, sid), 3)
+
+	// the agent's next upload for the same task would have joined the chain's file (v2, no longer the newest): it must not be added to the series
+	code, out = k.upTask("s1", root.ID, "plan, version three by the agent from its own copy", "")
+	require.Equal(t, 201, code, out)
+	assert.Nil(t, out["series_id"], "a new series: the join stopped")
+	assert.NotEqual(t, v1, strings.TrimPrefix(out["uri"].(string), "coral://artifacts/"))
+	ms := seriesMembers(k.coralDir, sid)
+	require.Len(t, ms, 3, "the old series is as it was")
+	assert.Equal(t, v3, ms[2].Digest, "the Operator's version is still the newest of it")
 }
