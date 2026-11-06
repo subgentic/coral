@@ -2,29 +2,43 @@ import assert from 'node:assert/strict';
 import { spawnSync } from './helpers/child_process.js';
 import { fileURLToPath } from 'node:url';
 import { installDom, importUi } from './helpers/jsdom_env.mjs';
+const cases = {
+    true: { account: { needs_native: true, goal_preview: true }, boot: false, expected: [true, true] },
+    false: { account: { needs_native: false, goal_preview: false }, boot: true, expected: [false, false] },
+    absent: { account: {}, boot: true, expected: [true, true] },
+    'absent-off': { account: {}, boot: false, expected: [false, false] },
+    error: { boot: true, expected: [true, true] },
+    refused: { boot: true, expected: [true, true] },
+    array: { account: [{ needs_native: false, goal_preview: false }], boot: true, expected: [true, true] },
+    malformed: { account: { needs_native: 'true', goal_preview: 1 }, boot: true, expected: [true, true] },
+    'needs-only': { account: { needs_native: false }, boot: true, expected: [false, true] },
+    'goals-only': { account: { goal_preview: false }, boot: true, expected: [true, false] },
+    hung: { boot: true, expected: [true, true] },
+    local: { boot: true, expected: [false, false] },
+    'self-hosted': { boot: true, expected: [false, false] },
+};
 const scenario = process.argv[2];
 if (!scenario) {
-    for (const name of ['local', 'self-hosted', 'refused', 'error', 'array', 'true', 'hung', 'yes']) {
+    let failures = 0;
+    for (const name of Object.keys(cases)) {
         const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), name], { encoding: 'utf8' });
-        assert.equal(r.status, 0, name + '\n' + r.stdout + r.stderr);
+        if (r.status) { failures++; console.error(name + '\n' + r.stdout + r.stderr); }
+        else console.log('PASS account flags ' + name);
     }
-    console.log('cloud_account_flags: ok');
+    assert.equal(failures, 0, 'account flag cases failed');
 } else {
-    const cloud = !['local', 'self-hosted'].includes(scenario);
-    const dom = installDom({ mode: cloud ? 'cloud' : 'local', boot: { inbox: 'native', needs: 'native', goal_preview: true } });
-    let calls = 0;
-    let release;
+    const c = cases[scenario], cloud = !['local', 'self-hosted'].includes(scenario);
+    const dom = installDom({ mode: cloud ? 'cloud' : 'local', boot: { inbox: 'native', needs: c.boot ? 'native' : 'frame', goal_preview: c.boot } });
+    let calls = 0, release;
     globalThis.fetch = window.fetch = async url => {
         calls++; assert.equal(url, '/api/account');
         if (scenario === 'hung') return new Promise(resolve => { release = resolve; });
         if (scenario === 'error') throw new Error('offline');
-        return { ok: scenario !== 'refused', json: async () => scenario === 'yes' ? { needs_native: 'yes', goal_preview: 'yes' } : scenario === 'array' ? [{ needs_native: true, goal_preview: true }] : { needs_native: true, goal_preview: true } };
+        return { ok: scenario !== 'refused', json: async () => c.account };
     };
     const base = await importUi('server_base');
     const { state } = await importUi('state');
     if (scenario === 'self-hosted') state.hub = true;
-    assert.equal(base.nativeNeeds(), false, 'boot never enables per-account flags');
-    assert.equal(base.goalPreviewOn(), false);
     if (scenario === 'hung') {
         const realSet = globalThis.setTimeout, realClear = globalThis.clearTimeout;
         let expire, cleared = false;
@@ -32,21 +46,13 @@ if (!scenario) {
         globalThis.clearTimeout = id => { if (id === -99) cleared = true; else realClear(id); };
         try {
             const init = base.initCloudAccountFlags();
-            assert.equal(typeof expire, 'function', 'hung account read has a bounded startup wait');
-            expire(); await init;
-            assert.equal(base.nativeNeeds(), false); assert.equal(base.goalPreviewOn(), false);
-            release({ ok: true, json: async () => ({ needs_native: true, goal_preview: true }) });
+            assert.equal(typeof expire, 'function'); expire(); await init;
+            release({ ok: true, json: async () => ({ needs_native: false, goal_preview: false }) });
             await Promise.resolve(); await Promise.resolve();
-            assert.equal(base.nativeNeeds(), false, 'late account response cannot change initial routing');
-            assert.equal(base.goalPreviewOn(), false);
-            assert.equal(cleared, true, 'timer is cleaned up');
+            assert.equal(cleared, true);
         } finally { globalThis.setTimeout = realSet; globalThis.clearTimeout = realClear; }
-    } else {
-        await base.initCloudAccountFlags();
-        await base.initCloudAccountFlags();
-    }
-    assert.equal(calls, cloud ? 1 : 0, 'cached account read only in cloud mode');
-    assert.equal(base.nativeNeeds(), scenario === 'true');
-    assert.equal(base.goalPreviewOn(), scenario === 'true');
+    } else { await base.initCloudAccountFlags(); await base.initCloudAccountFlags(); }
+    assert.equal(calls, cloud ? 1 : 0, 'one cached account read, only in cloud');
+    assert.deepEqual([base.nativeNeeds(), base.goalPreviewOn()], c.expected, 'explicit booleans win; otherwise boot survives');
     dom.window.close();
 }

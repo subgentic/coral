@@ -476,10 +476,10 @@ export function decisionNeedsPerson(server) {
     return !(live && live.owner_stamp === true);
 }
 
-// Per-account choices cannot live in the Hub's shared shell. Startup waits for this
-// cached account read before loading Inbox folders or allowing goal writes. These
-// flags select UI flows only; the Hub still authorizes every read and write.
-let _needsNative = false, _goalPreview = false, _accountFlagsInit = null;
+// Explicit account booleans override the existing boot choices independently.
+// Missing/malformed fields and failed reads retain boot behavior for older Hubs.
+// Startup bounds this shared cached read; the Hub still authorizes every write.
+let _needsNative = null, _goalPreview = null, _accountFlagsInit = null;
 export function initCloudAccountFlags() {
     if (!isCloud()) return Promise.resolve();
     if (!_accountFlagsInit) _accountFlagsInit = (async () => {
@@ -489,16 +489,16 @@ export function initCloudAccountFlags() {
                 readAccount(),
                 new Promise(resolve => { timer = setTimeout(() => resolve(null), 4000); }),
             ]);
-            _needsNative = account?.needs_native === true;
-            _goalPreview = account?.goal_preview === true;
+            _needsNative = typeof account?.needs_native === 'boolean' ? account.needs_native : null;
+            _goalPreview = typeof account?.goal_preview === 'boolean' ? account.goal_preview : null;
         } finally { clearTimeout(timer); }
     })();
     return _accountFlagsInit; // a late account answer cannot change routing after startup timed out
 }
 
-/** The cloud account's goals gate requests preview-before-write. Local writes stay unchanged. */
+/** The cloud account boolean selects preview-before-write, falling back to boot. Local writes stay unchanged. */
 export function goalPreviewOn() {
-    return isCloud() && _goalPreview;
+    return isCloud() && (_goalPreview ?? (bootConfig().goal_preview === true));
 }
 
 /** The Hub-served dashboard draws its own Inbox (Chats folders and Boards) in place of the Hub's framed one, and the top row's Chats and Board tabs go (Goal #100). One switch, set by the Hub's
@@ -508,10 +508,9 @@ export function nativeInbox() {
     return isCloud() && bootConfig().inbox === 'native';
 }
 
-/** Native Needs you is offered only when the cloud account says needs_native === true
- * and the release uses the native Inbox. Missing or malformed values keep the frame. */
+/** Native Needs you requires native Inbox; an account boolean wins, otherwise boot decides. */
 export function nativeNeeds() {
-    return nativeInbox() && _needsNative;
+    return nativeInbox() && (_needsNative ?? (bootConfig().needs === 'native'));
 }
 
 /** Read /api/health once and cache the flag in state.hub. Safe to call often.

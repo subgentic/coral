@@ -1,4 +1,4 @@
-/* A goal write through the Coral Hub's preview (#13503, coral-hub's contract): when the Hub's account flag goal_preview is true, a goal create, close or update is first PREVIEWED, and the write carries the token the preview gave.
+/* A goal write through the Coral Hub's preview (#13503, coral-hub's contract): when goal_preview is enabled by the account (or its boot fallback), a goal create, close or update is first PREVIEWED, and the write carries the token the preview gave.
  *   1. POST /api/remote/{server}/api/hub/goal-preview {board, action, goal?, body}: `body` is the EXACT text of the write (a JSON object as a string); the answer is {token, expires, tier}.
  *   2. The ordinary write, through the same computer, with X-Hub-Goal-Preview: <token> and the SAME bytes that were previewed (the Hub hashes them: one different byte is preview_invalid).
  * Before EVERY write, never once per page: one token, one write (a close or an update token works once). A preview that has run out (preview_expired) is asked for again, once, and the write sent again; anything else
