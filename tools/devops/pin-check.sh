@@ -10,6 +10,7 @@
 # This check finds the newest plain vX.Y.Z tag below X.Y.Z and exits 1, printing the exact command, when the batch's releases.go has no row for it.
 # It does not run the pin script, does not fetch anything and does not edit a file: a row is only ever added from a verified SHA256SUMS.txt by a person's reviewed diff.
 #
+# It reads the LOCAL tags: run `git fetch --tags` first, or an unfetched newer release is not seen.
 # Exit codes: 0 the previous release is pinned; 1 it is not (the command to run is printed); 2 usage or a broken tree.
 set -euo pipefail
 
