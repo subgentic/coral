@@ -5,7 +5,6 @@ import { installDom, STATIC } from './helpers/jsdom_env.mjs';
 const dom = installDom({ mode: 'local' });
 dom.window.eval(fs.readFileSync(STATIC + 'vendor/marked.min.js', 'utf8')); globalThis.marked = dom.window.marked;
 dom.window.eval(fs.readFileSync(STATIC + 'vendor/purify.min.js', 'utf8')); globalThis.DOMPurify = dom.window.DOMPurify;
-import * as modelApi from '../../coral-go/pkg/frontend/static/artifact_markdown_model.js';
 import { analyze, mapRenderedBlock, editRun } from '../../coral-go/pkg/frontend/static/artifact_markdown_model.js';
 import { renderMarkdownStrict } from '../../coral-go/pkg/frontend/static/markdown.js';
 function bytePatch(before, after) {
@@ -47,7 +46,7 @@ test('inserted Markdown characters are literal text and no old punctuation is re
 });
 test('readonly categories, ambiguous escapes and hidden characters never become editable', () => {
     const source = '---\ntitle: Keep\n---\n\n| A | B |\n| - | - |\n| x | y |\n\n```js\nconst x = 1;\n```\n\n<div>raw</div>\n\nHidden\u202e text\n';
-    const model = analyze(source, marked); for (const block of model.blocks) if (['frontmatter','table','code','html'].includes(block.type) || block.raw.includes('\u202e')) assert.equal(block.runs.length, 0);
+    const model = analyze(source, marked); for (const block of model.blocks) if (['frontmatter','html'].includes(block.type) || block.raw.includes('\u202e')) assert.equal(block.runs.length, 0);
     assert.equal(mapped('A &amp; B \\*escaped\\* word.\n').length, 0);
     const run = mapped('Keep these words.\n')[0]; assert.throws(() => editRun('Keep these words.\n', run, 'Keep\nthese words.'), /line breaks/);
     assert.throws(() => editRun('Keep these words.\n', run, 'Keep\u202ethese words.'), /Hidden/);
@@ -74,15 +73,84 @@ test('reference labels retain their definition URL and original source syntax', 
 });
 
 
-test('block reapply preserves every newest byte outside the Operator-edited block', () => {
-    assert.equal(typeof modelApi.reapplyEdits,'function');
-    const base='\ufeff# Report\r\n\r\nOld sentence.\r\n\r\nOld second block.\r\n', draft=base.replace('Old sentence.','My sentence.'), theirs=base.replace('Old second block.','Agent second block.');
-    const result=modelApi.reapplyEdits(base,draft,theirs,marked);assert.equal(result.ok,true);assert.equal(result.source,theirs.replace('Old sentence.','My sentence.'));
-    const inserted=theirs+'\r\nA new agent paragraph.\r\n';assert.equal(modelApi.reapplyEdits(base,draft,inserted,marked).source,inserted.replace('Old sentence.','My sentence.'));
+test('nested and continued list text maps exactly without editing markers or neighbouring items',()=>{
+ const source='\ufeff- Parent **words**\r\n  - Nested words\r\n    continued words\r\n- Last words\r\n';
+ const runs=mapped(source);assert.ok(runs.some(r=>r.text==='Parent '));const child=runs.find(r=>r.text.includes('Nested'));assert.ok(child,'nested list is editable');
+ const next=editRun(source,child,child.text.replace('continued','revised')).source;assert.equal(next,source.replace('continued','revised'));
+ const more=editRun(source,child,child.text+'\n- literal').source;assert.ok(more.includes('\r\n    \\- literal'));assert.ok(more.endsWith('- Last words\r\n'));
+ const host=document.createElement('div');host.innerHTML=renderMarkdownStrict(more.replace(/^\ufeff/,''));assert.equal(host.querySelectorAll('li').length,3,'typed marker did not add an item');
 });
-test('block reapply refuses changed or ambiguous edited blocks instead of dropping agent work', () => {
-    assert.equal(typeof modelApi.reapplyEdits,'function');
-    const base='Old sentence.\n\nOld second block.\n',draft=base.replace('Old sentence.','My sentence.');
-    assert.equal(modelApi.reapplyEdits(base,draft,base.replace('Old sentence.','Agent sentence.'),marked).ok,false);
-    const duplicate='Same words.\n\nSame words.\n\n';assert.equal(modelApi.reapplyEdits(duplicate,duplicate.replace('Same words.','My words.'),duplicate,marked).ok,false);
+
+test('numbered, loose and task-list labels retain numbering, checkbox state and continuation indentation',()=>{
+ for(const source of ['7. First words\n   continued words\n8. Last words\n','- First words\n\n- Last words\n','- [x] First words\n  continued words\n- [ ] Last words\n']) {
+  const runs=mapped(source),run=runs.find(r=>r.text.includes('First words'));assert.ok(run,source);
+  assert.equal(editRun(source,run,run.text.replace('First','New')).source,source.replace('First','New'));
+  const next=editRun(source,run,run.text+'\n# literal').source;const host=document.createElement('div');host.innerHTML=renderMarkdownStrict(next);assert.equal(host.querySelectorAll('li').length,2);assert.equal(host.querySelectorAll('h1,h2,h3').length,0);assert.ok(next.includes('\\# literal'));assert.equal(next.includes('[x]'),source.includes('[x]'));
+ }
+});
+
+test('table cells preserve delimiters, alignment, escaped pipes, code spans and untouched CRLF bytes',()=>{
+ const source='\ufeff| A | B |\r\n|:---|---:|\r\n| x \\| y | `a\\|b` |\r\n';
+ let runs=mapped(source),cell=runs.find(r=>r.text==='x | y'),code=runs.find(r=>r.text==='a|b');assert.ok(cell&&code,'table cells are editable');
+ assert.equal(editRun(source,cell,'x | revised').source,source.replace('x \\| y','x \\| revised'));
+ assert.equal(editRun(source,code,'a|b|c').source,source.replace('`a\\|b`','`a\\|b\\|c`'));
+ const changed=editRun(source,cell,'x | y | extra').source;assert.ok(changed.includes('x \\| y \\| extra'));const host=document.createElement('div');host.innerHTML=renderMarkdownStrict(changed.replace(/^\ufeff/,''));assert.equal(host.querySelectorAll('td').length,2);assert.equal(host.querySelectorAll('tr').length,2);
+ const again=mapped(changed).find(r=>r.text==='x | y | extra');assert.ok(again);assert.equal(editRun(changed,again,'x y extra').source,changed.replace('x \\| y \\| extra','x y extra'));
+ assert.throws(()=>editRun(source,cell,'x\nnew row'),/line breaks/);
+});
+
+test('fenced code edits keep fence and language bytes, allow literal lines, and refuse closing fences',()=>{
+ for(const fence of ['```','~~~~']) {
+  const source='\ufeffBefore.\r\n\r\n'+fence+'bash\r\nprintf "old"\r\n# unchanged\r\n'+fence+'\r\n\r\nAfter.\r\n';
+  const run=mapped(source).find(r=>r.kind==='blockcode');assert.ok(run,'fenced code is editable');
+  const next=editRun(source,run,'printf "new"\n# unchanged\n<b>literal</b>').source;
+  assert.equal(next,source.replace('printf "old"\r\n# unchanged','printf "new"\r\n# unchanged\r\n<b>literal</b>'));
+  const host=document.createElement('div');host.innerHTML=renderMarkdownStrict(next.replace(/^\ufeff/,''));assert.equal(host.querySelectorAll('pre').length,1);assert.equal(host.querySelector('b'),null);
+  for(const closing of ['```','````','~~~~','~~~~~'])assert.throws(()=>editRun(source,run,run.text+'\n'+closing),/fence/);
+ }
+});
+
+test('quoted text and nested quoted paragraphs retain every prefix and CRLF byte',()=>{
+ const source='\ufeff> First **words**\r\n> continued words\r\n>\r\n> > Nested quote\r\n>\r\n> Last words\r\n\r\nOutside.\r\n';
+ const runs=mapped(source),nested=runs.find(r=>r.text==='Nested quote');assert.ok(nested,'nested quote text editable');
+ assert.equal(editRun(source,nested,'Nested changed\n> literal').source,source.replace('Nested quote','Nested changed\r\n> > \\> literal'));
+ const first=runs.find(r=>r.text==='First ');assert.ok(first);assert.equal(editRun(source,first,'New ').source,source.replace('First','New'));
+ const next=editRun(source,nested,'Nested changed\n- literal').source;const host=document.createElement('div');host.innerHTML=renderMarkdownStrict(next.replace(/^\ufeff/,''));assert.equal(host.querySelectorAll('blockquote').length,2);assert.equal(host.querySelectorAll('li').length,0);
+});
+
+test('raw text edits retain BOM, untouched mixed line endings and Unicode boundaries',async()=>{
+ const {editRaw}=await import('../../coral-go/pkg/frontend/static/artifact_markdown_model.js');
+ const source='\ufeff# Heading\r\n\r\nOld 😀 words.\nTail.\r\n';
+ assert.equal(editRaw(source,'# Heading\n\nNew 😀 words.\nTail.\n'),source.replace('Old','New'));
+ assert.equal(editRaw(source,'# Heading\n\nOld 😀 words.\nTail.\n'),source);
+ assert.equal(editRaw(source,'# Heading\n\nOld 😀 words.\nAdded\nTail.\n'),source.replace('Tail.','Added\r\nTail.'));
+ assert.ok(editRaw(source,'<script>x</script>\n\u202e').includes('\u202e'),'raw is not a hidden-character filter');
+});
+
+test('table code spans refuse a backslash before a pipe before rendering',()=>{
+ const source='| A | B |\n|---|---|\n| x | `a\\|b` |\n';const code=mapped(source).find(r=>r.text==='a|b');assert.ok(code);
+ for(const value of ['a\\|b','a\\\\|b','a|b\\|c'])assert.throws(()=>editRun(source,code,value),/backslash.*pipe/);
+ assert.equal(editRun(source,code,'a|b|c').source,source.replace('`a\\|b`','`a\\|b\\|c`'));
+});
+
+test('all tag characters and Unicode line separators are read-only, visible, and refused in rendered edits',async()=>{
+ const {HIDDEN,visibleSpecials}=await import('../../coral-go/pkg/frontend/static/artifact_markdown_model.js');
+ const points=[...Array.from({length:128},(_,i)=>0xe0000+i),0x2028,0x2029];
+ for(const cp of points){const char=String.fromCodePoint(cp),label='U+'+cp.toString(16).toUpperCase(),source='\ufeffSafe words.\r\n\r\nHidden'+char+'words.\r\n';
+  assert.equal(HIDDEN.test(char),true,label+' is detected');const model=analyze(source,marked),block=model.blocks.find(b=>b.raw.includes(char));assert.ok(block.reason,label+' block is read-only');assert.equal(block.runs.length,0);assert.equal(model.source,source);
+  assert.equal(visibleSpecials(char),'⟦'+label+'⟧',label+' is one code-point marker, never two surrogate markers');
+  const clean='Safe words.\r\n',run=mapped(clean)[0];assert.throws(()=>editRun(clean,run,'Safe'+char+'words.'),/Hidden/,label+' cannot be inserted');
+ }
+ assert.equal(visibleSpecials('Plain 🍊\r\n\twords.'),'Plain 🍊\r\n\twords.');
+});
+
+test('rendered policy exposes additional invisible controls but retains variation selectors',async()=>{
+ const {HIDDEN,visibleSpecials}=await import('../../coral-go/pkg/frontend/static/artifact_markdown_model.js');
+ for(const cp of [0xad,0x34f,0x85,0x180e,0x115f,0x1160,0x3164,0xfff9,0xfffa,0xfffb]) {
+  const c=String.fromCodePoint(cp),label='U+'+cp.toString(16).toUpperCase().padStart(4,'0'),source='Before'+c+'after.\n';
+  assert.equal(HIDDEN.test(c),true,label);assert.equal(visibleSpecials(c),'⟦'+label+'⟧');assert.ok(analyze(source,marked).blocks[0].reason);assert.throws(()=>editRun('Safe words.\n',mapped('Safe words.\n')[0],'Safe'+c+'words.'),/Hidden/);
+ }
+ const selectors=[0x180b,0x180c,0x180d,0x180f,...Array.from({length:16},(_,i)=>0xfe00+i),...Array.from({length:240},(_,i)=>0xe0100+i)];
+ for(const cp of selectors){const c=String.fromCodePoint(cp);assert.equal(HIDDEN.test(c),false);assert.equal(visibleSpecials(c),c);const source='Words'+c+'.\n';assert.ok(mapped(source).length);assert.equal(editRun(source,mapped(source)[0],'New'+c+'.').source,'New'+c+'.\n');}
+ for(const source of ['Heart ❤️.\n','Mongolian ᠠ\u180b.\n','Ideograph 禰\u{e0100}.\n'])assert.ok(!analyze(source,marked).blocks[0].reason);
 });

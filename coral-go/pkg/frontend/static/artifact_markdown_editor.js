@@ -13,6 +13,7 @@ const shape = element => [...element.querySelectorAll('*')].map(e => [e.tagName,
 function render(raw, references) {
     const body = el('div', 'prose prose-doc amd-prose');
     body.innerHTML = renderMarkdownStrict(raw + (references ? '\n\n' + references : ''));
+    if (body.querySelector('table')) body.classList.add('md');
     return body;
 }
 function showSpecials(host) {
@@ -24,17 +25,22 @@ function showSpecials(host) {
  * rendered original; onSaved opens the server's newly stored version. */
 export function createMarkdownEditor({ body, footer, dialog, context, source: initialSource, onExit, onSaved }) {
     let source = initialSource, original = initialSource, busy = false, dead = false, composing = false, confirmOpen = false, latest = null, pendingText = false, baseDigest = context.hex;
+    let mode = 'rendered', previewShown = false;
     const keptDrafts = [];
     const status = el('p', 'amd-status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
-    const hint = el('p', 'amd-hint', 'Edit words in the highlighted text. Enter applies a change; Escape cancels it. Formatting and read-only blocks stay in place.');
+    const hint = el('p', 'amd-hint', 'Edit words in the highlighted text. Enter adds a line where supported or applies a change elsewhere; Escape cancels it. Formatting and read-only blocks stay in place.');
     const documentHost = el('div', 'amd-document'), conflict = el('section', 'amd-conflict'); conflict.hidden = true; conflict.setAttribute('aria-label', 'A newer document version');
     const kept = el('section', 'amd-kept'); kept.hidden = true; kept.setAttribute('aria-label', 'Your unsaved drafts');
-    const wrapper = el('div', 'amd-editor'); wrapper.append(hint, status, conflict, documentHost, kept);
+    const modes=el('div','amd-modes');modes.setAttribute('role','group');modes.setAttribute('aria-label','Editing mode');
+    const renderedButton=makeButton('Rendered text','amd-mode-rendered',()=>switchMode('rendered'));
+    const rawButton=makeButton('Raw text','amd-mode-raw',()=>switchMode('raw'));
+    const previewButton=makeButton('Preview','amd-preview-toggle',()=>{previewShown=!previewShown;draw();});modes.append(renderedButton,rawButton,previewButton);
+    const wrapper = el('div', 'amd-editor'); wrapper.append(modes, hint, status, conflict, documentHost, kept);
     const cancelButton = makeButton('Cancel', 'amd-cancel', () => cancel());
     const saveButton = makeButton('Save as new version', 'btn-primary amd-save', () => save(baseDigest));
     footer.prepend(cancelButton, saveButton); dialog.classList.add('av-markdown-edit'); body.replaceChildren(wrapper);
     const say = (text, error = false) => { status.textContent = text; status.classList.toggle('is-error', error); };
-    const sync = () => { saveButton.disabled = busy || !!latest || (!pendingText && source === original); cancelButton.disabled = busy; documentHost.inert = busy; };
+    const sync = () => { saveButton.disabled = busy || !!latest || (!pendingText && source === original); cancelButton.disabled = busy; documentHost.inert = busy; modes.inert = busy; };
     const flush = () => { if (documentHost.contains(document.activeElement)) document.activeElement.blur(); };
     const beforeLeave = next => {
         flush(); if (dead) return false;
@@ -53,30 +59,62 @@ export function createMarkdownEditor({ body, footer, dialog, context, source: in
     };
     const exit = () => onExit(baseDigest);
     const cancel = () => { if (!beforeLeave(exit)) exit(); };
+    function switchMode(next) {flush();if(dead||busy||mode===next)return;mode=next;draw();documentHost.querySelector('.amd-raw,.amd-text')?.focus();}
     function draw() {
         if (dead) return;
-        const model = M.analyze(source, marked); documentHost.replaceChildren();
+        renderedButton.setAttribute('aria-pressed',String(mode==='rendered'));rawButton.setAttribute('aria-pressed',String(mode==='raw'));
+        previewButton.hidden=mode!=='raw';previewButton.setAttribute('aria-pressed',String(previewShown));
+        documentHost.replaceChildren();
+        if(mode==='raw') {
+            hint.textContent='Edit the whole Markdown file. Preview shows how it will render. Save creates a new version.';
+            const input=el('textarea','amd-raw');input.setAttribute('aria-label','Markdown source');input.spellcheck=false;input.value=M.normalizeSource(source).text;
+            const warning=el('p','amd-raw-warning');warning.setAttribute('role','status');
+            const preview=el('div','amd-preview');preview.hidden=!previewShown;
+            const update=()=>{warning.hidden=!M.HIDDEN.test(M.normalizeSource(source).text);warning.textContent=warning.hidden?'':'This source contains hidden or bidirectional characters. They are preserved in the file.';if(previewShown){preview.replaceChildren(wholeDocument(source));}};
+            input.addEventListener('input',()=>{source=M.editRaw(source,input.value);pendingText=false;update();sync();});
+            documentHost.append(input,warning,preview);update();sync();return;
+        }
+        hint.textContent='Edit words in the highlighted text. Enter adds a line where supported or applies a change elsewhere; Escape cancels it. Formatting and read-only blocks stay in place.';
+        let model;
+        try {model=M.analyze(source,marked);} catch(error) {documentHost.append(el('p','amd-readonly',error.message+' Use Raw text to continue editing.'));if(new TextEncoder().encode(source).length<=M.MAX_BYTES)documentHost.append(wholeDocument(source));sync();return;}
+
         for (const block of model.blocks) {
             const section = el('section', 'amd-block'), prose = render(block.raw, model.references);
             const map = block.reason ? { exact: false, entries: [] } : M.mapRenderedBlock(block, prose);
             const editable = map.exact && map.entries.some(e => e.run.editable);
             if (!editable) {
-                const label = el('p', 'amd-readonly', `${block.reason || (prose.querySelector('img') ? 'Image' : 'Text mapping unavailable')} — read-only`); section.append(label); showSpecials(prose);
+                // A hidden character may live in a destination/attribute, outside text nodes.
+                const hidden = new Set(); if (M.HIDDEN.test(block.raw)) for (const char of block.raw) if (M.HIDDEN.test(char)) hidden.add(char);
+                const codes = [...hidden].map(char => M.visibleSpecials(char)).join(' ');
+                const label = el('p', 'amd-readonly', `${block.reason || (prose.querySelector('img') ? 'Image' : 'Text mapping unavailable')}${codes ? ' ' + codes : ''} — read-only`); section.append(label); showSpecials(prose);
             } else {
                 for (const { node, run } of map.entries) {
                     if (!run.editable) continue;
-                    const span = el('span', 'amd-text', node.data); span.contentEditable = 'plaintext-only'; span.setAttribute('role', 'textbox'); span.setAttribute('aria-label', 'Edit document text'); span.tabIndex = 0; span.spellcheck = true; node.replaceWith(span);
+                    const span = el('span', 'amd-text', node.data); span.contentEditable = 'plaintext-only'; span.setAttribute('role', 'textbox'); span.setAttribute('aria-label', 'Edit document text'); if (run.newlinePrefix != null) span.setAttribute('aria-multiline', 'true'); span.tabIndex = 0; span.spellcheck = true; node.replaceWith(span);
                     const before = span.textContent;
                     span.addEventListener('input', () => { pendingText = span.textContent !== before; sync(); });
                     span.addEventListener('compositionstart', () => { composing = true; }); span.addEventListener('compositionend', () => { composing = false; });
-                    span.addEventListener('beforeinput', event => { if (['insertParagraph', 'insertLineBreak', 'insertFromDrop'].includes(event.inputType) || M.HIDDEN.test(event.data || '')) { event.preventDefault(); say('Text only: line breaks, hidden characters and formatting stay unchanged.', true); } });
-                    span.addEventListener('paste', event => {
-                        event.preventDefault(); const text = event.clipboardData.getData('text/plain');
-                        if (/[\r\n]/.test(text) || M.HIDDEN.test(text)) { say('Paste words without line breaks or hidden characters.', true); return; }
-                        const selection = getSelection(); if (!selection.rangeCount) return; const range = selection.getRangeAt(0); if (!span.contains(range.commonAncestorContainer)) return;
-                        range.deleteContents(); const textNode = document.createTextNode(text); range.insertNode(textNode); range.setStartAfter(textNode); range.collapse(true); selection.removeAllRanges(); selection.addRange(range); pendingText = span.textContent !== before; sync();
+                    const insertPlain = text => {
+                        const selection = getSelection(); if (!selection.rangeCount) return;
+                        const range = selection.getRangeAt(0); if (!span.contains(range.commonAncestorContainer)) return;
+                        range.deleteContents(); const textNode = document.createTextNode(text); range.insertNode(textNode);
+                        // Chrome needs a trailing placeholder to keep a caret after a final newline.
+                        if (span.textContent.endsWith('\n') && !span.querySelector('[data-amd-caret]')) { const br=document.createElement('br'); br.dataset.amdCaret=''; span.append(br); }
+                        range.setStartAfter(textNode); range.collapse(true); selection.removeAllRanges(); selection.addRange(range); pendingText = span.textContent !== before; sync();
+                    };
+                    span.addEventListener('beforeinput', event => {
+                        const line = ['insertParagraph','insertLineBreak'].includes(event.inputType);
+                        if ((line && run.newlinePrefix == null) || event.inputType === 'insertFromDrop' || M.HIDDEN.test(event.data || '')) { event.preventDefault(); say('Use plain words without hidden characters; structural markers stay unchanged.', true); return; }
+                        if (event.inputType === 'insertText' && /[\r\n]/.test(event.data || '')) { event.preventDefault(); if (run.newlinePrefix != null) insertPlain(event.data.replace(/\r\n?/g,'\n')); else say('Edit words within one text run; changing line breaks is not supported.', true); return; }
+                        if (line && run.newlinePrefix != null) { event.preventDefault(); insertPlain('\n'); return; }
+
                     });
-                    span.addEventListener('keydown', event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); span.textContent = before; span.blur(); } else if (event.key === 'Enter' && !composing && !event.isComposing) { event.preventDefault(); span.blur(); } });
+                    span.addEventListener('paste', event => {
+                        event.preventDefault(); const text = event.clipboardData.getData('text/plain').replace(/\r\n?/g,'\n');
+                        if ((/[\r\n]/.test(text) && run.newlinePrefix == null) || M.HIDDEN.test(text)) { say('Paste words without line breaks or hidden characters.', true); return; }
+                        insertPlain(text);
+                    });
+                    span.addEventListener('keydown', event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); span.textContent = before; span.blur(); } else if (event.key === 'Enter' && !composing && !event.isComposing) { event.preventDefault(); event.stopPropagation(); if (run.newlinePrefix != null) insertPlain('\n'); else span.blur(); } });
                     span.addEventListener('blur', event => {
                         pendingText = false;
                         if (span.textContent === before || dead) { sync(); return; }
@@ -102,7 +140,9 @@ export function createMarkdownEditor({ body, footer, dialog, context, source: in
     function keepDraft() {
         if (!keptDrafts.includes(source)) keptDrafts.push(source);
         kept.hidden = false; kept.replaceChildren(el('h3', null, 'Your unsaved draft'), el('p', null, 'Your words are kept here. Redo your edits in the latest version above; nothing was saved.'));
-        for (const draft of keptDrafts) kept.append(wholeDocument(draft));
+        for (const draft of keptDrafts) {
+            if(mode==='raw'){const copy=el('textarea','amd-kept-source');copy.readOnly=true;copy.setAttribute('aria-label','Your unsaved Markdown source');copy.value=draft;kept.append(copy);}else kept.append(wholeDocument(draft));
+        }
     }
     async function showTheirs() {
         const choice = latest; if (!choice || dead) return;
@@ -113,37 +153,30 @@ export function createMarkdownEditor({ body, footer, dialog, context, source: in
             heading.tabIndex = -1; heading.focus();
         } catch (error) { if (!dead) say(error.message || 'The latest version could not be read.', true); }
     }
-    async function reapply() {
+    async function openLatest() {
         flush(); const choice = latest; if (!choice || dead || busy) return;
-        busy = true; sync(); conflict.querySelectorAll('button').forEach(b => { b.disabled = true; }); say('Reading the latest version to check your edited blocks…');
-        let saveReapplied = false, focusLatest = false;
+        let opened = false;
+        busy = true; sync(); conflict.querySelectorAll('button').forEach(b => { b.disabled = true; }); say('Reading the latest version; your draft will be kept…');
         try {
             const theirs = await API.readEditSource({ ...context, hex: choice.digest }); if (dead || latest !== choice) return;
-            const result = M.reapplyEdits(original, source, theirs, marked);
-            if (result.ok && new TextEncoder().encode(result.source).length > API.MAX_MARKDOWN_BYTES) throw new Error('Markdown editing is limited to 2 MiB. Shorten your edit before reapplying.');
-            if (!result.ok) keepDraft();
-            original = theirs; source = result.ok ? result.source : theirs; baseDigest = choice.digest;
+            keepDraft(); original = theirs; source = theirs; baseDigest = choice.digest;
             latest = null; conflict.hidden = true; conflict.replaceChildren(); draw();
-            if (!result.ok) {
-                say('An edited block changed or could not be matched safely. Nothing was saved. You are editing the latest version; your old draft is kept below.', true);
-                focusLatest = true;
-            } else if (result.changed) saveReapplied = true;
-            else say('The latest version is open. There are no text edits to save.');
-        } catch (error) { if (!dead) say(error.message || 'Your edits could not be reapplied. Your draft is kept.', true); }
+            say('The latest version is open. Nothing was saved. Your old draft is kept below; redo your changes here before saving.', true);
+            opened = true;
+        } catch (error) { if (!dead) say(error.message || 'The latest version could not be opened. Your draft is kept.', true); }
         finally { busy = false; if (!dead) { sync(); conflict.querySelectorAll('button').forEach(b => { b.disabled = false; }); } }
-        if (focusLatest && !dead) documentHost.querySelector('.amd-text')?.focus();
-        if (saveReapplied && !dead) await save(baseDigest);
+        if (opened && !dead) documentHost.querySelector('.amd-raw,.amd-text')?.focus();
     }
     function showConflict(data) {
         const digest = data.latest_digest || data.latest?.digest;
         if (!HEX.test(String(digest))) { say('A newer version exists. Reload it before saving your changes.', true); return; }
         latest = { digest, version: data.latest_version || data.latest?.version || data.version };
-        const title = el('h3', null, 'A newer version was saved'), words = el('p', null, 'Your draft is still here. Reapply your edits only if those blocks are unchanged in the latest version. Other changes stay in place. If an edited block changed, your draft is kept so you can redo it.');
-        conflict.replaceChildren(title, words, makeButton('See theirs', 'amd-see-theirs', showTheirs), makeButton('Reapply my edits and save', 'amd-reapply', reapply));
+        const title = el('h3', null, 'A newer version was saved'), words = el('p', null, 'Nothing was saved. Your draft is still here. Open the latest version and redo your changes; there is no override or automatic retry.');
+        conflict.replaceChildren(title, words, makeButton('See theirs', 'amd-see-theirs', showTheirs), makeButton('Open latest and keep draft', 'amd-open-latest', openLatest));
         conflict.hidden = false; title.tabIndex = -1; title.focus();
     }
     async function save(expected) {
-        flush(); if (dead || busy || source === original) return;
+        flush(); if (dead || busy || latest || source === original) return;
         busy = true; sync(); conflict.querySelectorAll('button').forEach(b => { b.disabled = true; }); say('Saving a new version…');
         try {
             const saved = await API.saveMarkdown({ ...context, hex: baseDigest }, source, expected);

@@ -9,9 +9,9 @@ dom.window.HTMLDialogElement.prototype.showModal = function () { this.open = tru
 dom.window.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new Event('close')); };
 const { createMarkdownEditor } = await importUi('artifact_markdown_editor'); const api = await importUi('artifact_markdown_api');
 const hex = 'a'.repeat(64), next = 'b'.repeat(64), latest = 'c'.repeat(64);
-function setup(source, onSaved = () => {}) {
+function setup(source, onSaved = () => {}, contextOverride = null) {
     const dialog = document.createElement('div'), body = document.createElement('div'), footer = document.createElement('div'); dialog.append(body, footer); document.body.append(dialog); let exited = 0, exitDigest;
-    const editor = createMarkdownEditor({ body, footer, dialog, context: api.editContext('local', 'dev', hex), source, onExit: digest => { exited++; exitDigest = digest; }, onSaved });
+    const editor = createMarkdownEditor({ body, footer, dialog, context: contextOverride || api.editContext('local', 'dev', hex), source, onExit: digest => { exited++; exitDigest = digest; }, onSaved });
     return { editor, body, footer, dialog, get exited() { return exited; }, get exitDigest() { return exitDigest; }, close() { editor.destroy(); dialog.remove(); } };
 }
 const change = (body, oldText, value) => { const node = [...body.querySelectorAll('.amd-text')].find(e => e.textContent === oldText); assert.ok(node); node.textContent = value; node.dispatchEvent(new Event('blur')); };
@@ -33,21 +33,25 @@ const observeUntil = (host, predicate) => new Promise(resolve => {
     const observer = new MutationObserver(() => { if (predicate()) { observer.disconnect(); resolve(); } });
     observer.observe(host, { childList: true, subtree: true }); if (predicate()) { observer.disconnect(); resolve(); }
 });
-test('reapplying an unchanged edited block keeps an agent change in another block', async () => {
-    const base = 'Old sentence.\n\nOld second block.\n', theirs = 'Old sentence.\n\nAgent second block.\n'; let calls = [];
-    globalThis.fetch = window.fetch = async (url, options = {}) => { calls.push({url,...options}); if(options.method !== 'POST') return new Response(theirs); if(calls.filter(c=>c.method==='POST').length===1) return Response.json({latest_digest:latest,latest_version:2},{status:409}); return Response.json({id:next,digest:'sha256:'+next,version:3}); };
-    let done; const saved = new Promise(resolve=>{done=resolve;}); const ui=setup(base,done); change(ui.body,'Old sentence.','My sentence.');
-    const ready=observeUntil(ui.body,()=>!!ui.body.querySelector('.amd-see-theirs')); ui.footer.querySelector('.amd-save').click();await ready;
-    assert.equal(calls.filter(c=>c.method==='POST').length,1); ui.body.querySelector('.amd-reapply,.amd-save-after').click(); await saved;
-    const posts=calls.filter(c=>c.method==='POST');assert.equal(posts.length,2);assert.ok(posts[1].url.includes('/artifacts/'+latest+'/edit?expected_latest='+latest));
-    assert.equal(Buffer.from(posts[1].body).toString(),'My sentence.\n\nAgent second block.\n');ui.close();
+test('both stale codes keep drafts and never resend, even when the edited block is unchanged', async () => {
+ for(const code of ['stale_version','stale_base']) {
+    const base='Old sentence.\n\nOld second block.\n',theirs='Old sentence.\n\nAgent second block.\n';let calls=[];
+    globalThis.fetch=window.fetch=async(url,options={})=>{calls.push({url,...options});if(options.method!=='POST')return new Response(theirs);if(calls.filter(c=>c.method==='POST').length===1)return Response.json({code,latest_digest:latest,latest_version:2},{status:409});return Response.json({id:next,version:3});};
+    let done;const saved=new Promise(r=>{done=r;});const ui=setup(base,done);change(ui.body,'Old sentence.','My sentence.');
+    const ready=observeUntil(ui.body,()=>!!ui.body.querySelector('.amd-open-latest'));ui.footer.querySelector('.amd-save').click();await ready;
+    assert.equal(ui.body.querySelector('.amd-reapply'),null);assert.equal(calls.filter(c=>c.method==='POST').length,1);
+    const opened=observeUntil(ui.body,()=>!!ui.body.querySelector('.amd-kept:not([hidden])'));ui.body.querySelector('.amd-open-latest').click();await opened;
+    assert.equal(calls.filter(c=>c.method==='POST').length,1,'opening latest must not save');assert.match(ui.body.querySelector('.amd-kept').textContent,/My sentence/);assert.equal(ui.footer.querySelector('.amd-save').disabled,true);
+    change(ui.body,'Old sentence.','My sentence.');ui.footer.querySelector('.amd-save').click();await saved;
+    const posts=calls.filter(c=>c.method==='POST');assert.equal(posts.length,2);assert.ok(posts[1].url.includes('/artifacts/'+latest+'/edit?expected_latest='+latest));assert.equal(Buffer.from(posts[1].body).toString(),'My sentence.\n\nAgent second block.\n');ui.close();
+ }
 });
 test('a changed edited block is not saved; latest is editable and the old draft stays guarded', async () => {
     let calls=[],saved=0,settled;const reached=new Promise(resolve=>{settled=resolve;});
     globalThis.fetch = window.fetch = async (url,options={})=>{calls.push({url,...options});if(options.method!=='POST')return new Response('Agent sentence.\n\nAgent second block.\n');if(calls.filter(c=>c.method==='POST').length===1)return Response.json({latest_digest:latest,latest_version:2},{status:409});return Response.json({id:next,version:3});};
     const ui=setup('Old sentence.\n\nOld second block.\n',()=>{saved++;settled();});change(ui.body,'Old sentence.','My sentence.');
     const ready=observeUntil(ui.body,()=>!!ui.body.querySelector('.amd-see-theirs'));ui.footer.querySelector('.amd-save').click();await ready;
-    observeUntil(ui.body,()=>!!ui.body.querySelector('.amd-kept:not([hidden])')).then(settled);ui.body.querySelector('.amd-reapply,.amd-save-after').click();await reached;
+    observeUntil(ui.body,()=>!!ui.body.querySelector('.amd-kept:not([hidden])')).then(settled);ui.body.querySelector('.amd-open-latest').click();await reached;
     assert.equal(saved,0);assert.equal(calls.filter(c=>c.method==='POST').length,1,'no blind second POST');assert.match(ui.body.querySelector('.amd-kept').textContent,/My sentence/);assert.match(ui.body.querySelector('.amd-document').textContent,/Agent sentence/);
     assert.equal(ui.footer.querySelector('.amd-save').disabled,true);assert.equal(ui.editor.dirty,true,'kept draft is still guarded');ui.editor.cancel();assert.ok(document.querySelector('.amd-discard[open]'));document.querySelector('.amd-discard .btn:not(.btn-danger)').click();ui.editor.cancel();document.querySelector('.amd-discard .btn-danger').click();assert.equal(ui.exited,1);assert.equal(ui.exitDigest,latest,'discard after redo opens the latest baseline, not the stale version');ui.close();
 });
@@ -69,4 +73,119 @@ test('plain-text paste enables Save immediately and preserves source delimiters'
     const paste = new Event('paste', { bubbles: true, cancelable: true }); Object.defineProperty(paste, 'clipboardData', { value: { getData: () => 'replacement' } }); span.dispatchEvent(paste);
     assert.equal(ui.footer.querySelector('.amd-save').disabled, false); ui.footer.querySelector('.amd-save').click(); await saved;
     assert.equal(Buffer.from(sent.body).toString(), 'A **replacement**.\n'); ui.close();
+});
+
+test('nested list editing preserves markers and permits a literal continuation without adding an item',async()=>{
+ const source='\ufeff- Parent\r\n  - Nested words\r\n- Last words\r\n';let sent;let done;const saved=new Promise(r=>{done=r;});
+ globalThis.fetch=window.fetch=async(u,o)=>{sent=o.body;return Response.json({id:next,version:2});};
+ const ui=setup(source,done);change(ui.body,'Nested words','Revised words\n- literal');
+ assert.equal(ui.footer.querySelector('.amd-save').disabled,false);assert.equal(ui.body.querySelectorAll('li').length,3);
+ ui.footer.querySelector('.amd-save').click();await saved;assert.equal(Buffer.from(sent).toString(),source.replace('Nested words','Revised words\r\n    \\- literal'));ui.close();
+});
+
+test('a multiline plain-text paste into a list retains the same items',()=>{
+ const ui=setup('- First words\n  - Nested words\n- Last words\n');const span=[...ui.body.querySelectorAll('.amd-text')].find(e=>e.textContent==='Nested words');assert.ok(span);assert.equal(span.getAttribute('aria-multiline'),'true','Enter continues this textbox');span.focus();const range=document.createRange();range.selectNodeContents(span);const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);
+ const paste=new Event('paste',{bubbles:true,cancelable:true});Object.defineProperty(paste,'clipboardData',{value:{getData:()=> 'New words\n1. literal'}});span.dispatchEvent(paste);assert.equal(span.textContent,'New words\n1. literal');span.blur();assert.equal(ui.body.querySelectorAll('li').length,3);assert.equal(ui.footer.querySelector('.amd-save').disabled,false);ui.close();
+});
+
+test('table edits escape typed pipes and reject a pasted row break',async()=>{
+ const source='\ufeff| Item | Owner |\r\n|---|---|\r\n| Report | Operator |\r\n';let sent;let done;const saved=new Promise(r=>{done=r;});globalThis.fetch=window.fetch=async(u,o)=>{sent=o.body;return Response.json({id:next,version:2});};const ui=setup(source,done);
+ const span=[...ui.body.querySelectorAll('.amd-text')].find(e=>e.textContent==='Operator');assert.ok(span);assert.equal(span.getAttribute('aria-multiline'),null);span.focus();const range=document.createRange();range.selectNodeContents(span);getSelection().removeAllRanges();getSelection().addRange(range);const paste=new Event('paste',{bubbles:true,cancelable:true});Object.defineProperty(paste,'clipboardData',{value:{getData:()=> 'New\nRow'}});span.dispatchEvent(paste);assert.equal(span.textContent,'Operator');
+ change(ui.body,'Operator','New | Owner');assert.equal(ui.body.querySelectorAll('td').length,2);ui.footer.querySelector('.amd-save').click();await saved;assert.equal(Buffer.from(sent).toString(),source.replace('Operator','New \\| Owner'));ui.close();
+});
+
+test('table drafts survive either stale refusal without an automatic second POST',async()=>{
+ for(const code of ['stale_version','stale_base']){
+  const source='| Item | Owner |\n|---|---|\n| Report | Operator |\n',theirs=source.replace('Operator','Agent');let posts=0;
+  globalThis.fetch=window.fetch=async(u,o={})=>{if(o.method==='POST'){posts++;return Response.json({code,latest_digest:latest,latest_version:2},{status:409});}return new Response(theirs);};const ui=setup(source);change(ui.body,'Operator','My words');const ready=observeUntil(ui.body,()=>!!ui.body.querySelector('.amd-open-latest'));ui.footer.querySelector('.amd-save').click();await ready;
+  const opened=observeUntil(ui.body,()=>!!ui.body.querySelector('.amd-kept:not([hidden])'));ui.body.querySelector('.amd-open-latest').click();await opened;assert.equal(posts,1);assert.match(ui.body.querySelector('.amd-kept').textContent,/My words/);assert.match(ui.body.querySelector('.amd-document').textContent,/Agent/);assert.equal(ui.footer.querySelector('.amd-save').disabled,true);ui.close();
+ }
+});
+
+test('code body edits remain literal, save exact source, and reject a closing fence',async()=>{
+ const source='\ufeff```bash\r\nprintf old\r\n```\r\n';let sent;globalThis.fetch=window.fetch=async(url,options)=>{sent=options.body;return Response.json({id:next,version:2});};let done;const saved=new Promise(r=>{done=r;});const ui=setup(source,done);
+ const field=ui.body.querySelector('pre .amd-text');assert.ok(field);assert.equal(field.getAttribute('aria-multiline'),'true');
+ change(ui.body,'printf old','printf old\n```');assert.equal(ui.body.querySelector('pre .amd-text').textContent,'printf old');assert.equal(ui.editor.dirty,false);
+ change(ui.body,'printf old','printf new\n<b>literal</b>');assert.equal(ui.body.querySelectorAll('pre').length,1);assert.equal(ui.body.querySelector('b'),null);ui.footer.querySelector('.amd-save').click();await saved;
+ assert.equal(Buffer.from(sent).toString(),source.replace('printf old','printf new\r\n<b>literal</b>'));ui.close();
+});
+
+test('code drafts survive both stale refusals without resend',async()=>{
+ for(const code of ['stale_version','stale_base']) {
+  const source='```bash\nold words\n```\n',theirs=source.replace('old','agent');let posts=0;globalThis.fetch=window.fetch=async(url,options={})=>{if(options.method==='POST'){posts++;return Response.json({code,latest_digest:latest,latest_version:2},{status:409});}return new Response(theirs);};
+  const ui=setup(source);change(ui.body,'old words','my words');ui.footer.querySelector('.amd-save').click();await observeUntil(ui.body,()=>!!ui.body.querySelector('.amd-open-latest'));ui.body.querySelector('.amd-open-latest').click();await observeUntil(ui.body,()=>!ui.body.querySelector('.amd-kept').hidden);
+  assert.equal(posts,1);assert.match(ui.body.querySelector('.amd-kept').textContent,/my words/);assert.equal(ui.footer.querySelector('.amd-save').disabled,true);assert.equal(ui.body.querySelector('.amd-reapply,.amd-save-after'),null);ui.close();
+ }
+});
+
+test('quote editing inserts a literal continuation inside the original quote',async()=>{
+ const source='\ufeff> Quoted words\r\n\r\nOutside.\r\n';let sent;globalThis.fetch=window.fetch=async(url,options)=>{sent=options.body;return Response.json({id:next,version:2});};let done;const saved=new Promise(r=>{done=r;});const ui=setup(source,done);
+ assert.equal(ui.body.querySelector('blockquote .amd-text').getAttribute('aria-multiline'),'true');change(ui.body,'Quoted words','Revised words\n> literal');assert.equal(ui.body.querySelectorAll('blockquote').length,1);ui.footer.querySelector('.amd-save').click();await saved;assert.equal(Buffer.from(sent).toString(),source.replace('Quoted words','Revised words\r\n> \\> literal'));ui.close();
+});
+
+test('quote drafts survive both stale refusals without resend',async()=>{
+ for(const code of ['stale_version','stale_base']) {
+  const source='> old words\n',theirs=source.replace('old','agent');let posts=0;globalThis.fetch=window.fetch=async(url,options={})=>{if(options.method==='POST'){posts++;return Response.json({code,latest_digest:latest,latest_version:2},{status:409});}return new Response(theirs);};
+  const ui=setup(source);change(ui.body,'old words','my words');ui.footer.querySelector('.amd-save').click();await observeUntil(ui.body,()=>!!ui.body.querySelector('.amd-open-latest'));ui.body.querySelector('.amd-open-latest').click();await observeUntil(ui.body,()=>!ui.body.querySelector('.amd-kept').hidden);assert.equal(posts,1);assert.match(ui.body.querySelector('.amd-kept').textContent,/my words/);assert.equal(ui.footer.querySelector('.amd-save').disabled,true);ui.close();
+ }
+});
+
+test('raw editing changes structure through plain text, uses strict preview, and saves exact bytes',async()=>{
+ const source='\ufeff# Old\r\n\r\nKeep.\r\n';let sent;globalThis.fetch=window.fetch=async(url,options)=>{sent=options.body;return Response.json({id:next,version:2});};let done;const saved=new Promise(r=>{done=r;});const ui=setup(source,done);
+ assert.ok(ui.body.querySelector('.amd-mode-raw'));ui.body.querySelector('.amd-mode-raw').click();const text=ui.body.querySelector('.amd-raw');assert.equal(text.value,'# Old\n\nKeep.\n');
+ const inserted='<script>window.BAD=1</script>\n[bad](javascript:alert(1))\n![remote](https://example.com/x.png)\n[local](coral://artifacts/'+hex+')\n\u202e';text.value=text.value.replace('Keep.',inserted);text.dispatchEvent(new Event('input'));
+ assert.match(ui.body.querySelector('.amd-raw-warning').textContent,/bidirectional/);ui.body.querySelector('.amd-preview-toggle').click();const preview=ui.body.querySelector('.amd-preview');assert.equal(preview.querySelector('script'),null);assert.ok(preview.textContent.includes('<script>'));assert.equal(preview.querySelector('[href^="javascript:"],img[src^="https:"]'),null);assert.ok(preview.querySelector('[href^="coral:"]'));
+ ui.body.querySelector('.amd-mode-rendered').click();assert.ok(ui.body.textContent.includes('<script>'));ui.body.querySelector('.amd-mode-raw').click();assert.ok(ui.body.querySelector('.amd-raw').value.includes(inserted));ui.footer.querySelector('.amd-save').click();await saved;assert.equal(Buffer.from(sent).toString(),source.replace('Keep.',inserted.replace(/\n/g,'\r\n')));ui.close();
+});
+
+test('raw mode retains the exact draft after either stale refusal and never auto-posts',async()=>{
+ for(const code of ['stale_version','stale_base']) {
+  const source='\ufeff# Old\r\n',theirs='# Agent\r\n';let posts=0;globalThis.fetch=window.fetch=async(url,options={})=>{if(options.method==='POST'){posts++;return Response.json({code,latest_digest:latest,latest_version:2},{status:409});}return new Response(theirs);};
+  const ui=setup(source);ui.body.querySelector('.amd-mode-raw').click();const input=ui.body.querySelector('.amd-raw');input.value='# My draft\n[link](https://example.com)\n';input.dispatchEvent(new Event('input'));ui.footer.querySelector('.amd-save').click();await observeUntil(ui.body,()=>!!ui.body.querySelector('.amd-open-latest'));assert.equal(input.value,'# My draft\n[link](https://example.com)\n');ui.body.querySelector('.amd-open-latest').click();await observeUntil(ui.body,()=>!ui.body.querySelector('.amd-kept').hidden);
+  assert.equal(posts,1);assert.equal(ui.body.querySelector('.amd-kept-source').value,'\ufeff# My draft\n[link](https://example.com)\n');assert.equal(ui.body.querySelector('.amd-raw').value,'# Agent\n');assert.equal(ui.footer.querySelector('.amd-save').disabled,true);ui.close();
+ }
+});
+
+test('raw oversize refusal keeps the entire draft and does not call fetch',async()=>{
+ const ui=setup('Old.\n');let posts=0;globalThis.fetch=window.fetch=async()=>{posts++;throw Error('must not call');};ui.body.querySelector('.amd-mode-raw').click();const input=ui.body.querySelector('.amd-raw'),value='x'.repeat(2*1024*1024+1);input.value=value;input.dispatchEvent(new Event('input'));ui.footer.querySelector('.amd-save').click();await observeUntil(ui.body,()=>ui.body.querySelector('.amd-status').textContent.includes('2 MiB'));assert.equal(posts,0);assert.equal(input.value,value);assert.equal(ui.editor.dirty,true);ui.close();
+});
+
+test('raw Hub save accepts exactly 64 KiB with expected-latest and retains 64 KiB plus one without fallback',async()=>{
+ const {state}=await importUi('state');state.hub=true;
+ try {
+  let calls=[];globalThis.fetch=window.fetch=async(url,options)=>{calls.push({url,...options});return Response.json({id:next,version:2});};
+  let done;const saved=new Promise(r=>{done=r;});let ui=setup('Old.',done,api.editContext('m1','dev',hex));ui.body.querySelector('.amd-mode-raw').click();let input=ui.body.querySelector('.amd-raw');input.value='x'.repeat(64*1024);input.dispatchEvent(new Event('input'));ui.footer.querySelector('.amd-save').click();await saved;assert.equal(calls.length,1);assert.equal(calls[0].body.byteLength,64*1024);assert.ok(String(calls[0].url).includes('expected_latest='+hex));assert.ok(String(calls[0].url).includes('/remote/m1/'));ui.close();
+  calls=[];ui=setup('Old.',()=>{},api.editContext('m1','dev',hex));ui.body.querySelector('.amd-mode-raw').click();input=ui.body.querySelector('.amd-raw');const value='x'.repeat(64*1024+1);input.value=value;input.dispatchEvent(new Event('input'));ui.footer.querySelector('.amd-save').click();await observeUntil(ui.body,()=>ui.body.querySelector('.amd-status').textContent.includes('64 KiB'));assert.equal(calls.length,0);assert.equal(input.value,value);assert.equal(ui.editor.dirty,true);ui.close();
+ }finally{state.hub=false;}
+});
+
+test('mode switches never serialize DOM or normalize untouched source bytes',async()=>{
+ const source='\ufeff# Title\r\n\r\nOld words.\nTail.\r\n';let sent;globalThis.fetch=window.fetch=async(url,options)=>{sent=options.body;return Response.json({id:next,version:2});};let done;const saved=new Promise(r=>{done=r;});const ui=setup(source,done);
+ change(ui.body,'Old words.\nTail.','New words.\nTail.');for(let i=0;i<2;i++){ui.body.querySelector('.amd-mode-raw').click();ui.body.querySelector('.amd-mode-rendered').click();}ui.body.querySelector('.amd-mode-raw').click();ui.footer.querySelector('.amd-save').click();await saved;assert.equal(Buffer.from(sent).toString(),source.replace('Old','New'));ui.close();
+ const noOp=setup(source);noOp.body.querySelector('.amd-mode-raw').click();const input=noOp.body.querySelector('.amd-raw');input.dispatchEvent(new Event('input'));noOp.body.querySelector('.amd-mode-rendered').click();assert.equal(noOp.editor.dirty,false);assert.equal(noOp.footer.querySelector('.amd-save').disabled,true);noOp.close();
+});
+
+test('tag and separator characters are visible/read-only, rejected on typing/paste, and only warned in raw mode',async()=>{
+ for(const cp of [0xe0000,0xe001f,0xe0020,0xe0041,0xe007f,0x2028,0x2029,0xad,0x34f,0x85,0x180e,0x115f,0x1160,0x3164,0xfff9,0xfffa,0xfffb]) {
+  const char=String.fromCodePoint(cp),label='U+'+cp.toString(16).toUpperCase().padStart(4,'0'),source='\ufeff# Title\r\n\r\nBefore'+char+'after.\r\n';let sent,done;const saved=new Promise(r=>{done=r;});
+  globalThis.fetch=window.fetch=async(url,options)=>{sent=options.body;return Response.json({id:next,version:2});};const ui=setup(source,done);
+  assert.ok(ui.body.textContent.includes(label),label+' code point is shown');assert.equal([...ui.body.querySelectorAll('.amd-text')].some(e=>e.textContent.includes('Before')),false,label+' block is read-only');
+  const field=ui.body.querySelector('.amd-text'),before=field.textContent;
+  const typed=new window.InputEvent('beforeinput',{inputType:'insertText',data:char,bubbles:true,cancelable:true});field.dispatchEvent(typed);assert.equal(typed.defaultPrevented,true,label+' typing refused');assert.equal(field.textContent,before);
+  const paste=new Event('paste',{bubbles:true,cancelable:true});Object.defineProperty(paste,'clipboardData',{value:{getData:()=>char}});field.dispatchEvent(paste);assert.equal(field.textContent,before,label+' paste refused');assert.match(ui.body.querySelector('.amd-status').textContent,/hidden/i);
+  ui.body.querySelector('.amd-mode-raw').click();const raw=ui.body.querySelector('.amd-raw');assert.equal(ui.body.querySelector('.amd-raw-warning').hidden,false,label+' raw warning');assert.ok(raw.value.includes(char));raw.value+='Changed.';raw.dispatchEvent(new Event('input'));ui.footer.querySelector('.amd-save').click();await saved;assert.deepEqual(Buffer.from(sent),Buffer.from(source+'Changed.'),label+' raw save preserves exact bytes');ui.close();
+ }
+});
+
+test('read-only notices name hidden code points even inside Markdown link destinations',()=>{
+ for(const cp of [0xe0041,0x2028,0x2029]) {
+  const char=String.fromCodePoint(cp),label='U+'+cp.toString(16).toUpperCase().padStart(4,'0'),source='[Visible label](https://example.com/'+char+')\n',ui=setup(source);
+  assert.ok(ui.body.querySelector('.amd-readonly'));assert.ok(ui.body.querySelector('.amd-readonly').textContent.includes(label),label+' is named when it is absent from visible link text');assert.equal(ui.body.querySelectorAll('.amd-text').length,0);assert.equal(ui.editor.dirty,false);ui.close();
+ }
+});
+
+test('multiline native insertion cannot put a tag into a continuation-capable rendered field',()=>{
+ const ui=setup('- Safe words.\n'),field=ui.body.querySelector('.amd-text');field.focus();const range=document.createRange();range.selectNodeContents(field);range.collapse(false);getSelection().removeAllRanges();getSelection().addRange(range);
+ field.dispatchEvent(new window.InputEvent('beforeinput',{inputType:'insertText',data:'More\n'+String.fromCodePoint(0xe0041),bubbles:true,cancelable:true}));
+ assert.equal(field.textContent,'Safe words.','hidden text is refused before any DOM insertion, not merely on blur');assert.match(ui.body.querySelector('.amd-status').textContent,/hidden/i);assert.equal(ui.editor.dirty,false);ui.close();
 });
