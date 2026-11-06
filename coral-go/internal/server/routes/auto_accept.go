@@ -77,6 +77,43 @@ var autoAcceptBlockingTools = map[string]string{
 	"request_user_input": "a question waits for your answer",
 }
 
+// autoAcceptActionTools are, per agent type whose prompts Coral learns the tool of (PreToolUse), the tools whose approval auto-accept may
+// answer: actions (run a command, read or write a file, fetch). It is an ALLOW-list: a tool not named here (a question or plan tool, or one a
+// CLI update adds whose prompt also starts "Do you want to ...") is left for the user, recorded as skipped. Claude's MCP tools (mcp__...) are
+// actions too. Codex has no entry: its prompts are recognised by the run-command and make-edits headers alone (classifyApproval).
+var autoAcceptActionTools = map[string]map[string]bool{
+	at.Claude: {
+		"Bash": true, "BashOutput": true, "KillShell": true, "Edit": true, "MultiEdit": true, "Write": true, "NotebookEdit": true, "Update": true,
+		"Read": true, "Glob": true, "Grep": true, "LS": true, "WebFetch": true, "WebSearch": true,
+	},
+	at.Agy:         agyActionTools,
+	at.Antigravity: agyActionTools,
+	at.Gemini: {
+		"run_shell_command": true, "write_file": true, "replace": true, "read_file": true, "read_many_files": true, "list_directory": true,
+		"glob": true, "search_file_content": true, "web_fetch": true, "google_web_search": true,
+	},
+}
+
+// agyActionTools are agy's and Antigravity's action tools.
+var agyActionTools = map[string]bool{"run_command": true, "write_to_file": true, "replace_file_content": true, "view_file": true}
+
+// autoAcceptHeaderRecognised are the supported types with no tool list: their approval prompts are recognised by their own header alone
+// (classifyApproval), and no PreToolUse record is needed.
+var autoAcceptHeaderRecognised = map[string]bool{at.Codex: true}
+
+// autoAcceptActionTool reports whether tool is an action auto-accept may approve for agentType: a listed tool, or any for a header-recognised
+// type (Codex). A type with neither is never approved (TestEveryAutoAcceptTypeHasAToolListOrAHeader).
+func autoAcceptActionTool(agentType, tool string) bool {
+	list, ok := autoAcceptActionTools[agentType]
+	if !ok {
+		return autoAcceptHeaderRecognised[agentType]
+	}
+	if agentType == at.Claude && strings.HasPrefix(tool, "mcp__") {
+		return true
+	}
+	return list[tool]
+}
+
 const (
 	autoAcceptInterval    = 2 * time.Second
 	autoAcceptDebounce    = 3 * time.Second
@@ -406,6 +443,10 @@ func (a *AutoAcceptor) check(ctx context.Context, s store.AutoAcceptState) {
 	if pending != nil {
 		if why, ok := autoAcceptBlockingTools[pending.ToolName]; ok {
 			a.skip(ctx, s, d.FP, "Not auto-accepted: "+why, pending)
+			return
+		}
+		if !autoAcceptActionTool(s.AgentType, pending.ToolName) {
+			a.skip(ctx, s, d.FP, "Not auto-accepted: the tool is not a known action, so its prompt may be a question", pending)
 			return
 		}
 	}
