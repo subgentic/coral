@@ -61,6 +61,9 @@ func TestFilesCompareModesListWhatTheirLabelsSay(t *testing.T) {
 		t.Helper()
 		_, err := handler.db.ExecContext(ctx, "INSERT INTO user_settings (key, value) VALUES ('git_diff_mode', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", mode)
 		require.NoError(t, err)
+		// The tree changes between asks (a stash, a checkout, a commit) while the mode, folder and agent stay the same, so a pass that took over refreshReuseOver (a loaded machine's cold git) would be reused for
+		// as long as it took and the next ask would get the list from before the change (#13925). Every ask here must be a pass of its own.
+		forgetRefreshResults()
 		req, err := http.NewRequest(http.MethodPost, server.URL+"/api/sessions/live/"+name+"/files/refresh", strings.NewReader(`{"session_id":"`+sid+`"}`))
 		require.NoError(t, err)
 		resp, err := http.DefaultClient.Do(req)
