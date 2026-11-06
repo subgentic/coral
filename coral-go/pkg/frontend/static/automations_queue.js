@@ -61,18 +61,21 @@ export const leaseWords = e => { const s = left(e.lease_until); if (!Number.isFi
 /** "Waiting 3 min" for an entry in line. */
 export const waitWords = e => { const s = ago(e.enqueued_at); return Number.isFinite(s) ? `Waiting ${compactDuration(s)}` : 'Waiting'; };
 
+/** A pool's hold is on the pool's list and on its member's (the member's slot is in use): it is one row, under the pool, so the member's group leaves it out of its rows (its count of slots in use still has it). */
+const ownHolders = r => (r.holders || []).filter(e => !(e.member && e.member === r.name));
+
 /** One row per holder and per waiting entry, a resource with nobody on it as one row that says all its slots are free. */
 export function queueItems() {
     const rows = [];
     for (const r of resources) {
         const holders = r.holders || [], queue = r.queue || [], head = { resource: r.name, machine: r.machine || '', slots: r.slots, used: holders.length, waiting: queue.length };
         if (!holders.length && !queue.length) rows.push({ ...head, key: `${r.name}-free`, id: 0, state: 'free', agent: '', note: '', task: 0, place: 0, last: true, first: true });
-        holders.forEach(e => rows.push({ ...head, key: `${r.name}-${e.id}`, id: e.id, state: 'holding', agent: e.agent, note: e.note || '', task: e.task || 0, project: e.project || '', goal_id: e.goal_id || 0, goal_title: e.goal_title || '', stuck: e.stuck || '', stuck_min: e.stuck_min || 0, place: 0, lease_until: e.lease_until, enqueued_at: e.enqueued_at, pinned: !!e.pinned }));
+        ownHolders(r).forEach(e => rows.push({ ...head, key: `${r.name}-${e.id}`, id: e.id, state: 'holding', agent: e.agent, note: e.note || '', task: e.task || 0, project: e.project || '', goal_id: e.goal_id || 0, goal_title: e.goal_title || '', member: e.member || '', heldOn: e.machine || '', stuck: e.stuck || '', stuck_min: e.stuck_min || 0, place: 0, lease_until: e.lease_until, enqueued_at: e.enqueued_at, pinned: !!e.pinned }));
         queue.forEach((e, i) => rows.push({ ...head, key: `${r.name}-${e.id}`, id: e.id, state: 'waiting', agent: e.agent, note: e.note || '', task: e.task || 0, project: e.project || '', goal_id: e.goal_id || 0, goal_title: e.goal_title || '', place: e.place || i + 1, first: i === 0, last: i === queue.length - 1, enqueued_at: e.enqueued_at, pinned: !!e.pinned }));
     }
     return rows;
 }
-export const queueCount = () => resources.reduce((n, r) => n + (r.queue || []).length + (r.holders || []).length, 0);
+export const queueCount = () => resources.reduce((n, r) => n + (r.queue || []).length + ownHolders(r).length, 0);
 export const resourceWords = r => `${r.resource}: ${r.used} of ${r.slots} in use${r.waiting ? `, ${r.waiting} waiting` : ''}${r.machine ? `, on ${r.machine}` : ''}`;
 export const groupOf = r => ({ key: r.resource, label: resourceWords(r) });
 
@@ -143,7 +146,9 @@ function neighbour(row) {
 
 /** A holder the Orchestrator was told is stuck (#13705): at a prompt for a person, or idle, while others wait. */
 const stuckWords = r => (r.stuck === 'prompt' ? `At a prompt waiting for a person for ${r.stuck_min} min` : `Idle for ${r.stuck_min} min`);
-const stateWord = row => (row.state === 'holding' ? (row.stuck ? `Stuck ${row.stuck_min} min` : 'Holding') : row.state === 'waiting' ? `Waiting, place ${row.place}` : 'Free');
+/** What a holder says of itself: Holding, or Stuck N min when the Orchestrator was told, and on a pool's hold the machine it got (#13719), so a phone card and a desktop chip say the same. */
+const holdWord = row => `${row.stuck ? `Stuck ${row.stuck_min} min` : 'Holding'}${row.heldOn ? ' on ' + row.heldOn : ''}`;
+const stateWord = row => (row.state === 'holding' ? holdWord(row) : row.state === 'waiting' ? `Waiting, place ${row.place}` : 'Free');
 
 const openTaskPage = (r, from) => importOnce('./task_navigation.js').then(m => m.openTask(r.project, r.task, from, { from: '' }));
 const openGoalPage = r => importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(r.project, r.goal_id));
@@ -162,7 +167,7 @@ const linkActions = r => (r.state === 'free' ? [] : [
 export function queueTable(rows, narrowed) {
     return { title: 'Queue (experimental)', noun: ['entry', 'entries'], rows,
         empty: { line: narrowed ? 'No entry matches the search.' : loaded ? 'No resource is defined.' : 'Reading the queue.', hint: narrowed || !loaded ? '' : 'An Orchestrator defines a resource with coral-board resource; agents claim a slot before a heavy run and wait in line when it is taken.' },
-        signature: JSON.stringify([denied, rows.map(r => [r.key, r.state, r.place, r.agent, r.project, r.goal_id, r.goal_title, r.stuck, r.stuck_min, r.note, r.used, r.slots, r.waiting, r.lease_until, r.first, r.last, r.state === 'holding' ? leaseWords(r) : r.state === 'waiting' ? waitWords(r) : ''])]), // the words of the clock are in it: the table is drawn again when they change
+        signature: JSON.stringify([denied, rows.map(r => [r.key, r.state, r.place, r.agent, r.project, r.goal_id, r.goal_title, r.stuck, r.stuck_min, r.member, r.heldOn, r.note, r.used, r.slots, r.waiting, r.lease_until, r.first, r.last, r.state === 'holding' ? leaseWords(r) : r.state === 'waiting' ? waitWords(r) : ''])]), // the words of the clock are in it: the table is drawn again when they change
         node: () => DT.dataTable({
             label: `Queue, ${rows.length}`, rows, oneLine: true, resize: true, keepOrder: true, rowKey: r => r.key, rowName: r => (r.state === 'free' ? `${r.resource}, all free` : `${r.agent}, ${stateWord(r)}, ${r.resource}`),
             groupBy: groupOf,
@@ -176,7 +181,7 @@ export function queueTable(rows, narrowed) {
                 ...(denied ? [] : [{ key: 'actions', label: 'Move or kick', width: '14rem', cell: actionsCell }]),
             ],
             mail: r => ({ lead: { icon: r.state === 'holding' ? 'lock' : r.state === 'waiting' ? 'hourglass_empty' : 'check_circle', square: true, name: stateWord(r) }, title: r.state === 'free' ? `${r.resource}: all slots free` : r.agent,
-                snippet: r.state === 'free' ? '' : `${r.resource}${r.note ? ' · ' + r.note : ''}`, state: stateWord(r), time: r.state === 'holding' ? `${r.stuck ? `Stuck ${r.stuck_min} min` : 'Holding'} \u00b7 ${leaseWords(r)}` : r.state === 'waiting' ? `Place ${r.place} \u00b7 ${waitWords(r)}` : '',
+                snippet: r.state === 'free' ? '' : `${r.resource}${r.note ? ' · ' + r.note : ''}`, state: stateWord(r), time: r.state === 'holding' ? `${holdWord(r)} \u00b7 ${leaseWords(r)}` : r.state === 'waiting' ? `Place ${r.place} \u00b7 ${waitWords(r)}` : '',
                 actions: [...linkActions(r), ...rowActions(r)].map(a => ({ label: a.label, title: a.title, off: a.off, ...(a.kick ? { confirm: 'Confirm kick', onArm: () => announceNotice(`Press Confirm kick to remove ${r.agent} from ${r.resource}.`) } : {}), run: () => { noteFocus(a.kick ? neighbour(r)[0] : r.id, a.label); a.run(); } })) }),
         }).el };
 }

@@ -57,6 +57,8 @@ type entryView struct {
 	Place     int    `json:"place,omitempty"`
 	Stuck     string `json:"stuck,omitempty"`     // "prompt" or "idle" once the holder has been told of (#13705)
 	StuckMin  int    `json:"stuck_min,omitempty"` // how long, in minutes
+	Member    string `json:"member,omitempty"`    // a pool's hold: the member it was granted (#13719)
+	Machine   string `json:"machine,omitempty"`   // and that member's machine, for people to read
 }
 
 type resourceView struct {
@@ -64,6 +66,7 @@ type resourceView struct {
 	Slots    int         `json:"slots"`
 	Machine  string      `json:"machine,omitempty"`
 	MaxLease int         `json:"max_lease_seconds"`
+	Members  []string    `json:"members,omitempty"` // a pool: its members, in the order they are tried
 	Allowed  []string    `json:"allowed,omitempty"`
 	Match    []string    `json:"match,omitempty"`
 	Holders  []entryView `json:"holders"`
@@ -71,7 +74,7 @@ type resourceView struct {
 }
 
 func viewEntry(e resourcequeue.Entry, place int) entryView {
-	v := entryView{ID: e.ID, Agent: e.Agent, Task: e.Task, Project: e.Project, Priority: e.Priority, Note: e.Note, Enqueued: e.Enqueued.UTC().Format(time.RFC3339), Pinned: e.Pin > 0, Place: place}
+	v := entryView{ID: e.ID, Agent: e.Agent, Task: e.Task, Project: e.Project, Priority: e.Priority, Note: e.Note, Enqueued: e.Enqueued.UTC().Format(time.RFC3339), Member: e.Member, Pinned: e.Pin > 0, Place: place}
 	if !e.Granted.IsZero() {
 		v.Granted = e.Granted.UTC().Format(time.RFC3339)
 		v.Lease = e.Lease.UTC().Format(time.RFC3339)
@@ -84,7 +87,7 @@ func viewStatus(st resourcequeue.Status) resourceView {
 	if lease <= 0 {
 		lease = resourcequeue.DefaultLease
 	}
-	v := resourceView{Name: st.Resource.Key, Slots: st.Resource.Slots, Machine: st.Resource.Machine, MaxLease: int(lease / time.Second), Allowed: st.Resource.Allowed, Match: st.Resource.Match, Holders: []entryView{}, Queue: []entryView{}}
+	v := resourceView{Name: st.Resource.Key, Slots: st.Resource.Slots, Machine: st.Resource.Machine, MaxLease: int(lease / time.Second), Members: st.Resource.Members, Allowed: st.Resource.Allowed, Match: st.Resource.Match, Holders: []entryView{}, Queue: []entryView{}}
 	for _, e := range st.Holders {
 		v.Holders = append(v.Holders, viewEntry(e, 0))
 	}
@@ -104,6 +107,8 @@ func (h *ResourcesHandler) fail(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "queue_full", err.Error())
 	case errors.Is(err, resourcequeue.ErrNotHolder):
 		writeError(w, http.StatusConflict, "not_holder", err.Error())
+	case errors.Is(err, resourcequeue.ErrInPool):
+		writeError(w, http.StatusConflict, "in_pool", err.Error())
 	case errors.Is(err, resourcequeue.ErrBadResource), errors.Is(err, resourcequeue.ErrBadMatch):
 		errBadRequest(w, err.Error())
 	default:
@@ -126,6 +131,7 @@ func (h *ResourcesHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	h.addGoals(r.Context(), out)
 	h.addStuck(out)
+	h.addMachines(out)
 	writeJSON(w, http.StatusOK, map[string]any{"resources": out})
 }
 
@@ -191,6 +197,7 @@ func (h *ResourcesHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	one := []resourceView{viewStatus(st)}
 	h.addStuck(one)
+	h.addMachines(one) // a pool's holds say which machine they are on here too (#13751)
 	writeJSON(w, http.StatusOK, one[0])
 }
 
@@ -248,7 +255,13 @@ func (h *ResourcesHandler) Claim(w http.ResponseWriter, r *http.Request) {
 	if !res.Granted {
 		code = http.StatusAccepted
 	}
-	writeJSON(w, code, map[string]any{"granted": res.Granted, "place": res.Place, "entry": viewEntry(res.Entry, res.Place)})
+	ev := viewEntry(res.Entry, res.Place)
+	if ev.Member != "" {
+		if ms, err := h.M.Queue().Status(ev.Member); err == nil {
+			ev.Machine = ms.Resource.Machine // a pool's grant says which machine it is on
+		}
+	}
+	writeJSON(w, code, map[string]any{"granted": res.Granted, "place": res.Place, "entry": ev})
 }
 
 // Release answers POST /api/resources/{name}/release.
@@ -330,14 +343,15 @@ func (h *ResourcesHandler) Define(w http.ResponseWriter, r *http.Request) {
 		MaxLeaseS int      `json:"max_lease_seconds"`
 		Allowed   []string `json:"allowed"`
 		Match     []string `json:"match"`
+		Members   []string `json:"members"` // a pool (#13719)
 	}
 	if err := decodeJSONMax(w, r, &body, 8192); err != nil {
 		errBadRequest(w, "invalid JSON")
 		return
 	}
 	name := chi.URLParam(r, "name")
-	if !resourceNameRe.MatchString(name) || body.Slots < 1 || body.Slots > 100 || body.MaxLeaseS < 0 || body.MaxLeaseS > 24*3600 || len(body.Allowed) > 100 {
-		errBadRequest(w, "name: letters, digits, dot, dash and underscore, up to 64; slots 1 to 100; a lease up to a day; at most 100 allowed agents")
+	if !resourceNameRe.MatchString(name) || (len(body.Members) == 0 && body.Slots < 1) || body.Slots > 100 || len(body.Members) > resourcequeue.MaxMembers || body.MaxLeaseS < 0 || body.MaxLeaseS > 24*3600 || len(body.Allowed) > 100 {
+		errBadRequest(w, "name: letters, digits, dot, dash and underscore, up to 64; slots 1 to 100 (none for a pool, which lists up to 8 members); a lease up to a day; at most 100 allowed agents")
 		return
 	}
 	allowed := make([]string, 0, len(body.Allowed))
@@ -346,7 +360,7 @@ func (h *ResourcesHandler) Define(w http.ResponseWriter, r *http.Request) {
 			allowed = append(allowed, a)
 		}
 	}
-	if err := h.M.Queue().Define(resourcequeue.Resource{Key: name, Slots: body.Slots, Machine: cleanText(body.Machine, 128), MaxLease: time.Duration(body.MaxLeaseS) * time.Second, Allowed: allowed, Match: body.Match}); err != nil {
+	if err := h.M.Queue().Define(resourcequeue.Resource{Key: name, Slots: body.Slots, Members: cleanMembers(body.Members), Machine: cleanText(body.Machine, 128), MaxLease: time.Duration(body.MaxLeaseS) * time.Second, Allowed: allowed, Match: body.Match}); err != nil {
 		h.fail(w, err)
 		return
 	}
@@ -412,4 +426,32 @@ func (h *ResourcesHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// cleanMembers are the member names of a pool; a name that cannot be a resource becomes one that cannot exist, so the queue refuses the pool.
+func cleanMembers(in []string) []string {
+	var out []string
+	for _, m := range in {
+		if resourceNameRe.MatchString(m) {
+			out = append(out, m)
+		} else {
+			out = append(out, "?")
+		}
+	}
+	return out
+}
+
+// addMachines gives each hold of a pool the machine of the member it got (#13719).
+func (h *ResourcesHandler) addMachines(views []resourceView) {
+	machine := map[string]string{}
+	for _, st := range h.M.Queue().All() {
+		machine[st.Resource.Key] = st.Resource.Machine
+	}
+	for i := range views {
+		for j := range views[i].Holders {
+			if e := &views[i].Holders[j]; e.Member != "" {
+				e.Machine = machine[e.Member]
+			}
+		}
+	}
 }

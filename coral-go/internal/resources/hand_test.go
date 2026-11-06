@@ -300,3 +300,26 @@ func TestMatchingWorkStillKeepsAClaimPastItsFirstLeaseUntilTheCap(t *testing.T) 
 	}
 	assert.Empty(t, g.holders(), "the cap still ends it")
 }
+
+// #13773, QA Reviewer 2's SHOULD on #13743: a claim inside its first lease whose call is open does not read the process list (ps is never run for it); past the first lease it must be read, because only the work it started can keep the claim.
+func TestAnOpenCallInsideItsFirstLeaseNeverReadsTheProcessList(t *testing.T) {
+	g := newHookRig(t)
+	reads := 0
+	g.h.o.Commands = func(string) []string { g.mu.Lock(); defer g.mu.Unlock(); reads++; return []string{"go test ./..."} }
+	require.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy)) // MaxLease 30 min in the rig
+	for i := 0; i < 5; i++ {
+		g.add(5 * time.Minute) // 25 minutes: inside the first lease, the call open
+		g.h.Sweep()
+	}
+	g.mu.Lock()
+	inside := reads
+	g.mu.Unlock()
+	assert.Equal(t, 0, inside, "inside the first lease, with its call open, the process list is not read")
+	g.add(10 * time.Minute) // 35 minutes: past the first lease
+	g.h.Sweep()
+	g.mu.Lock()
+	past := reads
+	g.mu.Unlock()
+	assert.Greater(t, past, 0, "past it the list is read: only matching work keeps the claim")
+	assert.Equal(t, []string{"Agent A"}, g.holders(), "and the matching work it shows keeps it")
+}

@@ -27,7 +27,7 @@ the Orchestrator can move you.
                                                   A slot now (exit 0), or a place in line: with --wait the command waits until the slot is yours
   resource release <name>                         Give the slot back, or leave the line
   resource renew <name>                           A full lease from now
-  resource define <name> --slots N [--machine M] [--lease 30m] [--allow a,b] [--match "go test ./..."]...
+  resource define <name> (--slots N | --pool a,b) [--machine M] [--lease 30m] [--allow a,b] [--match "go test ./..."]...
                                                   The Operator or an Orchestrator: make or change a resource
   resource remove <name>                          The Operator or an Orchestrator
   resource move <entry-id> first|up|down          The Operator or an Orchestrator: reorder the line
@@ -94,6 +94,8 @@ type resEntry struct {
 	Lease    string `json:"lease_until"`
 	Place    int    `json:"place"`
 	Priority int    `json:"priority"`
+	Member   string `json:"member"`  // a pool's hold: the member it was granted
+	Machine  string `json:"machine"` // and where that is
 }
 
 type resView struct {
@@ -101,6 +103,7 @@ type resView struct {
 	Slots    int        `json:"slots"`
 	Machine  string     `json:"machine"`
 	MaxLease int        `json:"max_lease_seconds"`
+	Members  []string   `json:"members"`
 	Holders  []resEntry `json:"holders"`
 	Queue    []resEntry `json:"queue"`
 }
@@ -110,9 +113,18 @@ func printResource(v resView, me string) {
 	if v.Machine != "" {
 		where = " on " + v.Machine
 	}
+	if len(v.Members) > 0 {
+		where = " (pool of " + strings.Join(v.Members, ", ") + ")"
+	}
 	fmt.Printf("%s: %d of %d slot(s) held%s\n", plainText(v.Name), len(v.Holders), v.Slots, plainText(where))
 	for _, h := range v.Holders {
-		fmt.Printf("  holds   #%d %s%s%s\n", h.ID, plainText(h.Agent), taskWords(h), leaseWords(h.Lease))
+		on := ""
+		if h.Machine != "" {
+			on = " on " + h.Machine
+		} else if h.Member != "" {
+			on = " on " + h.Member
+		}
+		fmt.Printf("  holds   #%d %s%s%s%s\n", h.ID, plainText(h.Agent), plainText(on), taskWords(h), leaseWords(h.Lease))
 	}
 	for _, q := range v.Queue {
 		mine := ""
@@ -213,10 +225,14 @@ func resourceClaim(rest []string) {
 	var res struct {
 		Granted bool `json:"granted"`
 		Place   int  `json:"place"`
+		Entry   struct {
+			Member  string `json:"member"`
+			Machine string `json:"machine"`
+		} `json:"entry"`
 	}
 	_ = json.Unmarshal(data, &res)
 	if res.Granted {
-		fmt.Printf("You hold a slot of %s. As an agent, it goes back when THIS command (tool call) ends: claim and run the work in the same command. Release early with: coral-board resource release %s\n", rest[0], rest[0])
+		fmt.Printf("You hold a slot of %s%s. As an agent, it goes back when THIS command (tool call) ends: claim and run the work in the same command. Release early with: coral-board resource release %s\n", rest[0], onWords(res.Entry.Machine, res.Entry.Member), rest[0])
 		return
 	}
 	fmt.Printf("%s is busy: you are number %d in line.\n", rest[0], res.Place)
@@ -240,7 +256,7 @@ func resourceClaim(rest []string) {
 		res.Granted, res.Place = false, 0
 		_ = json.Unmarshal(data, &res)
 		if res.Granted {
-			fmt.Printf("Your turn: you hold a slot of %s. As an agent, it goes back when THIS command (tool call) ends: claim and run the work in the same command. Release early with: coral-board resource release %s\n", rest[0], rest[0])
+			fmt.Printf("Your turn: you hold a slot of %s%s. As an agent, it goes back when THIS command (tool call) ends: claim and run the work in the same command. Release early with: coral-board resource release %s\n", rest[0], onWords(res.Entry.Machine, res.Entry.Member), rest[0])
 			return
 		}
 		if res.Place != last {
@@ -276,16 +292,25 @@ func resourceDefine(rest []string) {
 	slots := fs.Int("slots", 0, "how many may hold it at once")
 	machine := fs.String("machine", "", "where it is, for people to read")
 	lease := fs.Duration("lease", 0, "how long a claim lasts unless renewed (default 30m)")
+	pool := fs.String("pool", "", "a pool: comma-separated resources whose slots it hands out, first free one in order (no --slots)")
 	allow := fs.String("allow", "", "comma-separated agents that may claim it (default: everyone)")
 	var match listFlag
 	fs.Var(&match, "match", `a shell command that claims it by itself, such as "go test ./..." (repeat for more; the hook, off without one)`)
 	clihelp.ParseFlags(fs, rest[1:], func() string { return resourceUsageText })
-	if *slots < 1 {
-		fmt.Fprintln(os.Stderr, "--slots N (1 or more) is required")
+	if *pool != "" && *slots != 0 {
+		fmt.Fprintln(os.Stderr, "A pool has no slots of its own: --pool a,b or --slots N, not both")
+		exitFn(1)
+		return
+	}
+	if *pool == "" && *slots < 1 {
+		fmt.Fprintln(os.Stderr, "--slots N (1 or more) is required (or --pool a,b)")
 		exitFn(1)
 		return
 	}
 	body := map[string]any{"slots": *slots, "machine": *machine, "max_lease_seconds": int(lease.Seconds())}
+	if *pool != "" {
+		body["members"] = strings.Split(*pool, ",")
+	}
 	if *allow != "" {
 		body["allowed"] = strings.Split(*allow, ",")
 	}
@@ -295,6 +320,10 @@ func resourceDefine(rest []string) {
 	data, status, err := resourceCall("PUT", "/"+name, body)
 	if err != nil || status != http.StatusOK {
 		resourceFail("Could not define "+rest[0], err, status, data)
+		return
+	}
+	if *pool != "" {
+		fmt.Printf("Defined %s, a pool of %s.\n", rest[0], strings.ReplaceAll(*pool, ",", ", "))
 		return
 	}
 	fmt.Printf("Defined %s with %d slot(s).\n", rest[0], *slots)
@@ -346,4 +375,15 @@ func resourceKick(rest []string) {
 		return
 	}
 	fmt.Printf("Dropped entry #%d.\n", id)
+}
+
+// onWords says where a pool's grant is: " on Mac mini" (the machine, else the member), "" for a resource that is not a pool.
+func onWords(machine, member string) string {
+	switch {
+	case machine != "":
+		return " on " + plainText(machine)
+	case member != "":
+		return " on " + plainText(member)
+	}
+	return ""
 }

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	heavypkg "github.com/subgentic/coral/internal/heavy"
 	"github.com/subgentic/coral/internal/proctree"
 	"github.com/subgentic/coral/pkg/resourcequeue"
 )
@@ -53,6 +54,7 @@ type autoHold struct {
 	refused map[string]bool // tool_use ids of the matched calls this hook held: a CLI that ran one anyway says so at its end (#13647)
 	granted time.Time       // first seen holding the slot
 	window  time.Time       // before this a slot with no call yet is kept for its agent
+	remote  bool            // the call is a coral-board heavy run: its work is on another machine, so no local process shows it and its own client renews the lease and stops it when the slot is lost (#13751)
 }
 
 // handBind is what a hand claim (coral-board resource claim, run by an agent) is tied to: the tool call it was made in and, for a job that outlives the call (Claude's run_in_background, Codex's background terminal), the work
@@ -265,6 +267,9 @@ type procEntry struct {
 
 const procTTL = 3 * time.Second
 
+// remoteCap is the longest a heavy-run hold is kept: above the wrapper's own 2 h cap on a run.
+const remoteCap = 150 * time.Minute
+
 // Active reports whether any resource has a match: with none the hook has nothing to do, and a caller skips every lookup before it.
 func (h *Hook) Active() bool {
 	if h == nil || h.m == nil {
@@ -303,11 +308,16 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 	pattern := ""
 	for _, st := range h.m.Queue().All() {
 		if p, hit := MatchCommand(command, st.Resource.Match); hit {
-			res, pattern = st.Resource, p
-			break
+			// a pattern kept on a plain resource (the Mac's own) is for that machine only and wins over a pool's: that is how a Mac-only pattern is written (#13751)
+			if pattern == "" || (len(res.Members) > 0 && len(st.Resource.Members) == 0) {
+				res, pattern = st.Resource, p
+			}
 		}
 	}
 	if pattern == "" {
+		if _, hit := MatchCommand(command, []string{"coral-board heavy run"}); hit {
+			h.attachHeavyRun(session, agent, toolUseID) // the follow-up of a redirect: the same hold, running now
+		}
 		return ""
 	}
 	snap := h.snapshot()
@@ -322,6 +332,14 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 	// already in the line or holding?
 	mine, holding := entryOf(st, agent)
 	if mine != nil && holding {
+		if machine, remote := h.onMini(res, mine); remote { // the pool's slot is on the mini: not run here (#13751)
+			if ah := h.hold[key]; ah != nil {
+				ah.session = session
+				ah.window = h.o.Now().Add(h.o.ClaimWindow)
+			}
+			h.event(HookEvent{Kind: "redirected", Resource: res.Key, Pattern: pattern, Agent: agent, Session: session})
+			return redirection(res.Key, machine, h.o.ClaimWindow)
+		}
 		if ah := h.hold[key]; ah != nil {
 			ah.calls[toolUseID] = true
 			ah.session = session
@@ -341,6 +359,12 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 		ah := &autoHold{entry: r.Entry.ID, session: session, name: name, pattern: pattern, calls: map[string]bool{}, refused: map[string]bool{}}
 		h.hold[key] = ah
 		if r.Granted {
+			if machine, remote := h.onMini(res, &r.Entry); remote { // granted a slot on the mini: not run here; the agent is told how, and keeps the slot a moment for the follow-up
+				ah.granted = h.o.Now()
+				ah.window = ah.granted.Add(h.o.ClaimWindow)
+				h.event(HookEvent{Kind: "redirected", Resource: res.Key, Pattern: pattern, Agent: agent, Session: session})
+				return redirection(res.Key, machine, h.o.ClaimWindow)
+			}
 			ah.calls[toolUseID] = true
 			ah.granted = h.o.Now()
 			h.event(HookEvent{Kind: "claimed", Resource: res.Key, Pattern: pattern, Agent: agent, Session: session})
@@ -364,6 +388,49 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 	_, place := placeOf(st, agent)
 	h.event(HookEvent{Kind: "refused", Resource: res.Key, Pattern: pattern, Agent: agent, Session: session})
 	return refusal(res.Key, place)
+}
+
+// redirection is what an agent is told when the pool gave it a slot on another machine: the command did not run here. It names the pool and the machine, never the command.
+func redirection(pool, machine string, window time.Duration) string {
+	if machine == "" {
+		machine = "the mini"
+	}
+	return fmt.Sprintf("Coral did NOT run this command here: the %s pool gave your slot on %s. Run the SAME command there with: coral-board heavy run -- <your command>   (one tool call; it runs there and gives the slot back when it ends). "+
+		"Your slot is kept for %d minutes. Do not retry the command here.", pool, machine, int(window/time.Minute))
+}
+
+// onMini says whether the pool entry holds a slot on the mini, and that machine's name for the message.
+func (h *Hook) onMini(res resourcequeue.Resource, e *resourcequeue.Entry) (string, bool) {
+	if len(res.Members) == 0 || e == nil || e.Member == "" {
+		return "", false
+	}
+	machine := ""
+	if ms, err := h.m.Queue().Status(e.Member); err == nil {
+		machine = ms.Resource.Machine
+	}
+	return machine, heavypkg.OnMini(e.Member, machine)
+}
+
+// attachHeavyRun ties the agent's pool hold to the heavy-run call that follows a redirect: the slot is then the call's, kept while it runs and given back when it ends.
+func (h *Hook) attachHeavyRun(session, agent, toolUseID string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for k, ah := range h.hold {
+		if !strings.EqualFold(k.agent, agent) {
+			continue
+		}
+		st, err := h.m.Queue().Status(k.resource)
+		if err != nil || len(st.Resource.Members) == 0 {
+			continue
+		}
+		if e, holding := entryOf(st, agent); e != nil && holding {
+			ah.calls[toolUseID] = true
+			ah.session = session
+			ah.remote = true
+			ah.window = time.Time{}
+			_, _ = h.m.Queue().Renew(k.resource, k.agent)
+		}
+	}
 }
 
 func refusal(resource string, place int) string {
@@ -548,11 +615,15 @@ func (h *Hook) sweepLocked(snap map[string][]string) {
 		if lease <= 0 {
 			lease = resourcequeue.DefaultLease
 		}
-		if now.Sub(ah.granted) > 2*lease {
+		capAt := 2 * lease
+		if ah.remote && capAt < remoteCap {
+			capAt = remoteCap // a run on another machine may last as long as the wrapper allows (2 h), whatever the lease
+		}
+		if now.Sub(ah.granted) > capAt {
 			h.releaseLocked(k, ah, "cap")
 			continue
 		}
-		openCall := len(ah.calls) > 0 && now.Sub(ah.granted) <= lease // a call that never reported its end holds the claim for the first lease only: a renewal never passes it without the work still running (#13743)
+		openCall := len(ah.calls) > 0 && (ah.remote || now.Sub(ah.granted) <= lease) // a call that never reported its end holds the claim for the first lease only: a renewal never passes it without the work still running (#13743)
 		if openCall || h.startedWorkRuns(ah, st.Resource, snap) {
 			_, _ = h.m.Queue().Renew(k.resource, k.agent)
 			continue

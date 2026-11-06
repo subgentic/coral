@@ -85,6 +85,7 @@ wait_until 60 "Bob's stand-in" ready "$bob_name" "$bob_sid" || true
 holders() { operator resource status mac-heavy | sed -n 's/^  holds   #[0-9]* \([^:( ]*\).*/\1/p' | tr '\n' ' '; }
 in_line() { operator resource status mac-heavy | sed -n 's/^ *[0-9]*\.  *#[0-9]* \([^:( ]*\).*/\1/p' | tr '\n' ' '; }
 holder_is() { [[ "$(holders)" == *"$1"* ]]; }
+holder_is_pool() { operator resource status ph | grep -q "holds .*#[0-9]* $1\b"; } # who holds a slot of the pool ph
 nobody() { [[ -z "$(holders | tr -d ' ')" ]]; }
 captured() { capture "$1" "$2" | grep -q "$3"; }
 
@@ -128,6 +129,16 @@ wait_until 20 "the call to have returned" captured "$ann_name" "$ann_sid" "bash 
 sleep 12
 holder_is Ann && pass "the hand claim stays while the shell of her background job runs" || fail "the background hand claim was freed while its shell runs: holders=$(holders)"
 wait_until 60 "the job to end and the slot to go back" nobody && pass "the hand claim went back once the job's shell was gone" || fail "the background hand claim stayed: holders=$(holders)"
+
+# ── a pool (#13751): a match on the pool claims it; a grant on the other machine is not run here and the agent is told how ──
+operator resource define pm --slots 1 --machine Mac >/dev/null && operator resource define pmini --slots 1 --machine Mini >/dev/null && operator resource define ph --pool pm,pmini --match "sleep 11" >/dev/null && pass "a pool with a match is defined (ph = pm + pmini)" || fail "pool define"
+send "$ann_name" "$ann_sid" "MOCK_BASH wait sleep 11"
+wait_until 20 "Ann's pooled command to claim the Mac member" holder_is_pool Ann pm && pass "Ann's matching command claimed the pool's first free slot (the Mac)" || fail "pool claim: $(operator resource status ph)"
+send "$bob_name" "$bob_sid" "MOCK_BASH wait sleep 11"
+wait_until 20 "Bob's command to be redirected" captured "$bob_name" "$bob_sid" "bash REFUSED" && pass "Bob's command was not run here" || fail "no refusal for Bob"
+msg=$(capture "$bob_name" "$bob_sid" | tr -d '\n')   # the terminal wraps long lines: join them whole
+[[ "$msg" == *"coral-board heavy run --"* && "$msg" == *"Mini"* ]] && pass "Bob is told to run it with coral-board heavy run, on the Mini" || fail "the redirect message: ${msg:0:300}"
+operator resource status ph | grep -q "Bob.*on Mini" && pass "Bob's slot on the Mini is kept for the follow-up" || fail "Bob holds nothing: $(operator resource status ph)"
 
 # ── the server log: the pattern, never the command ────────────────────
 if grep -q "shell hook" "$TMP/server.log" && ! grep -q "MOCK_BASH\|sleep 7 \|sleep 40 " "$TMP/server.log"; then pass "the server log names the resource and the pattern, not the command ($(grep -c 'shell hook' "$TMP/server.log") lines)"; else fail "the server log: $(grep -n 'shell hook\|MOCK_BASH' "$TMP/server.log" | head -3)"; fi
