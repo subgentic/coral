@@ -423,6 +423,7 @@ export async function setReviewRead(row, read, { fresh = false, click = false } 
     const hit = items.find(a => a.reviewKey === row.reviewKey);
     if (hit) hit.tags = tags;
     row.tags = tags;
+    if (fview) { fview.invalidCounts = true; refreshActiveQuery().catch(() => {}); }
     changed();
 }
 
