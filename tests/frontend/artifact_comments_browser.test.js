@@ -263,6 +263,11 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             await key('Enter', 'Enter', 13);
             n = await nameInfo();
             check(`${tag}: Enter opens the whole name (aria-expanded true, taller, nothing sideways)`, n.open && n.expanded === 'true' && n.h > h0 && !n.sideways && n.right <= n.vw, JSON.stringify(n));
+            if (w <= 390) { // #13989: the opened name uses the header's whole width (not a narrow column beside Details) and Close is still on screen and free
+                const wide = await ev(`(() => { const hd = document.querySelector('#artifact-viewer .artifact-viewer-header').getBoundingClientRect(), t = document.querySelector('#artifact-viewer .artifact-viewer-title').getBoundingClientRect(), c = document.querySelector('#artifact-viewer .artifact-viewer-close').getBoundingClientRect(), lh = parseFloat(getComputedStyle(document.querySelector('#artifact-viewer .artifact-viewer-title')).lineHeight) || parseFloat(getComputedStyle(document.querySelector('#artifact-viewer .artifact-viewer-title')).fontSize) * 1.3; return { header: Math.round(hd.width), title: Math.round(t.width), lines: Math.round(t.height / lh), close: [Math.round(c.left), Math.round(c.top), Math.round(c.right), Math.round(c.bottom)], vh: innerHeight, vw: innerWidth }; })()`);
+                check(`${tag}: the opened name uses at least 85% of the header width, and Close is on screen`, wide.title >= wide.header * 0.85 && wide.close[0] >= 0 && wide.close[2] <= wide.vw && wide.close[3] <= wide.vh, JSON.stringify(wide));
+                await shot(`long-name-wide-${w}-${rootPx}`);
+            }
             await shot(`long-name-open-${w}-${rootPx}`);
             await key(' ', 'Space', 32);
             n = await nameInfo();
