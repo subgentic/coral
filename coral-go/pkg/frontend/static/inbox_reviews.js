@@ -182,7 +182,7 @@ const resolveGoalFilter = value => {
     return named.length === 1 ? named[0] : null;
 };
 export function reviewQueryParams(f, now = Date.now()) {
-    const v = viewParts(f), p = new URLSearchParams({ tag: 'for review', limit: '50', starred_first: 'true', facets: 'team,by,goal' });
+    const v = viewParts(f), p = new URLSearchParams({ tag: 'for review', limit: '50', versions: 'newest', starred_first: 'true', facets: 'team,by,goal' });
     if (v.q) p.set('q', v.q);
     if (v.team) p.set('team', v.team);
     const goal = resolveGoalFilter(v.goal);
@@ -265,7 +265,7 @@ export async function reviewOfTeam(team, digest, { anyState = false } = {}) {
 // The Inbox owns two bounded windows per computer, not a scan of every team.
 // Facets/attention policy is layered on this metadata when its server contract is
 // present. A raw for-review total is not an authoritative attention count.
-const reviewQuery = new URLSearchParams({ tag: 'for review', starred_first: 'true', facets: 'team,by,goal' }).toString();
+const reviewQuery = new URLSearchParams({ tag: 'for review', versions: 'newest', starred_first: 'true', facets: 'team,by,goal' }).toString();
 const savedQuery = new URLSearchParams({ tag: 'saved', versions: 'newest' }).toString();
 let pagesReady = false, pendingStarted = 0, finishedAt = 0, finishedRev = -1, lastSources = null, rescans = 0;
 async function readComputerPage(server, { query, cursor, limit, signal, revisionBound = true }) {
