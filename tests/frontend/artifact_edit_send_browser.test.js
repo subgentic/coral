@@ -43,7 +43,7 @@ const hexOf = data => String(data.digest || data.hex || data.id || '').replace(/
         await Emulation.setDeviceMetricsOverride({width:1280,height:900,deviceScaleFactor:1,mobile:false});
         await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev,'startup','liveList','liveListLoaded','settings');
         await httpJson('POST',`/api/board/${B}/subscribe`,{subscriber_id:'Markdown Writer',job_title:'Writer'});
-        author=await launchStandIn((method,p,body)=>httpJson(method,p,p==='/api/sessions/launch'?{...body,board_id:B}:body),{displayName:'Markdown Writer'});assert.ok(author.sid && author.token,'real stand-in agent token');
+        author=await launchStandIn((method,p,body)=>httpJson(method,p,p==='/api/sessions/launch'?{...body,board_id:B}:body),{displayName:'Markdown Writer'});assert.ok(author.sid && author.token,'real stand-in agent token: '+author.diag);
         const liveReply=await (await fetch(BASE+'/api/sessions/live')).json();const live=(Array.isArray(liveReply)?liveReply:liveReply.sessions||[]).find(s=>s.session_id===author.sid);assert.ok(live);
         assert.ok((await httpJson('POST',`/api/board/${B}/subscribe`,{subscriber_id:'Markdown Writer',job_title:'Writer',session_name:`${live.agent_type}-${author.sid}`})).status<300);
 
