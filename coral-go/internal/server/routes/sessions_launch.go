@@ -191,7 +191,8 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Resolve model: request wins, else per-type default from settings.
-	effectiveModel := h.resolveModelFor(r.Context(), body.AgentType, body.Model, isOrchestratorRole(body.DisplayName, body.AgentType))
+	takesSeat := h.launchTakesTheSeat(r.Context(), r, body.DisplayName, body.AgentType, body.BoardName, body.BoardServer)
+	effectiveModel := h.resolveModelFor(r.Context(), body.AgentType, body.Model, takesSeat)
 	if effectiveModel != "" && !agentmodels.ValidModelValue(effectiveModel) {
 		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": errInvalidModel, "field": "model"})
@@ -199,7 +200,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Thinking level: the request's, else the Settings default for the type.
-	effectiveThinking, thinkingErr := h.resolveThinkingFor(r.Context(), body.AgentType, body.Thinking, isOrchestratorRole(body.DisplayName, body.AgentType))
+	effectiveThinking, thinkingErr := h.resolveThinkingFor(r.Context(), body.AgentType, body.Thinking, takesSeat)
 	if thinkingErr != "" {
 		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": thinkingErr, "field": "thinking"})

@@ -351,10 +351,29 @@ func defaultModelFromSettings(settings map[string]string, agentType, requestMode
 	return defaultModelForRole(settings, agentType, requestModel, false)
 }
 
-// isOrchestratorRole says a launch's display name makes it a team's Orchestrator: the test the board uses when it subscribes a member (its role, the name with its type, says Orchestrator), so a team
-// template needs no new field (#13899). Every other member and every single-agent launch is a worker.
-func isOrchestratorRole(displayName, agentType string) bool {
-	return strings.Contains(strings.ToLower(naming.SubscriberID(displayName, agentType)), "orchestrator")
+// teamSeatIndex is the member of a team launch that is the team's Orchestrator seat: the first whose name claims the role, the rule the grant seed uses (#13891). -1 when none does. Only this member starts on
+// the Orchestrator's own default model and thinking level (#13964): a name with "orchestrator" in it is no longer enough, and a later member that has one is a worker.
+func teamSeatIndex(agents []launchTeamAgent) int {
+	for i, a := range agents {
+		if a.Name != "" && board.ClaimsOrchestrator(a.Name, "") {
+			return i
+		}
+	}
+	return -1
+}
+
+// launchTakesTheSeat says a single launch is its team's Orchestrator for the defaults (#13964): the Operator's own launch (never an agent's: it always starts workers' defaults), named as the role, on a team
+// that has no Orchestrator held by anyone else. A launch on no team, or on another computer's board the check cannot see, has no holder to stand in its way.
+func (h *SessionsHandler) launchTakesTheSeat(ctx context.Context, r *http.Request, displayName, agentType, boardName, boardServer string) bool {
+	subscriber := naming.SubscriberID(displayName, agentType)
+	if agentCaller(r) || displayName == "" || !board.ClaimsOrchestrator(subscriber, "") {
+		return false
+	}
+	if h.bs == nil || boardName == "" || (boardServer != "" && boardServer != "local") {
+		return true
+	}
+	holder, err := h.bs.OrchestratorSeatHeldBy(ctx, boardName, subscriber)
+	return err == nil && holder == ""
 }
 
 // defaultModelForRole is the model a launch starts on, first that is set winning: the one named in the launch, for an Orchestrator its type's default_orchestrator_model_<type>, the type's default_model_<type>

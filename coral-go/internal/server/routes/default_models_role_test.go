@@ -77,11 +77,19 @@ func TestTheThinkingLevelAnOrchestratorStartsOnFollowsTheOrder(t *testing.T) {
 	}
 }
 
-func TestWhoIsAnOrchestratorIsTheBoardsOwnTest(t *testing.T) {
-	assert.True(t, isOrchestratorRole("Orchestrator", "claude"))
-	assert.True(t, isOrchestratorRole("Team Orchestrator", "codex"))
-	assert.False(t, isOrchestratorRole("Dev", "claude"))
-	assert.False(t, isOrchestratorRole("", "claude"), "a single launch with no name is a worker")
+func TestTheSeatOfATeamLaunchIsTheGrantSeedsRule(t *testing.T) {
+	names := func(n ...string) []launchTeamAgent {
+		out := make([]launchTeamAgent, len(n))
+		for i, x := range n {
+			out[i] = launchTeamAgent{Name: x}
+		}
+		return out
+	}
+	assert.Equal(t, 0, teamSeatIndex(names("Orchestrator", "Dev")))
+	assert.Equal(t, 1, teamSeatIndex(names("Dev", "Team Orchestrator", "Orchestrator helper")), "the first that claims the role")
+	assert.Equal(t, -1, teamSeatIndex(names("Dev", "Dev2")))
+	assert.Equal(t, 1, teamSeatIndex(names("", "Orchestrator")), "a nameless entry is skipped")
+	assert.Equal(t, -1, teamSeatIndex(nil))
 }
 
 // The same order through the real launch and team launch, on what the CLI is started with.
