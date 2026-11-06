@@ -38,7 +38,7 @@ func inOrder(words, want []string) bool {
 	}
 	at := 1
 	for _, w := range words[1:] {
-		if at < len(want) && w == want[at] {
+		if at < len(want) && (w == want[at] || canonPath(w) == canonPath(want[at])) {
 			at++
 		}
 	}
@@ -59,4 +59,27 @@ func MatchImage(image string, patterns []string) bool {
 		}
 	}
 	return false
+}
+
+// canonPath is a package path in one spelling, so a pattern's spelling is not the only one that claims (goal #227: `go test ./internal/server/routes/` ran 9 minutes unclaimed against the pattern
+// "go test ./internal/server/routes"): a trailing slash is dropped, a relative path gets its "./", and "/..." on a path (the package and everything under it) is dropped. A flag, an absolute path,
+// "./..." itself and a word with no slash stay as they are. The package under it is still the same one, so ./internal/server/routesx does not match ./internal/server/routes.
+func canonPath(w string) string {
+	if w == "" || w[0] == '-' || w[0] == '/' || !strings.Contains(w, "/") {
+		return w
+	}
+	for {
+		t := strings.TrimSuffix(w, "/")
+		if t != "./..." && t != "..." && strings.HasSuffix(t, "/...") && t != "." && len(t) > len("/...") {
+			t = strings.TrimSuffix(t, "/...")
+		}
+		if t == w || t == "" || t == "." {
+			break
+		}
+		w = t
+	}
+	if !strings.HasPrefix(w, "./") && !strings.HasPrefix(w, "../") && w != "..." {
+		w = "./" + w
+	}
+	return w
 }
