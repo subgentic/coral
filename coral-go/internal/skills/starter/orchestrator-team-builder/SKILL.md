@@ -43,10 +43,10 @@ Write one Markdown file, `team-plan.md`: the goal, done-when, folder, a table (n
 
 ```sh
 coral-agent artifact upload team-plan.md --name "Team plan: <name>" --tag "for review" --question "Launch this team of N? Approve to start."
-coral-board wait --from Operator --reason "team plan review"
+coral-board wait --reason "team plan review" --timeout 30m
 ```
 
-Coral wakes you when they decide:
+Coral wakes you when they approve or comment (an approval and a comment each reach you as a board message). A denial may not wake you, so the wait has a timeout: when you wake for any reason, run `coral-board read` first and act on what it says:
 
 - **Approved:** launch exactly the approved prompts (a short note with the approval: apply it if small; do not send the file again).
 - **Changes requested** (their comments reach you as board messages): edit the file, upload it with `--new-version-of <the newest link>`, wait again.
