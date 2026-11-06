@@ -191,7 +191,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Resolve model: request wins, else per-type default from settings.
-	effectiveModel := h.resolveModel(r.Context(), body.AgentType, body.Model)
+	effectiveModel := h.resolveModelFor(r.Context(), body.AgentType, body.Model, isOrchestratorRole(body.DisplayName, body.AgentType))
 	if effectiveModel != "" && !agentmodels.ValidModelValue(effectiveModel) {
 		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": errInvalidModel, "field": "model"})
@@ -199,7 +199,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Thinking level: the request's, else the Settings default for the type.
-	effectiveThinking, thinkingErr := h.resolveThinking(r.Context(), body.AgentType, body.Thinking)
+	effectiveThinking, thinkingErr := h.resolveThinkingFor(r.Context(), body.AgentType, body.Thinking, isOrchestratorRole(body.DisplayName, body.AgentType))
 	if thinkingErr != "" {
 		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": thinkingErr, "field": "thinking"})
@@ -298,6 +298,11 @@ func errInvalidThinking(agentType string) string {
 // A request's level the type does not take is refused (the message is the reply's error); a saved default that no longer fits is
 // ignored, as the CLI's own default then applies. Terminal agents have none.
 func (h *SessionsHandler) resolveThinking(ctx context.Context, agentType, requested string) (level, refused string) {
+	return h.resolveThinkingFor(ctx, agentType, requested, false)
+}
+
+// resolveThinkingFor is resolveThinking for a launch whose role is known (#13899): an Orchestrator falls back to default_orchestrator_thinking_<type> before the workers' default_thinking_<type>.
+func (h *SessionsHandler) resolveThinkingFor(ctx context.Context, agentType, requested string, orchestrator bool) (level, refused string) {
 	if agentType == "" {
 		agentType = at.Claude
 	}
@@ -312,11 +317,17 @@ func (h *SessionsHandler) resolveThinking(ctx context.Context, agentType, reques
 	if err != nil {
 		return "", ""
 	}
-	return defaultThinkingFromSettings(settings, agentType, ""), ""
+	return defaultThinkingForRole(settings, agentType, "", orchestrator), ""
 }
 
 // defaultThinkingFromSettings is requested, else the saved default_thinking_<type> when the type takes it.
 func defaultThinkingFromSettings(settings map[string]string, agentType, requested string) string {
+	return defaultThinkingForRole(settings, agentType, requested, false)
+}
+
+// defaultThinkingForRole is the level a launch starts on, first that is set and that the type takes winning: the one named in the launch, for an Orchestrator default_orchestrator_thinking_<type>, the
+// type's default_thinking_<type>, none (#13899).
+func defaultThinkingForRole(settings map[string]string, agentType, requested string, orchestrator bool) string {
 	if requested = strings.TrimSpace(requested); requested != "" {
 		if agentmodels.ValidThinking(agentType, requested) {
 			return requested
@@ -325,6 +336,11 @@ func defaultThinkingFromSettings(settings map[string]string, agentType, requeste
 	}
 	if agentType == at.Terminal || settings == nil {
 		return ""
+	}
+	if orchestrator {
+		if d := setreg.TextFamily(settings, setreg.DefaultOrchestratorThinkingPrefix+agentType); d != "" && agentmodels.ValidThinking(agentType, d) {
+			return d
+		}
 	}
 	if d := setreg.TextFamily(settings, setreg.DefaultThinkingPrefix+agentType); agentmodels.ValidThinking(agentType, d) {
 		return d

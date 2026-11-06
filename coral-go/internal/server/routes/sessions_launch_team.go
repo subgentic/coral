@@ -681,7 +681,7 @@ func (h *SessionsHandler) launchTeamMember(ctx context.Context, body launchTeamR
 	if def.AgentType != "" {
 		agentType = def.AgentType
 	}
-	effectiveModel := defaultModelFromSettings(userSettings, agentType, def.Model)
+	effectiveModel := defaultModelForRole(userSettings, agentType, def.Model, isOrchestratorRole(def.Name, agentType))
 	agentFlags := def.Flags
 	memberPermMode := "" // the mode the team's flags stand for, handed on so that it is the one stored (below)
 	if len(agentFlags) == 0 {
@@ -708,7 +708,7 @@ func (h *SessionsHandler) launchTeamMember(ctx context.Context, body launchTeamR
 	if modelArgs, _ := agentmodels.ModelArgs(effectiveModel); modelArgs != nil { // checked above
 		agentFlags = append(agentFlags, modelArgs...)
 	}
-	effectiveThinking := defaultThinkingFromSettings(userSettings, agentType, def.Thinking)
+	effectiveThinking := defaultThinkingForRole(userSettings, agentType, def.Thinking, isOrchestratorRole(def.Name, agentType))
 	skillRows, _ := h.resolveSkillIDs(ctx, unionSkillIDs(body.Skills, def.Skills)) // checked before the launch started; one that changed since is simply not told
 	result, err := h.launchSession(ctx, launchSpec{
 		WorkDir: workingDir, AgentType: agentType, DisplayName: def.Name, Flags: agentFlags,

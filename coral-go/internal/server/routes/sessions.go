@@ -323,6 +323,11 @@ func (h *SessionsHandler) getDiffMode(ctx context.Context) string {
 // back to the user's default_model_<agentType> setting. Returns "" if
 // neither is set. Terminal agents never receive a model.
 func (h *SessionsHandler) resolveModel(ctx context.Context, agentType, requestModel string) string {
+	return h.resolveModelFor(ctx, agentType, requestModel, false)
+}
+
+// resolveModelFor is resolveModel for a launch whose role is known (#13899): the Orchestrator of a team falls back to default_orchestrator_model_<type> before the workers' default_model_<type>.
+func (h *SessionsHandler) resolveModelFor(ctx context.Context, agentType, requestModel string, orchestrator bool) string {
 	if agentType == at.Terminal {
 		return ""
 	}
@@ -336,13 +341,25 @@ func (h *SessionsHandler) resolveModel(ctx context.Context, agentType, requestMo
 	if err != nil {
 		return ""
 	}
-	return defaultModelFromSettings(settings, agentType, requestModel)
+	return defaultModelForRole(settings, agentType, requestModel, orchestrator)
 }
 
 // defaultModelFromSettings looks up default_model_<agentType> in an already-loaded
 // settings map. Used by LaunchTeam to avoid re-reading settings per agent.
 // Terminal agents never receive a model.
 func defaultModelFromSettings(settings map[string]string, agentType, requestModel string) string {
+	return defaultModelForRole(settings, agentType, requestModel, false)
+}
+
+// isOrchestratorRole says a launch's display name makes it a team's Orchestrator: the test the board uses when it subscribes a member (its role, the name with its type, says Orchestrator), so a team
+// template needs no new field (#13899). Every other member and every single-agent launch is a worker.
+func isOrchestratorRole(displayName, agentType string) bool {
+	return strings.Contains(strings.ToLower(naming.SubscriberID(displayName, agentType)), "orchestrator")
+}
+
+// defaultModelForRole is the model a launch starts on, first that is set winning: the one named in the launch, for an Orchestrator its type's default_orchestrator_model_<type>, the type's default_model_<type>
+// (the workers'), none (#13899). Terminal agents never receive a model.
+func defaultModelForRole(settings map[string]string, agentType, requestModel string, orchestrator bool) string {
 	if agentType == at.Terminal {
 		return ""
 	}
@@ -351,6 +368,11 @@ func defaultModelFromSettings(settings map[string]string, agentType, requestMode
 	}
 	if agentType == "" || settings == nil {
 		return ""
+	}
+	if orchestrator {
+		if m := setreg.TextFamily(settings, setreg.DefaultOrchestratorModelPrefix+agentType); m != "" {
+			return m
+		}
 	}
 	model := setreg.TextFamily(settings, setreg.DefaultModelPrefix+agentType)
 	if model == "" {
