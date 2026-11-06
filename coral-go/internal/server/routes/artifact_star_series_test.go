@@ -358,3 +358,31 @@ func TestStarsArePerPersonAndTheOwnerKeysAreTheOriginalTable(t *testing.T) {
 	own, _ = k.h.bs.StarredArtifactTimes(ctx, ownerPersonKey)
 	assert.Contains(t, own, d[0], "the owner key's star is untouched by another person's unstar")
 }
+
+// #13910: the person key from a REAL stamped Hub request (not a hand-made identity): on an organisation's computer each Hub user of the organisation has their own, on a personal computer the Hub owner is the local owner's
+// key, and a stamp of another organisation never gets a key at all.
+func TestThePersonKeyFromARealStampedHubRequest(t *testing.T) {
+	resetOwnerState(t)
+	withLabel(t, "", nil)
+	withRecord(t, "team", teamOrgA, nil)
+	keyOf := func(hdr http.Header) string {
+		req := httptest.NewRequest(http.MethodPost, "/api/artifacts/"+strings.Repeat("a", 64)+"/opened", nil)
+		req.Header = hdr
+		return openedPersonKey(req)
+	}
+	a := keyOf(teamStamp(teamOrgA, "admin", teamUIDA, teamUser))
+	b := keyOf(teamStamp(teamOrgA, "admin", teamUIDB, teamUser))
+	assert.Equal(t, "hub:"+teamOrgA+":"+teamUIDA, a)
+	assert.Equal(t, "hub:"+teamOrgA+":"+teamUIDB, b)
+	assert.NotEqual(t, a, b, "two people of one organisation")
+	assert.Equal(t, "owner", keyOf(teamStamp(teamOrgB, "owner", teamUIDA, teamUser)), "a stamp of another organisation is no team person: the constant key, and the owner routes refuse it anyway")
+
+	resetOwnerState(t)
+	withRecord(t, "personal", "", nil)
+	withLabel(t, ownerLabel, nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/artifacts/"+strings.Repeat("a", 64)+"/opened", nil)
+	for k, v := range ownerHeaders(ownerLabel) {
+		req.Header.Set(k, v)
+	}
+	assert.Equal(t, "owner", openedPersonKey(req), "the Hub owner of a personal computer is the local owner's key")
+}

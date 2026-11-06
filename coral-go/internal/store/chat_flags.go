@@ -37,7 +37,11 @@ func (s *SessionStore) UpdateChatFlags(ctx context.Context, id string, starred, 
 
 // DeleteBoardChatFlags keeps a new board from inheriting a deleted board's mailbox flags.
 func (s *SessionStore) DeleteBoardChatFlags(ctx context.Context, project string) error {
-	_, err := s.db.ExecContext(ctx, "DELETE FROM chat_flags WHERE session_id = ?", "board:"+project)
+	if _, err := s.db.ExecContext(ctx, "DELETE FROM chat_flags WHERE session_id = ?", "board:"+project); err != nil {
+		return err
+	}
+	// and the versions the Operator opened of that board's files (#13910): the opened-version rows are the sessions database's, keyed by board, and go with it
+	_, err := s.db.ExecContext(ctx, "DELETE FROM artifact_series_opened WHERE board_id = ?", project)
 	return err
 }
 
