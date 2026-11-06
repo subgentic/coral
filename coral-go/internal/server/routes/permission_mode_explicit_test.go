@@ -25,7 +25,7 @@ func TestEveryClaudeLaunchThatMeansAskCarriesAnExplicitDefaultMode(t *testing.T)
 	ctx := context.Background()
 	require.NoError(t, ss.SetSetting(ctx, MaxModeSetting, "launch"))
 	require.NoError(t, ss.SetSetting(ctx, AllowHubAutoAcceptSetting, "false")) // the owner's switch is off
-	parentDir := t.TempDir() // an agent starts agents in its team's folder (#13891)
+	parentDir := t.TempDir()                                                   // an agent starts agents in its team's folder (#13891)
 	const parent = "11111111-2222-4333-8444-555555555555"
 	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: parent, AgentType: "claude", AgentName: "parent", WorkingDir: parentDir}))
 	asAgent := func(r *http.Request) *http.Request {
