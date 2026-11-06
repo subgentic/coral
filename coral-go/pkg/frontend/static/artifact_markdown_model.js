@@ -111,6 +111,33 @@ function tableRuns(token, view, runs, units) {
     }
     return true;
 }
+function quoteRuns(token, view, runs, units, source) {
+    const lines=view.text.split('\n'), wanted=token.text.split('\n'), positions=[];let offset=0;
+    if(wanted.length>lines.length)return false;
+    for(let i=0;i<wanted.length;i++) {
+        const cut=lines[i].length-wanted[i].length,prefix=lines[i].slice(0,cut);
+        if(cut<0 || lines[i].slice(cut)!==wanted[i] || (prefix && !/^ {0,3}>[ \t]?$/.test(prefix)))return false;
+        for(let j=0;j<wanted[i].length;j++)positions.push(view.positions[offset+cut+j]);
+        positions.push(view.positions[offset+lines[i].length]);offset+=lines[i].length+1;
+    }
+    if(lines.slice(wanted.length).some(line=>line.trim()))return false;
+    const content={text:token.text,positions};let cursor=0;
+    for(const child of token.tokens) {
+        const at=content.text.indexOf(child.raw,cursor);if(at<0 || content.text.slice(cursor,at).trim())return false;cursor=at+child.raw.length;
+        if(child.type==='space')continue;
+        if(child.type==='blockquote') {if(!quoteRuns(child,{text:child.raw,positions:positions.slice(at,cursor+1)},runs,units,source))return false;continue;}
+        if(!['paragraph','heading'].includes(child.type))return false;
+        const local=[];if(!inlineRuns(child.tokens,child.raw,at,local))return false;
+        const first=runs.length;
+        for(const run of local) {
+            const pos=positions.slice(run.start,run.end+1),lineStart=source.lastIndexOf('\n',positions[at]-1)+1;
+            const prefix=source.slice(lineStart,positions[at]);
+            runs.push({...run,start:pos[0],end:pos.at(-1),sourceOffsets:pos,newlinePrefix:child.type==='paragraph'&&run.kind==='text'?prefix:null});
+        }
+        units.push({start:positions[at],end:positions[cursor],first,count:runs.length-first});
+    }
+    return true;
+}
 // Fences and language metadata remain source-only. Map only an exact body;
 // indented or unterminated blocks stay read-only until their bytes can be proven.
 function codeRuns(token, raw, start, runs) {
@@ -136,7 +163,8 @@ export function analyze(source, marked) {
         else if (type === 'paragraph' || type === 'heading') {
             if (!inlineRuns(tokens.tokens, raw, start, block.runs)) block.reason = 'Text does not map exactly';
             block.units.push({ start, end: start + raw.length, first: 0, count: block.runs.length });
-        } else if (type === 'code') { if (!codeRuns(tokens, raw, start, block.runs)) block.reason = 'Code body does not map exactly'; }
+        } else if (type === 'blockquote') { if (!quoteRuns(tokens,{text:raw,positions:Array.from({length:raw.length+1},(_,i)=>start+i)},block.runs,block.units,text)) block.reason='Quote text does not map exactly'; }
+        else if (type === 'code') { if (!codeRuns(tokens, raw, start, block.runs)) block.reason = 'Code body does not map exactly'; }
         else if (type === 'table') { if (!tableRuns(tokens, {text:raw,positions:Array.from({length:raw.length+1},(_,i)=>start+i)}, block.runs, block.units)) block.reason = 'Table cells do not map exactly'; }
         else if (type === 'list') { if (!listRuns(tokens, { text: raw, positions: Array.from({length:raw.length+1},(_,i)=>start+i) }, block.runs, block.units, text)) block.reason = 'Nested or indented list'; }
         else block.reason = ({ table: 'Table', code: 'Code block', html: 'Raw HTML', frontmatter: 'Front matter', definition: 'Reference definition', blockquote: 'Quoted block', hr: 'Divider' })[type] || 'Unsupported block';

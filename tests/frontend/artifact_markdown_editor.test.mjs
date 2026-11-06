@@ -117,3 +117,15 @@ test('code drafts survive both stale refusals without resend',async()=>{
   assert.equal(posts,1);assert.match(ui.body.querySelector('.amd-kept').textContent,/my words/);assert.equal(ui.footer.querySelector('.amd-save').disabled,true);assert.equal(ui.body.querySelector('.amd-reapply,.amd-save-after'),null);ui.close();
  }
 });
+
+test('quote editing inserts a literal continuation inside the original quote',async()=>{
+ const source='\ufeff> Quoted words\r\n\r\nOutside.\r\n';let sent;globalThis.fetch=window.fetch=async(url,options)=>{sent=options.body;return Response.json({id:next,version:2});};let done;const saved=new Promise(r=>{done=r;});const ui=setup(source,done);
+ assert.equal(ui.body.querySelector('blockquote .amd-text').getAttribute('aria-multiline'),'true');change(ui.body,'Quoted words','Revised words\n> literal');assert.equal(ui.body.querySelectorAll('blockquote').length,1);ui.footer.querySelector('.amd-save').click();await saved;assert.equal(Buffer.from(sent).toString(),source.replace('Quoted words','Revised words\r\n> \\> literal'));ui.close();
+});
+
+test('quote drafts survive both stale refusals without resend',async()=>{
+ for(const code of ['stale_version','stale_base']) {
+  const source='> old words\n',theirs=source.replace('old','agent');let posts=0;globalThis.fetch=window.fetch=async(url,options={})=>{if(options.method==='POST'){posts++;return Response.json({code,latest_digest:latest,latest_version:2},{status:409});}return new Response(theirs);};
+  const ui=setup(source);change(ui.body,'old words','my words');ui.footer.querySelector('.amd-save').click();await observeUntil(ui.body,()=>!!ui.body.querySelector('.amd-open-latest'));ui.body.querySelector('.amd-open-latest').click();await observeUntil(ui.body,()=>!ui.body.querySelector('.amd-kept').hidden);assert.equal(posts,1);assert.match(ui.body.querySelector('.amd-kept').textContent,/my words/);assert.equal(ui.footer.querySelector('.amd-save').disabled,true);ui.close();
+ }
+});

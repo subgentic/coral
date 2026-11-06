@@ -110,6 +110,14 @@ test('fenced code edits keep fence and language bytes, allow literal lines, and 
  }
 });
 
+test('quoted text and nested quoted paragraphs retain every prefix and CRLF byte',()=>{
+ const source='\ufeff> First **words**\r\n> continued words\r\n>\r\n> > Nested quote\r\n>\r\n> Last words\r\n\r\nOutside.\r\n';
+ const runs=mapped(source),nested=runs.find(r=>r.text==='Nested quote');assert.ok(nested,'nested quote text editable');
+ assert.equal(editRun(source,nested,'Nested changed\n> literal').source,source.replace('Nested quote','Nested changed\r\n> > \\> literal'));
+ const first=runs.find(r=>r.text==='First ');assert.ok(first);assert.equal(editRun(source,first,'New ').source,source.replace('First','New'));
+ const next=editRun(source,nested,'Nested changed\n- literal').source;const host=document.createElement('div');host.innerHTML=renderMarkdownStrict(next.replace(/^\ufeff/,''));assert.equal(host.querySelectorAll('blockquote').length,2);assert.equal(host.querySelectorAll('li').length,0);
+});
+
 test('table code spans refuse a backslash before a pipe before rendering',()=>{
  const source='| A | B |\n|---|---|\n| x | `a\\|b` |\n';const code=mapped(source).find(r=>r.text==='a|b');assert.ok(code);
  for(const value of ['a\\|b','a\\\\|b','a|b\\|c'])assert.throws(()=>editRun(source,code,value),/backslash.*pipe/);

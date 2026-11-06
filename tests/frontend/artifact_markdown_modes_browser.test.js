@@ -71,6 +71,12 @@ const hexOf = data => String(data.digest || data.hex || data.id || '').replace(/
             await type('printf old','printf new\n<b>literal</b>');await ev(`document.activeElement.blur()`);assert.equal(await ev(`document.querySelectorAll('.amd-document pre').length`),1);assert.equal(await ev(`!!document.querySelector('.amd-document b')`),false);await shot(`code-draft-${w}`);await nativeClick('.amd-save');await waitFor(`!document.querySelector('.amd-editor') && !!document.querySelector('.artifact-viewer-version')`,'code version saved',10000);
             const codeVersions=(await person('GET',`/api/artifacts/${codeHex}/versions`)).data;assert.equal(codeVersions.length,2);const codeSaved=hexOf(codeVersions.find(v=>v.is_latest)||codeVersions.at(-1));assert.equal(Buffer.from(await bytes(codeSaved)).toString(),codeSource.replace('printf old','printf new\r\n<b>literal</b>'));await shot(`code-saved-${w}`);await nativeClick('.artifact-viewer-close');
             console.log(`PASS literal fenced code and exact saved bytes ${w}px ${font}px`);
+            const quoteName=`quote-${w}.md`,quoteSource=`\ufeff# Quote ${w}\r\n\r\n> Quoted words\r\n>\r\n> > Nested quote\r\n\r\nOutside.\r\n`;
+            const quoteHex=await upload(quoteName,quoteSource);await open(quoteHex,quoteName);await waitFor(`!document.querySelector('.artifact-viewer-edit').hidden`,'quote edit capability',8000);await shot(`quotes-before-${w}`);await edit();await waitFor(`!!document.querySelector('.amd-document blockquote .amd-text')`,'mapped quote words',8000);
+            await type('Nested quote','Revised quote\n> literal');await ev(`document.activeElement.blur()`);assert.equal(await ev(`document.querySelectorAll('.amd-document blockquote').length`),2);await shot(`quotes-draft-${w}`);await nativeClick('.amd-save');await waitFor(`!document.querySelector('.amd-editor') && !!document.querySelector('.artifact-viewer-version')`,'quote version saved',10000);
+            const quoteVersions=(await person('GET',`/api/artifacts/${quoteHex}/versions`)).data;assert.equal(quoteVersions.length,2);const quoteSaved=hexOf(quoteVersions.find(v=>v.is_latest)||quoteVersions.at(-1));assert.equal(Buffer.from(await bytes(quoteSaved)).toString(),quoteSource.replace('Nested quote','Revised quote\r\n> > \\> literal'));await shot(`quotes-saved-${w}`);await nativeClick('.artifact-viewer-close');
+            console.log(`PASS quoted continuation, fixed nesting and exact saved bytes ${w}px ${font}px`);
+
 
 
         }
