@@ -2,21 +2,23 @@
 // and distinguish an in-progress notice from a successful or undelivered request.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { setupHubWorld } = require('./helpers/hub_world');
 const { coralReady } = require('./helpers/wait');
 const BASE = require('./test_base').BASE;
 const HEX = 'c'.repeat(64), PIC = 'd'.repeat(64);
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 (async () => {
-    const { client, Page, ev, waitFor, PRELOAD, install } = await connect();
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const failures = [];
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const mode of ['one', 'older', 'pictures', 'in-progress', 'not-delivered', 'hub']) {
+        for (const mode of ['one', 'older', 'pictures', 'in-progress', 'not-delivered', 'already-sent', 'hub', 'cloud']) {
             try {
+                if (mode === 'cloud') await setupHubWorld({ client, Page, Emulation, width: 1280, height: 900, mobile: false, inbox: true, hubFeed: true });
                 await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
                 await coralReady(ev, 'startup', 'liveList', 'settings');
                 await ev(`(async () => {
-                    const mode = ${JSON.stringify(mode)}, server = mode === 'hub' ? 'review-box' : 'local';
+                    const mode = ${JSON.stringify(mode)}, server = (mode === 'hub' || mode === 'cloud') ? 'review-box' : 'local';
                     const { state } = await import((window.__coralStatic || '/static/') + 'state.js');
                     state.hub = true; state.serversKnown = true; state.servers = [{id:'review-box',status:'online',owner_stamp:true}];
                     const real = window.fetch, json = (body,status=200) => Promise.resolve(Response.json(body,{status}));
@@ -31,7 +33,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                             if (path.endsWith('/review')) {
                                 if (mode === 'in-progress') return json({code:'already_in_progress',message:'retry in a moment'},409);
                                 if (mode === 'older' || mode === 'pictures') return json({state:'changes requested',delivered:false});
-                                return json({state:'changes requested',text_kept:true,comment_id:7,delivered:mode!=='not-delivered',...(mode==='not-delivered'?{reason:'agent_unavailable'}:{to:'Writer A'})});
+                                return json({state:'changes requested',text_kept:true,comment_id:7,delivered:mode!=='not-delivered' && mode!=='already-sent',...(mode==='not-delivered'?{reason:'agent_unavailable'}:mode==='already-sent'?{reason:'already_sent'}:{to:'Writer A'})});
                             }
                             if (path.endsWith('/send')) return json({ok:true,results:[{state:'sent',agent:'Writer A'}]});
                             return json({id:7,body:body.body,images:body.images || []},201);
@@ -61,18 +63,21 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                 } else {
                     await waitFor(`window.__reloads === 1`, mode + ' finishes');
                     const writes = await ev(`window.__writes`);
-                    if (mode === 'one' || mode === 'not-delivered' || mode === 'hub') {
+                    if (['one', 'not-delivered', 'already-sent', 'hub', 'cloud'].includes(mode)) {
                         assert.equal(writes.length,1,mode+' is one call');
                         assert.ok(writes[0].path.endsWith('/review')); assert.equal(writes[0].body.text,'Keep these exact words.');
                         assert.equal(writes[0].body.decision,'changes');
                     } else {
                         assert.equal(writes.length,3,mode+' uses exactly three writes');
+                        if (mode === 'older') { assert.ok(writes[0].path.endsWith('/review')); assert.equal(writes[0].body.text,'Keep these exact words.','older computer is negotiated before falling back'); }
                         assert.equal(writes.filter(w=>w.path.endsWith('/review')).length,1,'no duplicate decision');
                         const comment=writes.find(w=>w.path.endsWith('/comments'));
                         assert.equal(comment.body.body,'Changes requested: Keep these exact words.');
                         assert.deepEqual(comment.body.images || [],mode==='pictures'?[PIC]:[]);
                     }
-                    if (mode === 'hub') assert.ok(writes.every(w=>w.path.startsWith('/api/remote/review-box/')),'all writes retain the captured computer');
+                    if (mode === 'hub' || mode === 'cloud') assert.ok(writes.every(w=>w.path.startsWith('/api/remote/review-box/')),'all writes retain the captured computer');
+                    if (mode === 'cloud') assert.equal(await ev(`import((window.__coralStatic || '/static/')+'server_base.js').then(m=>m.isCloud())`),true,'the Cloud Hub boot mode is exercised');
+                    if (mode === 'already-sent') assert.match(await ev(`[...document.querySelectorAll('.toast')].map(t=>t.textContent).join(' ')`),/Writer A was already told/);
                     if (mode === 'not-delivered') {
                         const toast=await ev(`[...document.querySelectorAll('.toast')].map(t=>t.textContent).join(' ')`);
                         assert.match(toast,/Writer A.*not.*told/i); assert.match(toast,/agent unavailable/i); assert.doesNotMatch(toast,/was asked/);
