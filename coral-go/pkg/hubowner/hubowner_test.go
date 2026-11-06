@@ -188,7 +188,7 @@ func TestAllowedIsTheListedDecisionsAndNothingElse(t *testing.T) {
 			t.Errorf("%v allowed", bad)
 		}
 	}
-	if n := len(Routes()); n != 57 {
+	if n := len(Routes()); n != 58 {
 		t.Errorf("the allowlist has %d routes: a new one needs a reason and a review (Security's tiers, #13694)", n)
 	}
 	first := 0
