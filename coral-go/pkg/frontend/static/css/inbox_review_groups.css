@@ -12,6 +12,6 @@
     /* The sender and time keep the whole first line. The 44 px star sits beside
      * the description, with its own space, and never wraps the table's cells. */
     .inbox-needs-results .inbox-review-item.inbox-review-star-anchor { padding-inline-end: 0; min-height: calc(1lh + 46px); }
-    .inbox-needs-results .inbox-review-star-anchor > .inbox-review-name { box-sizing: border-box; margin-inline-end: 52px; padding-inline-end: 0; }
+    .inbox-needs-results .inbox-review-item.inbox-review-star-anchor > .inbox-review-name:not(.inbox-ask-name) { box-sizing: border-box; margin-inline-end: 52px; padding-inline-end: 0; }
     .inbox-needs-results .inbox-review-star-anchor > .inbox-review-star { top: calc(1lh + 2px); }
 }
