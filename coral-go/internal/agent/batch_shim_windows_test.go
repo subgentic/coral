@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/consoletest"
+	"github.com/subgentic/coral/internal/psquote"
 )
 
 func shimExists(set ...string) func(string) bool {
@@ -86,9 +87,9 @@ func TestAShimThatIsNotNpmsIsNotUnwrapped(t *testing.T) {
 }
 
 func TestOnlyAnAbsoluteBatchFileIsRead(t *testing.T) {
-	assert.Equal(t, []string{`C:\x\a.exe`, "--p"}, unwrapBatchShim([]string{`C:\x\a.exe`, "--p"}))
-	assert.Equal(t, []string{"claude.cmd", "--p"}, unwrapBatchShim([]string{"claude.cmd", "--p"}), "a bare name is not looked up from the current folder")
-	assert.Equal(t, []string{filepath.Join(t.TempDir(), "gone.cmd"), "--p"}[1:], unwrapBatchShim([]string{filepath.Join(t.TempDir(), "gone.cmd"), "--p"})[1:])
+	assert.Equal(t, []string{`C:\x\a.exe`, "--p"}, unwrapBatchShim([]string{`C:\x\a.exe`, "--p"}, nil))
+	assert.Equal(t, []string{"claude.cmd", "--p"}, unwrapBatchShim([]string{"claude.cmd", "--p"}, nil), "a bare name is not looked up from the current folder")
+	assert.Equal(t, []string{filepath.Join(t.TempDir(), "gone.cmd"), "--p"}[1:], unwrapBatchShim([]string{filepath.Join(t.TempDir(), "gone.cmd"), "--p"}, nil)[1:])
 }
 
 // The launch line of a board agent whose CLI is an npm .cmd gives the program the prompt exactly as written:
@@ -197,4 +198,29 @@ func mustLook(t *testing.T, name string) string {
 	p, err := exec.LookPath(name)
 	require.NoError(t, err)
 	return p
+}
+
+// The launch line of an agent has the environment's syntax before the program: the shim is found past it.
+func TestTheLaunchLineOfAnAgentWhoseCLIIsAnNpmShimRunsTheShimsProgram(t *testing.T) {
+	native, err := os.Executable()
+	require.NoError(t, err)
+	dir := t.TempDir()
+	npm := filepath.Join(dir, "claude.cmd")
+	require.NoError(t, os.WriteFile(npm, []byte("@ECHO off\r\nSETLOCAL\r\nCALL :find_dp0\r\n\""+native+"\"   %*\r\n"), 0o600))
+	other := filepath.Join(dir, "wrapped.cmd")
+	require.NoError(t, os.WriteFile(other, []byte("@echo off\r\n\""+native+"\" --wrapped %*\r\n"), 0o600))
+	params := func(cli string) LaunchParams {
+		return LaunchParams{CLIPath: cli, SessionID: "11111111-2222-3333-4444-555555555555", BoardName: "b"}
+	}
+
+	line, err := (&ClaudeAgent{}).LaunchCommand(params(npm))
+	require.NoError(t, err)
+	assert.NotContains(t, line, "claude.cmd", "the shim is not run")
+	assert.Contains(t, line, "Get-Content -Raw -Encoding UTF8", "the prompt is passed, from its file")
+	assert.Contains(t, line, "& "+psquote.Literal(native)+" --session-id", "the program the shim names is")
+
+	line, err = (&ClaudeAgent{}).LaunchCommand(params(other))
+	require.NoError(t, err)
+	assert.NotContains(t, line, "Get-Content -Raw -Encoding UTF8 -LiteralPath", "no prompt goes to a wrapper that is not npm's")
+	assert.Contains(t, line, "Write-Host 'Coral: wrapped.cmd is a .cmd wrapper")
 }

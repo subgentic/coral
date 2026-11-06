@@ -143,11 +143,12 @@ func shimWords(s string) ([]string, bool) {
 
 // unwrapBatchShim returns parts with the program, when it is an npm shim, replaced by what the
 // shim runs; otherwise parts as they are. The caller's own arguments follow unchanged.
-func unwrapBatchShim(parts []string) []string {
-	if len(parts) == 0 || !isBatchFile(parts[0]) || !filepath.IsAbs(parts[0]) {
+func unwrapBatchShim(parts, raw []string) []string {
+	i := programIndex(parts, raw)
+	if i < 0 || !isBatchFile(parts[i]) || !filepath.IsAbs(parts[i]) {
 		return parts
 	}
-	f, err := os.Open(parts[0])
+	f, err := os.Open(parts[i])
 	if err != nil {
 		return parts
 	}
@@ -157,14 +158,30 @@ func unwrapBatchShim(parts []string) []string {
 	if n > maxShimBytes {
 		return parts
 	}
-	cmd, ok := shimTarget(string(buf[:n]), filepath.Dir(parts[0]), fileExists, func() (string, bool) {
+	cmd, ok := shimTarget(string(buf[:n]), filepath.Dir(parts[i]), fileExists, func() (string, bool) {
 		p, err := exec.LookPath("node.exe")
 		return p, err == nil && filepath.IsAbs(p)
 	})
 	if !ok {
 		return parts
 	}
-	return append(append([]string{}, cmd...), parts[1:]...)
+	out := append(append([]string{}, parts[:i]...), cmd...)
+	return append(out, parts[i+1:]...)
+}
+
+// programIndex is where the program is in parts: the first part that is not shell syntax the builder wrote itself (an environment
+// prefix), the one joinQuoted starts as the command. -1 when there is none.
+func programIndex(parts, raw []string) int {
+	isRaw := make(map[string]bool, len(raw))
+	for _, r := range raw {
+		isRaw[r] = true
+	}
+	for i, p := range parts {
+		if !isRaw[p] {
+			return i
+		}
+	}
+	return -1
 }
 
 // promptFileMarker starts every prompt argument promptArg makes for PowerShell (FormatPromptFileArg).
@@ -175,7 +192,8 @@ const promptFileMarker = `"$(Get-Content -Raw -Encoding UTF8 -LiteralPath `
 // prompt arguments (and the "--" that stood before one), and the notice the pane shows first; changed is false when parts holds
 // no such program or no prompt.
 func withoutPromptForBatch(parts, raw []string) (outParts, outRaw []string, notice string, changed bool) {
-	if len(parts) == 0 || !isBatchFile(parts[0]) {
+	prog := programIndex(parts, raw)
+	if prog < 0 || !isBatchFile(parts[prog]) {
 		return parts, raw, "", false
 	}
 	isPrompt := func(s string) bool {
@@ -183,7 +201,7 @@ func withoutPromptForBatch(parts, raw []string) (outParts, outRaw []string, noti
 		return i >= 0 && strings.HasSuffix(s, ")\"")
 	}
 	for i, p := range parts {
-		if i > 0 && isPrompt(p) {
+		if i > prog && isPrompt(p) {
 			changed = true
 			continue
 		}
@@ -201,7 +219,7 @@ func withoutPromptForBatch(parts, raw []string) (outParts, outRaw []string, noti
 			outRaw = append(outRaw, r)
 		}
 	}
-	return outParts, outRaw, "Coral: " + filepath.Base(parts[0]) + " is a .cmd wrapper Coral cannot read, and cmd.exe would change the first message, so this agent was started without it. Point the CLI path at the .exe (or at an npm-installed CLI), or type the first message yourself.", true
+	return outParts, outRaw, "Coral: " + filepath.Base(parts[prog]) + " is a .cmd wrapper Coral cannot read, and cmd.exe would change the first message, so this agent was started without it. Point the CLI path at the .exe (or at an npm-installed CLI), or type the first message yourself.", true
 }
 
 func fileExists(p string) bool {

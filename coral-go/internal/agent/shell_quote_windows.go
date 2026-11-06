@@ -55,11 +55,11 @@ func shellSafeByte(c byte) bool {
 // part that is the command gets PowerShell's call operator (&), since a bare quoted
 // string is an expression, not a command.
 func ShellJoin(parts []string, raw ...string) string {
-	parts = unwrapBatchShim(parts) // a .cmd would read the prompt again with cmd's rules
+	parts = unwrapBatchShim(parts, raw) // a .cmd would read the prompt again with cmd's rules
 	notice := ""
 	if p, r, n, changed := withoutPromptForBatch(parts, raw); changed {
 		parts, raw, notice = p, r, n
-		slog.Warn("agent CLI is a .cmd that is not npm's: it is started without the first message", "cli", p[0])
+		slog.Warn("agent CLI is a .cmd that is not npm's: it is started without the first message", "cli", p[programIndex(p, r)])
 	}
 	legacy := legacyNativeArgs()
 	line := joinQuoted(parts, raw, func(s string) string { return psQuote(s, legacy) }, true)
