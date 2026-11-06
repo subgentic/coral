@@ -7,11 +7,3 @@
 .inbox-needs-results .inbox-review-star:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .inbox-pinned-context { display: block; font-size: var(--fs-sm); color: var(--text-secondary); white-space: normal; overflow-wrap: anywhere; }
 .inbox-group-review-toggle[hidden] { display: none; }
-
-@media (max-width: 760px) {
-    /* The sender and time keep the whole first line. The 44 px star sits beside
-     * the description, with its own space, and never wraps the table's cells. */
-    .inbox-needs-results .inbox-review-item.inbox-agent-first.inbox-review-star-anchor { padding-inline-end: 0; min-height: calc(1lh + 46px); grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(0, auto); }
-    .inbox-needs-results .inbox-review-item.inbox-review-star-anchor > .inbox-review-name:not(.inbox-ask-name) { box-sizing: border-box; width: calc(100% - 52px); max-width: calc(100% - 52px); margin-inline-end: 52px; padding-inline-end: 0; }
-    .inbox-needs-results .inbox-review-star-anchor > .inbox-review-star { top: calc(1lh + 2px); }
-}
