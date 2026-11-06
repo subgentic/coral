@@ -1,4 +1,4 @@
-import { multipleServers, serverColumns, serverMatches, syncServerField } from './inbox_servers.js';
+import { multipleServers, serverColumns, serverMatches, syncServerField, serverLabel } from './inbox_servers.js';
 import { keepMenuOnScreen } from './menu_fit.js';
 import { needsYou, askedRow } from './asked_before_restart.js';
 import { unrecordedItem, recordAllAgents } from './waiting.js';
@@ -17,7 +17,7 @@ import { doneGoals, nextQuietEnd, quietEndsAt, hideGoalDone, setGoalDoneCount, i
 import { state } from './state.js';
 import { isPhoneBar } from './phone_layout.js';
 
-const { mutedReviewItems, mutedWords, reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewsChangedOnServer, reviewGroups, setReviewRead, markOpenedReadVisibly, isRead, savedFiles } = await importOnce('./inbox_reviews.js');
+const { mutedReviewItems, mutedWords, reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewsChangedOnServer, reviewGroups, setReviewRead, markOpenedReadVisibly, isRead, savedFiles, reviewPages, savedReviewPages, loadMoreReviews, loadMoreSavedFiles } = await importOnce('./inbox_reviews.js');
 import { failedUnread, finishedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
 import { operatorAsks, refreshOperatorAsks, askLine, askPlain, askKey, openAskDialog, askSubjects } from './operator_asks.js';
 import { go, note, backIs, currentRoute } from './nav.js';
@@ -779,7 +779,7 @@ function renderInboxNav(force = false) {
     const here = navCurrent(), sections = folderSections();
     // what the tables show is part of the key too: the folder list is drawn from the counts, but the table on screen is refreshed (refreshGroupTable below) only when a row of it changed
     const needs = needsRows(), tk = taskRows(), sv = saved.savedView().shown.map(saved.savedItemFacts);
-    const key = JSON.stringify([here, sections, queries.needs, queries.tasks, page && `${page.kind}:${page.project || ''}#${page.id}`,
+    const key = JSON.stringify([reviewPagingSignature(), here, sections, queries.needs, queries.tasks, page && `${page.kind}:${page.project || ''}#${page.id}`,
         needs.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, teamOf(s), askOf(s)]), tk.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count]), sv.map(f => [f.id, f.which, f.saved, f.state]), savedFiles().map(a => a.reviewKey), mutedWords(mutedReviewItems()), dayOldMutedFiles().map(a => a.hex)]); // the quiet Muted line is part of what the table shows: a change that only moves muted files redraws it (#12881)
     if (!force && key === _navKey) return;
     _navKey = key;
@@ -809,6 +809,30 @@ function renderFolderCounts() {
     syncLeadStrip(sections, here);
     const pageList = page && $('inbox-page')?.querySelector('[data-view-list="inbox-goal-folders"], [data-view-list="inbox-item-folders"]');
     if (pageList) VL.update(pageList, { sections, current: here });
+}
+
+/** Paging controls live outside the rows; each button follows only its computer's cursor. */
+function reviewPagingSignature() {
+    return [reviewPages(), savedReviewPages()].map(pages => pages.map(p => [p.server, p.loading, p.error, p.has_more, p.next_cursor, p.loadedCount, p.total]));
+}
+function appendReviewPaging(host, savedPage = false) {
+    for (const page of (savedPage ? savedReviewPages() : reviewPages())) {
+        if (page.ownerOnly || (!page.has_more && !page.error)) continue;
+        const line = DT.el('p', 'inbox-review-more');
+        line.append(document.createTextNode(`${serverLabel(page.server)}: `));
+        const button = DT.el('button', 'btn btn-small', page.loading ? 'Loading…' : page.error ? 'Retry' : 'Show more');
+        button.type = 'button'; button.disabled = page.loading;
+        button.dataset.reviewMore = page.server;
+        button.dataset.reviewStream = savedPage ? 'saved' : 'review';
+        button.setAttribute('aria-label', `${page.error ? 'Retry' : 'Show more'} ${savedPage ? 'saved files' : 'review files'} from ${serverLabel(page.server)}`);
+        button.addEventListener('click', async () => {
+            button.disabled = true;
+            try { await (savedPage ? loadMoreSavedFiles : loadMoreReviews)(page.server); }
+            catch (error) { sayLive(error.message); }
+            renderInboxNav(true);
+        });
+        line.append(button); host.append(line);
+    }
 }
 
 // ── The tables ───────────────────────────────────────────────────────────
@@ -844,8 +868,11 @@ function savedListSpec(where = '') {
                     b.addEventListener('click', async () => { const it = saved.findSavedItem(f.id); if (!it) return; const done = !it.done_at; if (await saved.savedSetDone(it, done)) sayLive(done ? 'Marked done' : 'Moved back to Open'); });
                     return b; } },
             ] }).el };
-    if (!files.length) return spec;
-    return { ...spec, count: rows.length + files.length, empty: rows.length ? spec.empty : null, signature: JSON.stringify([spec.signature, files.map(a => [a.reviewKey, a.name])]), node: () => { const wrap = DT.el('div', 'saved-files-wrap'), host = DT.el('div', 'saved-files'); wrap.append(host); if (rows.length) wrap.append(DT.el('h3', 'saved-files-title', 'Saved messages'), spec.node()); importOnce('./saved_files.js').then(m => m.fillSavedFiles(host, files, { DT, reviewActions: a => hoverWrap(a, reviewActions(a, true)), openReview, shown: a => markHidden(a.name, { strict: true }), subtitleOf: a => subOf({ review: a, board_project: splitKey(a.team).name, server: splitKey(a.team).server }, true) })).catch(() => {}); return wrap; } };
+    if (!files.length) {
+        if (dock) return spec;
+        return { ...spec, signature: JSON.stringify([spec.signature, reviewPagingSignature()]), node: () => { const wrap = DT.el('div', 'saved-files-wrap'); wrap.append(spec.node()); appendReviewPaging(wrap, true); return wrap; } };
+    }
+    return { ...spec, count: rows.length + files.length, empty: rows.length ? spec.empty : null, signature: JSON.stringify([spec.signature, reviewPagingSignature(), files.map(a => [a.reviewKey, a.name])]), node: () => { const wrap = DT.el('div', 'saved-files-wrap'), host = DT.el('div', 'saved-files'); wrap.append(host); appendReviewPaging(wrap, true); if (rows.length) wrap.append(DT.el('h3', 'saved-files-title', 'Saved messages'), spec.node()); importOnce('./saved_files.js').then(m => m.fillSavedFiles(host, files, { DT, reviewActions: a => hoverWrap(a, reviewActions(a, true)), openReview, shown: a => markHidden(a.name, { strict: true }), subtitleOf: a => subOf({ review: a, board_project: splitKey(a.team).name, server: splitKey(a.team).server }, true) })).catch(() => {}); return wrap; } };
 }
 
 /** A message of the agent's Saved tab, as a sheet over the dock panel (the pane the Artifacts tab uses, detail_pane.js): what the Inbox's page holds (the text, why it cannot be opened, Read the whole message) with Open (the chat) and Remove from saved in its bar. Back, the close button and Escape return to the Saved table, the focus on the row. */
@@ -956,7 +983,7 @@ registerGroupSource('hub-inbox', {
             const total = filteredNeeds().length, hidden = allNeeds().length - total, rowsCounted = rows.filter(needsUnread).length, totalCounted = filteredNeeds().filter(needsUnread).length; // what the filters hide is said above the list, with the way to show it (#10399)
             const manyTeams = new Set(allNeeds().map(teamOf).filter(Boolean)).size > 1; // with two or more teams waiting, a one-line row names its team
             return { title: 'Needs you', noun: ['item', 'items'], rows, count: totalCounted > rowsCounted ? `${rowsCounted} of ${totalCounted}` : totalCounted, note: [...reviewErrors(), incompleteNote()].filter(Boolean).join(' '), empty: { line: NF.isFiltered(needsFilters) ? 'Nothing that needs you matches the search and filters.' : 'Nothing needs you', hint: NF.isFiltered(needsFilters) ? undefined : answered || 'An agent that asks a question or wants permission, and a review artifact, appear here. A task assigned to you is under Tasks.', go: NF.isFiltered(needsFilters) ? undefined : { action: 'inbox-go-agents', label: 'Go to Agents' } },
-                foot: needsFoot, signature: JSON.stringify([alertsOffered(), mutedWords(mutedReviewItems()), dayOldMutedFiles().map(a => a.hex), hidden, finishedUnread().length, answered || '', manyTeams, needsOverflow().map(g => [g.name, g.more.map(a => a.reviewKey)]), reviewErrors(), incompleteNote(), rows.map(blocksOf), rows.map(s => [s.operatorAsk ? [s.operatorAsk.id, s.operatorAsk.text] : 0, sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, s.task ? [s.task.id, s.task.title] : 0, dirOf(s), s.review ? isRead(s.review) : 0, s.proposal ? s.proposal.state : 0])]), // the words move on with the clock: they are part of what was drawn
+                foot: needsFoot, signature: JSON.stringify([reviewPagingSignature(), alertsOffered(), mutedWords(mutedReviewItems()), dayOldMutedFiles().map(a => a.hex), hidden, finishedUnread().length, answered || '', manyTeams, needsOverflow().map(g => [g.name, g.more.map(a => a.reviewKey)]), reviewErrors(), incompleteNote(), rows.map(blocksOf), rows.map(s => [s.operatorAsk ? [s.operatorAsk.id, s.operatorAsk.text] : 0, sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, s.task ? [s.task.id, s.task.title] : 0, dirOf(s), s.review ? isRead(s.review) : 0, s.proposal ? s.proposal.state : 0])]), // the words move on with the clock: they are part of what was drawn
                 node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const oneLineNeeds = !rows.some(isItem); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, ...(!oneLineNeeds ? { foldAt: () => isPhoneLayout() ? 48 : 40 } : {}), rows, keepOrder: true, orderKey: JSON.stringify([needsFilters, queries.needs]), rowKey: s => `${sessionServer(s)}:${s.session_id}`, unread: needsUnread, ...(isPhoneLayout() ? { selectable: { contextKey: 'inbox-needs', longPress: true, iconBar: true, clearLabel: 'Cancel', canSelect: s => !!(s.review || s.operatorAsk || s.welcome || s.autorun || s.proposal || s.goalDone), actions: needsBulkActions(), onChange: keys => Toolbar.mountSelection(document.querySelector('#group-table-view .gt-toolbar'), keys.size ? table.bar : null) } } : {}), decorate: (s, tr) => { NF.decorateKindRow(tr); if (!needsUnread(s)) tr.classList.add('dt-read'); if (s.welcome && s.welcome.dismiss) tr.dataset.welcomeId = s.welcome.id; if (s.review && !decisionNeedsPerson(splitKey(s.review.team).server)) { tr.draggable = true; tr.addEventListener('dragstart', e => { e.dataTransfer.setData('application/x-coral-review', s.review.reviewKey); e.dataTransfer.effectAllowed = 'move'; dragging = s.review; }); tr.addEventListener('dragend', () => { dragging = null; }); } }, state: needsState, rowName: s => s.review ? `${s.review.name}${earlierWords(s.review) ? `, ${earlierWords(s.review)}` : ''}, for review, ${teamOf(s)}` : s.autorun ? `${s.autorun.name}, run failed` : s.operatorAsk ? `${s.operatorAsk.asker}, asks you` : s.welcome ? s.welcome.title : resolveSessionIdentity(s),
                     open: s => { if (s.skillReview) { openSkill(s.skillReview); return; } if (s.goalDone) { openGoalDone(s.goalDone, false, `${sessionServer(s)}:${s.session_id}`); return; } if (s.proposal) { openProposalDialog(s.proposal, 'view'); return; } if (s.review) { openReview(s.review); return; } if (s.autorun) { openRun(s.autorun); return; } if (s.operatorAsk) { openAskDialog(s.operatorAsk, undefined, askRunners); return; } if (s.unrecorded) { recordAllAgents(); return; } if (s.welcome) { runWelcome(s.welcome.id); return; } if (!s.review && !s.autorun && s.waiting_kind === 'permission') { importOnce('./inbox_agent_card.js').then(m => { if (m.canOpenCard(s)) m.openAgentCard(s); else openInAgents(s); }); return; } openInAgents(s); }, // a row that needs an answer shows the chat card, not the terminal saved last (#10141)
                     columns: [
@@ -990,6 +1017,7 @@ registerGroupSource('hub-inbox', {
                         { key: 'review', label: 'Actions', fixed: true, align: 'end', width: rows.some(s => s.goalDone) ? '17rem' : rows.some(s => s.proposal || s.review) ? '15rem' : '13.5rem', line: 1, cell: s => (!isItem(s) && s.agent_type && !s.review && !s.autorun ? answerCell(s) : s.welcome ? welcomeActions(s.welcome) : hoverWrap(s, s.proposal ? proposalActions(s.proposal) : s.skillReview ? skillActions(s.skillReview) : s.goalDone ? goalDoneActions(s.goalDone) : s.review ? reviewActions(s.review) : s.autorun ? runActions(s.autorun) : s.operatorAsk ? askActions(s.operatorAsk) : s.unrecorded ? unrecordedActions() : '')) },
                     ], ...(oneLineNeeds ? { oneLine: true, resize: true, sortBar: false } : {}), ...(oneLineNeeds ? { mail: s => ({ lead: { text: needsName(s), name: needsName(s) }, kindIcon: NF.kindIcon(s), title: needsName(s), medium: true, starred: !!(s.review && s.review.starred), team: teamOf(s), teamAlways: multipleServers() || manyTeams, nameTeam: true, snippetTip: true, snippet: [blocksShortOf(s), askOf(s) || sessionStateInfo(s).label].filter(Boolean).join(' \u00b7 '), snippetTitle: [blocksOf(s), askOf(s) || sessionStateInfo(s).label].filter(Boolean).join(' \u00b7 '), state: askOf(s) || sessionStateInfo(s).label, time: DT.shortTime(s.waiting_since), unread: true, mark: 'attention', answers: answerCell(s, { dismiss: false }), actions: rowActions(s) }) } : {}) }); // a phone's row is the mail row: the agent, then the ask on a second line, amber and bold (every row of Needs you is unanswered); a list with a review or a run keeps its own actions. One line a row (Goal #79) for a list of agents: the ask is the row's tooltip, a narrow list drops it, then the team, the folder and the CLI; a list with a review item or a failed run keeps its own folded rows
                     wrap.append(table.el); needsTable = table;
+                    if (!needsFilters.kind || needsFilters.kind === 'review') appendReviewPaging(wrap);
                     if (isPhoneLayout()) { const bar = document.querySelector('#group-table-view .gt-toolbar'); Toolbar.mountSelection(bar, needsState.selected.size ? table.bar : null); bar?.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); } // the bar takes the toolbar's line while rows are selected; no Select button: the long press is the way in
                     if (rows.some(r => r.welcome)) { const hide = DT.el('button', 'btn btn-quiet btn-small inbox-welcome-hide', 'Hide all welcome items'); hide.type = 'button'; hide.addEventListener('click', () => { hideAllWelcome(); sayLive('The welcome items are hidden.'); }); wrap.append(hide); } // one quiet way out (#11443)
                     if (hidden > 0) {

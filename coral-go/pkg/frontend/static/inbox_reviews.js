@@ -1,18 +1,18 @@
-import { artifactRevision, artifactsUnchanged, onArtifactsRev } from './artifacts_feed.js';
+import { artifactRevision, onArtifactsRev } from './artifacts_feed.js';
 import { setReviewCacheReader } from './ask_filter.js';
 /* Review artifacts use the same owner-protected team list and tags routes as Artifacts.
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
-import { fetchReviewProjects, sourcesKey } from './board_fetch.js';
-import { boardFetch, boardArtifactPage, nextArtifactPage, keyLabel, splitKey } from './server_base.js';
+import { sourcesKey } from './board_fetch.js';
+import { inboxSources } from './inbox_servers.js';
+import { boardFetch, boardArtifactPage, nextArtifactPage, splitKey, serverFetch, identityKey, noteBoardLabels } from './server_base.js';
 import { hideAsksWhen } from './ask_filter.js';
 import { importOnce } from './import_once.js';
+const { createReviewPages } = await importOnce('./review_pages.js');
 
 let items = [], saved = [], muted = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => { if (typeof document !== 'undefined') document.dispatchEvent(new Event('coral:reviews-changed')); };
 let activated = false, refreshAgain = false;
-const loadedRevisions = new Map();
-onArtifactsRev((team, rev, reconnect) => {
+onArtifactsRev(() => {
     if (!activated) return;
-    if (reconnect) { if (team === null) loadedRevisions.clear(); else loadedRevisions.delete(team); }
     lastRead = 0;
     if (pending) refreshAgain = true; else refreshReviews();
 });
@@ -110,79 +110,107 @@ export async function reviewsOfGoal(team, goalId) {
     return collapseVersions((await readTeam(team)).sort(byAge)).filter(a => String(a.goal_id) === String(goalId));
 }
 
-// Teams are read a few at a time (#13116): through the Hub each read is about a second, and eight teams one after the other were eight seconds, twice when a click came during a scan.
-const SCAN_AT_ONCE = 4;
-let pendingStarted = 0;
-let finishedAt = 0, finishedRev = -1; // when the last whole scan finished, and the revision it was good for: a forced read soon after, with nothing settled or tagged since and the same computers, is that scan (#13489)
-let lastSources = null, rescans = 0; // which computers the last scan covered, and how many times in a row it started again because the list of computers moved under it
-export function refreshReviews(force = false, { reuse = false } = {}) { // reuse: a read for opening one file or link, which a scan finished in the last 30 s answers (#13489); every other forced read is a fresh one
-    // showInbox requests a forced read; badge/feed updates alone must not start the project scan.
+// The Inbox owns two bounded windows per computer, not a scan of every team.
+// Facets/attention policy is layered on this metadata when its server contract is
+// present. A raw for-review total is not an authoritative attention count.
+const reviewQuery = new URLSearchParams({ tag: 'for review', versions: 'newest' }).toString();
+const savedQuery = new URLSearchParams({ tag: 'saved', versions: 'newest' }).toString();
+let pagesReady = false, pendingStarted = 0, finishedAt = 0, finishedRev = -1, lastSources = null, rescans = 0;
+async function readComputerPage(server, { query, cursor, limit, signal }) {
+    const started = revision, params = new URLSearchParams(query);
+    params.set('limit', String(limit));
+    if (cursor) params.set('cursor', cursor); else params.delete('cursor');
+    const response = await serverFetch(server, `/api/team-artifacts?${params}`, { signal });
+    const data = await response.json().catch(() => ({}));
+    if (signal?.aborted || started !== revision) throw Object.assign(new Error('The review read was superseded.'), { name: 'AbortError' });
+    if (response.status === 403 && (data.code === 'owner_only' || data.error === 'owner_only')) return { artifacts: [], total: 0, tag_counts: {}, has_more: false, ownerOnly: true };
+    if (!response.ok) throw new Error(`Review artifacts could not be read (HTTP ${response.status}).`);
+    if (!Array.isArray(data.artifacts)) throw new Error('The review page was not a list.');
+    const rawBoard = id => typeof id === 'string' && !!id && !id.startsWith('@') && !id.includes('/');
+    noteBoardLabels((data.teams || []).filter(t => rawBoard(t.board_id)).map(t => ({ board_id: t.board_id, board_label: t.team })), 'board_id', server);
+    const artifacts = [];
+    for (const a of data.artifacts) {
+        const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1]?.toLowerCase();
+        // A computer response must name the owning board. A display label is not
+        // a routing identity, and a missing source never becomes the Hub/local.
+        if (!hex || !rawBoard(a.board_id)) continue;
+        const team = identityKey(server, a.board_id);
+        artifacts.push({ ...a, id: hex, team, hex, reviewKey: `${team}:${hex}` });
+    }
+    return { ...data, artifacts };
+}
+const pageKey = row => row.reviewKey;
+const reviewPager = createReviewPages({ read: readComputerPage, key: pageKey });
+const savedPager = createReviewPages({ read: readComputerPage, key: pageKey });
+function syncPageSources() {
+    const servers = inboxSources();
+    if (!pagesReady) { reviewPager.reset(servers, reviewQuery); savedPager.reset(servers, savedQuery); pagesReady = true; }
+    else { reviewPager.setSources(servers); savedPager.setSources(servers); }
+}
+export const reviewPages = () => reviewPager.status();
+export const savedReviewPages = () => savedPager.status();
+/** Query totals and tags describe the server query, not its attention policy. */
+export function reviewPageSummary() {
+    if (!activated) return null;
+    const sources = reviewPages().filter(s => !s.ownerOnly), ready = sources.length > 0 && sources.every(s => s.loaded && !s.error);
+    const totalKnown = ready && sources.every(s => Number.isSafeInteger(s.total));
+    const completeWindow = ready && sources.every(s => !s.has_more && !s.truncated && s.total === s.loadedCount);
+    const tagsKnown = ready && sources.every(s => s.tag_counts && Object.values(s.tag_counts).every(n => Number.isSafeInteger(n) && n >= 0));
+    const tags = tagsKnown ? Object.create(null) : null;
+    if (tags) for (const source of sources) for (const [tag, n] of Object.entries(source.tag_counts)) tags[tag] = (tags[tag] || 0) + n;
+    return { sources, expected: sources.length, answered: sources.filter(s => s.loaded && !s.error).length,
+        queryTotal: totalKnown ? sources.reduce((n, s) => n + s.total, 0) : null, tag_counts: tags,
+        attentionTotal: completeWindow ? unreadReviewItems().length : null, loadedUnread: unreadReviewItems().length,
+        hasMore: sources.some(s => s.has_more), partial: !ready || sources.some(s => s.truncated),
+        failed: sources.filter(s => s.error).map(s => s.server) };
+}
+function publishPages() {
+    const next = [], nextSaved = [], nextMuted = [], failed = [];
+    for (const source of reviewPager.snapshot()) {
+        if (source.error) failed.push(`${source.server} review artifacts could not be refreshed: ${source.error}`);
+        for (const a of source.artifacts) {
+            const tags = a.tags || [], decidedWithNews = a.new_comments > 0 && (tags.includes('approved') || tags.includes('denied')) && !tags.includes('for review');
+            if (!(tags.includes('for review') || decidedWithNews) || tags.includes('saved') || tags.includes('ignored') || tags.includes('superseded') || (tags.includes('changes requested') && !(a.new_comments > 0)) || !a.available) continue;
+            (a.muted === true ? nextMuted : next).push(a);
+        }
+    }
+    for (const source of savedPager.snapshot()) {
+        if (source.error) failed.push(`${source.server} saved review artifacts could not be refreshed: ${source.error}`);
+        for (const a of source.artifacts) if (a.tags?.includes('saved') && a.tags.includes('for review') && a.available) nextSaved.push(a);
+    }
+    items = next.sort(byAge); saved = nextSaved.sort(byAge); muted = nextMuted.sort(byAge); errors = failed;
+    changed();
+}
+async function appendReviews(pager, server) {
+    if (!activated) return;
+    if (pending) await pending;
+    const started = revision;
+    const servers = server === undefined ? pager.status().filter(s => s.has_more || !s.loaded).map(s => s.server) : [server];
+    const reads = servers.map(s => pager.more(s)); changed();
+    await Promise.all(reads);
+    if (started === revision) publishPages();
+}
+export const loadMoreReviews = server => appendReviews(reviewPager, server);
+export const loadMoreSavedFiles = server => appendReviews(savedPager, server);
+export function refreshReviews(force = false, { reuse = false } = {}) {
     if (force) activated = true;
     if (!activated) return null;
-    // A scan in flight is joined, not queued behind (#13116): its answer is as new as one started now, unless something was settled or tagged since it began (revision moved): it will be discarded, so a second one follows.
     if (pending) return force && pendingStarted !== revision ? pending.then(() => refreshReviews(true)) : pending;
     const sources = sourcesKey();
-    if (force && reuse && finishedAt && Date.now() - finishedAt < 30000 && finishedRev === revision && sources === lastSources) return Promise.resolve(); // opening a file, a link, or the Inbox again within 30 s of a finished scan reads nothing again (#13489: one click was a scan of every board, x9 for review and x7 saved)
-    if (!force && Date.now() - lastRead < 30000 && sources === lastSources) return null; // the 30 s wait is for the same computers: a computer that came into the list since is read now (#13304)
-    lastSources = sources;
+    if (force && reuse && finishedAt && Date.now() - finishedAt < 30000 && finishedRev === revision && sources === lastSources) return Promise.resolve();
+    if (!force && Date.now() - lastRead < 30000 && sources === lastSources) return null;
+    lastSources = sources; pendingStarted = revision; lastRead = Date.now();
     const started = revision;
-    pendingStarted = started;
-    lastRead = Date.now();
-    pending = (async () => {
-        try {
-            const projects = await fetchReviewProjects();
-            const results = new Array(projects.length);
-            const readOne = async (i) => {
-                const team = projects[i].project, mutedHere = [], got = { rows: [], saved: [], mutedHere, failed: '' };
-                try {
-                    if (!force && await artifactsUnchanged(team, loadedRevisions.get(team), splitKey(team).name === '~no-team')) {
-                        results[i] = { rows: items.filter(a => a.team === team), saved: saved.filter(a => a.team === team), mutedHere: muted.filter(a => a.team === team), failed: '' };
-                        return;
-                    }
-                    const stamp = {};
-                    got.rows = await readTeam(team, mutedHere, stamp);
-                    try { // the saved files of this team, every page (50 a request, #13161): a failure here leaves the others alone
-                        for (let at = { cursor: '', offset: 0 }, pages = 0; pages < 200; pages++) {
-                            const r = await boardArtifactPage(team, 'saved', at);
-                            if (!r.ok) { loadedRevisions.delete(team); break; }
-                            const data = await r.json();
-                            if (pages === 0) loadedRevisions.set(team, stamp.rev === artifactRevision(data.artifacts_rev) ? stamp.rev : null);
-                            for (const a of data.artifacts || []) {
-                                const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
-                                if ((splitKey(team).name !== '~no-team' || a.board_id === '~no-team') && a.tags?.includes('saved') && a.tags.includes('for review') && a.available && hex) got.saved.push({ ...a, team, hex, reviewKey: `${team}:${a.id}` });
-                            }
-                            if (!nextArtifactPage(at, data)) break;
-                        }
-                    } catch { loadedRevisions.delete(team); got.saved = saved.filter(a => a.team === team); }
-                } catch {
-                    got.rows = items.filter(a => a.team === team);
-                    got.mutedHere.push(...muted.filter(a => a.team === team));
-                    got.failed = `${keyLabel(team)} review artifacts could not be refreshed.`;
-                }
-                results[i] = got;
-            };
-            let at = 0;
-            await Promise.all(Array.from({ length: Math.min(SCAN_AT_ONCE, projects.length) }, async () => { while (at < projects.length) await readOne(at++); }));
-            const next = [], failed = [], nextSaved = [], nextMuted = []; // joined in the teams' own order, whatever order the reads finished in
-            for (const g of results) { next.push(...g.rows); nextSaved.push(...g.saved); nextMuted.push(...g.mutedHere); if (g.failed) failed.push(g.failed); }
-            if (started !== revision) { loadedRevisions.clear(); return; } // discarded payloads cannot certify the retained rows as fresh
-            items = next.sort(byAge); saved = nextSaved.sort(byAge); muted = nextMuted.sort(byAge);
-            errors = failed;
-            if (!failed.length) { finishedAt = Date.now(); finishedRev = revision; }
-        } catch { errors = ['Review artifacts could not be refreshed.']; }
-        changed();
-    })().finally(() => {
+    syncPageSources();
+    pending = Promise.all([reviewPager.refresh(), savedPager.refresh()]).then(() => {
+        if (started !== revision) return;
+        publishPages();
+        if (!errors.length) { finishedAt = Date.now(); finishedRev = revision; }
+    }).catch(() => { errors = ['Review artifacts could not be refreshed.']; changed(); }).finally(() => {
         pending = null;
-        // A changed source list needs a bounded full rescan; join a queued
-        // artifact revision notification into that scan rather than start two.
         const sourcesChanged = sourcesKey() !== sources;
-        if (sourcesChanged && rescans < 2) {
-            rescans++; refreshAgain = false;
-            refreshReviews(true).catch(() => {});
-        } else {
-            if (!sourcesChanged) rescans = 0;
-            if (refreshAgain) { refreshAgain = false; lastRead = 0; refreshReviews(); }
-        }
+        if (sourcesChanged && rescans < 2) { rescans++; refreshAgain = false; refreshReviews(true).catch(() => {}); }
+        else { if (!sourcesChanged) rescans = 0; if (refreshAgain) { refreshAgain = false; lastRead = 0; refreshReviews(); } }
     });
     return pending;
 }
@@ -222,12 +250,13 @@ export async function setReviewRead(row, read, { fresh = false, click = false } 
 }
 
 /** A decision put a row back (Undo of Dismiss, Move to Needs you): a read in flight took its lists before the write, so its answer is stale. Moving the revision makes that read be discarded, and the forced read that follows is a new one (#13601). */
-export function reviewsChangedOnServer() { revision++; }
+export function reviewsChangedOnServer() { revision++; reviewPager.remove(() => false); savedPager.remove(() => false); }
 
 /** The Operator decided a review (Approve): the row is out of the list at once, and a read that was already in flight cannot put it back. */
 export function settleReview(row) {
     revision++;
     const gone = new Set([row.reviewKey || `${row.team}:${row.id}`, ...earlierVersions(row).map(a => a.reviewKey)]); // the versions before it were settled with it (settleEarlierVersions)
+    reviewPager.remove(a => gone.has(a.reviewKey)); savedPager.remove(a => gone.has(a.reviewKey));
     items = items.filter(a => !gone.has(a.reviewKey)); saved = saved.filter(a => !gone.has(a.reviewKey));
     changed();
 }
@@ -270,4 +299,4 @@ export function markOpenedRead(hex, team = '') {
 }
 
 
-setReviewCacheReader(unreadReviewItems, refreshReviews);
+setReviewCacheReader(unreadReviewItems, refreshReviews, reviewPageSummary);

@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { reviewAttentionCount, setReviewCacheReader } from '../../coral-go/pkg/frontend/static/ask_filter.js';
+const loaded = [{}, {}];
+setReviewCacheReader(() => loaded, () => {}, () => ({ attentionTotal: 125 }));
+assert.deepEqual(reviewAttentionCount(), { value: 125, complete: true }, 'an authoritative total is independent of the loaded window');
+setReviewCacheReader(() => loaded, () => {}, () => ({ queryTotal: 125, attentionTotal: null }));
+assert.deepEqual(reviewAttentionCount(), { value: 2, complete: false }, 'a raw query total cannot substitute for attention policy');
+setReviewCacheReader(() => [], () => {}, () => ({ attentionTotal: 0 }));
+assert.deepEqual(reviewAttentionCount(), { value: 0, complete: true }, 'explicit zero is a known total');
+setReviewCacheReader(() => loaded, () => {});
+assert.deepEqual(reviewAttentionCount(), { value: 2, complete: true }, 'legacy cache readers retain their old behavior');
+console.log('review_attention_count: exact attention totals and incomplete loaded windows stay distinct');

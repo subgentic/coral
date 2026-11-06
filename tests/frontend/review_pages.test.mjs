@@ -43,6 +43,20 @@ fail = false; await failures.more('bad');
 assert.deepEqual(retries.filter(r => r[0] === 'bad').map(r => r[1]), ['', 'bad-c', 'bad-c']);
 assert.equal(failures.snapshot()[0].error, '');
 
+// A failed refresh of an exhausted window still has a working Retry action.
+let unavailable = false;
+const exhausted = createReviewPages({ key, read: async () => {
+    if (unavailable) throw new Error('offline');
+    return page([row('team', 'only')]);
+} });
+exhausted.reset(['box']); await exhausted.load();
+unavailable = true; await exhausted.refresh();
+assert.equal(exhausted.status()[0].has_more, false);
+assert.equal(exhausted.status()[0].error, 'offline');
+unavailable = false; await exhausted.more('box');
+assert.equal(exhausted.status()[0].error, '');
+assert.equal(exhausted.status()[0].loadedCount, 1);
+
 // A server that ignores a cursor must not create an endless Show more loop.
 const stalled = createReviewPages({ key, read: async () => page([row('team', 'x')], { has_more: true, next_cursor: 'unchanged' }) });
 stalled.reset(['box']); await stalled.load(); await stalled.more('box');
@@ -72,5 +86,22 @@ queued.reset(['box'], 'latest'); await queued.load(); await cancelled;
 assert.deepEqual(dispatched, ['latest']);
 await queued.more('unknown');
 assert.equal(dispatched.length, 1, 'an unknown computer never falls back to local');
+
+// Refresh keeps the whole loaded window published until all its pages answer.
+let refreshing = false;
+const second = pending(), enteredSecond = pending();
+const retained = createReviewPages({ key, read: async (server, options) => {
+    if (!refreshing) return options.cursor ? page([row('team', 'old-two')]) : page([row('team', 'old-one')], { has_more: true, next_cursor: 'next' });
+    if (!options.cursor) return page([row('team', 'new-one')], { has_more: true, next_cursor: 'next' });
+    enteredSecond.resolve(); return second.promise;
+} });
+retained.reset(['box']); await retained.load(); await retained.more('box');
+refreshing = true; const replacement = retained.refresh(); await enteredSecond.promise;
+assert.deepEqual(retained.snapshot()[0].artifacts.map(r => r.id), ['old-one', 'old-two'], 'page one of a refresh never shrinks the visible window');
+second.resolve(page([row('team', 'new-two')])); await replacement;
+assert.deepEqual(retained.snapshot()[0].artifacts.map(r => r.id), ['new-one', 'new-two']);
+retained.remove(r => r.id === 'new-one');
+assert.equal(retained.snapshot()[0].total, null, 'a local decision invalidates server counts rather than guessing them');
+assert.deepEqual(retained.snapshot()[0].artifacts.map(r => r.id), ['new-two']);
 
 console.log('review_pages: bounded first reads, isolated cursors, stable append/retry, authoritative metadata and stale-query rejection pass');
