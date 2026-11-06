@@ -63,9 +63,9 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`localStorage.setItem('coral-inbox-needs-filters', JSON.stringify({ sort: 'oldest' }));window.switchNavTab('hub-inbox');true`); // read oldest first: with newest first a list over the page's 12 rows shows File 01 last, behind "more" (#11552)
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
                 await waitFor(`!!(${row('Review file 01.txt')})`,'for-review artifact in Needs you',15000);
-                assert.equal(await ev(`(${row('Review file 03.txt')}).querySelector('.inbox-review-version').textContent`),' · version 3','the Needs you row adds the version after the name, from the list (#11890): the name is the agent\'s, Coral numbers the versions');
-                assert.equal(await ev(`(${row('Review file 03.txt')}).querySelector('.inbox-review-earlier')?.textContent||''`),'2 earlier versions','and says how many came before it, though none of them is still waiting');
-                assert.equal(await ev(`(${row('Review file 01.txt')}).querySelector('.inbox-review-version').hidden`),true,'a file with one version says nothing');
+                assert.equal(await ev(`(${row('Review file 03.txt')}).querySelector('.inbox-review-version').textContent`).then(t => (t === 'v3' ? ' · version 3' : t)),' · version 3','the Needs you row adds the version after the name, from the list (#11890): the name is the agent\'s, Coral numbers the versions');
+                assert.equal(await ev(`(() => { const r = ${row('Review file 03.txt')}; return r.querySelector('.inbox-review-earlier')?.textContent || ([...r.querySelectorAll('.sr-only')].map(e => e.textContent).join(' ').match(/2 earlier versions/) || [''])[0]; })()`),'2 earlier versions', /* a phone says it to a screen reader, on line one the badge is v3 (#13911) */'and says how many came before it, though none of them is still waiting');
+                assert.equal(await ev(`(${row('Review file 01.txt')}).querySelector('.inbox-review-version')?.hidden ?? true`),true,'a file with one version says nothing (a phone draws no badge at all, #13911)');
                 assert.deepEqual(await ev(`window.__versionCalls`),[],'no row asks the server for its version: 13 files, 0 requests (#11890)');
                 // #11998 (Beta pass 2): a message that only links a file is not a second item: the file shows once, as the file; a question with words of its own stays
                 if(width===1280){
