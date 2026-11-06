@@ -8,6 +8,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const guard = await require('./helpers/settings_guard').guardSettings(); // Load > Light is kept as the saved theme now (#13760): the settings are put back in the finally
     const failures = [], S = `(window.__coralStatic || '/static/')`, NAME = 'zz-light-' + Date.now().toString(36);
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
@@ -69,6 +70,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         check(bgNow.toLowerCase() === lightBg.toLowerCase(), `and its background is the Light one: ${bgNow} vs ${lightBg}`);
     } finally {
         await ev(`fetch('/api/themes/${NAME}', { method: 'DELETE' }).then(() => fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ custom_theme: '' }) })).then(() => true)`).catch(() => {});
+        await guard.restore();
         await client.close();
     }
     if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
