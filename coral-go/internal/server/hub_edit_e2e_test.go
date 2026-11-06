@@ -87,7 +87,8 @@ func TestTheMarkdownSaveWorksThroughAStampedProxyAndATunnelledOwnerAndRefusesEve
 	require.NoError(t, aerr)
 	require.Len(t, rows, 1, "the owner's stamped save is one row of the Activity record")
 	assert.Equal(t, v2, rows[0].ItemID)
-	// NOT asserted: the row's source and actor. activityMetaFor marks only a tunnelled request as a Hub's; a stamped self-hosted-Hub request is recorded as "local" today (reported on #13757 as a follow-up).
+	assert.Equal(t, "hub", rows[0].Source, "a stamped request from the self-hosted Hub is recorded as coming through the Hub, not as local")
+	assert.Equal(t, "hub:owner", rows[0].Actor)
 	// the signed query is the compare-and-swap: a stamp over ?expected_latest=v1 cannot be replayed for another value, and a stale one is a 409
 	m, target = req(v1, v1)
 	rec = bare(h, m, target, "# plan, again\n", stamp(m, target, "# plan, again\n"))
@@ -119,4 +120,51 @@ func TestTheMarkdownSaveWorksThroughAStampedProxyAndATunnelledOwnerAndRefusesEve
 	m, target = req(v1, v2)
 	rec = bare(h, m, target, "# from nowhere\n", map[string]string{"Content-Type": "text/markdown; charset=utf-8"})
 	assert.Equal(t, 403, rec.Code, rec.Body.String())
+}
+
+
+// #13694: every stamped click of the self-hosted Hub is recorded in the Activity record as the Hub's: the original eight routes (generation 1: a message to an agent), the Activity clicks of generation 2 (a
+// task is created) and the editor's save (3), and a click of this computer's own page stays local.
+func TestEveryStampedClickIsRecordedAsComingThroughTheHub(t *testing.T) {
+	r := newE2ERemote(t, "stamp-source", nil)
+	setHome(t, r.dir)
+	h := r.srv.Router()
+	js := map[string]string{"Content-Type": "application/json"}
+	ctx := t.Context()
+	sid := r.launchDirectTerminal(t, r.work)
+	name := r.sessionNameFor(sid)
+	require.Equal(t, 200, call(h, "POST", "/api/board/team/subscribe", `{"subscriber_id":"Dev","job_title":"Dev","session_name":"`+name+`"}`, js).Code)
+	secret, err := hubowner.NewSecret()
+	require.NoError(t, err)
+	require.NoError(t, hubowner.WriteFile(r.cfg.CoralDir(), "stamp-source", secret))
+	stamped := func(method, target, body string) *httptest.ResponseRecorder {
+		u, perr := url.Parse(target)
+		require.NoError(t, perr)
+		sig, serr := hubowner.Sign(secret, "stamp-source", method, hubowner.Target(u), []byte(body), time.Now())
+		require.NoError(t, serr)
+		return bare(h, method, target, body, map[string]string{"Authorization": "Bearer " + r.key(), hubowner.Header: sig, "Content-Type": "application/json"})
+	}
+	// generation 1: the owner's message to an agent
+	rec := stamped("POST", "/api/sessions/live/"+name+"/send", `{"command":"hello","agent_type":"terminal","session_id":"`+sid+`"}`)
+	require.Equal(t, 200, rec.Code, rec.Body.String())
+	// generation 2: a task created
+	rec = stamped("POST", "/api/board/team/tasks", `{"subscriber_id":"Operator","created_by":"Operator","title":"from the hub","assigned_to":"Dev"}`)
+	require.Equal(t, 201, rec.Code, rec.Body.String())
+	for _, action := range []string{board.ActChatSend, board.ActTaskCreate} {
+		rows, aerr := r.srv.boardStore.ListActivity(ctx, board.ActivityFilter{Action: action, Limit: 10})
+		require.NoError(t, aerr)
+		require.Len(t, rows, 1, action)
+		assert.Equal(t, "hub", rows[0].Source, "%s: a stamped click is the Hub's", action)
+		assert.Equal(t, "hub:owner", rows[0].Actor, action)
+	}
+	// this computer's own page is local (the dashboard's request, no Hub)
+	rec = call(h, "POST", "/api/board/team/tasks", `{"subscriber_id":"Operator","created_by":"Operator","title":"from this page","assigned_to":"Dev"}`, map[string]string{"Content-Type": "application/json", "Origin": "http://127.0.0.1:8420"})
+	require.Equal(t, 201, rec.Code, rec.Body.String())
+	rows, aerr := r.srv.boardStore.ListActivity(ctx, board.ActivityFilter{Action: board.ActTaskCreate, Limit: 10})
+	require.NoError(t, aerr)
+	sources := map[string]int{}
+	for _, row := range rows {
+		sources[row.Source]++
+	}
+	assert.Equal(t, map[string]int{"hub": 1, "local": 1}, sources, "one row from the Hub, one from this page")
 }

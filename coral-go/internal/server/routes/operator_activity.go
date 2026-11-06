@@ -25,6 +25,10 @@ func activityMetaFor(r *http.Request, title, note string) board.ActivityMeta {
 		m.Source = "hub"
 		m.Actor = activityActor(hubOwnerRequest(r)) // the one owner check (hub_owner.go): this file reads no stamp of its own
 	}
+	if kind, _ := r.Context().Value(callerKindKey{}).(string); kind == callerHubOwner && m.Source == "local" {
+		// The self-hosted Hub's signed owner stamp (the identity layer verified it): a click the Operator made at the Hub, not at this computer. The stamp names no account, so the actor is the Hub's owner.
+		m.Source, m.Actor = "hub", "hub:owner"
+	}
 	if r.Header.Get("X-Coral-Client") == "phone" {
 		m.Hint = "phone"
 	}
