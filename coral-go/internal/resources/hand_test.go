@@ -367,3 +367,54 @@ func TestACommandThatBeginsWithItsOwnWaitingClaimIsNotRefusedBeforeTheClaimRuns(
 		assert.NotEmpty(t, g.h.Before(ctx, "s-b", "s-b", "call-held", held), held)
 	}
 }
+
+// #13951: the Hub Lead's 2 h pre-run kept running after its claim's lease lapsed, and the queue showed the mini free with the run still going. A claim whose work is alive is renewed (up to the heavy-run cap); one whose
+// work is gone, or that has no shell to look at, is left to its lease.
+func TestAClaimWhoseWorkStillRunsIsKeptPastItsLease(t *testing.T) {
+	g := newHookRig(t) // mac-heavy: one slot, a 30 minute lease
+	g.setProcs(proctree.Proc{PID: agentPID, PPID: 1, Command: "claude"}, proctree.Proc{PID: 500, PPID: agentPID, Command: "bash -c claim; ssh mini run"},
+		proctree.Proc{PID: 501, PPID: 500, Command: "coral-board resource claim mac-heavy"})
+	g.bgClaim("s-a", "Agent A", "call-1", 500)
+	g.dropProc(501)
+	g.addProc(proctree.Proc{PID: 502, PPID: 500, Command: "ssh mini run"}) // the work the call started, still going
+	for i := 0; i < 6; i++ {                                               // 6 x 20 minutes: two hours, past the 30 minute lease and inside the 150 minute cap
+		g.add(20 * time.Minute)
+	}
+	assert.Equal(t, []string{"Agent A"}, g.holders(), "the work runs: the slot is still held, not shown free")
+	g.dropProc(502)
+	g.h.After("s-a", "call-1")
+	g.h.Sweep()
+	assert.Empty(t, g.holders(), "the work is gone and the call ended: back")
+}
+
+func TestAClaimWithNoWorkOrNoShellIsLeftToItsLease(t *testing.T) {
+	g := newHookRig(t)
+	g.handClaim("s-a", "Agent A", "call-1") // no shell known: nothing to look at
+	g.add(31 * time.Minute)
+	assert.Empty(t, g.holders(), "the lease ended it, as before")
+
+	g2 := newHookRig(t)
+	g2.setProcs(proctree.Proc{PID: agentPID, PPID: 1, Command: "claude"}, proctree.Proc{PID: 500, PPID: agentPID, Command: "sh"})
+	g2.bgClaim("s-a", "Agent A", "call-1", 500) // a shell with nothing started under it
+	g2.add(31 * time.Minute)
+	assert.Empty(t, g2.holders(), "no work alive: the lease ends it")
+}
+
+func TestARenewedClaimStopsAtTheHeavyRunCap(t *testing.T) {
+	g := newHookRig(t)
+	g.setProcs(proctree.Proc{PID: agentPID, PPID: 1, Command: "claude"}, proctree.Proc{PID: 500, PPID: agentPID, Command: "bash"},
+		proctree.Proc{PID: 502, PPID: 500, Command: "sleep forever"})
+	_, err := g.m.Claim(context.Background(), "mac-heavy", "Agent A", "bg")
+	require.NoError(t, err)
+	g.dropProc(502) // not there at the claim, so it is the work the call started
+	g.h.BindHand("s-a", "Agent A", "mac-heavy", []string{"call-1"}, 500, agentPID)
+	g.addProc(proctree.Proc{PID: 502, PPID: 500, Command: "sleep forever"})
+	for i := 0; i < 7; i++ {
+		g.add(20 * time.Minute) // 140 minutes: inside the cap, still held
+	}
+	assert.Equal(t, []string{"Agent A"}, g.holders())
+	for i := 0; i < 3; i++ {
+		g.add(20 * time.Minute) // 200 minutes: the last renewal was inside the cap, its lease has run out since
+	}
+	assert.Empty(t, g.holders(), "a process that never ends does not hold the slot for ever")
+}
