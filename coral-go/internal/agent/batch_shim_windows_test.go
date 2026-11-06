@@ -379,4 +379,8 @@ func TestADroppedPromptTakesItsOptionWithIt(t *testing.T) {
 
 	got, _, _, _ = withoutPromptForBatch([]string{wrapper, "--append-system-prompt", prompt, "--print"}, []string{prompt})
 	assert.Equal(t, []string{wrapper, "--print"}, got)
+
+	// agy passes its prompt after -i
+	got, _, _, _ = withoutPromptForBatch([]string{wrapper, "--add-dir", `C:\d`, "-i", prompt}, []string{prompt})
+	assert.Equal(t, []string{wrapper, "--add-dir", `C:\d`}, got)
 }

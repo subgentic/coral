@@ -258,8 +258,10 @@ func withoutPromptForBatch(parts, raw []string) (outParts, outRaw []string, noti
 	for i, p := range parts {
 		if i > prog && isPrompt(p) {
 			changed = true
-			// The option that introduced it goes too, or the next option would be read as its value.
-			if n := len(outParts); n > prog+1 && (outParts[n-1] == "-c" || outParts[n-1] == "--append-system-prompt") {
+			// The option that introduced it goes too, or the next option would be read as its value. These are the options an agent
+			// places a prompt after (codex -c, pi --append-system-prompt, agy -i): a new caller of promptArg that puts a prompt after
+			// an option must add that option here.
+			if n := len(outParts); n > prog+1 && (outParts[n-1] == "-c" || outParts[n-1] == "--append-system-prompt" || outParts[n-1] == "-i") {
 				outParts = outParts[:n-1]
 			}
 			continue
