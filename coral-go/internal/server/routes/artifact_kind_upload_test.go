@@ -32,7 +32,12 @@ func newKindRig(t *testing.T) *kindRig {
 	l := newLinkRig(t)
 	old := uploaderLookup
 	t.Cleanup(func() { uploaderLookup = old })
-	uploaderLookup = func(ctx context.Context, sid string) (string, string, string) { return "alpha", "Backend", "Backend" }
+	uploaderLookup = func(ctx context.Context, sid string) (string, string, string) {
+		if sid == "s2" { // the other agent of the team (#13908: a plain upload joins only a file its own uploader made)
+			return "alpha", "Frontend", "Frontend"
+		}
+		return "alpha", "Backend", "Backend"
+	}
 	ctx := context.Background()
 	require.NoError(t, l.ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: "s4", AgentName: "Lead", AgentType: "claude", WorkingDir: t.TempDir()}))
 	_, err := l.h.bs.Subscribe(ctx, "alpha", "Lead", "Orchestrator", "agent-s4", nil, "all")
@@ -207,9 +212,9 @@ func TestAnUploadForReviewJoinsTheOpenFileOfItsTaskChain(t *testing.T) {
 	assert.NotNil(t, out["series_id"])
 	assert.NotEqual(t, first, out["uri"])
 
-	// a follow-up of the root, by another agent of the team, joins the same file
-	kid := k.followUp("Follow-up fix", "Frontend", root.ID)
-	code, out = k.upTask("s2", kid, "the follow-up changes", "")
+	// a follow-up of the root, by the same agent, joins the same file (#13908: another agent's follow-up starts a series of its own, see TestAFollowUpOfAnotherAgentStartsItsOwnSeries)
+	kid := k.followUp("Follow-up fix", "Backend", root.ID)
+	code, out = k.upTask("s1", kid, "the follow-up changes", "")
 	require.Equal(t, 201, code, out)
 	assert.EqualValues(t, 3, out["version"], "a follow-up joins its parent's chain: the Operator reviews one file that grows")
 	grandkid := k.followUp("Follow-up of the follow-up", "Backend", kid)
@@ -497,4 +502,70 @@ func TestSiblingFollowUpsNeverShareAFileAndEachKeepsItsOwnSeries(t *testing.T) {
 	code, out = k.upTask("s1", skill, "the skill, version four", "&name=skill.md")
 	require.Equal(t, 201, code, "the parent after its follow-up is not stale: %v", out)
 	assert.EqualValues(t, 4, out["version"])
+}
+
+// #13908 (QA and Security): a plain upload joins the nearest open file of its line only when the SAME uploader made its newest version. A parent's file by agent A: A's follow-up joins it, B's follow-up starts a series of its
+// own, and a second follow-up by A joins A's again, never B's. And the NEAREST open file of the line wins over a farther one.
+func TestAFollowUpOfAnotherAgentStartsItsOwnSeries(t *testing.T) {
+	k := newKindRig(t)
+	ctx := context.Background()
+	parent, err := k.h.bs.CreateTask(ctx, "alpha", "OPERATOR the draft", "", "medium", "lead", "Backend")
+	require.NoError(t, err)
+	code, out := k.upTask("s1", parent.ID, "the parent's file, by A", "&name=draft.md")
+	require.Equal(t, 201, code, out)
+	byA := k.followUp("A's follow-up", "Backend", parent.ID)
+	byB := k.followUp("B's follow-up", "Frontend", parent.ID)
+	code, out = k.upTask("s1", byA, "A extends its own file", "&name=draft.md")
+	require.Equal(t, 201, code, out)
+	assert.EqualValues(t, 2, out["version"], "the same agent's follow-up joins the file")
+	aSeries := out["series_id"]
+	code, out = k.upTask("s2", byB, "B's file", "&name=other.md")
+	require.Equal(t, 201, code, out)
+	assert.NotEqual(t, aSeries, out["series_id"], "another agent's follow-up never joins A's file")
+	assert.Nil(t, out["series_id"], "it is a first version")
+	bFile := out["uri"].(string)
+	again := k.followUp("A again", "Backend", parent.ID)
+	code, out = k.upTask("s1", again, "A extends once more", "&name=draft.md")
+	require.Equal(t, 201, code, out)
+	assert.Equal(t, aSeries, out["series_id"], "A's next follow-up joins A's series, not B's")
+	assert.EqualValues(t, 3, out["version"])
+	assert.NotEqual(t, bFile, out["uri"])
+	// and B's own next upload on its task continues B's file
+	code, out = k.upTask("s2", byB, "B's file, again", "&name=other.md")
+	require.Equal(t, 201, code, out)
+	assert.EqualValues(t, 2, out["version"])
+}
+
+func TestTheNearestOpenFileOfTheLineIsTheOneAFollowUpJoins(t *testing.T) {
+	k := newKindRig(t)
+	ctx := context.Background()
+	grand, err := k.h.bs.CreateTask(ctx, "alpha", "OPERATOR the draft", "", "medium", "lead", "Backend")
+	require.NoError(t, err)
+	code, out := k.upTask("s1", grand.ID, "the grandparent's file, by Backend", "&name=draft.md")
+	require.Equal(t, 201, code, out)
+	grandFile := out["uri"].(string)
+	// the parent's agent is another one: its file is its own series, and the line now has two open files
+	parent := k.followUp("Parent", "Frontend", grand.ID)
+	code, out = k.upTask("s2", parent, "the parent's own file, by Frontend", "&name=parent.md")
+	require.Equal(t, 201, code, out)
+	assert.Nil(t, out["series_id"], "another agent's follow-up starts its own file")
+	parentFile := out["uri"].(string)
+	require.NotEqual(t, grandFile, parentFile)
+	// the child of the parent, by the parent's agent: the NEAREST open file is the parent's, and it is that agent's: it joins it
+	child := k.followUp("Child", "Frontend", parent)
+	code, out = k.upTask("s2", child, "the child's changes", "&name=parent.md")
+	require.Equal(t, 201, code, out)
+	assert.EqualValues(t, 2, out["version"], "the nearest open file of the line, not the farther one")
+	// the grandparent's own agent, on the grandparent task, still continues ITS file
+	code, out = k.upTask("s1", grand.ID, "the grandparent's file, again", "&name=draft.md")
+	require.Equal(t, 201, code, out)
+	assert.EqualValues(t, 2, out["version"])
+}
+
+// The chain file is the agent's by the server's record of that file; a file with no record, or an empty uploader name, is nobody's. (A person's newer version still gets the stale refusal, #13792: TestAChainJoinOntoAFileThatIsNoLongerTheNewestIsRefused...)
+func TestAChainFileWhoseNewestVersionIsAnotherUploadersIsNotJoined(t *testing.T) {
+	dir := t.TempDir()
+	assert.False(t, chainFileIsTheUploaders(dir, "alpha", strings.Repeat("a", 64), "Backend"), "a file with no record is nobody's")
+	assert.False(t, chainFileIsTheUploaders("", "alpha", strings.Repeat("a", 64), "Backend"))
+	assert.False(t, chainFileIsTheUploaders(dir, "alpha", strings.Repeat("a", 64), ""), "no uploader name: no join")
 }

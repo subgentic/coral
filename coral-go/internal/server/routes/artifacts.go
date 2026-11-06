@@ -265,14 +265,18 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 	var chainRoot int64     // the root of this upload's task chain, when it is for review (#12144)
 	var chainJoined []int64 // the task the joined file was remembered under, so it follows the file to its new version
 	autoChain := false      // the version was joined by the server, not asked for: anything that stops the join starts a new series instead of refusing the upload
-	chainBoard, _, _ := uploaderOf(sid)
+	chainBoard, chainUploader, _ := uploaderOf(sid)
 	if forReviewUpload := hasTag(board.CleanArtifactTags(r.URL.Query()["tag"]), tagForReview); forReviewUpload && taskID > 0 && h.bs != nil && chainBoard != "" {
 		chainRoot = taskID // a file is remembered under the task that made it (#13908), not under the chain's root: two follow-ups of one parent are different deliverables
 		if ref == "" {     // one file per line of tasks: the nearest file of this task's line (itself, its parent, ...) that is still open for review gets this one as its next version, with no --new-version-of from the agent
 			for _, e := range h.bs.ChainFilesNear(r.Context(), chainBoard, taskID) {
 				if h.chainFileOpen(r.Context(), chainBoard, e.Hex) {
-					ref, autoChain = "coral://artifacts/"+e.Hex, true
-					chainJoined = append(chainJoined, e.Task)
+					// A plain upload joins the nearest open file of its line only when the SAME uploader made its newest version (QA and Security, #13908): another agent's follow-up, or a version the Operator made, is not
+					// joined, and the upload starts a series of its own (an agent that means another's series says so with --new-version-of). The uploader is the server's own record of the version, never a flag.
+					if chainFileIsTheUploaders(coralDir, chainBoard, e.Hex, chainUploader) {
+						ref, autoChain = "coral://artifacts/"+e.Hex, true
+						chainJoined = append(chainJoined, e.Task)
+					}
 					break
 				}
 			}
