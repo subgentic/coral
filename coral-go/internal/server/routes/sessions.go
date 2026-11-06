@@ -40,8 +40,13 @@ import (
 
 // SessionsHandler handles all live session API endpoints.
 type SessionsHandler struct {
-	dialogs  dialogWatch     // the prompts seen on awake agents' screens (#11437)
-	opencode OpencodeRuntime // the opencode servers, one per agent; nil until the server wires it
+	dialogs  dialogWatch    // the prompts seen on awake agents' screens (#11437)
+	locks    agentLocks     // one lock per agent for whatever answers or closes a prompt on its screen (agent_lock.go)
+	episodes dialogEpisodes // the prompts the dialog timeout closed, each once (dialog_timeout.go)
+	focus    terminalFocus  // when a dashboard terminal view of each agent last said it was focused (dialog_timeout.go)
+	// noticeInStep runs a close's notice in step with the close (tests); in Coral it runs on a goroutine outside the agent's lock (dialog_timeout.go afterClose).
+	noticeInStep bool
+	opencode     OpencodeRuntime // the opencode servers, one per agent; nil until the server wires it
 
 	resourceHook *resources.Hook // the resource queue's shell hook (#13645); nil when the queue is off
 

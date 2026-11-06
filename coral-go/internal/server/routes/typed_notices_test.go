@@ -40,6 +40,7 @@ func TestTypedNoticeCensus(t *testing.T) {
 		typedcensus.C("no-team approval with a note", typedNoTeamApproved("report.md", strings.Repeat("a", 64), "Tidy the title."), typedNoTeamApproved(h, strings.Repeat("a", 64), h)),
 		typedcensus.C("no-team denial", typedNoTeamDenied("report.md", strings.Repeat("a", 64), "Wrong template."), typedNoTeamDenied(h, strings.Repeat("a", 64), h)),
 		typedcensus.C("no-team comment", typedNoTeamComment(strings.Repeat("a", 64), "Please add the Q4 table.", "report.md"), typedNoTeamComment(strings.Repeat("a", 64), h, h)),
+		typedcensus.C("dialog timeout", dialogTimeoutNotice, dialogTimeoutNotice),
 	}
 	typedcensus.Run(t, cases)
 }
@@ -88,5 +89,9 @@ func TestEveryTypedSenderIsInTheCensus(t *testing.T) {
 		typedcensus.S("hermes_runtime.go", `text, "first message")`, 1, "exception: a Hermes agent's own launch instructions (the board protocol, its role and the launch prompt it was given: the text every other type gets on its command line), written by Coral's launch into a private file and typed once through the gate (#11831)"),
 		typedcensus.S("sessions_waiting.go", `ptymanager.DeliverNow(`, 1, "Send now: board.NudgeText (census)"),
 		typedcensus.S("sessions_waiting.go", `name, text, ls.AgentType`, 1, "Send now's send: board.NudgeText (census)"),
+		typedcensus.S("dialog_timeout.go", `dialogTimeoutNotice, "dialog timeout notice"`, 1, "census: dialog timeout (fixed, no digit)"),
+		typedcensus.S("dialog_timeout_opencode.go", `dialogTimeoutNotice, "dialog timeout notice"`, 1, "census: dialog timeout (fixed, no digit)"),
+		typedcensus.S("agent_exited.go", `text, what, wanted)`, 1, "deliverAutomatedWhile: forwards the text of its callers, listed here"),
+		typedcensus.S("agent_exited.go", `text, what, nil)`, 1, "deliverNoticeRetrying: forwards the text of its callers, listed here"),
 	})
 }

@@ -722,6 +722,30 @@ function _wireRevealScroll(containerEl) {
     _cursorDisposable = typeof terminal.onCursorMove === 'function' ? terminal.onCursorMove(() => revealCursor()) : null;
 }
 
+/** Whether this view has the keyboard focus in a visible, ACTIVE window: what the server's dialog timeout counts as a person at the agent (goal #14). A window that is visible but not the active one keeps its
+ *  activeElement, so the page must also have the window's focus (document.hasFocus()). */
+function _viewFocused() {
+    return !!(terminal && terminal.textarea && document.activeElement === terminal.textarea && !document.hidden && document.hasFocus());
+}
+
+/** Tell the server whether this view is focused: on every change, on a new socket, and again every FOCUS_REPORT_MS while it stays focused (the server forgets a report after 2 minutes). Only the
+ *  yes or no goes: nothing typed and nothing on the screen. */
+const FOCUS_REPORT_MS = 60000;
+let _focusTimer = null;
+function _reportFocus() {
+    const on = _viewFocused();
+    if (terminalWs && terminalWs.readyState === WebSocket.OPEN && !_paneClosed) {
+        try { terminalWs.send(JSON.stringify({ type: 'terminal_focus', focused: on })); } catch { /* the socket is closing: the next one reports */ }
+    }
+    if (on && !_focusTimer) _focusTimer = setInterval(_reportFocus, FOCUS_REPORT_MS);
+    if (!on && _focusTimer) { clearInterval(_focusTimer); _focusTimer = null; }
+}
+document.addEventListener('visibilitychange', _reportFocus);
+window.addEventListener('blur', _reportFocus); // the window went inactive (another window took the keyboard): visibilitychange does not say
+window.addEventListener('focus', _reportFocus);
+/** The re-report timer is stopped with the socket it reports on (a disconnect or a dispose); the next socket's first report starts it again. */
+function _stopFocusTimer() { if (_focusTimer) { clearInterval(_focusTimer); _focusTimer = null; } }
+
 /** The terminal's focus state, and what xterm's resize tells the pane. */
 function _wireFocusAndResize(containerEl) {
     // Focus management: track terminal focus state
@@ -730,10 +754,12 @@ function _wireFocusAndResize(containerEl) {
         terminal.textarea.addEventListener('focus', () => {
             containerEl.classList.add('xterm-focused');
             setTerminalFocused(true);
+            _reportFocus();
         });
         terminal.textarea.addEventListener('blur', () => {
             containerEl.classList.remove('xterm-focused');
             setTerminalFocused(false);
+            _reportFocus();
         });
     }
 
@@ -836,6 +862,7 @@ export function connectTerminalWs(name, agentType, sessionId, server) {
         _termFailures = 0;
         _setDisconnectedBadge(false);
         setTerminalState('connected');
+        _reportFocus(); // a new socket says whether this view is focused (the old one's report went with it)
         // The server answers a connect with the replay and a hello at once: an open socket that has sent nothing after
         // SILENT_SOCKET_MS is stuck (a hub path that dropped the stream, a stalled attach), so it is closed and the
         // reconnect (with its backoff) takes over, rather than leaving the pane blank (#4518).
@@ -991,6 +1018,7 @@ export function disconnectTerminalWs() {
     _connectedServer = 'local';
     _inputQueue = [];
     _setDisconnectedBadge(false);
+    _stopFocusTimer();
     if (terminalWs) {
         terminalWs.close();
         terminalWs = null;
@@ -1003,6 +1031,7 @@ document.addEventListener('coral:signed-out', () => disconnectTerminalWs());
 export function disposeTerminal() {
     dbg('disposeTerminal', { hadTerminal: !!terminal });
     disconnectTerminalWs();
+    _stopFocusTimer(); // (disconnectTerminalWs stops it too: said here as well, since a terminal that is gone reports nothing)
     if (_selectionDisposable) {
         _selectionDisposable.dispose();
         _selectionDisposable = null;

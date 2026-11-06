@@ -296,3 +296,8 @@ func AutoAcceptSend(ctx context.Context, name string, send func(ctx context.Cont
 	inputlog.Note(name, inputlog.Keys, "[auto-accept answers an approval prompt]")
 	return send(ctx)
 }
+
+// NoteDialogClose logs, in the input debug log, that the dialog timeout is closing a prompt (its Esc or reject key follows): the gate's own annotation, as AutoAcceptSend's is.
+func NoteDialogClose(name string) {
+	inputlog.Note(name, inputlog.Keys, "[dialog timeout closes a prompt]")
+}

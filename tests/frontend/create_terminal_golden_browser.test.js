@@ -18,6 +18,7 @@ const { coralReady } = require('./helpers/wait');
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+        await Emulation.setFocusEmulationEnabled({ enabled: true }); // the focus report needs document.hasFocus(): the page counts as its browser's focused window on every machine, so the recorded frames do not depend on it
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
         await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`(async () => {

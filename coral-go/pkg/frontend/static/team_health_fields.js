@@ -18,6 +18,7 @@ const tagPatternProblem = (value) => {
     return p.length > 60 || p[0] === '-' || !/^[A-Za-z0-9._/*?[\]^-]+$/.test(p) ? `"${p.slice(0, 40)}" is not a tag pattern Coral reads (letters, digits, . _ - / and the glob characters * ? [ ]; at most 60 characters).` : '';
 };
 const [C_LO, C_HI] = HEALTH_LIMITS.checkWait;
+const [D_LO, D_HI] = HEALTH_LIMITS.dialogTimeout;
 /** The server's words for a branch name it will not read (LandingBranchValid): letters, digits and . _ - /, at most 100, not starting with - or /, no .., not ending in / or .lock; empty is the default. */
 const branchProblem = (value) => {
     const b = String(value || '').trim();
@@ -25,7 +26,7 @@ const branchProblem = (value) => {
     const bad = b.length > 100 || b[0] === '-' || b[0] === '/' || b.includes('..') || b.endsWith('/') || b.endsWith('.lock') || !/^[A-Za-z0-9._/-]+$/.test(b);
     return bad ? `"${b.slice(0, 40)}" is not a branch name Coral reads (letters, digits, . _ - /; at most 100 characters).` : '';
 };
-const RULES = ['claim_nudge', 'status_nudge', 'mention_renudge', 'held_notice', 'busy_no_task', 'post_no_task', 'upload_no_task', 'goal_size', 'ask_reminder', 'landing', 'release', 'goals_ready', 'unowned_tasks'];
+const RULES = ['claim_nudge', 'status_nudge', 'mention_renudge', 'held_notice', 'busy_no_task', 'post_no_task', 'upload_no_task', 'goal_size', 'ask_reminder', 'landing', 'release', 'goals_ready', 'unowned_tasks', 'dialog_timeout'];
 
 /** The health object as the flat values of the fields. */
 export function healthToValues(h) {
@@ -55,6 +56,7 @@ export function valuesToHealth(v, base) {
     if (h.release && v.release_on !== undefined) h.release = { ...h.release, on: !!v.release_on, branch: String(v.release_branch || '').trim(), tag_pattern: String(v.release_tag_pattern || '').trim(), wait_min: Number.isInteger(v.release_wait_min) ? v.release_wait_min : h.release.wait_min, nudge: v.release_nudge || '' };
     if (h.landing && v.landing_on !== undefined) h.landing = { ...h.landing, on: !!v.landing_on, branch: String(v.landing_branch || '').trim(), wait_min: Number.isInteger(v.landing_wait_min) ? v.landing_wait_min : h.landing.wait_min, nudge: v.landing_nudge || '' };
     for (const k of ['goals_ready', 'unowned_tasks']) if (h[k] && v[`${k}_on`] !== undefined) h[k] = { ...h[k], on: !!v[`${k}_on`], wait_min: Number.isInteger(v[`${k}_wait_min`]) ? v[`${k}_wait_min`] : h[k].wait_min, nudge: v[`${k}_nudge`] || '' };
+    if (h.dialog_timeout && v.dialog_timeout_on !== undefined) h.dialog_timeout = { ...h.dialog_timeout, on: !!v.dialog_timeout_on, after_min: Number.isInteger(v.dialog_timeout_after_min) ? v.dialog_timeout_after_min : h.dialog_timeout.after_min };
     if (h.goal_size && v.goal_size_on !== undefined) h.goal_size = { ...h.goal_size, on: !!v.goal_size_on, limit: v.goal_size_limit };
     return h;
 }
@@ -99,6 +101,10 @@ export function healthFields(ctx) {
         { key: 'held_notice_on', type: 'toggle', label: 'Tell the Operator about a held delivery', visibleWhen: () => ctx.hasHeld(),
             help: 'A message Coral could not type into an agent (its terminal is on a dialog) and has held back for a while is reported to the Operator.' },
         { ...minutes('held_notice_after_min', 'After', 'minutes held', 'held_notice_on'), visibleWhen: () => ctx.hasHeld() },
+        { key: 'health_dialogs', type: 'heading', label: 'Dialogs nobody answers', help: 'Works whether or not the health check is on.', visibleWhen: v => v.dialog_timeout_on !== undefined },
+        { key: 'dialog_timeout_on', type: 'toggle', label: 'Close a dialog nobody answered', visibleWhen: v => v.dialog_timeout_on !== undefined,
+            help: 'When an agent’s permission, plan or question dialog has waited past the limit, and nobody is at its terminal, Coral closes it the safe way (No, or Esc; never Yes) and tells the agent to ask the Operator on the board, so its other work goes on. A person typing in their own terminal window, outside Coral, is not seen as present. Off by default.' },
+        { key: 'dialog_timeout_after_min', type: 'number', label: 'After', unit: 'minutes waiting', help: '10 minutes to 1 day', min: D_LO, max: D_HI, integer: true, compact: true, disabledWhen: v => !v.dialog_timeout_on, visibleWhen: v => v.dialog_timeout_on !== undefined },
         { key: 'mention_renudge_on', type: 'toggle', label: 'Remind the orchestrator of an unanswered mention', help: 'A message that @mentions the orchestrator and has had no reply gets a reminder.' },
         minutes('mention_renudge_after_min', 'Remind the orchestrator after', 'minutes', 'mention_renudge_on'),
         { key: 'health_offbooks', type: 'heading', label: 'Work done off the books', help: 'Named to the orchestrator in the next health check, once each.' },

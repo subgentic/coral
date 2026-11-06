@@ -20,7 +20,7 @@ type Site struct {
 // typing matches a call that types text into an agent's terminal: Coral's automated senders and the gate's wrappers, and every direct
 // use of Coral's own input origin (terminalinput.Coral) or of the gate's DeliverNow, so a send that skips the named wrappers is caught
 // too (the coral-go-team's Security on #210).
-var typing = regexp.MustCompile(`\b(sendAutomated|deliverAutomated|deliverAutomatedIfWanted|sendTaskNudge|sendUnlessBlocked|deliver|DeliverNow)\(|terminalinput\.Coral\b`)
+var typing = regexp.MustCompile(`\b(sendAutomated|deliverAutomated|deliverAutomatedOutcome|deliverNoticeRetrying|deliverAutomatedIfWanted|sendTaskNudge|sendUnlessBlocked|deliver|DeliverNow)\(|terminalinput\.Coral\b`)
 
 // CheckSites scans the package in dir (its non-test Go files) for calls that type text into an agent's terminal and requires each to be
 // one of sites, with the counts given: a new call fails until its text comes from a builder in the census and it is listed here
