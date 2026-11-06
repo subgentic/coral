@@ -39,9 +39,8 @@ func (h *CloudHandler) CLIHello(w http.ResponseWriter, r *http.Request) {
 		errForbidden(w, "Cloud connector settings are only available on this computer")
 		return
 	}
-	if same, supported := h.sameUser(r); supported && !same {
-		writeError(w, http.StatusForbidden, "other_user", "Cloud connector settings are only available to the user Coral runs as")
-		return
+	if h.refusePeer(w, r, "Cloud connector settings are only available to the user Coral runs as") {
+		return // another user's: 403; not told yet: 503 "try again", which cliauth retries on a new connection (#409)
 	}
 	if !localCLI(r) {
 		errForbidden(w, "Only `coral cloud connect`, run on this computer, can do this")
@@ -79,8 +78,8 @@ func (h *CloudHandler) VerifyCLI(r *http.Request) (*http.Request, bool) {
 	if r.Header.Get(cloud.CLIAuthHeader) == "" || !localCLI(r) {
 		return r, false
 	}
-	if h.OtherUser(r) {
-		return r, false
+	if a := h.peer(r); a == peerOther || a == peerUndecided {
+		return r, false // only Coral's own user's signature is checked; one whose user isn't told yet is not
 	}
 	var body []byte
 	if r.Body != nil && r.Body != http.NoBody {
@@ -100,14 +99,15 @@ func (h *CloudHandler) VerifyCLI(r *http.Request) (*http.Request, bool) {
 
 // SameUser is the peer-user check (#3949): whether a loopback request comes from Coral's own OS
 // user, and whether the system can tell at all.
-func (h *CloudHandler) SameUser(r *http.Request) (same, supported bool) { return h.sameUser(r) }
-
-// OtherUser reports whether a loopback request comes from another OS user (where the
-// system can tell, peercred): such a caller is refused with code other_user.
-func (h *CloudHandler) OtherUser(r *http.Request) bool {
-	same, supported := h.sameUser(r)
-	return supported && !same
+// A connection whose user isn't told yet is "not the same user" here (fail closed).
+func (h *CloudHandler) SameUser(r *http.Request) (same, supported bool) {
+	a := h.peer(r)
+	return a == peerSame, a != peerUnsupported
 }
+
+// OtherUser reports whether a loopback request comes from another OS user, positively (#409): such a caller is refused with code
+// other_user. One whose user isn't told yet is not "another user" (it is asked again, or needs a credential like any unattributed one).
+func (h *CloudHandler) OtherUser(r *http.Request) bool { return h.peer(r) == peerOther }
 
 // cliSignedBodyMax matches the command-line transport's limit (an artifact upload).
 const cliSignedBodyMax = 32 << 20

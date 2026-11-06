@@ -66,6 +66,48 @@ var ErrHelloLimit = errors.New("too many command-line hellos from this computer 
 
 // ErrServerBusy is the command line's side of ErrHelloLimit: the server refused the hello
 // for its rate, so nothing was sent; it is not a sign of another program on the port.
+// PeerUndecidedCode is the code of a hello answered 503 "try again" (#409): the server could not tell yet which OS user the connection is (the
+// socket table can lag a connection). The server closes that connection, so the hello sent again comes on a new one, attributed afresh.
+const PeerUndecidedCode = "peer_unattributed"
+
+// helloRetries is how many times a hello answered PeerUndecidedCode is sent again, helloRetryWait apart (variables: a test shortens the wait).
+var (
+	helloRetries   = 3
+	helloRetryWait = 300 * time.Millisecond
+)
+
+// PeerUndecidedError is a hello still answered "try again" after the retries. Its words are fixed, never the answer's: until the hello is
+// proved, the answer may come from any program on the port (where the Coral proof is off), and its text is not printed to the terminal.
+type PeerUndecidedError struct{}
+
+func (PeerUndecidedError) Error() string {
+	return "Coral could not tell yet which user this command runs as (the system had not caught up with the connection); try again in a moment"
+}
+
+// helloUndecided reports whether resp (its body already read into body) is the server's "try again: whose connection this is can't be told
+// yet" (503 with PeerUndecidedCode).
+func helloUndecided(resp *http.Response, body []byte) bool {
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		return false
+	}
+	var e struct {
+		Code string `json:"code"`
+	}
+	return json.Unmarshal(body, &e) == nil && e.Code == PeerUndecidedCode
+}
+
+// waitHelloRetry waits helloRetryWait, or until ctx ends (false).
+func waitHelloRetry(ctx context.Context) bool {
+	t := time.NewTimer(helloRetryWait)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-t.C:
+		return true
+	}
+}
+
 var ErrServerBusy = errors.New("Coral refused the command line's hello for now (too many hellos from this computer, possibly another program); try again in a few seconds")
 
 func cliMAC(token, label string, parts ...[]byte) []byte {
@@ -278,27 +320,38 @@ func (c CLIClient) Do(ctx context.Context, method, path string, body []byte, hea
 		return nil, err
 	}
 	hb, _ := json.Marshal(map[string]string{"nonce": b64.EncodeToString(cn)})
-	hreq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.Base+CLIHelloPath, bytes.NewReader(hb))
-	if err != nil {
-		return nil, err
-	}
-	hreq.Header.Set("Content-Type", "application/json")
-	// The same client sends both requests, so the second one normally reuses the
-	// connection the proof came back on.
-	hresp, err := client.Do(hreq)
-	if err != nil {
-		if isRefused(err) {
-			return nil, notCoral{err} // the program on the port did not prove it is Coral (#6103): nothing was sent
+	var hresp *http.Response
+	var hbody []byte
+	for attempt := 0; ; attempt++ {
+		hreq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.Base+CLIHelloPath, bytes.NewReader(hb))
+		if err != nil {
+			return nil, err
 		}
-		return nil, err // nothing answered
+		hreq.Header.Set("Content-Type", "application/json")
+		// The same client sends both requests, so the second one normally reuses the
+		// connection the proof came back on.
+		hresp, err = client.Do(hreq)
+		if err != nil {
+			if isRefused(err) {
+				return nil, notCoral{err} // the program on the port did not prove it is Coral (#6103): nothing was sent
+			}
+			return nil, err // nothing answered
+		}
+		hbody, _ = io.ReadAll(io.LimitReader(hresp.Body, 4096))
+		io.Copy(io.Discard, io.LimitReader(hresp.Body, 4096)) // to the end, so the second request reuses the proved connection
+		hresp.Body.Close()
+		if !helloUndecided(hresp, hbody) {
+			break
+		}
+		if attempt >= helloRetries || !waitHelloRetry(ctx) {
+			return nil, PeerUndecidedError{} // still not told (#409)
+		}
 	}
 	var hello struct {
 		Nonce string `json:"nonce"`
 		Proof string `json:"proof"`
 	}
-	_ = json.NewDecoder(io.LimitReader(hresp.Body, 4096)).Decode(&hello)
-	io.Copy(io.Discard, io.LimitReader(hresp.Body, 4096)) // to the end, so the second request reuses the proved connection
-	hresp.Body.Close()
+	_ = json.Unmarshal(hbody, &hello)
 	if hresp.Header.Get(httputil.ActionLimitHeader) != "" {
 		return nil, ErrServerBusy
 	}
