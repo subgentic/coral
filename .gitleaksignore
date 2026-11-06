@@ -347,3 +347,4 @@ fe65aa06ddb791c936669cd5695a44be670ec666:coral-go/internal/agent/summary_redact_
 d024f94132f33d22320ab6da094a94e85d4b010a:coral-go/internal/agent/first_user_message_test.go:aws-access-token:118
 d024f94132f33d22320ab6da094a94e85d4b010a:coral-go/internal/agent/summary_redact_test.go:aws-access-token:18
 d024f94132f33d22320ab6da094a94e85d4b010a:coral-go/internal/server/routes/agent_history_excerpt_redact_test.go:aws-access-token:14
+f1918eaa64f6fb1d4809c1af5c794b77007b439e:coral-go/internal/machinelaunch/diag_test.go:private-key:25
