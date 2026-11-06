@@ -44,6 +44,7 @@ GET /api/board/remotes/proxy/{remoteServer}/{project}/subscribers | board-unchec
 GET /api/board/tasks | board-unchecked | operator-only
 GET /api/board/{project} | board-claims
 GET /api/board/{project}/artifacts | board-claims +token-session
+GET /api/board/{project}/artifacts/{digest}/edit | board-claims | operator-only
 GET /api/board/{project}/cross-team-candidates | board-claims +token-session | operator-only
 GET /api/board/{project}/cross-team-links | board-claims +token-session | operator-only
 GET /api/board/{project}/cross-team-state | board-claims +token-session | operator-only
@@ -162,6 +163,7 @@ POST /api/artifacts/{id}/comments/{cid}/send | token-session | operator-only
 POST /api/board/remotes | board-unchecked | operator-only
 POST /api/board/{project}/agents/{subscriber}/sleep | board-claims +token-session
 POST /api/board/{project}/agents/{subscriber}/wake | board-claims +token-session
+POST /api/board/{project}/artifacts/{digest}/edit | board-claims | operator-only
 POST /api/board/{project}/artifacts/{id}/review | board-claims | operator-only
 POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim | board-claims | operator-only
 POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle | board-claims | operator-only

@@ -19,6 +19,7 @@ GET /api/board/remotes/proxy/{remoteServer}/{project}/subscribers | (*BoardRemot
 GET /api/board/tasks | (*BoardHandler).ListAllTasks-fm
 GET /api/board/{project} | (*BoardHandler).GetBoardInfo-fm
 GET /api/board/{project}/artifacts | (*BoardHandler).ListTeamArtifacts-fm
+GET /api/board/{project}/artifacts/{digest}/edit | (*BoardHandler).GetArtifactEdit-fm
 GET /api/board/{project}/cross-team-candidates | (*BoardHandler).GetCrossTeamCandidates-fm
 GET /api/board/{project}/cross-team-links | (*BoardHandler).ListLocalLinks-fm
 GET /api/board/{project}/cross-team-state | (*BoardHandler).GetCrossTeamState-fm
@@ -71,6 +72,7 @@ PATCH /api/board/{project}/tasks/{taskID}/amend | (*BoardHandler).AmendTask-fm
 POST /api/board/remotes | (*BoardRemotesHandler).AddSubscription-fm
 POST /api/board/{project}/agents/{subscriber}/sleep | (*SessionsHandler).OrchestratorSleep-fm
 POST /api/board/{project}/agents/{subscriber}/wake | (*SessionsHandler).OrchestratorWake-fm
+POST /api/board/{project}/artifacts/{digest}/edit | (*BoardHandler).SaveArtifactEdit-fm
 POST /api/board/{project}/artifacts/{id}/review | (*BoardHandler).ReviewArtifact-fm
 POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim | (*BoardHandler).ClaimAskButton-fm
 POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle | (*BoardHandler).SettleAskButton-fm

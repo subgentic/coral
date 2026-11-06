@@ -146,6 +146,8 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"POST /api/board/{project}/asks/{messageID}/close":                     "owner-only", // Ignore and Undo in the owner's Needs you table on the Hub (#13446)
 		"POST /api/sessions/live/{name}/dismiss-wait":                          "owner-only",
 		"POST /api/sessions/live/{name}/auto-sleep":                            "owner-only", // an agent's auto-sleep switch (#12111)
+		"GET /api/board/{project}/artifacts/{digest}/edit":                     "owner-only",
+		"POST /api/board/{project}/artifacts/{digest}/edit":                    "owner-only",
 		"POST /api/board/{project}/operator-artifacts":                         "owner-only",
 		"POST /api/board/{project}/operator-artifacts/message":                 "owner-only",
 		"POST /api/board/{project}/messages":                                   "owner-sees", "POST /api/board/{project}/subscribe": "owner-sees", "POST /api/board/{project}/tasks": "owner-sees", "POST /api/board/{project}/goals": "owner-sees", // they can start a new board (#11627)

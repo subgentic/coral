@@ -153,6 +153,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/board/") && (strings.HasSuffix(p, "/operator-artifacts") || strings.HasSuffix(p, "/operator-artifacts/message")) {
 				continue
 			}
+			// The Markdown editor's capability read and save (#13757) are the owner's alone through the hub: the old list never had them.
+			if strings.HasPrefix(p, "/api/board/") && strings.Contains(p, "/artifacts/") && strings.HasSuffix(p, "/edit") {
+				continue
+			}
 			// Pausing and resuming Coral's notices to an agent (#11387) are the owner's alone: the old list never had them.
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/sessions/live/") && (strings.HasSuffix(p, "/notices/pause") || strings.HasSuffix(p, "/notices/resume")) {
 				continue

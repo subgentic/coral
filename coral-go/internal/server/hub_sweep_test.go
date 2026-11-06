@@ -147,6 +147,7 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		"/api/activity":      true, // the record of what the Operator did in Needs you, read only, the owner's alone (#12070)
 		"/api/chief":         true, // which agent the Operator recorded as Chief is the owner's alone through the hub (#11470)
 		"/api/board/{project}/orchestrator-grant": true, "/api/board/{project}/lifecycle-log": true, "/api/board/{project}/guide-roster": true, "/api/artifacts/{id}/private": true, // the grant to a board's orchestrator and its log are the owner's alone (#11432)
+		"/api/board/{project}/artifacts/{digest}/edit": true, // what the Markdown editor may do with a file is the owner's alone (#13757)
 		"/api/custom-models": true} // the custom models are the owner's alone through the hub (#5996)
 
 	golden, err := os.ReadFile("testdata/cloud_routes.golden")
@@ -154,7 +155,7 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 	homes := homeForms(r.dir) // as given, resolved, and JSON-escaped (#3914)
 	repl := strings.NewReplacer("{name}", name, "{sessionID}", sid, "{project}", "team", "{boardName}", "team",
 		"{taskID}", strconv.FormatInt(task.ID, 10), "{goalID}", strconv.FormatInt(goal.ID, 10), "{runID}", "1", "{jobID}", "1", "{workflowID}", "1", "{groupID}", "g", "{id}", "1",
-		"{category}", "x", "{agentName}", "x", "{subagentID}", "x", "{folderName}", "x", "{name}", name)
+		"{digest}", artifactHex, "{category}", "x", "{agentName}", "x", "{subagentID}", "x", "{folderName}", "x", "{name}", name)
 	var leaks, tried []string
 	answered := 0
 	for _, line := range strings.Split(string(golden), "\n") {
@@ -218,7 +219,9 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		savedAbsent := f[1] == "/api/saved/{id}/message" && rec.Code == 404 && strings.Contains(rec.Body.String(), "no such saved message")
 		// The owner's version list and series reads (#11354) name an artifact in a series; the rig's is in none, so the owner's answer is the route's own 404 (the plain hub caller was refused above).
 		versionsAbsent := ownerOnly[f[1]] && (strings.HasSuffix(f[1], "/versions") || strings.HasPrefix(f[1], "/api/artifacts/series/")) && (rec.Code == 404 || rec.Code == 400)
-		if rec.Code == 200 || versionsAbsent || resolveAnswered || updateOff || savedAbsent || (strings.HasPrefix(f[1], "/api/templates/") && rec.Code == 404 && strings.Contains(rec.Body.String(), "template_not_found")) {
+		// The editor's capability read (#13757) names a file of the board; the rig's artifact is on no team, so the owner's answer is the route's own 404 (the plain hub caller was refused above).
+		editAbsent := ownerOnly[f[1]] && strings.HasSuffix(f[1], "/edit") && rec.Code == 404
+		if rec.Code == 200 || versionsAbsent || editAbsent || resolveAnswered || updateOff || savedAbsent || (strings.HasPrefix(f[1], "/api/templates/") && rec.Code == 404 && strings.Contains(rec.Body.String(), "template_not_found")) {
 			answered++
 		}
 		for _, home := range homes {

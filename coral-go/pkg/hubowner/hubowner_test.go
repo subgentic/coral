@@ -188,7 +188,7 @@ func TestAllowedIsTheListedDecisionsAndNothingElse(t *testing.T) {
 			t.Errorf("%v allowed", bad)
 		}
 	}
-	if n := len(Routes()); n != 56 {
+	if n := len(Routes()); n != 57 {
 		t.Errorf("the allowlist has %d routes: a new one needs a reason and a review (Security's tiers, #13694)", n)
 	}
 	first := 0
@@ -216,6 +216,9 @@ func TestARouteIsStampedOnlyForARemoteThatListsIt(t *testing.T) {
 		{"POST", "/api/board/t/tasks/7/complete", 0, false, true},
 		{"DELETE", "/api/artifacts/abc", 1, false, true},
 		{"DELETE", "/api/artifacts/abc", 2, true, true},
+		{"POST", "/api/board/t/artifacts/abc/edit", 2, false, true}, // the editor's save (#13757) is generation 3: an older remote gets it unstamped
+		{"POST", "/api/board/t/artifacts/abc/edit", 3, true, true},
+		{"GET", "/api/board/t/artifacts/abc/edit", 3, false, false},
 		{"POST", "/api/board/t/asks/9/buttons/b/settle", 2, true, true},
 		{"POST", "/api/sessions/live/x/send", 1, true, true},
 		{"POST", "/api/skills/3/approve", 2, false, false},
@@ -229,7 +232,7 @@ func TestARouteIsStampedOnlyForARemoteThatListsIt(t *testing.T) {
 			t.Errorf("MustBeSigned(%s %s) = %v, want %v", c.m, c.p, got, c.must)
 		}
 	}
-	if RoutesVersion != 2 {
+	if RoutesVersion != 3 {
 		t.Errorf("RoutesVersion = %d: it moves with a widening, and the remote's health answer reports it", RoutesVersion)
 	}
 }
