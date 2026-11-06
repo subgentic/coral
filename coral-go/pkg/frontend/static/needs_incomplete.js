@@ -18,6 +18,6 @@ export const readGaps = () => [...gaps.values()];
 export function incompleteNote() {
     const all = readGaps();
     if (!all.length) return '';
-    const parts = all.map(g => `${KIND_WORDS[g.kind] || g.kind}${g.source === 'local' ? '' : ` from ${String(g.source).replace(/[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩]/g, '')}`}`);
+    const parts = all.map(g => `${KIND_WORDS[g.kind] || g.kind}${g.source === 'local' ? '' : ` from ${String(g.source).replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, '')}`}`);
     return `Not everything is shown: ${[...new Set(parts)].join(', ')} could not be read.`;
 }
