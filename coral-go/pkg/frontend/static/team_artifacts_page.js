@@ -139,9 +139,10 @@ export function createArtifactsList({ inbox = false } = {}) {
 
     // A bulk delete says how many of the selected files other teams hold too (#13949): artifact_held.js keeps the answers for one confirmation and drops a late one; the confirmation's words are updated in place when an answer arrives.
     let heldRows = [];
-    const held = heldChecker({ read: heldByTeams, changed: () => { const el = root?.querySelector('.dt-bar-confirm'); if (el && /^Delete \d+ artifacts\?/.test(el.textContent)) el.textContent = bulkDeleteWords(heldRows.length, heldRows); } });
-    const heldWords = rows => { heldRows = rows; return held.words(rows.map(managedHex).filter(Boolean)); };
-    const wireHeld = () => { if (root && !root.dataset.heldWired) { root.dataset.heldWired = '1'; root.addEventListener('click', e => { if (e.target.closest?.('.dt-bar button')) held.end(); }, true); } }; // any press in the selection bar ends the confirmation that was drawn (Keep, Delete, Cancel, a new action)
+    let selectionBar = null; // the table's own selection bar: on the team page it sits inside the page, in the Inbox it is mounted on the folder toolbar, outside it, so it is found through its own node
+    const heldFiles = heldChecker({ read: heldByTeams, changed: () => { const el = selectionBar?.querySelector('.dt-bar-confirm'); if (el && /^Delete \d+ artifacts\?/.test(el.textContent)) el.textContent = bulkDeleteWords(heldRows.length, heldRows); } });
+    const heldWords = rows => { heldRows = rows; return heldFiles.words(rows.map(managedHex).filter(Boolean)); };
+    const wireHeld = node => { if (node && !node.dataset.heldWired) { node.dataset.heldWired = '1'; node.addEventListener('click', e => { if (e.target.closest?.('button')) heldFiles.end(); }, true); } }; // any press in the selection bar ends the confirmation that was drawn (Keep, Delete, Cancel, a new action)
     const bulkDeleteWords = (n, rows) => `Delete ${n} artifacts?${heldWords(rows)} Their links will become unavailable. This cannot be undone.`;
 
     async function deleteArtifact(hex, name, size) {
@@ -454,6 +455,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                 footer: { auto: !model.truncated && !model.error, text: `Showing ${model.items.length} of ${model.counts?.matched ?? model.items.length}${model.truncated ? '+' : ''}`,
                     more: model.hasMore ? { label: 'Load more', busy: !!model.controller, run: () => { if (!model.loadingMore) loadArtifacts({ append: true }); } } : null },
             });
+            if (selectionBar !== table.bar) { heldFiles.end(); selectionBar = table.bar; wireHeld(table.bar); } // a new table is a new selection bar: the confirmation of the old one is over
             // This table never folds: optional columns disappear as its container narrows.
             if (phoneTeam) { const bleed = document.createElement('div'); bleed.className = 'goals-bleed'; bleed.append(table.el); body.append(bleed); } else body.append(table.el); Toolbar.mountSelection(toolbarRow, artifactState.selected.size ? table.bar : null);
             if (!model.scope && !phoneTeam && matchMedia('(max-width: 760px)').matches) toolbarRow?.append(table.selectButton); // a team's list on a phone selects by long press, with no Select button
@@ -602,6 +604,7 @@ export function createArtifactsList({ inbox = false } = {}) {
     function initModel(project, scope, key) {
         clearPendingBoard(); retryLabels = false;
         artifactState = DT.tableState();
+        heldFiles.end(); // a new model or context: no answer asked for the old one counts here (#13949)
         forgetChoices();
         model.controller?.abort();
         Object.assign(model, { project, scope, key, loaded: false, waiting: false, partial: null, versionless: [], items: [], hasMore: false, cursor: '', counts: null, tagCounts: {}, truncated: false, loading: false, error: '', loadingMore: false, filters: scope && scope.standalone ? { ...F.EMPTY } : F.load(scope ? `${project}::agent::${scope.session}` : project), kept: new Set() });
@@ -638,7 +641,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             host.replaceChildren(page);
             if (!external) bar = null;
         }
-        root = host.firstChild; wireHeld();
+        root = host.firstChild;
         if (scope && !scope.standalone && project && !external && !inbox) { // an agent with a team: files can be dropped on its list to share them with it (#11376)
             importOnce('./operator_share.js').then(m => m.mountOperatorShare(root, { project, session: scope.session, server: scope.server, name: scope.name, reload: () => loadArtifacts({ keep: true }) })).catch(() => {});
         } else if (root._share) importOnce('./operator_share.js').then(m => m.unmountOperatorShare(root)).catch(() => {}); // an agent with no team: nothing to share with
