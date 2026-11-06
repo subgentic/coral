@@ -358,3 +358,73 @@ func TestAnEmptyDiffAndAnOversizedVersionAreSentAsTheNoteWithBothLinks(t *testin
 	assert.Equal(t, true, out["limited"], "an object over the editor's size is not read into a diff")
 	assert.Contains(t, rig2.operatorMessages()[0].Content, "coral://artifacts/"+editV1)
 }
+
+// QA Reviewer 2's pins on #13802 (test-only).
+
+// The store erases a deleted comment's text, so a deleted root can never carry the marker through its API. Put the marker back by a row edit the store never makes: the deleted flag alone must keep the
+// root from being the thread.
+func TestADeletedRootThatStillCarriesTheMarkerIsNotTheThread(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	rig.edited()
+	code, out := rig.editSend(editAsPage, "Dev")
+	require.Equal(t, 200, code, out)
+	oldRoot := int64(out["thread_id"].(float64))
+	code, rep := rig.do("POST", cp(editV2), cmtAsOwner, map[string]any{"body": "a reply, so the deleted root stays", "parent_id": oldRoot, "board": "team-a"})
+	require.Equal(t, http.StatusCreated, code, rep)
+	code, _ = rig.do("DELETE", fmt.Sprintf("%s/%d", cp(editV2), oldRoot), cmtAsOwner, nil)
+	require.Equal(t, 200, code)
+	_, err := rig.h.db.Exec("UPDATE artifact_comments SET body = ? WHERE id = ?", fmt.Sprintf(editSendThreadTag, 2), oldRoot)
+	require.NoError(t, err)
+	rig.agent(2, "QA", false)
+	code, out = rig.editSend(editAsPage, "QA")
+	require.Equal(t, 200, code, out)
+	assert.NotEqual(t, float64(oldRoot), out["thread_id"], "a deleted root with the marker's words is still not the thread")
+}
+
+// The POST is a person's alone: a request that is the owner's page but carries an agent's session token is not a person (humanInputCaller), and nothing is made or sent.
+func TestARequestFromThePageCarryingAnAgentTokenIsNotAPersonAndSendsNothing(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	rig.edited()
+	hdr := map[string]string{testDashboardHeader: "1", "Sec-Fetch-Site": "same-origin", "X-Coral-Session-Token": "any-token"}
+	code, out := rig.editSend(hdr, "Dev")
+	assert.Equal(t, http.StatusForbidden, code, out)
+	assert.Empty(t, rig.operatorMessages())
+	cs, _ := rig.ss.ListArtifactComments(context.Background(), editV2, "", []string{"team-a"})
+	assert.Empty(t, cs, "no thread was made")
+}
+
+// An edit whose lines are all the same (only line endings or the last newline differ) has no hunks: it goes as the note with both links, and never as an empty diff.
+func TestEditsThatChangeNoLineAreTheNoteNotAnEmptyDiff(t *testing.T) {
+	for name, c := range map[string][2]string{"crlf": {"a\r\nb\r\n", "a\nb\n"}, "last newline": {"a\nb", "a\nb\n"}} {
+		t.Run(name, func(t *testing.T) {
+			rig := newCmtRig(t)
+			rig.agent(1, "Dev", false)
+			rig.editSeries(c[0], c[1], sourceOperatorEdit)
+			code, out := rig.editSend(editAsPage, "Dev")
+			require.Equal(t, 200, code, out)
+			assert.Equal(t, true, out["limited"])
+			m := rig.operatorMessages()[0].Content
+			assert.NotContains(t, m, "@@")
+			assert.Contains(t, m, "coral://artifacts/"+editV1)
+		})
+	}
+	h, ok := unifiedHunks("a\r\nb\r\n", "a\nb\n")
+	assert.True(t, ok)
+	assert.Equal(t, "", h)
+}
+
+// The diff step alone, so the empty-diff branch is pinned where it lives and not only by the message builder behind it: no hunks is "limited" (the note), never an empty diff passed on as a good one.
+func TestTheDiffStepCallsAnEditWithNoChangedLineLimited(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.editSeries("a\r\nb\r\n", "a\nb\n", sourceOperatorEdit)
+	text, limited, down := rig.h.editSendDiff(editSendTarget{prev: editV1, digest: editV2})
+	assert.Equal(t, "", text)
+	assert.True(t, limited, "nothing to show as lines is limited")
+	assert.False(t, down)
+	rig.editSeries("one\ntwo\n", "one\n2\n", sourceOperatorEdit)
+	text, limited, _ = rig.h.editSendDiff(editSendTarget{prev: editV1, digest: editV2})
+	assert.False(t, limited)
+	assert.Contains(t, text, "+2")
+}
