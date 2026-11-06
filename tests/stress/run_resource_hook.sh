@@ -96,7 +96,8 @@ wait_until 20 "Ann's call to claim the slot" holder_is Ann && pass "Ann's matchi
 send "$bob_name" "$bob_sid" "MOCK_BASH wait sleep 7"
 wait_until 20 "Bob's command to be held" captured "$bob_name" "$bob_sid" "bash REFUSED" && pass "Bob's matching command was held, not run" || true
 msg=$(capture "$bob_name" "$bob_sid" | tr '\n' ' ')
-[[ "$msg" == *"number 1 in line"* && "$msg" == *"resource claim mac-heavy --wait"* ]] && pass "the message names his place and how to wait" || fail "the held message: ${msg:0:300}"
+flat=${msg// /} # the terminal wraps a long message at its width, in the middle of "mac-heavy" too: compare without spaces
+[[ "$flat" == *"number1inline"* && "$flat" == *"resourceclaimmac-heavy--wait"* ]] && pass "the message names his place and how to wait" || fail "the held message: ${msg:0:300}"
 [[ "$(in_line)" == *Bob* ]] && pass "Bob is in line" || fail "Bob is not in line: $(in_line)"
 note=$(operator resource status mac-heavy --json | python3 -c 'import sys,json; d=json.load(sys.stdin); print(" ".join(e.get("note","") for e in d["queue"]+d["holders"]))')
 [[ "$note" == *"auto: sleep 7"* && "$note" != *"MOCK_BASH"* ]] && pass "the queue shows the pattern ($note), not the command" || fail "queue notes: $note"
