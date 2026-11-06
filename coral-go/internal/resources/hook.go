@@ -54,6 +54,7 @@ type autoHold struct {
 	refused map[string]bool // tool_use ids of the matched calls this hook held: a CLI that ran one anyway says so at its end (#13647)
 	granted time.Time       // first seen holding the slot
 	window  time.Time       // before this a slot with no call yet is kept for its agent
+	remote  bool            // the call is a coral-board heavy run: its work is on another machine, so no local process shows it and its own client renews the lease and stops it when the slot is lost (#13751)
 }
 
 // handBind is what a hand claim (coral-board resource claim, run by an agent) is tied to: the tool call it was made in and, for a job that outlives the call (Claude's run_in_background, Codex's background terminal), the work
@@ -266,6 +267,9 @@ type procEntry struct {
 
 const procTTL = 3 * time.Second
 
+// remoteCap is the longest a heavy-run hold is kept: above the wrapper's own 2 h cap on a run.
+const remoteCap = 150 * time.Minute
+
 // Active reports whether any resource has a match: with none the hook has nothing to do, and a caller skips every lookup before it.
 func (h *Hook) Active() bool {
 	if h == nil || h.m == nil {
@@ -422,6 +426,7 @@ func (h *Hook) attachHeavyRun(session, agent, toolUseID string) {
 		if e, holding := entryOf(st, agent); e != nil && holding {
 			ah.calls[toolUseID] = true
 			ah.session = session
+			ah.remote = true
 			ah.window = time.Time{}
 			_, _ = h.m.Queue().Renew(k.resource, k.agent)
 		}
@@ -610,11 +615,15 @@ func (h *Hook) sweepLocked(snap map[string][]string) {
 		if lease <= 0 {
 			lease = resourcequeue.DefaultLease
 		}
-		if now.Sub(ah.granted) > 2*lease {
+		capAt := 2 * lease
+		if ah.remote && capAt < remoteCap {
+			capAt = remoteCap // a run on another machine may last as long as the wrapper allows (2 h), whatever the lease
+		}
+		if now.Sub(ah.granted) > capAt {
 			h.releaseLocked(k, ah, "cap")
 			continue
 		}
-		openCall := len(ah.calls) > 0 && now.Sub(ah.granted) <= lease // a call that never reported its end holds the claim for the first lease only: a renewal never passes it without the work still running (#13743)
+		openCall := len(ah.calls) > 0 && (ah.remote || now.Sub(ah.granted) <= lease) // a call that never reported its end holds the claim for the first lease only: a renewal never passes it without the work still running (#13743)
 		if openCall || h.startedWorkRuns(ah, st.Resource, snap) {
 			_, _ = h.m.Queue().Renew(k.resource, k.agent)
 			continue

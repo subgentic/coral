@@ -106,3 +106,67 @@ func TestAWaitingPoolEntryLaterGrantedTheMiniIsRedirectedWhenItRetries(t *testin
 }
 
 var _ = context.Background
+
+// QA Reviewer 2's pins on #13751.
+
+// The mini is told by its machine as well as by its member's name: a member called something else whose machine is Mini is still the mini.
+func TestAMemberNamedOtherwiseWhoseMachineIsMiniIsStillRedirected(t *testing.T) {
+	g := newHookRig(t)
+	q := g.m.Queue()
+	require.NoError(t, q.Remove("mac-heavy"))
+	require.NoError(t, q.Define(resourcequeue.Resource{Key: "studio", Slots: 1, Machine: "Mac", MaxLease: 30 * time.Minute}))
+	require.NoError(t, q.Define(resourcequeue.Resource{Key: "box2", Slots: 1, Machine: "Mini", MaxLease: 30 * time.Minute})) // named otherwise, machine Mini
+	require.NoError(t, q.Define(resourcequeue.Resource{Key: "heavy", Members: []string{"studio", "box2"}, Match: []string{"go test ./..."}}))
+	require.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy), "the first member is a Mac: it runs")
+	msg := g.h.Before(t.Context(), "s-b", "s-b", "call-2", heavy)
+	assert.Contains(t, msg, "coral-board heavy run --", "granted box2 whose machine is Mini: not run here")
+	assert.Contains(t, msg, "Mini")
+	// and the reverse: a member named mini whose machine says Mac is the mini by its name (the CLI's rule is the same)
+	g2 := newHookRig(t)
+	q2 := g2.m.Queue()
+	require.NoError(t, q2.Remove("mac-heavy"))
+	require.NoError(t, q2.Define(resourcequeue.Resource{Key: "one", Slots: 1, Machine: "Mac", MaxLease: 30 * time.Minute}))
+	require.NoError(t, q2.Define(resourcequeue.Resource{Key: "mini", Slots: 1, Machine: "Mac", MaxLease: 30 * time.Minute}))
+	require.NoError(t, q2.Define(resourcequeue.Resource{Key: "heavy", Members: []string{"one", "mini"}, Match: []string{"go test ./..."}}))
+	require.Equal(t, "", g2.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy))
+	assert.Contains(t, g2.h.Before(t.Context(), "s-b", "s-b", "call-2", heavy), "coral-board heavy run --")
+}
+
+// Once the follow-up heavy run has started, the sweep never frees the slot, however far the clock goes past the claim window, while the call is running; and each sweep keeps the lease renewed.
+func TestTheSweepNeverFreesAFollowUpsSlotWhileItsCallRunsHoweverLongAfterTheWindow(t *testing.T) {
+	g := poolRig(t)
+	require.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy))
+	require.Contains(t, g.h.Before(t.Context(), "s-b", "s-b", "call-2", heavy), "heavy run")
+	require.Equal(t, "", g.h.Before(t.Context(), "s-b", "s-b", "call-4", "coral-board heavy run -- go test ./..."))
+	for i := 0; i < 12; i++ { // an hour in five-minute steps: far past the two-minute window and past the mini's ten-minute lease
+		g.add(5 * time.Minute)
+		g.h.Sweep()
+		require.Contains(t, holdersOf(g, "heavy"), "Agent B@mini", "step %d: the follow-up is running: the slot is its own", i)
+	}
+	st, _ := g.m.Queue().Status("heavy")
+	for _, e := range st.Holders {
+		if e.Agent == "Agent B" {
+			assert.True(t, e.Lease.After(g.clock()), "the sweep kept the lease renewed")
+		}
+	}
+	g.h.After("s-b", "call-4")
+	assert.NotContains(t, holdersOf(g, "heavy"), "Agent B@mini", "and the call's end frees it")
+}
+
+// A heavy run may last as long as the wrapper allows (2 h), so its hold is kept that long whatever the lease, and not for ever when the call never ends.
+func TestAHeavyRunHoldIsKeptUpToTheWrappersCapAndNotBeyondIt(t *testing.T) {
+	g := poolRig(t)
+	require.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy))
+	require.Contains(t, g.h.Before(t.Context(), "s-b", "s-b", "call-2", heavy), "heavy run")
+	require.Equal(t, "", g.h.Before(t.Context(), "s-b", "s-b", "call-4", "coral-board heavy run -- go test ./..."))
+	for i := 0; i < 24; i++ { // two hours
+		g.add(5 * time.Minute)
+		g.h.Sweep()
+	}
+	assert.Contains(t, holdersOf(g, "heavy"), "Agent B@mini", "two hours in: still the run's (the wrapper's own cap is two hours)")
+	for i := 0; i < 8; i++ { // three hours
+		g.add(5 * time.Minute)
+		g.h.Sweep()
+	}
+	assert.NotContains(t, holdersOf(g, "heavy"), "Agent B@mini", "a call that never ends is not kept for ever")
+}
