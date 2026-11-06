@@ -552,6 +552,25 @@ CREATE TABLE IF NOT EXISTS artifact_stars (
     starred_at TEXT NOT NULL
 );
 
+-- The newest version of a series the Operator has opened (#13910, the row's "New version v3"): one row per person, team (board id) and series, only ever raised. The person is the owner's constant key on a
+-- personal computer, and the verified Hub user on a team's computer. It follows a series when the series is deleted.
+-- The stars of any person other than the machine's owner key (#13910): on an organisation's computer each Hub user pins their own. The owner key's stars stay in artifact_stars above, so an upgrade loses none.
+CREATE TABLE IF NOT EXISTS artifact_person_stars (
+    person     TEXT NOT NULL,
+    hex        TEXT NOT NULL,
+    starred_at TEXT NOT NULL,
+    PRIMARY KEY (person, hex)
+);
+
+CREATE TABLE IF NOT EXISTS artifact_series_opened (
+    person    TEXT NOT NULL,
+    board_id  TEXT NOT NULL,
+    series_id TEXT NOT NULL,
+    version   INTEGER NOT NULL,
+    opened_at TEXT NOT NULL,
+    PRIMARY KEY (person, board_id, series_id)
+);
+
 CREATE TABLE IF NOT EXISTS custom_views (
 	id         INTEGER PRIMARY KEY AUTOINCREMENT,
 	name       TEXT NOT NULL,

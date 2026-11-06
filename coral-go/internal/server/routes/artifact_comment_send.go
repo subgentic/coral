@@ -315,7 +315,7 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 	case author == "":
 		author = "someone"
 	}
-	version := h.sendVersionLine(id)
+	version := h.sendVersionLine(id, t.Board)
 	var mentionNames []string // the board's names: DefuseMentions also breaks "Name:" forms for them
 
 	subs, err := h.bs.ListSubscribers(r.Context(), t.Board)
@@ -406,9 +406,9 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 }
 
 // sendVersionLine names the exact bytes the comment is on: the digest link, and where it stands in its series when it is in one.
-func (h *SessionsHandler) sendVersionLine(id string) string {
+func (h *SessionsHandler) sendVersionLine(id, board string) string {
 	link := "coral://artifacts/" + id
-	sid, n, in := digestSeries(h.cfg.CoralDir(), id)
+	sid, n, in := digestSeriesOnBoard(h.cfg.CoralDir(), id, board) // the team the message goes to: its own series of the bytes (#13949)
 	if !in {
 		return link
 	}

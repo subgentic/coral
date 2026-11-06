@@ -204,7 +204,7 @@ func TestOnlyAnOperatorEditWithAPredecessorCanBeSentAndOnlyOnItsOwnTeam(t *testi
 	code, out = rig.do("POST", editSendPath(editV1), editAsPage, map[string]any{"agents": []string{"Dev"}})
 	assert.Equal(t, http.StatusConflict, code, "the first version has no predecessor: %v", out)
 	code, _ = rig.do("POST", "/api/board/team-b/artifacts/"+editV2+"/edit/send", editAsPage, map[string]any{"agents": []string{"Dev"}})
-	assert.Equal(t, http.StatusNotFound, code, "another team's file looks like no file")
+	assert.Equal(t, http.StatusConflict, code, "another team's file answers as an artifact in no series: no 404 that tells a series exists (#13942)")
 	code, _ = rig.do("POST", editSendPath(strings.Repeat("9", 64)), editAsPage, map[string]any{"agents": []string{"Dev"}})
 	assert.Equal(t, http.StatusConflict, code, "an artifact in no series is no edit")
 	assert.Empty(t, rig.operatorMessages())

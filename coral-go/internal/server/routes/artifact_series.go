@@ -374,7 +374,7 @@ func planNewVersion(coralDir, ref, callerBoard, newDigest string) (*seriesPlan, 
 		if p.base.session == "" {
 			return nil, errSeriesNotYours
 		}
-		if sid, _, in := digestSeries(coralDir, digest); in {
+		if sid, _, in := digestSeriesOnBoard(coralDir, digest, callerBoard); in { // the caller's own team's series of the bytes, never another team's (#13942)
 			p.id = sid
 			unlockCreate() // it is in a series already: the series lock serialises from here, as for a series link
 			unlockCreate = nil
@@ -417,7 +417,7 @@ func planNewVersion(coralDir, ref, callerBoard, newDigest string) (*seriesPlan, 
 		return fail(&seriesRefusal{http.StatusOK, "same_as_latest", "these bytes are the artifact it is a version of: nothing to add"})
 	}
 	// Bytes already in ANOTHER series are refused, in words that name nothing of it.
-	if other, _, in := digestSeries(coralDir, newDigest); in && other != p.id {
+	if other, _, in := digestSeriesOnBoard(coralDir, newDigest, callerBoard); in && other != p.id { // bytes already in ANOTHER series of the caller's team; the same bytes in another team's series are that team's (#13942)
 		return fail(errSeriesOtherOwner)
 	}
 	var next int

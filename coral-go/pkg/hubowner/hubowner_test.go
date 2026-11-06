@@ -155,6 +155,7 @@ func TestAllowedIsTheListedDecisionsAndNothingElse(t *testing.T) {
 		{"POST", "/api/board/team/asks/42/close"},
 		{"POST", "/api/board/team/goals/7/driver"}, // #13517: the owner's change of a goal's driver and its move to another team
 		{"POST", "/api/board/team/goals/7/move"},
+		{"POST", "/api/artifacts/abc/opened"}, // #13910: generation 6
 	} {
 		if !Allowed(ok.m, ok.p) {
 			t.Errorf("%v not allowed", ok)
@@ -166,6 +167,8 @@ func TestAllowedIsTheListedDecisionsAndNothingElse(t *testing.T) {
 		{"POST", "/api/board/team/artifacts//review"},
 		{"POST", "/api/board//artifacts/abc/review"},
 		{"POST", "/api/artifacts/abc/comments/c1/resolve"},
+		{"POST", "/api/artifacts/abc/opened/x"},
+		{"POST", "/api/artifacts//opened"},
 		{"POST", "/api/artifacts/abc/comments/c1/send/x"},
 		{"POST", "/api/sessions/live//send"},
 		{"POST", "/api/sessions/live/x/send/more"},
@@ -188,7 +191,7 @@ func TestAllowedIsTheListedDecisionsAndNothingElse(t *testing.T) {
 			t.Errorf("%v allowed", bad)
 		}
 	}
-	if n := len(Routes()); n != 60 { // 60 since generation 5 (#13834, the done-state of a goal)
+	if n := len(Routes()); n != 61 { // 61 since generation 6 (#13910, the opened version of a file); 60 since generation 5 (#13834, the done-state of a goal)
 		t.Errorf("the allowlist has %d routes: a new one needs a reason and a review (Security's tiers, #13694)", n)
 	}
 	first := 0
@@ -234,6 +237,9 @@ func TestARouteIsStampedOnlyForARemoteThatListsIt(t *testing.T) {
 		{"POST", "/api/board/t/artifacts/abc/edit/send", 4, true, true},
 		{"POST", "/api/board/t/goals/12/done-state", 4, false, true}, // the done-state of a goal row (#13834) is generation 5: a generation 4 remote gets it unstamped
 		{"POST", "/api/board/t/goals/12/done-state", 5, true, true},
+		{"POST", "/api/artifacts/abc/opened", 5, false, true}, // the opened version of a file (#13910) is generation 6: a generation 5 remote gets it unstamped
+		{"POST", "/api/artifacts/abc/opened", 6, true, true},
+		{"GET", "/api/artifacts/abc/opened", 6, false, false},
 		{"POST", "/api/board/t/asks/9/buttons/b/settle", 2, true, true},
 		{"POST", "/api/sessions/live/x/send", 1, true, true},
 		{"POST", "/api/skills/3/approve", 2, false, false},
@@ -247,7 +253,7 @@ func TestARouteIsStampedOnlyForARemoteThatListsIt(t *testing.T) {
 			t.Errorf("MustBeSigned(%s %s) = %v, want %v", c.m, c.p, got, c.must)
 		}
 	}
-	if RoutesVersion != 5 {
+	if RoutesVersion != 6 {
 		t.Errorf("RoutesVersion = %d: it moves with a widening, and the remote's health answer reports it", RoutesVersion)
 	}
 }

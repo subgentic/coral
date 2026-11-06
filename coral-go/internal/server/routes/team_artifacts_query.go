@@ -28,10 +28,10 @@ import (
 // (so % and _ are ordinary characters), the rest are enum words, names compared for equality, and times.
 
 var teamArtifactParamNames = map[string]bool{"limit": true, "offset": true, "session_id": true,
-	"q": true, "kind": true, "origin": true, "by": true, "board": true, "kept": true, "starred": true, "task": true, "goal": true, "tag": true, "since": true, "until": true, "sort": true, "cursor": true, "versions": true, "read": true, "facets": true, "muted": true, "waiting": true}
+	"q": true, "kind": true, "origin": true, "by": true, "board": true, "kept": true, "starred": true, "task": true, "goal": true, "tag": true, "since": true, "until": true, "sort": true, "cursor": true, "versions": true, "read": true, "facets": true, "muted": true, "waiting": true, "starred_first": true}
 
 // teamArtifactQueryParams are the parameters that make the reply a query (the others are the list's original ones).
-var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "kept", "starred", "task", "goal", "tag", "since", "until", "sort", "cursor", "versions", "read", "facets", "muted", "waiting"}
+var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "kept", "starred", "task", "goal", "tag", "since", "until", "sort", "cursor", "versions", "read", "facets", "muted", "waiting", "starred_first"}
 
 var (
 	teamArtifactKinds   = []string{"image", "pdf", "text", "other"}
@@ -55,27 +55,29 @@ const (
 )
 
 type teamArtifactQuery struct {
-	q        string // lower-cased
-	kinds    []string
-	origins  []string
-	by       []string // lower-cased
-	boards   []string // lower-cased
-	kept     *bool
-	waiting  *bool // waiting=1|0 (#13172): the files that wait for the Operator, by the server's own rule (needsYouFile: for review and not opened, or news in a decided file's thread; never saved, ignored or superseded) and still available, or the ones that do not
-	muted    *bool // muted=1|0 (#13172): the files the Operator's inbox settings mute (#12144), or the ones they do not; only the Operator's own read marks any row muted
-	read     *bool // read=1: the files the Operator has read (a read tag and no news in their thread); read=0: the ones still unread (#13162, Needs you's unread filter, applied by the computer before the page is cut)
-	starred  *bool
-	tags     []string // any of these tags (#8583), normalised
-	goal     int64    // 0: any; a goal's number: only what the tasks that work toward it hold (#8579)
-	task     int64    // 0: any; a task's number: only what is attached to or linked to that task (#7739, the task page's Artifacts)
-	since    *time.Time
-	until    *time.Time
-	sortName string
-	collapse bool // versions=newest (#11700): the versions of one file are one row, the newest; the totals and the tag counts follow
-	cursor   *teamArtifactCursor
-	finger   string
-	teams    []string // the cross-team list's team= restriction, as a filter (set by the handler, not parsed): with facets=team the other teams' rows are collected too, so the team facet can leave this one out (#13378)
-	facets   []string // facets=team,by,goal (#13172): the distinct values of the matching set, each with its own filter left out
+	q            string // lower-cased
+	kinds        []string
+	origins      []string
+	by           []string // lower-cased
+	boards       []string // lower-cased
+	kept         *bool
+	waiting      *bool // waiting=1|0 (#13172): the files that wait for the Operator, by the server's own rule (needsYouFile: for review and not opened, or news in a decided file's thread; never saved, ignored or superseded) and still available, or the ones that do not
+	muted        *bool // muted=1|0 (#13172): the files the Operator's inbox settings mute (#12144), or the ones they do not; only the Operator's own read marks any row muted
+	read         *bool // read=1: the files the Operator has read (a read tag and no news in their thread); read=0: the ones still unread (#13162, Needs you's unread filter, applied by the computer before the page is cut)
+	starred      *bool
+	starredFirst bool     // starred_first=true (#13910): the starred series first, one row each at its newest version, then the rest in the sort; paged by position (the cursor carries it)
+	tags         []string // any of these tags (#8583), normalised
+	goal         int64    // 0: any; a goal's number: only what the tasks that work toward it hold (#8579)
+	task         int64    // 0: any; a task's number: only what is attached to or linked to that task (#7739, the task page's Artifacts)
+	since        *time.Time
+	until        *time.Time
+	sortName     string
+	crossTeam    bool // the owner-only cross-team list (GET /api/team-artifacts): the one list that carries the star-following fields (#13910)
+	collapse     bool // versions=newest (#11700): the versions of one file are one row, the newest; the totals and the tag counts follow
+	cursor       *teamArtifactCursor
+	finger       string
+	teams        []string // the cross-team list's team= restriction, as a filter (set by the handler, not parsed): with facets=team the other teams' rows are collected too, so the team facet can leave this one out (#13378)
+	facets       []string // facets=team,by,goal (#13172): the distinct values of the matching set, each with its own filter left out
 }
 
 type teamArtifactCursor struct {
@@ -282,6 +284,19 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 			return nil, taErr("starred must be true or false")
 		}
 	}
+	if v, ok, serr := taSingle("starred_first", vals["starred_first"]); serr != nil {
+		return nil, serr
+	} else if ok {
+		switch v {
+		case "true", "false":
+			if v == "true" && vals.Get(crossTeamScopeParam) == "" {
+				return nil, taErr("starred_first is only on the cross-team list (GET /api/team-artifacts)")
+			}
+			q.starredFirst = v == "true"
+		default:
+			return nil, taErr("starred_first must be true or false")
+		}
+	}
 	if v, ok, serr := taSingle("task", vals["task"]); serr != nil {
 		return nil, serr
 	} else if ok {
@@ -338,6 +353,7 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 	// What a cursor is tied to: every filter and the sort (not limit, offset or the cursor itself).
 	fp := sha256.New()
 	fmt.Fprintf(fp, "%s|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%s|%s|%v|%v|%v", q.q, q.kinds, q.origins, q.by, q.boards, q.kept, q.starred, q.task, q.goal, q.tags, q.since, q.until, q.collapse, q.sortName, vals.Get("session_id"), q.read, q.muted, q.waiting)
+	fmt.Fprintf(fp, "|sf=%v", q.starredFirst)
 	if scope := vals.Get(crossTeamScopeParam); scope != "" { // the cross-team list: its cursors are its own (a team route's is refused there) and tied to the teams asked for
 		fmt.Fprintf(fp, "|%s|%v", scope, vals["team"])
 	}
@@ -439,7 +455,7 @@ func parseArtifactTime(s string) (time.Time, bool) {
 }
 
 // cheapMatch applies the filters that need no file system: origin, by, board, kept and the time range.
-func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept, starred map[string]bool) bool {
+func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept map[string]bool, starred map[string]starInfo) bool {
 	if len(q.origins) > 0 {
 		o, ok := teamArtifactOrigin(it), false
 		for _, w := range q.origins {
@@ -497,7 +513,7 @@ func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept, starred map[string
 		}
 	}
 	if q.starred != nil {
-		isStarred := it.managed != "" && starred[it.managed]
+		_, isStarred := starOf(starred, it.BoardID, it.managed)
 		if isStarred != *q.starred {
 			return false
 		}
@@ -733,13 +749,14 @@ func clipKey(s string, n int) string {
 
 // teamArtifactSelection is one page of a query over a collected list.
 type teamArtifactSelection struct {
-	page    []teamArtifact
-	total   int                             // the rows the filters matched
-	start   int                             // where the page starts in them
-	hasMore bool                            // another page follows
-	next    string                          // its cursor ("" when none)
-	tags    map[string]int                  // the tag words of the whole list, with their counts (the Tag filter's choices)
-	facets  map[string][]artifactFacetValue // facets=: the distinct values of the matching set (#13172), nil when none were asked for
+	page         []teamArtifact
+	total        int                             // the rows the filters matched
+	start        int                             // where the page starts in them
+	hasMore      bool                            // another page follows
+	next         string                          // its cursor ("" when none)
+	tags         map[string]int                  // the tag words of the whole list, with their counts (the Tag filter's choices)
+	starredTotal int                             // starred_first: the starred series the filters matched, before paging (#13910)
+	facets       map[string][]artifactFacetValue // facets=: the distinct values of the matching set (#13172), nil when none were asked for
 }
 
 // selectTeamArtifacts filters, sorts and pages items (the collected, merged list) by q: the one rule behind a team's list and the cross-team list.
@@ -751,13 +768,20 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 			return nil, err
 		}
 	}
-	starred, err := h.bs.StarredArtifactIDs(r.Context()) // a small set: read for every list, the rows say whether they are starred
-	if err != nil {
-		if q.starred != nil {
+	var follow map[string]starInfo
+	if starVisible(r) { // the Operator's own attention: an agent's token and a Hub caller that is not the owner see no bookmark, and a starred filter finds none
+		times, err := h.bs.StarredArtifactTimes(r.Context(), openedPersonKey(r)) // a small set: read for every list, the rows say whether they are starred
+		switch {
+		case err != nil && q.starred != nil:
 			return nil, err // the Starred view cannot be answered without it
+		case err != nil:
+			times = map[string]string{} // a star is a bookmark: the list still answers, its rows unstarred
 		}
-		starred = map[string]bool{} // a star is a bookmark: the list still answers, its rows unstarred
+		follow = starFollowIf(h.coralDir, times, q.crossTeam)
+	} else {
+		follow = map[string]starInfo{}
 	}
+	starred := follow
 	dir := h.artifactObjectDir()
 	tunneled := cloud.Tunneled(r)
 	if tunneled {
@@ -805,7 +829,8 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 	}
 	// A list with no text match, kind filter, name-like sort, facets or collapse (the Operator's walk of the for-review tag, a page after a page) keeps the matching rows as positions in items: a copy of every matching row, for every page of a
 	// big board, was 20,000 rows allocated 400 times (#13614: the walk at the 50 cap). Only the page's own rows are copied out below. Facets (#13172) need the matching set (and a set per facet) as rows: they take the copying path.
-	fast := !q.needsEnrichment() && !q.collapse && len(q.facets) == 0
+	pinMode := q.crossTeam && (q.starredFirst || (q.starred != nil && *q.starred)) // a pinned list shows each starred series once, at its newest version (#13910)
+	fast := !q.needsEnrichment() && !q.collapse && !pinMode && len(q.facets) == 0
 	var set []teamArtifact
 	var idx []int
 	enriched := false
@@ -849,6 +874,16 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 	}
 	if q.collapse {
 		set = collapseVersions(set) // after the filters: a version that matches stands for its file, as Needs you does (#11700)
+	}
+	if pinMode { // one row per starred series: its newest version; the older versions of a starred series are the same document
+		kept := set[:0:0]
+		for _, it := range set {
+			if info, ok := starOf(follow, it.BoardID, it.managed); ok && !info.Latest {
+				continue
+			}
+			kept = append(kept, it)
+		}
+		set = kept
 	}
 	n := len(set)
 	if fast {
@@ -895,9 +930,29 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 	if !fast {
 		n = len(set)
 	}
-	sel := &teamArtifactSelection{total: n, tags: counts, facets: facets}
+	pinned := 0
+	if pinMode && q.starredFirst { // the starred series first, the newest star first, then everything else in the order asked for; paged by position, which the cursor carries
+		var pins, rest []teamArtifact
+		for _, it := range set {
+			if info, ok := starOf(follow, it.BoardID, it.managed); ok && info.Latest {
+				pins = append(pins, it)
+			} else {
+				rest = append(rest, it)
+			}
+		}
+		sort.SliceStable(pins, func(i, j int) bool {
+			a, _ := starOf(follow, pins[i].BoardID, pins[i].managed)
+			b, _ := starOf(follow, pins[j].BoardID, pins[j].managed)
+			return a.At > b.At
+		})
+		pinned = len(pins)
+		set = append(pins, rest...)
+	}
+	sel := &teamArtifactSelection{total: n, tags: counts, facets: facets, starredTotal: pinned}
 	start := offset
-	if q.cursor != nil {
+	if q.cursor != nil && q.starredFirst {
+		start = q.cursor.Index // the pinned order is not a sort order: the cursor is a position in it
+	} else if q.cursor != nil {
 		ck := artifactSortKey{At: q.cursor.At, Name: q.cursor.Name, Size: q.cursor.Size, Type: q.cursor.Type, Tags: q.cursor.Tags, Uploader: q.cursor.Uploader, TaskID: q.cursor.TaskID, Source: q.cursor.Source, Index: q.cursor.Index, ID: q.cursor.ID}
 		start = sort.Search(n, func(i int) bool { return artifactAfter(q.sortName, keyOfP(rowAt(i)), ck) })
 	}
@@ -928,7 +983,15 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 		}
 	}
 	for i := range sel.page {
-		sel.page[i].Starred = sel.page[i].managed != "" && starred[sel.page[i].managed]
+		_, sel.page[i].Starred = starOf(starred, sel.page[i].BoardID, sel.page[i].managed)
+		if q.crossTeam && sel.page[i].Starred { // the star-following fields, on the owner-only cross-team list alone (#13910)
+			if info, ok := starOf(follow, sel.page[i].BoardID, sel.page[i].managed); ok {
+				sel.page[i].StarredAt, sel.page[i].SeriesID = info.At, info.Series
+				if info.Latest {
+					sel.page[i].EarlierDigests = info.Earlier
+				}
+			}
+		}
 	}
 	if sel.page == nil {
 		sel.page = []teamArtifact{}
@@ -946,6 +1009,9 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 		}
 		if q.sortName != "uploader" && q.sortName != "uploader_desc" {
 			k.Uploader = ""
+		}
+		if q.starredFirst {
+			k.Index = end
 		}
 		sel.next = teamArtifactCursor{Uploader: k.Uploader, Sort: q.sortName, Finger: q.finger, At: k.At, Name: k.Name, Size: k.Size, Type: k.Type, Tags: k.Tags, TaskID: k.TaskID, Source: k.Source, Index: k.Index, ID: k.ID}.encode()
 	}
@@ -1136,3 +1202,15 @@ func hasFacet(list []string, f string) bool {
 
 // teamArtifactEnrichments counts the files whose sidecar a list query has read (a test seam: each file once per query, however many facets are asked, #13378).
 var teamArtifactEnrichments atomic.Int64
+
+// starFollowIf is the stars with their series followed on the cross-team list, and as plain digests everywhere else (the per-board list keeps its one-digest star).
+func starFollowIf(coralDir string, times map[string]string, follow bool) map[string]starInfo {
+	if follow && coralDir != "" {
+		return starFollow(coralDir, times)
+	}
+	out := make(map[string]starInfo, len(times))
+	for d, at := range times {
+		out["|"+d] = starInfo{At: at, Latest: true}
+	}
+	return out
+}

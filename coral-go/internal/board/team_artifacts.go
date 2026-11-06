@@ -233,17 +233,69 @@ func (s *Store) ListTeamArtifactTasksQuery(ctx context.Context, q TeamArtifactQu
 	return tasks, truncated, nil
 }
 
-// StarredArtifactIDs is the set of artifact ids (64 hex) the Operator starred (the artifact_stars table of the main sessions database, #9819). Empty when that database is not attached.
-func (s *Store) StarredArtifactIDs(ctx context.Context) (map[string]bool, error) {
-	starred := map[string]bool{}
+// OwnerPersonKey is the person key of the machine's owner on a personal computer: the stars and opened versions kept before there were people (#13910) belong to it, so an upgrade loses nothing.
+const OwnerPersonKey = "owner"
+
+// StarredArtifactTimes is the artifacts the person starred with the time of each star (RFC 3339), for the series-following star (#13910). The owner key's stars are the original artifact_stars table (an upgrade
+// loses none); another person's are in artifact_person_stars, and never include the owner key's. Empty when the sessions database is not attached.
+func (s *Store) StarredArtifactTimes(ctx context.Context, person string) (map[string]string, error) {
+	out := map[string]string{}
 	if s.sessionsDB == nil {
-		return starred, nil
+		return out, nil
 	}
-	var ids []string
-	if err := s.sessionsDB.SelectContext(ctx, &ids, "SELECT hex FROM artifact_stars"); err != nil {
+	var rows []struct {
+		Hex string `db:"hex"`
+		At  string `db:"starred_at"`
+	}
+	var err error
+	if person == "" || person == OwnerPersonKey {
+		err = s.sessionsDB.SelectContext(ctx, &rows, "SELECT hex, starred_at FROM artifact_stars")
+	} else {
+		err = s.sessionsDB.SelectContext(ctx, &rows, "SELECT hex, starred_at FROM artifact_person_stars WHERE person = ?", person)
+	}
+	if err != nil {
 		return nil, err
 	}
-	for _, id := range ids {
+	for _, r := range rows {
+		out[r.Hex] = r.At
+	}
+	return out, nil
+}
+
+// OpenedVersions is the newest version of each series the person has opened (#13910), keyed "board_id|series_id", for the given series. Empty when the sessions database is not attached or none was opened.
+func (s *Store) OpenedVersions(ctx context.Context, person string, seriesIDs []string) (map[string]int, error) {
+	out := map[string]int{}
+	if s.sessionsDB == nil || len(seriesIDs) == 0 {
+		return out, nil
+	}
+	marks := make([]string, len(seriesIDs))
+	args := []any{person}
+	for i, id := range seriesIDs {
+		marks[i] = "?"
+		args = append(args, id)
+	}
+	var rows []struct {
+		Board   string `db:"board_id"`
+		Series  string `db:"series_id"`
+		Version int    `db:"version"`
+	}
+	if err := s.sessionsDB.SelectContext(ctx, &rows, "SELECT board_id, series_id, version FROM artifact_series_opened WHERE person = ? AND series_id IN ("+strings.Join(marks, ",")+")", args...); err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		out[r.Board+"|"+r.Series] = r.Version
+	}
+	return out, nil
+}
+
+// StarredArtifactIDs is the set of artifact ids (64 hex) the person starred (see StarredArtifactTimes). Empty when the sessions database is not attached.
+func (s *Store) StarredArtifactIDs(ctx context.Context, person string) (map[string]bool, error) {
+	times, err := s.StarredArtifactTimes(ctx, person)
+	if err != nil {
+		return nil, err
+	}
+	starred := make(map[string]bool, len(times))
+	for id := range times {
 		starred[id] = true
 	}
 	return starred, nil

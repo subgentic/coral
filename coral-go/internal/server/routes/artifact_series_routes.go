@@ -116,7 +116,7 @@ func (h *SessionsHandler) artifactVersions(w http.ResponseWriter, r *http.Reques
 		errNotFound(w, "artifact not found")
 		return
 	}
-	sid, _, in := digestSeries(h.cfg.CoralDir(), digest)
+	sid, _, in := callerSeries(r, h.cfg.CoralDir(), digest)
 	if !in {
 		errNotFound(w, "artifact not found")
 		return
@@ -159,12 +159,16 @@ func (h *SessionsHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
 		freed += f
 		if h.db != nil {
 			_, _ = h.db.ExecContext(r.Context(), "DELETE FROM artifact_keep WHERE hex = ?", m.Digest)
-			_, _ = h.db.ExecContext(r.Context(), "DELETE FROM artifact_stars WHERE hex = ?", m.Digest) // and its star (#9819)
+			_, _ = h.db.ExecContext(r.Context(), "DELETE FROM artifact_stars WHERE hex = ?", m.Digest)        // and its star (#9819)
+			_, _ = h.db.ExecContext(r.Context(), "DELETE FROM artifact_person_stars WHERE hex = ?", m.Digest) // and every person's (#13910)
 		}
 		h.dropArtifactComments(r.Context(), m.Digest)
 	}
 	if p := seriesPath(coralDir, id); p != "" {
 		_ = os.Remove(p)
+	}
+	if h.db != nil {
+		_, _ = h.db.ExecContext(r.Context(), "DELETE FROM artifact_series_opened WHERE series_id = ?", id) // the opened-version rows follow their series (#13910)
 	}
 	slog.Info("[artifacts] a series deleted by the Operator", "series", id, "versions", len(members), "bytes", freed)
 	writeJSON(w, http.StatusOK, map[string]any{"deleted": true, "versions": len(members), "bytes": freed})

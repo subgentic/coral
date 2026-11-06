@@ -41,7 +41,7 @@ EXTRA = {
     # which the scan above does not follow. Search, filters, sort and cursor paging on the existing route.
     'GET /api/board/{}/artifacts': {'q', 'kind', 'origin', 'by', 'board', 'kept', 'starred', 'task', 'goal', 'tag', 'since', 'until', 'sort', 'cursor', 'versions', 'read', 'facets', 'muted', 'waiting'},
     # The cross-team artifact list (Goal #62): ListAllTeamArtifacts hands the team route's query parser a url.Values it parsed itself, plus team, limit and offset, which the scan above does not follow.
-    'GET /api/team-artifacts': {'team', 'q', 'kind', 'origin', 'by', 'board', 'kept', 'starred', 'task', 'goal', 'tag', 'since', 'until', 'sort', 'cursor', 'limit', 'offset', 'versions', 'read', 'facets', 'muted', 'waiting'},
+    'GET /api/team-artifacts': {'team', 'q', 'kind', 'origin', 'by', 'board', 'kept', 'starred', 'starred_first', 'task', 'goal', 'tag', 'since', 'until', 'sort', 'cursor', 'limit', 'offset', 'versions', 'read', 'facets', 'muted', 'waiting'},
     # The board message search (#4745): SearchMessages reads these from a url.Values it parsed itself (a mistyped query string is refused,
     # not dropped), which the scan above does not follow.
     'GET /api/board/{}/messages/search': {'q', 'from', 'mentions', 'since', 'until', 'sort', 'limit', 'cursor', 'for_subscriber'},
@@ -100,7 +100,8 @@ ENUM = {
     'GET /ws/coral': {'feed': ['hub'], 'diff': ['fields']},
     # One row per file (#11700, coral-hub's ask #11782): versions accepts only newest through the tunnel. The handler also takes "all", which the Hub has no use for; any other word is refused here as it is by the handler.
     'GET /api/board/{}/artifacts': {'versions': ['newest']},
-    'GET /api/team-artifacts': {'versions': ['newest']},
+    # The starred series first (#13910): only starred_first=true passes.
+    'GET /api/team-artifacts': {'versions': ['newest'], 'starred_first': ['true']},
     # The artifact link form (#3168): only v=2 passes; any other value or a second v is refused. open=1 (#11836, #11845) is the viewer's Open in new tab (a readable tab, not a download); only that exact value passes.
     'GET /api/artifacts/{}': {'v': ['2'], 'open': ['1']},
     # The earlier versions' comments (#6459, #13502): the handler acts on series=1 only and ignores any other value, so only that exact value passes (the shell sends nothing else).

@@ -20,6 +20,7 @@ import (
 // activityByHandler: the handler writes the row itself (in the store transaction of the decision, after the post, or by asking the recorder), for a person only.
 var activityByHandler = map[string]string{
 	"DELETE /api/board/{project}/artifacts/{id}/review":                   "take out of review (unsend_review)",
+	"POST /api/artifacts/{id}/opened":                                     "the version of a series the Operator opened (#13910): the Operator's own reading state, kept so a row can say New version; it is not a decision, so no Activity row",
 	"POST /api/board/{project}/artifacts/{id}/review":                     "a file's review: approve, changes, deny, ignore, unignore, save, unsave, supersede (board.DecideArtifactReview and friends)",
 	"POST /api/board/{project}/artifacts/{digest}/edit/send":              "a saved edit sent to agents as a diff (file_edit_send, #13802): the handler asks the recorder for the row",
 	"POST /api/board/{project}/artifacts/{digest}/edit":                   "a Markdown file saved from the editor as a new version (file_edit, #13757): the handler asks the recorder for the row",

@@ -243,6 +243,10 @@ func TestAnAgentReadsCommentsRedactedAgain(t *testing.T) {
 // #11425 (c): with series=1 an agent also reads the earlier versions' comments, each by its own id: a version it did not upload (and was not asked into) is not read through a newer one.
 func TestAnAgentReadsAnEarlierVersionsCommentsOnlyForAnEarlierVersionItMayRead(t *testing.T) {
 	rig := newCmtRig(t)
+	useCircle(t, ArtifactCircle{ // Dev is on team-a, as its launch says (#13949: an agent's series is its own team's, so the circle must place it)
+		SessionBoard: func(context.Context, string) (string, error) { return "team-a", nil },
+		BoardOwner:   func(context.Context, string) (artifactPrincipal, error) { return operatorPrincipal, nil },
+	})
 	rig.agent(1, "Dev", false)
 	_, err := rig.h.bs.Subscribe(context.Background(), "team-a", "alias-1", "Alias1", "agent-"+sendSid(1), nil, "")
 	require.NoError(t, err)

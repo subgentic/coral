@@ -107,6 +107,7 @@ var ownerRefusals = map[string]string{
 	tunnel.OwnerRouteKey("GET", "/api/team-artifacts"):                                              textArtifactsOwnerOnly,
 	tunnel.OwnerRouteKey("PUT", "/api/artifacts/{hex64}/star"):                                      textStarOwnerOnly,
 	tunnel.OwnerRouteKey("DELETE", "/api/artifacts/{hex64}/star"):                                   textStarOwnerOnly,
+	tunnel.OwnerRouteKey("POST", "/api/artifacts/{hex64}/opened"):                                   "through Coral Hub only the account this computer is linked to can record which version of a file it opened (#13910)",
 	tunnel.OwnerRouteKey("DELETE", "/api/artifacts/{hex64}"):                                        "through Coral Hub only the account this computer is linked to can delete an artifact",
 	tunnel.OwnerRouteKey("GET", "/api/board/{project}/proposals"):                                   "through Coral Hub only the account this computer is linked to can decide what an agent asked to add",
 	tunnel.OwnerRouteKey("GET", "/api/proposals"):                                                   "through Coral Hub only the account this computer is linked to can decide what an agent asked to add",
