@@ -518,4 +518,4 @@ func (h *SessionsHandler) addModelSwitch(entry map[string]any, sessionID string)
 
 // modelSwitchRefusal is what a caller that is not a person gets (#13761). Through the self-hosted Hub the person IS the operator, but this computer sees the Hub's key unless the Hub has signed the click for it: so the
 // words say what this computer needs, not that "only the operator" may. The Hub's page puts the computer's name in front of them.
-const modelSwitchRefusal = "this computer changes an agent's model or thinking level only for a person at its own dashboard, or at a Hub that has set up approvals for it and a Coral new enough to take it: open this computer's own dashboard, or open this computer's page in the Hub, set up approvals and update it"
+const modelSwitchRefusal = "this computer changes an agent's model or thinking level only for a person at its own dashboard, or signed in at a Hub that signs the click for it (approvals set up for this computer, and an up-to-date Coral on it)"
