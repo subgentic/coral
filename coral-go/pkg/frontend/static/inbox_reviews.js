@@ -21,7 +21,14 @@ onArtifactsRev((team, rev, reconnect) => {
 const vkey = a => a.series_id ? JSON.stringify([a.team, 'series', a.series_id]) : (a.session_id || a.produced_by) ? JSON.stringify([a.team, a.session_id, a.produced_by, a.name]) : a.reviewKey; // a JSON array: no name or id can run into the next field
 const byAge = (a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.reviewKey.localeCompare(b.reviewKey);
 /** The versions older than `row`, still for review. */
-export const earlierVersions = row => { const key = row.reviewKey || `${row.team}:${row.id}`, pool = saved.some(a => a.reviewKey === key) ? saved : items, me = pool.find(a => a.reviewKey === key) || row; return pool.filter(a => a.reviewKey !== key && vkey(a) === vkey(me) && byAge(a, me) < 0); }; // in the list the row is in: Needs you's, or Saved's (#11937)
+export const earlierVersions = row => {
+    const key = row.reviewKey || `${row.team}:${row.id}`, pool = saved.some(a => a.reviewKey === key) ? saved : items, me = pool.find(a => a.reviewKey === key) || row;
+    const older = new Map(pool.filter(a => a.reviewKey !== key && vkey(a) === vkey(me) && byAge(a, me) < 0).map(a => [a.hex, a]));
+    // Starred-first returns only the newest row; its authoritative older ids
+    // preserve the existing decision cleanup without fetching every version.
+    for (const hex of me.earlier_digests || []) if (/^[a-f0-9]{64}$/.test(hex) && hex !== me.hex && !older.has(hex)) older.set(hex, { ...me, id: hex, hex, version: 0, reviewKey: `${me.team}:${hex}`, earlier: undefined, earlier_digests: undefined });
+    return [...older.values()];
+};
 // Worked out once per change, not once per call (#11633): this is asked for by the badge, the folder count, the pills, the rows and the labels on every update, and the old way compared every item with every other
 // (a JSON key built for each pair): with a few hundred files for review one call took a tenth of a second, a few dozen calls a redraw, and an Approve (which redraws three times) froze the Inbox for seconds.
 // The list is rebuilt when `items` is replaced or `revision` moves (a tag written in place, a row settled), and shared between callers in between.
@@ -266,7 +273,7 @@ export function markOpenedRead(hex, team = '') {
         let own = null; // the file's own row, read from its own team alone when the Inbox's scan of every team has not run (a file opened through the Hub): one team's list, not nine (#13489)
         if (!activated && team) own = (await readTeam(team)).find(a => a.hex.toLowerCase() === hex) || null;
         else if (!activated) await refreshReviews(true, { reuse: true }); else if (pending) await pending;
-        const row = own ? (needsReviewAttention(own) || (!isRead(own) && !waitingOnAgent(own)) ? own : undefined) : items.find(a => a.hex.toLowerCase() === hex && (!team || a.team === team) && (needsReviewAttention(a) || (!isRead(a) && !waitingOnAgent(a)))); // a file the Operator asked changes of waits on the agent: the viewer and the preview redraw it after the request, and that is not reading it again (#11860); it stays counted until the agent answers
+        const row = own ? (needsReviewAttention(own) || (!isRead(own) && !waitingOnAgent(own)) ? own : undefined) : items.find(a => a.hex.toLowerCase() === hex && (!team || a.team === team) && (needsReviewAttention(a) || (!isRead(a) && !waitingOnAgent(a)))); // A sent-back file with no news is visible but uncounted; automatic viewer reloads leave its read tag alone. Unseen replies can be read normally.
         if (row) {
             if (row.new_comments > 0) { // opening the file is opening its thread: the server marks the Operator's threads seen when the comments are read (#12026), so the row is read, and the count follows
                 const { listComments } = await importOnce('./artifact_comments_api.js');

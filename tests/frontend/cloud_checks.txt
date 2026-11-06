@@ -381,3 +381,5 @@ node inbox_review_waiting.test.mjs
 node review_fixture_url.test.mjs
 
 node artifact_opened_version.test.mjs
+
+node artifact_pinned_cleanup.test.mjs
