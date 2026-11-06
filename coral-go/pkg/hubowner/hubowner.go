@@ -46,10 +46,10 @@ const Skew = 30 * time.Second
 // secretBytes is the length of a secret, hex-encoded in its file and on the wire between the hub and the human act.
 const secretBytes = 32
 
-// RoutesVersion is the generation of the allowlist below: 1 is the first eight routes, 2 (#13694) adds every Operator click that writes an Activity row and the decisions that need a person, 3 (#13757) the Markdown editor's save and the model switch, 4 (#13802) Send to agent with the diff, 5 (#13834) the done-state of a "Goal looks done" row. A remote says in
+// RoutesVersion is the generation of the allowlist below: 1 is the first eight routes, 2 (#13694) adds every Operator click that writes an Activity row and the decisions that need a person, 3 (#13757) the Markdown editor's save and the model switch, 4 (#13802) Send to agent with the diff, 5 (#13834) the done-state of a "Goal looks done" row, 6 (#13910) the Operator's opened version of a file. A remote says in
 // its health answer which generation it accepts; a hub stamps a route only when the remote's generation is at least the route's (a stamp on a route an older remote does not list is refused 403, where an
 // unstamped call still goes through as a key caller). The remote still checks every stamp against its own list, so a wrong number gets a 403 and never more power.
-const RoutesVersion = 5
+const RoutesVersion = 6
 
 type route struct {
 	pattern string
@@ -126,6 +126,8 @@ var routes = []route{
 	{"POST /api/board/{project}/artifacts/{id}/edit/send", 4},
 	// Generation 5 (#13834, Security: exactly one route, and a released generation never gains one): Not yet, Dismiss, Undo and Mark read or unread on a goal-looks-done row. The body is one word of a closed set; the remote builds the saved entry itself.
 	{"POST /api/board/{project}/goals/{goalID}/done-state", 5},
+	// Generation 6 (#13910, Security: exactly one route): the Operator opened a version of a series (the row's "New version"). No body is read; the machine works the series and version out from its own records.
+	{"POST /api/artifacts/{id}/opened", 6},
 }
 
 // MustBeSigned reports whether a request is one whose words are the person's own and become automation on the remote when no stamp goes with it: the owner's message to an agent (#13456) and, since

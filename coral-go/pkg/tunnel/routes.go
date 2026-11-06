@@ -546,6 +546,8 @@ var routeTable = cat(
 	// Starring an artifact to find it again (#9819): a personal bookmark, Interact like the saved items, and the machine refuses anyone but the owner.
 	owner(OwnerRefuse, rules(http.MethodPut, TierInteract, "/api/artifacts/{hex64}/star")),
 	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/artifacts/{hex64}/star")),
+	// The Operator opened a version of a series (#13910, the row's "New version"): the OWNER's alone; no body is read and the machine works the series and the version out from its own upload records. Interact: it moves no work.
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/artifacts/{hex64}/opened")),
 	owner(OwnerRefuse, rules(http.MethodGet, TierLaunch, PromptInspectionPath)),
 	owner(OwnerRefuse, rules(http.MethodPost, TierLaunch, UpdateRelaunchPath)), // installing and restarting a computer is the owner's alone, refused before the handler (a grantee at any tier gets 403 owner_only); the machine linked before the owner label was recorded must link again (#13258)
 	owner(OwnerRefuse, rules(http.MethodPost, TierLaunch, UpdateCheckPath)),    // ask this computer to check for and stage an update (never installs): no body, no query, the owner's alone and only with the person's switch on (#13258)
