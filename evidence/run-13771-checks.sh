@@ -8,7 +8,7 @@ finish() {
  result=$?
  coral-board resource release mac-heavy
  if (( result != 0 )); then
-  coral-agent artifact upload "$log" --task 13771 --tag internal > /private/tmp/ui13771-failure-artifact.json || true
+  coral-agent artifact upload "$log" --no-task --tag internal > /private/tmp/ui13771-failure-artifact.json || true
   coral-board post --task 13771 "@Orchestrator #13771 ${mode} stopped with exit ${result}; no webview/AppKit/GUI test ran. Failure log uploaded; I am inspecting it before continuing." || true
  fi
 }
@@ -25,6 +25,8 @@ fi
 if [[ "$mode" == all ]]; then
  suites=$(node --input-type=module -e 'import fs from "node:fs";console.log(fs.readdirSync("tests/frontend").filter(f=>/^(inbox_|needs_|mailbox_|artifact_).*_browser\.test\.(js|mjs)$/.test(f)).join(","))')
  suites="${suites},native_download_browser,preview_pane_artifact_refs_browser,operator_asks_browser,operator_asks_servers_browser"
+elif [[ "$mode" == tag ]]; then
+ suites=artifact_question_links_browser,artifact_refs_browser,artifact_viewer_browser,inbox_ask_buttons_real_browser
 elif [[ "$mode" == followup ]]; then
  suites=artifact_refs_browser,artifact_viewer_browser,artifact_question_links_browser
 else
@@ -32,11 +34,11 @@ else
 fi
 CORAL_SCREENSHOT_DIR=/private/tmp/ui13771-${mode}-shots node tests/frontend/run_cdp_suites.mjs --only "$suites" --shards 2 --retries 0 --results-out /private/tmp/ui13771-${mode}-results.json > "$log" 2>&1
 
-if [[ "$mode" == all || "$mode" == followup ]]; then
+if [[ "$mode" == all || "$mode" == followup || "$mode" == tag ]]; then
  log=/private/tmp/ui13771-go.log
  (cd coral-go && go test -p 4 ./pkg/frontend) > "$log" 2>&1
  coral-board resource release mac-heavy
  trap - EXIT
  log=/private/tmp/ui13771-static.log
- npm --prefix tests/frontend run test:cloud > "$log" 2>&1 || { coral-agent artifact upload "$log" --task 13771 --tag internal; coral-board post --task 13771 '@Orchestrator #13771 static checks failed; log uploaded, no commit or review submitted.'; exit 1; }
+ npm --prefix tests/frontend run test:cloud > "$log" 2>&1 || { coral-agent artifact upload "$log" --no-task --tag internal; coral-board post --task 13771 '@Orchestrator #13771 static checks failed; log uploaded, no commit or review submitted.'; exit 1; }
 fi

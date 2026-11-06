@@ -26,3 +26,9 @@ After desktop: coral://artifacts/2938b85485382d6efe616d0de6565fceb1cd679f65ea8e7
 Phone before/after are tagged for Operator review (question #176109); screenshots were visually inspected. Headless integration covers local/remote widths 1280/390/320, uploaded draft retention, About Goal/Task, goal/diff, remote comment, chat preview and external HTTPS exactly once.
 
 Release: AFTER v2.0.55; base main 515cf72c5 (v2.0.54). UI and Security review required; DevOps owns landing. No claim of native GUI execution or real Hub integration: remote source behavior uses CDP API fixtures.
+
+## v2.0.55 integration
+
+Rebased onto the published v2.0.55 tag ef89652c9 at Orchestrator's request. The sole conflict was the artifact_comments import; both boardTeamKey and LOCAL_SERVER are retained. Range-diff preserves the approved functional patch. v2.0.55's check/X reply buttons, draft-and-picture send logic, owner-stamped identity checks and viewer/editor work remain present.
+
+Post-rebase checks: 5/5 focused browser suites passed in 15.9s on two shards with no retries: artifact_question_links, artifact_refs, artifact_viewer, preview_pane_artifact_refs, and inbox_ask_buttons_real. Frontend Go passed in 21.131s; explicit-file headless native tests passed in 1.608s; full static pipeline exited 0. No webview/AppKit/native GUI process ran. This is focused integration proof, not a full final-head 205-suite rerun.
