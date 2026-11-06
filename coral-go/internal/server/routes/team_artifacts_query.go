@@ -65,10 +65,11 @@ type teamArtifactQuery struct {
 	muted        *bool // muted=1|0 (#13172): the files the Operator's inbox settings mute (#12144), or the ones they do not; only the Operator's own read marks any row muted
 	read         *bool // read=1: the files the Operator has read (a read tag and no news in their thread); read=0: the ones still unread (#13162, Needs you's unread filter, applied by the computer before the page is cut)
 	starred      *bool
-	starredFirst bool     // starred_first=true (#13910): the starred series first, one row each at its newest version, then the rest in the sort; paged by position (the cursor carries it)
-	tags         []string // any of these tags (#8583), normalised
-	goal         int64    // 0: any; a goal's number: only what the tasks that work toward it hold (#8579)
-	task         int64    // 0: any; a task's number: only what is attached to or linked to that task (#7739, the task page's Artifacts)
+	newVersion   map[string]bool // set per request when a waiting or read filter is asked by the Operator: the files read on an earlier version whose newer one they have not opened (#13959); never shared, never cached
+	starredFirst bool            // starred_first=true (#13910): the starred series first, one row each at its newest version, then the rest in the sort; paged by position (the cursor carries it)
+	tags         []string        // any of these tags (#8583), normalised
+	goal         int64           // 0: any; a goal's number: only what the tasks that work toward it hold (#8579)
+	task         int64           // 0: any; a task's number: only what is attached to or linked to that task (#7739, the task page's Artifacts)
 	since        *time.Time
 	until        *time.Time
 	sortName     string
@@ -497,13 +498,13 @@ func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept map[string]bool, st
 	if len(q.tags) > 0 && !hasAnyTag(it.Tags, q.tags) && !(it.NewComments > 0 && hasAnyTag([]string{tagNewComments}, q.tags)) && !(hasAnyTag([]string{"for review"}, q.tags) && decidedWithNews(it.Tags, it.NewComments)) {
 		return false // the tag "new comments" is not stored: it matches the rows the Operator's list says have news (#12026); and the list tagged "for review" also holds the decided files that have news, so the page reads one list (#12097)
 	}
-	if q.waiting != nil && needsYouFile(it.Tags, it.NewComments) != *q.waiting {
+	if q.waiting != nil && needsYouFileV(it.Tags, it.NewComments, q.newVersion[attentionKey(it.BoardID, artifactStoreID(it))]) != *q.waiting {
 		return false
 	}
 	if q.muted != nil && it.Muted != *q.muted {
 		return false // Muted is set only on the Operator's own read (attachArtifactKinds): for anyone else no row is muted
 	}
-	if q.read != nil && artifactIsRead(it) != *q.read {
+	if q.read != nil && artifactIsReadV(it, q.newVersion[attentionKey(it.BoardID, artifactStoreID(it))]) != *q.read {
 		return false
 	}
 	if q.kept != nil {
@@ -767,6 +768,9 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 		if kept, err = h.bs.KeptArtifactIDs(r.Context()); err != nil {
 			return nil, err
 		}
+	}
+	if q.waiting != nil || q.read != nil { // the person's own opened versions decide what still waits for them and what is read, before the page is cut (#13959)
+		q.newVersion = h.newVersionUnopened(r, "", items)
 	}
 	var follow map[string]starInfo
 	if starVisible(r) { // the Operator's own attention: an agent's token and a Hub caller that is not the owner see no bookmark, and a starred filter finds none
@@ -1117,8 +1121,11 @@ func artifactUploaderLabel(it teamArtifact) string {
 }
 
 // artifactIsRead is whether the Operator has read a file, as Needs you says it (inbox_reviews.js isRead): it has the read tag and its thread has no news (replies an agent left since the Operator last opened it).
-func artifactIsRead(it teamArtifact) bool {
-	if it.NewComments > 0 {
+func artifactIsRead(it teamArtifact) bool { return artifactIsReadV(it, false) }
+
+// artifactIsReadV is artifactIsRead for the person who is asking, version-aware (#13959): a file whose newer version they have not opened is not read, though the read tag is on it (that tag was set on an earlier version).
+func artifactIsReadV(it teamArtifact, newVersion bool) bool {
+	if it.NewComments > 0 || newVersion {
 		return false
 	}
 	for _, t := range it.Tags {
