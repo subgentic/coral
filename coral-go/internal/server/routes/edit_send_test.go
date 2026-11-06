@@ -259,7 +259,7 @@ func TestADiffOverOneKiBIsNotShownEvenWhenTheMessageWouldHaveFit(t *testing.T) {
 	code, out := rig.editSend(editAsPage, "Dev")
 	require.Equal(t, 200, code, out)
 	assert.Equal(t, true, out["limited"])
-	assert.NotContains(t, rig.operatorMessages()[0].Content, "@​@​", "no hunk")
+	assert.NotContains(t, rig.operatorMessages()[0].Content, "@\u200b@\u200b", "no hunk")
 	assert.NotContains(t, rig.operatorMessages()[0].Content, "-old line number 00")
 }
 
