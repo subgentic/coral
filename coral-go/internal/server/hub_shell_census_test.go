@@ -170,6 +170,48 @@ var (
 
 var helperMethod = map[string]string{"post": "POST", "postJson": "POST", "put": "PUT", "putJson": "PUT", "patch": "PATCH", "patchJson": "PATCH", "del": "DELETE", "delJson": "DELETE", "deleteJson": "DELETE"}
 
+var blockCommentRe = regexp.MustCompile("(?s)(^|[^'\"`\\w/])(/\\*.*?\\*/)")
+
+// blankComments is src with block comments and the rest of any line after a // comment turned to spaces (line ends and offsets kept), so a doc comment that names a route is not a call. A // that
+// follows a colon (a URL) or sits inside a quote on its line is left alone.
+func blankComments(src string) string {
+	blank := func(s string) string {
+		return strings.Map(func(r rune) rune {
+			if r == '\n' {
+				return r
+			}
+			return ' '
+		}, s)
+	}
+	src = blockCommentRe.ReplaceAllStringFunc(src, func(m string) string {
+		i := strings.Index(m, "/*")
+		return m[:i] + blank(m[i:])
+	})
+	lines := strings.Split(src, "\n")
+	for n, l := range lines {
+		for i := 0; i+1 < len(l); i++ {
+			if l[i] == '/' && l[i+1] == '/' && (i == 0 || l[i-1] != ':') && strings.Count(l[:i], "'")%2 == 0 && strings.Count(l[:i], "\"")%2 == 0 && strings.Count(l[:i], "`")%2 == 0 {
+				lines[n] = l[:i] + blank(l[i:])
+				break
+			}
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+func TestBlankCommentsHidesCommentedRoutesOnly(t *testing.T) {
+	src := "a('/api/real');\n// fetch('/api/in-line-comment')\n/* fetch('/api/in-block')\n * more */\nb('/api/after'); // fetch('/api/trailing')\nu = 'https://x.dev/api/y'; c('/api/a//b');\n"
+	got := blankComments(src)
+	require.Equal(t, len(src), len(got))
+	require.Equal(t, strings.Count(src, "\n"), strings.Count(got, "\n"))
+	for _, keep := range []string{"/api/real", "/api/after", "https://x.dev/api/y", "/api/a//b"} {
+		require.Contains(t, got, keep)
+	}
+	for _, gone := range []string{"in-line-comment", "in-block", "trailing"} {
+		require.NotContains(t, got, gone)
+	}
+}
+
 // shellCalls is every /api/ literal in the shell's scripts with the method found around it. Prefix tests ("startsWith('/api/')") and a bare "/api/" are not calls.
 func shellCalls(t *testing.T) (calls []shellCall, unsure int) {
 	t.Helper()
@@ -180,7 +222,7 @@ func shellCalls(t *testing.T) (calls []shellCall, unsure int) {
 		}
 		b, rerr := os.ReadFile(p)
 		require.NoError(t, rerr)
-		src := string(b)
+		src := blankComments(string(b))
 		rel, _ := filepath.Rel(root, p)
 		rel = filepath.ToSlash(rel)
 		for _, m := range apiLiteralRe.FindAllStringSubmatchIndex(src, -1) {
@@ -346,11 +388,10 @@ var shellBareFetches = map[string]string{
 	"team_wizard.js POST /api/teams/generate":                      "unreviewed: a bare fetch asks the page's own origin, which through a Hub is the Hub (#13860 worklist)",
 	"terminal_backend.js POST /api/sessions/live/{}/refresh-hooks": "unreviewed: a bare fetch asks the page's own origin, which through a Hub is the Hub (#13860 worklist)",
 	"terminal_backend.js POST /api/sessions/live/{}/wake":          "unreviewed: a bare fetch asks the page's own origin, which through a Hub is the Hub (#13860 worklist)",
-	"view_sandbox.js GET /api/sessions/live":                       "unreviewed: a bare fetch asks the page's own origin, which through a Hub is the Hub (#13860 worklist)",
 	"workflow_agent.js POST /api/sessions/launch":                  "unreviewed: a bare fetch asks the page's own origin, which through a Hub is the Hub (#13860 worklist)",
 }
 
-const shellBareFetchesMax = 25
+const shellBareFetchesMax = 24
 
 func TestBareFetchesToAComputersRoutesAreListed(t *testing.T) {
 	calls, _ := shellCalls(t)
