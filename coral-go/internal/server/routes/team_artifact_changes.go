@@ -126,8 +126,13 @@ func (h *SessionsHandler) ChangeRequestWords(r *http.Request, project, hex, text
 		}
 	}
 	out.CommentID = c.ID
-	if _, claimed := h.changeClaims.Load(c.ID); claimed || (!out.Created && h.commentWasTold(ctx, hex, c.ID)) {
-		out.Delivery = autoDelivery{Reason: "already_sent"} // an earlier request of the same words did both halves, or is telling the agent now
+	if _, claimed := h.changeClaims.Load(c.ID); claimed {
+		// An earlier request of the same words is telling the agent right now and may still fail and undo everything: this one is not told "ok" (it would be about a comment that can vanish) and changes nothing. The
+		// retry finds the ask (already_sent) or, if that one failed, delivers.
+		return ChangeWords{}, &changeWordsError{http.StatusConflict, "already_in_progress", "the agent is being told right now: retry in a moment"}
+	}
+	if !out.Created && h.commentWasTold(ctx, hex, c.ID) {
+		out.Delivery = autoDelivery{Reason: "already_sent"} // an earlier request of the same words did both halves
 		return out, nil
 	}
 	// The notice is CLAIMED under the lock and delivered outside it (QA's point on #13976): a slow delivery holds no other request for this artifact, and the one-notice rule stands because a second request

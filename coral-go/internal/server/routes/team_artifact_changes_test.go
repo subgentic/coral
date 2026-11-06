@@ -312,9 +312,16 @@ func TestRequestsAtOnceMakeOneCommentAndOneNotice(t *testing.T) {
 		}()
 	}
 	close(start)
+	ok := 0
 	for i := 0; i < n; i++ {
-		assert.Equal(t, http.StatusOK, <-codes)
+		code := <-codes
+		if code == http.StatusOK {
+			ok++
+		} else {
+			assert.Equal(t, http.StatusConflict, code, "a request that met the delivery in progress is told to retry") // #13998
+		}
 	}
+	assert.GreaterOrEqual(t, ok, 1, "the first one went through")
 	assert.Len(t, c.comments(t), 1, "one comment")
 	assert.Len(t, c.messages(t), 1, "one notice")
 }
@@ -357,11 +364,11 @@ func TestAnyoneButTheOwnerGetsOwnerOnlyAndNothingIsWritten(t *testing.T) {
 	assert.Empty(t, asks, "no ask")
 }
 
-// #13998: the notice is claimed under the artifact's lock and delivered outside it. A slow delivery holds no other request for the same artifact, and still one comment and one notice come of it.
-func TestASlowDeliveryDoesNotHoldASecondRequestAndStillMakesOneNotice(t *testing.T) {
-	c := newChangesEnv(t)
-	entered := make(chan struct{})
-	release := make(chan struct{})
+// #13998: the notice is claimed under the artifact's lock and delivered outside it. A slow delivery holds no other request for the same artifact; a request of the same words while it is open answers 409
+// already_in_progress and changes nothing (never "ok" about a comment the first one may yet undo).
+func slowFirstDelivery(t *testing.T, c *changesEnv) (entered, release chan struct{}) {
+	t.Helper()
+	entered, release = make(chan struct{}), make(chan struct{})
 	var once sync.Once
 	c.sh.changeDelivering = func() {
 		once.Do(func() {
@@ -369,16 +376,22 @@ func TestASlowDeliveryDoesNotHoldASecondRequestAndStillMakesOneNotice(t *testing
 			<-release // the first request's delivery is slow
 		})
 	}
+	return entered, release
+}
+
+func TestASecondRequestWhileTheNoticeIsBeingDeliveredGets409AndTheFirstStillMakesOneNotice(t *testing.T) {
+	c := newChangesEnv(t)
+	entered, release := slowFirstDelivery(t, c)
 	words := `{"decision":"changes","text":"Use 5,000 rows per batch."}`
 	firstDone := make(chan int, 1)
 	go func() { code, _ := c.changesNoT(words); firstDone <- code }()
 	<-entered // the first has made the comment, claimed the notice and let go of the lock
-	secondDone := make(chan map[string]any, 1)
-	go func() { _, out := c.changesNoT(words); secondDone <- out }()
+	secondDone := make(chan []any, 1)
+	go func() { code, out := c.changesNoT(words); secondDone <- []any{code, out} }()
 	select {
-	case out := <-secondDone:
-		assert.Equal(t, true, out["text_kept"])
-		assert.Equal(t, "already_sent", out["reason"], "the notice is the first request's to deliver")
+	case r := <-secondDone:
+		assert.Equal(t, http.StatusConflict, r[0], "not ok: the first may yet fail")
+		assert.Equal(t, "already_in_progress", r[1].(map[string]any)["code"])
 	case <-time.After(10 * time.Second):
 		close(release)
 		t.Fatal("the second request waited for the first one's delivery")
@@ -388,9 +401,37 @@ func TestASlowDeliveryDoesNotHoldASecondRequestAndStillMakesOneNotice(t *testing
 	assert.Equal(t, http.StatusOK, <-firstDone)
 	assert.Len(t, c.comments(t), 1, "one comment")
 	assert.Len(t, c.messages(t), 1, "one notice")
-	// the claim is dropped when the delivery is done: the same words again find the ask and send nothing more
+	// after the first finished, the same words find the ask: ok, nothing more sent
 	code, again := c.changes(t, words)
 	require.Equal(t, http.StatusOK, code, again)
+	assert.Equal(t, "already_sent", again["reason"])
+	assert.Len(t, c.messages(t), 1)
+}
+
+// QA's test: hold the first delivery open, the second gets 409, then the first fails: nobody was told ok, nothing is left, and a retry delivers.
+func TestWhenTheFirstDeliveryFailsAfterASecondGot409NobodyWasTold(t *testing.T) {
+	c := newChangesEnv(t)
+	before := c.state(t)
+	entered, release := slowFirstDelivery(t, c)
+	words := `{"decision":"changes","text":"Use 5,000 rows."}`
+	firstDone := make(chan int, 1)
+	go func() { code, _ := c.changesNoT(words); firstDone <- code }()
+	<-entered
+	code, out := c.changesNoT(words)
+	assert.Equal(t, http.StatusConflict, code, out)
+	assert.Equal(t, "already_in_progress", out["code"])
+	_, err := c.sh.db.ExecContext(context.Background(), `ALTER TABLE artifact_comment_asks RENAME TO asks_away`) // the first one's delivery now fails
+	require.NoError(t, err)
+	close(release)
+	assert.GreaterOrEqual(t, <-firstDone, 500)
+	assert.Equal(t, before, c.state(t), "the decision is undone")
+	assert.Empty(t, c.comments(t), "and the comment")
+	assert.Empty(t, c.messages(t), "nobody was told")
+	_, err = c.sh.db.ExecContext(context.Background(), `ALTER TABLE asks_away RENAME TO artifact_comment_asks`)
+	require.NoError(t, err)
+	code, out = c.changes(t, words) // the retry
+	require.Equal(t, http.StatusOK, code, out)
+	assert.Equal(t, true, out["delivered"])
 	assert.Len(t, c.messages(t), 1)
 }
 
