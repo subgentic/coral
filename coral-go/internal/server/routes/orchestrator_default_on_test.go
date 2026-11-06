@@ -249,3 +249,66 @@ func TestASiblingWorktreeOfTheTeamsRepoIsTheTeamsFolder(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, code, "a folder outside the repo: %v", out)
 	assert.Equal(t, "outside_team_folder", out["code"])
 }
+
+// #13903: an agent's launch that names no board goes onto its own team's board where the grant is on, so the cap and the log apply; no_board says none is meant; a board with no grant or an off one is as it was.
+func TestAnAgentsLaunchWithNoBoardGoesOntoItsOwnTeamWhereTheGrantIsOn(t *testing.T) {
+	r := newOrchRig(t)
+	ctx := context.Background()
+	r.usualBoard() // Orchestrator and Dev2 awake, Dev asleep
+	launch := func(extra map[string]any) (int, map[string]any) {
+		body := map[string]any{"working_dir": r.work, "agent_type": "claude", "display_name": "Helper"}
+		for k, v := range extra {
+			body[k] = v
+		}
+		b, _ := json.Marshal(body)
+		return r.do("POST", "/api/sessions/launch", string(b), nil, r.tok["Dev2"])
+	}
+	boardOf := func(out map[string]any) string {
+		sid, _ := out["session_id"].(string)
+		ls, err := r.ss.GetLiveSession(ctx, sid)
+		require.NoError(t, err)
+		require.NotNil(t, ls)
+		if ls.BoardName == nil {
+			return ""
+		}
+		return *ls.BoardName
+	}
+	// no grant row: as it was, on no board
+	code, out := launch(nil)
+	require.Equal(t, http.StatusOK, code, out)
+	assert.Equal(t, "", boardOf(out), "grant absent: unchanged")
+	// the grant on: the launch is on the team, logged, and under the cap
+	code, _ = r.operatorGrant("Orchestrator", map[string]any{"max_live": 2, "max_per_hour": 50})
+	require.Equal(t, http.StatusOK, code)
+	code, out = launch(nil)
+	require.Equal(t, http.StatusOK, code, out)
+	assert.Equal(t, orchBoard, boardOf(out), "the grant on: its own team")
+	log, err := r.h.bs.LifecycleLog(ctx, orchBoard, 20)
+	require.NoError(t, err)
+	var launches int
+	for _, e := range log {
+		if e.Kind == board.LifecycleLaunch {
+			launches++
+		}
+	}
+	assert.Equal(t, 1, launches, "logged to the team")
+	// one more fits (Dev2 and the first helper are live besides the seat: two), the next is the cap
+	code, out = launch(nil)
+	assert.Equal(t, http.StatusTooManyRequests, code, "the cap holds for a launch that forgot the board: %v", out)
+	assert.Equal(t, "board_live_limit", out["code"])
+	// no_board is how an agent starts one on no board on purpose
+	code, out = launch(map[string]any{"no_board": true})
+	require.Equal(t, http.StatusOK, code, out)
+	assert.Equal(t, "", boardOf(out))
+	// off again: as it was
+	code, _ = r.do("PUT", "/api/board/"+orchBoard+"/orchestrator-grant", `{"enabled":false,"max_live":2,"max_per_hour":50,"idle_minutes":5}`, operatorClient, "")
+	require.Equal(t, http.StatusOK, code)
+	code, out = launch(nil)
+	require.Equal(t, http.StatusOK, code, out)
+	assert.Equal(t, "", boardOf(out), "the grant off: unchanged")
+	// the Operator's launch with no board is never put on a team
+	b, _ := json.Marshal(map[string]any{"working_dir": r.work, "agent_type": "claude", "display_name": "Mine"})
+	code, out = r.do("POST", "/api/sessions/launch", string(b), operatorClient, "")
+	require.Equal(t, http.StatusOK, code, out)
+	assert.Equal(t, "", boardOf(out))
+}

@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"log/slog"
 	"net/http"
 	"path/filepath"
 
@@ -20,7 +21,13 @@ func (h *SessionsHandler) refuseAgentLaunchOutsideTeam(w http.ResponseWriter, r 
 	if h.bs == nil {
 		return false
 	}
-	if g, err := h.bs.GetOrchGrant(ctx, boardName); err != nil || !g.Enabled {
+	g, gerr := h.bs.GetOrchGrant(ctx, boardName)
+	if gerr != nil {
+		// A grant that cannot be read does not stop a launch on an existing team (nothing there may break on a store hiccup): the rule is skipped, and said in the log with the reason.
+		slog.Warn("the folder rule of an agent's launch was skipped: the board's grant could not be read", "board", boardName, "error", gerr)
+		return false
+	}
+	if !g.Enabled {
 		return false
 	}
 	var roots []string
@@ -49,4 +56,26 @@ func (h *SessionsHandler) refuseAgentLaunchOutsideTeam(w http.ResponseWriter, r 
 	msg := "an agent can start agents only in the team's folder or below it; this folder is outside it. The Operator can start agents anywhere"
 	writeError(w, http.StatusForbidden, "outside_team_folder", msg)
 	return true
+}
+
+// callersBoardWithGrant is the board an agent's launch that named none goes onto (#13903): the board the calling agent is seated on, when the Operator's grant of that board is on. "" for anyone else: the
+// Operator, a caller with no session, a session on no board, a board with no grant row or an off grant.
+func (h *SessionsHandler) callersBoardWithGrant(r *http.Request) string {
+	owner, ok := VerifiedSession(r.Context())
+	if !ok || h.ss == nil || h.bs == nil {
+		return ""
+	}
+	sess, err := h.ss.GetLiveSession(r.Context(), owner.SessionID)
+	if err != nil || sess == nil || sess.BoardName == nil || *sess.BoardName == "" {
+		return ""
+	}
+	g, err := h.bs.GetOrchGrant(r.Context(), *sess.BoardName)
+	if err != nil {
+		slog.Warn("an agent's launch with no board was not put on its team: the board's grant could not be read", "board", *sess.BoardName, "error", err)
+		return ""
+	}
+	if !g.Enabled {
+		return ""
+	}
+	return *sess.BoardName
 }

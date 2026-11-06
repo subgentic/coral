@@ -36,6 +36,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		BoardName       string                 `json:"board_name"`
 		BoardID         string                 `json:"board_id"`  // join this board (#3536)
 		NewBoard        bool                   `json:"new_board"` // create another board even if the name exists
+		NoBoard         bool                   `json:"no_board"`  // an agent that names no board starts this one on none, instead of on its own team's (#13903)
 		BoardServer     string                 `json:"board_server"`
 		Backend         string                 `json:"backend"`
 		BoardType       string                 `json:"board_type"`
@@ -89,6 +90,11 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
 		errBadRequest(w, "working_dir is required")
 		return
+	}
+	// An agent that names no board starts the agent on its own team's board where that team's grant is on (#13903), so the caps and the log apply: a launch that forgot the board is no way round them. no_board says
+	// a launch on no board is meant; a board that has no grant, or one that is off, is as it was.
+	if body.BoardName == "" && body.BoardID == "" && !body.NoBoard && (body.BoardServer == "" || body.BoardServer == "local") {
+		body.BoardID = h.callersBoardWithGrant(r)
 	}
 	// Which board on this Coral the agent joins or starts (#3536); a remote board's Coral decides its own.
 	if (body.BoardName != "" || body.BoardID != "") && (body.BoardServer == "" || body.BoardServer == "local") {
