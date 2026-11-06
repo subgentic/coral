@@ -10,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/testtemp"
 )
 
 // Claude Code's native Windows installer puts claude.exe in %USERPROFILE%\.local\bin and adds that folder to the user's Path, which a Coral that was already running does not see.
@@ -17,11 +19,7 @@ import (
 
 func windowsNativeHome(t *testing.T) string {
 	t.Helper()
-	here, err := filepath.Abs(".")
-	require.NoError(t, err)
-	home, err := os.MkdirTemp(here, "nativehome-") // not in the system temp folder, where a CLI is refused as a temporary one
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.RemoveAll(home) }) // this folder only, by its exact name
+	home := testtemp.OutsideTemp(t) // not in the system temp folder, where a CLI is refused as a temporary one
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("HOME", home)
 	appData, localAppData := filepath.Join(home, "AppData", "Roaming"), filepath.Join(home, "AppData", "Local")

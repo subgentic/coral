@@ -5,10 +5,13 @@ package agent
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/testtemp"
 )
 
 // #11454: Claude Code's native installer puts ~/.local/bin/claude (a link into ~/.local/share/claude/versions/<v>) and an older one ~/.claude/local/claude. Both are fixed common places, the link is
@@ -16,11 +19,7 @@ import (
 
 func nativeHome(t *testing.T) string {
 	t.Helper()
-	here, err := filepath.Abs(".")
-	require.NoError(t, err)
-	home, err := os.MkdirTemp(here, "nativehome-") // not in the system temp folder, where a CLI is refused as a temporary one
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.RemoveAll(home) }) // this folder only, by its exact name
+	home := testtemp.OutsideTemp(t) // not in the system temp folder, where a CLI is refused as a temporary one
 	t.Setenv("HOME", home)
 	t.Setenv("PATH", t.TempDir()) // the server's PATH: it does not hold ~/.local/bin
 	return home
@@ -87,4 +86,16 @@ func TestTheNotFoundAnswerNamesWhatWasRefusedAndWhereItLooked(t *testing.T) {
 	assert.Empty(t, nf.Refused)
 	assert.NotContains(t, nf.Error(), "did not use it")
 	assert.Contains(t, nf.Error(), "~/.local/bin/claude")
+}
+
+// #13745: testtemp.OutsideTemp is a folder agent.InTempFolder does not call temporary, made as any t.TempDir (not in the source folder), and the temp folder is then another one.
+func TestOutsideTempIsNotATempFolderAndNotInTheSourceTree(t *testing.T) {
+	home := testtemp.OutsideTemp(t)
+	assert.False(t, InTempFolder(home), "the folder is not in the temp folder any more")
+	assert.True(t, InTempFolder(filepath.Join(os.TempDir(), "x")), "the temp folder moved: a path in os.TempDir() is still temporary")
+	here, err := filepath.Abs(".")
+	require.NoError(t, err)
+	rel, err := filepath.Rel(here, home)
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(rel, ".."), "and not inside the package's source folder: %s", rel)
 }

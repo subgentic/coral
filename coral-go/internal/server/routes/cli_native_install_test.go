@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/testtemp"
+
 	"github.com/subgentic/coral/internal/agent"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -33,12 +35,8 @@ type nativeRig struct {
 func newNativeRig(t *testing.T) *nativeRig {
 	t.Helper()
 	_, h, _, ss := setupSessionsTestServer(t)
-	// The fake home is in the package's own folder, not in the system temp folder: a CLI there is refused as a temporary one before any screen (agent.InTempFolder), which is not what these tests are about.
-	here, err := filepath.Abs(".")
-	require.NoError(t, err)
-	home, err := os.MkdirTemp(here, "nativehome-")
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.RemoveAll(home) }) // this folder only, by its exact name
+	// The fake home is not in the system temp folder: a CLI there is refused as a temporary one before any screen (agent.InTempFolder), which is not what these tests are about.
+	home := testtemp.OutsideTemp(t)
 	t.Setenv("HOME", home)
 	prevSys := agent.CommonSystemBinDirs // the machine's own install places (a runner's /usr/local/bin) are not these tests': they own every place a CLI could be found (#12423)
 	agent.CommonSystemBinDirs = func() []string { return nil }
