@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -56,9 +57,12 @@ func TestExtractWritesFilesAndFoldersAndClearsSpecialBits(t *testing.T) {
 	assert.Equal(t, "hello", string(got))
 	fi, _ := os.Stat(filepath.Join(dir, "a/b/c.txt"))
 	assert.Zero(t, fi.Mode()&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky), "no setuid, setgid or sticky bit")
-	assert.Equal(t, os.FileMode(0o700), fi.Mode().Perm(), "the owner-execute bit was on in the archive: 0700")
+	unixModes := runtime.GOOS != "windows" // Windows has no owner/group/world bits: the special-bit check above is all there is to ask of it
 	fx, _ := os.Stat(filepath.Join(dir, "run.sh"))
-	assert.Equal(t, os.FileMode(0o700), fx.Mode().Perm())
+	if unixModes {
+		assert.Equal(t, os.FileMode(0o700), fi.Mode().Perm(), "the owner-execute bit was on in the archive: 0700")
+		assert.Equal(t, os.FileMode(0o700), fx.Mode().Perm())
+	}
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "x"), nil, 0o600))
 	_, err = Extract(t.TempDir(), mkTar(t, ent{name: "plain.txt", body: "p", mode: 0o666}), Limits{Files: 10, Bytes: 100})
 	require.NoError(t, err)
@@ -66,9 +70,11 @@ func TestExtractWritesFilesAndFoldersAndClearsSpecialBits(t *testing.T) {
 	_, err = Extract(d2, mkTar(t, ent{name: "plain.txt", body: "p", mode: 0o666}, ent{name: "dir/", typ: tar.TypeDir, mode: 0o777}), Limits{Files: 10, Bytes: 100})
 	require.NoError(t, err)
 	fp, _ := os.Stat(filepath.Join(d2, "plain.txt"))
-	assert.Equal(t, os.FileMode(0o600), fp.Mode().Perm(), "no owner-execute: 0600, whatever the group and world bits were")
 	fd, _ := os.Stat(filepath.Join(d2, "dir"))
-	assert.Equal(t, os.FileMode(0o700), fd.Mode().Perm(), "folders are 0700")
+	if unixModes {
+		assert.Equal(t, os.FileMode(0o600), fp.Mode().Perm(), "no owner-execute: 0600, whatever the group and world bits were")
+		assert.Equal(t, os.FileMode(0o700), fd.Mode().Perm(), "folders are 0700")
+	}
 }
 
 func TestExtractRefusesNamesThatLeaveTheFolderAndEverythingNotAFileOrFolder(t *testing.T) {

@@ -64,6 +64,11 @@ func cmdHeavy() {
 		exitFn(1)
 		return
 	}
+	if why := heavyUnsupportedHere(); why != "" {
+		fmt.Fprintln(os.Stderr, "[heavy] "+why)
+		exitFn(1)
+		return
+	}
 	fs := flag.NewFlagSet("heavy-run", flag.ContinueOnError)
 	pool := fs.String("pool", "heavy", "the pool to claim")
 	timeout := fs.Duration("timeout", 90*time.Minute, "stop the command after this long (at most 2h)")
