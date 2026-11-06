@@ -161,6 +161,7 @@ func (h *SessionsHandler) dialogPass(ctx context.Context, now time.Time) {
 			h.opencodeDialogTimeout(ctx, a, timeout, now)
 		}
 	}
+	h.autoRecommend.keepOnly(live)
 	sort.Slice(awake, func(i, j int) bool { return awake[i].sid < awake[j].sid })
 	if len(awake) == 0 {
 		return
@@ -188,6 +189,7 @@ func (h *SessionsHandler) dialogPass(ctx context.Context, now time.Time) {
 		if timeout > 0 && shown {
 			h.dialogTimeout(ctx, a, timeout, now) // the team's dialog timeout (dialog_timeout.go): only for an agent on a team board that turned it on
 		}
+		h.autoRecommend.pass(ctx, a, screen, shown, now)
 	}
 }
 

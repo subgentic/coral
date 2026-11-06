@@ -15,7 +15,7 @@ export const TYPE_WORDS = {
     goal: ['goal'],
     confidence: ['confidence'],
     stop: ['stop', 'notification'],
-    auto_accept: ['auto_accept', 'auto_accept_paused', 'auto_accept_skipped', 'auto_accept_cleared', 'auto_accept_enabled', 'auto_accept_disabled'],
+    auto_accept: ['auto_accept', 'auto_accept_paused', 'auto_accept_skipped', 'auto_accept_cleared', 'auto_accept_enabled', 'auto_accept_disabled', 'auto_recommend', 'auto_recommend_notice_not_typed'],
 };
 export const TYPES = Object.keys(TYPE_WORDS);
 export const TYPE_LABEL = {
