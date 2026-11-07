@@ -227,27 +227,28 @@ function drawStatus(data) {
     const live = (state.liveSessions || []).filter(row => inTeam(row, S.team));
     const n = live.filter(needsYou).length;
     if (live.length && (!data || !data.agents?.length)) data = { agents: live.map(row => ({ availability: row.sleeping ? 'sleeping' : 'unknown' })) };
-    if (!data || !Array.isArray(data.agents)) { s.textContent = ''; s.className = 'team-page-status'; return; } // kept in the page and empty: a live region that is shown and filled in one turn is not announced
+    if (!data || !Array.isArray(data.agents)) { s.textContent = 'Status unavailable'; s.className = 'team-page-status unknown'; const health = $('team-page-health'); if (health) health.hidden = true; return; } // kept in the page and empty: a live region that is shown and filled in one turn is not announced
     // a team with no agent has nothing to be well: a name no board has (a mistyped /team/<name>) said All well in green (#8839 c); say nothing
     if (!data.agents.length) { s.textContent = ''; s.className = 'team-page-status'; const hb = $('team-page-health'); if (hb) hb.hidden = true; return; }
+    const uncertainAttention = data.agents.filter(agent => ['needs_input', 'waiting'].includes(agent.availability)).length > n;
     const waking = wakingSince(S.team) > 0;
     // no signal yet, or (right after Wake, while the read still says so) still asleep: nothing says they are well (#10006), and a just-woken team is counted as it reports (#10052, #10359)
     const notYet = a => a.availability === 'unknown' || (waking && a.availability === 'sleeping');
     const unknown = data.agents.filter(notYet).length;
-    S.unknown = unknown; // while an agent has not reported, the page reads again every 3 s (startCounts)
+    S.unknown = uncertainAttention ? Math.max(1, unknown) : unknown; // while an agent has not reported, the page reads again every 3 s (startCounts)
     const asleep = !waking && teamAsleep(); // every agent of the team asleep: "Asleep", not "All well" in green (Mobile tester, #10359)
     // Just woken from here: how many have reported so far, until all have (or two minutes pass), not only "waiting" (#10052).
     const wakingNow = unknown > 0 && !n && waking;
     if (!unknown) stopWaking(S.team);
-    const text = asleep ? 'Asleep' : wakingNow ? `Waking the team: ${data.agents.length - unknown} of ${data.agents.length} agents have sent their first message.` : n ? `${n} ${n === 1 ? 'needs' : 'need'} attention` : unknown ? `${unknown === data.agents.length ? 'Waiting for first signal' : `${unknown} of ${data.agents.length} waiting for first signal`}. A signal is an agent's first message.` : 'All well';
+    const text = uncertainAttention ? 'Checking attention status' : asleep ? 'Asleep' : wakingNow ? `Waking the team: ${data.agents.length - unknown} of ${data.agents.length} agents have sent their first message.` : n ? `${n} ${n === 1 ? 'needs' : 'need'} attention` : unknown ? `${unknown === data.agents.length ? 'Waiting for first signal' : `${unknown} of ${data.agents.length} waiting for first signal`}. A signal is an agent's first message.` : 'All well';
     // When agents need attention the visible status is a button to the Agents tab (beside the live region, which keeps saying it and is then only for a screen reader: the button's name is not announced twice); "All well" is plain text.
     const b = $('team-page-health');
     if (b) {
-        b.hidden = !n;
-        if (n) { b.replaceChildren(Object.assign(el('span', 'team-status-dot'), {}), document.createTextNode(text)); b.firstChild.setAttribute('aria-hidden', 'true'); b.setAttribute('aria-label', `Team health: ${text}`); }
+        b.hidden = !n || uncertainAttention;
+        if (n && !uncertainAttention) { b.replaceChildren(Object.assign(el('span', 'team-status-dot'), {}), document.createTextNode(text)); b.firstChild.setAttribute('aria-hidden', 'true'); b.setAttribute('aria-label', `Team health: ${text}`); }
     }
     if (s.textContent === text) return; // the same words are not said again
-    s.className = `team-page-status ${asleep ? 'unknown' : n ? 'needs sr-only' : unknown ? 'unknown' : 'well'}`; // Asleep takes the neutral dot, as waiting does
+    s.className = `team-page-status ${uncertainAttention || asleep ? 'unknown' : n ? 'needs sr-only' : unknown ? 'unknown' : 'well'}`; // Asleep takes the neutral dot, as waiting does
     const dot = el('span', 'team-status-dot'); dot.setAttribute('aria-hidden', 'true');
     s.replaceChildren(dot, document.createTextNode(text));
 }
