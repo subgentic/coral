@@ -67,7 +67,7 @@
 // Disk: a run's temp folder holds the built binary and every shard's data dir and Chrome profile (about
 // 250 MB). On exit it is deleted when every suite passed on its first attempt; otherwise (a failure, a
 // flaky suite, an interrupt) only results.json and the coral.log files are kept, for diagnosis. --keep
-// keeps the whole folder.
+// keeps the whole folder for CORAL_CDP_BINARY_HOURS (3) hours: the next run removes the binaries and profiles of any folder older than that, whatever left it (a killed run, a harness timeout, --keep).
 //
 // Before every suite attempt, the shard's Chrome gets one fresh about:blank tab (every other page is
 // closed) and the Coral origin's browser storage (localStorage, sessionStorage via the fresh tab,
@@ -95,7 +95,7 @@ import { loadDurations, orderLongestFirst, partsByDuration } from './suite_order
 import { failingOutput } from './failing_output.mjs';
 import { suiteTimeoutS } from './suite_timeout.mjs';
 import { shardDirName } from './shard_dir.mjs';
-import { pruneOldRunFolders, liveRunFolders, KEEP_RUNS, KEEP_HOURS } from './helpers/run_folders.mjs';
+import { pruneOldRunFolders, stripOldRunFolders, liveRunFolders, KEEP_RUNS, KEEP_HOURS, BINARY_HOURS } from './helpers/run_folders.mjs';
 import { sqliteAvailable, sqliteExec } from './helpers/sqlite.js';
 import { redactEvidence as redactEvidenceText } from './helpers/redact_evidence.mjs';
 import { snapshot as serverSnapshot, diff as serverDiff, rowLeaks, restoreSettings, leftovers, cleanup as cleanupLeftovers } from './helpers/server_state.mjs';
@@ -296,6 +296,12 @@ const tmp = fs.mkdtempSync(path.join(tempRoot, 'coral-cdp-'));
 {
   const gone = pruneOldRunFolders(tempRoot, { own: tmp, live: liveRunFolders(tempRoot, isAlive), keep: Number(process.env.CORAL_CDP_KEEP_RUNS || KEEP_RUNS), hours: Number(process.env.CORAL_CDP_KEEP_HOURS || KEEP_HOURS) });
   if (gone.length) console.log(`removed ${gone.length} old run folder(s) from ${tempRoot} (keeping the newest ${process.env.CORAL_CDP_KEEP_RUNS || KEEP_RUNS} and any from the last ${process.env.CORAL_CDP_KEEP_HOURS || KEEP_HOURS} h)`);
+}
+// What is big in the folders that stay (#14022): the binaries and profiles of a run folder older than CORAL_CDP_BINARY_HOURS (3) hours go, whatever left them (a killed run, a harness timeout, --keep); only
+// results.json and the coral.log files stay for the rest of the keep window.
+{
+  const freed = stripOldRunFolders(tempRoot, { own: tmp, live: liveRunFolders(tempRoot, isAlive), hours: Number(process.env.CORAL_CDP_BINARY_HOURS || BINARY_HOURS) });
+  if (freed.length) console.log(`removed the binaries and profiles of ${freed.length} run folder(s) older than ${process.env.CORAL_CDP_BINARY_HOURS || BINARY_HOURS} h in ${tempRoot}`);
 }
 // Windows: a folder made under the runner's temp inherits an access list that lets other accounts change it (BUILTIN\\Users here), which Coral warns about in the
 // dashboard of every shard server: a "Security warning" toast over the page's bottom controls at phone width (sleeping_agent_view's Wake, ui_audit_batch4's Cancel) and
