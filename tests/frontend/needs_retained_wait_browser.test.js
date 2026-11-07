@@ -21,7 +21,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
    await waitFor(`document.querySelector('#group-table-view')?.textContent.includes('Still waiting in its terminal')`,'retained wait explanation');
    await waitFor(`!!document.querySelector('#group-table-view .inbox-open-agent')`,'Open agent remains available');
    assert.equal(await ev(`document.querySelectorAll('#group-table-view .inbox-answer, #group-table-view .inbox-dismiss').length`),0,'no stale answers or repeat Dismiss');
-   await ev(`import((window.__coralStatic||'/static/')+'team_page.js').then(m=>m.openTeamPage(${JSON.stringify(team)}))`);
+   await ev(`window.openTeamPage(${JSON.stringify(team)})`);
    await waitFor(`document.querySelector('#team-page-health')?.textContent.includes('1 needs attention')`,'team status counts the same retained wait');
    await ev(`window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
    await waitFor(`!!document.querySelector('#group-table-view .inbox-open-agent')`,'return to retained row');
