@@ -44,7 +44,7 @@ func TestAMachineThatNeverMakesTheFolderSaysWhyAndNothingSecretPrints(t *testing
 	for _, secret := range []string{"chb_SECRETSECRET", "b3BlbnNzaC1rZXkt", "BEGIN OPENSSH PRIVATE KEY", strings.Repeat("QUJD", 30), "\x1b", "\x07", "\u202e"} {
 		assert.NotContains(t, msg, secret)
 	}
-	assert.Less(t, len(msg), 3600, "capped")
+	assert.Less(t, len(msg), 6600, "capped")
 	assert.Equal(t, 0, len(m.delivered), "nothing was sent")
 }
 

@@ -92,7 +92,7 @@ WantedBy=multi-user.target
 `, egressUnitName, egressCheckPath)
 }
 
-// EgressCheckScript is the check, run as root. "rules" (after the load, fatal): the table is there with both of its rules. "resolvers" (after network-online.target, report only): none of the machine's DNS
+// EgressCheckScript is the check, run as root. "state" (#12885) prints the machine's DNS and egress state for the launcher's failure report and always exits 0. "rules" (after the load, fatal): the table is there with both of its rules. "resolvers" (after network-online.target, report only): none of the machine's DNS
 // resolvers is inside a blocked range; it says what is wrong on standard error (the journal) and exits 0 either way.
 func EgressCheckScript() string {
 	return fmt.Sprintf(`#!/bin/sh
@@ -113,7 +113,20 @@ resolvers)
     esac
   done
   ;;
-*) echo "usage: coral-egress-check rules|resolvers" >&2; exit 2 ;;
+state)
+  # what the machine knows about its DNS and the egress table, for the launcher's failure report (#12885): read by root, kept in /run/coral/dns.txt for the launch key's user. It only reports and always exits 0.
+  # Order matters: the launcher's report keeps only the END of this file, so the bulky parts (each capped) come first and the short, high-value lines last: the clock, the service states, the NTP state, cloud-init.
+  echo "== nft table"; /usr/sbin/nft list table inet %[1]s 2>&1 | head -c 600 || true
+  echo "== journal: coral-egress-resolvers, systemd-resolved"; journalctl -u coral-egress-resolvers -u systemd-resolved --no-pager 2>&1 | tail -n 40 | tail -c 1200 || true
+  echo "== upstream resolvers (resolved)"; cat /run/systemd/resolve/resolv.conf 2>&1 | grep -v '^#' | head -c 250 || true
+  echo "== /etc/resolv.conf"; cat /etc/resolv.conf 2>&1 | grep -v '^#' | head -c 400 || true
+  echo "== resolvectl status"; resolvectl status 2>&1 | head -n 20 | head -c 800 || true
+  echo "== cloud-init status --long"; cloud-init status --long 2>&1 | head -n 8 | head -c 300 || true
+  echo "== systemctl is-active (network-online, timesyncd, resolved)"; systemctl is-active network-online.target 2>&1 || true; systemctl is-active systemd-timesyncd 2>&1 || true; systemctl is-active systemd-resolved 2>&1 || true
+  echo "== timedatectl"; timedatectl show -p NTPSynchronized -p Timezone 2>&1 || true
+  echo "== date -u / uptime -s"; date -u 2>&1 || true; uptime -s 2>&1 || true
+  ;;
+*) echo "usage: coral-egress-check rules|resolvers|state" >&2; exit 2 ;;
 esac
 `, egressTableName)
 }
