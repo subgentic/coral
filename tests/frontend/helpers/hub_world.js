@@ -69,6 +69,7 @@ async function setupHubWorld({ client, Page, Emulation, width, height, mobile, i
     if(p.pathname==='/api/servers')return json({servers:computers});
     if(p.pathname==='/api/settings'&&m==='GET')return json({settings:{}});
     const match=p.pathname.match(/^\\/api\\/remote\\/([^/]+)(\\/api\\/.*)$/);
+    if(!match&&p.pathname==='/api/needs-you'){(window.__bareNeedsYou=window.__bareNeedsYou||[]).push(p.pathname+p.search);return Promise.resolve(new Response('{"error":"not found"}',{status:404,headers:{'content-type':'application/json'}}));} // the Hub's own origin has no Needs you route: only /api/remote/<computer>/api/needs-you exists (#14046)
     if(!match)return original(u,o);
     const [_,server,path]=match;window.__remoteRequests.push({server,path,method:m,query:p.search});
     if(path==='/api/sessions/history' && server==='m1' && window.__holdHistory) return new Promise(resolve=>{window.__releaseHistory=()=>resolve(new Response(JSON.stringify({sessions:[{session_id:'same-chat',title:'OLD LAPTOP RESULT'}],total:1}),{headers:{'content-type':'application/json'}}));});
@@ -82,6 +83,7 @@ async function setupHubWorld({ client, Page, Emulation, width, height, mobile, i
     if(path.includes('/changes'))return Promise.resolve(new Response('Changes from '+server));
     if(path==='/api/tags'||/\\/(tags|events|tasks|agent-notes|files)$/.test(path))return json([]);
     if(path.endsWith('/git'))return json({commits:[]});
+    if(path==='/api/needs-you'&&/kind=skill/.test(p.search)){if(window.__skillsFail&&window.__skillsFail.includes(server))return Promise.resolve(new Response('{}',{status:500,headers:{'content-type':'application/json'}}));return json({count:1,counts:{skill:1},items:[{kind:'skill',id:'skill:'+(server==='m1'?7:8),line:'Skill deploy-'+server,from:'Dev',team:'release',at:'2026-11-06T10:00:00Z'}]});}
     if(path==='/api/goals')return json({goals:[{id:1,board_id:'same-team',board_label:'Release team',title:'Goal from '+server,state:'active',done_when:'Done on '+server,rollup:{done:0,active:0,blocked:0,queued:1,total:1}}]});
     if(path==='/api/team-artifacts'){if(window.__artifactsOwnerOnly&&(window.__artifactsOwnerOnly===true||window.__artifactsOwnerOnly.includes(server)))return Promise.resolve(new Response(JSON.stringify({error:'owner_only',code:'owner_only'}),{status:403,headers:{'content-type':'application/json'}}));return json({artifacts:[{id:'art-'+server,name:'report-'+server+'.md',board_id:'same-team',media_type:'text/markdown',size:12,created_at:'2026-10-22T12:00:00Z'}],limit:100,offset:0,has_more:false,truncated:false,total:1,all:1,teams:[{board_id:'same-team',team:'Release team',all:1}]});}
     if(path==='/api/board/projects')return json([{project:'same-team',board_label:'Release team',message_count:1,subscriber_count:1}]);

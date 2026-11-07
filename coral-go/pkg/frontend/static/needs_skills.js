@@ -6,24 +6,33 @@ import { readOutcome as gap } from './needs_incomplete.js';
 
 let pending = [], hubCount = null;
 
-/** Read the skills that wait. On a computer: GET /api/skills?status=pending. Through a Hub (#13841): one read of GET /api/needs-you?kind=skill gives the rows and the count of every skill waiting, shown as plain text
- *  with "approve at the computer" and no buttons (the Hub cannot approve one). A refused or missing route, or a failed read, is not "no skills": the rows stay as they were and the Inbox says not everything is shown
- *  (needs_incomplete.js); only a 200 with an empty list is nothing waiting. */
-export async function loadPendingSkills({ hub = false } = {}) {
+/** Read the skills that wait. On a computer: GET /api/skills?status=pending. Through a Hub (#13841): each computer's own GET /api/needs-you?kind=skill, read through the Hub's /api/remote/<computer>/ (#14046: a bare path is the Hub's
+ *  own origin, which has no such route, so every Inbox load said "skills from hub could not be read"), gives the rows and the count of every skill waiting there, shown with "approve at the computer" and no buttons (the Hub
+ *  cannot approve one). `sources` are the computers to read and `urlOf(path, server)` is how a path reaches one (the caller has both: this module has no imports, see the top). A refused or missing route, or a failed read,
+ *  is not "no skills": that computer's rows stay as they were and the Inbox says not everything is shown, naming it (needs_incomplete.js); only a 200 with an empty list is nothing waiting. One computer's failure
+ *  marks only its own source. */
+const byServer = new Map(); // server -> { rows, count }
+export async function loadPendingSkills({ hub = false, sources = [], urlOf = null } = {}) {
     if (hub) {
-        try {
-            const r = await fetch('/api/needs-you?kind=skill');
-            if (!r.ok) { gap('skills', 'hub', false); if (r.status === 401 || r.status === 403) { pending = []; hubCount = 0; } return pending; } // access taken away: none drawn, and the note says so
-            const d = await r.json();
-            if (!d || !Array.isArray(d.items)) { gap('skills', 'hub', false); return pending; } // not a list: not "nothing waiting"
-            const items = d.items;
-            pending = items.filter(i => i && i.kind === 'skill' && typeof i.id === 'string').map(i => ({ id: i.id, hub: true, line: String(i.line || ''), publisher_agent: i.from || '', publisher_team: i.team || '', created_at: i.at || '' }));
-            const n = Number(d && d.counts && d.counts.skill);
-            hubCount = Number.isFinite(n) && n >= pending.length ? n : pending.length;
-            gap('skills', 'hub', true);
-        } catch { gap('skills', 'hub', false); }
+        const servers = [...new Set((sources || []).filter(s => typeof s === 'string' && s))];
+        for (const gone of [...byServer.keys()]) if (!servers.includes(gone)) { byServer.delete(gone); gap('skills', gone, true); } // a computer no longer read has no note either
+        await Promise.all(servers.map(async server => {
+            try {
+                const r = await fetch(urlOf ? urlOf('/api/needs-you?kind=skill', server) : '/api/needs-you?kind=skill');
+                if (!r.ok) { gap('skills', server, false); if (r.status === 401 || r.status === 403) byServer.set(server, { rows: [], count: 0 }); return; } // access taken away: none drawn, and the note says so
+                const d = await r.json();
+                if (!d || !Array.isArray(d.items)) { gap('skills', server, false); return; } // not a list: not "nothing waiting"
+                const rows = d.items.filter(i => i && i.kind === 'skill' && typeof i.id === 'string').map(i => ({ id: i.id, hub: true, server, line: String(i.line || ''), publisher_agent: i.from || '', publisher_team: i.team || '', created_at: i.at || '' }));
+                const n = Number(d && d.counts && d.counts.skill);
+                byServer.set(server, { rows, count: Number.isFinite(n) && n >= rows.length ? n : rows.length });
+                gap('skills', server, true);
+            } catch { gap('skills', server, false); }
+        }));
+        pending = servers.flatMap(server => (byServer.get(server) || { rows: [] }).rows);
+        hubCount = servers.reduce((sum, server) => sum + (byServer.get(server) || { count: 0 }).count, 0);
         return pending;
     }
+    byServer.clear();
     hubCount = null;
     try { const r = await fetch('/api/skills?status=pending'); if (!r.ok) { gap('skills', 'local', false); if (r.status === 401 || r.status === 403) pending = []; } else { const got = (await r.json()).skills; if (Array.isArray(got)) { pending = got; gap('skills', 'local', true); } else gap('skills', 'local', false); } } catch { gap('skills', 'local', false); }
     return pending;
@@ -36,7 +45,7 @@ const who = r => `${marked(r.publisher_agent) || 'An agent'}${r.publisher_team ?
 
 /** The rows Needs you draws, in the shape of the other items. */
 export const skillRows = () => pending.map(r => ({
-    skillReview: r, session_id: `skill_review:${String(r.id).replace(/^skill:/, '')}`, display_name: marked(r.hub ? r.line : r.name), board_project: marked(r.publisher_team), server: LOCAL_SERVER, waiting_kind: 'skill_review',
+    skillReview: r, session_id: `skill_review:${r.server && r.server !== LOCAL_SERVER ? r.server + ':' : ''}${String(r.id).replace(/^skill:/, '')}`, display_name: marked(r.hub ? r.line : r.name), board_project: marked(r.publisher_team), server: r.server || LOCAL_SERVER, waiting_kind: 'skill_review',
     waiting_summary: r.hub ? `Published by ${who(r)} · approve at the computer` : `Published by ${who(r)}${r.has_scripts || r.not_reviewable ? ' · has files to review' : ''}`, waiting_since: r.created_at,
 }));
 

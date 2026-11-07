@@ -30,8 +30,8 @@
       "reason": "Automations (scheduled jobs and workflows) run on this computer: the page has no server for them"
     },
     "needs_skills.js": {
-      "count": 2,
-      "reason": "the local read (/api/skills?status=pending) is this computer's alone: the Skills Store stays on the computer. Through a Hub the one read of what waits (/api/needs-you?kind=skill) is the Hub's own list, shown as text to approve at the computer (#13841)"
+      "count": 1,
+      "reason": "the local read (/api/skills?status=pending) is this computer's alone: the Skills Store stays on the computer. Through a Hub each computer's own list of what waits (/api/needs-you?kind=skill) is read with serverUrl over inboxSources, shown as text to approve at the computer (#13841, #14046)"
     },
     "received_cap_notice.js": {
       "count": 1,

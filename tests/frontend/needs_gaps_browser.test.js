@@ -33,17 +33,17 @@ const { coralReady, framesJs } = require('./helpers/wait');
         // through a Hub: one read of /api/needs-you?kind=skill gives the rows and the count, as plain text with no controls
         const hub = await ev(`(async () => { const g = await import(${S} + 'needs_incomplete.js'), sk = await import(${S} + 'needs_skills.js'), original = window.fetch; const out = {}; const seen = [];
             window.fetch = (u, o) => { const url = new URL(String(u), location.origin); seen.push(url.pathname + url.search); if (url.pathname === '/api/needs-you') return Promise.resolve(new Response(JSON.stringify({ count: 9, counts: { skill: 3 }, items: [{ kind: 'skill', from: 'Dev', line: 'Dev published skill dep\\u202Eloy', team: 'ops', id: 'skill:7', at: '2026-11-06T01:00:00Z' }] }), { status: 200 })); return original(u, o); };
-            await sk.loadPendingSkills({ hub: true }); const rows = sk.skillRows(); window.fetch = original;
+            await sk.loadPendingSkills({ hub: true, sources: ['hub'], urlOf: p => p }); const rows = sk.skillRows(); window.fetch = original;
             return { seen, n: rows.length, count: sk.skillCount(), line: rows[0] && sk.skillLine(rows[0].skillReview), summary: rows[0] && rows[0].waiting_summary, hub: rows[0] && rows[0].skillReview.hub, id: rows[0] && rows[0].session_id, note: g.incompleteNote() }; })()`);
         check(hub.seen.length === 1 && hub.seen[0] === '/api/needs-you?kind=skill', 'one read, of the one list of what waits: ' + JSON.stringify(hub.seen));
         check(hub.n === 1 && hub.count === 3 && hub.hub === true, 'the rows and the count the computer gave: ' + JSON.stringify(hub));
         check(/dep<U\+202E>loy/.test(hub.line) && !/\u202e/.test(hub.line), 'the line is plain text, the reordering character written out: ' + JSON.stringify(hub.line));
-        check(/approve at the computer/.test(hub.summary) && hub.id === 'skill_review:7' && hub.note === '', 'it says approve at the computer: ' + JSON.stringify(hub));
+        check(/approve at the computer/.test(hub.summary) && hub.id === 'skill_review:hub:7' && hub.note === '', 'it says approve at the computer: ' + JSON.stringify(hub));
         // a failed hub read (a server error) keeps the rows and says it is not everything; a refused one (403: access was taken away) drops them and still says so (the Orchestrator's decision on #13841)
         const refused = await ev(`(async () => { const g = await import(${S} + 'needs_incomplete.js'), sk = await import(${S} + 'needs_skills.js'), original = window.fetch; const out = {};
             const answer = status => { window.fetch = (u, o) => (String(u).includes('/api/needs-you') ? Promise.resolve(new Response('{}', { status })) : original(u, o)); };
-            answer(500); await sk.loadPendingSkills({ hub: true }); out.failed = { n: sk.skillRows().length, note: g.incompleteNote() };
-            answer(403); await sk.loadPendingSkills({ hub: true }); out.refused = { n: sk.skillRows().length, note: g.incompleteNote(), count: sk.skillCount() };
+            answer(500); await sk.loadPendingSkills({ hub: true, sources: ['hub'], urlOf: p => p }); out.failed = { n: sk.skillRows().length, note: g.incompleteNote() };
+            answer(403); await sk.loadPendingSkills({ hub: true, sources: ['hub'], urlOf: p => p }); out.refused = { n: sk.skillRows().length, note: g.incompleteNote(), count: sk.skillCount() };
             window.fetch = original; return out; })()`);
         check(refused.failed.n === 1 && /skills from hub could not be read/.test(refused.failed.note), 'a failed hub read keeps the rows and says not everything is shown: ' + JSON.stringify(refused.failed));
         check(refused.refused.n === 0 && refused.refused.count === 0 && /skills from hub could not be read/.test(refused.refused.note), 'a refused hub read drops the rows and still says so: ' + JSON.stringify(refused.refused));
