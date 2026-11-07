@@ -61,6 +61,23 @@ const { connect } = require('./agent_view_harness');
             check(!s.bar && !s.wake && !s.paneSleeping && !s.inputDisabled, `${at}the chat stays awake after the refusal: ` + JSON.stringify(s));
             check((await ev(`[...document.querySelectorAll('.toast')].map(e => e.textContent.trim())`)).some(t => /not sleeping/i.test(t)), `${at}the refusal is told`);
 
+            // two agents of ONE name on two computers (their session ids differ): waking this computer's leaves the chat open on the other computer's alone (#14323, QA). A session id is unique by design
+            // (serverForSession resolves the computer by it), so the same name is the case that can happen.
+            await ev(`window.__m.add('pw-dup-l', 'S', 5, { sleeping: true }); window.__m.add('pw-dup-r', 'R', 5, { sleeping: true, server: 'm1' });
+                T.state.hub = true; T.state.servers = [{ id: 'm1', label: 'other-box', transport: 'ssh' }];
+                for (const x of T.state.liveSessions) if (x.session_id === 'pw-dup-l-id' || x.session_id === 'pw-dup-r-id') x.name = 'pw-dup'; true`);
+            await ev(`window.selectLiveSession('pw-dup', 'claude', 'pw-dup-r-id', 'm1')`);
+            await waitFor(`!!T.state.currentSession && T.state.currentSession.session_id === 'pw-dup-r-id' && !document.getElementById('sleeping-composer').hidden`, `${at}the chat on the other computer is open and asleep`, 8000).catch(async e => { throw new Error(e.message + ' ' + JSON.stringify(await ev(`({ cur: T.state.currentSession && [T.state.currentSession.name, T.state.currentSession.session_id], hidden: document.getElementById('sleeping-composer').hidden, rows: T.state.liveSessions.filter(x => /^pw-dup/.test(x.session_id)).map(x => [x.name, x.session_id, x.server, x.sleeping]) })`))); });
+            await clearReqs();
+            const woke = await ev(`window.toggleAgentSleep('pw-dup', 'claude', 'pw-dup-l-id', 'wake')`);
+            await quiet();
+            const rows = await ev(`T.state.liveSessions.filter(x => /^pw-dup-/.test(x.session_id)).map(x => ({ id: x.session_id, sleeping: !!x.sleeping }))`);
+            s = await asleepWords();
+            check(woke === true && rows.some(x => x.id === 'pw-dup-l-id' && !x.sleeping), `${at}this computer's agent was woken: ` + JSON.stringify([woke, rows]));
+            check(rows.some(x => x.id === 'pw-dup-r-id' && x.sleeping), `${at}the other computer's agent of the same name is still asleep: ` + JSON.stringify(rows));
+            check(await ev(`window.__selCalls`) === 0, `${at}the chat open on the other computer's agent is not re-selected`);
+            check(s.bar && s.wake && s.inputDisabled, `${at}and it still says asleep: ` + JSON.stringify(s));
+
             // 2. a sleeping agent with no history: the empty chat's own notice
             await ev(`window.__m.add('pw-new', 'N', 0, { sleeping: true })`);
             await select('pw-new');
