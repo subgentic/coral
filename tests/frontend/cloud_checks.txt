@@ -18,6 +18,7 @@ node lint_undef_selfcheck.test.js
 node import_hygiene.test.js
 node vendor_manifest.mjs
 node run_folders.test.mjs
+node run_folders_qa.test.mjs
 node sandbox_profile.test.mjs
 node when_text.test.mjs
 node artifact_tag_rules_unit.test.mjs
