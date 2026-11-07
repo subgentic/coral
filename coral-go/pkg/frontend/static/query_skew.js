@@ -11,7 +11,10 @@ export const VERSIONS_KEYS = ['board'];
 const REMEMBER_MS = 10 * 60 * 1000; // an upgraded computer is asked with the keys again after this: one refused call, then it is accepted
 const refused = new Map(); // `${server} ${kind}` -> when that computer refused
 
+export const LIST_KIND = '/api/team-artifacts';
 const slot = (server, kind) => `${server || 'local'} ${kind}`;
+/** A read that cannot be sent plain (the Inbox badge count: its total is only right with waiting and muted) tells the others that this computer refused. */
+export const markOlder = (server, kind = LIST_KIND) => { refused.set(slot(server, kind), Date.now()); };
 export function knownOlder(server, kind, now = Date.now()) {
     const at = refused.get(slot(server, kind));
     if (at === undefined) return false;
@@ -46,7 +49,7 @@ export async function fetchSkewed(server, path, query, { kind = path, keys = LIS
     }
     const response = await serverFetch(server, at(whole), options);
     if (!(await refusedByConnector(response))) return { response, dropped: [] };
-    refused.set(slot(server, kind), Date.now());
+    markOlder(server, kind);
     const { q, dropped } = without(whole, keys);
     return { response: await serverFetch(server, at(q), options), dropped };
 }

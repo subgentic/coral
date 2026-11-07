@@ -16,7 +16,7 @@ globalThis.fetch = window.fetch = async input => {
     if (mode === 'owner') return Response.json({ code: 'owner_only', error: 'owner_only' }, { status: 403 });
     if (mode === 'localmode') return Response.json({ error: 'local_mode', mode: 'view' }, { status: 403 });
     if (path === '/api/team-artifacts') {
-        if (server === 'old' || mode === 'old') for (const k of u.searchParams.keys()) if (!OLD_LIST.has(k)) return refusal(server);
+        if (server.startsWith('old') || mode === 'old') for (const k of u.searchParams.keys()) if (!OLD_LIST.has(k)) return refusal(server);
         const want = u.searchParams.get('digest');
         const list = want ? rows.filter(a => want.split(',').includes(a.id)) : rows;
         return Response.json({ artifacts: list, total: list.length, has_more: false, teams: [] });
@@ -118,14 +118,28 @@ test('needs_skills: a computer below v2.0.58 refuses the skills read, which clea
     reset(); hideServer = true;
     const skills = await importUi('needs_skills'), gaps = await importUi('needs_incomplete');
     const urlOf = (path, server) => `/api/remote/${server}${path}`;
+    const keep = globalThis.fetch; // put back below: the tests after this one use the shared stub
     globalThis.fetch = window.fetch = async input => {
         const u = new URL(String(input), location.href); calls.push(u);
         if (u.pathname === '/api/remote/old/api/needs-you') return refusal('old');
         return Response.json({});
     };
-    await skills.loadPendingSkills({ hub: true, sources: ['old'], urlOf });
+    try { await skills.loadPendingSkills({ hub: true, sources: ['old'], urlOf }); } finally { globalThis.fetch = window.fetch = keep; }
     assert.deepEqual(skills.skillRows(), [], 'no rows are drawn from that computer');
     assert.deepEqual(gaps.readGaps().filter(g => g.kind === 'skills').map(g => g.source), ['old'], 'the Inbox is told it could not read them');
     assert.match(gaps.incompleteNote(), /skills from old could not be read/);
+});
+test('the Inbox badge count: a v2.0.58 computer has no number (never the plain total), is asked once, and a later refresh does not ask it again', async () => {
+    reset(); mode = 'new';
+    const { state } = await importUi('state'); state.hub = true; state.servers = [{ id: 'old2', label: 'Second old box', status: 'online' }]; // its own computer: reads left over from the tests above go to 'old'
+    const counts = await importUi('review_counts');
+    await counts.refreshCounts(true);
+    assert.equal(counts.countSummary().sources.find(r => r.server === 'old2').total, null, 'that computer cannot count what waits');
+    assert.equal(counts.countedUnread(), null, 'one computer is unknown, so the badge states no number');
+    const settle = () => new Promise(r => setTimeout(r, 50)), countReads = () => calls.filter(u => u.pathname.startsWith('/api/remote/old2/') && u.searchParams.has('waiting'));
+    await settle(); assert.equal(countReads().length, 1, 'one count read, refused');
+    await counts.refreshCounts(true); await settle();
+    assert.equal(countReads().length, 1, 'a refresh does not ask it again while it is known to refuse');
+    state.hub = false; state.servers = [];
 });
 test.after(() => dom.window.close());
