@@ -79,19 +79,27 @@ func TestAgentCannotLaunchALessRestrictedAgent(t *testing.T) {
 	}
 }
 
-// The limits themselves: every flag but --model, allow rules, tools and hooks go; deny rules,
-// which only narrow, stay.
+// The limits themselves, now the cap's (#14336): an agent's launch keeps --model and its deny rules; flags beyond it are dropped; allow rules, tools and hooks the caller does not have are refused.
 func TestLimitAgentLaunch(t *testing.T) {
-	flags, caps, tools, hooks := limitAgentLaunch("test",
-		[]string{"--sandbox", "danger-full-access", "-s=x", "--approval-mode=yolo", "-y", "--add-dir", "/", "--mcp-config", "m.json", "--permission-mode=bypassPermissions", "--model", "opus", "--verbose"},
-		&agent.Capabilities{Allow: []string{"Bash(*)"}, Deny: []string{"Bash(rm *)"}},
-		[]string{"Bash"}, map[string]interface{}{"PreToolUse": "x"})
-	assert.Equal(t, []string{"--model", "opus"}, flags)
-	require.NotNil(t, caps)
-	assert.Empty(t, caps.Allow)
-	assert.Equal(t, []string{"Bash(rm *)"}, caps.Deny)
-	assert.Nil(t, tools)
-	assert.Nil(t, hooks)
+	grant, refusal := capAgentLaunchFor(callerAuthority{}, agentLaunchAsk{AgentType: "claude", Flags: []string{"--model", "opus", "--verbose", "--add-dir", "/"},
+		Caps: &agent.Capabilities{Deny: []string{"Bash(rm *)"}}})
+	require.Nil(t, refusal)
+	assert.Equal(t, []string{"--model", "opus"}, grant.Flags)
+	require.NotNil(t, grant.Caps)
+	assert.Equal(t, []string{"Bash(rm *)"}, grant.Caps.Deny)
+	assert.Empty(t, grant.Caps.Allow)
+	for name, ask := range map[string]agentLaunchAsk{
+		"an allow rule":  {AgentType: "claude", Caps: &agent.Capabilities{Allow: []string{"Bash(*)"}}},
+		"an allowed tool": {AgentType: "claude", Tools: []string{"Bash"}},
+		"a hook":          {AgentType: "claude", Hooks: map[string]interface{}{"PreToolUse": "x"}},
+		"a bypass flag":   {AgentType: "claude", Flags: []string{"--permission-mode=bypassPermissions"}},
+		"a sandbox flag":  {AgentType: "codex", Flags: []string{"--sandbox", "danger-full-access", "-s=x"}},
+		"a yolo flag":     {AgentType: "gemini", Flags: []string{"--approval-mode=yolo", "-y"}},
+	} {
+		_, refusal := capAgentLaunchFor(callerAuthority{}, ask)
+		require.NotNil(t, refusal, name)
+		assert.Equal(t, agentLaunchAboveCallerCode, refusal.Code, name)
+	}
 }
 
 // #4032 round 2: the agent's flags are an allowlist, so the spellings Security found past the
