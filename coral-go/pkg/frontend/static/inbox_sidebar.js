@@ -304,13 +304,16 @@ function inboxNeedsToolbar() {
             items: [{ key: 'all', label: 'All', count: attention !== null && attention !== undefined ? pillCount(rows.filter(s => !s.review && needsUnread(s)).length + attention, rows.filter(s => !s.review).length + listedReviews) : said(rows.filter(needsUnread).length, rows.length) }, ...NF.KINDS.filter(kindShown).map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: k === 'review' && attention !== null && attention !== undefined ? pillCount(attention, listedReviews) : said(counts[i], listed[i]) }))],
             onPick: key => { needsFilters = { ...needsFilters, kind: key === 'all' ? '' : key }; NF.saveFilters(needsFilters); renderInboxNav(true); } },
     });
-    if (!node.querySelector('.inbox-group-review-toggle')) {
-        const label = DT.el('label', 'inbox-group-review-toggle');
-        const input = DT.el('input'); input.type = 'checkbox'; input.checked = groupReviews;
+    // Group by goal is an option of the Filters panel, with the other ways to show the list (#14378, the Operator): not a checkbox always on the page under the header. It is shut with the panel, so it takes no room until asked for.
+    const menu = node.querySelector('.list-bar-menu');
+    if (menu && !menu.querySelector('.inbox-group-review-toggle')) {
+        const label = DT.el('label', 'list-bar-field list-bar-kept inbox-group-review-toggle');
+        const input = DT.el('input'); input.type = 'checkbox'; input.checked = groupReviews; input.id = 'inbox-needs-group-goal';
         input.addEventListener('change', () => { groupReviews = input.checked; browserLocal.set(GROUP_REVIEW_KEY, String(groupReviews)); needsState.shown = null; renderInboxNav(true); });
-        label.append(input, document.createTextNode('Group by goal')); node.append(label);
+        label.append(input, DT.el('span', 'list-bar-field-label', 'Group by goal')); menu.insertBefore(label, menu.querySelector(':scope > .list-bar-clear-all, :scope > .list-bar-done')); // before the panel's own buttons (a null reference appends)
     }
-    node.querySelector('.inbox-group-review-toggle').hidden = (!!needsFilters.kind && needsFilters.kind !== 'review') || (!reviewItems().length && needsFilters.kind !== 'review');
+    const groupToggle = node.querySelector('.inbox-group-review-toggle');
+    if (groupToggle) groupToggle.hidden = (!!needsFilters.kind && needsFilters.kind !== 'review') || (!reviewItems().length && needsFilters.kind !== 'review');
     return { node, signature: JSON.stringify([groupReviews, needsFilters, teams, names, goalNames, counts, completeCount, listedReviews, listedComplete, rows.length, rows.filter(needsUnread).length]) };
 }
 
