@@ -92,7 +92,6 @@ var shellNeverFiles = map[string]shellNever{
 	"hub_notice.js":             {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 4},
 	"hub_pending.js":            {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"inbox_sidebar.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
-	"info_dialog.js":            {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"job_form.js":               {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
 	"launch_dialog.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"launch_models.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
@@ -152,7 +151,7 @@ var shellNeverFiles = map[string]shellNever{
 	"xterm_renderer.js":         {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 }
 
-const shellUnreviewedMax = 87
+const shellUnreviewedMax = 86
 
 type shellCall struct {
 	file, method, route, raw string
