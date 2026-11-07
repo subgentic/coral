@@ -55,7 +55,8 @@ function agentMovedOn(row, pt, screen) {
     const summary = askWords(String((row && row.waiting_summary) || "").replace(/^Notification:\s*/, ""));
     const questionTool = !!(pt && BLOCKING_TOOLS[pt.tool_name] === "question");
     const asksQuestion = questionTool || /^(Wants to know:|Has a question for you$)/.test(summary) || !!(screen && screen.kind === "question");
-    if (!asksQuestion || (screen && screen.kind && screen.kind !== "question")) return false;
+    if (!asksQuestion) return false;
+    if (screen && screen.options && screen.options.length) return false; // a prompt is on the terminal screen right now: the agent has not moved on, whatever the row's old summary says
     if (pt && !questionTool) return false; // another tool is the pending one: a newer request than the question, and its card is current
     const lm = row && row.last_message;
     if (!lm || lm.role !== "assistant") return false;

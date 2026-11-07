@@ -54,6 +54,10 @@ const { coralReady } = require('./helpers/wait');
             await setRow(OLD, { tool_name: 'Bash', input: { command: 'rm -rf build' }, at: iso(30000) }, { question: 'Allow this command?', options: [{ n: 1, label: 'Yes', action: 'select' }, { n: 2, label: 'No', action: 'select' }] });
             await waitFor(`!!document.querySelector('#live-history-messages .chat-needs-input .cni-answer')`, `${tag}: the new permission tool's card with its answers is drawn`, 6000).catch(e => console.log('waitFor: ' + e.message));
             check(`${tag}: a new permission tool (T0+30 s) with its screen prompt stays actionable after an older question and a message at T0+20 s`, /Permission|Question/i.test(String(await card())) && !!(await ev(`!!document.querySelector('#live-history-messages .chat-needs-input .cni-answer')`)), String(await card()));
+            // UI: a fresh screen-only prompt (no kind) with an OLD question summary still on the row, and a newer agent message: kept. The chat reply (pending tool, screen) is re-read after the row changes, so settle before reading.
+            await setRow({ ...OLD, waiting_kind: 'question', waiting_summary: 'Wants to know: Which one?' }, null, { question: 'Which one?', options: [{ n: 1, label: 'Red', action: 'select' }] });
+            await sleep(1500); // sleep-ok: the chat reply is re-fetched and the card redrawn from it
+            check(`${tag}: a screen-only prompt with an old question summary on the row keeps its card`, /Question/.test(String(await card())) && !!(await ev(`!!document.querySelector('#live-history-messages .chat-needs-input .cni-answer')`)), String(await card()));
             await setRow({ ...OLD, waiting_kind: 'question', waiting_summary: '' }, null, { question: 'Which one?', options: [{ n: 1, label: 'Red', action: 'select' }] });
             await sleep(300); // sleep-ok: the card redraws
             check(`${tag}: a screen prompt of its own (no pending tool) is not hidden by an older timestamp`, !!(await ev(`!!document.querySelector('#live-history-messages .chat-needs-input .cni-answer')`)), String(await card()));
