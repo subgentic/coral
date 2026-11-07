@@ -3,6 +3,7 @@
 package routes
 
 import (
+	"context"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -21,6 +22,7 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/tracking"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
@@ -589,7 +591,29 @@ func (h *BoardHandler) ReadMessages(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, err.Error())
 		return
 	}
+	h.noteCommentReads(r.Context(), project, subscriberID, messages)
 	writeJSON(w, http.StatusOK, emptyIfNil(messages))
+}
+
+// SetCommentReadStamp tells the board what to do with the messages a member's coral-board read returned: stamp the comments they delivered (the sessions handler owns the asks, #14130).
+func (h *BoardHandler) SetCommentReadStamp(fn func(ctx context.Context, project, readerSession string, messageIDs []int64)) {
+	h.commentReadStamp = fn
+}
+
+// noteCommentReads hands the ids of the messages a read returned to the comment read stamp, with the reader's own session: a message that delivered a comment to another agent stamps nothing (#14130).
+func (h *BoardHandler) noteCommentReads(ctx context.Context, project, subscriberID string, messages []board.Message) {
+	if h.commentReadStamp == nil || len(messages) == 0 || h.bs == nil {
+		return
+	}
+	sub, err := h.bs.GetSubscription(ctx, subscriberID)
+	if err != nil || sub == nil || sub.Project != project || sub.SessionName == "" {
+		return
+	}
+	ids := make([]int64, 0, len(messages))
+	for _, m := range messages {
+		ids = append(ids, m.ID)
+	}
+	h.commentReadStamp(ctx, project, naming.SessionIDFromName(sub.SessionName), ids)
 }
 
 // ListAllMessages returns all messages (no cursor advancement).

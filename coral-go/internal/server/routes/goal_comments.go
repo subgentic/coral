@@ -174,11 +174,13 @@ func (h *SessionsHandler) deliverGoalComment(r *http.Request, caller commentCall
 		context += ". " + note
 	}
 	msg := sendMessageOf(sendOnGoal, title, "the owner", context, sendReplyCommand(id, rootID), text, snippet, names, commentPictureLinks(c.ImagesJSON)...)
-	if _, err := h.bs.PostDefusedMessage(ctx, team, board.OperatorName, msg); err != nil {
+	posted, err := h.bs.PostDefusedMessage(ctx, team, board.OperatorName, msg)
+	if err != nil {
 		slog.Warn("[goal comments] message not posted", "board", team, "error", err)
 		_ = h.ss.CloseArtifactAsk(ctx, rootID, sessionID, time.Now())
 		return autoDelivery{Reason: "failed"}
 	}
+	h.linkCommentMessage(ctx, team, posted, rootID, sessionID)
 	h.operatorPosted(team, msg)
 	if h.boardHandler != nil && h.boardHandler.notifyFn != nil {
 		h.boardHandler.notifyFn(team)

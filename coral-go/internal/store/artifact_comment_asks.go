@@ -47,9 +47,11 @@ type ArtifactAsk struct {
 	// SeenAt is when the agent first read the artifact's threads or replied, NudgedAt when Coral reminded it to answer in the thread (#11722).
 	SeenAt   *string `db:"seen_at" json:"seen_at"`
 	NudgedAt *string `db:"nudged_at" json:"nudged_at"`
+	// ReadAt is when the agent first read, with coral-board read, the message that delivered this comment to it (#14130).
+	ReadAt *string `db:"read_at" json:"read_at"`
 }
 
-const artifactAskCols = "id, comment_id, artifact_id, board, agent_session, agent_name, created_at, expires_at, closed_at, replies, seen_at, nudged_at"
+const artifactAskCols = "id, comment_id, artifact_id, board, agent_session, agent_name, created_at, expires_at, closed_at, replies, seen_at, nudged_at, read_at"
 
 func (a ArtifactAsk) open(now time.Time) bool {
 	if a.ClosedAt != nil {
@@ -77,7 +79,7 @@ func (s *SessionStore) CreateArtifactAsk(ctx context.Context, commentID int64, a
 	case err == nil && cur.open(now):
 		return cur, false, tx.Commit()
 	case err == nil:
-		_, err = tx.ExecContext(ctx, `UPDATE artifact_comment_asks SET artifact_id = ?, board = ?, agent_name = ?, created_at = ?, expires_at = ?, closed_at = NULL, replies = 0, seen_at = NULL, nudged_at = NULL WHERE id = ?`,
+		_, err = tx.ExecContext(ctx, `UPDATE artifact_comment_asks SET artifact_id = ?, board = ?, agent_name = ?, created_at = ?, expires_at = ?, closed_at = NULL, replies = 0, seen_at = NULL, nudged_at = NULL, read_at = NULL WHERE id = ?`,
 			artifactID, board, agentName, now.UTC().Format(ISOFormat), now.Add(AskTTL).UTC().Format(ISOFormat), cur.ID)
 	case errors.Is(err, sql.ErrNoRows):
 		_, err = tx.ExecContext(ctx, `INSERT INTO artifact_comment_asks (comment_id, artifact_id, board, agent_session, agent_name, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -176,6 +178,40 @@ func (s *SessionStore) HasArtifactAsk(ctx context.Context, artifactID, agentSess
 func (s *SessionStore) MarkAsksSeen(ctx context.Context, artifactID, agentSession string, now time.Time) error {
 	_, err := s.db.ExecContext(ctx, `UPDATE artifact_comment_asks SET seen_at = ? WHERE artifact_id = ? AND agent_session = ? AND closed_at IS NULL AND seen_at IS NULL`, now.UTC().Format(ISOFormat), artifactID, agentSession)
 	return err
+}
+
+// ReadStamp is when the agent first read the comment: the earlier of the comments-GET stamp (seen_at) and the board-read stamp (read_at), "" while neither is set (#14130).
+func (a ArtifactAsk) ReadStamp() string {
+	first := ""
+	for _, p := range []*string{a.SeenAt, a.ReadAt} {
+		if p != nil && *p != "" && (first == "" || *p < first) { // ISOFormat is fixed width: the string order is the time order
+			first = *p
+		}
+	}
+	return first
+}
+
+// LinkCommentMessage records that the board message messageID delivered the comment (the thread's root commentID) to the agent session agentSession (#14130).
+func (s *SessionStore) LinkCommentMessage(ctx context.Context, board string, messageID, commentID int64, agentSession string) error {
+	_, err := s.db.ExecContext(ctx, `INSERT OR REPLACE INTO artifact_comment_messages (board, message_id, comment_id, agent_session) VALUES (?, ?, ?, ?)`, board, messageID, commentID, agentSession)
+	return err
+}
+
+// MarkCommentMessagesRead records that the agent session read the board messages messageIDs (coral-board read): for each that delivered a comment TO THAT SESSION, the thread's open ask gets its read_at, the
+// first time only (#14130). A message that was for another agent stamps nothing, whoever reads it. It returns how many asks were stamped.
+func (s *SessionStore) MarkCommentMessagesRead(ctx context.Context, board, agentSession string, messageIDs []int64, now time.Time) (int, error) {
+	stamped := 0
+	for _, id := range messageIDs {
+		res, err := s.db.ExecContext(ctx, `UPDATE artifact_comment_asks SET read_at = ? WHERE read_at IS NULL AND closed_at IS NULL AND agent_session = ?
+ AND comment_id IN (SELECT comment_id FROM artifact_comment_messages WHERE board = ? AND message_id = ? AND agent_session = ?)`, now.UTC().Format(ISOFormat), agentSession, board, id, agentSession)
+		if err != nil {
+			return stamped, err
+		}
+		if n, _ := res.RowsAffected(); n > 0 {
+			stamped += int(n)
+		}
+	}
+	return stamped, nil
 }
 
 // AwaitingAsks are the asks still open at now that the agent has not answered (no reply in the thread) and that Coral has not reminded it about, oldest first, at most limit (#11722). Only asks of a session that is
