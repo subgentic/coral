@@ -182,3 +182,17 @@ func TestANewerPromotionThatIsNotServedYetDoesNotLetAnOlderOneWin(t *testing.T) 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"1.4.132"}, st.Revoked)
 }
+
+// A promotion the feed names has no asset list: the download says whether its files are there. A promote-* release the feed names whose files answer 404 is junk, skipped like a
+// release without them, and must not stop every check: the older promotion that verifies is staged (a 404 stops the pass only for a release whose list shows the files, above).
+func TestAFeedNamedPromotionWithNoFilesIsSkippedNotAStopForEveryCheck(t *testing.T) {
+	r := newRig(t)
+	r.gh.FeedWithPromotions = true // the real feed names none; a feed that did names this one
+	r.publish(Spec{Version: "1.4.131", Sequence: 5})
+	r.publish(Spec{Version: "1.4.132", Sequence: 6})
+	r.gh.Status[PromotionTag("v1.4.132", 6)+"/"+stage.ManifestFile] = 404 // named, and its files are not there
+	res := r.check()
+	require.Equal(t, stage.ResultStaged, res.Result, "%+v", res)
+	assert.Equal(t, "1.4.131", res.Version, "the older promotion, which verifies, is taken")
+	assert.Empty(t, res.NextAttempt, "no back-off: nothing failed")
+}
