@@ -15,7 +15,7 @@ const BASE = require('./test_base').BASE;
             await Emulation.setDeviceMetricsOverride({ width, height: 844, deviceScaleFactor: 1, mobile: width === 390 });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await installTeam(ev);
             await seed(ev, team);
-            await ev(`import((window.__coralStatic || '/static/') + 'team_page.js').then(m => m.openTeamPage(${JSON.stringify(team)}))`);
+            await ev(`window.openTeamPage(${JSON.stringify(team)})`);
             await waitFor(`document.querySelector('#team-tabs [role=tab]')?.getClientRects().length > 0`, 'team tabs visible');
             const tabs = await ev(`window.__tp.allTabs().map(window.__tp.tabLabel)`);
             try { assert.deepEqual(tabs.slice(0, 3), ['Goals', 'Needs you', 'Agents'], width + ': Needs you follows Goals'); }
