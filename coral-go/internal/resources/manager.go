@@ -60,7 +60,7 @@ func Open(o Options) (*Manager, error) {
 	var hist *History
 	if o.HistoryPath != "" {
 		if h, err := OpenHistory(o.HistoryPath); err != nil {
-			slog.Warn("resource history is off", "error", err) // analytics are lost, never the queue
+			slog.Warn("resource history is off: " + err.Error()) // analytics are lost, never the queue; the cause is in the line itself
 		} else {
 			hist = h
 			cfg.OnEvent = h.Add

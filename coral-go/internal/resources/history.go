@@ -121,7 +121,7 @@ func OpenHistory(path string) (*History, error) {
 		_ = db.Close()
 		return nil, err
 	}
-	if err := migrateHistory(db); err != nil { // a failed migration leaves the old file as it was: the record still opens, without the new columns' help
+	if err := migrateHistory(db); err != nil { // a failed migration is rolled back and leaves the old file as it was; the record is then NOT opened: the caller turns the history off (Open logs why) and the queue goes on
 		_ = db.Close()
 		return nil, err
 	}

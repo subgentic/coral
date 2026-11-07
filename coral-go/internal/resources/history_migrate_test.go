@@ -88,3 +88,34 @@ func TestAnOlderHistoryKeepsEverythingItSaidWhenItIsMigrated(t *testing.T) {
 	}
 	assert.Equal(t, 3, r5, "and does not count again")
 }
+
+// Security's INFO 4 on #14222: a migration that fails turns the history OFF and says why in one plain line; the queue itself goes on, and the file is left as it was.
+func TestAMigrationThatFailsTurnsTheHistoryOffAndTheQueueGoesOn(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "resource_history.db")
+	old, err := sql.Open("sqlite", "file:"+path)
+	require.NoError(t, err)
+	_, err = old.Exec(`CREATE TABLE resource_events (at INTEGER NOT NULL, kind TEXT NOT NULL, resource TEXT NOT NULL, agent TEXT NOT NULL, task INTEGER NOT NULL DEFAULT 0, entry INTEGER NOT NULL DEFAULT 0, via TEXT NOT NULL DEFAULT '', pattern TEXT NOT NULL DEFAULT '', wait_ms INTEGER NOT NULL DEFAULT 0, held_ms INTEGER NOT NULL DEFAULT 0);
+		INSERT INTO resource_events (at, kind, resource, agent, entry) VALUES (1, 'released', 'mac', 'a', 5), (2, 'renewed', 'mac', 'a', 5);
+		CREATE TRIGGER no_update BEFORE UPDATE ON resource_events BEGIN SELECT RAISE(ABORT, 'update refused'); END`)
+	require.NoError(t, err)
+	require.NoError(t, old.Close())
+
+	m, err := Open(Options{Path: filepath.Join(dir, "resources.json"), HistoryPath: path, AgeStep: -1})
+	require.NoError(t, err, "Coral still starts")
+	defer m.Close()
+	assert.Nil(t, m.History(), "the history is off, not half-open")
+	require.NoError(t, m.Queue().Define(resourcequeue.Resource{Key: "mac", Slots: 1}))
+	r, err := m.Claim(t.Context(), "mac", "a", "")
+	require.NoError(t, err)
+	assert.True(t, r.Granted, "the queue works without its record")
+
+	chk, err := sql.Open("sqlite", "file:"+path)
+	require.NoError(t, err)
+	defer chk.Close()
+	var cols, rows int
+	require.NoError(t, chk.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('resource_events')`).Scan(&cols))
+	require.NoError(t, chk.QueryRow(`SELECT COUNT(*) FROM resource_events`).Scan(&rows))
+	assert.Equal(t, 10, cols, "the file is as it was: no half-added column")
+	assert.Equal(t, 2, rows)
+}
