@@ -14,8 +14,14 @@ const { coralReady } = require('./helpers/wait');
     const B = 'tpa-' + Date.now().toString(36);
     const check = (label, ok, detail) => { console.log(`[${ok ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' — ' + detail : ''}`); if (!ok) process.exitCode = 1; };
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; const fs = require('node:fs'); fs.mkdirSync(d, { recursive: true }); await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); new Promise(r => setTimeout(r, 350))`); /* sleep-ok: a screenshot waits out transitions; the toasts of the steps before are not the picture */ fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
-    const barButtons = () => ev(`[...document.querySelectorAll('#team-panel-item .goals-pinbar .btn')].map(b => b.textContent)`);
-    const open = async (id) => { await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks', item: ${id} }); true`); await waitFor(`!!document.querySelector('#team-panel-item #team-task-title') && document.querySelector('#team-task-title').textContent.startsWith('#${id} ')`, 'the task page', 12000); await waitFor(`document.querySelectorAll('#team-panel-item .goals-pinbar .btn').length >= 0 && !!document.querySelector('#team-panel-item .goals-pinbar')`, 'the bar'); };
+    const barButtons = async (allowEmpty = false) => {
+        await waitFor(`(() => { const bar = document.querySelector('#team-panel-item .goals-pinbar'); if (!bar) return false;
+            const buttons = [...bar.querySelectorAll('.btn')].map(b => b.textContent);
+            if (!${allowEmpty} && !buttons.length) return false;
+            window.__taskBarSnapshot = buttons; return true; })()`, 'the task action buttons');
+        return ev(`window.__taskBarSnapshot`); // readiness and the DOM read were the same evaluate
+    };
+    const open = async (id, hasActions = true) => { await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks', item: ${id} }); true`); await waitFor(`!!document.querySelector('#team-panel-item #team-task-title') && document.querySelector('#team-task-title').textContent.startsWith('#${id} ')`, 'the task page', 12000); await barButtons(!hasActions); };
     const menuItems = () => ev(`[...document.querySelectorAll('#team-panel-item .goals-pinbar [role=menuitem]')].map(b => b.textContent)`); // the More menu's (#9076)
     const click = (text) => ev(`[...document.querySelectorAll('#team-panel-item .goals-pinbar .btn, #team-panel-item .goals-pinbar [role=menuitem]')].find(b => b.textContent === ${JSON.stringify(text)}).click(); true`);
     const set = (id, value) => ev(`(() => { const e = document.getElementById(${JSON.stringify(id)}); e.value = ${JSON.stringify(value)}; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
@@ -52,8 +58,8 @@ const { coralReady } = require('./helpers/wait');
         await open(draft);
         const dbar = await barButtons();
         check('a draft: Publish, no Complete, Edit under More', dbar.includes('Publish') && !dbar.includes('Complete') && (await menuItems()).includes('Edit'), JSON.stringify(dbar));
-        await open(done);
-        check('a finished task: no actions', (await barButtons()).every(t => !['More', 'Complete', 'Publish'].includes(t)) && (await menuItems()).length === 0, JSON.stringify(await barButtons()));
+        await open(done, false);
+        check('a finished task: no actions', (await barButtons(true)).every(t => !['More', 'Complete', 'Publish'].includes(t)) && (await menuItems()).length === 0, JSON.stringify(await barButtons(true)));
 
         console.log('2. Edit');
         await open(open1);
