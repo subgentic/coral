@@ -681,6 +681,7 @@ Subcommands:
                                    --follow-up ID: the work that came out of task ID: it takes that task's goal, reviewers and assignee unless you give your own,
                                    and ID lists it (task show ID, task detail ID, the goal page's "N follow-ups open")
   list [--json] [--goal ID]        Every task, or one goal's; --json prints the tasks as a JSON array
+  list --mine [--json]             Only your own: in progress first, then assigned and waiting (what to resume or claim after a wake)
   goal <task-id> <goal-id|none>    Put a task on a goal of this board, move it, or take it off (coral-board goal ... manages the goals)
   claim [id]                       Claim a specific task or the next available one
   current                          Show your current in-progress task
@@ -751,6 +752,7 @@ Subcommands:
                                    --follow-up ID: the work that came out of task ID: it takes that task's goal, reviewers and assignee unless you give your own,
                                    and ID lists it (task show ID, task detail ID, the goal page's "N follow-ups open")
   list [--json] [--goal ID]        Every task, or one goal's; --json prints the tasks as a JSON array
+  list --mine [--json]             Only your own: in progress first, then assigned and waiting (what to resume or claim after a wake)
   goal <task-id> <goal-id|none>    Put a task on a goal of this board, move it, or take it off (coral-board goal ... manages the goals)
   claim [id]                       Claim a specific task or the next available one
   current                          Show your current in-progress task
@@ -829,6 +831,7 @@ Error: unknown option "--bogus"
 Usage: coral-board task <subcommand> [args]
 
   list [--json] [--goal ID]        Every task, or one goal's; --json prints the tasks as a JSON array
+  list --mine [--json]             Only your own: in progress first, then assigned and waiting (what to resume or claim after a wake)
 === coral-board goal show --bogus
 exit 2
 --- stdout
