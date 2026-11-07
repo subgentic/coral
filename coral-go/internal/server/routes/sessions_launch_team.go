@@ -325,7 +325,7 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 		}
 		// A member that names no mode starts in the new default of its type (#14336: Auto for Claude and Codex, Bypass for Hermes and opencode), or the Operator's saved default, as a single launch does;
 		// for an agent's launch it is the default CAPPED by the launching agent (above). A member whose form says Default sends it, and starts in Default (#10362, the form's own pick).
-		entry, category := h.launchTeamMember(ctx, body, agentDef, userSettings, workingDir, worktreePath, teamID, !fromAgent && autoDefaultAllowed(ctx, r, h.ss), !fromAgent && memberAt == seatAt)
+		entry, category := h.launchTeamMember(ctx, body, agentDef, userSettings, workingDir, worktreePath, teamID, !fromAgent && !teamIsRelaunch(body) && autoDefaultAllowed(ctx, r, h.ss), !fromAgent && memberAt == seatAt)
 		_, memberFailed := entry["error"]
 		sidMade, _ := entry["session_id"].(string)
 		h.endAgentLaunch(ctx, h.accountingBoard(r, body.BoardName, body.BoardServer), lifeID, !memberFailed, launcherWords(h.orchActorOf(r))+" started "+orchName(agentDef.Name), sidMade)
@@ -465,6 +465,12 @@ func teamAsksToSkip(body launchTeamRequest, settings map[string]string) bool {
 	return false
 }
 
+// teamIsRelaunch is a launch on a board that already exists, named by its id (#3536): the new default is for NEW teams, so a member of a relaunch that names no mode keeps what it had, the CLI's own
+// confirm mode (a saved template stores no mode), and the Hub gate does not count the new default for it (#14336, build item 3). An explicit mode, flags or capabilities are what they say.
+func teamIsRelaunch(body launchTeamRequest) bool {
+	return body.BoardID != "" && !body.NewBoard
+}
+
 // memberAsksToSkip is teamAsksToSkip for one member.
 func memberAsksToSkip(body launchTeamRequest, def launchTeamAgent, settings map[string]string) bool {
 	agentType, flags := body.AgentType, def.Flags
@@ -488,7 +494,7 @@ func memberAsksToSkip(body launchTeamRequest, def launchTeamAgent, settings map[
 // hub_auto_accept_disabled, never started in Default and never in Auto. A member that names a mode (its own flags, the team's, or an explicit Default) is judged by what it names; the Operator's own
 // saved default is the owner's choice and is not counted, as before.
 func memberDefaultSkips(body launchTeamRequest, def launchTeamAgent, settings map[string]string, agentType string, flags []string) bool {
-	if def.PermissionMode != "" || savedDefaultMode(settings) != "" {
+	if teamIsRelaunch(body) || def.PermissionMode != "" || savedDefaultMode(settings) != "" {
 		return false
 	}
 	if carried, _ := agent.SplitPermissionFlags(flags); len(carried) > 0 || agent.PermissionModeFromFlags(flags) != "" {
