@@ -83,3 +83,13 @@ func TestAHeavyRunOnTheMiniRunsAndReturnsTheExitCode(t *testing.T) {
 		t.Fatalf("code=%d out=%q", code, out)
 	}
 }
+
+// #14354: a pool grant that names no machine is not sent to a default one: heavyRunRemote refuses before it touches ssh or the worktree.
+func TestARemoteRunWithNoMachineIsRefusedBeforeAnySsh(t *testing.T) {
+	old := heavyTestTransport
+	heavyTestTransport = nil
+	t.Cleanup(func() { heavyTestTransport = old })
+	if code := heavyRunRemote(context.Background(), "true", time.Second, ""); code != 1 {
+		t.Fatalf("a grant with no machine: exit %d, want 1 (refused)", code)
+	}
+}

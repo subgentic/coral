@@ -30,9 +30,6 @@ secret-looking names and links that leave it) is sent and the command runs in a 
 small allowlisted environment; the folder is deleted afterwards. One argument is a shell line; several are quoted.
 Commands for the Mac only (those that name ~/.coral or port 8420) are refused on the mini: use coral-board resource claim mac-heavy.`
 
-// heavyMiniAlias is the Operator's ssh Host alias for the restricted account on the mini: the only thing the code knows of the destination. Its address, user, key and pinned host key are in the Operator's own ssh config.
-const heavyMiniAlias = "coral-heavy-mini"
-
 // heavyOnMini says whether a pool grant is the mini (by the member's name or its machine).
 func heavyOnMini(member, machine string) bool { return heavy.OnMini(member, machine) }
 
@@ -159,7 +156,7 @@ func cmdHeavy() {
 	}()
 	var code int
 	if mini {
-		code = heavyRunRemote(runCtx, command, *timeout)
+		code = heavyRunRemote(runCtx, command, *timeout, where)
 	} else {
 		code = heavyRunLocal(runCtx, command)
 	}
@@ -222,8 +219,8 @@ func heavyRunLocal(ctx context.Context, command string) int {
 	return 0
 }
 
-// heavyRunRemote sends this worktree to the mini and runs the command there (internal/heavy), streaming its output and returning its exit code.
-func heavyRunRemote(ctx context.Context, command string, timeout time.Duration) int {
+// heavyRunRemote sends this worktree to the machine the pool grant names (where) and runs the command there (internal/heavy), streaming its output and returning its exit code. The ssh alias is heavy.AliasFor(where).
+func heavyRunRemote(ctx context.Context, command string, timeout time.Duration, where string) int {
 	cwd, err := os.Getwd()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "[heavy] "+err.Error())
@@ -256,7 +253,10 @@ func heavyRunRemote(ctx context.Context, command string, timeout time.Duration) 
 		tr, ok = heavyTestTransport, true
 	}
 	if !ok {
-		tr, err = heavy.SSHTransport(heavyMiniAlias)
+		var alias string
+		if alias, err = heavy.AliasFor(where); err == nil {
+			tr, err = heavy.SSHTransport(alias)
+		}
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "[heavy] "+err.Error())
 			return 1
