@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/agent"
+	"github.com/subgentic/coral/internal/store"
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
@@ -75,17 +76,44 @@ func TestAnUnsetSavedDefaultMeansTheShippedDefaultAndASavedDefaultWinsEverywhere
 	}
 }
 
-// The guards that read "the Operator's saved default" read only the stored setting, never the shipped default (Security's point 5 of #14333): an unset default is not "skipping".
+// What an agent-made launch inherits reads only the stored setting, never the shipped default (Security's point 5 of #14333): an unset default is the shipped default of the type, capped at the caller;
+// a stored one is the Operator's own choice, capped the same way. Neither is a refusal.
 func TestTheInheritedDefaultGuardsReadOnlyTheStoredSetting(t *testing.T) {
-	for _, typ := range []string{at.Claude, at.Codex, at.Agy} {
-		_, inherits := agentLaunchInheritsSkippingDefault(typ, nil, map[string]string{})
-		assert.False(t, inherits, "%s: an unset saved default is not skipping, whatever the shipped default is", typ)
-		_, inherits = agentLaunchInheritsSkippingDefault(typ, nil, map[string]string{"default_permission_mode": "default"})
-		assert.False(t, inherits, typ)
+	assert.Equal(t, "", savedDefaultMode(map[string]string{}), "unset is not a saved default")
+	assert.Equal(t, "default", savedDefaultMode(map[string]string{"default_permission_mode": "default"}))
+	assert.Equal(t, "auto", defaultModeFor(at.Claude, map[string]string{}), "unset: the shipped default")
+	assert.Equal(t, "default", defaultModeFor(at.Claude, map[string]string{"default_permission_mode": "default"}), "a saved default wins")
+	open3 := callerAuthority{Rank: rankOpen}
+	for _, typ := range []string{at.Claude, at.Codex} {
+		grant, refusal := capAgentLaunchFor(open3, agentLaunchAsk{AgentType: typ, DefaultMode: defaultModeFor(typ, map[string]string{})})
+		require.Nil(t, refusal, typ)
+		assert.Equal(t, "auto", grant.Mode, "an unset default reaches a rank-3 caller's member as the shipped default, not a refusal: %s", typ)
 	}
-	_, inherits := agentLaunchInheritsSkippingDefault(at.Claude, nil, map[string]string{"default_permission_mode": "bypassPermissions"})
-	assert.True(t, inherits, "a stored Bypass is")
-	assert.False(t, agentLaunchNeedsMode(at.Codex, nil, true, map[string]string{"default_permission_mode": "default"}))
+	// a stored Bypass is capped at a lowered caller, never refused and never inherited above it
+	grant, refusal := capAgentLaunchFor(callerAuthority{Rank: rankEdits}, agentLaunchAsk{AgentType: at.Claude, DefaultMode: "bypassPermissions"})
+	require.Nil(t, refusal)
+	assert.Equal(t, "acceptEdits", grant.Mode)
+}
+
+// Security's SHOULD on #14336: a Don't ask caller is ranked by what its allow list covers (as a caller, at the bottom), so one with no shell cannot start an Auto member.
+func TestADontAskCallerWithNoShellCannotStartAnAutoMember(t *testing.T) {
+	row := func(caps string) callerAuthority {
+		mode := "dontAsk"
+		ls := &store.LiveSession{SessionID: "s", AgentType: at.Claude, PermissionMode: &mode, Capabilities: &caps}
+		return authorityFromRow(ls, false)
+	}
+	for _, caps := range []string{`{"allow":["file_read","file_write"]}`, `{"allow":["file_read"]}`, ``, `{"allow":["file_read","file_write","shell"]}`} {
+		auth := row(caps)
+		assert.Equal(t, rankAsks, auth.Rank, "a Don't ask caller starts at the bottom: %q", caps)
+		_, refusal := capAgentLaunchFor(auth, agentLaunchAsk{AgentType: at.Claude, PermissionMode: "auto"})
+		require.NotNil(t, refusal, "a Don't ask caller cannot start an Auto member: %q", caps)
+		assert.Equal(t, agentLaunchAboveCallerCode, refusal.Code)
+	}
+	// as a member's own mode, Don't ask is ranked by what the allow list covers
+	assert.Equal(t, rankAsks, effectiveRank(at.Claude, "dontAsk", &agent.Capabilities{Allow: []string{"file_read"}}, false))
+	assert.Equal(t, rankEdits, effectiveRank(at.Claude, "dontAsk", &agent.Capabilities{Allow: []string{"file_read", "file_write"}}, false))
+	assert.Equal(t, rankOpen, effectiveRank(at.Claude, "dontAsk", &agent.Capabilities{Allow: []string{"shell"}}, false))
+	assert.Equal(t, rankAsks, effectiveRank(at.Claude, "dontAsk", nil, false), "nothing allowed")
 }
 
 // Build item (1): Codex stays in its sandbox. Full capabilities never translate to "no sandbox" (that is the Bypass mode, or Keep Full access, alone). Pinned per release of the translation:
@@ -297,4 +325,19 @@ func TestATeamMemberThatNamesNoModeIsSpawnedWithEachTypesMapping(t *testing.T) {
 			assert.Equal(t, c.wantStore, *ls.PermissionMode, c.cli)
 		})
 	}
+}
+
+// A caller the Operator keeps in Full access (Keep Full access, #14061) reads as rank 3 whatever its stored mode says, so its member may be started in Bypass; a caller without the choice and with a lower
+// mode may not (Security's INFO on #14336).
+func TestAKeepFullAccessCallerMayStartABypassMember(t *testing.T) {
+	mode := "default"
+	ls := &store.LiveSession{SessionID: "s", AgentType: at.Codex, PermissionMode: &mode}
+	kept := authorityFromRow(ls, true)
+	assert.Equal(t, rankOpen, kept.Rank)
+	grant, refusal := capAgentLaunchFor(kept, agentLaunchAsk{AgentType: at.Codex, PermissionMode: "bypassPermissions"})
+	require.Nil(t, refusal)
+	assert.Equal(t, "bypassPermissions", grant.Mode)
+	_, refusal = capAgentLaunchFor(authorityFromRow(ls, false), agentLaunchAsk{AgentType: at.Codex, PermissionMode: "bypassPermissions"})
+	require.NotNil(t, refusal)
+	assert.Equal(t, agentLaunchAboveCallerCode, refusal.Code)
 }
