@@ -79,6 +79,7 @@ async function readAsk(s) {
     if (browser) return { ask: String(po.ask_id || ''), picks: [browser.notNow], onlyReject, browser: true, question: '' }; // only Not now is a button; Install and Don't ask again are left to Open, and the row says so
     const trust = trustMenu(po);
     if (trust) return trust.folder ? { ask: String(po.ask_id || ''), picks: [trust.no, trust.yes], onlyReject, trust: { folder: trust.folder, yes: trust.yes } } : { ask: String(po.ask_id || ''), picks: [trust.no], onlyReject, held: true }; // No only, and the row says the rest is left to Open
+    if (po.unnumbered) return none; // an unnumbered menu that is neither the folder-trust nor the browser menu above: no button on a row (the arrows and Enter go into whatever is on that screen; #14151, UI Reviewer), the row says the rest is Open agent's
     const permission = (po.options || []).some(o => PERMISSION_WORDS.test(String(o.label || ''))); // a permission card: only a plain Yes or No is a button; a question's own choices (Red, Blue) are
     const picks = (po.options || []).filter(o => (o.action || 'select') === 'select' && o.label && Number.isInteger(Number(o.n)) && plainlyOneTime(String(o.label), permission) && (!onlyReject || REJECT_FORM.test(wholeLabel(String(o.label)))));
     // A question's choice the filter holds back (a lasting one, or one with a word like "Switch to", "from", "all") is left to Open as before, and the row says so: a partial list must not read as the whole list (the Mobile

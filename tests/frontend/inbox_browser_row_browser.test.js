@@ -90,7 +90,7 @@ const MENU = (extra = {}) => ({ question: 'Claude wants to use your browser This
                 await waitFor(`document.querySelectorAll('#group-table-view tbody .dt-primary').length === 1`, `${at}${name}: the row`, 8000);
                 await new Promise(r => setTimeout(r, 600)); // sleep-ok: the choices are read once the row is drawn
                 const got = await rowButtons();
-                check(!got.some(l => /install|don.?t ask/i.test(l)) && !(await ev(`!!document.querySelector('#group-table-view .inbox-browser-note')`)), `${at}${name}: never Install extension or Don't ask again as a button, and no browser sentence (the menu is not exactly this one): ` + JSON.stringify(got));
+                check((await ev(`document.querySelectorAll('#group-table-view .inbox-answers .inbox-answer').length`)) === 0 && JSON.stringify(got) === JSON.stringify(['Open agent']) && !(await ev(`!!document.querySelector('#group-table-view .inbox-browser-note')`)), `${at}${name}: ZERO answer buttons (only Open agent) and no browser sentence (the menu is not exactly this one): ` + JSON.stringify(got));
             }
         }
     } finally { await client.close(); }
