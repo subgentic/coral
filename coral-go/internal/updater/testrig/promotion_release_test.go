@@ -196,3 +196,16 @@ func TestAFeedNamedPromotionWithNoFilesIsSkippedNotAStopForEveryCheck(t *testing
 	assert.Equal(t, "1.4.131", res.Version, "the older promotion, which verifies, is taken")
 	assert.Empty(t, res.NextAttempt, "no back-off: nothing failed")
 }
+
+// An older promotion that is listed and whose files answer 404 cannot beat the newer one that has already verified, so it must not throw it away: the newest verified promotion is staged
+// (coral-hub's Security on #151). The 404 of a release ABOVE the best verified one still stops the pass (the test above).
+func TestAnOlderListedPromotionThatAnswers404DoesNotDiscardANewerVerifiedOne(t *testing.T) {
+	r := newRig(t)
+	r.publish(Spec{Version: "1.4.130", Sequence: 5})
+	r.publish(Spec{Version: "1.4.131", Sequence: 8})
+	r.gh.Status[PromotionTag("v1.4.130", 5)+"/"+stage.ManifestFile] = 404 // the older one's files are gone
+	res := r.check()
+	require.Equal(t, stage.ResultStaged, res.Result, "%+v", res)
+	assert.Equal(t, "1.4.131", res.Version, "the newest verified promotion is taken")
+	assert.Empty(t, res.NextAttempt, "no back-off: nothing the pass needed failed")
+}

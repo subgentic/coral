@@ -121,6 +121,12 @@ func (c *checker) findPromotion(ctx context.Context, onlyTag string) (p *promoti
 				junk++
 				continue
 			}
+			// An older listed release whose files answer 404 cannot beat a promotion that has already verified, so it must not throw that one away: it is counted and skipped. Only a release
+			// above the best verified sequence (or any, while nothing verified yet) stops the pass below (coral-hub's Security on #151).
+			if p != nil && seq <= p.m.Sequence && (notFound(merr) || notFound(berr)) {
+				junk++
+				continue
+			}
 			// A file the list says the release has (the API's list shows its assets) and that answers 404 is not junk: it is a promotion published seconds ago that the download host
 			// doesn't serve yet. Skipping it would let an older promotion win this pass, so a revocation could lose to the promotion it revokes; it stops the pass like any other fetch
 			// error, and the network back-off tries again (Security's #337).
