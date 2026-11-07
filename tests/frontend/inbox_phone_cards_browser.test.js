@@ -44,7 +44,7 @@ const { coralReady } = require('./helpers/wait');
             check(m.cards.every(c => c.radius === m.chat.radius && c.tl === m.chat.tl), `${at}and its corners (12 px, the small top-left one): ` + JSON.stringify([m.chat.radius, m.chat.tl, m.cards.map(c => [c.radius, c.tl])]));
             check(b.rect[1] - a.rect[3] >= 10 && b.rect[1] - a.rect[3] <= 14, `${at}the cards are 12 px apart: ${Math.round(b.rect[1] - a.rect[3])}`);
             check(m.cards.every(c => c.glyphRight !== null && c.glyphRight <= c.fromLeft + 1), `${at}the glyph clears the sender's name: ` + JSON.stringify(m.cards.map(c => [c.glyphRight, c.fromLeft])));
-            check(m.cards.every(c => c.qLines === null || c.qLines <= 2), `${at}the description is at most two lines (Layout A, #13829): ` + JSON.stringify(m.cards.map(c => c.qLines)));
+            check(m.cards.every(c => c.qLines === null || c.qLines <= 1), `${at}a file's review question is ONE line on a card (the approved mock; needs_three_lines pins the same on a phone): ` + JSON.stringify(m.cards.map(c => c.qLines)));
             check(m.sortLabelPx && m.sortLabelPx[0] <= 1 && m.sortLabelPx[1] <= 1, `${at}"Sort by" is for a screen reader, not drawn: ` + JSON.stringify(m.sortLabelPx));
             check(!m.wide && m.cards.every(c => c.rect[0] >= 0 && c.rect[2] <= m.vw && !c.over), `${at}nothing runs off the screen: ` + JSON.stringify([m.wide, m.vw, m.cards.map(c => c.rect)]));
             check(m.tailTop === null || m.tailTop >= b.rect[3], `${at}the footer notice is after the last card, not over it: ` + JSON.stringify([m.tailTop, b.rect[3]]));
@@ -59,6 +59,14 @@ const { coralReady } = require('./helpers/wait');
                 const search = [...document.querySelectorAll('input[type=search]')].find(vis), tog = view.querySelector('.inbox-group-review-toggle'), sel = view.querySelector('.dt-sortbar-select'), note = view.querySelector('.inbox-alerts-link'), alerts = note && note.querySelector('button');
                 return { title: text(view.querySelector('h2')), search: search && Math.round(search.getBoundingClientRect().left + parseFloat(cs(search).paddingLeft) + parseFloat(cs(search).borderLeftWidth)), group: tog && left(tog), chips: left(sel), card: left(view.querySelector('tbody tr.dt-row')), note: note && text(note), alerts: alerts && text(alerts) - parseFloat(cs(alerts).paddingLeft) + parseFloat(cs(alerts).paddingLeft) }; })()`);
             check(Object.entries(edges).filter(([, v]) => v !== null && v !== undefined).every(([, v]) => Math.abs(v - 12) <= 1), `${at}one left edge (12 px) for the title, the search, the grouping box, the chips, the cards and the notice: ` + JSON.stringify(edges));
+            // the whole question is ONE TAP away: a tap on the card opens the file, and its header says the full question the card cut
+            if (w === 390 && theme === 'dark' && font === 16) {
+                await ev(`document.querySelector('#group-table-view tbody tr.dt-row .dt-primary').click(); true`);
+                await waitFor(`(() => { const v = document.getElementById('artifact-viewer'); return !!v && !v.hidden; })()`, `${at}one tap opens the file`, 8000);
+                const said = await ev(`(document.getElementById('artifact-viewer').innerText || '').replace(/\\s+/g, ' ')`);
+                check(said.includes('A longer second sentence that must not make the card taller.'), `${at}the file's header carries the whole question the card cut: ` + JSON.stringify(said.slice(0, 300)));
+                await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close')?.click(); true`);
+            }
             const badge = await ev(`document.getElementById('nav-tab-hub-inbox-badge')?.textContent`);
             check(badge === '2', `${at}the count is the number of cards (2): ` + badge);
             if (w === 390 && theme === 'dark' && font === 16) await shot('phone-cards-390');
