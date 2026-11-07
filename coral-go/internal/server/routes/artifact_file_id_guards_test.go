@@ -23,7 +23,7 @@ func TestATaskChainJoinNeverRefusesOnAFileName(t *testing.T) {
 	require.NoError(t, err)
 	code, out := k.upTask("s1", root.ID, "plan, version one", "")
 	require.Equal(t, 201, code, out)
-	sid := fmt.Sprint(out["series_id"])
+	sid := fmt.Sprint(out["file_id"]) // a file with one version has a file id and no series yet: its id is the one the second version's series carries (asserted below)
 	// the same agent's next upload for the task, under ANOTHER name, and with no --new-version-of: it joins the chain's file, as before the name rule
 	code, out = k.post("s1&tag=for+review&question=Does+it+work%3F", "plan, version two", map[string]string{"X-Artifact-Task": strconv.FormatInt(root.ID, 10), "X-Artifact-Name": "plan-renamed.md"})
 	assert.Equal(t, http.StatusCreated, code, "a chain join is never refused for a name: %v", out)
