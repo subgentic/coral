@@ -43,7 +43,7 @@ let _versions = null;    // the version bar of the viewer (#6472)
 let _review = null;      // Approve and Request changes of a for-review artifact (#136584)
 let _hex = '';           // the artifact on show and what it was opened with, for a version chosen from the bar
 let _lastOpts = {};
-let _line = null;       // the file id and version line a caller gave for ONE file as seen from ONE computer and team ({ hex, server, board, fileId, versionLine }): shown only while that hex, computer and team are the ones shown; cleared by every open that carries none and by a close (#14178)
+let _line = null;       // the file id and version line the CURRENT open's caller gave, for the hex it was given for ({ hex, fileId, versionLine }). It is rebuilt from that open's own options on every open, so it cannot outlive its open or cross to another computer or team (those travel in the same options): an open that carries none has none. Shown only while its hex is the one shown (#14178)
 let _barLine = null;    // the same for the version the bar shows, from the server's list: it replaces the caller's on a switch and after a save
 let _lineChip = null;   // the line's chip in Details, made on the first line this open has
 let _details = null;     // the Details button and its panel (the readers' row)
@@ -104,7 +104,6 @@ function _build() {
         <div class="artifact-viewer-header">
             <h2 id="artifact-viewer-title" class="artifact-viewer-title"></h2>
             <span class="artifact-viewer-from" hidden></span>
-            <span class="artifact-viewer-versionline" hidden></span>
             <span class="artifact-viewer-chips"></span>
             <span class="artifact-viewer-actions"><button type="button" class="btn artifact-viewer-edit" hidden>Edit text</button><button type="button" class="btn artifact-viewer-markup" hidden>Mark up</button></span>
             <button type="button" class="btn btn-icon artifact-viewer-fullscreen" aria-label="Full screen" aria-pressed="false" title="Full screen">⤢</button>
@@ -113,11 +112,13 @@ function _build() {
                 <div class="menu artifact-viewer-menu" id="artifact-viewer-menu" role="menu" aria-label="More actions" hidden>
                     <button type="button" class="menu-item artifact-viewer-edit-item" role="menuitem" hidden>Edit text</button>
                     <button type="button" class="menu-item artifact-viewer-markup-item" role="menuitem" hidden>Mark up</button>
+                    <button type="button" class="menu-item artifact-viewer-copyid-item" role="menuitem" hidden>Copy file ID</button>
                     <a class="menu-item artifact-viewer-newtab" role="menuitem" target="_blank" rel="noopener noreferrer" hidden>Open in new tab</a>
                     <a class="menu-item artifact-viewer-download" role="menuitem" rel="noopener noreferrer" download>Download</a>
                 </div>
             </span>
         </div>
+        <p class="artifact-viewer-versionline" hidden></p>
         <p class="artifact-viewer-source" role="note" hidden></p>
         <div class="artifact-viewer-readers" hidden></div>
         <p class="artifact-edit-send-note" role="status" hidden></p>
@@ -127,6 +128,7 @@ function _build() {
     _details = makeDetails({ panel: d.querySelector('.artifact-viewer-readers'), remember: false, hide: true }); // closed on every open of the viewer: one open Details no longer fills the next file's screen (#12725)
     _details.button.classList.add('artifact-viewer-details'); d.querySelector('.artifact-viewer-morewrap').before(_details.button); // Details is a button in the header row, beside ⋯: where a person looks to close it (#12725) header row (#12223)
     // the HTML preview's banner is said once; after that a "Sandboxed" chip in the header says it, and a tap shows or hides the banner (#12224)
+    d.querySelector('.artifact-viewer-copyid-item').addEventListener('click', e => { const id = e.currentTarget.dataset.fileId; copyFileId({ file_id: id }, showToast); }); // the menu closes itself on a choice // Copy file ID: the id alone; a failed copy says so (#14178)
     const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'chip artifact-viewer-sandbox'; chip.hidden = true; chip.setAttribute('aria-expanded', 'false');
     chip.textContent = 'Sandboxed'; // words only: the icon font is a subset and has no shield
     d.querySelector('.artifact-viewer-chips').append(chip);
@@ -303,16 +305,18 @@ function openAfterInventory(hex, opts, intent) {
 /** The file id and version line of the version SHOWN now: the bar's, from the server's list of versions, else the one a caller gave for exactly this hex; never a line that belongs to another version (#14178). */
 function shownLine() {
     if (_barLine && _barLine.hex === _hex) return _barLine;
-    // a caller's line is for the digest AND the computer and team it was read from: the same digest opened from another team or computer is another row (#14178, round 3)
-    if (_line && _line.hex === _hex && _line.server === String(_lastOpts.server || '') && _line.board === String(_lastOpts.board || '')) return _line;
+    // a caller's line is for the hex it was given for: a version switch or a save spreads the options onto ANOTHER hex (the line stays with the first)
+    if (_line && _line.hex === _hex) return _line;
     return null;
 }
 /** Draw the version line in the header and in Details (with its Copy file ID button), or clear both when the shown version has none. */
 function paintLine(d) {
     const L = shownLine();
-    const text = L ? markHidden(versionLineOf({ file_id: L.fileId, version_line: L.versionLine }), { strict: true }) : '';
+    const text = L ? versionLineOf({ file_id: L.fileId, version_line: L.versionLine }) : ''; // hidden characters of the name are written out by versionLineOf
     const head = d.querySelector('.artifact-viewer-versionline');
     head.textContent = text; head.hidden = !text; // the full line is in Details too; no tooltip repeating the text (title_repeats_census)
+    const copyItem = d.querySelector('.artifact-viewer-copyid-item'); // Copy file ID is always reachable from the ⋯ menu: a file id and line never add a Details button of their own (#14178: it joined row one on a phone)
+    copyItem.hidden = !text; copyItem.dataset.fileId = text ? L.fileId : '';
     if (!text) { if (_lineChip) _lineChip.hidden = true; return; }
     if (!_lineChip) {
         const chip = document.createElement('span'); chip.className = 'chip detail-chip artifact-viewer-fileid';
@@ -321,7 +325,9 @@ function paintLine(d) {
         copy.addEventListener('click', () => { copyFileId({ file_id: chip.dataset.fileId }, showToast); });
         chip.append(label, ' ', copy);
         const wrap = document.createElement('div'); wrap.className = 'detail-chips'; wrap.append(chip);
-        _details.add(wrap); _lineChip = chip;
+        if (_details.button.hidden) _details.panel.append(wrap); // nothing else is in Details: the chip waits in the closed panel, and shows if something else (a goal, a task, who can read) makes the button appear
+        else _details.add(wrap);
+        _lineChip = chip;
     }
     _lineChip.dataset.fileId = L.fileId; _lineChip.firstChild.textContent = text; _lineChip.hidden = false;
 }
@@ -408,7 +414,7 @@ export function openArtifactViewer(hex, opts = {}) {
     if (chips.children.length) _details.add(chips);
     _lineChip = null;
     // Every open sets the line afresh: a caller's valid id and line (bound to its hex, computer and team), else NONE. An earlier open's line never survives into one that carries none (the same digest from another team, a plain reopen).
-    _line = fileIdOf({ file_id: opts.fileId }) && opts.versionLine ? { hex: opts.lineHex, server: String(opts.server || ''), board: String(opts.board || ''), fileId: opts.fileId, versionLine: opts.versionLine } : null;
+    _line = fileIdOf({ file_id: opts.fileId }) && opts.versionLine ? { hex: opts.lineHex, fileId: opts.fileId, versionLine: opts.versionLine } : null;
     paintLine(d);
     readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) { _details.add(readersBlock(hex, opts.server, _details)); if (opts.sourceNamed) _details.add(privateBlock(hex, opts.server, _details)); } }).catch(() => {});
     if (!opts.switched) d.querySelector('.artifact-viewer-close').focus(); // a version chosen from the bar keeps the keyboard on the bar
@@ -458,7 +464,6 @@ export function openArtifactViewer(hex, opts = {}) {
         }
     }
     stopEditSend(); stopMarkdownEdit();
-    _line = null; _barLine = null; _lineChip = null; // a closed viewer keeps no file's id for the next one (#14178)
     _versions?.close();
     _review?.close();
     _comments?.close(); // the sheet (above it) goes first, so Back's order and ours agree
