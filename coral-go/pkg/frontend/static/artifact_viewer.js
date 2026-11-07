@@ -43,6 +43,9 @@ let _versions = null;    // the version bar of the viewer (#6472)
 let _review = null;      // Approve and Request changes of a for-review artifact (#136584)
 let _hex = '';           // the artifact on show and what it was opened with, for a version chosen from the bar
 let _lastOpts = {};
+let _line = null;       // the file id and version line a caller gave for ONE hex ({ hex, fileId, versionLine }): shown only while that hex is the one shown (#14178)
+let _barLine = null;    // the same for the version the bar shows, from the server's list: it replaces the caller's on a switch and after a save
+let _lineChip = null;   // the line's chip in Details, made on the first line this open has
 let _details = null;     // the Details button and its panel (the readers' row)
 let _editor = null;
 let _editAbort = null;
@@ -101,6 +104,7 @@ function _build() {
         <div class="artifact-viewer-header">
             <h2 id="artifact-viewer-title" class="artifact-viewer-title"></h2>
             <span class="artifact-viewer-from" hidden></span>
+            <span class="artifact-viewer-versionline" hidden></span>
             <span class="artifact-viewer-chips"></span>
             <span class="artifact-viewer-actions"><button type="button" class="btn artifact-viewer-edit" hidden>Edit text</button><button type="button" class="btn artifact-viewer-markup" hidden>Mark up</button></span>
             <button type="button" class="btn btn-icon artifact-viewer-fullscreen" aria-label="Full screen" aria-pressed="false" title="Full screen">⤢</button>
@@ -185,6 +189,7 @@ function _build() {
         body: () => d.querySelector('.artifact-viewer-body'),
         show: (row) => openArtifactViewer(row.digest, { ..._lastOpts, filename: row.name || _lastOpts.filename, mediaType: row.media_type, switched: true }),
         reload: () => openArtifactViewer(_hex, { ..._lastOpts, switched: false }),
+        line: (row) => { _barLine = row && row.file_id && row.version_line ? { hex: row.digest, fileId: row.file_id, versionLine: row.version_line } : null; if (_dialog) paintLine(_dialog); },
         sheetOpen: () => _comments.sheetOpen(),
         setSheet: (open) => _comments.setSheet(open),
     });
@@ -295,6 +300,30 @@ function openAfterInventory(hex, opts, intent) {
         if (openArtifactViewer(hex, opts) === false) opts.onClose?.();
     }).catch(error => { if (intent === _openIntent) { showToast(error.message, true); opts.onClose?.(); } }).finally(() => { clearTimeout(timer); window.removeEventListener('popstate', cancel); document.removeEventListener('coral:route-changed', cancel); });
 }
+/** The file id and version line of the version SHOWN now: the bar's, from the server's list of versions, else the one a caller gave for exactly this hex; never a line that belongs to another version (#14178). */
+function shownLine() {
+    if (_barLine && _barLine.hex === _hex) return _barLine;
+    if (_line && _line.hex === _hex) return _line;
+    return null;
+}
+/** Draw the version line in the header and in Details (with its Copy file ID button), or clear both when the shown version has none. */
+function paintLine(d) {
+    const L = shownLine();
+    const text = L ? markHidden(versionLineOf({ file_id: L.fileId, version_line: L.versionLine }), { strict: true }) : '';
+    const head = d.querySelector('.artifact-viewer-versionline');
+    head.textContent = text; head.hidden = !text; // the full line is in Details too; no tooltip repeating the text (title_repeats_census)
+    if (!text) { if (_lineChip) _lineChip.hidden = true; return; }
+    if (!_lineChip) {
+        const chip = document.createElement('span'); chip.className = 'chip detail-chip artifact-viewer-fileid';
+        const label = document.createElement('span'); label.className = 'artifact-viewer-fileid-text';
+        const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'dt-link detail-chip-link'; copy.textContent = 'Copy file ID';
+        copy.addEventListener('click', () => { copyFileId({ file_id: chip.dataset.fileId }, showToast); });
+        chip.append(label, ' ', copy);
+        const wrap = document.createElement('div'); wrap.className = 'detail-chips'; wrap.append(chip);
+        _details.add(wrap); _lineChip = chip;
+    }
+    _lineChip.dataset.fileId = L.fileId; _lineChip.firstChild.textContent = text; _lineChip.hidden = false;
+}
 /** Open the artifact `hex` (64 lowercase hex). opts: { server, filename, mediaType }. */
 export function openArtifactViewer(hex, opts = {}) {
     const intent = ++_openIntent;
@@ -317,7 +346,9 @@ export function openArtifactViewer(hex, opts = {}) {
     _abort?.abort();
     _abort = new AbortController();
     const gen = ++_gen;
+    opts = { ...opts, lineHex: opts.lineHex || hex }; // the hex a caller's file id and line were given for: a version switch or a save spreads these opts onto ANOTHER hex, and the line must stay with its own (#14178)
     _hex = hex; _lastOpts = opts;
+    _barLine = null; // before the bar is opened below: it may draw at once and tell the version it shows, and that line must survive the rest of this open
     _sendCapability = null; const sendButton = d.querySelector('.artifact-edit-send-action'); sendButton.hidden = true; sendButton.disabled = false; const sendNote = d.querySelector('.artifact-edit-send-note'); sendNote.hidden = !opts.editSaved; sendNote.textContent = opts.editSaved ? 'Saved as a new version. Nothing was sent to an agent automatically.' : '';
     _editCapability = null; const editButton = d.querySelector('.artifact-viewer-edit'); editButton.hidden = true; d.querySelector('.artifact-viewer-edit-item').hidden = true; d.querySelector('.artifact-viewer-edit-item').disabled = false; editButton.disabled = false; editButton.textContent = 'Edit text';
     _layoutType = null;
@@ -373,15 +404,10 @@ export function openArtifactViewer(hex, opts = {}) {
         wrap.append('Goal: ', link); chips.append(wrap);
     } else if (opts.goal) { const g = document.createElement('span'); g.className = 'chip detail-chip'; g.textContent = `Goal: ${markHidden(opts.goal, { strict: true })}`; g.title = g.textContent; chips.append(g); }
     if (opts.task) { const t = document.createElement('span'); t.className = 'chip detail-chip'; t.textContent = `Task: ${markHidden(opts.task, { strict: true })}`; t.title = t.textContent; chips.append(t); }
-    if (opts.versionLine && fileIdOf({ file_id: opts.fileId })) { // the file's version and stable id, the same line everywhere (#14145)
-        const idChip = document.createElement('span'); idChip.className = 'chip detail-chip artifact-viewer-fileid';
-        const shown = markHidden(versionLineOf({ file_id: opts.fileId, version_line: opts.versionLine }), { strict: true });
-        idChip.append(shown); idChip.title = shown;
-        const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'dt-link detail-chip-link'; copy.textContent = 'Copy file ID';
-        copy.addEventListener('click', () => { copyFileId({ file_id: opts.fileId }, showToast); });
-        idChip.append(' ', copy); chips.append(idChip);
-    }
     if (chips.children.length) _details.add(chips);
+    _lineChip = null;
+    if (fileIdOf({ file_id: opts.fileId }) && opts.versionLine) _line = { hex: opts.lineHex, fileId: opts.fileId, versionLine: opts.versionLine }; // a caller's line is for the hex it opened; a later hex (a version switch, a save) never inherits it
+    paintLine(d);
     readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) { _details.add(readersBlock(hex, opts.server, _details)); if (opts.sourceNamed) _details.add(privateBlock(hex, opts.server, _details)); } }).catch(() => {});
     if (!opts.switched) d.querySelector('.artifact-viewer-close').focus(); // a version chosen from the bar keeps the keyboard on the bar
     let textShown = false; // the strict text view drew it: comments can point into it. Anything else (a frame, a picture, a PDF, a table, a video, a download) takes whole-document comments (#11444).

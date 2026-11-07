@@ -14,7 +14,7 @@ import { loadStyles } from './lazy_styles.js';
 await loadStyles('phone_lists.css'); // the phone form of a team list (#12230); not at start (page_weight)
 import { browserLocal } from './safe_storage.js';
 import { renderArtifact } from './artifact_preview.js';
-import { showToast, fileIdOf, copyFileId } from './utils.js';
+import { showToast, fileIdOf, versionLineOf, copyFileId } from './utils.js';
 /** An agent's file with no team says whose it is where the Team column would say "No team" (#10797): the name comes from the live list, and "No team" stays when the agent is not in it. */
 const placeOf = item => { const a = (item.team === 'No team' || item.team === 'Not on a team') && item.session_id && (state.liveSessions || []).find(s => s.session_id === item.session_id); return a ? (a.display_name || a.name) : teamLabel(item.board_id, item.team); };
 const DT = await importOnce('./data_table.js');
@@ -426,7 +426,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                     if (origin) note.classList.add(`team-artifact-badge-${isUnverified(item) ? 'unverified' : item.source === 'shared' ? 'shared' : 'received'}`);
                     if (isUnverified(item)) note.classList.add('dt-warning'); return note;
                 },
-                ...(inbox || phoneTeam ? { mail: item => ({ data: { artifactId: itemKey(item) }, lead: { icon: 'description', square: true, name: String(readableName(item)).split('.').pop() }, title: readableName(item), ask: uploaderText(item) || '—', askTag: isOperatorUpload(item), starred: !!item.starred, snippet: [placeOf(item), taskText(item)].filter(Boolean).join(' · '), time: DT.timeCell(item.updated_at || item.created_at).textContent, tip: [`Uploaded by: ${uploaderText(item) || '—'}`, multipleServers() ? `${item.team || keyLabel(item.board_id)} \u00b7 ${serverLabel(serverOf(item))}` : placeOf(item), taskText(item)].filter(Boolean).join(' \u00b7 ') }) } : {}), // a phone's row (#9583): its hover names the team and the computer, as the dropped columns did: a file glyph, the name, its team and task, when it changed
+                ...(inbox || phoneTeam ? { mail: item => ({ data: { artifactId: itemKey(item) }, lead: { icon: 'description', square: true, name: String(readableName(item)).split('.').pop() }, title: readableName(item), ask: uploaderText(item) || '—', askTag: isOperatorUpload(item), starred: !!item.starred, snippet: [placeOf(item), taskText(item), versionLineOf(item)].filter(Boolean).join(' · '), time: DT.timeCell(item.updated_at || item.created_at).textContent, tip: [`Uploaded by: ${uploaderText(item) || '—'}`, multipleServers() ? `${item.team || keyLabel(item.board_id)} \u00b7 ${serverLabel(serverOf(item))}` : placeOf(item), taskText(item)].filter(Boolean).join(' \u00b7 ') }) } : {}), // a phone's row (#9583): its hover names the team and the computer, as the dropped columns did: a file glyph, the name, its team and task, when it changed
                 updatedWidth: model.scope ? '' : '9rem', // the lists with a Goal column keep "yesterday 3:00 AM" whole (the narrow lists drop nothing here and keep 7.5 rem)
                 tagsDropAt: inbox ? 62 : 0, // the Inbox list is crowded (a team, a task): its Tags go first, before Team and Task
                 afterName: [...(inbox ? (model.filters.team
@@ -531,7 +531,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         const received = item.source === 'received';
         const facts = [
             ['MIME', un ? '' : item.media_type || 'Unknown'], // the header says the type, the size and when (#7775): nothing here repeats it
-            ...(inbox ? (multipleServers() ? [['Team', item.team || keyLabel(item.board_id)], ['Computer', serverLabel(serverOf(item))]] : [['Team', placeOf(item)]]) : []), ['Task', taskCell(item)], ...(item.goal_id && item.goal_title ? [['Goal', goalCell(item)]] : []), ['Producer', item.produced_by ? nameSpan(item.produced_by, { board: inbox ? item.board_id : model.project }) : item.produced_by], // the Task fact is the same link as the column: a phone drops the column
+            ...(inbox ? (multipleServers() ? [['Team', item.team || keyLabel(item.board_id)], ['Computer', serverLabel(serverOf(item))]] : [['Team', placeOf(item)]]) : []), ['Version', versionLineOf(item)], ['Task', taskCell(item)], ...(item.goal_id && item.goal_title ? [['Goal', goalCell(item)]] : []), ['Producer', item.produced_by ? nameSpan(item.produced_by, { board: inbox ? item.board_id : model.project }) : item.produced_by], // the Task fact is the same link as the column: a phone drops the column
             ['Status', un ? 'Link not verified: this team has not uploaded this file, so Coral shows no size, type or preview' : ''],
             ['Sent to', item.source === 'shared' ? item.shared_to : ''], ['Sent by', (item.source === 'shared' || received) && item.sent_by ? nameSpan(item.sent_by) : ''],
             ['Received from', received ? item.received_from : ''], ['Board (claimed by the sender)', received ? item.from_board : ''],

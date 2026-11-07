@@ -115,6 +115,7 @@ export function attachVersions(dialog, hooks) {
         const i = cur();
         bar.hidden = !st.rows || i < 0;
         hooks.version?.(bar.hidden ? 0 : st.rows[i].version);
+        hooks.line?.(bar.hidden ? null : st.rows[i]); // the file id and line of the version SHOWN, from the server's list (#14178): a switch or a save never keeps another version's
         dialog.classList.toggle('av-has-versions', !bar.hidden);
         if (bar.hidden) return;
         const rows = st.rows, row = rows[i], total = rows.length, latest = i === total - 1;

@@ -14,6 +14,9 @@
 /* the sandbox chip and the one-line question (#12224) */
 .artifact-viewer-sandbox { flex: none; cursor: pointer; border: 0; background: var(--bg-tertiary); color: var(--text-secondary); font: inherit; font-size: var(--fs-sm); height: auto; padding: 2px 10px; }
 .artifact-viewer-sandbox[hidden], .artifact-linked-notice[hidden] { display: none; }
+.artifact-viewer-versionline { flex: 1 1 0; min-width: 0; padding: 0; font-size: var(--fs-sm); color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* the file's version line, one cut line like the sender's (#14178) */
+.artifact-viewer-versionline[hidden] { display: none; }
+@media (max-width: 767px) { .artifact-viewer-header .artifact-viewer-versionline { flex: 1 1 100%; order: 9; } }
 .artifact-viewer-from.is-open { white-space: normal; overflow-wrap: anywhere; }
 .artifact-viewer-source { flex: none; margin: 0; padding: 8px 16px; color: var(--text-secondary); font-size: var(--fs-sm); line-height: var(--lh-body); overflow-wrap: anywhere; }
 .artifact-viewer-source[hidden] { display: none; }

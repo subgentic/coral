@@ -193,5 +193,7 @@ export function copyFileId(it, toast) {
     const id = fileIdOf(it);
     if (!id) return Promise.resolve(false);
     const say = (t, bad) => { try { toast?.(t, bad); } catch { /* the toast is a courtesy */ } };
-    return Promise.resolve(navigator.clipboard?.writeText(id)).then(() => { say('File ID copied'); return true; }, () => { say('The file ID could not be copied', true); return false; });
+    const failed = () => { say('The file ID could not be copied', true); return false; };
+    if (typeof navigator === 'undefined' || !navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') return Promise.resolve(failed()); // no clipboard is a failed copy, never "copied" (UI Reviewer, #14178)
+    try { return Promise.resolve(navigator.clipboard.writeText(id)).then(() => { say('File ID copied'); return true; }, failed); } catch { return Promise.resolve(failed()); }
 }

@@ -68,6 +68,9 @@ type versionRow struct {
 	At        string `json:"at"`
 	Uploader  string `json:"uploader"`
 	Role      string `json:"role"`
+	// FileID and VersionLine (#14145): the file's stable id and this version's line, so the viewer's bar can say which version it shows and never keep another's.
+	FileID      string `json:"file_id"`
+	VersionLine string `json:"version_line"`
 }
 
 func (h *SessionsHandler) versionsOf(w http.ResponseWriter, r *http.Request, id string) {
@@ -84,6 +87,7 @@ func (h *SessionsHandler) versionsOf(w http.ResponseWriter, r *http.Request, id 
 		if meta, ok := readSidecar(filepath.Join(coralDir, "artifacts", "objects", m.Digest+".json")); ok {
 			row.Name, row.MediaType, row.Size = meta.Name, meta.MediaType, meta.Size
 		}
+		row.FileID, row.VersionLine = id, versionLine(m.N, row.Name, id)
 		rows = append(rows, row)
 	}
 	writeJSON(w, http.StatusOK, rows)
