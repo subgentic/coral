@@ -19,6 +19,13 @@ const { guardSettings } = require('./helpers/settings_guard');
    assert.match(actual.body.text,/run as you, with every file you can reach/,'real server text states the operating-system authority');
    assert.match(actual.body.text,/Hermes/,'real server disclosure names Hermes Bypass');
    await ev(`fetch('/api/launch-disclosure/ack',{method:'DELETE'}).then(r=>r.ok)`);
+   await ev(`fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({default_permission_mode:''})}).then(r=>r.ok)`);
+   for(const path of ['/api/sessions/launch','/api/sessions/launch-team']){
+    const payload=path.endsWith('launch-team')?{board_name:'disclosure-ui-probe',working_dir:'/tmp/coral-disclosure-no-folder',agent_type:'claude',flags:['--permission-mode','auto'],agents:[{name:'Orchestrator',prompt:'Coordinate'}]}:{name:'disclosure-ui-probe',working_dir:'/tmp/coral-disclosure-no-folder',agent_type:'claude',flags:['--permission-mode','auto']};
+    const refusal=await ev(`fetch(${JSON.stringify(path)},{method:'POST',headers:{'Content-Type':'application/json'},body:${JSON.stringify(JSON.stringify(payload))}}).then(async r=>({status:r.status,body:await r.json()}))`);
+    assert.equal(refusal.status,409,path+': real authenticated dialog request is gated before missing-folder checks/spawn');assert.equal(refusal.body.code,'launch_disclosure_required');
+   }
+
    await ev(`import((window.__coralStatic||'/static/')+'launch_disclosure.js').then(m=>m.refreshLaunchDisclosure())`);
    await waitFor(`!!document.getElementById('launch-disclosure-banner')`,'real unseen server record shows the banner');
    await ev(`[...document.querySelectorAll('#launch-disclosure-banner button')].find(b=>b.textContent==="I've read this").click();true`);
