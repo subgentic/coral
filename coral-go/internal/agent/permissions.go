@@ -42,6 +42,13 @@ type ClaudePermissions struct {
 // TranslateToClaudePermissions converts Coral capabilities to Claude Code's
 // native permissions format for injection into settings.json.
 func TranslateToClaudePermissions(caps *Capabilities) *ClaudePermissions {
+	return TranslateToClaudePermissionsForMode(caps, "default")
+}
+
+// TranslateToClaudePermissionsForMode is TranslateToClaudePermissions for the permission mode the launch really uses. In Auto the git_write capability emits NO Bash(git ...) allow rule (#14350,
+// found by #14338): an allow rule decides before Auto's own judgement, so Bash(git push *) let a force push run unasked. A blanket Bash allow still lets Auto's judgement cover git, and destructive
+// git stays judged. In every other mode the rules stay: they only stop the question (Default, Plan, Accept edits), or are what is allowed at all (Don't ask); in Bypass the list is moot.
+func TranslateToClaudePermissionsForMode(caps *Capabilities, mode string) *ClaudePermissions {
 	if caps.IsEmpty() {
 		return nil
 	}
@@ -58,6 +65,9 @@ func TranslateToClaudePermissions(caps *Capabilities) *ClaudePermissions {
 	}
 
 	for _, cap := range caps.Allow {
+		if cap == CapGitWrite && mode == "auto" {
+			continue // Auto's own judgement stays in charge of git (#14350)
+		}
 		allow = append(allow, mapCapToClaudeTools(cap)...)
 	}
 	for _, cap := range caps.Deny {
