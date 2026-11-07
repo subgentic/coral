@@ -39,3 +39,21 @@ func TestRedactForLogCutsTheQuery(t *testing.T) {
 	assert.Equal(t, "http://127.0.0.1:8420/?...", redactForLog("http://127.0.0.1:8420/?login=abc"))
 	assert.Equal(t, "http://h/p", redactForLog("http://h/p"))
 }
+
+// #3970 / #14064: when the redirect page cannot be opened, the fallback opens the address without the token; no argv ever holds it.
+func TestTryOpenLoginFallbackNeverPutsTheTokenInAnArgument(t *testing.T) {
+	old := startOpener
+	t.Cleanup(func() { startOpener = old })
+	var got [][]string
+	n := 0
+	startOpener = func(argv []string) bool { got = append(got, argv); n++; return n > 1 } // the redirect page's opener fails once
+	assert.True(t, TryOpenLogin("http://127.0.0.1:8420/?settings=updates&login_token=SECRETTOKEN"))
+	assert.Len(t, got, 2)
+	for _, a := range got {
+		for _, x := range a {
+			assert.NotContains(t, x, "SECRETTOKEN")
+			assert.NotContains(t, x, "login_token")
+		}
+	}
+	assert.Contains(t, got[1][len(got[1])-1], "settings=updates", "the page is kept")
+}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html"
 	"log"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -87,7 +88,20 @@ func TryOpenLogin(link string) bool {
 	if path, err := writeLoginPage(u); err == nil && startOpener(fileOpenCommand(runtime.GOOS, path)) {
 		return true
 	}
-	return tryOpenBrowser(u)
+	// The redirect page failed: open the same address without the token, never the token in an argument (#3970, #14064). The dashboard then asks to sign in.
+	return tryOpenBrowser(withoutLoginToken(u))
+}
+
+// withoutLoginToken is u with its login_token query value removed.
+func withoutLoginToken(u string) string {
+	p, err := url.Parse(u)
+	if err != nil {
+		return strings.SplitN(u, "?", 2)[0]
+	}
+	q := p.Query()
+	q.Del("login_token")
+	p.RawQuery = q.Encode()
+	return p.String()
 }
 
 // fileOpenCommand is the argv that opens the file at path in its default program on goos (the browser, for a page).
