@@ -28,16 +28,20 @@ const OPERATOR_TEXT = '@Operator TEST ITEM, safe to answer any way: this is a te
                     if (/^\\/api\\/board\\/[^/]+\\/messages$/.test(url) && o && o.method === 'POST') { const body = JSON.parse(o.body); window.__posts.push({ url, body }); if (window.__failPost) return json({ error: 'too many messages; retry in 20s' }, 429);
                         window.__asks = window.__asks.filter(a => !(body.content.startsWith('@' + a.asker + ' ') && (a.kind === 'wait' || body.reply_to === a.id))); return json({ id: 99 }); }
                     return orig(u, o); }; return true; })()`);
+            if (what !== 'none') await ev(`window.__asks[0].may_no_longer_apply=${JSON.stringify(what === 'task' ? 'task_completed' : 'task_reassigned')};true`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, at + 'three rows of Needs you (' + what + ')', 10000).catch(async e => { console.error('STATE', await ev('location.pathname + " rows=" + document.querySelectorAll("#group-table-view tbody tr").length + " tab=" + (localStorage.getItem("coral.inbox.tab") || "")')); throw e; });
             const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => ({ who: (r.querySelector('.inbox-review-from') || {}).textContent || '', mark: (r.querySelector('.inbox-review-earlier') || {}).textContent || '', tip: (r.querySelector('.inbox-review-earlier') || {}).title || '' }))`);
             const orch = rows.find(r => r.who === 'Orchestrator'), dev = rows.find(r => r.who === 'Dev');
             assert.ok(orch && orch.mark === 'Goal #7 \u00b7 Task #12' && /Ship the beta/.test(orch.tip) && /Fix the login page/.test(orch.tip) && /named by Orchestrator/.test(orch.tip), at + "the row says which goal and task, with their titles in its tooltip: " + JSON.stringify(orch));
             assert.ok(dev && dev.mark === '', at + 'a question about neither shows nothing on its row: ' + JSON.stringify(dev));
+            if (what !== 'none') assert.ok(await ev(`document.querySelector('#group-table-view').textContent.includes('May no longer apply.')`), at+'the task caution appears on its Needs you row');
             // the dialog: a line of links
             if (what !== 'none') { // the question about a goal and a task: its dialog and a link
                 await ev(`document.querySelector('button[aria-label="Answer the question of Orchestrator"]').click(); true`);
                 await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the dialog opens', 4000);
+                assert.ok(await ev(`document.querySelector('dialog.inbox-ask-dialog').textContent.includes('May no longer apply.') && document.querySelector('dialog.inbox-ask-dialog').textContent.includes('The asker can close this question.')`),at+'the detail explains the caution without posting a reply');
+                assert.equal(await ev('window.__posts.length'),0,at+'a context change never sends an answer automatically');
                 const d = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'), p = d.querySelector('.inbox-ask-subjects'), sub = d.querySelector('.inbox-ask-sub'); return { shown: !!p && !p.hidden, buttons: p ? [...p.querySelectorAll('button')].map(b => [b.dataset.kind, b.textContent]) : [], text: p ? p.textContent : '', below: !!p && !!sub && p.getBoundingClientRect().top >= sub.getBoundingClientRect().bottom - 1 }; })()`);
                 assert.ok(d.shown && d.below && JSON.stringify(d.buttons) === JSON.stringify([['goal', 'Goal #7'], ['task', 'Task #12']]), at + 'the dialog has the goal and the task as links under who asked: ' + JSON.stringify(d));
                 assert.ok(/^About Goal #7 \u00b7 Task #12$/.test(d.text), at + 'the line says the asker named them: ' + d.text);
@@ -60,6 +64,20 @@ const OPERATOR_TEXT = '@Operator TEST ITEM, safe to answer any way: this is a te
             await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the second question opens', 4000);
             assert.ok(await ev(`(() => { const p = document.querySelector('dialog.inbox-ask-dialog .inbox-ask-subjects'); return !p || p.hidden || !document.querySelector('dialog.inbox-ask-dialog').contains(p); })()`), at + 'a question about neither shows no line');
             await ev(`document.querySelector('dialog.inbox-ask-dialog .inbox-ask-buttons .btn:not(.btn-primary)').click(); true`);
+            await ev(`(async()=>{ const DT=await import(${S}+'data_table.js');const host=document.createElement('div');host.id='context-tables';host.style.cssText='position:fixed;inset:50px auto auto 10px;width:250px;z-index:9999;background:var(--bg-primary)';document.body.append(host);
+                for(let i=0;i<2;i++){const t=DT.dataTable({label:'Context list '+i,rows:[{id:1,name:'A task',goal:'A long acceptance criterion for this task',age:'This has waited for a long time'}],rowKey:r=>r.id,state:DT.tableState(),fold:'none',columns:[{key:'name',label:'Item',primary:true,width:'grow',cell:r=>r.name},{key:'goal',label:'Goal',drop:1,cell:r=>r.goal},{key:'age',label:'Age',drop:2,cell:r=>r.age}]});host.append(t.el);} return true;})()`);
+            await waitFor(`(()=>{const buttons=[...document.querySelectorAll('#context-tables .cols-hidden-btn')];return buttons.length===2&&buttons.every(b=>b.getClientRects().length>0&&b.closest('.dt-box').querySelector('.cols-hidden-menu .menu-item'));})()`,at+'two independent hidden-column menus');
+            await ev(`document.querySelectorAll('#context-tables .cols-hidden-btn')[1].click();true`);
+            await waitFor(`document.querySelectorAll('#context-tables .cols-hidden-btn')[1].getAttribute('aria-expanded')==='true'`,at+'second list menu opens');
+            const menuState=await ev(`(()=>{const b=document.querySelectorAll('#context-tables .cols-hidden-btn')[1], own=b.closest('.dt-box').querySelector('.cols-hidden-menu'), found=document.getElementById(b.getAttribute('aria-controls'));return{id:b.getAttribute('aria-controls'),matches:document.querySelectorAll('[id="'+b.getAttribute('aria-controls')+'"]').length,own:own===found,items:found?.innerHTML,ownItems:own?.innerHTML};})()`);
+            assert.ok(menuState.own,at+'the visible control owns the resolved menu: '+JSON.stringify(menuState));
+            assert.ok(menuState.items.includes('menu-item'),at+'the opened menu has a Show action: '+JSON.stringify(menuState));
+            await ev(`(()=>{const b=document.querySelectorAll('#context-tables .cols-hidden-btn')[1];document.getElementById(b.getAttribute('aria-controls')).querySelector('.menu-item').click();return true;})()`);
+            await waitFor(`!document.querySelectorAll('#context-tables .dt-box')[1].querySelector('td[data-key="goal"]').classList.contains('dt-col-tight')`,at+'Show restores a column of the second list');
+            assert.ok(await ev(`document.querySelectorAll('#context-tables .dt-box')[0].querySelector('td[data-key="goal"]').classList.contains('dt-col-tight')`),at+'the first list stays unchanged');
+            await ev(`document.getElementById('context-tables').remove();true`);
+            assert.equal(await ev(`(async()=>{const G=await import(${S}+'goal_done.js');return G.doneGoals([{id:9,state:'active',rollup:{done:2},moved_open:1,looks_done_at:'2000-01-01T00:00:00Z'}],()=> 'team',{goal_done_quiet_minutes:'0'}).length;})()`),0,at+'moved unfinished work suppresses an old completion hint');
+
         }
     } finally { await client.close(); }
     console.log('ask_subject_links_browser: ok');

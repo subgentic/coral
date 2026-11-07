@@ -50,3 +50,9 @@ for (const hidden of ['dismissed', 'not_yet']) {
 }
 assert.equal(isGoalDoneRead(remote.board_id, { ...remote, done_state: { read: true } }, {}), true);
 assert.equal(doneGoals([{ ...remote, board_id: '@m1/team' }, { ...remote, done_state: { hidden: 'dismissed' } }], g => g.board_id, {}, now).length, 1);
+assert.deepEqual(ids([goal(9,60,{moved_open:1})]),[],'old completed tasks cannot hide unfinished work moved to another goal');
+assert.equal(nextQuietEnd([goal(9,60,{moved_open:1})],team,{},now),null,'no timer can promote a goal while moved work is unfinished');
+assert.equal(quietEndsAt(goal(9,15,{updated_at:'2000-01-01T00:00:00Z',moved_open:0}),{}),now,'the arrival time follows the completion candidate and quiet period, not the goal’s old edit time');
+
+const {toGoal}=await import(pathToFileURL(path.resolve(here,'../../coral-go/pkg/frontend/static/goals_adapter.js')).href);
+assert.deepEqual(ids([toGoal(goal(10,60,{moved_open:1}))]),[],'the goal detail adapter preserves the moved-work eligibility guard');

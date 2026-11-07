@@ -2,6 +2,7 @@ package background
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,9 +16,17 @@ import (
 func TestRunNowRecordsTheJobsRunAndKeepsTheSchedule(t *testing.T) {
 	ctx := context.Background()
 	s, ss, job := jobWithRuns(t) // a daily 09:00 job, no runs
+	var mu sync.Mutex
 	var launched []int64
+	// The launch waits for the test: "a job that is running is not run twice" is only a fact while the first run is still running. A launch that returned at once let a loaded run (two cores, -race) end the first
+	// run before the second RunNow, which then started another (#14281).
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
 	s.SetLaunchFn(func(_ context.Context, _ store.ScheduledJob, runID int64) error {
+		mu.Lock()
 		launched = append(launched, runID)
+		mu.Unlock()
+		<-release
 		return nil
 	})
 

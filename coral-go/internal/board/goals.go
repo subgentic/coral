@@ -109,8 +109,10 @@ type Goal struct {
 	// MadeByOrchestrator is set on the way out (never stored) when the team's Orchestrator wrote this goal itself (#11887): the goal page says so instead of "nobody was told".
 	MadeByOrchestrator bool       `db:"-" json:"made_by_orchestrator,omitempty"`
 	Rollup             GoalRollup `db:"-" json:"rollup"`
-	// LooksDoneAt is when the last of an active goal's tasks was completed, set (on the list pages) only for a goal whose tasks are all done: "Goal #N looks done" waits from then, not from the goal's creation (#12081).
+	// LooksDoneAt is the latest relevant completion or task move for an active goal with all current and moved work finished. The quiet period starts there, never at goal creation.
 	LooksDoneAt *string `db:"-" json:"looks_done_at,omitempty"`
+	// MovedOpen prevents a completion hint when unfinished work was moved off a goal whose current tasks are all done.
+	MovedOpen int `db:"-" json:"moved_open,omitempty"`
 	// FollowUpsOpen: the open tasks of the goal that were made as follow-ups of another task (task add --follow-up); filled where one goal is read (GetGoal), never in a list.
 	FollowUpsOpen int `db:"-" json:"follow_ups_open,omitempty"`
 	// NewComments: how many replies agents left in the Operator's comment threads on this goal since they last opened them (#12073); set on the way out for the Operator's own read, never stored.
@@ -255,8 +257,10 @@ func (s *Store) GetGoal(ctx context.Context, board string, id int64) (*Goal, err
 	if err = s.fillGoalImages(ctx, one); err != nil {
 		return nil, err
 	}
-	g.Images = one[0].Images
-	return &g, nil
+	if err = s.fillLooksDone(ctx, one); err != nil {
+		return nil, err
+	}
+	return &one[0], nil
 }
 
 // ListGoals is the first page of a board's goals (GoalPage without a cursor), for a caller that wants the goals and not the paging.

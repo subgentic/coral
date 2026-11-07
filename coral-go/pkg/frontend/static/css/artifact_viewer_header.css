@@ -14,6 +14,9 @@
 /* the sandbox chip and the one-line question (#12224) */
 .artifact-viewer-sandbox { flex: none; cursor: pointer; border: 0; background: var(--bg-tertiary); color: var(--text-secondary); font: inherit; font-size: var(--fs-sm); height: auto; padding: 2px 10px; }
 .artifact-viewer-sandbox[hidden], .artifact-linked-notice[hidden] { display: none; }
+.artifact-viewer-versionline { flex: none; margin: 0; padding: 6px 16px 0; color: var(--text-secondary); font-size: var(--fs-sm); line-height: var(--lh-body); overflow-wrap: anywhere; } /* the file's version line on a row of its own UNDER the header, never in the header's row: at 390 px row one stays the name, Comments and the ⋯ button (#14178) */
+.artifact-viewer-versionline[hidden] { display: none; }
+@media (max-width: 767px) { .artifact-viewer-versionline { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } } /* a phone: one line (the whole line is in Copy file ID and Details) so the rows above the file stay within the phone suite's budget */
 .artifact-viewer-from.is-open { white-space: normal; overflow-wrap: anywhere; }
 .artifact-viewer-source { flex: none; margin: 0; padding: 8px 16px; color: var(--text-secondary); font-size: var(--fs-sm); line-height: var(--lh-body); overflow-wrap: anywhere; }
 .artifact-viewer-source[hidden] { display: none; }

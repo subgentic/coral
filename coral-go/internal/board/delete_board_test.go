@@ -13,6 +13,7 @@ import (
 
 // Everything a board has, with the table and key column it is in: DeleteProject must leave none of it for the deleted board and all of it for another.
 var boardOwnedRows = []struct{ table, col string }{
+	{"board_ask_task_snapshots", "project"}, {"board_goal_task_moves", "board_id"},
 	{"board_message_sessions", "project"}, {"chief_check_messages", "project"},
 	{"board_subscribers", "project"}, {"board_messages", "project"}, {"board_reminders", "project"}, {"board_groups", "project"},
 	{"board_tasks", "board_id"}, {"board_settings", "project"}, {"board_waits", "project"}, {"board_working_modes", "board_id"},
@@ -64,6 +65,9 @@ func fillBoard(t *testing.T, s *Store, project string) (taskIDs []int64) {
 	_, err = s.db.ExecContext(ctx, `INSERT INTO board_clashes (project, target, ask_id, a_msg, b_msg, filed_by, filed_at) VALUES (?, 'task:1', ?, 1, 2, 'Dev', ?)`, project, hello.ID, nowUTC()) // #11457
 	require.NoError(t, err)
 	first, err := s.CreateTask(ctx, project, "first", "body", "high", "Boss", "Dev")
+	require.NoError(t, err)
+	require.NoError(t, s.RecordAskSubject(ctx, project, hello.ID, 0, first.ID))
+	_, err = s.db.ExecContext(ctx, `INSERT INTO board_goal_task_moves (board_id, goal_id, task_id, moved_at) VALUES (?, 1, ?, ?)`, project, first.ID, nowUTC())
 	require.NoError(t, err)
 	second, err := s.CreateTaskWithOpts(ctx, project, "second", "body", "high", "Boss", &CreateTaskOpts{BlockedBy: []TaskDep{{TaskID: first.ID, BoardID: project}}}, "Dev")
 	require.NoError(t, err)

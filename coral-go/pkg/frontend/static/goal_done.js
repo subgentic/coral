@@ -7,7 +7,7 @@ import { serverFetch, splitKey, pathId, LOCAL_SERVER } from './server_base.js';
 // goal_words.js's rule (readyToClose, allTasksOf), written out here: the Inbox tab's badge imports this file at start, and the goal words are not loaded until a goal is shown.
 const tasksOf = r => ['active', 'blocked', 'queued', 'done'].reduce((n, k) => n + Math.max(0, Number((r || {})[k]) || 0), 0);
 const openOf = r => tasksOf(r) - Math.max(0, Number((r || {}).done) || 0);
-const readyToClose = g => String((g && g.state) || '').toLowerCase() === 'active' && tasksOf(g && g.rollup) > 0 && openOf(g && g.rollup) === 0;
+const readyToClose = g => String((g && g.state) || '').toLowerCase() === 'active' && !(Number(g?.moved_open ?? g?.movedOpen) > 0) && tasksOf(g && g.rollup) > 0 && openOf(g && g.rollup) === 0;
 const allTasksOf = tasksOf;
 /** Whether a goal looks done (an active goal whose tasks are all done): the goal's page offers Not yet for it, as its item in Needs you does (#12248). */
 export const looksDone = readyToClose;
@@ -104,8 +104,10 @@ export async function markGoalDoneUnread(team, g) {
 
 /** Hides a goal's item: mode 'not-yet' (until a task is added) or 'ignore'. Resolves to a function that puts it back. */
 export async function hideGoalDone(team, g, mode) {
+    const h = { table: null }; document.dispatchEvent(new CustomEvent('coral:action-start', { detail: h })); // the table on screen when it began (#14373)
     const entry = mode === 'ignore' ? starOf(team, g) : keyOf(team, g);
     await post(team, g, mode);
     keep(SETTING, [...hiddenList().filter(e => e !== entry), entry]);
+    document.dispatchEvent(new CustomEvent('coral:action-result', { detail: h })); // the hidden list is saved: that table's one redraw for this action is not held under a resting pointer (#14373)
     return async () => { await post(team, g, 'show'); keep(SETTING, withoutGoal(hiddenList(), team, g)); };
 }

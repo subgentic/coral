@@ -20,6 +20,7 @@ export function toGoal(g) {
         madeByOrchestrator: !!(g && g.made_by_orchestrator), // the team's Orchestrator wrote this goal itself (#11887)
         newComments: count(g && g.new_comments), // agents replied in the Operator's comment threads on this goal and they have not opened them (#12073)
         toldAt: text(g && g.orchestrator_told_at), // when the team's Orchestrator was told this goal was made (#11866); '' when nobody was
+        ...(count(g && (g.moved_open ?? g.movedOpen)) ? { movedOpen: count(g.moved_open ?? g.movedOpen) } : {}),
         rollup: { done: count(r.done), active: count(r.active), blocked: count(r.blocked), queued: count(r.queued) },
     };
 }
