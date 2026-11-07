@@ -66,6 +66,7 @@ function avatar(c) {
  *  document now (the viewer: a phone's width; the pane: the pane's own width, so a narrow docked pane on a desktop gets the sheet too); shown(): whether the pane is on screen; observe: the element whose
  *  size decides sheet(). */
 let panelSeq = 0; // one id per panel (the viewer's and the docked pane's)
+const { attachPanelResize } = await importOnce('./artifact_comments_resize.js');
 export function attachComments(dialog, body, host, opts = {}) {
     const sourcePolicy = data => opts.readOnly?.() ? { ...data, canComment: false, canLock: false, reason: 'Open this file from its original team to write comments.', comments: data.comments.map(c => ({ ...c, can: { reply: false, edit: false, delete: false, resolve: false } })) } : data;
     const st = { lifetime: 0, video: null, videoTime: null, groupOpen: {}, series: false, hex: null, server: undefined, board: undefined, source: '', text: false, whole: false, data: null, showResolved: false, active: null, composing: null, busy: false, error: '', ranges: new Map(), orphan: new Set(), gone: false };
@@ -74,7 +75,9 @@ export function attachComments(dialog, body, host, opts = {}) {
     const toggle = btn('ac-toggle', 'Comments', 'Comments: show the comments'); toggle.hidden = true; toggle.setAttribute('aria-expanded', 'false');
     toggle.setAttribute('aria-controls', panel.id);
     const selBtn = btn('ac-selbtn', 'Add comment', 'Add comment on the selected text'); selBtn.hidden = true;
-    host.append(panel); if (!opts.toggleHost) (dialog.querySelector('.artifact-viewer-actions') || dialog.querySelector('.artifact-viewer-header'))?.prepend(toggle);
+    host.append(panel);
+    const resizer = opts.resizable ? attachPanelResize({ panel, main: host, isColumn: () => !panel.hidden && !phoneNow() && panel.classList.contains('ac-sheet-open') }) : null; // the viewer's column can be widened (#14024)
+    if (!opts.toggleHost) (dialog.querySelector('.artifact-viewer-actions') || dialog.querySelector('.artifact-viewer-header'))?.prepend(toggle);
     dialog.append(selBtn);
     // A live region for what the panel does (a comment posted, resolved, the one stepped to): outside the panel, which is out of the accessibility tree while the phone's sheet is shut.
     const live = el('div', 'ac-live'); live.setAttribute('role', 'status'); live.setAttribute('aria-live', 'polite'); live.setAttribute('aria-atomic', 'true');
@@ -89,7 +92,8 @@ export function attachComments(dialog, body, host, opts = {}) {
     const preferenceKey = () => opts.preferenceKey ? opts.preferenceKey() : OPEN_KEY;
     const remember = (open) => { const key = preferenceKey(); if (key) browserLocal.set(key, open ? 'open' : 'closed'); };
     const remembered = () => { const key = preferenceKey(), choice = key ? browserLocal.get(key) : null; return choice === 'open' ? true : choice === 'closed' ? false : null; };
-    const syncOn = () => dialog.classList.toggle('ac-on', !!st.shownNow && (phone.matches || isOpen()));
+    const phoneNow = () => phone.matches || sheet();
+    const syncOn = () => { dialog.classList.toggle('ac-on', !!st.shownNow && (phone.matches || isOpen())); resizer?.sync(); };
     const shown = opts.shown || (() => !dialog.hidden);
     // Available on both the side column and the bottom sheet; never reserve a
     // column the person cannot hide.

@@ -2,7 +2,7 @@
 .artifact-viewer-content { display: flex; flex-direction: column; }
 .artifact-viewer-main { display: flex; flex: 1 1 auto; min-height: 0; overflow: hidden; }
 .artifact-viewer-main > .artifact-viewer-body { flex: 1 1 auto; min-width: 0; }
-.artifact-viewer.ac-on .artifact-viewer-content { width: min(1240px, 96vw); }
+.artifact-viewer.ac-on .artifact-viewer-content { width: min(1480px, 96vw); } /* more of a wide screen with the panel open (#14024; it was 1240) */
 
 ::highlight(ac-comment) { background-color: color-mix(in srgb, var(--accent) 28%, transparent); text-decoration: underline; text-decoration-color: var(--accent); }
 ::highlight(ac-hover) { background-color: color-mix(in srgb, var(--accent) 40%, transparent); text-decoration: underline; text-decoration-color: var(--accent); }
@@ -199,3 +199,17 @@
 .artifact-private-title { font-size: var(--fs-sm, 0.8125rem); }
 .artifact-private-help { color: var(--text-muted); font-size: var(--fs-sm, 0.8125rem); }
 .artifact-private-say { margin: 0; color: var(--text-muted); font-size: var(--fs-base); }
+
+/* A wider default where there is room: 420 px once the viewer is 1100 px or more (the viewer is min(1480px, 96vw), so from a 1146 px window); the person's own width, when set, is --ac-w (#14024). */
+/* The viewer's own panel takes its width from --ac-w (the person's), else --ac-w-default; the document keeps 360 px. The preview pane, a goal's and a diff's panel keep their own widths. */
+.artifact-viewer-main > .ac-panel { --ac-w-default: 340px; flex: 0 0 var(--ac-w, var(--ac-w-default)); width: var(--ac-w, var(--ac-w-default)); max-width: calc(100% - 360px); }
+@media (min-width: 1146px) { .artifact-viewer-main > .ac-panel { --ac-w-default: 420px; } }
+/* The separator on the panel's left edge: a few pixels wide, a line on hover, drag and focus. A phone's sheet has none (it is hidden there). */
+.ac-resize { flex: 0 0 8px; margin: 0 -4px; position: relative; z-index: 3; cursor: col-resize; touch-action: none; background: transparent; }
+.ac-resize[hidden] { display: none; }
+.ac-resize::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; transition: background-color .12s ease; }
+.ac-resize:hover::after, .ac-resize:focus-visible::after, .ac-resize.ac-resizing::after { background: var(--accent); }
+.ac-resize:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+body:has(.ac-resizing) { user-select: none; }
+
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .artifact-viewer-main > .ac-panel { flex: none; width: auto; max-width: none; } }
