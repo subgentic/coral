@@ -92,7 +92,8 @@ function syncInstructionsLine(el, session) {
     if (t.textContent !== (shown ? `Instructions: ${shown}` : '')) t.textContent = shown ? `Instructions: ${shown}` : '';
     if (shown) t.title = text.slice(0, 500);
     const btn = line.querySelector('button');
-    if (row) { btn.dataset.name = row.name || ''; btn.dataset.agentType = row.agent_type || ''; btn.dataset.sessionId = row.session_id || ''; }
+    // the id rides on the button only while the line is shown and Edit can be clicked: a hidden button holds no session id (#14318: the popout's leak scan met it there on an empty chat; Security: fix the code, do not loosen the scan)
+    if (row) { btn.dataset.name = row.name || ''; btn.dataset.agentType = row.agent_type || ''; if (shown) btn.dataset.sessionId = row.session_id || ''; else delete btn.dataset.sessionId; }
     line.hidden = !shown;
 }
 

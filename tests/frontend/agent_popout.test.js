@@ -255,7 +255,7 @@ const LEAK_PROBE = (uuid) => `(() => {
         if (!a.value.includes(id)) continue;
         if (el === document.body && a.name === 'data-target-session-id') continue;
         if (a.name === 'href' && ALLOWED_HREF(el)) continue;
-        out.attrs.push((el.tagName + (el.id ? '#' + el.id : '') + '[' + a.name + ']').toLowerCase());
+        out.attrs.push((el.tagName + (el.id ? '#' + el.id : '') + '[' + a.name + ']').toLowerCase() + (el.className && typeof el.className === 'string' ? ' .' + el.className.trim().split(/\s+/).join('.') : '') + (el.getClientRects().length ? ' (shown)' : ' (hidden)') + ' in ' + ((el.closest('[id]') && el.closest('[id]').id) || 'body'));
     }
     return out;
 })()`;
