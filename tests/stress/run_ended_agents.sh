@@ -28,6 +28,8 @@ api() { local m="$1" p="$2"; shift 2; curl -s -m 20 -X "$m" "${BASE_URL}${p}" -H
 
 TMP="$(mktemp -d /tmp/coral-ended.XXXXXX)"
 export TMPDIR="$TMP" CORAL_DATA_DIR="$TMP/data" CORAL_NO_DEMO_SEED=1 CORAL_NO_WELCOME=1 CORAL_TMUX_NO_FALLBACK=1 MOCK_AGENT_TRANSCRIPT=1
+# Raw-input mode is what makes the mock agent run the hooks in its settings (SessionStart, then Stop once ready), as Claude does, so the agents send state events (#14257): without MOCK_AGENT_RAW_DIR none were sent.
+export MOCK_AGENT_RAW_DIR="$TMP/raw"; mkdir -p "$MOCK_AGENT_RAW_DIR"
 SOCK="$CORAL_DATA_DIR/tmux.sock"; WORK="$TMP/proj"
 mkdir -p "$CORAL_DATA_DIR" "$WORK" "$TMP/host-home"
 
@@ -53,10 +55,17 @@ trap cleanup EXIT
 coral_test_port_in_use "$PORT" && { log "ERROR: port $PORT is in use"; exit 1; }
 
 log "building coral and mock-agent from $CORAL_SRC ($(git -C "$CORAL_SRC" rev-parse --short HEAD 2>/dev/null))"
-(cd "$CORAL_SRC" && go build -tags "dev fts5" -o "$TMP/coral" ./cmd/coral/ && go build -o "$TMP/mock-agent" ./cmd/mock-agent/) || { log "ERROR: build failed"; exit 1; }
+# The server and the agent tools are built into one folder, so the agents' hooks (coral-hook-*) are the ones next to this build: the mock agents run the hooks in their settings at session start and send state events, as real agents do (#14257: with none, an agent never sent an event and the exit of one was held for the launch minute). CORAL_NO_HOOKS=1 builds the server alone.
+mkdir -p "$TMP/bin"
+if [[ "${CORAL_NO_HOOKS:-0}" == 1 ]]; then
+    (cd "$CORAL_SRC" && go build -tags "dev fts5" -o "$TMP/bin/coral" ./cmd/coral/ && go build -o "$TMP/mock-agent" ./cmd/mock-agent/) || { log "ERROR: build failed"; exit 1; }
+else
+    (cd "$CORAL_SRC" && go build -tags "dev fts5" -o "$TMP/bin/" ./cmd/coral ./cmd/coral-board ./cmd/coral-agent ./cmd/coral-hook-* && go build -o "$TMP/mock-agent" ./cmd/mock-agent/) || { log "ERROR: build failed"; exit 1; }
+fi
+CORAL_BIN="$TMP/bin/coral"
 coral_test_sandbox 2>/dev/null || true
 env -u CORAL_PORT -u CORAL_URL -u CORAL_SESSION_NAME -u CORAL_SUBSCRIBER_ID -u TMUX -u TMUX_PANE HOME="$TMP/host-home" \
-    "$TMP/coral" --home "$CORAL_DATA_DIR" --no-browser --cloud-url off --host "$HOST" --port "$PORT" --backend "$CORAL_TEST_BACKEND" >"$TMP/server.log" 2>&1 &
+    "$CORAL_BIN" --home "$CORAL_DATA_DIR" --no-browser --cloud-url off --host "$HOST" --port "$PORT" --backend "$CORAL_TEST_BACKEND" >"$TMP/server.log" 2>&1 &
 SERVER_PID=$!
 for _ in $(seq 1 80); do
     grep -q "Coral dashboard: http://localhost:${PORT}" "$TMP/server.log" 2>/dev/null && break
@@ -86,6 +95,11 @@ if [[ "$SCENARIO" == exited ]]; then
     # The agents' own processes end (each is a mock-agent started under the server, found by its PID below it): Kill All is not used, so the dead terminals stay in the terminal manager.
     # CORAL_EXITED_AFTER: wait this many seconds after the launch before the exit, to see an agent that exits after its first minute (the launch grace) as well as one that exits in it
     [[ -n "${CORAL_EXITED_AFTER:-}" ]] && { log "waiting ${CORAL_EXITED_AFTER} s before the agents exit"; sleep "$CORAL_EXITED_AFTER"; }
+    # what the reconciler can see of each agent before its exit: the state events the hooks sent (an agent with none is held for the launch minute; one with some is not, #14257)
+    if command -v sqlite3 >/dev/null 2>&1; then
+        log "state events per team agent just before the exit (event types, from the agents' hooks):"
+        for sid in $BEFORE_IDS; do echo "    $sid: $(sqlite3 "$CORAL_DATA_DIR/sessions.db" "select group_concat(event_type, ',') from (select event_type from agent_events where session_id = '$sid' order by id)" 2>&1 | cut -c1-160)"; done
+    fi
     log "THE AGENTS EXIT ON THEIR OWN: stopping each mock-agent process of this run by its PID"
     # the pty agents are below the server; the tmux agents are below the tmux server, which is not (#14257: the first version found none there, and the tmux run observed nothing)
     CANDIDATES="$(descendants "$SERVER_PID")"
