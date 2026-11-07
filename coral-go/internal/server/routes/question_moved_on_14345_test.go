@@ -152,3 +152,70 @@ func TestAPermissionPromptStaysOpenWhateverTheTranscriptHolds(t *testing.T) {
 	assert.True(t, st.NeedsInput, "a permission prompt waits for the person whatever the transcript holds")
 	assert.Equal(t, "permission", st.WaitingKind)
 }
+
+// #14387 (QA's SHOULD on #14345): an older Claude Code writes no isSidechain field at all. Its assistant entry is the main thread's, so it closes the question like any other; a reading that took a missing
+// field for a sidechain would leave the row, Needs you and the gate waiting for an agent that has gone on.
+func TestAnOlderClaudesEntryWithNoSidechainFieldClosesTheQuestion(t *testing.T) {
+	projects := t.TempDir()
+	t.Setenv("CLAUDE_PROJECTS_DIR", projects)
+	server, h, terminal, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	sid := "dddddddd-1434-4a00-8000-000000000003"
+	name := "claude-" + sid
+	terminal.addSession(name, "/work")
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "asker3", WorkingDir: "/work", CreatedAt: time.Now().UTC().Format(time.RFC3339)}))
+	require.NoError(t, ss.SetCLIVersion(ctx, sid, "1.0.30"))
+	tok := agentToken(t, h, sid, name)
+	post := func(body string) {
+		t.Helper()
+		body = strings.Replace(body, "{", `{"hooks_rev":`+strconv.Itoa(agent.ClaudeHooksRev)+`,`, 1)
+		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/asker3/events", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(store.SessionTokenHeader, tok)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode, body)
+	}
+	dir := filepath.Join(projects, "-work")
+	require.NoError(t, os.MkdirAll(dir, 0o700))
+	transcript := filepath.Join(dir, sid+".jsonl")
+	at := func(d time.Duration) string { return time.Now().Add(d).UTC().Format(time.RFC3339Nano) }
+	require.NoError(t, os.WriteFile(transcript, []byte(`{"type":"user","message":{"role":"user","content":"Pick a colour"},"timestamp":"`+at(-time.Minute)+`"}`+"\n"), 0o600))
+	appendLine := func(line string) {
+		t.Helper()
+		f, err := os.OpenFile(transcript, os.O_APPEND|os.O_WRONLY, 0o600)
+		require.NoError(t, err)
+		_, err = f.WriteString(line + "\n")
+		require.NoError(t, err)
+		require.NoError(t, f.Close())
+	}
+	older := func(when time.Duration, tool string) string { // as an older Claude Code writes it: no isSidechain key anywhere
+		return `{"type":"assistant","message":{"role":"assistant","model":"claude-opus-4-5","content":[{"type":"tool_use","id":"toolu_` + tool + `","name":"` + tool + `","input":{}}]},"timestamp":"` + at(when) + `"}`
+	}
+	waiting := func() bool {
+		t.Helper()
+		resp, err := http.Get(server.URL + "/api/sessions/live")
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var rows []map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&rows))
+		for _, r := range rows {
+			if r["session_id"] == sid {
+				return r["waiting_for_input"] == true
+			}
+		}
+		t.Fatalf("no live row for %s", sid)
+		return false
+	}
+
+	post(`{"event_type":"prompt_submit","summary":"User submitted prompt"}`)
+	post(`{"event_type":"permission_request","summary":"Waiting for the user: question (AskUserQuestion)","tool_name":"AskUserQuestion","detail_json":{"kind":"question","tool_name":"AskUserQuestion"}}`)
+	appendLine(older(time.Second, "AskUserQuestion"))
+	assert.True(t, waiting(), "the question is open: the transcript holds only its own entry")
+
+	appendLine(older(45*time.Second, "Read")) // the agent went on, in a transcript with no isSidechain field
+	assert.False(t, waiting(), "an older Claude's assistant entry (no isSidechain) is the main thread going on: the row is no longer waiting")
+	st, _ := h.gateState(ctx, name, "claude", sid)
+	assert.NotEqual(t, ptymanager.StateBlocked, st.State, "and the gate no longer holds the agent as blocked")
+}
