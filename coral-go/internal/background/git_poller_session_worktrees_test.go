@@ -249,3 +249,36 @@ func TestTheFirstReadOfManyWorktreesIsSpreadOverPassesNotDoneInOne(t *testing.T)
 	require.NoError(t, r.p.PollOnce(context.Background()))
 	assert.Equal(t, 5, count(), "and a pass with nothing new does no more")
 }
+
+// QA's surviving mutant on #14095 ('ownedBy always true'): the old link test pointed at a repository whose history lacks the commit ids, so git failed there whatever ownedBy said. These two point the session's registered
+// worktree path at ANOTHER repository's checkout that HAS the commits (a clone of the repository, and a worktree of that clone), so only ownedBy stands between the reflog's ids and a read in the wrong folder.
+func TestAWorktreePathThatIsALinkToAnotherRepositorysCheckoutIsNotRead(t *testing.T) {
+	r := newWTRig(t, "sess-a")
+	wt := r.worktree(t, "sess-a", "wt-a", "feat-a")
+	runGit(t, wt, "commit", "-q", "--allow-empty", "-m", "made in the real worktree")
+	clone := filepath.Join(t.TempDir(), "clone")
+	runGit(t, t.TempDir(), "clone", "-q", r.repo, clone)
+	runGit(t, clone, "fetch", "-q", "origin", "feat-a") // the clone has the commit objects: git log there would find them
+	runGit(t, clone, "checkout", "-q", "-b", "mine", "FETCH_HEAD")
+	cloneWT := filepath.Join(t.TempDir(), "clone-wt")
+	runGit(t, clone, "worktree", "add", "-q", "-b", "other", cloneWT, "FETCH_HEAD")
+	for name, target := range map[string]string{"a clone's checkout (its .git is a folder)": clone, "a worktree of the clone (its .git names the clone's registry)": cloneWT} {
+		t.Run(name, func(t *testing.T) {
+			r2 := newWTRig(t, "sess-a")
+			wt2 := r2.worktree(t, "sess-a", "wt-a", "feat-a")
+			runGit(t, wt2, "commit", "-q", "--allow-empty", "-m", "made in the real worktree")
+			require.NoError(t, os.RemoveAll(wt2))
+			if err := os.Symlink(target, wt2); err != nil {
+				t.Skip("symbolic links are not available here: " + err.Error())
+			}
+			require.NoError(t, r2.p.PollOnce(context.Background()))
+			assert.NotContains(t, r2.madeInWorktrees(t, "sess-a"), "made in the real worktree", "the commits of the reflog are not read in another repository's folder")
+			var n int
+			require.NoError(t, r2.db.Get(&n, `SELECT COUNT(*) FROM git_snapshots WHERE session_id = 'sess-a' AND working_directory = ?`, func() string { p, _ := filepath.EvalSymlinks(target); return p }()))
+			assert.Zero(t, n, "nothing is recorded as made in the linked folder")
+		})
+	}
+	// and the real worktree is still read when nothing is swapped
+	require.NoError(t, r.p.PollOnce(context.Background()))
+	assert.Contains(t, r.madeInWorktrees(t, "sess-a"), "made in the real worktree")
+}
