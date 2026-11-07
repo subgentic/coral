@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { setupHubWorld, BASE } = require('./helpers/hub_world');
 const { coralReady } = require('./helpers/wait');
-const HEX = 'a'.repeat(64), DECIDED = 'b'.repeat(64);
+const HEX = 'a'.repeat(64), DECIDED = 'b'.repeat(64), REVIEW_ONLY = 'c'.repeat(64), SAVED_ONLY = 'd'.repeat(64);
 (async () => {
     const { client, Page, Emulation, ev, waitFor } = await connect();
     const S = `(window.__coralStatic||'/static/')`;
@@ -12,7 +12,7 @@ const HEX = 'a'.repeat(64), DECIDED = 'b'.repeat(64);
         await setupHubWorld({ client, Page, Emulation, width:1280, height:900, mobile:false, inbox:'native', needs:true, hubPages:true });
         await Page.addScriptToEvaluateOnNewDocument({source:`(()=>{
             const original=window.fetch, json=(body,status=200)=>Promise.resolve(Response.json(body,{status}));
-            window.__savedLink={lookups:[],bare:[],forbidLookup:false};
+            window.__savedLink={lookups:[],bare:[],byteReads:[],forbidLookup:false};
             window.fetch=(input,options={})=>{
                 const u=new URL(String(input),location.href), method=options.method||'GET';
                 if(u.pathname==='/api/team-artifacts'){window.__savedLink.bare.push(u.pathname);return json({error:'owner_only'},403);}
@@ -24,11 +24,24 @@ const HEX = 'a'.repeat(64), DECIDED = 'b'.repeat(64);
                 if(path==='/api/team-artifacts'){
                     const digest=u.searchParams.get('digest');
                     if(digest){window.__savedLink.lookups.push({server,team:u.searchParams.get('team'),digest,tag:u.searchParams.get('tag')});if(window.__savedLink.forbidLookup&&u.searchParams.get('tag')==='for review')return json({error:'lookup unavailable'},503);}
-                    let rows=digest==='${DECIDED}'?[{...artifact,id:'${DECIDED}',uri:'coral://artifacts/${DECIDED}',tags:['approved']}]:[artifact];
+                    const partials={'${REVIEW_ONLY}':['for review'],'${SAVED_ONLY}':['saved','approved']};
+                    let rows=partials[digest]?[{...artifact,id:digest,uri:'coral://artifacts/'+digest,tags:partials[digest]}]:digest==='${DECIDED}'?[{...artifact,id:'${DECIDED}',uri:'coral://artifacts/${DECIDED}',tags:['approved']}]:[artifact];
                     if(u.searchParams.get('tag')==='for review'||u.searchParams.has('waiting'))rows=[];
-                    if(digest&&!['${HEX}','${DECIDED}'].includes(digest))rows=[];
+                    if(digest&&!['${HEX}','${DECIDED}','${REVIEW_ONLY}','${SAVED_ONLY}'].includes(digest))rows=[];
                     if(u.searchParams.has('team')&&u.searchParams.get('team')!=='same')rows=[];
                     return json({artifacts:rows,total:rows.length,all:rows.length,teams:[],has_more:false,tag_counts:rows.length?{'for review':1,saved:1}:{}});
+                }
+                const partialID=path.split('/')[3];
+                if(['${REVIEW_ONLY}','${SAVED_ONLY}'].includes(partialID)){
+                    if(path==='/api/artifacts/'+partialID&&method==='GET'){
+                        window.__savedLink.byteReads.push(partialID);
+                        return Promise.resolve(new Response('# Partial-tag bytes',{headers:{'content-type':'text/markdown'}}));
+                    }
+                    if(path.endsWith('/meta'))return json({...artifact,id:partialID,uri:'coral://artifacts/'+partialID});
+                    if(path.endsWith('/versions'))return json({versions:[]});
+                    if(path.endsWith('/readers'))return json({readers:[]});
+                    if(path.endsWith('/comments'))return json({comments:[],you:{can_comment:false},locked:false});
+                    if(path.endsWith('/opened'))return json({ok:true});
                 }
                 if(path==='/api/artifacts/${HEX}'&&method==='GET')return Promise.resolve(new Response('# Saved review bytes',{headers:{'content-type':'text/markdown'}}));
                 if(path==='/api/artifacts/${HEX}/meta')return json(artifact);
@@ -64,6 +77,14 @@ const HEX = 'a'.repeat(64), DECIDED = 'b'.repeat(64);
             }
             assert.deepEqual(await ev('window.__savedLink.bare'),[],'no fallback to the Hub local list');
             await ev(`window.__savedLink.forbidLookup=false;true`);
+            for(const [id,label] of [[REVIEW_ONLY,'for-review-only'],[SAVED_ONLY,'saved-only decided']]){
+                await ev(`document.querySelectorAll('.toast').forEach(t=>t.remove());window.__savedLink.lookups=[];window.__savedLink.byteReads=[];true`);
+                await open('m2',id);
+                await waitFor(`Array.from(document.querySelectorAll('.toast')).some(t=>t.textContent.includes('That file is not waiting for you any more.'))`,label+': cold lookup refuses a missing required tag');
+                assert.equal(await ev(`document.querySelector('#artifact-viewer')?.hidden`),true,label+': missing required tag never opens the viewer');
+                assert.deepEqual(await ev('window.__savedLink.byteReads'),[],label+': missing required tag never reads file bytes');
+                assert.deepEqual((await ev('window.__savedLink.lookups')).map(r=>[r.server,r.team,r.digest,r.tag]),[['m2','same',id,'for review'],['m2','same',id,null]],label+': exercises exact protected cold fallback');
+            }
             await open('m2',DECIDED);
             await waitFor(`Array.from(document.querySelectorAll('.toast')).some(t=>t.textContent.includes('That file is not waiting for you any more.'))`,'non-Saved decided file stays unavailable');
             assert.equal(await ev(`document.querySelector('#artifact-viewer')?.hidden`),true,'the Saved fallback never opens an unrelated decided file');
