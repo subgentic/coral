@@ -18,7 +18,7 @@ const { canDismissWait, dismissButton, dismissWait } = await importOnce('./dismi
 
 const MAX_CHOICES = 4;
 // Choices that last past this one answer, or change how the agent runs: never a button on a list row (each CLI's own words: Claude's "Yes, and don't ask again for ..." and "Yes, allow all edits during this session", Codex's "Yes, and don't ask again", Antigravity's "always allow").
-const LASTING = /don.?t ask|always|allow all|all edits|session|conversation|switch to|persist|remember|from now on|auto mode|accept edits/i;
+const LASTING = /don.?t ask|install|always|allow all|all edits|session|conversation|switch to|persist|remember|from now on|auto mode|accept edits/i;
 // A permission's choice is a button only when the WHOLE label (a trailing key hint like "(y)" and final punctuation dropped) is one of these one-time forms, and nothing else (Security Reviewer, #10462): Yes, Allow or Approve,
 // optionally "once", "this once", "proceed", "continue", Antigravity's "run command"; No, Deny or Reject, optionally "cancel" or Codex's "and tell <CLI> what to do differently". Everything else, including every phrasing that
 // lasts ("never ask again", "forever", "trust this workspace", "for the rest of this task") and every one that names a place, is left to Open.
@@ -32,6 +32,32 @@ const plainlyOneTime = (label, permission) => permission ? ONE_TIME.test(wholeLa
 const read = new Map(); // server:session:waiting_since -> the choices, read once per ask
 const stepClean = t => String(t == null ? '' : t).replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069]/g, ' ').replace(/\s+/g, ' ').trim(); // the dialog's own words, as one clean line, uncut
 const stepCut = t => (t.length > 80 ? `${t.slice(0, 79)}…` : t); // what is drawn: a cut field says so
+
+// Claude's folder-trust menu is the ONE lasting grant a row may answer (#14110, Security): the server says so (trust_offer: the menu is exactly these two options, the person's own dashboard, a folder
+// Coral may trust) and names the folder it read from the screen (trust_folder); this side checks the same two labels again, draws the folder as plain text and asks once more before Yes. Without the offer
+// (a Hub viewer, a folder Coral may not trust) only No is a button and the rest is left to Open.
+const TRUST_NO = 'no, exit', TRUST_YES = 'i trust this folder';
+const trustMenu = po => {
+    const o = po && po.options;
+    if (!po || !po.unnumbered || !Array.isArray(o) || o.length !== 2) return null;
+    const no = o[0], yes = o[1], said = x => String(x && x.label || '').trim().toLowerCase().replace(/^yes,\s*/, '');
+    if (String(no.label || '').trim().toLowerCase() !== TRUST_NO || said(yes) !== TRUST_YES || !/^yes,/i.test(String(yes.label || '').trim())) return null;
+    if (!Number.isInteger(Number(no.n)) || !Number.isInteger(Number(yes.n))) return null;
+    const folder = typeof po.trust_folder === 'string' ? po.trust_folder : '';
+    return { no, yes, folder: po.trust_offer === true && folder && stepClean(folder) === folder ? folder : '' }; // a folder with a hidden or control character is never offered
+};
+
+// Claude's "Claude wants to use your browser" menu (#14151): the server reads it by structure (browser_menu: the title, then exactly these three rows in this order, one marked, no numbers, no footer). The row takes ONE of
+// them: "Not now" (Claude goes on without browser tools; nothing is installed, nothing is remembered). "Install extension" opens the person's Chrome and "Don't ask again" is lasting, so neither is a button: the row says so.
+// This side checks the same three labels again, so a menu that is not exactly this one gets no button.
+const BROWSER_LABELS = ['install extension', 'not now', "don't ask again"];
+const browserMenu = po => {
+    const o = po && po.options;
+    if (!po || po.browser_menu !== true || !po.unnumbered || po.multi || !Array.isArray(o) || o.length !== 3) return null;
+    if (!o.every((x, i) => String(x && x.label || '').trim().toLowerCase() === BROWSER_LABELS[i] && Number.isInteger(Number(x.n)))) return null;
+    return { notNow: o[1] };
+};
+const BROWSER_NOTE = 'Not now: Claude goes on without browser tools; nothing is installed. To install the extension, or to stop being asked, open the agent.';
 
 /** The card's one-time choices and the ask they belong to: { ask, picks, onlyReject } ({ ask: '', picks: [] } when the card cannot be answered by one choice). onlyReject: the request can only be rejected, and picks are then only the No form. */
 async function readAsk(s) {
@@ -49,6 +75,11 @@ async function readAsk(s) {
         const lines = ['Submit these answers?', ...po.review.map(r => `${stepCut(stepClean(r.question))}: ${stepCut(stepClean(r.answer))}`)];
         return submit && !onlyReject ? { ask: String(po.ask_id || ''), picks: [submit], onlyReject, step: `Submit these answers? ${drawn}`, stepFull: `Submit these answers? ${full}`, lines } : none; // exactly what the screen shows now, every question with its answer: the click compares the UNCUT text, a field cut for drawing wears an ellipsis and the hover is the whole line (#11997, Security)
     }
+    const browser = browserMenu(po);
+    if (browser) return { ask: String(po.ask_id || ''), picks: [browser.notNow], onlyReject, browser: true, question: '' }; // only Not now is a button; Install and Don't ask again are left to Open, and the row says so
+    const trust = trustMenu(po);
+    if (trust) return trust.folder ? { ask: String(po.ask_id || ''), picks: [trust.no, trust.yes], onlyReject, trust: { folder: trust.folder, yes: trust.yes } } : { ask: String(po.ask_id || ''), picks: [trust.no], onlyReject, held: true }; // No only, and the row says the rest is left to Open
+    if (po.unnumbered) return none; // an unnumbered menu that is neither the folder-trust nor the browser menu above: no button on a row (the arrows and Enter go into whatever is on that screen; #14151, UI Reviewer), the row says the rest is Open agent's
     const permission = (po.options || []).some(o => PERMISSION_WORDS.test(String(o.label || ''))); // a permission card: only a plain Yes or No is a button; a question's own choices (Red, Blue) are
     const picks = (po.options || []).filter(o => (o.action || 'select') === 'select' && o.label && Number.isInteger(Number(o.n)) && plainlyOneTime(String(o.label), permission) && (!onlyReject || REJECT_FORM.test(wholeLabel(String(o.label)))));
     // A question's choice the filter holds back (a lasting one, or one with a word like "Switch to", "from", "all") is left to Open as before, and the row says so: a partial list must not read as the whole list (the Mobile
@@ -60,7 +91,7 @@ async function readAsk(s) {
 
 const askKey = s => `${sessionServer(s)}:${s.session_id}:${s.waiting_since || ''}`;
 
-async function answer(s, o, ask, cell, step = '') { // step: the whole review text the row was drawn for ('' for a step with no review)
+async function answer(s, o, ask, cell, step = '', trustFolder = '') { // step: the whole review text the row was drawn for ('' for a step with no review)
     const buttons = [...cell.querySelectorAll('button')];
     const had = cell.contains(document.activeElement); // the keyboard is on a choice: it must still be on something when the cell is drawn again or says Answered (#10560)
     const keep = () => { if (had) (cell.querySelector(`.inbox-answer[data-n="${Number(o.n)}"]`) || cell.querySelector('.inbox-answer') || cell.closest('tr')?.querySelector('.dt-primary'))?.focus({ preventScroll: true }); };
@@ -68,7 +99,7 @@ async function answer(s, o, ask, cell, step = '') { // step: the whole review te
     try {
         if (await hubBlocked(s)) { buttons.forEach(b => { b.disabled = false; }); return; } // a viewer: the reason is said
         const now = await readAsk(s); // the card is read again at the click: a row can be stale
-        if (!ask || now.ask !== ask || (step && now.stepFull !== step) || !now.picks.some(p => Number(p.n) === Number(o.n) && p.label === o.label)) { // a Submit is sent only while the screen still shows the same review step with the same answers (#11981, Security)
+        if (!ask || now.ask !== ask || (step && now.stepFull !== step) || !now.picks.some(p => Number(p.n) === Number(o.n) && p.label === o.label) || (trustFolder && (!now.trust || now.trust.folder !== trustFolder))) { // a Yes for a folder is sent only while the screen still names that folder // a Submit is sent only while the screen still shows the same review step with the same answers (#11981, Security)
             read.delete(askKey(s));
             fill(s, cell).then(keep);
             showToast('That question changed; look at it again.', true);
@@ -76,10 +107,11 @@ async function answer(s, o, ask, cell, step = '') { // step: the whole review te
         }
         const resp = await serverFetch(sessionServer(s), `/api/sessions/live/${encodeURIComponent(s.name)}/answer-prompt`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ session_id: s.session_id, agent_type: s.agent_type || '', n: Number(o.n), label: o.label, text: '', ask_id: ask }),
+            body: JSON.stringify({ session_id: s.session_id, agent_type: s.agent_type || '', n: Number(o.n), label: o.label, text: '', ask_id: ask, ...(trustFolder ? { trust_folder: trustFolder } : {}) }),
         });
         if (resp.status === 409) { // told apart by the server's code, never its words (#10516)
             const why = await resp.json().catch(() => ({}));
+            if (why.code === 'trust_changed') { read.delete(askKey(s)); fill(s, cell).then(keep); showToast('The folder to trust changed or cannot be trusted from here. Open the agent to answer it.', true); return; } // the server refused the Yes: nothing was sent
             if (why.code === 'ask_changed') { read.delete(askKey(s)); fill(s, cell).then(keep); showToast('That question changed; look at it again.', true); return; } // the server saw another ask than the one drawn
             if (why.code === 'answer_sent_prompt_open') { // the key went and the prompt had not cleared: the agent may still be waiting, so the row stays in Needs you (the feed removes it when the agent stops waiting) and says so
                 read.delete(askKey(s));
@@ -103,21 +135,45 @@ async function answer(s, o, ask, cell, step = '') { // step: the whole review te
     }
 }
 
+/** Yes for a folder asks once more on the row, with the folder as plain text (#14110): a lasting grant is never one click. Cancel draws the choices again; nothing is sent until the second press. */
+function confirmTrust(s, o, ask, cell, trust) {
+    const who = resolveSessionIdentity(s);
+    cell.replaceChildren();
+    const q = document.createElement('span'); q.className = 'inbox-trust-note inbox-trust-confirm'; q.setAttribute('role', 'group'); q.setAttribute('aria-label', `Trust this folder for ${who}?`);
+    const path = document.createElement('code'); path.className = 'inbox-trust-path'; path.textContent = trust.folder;
+    q.append('Trust ', path, ' for Claude, for every agent that starts there?');
+    const go = document.createElement('button'); go.type = 'button'; go.className = 'btn btn-small inbox-answer inbox-trust-go'; go.textContent = 'Trust this folder';
+    go.dataset.session = s.session_id; go.dataset.n = String(Number(o.n)); go.setAttribute('aria-label', `Trust ${trust.folder} for Claude, for ${who}`);
+    const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'btn btn-small inbox-trust-cancel'; cancel.textContent = 'Cancel';
+    go.addEventListener('click', e => { e.stopPropagation(); answer(s, o, ask, cell, '', trust.folder); });
+    cancel.addEventListener('click', e => { e.stopPropagation(); fill(s, cell).then(() => cell.querySelector('.inbox-answer')?.focus({ preventScroll: true })); });
+    for (const b of [go, cancel]) b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
+    cell.append(q, go, cancel);
+    cancel.focus({ preventScroll: true }); // the safe choice has the keyboard; Enter does not trust by accident
+}
+
 /** Draws the choices into the cell once they are read (again after a question changed). */
 function fill(s, cell, withDismiss = true) {
     const key = askKey(s);
     if (!read.has(key)) read.set(key, readAsk(s).catch(() => ({ ask: '', picks: [], onlyReject: false })));
-    return read.get(key).then(({ ask, picks, onlyReject, held, step, stepFull, question, later, lines }) => {
+    return read.get(key).then(({ ask, picks, onlyReject, held, step, stepFull, question, later, lines, trust, browser }) => {
         cell.replaceChildren();
         const said = norm => String(norm || '').replace(/[?\s]+$/, '');
         const words = step || (question && (later || !said(s.waiting_summary).includes(said(question))) ? question : ''); // the question is named when the row's own words do not carry it (a later step's never does)
         if (lines && lines.length) { const t = document.createElement('span'); t.className = 'inbox-answer-step'; if (stepFull && stepFull !== words) t.title = stepFull; lines.forEach(l => { const ln = document.createElement('span'); ln.className = 'inbox-answer-step-line'; ln.textContent = l.length > 240 ? `${l.slice(0, 239)}…` : l; t.append(ln, ' '); }); cell.append(t); } else if (words) { const t = document.createElement('span'); t.className = 'inbox-answer-step'; t.textContent = words.length > 240 ? `${words.slice(0, 239)}…` : words; if (stepFull && stepFull !== words) t.title = stepFull; else if (words.length > 240) t.title = words; cell.append(t); } // text only; a cut line (a field or the whole) says so and keeps the uncut text as its hover; the review's lines have a space between them: one run of words for a screen reader
+        if (browser) { const note = document.createElement('span'); note.className = 'inbox-trust-note inbox-browser-note'; note.textContent = BROWSER_NOTE; cell.append(note); } // what the one button does, and why the other two are not buttons (#14151)
+        if (trust) { // the folder, plain text, and what Yes does, before any choice (#14110)
+            const note = document.createElement('span'); note.className = 'inbox-trust-note';
+            const path = document.createElement('code'); path.className = 'inbox-trust-path'; path.textContent = trust.folder;
+            note.append('Folder: ', path, '. Yes adds this folder to Claude’s own trust list.');
+            cell.append(note);
+        }
         for (const o of picks) {
             const b = document.createElement('button');
             b.type = 'button'; b.className = 'btn btn-small inbox-answer'; b.textContent = o.label;
             b.dataset.session = s.session_id; b.dataset.n = String(Number(o.n)); // what finds this choice again after a redraw keeps the keyboard on it (sidebar_groups.js)
             b.setAttribute('aria-label', `Answer ${o.label} for ${resolveSessionIdentity(s)}`);
-            b.addEventListener('click', e => { e.stopPropagation(); answer(s, o, ask, cell, stepFull || ''); });
+            b.addEventListener('click', e => { e.stopPropagation(); if (trust && o === trust.yes) confirmTrust(s, o, ask, cell, trust); else answer(s, o, ask, cell, stepFull || ''); });
             b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
             cell.append(b);
         }

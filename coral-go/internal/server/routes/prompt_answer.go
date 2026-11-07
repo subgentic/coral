@@ -81,6 +81,12 @@ type promptScreen struct {
 	// Unnumbered: the options carry no numbers (Claude Code's folder-trust and API-key menus at launch,
 	// #4543); n is an option's place in the list, and it is answered with the arrow keys and Enter.
 	Unnumbered bool `json:"unnumbered,omitempty"`
+	// TrustFolder and TrustOffer: Claude's folder-trust menu names its folder (read from the screen, never from the agent's words) and a row may offer Yes for it
+	// only to the person's own dashboard and for a folder Coral may trust (#14110, prompt_trust.go).
+	TrustFolder string `json:"trust_folder,omitempty"`
+	TrustOffer  bool   `json:"trust_offer,omitempty"`
+	// BrowserMenu: Claude's "Claude wants to use your browser" menu, read by structure (prompt_browser.go, #14151): a row may take its "Not now" only.
+	BrowserMenu bool `json:"browser_menu,omitempty"`
 	// Multi: every option has a box (a multi-select question, #5232): a digit toggles the box and nothing is
 	// answered until Submit is taken. Submit is the row under the options (nil when it is not on screen).
 	Multi  bool          `json:"multi,omitempty"`
@@ -586,14 +592,35 @@ func (h *SessionsHandler) readPromptScreenText(ctx context.Context, name, agentT
 	if err != nil {
 		return promptScreen{}, false, "", err
 	}
-	s, ok := parsePromptScreen(text)
+	s, ok := parseAgentScreen(agentType, text)
 	if ok {
-		markApprovalKinds(agentType, text, &s)
 		if agentType == at.Hermes && s.Kind == promptKindApproval {
 			applyHermesCommand(&s, h.hermesStoredCommand(ctx, sessionID)) // the screen drops a hidden character; Hermes's stored call has it (#12170)
 		}
 	}
 	return s, ok, text, nil
+}
+
+// parseAgentScreen reads the prompt on an agent's screen the way a row, a card and an answer all must: the generic parse, plus the two Claude-only menus that a row may answer (the folder-trust menu, #14110,
+// and Claude's browser menu, #14151). Those two are read ONLY when the session's stored agent type is Claude: three lines shaped like either menu printed by a Codex, agy, Gemini or terminal agent's own program
+// are not a prompt of Claude's, and an arrow key and Enter into that program would answer whatever it is waiting for (Security's MUST on #14151). Every caller that reads a screen for an offer or an answer comes here, so the
+// gate holds at offer time and again at answer time.
+func parseAgentScreen(agentType, text string) (promptScreen, bool) {
+	s, ok := parsePromptScreen(text)
+	if !ok && agentType == at.Claude {
+		lines := strings.Split(strings.ReplaceAll(text, "\r", ""), "\n")
+		for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
+			lines = lines[:len(lines)-1]
+		}
+		s, ok = parseBrowserPromptMenu(lines)
+	}
+	if ok {
+		markApprovalKinds(agentType, text, &s)
+		if agentType == at.Claude {
+			markFolderTrust(text, &s)
+		}
+	}
+	return s, ok
 }
 
 // menuStillDrawn says whether text still shows the menu `before`: at least two of its option labels (or all, for a short
@@ -628,13 +655,14 @@ func normalizeLabel(s string) string {
 func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	var body struct {
-		SessionID string `json:"session_id"`
-		AgentType string `json:"agent_type"`
-		N         int    `json:"n"`
-		Label     string `json:"label"`
-		Text      string `json:"text"`   // the typed answer, for a "text" option
-		Submit    bool   `json:"submit"` // take the Submit row of a multi-select question (#5232); no n or label
-		AskID     string `json:"ask_id"` // the ask the caller drew (a screen's ask_id): another ask now open is refused (#10400); empty: not checked
+		SessionID   string `json:"session_id"`
+		AgentType   string `json:"agent_type"`
+		N           int    `json:"n"`
+		Label       string `json:"label"`
+		Text        string `json:"text"`         // the typed answer, for a "text" option
+		Submit      bool   `json:"submit"`       // take the Submit row of a multi-select question (#5232); no n or label
+		AskID       string `json:"ask_id"`       // the ask the caller drew (a screen's ask_id): another ask now open is refused (#10400); empty: not checked
+		TrustFolder string `json:"trust_folder"` // a row's Yes for the folder-trust menu names the folder it drew: the screen must still name it, and Coral may trust it (#14110); empty: the chat's own answer
 	}
 	if err := decodeJSON(r, &body); err != nil || !body.Submit && (body.N < 1 || body.N > 9 || strings.TrimSpace(body.Label) == "") {
 		errBadRequest(w, "n (1-9) and label are required")
@@ -691,6 +719,10 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 	opt := screen.Options[body.N-1]
 	if normalizeLabel(opt.Label) != normalizeLabel(body.Label) {
 		errConflict(w, "The prompt changed. Answer it in the terminal.")
+		return
+	}
+	if body.TrustFolder != "" && isTrustYes(screen, opt) && (screen.TrustFolder != body.TrustFolder || !h.trustOffered(r, body.SessionID, screen)) { // a row's lasting Yes: only for the folder it showed, a folder Coral may trust, from the person's own dashboard (#14110)
+		writeError(w, http.StatusConflict, "trust_changed", "The folder to trust changed or cannot be trusted from here. Answer it in the agent's own chat.")
 		return
 	}
 	if note := h.onlyRejectNote(body.SessionID, screen); note != "" && !optionIsReject(opt) { // a request that cannot be shown whole or hides something is never allowed from here (#11399)
@@ -759,7 +791,11 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 	case optionIsReject(opt):
 		row = board.ActPromptReject
 	}
-	noteActivity(r, row, "agent", name, "", "", opt.Label)
+	note := opt.Label
+	if body.TrustFolder != "" && isTrustYes(screen, opt) {
+		note = opt.Label + ": " + screen.TrustFolder // the grant can be found later: who, which agent, which folder (#14110)
+	}
+	noteActivity(r, row, "agent", name, "", "", note)
 	h.kickWS()                     // every screen showing the card takes the answer now
 	h.forgetDialog(body.SessionID) // the prompt was answered: it is not a dialog the agent is stuck at (#11437); the next pass reads the screen again
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "answered": opt.Label, "at": at})
