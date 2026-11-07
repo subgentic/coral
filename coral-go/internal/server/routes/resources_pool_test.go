@@ -92,6 +92,7 @@ func TestAResourceIsDefinedHereOrRemoteAndAClaimCarriesIt(t *testing.T) {
 	code, b := g.do("token:Dev A", "POST", "/api/resources/far/claim", map[string]any{})
 	require.Equal(t, 200, code)
 	assert.Equal(t, "remote", b["entry"].(map[string]any)["where"])
+	assert.Equal(t, "Far", b["entry"].(map[string]any)["machine"], "a plain resource's grant carries its own machine, which heavy run builds the ssh alias from")
 	code, _ = g.do("token:Dev A", "POST", "/api/resources/far/release", map[string]any{})
 	require.Equal(t, 200, code)
 	// a pool's grant carries the member's

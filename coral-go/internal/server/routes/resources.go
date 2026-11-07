@@ -263,10 +263,8 @@ func (h *ResourcesHandler) Claim(w http.ResponseWriter, r *http.Request) {
 		granted = res.Entry.Resource
 	}
 	if ms, err := h.M.Queue().Status(granted); err == nil {
-		if ev.Member != "" {
-			ev.Machine = ms.Resource.Machine // a pool's grant says which machine it is on
-		}
-		ev.Where = ms.Resource.Where // and whether that is here or remote (#14354)
+		ev.Machine = ms.Resource.Machine // the grant says which machine it is on: a pool member's, or the resource's own (#14354: heavy run builds the ssh alias from it)
+		ev.Where = ms.Resource.Where     // and whether that is here or remote
 	}
 	writeJSON(w, code, map[string]any{"granted": res.Granted, "place": res.Place, "entry": ev})
 }
