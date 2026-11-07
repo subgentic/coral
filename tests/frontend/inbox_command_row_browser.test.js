@@ -86,6 +86,15 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
             check(!(await ev(`!!document.querySelector('#group-table-view .inbox-answers button.inbox-arming')`)), `${at}after 400 ms the Yes is armed`);
             await ev(`[...document.querySelectorAll('#group-table-view .inbox-answers button')].filter(b => b.textContent === 'Yes').forEach(b => b.click()); true`);
             await waitFor(`window.__answers.length === 1`, `${at}the Yes answers once armed`, 5000);
+            // a redraw of the SAME ask keeps its Yes armed (Needs you redraws often): arm, wait 400 ms, force a real redraw (the list filtered and cleared), click at once: it answers
+            await show(MENU({ target: ONE }), 2);
+            await ev(`window.__answers = []; true`);
+            await new Promise(r => setTimeout(r, 650)); // sleep-ok: the 400 ms of the first drawing pass
+            await ev(`window.__oldYes = [...document.querySelectorAll('#group-table-view .inbox-answers button')].find(b => b.textContent === 'Yes'); (async () => { const m = await import((window.__coralStatic || '/static/') + 'inbox_sidebar.js'); m.filterInbox('qa'); await new Promise(r => setTimeout(r, 300)); m.filterInbox(''); return true; })()`); // sleep-ok: the list redraws for the filter before it is cleared
+            await waitFor(`(() => { const b = [...document.querySelectorAll('#group-table-view .inbox-answers button')].find(x => x.textContent === 'Yes'); return !!b && b !== window.__oldYes; })()`, `${at}the row is drawn again (a new Yes button)`, 6000);
+            check(!(await ev(`!!document.querySelector('#group-table-view .inbox-answers button.inbox-arming')`)), `${at}the Yes of the same ask is not arming again after a redraw`);
+            await ev(`[...document.querySelectorAll('#group-table-view .inbox-answers button')].filter(b => b.textContent === 'Yes').forEach(b => b.click()); true`);
+            await waitFor(`window.__answers.length === 1`, `${at}a click right after a redraw of the same ask answers`, 5000);
             if (!mobile) { // the pointer leaves the Yes and enters it again: armed at once
                 await show(MENU({ target: ONE }), 2);
                 await ev(`window.__answers = []; window.__ws += 1; true`); await refresh();
