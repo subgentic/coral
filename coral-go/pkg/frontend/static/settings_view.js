@@ -354,6 +354,7 @@ export function mountSettingsView(host, spec) {
     function paintBar() {
         const dirty = dirtyKeys().size > 0 || partsDirty().length > 0;
         if (saveBtn) { saveBtn.disabled = formSpec ? busy : !dirty || busy || !!globalReadOnly; cancelBtn.disabled = formSpec ? busy : (!dirty && !(barSpec && barSpec.cancelAlways)) || busy; }
+        if (barSpec && barSpec.cancelAlways && cancelBtn) { const word = dirty ? barSpec.cancel : 'Close'; if (cancelBtn.textContent !== word) cancelBtn.textContent = word; } // a dialog's Cancel that stays enabled says Close while there is nothing to cancel (#14293)
         if (statusEl) {
             const text = busy ? words.busy : status !== null ? status : formSpec ? '' : dirty ? words.dirty : lastSaved ? words.saved : words.none;
             statusEl.textContent = text; statusEl.classList.toggle('is-error', statusError && !busy);
