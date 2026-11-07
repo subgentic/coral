@@ -18,10 +18,10 @@ const { coralReady } = require('./helpers/wait');
         window.fetch = (u, o) => { const url = new URL(String(u), location.origin), m = /^\\/api\\/artifacts\\/([0-9a-f]{64})\\/versions$/.exec(url.pathname);
             if (m) { const board = url.searchParams.get('board') || ''; window.__vreads.push(board);
                 const json = (b, status) => Promise.resolve(new Response(JSON.stringify(b), { status: status || 200, headers: { 'Content-Type': 'application/json' } }));
+                if (board && window.__older) return json({ error: 'path not allowed', code: 'path_not_allowed' }, 403); // a computer on v2.0.58 behind a Hub: its versions route takes no query (#14317)
                 if (board === 'alpha') return json(rowsFor('QA Engineer'));
                 if (board === 'beta') return json(rowsFor('Backend Dev', true));
                 if (board === 'solo') return json(rowsFor('Docs Writer'));
-                if (board && window.__older) return json({ error: 'path not allowed', code: 'path_not_allowed' }, 403); // a computer on v2.0.58 behind a Hub: its versions route takes no query (#14317)
                 if (!board && window.__hold) return new Promise(resolve => { window.__release = () => resolve(new Response(JSON.stringify({ error: 'x', code: 'ambiguous_series', boards: ['alpha', 'beta'] }), { status: 409, headers: { 'Content-Type': 'application/json' } })); }); // an older answer, held
                 if (!board && window.__ambiguous) return json({ error: 'more than one team holds these bytes in a series: ask for one with ?board=', code: 'ambiguous_series', boards: ['alpha', 'beta'] }, 409);
                 if (!board) return json(rowsFor('Docs Writer'));
