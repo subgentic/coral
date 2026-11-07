@@ -550,3 +550,31 @@ func TestAHolderWhoStartsWorkingAgainIsNotIdleAnyMore(t *testing.T) {
 	assert.Equal(t, []string{"Agent A"}, g.holders())
 	assert.Empty(t, *told)
 }
+
+// #14079: a claim made with no tool call known (the common case: calls_known=0) is still judged by the work under its believed shell.
+func TestAHolderWithNoKnownCallIsJudgedByItsShellToo(t *testing.T) {
+	g := newHookRig(t)
+	g.setProcs(proctree.Proc{PID: agentPID, PPID: 1, Command: "codex"}, proctree.Proc{PID: 500, PPID: agentPID, Command: "bash"})
+	_, err := g.m.Claim(context.Background(), "mac-heavy", "Agent A", "bg")
+	require.NoError(t, err)
+	g.h.BindHand("s-a", "Agent A", "mac-heavy", nil, 500, agentPID)
+	g.addProc(proctree.Proc{PID: 502, PPID: 500, Command: "sleep 600"})
+	g.add(15 * time.Second)
+	g.add(3*time.Minute + time.Second)
+	assert.Empty(t, g.holders(), "idle with no known call: taken back")
+
+	g2 := newHookRig(t)
+	g2.setProcs(proctree.Proc{PID: agentPID, PPID: 1, Command: "codex"}, proctree.Proc{PID: 500, PPID: agentPID, Command: "bash"})
+	_, err = g2.m.Claim(context.Background(), "mac-heavy", "Agent A", "bg")
+	require.NoError(t, err)
+	g2.h.BindHand("s-a", "Agent A", "mac-heavy", nil, 500, agentPID)
+	g2.addProc(proctree.Proc{PID: 502, PPID: 500, Command: "go test ./...", CPU: 80})
+	for i := 0; i < 4; i++ {
+		g2.add(20 * time.Minute)
+	}
+	assert.Equal(t, []string{"Agent A"}, g2.holders(), "working with no known call: kept past the lease")
+	g2.h.TurnEnded("s-a")
+	g2.dropProc(502)
+	g2.h.Sweep()
+	assert.Empty(t, g2.holders(), "the turn ended and the work is gone: back")
+}

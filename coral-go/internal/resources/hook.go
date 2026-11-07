@@ -150,7 +150,7 @@ func (h *Hook) BindHand(session, agent, resource string, toolCalls []string, she
 			b.calls[c] = true
 		}
 	}
-	if h == nil || session == "" || len(b.calls) == 0 { // no known call: nothing to tie it to, the lease alone ends it
+	if h == nil || session == "" { // not an agent's claim (the Operator's command line): the lease alone ends it
 		return
 	}
 	if shell > 1 && agentPID > 1 && h.o.Procs != nil {
@@ -164,6 +164,11 @@ func (h *Hook) BindHand(session, agent, resource string, toolCalls []string, she
 			}
 		}
 	}
+	if len(b.calls) == 0 && b.shell <= 1 { // no known call and no shell to look at: nothing to tie it to, the lease alone ends it
+		return
+	}
+	// #14079: most agent claims arrive with no call known (the tray log's calls_known=0): with a shell that is believed they are bound to it all the same, so the work under the shell (or its absence) is judged and
+	// the turn's end gives the slot back.
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if ah := h.hold[holdKey{resource, agent}]; ah != nil && ah.calls != nil && len(ah.refused) > 0 {
