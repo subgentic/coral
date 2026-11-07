@@ -174,9 +174,9 @@ const fromOf = (s, withTeam) => { if (s.operatorAsk) return [`from ${markHidden(
 /** The wait, again, inside the item cell (#13795): a phone's row puts it at the right of the sender's line, so the Waiting column is hidden there; hidden everywhere else (the column says it). */
 const waitMark = s => {
     const text = waitingText(s.waiting_since); if (!text) return [];
-    const elapsed = text.replace(/^waiting /, '').replace('under 1 min', '<1m').replace(/ min/g, 'm').replace(/ h/g, 'h').replace(/ d/g, 'd').replace(/ /g, '');
+    const elapsed = text.replace(/^waiting /, '').replace('under 1 min', '<1m').replace(/ (min|h|d)/g, '$1').split(' ')[0];
     const mark = DT.el('span', 'inbox-review-wait'); mark.title = text;
-    const visible = DT.el('span', 'inbox-review-elapsed', elapsed); visible.setAttribute('aria-hidden', 'true');
+    const visible = DT.el('span', 'inbox-review-elapsed'); visible.dataset.elapsed = elapsed; visible.setAttribute('aria-hidden', 'true');
     mark.append(DT.el('span', 'sr-only', text), visible); return [mark];
 }; // every phone kind uses one compact time; desktop's Waiting cell keeps the full words
 /** One phone row for every kind (#13911, the Operator: "Layout A"): the sender or the intro on line one with the time since at its right, then the description, at most two lines; the same grid whatever the kind, so the icon, the time and the line count are the same in every row. `from` is the element that names the sender or the intro. */
@@ -1082,9 +1082,8 @@ registerGroupSource('hub-inbox', {
     const wrap = DT.el('span', 'inbox-review-item inbox-agent-first'), sender = agentLink(markHidden(s.review.produced_by, { strict: true }).trim() || 'sender unknown', { board: boardTeamKey(sessionServer(s), s.review.team), cls: 'inbox-review-from' });
     const readWords = `${isRead(s.review) ? ', read' : ', unread'}${waitingOnAgent(s.review) && !(s.review.new_comments > 0) ? ', waiting on agent, not counted' : ''}`;
     if (isPhoneLayout()) {
-        const tags = DT.el('span', 'inbox-review-tags');
-        if (versionOf(s.review) > 1) { const version = DT.el('span', 'inbox-review-version', `${hasNewVersion(s.review) ? 'New ' : ''}v${versionOf(s.review)}`); version.title = hasNewVersion(s.review) ? `New version v${versionOf(s.review)}` : `Version ${versionOf(s.review)}`; tags.append(version); }
-        wrap.append(sender, name); if (tags.childNodes.length) name.append(' · ', tags);
+        if (versionOf(s.review) > 1) { const version = DT.el('span', 'inbox-review-version', hasNewVersion(s.review) ? ` · New version v${versionOf(s.review)}` : ` · version ${versionOf(s.review)}`); name.append(version); }
+        wrap.append(sender, name);
         wrap.append(DT.el('span', 'sr-only', `${earlierWords(s.review) ? `, ${earlierWords(s.review)}` : ''}${readWords}`), ...waitMark(s)); return wrap;
     }
     const ver = DT.el('span', 'inbox-review-version', versionOf(s.review) > 1 ? ` · version ${versionOf(s.review)}` : ''); ver.hidden = !(versionOf(s.review) > 1);

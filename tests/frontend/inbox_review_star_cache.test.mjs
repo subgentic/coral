@@ -14,4 +14,14 @@ test('acknowledged star survives rebuilding a collapsed series row',async()=>{
  reviews.reviewStarChanged(reviews.reviewItems()[0],false);
  assert.equal(reviews.reviewItems()[0].starred,false);
 });
+test('stars distinguish equal filenames in different series while following a renamed series',async()=>{
+ artifacts.push({...artifacts[0],id:hex(3),series_id:'different-series',created_at:'2026-11-06T10:03:00Z'});
+ await reviews.refreshReviews(true);
+ const rows=reviews.reviewItems(),renamed=rows.find(r=>r.hex===hex(2)),other=rows.find(r=>r.hex===hex(3));
+ assert.equal(rows.length,2);assert.deepEqual(reviews.earlierVersions(renamed).map(r=>r.hex),[hex(1)]);
+ assert.deepEqual(reviews.earlierVersions(other),[],'same filename is a separate document');
+ reviews.reviewStarChanged(renamed,true);
+ assert.equal(reviews.reviewItems().find(r=>r.hex===hex(2)).starred,true);
+ assert.equal(!!reviews.reviewItems().find(r=>r.hex===hex(3)).starred,false);
+});
 test.after(()=>dom.window.close());
