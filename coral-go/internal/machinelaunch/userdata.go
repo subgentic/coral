@@ -277,7 +277,8 @@ func BuildUserData(spec UserDataSpec) (string, error) {
 	w("      rc=0")
 	w("      /usr/local/sbin/coral-machine-setup > /run/coral/setup.log 2>&1 || rc=$?")
 	w("      echo \"$rc\" > /run/coral/setup.status")
-	w("      chmod 0644 /run/coral/setup.log /run/coral/setup.status")
+	w("      %s state > /run/coral/dns.txt 2>&1 || true # the DNS and egress state, for the launcher's failure report (#12885)", egressCheckPath)
+	w("      chmod 0644 /run/coral/setup.log /run/coral/setup.status /run/coral/dns.txt")
 	w("      [ \"$rc\" = 0 ] || exit \"$rc\"")
 	w("      install -d -m 0700 -o coral -g coral /run/coral/bootstrap.d")
 	w("      systemctl daemon-reload")
@@ -501,6 +502,7 @@ func setupScript(version string, digests ReleaseDigests) string {
 	p("work=$(mktemp -d)")
 	p("trap 'rm -rf \"$work\"' EXIT")
 	p("cd \"$work\"")
+	p("%s", dnsWaitSnippet(dnsWaitSeconds))
 	p("curl -fsSL --proto '=https' --tlsv1.2 -o \"$tarball\" \"$base/$tarball\"")
 	p("echo \"${want}  ${tarball}\" | sha256sum -c -")
 	p("# The archive is unpacked in a private folder of this script (its members are stored as ./coral and so on, and GNU tar matches a name literally: asking it for `coral` finds nothing, #13876), and only the named programs are")
@@ -575,4 +577,39 @@ func agentsScript(agents []agentInstall) string {
 	}
 	p("if [ -n \"$failed\" ]; then echo \"coral-machine-agents: FAILED agents:$failed (each was removed; the machine itself is enrolled)\" >&2; exit 1; fi")
 	return s.String()
+}
+
+// dnsWaitSeconds is how long the setup waits for each of the two things its first download needs, DNS and a plausible clock (#12885): about a minute each, then it goes on either way. One line to change.
+const dnsWaitSeconds = 60
+
+// dnsWaitSnippet is the shell the setup runs before its first network call. It waits, in this order and with a time on every line it writes, for (a) github.com to resolve (as root, the way curl asks) and (b) the clock
+// to be plausible (the year is 2025 or later, or the machine says its clock is synchronised): a machine whose clock is still at 1970 fails TLS on certificate dates even when DNS answers. Each wait is bounded by the
+// seconds given; when one is not met the setup says which, prints the resolver state, and goes on, because stopping here would hide the download's own, clearer error. It needs no root and no secret.
+func dnsWaitSnippet(seconds int) string {
+	return fmt.Sprintf(`# Wait (bounded) for DNS and a plausible clock before the first download, and log which; never stop the setup for it.
+stamp() { date -u +%%Y-%%m-%%dT%%H:%%M:%%SZ 2>/dev/null || echo unknown-time; }
+waited=0
+until getent hosts github.com >/dev/null 2>&1; do
+  waited=$((waited + 1))
+  if [ "$waited" -ge %[1]d ]; then
+    echo "$(stamp) coral-machine-setup: github.com did not resolve in %[1]d s: going on"
+    resolvectl status 2>&1 | head -n 20 || true
+    cat /etc/resolv.conf 2>&1 || true
+    break
+  fi
+  sleep 1
+done
+[ "$waited" -lt %[1]d ] && echo "$(stamp) coral-machine-setup: github.com resolved after $waited s"
+waited=0
+until [ "$(date -u +%%Y 2>/dev/null || echo 0)" -ge 2025 ] || timedatectl show -p NTPSynchronized --value 2>/dev/null | grep -qx yes; do
+  waited=$((waited + 1))
+  if [ "$waited" -ge %[1]d ]; then
+    echo "$(stamp) coral-machine-setup: the clock is not plausible after %[1]d s: going on"
+    timedatectl 2>&1 | head -n 12 || true
+    break
+  fi
+  sleep 1
+done
+[ "$waited" -lt %[1]d ] && echo "$(stamp) coral-machine-setup: the clock is plausible after $waited s"
+true`, seconds)
 }

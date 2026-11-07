@@ -17,12 +17,14 @@ import (
 // Nothing here is a secret by design, and the text is still cleaned before it is printed: the launch's host key (the one secret in the user-data), the credential's shape, any private-key block and any long
 // base64-looking run are replaced, control characters are dropped, and the whole is cut.
 const (
-	whyCommand = `echo "== setup exit status: $(cat /run/coral/setup.status 2>&1)"; ` +
-		`echo "== setup output (tail)"; tail -c 2500 /run/coral/setup.log 2>&1; ` +
-		`echo "== cloud-init status"; cloud-init status --long 2>&1 | head -c 1200; ` +
-		`echo "== cloud-init output (tail)"; tail -c 1500 /var/log/cloud-init-output.log 2>&1`
-	whyReadMax   = 8 << 10 // read from the machine at most this much
-	whyShown     = 3000    // bytes printed, the END of what the machine said
+	// The text is cut to its END, so the part that matters most comes last: the setup's own output (its DNS wait says which way it went), then its exit status.
+	whyCommand = `echo "== cloud-init status"; cloud-init status --long 2>&1 | head -c 1000; ` +
+		`echo "== cloud-init output (tail)"; tail -c 1000 /var/log/cloud-init-output.log 2>&1; ` +
+		`echo "== dns state (root's report, #12885)"; tail -c 1800 /run/coral/dns.txt 2>&1; ` +
+		`echo "== setup output (tail)"; tail -c 2000 /run/coral/setup.log 2>&1; ` +
+		`echo "== setup exit status: $(cat /run/coral/setup.status 2>&1)"`
+	whyReadMax   = 12 << 10 // read from the machine at most this much
+	whyShown     = 6000     // bytes printed, the END of what the machine said
 	whyLineShown = 240
 	whyTimeout   = 20 * time.Second
 )
