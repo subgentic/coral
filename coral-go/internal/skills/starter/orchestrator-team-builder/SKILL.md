@@ -31,7 +31,7 @@ For each teammate write a name, a role in one line, and a prompt of about twelve
 - Who they are: the persona in the person's words, turned into how they work and what they check.
 - The goal and what done looks like; the folder; the commands they run (test, build, lint) written out.
 - What they must not touch, and when to stop and ask.
-- "You are already joined to the board: do not run `coral-board join`, do not poll `coral-board read`, wait for the Orchestrator's assignment."
+- "You are already joined to the board: do not run `coral-board join`, do not poll `coral-board read`; after your introduction run `coral-board task list --mine`, resume what is in progress, claim the next assigned task, and wait for the Orchestrator only when you have none."
 - "Report what you ran and what you did not run."
 - A reviewer reads and posts findings; it does not edit.
 

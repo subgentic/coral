@@ -448,7 +448,7 @@ Hard platform rules:
 2. Every team MUST contain 3-8 agents. If the user asks for fewer than 3, still produce 3 agents by adding the minimum supporting roles needed. If the user asks for more than 8, consolidate responsibilities to stay within 8.
 3. The Orchestrator coordinates work, delegates tasks via the message board, tracks progress, and should not do the implementation work itself.
 4. The Orchestrator must include these allowed capabilities: ["file_read", "shell:coral-board *", "agent_spawn", "web_access"].
-5. Every worker prompt must say they are automatically joined to the message board, must not run "coral-board join", must not poll or loop on "coral-board read", and must wait for instructions from the Orchestrator before starting work.
+5. Every worker prompt must say they are automatically joined to the message board, must not run "coral-board join", must not poll or loop on "coral-board read", and must, after introducing themselves, run "coral-board task list --mine", resume a task that is in progress, claim the next one assigned to them, and wait for instructions from the Orchestrator only when they have none.
 6. The Orchestrator prompt must say it is automatically joined to the message board, must not run "coral-board join", must not poll or loop on "coral-board read", and should discuss its plan with the operator before posting assignments.
 7. Every agent object MUST include all of these keys: "name", "prompt", "capabilities", "agent_type", and "model".
 8. If useful, agent objects MAY also include "tools" (array of strings). Never include "mcpServers": Coral does not configure MCP servers.
@@ -499,7 +499,7 @@ Few-shot example:
     },
     {
       "name": "Lead Developer",
-      "prompt": "You are the lead developer. You are automatically joined to the message board. Do not run coral-board join. Do not poll or loop on coral-board read. Wait for instructions from the Orchestrator before starting. Implement features, modify code, run necessary development commands, and coordinate status updates through the message board.",
+      "prompt": "You are the lead developer. You are automatically joined to the message board. Do not run coral-board join. Do not poll or loop on coral-board read. After you introduce yourself, run coral-board task list --mine: resume a task in progress, otherwise claim the next one assigned to you, and wait for instructions from the Orchestrator only when you have none. Implement features, modify code, run necessary development commands, and coordinate status updates through the message board.",
       "tools": [],
       "capabilities": {
         "allow": ["file_read", "file_write", "shell", "git_write", "agent_spawn", "web_access"],
@@ -510,7 +510,7 @@ Few-shot example:
     },
     {
       "name": "QA Engineer",
-      "prompt": "You are the QA engineer. You are automatically joined to the message board. Do not run coral-board join. Do not poll or loop on coral-board read. Wait for instructions from the Orchestrator before starting. Review changes, write or run tests when needed, verify behavior, and report risks and regressions through the message board.",
+      "prompt": "You are the QA engineer. You are automatically joined to the message board. Do not run coral-board join. Do not poll or loop on coral-board read. After you introduce yourself, run coral-board task list --mine: resume a task in progress, otherwise claim the next one assigned to you, and wait for instructions from the Orchestrator only when you have none. Review changes, write or run tests when needed, verify behavior, and report risks and regressions through the message board.",
       "tools": [],
       "capabilities": {
         "allow": ["file_read", "file_write", "shell", "git_write", "agent_spawn", "web_access"],

@@ -49,6 +49,10 @@ Subcommands:
 		cmdTaskAdd(st, taskArgs)
 	case "list":
 		asJSON, goal := taskListArgs(taskArgs)
+		if clihelp.HasFlag(taskArgs, "--mine") {
+			cmdTaskListMine(st, asJSON)
+			return
+		}
 		cmdTaskListGoal(st, asJSON, goal)
 	case "goal":
 		cmdTaskGoal(st, taskArgs)
@@ -138,6 +142,7 @@ Subcommands:
                                    --follow-up ID: the work that came out of task ID: it takes that task's goal, reviewers and assignee unless you give your own,
                                    and ID lists it (task show ID, task detail ID, the goal page's "N follow-ups open")
   list [--json] [--goal ID]        Every task, or one goal's; --json prints the tasks as a JSON array
+  list --mine [--json]             Only your own: in progress first, then assigned and waiting (what to resume or claim after a wake)
   goal <task-id> <goal-id|none>    Put a task on a goal of this board, move it, or take it off (coral-board goal ... manages the goals)
   claim [id]                       Claim a specific task or the next available one
   current                          Show your current in-progress task
@@ -177,6 +182,41 @@ Conditions: success (default), failure, termination. Completed results are immut
 
 func cmdTaskList(st *boardState, asJSON bool) { cmdTaskListGoal(st, asJSON, 0) }
 
+// mineTasks keeps the tasks assigned to subscriberID that are still open: in progress first, then pending, each in the order fetchTasks gave (priority, then id). A done or cancelled task is not on the list.
+func mineTasks(tasks []map[string]any, subscriberID string) []map[string]any {
+	var active, waiting []map[string]any
+	for _, t := range tasks {
+		if a, _ := t["assigned_to"].(string); a == "" || a != subscriberID {
+			continue
+		}
+		switch st, _ := t["status"].(string); st {
+		case "in_progress":
+			active = append(active, t)
+		case "pending":
+			waiting = append(waiting, t)
+		}
+	}
+	return append(active, waiting...)
+}
+
+// cmdTaskListMine is task list --mine (#14133): the agent's own queue, so a restarted agent finds its work without remembering it.
+func cmdTaskListMine(st *boardState, asJSON bool) {
+	tasks := mineTasks(fetchTasks(st, 0), resolveSubscriberID())
+	if asJSON {
+		if tasks == nil {
+			tasks = []map[string]any{}
+		}
+		out, _ := json.MarshalIndent(tasks, "", "  ")
+		fmt.Println(string(out))
+		return
+	}
+	if len(tasks) == 0 {
+		fmt.Println("No tasks of yours in progress or waiting.")
+		return
+	}
+	printTaskTable(tasks)
+}
+
 // taskListArgs reads task list's options: --json and --goal ID (a whole number, 1 or more).
 func taskListArgs(args []string) (asJSON bool, goal int64) {
 	asJSON = clihelp.HasFlag(args, "--json")
@@ -214,6 +254,10 @@ func cmdTaskListGoal(st *boardState, asJSON bool, goal int64) {
 		return
 	}
 
+	printTaskTable(tasks)
+}
+
+func printTaskTable(tasks []map[string]any) {
 	fmt.Printf("%-4s %-12s %-9s %-15s %s\n", "ID", "Status", "Priority", "Assignee", "Title")
 	for _, task := range tasks {
 		id, _ := task["id"].(float64)

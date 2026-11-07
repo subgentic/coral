@@ -1161,3 +1161,27 @@ func (s *Store) OpenSelfTasks(ctx context.Context, project, agent string) ([]Ope
 	err := s.reader().SelectContext(ctx, &tasks, `SELECT id, title FROM board_tasks WHERE board_id = ? AND created_by = ? AND assigned_to = ? AND `+openTaskStatusSQL+` ORDER BY id`, project, agent, agent)
 	return tasks, err
 }
+
+// OwnQueue is what a subscriber has on a board: the task it holds the slot of, and the tasks assigned to it and waiting, in the order claim would take them (#14133).
+type OwnQueue struct {
+	InProgress []int64
+	Assigned   []int64
+}
+
+// QueueFor reads a subscriber's own queue: in-progress tasks first (a parked one is set aside on purpose and is left out), then pending tasks assigned to it by priority and id. A parked pending task is left out too, as claim leaves it.
+func (s *Store) QueueFor(ctx context.Context, project, subscriberID string) (OwnQueue, error) {
+	var q OwnQueue
+	if subscriberID == "" {
+		return q, nil
+	}
+	if err := s.reader().SelectContext(ctx, &q.InProgress,
+		`SELECT id FROM board_tasks WHERE board_id = ? AND assigned_to = ? AND `+holdsSlotSQL+` ORDER BY claimed_at DESC, id DESC`, project, subscriberID); err != nil {
+		return OwnQueue{}, err
+	}
+	priorityOrder := `CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END, id ASC`
+	if err := s.reader().SelectContext(ctx, &q.Assigned,
+		`SELECT id FROM board_tasks WHERE board_id = ? AND assigned_to = ? AND status = 'pending' AND NOT `+parkedSQL+` ORDER BY `+priorityOrder, project, subscriberID); err != nil {
+		return OwnQueue{}, err
+	}
+	return q, nil
+}

@@ -342,7 +342,7 @@ func (h *SessionsHandler) sendAutoWakeNotice(ctx context.Context, ls store.LiveS
 	if title == "" {
 		return
 	}
-	if _, err := h.bs.PostSystemMessage(ctx, boardName, board.CoralSender, "@"+title+" "+AutoWakeNotice, nil); err != nil {
+	if _, err := h.bs.PostSystemMessage(ctx, boardName, board.CoralSender, "@"+title+" "+AutoWakeNotice+h.queueSentence(ctx, boardName, sub.SubscriberID), nil); err != nil {
 		slog.Warn("[auto-wake] notice not posted", "board", boardName, "err", err)
 	}
 }
@@ -442,4 +442,36 @@ func validateAutoSleepSettings(body map[string]any) error {
 		body[setreg.AutoSleepIdleMinutes] = strconv.Itoa(n)
 	}
 	return nil
+}
+
+// queueSentence names the tasks a woken agent has on its board, so its notice does not depend on what it remembers (#14133): a restarted agent with an in-progress task got no nudge for its queue and introduced itself and waited.
+// It is empty when the agent has none (the notice is then its fixed sentence alone), and never fails the notice. Only task numbers go in it, never a title or any stored text.
+func (h *SessionsHandler) queueSentence(ctx context.Context, project, subscriberID string) string {
+	if h.bs == nil || subscriberID == "" {
+		return ""
+	}
+	q, err := h.bs.QueueFor(ctx, project, subscriberID)
+	if err != nil || (len(q.InProgress) == 0 && len(q.Assigned) == 0) {
+		return ""
+	}
+	nums := func(ids []int64) string {
+		const most = 8
+		var parts []string
+		for i, id := range ids {
+			if i == most {
+				parts = append(parts, fmt.Sprintf("and %d more", len(ids)-most))
+				break
+			}
+			parts = append(parts, fmt.Sprintf("#%d", id))
+		}
+		return strings.Join(parts, ", ")
+	}
+	out := " Your tasks:"
+	if len(q.InProgress) > 0 {
+		out += " in progress " + nums(q.InProgress) + " (resume it from its thread and worktree);"
+	}
+	if len(q.Assigned) > 0 {
+		out += " assigned and waiting " + nums(q.Assigned) + " (claim the next when nothing is in progress);"
+	}
+	return strings.TrimSuffix(out, ";") + ". 'coral-board task list --mine' shows them."
 }

@@ -286,7 +286,11 @@ const OrchestratorWakeNotice = "[Coral] Woken by the Orchestrator: read the boar
 
 // tellWoken addresses the fixed wake line to the woken agent on the board; the notifier delivers it through the normal notice gate (held while a prompt is open, never typed over a draft).
 func (h *SessionsHandler) tellWoken(ctx context.Context, project, member string) {
-	if _, err := h.bs.PostSystemMessage(ctx, project, board.CoralSender, "@"+orchName(member)+" "+OrchestratorWakeNotice, nil); err != nil {
+	queue := ""
+	if sub, err := h.bs.GetProjectSubscription(ctx, project, member); err == nil && sub != nil {
+		queue = h.queueSentence(ctx, project, sub.SubscriberID)
+	}
+	if _, err := h.bs.PostSystemMessage(ctx, project, board.CoralSender, "@"+orchName(member)+" "+OrchestratorWakeNotice+queue, nil); err != nil {
 		slog.Warn("wake line not posted", "board", project, "error", err)
 	}
 }

@@ -36,12 +36,12 @@ func TestNoStartPromptLeavesOutTheFirstMessage(t *testing.T) {
 			with, err := ag.LaunchCommand(params)
 			require.NoError(t, err)
 			assert.Contains(t, filesOf(t, with), "UNIQUE-FIRST-PROMPT", "a launch passes the first prompt")
-			assert.Contains(t, filesOf(t, with), "Do not start any actions until you receive instructions", "and the board's action text")
+			assert.Contains(t, filesOf(t, with), "IMPORTANT: You were automatically joined to message board", "and the board's action text")
 			params.NoStartPrompt = true
 			without, err := ag.LaunchCommand(params)
 			require.NoError(t, err)
 			assert.NotContains(t, filesOf(t, without), "UNIQUE-FIRST-PROMPT", "a launch asked for none passes no first prompt")
-			assert.NotContains(t, filesOf(t, without), "Do not start any actions until you receive instructions", "and no action text")
+			assert.NotContains(t, filesOf(t, without), "IMPORTANT: You were automatically joined to message board", "and no action text")
 		})
 	}
 }
