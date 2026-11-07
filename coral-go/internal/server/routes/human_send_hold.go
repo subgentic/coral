@@ -61,6 +61,8 @@ type personHeld struct {
 	done func(error)
 	// guarded by personHolds.mu: typing is set once the message is being typed (it can no longer be cancelled), cancelled when it was cancelled while it waited.
 	typing, cancelled bool
+	// screenOnly: it was held for a prompt on the screen while the agent's signals said no box was open (or had none): with no signals to wait on, only the screen decides when it goes (#14357).
+	screenOnly bool
 	finished          sync.Once
 }
 
@@ -95,12 +97,20 @@ func (h *SessionsHandler) blockedOnBox(ctx context.Context, name, agentType, ses
 	return ok && st.State == ptymanager.StateBlocked
 }
 
+// promptOnScreen is the last look at the screen before a person's message is typed (#14357): a prompt that is open there means hold, whatever the derived state says (it can be late, or have
+// no signal at all). The same look and the same rules as an automated send's, so the two cannot disagree about what a prompt is.
+func (h *SessionsHandler) promptOnScreen(ctx context.Context, name, agentType, sessionID, text string) bool {
+	return ptymanager.PromptOpenOnScreen(ctx, h.terminal, name, agentType, sessionID, text)
+}
+
 // deliverPersonSend is deliverHumanSend for a person's chat message, held while the agent waits on a box. heldID is not empty when the message was queued: it is typed later, and done (which
 // may be nil) is called then with how that ended; the id names it for a cancel and in the live row's held_messages. When it is not held the message was delivered here, and done is not used.
 func (h *SessionsHandler) deliverPersonSend(ctx context.Context, name, agentType, sessionID, text string, viaHub bool, done func(error)) (heldID string, err error) {
 	key := personKey(name, sessionID)
-	if h.holds.waiting(key) || h.blockedOnBox(ctx, name, agentType, sessionID) { // behind an earlier held message, or a box is open now
-		m := &personHeld{id: newHeldID(), name: name, agentType: agentType, sessionID: sessionID, text: text, heldAt: time.Now().UTC(), viaHub: viaHub, done: done}
+	blocked := h.blockedOnBox(ctx, name, agentType, sessionID)
+	onScreen := !blocked && h.promptOnScreen(ctx, name, agentType, sessionID, text)
+	if h.holds.waiting(key) || blocked || onScreen { // behind an earlier held message, or a box is open now (by the agent's own signals, or on its screen)
+		m := &personHeld{id: newHeldID(), name: name, agentType: agentType, sessionID: sessionID, text: text, heldAt: time.Now().UTC(), viaHub: viaHub, done: done, screenOnly: onScreen}
 		if err := h.holdPerson(m); err != nil {
 			return "", err
 		}
@@ -281,10 +291,11 @@ func (h *SessionsHandler) releaseOne(m *personHeld) error {
 			return errSendCancelled
 		}
 		st, ok := h.gateState(ctx, m.name, m.agentType, m.sessionID)
+		prompt := h.promptOnScreen(ctx, m.name, m.agentType, m.sessionID, m.text) // the last look at the screen (#14357)
 		switch {
 		case ok && st.State == ptymanager.StateGone, !h.sessionStillLive(ctx, m.sessionID):
 			return ptymanager.ErrTerminalGone // the session ended while the message waited
-		case !ok, st.State == ptymanager.StateBlocked:
+		case prompt, (!ok && !m.screenOnly), st.State == ptymanager.StateBlocked:
 			// A box (the first, or the next one in a row): the wait starts again. A state that cannot be read now (the signals were there when the message was held) is no evidence
 			// that the box is gone: it waits, until personHoldMax.
 			clearSince = time.Time{}
