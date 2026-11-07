@@ -116,7 +116,7 @@ func (a *ClaudeAgent) LaunchCommand(params LaunchParams) (string, error) {
 		parts = append(parts, "--session-id", params.SessionID)
 	}
 
-	settingsFile := claudeSettingsFile(files, params, effectiveID)
+	settingsFile := claudeSettingsFile(files, params, effectiveID, true)
 	parts = append(parts, "--settings", settingsFile)
 
 	if len(params.Flags) > 0 {
@@ -144,7 +144,7 @@ func (a *ClaudeAgent) LaunchCommand(params LaunchParams) (string, error) {
 // claudeSettingsFile writes the agent's merged settings (hooks, system prompt, permissions,
 // tools, Coral's environment) to a temp file and returns its path. MCP servers are never among
 // them: Coral doesn't configure MCP servers (#3644); the CLI's own configuration does.
-func claudeSettingsFile(files *launchFiles, params LaunchParams, effectiveID string) string {
+func claudeSettingsFile(files *launchFiles, params LaunchParams, effectiveID string, interactive bool) string {
 	// Build merged settings with hooks and system prompt
 	merged := buildMergedSettings(params.Hooks)
 
@@ -163,7 +163,7 @@ func claudeSettingsFile(files *launchFiles, params LaunchParams, effectiveID str
 	}
 
 	// Inject permissions from capabilities
-	if perms := TranslateToClaudePermissions(params.Capabilities); perms != nil {
+	if perms := TranslateToClaudePermissionsForMode(params.Capabilities, claudeLaunchMode(params, interactive)); perms != nil {
 		permMap := map[string]any{}
 		if len(perms.Allow) > 0 {
 			permMap["allow"] = perms.Allow
@@ -220,25 +220,44 @@ func claudeSettingsFile(files *launchFiles, params LaunchParams, effectiveID str
 	return files.write("settings", effectiveID, "json", append(data, '\n'))
 }
 
-// appendPermissionMode adds --permission-mode from the settings unless Flags already has a permission mode (the flag, its = form, or a bypass). An interactive launch always carries one
-// (#5894): where Coral means "ask" (the default mode, or none) it says so with --permission-mode default, because Claude Code 2.1.283 and later starts an interactive session in Auto when
-// no mode is given, and a launch that meant to keep asking (a Coral Hub launch with the auto-accept switch off, an agent started by another agent, a restart or wake restoring a stored
-// default) would then start in the mode the Hub gate and the agent-launch limits refuse to hand out. A print-mode run starts in Manual without a flag, so it is left as it was.
-func appendPermissionMode(parts []string, params LaunchParams, interactive bool) []string {
-	mode := params.PermissionMode
+// claudeLaunchMode is the permission mode the launch really starts in, read from the ONE function appendPermissionMode uses, so the two cannot drift. The capabilities' allow list is built from
+// it (#14350) every time the agent starts, from the stored capabilities: a Resume, Wake or Restart that moves an agent from Default to Auto regenerates the list without the git rules. "" means
+// no mode is written (a print-mode run with Default or none, or a permission flag nobody here can read): the translator fails closed on it.
+func claudeLaunchMode(params LaunchParams, interactive bool) string {
+	m, _ := claudePermissionMode(params, interactive)
+	return m
+}
+
+// claudePermissionMode is the mode a launch carries and whether it comes from the request's own flags (which win): the flags' mode ("" when a permission flag is there that cannot be read as a
+// mode), else the launch's mode, else Default for an interactive launch. A print-mode run starts in Manual without a flag, so for it Default and none are "" (nothing written).
+func claudePermissionMode(params LaunchParams, interactive bool) (mode string, fromFlags bool) {
+	for _, f := range params.Flags {
+		if f == "--permission-mode" || strings.HasPrefix(f, "--permission-mode=") || f == "--dangerously-skip-permissions" {
+			m := PermissionModeFromFlags(params.Flags)
+			if !ValidPermissionMode(m) {
+				m = "" // a value nobody here can read as a mode
+			}
+			return m, true // a mode of its own in the flags wins
+		}
+	}
+	mode = params.PermissionMode
 	if mode == "" && interactive {
 		mode = "default"
 	}
 	if mode == "default" && !interactive {
 		mode = ""
 	}
-	if mode == "" {
+	return mode, false
+}
+
+// appendPermissionMode adds --permission-mode from the settings unless Flags already has a permission mode (the flag, its = form, or a bypass). An interactive launch always carries one
+// (#5894): where Coral means "ask" (the default mode, or none) it says so with --permission-mode default, because Claude Code 2.1.283 and later starts an interactive session in Auto when
+// no mode is given, and a launch that meant to keep asking (a Coral Hub launch with the auto-accept switch off, an agent started by another agent, a restart or wake restoring a stored
+// default) would then start in the mode the Hub gate and the agent-launch limits refuse to hand out. A print-mode run starts in Manual without a flag, so it is left as it was.
+func appendPermissionMode(parts []string, params LaunchParams, interactive bool) []string {
+	mode, fromFlags := claudePermissionMode(params, interactive)
+	if fromFlags || mode == "" {
 		return parts
-	}
-	for _, f := range params.Flags {
-		if f == "--permission-mode" || strings.HasPrefix(f, "--permission-mode=") || f == "--dangerously-skip-permissions" {
-			return parts // a mode of its own in the flags wins
-		}
 	}
 	return append(parts, "--permission-mode", mode)
 }
@@ -251,7 +270,7 @@ func appendPermissionMode(parts []string, params LaunchParams, interactive bool)
 // the args name: the caller removes it once the command has exited.
 func (a *ClaudeAgent) PrintArgs(params LaunchParams) (args []string, settingsFile string, err error) {
 	files := &launchFiles{}
-	settingsFile = claudeSettingsFile(files, params, params.SessionID)
+	settingsFile = claudeSettingsFile(files, params, params.SessionID, false)
 	if _, err := files.done(""); err != nil {
 		return nil, "", err
 	}
