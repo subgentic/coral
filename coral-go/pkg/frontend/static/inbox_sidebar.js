@@ -24,7 +24,7 @@ import { go, note, backIs, currentRoute } from './nav.js';
 import { unreadReviewCount } from './ask_filter.js'; // the files waiting: the full read's once it has run, else what the computers counted (#13172)
 
 import { build, keyRoute, parse as parseRoute, inboxFolderPath, BOARDS_FOLDER, BOARDS_SUB } from './routes.js';
-import { sessionServer, normServer, boardTeamKey, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox, nativeNeeds, decisionNeedsPerson, LOCAL_SERVER } from './server_base.js';
+import { sessionServer, normServer, boardTeamKey, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox, nativeNeeds, decisionNeedsPerson, LOCAL_SERVER, isCloud } from './server_base.js';
 import { teamLabel } from './server_status.js';
 import { showView, showToast, OPERATOR_ID } from './utils.js';
 import { registerActions, textOf } from './actions.js';
@@ -664,7 +664,7 @@ async function refreshGoals() {
     try {
         goals = await listInboxGoals();
     } catch { goals = []; }
-    try { // what was hidden from another browser or the phone (Not yet, Dismiss) is on the machine: read it with the goals
+    if (!isCloud()) try { // Local hidden state lives in this computer's settings; Hub goals carry per-computer done_state.
         const r = await fetch('/api/settings');
         if (r.ok) { const saved = (await r.json()).settings || {}; state.settings = { ...(state.settings || {}), [GOAL_DONE_SETTING]: saved[GOAL_DONE_SETTING] || '' }; }
     } catch { /* the list this page has stays */ }

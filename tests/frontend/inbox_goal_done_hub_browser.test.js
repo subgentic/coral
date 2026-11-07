@@ -13,11 +13,13 @@ const { coralReady } = require('./helpers/wait');
         await setupHubWorld({ client, Page, Emulation, width: 1280, height: 1000, mobile: false, inbox: 'native', needs: true, hubPages: true });
         await Page.addScriptToEvaluateOnNewDocument({ source: `(() => {
             const original = window.fetch, json = (body, status = 200) => Promise.resolve(Response.json(body, { status }));
+            window.__bareSettingsReads = []; window.__auditSettings = false;
             window.__goalOwner = true; window.__goalWrites = []; window.__localGoalWrites = [];
             window.__remoteDone = JSON.parse(sessionStorage.getItem('hub-done-goals') || 'null') || Object.fromEntries(['m1','m2'].map(server => [server, { id:7, board_id:'same-team', board_label:'Release team', title:'Ship on '+server, state:'active', done_when:'The release ships', created_by:'Operator', driver:'Dev', created_at:'2026-11-01T00:00:00Z', updated_at:'2026-11-01T00:00:00Z', looks_done_at:'2026-11-01T00:00:00Z', rollup:{active:0,blocked:0,queued:0,done:1,total:1} }]));
             window.fetch = (input, options = {}) => {
                 const url = new URL(String(input), location.href), method = options.method || 'GET';
                 if (method !== 'GET' && url.pathname.startsWith('/api/board/')) window.__localGoalWrites.push(url.pathname);
+                if (window.__auditSettings && method === 'GET' && url.pathname === '/api/settings') window.__bareSettingsReads.push(url.pathname);
                 const parts = url.pathname.split('/'), source = parts[3];
                 if (parts[1] !== 'api' || parts[2] !== 'remote' || !['m1','m2'].includes(source)) return original(input, options);
                 const path = '/' + parts.slice(4).join('/'), goal = window.__remoteDone[source];
@@ -50,10 +52,11 @@ const { coralReady } = require('./helpers/wait');
             await Emulation.setDeviceMetricsOverride({width,height:1000,deviceScaleFactor:1,mobile:width<760});
             await Emulation.setTouchEmulationEnabled({enabled:width<760});
             await Page.navigate({url:BASE+'/'}); await Page.loadEventFired(); await coralReady(ev,'startup','settings');
-            await ev(`window.switchNavTab('hub-inbox'); import(${S}+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
+            await ev(`window.__auditSettings=true; window.switchNavTab('hub-inbox'); import(${S}+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
             await waitFor(`!!(${row('m1')}) && !!(${row('m2')})`, width+': equal goal ids from both computers appear',8000);
             const keys = await ev(`[...document.querySelectorAll('${T} tr[data-key*="goal_done:"]')].map(r=>r.dataset.key)`);
             assert.equal(new Set(keys).size,2,'source-qualified goal row identities');
+            assert.deepEqual(await ev('window.__bareSettingsReads'), [], 'Hub goal refresh must use per-computer done_state and never read Hub settings');
             if (process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true}); fs.writeFileSync(process.env.CORAL_SCREENSHOT_DIR+'/hub-goals-'+width+'.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64')); }
             const action = async label => {
                 if (width >= 760) { await ev(`(${row('m2')}).querySelector('button[aria-label^="${label}"]').click();true`); return; }
@@ -77,8 +80,9 @@ const { coralReady } = require('./helpers/wait');
             await ev(`window.__goalOwner=true;true`);
             const reloadNeeds = async () => {
                 await Page.navigate({url:BASE+'/'}); await Page.loadEventFired(); await coralReady(ev,'startup','settings');
-                await ev(`window.switchNavTab('hub-inbox'); import(${S}+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
+                await ev(`window.__auditSettings=true; window.switchNavTab('hub-inbox'); import(${S}+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
                 await waitFor(`!!(${row('m1')})`,'other computer remains after reload');
+                assert.deepEqual(await ev('window.__bareSettingsReads'), [], 'reload must not refresh computer state from Hub settings');
             };
             for (const label of ['Not yet','Dismiss']) {
                 await action(label); await waitFor(`!(${row('m2')})`,'hidden before reload');
