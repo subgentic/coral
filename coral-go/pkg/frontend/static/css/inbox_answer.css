@@ -19,3 +19,6 @@
 
 /* The line that says new items wait while a pointer holds the Needs you rows still (#14173): under the table, stuck to the bottom of the view, so it never moves a row. */
 .group-table-held { position: sticky; bottom: 0; margin: 0; padding: 6px 12px; background: var(--bg-secondary); border-top: 1px solid var(--border); text-align: center; }
+
+/* A Yes that has just been drawn waits 400 ms for a click (#14302): it shows it is not ready yet. */
+.inbox-answer.inbox-arming { opacity: .6; cursor: progress; }

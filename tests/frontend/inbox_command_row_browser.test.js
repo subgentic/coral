@@ -75,6 +75,29 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'inbox_answer.js'); const s = window.__qaState.liveSessions[0]; for (let i = 0; i < 5; i++) { const c = m.answerCell({ ...s, waiting_since: 'obs' + i }); document.body.append(c); await new Promise(r => setTimeout(r, 500)); /* sleep-ok: the cell reads its ask and draws */ c.remove(); await new Promise(r => setTimeout(r, 250)); /* sleep-ok: the observer reports the removal */ } return true; })()`);
             const live = await ev(`window.__roLive.size`);
             check(live <= 1, `${at}after five cells drawn and removed at most one command-block observer is live (the row's own), not ${live}`);
+            // a freshly drawn Yes ignores clicks for about 400 ms, so a row that arrives under a click cannot be approved by it (#14302); a deliberate return of the pointer arms it at once
+            await show(MENU({ target: ONE }), 2);
+            await ev(`window.__answers = []; window.__ws += 1; true`); await refresh();
+            await waitFor(`!!document.querySelector('#group-table-view .inbox-answers button.inbox-arming')`, `${at}a freshly drawn Yes is arming`, 4000);
+            await ev(`[...document.querySelectorAll('#group-table-view .inbox-answers button')].filter(b => b.textContent === 'Yes').forEach(b => b.click()); true`);
+            await new Promise(r => setTimeout(r, 250)); // sleep-ok: a click that is ignored settles
+            check((await ev(`window.__answers.length`)) === 0, `${at}a click on a freshly drawn Yes answers nothing`);
+            await new Promise(r => setTimeout(r, 450)); // sleep-ok: the 400 ms pass
+            check(!(await ev(`!!document.querySelector('#group-table-view .inbox-answers button.inbox-arming')`)), `${at}after 400 ms the Yes is armed`);
+            await ev(`[...document.querySelectorAll('#group-table-view .inbox-answers button')].filter(b => b.textContent === 'Yes').forEach(b => b.click()); true`);
+            await waitFor(`window.__answers.length === 1`, `${at}the Yes answers once armed`, 5000);
+            if (!mobile) { // the pointer leaves the Yes and enters it again: armed at once
+                await show(MENU({ target: ONE }), 2);
+                await ev(`window.__answers = []; window.__ws += 1; true`); await refresh();
+                await waitFor(`!!document.querySelector('#group-table-view .inbox-answers button.inbox-arming')`, `${at}arming again`, 4000);
+                const yp = await ev(`(() => { const b = [...document.querySelectorAll('#group-table-view .inbox-answers button')].find(x => x.textContent === 'Yes'); b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+                await Input.dispatchMouseEvent({ type: 'mouseMoved', x: yp.x, y: yp.y });
+                await Input.dispatchMouseEvent({ type: 'mouseMoved', x: 4, y: 4 });
+                await Input.dispatchMouseEvent({ type: 'mouseMoved', x: yp.x, y: yp.y });
+                check(!(await ev(`!!document.querySelector('#group-table-view .inbox-answers button.inbox-arming')`)), `${at}the pointer leaving and entering the Yes arms it at once`);
+                await Input.dispatchMouseEvent({ type: 'mousePressed', x: yp.x, y: yp.y, button: 'left', clickCount: 1 }); await Input.dispatchMouseEvent({ type: 'mouseReleased', x: yp.x, y: yp.y, button: 'left', clickCount: 1 });
+                await waitFor(`window.__answers.length === 1`, `${at}a click right after the pointer came back answers`, 5000);
+            }
             // 2) the three-line command: all of it is on the row and not clipped (3 lines on a desktop, 4 on a phone), so Yes stays
             await show(MENU({ target: ['npm run build', 'npm test -- --reporter=dot', 'git status --short'].join('\n') }), 2);
             st = await rowState(); consistent(st, 'three short lines');
