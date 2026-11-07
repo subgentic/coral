@@ -15,7 +15,7 @@ import { openAgent } from './agent_live.js';
 import { importOnce } from './import_once.js';
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('inbox_answer.css'); // the step line's rules (#11981) are a sheet of their own: not in the start's stylesheet, and here before any step is drawn
-const { canDismissWait, dismissButton, dismissWait } = await importOnce('./dismiss_wait.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
+const { canDismissWait, dismissButton, dismissWait, canRemoveWait, removeWait, REMOVE_WAIT_LINE } = await importOnce('./dismiss_wait.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 
 const MAX_CHOICES = 4;
 // Choices that last past this one answer, or change how the agent runs: never a button on a list row (each CLI's own words: Claude's "Yes, and don't ask again for ..." and "Yes, allow all edits during this session", Codex's "Yes, and don't ask again", Antigravity's "always allow").
@@ -151,7 +151,7 @@ const answerable = s => !(s.review || s.autorun || !s.agent_type || !s.session_i
 
 /** The actions of a phone Needs you row's ⋯ menu (#137104): the Dismiss of a wait that is no longer true, offered by the rule the desktop row's button follows. */
 export function rowActions(s) {
-    if (s.waiting_for_input && waitIgnored(s)) return [];
+    if (s.waiting_for_input && waitIgnored(s)) return canRemoveWait(s) ? [{ label: 'Remove from Needs you', title: REMOVE_WAIT_LINE, run: b => removeWait(s, b) }] : [];
     if (!canDismissWait(s, s.waiting_kind)) return []; // every waiting agent's row has one, a sign-in's too (#11946)
     return [{ label: 'Dismiss', title: 'Clear this if the agent is not waiting. Nothing is sent to the agent.', run: b => dismissWait(s, b) }];
 }
@@ -164,7 +164,14 @@ export function answerCell(s, { dismiss = true } = {}) {
         button.setAttribute('aria-label', `Open ${resolveSessionIdentity(s)} to answer in its terminal`);
         button.addEventListener('click', e => { e.stopPropagation(); openAgent(s); });
         button.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
-        cell.append(button); return cell;
+        cell.append(button);
+        if (dismiss && canRemoveWait(s)) {
+            const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'btn btn-small btn-quiet inbox-remove-wait';
+            remove.textContent = 'Remove from Needs you'; remove.title = REMOVE_WAIT_LINE;
+            remove.addEventListener('click', event => { event.stopPropagation(); removeWait(s, remove); });
+            cell.append(remove);
+        }
+        return cell;
     }
     if (!answerable(s)) { // a sign-in, or a viewer through the Hub: no answers, but the row can still be hidden (#11946)
         if (!dismiss || !canDismissWait(s, s.waiting_kind)) return '';
