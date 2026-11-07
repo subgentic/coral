@@ -98,6 +98,35 @@ const B = 'goal-done-' + Date.now().toString(36);
         const asked = await root('GET', '/api/needs-you?limit=50');
         assert.ok(asked.json.items.some(i => i.kind === 'goal_done' && i.id === `goal_done:${B}:${gid}`), 'the phone-push read has it too');
 
+        // #14230: another client saves a local choice while this client's startup
+        // settings snapshot is stale. Reload must refresh it from this computer,
+        // rather than only trusting the bootstrap copy (the LOCAL half of #14067).
+        for (const [label, suffix] of [['Not yet', '1'], ['Dismiss', '*']]) {
+            const hidden = `${B}|${gid}|${suffix}`;
+            assert.equal((await root('PUT', '/api/settings', { goal_done_hidden: JSON.stringify([hidden]) })).status, 200);
+            const staleBootstrap = await Page.addScriptToEvaluateOnNewDocument({ source: `(() => {
+                const original = window.fetch; let first = true;
+                window.fetch = (input, options = {}) => {
+                    if (first && new URL(String(input), location.href).pathname === '/api/settings' && (options.method || 'GET') === 'GET') {
+                        first = false;
+                        return original(input, options).then(async response => {
+                            const body = await response.json(); body.settings.goal_done_hidden = '[]';
+                            return Response.json(body, {status: response.status});
+                        });
+                    }
+                    return original(input, options);
+                };
+            })()` });
+            try {
+                await openNeeds();
+                await waitFor(`import((window.__coralStatic||'/static/')+'state.js').then(m => JSON.parse(m.state.settings.goal_done_hidden || '[]').includes(${JSON.stringify(hidden)}))`, label + ': reload reads the other client\'s local choice', 10000);
+                assert.equal((await doneRows()).length, 0, label + ': the local Inbox hides the goal after reload');
+            } finally { await Page.removeScriptToEvaluateOnNewDocument({ identifier: staleBootstrap.identifier }); }
+            await root('PUT', '/api/settings', { goal_done_hidden: '[]' });
+            await openNeeds();
+            await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, label + ': clearing the saved choice restores the goal', 20000);
+        }
+
         // Not yet: gone here and on the machine, until a task is added
         await root('PUT', '/api/settings', { goal_done_hidden: JSON.stringify(['other|9|9']) }); // another browser hid something since this page read the list (#13841): the page's copy is stale, and pressing Not yet must not erase it
         await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('button[aria-label^="Not yet"]').click(); true`);
