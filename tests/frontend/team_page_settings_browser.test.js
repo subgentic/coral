@@ -16,7 +16,7 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const S = scenarios();
-    const bar = () => ev(`(() => { const save = window.__tp.find('button', /^Save settings$/i), cancel = window.__tp.find('button', /^Cancel$/i); const st = [...window.__tp.page().querySelectorAll('[role=status], output, p, div')].filter(window.__na.vis).map(e => window.__na.text(e)).find(t => /^(No changes to save|You have unsaved changes|Saved\.|Could not save)/.test(t.trim()) && t.length < 80) || ''; return { save: save ? { disabled: save.disabled || save.getAttribute('aria-disabled') === 'true', ...window.__na.box(save) } : null, cancel: cancel ? window.__na.box(cancel) : null, status: st.trim(), vh: innerHeight }; })()`);
+    const bar = () => ev(`(() => { const save = window.__tp.find('button', /^Save settings$/i), cancel = window.__tp.find('button', /^(Cancel|Close)$/i); const st = [...window.__tp.page().querySelectorAll('[role=status], output, p, div')].filter(window.__na.vis).map(e => window.__na.text(e)).find(t => /^(No changes to save|You have unsaved changes|Saved\.|Could not save)/.test(t.trim()) && t.length < 80) || ''; return { save: save ? { disabled: save.disabled || save.getAttribute('aria-disabled') === 'true', ...window.__na.box(save) } : null, cancel: cancel ? window.__na.box(cancel) : null, status: st.trim(), vh: innerHeight }; })()`);
     const sw = n => `(() => { const e = [...window.__tp.page().querySelectorAll('[role=switch], input[type=checkbox]')].filter(window.__na.vis).find(x => window.__na.name(x) === ${JSON.stringify(n)}); return e; })()`;
     const state = n => ev(`(() => { const e = ${sw(n)}; return e ? (e.getAttribute('aria-checked') || String(e.checked)) : null; })()`);
     // The groups of the page are the main Settings' (#7663): a list at the left (a selector on a phone); one group's pane is open at a time.
@@ -68,7 +68,7 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
                 await openFor('Send health check');
                 const wasOn = await state('Send health check');
                 await ev(`${sw('Send health check')}.click(); true`); await settle(250);
-                await ev(`window.__tp.find('button', /^Cancel$/i).click(); true`); await settle(500);
+                await ev(`window.__tp.find('button', /^(Cancel|Close)$/i).click(); true`); await settle(500);
                 assert.equal(await ev(`!!document.querySelector('.team-settings-modal')`), false, 'Cancel closes the dialog (a deliberate press: no unsaved question)');
                 await goTab(ev, settle, 'Settings'); await settle(500);
                 assert.equal(await sel(), 'Health check', 'the dialog opens again on the group that was open');
