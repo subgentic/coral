@@ -57,6 +57,7 @@ func parseCodexEventEntry(entry map[string]any, toolUseNames map[string]string) 
 			}
 			messages := parseCodexUserEntry(agent.CodexUserMessageText(message, atts), timestamp, toolUseNames)
 			setCodexAttachments(messages, atts)
+			setCodexSource(messages, codexSourceEvent)
 			return messages
 		case "agent_message":
 			messages := parseCodexAssistantEntry(message, timestamp, toolUseNames)
@@ -66,6 +67,7 @@ func parseCodexEventEntry(entry map[string]any, toolUseNames map[string]string) 
 					msg["phase"] = phase
 				}
 			}
+			setCodexSource(messages, codexSourceEvent)
 			return messages
 		}
 	case "response_item":
@@ -89,6 +91,7 @@ func parseCodexEventEntry(entry map[string]any, toolUseNames map[string]string) 
 					msg["phase"] = phase
 				}
 			}
+			setCodexSource(messages, codexSourceItem)
 			return messages
 		case "function_call", "custom_tool_call":
 			var tool map[string]any
@@ -131,13 +134,39 @@ func parseCodexEventEntry(entry map[string]any, toolUseNames map[string]string) 
 	return nil
 }
 
+// The record format a Codex user or assistant message came from (its "source"), so the merge below can tell the two copies of one message from two messages (#14102).
+const (
+	codexSourceEvent = "event_msg"
+	codexSourceItem  = "response_item"
+)
+
+func setCodexSource(messages []map[string]any, source string) {
+	for _, m := range messages {
+		m["source"] = source
+	}
+}
+
 // Codex has used both event_msg and response_item records for the same visible
 // message. Some versions emit both a few milliseconds apart, while newer
 // versions emit only response_item. Merge only adjacent, equal messages in a
 // tight time window so both formats work without hiding intentional repeats.
+// The two copies of one message are one of each format with the same phase (#14102): two records of
+// the same format, and two that differ in phase (a commentary and a final answer that both say "Done"),
+// are each their own message. The source stays the first copy's, so a message reads the same whether
+// it was parsed in one pass or across chunks and checkpoints.
 func mergeDuplicateCodexMessage(previous, current map[string]any) bool {
 	if previous == nil || current == nil || previous["type"] != current["type"] {
 		return false
+	}
+	if ps, _ := previous["source"].(string); ps != "" {
+		if cs, _ := current["source"].(string); cs != "" && ps == cs {
+			return false
+		}
+	}
+	if pp, _ := previous["phase"].(string); pp != "" {
+		if cp, _ := current["phase"].(string); cp != "" && cp != pp {
+			return false
+		}
 	}
 	kind, _ := current["type"].(string)
 	var previousText, currentText string
