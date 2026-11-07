@@ -151,7 +151,7 @@ var shellNeverFiles = map[string]shellNever{
 	"xterm_renderer.js":         {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 }
 
-const shellUnreviewedMax = 87
+const shellUnreviewedMax = 86
 
 type shellCall struct {
 	file, method, route, raw string

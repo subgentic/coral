@@ -267,3 +267,50 @@ func TestAPersonsSaveOfAnAgentsKnowledgeIsMarkedForTheDailyRun(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(b), `"lead"`)
 }
+
+// Security's SHOULD on #13928: the waiting candidate and its diff are unreviewed transcript text, the owner's to read. A Hub viewer or grantee and an agent get the switch state and the last run, with no candidate body.
+func (r *dailyRig) get(hdr map[string]string) (int, map[string]any) {
+	r.t.Helper()
+	req, _ := http.NewRequest("GET", r.srv.URL+dailyBase, nil)
+	for k, v := range hdr {
+		req.Header.Set(k, v)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(r.t, err)
+	defer resp.Body.Close()
+	var out map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&out)
+	return resp.StatusCode, out
+}
+
+func TestOnlyTheOwnerReadsTheWaitingCandidateAndItsDiff(t *testing.T) {
+	r := newDailyRig(t)
+	withLabel(t, cmtHubUser, nil)
+	team := filepath.Join(r.dir, "agent_knowledge", "alpha")
+	require.NoError(t, os.MkdirAll(filepath.Join(team, ".candidate"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(team, "lead.md"), []byte("line one\nold line\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(team, ".candidate", "lead.md"), []byte("line one\nSECRET-ISH new line from a transcript\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(team, ".candidate", "candidate.json"), []byte(`{"created_at":"2026-11-07T03:40:00Z","held":true,"held_reason":"shell-like lines","approx_tokens":900,"agents":["lead"]}`), 0o600))
+	// the Operator at this computer, and the Hub's owner: the candidate and its diff
+	for name, hdr := range map[string]map[string]string{"the Operator": cmtAsOwner, "the Hub's owner": cmtAsHubOwner} {
+		code, out := r.get(hdr)
+		require.Equal(t, http.StatusOK, code, name)
+		cand, ok := out["candidate"].(map[string]any)
+		require.True(t, ok, "%s sees the candidate: %v", name, out)
+		raw, _ := json.Marshal(cand)
+		assert.Contains(t, string(raw), "SECRET-ISH new line", name)
+		assert.NotContains(t, out, "candidate_waiting", name)
+	}
+	// a Hub viewer or grantee, and an agent: the switch and the last run, and that one waits, with no body, diff, id or reason
+	for name, hdr := range map[string]map[string]string{"a Hub viewer": cmtAsHub, "a Hub viewer with the Operator's credential": cmtAsOwnerThroughTunnel, "an agent": {testAgentHeader: "dddddddd-0001"}} {
+		code, out := r.get(hdr)
+		require.Equal(t, http.StatusOK, code, name)
+		assert.Contains(t, out, "enabled", name)
+		assert.Equal(t, true, out["candidate_waiting"], name)
+		assert.NotContains(t, out, "candidate", name)
+		raw, _ := json.Marshal(out)
+		for _, leak := range []string{"SECRET-ISH", "shell-like lines", "old line", "@@"} {
+			assert.NotContains(t, string(raw), leak, "%s: %s", name, leak)
+		}
+	}
+}
