@@ -7,6 +7,7 @@ import { isPhoneLayout, PHONE_QUERY } from './phone_layout.js';
 import { importOnce } from './import_once.js';
 const { buildAnchor } = await importOnce('./artifact_anchor.js');
 const api = await importOnce('./artifact_comments_api.js');
+const { markBidi, bidiWritten } = await importOnce('./bidi_marks.js'); // another person's comment text: their bidirectional controls are shown, not applied (#14113)
 const { linkArtifactRefsIn } = await importOnce('./artifact_refs.js'); // a coral://artifacts/<hex> in a comment is a link (#11416)
 const { createAsk } = await importOnce('./artifact_comment_ask.js');
 const { createComposer } = await importOnce('./artifact_comment_composer.js');
@@ -298,7 +299,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         }
         if (resolveBtn) { const row = el('div', 'ac-headrow'); row.append(m, resolveBtn); main.append(row); } // Resolve at the top right: the name line wraps beside it, never under it
         else main.append(m);
-        main.append(editing(c) || (c.deleted ? el('p', 'ac-body ac-deleted', 'Comment deleted') : linkArtifactRefsIn(el('p', 'ac-body', c.body), { server: st.server })));
+        main.append(editing(c) || (c.deleted ? el('p', 'ac-body ac-deleted', 'Comment deleted') : markBidi(linkArtifactRefsIn(el('p', 'ac-body', c.body), { server: st.server })))); // another person's words: their bidirectional controls are shown, not applied, and the text is its own isolate (#14113)
         if (!c.deleted && c.images && c.images.length && !editing(c)) main.append(pictures(c));
         if (top && c.fromVersion != null && groupOf(c) !== 'main') main.append(el('p', 'ac-from ac-from-note', groupOf(c) === 'look' ? `From v${c.fromVersion}. The quote is in this version more than once, so it is not pinned to either.` : `On v${c.fromVersion}. Its text is not in this version.`));
         main.append(actions(c, top));
@@ -320,7 +321,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         // ac-composing: a card with its reply box open keeps its actions row when the box loses the focus, so nothing under it moves between a press and its release (#12301)
         const li = el('li', 'ac-card' + (st.active === c.id ? ' ac-active' : '') + (c.resolved ? ' ac-resolved' : '') + (st.composing && st.composing.parentId === c.id ? ' ac-composing' : '')); li.dataset.id = String(c.id); li.setAttribute('aria-label', `Comment by ${c.authorName || c.authorId || 'unknown'}`); li.setAttribute('role', 'group');
         const a = c.anchor || {};
-        const q = el('blockquote', 'ac-quote' + (st.orphan.has(c.id) ? ' ac-orphan' : ''), st.video && c.atS != null ? `Video: ${stampRange(c)}` : a.whole ? (opts.words?.quote || 'The whole document') : a.quote || '');
+        const q = markBidi(el('blockquote', 'ac-quote' + (st.orphan.has(c.id) ? ' ac-orphan' : ''), st.video && c.atS != null ? `Video: ${stampRange(c)}` : a.whole ? (opts.words?.quote || 'The whole document') : a.quote || '')); // the quoted text is the commenter's too (#14113)
         li.append(q);
         li.append(entry(c, true));
         for (const r of replies) li.append(entry(r, false));
@@ -376,7 +377,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         const id = ids[at < 0 ? (dir > 0 ? 0 : ids.length - 1) : (at + dir + ids.length) % ids.length];
         activate(id, true); st.scrollCard = true; paint();
         const c = threads().find(t => t.c.id === id);
-        announce(`Comment ${ids.indexOf(id) + 1} of ${ids.length}: ${c ? c.c.body.slice(0, 80) : ''}`);
+        announce(`Comment ${ids.indexOf(id) + 1} of ${ids.length}: ${c ? bidiWritten(c.c.body).slice(0, 80) : ''}`);
     }
     body.addEventListener('keydown', (e) => {
         if (e.target !== body || e.ctrlKey || e.metaKey || e.altKey || !st.data) return;
