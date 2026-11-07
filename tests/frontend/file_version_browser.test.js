@@ -114,6 +114,45 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await chip(), MARKED, `${at}: nor in the Details chip`);
             await closeViewer();
 
+            console.log(`${at}: an older computer whose version list has no lines: the bar is there, only the caller's line can show, and only for its own version`);
+            await ev(STUB);
+            await ev(`(() => { const f = window.fetch; window.fetch = (u, o) => f(u, o).then(r => /\\/versions/.test(String(u)) ? r.json().then(rows => new Response(JSON.stringify(rows.map(({ file_id, version_line, ...rest }) => rest)), { status: 200, headers: { 'Content-Type': 'application/json' } })) : r); return true; })()`); // the same list, each row without file_id and version_line
+            await open(H3, { fileId: FILE, versionLine: lineOf(3) });
+            await waitFor(vis('#artifact-viewer .av-current'), `${at}: the bar (a list with no lines)`, 6000);
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(lineOf(3))}`, `${at}: the bar has no line, so the caller's line shows (removing the caller's fallback must fail here)`, 6000);
+            assert.equal(await chip(), lineOf(3), `${at}: and Details says it too`);
+            await ev(`document.querySelector('#artifact-viewer .av-current').click(); true`);
+            await waitFor(vis('#artifact-viewer .av-list'), `${at}: the list`, 3000);
+            await ev(`document.querySelector('#artifact-viewer .av-option[data-version="2"]').click(); true`);
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-body').textContent.includes('Revoke sits beside Rename')`, `${at}: v2's text`, 6000);
+            await waitFor(`!document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent`, `${at}: v3's caller line is not v2's (no list line, no line)`, 4000);
+            await closeViewer();
+
+            console.log(`${at}: older computer, reopened with no metadata: the first open's line does not stay`);
+            await open(H3, { fileId: FILE, versionLine: lineOf(3) });
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(lineOf(3))}`, `${at}: the caller's line, first open`, 6000);
+            await closeViewer();
+            await open(H3, {}); // the same digest, no metadata, a list with no lines
+            await waitFor(vis('#artifact-viewer .av-current'), `${at}: reopened, the bar`, 6000);
+            await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-body')?.textContent`, `${at}: drawn`, 6000);
+            assert.equal(await headShown(), false, `${at}: no line on a reopen with none (keeping the last open's line, '_line = _line || ...', must fail here)`);
+            assert.equal(await chip(), '', `${at}: and no Copy chip`);
+            await closeViewer();
+
+            console.log(`${at}: Copy file ID is in the menu only when the file has a line`);
+            await open(H3, { fileId: FILE, versionLine: lineOf(3) });
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(lineOf(3))}`, `${at}: a line for the positive case`, 6000);
+            await ev(`document.querySelector('#artifact-viewer .artifact-viewer-more').click(); true`);
+            await waitFor(vis('#artifact-viewer .artifact-viewer-copyid-item'), `${at}: with a line the item is there`, 3000);
+            await closeViewer();
+            await open('9'.repeat(64), {}); // no list, no caller line
+            await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-body')?.textContent`, `${at}: drawn without a line`, 6000);
+            await ev(`document.querySelector('#artifact-viewer .artifact-viewer-more').click(); true`);
+            await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-more[aria-expanded="true"]')`, `${at}: menu opened`, 3000);
+            assert.equal(await ev(`document.querySelector('#artifact-viewer .artifact-viewer-copyid-item').hidden`), true, `${at}: no line, no Copy file ID item (removing "hidden = !text" must fail here)`);
+            assert.equal(await ev(vis('#artifact-viewer .artifact-viewer-copyid-item')), false, `${at}: and it is not drawn`);
+            await closeViewer();
+
             console.log(`${at}: a file with no id, or a made-up one, shows no line`);
             await ev(STUB);
             for (const extra of [{}, { fileId: 'not-an-id', versionLine: 'version 9 of x (file not-an-id)' }, { fileId: FILE }, { fileId: FILE, versionLine: lineOf(3), lineHex: H3 }]) { // the last: a line given for v3 and carried onto a hex with no versions list (what a switch or a save spreads)
