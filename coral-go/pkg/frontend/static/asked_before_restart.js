@@ -26,14 +26,15 @@ export function dismissAsked(s) {
 /** Whether the Operator hid this agent's open request from Needs you (#11946): the machine keeps it, per agent and request (the row says wait_ignored), so the page, the tab's number and the phone push agree; the agent's next request is not hidden by it. */
 export const waitIgnored = s => !!(s && s.wait_ignored);
 
-/** Does Needs you list this agent: it waits for its person (and the person has not hidden that request), or it asked something before Coral restarted. */
-export const needsYou = s => (needsInputAttention(s) && !waitIgnored(s)) || !!askedBefore(s);
+/* Dismiss never answers a live terminal: retain the active wait until the agent clears it (#14152). */
+export const needsYou = s => (!!s && !s.sleeping && !s.archived && needsInputAttention(s)) || !!askedBefore(s);
 
 /** The words that open what it asked: "before Coral restarted" when Coral's stop put it to sleep, else "before it went to sleep" (an operator's Sleep, an ended CLI). */
 export const askedWords = a => `Asked ${a && a.after_restart ? 'before Coral restarted' : 'before it went to sleep'}: ${a ? a.text : ''}`;
 
 /** The row as Needs you shows it: an agent that asked before the restart carries its words, kind and time as a waiting agent's do. */
 export function askedRow(s) {
+    if (s.waiting_for_input && waitIgnored(s) && !s.sleeping && !s.archived) return { ...s, waiting_summary: `Still waiting in its terminal. ${s.waiting_summary || "Open the agent to continue."}` };
     if (dialogDue(s) && !s.waiting_summary) { const d = dialogOf(s); return { ...s, waiting_summary: DIALOG_WORDS, waiting_kind: 'dialog', waiting_since: new Date(d.since).toISOString() }; } // at a dialog for the set minutes (#11430)
     const a = askedBefore(s);
     return a ? { ...s, waiting_summary: askedWords(a), waiting_kind: a.kind, waiting_since: a.at } : s;

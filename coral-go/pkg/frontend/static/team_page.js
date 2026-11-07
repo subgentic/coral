@@ -4,6 +4,7 @@ import { openTask } from './task_navigation.js';
  * This module is the shell: each tab's own panel is built the first time the tab is opened by its own module (goals_view.js, team_tasks_page.js, team_artifacts_page.js); Messages is the board's own column moved in (message_board.js),
  * and Agents, Knowledge and Settings are today's panels of the right dock moved in, until their own builds (stage 3 of #7453). Lazy: loaded by openTeamPage (lazy_panels.js). */
 import { state } from './state.js';
+import { needsYou } from './asked_before_restart.js';
 import { keyLabel, splitKey, boardFetch, teamFetch, isCloud, teamWorkDir, inTeam } from './server_base.js';
 const { wakingSince, stopWaking } = await importOnce('./team_waking.js'); // lazy like this file (the Wake action loads it too)
 import { showView } from './utils.js';
@@ -219,14 +220,16 @@ function drawHeader() {
     document.title = `${keyLabel(S.team)} · Coral`;
 }
 
-const ATTENTION = ['needs_input', 'waiting']; // a person has to do something: an agent waiting for input; an ended agent (no live terminal) and a queued one (waiting for a slot) are not (#8271, UI/UX); // a waiting agent (a trust prompt, a question, an approval) needs a person (UI/UX, #7513)
 function drawStatus(data) {
     const s = $('team-page-status'); if (!s) return;
     syncStop();
+    S.statusData = data;
+    const live = (state.liveSessions || []).filter(row => inTeam(row, S.team));
+    const n = live.filter(needsYou).length;
+    if (live.length && (!data || !data.agents?.length)) data = { agents: live.map(row => ({ availability: row.sleeping ? 'sleeping' : 'unknown' })) };
     if (!data || !Array.isArray(data.agents)) { s.textContent = ''; s.className = 'team-page-status'; return; } // kept in the page and empty: a live region that is shown and filled in one turn is not announced
     // a team with no agent has nothing to be well: a name no board has (a mistyped /team/<name>) said All well in green (#8839 c); say nothing
     if (!data.agents.length) { s.textContent = ''; s.className = 'team-page-status'; const hb = $('team-page-health'); if (hb) hb.hidden = true; return; }
-    const n = data.agents.filter(a => ATTENTION.includes(a.availability)).length;
     const waking = wakingSince(S.team) > 0;
     // no signal yet, or (right after Wake, while the read still says so) still asleep: nothing says they are well (#10006), and a just-woken team is counted as it reports (#10052, #10359)
     const notYet = a => a.availability === 'unknown' || (waking && a.availability === 'sleeping');
@@ -290,6 +293,7 @@ async function readCounts() {
     drawCounts();
 }
 // A Wake or a Sleep from here: the status is read and drawn at once, not at the next poll (#10359).
+document.addEventListener('coral:needs-updated', () => { if (S.team && currentTeamPage()) drawStatus(S.statusData); });
 document.addEventListener('coral:team-sleep-changed', e => { if (S.team && e.detail && e.detail.team === S.team) readCounts(); });
 function startCounts() {
     readCounts();

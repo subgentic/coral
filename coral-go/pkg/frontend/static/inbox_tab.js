@@ -95,6 +95,7 @@ export function updateInboxTab() {
     _hooks.goals?.(); // goals that moved (a goal finished) are read again, at most every 30 s and not in a hidden tab: the age tick no longer reads them
     _hooks.needs?.(); // the Needs you rows, once the sidebar is loaded and while the Inbox is on screen
     announceNewlyWaiting(tab);
+    document.dispatchEvent(new CustomEvent('coral:needs-updated'));
 }
 
 // The count of each of the Inbox's three groups (Needs you, Tasks, Saved) and how many tasks are high priority. A count that is not known yet (the tasks before the first read) is 0. The sidebar (once
