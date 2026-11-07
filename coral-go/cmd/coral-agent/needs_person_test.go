@@ -84,3 +84,33 @@ func TestTheOrchestratorMakesATaskForWhatAGoalNamesForTheirReview(t *testing.T) 
 		t.Errorf("docs board lacks the rule (exit %d): %s", code, errOut)
 	}
 }
+
+// #14314 (beta report run 2, item 6): files with the 'for review' tag do reach Needs you, but the team's agents never tagged them. The upload REFUSES --tag "for review" without --question (one line, the decision), and the
+// default prompts and the board docs told agents to use the tag alone, so an agent that followed them was refused. They now name the question beside the tag, say it is required, and say what is and is not for review.
+func TestTheDefaultPromptsTellAnAgentToTagWithAOneLineQuestion(t *testing.T) {
+	const withQuestion = `coral-agent artifact upload <file> --tag "for review" --question "<what you need from them, one line>"`
+	const required = `The tag is refused without the question.`
+	srv := realDocsServer(t)
+	for name, prompt := range map[string]string{"orchestrator system": agent.DefaultOrchestratorSystemPrompt, "worker system": agent.DefaultWorkerSystemPrompt, "orchestrator action": agent.DefaultOrchestratorActionPrompt, "worker action": agent.DefaultWorkerActionPrompt} {
+		for _, w := range []string{withQuestion, required} {
+			if !strings.Contains(prompt, w) {
+				t.Errorf("%s default prompt lacks %q", name, w)
+			}
+		}
+	}
+	code, out, errOut := runAgentWithToken(t, srv.URL, "docs", "board")
+	if code != 0 {
+		t.Fatalf("docs board: exit %d: %s", code, errOut)
+	}
+	flat := strings.Join(strings.Fields(out), " ")
+	for _, w := range []string{withQuestion, required} {
+		if !strings.Contains(flat, w) {
+			t.Errorf("docs board lacks %q", w)
+		}
+	}
+	// the help says the same thing the prompt promises: the question is required with the tag
+	_, help, helpErr := runAgent(t, srv.URL, "artifact", "upload", "--help")
+	if !strings.Contains(strings.Join(strings.Fields(help+helpErr), " "), `is REQUIRED with --tag "for review"`) {
+		t.Errorf("the upload help no longer says the question is required: %q", help+helpErr)
+	}
+}
