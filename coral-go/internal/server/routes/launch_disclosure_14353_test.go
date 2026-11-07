@@ -214,8 +214,28 @@ func TestADialogLaunchThatWritesItsShippedModeAsFlagsStillWaitsForTheNotice(t *t
 
 // Security's condition B on #14333: the notice names Hermes Bypass and the Bypass and Full access exception for the checks and Codex's folder.
 func TestTheLaunchNoticeNamesHermesBypassAndTheBypassException(t *testing.T) {
-	assert.Contains(t, LaunchDisclosureText, "Hermes starts in Bypass")
-	assert.Contains(t, LaunchDisclosureText, "Bypass or with Full access")
-	assert.Contains(t, LaunchDisclosureText, "Codex then leaves its folder")
-	assert.Equal(t, "full-permissions-2", LaunchDisclosureID, "new words, new id: an older acknowledgement no longer counts")
+	assert.Contains(t, LaunchDisclosureText, "Hermes, OpenCode and Pi agents run with no such checks at all, and so does any agent you start in Bypass or with Full access (Codex then leaves its folder too).")
+	assert.Equal(t, "full-permissions-3", LaunchDisclosureID, "new words, new id: an older acknowledgement no longer counts")
+}
+
+// Security's SHOULD on #14353: only "default" names a mode. Any other non-empty permission_mode is dropped by the launch, so it counts as none in each of the three places that decide the gate.
+func TestOnlyDefaultCountsAsNamingAModeForTheNoticeGate(t *testing.T) {
+	none := map[string]string{}
+	// launchDefaultSkips
+	assert.True(t, launchDefaultSkips(at.Claude, nil, "", none))
+	assert.True(t, launchDefaultSkips(at.Claude, nil, "auto", none), "another value is as good as none")
+	assert.True(t, launchDefaultSkips(at.Claude, nil, "bypassPermissions", none))
+	assert.False(t, launchDefaultSkips(at.Claude, nil, "default", none), "only default names a mode")
+	// memberDefaultSkips
+	body := launchTeamRequest{AgentType: at.Claude}
+	assert.True(t, memberDefaultSkips(body, launchTeamAgent{Name: "A", PermissionMode: "auto"}, none, at.Claude, nil))
+	assert.False(t, memberDefaultSkips(body, launchTeamAgent{Name: "A", PermissionMode: "default"}, none, at.Claude, nil))
+	// teamUsesNewDefault
+	assert.True(t, teamUsesNewDefault(launchTeamRequest{AgentType: at.Claude, Agents: []launchTeamAgent{{Name: "A", PermissionMode: "bypassPermissions"}}}, none))
+	assert.False(t, teamUsesNewDefault(launchTeamRequest{AgentType: at.Claude, Agents: []launchTeamAgent{{Name: "A", PermissionMode: "default"}}}, none))
+	// every prompt-skipping default is covered, not only Claude's: Auto, Codex never-ask, Hermes and OpenCode Bypass, agy yolo written as flags
+	for _, typ := range []string{at.Claude, at.Codex, at.Hermes, at.Opencode} {
+		assert.True(t, launchDefaultSkips(typ, nil, "", none), typ)
+	}
+	assert.True(t, launchDefaultSkips(at.Agy, []string{"--dangerously-skip-permissions"}, "", none), "agy yolo as flags")
 }
