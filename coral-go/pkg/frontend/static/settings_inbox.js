@@ -3,8 +3,7 @@
 import { fetchProjectsChecked } from './board_fetch.js';
 import { keyLabel } from './server_base.js';
 import { settingBool } from './settings_core.js';
-const { mutedReviewItems, mutedWords } = await importOnce('./inbox_reviews.js');
-import { importOnce } from './import_once.js';
+import { importOnce, loadedModule } from './import_once.js';
 
 export const INBOX_KINDS = [
     { kind: 'file', key: 'inbox_kind_file', id: 'settings-inbox-file', label: 'Files for review', help: 'A file an agent wants you to read, approve or send back.' },
@@ -103,7 +102,9 @@ export function drawMutedLine() {
     const el = document.getElementById('settings-inbox-muted');
     if (!el) return;
     const week = Date.now() - 7 * 24 * 3600 * 1000;
-    const words = mutedWords(mutedReviewItems().filter(a => Date.parse(a.created_at) >= week));
+    // A cold Settings open has no review cache to summarize: do not load the Inbox pager for an empty line.
+    const reviews = loadedModule('./inbox_reviews.js');
+    const words = reviews ? reviews.mutedWords(reviews.mutedReviewItems().filter(a => Date.parse(a.created_at) >= week)) : '';
     el.hidden = !words;
     if (!words) { el.replaceChildren(); return; }
     const b = document.createElement('button');
