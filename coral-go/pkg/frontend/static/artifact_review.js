@@ -35,6 +35,7 @@ async function decide(team, row, decision, reason, note, quiet = false, words = 
 /** Approving or denying a version settles the ones before it quietly (no review or message): locally their 'for review' tag comes off; through the Hub automatic superseded settlement keeps the restricted tags route out of it. Resolves { settled, failed }. */
 async function decisionEarlier(m, row) {
     const older = m.earlierVersions(row);
+    if (!row.series_id && Number(row.earlier_versions) > older.length) return m.legacyEarlierVersions(row);
     if (!row.series_id || !Number.isSafeInteger(row.version) || row.version <= older.length + 1) return older;
     // earlier_digests is capped at 50. Expand only on a decision, and never
     // settle a version uploaded after the one the person actually reviewed.
