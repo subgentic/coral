@@ -13,6 +13,32 @@ import (
 type Proc struct {
 	PID, PPID int
 	Command   string
+	CPU       float64 // percent of a core ps reports for it (0 where not read: only ParseCPU fills it)
+}
+
+// ParseCPU reads `ps -axo pid=,ppid=,pcpu=,command=`: Parse's rows with the CPU column (#14079: a claim's work is told from a waiting process by its CPU).
+func ParseCPU(out string) []Proc {
+	var procs []Proc
+	sc := bufio.NewScanner(strings.NewReader(out))
+	sc.Buffer(make([]byte, 0, 64*1024), 1<<20)
+	for sc.Scan() {
+		f := strings.Fields(sc.Text())
+		if len(f) < 4 {
+			continue
+		}
+		pid, err1 := strconv.Atoi(f[0])
+		ppid, err2 := strconv.Atoi(f[1])
+		cpu, err3 := strconv.ParseFloat(strings.ReplaceAll(f[2], ",", "."), 64)
+		if err1 != nil || err2 != nil || err3 != nil {
+			continue
+		}
+		line := strings.TrimSpace(sc.Text())
+		for i := 0; i < 3; i++ {
+			line = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), f[i]))
+		}
+		procs = append(procs, Proc{PID: pid, PPID: ppid, Command: line, CPU: cpu})
+	}
+	return procs
 }
 
 // Parse reads the output of `ps -axo pid=,ppid=,command=`: one process a line, two numbers and the command line.

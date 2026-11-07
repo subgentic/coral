@@ -10,12 +10,18 @@ import (
 // program (by name): "go test ./..." matches `go test -count=1 ./...` and `cd x && CGO=0 go test ./... | tail`, not `go test -run X ./one/pkg` and not `echo "go test ./..."` or a commit message (a quoted
 // text is one word). A command the reader cannot read within its bounds matches nothing: this is a guard against overlap, not a gate, so the command runs.
 func MatchCommand(command string, patterns []string) (string, bool) {
+	p, _, ok := matchWords(command, patterns)
+	return p, ok
+}
+
+// matchWords is MatchCommand that also says WHICH command matched, as a short redacted line for the log (#14170: an "auto:" claim on a run that was on another machine could not be traced to its text): the matched command's program (its first word). It is never an argument, the whole command or a file's text.
+func matchWords(command string, patterns []string) (pattern, matched string, ok bool) {
 	if len(patterns) == 0 || strings.TrimSpace(command) == "" {
-		return "", false
+		return "", "", false
 	}
-	cmds, ok := shellkill.Programs(command)
-	if !ok {
-		return "", false
+	cmds, okp := shellkill.Programs(command)
+	if !okp {
+		return "", "", false
 	}
 	for _, p := range patterns {
 		want := strings.Fields(p)
@@ -24,11 +30,23 @@ func MatchCommand(command string, patterns []string) (string, bool) {
 		}
 		for _, words := range cmds {
 			if inOrder(words, want) {
-				return p, true
+				return p, redactedWords(words), true
 			}
 		}
 	}
-	return "", false
+	return "", "", false
+}
+
+// redactedWords is the matched command's PROGRAM only (its first word, cut at 40): Security's SHOULD on #14170, no argument and so no value or token can reach the log.
+func redactedWords(words []string) string {
+	if len(words) == 0 {
+		return ""
+	}
+	w := words[0]
+	if len(w) > 40 {
+		w = w[:40]
+	}
+	return strings.ToValidUTF8(w, "")
 }
 
 // inOrder reports whether want is a subsequence of words that starts at the program.

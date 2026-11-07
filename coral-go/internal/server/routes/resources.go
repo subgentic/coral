@@ -57,6 +57,7 @@ type entryView struct {
 	Place     int    `json:"place,omitempty"`
 	Stuck     string `json:"stuck,omitempty"`     // "prompt" or "idle" once the holder has been told of (#13705)
 	StuckMin  int    `json:"stuck_min,omitempty"` // how long, in minutes
+	IdleMin   *int   `json:"idle_min,omitempty"`  // #14079: minutes with nothing running under the claim (0 is shown too); absent: working, or not a claim Coral can look at
 	Member    string `json:"member,omitempty"`    // a pool's hold: the member it was granted (#13719)
 	Machine   string `json:"machine,omitempty"`   // and that member's machine, for people to read
 }
@@ -174,12 +175,16 @@ func (h *ResourcesHandler) addGoals(ctx context.Context, views []resourceView) {
 
 // addStuck marks the holders the watcher has told the Orchestrator of (#13705): the Queue folder shows them as Stuck.
 func (h *ResourcesHandler) addStuck(views []resourceView) {
-	if h.Watch == nil {
-		return
-	}
 	for i := range views {
 		for j := range views[i].Holders {
 			e := &views[i].Holders[j]
+			if d, ok := h.Hook.IdleFor(views[i].Name, e.Agent); ok {
+				m := int(d / time.Minute)
+				e.IdleMin = &m
+			}
+			if h.Watch == nil {
+				continue
+			}
 			if info, ok := h.Watch.Stuck(e.ID); ok {
 				e.Stuck, e.StuckMin = info.Kind, int(info.Age/time.Minute)
 			}
@@ -235,7 +240,7 @@ func (h *ResourcesHandler) Claim(w http.ResponseWriter, r *http.Request) {
 	}
 	h.reap()
 	name := chi.URLParam(r, "name")
-	res, err := h.M.Claim(resources.WithSession(r.Context(), callerActor(r).Session), name, who, cleanText(body.Note, 200))
+	res, err := h.M.ClaimPolling(resources.WithSession(r.Context(), callerActor(r).Session), name, who, cleanText(body.Note, 200))
 	if err != nil {
 		h.fail(w, err)
 		return

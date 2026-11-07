@@ -20,6 +20,7 @@ const resourceUsageText = `Usage: coral-board resource <subcommand> [args]
 Resources with slots that agents claim (the resource queue, #13613): "mac-heavy" has one slot; claim it before a heavy run, release it after. A claim is a lease (renew it on a long run); it ends by itself when
 you release it, when it runs out, or when you are no longer on a board. While you wait you have a place in line, ranked by the task you are working on (critical, high, medium, low), then first come first served;
 the Orchestrator can move you.
+The queue is cooperation, not isolation: it tells the team who is using a machine; it does not stop a command that skips it. A claim --wait that is stopped (or a place made by a claim you never ask about again) is skipped after about 30 seconds and dropped after 10 minutes: run the same claim again to keep your place.
 
   resource list [--json]                          Every resource: slots, who holds them, the line in order
   resource status <name> [--json]                 One resource, and your place
@@ -94,8 +95,9 @@ type resEntry struct {
 	Lease    string `json:"lease_until"`
 	Place    int    `json:"place"`
 	Priority int    `json:"priority"`
-	Member   string `json:"member"`  // a pool's hold: the member it was granted
-	Machine  string `json:"machine"` // and where that is
+	Member   string `json:"member"`   // a pool's hold: the member it was granted
+	Machine  string `json:"machine"`  // and where that is
+	IdleMin  *int   `json:"idle_min"` // nothing has run under the claim for this many minutes (#14079)
 }
 
 type resView struct {
@@ -124,7 +126,7 @@ func printResource(v resView, me string) {
 		} else if h.Member != "" {
 			on = " on " + h.Member
 		}
-		fmt.Printf("  holds   #%d %s%s%s%s\n", h.ID, plainText(h.Agent), plainText(on), taskWords(h), leaseWords(h.Lease))
+		fmt.Printf("  holds   #%d %s%s%s%s%s\n", h.ID, plainText(h.Agent), plainText(on), taskWords(h), idleWords(h.IdleMin), leaseWords(h.Lease))
 	}
 	for _, q := range v.Queue {
 		mine := ""
@@ -144,6 +146,13 @@ func taskWords(e resEntry) string {
 		s += ": " + plainText(e.Note)
 	}
 	return s
+}
+
+func idleWords(m *int) string {
+	if m == nil {
+		return ""
+	}
+	return fmt.Sprintf(" [idle for %d min: nothing running; the slot goes back after 3]", *m)
 }
 
 func leaseWords(lease string) string {
