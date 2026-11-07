@@ -34,7 +34,7 @@ import { showConfirmModal } from './confirm_dialog.js';
 import { markReady } from './ready.js';
 import { browserLocal } from './safe_storage.js';
 import { resolveSessionIdentity, sessionStateInfo } from './session_state.js';
-import { pollEvery } from './overload.js';
+import { pollEvery, isPaused } from './overload.js';
 import { setHidden } from './dom_write.js';
 import { loadStyles } from './lazy_styles.js';
 import { syncDisplayPanels } from './display_panel.js';
@@ -42,7 +42,7 @@ import { onViewShown } from './view_switch.js';
 import { importOnce } from './import_once.js';
 import { markHidden } from './visible_marks.js';
 import { onInboxHooks, setInboxCount, askOf, updateInboxTab } from './inbox_tab.js';
-const { coralInboxAdapter, savedExpandFor, listInboxGoals } = await importOnce('./inbox_coral.js');
+const { coralInboxAdapter, savedExpandFor, listInboxGoals, goalsReadFailed } = await importOnce('./inbox_coral.js');
 const { agentLink } = await importOnce('./agent_link.js'); // an agent's name is one shared helper everywhere (#12168)
 const { openedFrom, backLabelFor } = await importOnce('./inbox_back_label.js'); // the Back words of the Inbox's task and goal screens (#8861)
 const saved = await importOnce('./saved.js');
@@ -694,9 +694,10 @@ function inboxActivityToolbar() {
     return { node, signature: JSON.stringify([activityFilters, teams, AC.total()]) };
 }
 async function refreshGoals() {
+    let ok = true;
     try {
-        goals = await listInboxGoals();
-    } catch { goals = []; }
+        goals = await listInboxGoals(); ok = !goalsReadFailed();
+    } catch { goals = []; ok = false; }
     try { // what was hidden from another browser or the phone (Not yet, Dismiss) is on the machine: read it with the goals
         const r = await fetch('/api/settings');
         if (r.ok) { const saved = (await r.json()).settings || {}; state.settings = { ...(state.settings || {}), [GOAL_DONE_SETTING]: saved[GOAL_DONE_SETTING] || '' }; }
@@ -704,6 +705,7 @@ async function refreshGoals() {
     await loadPendingSkills({ hub: nativeInbox(), sources: inboxSources(), urlOf: serverUrl }); // the skills that wait for the Operator are items of Needs you too (#12139); the Hub has no skill store, so its Inbox reads the one list of what waits (/api/needs-you?kind=skill) and shows each as text to approve at the computer (#13841)
     syncGoalDoneCount();
     renderInboxNav(true);
+    return ok;
 }
 
 // ── Chats ────────────────────────────────────────────────────────────────
@@ -788,6 +790,15 @@ const folderSections = () => {
     return [...sections, ...CH.chatSections(), ...boardSection()].map(section => ({ ...section, items: section.items.map(item => ({ ...item, tip: FOLDER_TIPS[item.key], icon: FOLDER_ICONS[item.key] || (item.key.startsWith(BOARD_ITEM) ? 'forum' : undefined) || (item.key.startsWith('chats-cli-') ? `cli:${item.key.slice(10)}` : undefined) })) }));
 };
 let _navKey = null, _folders = null, _poll = 0;
+// The goals are read again with the live updates (api.js's list of sessions -> updateInboxTab), under coral-hub Security's four conditions (#13389): only while the tab is visible; one read in flight, never overlapping; a failed or
+// refused read, or a Coral that is shedding load (429), backs the next read off (doubling, at most 10 minutes: no retry loop); and at most one read in 30 s, far inside the Hub's 60 reads a minute per computer.
+let _goalsAt = 0, _goalsBusy = false, _goalsFails = 0;
+const goalsGap = () => { const base = Number(globalThis.__coralGoalsMs) || 30000; return _goalsFails ? Math.min(base * 2 ** _goalsFails, 600000) : base; };
+function liveGoals() {
+    if (document.hidden || _goalsBusy || isPaused() || Date.now() - _goalsAt < goalsGap()) return;
+    _goalsAt = Date.now(); _goalsBusy = true;
+    Promise.resolve(refreshGoals()).then(ok => { _goalsFails = ok ? 0 : Math.min(_goalsFails + 1, 8); }, () => { _goalsFails = Math.min(_goalsFails + 1, 8); }).finally(() => { _goalsBusy = false; });
+}
 /** What the phone's ☰ drawer lists for the Inbox (#13596): every folder the sidebar has, with its count, the open one marked, and the pick. Read when the drawer opens. */
 state.inboxFolderRows = () => ({ sections: folderSections().filter(sec => !sec.items.some(it => String(it.key).startsWith(BOARD_ITEM))), current: navCurrent(), pick: pickFolder });
 /** A folder was picked: a page that is open gives way, and the folder's table opens with the keyboard at its heading. */
@@ -833,7 +844,7 @@ function renderInboxNav(force = false) {
         needs.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, teamOf(s), askOf(s)]), tk.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count]), sv.map(f => [f.id, f.which, f.saved, f.state]), savedFiles().map(a => a.reviewKey), mutedWords(mutedReviewItems()), dayOldMutedFiles().map(a => a.hex)]); // the quiet Muted line is part of what the table shows: a change that only moves muted files redraws it (#12881)
     if (!force && key === _navKey) return;
     _navKey = key;
-    if (needsRows().some(s => s.waiting_since) && !_poll) _poll = pollEvery(() => { if (group !== 'needs') return; refreshProposals(); refreshGoals(); renderInboxNav(true); }, 30000); // "waiting 4 min" in the Needs you table moves on while the tab is open. Only while Needs you is the table on screen (#9551 'never polled'): any other folder's tick does nothing, where it used to re-read reviews, proposals and goals and, through its repaint, the kept chat lists. Reviews are not read here: they refresh when the server's artifact revision moves (inbox_reviews.js onArtifactsRev). Proposals and goals have no such signal, so they keep this read while their table is the one shown.
+    if (needsRows().some(s => s.waiting_since) && !_poll) _poll = pollEvery(() => { if (group === 'needs') renderInboxNav(true); }, 30000); // "waiting 4 min" in the Needs you table moves on while the tab is open: the tick repaints the ages of the table on screen and asks nothing (#9551 'never polled'). Reviews refresh when the server's artifact revision moves (inbox_reviews.js), proposals and goals with the live updates (inbox_tab.js updateInboxTab)
     if (_folders && list.contains(_folders)) VL.update(_folders, { sections, current: here });
     else { _folders = VL.build({ id: 'inbox-folders', label: 'Inbox views', sections, current: here, onPick: pickFolder }); list.replaceChildren(_folders); }
     const pageList = page && $('inbox-page')?.querySelector('[data-view-list="inbox-goal-folders"], [data-view-list="inbox-item-folders"]'); // an opened item's own folder list (a phone's select) follows the counts too: it was drawn once, with the counts of that moment (#8681)
@@ -1346,7 +1357,7 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
         new MutationObserver(() => { if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') { _wasShown = false; needsOrder = null; needsState.shown = null; if (needsFilters.kind) { needsFilters = { ...needsFilters, kind: '' }; NF.saveFilters(needsFilters); } } }).observe(document.body, { attributes: true, attributeFilter: ['data-nav-tab'] });
         $('inbox-view').addEventListener('click', () => quietFocus($('inbox-view')), true);
         if (nativeInbox()) $('inbox-search')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); if (e.repeat) return; /* a held Enter is one search */ filterInbox(e.target.value); } }); // a chat search runs when it is asked for, not on each key (coral-hub's rate condition)
-        onInboxHooks({ needs: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); }, counts: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); } });
+        onInboxHooks({ goals: liveGoals, needs: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); }, counts: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); } });
         saved.onSavedRender(() => { if (!$('inbox-local')?.hidden) renderInboxNav(true); });
         saved.mountInboxSavedBar($('inbox-saved-bar'));
     }
