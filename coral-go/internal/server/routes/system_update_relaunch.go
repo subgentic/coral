@@ -512,9 +512,12 @@ func (h *UpdateRelaunchHandler) view(ctx context.Context, id callerIdentity) (re
 		v.version = rec.Staged.Version
 	}
 	if h.Agents != nil {
-		if v.agents, err = h.Agents(ctx); err != nil {
+		got, err := h.Agents(ctx)
+		if err != nil {
 			return v, err
 		}
+		// A copy: afterRestart sets After on each row, and two status requests at once must not write the same rows (a provider may return storage it keeps: a DATA RACE under -race, #14280).
+		v.agents = append([]RestartAgent(nil), got...)
 		var settings map[string]string
 		if h.Settings != nil {
 			settings, _ = h.Settings(ctx) // unreadable settings: their defaults, as auto_wake reads them
