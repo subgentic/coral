@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -160,7 +162,7 @@ func TestAClickOpensThePaneOrThePageAndCountsTheOfferOnlyForThePage(t *testing.T
 	var pane int
 	var pages, offers []string
 	click := func() {
-		u.open(func() { pane++ }, func(p string) { pages = append(pages, p) }, func(v, c string) { offers = append(offers, v+" "+c) })
+		u.open(func() bool { pane++; return true }, func(p string) bool { pages = append(pages, p); return true }, func(v, c string) { offers = append(offers, v+" "+c) }, func(string) {})
 	}
 	click() // before anything is shown: nothing
 	assert.Zero(t, pane)
@@ -178,6 +180,37 @@ func TestAClickOpensThePaneOrThePageAndCountsTheOfferOnlyForThePage(t *testing.T
 	assert.Equal(t, 1, pane)
 	assert.Equal(t, []string{"https://github.com/subgentic/coral/releases"}, pages)
 	assert.Equal(t, []string{"1.4.157 approved"}, offers, "the release page was opened: the offer is counted")
+}
+
+// #14064: a click never does nothing: a pane that will not open falls back to the release page, and when nothing opens the person is told, and every step is logged.
+func TestAClickThatCannotOpenAnythingFallsBackAndSaysSo(t *testing.T) {
+	a, aerr, st := approvedAnswer("2.0.58"), error(nil), updaterStatus{FeatureOn: true, Enabled: true}
+	u, _, _, _ := newItem(&a, &aerr, &st)
+	var logs bytes.Buffer
+	log.SetOutput(&logs)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	var pages, offers, told []string
+	paneOK, pageOK := false, true
+	click := func() {
+		u.open(func() bool { return paneOK }, func(p string) bool { pages = append(pages, p); return pageOK }, func(v, c string) { offers = append(offers, v) }, func(m string) { told = append(told, m) })
+	}
+	click() // nothing shown yet: the click says so instead of doing nothing
+	require.Len(t, told, 1, "a stale click tells the person")
+	assert.Contains(t, logs.String(), "nothing to offer")
+
+	u.refresh()
+	click() // the pane cannot open: the release page does
+	assert.Len(t, pages, 1, "the pane failed: the release page opens instead")
+	assert.Equal(t, []string{"2.0.58"}, offers)
+	assert.Contains(t, logs.String(), "could not open the Updates pane")
+
+	pageOK = false
+	pages, offers = nil, nil
+	click() // nothing opens: told, with the address, and not counted as an offer seen
+	assert.Len(t, told, 2)
+	assert.Contains(t, told[1], "releases")
+	assert.Empty(t, offers)
+	assert.Contains(t, logs.String(), "could not open the release page")
 }
 
 func TestTheJobDoesNothingWhenItsContextHasEnded(t *testing.T) {
