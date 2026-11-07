@@ -313,6 +313,21 @@ func TestAnswerPrompt(t *testing.T) {
 	assert.Equal(t, "ask_changed", lastCode, "the client matches on the code, not the words (#10516)")
 	assert.Len(t, sentKeys(), before, "a refused answer sends no key")
 	assert.Equal(t, http.StatusOK, askAnswer(next.AskID), "the ask that is open is answered")
+
+	// #14173 (Security's MUST): two requests that end with the same three lines are two asks. A long command whose FIRST line changed after the row was drawn is refused (409 ask_changed), sends no key.
+	cmdA := " rm -rf ./build\n echo one\n echo two\n echo three"
+	cmdB := " rm -rf /\n echo one\n echo two\n echo three"
+	drawnA, ok := parsePromptScreen(claudeBashScreen(cmdA))
+	require.True(t, ok)
+	nowB, ok := parsePromptScreen(claudeBashScreen(cmdB))
+	require.True(t, ok)
+	assert.NotEqual(t, drawnA.AskID, nowB.AskID, "the same last three lines, another first line: another ask")
+	assert.False(t, samePrompt(drawnA, nowB), "samePrompt compares the whole command too")
+	setScreen(claudeBashScreen(cmdB))
+	before = len(sentKeys())
+	assert.Equal(t, http.StatusConflict, askAnswer(drawnA.AskID), "the command changed between draw and click")
+	assert.Equal(t, "ask_changed", lastCode)
+	assert.Len(t, sentKeys(), before, "a refused answer sends no key")
 }
 
 // fastPromptChecks shortens the waits after an answer for a test.

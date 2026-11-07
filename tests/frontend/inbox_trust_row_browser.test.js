@@ -54,6 +54,7 @@ const MENU = (extra = {}) => ({ question: 'Quick safety check: Is this a project
             };
             // a new ask in the row: the agent stops waiting (the row goes) and waits again on this menu
             const show = async (po, expect) => {
+                await Input.dispatchMouseEvent({ type: 'mouseMoved', x: 4, y: 4 }); // the pointer is off the list (a pointer resting on it holds the rows still, #14173)
                 await ev(`window.__waiting = false; window.__answers = []; window.__status = 200; true`); await refresh();
                 await waitFor(`document.querySelectorAll('#group-table-view tbody .dt-primary').length === 0`, `${at}the row leaves`, 8000);
                 await ev(`window.__po = ${JSON.stringify(po)}; window.__ws += 1; window.__waiting = true; true`); await refresh();
@@ -107,6 +108,7 @@ const MENU = (extra = {}) => ({ question: 'Quick safety check: Is this a project
                 'a third option': [MENU({ options: [{ n: 1, label: 'No, exit', action: 'select' }, { n: 2, label: 'Yes, I trust this folder', action: 'select' }, { n: 3, label: 'Yes, and every folder under it', action: 'select' }] }), 0],
             };
             for (const [name, [po, expect]] of Object.entries(cases)) {
+                await Input.dispatchMouseEvent({ type: 'mouseMoved', x: 4, y: 4 }); // off the list
                 await ev(`window.__waiting = false; true`); await refresh();
                 await waitFor(`document.querySelectorAll('#group-table-view tbody .dt-primary').length === 0`, `${at}${name}: the row leaves`, 8000);
                 await ev(`window.__po = ${JSON.stringify(po)}; window.__ws += 1; window.__waiting = true; window.__answers = []; true`); await refresh();

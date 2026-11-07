@@ -188,7 +188,7 @@ function drawTable() {
     const focusTargets = '.group-chip, .dt-primary, .dt-quiet, .inbox-answer, a.inbox-ask-subject-link';
     const held = host.contains(a) && a.matches(focusTargets) ? { cls: a.className, data: JSON.stringify(a.dataset), href: a.getAttribute('href'), row: a.closest('tbody tr') ? [...a.closest('tbody').children].indexOf(a.closest('tr')) : -1 } : null;
     if (host.dataset.drawn !== drawn) {
-        host.innerHTML = html; host.dataset.drawn = drawn; // a redraw of what is there would drop the focus from a row the keyboard is on
+        host.innerHTML = html; host.dataset.drawn = drawn; drawnUrgent = src.urgentSignature ? src.urgentSignature() : ''; // the waiting agents this drawing shows (a module variable: a data attribute is an injection the payload census refuses) // a redraw of what is there would drop the focus from a row the keyboard is on
         if (bar?.node) host.prepend(bar.node);
         if (folderPage) folderHead(bar.node, folderPage);
         if (lead) { // a phone: the strip is a tab list and everything under it is its panel (#11281); the panel adds no box (display: contents)
@@ -242,10 +242,33 @@ if (typeof document !== 'undefined') {
     document.addEventListener('pointerup', releasePointer, true); document.addEventListener('pointercancel', releasePointer, true); window.addEventListener('blur', releasePointer);
 }
 
+// The same for a pointer that only RESTS over the list (#14173, the Beta Tester: a new permission row arrived, the rows moved and a click opened the wrong item): while a mouse pointer is over the table of a source with
+// holdRedraw, a redraw waits and the table says so in one line ("New items are waiting; they appear when the pointer leaves the list"); it happens once when the pointer leaves. A hold is never longer than its cap (2 s for a waiting agent, 10 s otherwise)
+// from the first redraw it held, so a pointer left over the list does not freeze it. Only a fine, hovering pointer: a touch screen has no hover (its press is held above).
+const HOVER_HOLD_MS = 10000, URGENT_HOLD_MS = 2000; // a row that needs the person (a waiting agent, a permission) is held 2 s at most: enough that a row does not jump under a click, not enough to hide that an agent is waiting (QA Reviewer 2 on #14173); other new rows, 10 s
+const canHover = () => typeof matchMedia === 'function' && matchMedia('(hover: hover)').matches; // a touch screen has no hover: only a pointer that can rest on the list holds it
+let hoverOver = false, hoverHeldSince = null;
+let holdCap = HOVER_HOLD_MS, drawnUrgent = '';
+const hovering = () => hoverOver && hoverHeldSince !== null ? Date.now() - hoverHeldSince < holdCap : hoverOver;
+function showHeldNote() {
+    const host = document.getElementById('group-table-view');
+    if (!host || host.querySelector('.group-table-held')) return;
+    const n = document.createElement('p'); n.className = 'item-meta group-table-held'; n.setAttribute('role', 'status'); n.textContent = 'New items are waiting. They appear in a moment, or when you move the pointer away.';
+    host.append(n); // under the table, sticky at the bottom of the view: a line above it would itself move the rows it is meant to hold still
+}
+function leaveList() { hoverOver = false; const k = deferredKind, had = hoverHeldSince !== null; hoverHeldSince = null; document.querySelectorAll('.group-table-held').forEach(n => n.remove()); if (k && had && !holding()) { deferredKind = null; setTimeout(() => refreshGroupTable(k), 0); } }
+if (typeof document !== 'undefined') {
+    // Every mouse move says where the pointer is now: a button that was pressed and then replaced (an answered row's choices) sends no pointerout, so the way out is seen on the first move outside the list.
+    document.addEventListener('pointermove', e => { if (!canHover()) return; const inside = e.target instanceof Element && !!e.target.closest('#group-table-view tbody'); if (inside) hoverOver = true; else if (hoverOver) leaveList(); }, true);
+    document.addEventListener('pointerout', e => { if (hoverOver && e.relatedTarget === null) leaveList(); }, true); // the pointer left the window
+    window.addEventListener('blur', leaveList);
+}
+
 export function refreshGroupTable(kind) {
     const src = sources.get(kind);
     if (open && open.kind === kind) {
         if (src?.holdRedraw && holding()) { deferredKind = kind; flushLater(); return; }
+        if (src?.holdRedraw && hoverOver) { if (hoverHeldSince === null) hoverHeldSince = Date.now(); holdCap = src.urgentSignature && src.urgentSignature() !== drawnUrgent ? URGENT_HOLD_MS : HOVER_HOLD_MS; if (hovering()) { deferredKind = kind; showHeldNote(); setTimeout(() => { const k = deferredKind; if (k && !holding()) { deferredKind = null; refreshGroupTable(k); } }, Math.max(60, holdCap - (Date.now() - hoverHeldSince) + 60)); return; } } // a pointer resting on the list: the rows stay where they are, up to HOVER_HOLD_MS
         const host = document.getElementById('group-table-view');
         if (!host || host.style.display === 'none') { open = null; return; }
         if (drawTable()) return;
