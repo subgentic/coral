@@ -86,13 +86,10 @@ When you open Coral, the workspace screen asks **What do you want to work on?** 
      - **Describe your team:** Click **Describe your team** to generate a custom roster from a plain-English description.
      - **Let the Orchestrator build and launch the team (`orchestrator-team-builder`):** Launch just the **Orchestrator** (or start from **Default team** and remove the other members), then tell the Orchestrator in **Chat** what teammates and goal you want.
 2. **What you see with `orchestrator-team-builder`:**
-   - The Orchestrator inspects your repository (read-only), drafts a `team-plan.md` naming each teammate's role, CLI (`claude` or `codex`), model, thinking level, and initial tasks, and uploads it for your review:
-     ```text
-     coral://artifacts/d26734243be993e7ab199178398dffee04482b60dadfeb5af0cf5414a0435f6c
-     ```
+   - The Orchestrator inspects your repository (read-only), drafts a `team-plan.md` naming each teammate's role, CLI (`claude` or `codex`), model, thinking level, and initial tasks, and uploads it as a `coral://artifacts/<sha256>` link for your review.
    - A red badge appears on **Inbox -> Needs you** with the question: *"Launch Dev and Reviewer on first-team as in team-plan.md?"*
    - Click **Approve** in **Needs you**.
-   - The Orchestrator wakes up automatically, launches **Dev** and **Reviewer** on the team board (`[Coral] Orchestrator started Dev`, `[Coral] Orchestrator started Reviewer`), creates **Goal #1**, and assigns **Task #1** to **Dev**.
+   - The Orchestrator wakes up automatically, launches **Dev** and **Reviewer** on the team board (posting `[Coral] Orchestrator started Dev` and `[Coral] Orchestrator started Reviewer`), creates **Goal #1**, and assigns **Task #1** to **Dev**.
 
 ## 4. Your first review
 
@@ -110,14 +107,14 @@ Agents upload plans, test reports, diffs, and screenshots to Coral's content-add
 - **Where you see it:**
   - Open the team's **Artifacts** tab (or **Files -> Artifacts** in the left sidebar) to browse, search, preview, or comment on every file produced by the team.
   - When an agent tags an artifact `"for review"` (`--tag "for review" --question "..."`), it lands directly in **Inbox -> Needs you** under **For review**, where you can read the rendered Markdown or image, leave inline comments, and click **Approve** or **Request changes**.
-  - For example, in our walkthrough, **Reviewer** uploaded `review-task1-round1.md` (`coral://artifacts/626cb21024f59101ebeb1564974d489bb148f91097b9fa1ea4b5a605eb3f5ddf`) summarizing the 16 passing subtests and verification checks.
+  - For example, in our walkthrough, **Reviewer** uploaded `review-task1-round1.md` summarizing the 16 passing subtests and verification checks.
 
 ## 6. What to do when stuck
 
 | What you see | Why it happens & how to fix it |
 |---|---|
 | **Newly launched agent looks idle and produces no output** | On its first run in a repository, Claude Code (`claude`) or Codex (`codex`) stops at an interactive folder-trust prompt (`Quick safety check: Is this a project you created or one you trust?`) or a hook/permission prompt. Check **Inbox -> Needs you** or open the agent's **Terminal** tab and press `Down` then `Enter` to trust the folder (or toggle **Trust this folder** in Step 1 of **New team** before launching). |
-| **Teammates launched by the Orchestrator sit waiting before their first post** | Agents started by the Orchestrator via `coral-agent launch` start ask-first (`default`) unless the person sets otherwise. Open **Inbox -> Needs you** or their **Terminal** tab to approve their first command (or choose Claude's `Yes, and switch to auto mode`, or turn on **Auto-accept prompts** in the agent's `⋮` menu). |
+| **Teammates launched by the Orchestrator sit waiting before their first post** | The board's Orchestrator starts teammates via `coral-agent launch` in ask-first (`default`) permission mode (an agent cannot launch a less-restricted agent; for non-Orchestrator agents, a launch when the saved default skips prompts is refused with `403`, and the Operator raises the mode later). Open **Inbox -> Needs you** or their **Terminal** tab to approve their first command (or choose Claude's `Yes, and switch to auto mode`, or turn on **Auto-accept prompts** in the agent's `⋮` menu). |
 | **You typed in an agent's Terminal and board notifications stopped arriving** | After you type in an agent's terminal, Coral pauses board nudges for **60 seconds** (`TypingHold`) so it never interrupts you mid-command. Wait 60 seconds after your last keystroke and Coral automatically flushes `[Coral] While you were talking: ...`. |
 | **Codex agent cannot reach the board or upload artifacts** | Codex's default sandbox blocks `localhost` network calls. Launch Codex with Coral's default settings (or pass `-c sandbox_workspace_write.network_access=true`). |
 | **`coral` starts an unfamiliar old server in a terminal** | The retired Python package (`pip install agent-coral`) is shadowing Coral on your `PATH`. Run `which -a coral` and `pip uninstall agent-coral`. |
