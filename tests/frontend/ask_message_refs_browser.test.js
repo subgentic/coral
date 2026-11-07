@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { removeBoards } = require('./helpers/board_cleanup');
 const { coralReady } = require('./helpers/wait');
 
 (async () => {
@@ -58,7 +59,7 @@ const { coralReady } = require('./helpers/wait');
             }
             await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open] .inbox-ask-box') && document.querySelector('dialog.inbox-ask-dialog .inbox-ask-box').value === 'my unfinished reply'`, `${tag}: Back restores the question and its draft`, 10000).catch(async () => check(`${tag}: Back restores the question and its draft`, false, JSON.stringify(await ev(`({ path: location.pathname, dialog: !!document.querySelector('dialog.inbox-ask-dialog[open]'), value: (document.querySelector('dialog.inbox-ask-dialog .inbox-ask-box') || {}).value, hist: history.length, toast: [...document.querySelectorAll('#toast-host .toast')].map(x => x.textContent.trim().slice(0, 80)) })`))));
         }
-    } finally { await client.close(); }
+    } finally { await removeBoards(ev, ['coral-hub']); await client.close(); } // the dialog's board (coral-hub) was subscribed by the page's own question stub: take it away again (#4959)
     assert.deepEqual(problems, [], '#N links and the fixed reply box:\n  ' + problems.join('\n  '));
     console.log('PASS #N in a question opens that message (not task/goal/code), the reply box is fixed and scrolls inside, Send reply stays; 1280, 390, 200% text');
 })().catch(e => { console.error(e); process.exit(1); });
