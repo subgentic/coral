@@ -128,6 +128,17 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`!document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent`, `${at}: v3's caller line is not v2's (no list line, no line)`, 4000);
             await closeViewer();
 
+            console.log(`${at}: older computer, reopened with no metadata: the first open's line does not stay`);
+            await open(H3, { fileId: FILE, versionLine: lineOf(3) });
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(lineOf(3))}`, `${at}: the caller's line, first open`, 6000);
+            await closeViewer();
+            await open(H3, {}); // the same digest, no metadata, a list with no lines
+            await waitFor(vis('#artifact-viewer .av-current'), `${at}: reopened, the bar`, 6000);
+            await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-body')?.textContent`, `${at}: drawn`, 6000);
+            assert.equal(await headShown(), false, `${at}: no line on a reopen with none (keeping the last open's line, '_line = _line || ...', must fail here)`);
+            assert.equal(await chip(), '', `${at}: and no Copy chip`);
+            await closeViewer();
+
             console.log(`${at}: Copy file ID is in the menu only when the file has a line`);
             await open(H3, { fileId: FILE, versionLine: lineOf(3) });
             await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(lineOf(3))}`, `${at}: a line for the positive case`, 6000);
