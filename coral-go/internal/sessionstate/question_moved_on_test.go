@@ -21,8 +21,8 @@ func TestAnAssistantEntryAfterTheQuestionClosesIt(t *testing.T) {
 	assert.True(t, st.NeedsInput, "the question is open with no transcript evidence")
 	assert.Equal(t, "question", st.WaitingKind)
 
-	st = Derive(Input{Events: events, AssistantEntryAt: t0.Add(10*time.Second + 5*time.Second)})
-	assert.False(t, st.NeedsInput, "an assistant entry written 5 s after the question went on: the question is over")
+	st = Derive(Input{Events: events, AssistantEntryAt: t0.Add(10*time.Second + 45*time.Second)})
+	assert.False(t, st.NeedsInput, "an assistant entry written 45 s after the question (past the 30 s margin) went on: the question is over")
 	assert.Empty(t, st.WaitingKind)
 	assert.Empty(t, st.WaitingSummary)
 	assert.True(t, st.InTurn, "the agent is in its turn, as after a call that started")

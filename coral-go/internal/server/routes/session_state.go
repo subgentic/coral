@@ -84,8 +84,8 @@ func (h *SessionsHandler) applyTranscriptState(input *SessionStateInput, events 
 		if claudeTurnOpen(events) {
 			kind, atTime := h.jsonl.ReadClaudeTurnEvent(sessionID, workingDir)
 			mergeTranscriptTurnEvent(input, events, kind, atTime)
-			// An assistant entry written after the agent's own question was raised says it went on: the question was settled in the terminal (#14345). Read from what the call above just scanned.
-			input.AssistantEntryAt = h.jsonl.TranscriptTurnAt(sessionID)
+			// An assistant entry of the main thread written after the agent's own question was raised says it went on: the question was settled in the terminal (#14345). Read from what the call above just scanned.
+			input.AssistantEntryAt = h.jsonl.TranscriptAssistantAt(sessionID)
 		}
 		// A failed sign-in ends a turn like any API error; the transcript says which (#3830).
 		input.NeedsLogin, input.LoginReason = h.claudeLoginState(name, sessionID, workingDir, func() []store.AgentEvent { return events })

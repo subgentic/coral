@@ -111,7 +111,7 @@ type Input struct {
 
 // MovedOnMargin is how long after a question an assistant entry must have been written to say the agent went on: the entry that carries the question's own tool call is written by another writer than
 // the hook that raised the question, within a moment of it, and never answers it.
-const MovedOnMargin = 3 * time.Second
+const MovedOnMargin = requestMargin
 
 // KindStartup is the WaitingKind of an agent held by a prompt its CLI draws at launch (#4543).
 const KindStartup = "startup"

@@ -56,6 +56,7 @@ func (r *SessionReader) scanClaudeTranscript(sessionID, workingDir string) claud
 	reset := func() {
 		c.claudeState.event, c.claudeState.at, c.claudeState.version, c.claudeState.model, c.claudeState.effort = "", time.Time{}, "", "", ""
 		c.claudeState.turnAt = time.Time{}
+		c.claudeState.assistantAt = time.Time{}
 		c.claudeState.apiErr = ClaudeAPIError{}
 	}
 	consume := func(line []byte) {
@@ -66,6 +67,9 @@ func (r *SessionReader) scanClaudeTranscript(sessionID, workingDir string) claud
 			c.claudeState.model = m
 			c.claudeState.effort = e // the level of the same turn: "" when it recorded none, so a stale one is not shown (#4969)
 			c.claudeState.turnAt = claudeLineTime(line)
+		}
+		if t := claudeLineMainAssistantTime(line); !t.IsZero() {
+			c.claudeState.assistantAt = t
 		}
 		updateClaudeTurnState(&c.claudeState, line)
 		updateClaudeAPIError(&c.claudeState.apiErr, line)

@@ -76,8 +76,15 @@ func TestAQuestionSettledInTheTerminalClearsFromTheRowAndTheGate(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, f.Close())
 	}
-	assistant := func(when time.Duration, tool string) string { // an assistant entry, as Claude writes it: a model, a tool call
-		return `{"type":"assistant","message":{"role":"assistant","model":"claude-opus-4-5","content":[{"type":"tool_use","id":"toolu_` + tool + `","name":"` + tool + `","input":{}}]},"timestamp":"` + at(when) + `"}`
+	assistant := func(when time.Duration, tool string) string { // an assistant entry of the main thread, as Claude writes it: a model, a tool call
+		return `{"isSidechain":false,"type":"assistant","message":{"role":"assistant","model":"claude-opus-4-5","content":[{"type":"tool_use","id":"toolu_` + tool + `","name":"` + tool + `","input":{}}]},"timestamp":"` + at(when) + `"}`
+	}
+
+	sidechain := func(when time.Duration) string { // a subagent's entry, written into the main file by a Claude Code that does so (#14345, Security): it runs beside the waiting question
+		return `{"isSidechain":true,"type":"assistant","message":{"role":"assistant","model":"claude-haiku-5-5","content":[{"type":"text","text":"working"}]},"timestamp":"` + at(when) + `"}`
+	}
+	apiError := func(when time.Duration) string { // a real API error: a main-thread assistant entry of the synthetic model
+		return `{"isSidechain":false,"type":"assistant","error":"rate_limit","isApiErrorMessage":true,"message":{"role":"assistant","model":"<synthetic>","content":[{"type":"text","text":"limit"}]},"timestamp":"` + at(when) + `"}`
 	}
 
 	post(`{"event_type":"prompt_submit","summary":"User submitted prompt"}`)
@@ -90,8 +97,18 @@ func TestAQuestionSettledInTheTerminalClearsFromTheRowAndTheGate(t *testing.T) {
 	assert.Equal(t, "question", r["waiting_kind"])
 	assert.Equal(t, ptymanager.StateBlocked, gate().State, "the held-message gate sees a blocked agent")
 
-	// The person answered in the terminal and the agent went on: its next tool call is an assistant entry written well after the question.
-	appendLine(assistant(10*time.Second, "Read"))
+	// Entries that are not the main thread going on never answer it, however late they are written (the held-message gate rests on this state alone): a subagent's, and the CLI's own API error.
+	appendLine(sidechain(45 * time.Second))
+	appendLine(apiError(50 * time.Second))
+	r = row()
+	assert.Equal(t, true, r["waiting_for_input"], "a sidechain entry and an API error 45 s after the question leave it open")
+	assert.Equal(t, ptymanager.StateBlocked, gate().State, "and the gate still holds the agent as blocked")
+	// Inside the 30 s margin of the older call rule, even the main thread's own entry is not yet taken as the agent going on.
+	appendLine(assistant(20*time.Second, "Read"))
+	assert.Equal(t, true, row()["waiting_for_input"], "a main-thread entry 20 s after the question is inside the margin")
+
+	// The person answered in the terminal and the agent went on: its next tool call is an assistant entry of the main thread, written well after the question.
+	appendLine(assistant(45*time.Second, "Read"))
 	r = row()
 	assert.NotEqual(t, true, r["waiting_for_input"], "an assistant entry after the question: the row is no longer waiting")
 	assert.Empty(t, r["waiting_kind"])
