@@ -93,6 +93,7 @@ func TestAnUnstampedRecordOfBytesAlreadyInASeriesIsNotAVersionOneOfItsOwn(t *tes
 	require.Equal(t, http.StatusCreated, code, out)
 	sid := fmt.Sprint(out["file_id"])
 	require.Equal(t, same, rig.uploadText("a1", "plan.txt", "the same first draft"), "a1 uploads the same bytes: an unstamped record, visited before a2's")
+	require.NoError(t, os.Remove(seriesPath(rig.coralDir, sid)), "the index is gone (a lost or damaged one is found by the walk of the records, which is where a bare record could be mistaken for a file)")
 	members := membersOfSeries(rig.coralDir, sid, true)
 	require.Len(t, members, 2, "the series has its two versions, whatever record the walk meets first")
 	for _, m := range members {
