@@ -22,7 +22,7 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(r.lead, 'Everything on this step is optional. The team starts with the settings shown here.');
         // the template the helper picks names a working mode: Workflow says it (None when the team has none)
         const mode = await ev(`(() => { const s = [...document.querySelectorAll('#team-start-host select')].find(x => [...x.options].some(o => o.textContent.trim() === 'Worktrees')); return s.options[s.selectedIndex].textContent.trim(); })()`);
-        assert.deepEqual(r.states, { Start: 'optional', Workflow: mode === 'None' ? 'you approve goals' : mode, 'Health check': 'off: no stuck-agent checks', Messaging: 'on: other computers' }, JSON.stringify(r)); // both switches start on, as a team launched with no change acts (#11788)
+        assert.deepEqual(r.states, { Start: 'optional', Workflow: mode === 'None' ? 'you approve goals' : mode, 'Health check': 'on', Messaging: 'on: other computers' }, JSON.stringify(r)); // both switches start on, as a team launched with no change acts (#11788)
         assert.deepEqual(r.names, ['Start', 'Workflow', 'Health check', 'Messaging'], 'each tab keeps its name');
         // a change shows in the menu
         await ev(`(() => { const g = document.getElementById('team-goal'); g.value = 'Ship it'; g.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);

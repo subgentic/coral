@@ -798,7 +798,7 @@ async function launchTeam() {
     else if (document.getElementById('launch-team-dir')?.dataset.createNew === workingDir) payload.create_new_folder = true; // a new folder the person chose, which step 1 said Coral makes (#12833)
     if (!isHub() && trustTicked()) payload.trust_folder = true; // the person ticked: trust this existing folder for the agents (#11889)
     if (settings.working_mode) payload.working_mode = settings.working_mode; // the working mode, its guidance and the Additional instructions (#7407)
-    if (settings.health_monitor) payload.health_monitor = true;
+    if (settings.health_monitor === false) payload.health_monitor = false; // unticked on a new team (#14091); on is the default and is not sent
     if (useWorktree) {
         payload.worktree = true;
         if (baseBranch) payload.base_branch = baseBranch;
