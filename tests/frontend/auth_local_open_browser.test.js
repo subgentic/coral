@@ -35,6 +35,11 @@ const ATTACK = {
         const { browserContextId } = await browser.Target.createBrowserContext({ disposeOnDetach: true });
         assert.ok(browserContextId, 'the case owns a new browser context');
         contexts.push(browserContextId);
+        // Chrome's local-network check blocks a load from the framing page (a loopback address of ours) to this server BEFORE the server's headers matter: the frame ends on Chrome's error page whether or not
+        // X-Frame-Options and frame-ancestors are sent (net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS on Chrome 156 and 157; #14020), so the case would pass with the headers gone. The framing page's origin is
+        // granted the permission (the names this Chrome knows, as helpers/hub_world.js), so the headers are what blocks the frame.
+        const lna = ['localNetworkAccess', 'localNetwork', 'loopbackNetwork'].filter(name => browser.Browser.PermissionType.enum.includes(name));
+        if (lna.length) for (const origin of [new URL(SAME_SITE).origin, new URL(CROSS).origin]) await browser.Browser.grantPermissions({ origin, permissions: lna, browserContextId });
         const { targetId } = await browser.Target.createTarget({ url: 'about:blank', browserContextId });
         assert.ok(targetId, 'the case owns an exact page target');
         const c = await CDP({ port, target: targetId });
@@ -192,17 +197,49 @@ const ATTACK = {
                 assert.deepEqual(await p.cookies(), [], 'no cookie');
             });
         }
+        // No browser in this check: the answer to a request that asks for /auth to be framed carries both frame headers, whatever Chrome does with them (Chrome 156 and 157 block the framed load on their local-network
+        // check first, #14020), so the header cover does not depend on the browser's version. Plain http, so the Sec-Fetch headers a framing browser sends are sent as they are.
+        await test('the /auth answer to a framed request carries X-Frame-Options and frame-ancestors (no browser)', async () => {
+            const http = require('node:http');
+            for (const path of ['/auth', '/auth?locked=1&return_to=%2F']) {
+                const res = await new Promise((resolve, reject) => {
+                    const r = http.request(BASE + path, { method: 'GET', headers: { 'Sec-Fetch-Dest': 'iframe', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'cross-site', Referer: CROSS + '/frame.html' } }, resp => { resp.resume(); resp.on('end', () => resolve(resp)); });
+                    r.on('error', reject); r.setTimeout(5000, () => r.destroy(new Error('timed out'))); r.end();
+                });
+                assert.equal(res.statusCode, 200, `${path}: the sign-in page answers a framed request`);
+                assert.equal(res.headers['x-frame-options'], 'DENY', `${path}: X-Frame-Options DENY`);
+                assert.match(String(res.headers['content-security-policy'] || ''), /(^|; )frame-ancestors 'none'(;|$)/, `${path}: frame-ancestors 'none' in the Content-Security-Policy`);
+            }
+        });
         await test('another site cannot frame /auth', async () => {
             const p = await freshPage();
             // The same site on another port: a cross-site frame runs in its own process and is not in this page's frame tree, and frame-ancestors 'none' refuses every framer.
             await p.c.Page.navigate({ url: SAME_SITE + '/frame.html' });
             await p.waitFor(`document.readyState === 'complete'`, 'the framing page');
-            // Blocked: the child frame ends on Chrome's error page for /auth, never on /auth itself.
-            let child = null;
-            await until(async () => { const { frameTree } = await p.c.Page.getFrameTree(); child = (frameTree.childFrames || [])[0]; return !!child && (child.frame.unreachableUrl === BASE + '/auth' || child.frame.url.startsWith('chrome-error:')); }, 'the browser to block the frame');
+            // Blocked: the child frame ends on Chrome's error page for /auth, never on /auth itself. Chrome shows a block in one of two places: in this page's frame tree (child.frame.unreachableUrl or a chrome-error: url,
+            // Chrome 155 and 156), or, from Chrome 157, not in the frame tree at all but as the browser's own iframe target for /auth, whose document is Chrome's error page (#14011). Either is a pass; what never passes is a frame
+            // that is /auth itself: the same frame-tree url, or an iframe target whose document is /auth or holds a password field or a button.
+            const blockedHow = async () => {
+                const { frameTree } = await p.c.Page.getFrameTree();
+                const child = (frameTree.childFrames || [])[0];
+                if (child) return (child.frame.unreachableUrl === BASE + '/auth' || child.frame.url.startsWith('chrome-error:')) ? { how: 'frame tree', shown: child.frame.url === BASE + '/auth' } : null;
+                const { targetInfos } = await browser.Target.getTargets();
+                const t = targetInfos.find(x => x.type === 'iframe' && x.url.startsWith(BASE + '/auth'));
+                if (!t) return null;
+                const fc = await CDP({ port, target: t.targetId });
+                try {
+                    await fc.Runtime.enable();
+                    const r = await fc.Runtime.evaluate({ expression: `JSON.stringify({ href: location.href, password: !!document.querySelector('input[type=password]'), buttons: document.querySelectorAll('button').length })`, returnByValue: true });
+                    const d = JSON.parse(r.result.value);
+                    return d.href.startsWith('chrome-error:') ? { how: 'iframe target', shown: d.password || d.buttons > 0 } : null;
+                } finally { await fc.close(); }
+            };
+            let seen = null;
+            await until(async () => { seen = await blockedHow(); return !!seen; }, 'the browser to block the frame', 8000, p);
             const auth = p.reqs.find(r => r.url === '/auth');
             assert.ok(auth, 'the frame asked for /auth');
-            assert.notEqual(child.frame.url, BASE + '/auth', 'the frame never shows /auth');
+            assert.equal(seen.shown, false, `the frame never shows /auth (seen as: ${seen.how})`);
+            console.log(`      the block was seen as: ${seen.how}`);
         });
         // The operator's choice for #289: the button only while no password is set. Every test server starts with the runner's throwaway password (run_cdp_suites.mjs,
         // TEST_PASSWORD), so this is the state a fresh browser meets first.
