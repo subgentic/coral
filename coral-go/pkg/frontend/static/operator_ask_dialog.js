@@ -1,5 +1,5 @@
 /* The question's reply box, pictures and offered actions; loaded when opened, not for the Inbox badge. */
-import { LOCAL_SERVER, boardTeamKey, normServer } from './server_base.js';
+import { LOCAL_SERVER, boardTeamKey, normServer, serverFetch } from './server_base.js';
 import { openWithQuestionReturn } from './suspend_native_dialog.js';
 import { markHidden } from './visible_marks.js';
 import { renderMarkdownStrict } from './utils.js';
@@ -55,58 +55,62 @@ export function openAskDialog(a, onDone, runners = {}) {
     const picturesBlocked = () => !!tray && (tray.busy() || tray.failed());
     const replyText = () => [box.value.trim(), tray ? tray.hexes().map(h => `coral://artifacts/${h}`).join('\n') : ''].filter(Boolean).join('\n\n');
     const sync = () => { send.disabled = sending || picturesBlocked(); choices.forEach(c => { c.disabled = sending || (binary && picturesBlocked()); }); }; // Send waits for a picture going up, and for a failed one to be taken out
-    const binary = yesNoButtons(a);
-    const offers = (fromAnotherComputer(a) && (!binary || decisionNeedsPerson(a.server))) ? [] : buttonsOf(a); // remote binary replies use the owner-stamped claim route; other remote actions keep Reply and Close
-    let offered = null;
-    if (offers.length) { // what the asker offered: one tap per choice, each with what it does
-        offered = document.createElement('section'); offered.className = 'inbox-ask-offers'; offered.setAttribute('aria-label', `Buttons ${markHidden(a.asker, { strict: true })} offered`);
-        const head = document.createElement('p'); head.className = 'inbox-ask-offers-head'; head.textContent = offers.every(b => isReply(b.action)) ? 'Choose a reply, or write your own.' : 'Choose an action, or write a reply.';
-        const list = document.createElement('div'); list.className = 'inbox-ask-offers-list';
-        for (const b of offers) {
-            const item = document.createElement('div'); item.className = 'inbox-ask-offer';
-            const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn'; const label = binary ? (b.label === 'Yes' ? 'Approve' : 'Deny') : markHidden(b.label, { strict: true }); btn.textContent = label; btn.dataset.buttonId = String(b.id);
-            const what = document.createElement('span'); what.className = 'inbox-ask-offer-what sr-only'; what.textContent = buttonWords(b);
-            btn.setAttribute('aria-label', `${label}: ${what.textContent}`); btn.title = what.textContent;
-            if (binary) { const icon = document.createElement('span'); icon.className = 'material-icons'; icon.setAttribute('aria-hidden', 'true'); icon.textContent = b.label === 'Yes' ? 'check' : 'close'; btn.replaceChildren(icon); btn.classList.add('btn-icon'); btn.setAttribute('aria-label', `${label}, sends ${b.label} with any draft text and pictures`); btn.title = btn.getAttribute('aria-label'); }
-            btn.addEventListener('click', async () => {
-                if (sending || (binary && picturesBlocked())) return;
-                sending = true; err.textContent = ''; sync();
-                try {
-                    const draft = replyText();
-                    if (binary && draft) { await replyToAsk(a, `${b.label}\n\n${draft}`); finish(); showToast(`Sent: ${b.label} with your reply`); return; }
-                    const got = await claimButton(a, b); // the stored action, whatever the label says
-                    if (isReply(got.action)) { forgetAsk(a); refreshOperatorAsks(true); finish(); showToast(`Sent: ${markHidden(got.label, { strict: true })}`); return; }
-                    const navigates = ['open:new-agent', 'open:task', 'open:artifact'].includes(got.action);
-                    finish(); // the dialog is modal: it goes before the page it opens
+    let binary = yesNoButtons(a), offered = null;
+    const drawOffers = () => {
+        offered?.remove(); offered = null; choices.length = 0;
+        binary = yesNoButtons(a);
+        const offers = (fromAnotherComputer(a) && (!binary || decisionNeedsPerson(a.server))) ? [] : buttonsOf(a);
+        if (offers.length) { // what the asker offered: one tap per choice, each with what it does
+            offered = document.createElement('section'); offered.className = 'inbox-ask-offers'; offered.setAttribute('aria-label', `Buttons ${markHidden(a.asker, { strict: true })} offered`);
+            const head = document.createElement('p'); head.className = 'inbox-ask-offers-head'; head.textContent = offers.every(b => isReply(b.action)) ? 'Choose a reply, or write your own.' : 'Choose an action, or write a reply.';
+            const list = document.createElement('div'); list.className = 'inbox-ask-offers-list';
+            for (const b of offers) {
+                const item = document.createElement('div'); item.className = 'inbox-ask-offer';
+                const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn'; const label = binary ? (b.label === 'Yes' ? 'Approve' : 'Deny') : markHidden(b.label, { strict: true }); btn.textContent = label; btn.dataset.buttonId = String(b.id);
+                const what = document.createElement('span'); what.className = 'inbox-ask-offer-what sr-only'; what.textContent = buttonWords(b);
+                btn.setAttribute('aria-label', `${label}: ${what.textContent}`); btn.title = what.textContent;
+                if (binary) { const icon = document.createElement('span'); icon.className = 'material-icons'; icon.setAttribute('aria-hidden', 'true'); icon.textContent = b.label === 'Yes' ? 'check' : 'close'; btn.replaceChildren(icon); btn.classList.add('btn-icon'); btn.setAttribute('aria-label', `${label}, sends ${b.label} with any draft text and pictures`); btn.title = btn.getAttribute('aria-label'); }
+                btn.addEventListener('click', async () => {
+                    if (sending || (binary && picturesBlocked())) return;
+                    sending = true; err.textContent = ''; sync();
                     try {
-                        if (got.action === 'open:new-agent') { if (!window.showLaunchModal) throw new Error('The New agent dialog is not available here.'); await window.showLaunchModal(); }
-                        else if (got.action === 'open:task') { if (!runners.task) throw new Error('Tasks cannot be opened here.'); await runners.task(a, String(got.arg)); }
-                        else if (got.action === 'open:artifact') { if (!runners.artifact) throw new Error('Files cannot be opened here.'); await runners.artifact(a, String(got.arg)); }
-                        else if (got.action === 'wake') { await wakeMember(a, String(got.arg)); showToast(`Woke ${markHidden(got.arg, { strict: true })}.`); }
-                        else throw new Error('This button does something this version does not know.');
-                        if (!navigates) await settleButton(a, b, 'done'); // only an action that answers the question settles it
-                    } catch (e) {
-                        showToast(e.message || 'That did not work.', true);
-                        if (!navigates) await settleButton(a, b, 'failed').catch(() => {}); // give a failed wake back; navigation never claims an answer
-                    }
-                    refreshOperatorAsks(true);
-                } catch (e) { err.textContent = e.message || 'Not done.'; sending = false; sync(); }
-            });
-            choices.push(btn); item.append(btn, what); list.append(item);
+                        const draft = replyText();
+                        if (binary && draft) { await replyToAsk(a, `${b.label}\n\n${draft}`); finish(); showToast(`Sent: ${b.label} with your reply`); return; }
+                        const got = await claimButton(a, b); // the stored action, whatever the label says
+                        if (isReply(got.action)) { forgetAsk(a); refreshOperatorAsks(true); finish(); showToast(`Sent: ${markHidden(got.label, { strict: true })}`); return; }
+                        const navigates = ['open:new-agent', 'open:task', 'open:artifact'].includes(got.action);
+                        finish(); // the dialog is modal: it goes before the page it opens
+                        try {
+                            if (got.action === 'open:new-agent') { if (!window.showLaunchModal) throw new Error('The New agent dialog is not available here.'); await window.showLaunchModal(); }
+                            else if (got.action === 'open:task') { if (!runners.task) throw new Error('Tasks cannot be opened here.'); await runners.task(a, String(got.arg)); }
+                            else if (got.action === 'open:artifact') { if (!runners.artifact) throw new Error('Files cannot be opened here.'); await runners.artifact(a, String(got.arg)); }
+                            else if (got.action === 'wake') { await wakeMember(a, String(got.arg)); showToast(`Woke ${markHidden(got.arg, { strict: true })}.`); }
+                            else throw new Error('This button does something this version does not know.');
+                            if (!navigates) await settleButton(a, b, 'done'); // only an action that answers the question settles it
+                        } catch (e) {
+                            showToast(e.message || 'That did not work.', true);
+                            if (!navigates) await settleButton(a, b, 'failed').catch(() => {}); // give a failed wake back; navigation never claims an answer
+                        }
+                        refreshOperatorAsks(true);
+                    } catch (e) { err.textContent = e.message || 'Not done.'; sending = false; sync(); }
+                });
+                choices.push(btn); item.append(btn, what); list.append(item);
+            }
+            const hint = document.createElement('p'); hint.className = 'inbox-ask-offers-hint'; hint.textContent = binary ? 'Sends Yes or No with any text and pictures below.' : offers.every(b => isReply(b.action)) ? 'Replies are sent as you.' : 'These actions run as you when you choose one.';
+            offered.append(head, list, hint);
         }
-        const hint = document.createElement('p'); hint.className = 'inbox-ask-offers-hint'; hint.textContent = binary ? 'Sends Yes or No with any text and pictures below.' : offers.every(b => isReply(b.action)) ? 'Replies are sent as you.' : 'These actions run as you when you choose one.';
-        offered.append(head, list, hint);
-    }
+        if (offered && !binary) reading.append(offered);
+        if (offered && binary) { offered.classList.add('inbox-ask-yes-no'); offered.replaceChildren(offered.querySelector('.inbox-ask-offers-list')); sendRow.insertBefore(offered, send); }
+    };
     const foot = document.createElement('div'); foot.className = 'inbox-ask-foot'; foot.append(row); // Reply attachments belong with the reply box; the footer holds its final actions
     const reading = document.createElement('div'); reading.className = 'inbox-ask-reading'; reading.tabIndex = -1;
     if (!whole.hidden) reading.append(whole);
-    if (offered && !binary) reading.append(offered);
     const compose = document.createElement('div'); compose.className = 'inbox-ask-compose';
     const addSlot = document.createElement('div'); addSlot.className = 'inbox-ask-attach'; pics.append(addSlot);
     const sendRow = document.createElement('div'); sendRow.className = 'inbox-ask-sendrow'; const pickSlot = document.createElement('span'); pickSlot.className = 'inbox-ask-pick'; sendRow.append(pickSlot, send); addSlot.append(sendRow); // Add image on the left, Send reply on the right, the pictures note under them (#13148)
-    if (offered && binary) { offered.classList.add('inbox-ask-yes-no'); offered.replaceChildren(offered.querySelector('.inbox-ask-offers-list')); sendRow.insertBefore(offered, send); }
     compose.append(label, pics, err);
     dlg.append(title, sub, ...(links.hidden ? [] : [links]), reading, compose, foot);
+    drawOffers();
     if (!fromAnotherComputer(a)) { // the picture is stored on the question's own team, as a goal's pictures are
         Promise.all([importOnce('./artifact_comment_images.js'), importOnce('./artifact_comments_api.js')]).then(([m, api]) => {
             if (!dlg.isConnected) return;
@@ -135,5 +139,16 @@ export function openAskDialog(a, onDone, runners = {}) {
     document.body.append(dlg);
     dlg.showModal();
     box.focus();
+    // Older list/link snapshots may precede the question's button metadata.
+    // Keep the reply/draft open while loading choices from its captured computer.
+    if (a.kind === 'ask' && !Array.isArray(a.buttons)) {
+        serverFetch(a.server, '/api/operator-asks', { signal: AbortSignal.timeout(5000) }).then(async response => {
+            if (!response.ok) throw new Error('Question choices could not be read.');
+            const rows = await response.json();
+            if (!Array.isArray(rows)) throw new Error('Question choices were not a list.');
+            const current = rows.find(row => row.kind === 'ask' && row.board === a.board && String(row.id) === String(a.id));
+            if (current && dlg.isConnected && !sending) { a.buttons = Array.isArray(current.buttons) ? current.buttons : []; drawOffers(); sync(); }
+        }).catch(() => { if (dlg.isConnected && !sending) err.textContent = 'Could not load answer choices. Close and reopen the question to try again.'; });
+    }
     return dlg;
 }

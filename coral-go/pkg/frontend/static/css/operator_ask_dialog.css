@@ -8,7 +8,7 @@
 }
 .inbox-ask-sendrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; } /* the row under the reply box: Add image left, Send reply right */
 .inbox-ask-pick { display: inline-flex; flex: none; }
-.inbox-ask-sendrow .inbox-ask-send { margin-left: auto; } /* alone on the row until the picture button has loaded */
+.inbox-ask-sendrow .inbox-ask-send { margin-left: auto; min-height: 44px; } /* alone on the row until the picture button has loaded */
 
 /* A wide question uses the shared flow size: its reader and reply sit side by side.
    The DOM order and the narrow dialog's single scroll area stay the same. */
