@@ -288,20 +288,15 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 		plan, perr = planNewVersion(coralDir, ref, callerBoard, hexID)
 		if plan != nil {
 			plan.caller = chainUploader
-			// A new version keeps its file's name (#14145): a different name is a different file unless the agent says it is a rename. The server's own join of a task chain never refuses: a file with another name starts its own.
-			if cur := plan.currentName(); plan.same == nil && cur != "" && cur != name && r.Header.Get("X-Artifact-Rename") != "1" {
-				if autoChain {
-					plan.unlock()
-					plan, perr = nil, nil
-				} else {
-					plan.unlock()
-					writeJSON(w, http.StatusBadRequest, map[string]any{"error": nameDiffersSentence(plan.id, cur, name), "code": "name_differs", "file_id": plan.id, "current_name": cur})
-					return
-				}
+			// A new version keeps its file's name (#14145): a different name is a different file unless the agent says it is a rename. Only an upload that NAMED its file is checked: the server's own join of a task chain
+			// is one file per chain, not per file name (#12144), and never refuses on a name.
+			if cur := plan.currentName(); !autoChain && plan.same == nil && cur != "" && cur != name && r.Header.Get("X-Artifact-Rename") != "1" {
+				plan.unlock()
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": nameDiffersSentence(plan.id, cur, name), "code": "name_differs", "file_id": plan.id, "current_name": cur})
+				return
 			}
 		}
 		switch {
-		case plan == nil && perr == nil: // the chain's file has another name: this one is its own series (above)
 		case perr != nil && autoChain:
 			plan = nil // the chain's file cannot take it (another team's, an older bytes match, ...): a new series, never a refused upload
 		case perr != nil:
