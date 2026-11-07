@@ -549,7 +549,7 @@ func promptCommand(lines []string, questionAt int) (cmd, note string, missing bo
 		if dashedRuleRe.MatchString(lines[i]) {
 			break
 		}
-		if seen++; seen > 3 {
+		if seen++; seen > descriptionLines {
 			return "", "", false
 		}
 		desc = append([]string{t}, desc...)
@@ -561,7 +561,7 @@ func promptCommand(lines []string, questionAt int) (cmd, note string, missing bo
 	for j := end - 1; j >= 0 && j >= end-commandMaxLines; j-- {
 		if dashedRuleRe.MatchString(lines[j]) {
 			if !requestDialogHeader(lines, j) {
-				return "", "", false // rules printed by the agent above a prompt are not Claude's request dialog
+				return "", "", true // two rules and no Claude dialog header above them: not shown whole, so Reject only; never the old three lines with an Allow (#14173, Security)
 			}
 			block := make([]string, 0, end-j-1)
 			for _, l := range lines[j+1 : end] {
@@ -573,6 +573,12 @@ func promptCommand(lines []string, questionAt int) (cmd, note string, missing bo
 	return "", "", true // a closing rule with no opening rule in reach: the request is not shown whole
 }
 
+// headerScanLines: how many non-blank lines above the opening rule are searched for the dialog's header; the agent's own description under the header can run to many lines, and must not push it out of reach.
+const headerScanLines = 24
+
+// descriptionLines: how many lines of Claude's own (and an agent's) text may sit between the closing dashed rule and the question.
+const descriptionLines = 12
+
 var (
 	solidRuleRe        = regexp.MustCompile(`^\s*─{8,}\s*$`)
 	dialogHeaderLineRe = regexp.MustCompile(`(?i)\b(?:command|files?)\s*$`)
@@ -582,7 +588,7 @@ var (
 // file"). Without that header the rules and the question are text something else printed (#14173, Security's SHOULD).
 func requestDialogHeader(lines []string, open int) bool {
 	seen := 0
-	for k := open - 1; k >= 0 && seen < 6; k-- {
+	for k := open - 1; k >= 0 && seen < headerScanLines; k-- {
 		if strings.TrimSpace(lines[k]) == "" {
 			continue
 		}

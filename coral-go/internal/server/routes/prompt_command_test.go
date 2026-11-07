@@ -74,7 +74,7 @@ func TestPermissionTarget_NoOpeningRuleIsOnlyReject(t *testing.T) {
 	assert.Contains(t, s.Note, "top of this request")
 }
 
-// A real prompt may carry up to three lines of Claude's own under the request; four or more is not this layout (the screen keeps the old three-line context).
+// A real prompt carries one line of Claude's own under the request; up to twelve lines of text are allowed there, more than that is not this layout (the screen keeps the old three-line context).
 func TestPermissionTarget_DescriptionLines(t *testing.T) {
 	rule := strings.Repeat("╌", 110)
 	mk := func(desc string) string {
@@ -89,7 +89,10 @@ func TestPermissionTarget_DescriptionLines(t *testing.T) {
 	assert.Equal(t, "touch a", three.Target)
 	four, ok := parsePromptScreen(mk(" one\n two\n three\n four"))
 	require.True(t, ok)
-	assert.Empty(t, four.command, "four lines under the rule is not a request block")
+	assert.Equal(t, "touch a", four.Target, "four lines under the rule is still the request block")
+	many, ok := parsePromptScreen(mk(strings.Repeat(" more\n", 13)))
+	require.True(t, ok)
+	assert.Empty(t, many.command, "thirteen lines under the rule is not this layout (the old three-line context)")
 }
 
 // A REAL long Bash prompt (Beta Tester's run 2, Claude Code 2.1.314, paths and ids replaced, from a raw terminal log whose spacing is lost): 17 screen lines, about 1100 characters, Claude's own line under the closing rule.
@@ -115,7 +118,8 @@ func TestPermissionTarget_NeedsClaudeDialogAndSession(t *testing.T) {
 	s, ok := parsePromptScreen(forged)
 	require.True(t, ok)
 	assert.Empty(t, s.command, "rules with no dialog header above them are not Claude's request block")
-	assert.False(t, s.OnlyReject)
+	assert.True(t, s.OnlyReject, "two rules and no header: Reject only, never the old three lines with an Allow")
+	assert.Contains(t, s.Note, "top of this request")
 
 	real := claudeBashScreen(" touch a\n echo b")
 	c, ok := parseAgentScreen(at.Claude, real)
@@ -138,4 +142,24 @@ func TestPermissionTarget_NeedsClaudeDialogAndSession(t *testing.T) {
 	other, ok := parsePromptScreen(strings.Replace(real, "Bash command", "Something else", 1))
 	require.True(t, ok)
 	assert.Empty(t, other.command, "a header that names no command or file is not the request dialog")
+}
+
+// Security's SHOULD on #14173 round 4: the agent's own description under the header can run to many lines; it must not push the header out of reach and turn the prompt back into one with an Allow.
+func TestPermissionTarget_LongDescriptionStillFindsTheHeader(t *testing.T) {
+	rule := strings.Repeat("╌", 110)
+	for _, n := range []int{1, 6, 12, 20} {
+		var desc []string
+		for i := 0; i < n; i++ {
+			desc = append(desc, fmt.Sprintf(" description line %d of the agent", i+1))
+		}
+		screen := strings.Repeat("─", 110) + "\n Bash command\n" + strings.Join(desc, "\n") + "\n" + rule + "\n touch a\n echo b\n" + rule + "\n This command requires approval\n\n Do you want to proceed?\n ❯ 1. Yes\n   2. No\n\n Esc to cancel\n"
+		s, ok := parsePromptScreen(screen)
+		require.True(t, ok, n)
+		assert.Equal(t, "touch a\necho b", s.Target, "a %d-line description still finds the header", n)
+		assert.False(t, s.OnlyReject, n)
+	}
+	far := strings.Repeat("─", 110) + "\n Bash command\n" + strings.Repeat(" filler\n", 40) + rule + "\n touch a\n" + rule + "\n x\n\n Do you want to proceed?\n ❯ 1. Yes\n   2. No\n"
+	s, ok := parsePromptScreen(far)
+	require.True(t, ok)
+	assert.True(t, s.OnlyReject, "a header that is out of reach is Reject only, not an Allow on a command whose top was never read")
 }
