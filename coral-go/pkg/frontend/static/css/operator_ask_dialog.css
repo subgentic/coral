@@ -8,7 +8,7 @@
 }
 .inbox-ask-sendrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; } /* the row under the reply box: Add image left, Send reply right */
 .inbox-ask-pick { display: inline-flex; flex: none; }
-.inbox-ask-sendrow .inbox-ask-send { margin-left: auto; } /* alone on the row until the picture button has loaded */
+.inbox-ask-sendrow .inbox-ask-send { margin-left: auto; min-height: 44px; } /* alone on the row until the picture button has loaded */
 
 /* A wide question uses the shared flow size: its reader and reply sit side by side.
    The DOM order and the narrow dialog's single scroll area stay the same. */
@@ -43,9 +43,9 @@
 .inbox-ask-reading .inbox-ask-offers { margin-top: 16px; }
 
 /* Binary decisions sit below the draft, directly beside Send reply. */
-.inbox-ask-sendrow.has-binary-choices { gap: 6px; }
+.inbox-ask-sendrow:has(.inbox-ask-yes-no) { gap: 6px; }
 .inbox-ask-sendrow .inbox-ask-yes-no { display: flex; flex: none; margin: 0; margin-left: auto; }
 .inbox-ask-yes-no .inbox-ask-offers-list { display: flex; flex-wrap: nowrap; gap: 6px; }
 .inbox-ask-yes-no .inbox-ask-offer { flex: none; width: 44px; min-width: 44px; }
 .inbox-ask-yes-no .inbox-ask-offer .btn { width: 44px; min-width: 44px; min-height: 44px; padding: 0; }
-.inbox-ask-sendrow.has-binary-choices .inbox-ask-send { margin-left: 0; min-height: 44px; }
+.inbox-ask-sendrow:has(.inbox-ask-yes-no) .inbox-ask-send { margin-left: 0; min-height: 44px; }

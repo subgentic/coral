@@ -60,7 +60,6 @@ export function openAskDialog(a, onDone, runners = {}) {
         offered?.remove(); offered = null; choices.length = 0;
         binary = yesNoButtons(a);
         const offers = (fromAnotherComputer(a) && (!binary || decisionNeedsPerson(a.server))) ? [] : buttonsOf(a);
-        sendRow.classList.toggle('has-binary-choices', binary && offers.length > 0);
         if (offers.length) { // what the asker offered: one tap per choice, each with what it does
             offered = document.createElement('section'); offered.className = 'inbox-ask-offers'; offered.setAttribute('aria-label', `Buttons ${markHidden(a.asker, { strict: true })} offered`);
             const head = document.createElement('p'); head.className = 'inbox-ask-offers-head'; head.textContent = offers.every(b => isReply(b.action)) ? 'Choose a reply, or write your own.' : 'Choose an action, or write a reply.';
