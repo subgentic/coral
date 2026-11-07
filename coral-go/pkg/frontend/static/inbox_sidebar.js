@@ -1,4 +1,4 @@
-import { multipleServers, serverColumns, serverMatches, syncServerField } from './inbox_servers.js';
+import { multipleServers, serverColumns, serverMatches, syncServerField, inboxSources } from './inbox_servers.js';
 import { keepMenuOnScreen } from './menu_fit.js';
 import { needsYou, askedRow } from './asked_before_restart.js';
 import { unrecordedItem, recordAllAgents } from './waiting.js';
@@ -24,7 +24,7 @@ import { go, note, backIs, currentRoute } from './nav.js';
 import { unreadReviewCount } from './ask_filter.js'; // the files waiting: the full read's once it has run, else what the computers counted (#13172)
 
 import { build, keyRoute, parse as parseRoute, inboxFolderPath, BOARDS_FOLDER, BOARDS_SUB } from './routes.js';
-import { sessionServer, normServer, boardTeamKey, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox, nativeNeeds, decisionNeedsPerson, LOCAL_SERVER } from './server_base.js';
+import { sessionServer, normServer, boardTeamKey, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox, nativeNeeds, decisionNeedsPerson, LOCAL_SERVER, serverUrl } from './server_base.js';
 import { teamLabel } from './server_status.js';
 import { showView, showToast, OPERATOR_ID } from './utils.js';
 import { registerActions, textOf } from './actions.js';
@@ -668,7 +668,7 @@ async function refreshGoals() {
         const r = await fetch('/api/settings');
         if (r.ok) { const saved = (await r.json()).settings || {}; state.settings = { ...(state.settings || {}), [GOAL_DONE_SETTING]: saved[GOAL_DONE_SETTING] || '' }; }
     } catch { /* the list this page has stays */ }
-    await loadPendingSkills({ hub: nativeInbox() }); // the skills that wait for the Operator are items of Needs you too (#12139); the Hub has no skill store, so its Inbox reads the one list of what waits (/api/needs-you?kind=skill) and shows each as text to approve at the computer (#13841)
+    await loadPendingSkills({ hub: nativeInbox(), sources: inboxSources(), urlOf: serverUrl }); // the skills that wait for the Operator are items of Needs you too (#12139); the Hub has no skill store, so its Inbox reads the one list of what waits (/api/needs-you?kind=skill) and shows each as text to approve at the computer (#13841)
     syncGoalDoneCount();
     renderInboxNav(true);
 }
