@@ -57,7 +57,7 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
      await ev(`document.querySelector('#group-table-view .list-bar-toggle').click();true`);
      await waitFor(`!!(${pick})&&(${pick}).getClientRects().length>0`,'Server filter in '+folder+' on a phone');
      await ev(`(()=>{const s=${pick};s.value='box-2';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
-     await waitFor(`${rows}>0&&${rows}<${all}`,'the Server filter narrows '+folder+' on a phone');
+     try{await waitFor(`${rows}>0&&${rows}<${all}`,'the Server filter narrows '+folder+' on a phone');}catch(e){console.log('DIAG '+folder+' all='+all+' '+JSON.stringify(await ev(`({rows:${rows},sel:(${pick})?(${pick}).value:null,opts:(${pick})?[...(${pick}).options].map(o=>o.value):null,ls:Object.keys(localStorage).filter(k=>k.includes('inbox')).map(k=>k+'='+localStorage.getItem(k)),titles:[...document.querySelectorAll('#group-table-view tr.dt-mailed .dt-primary')].map(b=>b.textContent.trim().slice(0,40)),live:window.__serverState.liveSessions.map(s=>s.name+':'+(s.server||'local'))})`)));throw e;}
      await ev(`(()=>{const s=${pick};s.value='';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
      assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth+1`),folder+': no horizontal overflow on a phone');
      continue;
