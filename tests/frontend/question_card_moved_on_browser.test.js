@@ -68,6 +68,15 @@ const { coralReady } = require('./helpers/wait');
             await setRow(PERM, { tool_name: 'Bash', input: { command: 'rm -rf build' }, at: iso(0) });
             await sleep(300); // sleep-ok: the card redraws
             check(`${tag}: a permission card stays although the agent wrote 60 s after it`, /Permission/i.test(String(await card())), String(await card()));
+            // QA #14358: the two guards each need their own case (a mutant that dropped either survived). The chat reply is re-read after a row change, so each settles before it reads.
+            // 1) a permission row with NO pending tool and no screen, a newer assistant message: only the question-only scope keeps it
+            await setRow(PERM, null);
+            await sleep(1500); // sleep-ok: the chat reply is re-fetched and the card redrawn from it
+            check(`${tag}: a permission row with no pending tool keeps its card after a newer assistant message`, /Permission/i.test(String(await card())), String(await card()));
+            // 2) a row whose summary asks a question while the pending tool is Bash (a newer request): only the pending-tool guard keeps it
+            await setRow({ ...ASK, last_message: { role: 'assistant', text: 'Moving on', at: iso(20000) } }, { tool_name: 'Bash', input: { command: 'ls' }, at: iso(10000) });
+            await sleep(1500); // sleep-ok: the chat reply is re-fetched and the card redrawn from it
+            check(`${tag}: a question-worded row with a pending non-question tool keeps its card after a newer assistant message`, card && (await card()) !== null, String(await card()));
             await setRow({ ...ASK, last_message: { role: 'assistant', text: 'again', at: iso(-1000) } }, { tool_name: 'AskUserQuestion', input: {}, at: iso(0) });
             await waitFor(`!!document.querySelector('#live-history-messages .chat-needs-input')`, `${tag}: the question card is back for the next case`, 6000);
             await setRow({ waiting_since: null, last_message: { role: 'assistant', text: 'Moving on', at: iso(25000) } }, { tool_name: 'AskUserQuestion', input: {}, at: iso(0) });
