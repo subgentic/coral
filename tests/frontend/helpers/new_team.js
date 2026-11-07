@@ -14,7 +14,10 @@ const SOURCE = `(() => {
     window.__nt = { dlg, find, rows, roles, panel, buttons, tablist };
     return true;
 })()`;
-const install = async ev => { await na.install(ev); return ev(SOURCE); };
+// Only the made-up folders used by wizard fixtures exist here. Other paths keep
+// their real responses, including explicit missing/unreadable-folder tests.
+const stubFolders = ev => ev(`(() => { const real=window.fetch; window.fetch=(u,o)=>{const p=new URL(String(u),location.href);return p.pathname==='/api/filesystem/list'&&['/work/payments-app','/work/repo'].includes(p.searchParams.get('path'))?Promise.resolve(Response.json({path:p.searchParams.get('path'),entries:[]})):real(u,o);};return true;})()`);
+const install = async ev => { await na.install(ev); await stubFolders(ev); return ev(SOURCE); };
 const N = {
     team: /^New team$/i, member: /^(Edit|Add) member/i,
     teamName: /^Team name/i, folder: /^Folder/i, recents: /^Recent folders$/i, machine: /^Computer$/i, address: /^Another computer's address$/i,
@@ -66,4 +69,4 @@ const M = (ev, waitFor) => {
     return m;
 };
 function assert_(ok, msg) { if (!ok) throw new Error(msg); }
-module.exports = { T, M, SOURCE, install, N, stepLine, openNewTeam, scenarios: na.scenarios, stubModels: na.stubModels };
+module.exports = { stubFolders, T, M, SOURCE, install, N, stepLine, openNewTeam, scenarios: na.scenarios, stubModels: na.stubModels };

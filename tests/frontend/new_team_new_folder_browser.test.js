@@ -24,7 +24,7 @@ const { coralReady } = require('./helpers/wait');
                     if (m === 'POST' && p.pathname === '/api/sessions/launch-team') { window.__reqs.push(JSON.parse(o.body)); return json({ agents: [{ name: 'A', session_id: 's' }] }); }
                     if (p.pathname === '/api/board/projects') return json([]);
                     if (p.pathname === '/api/filesystem/is-git') return json({ is_git: false });
-                    if (p.pathname === '/api/filesystem/list') { const d = (p.searchParams.get('path') || '').replace(/\\/+$/, ''); const answer=()=>there.has(d) ? json({ entries: [] }) : json({ error: 'access denied' }, 403); if(window.__holdFolder===d) return new Promise(resolve=>(window.__folderGates ||= []).push(()=>resolve(answer()))); return answer(); }
+                    if (p.pathname === '/api/filesystem/list') { const d = (p.searchParams.get('path') || '').replace(/\\/+$/, ''); const answer=()=>window.__folderCases?.[d]?json(window.__folderCases[d].body,window.__folderCases[d].status):there.has(d) ? json({ entries: [] }) : json({ error: 'access denied' }, 403); if(window.__holdFolder===d) return new Promise(resolve=>(window.__folderGates ||= []).push(()=>resolve(answer()))); return answer(); }
                     return real(u, o); };
                 await window.showLaunchModal(); window.hideLaunchModal(); return true; })()`);
             const fill = (id, v) => ev(`(() => { const e = document.getElementById(${JSON.stringify(id)}); e.value = ${JSON.stringify(v)}; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
@@ -54,6 +54,35 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`document.getElementById('launch-step-team').dataset.stage==='members'`, 'validated folder advances');
             check(`${tag}: the fast path captures creation before leaving step 1`, await ev(`document.getElementById('launch-team-dir').dataset.createNew==='/work/fast-new'`));
             await close();
+            // A response for a previous path cannot set the current field's creation mark.
+            await open('/work/existing');
+            await ev(`(async()=>{window.__holdFolder='/work/stale-new';window.__folderGates=[];const d=document.getElementById('launch-team-dir');d.value=window.__holdFolder;d.dispatchEvent(new Event('input',{bubbles:true}));const m=await import((window.__coralStatic||'/static/')+'team_dialogs.js');window.__nextCheck=m.teamStepMove(1);return true;})()`);
+            await waitFor(`window.__folderGates.length>0`, 'held stale path lookup');
+            await fill('launch-team-dir','/work/existing');
+            await ev(`(async()=>{window.__holdFolder=null;window.__folderGates.forEach(done=>done());await window.__nextCheck;return true;})()`);
+            check(`${tag}: stale answer neither advances nor marks the edited folder`,await ev(`document.getElementById('launch-step-team').dataset.stage==='team'&&!document.getElementById('launch-team-dir').dataset.createNew`));
+            await close();
+            const refusalCases=[
+                ['listed but unreadable','/work/locked',{'/work':{status:200,body:{entries:['locked']}}}],
+                ['unreadable successful response','/work/unreadable',{'/work/unreadable':{status:200,body:{error:'permission denied'}}}],
+                ['server failure','/work/broken',{'/work/broken':{status:500,body:{error:'offline'}}}],
+                ['missing parent','/missing/child',{}],
+                ['unreadable parent','/bad-parent/child',{'/bad-parent':{status:200,body:{error:'permission denied'}}}],
+                ['invalid parent listing','/invalid-parent/child',{'/invalid-parent':{status:200,body:{entries:null}}}],
+            ];
+            for(const [why,dir,replies] of refusalCases){
+                await ev(`window.__folderCases=${JSON.stringify(replies)};true`);
+                await open(dir);
+                await ev(`import((window.__coralStatic||'/static/')+'team_dialogs.js').then(m=>m.teamStepMove(1))`);
+                check(`${tag}: ${why} refuses Next and folder creation`,await ev(`document.getElementById('launch-step-team').dataset.stage==='team'&&document.getElementById('launch-team-dir').getAttribute('aria-invalid')==='true'&&!document.getElementById('launch-team-dir').dataset.createNew`));
+                await close();
+            }
+            await ev(`window.__folderCases={};true`);
+            await open('/work/planner-shop');
+            await ev(`document.getElementById('launch-team-dir').dataset.dirServer='srv2';true`);
+            await ev(`import((window.__coralStatic||'/static/')+'team_dialogs.js').then(m=>m.teamStepMove(1))`);
+            check(`${tag}: missing remote folder refuses Next without creation`,await ev(`document.getElementById('launch-step-team').dataset.stage==='team'&&!document.getElementById('launch-team-dir').dataset.createNew`));
+            await ev(`delete document.getElementById('launch-team-dir').dataset.dirServer;true`);await close();
             // Only a Coral suggestion follows the name; a person’s own folder stays.
             await ev(`(async()=>{const {browserLocal}=await import((window.__coralStatic||'/static/')+'safe_storage.js');const {recentDirsKey}=await import((window.__coralStatic||'/static/')+'launch_server.js');browserLocal.remove(recentDirsKey('local'));window.showLaunchModal();window._selectLaunchType('team');return true;})()`);
             await waitFor(`document.getElementById('launch-step-team').dataset.stage==='team'`, 'fresh team');
