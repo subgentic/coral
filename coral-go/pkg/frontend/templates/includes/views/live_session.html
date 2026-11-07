@@ -239,6 +239,10 @@
                                         </button>
                                         <div id="thinking-chip-menu" class="menu model-chip-menu" role="menu" aria-label="Thinking level" hidden></div>
                                     </span>
+                                    <!-- A Codex agent's live mode (codex_mode.js, #14051): read from its session file, shown only, never a button -->
+                                    <span class="model-chip-wrap" id="codex-mode-wrap" hidden><span class="model-chip codex-mode-chip" id="codex-mode-chip" role="status"><span class="model-chip-key" id="codex-mode-key" aria-hidden="true">Mode: </span><span id="codex-mode-text" class="model-chip-text"></span></span></span>
+                                    <!-- The Operator's "keep Full access when this agent restarts" (#14061): shown only while it is on, with its one-click Off -->
+                                    <span class="model-chip-wrap" id="codex-keep-wrap" hidden><span class="model-chip codex-mode-chip" id="codex-keep-chip" role="status"><span id="codex-keep-text" class="model-chip-text"></span> <button type="button" id="codex-keep-off" data-on-click="agent-keep-full-access" data-mode="off" aria-label="Turn off keeping Full access on restart">Off</button></span></span>
                                     <button type="button" class="model-chip keys-chip" id="keys-chip" data-on-click="agent-keys-toggle" aria-pressed="false" aria-controls="terminal-key-bar" aria-label="Keys"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg><span class="model-chip-text">Keys</span></button>
                                 </div>
                                 <!-- All other buttons populated dynamically -->

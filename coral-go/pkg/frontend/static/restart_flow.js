@@ -7,9 +7,10 @@ import { state, sessionKey, saveSessionDraft } from './state.js';
 import { showToast } from './utils.js';
 import { loadAgentEvents, renderEventTimeline } from './agentic_state.js';
 import { resetLiveHistory, effectiveLiveViewMode, showChatView } from './live_chat.js';
-import { serverFetch, currentServer } from './server_base.js';
+import { serverFetch, currentServer, sessionServer } from './server_base.js';
 import { applySleepingView } from './sleeping_view.js';
 import { loadModals } from './lazy_panels.js';
+import { relaunchNarrowing } from './codex_mode.js';
 import { launchFlags } from './launch_flags.js';
 import { pollEvery } from './overload.js';
 import { _getXtermModule } from './control_runtime.js';
@@ -33,6 +34,7 @@ async function showRestartModal() {
     // Render unified config form pre-filled from session
     if (window.renderAgentConfigForm) {
         window.renderAgentConfigForm('restart-acf', {
+            offerUseFullAccess: true, // #14085
             showPreset: false,
             showName: false,
             sections: true,
@@ -47,6 +49,7 @@ async function showRestartModal() {
                 capabilities: s.capabilities || null,
                 autoPermissions: s.permission_mode || s.live_permission_mode || true, // the form opens on the mode a restart will use (the stored one; the CLI's own report when none is stored): one that does not touch the select keeps it (#12481)
                 liveMode: s.live_permission_mode || '', // when it differs, a note beside the select says what the agent runs in now
+                codexNarrows: relaunchNarrowing(state.liveSessions.find(x => x.session_id === s.session_id && sessionServer(x) === sessionServer(s))), // from the list's row, which the server keeps current (#14051)
             },
         });
     }
@@ -152,6 +155,7 @@ async function runRestart(config) {
         if (config.model !== undefined) payload.model = config.model;
         if (config.thinking !== undefined) payload.thinking = config.thinking; // only when chosen: a restart keeps the agent's level otherwise (#4969)
         if (config.capabilities) payload.capabilities = config.capabilities;
+        if (config.useFullAccess) payload.keep_full_access = true; // the Operator's "Use Full access for this agent" (#14085)
         if (config.pickedMode) payload.permission_mode = config.pickedMode; // the server uses it over the stored mode and flags; an extra flag could not do that, it is stripped (#12481)
         const resp = await serverFetch(currentServer(), `/api/sessions/live/${encodeURIComponent(state.currentSession.name)}/restart`, {
             method: "POST",

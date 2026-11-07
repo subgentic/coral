@@ -15,6 +15,9 @@ import (
 var columnMigrations = []struct {
 	table, column, definition string
 }{
+	// Where a Keep Full access choice came from (#14193): 'local' (every choice before this column, made at this computer) or 'hub'. A database made by a dev or beta build already has the table without it, and
+	// CREATE TABLE IF NOT EXISTS leaves that table alone, so without this entry every restart and wake failed on the new queries.
+	{"keep_full_access", "source", "TEXT NOT NULL DEFAULT 'local'"},
 	{"artifact_comments", "at_s", "REAL"},
 	{"artifact_comments", "end_s", "REAL"},
 	// The pictures a person attached to an artifact comment (#11650): a JSON list of {hex, name, content_type}; '' for none.

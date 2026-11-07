@@ -1,8 +1,9 @@
 /* What the sidebar's menus do to one agent: kill, info, attach, restart, sleep and archive (moved out of render.js, #4996; no behaviour change). */
+import { relaunchNarrowing, wakeQuestion, permissionNarrowing, useFullAccessQuestion } from './codex_mode.js';
 import { state } from './state.js';
 import { worktreeConfirmWords } from './worktree_words.js';
 import { showWorktreeNotice } from './worktree_notice.js';
-import { serverFetch, serverForSession, sessionServer } from './server_base.js';
+import { serverFetch, serverForSession, sessionServer, normServer } from './server_base.js';
 import { killLiveSession, dropKilledRows } from './kill_live.js';
 import { showToast, showView } from './utils.js';
 import { redrawLiveList } from './list_hooks.js';
@@ -114,8 +115,41 @@ export async function setAgentAutoSleep(name, agentType, sessionId, mode) {
     } catch { showToast('Could not change auto-sleep', true); return false; }
 }
 
+/** The Operator's per-agent "keep Full access when this agent restarts" (#14061, #14085; Claude, Codex and agy): mode 'on' sets it, 'off' clears it, and 'use' (the button that says what the capabilities did to the chosen mode) asks
+ *  first, then sets it AND restarts the agent now, since that is the only way a running agent takes it. Only Coral's own record changes, apart from that restart. */
+export async function setKeepFullAccess(name, agentType, sessionId, mode) {
+    const server = serverForSession(name, sessionId);
+    if (mode === 'use') {
+        const row = state.liveSessions.find(x => x.session_id === sessionId && sessionServer(x) === server);
+        const n = permissionNarrowing(row);
+        const who = agentWords(row, row ? resolveSessionIdentity(row) : name).label;
+        showConfirmModal('Restart agent', useFullAccessQuestion(who, n || { chosen: 'the mode that was chosen', effective: 'less', why: 'its capabilities allow less' }, agentType),
+            async () => { if (await postKeepFullAccess(name, agentType, sessionId, server, true)) await restartSameDirect(name, agentType, sessionId); }, undefined, { danger: false, label: 'Use Full access' });
+        return false;
+    }
+    return postKeepFullAccess(name, agentType, sessionId, server, mode === 'on');
+}
+
+async function postKeepFullAccess(name, agentType, sessionId, server, on) {
+    try {
+        const resp = await serverFetch(server, `/api/sessions/live/${encodeURIComponent(name)}/keep-full-access`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: sessionId, agent_type: agentType, on }) });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.ok) { showToast(data.error || 'Could not change the Full access setting', true); return false; }
+        const row = state.liveSessions.find(x => x.session_id === sessionId && sessionServer(x) === server);
+        if (row) row.keep_full_access = on;
+        redrawLiveList();
+        document.dispatchEvent(new CustomEvent('coral:keep-full-access-changed', { detail: { sessionId, on, server: normServer(server) } }));
+        const who = agentWords(row, row ? resolveSessionIdentity(row) : name).label;
+        showToast(on ? `${who} will keep Full access when it restarts` : `${who} will restart with the permissions it was launched with`);
+        return true;
+    } catch { showToast('Could not change the Full access setting', true); return false; }
+}
+
 export function toggleAgentSleep(name, agentType, sessionId, action) {
     const server = serverForSession(name, sessionId);
+    const wakeRow = action === 'wake' ? state.liveSessions.find(x => x.session_id === sessionId && sessionServer(x) === server) : null;
+    const narrowing = relaunchNarrowing(wakeRow); // a Codex agent that ran wider than a wake will start it (#14051)
     // Resolves true when the server applied the action.
     const doIt = async (confirmHome) => { // true only from the home-folder question below (a confirm dialog may pass other arguments)
         try {
@@ -148,6 +182,11 @@ export function toggleAgentSleep(name, agentType, sessionId, action) {
         if (row && row.sleeping && !row.archived && row.sleep_reason === 'terminal_gone') return doIt(); // already asleep, nothing runs to stop: it is only filed under sleeping (#13171)
         const who = agentWords(row, row ? resolveSessionIdentity(row) : name).label; // the agent's own name and team, not the folder it works in (#10785)
         showConfirmModal('Sleep agent', `Put ${who} to sleep? ${WHAT_STAYS_SLEEP}`, doIt, undefined, { danger: false, label: 'Sleep agent' });
+        return Promise.resolve(false);
+    }
+    if (narrowing) { // a Codex agent that ran wider than this Wake will start it: say so, and let the person decide (#14051; never changes a permission)
+        const who = agentWords(wakeRow, resolveSessionIdentity(wakeRow)).label;
+        showConfirmModal('Wake agent', wakeQuestion(who, narrowing), doIt, undefined, { danger: false, label: 'Wake agent' });
         return Promise.resolve(false);
     }
     return doIt();

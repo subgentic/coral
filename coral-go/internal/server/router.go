@@ -488,6 +488,7 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.Post("/api/sessions/live/{name}/answer-prompt", sessHandler.AnswerPrompt)
 	r.Post("/api/sessions/live/{name}/dismiss-wait", sessHandler.DismissWait)
 	r.Post("/api/sessions/live/{name}/auto-sleep", sessHandler.AutoSleepOpt)
+	r.Post("/api/sessions/live/{name}/keep-full-access", sessHandler.KeepFullAccessOpt)
 	r.Get("/api/sessions/live/{name}/events/counts", sessHandler.EventCounts)
 	r.Delete("/api/sessions/live/{name}/events", sessHandler.ClearEvents)
 	r.Post("/api/sessions/live/{name}/token-usage", sessHandler.RecordTokenUsage)

@@ -67,6 +67,8 @@ type launchSpec struct {
 	// AutoByDefault: this is a new launch that may start Claude in Auto when it names no permission mode (#5836). Set only by the launch and the team launch, and only when
 	// autoDefaultAllowed (a Coral Hub request the owner does not let skip prompts is not). A restart, resume, wake or team reset restores a session and never sets it.
 	AutoByDefault bool
+	// KeepFullAccess: the Operator's "keep Full access when this agent restarts" choice (#14061, #14085): the launch is Full access after the capabilities. Set only by a relaunch of an agent that has it.
+	KeepFullAccess bool
 }
 
 // launchSession creates a new agent session using the specified backend (tmux or pty).
@@ -136,6 +138,7 @@ func (h *SessionsHandler) launchSession(ctx context.Context, spec launchSpec) (_
 		PromptOverrides: promptOverrides(userSettings),
 		BoardType:       spec.BoardType,
 		Capabilities:    spec.Capabilities,
+		KeepFullAccess:  spec.KeepFullAccess,
 		Tools:           spec.Tools,
 		Hooks:           spec.Hooks,
 		CLIPath:         cliPath,

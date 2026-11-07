@@ -55,6 +55,12 @@ func (h *SessionsHandler) ResetTeam(w http.ResponseWriter, r *http.Request) {
 		Thinking       *string
 		Tools          *string
 		PermissionMode *string
+		OldSessionID   string // the session being replaced: the Operator's keep-Full-access choice moves from it to the new one (#14085)
+		KeepFull       bool
+	}
+	keepSet, kerr := h.ss.KeepFullAccessSessions(ctx)
+	if kerr != nil {
+		log.Printf("[reset-team] could not read the keep-Full-access choices; agents restart without them: %v", kerr)
 	}
 	configs := make([]agentConfig, 0, len(sessions))
 	for _, s := range sessions {
@@ -79,6 +85,8 @@ func (h *SessionsHandler) ResetTeam(w http.ResponseWriter, r *http.Request) {
 			Thinking:       s.Thinking,
 			Tools:          s.Tools,
 			PermissionMode: s.PermissionMode,
+			OldSessionID:   s.SessionID,
+			KeepFull:       keepSet[s.SessionID] && keepFullAccessType(s.AgentType),
 		})
 	}
 
@@ -165,12 +173,23 @@ func (h *SessionsHandler) ResetTeam(w http.ResponseWriter, r *http.Request) {
 		result, err := h.launchSession(bgCtx, launchSpec{
 			WorkDir: cfg.WorkingDir, AgentType: cfg.AgentType, DisplayName: displayName, Flags: cleanFlags, Prompt: prompt,
 			BoardName: boardName, BoardServer: boardServer, BoardType: boardType, Model: modelStr, Thinking: ptr.Value(cfg.Thinking), Capabilities: caps, Tools: tools,
-			PermissionMode: storedPermMode,
+			PermissionMode: storedPermMode, KeepFullAccess: cfg.KeepFull,
 		})
 		if err != nil {
 			log.Printf("[reset-team] failed to re-launch %s: %v", displayName, err)
 			launched = append(launched, map[string]any{"name": displayName, "error": err.Error()})
 			continue
+		}
+
+		if cfg.KeepFull { // the same agent, started again with the same capabilities: the choice goes with it (logged, as every application is)
+			if newSID, _ := result["session_id"].(string); newSID != "" {
+				if _, err := h.ss.SetKeepFullAccess(bgCtx, newSID, true); err != nil {
+					log.Printf("[keep-full-access] could not carry the choice to the new session: %v", err)
+				} else {
+					h.clearKeepFullAccess(bgCtx, cfg.OldSessionID, "the team was reset: the choice moved to the new session")
+					log.Printf("[keep-full-access] applied session_id=%s via=team-reset", newSID)
+				}
+			}
 		}
 
 		// Re-setup board subscription

@@ -51,6 +51,8 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		// ConfirmHomeFolder: the person was asked about starting in the home folder itself and said Launch anyway (#13425).
 		HomeFolderAsk     bool `json:"home_folder_ask"` // the page can answer the home-folder question (#13425); a page that cannot never gets it, so no launch is stopped for it
 		ConfirmHomeFolder bool `json:"confirm_home_folder"`
+		// KeepFullAccess: the form's "Use Full access for this agent" (#14085): the agent starts with Full access whatever its capabilities say, and keeps it on every restart. The Operator's alone.
+		KeepFullAccess bool `json:"keep_full_access"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -122,7 +124,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Through the Coral Hub, an agent that skips permission prompts needs the owner's local switch (#126 F4).
-	if refuseHubSkip(w, r, h.ss, hubAsksToSkip(body.AgentType, body.Flags, body.Capabilities, body.Tools, body.Hooks)) {
+	if refuseHubSkip(w, r, h.ss, hubAsksToSkip(body.AgentType, body.Flags, body.Capabilities, body.Tools, body.Hooks) || body.KeepFullAccess) { // Full access is the widest skip: through the Hub it meets the owner's switch like any other (#14193)
 		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
 		return
 	}
@@ -230,13 +232,21 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": serr.Error(), "field": "skills"})
 		return
 	}
+	if body.KeepFullAccess {
+		if status, msg := h.keepFullAccessRequestRefusal(r, body.AgentType); status != 0 {
+			attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+			writeError(w, status, "", msg)
+			return
+		}
+	}
 	lctx, cancel := lifecycleCtx(r.Context())
 	defer cancel()
 	result, err := h.launchSession(lctx, launchSpec{
 		WorkDir: body.WorkingDir, AgentType: body.AgentType, DisplayName: body.DisplayName, ResumeSessionID: body.ResumeSessionID,
 		Flags: launchFlags, Prompt: withSkillNote(body.Prompt, launchSkillNote(skillRows)), BoardName: body.BoardName, BoardServer: body.BoardServer, Backend: body.Backend,
 		BoardType: body.BoardType, Model: effectiveModel, Thinking: effectiveThinking, Capabilities: body.Capabilities, Tools: body.Tools, Hooks: body.Hooks, PermissionMode: explicitDefaultMode(body.PermissionMode, launchFlags),
-		AutoByDefault: !agentCaller(r) && autoDefaultAllowed(lctx, r, h.ss), // not for an agent's launch (it may not start a less-restricted agent, #4032), and a Hub request the owner does not let skip prompts asks instead (#5836)
+		KeepFullAccess: body.KeepFullAccess,
+		AutoByDefault:  !agentCaller(r) && autoDefaultAllowed(lctx, r, h.ss), // not for an agent's launch (it may not start a less-restricted agent, #4032), and a Hub request the owner does not let skip prompts asks instead (#5836)
 	})
 	if err != nil {
 		h.endAgentLaunch(r.Context(), acct, lifeID, false, "", "")
@@ -255,6 +265,11 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	attempt.Finish(tracking.OutcomeSuccess, "", 1, 0)
+	if body.KeepFullAccess {
+		if sid, _ := result["session_id"].(string); sid != "" {
+			h.storeKeepFullAccess(r.Context(), r, sid, launchTargetName(body.DisplayName, body.AgentType), "launch")
+		}
+	}
 	h.endAgentLaunch(r.Context(), acct, lifeID, true, launcherWords(h.orchActorOf(r))+" started "+orchName(launchTargetName(body.DisplayName, body.AgentType)), fmt.Sprint(result["session_id"]))
 
 	// Setup board subscription in background (prompt is passed as CLI arg, not via tmux send-keys)

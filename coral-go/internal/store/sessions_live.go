@@ -429,6 +429,10 @@ func (s *SessionStore) ReplaceLiveSession(ctx context.Context, oldSessionID stri
 		if err := clearAutoAcceptTx(ctx, tx, oldSessionID, AutoAcceptAgentRestarted, false); err != nil {
 			return err
 		}
+		// The Operator's "Keep Full access when this agent restarts" follows the agent to its new session, unless this restart edits its capabilities (#14061).
+		if err := carryKeepFullAccessTx(ctx, tx, oldSessionID, newSession.SessionID, old.Capabilities, newSession.Capabilities); err != nil {
+			return err
+		}
 		if _, err := tx.ExecContext(ctx, "UPDATE live_sessions SET status = 'inactive', stopped_at = ? WHERE session_id = ?", nowUTC(), oldSessionID); err != nil {
 			return err
 		}

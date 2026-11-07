@@ -92,6 +92,7 @@ const (
 	ActChatSend       = "chat_send" // the chat composer's Send to an agent
 	ActRunSeen        = "run_seen"  // a failed run opened or dismissed
 	ActAgentsRecord   = "agents_record"
+	ActKeepFullAccess = "keep_full_access" // the Operator turned "keep Full access when this agent restarts" on or off for a Codex agent; the note says which (#14061)
 	ActGoalCreate     = "goal_create"
 	ActGoalEdit       = "goal_edit" // a goal's words, or Reopen
 	ActGoalDriver     = "goal_driver"
