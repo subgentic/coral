@@ -12,6 +12,7 @@
 const assert = require('node:assert/strict');
 const CDP = require('chrome-remote-interface');
 const BASE = require('./test_base').BASE;
+const { removeBoards } = require('./helpers/board_cleanup');
 
 (async () => {
     const client = await CDP({ port: Number(process.env.CDP_PORT || 9222) });
@@ -73,6 +74,7 @@ const BASE = require('./test_base').BASE;
                 { id: 2, project: 'gamma', subscriber_id: 'hub-user-99999999', job_title: 'hub-user-99999999', content: 'looks like one', created_at: '2026-10-14T08:00:02Z' },
                 { id: 3, project: 'gamma', subscriber_id: 'Lead Developer', job_title: 'Lead Developer', content: 'an agent', created_at: '2026-10-14T08:00:03Z' },
                 { id: 4, project: 'gamma', subscriber_id: 'hub-user-0a1b2c3d', job_title: 'hub-user-0a1b2c3d', origin: 'hub_operator', hub_user: 'hub-user-0a1b2c3d', content: '[Operator via Coral Hub, hub-user-0a1b2c3d] ship it', created_at: '2026-10-14T08:00:04Z' },
+                { id: 5, project: 'gamma', subscriber_id: 'Member', job_title: 'Member', origin: 'hub_operator', hub_user: 'hub-user-0a1b2c3d', content: '[Operator via Coral Hub, hub-user-0a1b2c3d] and me', created_at: '2026-10-14T08:00:05Z' },
             ];
             window.fetch = async (url, opts) => {
                 const u = String(url);
@@ -96,31 +98,36 @@ const BASE = require('./test_base').BASE;
             (await import(${S}+'render.js')).showBoardChatTab('gamma'); // the board chat of an agent on the team (its Board tab)
             return true;
         })()`);
-        await waitFor(`document.querySelectorAll('#board-panel-msgs .mb-message').length === 4`, 'the team chat');
+        await waitFor(`document.querySelectorAll('#board-panel-msgs .mb-message').length === 5`, 'the team chat');
         const chat = await ev(`[...document.querySelectorAll('#board-panel-msgs .mb-message')].map(m => ({ body: m.querySelector('.mb-message-body').textContent.trim(), badge: !!m.querySelector('.mb-hub-user-badge') }))`);
         assert.deepEqual(chat, [
             { body: 'from the hub', badge: true },
             { body: 'looks like one', badge: false },
             { body: 'an agent', badge: false },
             { body: 'ship it', badge: true },
+            { body: 'and me', badge: true },
         ], 'the Operator via Coral Hub post: its badge, and the prefix not shown twice');
         // The chip as the page renders it at the two widths (the table row keeps its header copy hidden by CSS, so this reads the rendered text and title, not the paint).
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
-            await waitFor(`document.querySelectorAll('#board-panel-msgs .mb-message').length === 4`, `${w}: the team chat`);
+            await waitFor(`document.querySelectorAll('#board-panel-msgs .mb-message').length === 5`, `${w}: the team chat`);
             const chip = await ev(`(() => { const c = document.querySelector('#board-panel-msgs .mb-hub-user-badge.is-operator'); return c ? { text: c.textContent.trim(), title: c.title } : null; })()`);
             assert.ok(chip, `${w}: the Operator via Coral Hub chip is rendered`);
             assert.equal(chip.text, 'Operator via Coral Hub', `${w}: the chip shows no Hub user id (#14292)`);
             assert.match(chip.title, /hub-user-0a1b2c3d/, `${w}: the id is in the hover title`);
-            // Reply pre-fills '@' + this name (replyToMessage, board_composer.js): the name the button draws is what the box gets (#14292)
-            const reply = await ev(`(() => { const row = [...document.querySelectorAll('#board-panel-msgs .mb-message')].find(x => x.querySelector('.mb-hub-user-badge.is-operator'));
+            // A real click on Reply, in the team chat and then on the board page: the box reads '@Operator ' for every Hub-as-Operator post, also one whose Hub user is named 'Member' (#14292)
+            const REPLIES = (rows, input) => `(() => { const out = []; for (const row of document.querySelectorAll(${JSON.stringify(rows)})) { if (!row.querySelector('.is-operator')) continue;
                 const t = row.querySelector(':scope > .mb-row-toggle'); if (t && t.getAttribute('aria-expanded') !== 'true') t.click();
-                const b = row.querySelector('[data-on-click="mb-msg-reply"]'); if (!b) return null;
-                const who = b.dataset.sender;
-                return { who, label: b.getAttribute('aria-label') }; })()`);
-            assert.ok(reply, `${w}: an open row has Reply`);
-            assert.equal(reply.who, 'Operator', `${w}: Reply names the Operator, not the Hub user id`);
-            assert.ok(!/hub-user-/.test(String(reply.label)), `${w}: the Reply label has no id: ` + reply.label);
+                const b = row.querySelector('[data-on-click="mb-msg-reply"]'); const box = document.getElementById(${JSON.stringify(input)}); if (!b || !box) { out.push({ missing: !b ? 'reply' : 'box' }); continue; }
+                box.value = ''; b.click(); out.push({ who: b.dataset.sender, label: b.getAttribute('aria-label'), box: box.value }); } return out; })()`;
+            const chat = await ev(REPLIES('#board-panel-msgs .mb-message', 'board-panel-input'));
+            assert.equal(chat.length, 2, `${w}: both Hub-as-Operator posts in the team chat have Reply: ` + JSON.stringify(chat));
+            for (const r of chat) { assert.equal(r.box, '@Operator ', `${w}: the team chat's box reads @Operator: ` + JSON.stringify(r)); assert.ok(!/hub-user-|Member/.test(String(r.label)), `${w}: the Reply label names no id: ` + r.label); }
+            await ev(`(async () => { const m = await import(${S}+'message_board.js'); m.showBoardInPage('gamma', document.getElementById('mb-board').parentElement); return true; })()`);
+            await waitFor(`document.querySelectorAll('#mb-board .mb-message').length === 5`, `${w}: the board page's rows`);
+            const page = await ev(REPLIES('#mb-board .mb-message', 'mb-post-input'));
+            assert.equal(page.length, 2, `${w}: both posts on the board page have Reply: ` + JSON.stringify(page));
+            for (const r of page) assert.equal(r.box, '@Operator ', `${w}: the board page's box reads @Operator: ` + JSON.stringify(r));
         }
         await Emulation.setDeviceMetricsOverride({ width: 1400, height: 900, deviceScaleFactor: 1, mobile: false });
         console.log("   ✓ team chat: the badge on the Hub user's message only");
@@ -206,6 +213,7 @@ const BASE = require('./test_base').BASE;
         console.log('   ✓ hidden where the answer is read-only (through the hub) or 404');
         console.log('PASS hub_user_ui_browser');
     } finally {
+        await removeBoards(ev, ['gamma']).catch(() => {}); // the board page check made it
         await client.close();
     }
 })().catch(e => { console.error(e); process.exit(1); });
