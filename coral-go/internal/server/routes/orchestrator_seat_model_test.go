@@ -92,11 +92,12 @@ func TestTheThinkingLevelFollowsTheSameSeatAsTheModel(t *testing.T) {
 	r.usualBoard()
 	run := func(name, boardID string) string {
 		before := len(r.term.sentCommands())
-		body := `{"working_dir":"` + r.work + `","agent_type":"claude","display_name":"` + name + `"`
+		body := map[string]any{"working_dir": r.work, "agent_type": "claude", "display_name": name}
 		if boardID != "" {
-			body += `,"board_id":"` + boardID + `"`
+			body["board_id"] = boardID
 		}
-		code, out := r.do("POST", "/api/sessions/launch", body+"}", operatorClient, "")
+		b, _ := json.Marshal(body)
+		code, out := r.do("POST", "/api/sessions/launch", string(b), operatorClient, "")
 		require.Equal(t, http.StatusOK, code, out)
 		return strings.Join(r.term.sentCommands()[before:], "\n")
 	}
