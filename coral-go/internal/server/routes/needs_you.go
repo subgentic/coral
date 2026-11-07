@@ -48,6 +48,9 @@ type NeedsYouItem struct {
 	TaskTitle string `json:"task_title,omitempty"`
 	// NewComments: on a review item, how many replies agents left in the Operator's comment threads on the file since the Operator opened them (#12026). The file's row is unread again and counted once, as itself.
 	NewComments int `json:"new_comments,omitempty"`
+	// StillWaiting: on an agent item, the Operator dismissed this request but the agent is still waiting in its terminal (#14203): Dismiss marks it ignored, it does not resolve it, so the row stays, flagged,
+	// until the agent's own evidence clears it.
+	StillWaiting bool `json:"still_waiting,omitempty"`
 }
 
 // needsYouAnswer is the whole answer. Count is every waiting thing. The order of items is (time, id). The first read (no ?after=) gives the newest few, newest first, and the cursor is "<time>|<id>" of the newest item. A poll with ?after=<cursor> gives the items strictly after that place, OLDEST first, up to the limit, and the cursor becomes the last item given: a burst bigger than the limit, and items in one instant, are read in several polls, none skipped and none given twice (a poller reads until a poll is shorter than the limit). A bare time as the cursor is still taken, and includes the items at that time.
@@ -81,7 +84,7 @@ func (h *SessionsHandler) NeedsYouAgents(r *http.Request) ([]NeedsYouItem, error
 	return needsYouAgentItems(rows, time.Now()), nil
 }
 
-// needsYouAgentItems is the live list's rows reduced to the agents that wait on the Operator: awake, not archived, waiting for input. A row with no start time of its wait is given now (it is waiting now).
+// needsYouAgentItems is the live list's rows reduced to the agents that wait on the Operator: awake, not archived, waiting for input (a request the Operator dismissed is still there while the agent waits, flagged StillWaiting, #14203). A row with no start time of its wait is given now (it is waiting now).
 func needsYouAgentItems(rows []map[string]any, now time.Time) []NeedsYouItem {
 	var out []NeedsYouItem
 	for _, row := range rows {
@@ -94,9 +97,7 @@ func needsYouAgentItems(rows []map[string]any, now time.Time) []NeedsYouItem {
 		if gone, _ := row["archived"].(bool); gone {
 			continue
 		}
-		if hid, _ := row["wait_ignored"].(bool); hid {
-			continue // the Operator hid this request (#11946): not in what waits for them, so the count and the phone push agree with the page
-		}
+		hid, _ := row["wait_ignored"].(bool) // the Operator dismissed this request (#11946, #14203): the agent still waits in its terminal, so it stays, flagged, and the count, the page and the team page agree
 		sid, _ := row["session_id"].(string)
 		name, _ := row["display_name"].(string)
 		if name == "" {
@@ -111,7 +112,7 @@ func needsYouAgentItems(rows []map[string]any, now time.Time) []NeedsYouItem {
 		if at = needsYouTime(at); at == "" {
 			at = now.UTC().Format(time.RFC3339Nano)
 		}
-		out = append(out, NeedsYouItem{Kind: "agent", From: needsYouLine(name), Line: needsYouLine(line), Team: team, ID: "agent:" + sid, At: at})
+		out = append(out, NeedsYouItem{Kind: "agent", From: needsYouLine(name), Line: needsYouLine(line), Team: team, ID: "agent:" + sid, At: at, StillWaiting: hid})
 	}
 	return out
 }
