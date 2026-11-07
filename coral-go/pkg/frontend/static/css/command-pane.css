@@ -550,3 +550,9 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
     .command-pane-toolbar:has(.model-chip-bar.adding) > :not(.model-chip-bar) { display: none; }
     .model-chip-bar.adding { display: flex; }
 }
+.codex-mode-chip { cursor: default; } /* a Codex agent's live mode (#14051): read from its session file, shown only: not a button, so no hover or press look */
+.codex-mode-chip:hover { color: inherit; border-color: inherit; }
+.codex-mode-chip[data-warn="on"] { border-color: var(--warning, var(--text-muted)); } /* a relaunch would give it less: the border says so, the title says what */
+.options-sheet-mode-note { padding: 8px 12px; color: var(--text-secondary); overflow-wrap: anywhere; } /* the Options sheet's line for a Codex agent's live mode (#14051): text only, no button look */
+.options-sheet-mode-note[data-warn="on"] { border-top: 1px solid var(--warning, var(--text-muted)); }
+

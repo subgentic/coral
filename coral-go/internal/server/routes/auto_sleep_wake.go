@@ -79,11 +79,13 @@ func (h *SessionsHandler) WakeIdleFor(ctx context.Context, sessionID string, fro
 		return false
 	}
 	defer release()
+	narrowedFrom, narrowedTo := h.relaunchNarrowing(*ls) // read before the relaunch (#14051)
 	if err := h.wakeSession(ctx, ls, true); err != nil { // no starting prompt: the delivery that woke it says what to do (#12358)
 		h.autoWakeFailed(ctx, ls, store.StartFailureWakeFailed, err)
 		return false
 	}
 	_ = h.ss.NoteAutoWoken(ctx, ls.SessionID, time.Now())
+	h.postRelaunchNarrowed(ctx, *ls, narrowedFrom, narrowedTo)
 	name := naming.SessionName(ls.AgentType, ls.SessionID)
 	ready := h.waitForInputBox(ctx, name, ls.AgentType, ls.SessionID)
 	slog.Info("auto_wake", "session_id", ls.SessionID, "agent_type", ls.AgentType, "wake_latency_ms", time.Since(start).Milliseconds(), "input_box_ready", ready)

@@ -1,5 +1,7 @@
 package agent
 
+import "strings"
+
 // What a permission mode and a capability set each allow, and the narrower of the two (#6425, Security's rule): an explicit mode is always applied and capabilities only narrow it for
 // the CLIs that keep only a sandbox and an approval mode (Codex, Antigravity). Claude keeps the lists and the mode apart.
 
@@ -111,4 +113,50 @@ func narrowAgyPermissions(caps *AgyPermissions, mode int) *AgyPermissions {
 		out.Mode = "plan"
 	}
 	return out
+}
+
+// CodexLaunchPermissions is the sandbox and the approval policy a Codex launch with these stored settings runs with: the flags, the capabilities and the permission mode go through the same
+// steps the launch builder takes (capabilities first, then the stored flags, then the mode), and the permission flags that come out are read back as a pair. It is what a wake, a restart
+// or an auto-wake would give the agent, to be compared with the mode it runs in now (#14051). "" and "" when the settings carry no permission at all: the CLI's own config decides then,
+// and nothing can be said to be narrower or wider.
+func CodexLaunchPermissions(flags []string, caps *Capabilities, mode string) (sandbox, approval string) {
+	parts, bypass, applied := codexCapabilityFlags(nil, caps, mode)
+	presetApplied := applied
+	parts, bypass, applied = codexUserFlags(parts, flags, bypass, applied)
+	if !applied {
+		parts, _, _ = appendCodexPermissionMode(parts, bypass, mode)
+	}
+	parts = collapseCodexSandboxFlags(parts, presetApplied)
+	for i := 0; i < len(parts); i++ {
+		switch {
+		case parts[i] == "--dangerously-bypass-approvals-and-sandbox":
+			sandbox, approval = codexSandboxNone, "never"
+		case (parts[i] == "-c" || parts[i] == "--config") && i+1 < len(parts):
+			i++
+			key, value, _ := strings.Cut(parts[i], "=")
+			value = strings.Trim(value, `"'`)
+			switch key {
+			case "sandbox_mode":
+				sandbox = value
+			case "approval_policy":
+				approval = normalizeCodexApprovalPolicy(value)
+			}
+		default:
+			kind, n := codexPermissionFlag(parts, i)
+			if n == 0 {
+				continue
+			}
+			value := parts[i+n-1]
+			if n == 1 { // the = form
+				_, value, _ = strings.Cut(parts[i], "=")
+			}
+			if kind == 's' {
+				sandbox = value
+			} else {
+				approval = normalizeCodexApprovalPolicy(value)
+			}
+			i += n - 1
+		}
+	}
+	return sandbox, approval
 }

@@ -309,6 +309,7 @@ func (h *SessionsHandler) autoWakeOne(ctx context.Context, ls store.LiveSession)
 	if !isDir(ls.WorkingDir) {
 		return "its folder is gone"
 	}
+	narrowedFrom, narrowedTo := h.relaunchNarrowing(ls) // read before the relaunch: what a Codex agent ran with, and what the relaunch gives it (#14051)
 	if err := h.wakeExistingSession(ctx, &ls); err != nil {
 		if errors.Is(err, ErrStillInOldTmux) {
 			return "it is still running in Coral's old tmux server"
@@ -323,13 +324,18 @@ func (h *SessionsHandler) autoWakeOne(ctx context.Context, ls store.LiveSession)
 			slog.Info("[auto-wake] resumed the board", "board", bn)
 		}
 	}
-	h.sendAutoWakeNotice(ctx, ls)
+	h.sendAutoWakeNoticeNarrowed(ctx, ls, narrowedFrom, narrowedTo)
 	return ""
 }
 
 // sendAutoWakeNotice posts Coral's fixed notice to a woken board agent, addressed to it alone
 // (CoralSender: a subscriber reading everything counts it only when it is named).
 func (h *SessionsHandler) sendAutoWakeNotice(ctx context.Context, ls store.LiveSession) {
+	h.sendAutoWakeNoticeNarrowed(ctx, ls, "", "")
+}
+
+// sendAutoWakeNoticeNarrowed is the notice with, for a Codex agent whose relaunch gave it less than it ran with, the one sentence that says so (#14051).
+func (h *SessionsHandler) sendAutoWakeNoticeNarrowed(ctx context.Context, ls store.LiveSession, narrowedFrom, narrowedTo string) {
 	boardName := ptr.Value(ls.BoardName)
 	if boardName == "" || h.bs == nil {
 		return
@@ -342,7 +348,11 @@ func (h *SessionsHandler) sendAutoWakeNotice(ctx context.Context, ls store.LiveS
 	if title == "" {
 		return
 	}
-	if _, err := h.bs.PostSystemMessage(ctx, boardName, board.CoralSender, "@"+title+" "+AutoWakeNotice, nil); err != nil {
+	text := AutoWakeNotice
+	if narrowedFrom != "" { // a Codex agent whose relaunch gave it less than it ran with (#14051)
+		text += " " + relaunchNarrowedSentence(narrowedFrom, narrowedTo)
+	}
+	if _, err := h.bs.PostSystemMessage(ctx, boardName, board.CoralSender, "@"+title+" "+text, nil); err != nil {
 		slog.Warn("[auto-wake] notice not posted", "board", boardName, "err", err)
 	}
 }

@@ -2,6 +2,7 @@
 1	agent_config_form.js	agentHTML
 1	agent_config_form.js	autoPermissionsHTML
 1	agent_config_form.js	body
+1	agent_config_form.js	codexNote
 1	agent_config_form.js	flagsInput
 1	agent_config_form.js	liveNote
 1	agent_config_form.js	modelPickerHtml()
