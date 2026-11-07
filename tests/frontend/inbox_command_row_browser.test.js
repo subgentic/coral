@@ -213,6 +213,7 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
             check(st && st.yes === 0 && st.no === 1 && st.text === ONE, `${at}a reject-only request shows its command and offers no Yes: ` + JSON.stringify(st));
 
             if (!mobile) { // 3) a pointer resting over the list holds the rows
+                await new Promise(r => setTimeout(r, 5300)); // sleep-ok: the earlier Yes/No clicks of this suite are the person's own actions, and a redraw within 5 s of one is not held (#14373): let that window pass
                 await show(MENU({ target: ONE }), 2);
                 const top0 = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr'); r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { top: Math.round(b.top), x: Math.round(b.left + 120), y: Math.round(b.top + b.height / 2), rows: document.querySelectorAll('#group-table-view tbody tr').length }; })()`);
                 await Input.dispatchMouseEvent({ type: 'mouseMoved', x: top0.x, y: top0.y });
@@ -235,6 +236,17 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
                 await new Promise(r => setTimeout(r, 3200)); // sleep-ok: past the 2 s cap of a waiting agent
                 check(!(await ev(`document.querySelector('#group-table-view tbody').textContent.includes('a different permission')`)) && /New items are waiting/.test(await ev(`(document.querySelector('#group-table-view .group-table-held') || {}).textContent || ''`)), `${at}a change that is not a waiting agent is still held at 3 s`);
                 await waitFor(`document.querySelector('#group-table-view tbody').textContent.includes('a different permission')`, `${at}and drawn by about 10 s`, 12000);
+                await ev(`window.__sum = undefined; true`);
+                // #14373 (saved_files_actions red in v2.0.60): a row the person just acted on leaves at once under a resting pointer; the hold is for rows that change on their own
+                await ev(`(() => { const td = document.querySelector('#group-table-view tbody tr td'); const b = document.createElement('button'); b.type = 'button'; b.id = 'act-probe'; b.textContent = 'Ignore'; td.append(b); return true; })()`);
+                const probe = await ev(`(() => { const r = document.getElementById('act-probe').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+                await Input.dispatchMouseEvent({ type: 'mouseMoved', x: 4, y: 4 }); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the pointer leaves, so the next rest starts a fresh hold (the last one has run out)
+                await Input.dispatchMouseEvent({ type: 'mouseMoved', x: probe.x, y: probe.y }); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the pointer events reach the page
+                await Input.dispatchMouseEvent({ type: 'mousePressed', x: probe.x, y: probe.y, button: 'left', clickCount: 1 });
+                await Input.dispatchMouseEvent({ type: 'mouseReleased', x: probe.x, y: probe.y, button: 'left', clickCount: 1 });
+                await ev(`window.__sum = 'Notification: Claude needs the permission after the click'; true`); await refresh();
+                await new Promise(r => setTimeout(r, 700)); // sleep-ok: well under the 2 s urgent cap and the 10 s hold: a held redraw would not be drawn yet
+                check(await ev(`document.querySelector('#group-table-view tbody').textContent.includes('after the click')`) && !(await ev(`!!document.querySelector('#group-table-view .group-table-held')`)), `${at}the redraw after the person's own click (Ignore, Dismiss, Answer) is drawn at once, not held under the resting pointer`);
                 await ev(`window.__sum = undefined; true`);
                 await Input.dispatchMouseEvent({ type: 'mouseMoved', x: 4, y: 4 });
             }

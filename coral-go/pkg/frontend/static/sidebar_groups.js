@@ -248,6 +248,10 @@ if (typeof document !== 'undefined') {
 const HOVER_HOLD_MS = 10000, URGENT_HOLD_MS = 2000; // a row that needs the person (a waiting agent, a permission) is held 2 s at most: enough that a row does not jump under a click, not enough to hide that an agent is waiting (QA Reviewer 2 on #14173); other new rows, 10 s
 const canHover = () => typeof matchMedia === 'function' && matchMedia('(hover: hover)').matches; // a touch screen has no hover: only a pointer that can rest on the list holds it
 let hoverOver = false, hoverHeldSince = null;
+// A row the person just acted on (Ignore, Dismiss, Done, Answer: a click on a button in the table) leaves at once (#14373, saved_files_actions): the hold is for rows that change on their own while the pointer rests, not for the answer to a click.
+// The click has up to ACT_MS to come back from the server; a redraw inside it is not held.
+const ACT_MS = 5000;
+let lastActAt = 0;
 let holdCap = HOVER_HOLD_MS, drawnUrgent = '';
 const hovering = () => hoverOver && hoverHeldSince !== null ? Date.now() - hoverHeldSince < holdCap : hoverOver;
 function showHeldNote() {
@@ -261,6 +265,7 @@ if (typeof document !== 'undefined') {
     // Every mouse move says where the pointer is now: a button that was pressed and then replaced (an answered row's choices) sends no pointerout, so the way out is seen on the first move outside the list.
     document.addEventListener('pointermove', e => { if (!canHover()) return; const inside = e.target instanceof Element && !!e.target.closest('#group-table-view tbody'); if (inside) hoverOver = true; else if (hoverOver) leaveList(); }, true);
     document.addEventListener('pointerout', e => { if (hoverOver && e.relatedTarget === null) leaveList(); }, true); // the pointer left the window
+    document.addEventListener('click', e => { if (e.target instanceof Element && e.target.closest('#group-table-view tbody button')) lastActAt = Date.now(); }, true); // the person's own action: its redraw is never held
     window.addEventListener('blur', leaveList);
 }
 
@@ -268,7 +273,7 @@ export function refreshGroupTable(kind) {
     const src = sources.get(kind);
     if (open && open.kind === kind) {
         if (src?.holdRedraw && holding()) { deferredKind = kind; flushLater(); return; }
-        if (src?.holdRedraw && hoverOver) { if (hoverHeldSince === null) hoverHeldSince = Date.now(); holdCap = src.urgentSignature && src.urgentSignature() !== drawnUrgent ? URGENT_HOLD_MS : HOVER_HOLD_MS; if (hovering()) { deferredKind = kind; showHeldNote(); setTimeout(() => { const k = deferredKind; if (k && !holding()) { deferredKind = null; refreshGroupTable(k); } }, Math.max(60, holdCap - (Date.now() - hoverHeldSince) + 60)); return; } } // a pointer resting on the list: the rows stay where they are, up to HOVER_HOLD_MS
+        if (src?.holdRedraw && hoverOver && Date.now() - lastActAt > ACT_MS) { if (hoverHeldSince === null) hoverHeldSince = Date.now(); holdCap = src.urgentSignature && src.urgentSignature() !== drawnUrgent ? URGENT_HOLD_MS : HOVER_HOLD_MS; if (hovering()) { deferredKind = kind; showHeldNote(); setTimeout(() => { const k = deferredKind; if (k && !holding()) { deferredKind = null; refreshGroupTable(k); } }, Math.max(60, holdCap - (Date.now() - hoverHeldSince) + 60)); return; } } // a pointer resting on the list: the rows stay where they are, up to HOVER_HOLD_MS
         const host = document.getElementById('group-table-view');
         if (!host || host.style.display === 'none') { open = null; return; }
         if (drawTable()) return;
