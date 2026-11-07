@@ -19,6 +19,18 @@ type UnreadState struct {
 	LatestID int64
 }
 
+// The review notice (#14104): "@<orchestrator> [Task #N in review] ..." is posted by Coral Task Queue (task submit-review) to tell the orchestrator a task waits for it. An orchestrator's plain read returns it,
+// so it counts as unread for that orchestrator and nudges it, even in a quiet team where nothing else is unread (a waiting orchestrator was never woken). It is the ONLY queue line that does: health lines,
+// reminders, park notices, assignments and a notice that names someone else stay out, so the queue's other chatter never floods an agent with nudges.
+const reviewNoticeMarker = " in review] "
+
+// reviewNoticePrefix is how a review notice to this subscriber begins.
+func reviewNoticePrefix(subscriberID string) string { return "@" + subscriberID + " [Task #" }
+
+// orchestratorQueueFilter is the sender filter of an orchestrator's unread selection: every sender but Coral Task Queue, whose review notice naming the orchestrator is counted. It takes two arguments, the
+// notice's prefix and marker.
+const orchestratorQueueFilter = ` AND (subscriber_id NOT IN ('Coral Task Queue') OR (instr(content, ?) = 1 AND instr(content, ?) > 0))`
+
 func (s *Store) CheckUnread(ctx context.Context, project, subscriberID string) (int, error) {
 	var sub struct {
 		LastReadID  int64  `db:"last_read_id"`
@@ -55,9 +67,9 @@ func (s *Store) CheckUnread(ctx context.Context, project, subscriberID string) (
 		// names: never a fan-out to every subscriber that reads everything.
 		var count int
 		err := s.reader().GetContext(ctx, &count,
-			`SELECT COUNT(*) FROM board_messages WHERE project = ? AND id > ? AND subscriber_id != ?`+systemFilter+
+			`SELECT COUNT(*) FROM board_messages WHERE project = ? AND id > ? AND subscriber_id != ?`+orchestratorQueueFilter+
 				` AND (subscriber_id != '`+CoralSender+`' OR instr(content, ?) > 0)`,
-			project, sub.LastReadID, subscriberID, "@"+sub.JobTitle)
+			project, sub.LastReadID, subscriberID, reviewNoticePrefix(subscriberID), reviewNoticeMarker, "@"+sub.JobTitle)
 		return count, err
 	}
 
@@ -95,6 +107,10 @@ func (s *Store) LatestUnreadMessageID(ctx context.Context, project, subscriberID
 	}
 	args := []interface{}{project, sub.LastReadID, subscriberID}
 	where := "m.project=? AND m.id>? AND m.subscriber_id!=? AND m.subscriber_id!='Coral Task Queue'"
+	if isOrchestrator(subscriberID, sub.JobTitle, sub.CanPeek) { // its plain read returns the review notice that names it, so that notice is a latest message too (#14104)
+		where = "m.project=? AND m.id>? AND m.subscriber_id!=?" + strings.ReplaceAll(orchestratorQueueFilter, "subscriber_id", "m.subscriber_id")
+		args = append(args, reviewNoticePrefix(subscriberID), reviewNoticeMarker)
+	}
 	if !isOrchestrator(subscriberID, sub.JobTitle, sub.CanPeek) { // the selection of a plain read: tagged messages, whatever the mode
 		args[1] = max(sub.LastReadID, s.unreadFloor(ctx, project)) // within the unread window (#3875)
 		return s.confirmedMention(ctx, project, subscriberID, sub.JobTitle, where, args, args[1].(int64), true)
