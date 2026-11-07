@@ -175,7 +175,7 @@ func claudeSettingsFile(files *launchFiles, params LaunchParams, effectiveID str
 	}
 
 	// Inject permissions from capabilities
-	if perms := TranslateToClaudePermissions(params.Capabilities); perms != nil && !params.KeepFullAccess {
+	if perms := TranslateToClaudePermissionsForMode(params.Capabilities, claudeLaunchMode(params)); perms != nil && !params.KeepFullAccess {
 		permMap := map[string]any{}
 		if len(perms.Allow) > 0 {
 			permMap["allow"] = perms.Allow
@@ -230,6 +230,19 @@ func claudeSettingsFile(files *launchFiles, params LaunchParams, effectiveID str
 	// Write settings to temp file using writeTempFile for safe creation
 	data, _ := json.MarshalIndent(merged, "", "  ")
 	return files.write("settings", effectiveID, "json", append(data, '\n'))
+}
+
+// claudeLaunchMode is the permission mode the launch really starts in, the one appendPermissionMode puts on the command line: a mode in the flags wins, else the launch's mode, else Default
+// for an interactive launch. The capabilities' allow list is built from it (#14350) every time the agent starts, from the stored capabilities: a Resume, Wake or Restart that moves an agent
+// from Default to Auto regenerates the list without the git rules.
+func claudeLaunchMode(params LaunchParams) string {
+	if m := PermissionModeFromFlags(params.Flags); m != "" {
+		return m
+	}
+	if params.PermissionMode != "" {
+		return params.PermissionMode
+	}
+	return "default"
 }
 
 // appendPermissionMode adds --permission-mode from the settings unless Flags already has a permission mode (the flag, its = form, or a bypass). An interactive launch always carries one
