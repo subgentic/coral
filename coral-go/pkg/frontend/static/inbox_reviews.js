@@ -461,6 +461,7 @@ let lastReadNotice = 0;
 /** markOpenedRead that says so on the page when the write is refused (#12742): the sentence goes to `say` (the live region) and, at most once in ten seconds, to a visible toast, so a file that stays unread is never silent. Resolves either way. */
 export function markOpenedReadVisibly(hex, say, team = '') {
     return markOpenedRead(hex, team).catch(error => {
+        if (error?.name === 'AbortError') return; // A newer read replaced this one; no write was refused.
         const text = `Could not mark the file read: ${error && error.message ? error.message : 'try again'}`;
         if (say) say(text);
         const now = Date.now();
