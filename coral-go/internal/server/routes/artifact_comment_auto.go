@@ -20,7 +20,7 @@ import (
 // autoDelivery is what became of the delivery of one comment: who it went to, or why it did not (never shown to the agent).
 type autoDelivery struct {
 	To     string // the agent's title, "" when nothing was sent
-	Reason string // not_owner, not_for_review, no_uploader, asleep_or_gone, board_paused, rate_limited, redaction_unavailable, failed
+	Reason string // not_owner, no_uploader, asleep_or_gone (the session is archived, ended or gone, or a terminal: a SLEEPING agent is told and reads it on waking), ambiguous_uploader (a no-team file two agents uploaded), board_paused, rate_limited, redaction_unavailable, failed; pinned by delivery_reasons_test.go
 }
 
 // deliverOperatorComment sends the Operator's new comment c (on artifact id, board b) to the uploading agent when the rules above hold. Best effort: the comment is already kept, so a failure is logged

@@ -475,3 +475,41 @@ func TestTheClaimOfADeliveryToNobodyIsDroppedSoALaterRetryTellsTheAgent(t *testi
 	assert.Len(t, c.messages(t), 1)
 	assert.Len(t, c.comments(t), 1, "still one comment")
 }
+
+// coral-hub's question on #13976: a SLEEPING uploader has the notice stored and reads it when it wakes, so the one-call answer says delivered true, to, asleep true, as the plain notice does; only an archived, ended or gone
+// session (or a terminal) is not stored for: asleep_or_gone, delivered false.
+func TestASleepingUploaderIsToldAndTheAnswerSaysItWillReadItOnWaking(t *testing.T) {
+	words := `{"decision":"changes","text":"Use 5,000 rows."}`
+	for _, c := range []struct {
+		name          string
+		prepare       func(c *changesEnv)
+		delivered     bool
+		asleep        bool
+		reason        string
+		wantNotices   int
+		wantAsleepKey bool
+	}{
+		{"awake", func(*changesEnv) {}, true, false, "", 1, false},
+		{"sleeping", func(c *changesEnv) {
+			require.NoError(t, c.ss.SetSessionSleeping(context.Background(), sessAlice, true))
+		}, true, true, "", 1, true},
+		{"archived", func(c *changesEnv) {
+			require.NoError(t, c.ss.SetSessionArchived(context.Background(), sessAlice, true))
+		}, false, false, "asleep_or_gone", 0, false},
+	} {
+		e := newChangesEnv(t)
+		e.h.SetSessionAsleepLookup(SessionAsleepLookup(e.ss))
+		c.prepare(e)
+		code, out := e.changes(t, words)
+		require.Equal(t, http.StatusOK, code, c.name+": %v", out)
+		assert.Equal(t, c.delivered, out["delivered"], c.name)
+		assert.Equal(t, c.reason, func() string { r, _ := out["reason"].(string); return r }(), c.name)
+		if c.wantAsleepKey {
+			assert.Equal(t, true, out["asleep"], c.name+": it reads the notice when it wakes")
+		} else {
+			assert.NotContains(t, out, "asleep", c.name)
+		}
+		assert.Len(t, e.messages(t), c.wantNotices, c.name)
+		assert.Len(t, e.comments(t), 1, c.name+": the words are in the thread whatever became of the notice")
+	}
+}
