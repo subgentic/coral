@@ -57,3 +57,13 @@ func TestPermissionTarget_TooLongIsOnlyReject(t *testing.T) {
 	require.True(t, ok)
 	assert.True(t, s.OnlyReject, "a request longer than the card shows can only be rejected")
 }
+
+// Security's SHOULD on #14173: a closing dashed rule with no opening rule in reach is a request that cannot be read whole: only Reject.
+func TestPermissionTarget_NoOpeningRuleIsOnlyReject(t *testing.T) {
+	rule := strings.Repeat("╌", 110)
+	screen := "⏺ Bash(x)\n" + strings.Repeat(" more output\n", 3) + " touch a\n" + rule + "\n Do you want to proceed?\n ❯ 1. Yes\n   2. No\n\n Esc to cancel\n"
+	s, ok := parsePromptScreen(screen)
+	require.True(t, ok)
+	assert.True(t, s.OnlyReject, "the opening rule is not on the screen")
+	assert.Contains(t, s.Note, "top of this request")
+}

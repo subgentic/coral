@@ -58,22 +58,30 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
                 await new Promise(r => setTimeout(r, 400)); // sleep-ok: the folded table settles after the first paint
             };
 
-            // 1) the command is on the row: one line, an ellipsis, the whole text as its tooltip, and what Yes allows
-            await show(MENU(), 2);
-            const cmd = await ev(`(() => { const c = document.querySelector('#group-table-view .inbox-answers .inbox-cmd'), code = c && c.querySelector('code'); if (!c) return null; const r = c.getBoundingClientRect(); return { text: c.textContent, h: Math.round(r.height), cut: c.scrollWidth > c.clientWidth + 1 || c.textContent.endsWith('…'), title: c.title, left: Math.round(r.left), right: Math.round(r.right), vw: innerWidth, lh: parseFloat(getComputedStyle(c).lineHeight) || parseFloat(getComputedStyle(c).fontSize) * 1.4 }; })()`);
+            // 1) a one-line command is on the row whole: the command, what Yes allows, Yes and No
+            const ONE = 'git status --short';
+            await show(MENU({ target: ONE }), 2);
+            const one = await ev(`(() => { const c = document.querySelector('#group-table-view .inbox-answers .inbox-cmd'); if (!c) return null; const r = c.getBoundingClientRect(); return { text: c.textContent, title: c.title, h: Math.round(r.height), left: Math.round(r.left), right: Math.round(r.right), vw: innerWidth, lh: parseFloat(getComputedStyle(c).lineHeight) || parseFloat(getComputedStyle(c).fontSize) * 1.4 }; })()`);
+            check(one && one.text === 'Wants to run git status --short' && one.title === ONE && one.h <= one.lh * 1.6 && one.left >= 0 && one.right <= one.vw, `${at}a one-line command is on the row: ` + JSON.stringify(one));
+            check(/Yes lets it run this once\. No refuses it/.test(await ev(`(document.querySelector('#group-table-view .inbox-answers .inbox-yes-note') || {}).textContent`) || ''), `${at}the row says what Yes allows`);
+            assert.deepEqual(await rowButtons(), ['Yes', 'No'], `${at}Yes and No stay for a command shown whole`);
+            await shot(`command-row-${w}`);
+            // 2) a command of several lines, or one cut at the row's width, is NOT shown whole: the first line, one line with an ellipsis, the whole text as its tooltip, and only No on the row (Security's SHOULD)
+            await show(MENU(), 1);
+            const cmd = await ev(`(() => { const c = document.querySelector('#group-table-view .inbox-answers .inbox-cmd'); if (!c) return null; const r = c.getBoundingClientRect(); return { text: c.textContent, h: Math.round(r.height), cut: c.scrollWidth > c.clientWidth + 1 || c.textContent.endsWith('…'), title: c.title, left: Math.round(r.left), right: Math.round(r.right), vw: innerWidth, lh: parseFloat(getComputedStyle(c).lineHeight) || parseFloat(getComputedStyle(c).fontSize) * 1.4 }; })()`);
             check(cmd && /^Wants to run cd \/Users\/qa\/work\/app && npm run build/.test(cmd.text) && cmd.title.startsWith('cd /Users/qa/work/app'), `${at}the first line of the command is on the row: ` + JSON.stringify(cmd));
             check(cmd && cmd.h <= cmd.lh * 1.6 && cmd.cut && cmd.left >= 0 && cmd.right <= cmd.vw, `${at}one line, cut with an ellipsis, on the screen: ` + JSON.stringify(cmd));
             check(cmd && cmd.title.includes('npm test -- --reporter=dot') && cmd.title.includes('git status --short'), `${at}the whole command (all three lines) is the tooltip: ` + JSON.stringify(cmd && cmd.title));
-            const yesNote = await ev(`(document.querySelector('#group-table-view .inbox-answers .inbox-yes-note') || {}).textContent`);
-            check(/Yes lets it run this once\. No refuses it/.test(yesNote || ''), `${at}the row says what Yes allows: ` + JSON.stringify(yesNote));
-            assert.deepEqual(await rowButtons(), ['Yes', 'No'], `${at}Yes and No stay on the row`);
-            await shot(`command-row-${w}`);
+            assert.deepEqual(await rowButtons(), ['No'], `${at}only No on a command the row does not show whole`);
+            check(/longer than one line, so it can only be refused here/.test(await ev(`(document.querySelector('#group-table-view .inbox-answers .inbox-yes-note') || {}).textContent`) || ''), `${at}the row says why there is no Yes`);
+            await show(MENU({ target: 'echo ' + 'x'.repeat(200) }), 1);
+            assert.deepEqual(await rowButtons(), ['No'], `${at}one line of more than 160 characters is cut on the row: only No`);
             // a request that can only be rejected shows its command too, and no Yes sentence
-            await show(MENU({ only_reject: true, options: [{ n: 1, label: 'Yes', action: 'select' }, { n: 2, label: 'No', action: 'select' }] }), 1);
+            await show(MENU({ only_reject: true, target: ONE }), 1);
             check(!!(await ev(`!!document.querySelector('#group-table-view .inbox-answers .inbox-cmd')`)) && !(await ev(`!!document.querySelector('#group-table-view .inbox-yes-note')`)), `${at}a reject-only request still shows its command and offers no Yes sentence`);
 
-            if (!mobile) { // 2) a pointer resting over the list holds the rows
-                await show(MENU(), 2);
+            if (!mobile) { // 3) a pointer resting over the list holds the rows
+                await show(MENU({ target: ONE }), 2);
                 const top0 = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr'); r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { top: Math.round(b.top), x: Math.round(b.left + 120), y: Math.round(b.top + b.height / 2), rows: document.querySelectorAll('#group-table-view tbody tr').length }; })()`);
                 await Input.dispatchMouseEvent({ type: 'mouseMoved', x: top0.x, y: top0.y });
                 await new Promise(r => setTimeout(r, 300)); // sleep-ok: the pointer events reach the page
