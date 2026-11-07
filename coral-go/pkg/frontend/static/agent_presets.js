@@ -54,7 +54,7 @@ export const AGENT_PRESETS = [
         name: "Security Reviewer",
         prompt: "You are a security reviewer. Audit code for vulnerabilities, review auth flows, and ensure OWASP best practices. Report findings via the message board.",
         roleLimits: { allow: ['file_read', 'web_access', 'shell:coral-board *'] },
-        roleNote: "This role is a prompt, not a permission. It starts with full tool permissions; apply the role’s limits to restrict its tools.",
+        roleNote: "This role is a prompt, not a permission. Its instructions do not restrict its tools; apply the role’s limits to do that.",
         capabilities: { allow: ['file_read', 'file_write', 'shell', 'web_access', 'agent_spawn'], deny: [] },
     },
     {
@@ -73,7 +73,7 @@ export const AGENT_PRESETS = [
         name: "SEO Strategist",
         prompt: "You are an SEO and analytics expert. Research keywords, analyze competitors, optimize content for search engines, and provide data-driven recommendations. Coordinate with the team via the message board.",
         roleLimits: { allow: ['file_read', 'web_access', 'shell:coral-board *'] },
-        roleNote: "This role is a prompt, not a permission. It starts with full tool permissions; apply the role’s limits to restrict its tools.",
+        roleNote: "This role is a prompt, not a permission. Its instructions do not restrict its tools; apply the role’s limits to do that.",
         capabilities: { allow: ['file_read', 'file_write', 'shell', 'web_access', 'agent_spawn'], deny: [] },
     },
     {
@@ -86,7 +86,7 @@ export const AGENT_PRESETS = [
         name: "Research Analyst",
         prompt: "You are a thorough research analyst. Find information, summarize documents, compare options, and provide well-sourced answers. Coordinate with the team via the message board.",
         roleLimits: { allow: ['file_read', 'web_access', 'shell:coral-board *'] },
-        roleNote: "This role is a prompt, not a permission. It starts with full tool permissions; apply the role’s limits to restrict its tools.",
+        roleNote: "This role is a prompt, not a permission. Its instructions do not restrict its tools; apply the role’s limits to do that.",
         capabilities: { allow: ['file_read', 'file_write', 'shell', 'web_access', 'agent_spawn'], deny: [] },
     },
     {
