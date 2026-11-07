@@ -6,6 +6,9 @@ import (
 	"strings"
 
 	"github.com/jmoiron/sqlx"
+
+	"github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/naming"
 )
 
 // CompletionReview preserves an unaccepted candidate independently of the final
@@ -53,10 +56,21 @@ func (s *Store) RequirePlanner(ctx context.Context, project, actor string) error
 		return fmt.Errorf("an active registered orchestrator is required")
 	}
 	g, err := s.GetOrchGrant(ctx, project)
-	if err != nil || len(g.SeatSession) < 8 || !strings.HasSuffix(sub.SessionName, g.SeatSession) {
+	if err != nil || len(g.SeatSession) < 8 || !isSeatSessionName(sub.SessionName, g.SeatSession) {
 		return fmt.Errorf("an active registered orchestrator is required")
 	}
 	return nil
+}
+
+// isSeatSessionName says the member's session name IS the seat's session: exactly "<agent type>-<seat session id>" for one of Coral's agent types, compared whole, never as a suffix or by parsing the name (a name that
+// merely ends in the seat id, or has any other prefix, is not the seat's session; Security's SHOULD on #14050).
+func isSeatSessionName(sessionName, seat string) bool {
+	for _, t := range []string{agenttypes.Claude, agenttypes.Agy, agenttypes.Antigravity, agenttypes.Gemini, agenttypes.Codex, agenttypes.Pi, agenttypes.Hermes, agenttypes.Opencode, agenttypes.Terminal} {
+		if sessionName == naming.SessionName(t, seat) {
+			return true
+		}
+	}
+	return false
 }
 
 // SubmitCompletionReview records evidence that actually reached Coral. It does

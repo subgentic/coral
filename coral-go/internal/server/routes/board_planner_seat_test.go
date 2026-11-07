@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -116,4 +117,69 @@ func TestATitleThatOnlySaysOrchestratorIsStillNoPrivilege(t *testing.T) {
 func TestARefusedGoalRequestSendNamesTheSeatToo(t *testing.T) {
 	assert.Contains(t, goalRequestSendWords("team").notPlanner, "Orchestrator seat")
 	assert.Contains(t, goalRequestSendWords("team").notPlanner, "job title must be the word Orchestrator")
+}
+
+// Security's SHOULD on #14050: the member's session IS the seat's, compared whole as "<agent type>-<seat id>": a name that merely ends in the seat id, or carries another prefix, is not the seat.
+func TestOnlyTheSeatsExactSessionNameIsTheSeat(t *testing.T) {
+	h, call := seatTeam(t)
+	ctx := context.Background()
+	_, err := h.bs.SeedOrchGrant(ctx, "team", seatSession)
+	require.NoError(t, err)
+	plans := func(sessionName string) bool {
+		_, err := h.bs.Subscribe(ctx, "team", "Lead", "Team Lead", sessionName, nil, "all", false) // the same member, with another session name
+		require.NoError(t, err)
+		code, _ := call("POST", "/api/board/team/goals", map[string]any{"title": "A goal", "subscriber_id": "Lead"})
+		return code == http.StatusCreated
+	}
+	assert.True(t, plans("claude-"+seatSession), "the seat's own session")
+	assert.True(t, plans("codex-"+seatSession), "any of Coral's agent types")
+	for _, name := range []string{
+		"evil-" + seatSession,          // another prefix: the old suffix test and SessionIDFromName both said yes
+		"claudex-" + seatSession,       // a prefix that only starts like a type
+		"claude-x-" + seatSession,      // ends in the seat id
+		seatSession,                    // no prefix at all
+		"claude-" + seatSession + "-2", // the id is not the end
+		"Claude-" + seatSession,        // not the type's spelling
+		"claude-" + seatSession[1:],    // a different id
+	} {
+		assert.False(t, plans(name), "%q is not the seat's session", name)
+	}
+}
+
+// QA's SHOULD on #14050: isTaskPlanner (the planner-or-assignee edits: cancel, nudge, reminders, release, and the task title and priority edit through requireTaskTextEditor) is the seat's too. Changing it back to the old
+// rule would leave a seat holder with another title unable to cancel or edit the team's shared tasks, with nothing else noticing.
+func TestTheSeatCancelsAndEditsSharedTasksAndAWorkerCannot(t *testing.T) {
+	h, call := seatTeam(t)
+	ctx := context.Background()
+	_, err := h.bs.SeedOrchGrant(ctx, "team", seatSession)
+	require.NoError(t, err)
+	_, err = h.bs.Subscribe(ctx, "team", "Dev2", "Developer", "claude-aaaaaaaa-0000-0000-0000-000000000002", nil, "mentions", false)
+	require.NoError(t, err)
+	mk := func() int64 { // a shared task assigned to Dev2: neither Lead nor Dev made or owns it
+		tk, err := h.bs.CreateTask(ctx, "team", "Shared task", "", "medium", "Orchestrator")
+		require.NoError(t, err)
+		_, err = h.bs.ClaimTask(ctx, "team", "Dev2", tk.ID)
+		require.NoError(t, err)
+		return tk.ID
+	}
+	// the helper the edits use, directly: the Operator, the seat, not a worker, nobody
+	assert.True(t, h.isTaskPlanner(ctx, "team", "Operator"))
+	assert.True(t, h.isTaskPlanner(ctx, "team", "Lead"), "the seat plans the team's shared tasks, whatever its title")
+	assert.False(t, h.isTaskPlanner(ctx, "team", "Dev"))
+	assert.False(t, h.isTaskPlanner(ctx, "team", ""))
+	// cancel (requirePlannerOrAssignee): a worker that is not the assignee is refused, the seat is not
+	id := mk()
+	code, out := call("POST", "/api/board/team/tasks/"+itoa(id)+"/cancel", map[string]any{"subscriber_id": "Dev", "message": "no"})
+	assert.Equal(t, http.StatusForbidden, code, out)
+	code, out = call("POST", "/api/board/team/tasks/"+itoa(id)+"/cancel", map[string]any{"subscriber_id": "Lead", "message": "the seat cancels it"})
+	assert.Equal(t, http.StatusOK, code, out)
+	// the title/priority editor shares the helper
+	task, err := h.bs.GetTask(ctx, "team", mk())
+	require.NoError(t, err)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/x", nil)
+	assert.True(t, h.requireTaskTextEditor(rec, req, "team", task, "Lead"), "the seat edits a shared task's title")
+	rec = httptest.NewRecorder()
+	assert.False(t, h.requireTaskTextEditor(rec, req, "team", task, "Dev"), "a worker does not")
+	assert.Equal(t, http.StatusForbidden, rec.Code)
 }
