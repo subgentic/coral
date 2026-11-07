@@ -155,7 +155,7 @@ func TestBytesInAnotherTeamsSeriesAreTheCallersOwnAndTheOtherTeamsSeriesIsUntouc
 	sid, _ := seriesOf(t, rig) // team-a's series holds "plan, second draft"
 	before := len(seriesMembers(rig.coralDir, sid))
 	own := rig.uploadText("b1", "b.txt", "bob's own artifact")
-	code, out := rig.uploadVersion("b1", "b2.txt", "plan, second draft", "coral://artifacts/"+own)
+	code, out := rig.uploadVersion("b1", "b.txt", "plan, second draft", "coral://artifacts/"+own) // the same name as its own file: the test is about team isolation, not a rename (#14145: a new version under another name is refused unless --rename)
 	assert.Equal(t, http.StatusCreated, code, "team-b's version is team-b's: it learns nothing of team-a's series: %v", out)
 	assert.NotEqual(t, sid, out["series_id"], "a series of team-b's own")
 	assert.EqualValues(t, 2, out["version"])
