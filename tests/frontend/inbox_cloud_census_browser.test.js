@@ -71,6 +71,8 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
         let bootNative = false; // the Hub's boot value for the Inbox: off while the baseline is recorded (the Chats and Board tabs as the Hub has them), on for the Inbox
         await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false, inbox: () => bootNative, hubPages: !!process.env.INBOX_CENSUS_SHOTS }); // the stand-in Hub page only for the pictures: a run without them answers the Hub's own pages as the isolated server does
         await Page.addScriptToEvaluateOnNewDocument({ source: RECORDER });
+        // The census measures a Hub with nothing waiting: the stand-in's per-computer skill rows (#14046) carry a waiting time, and a Needs you table with such a row repaints every 30 s (inbox_sidebar.js, the age tick), which re-reads the kept lists. The skills read is still made and counted (ADDED baseline above); its answer here is an empty list.
+        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const prev = window.fetch; window.fetch = async function (u, o) { const r = await prev.call(this, u, o); return /\\/api\\/needs-you\\?kind=skill/.test(String(u)) ? new Response(JSON.stringify({ count: 0, counts: { skill: 0 }, items: [] }), { headers: { 'Content-Type': 'application/json' } }) : r; }; })();` });
 
         // 1. the baseline: the cloud Chats tab, and the team page's Board tab, as the Hub's dashboard has them
         await open('/');
