@@ -67,7 +67,7 @@ func TestAnExcerptOfAHugeMessageIsFastAndSafeAtTheEdge(t *testing.T) {
 			idx := strings.Index(text, "needle")
 			start := time.Now()
 			got := makeBoundedExcerpt(text, idx, 300)
-			if took := time.Since(start); took > time.Second {
+			if took := time.Since(start); took > time.Second*raceSlowdown() { // a clock bound: widened under -race (#14280)
 				t.Fatalf("%s edge, off %d: a %d byte message took %v", edge, off, len(text), took)
 			}
 			if !strings.Contains(got, "needle") {
