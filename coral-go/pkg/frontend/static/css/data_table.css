@@ -665,11 +665,11 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
     .inbox-needs-results .dt-box.dt-folded tbody { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 12px 12px 0; }
     #group-table-view[data-group="hub-inbox:needs"] .dt-box.dt-folded tbody tr.dt-row > td, #group-table-view[data-group="hub-inbox:needs"] .dt-box.dt-folded tbody tr.dt-row:hover > td { background: none; } /* the unread tint and the hover paint the cells; the card's colour is the row's */
     :root #group-table-view[data-group="hub-inbox:needs"] .dt-box.dt-folded tbody tr.dt-row.dt-row { background: var(--chat-assistant-bg, var(--bg-tertiary)); border: 1px solid var(--border); border-radius: var(--radius-xl); border-top-left-radius: 2px; padding: 12px 16px; min-width: 0; }
+    :root #group-table-view[data-group="hub-inbox:needs"] .dt-box.dt-folded tbody tr.dt-row.dt-row.dt-read { background: var(--bg-secondary); } /* a read card is quieter than an unread one (the card keeps the unread signal the old row's tint gave: needs_read_state) */
     .inbox-needs-results .dt-box.dt-folded tbody tr.dt-row:last-child { border-bottom: 1px solid var(--border); }
     .inbox-needs-results .dt-box.dt-folded tbody tr.dt-row { position: relative; }
     .inbox-needs-results .dt-box.dt-folded tbody tr.dt-row > td:has(> .inbox-kind-column) { padding-inline-start: calc(2rem + 12px); } /* the card's padding holds the glyph: the text starts after it (the glyph is 2 rem wide, so it grows with the text size) */
     .inbox-needs-results .dt-box.dt-folded tbody tr.dt-row > td > .inbox-kind-column { left: 0; top: 0; }
-    .inbox-needs-results .dt-box.dt-folded tbody tr.dt-row .inbox-file-question { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* one short line */
     #group-table-view[data-group="hub-inbox:needs"] { --space-2xl: 12px; } /* ONE left edge, 12 px, for the title, the search, the grouping box, the chips, the cards and the notice under them (the Operator: the search bar is offset): the page's own 24 px gutter is the card's 12 px too */
     #group-table-view[data-group="hub-inbox:needs"] .inbox-group-review-toggle { margin-inline: 0; }
     body:has(#group-table-view[data-group="hub-inbox:needs"]) .phone-inbox-bar .phone-bar-title .phone-bar-search { padding: 12px max(12px, env(safe-area-inset-right, 0px)) 12px max(12px, env(safe-area-inset-left, 0px)); } /* the Needs you search starts its text on the same 12 px edge (the other folders keep their bar) */
