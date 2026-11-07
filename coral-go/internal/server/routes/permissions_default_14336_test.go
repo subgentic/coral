@@ -264,8 +264,15 @@ func TestATeamMemberThatNamesNoModeIsSpawnedWithEachTypesMapping(t *testing.T) {
 			rig := setupAgyTestRig(t)
 			fake := stubScript(t, filepath.Join(t.TempDir(), "mock-"+c.cli), "#!/bin/sh\nexit 0\n")
 			require.NoError(t, rig.ss.SetSetting(context.Background(), agent.CLIPathSettingKey(c.cli), fake))
-			code, out, cmd := teamOf(t, rig, c.cli, "map-"+c.cli, map[string]any{"name": "A"}, nil)
+			code, out, _ := teamOf(t, rig, c.cli, "map-"+c.cli, map[string]any{"name": "A"}, nil)
 			require.Equal(t, http.StatusOK, code, out)
+			cmd := "" // the line that starts the CLI (Hermes gets its prompt typed after it)
+			for _, sent := range rig.term.sentCommands() {
+				if strings.Contains(sent, fake) {
+					cmd = sent
+				}
+			}
+			require.NotEmpty(t, cmd, "the launch line")
 			for _, h := range c.has {
 				assert.Contains(t, cmd, h, c.cli)
 			}
