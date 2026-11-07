@@ -97,3 +97,20 @@ func TestAskTaskContextWarnsWithoutClosingTheQuestion(t *testing.T) {
 	assert.Empty(t, goneContext[gone.ID].MayNoLongerApply, "a missing task is not evidence of reassignment")
 
 }
+
+// Cancellation finishes the linked work but never answers the person's question.
+func TestCancelledLinkedTaskMayNoLongerApply(t *testing.T) {
+	s, ctx := askBoard(t)
+	task, err := s.CreateTask(ctx, "alpha", "Obsolete build", "", "medium", "Lead", "Dev A")
+	require.NoError(t, err)
+	q := askPost(t, s, ctx, "Lead", "@Dev B restart the build?", true, 0)
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q.ID, 0, task.ID))
+	_, err = s.CancelTask(ctx, "alpha", task.ID, "Lead", nil)
+	require.NoError(t, err)
+	rows, err := s.AskSubjectsOf(ctx, "alpha", []int64{q.ID})
+	require.NoError(t, err)
+	assert.Equal(t, "task_completed", rows[q.ID].MayNoLongerApply)
+	closed, err := s.AskIsClosed(ctx, "alpha", q.ID)
+	require.NoError(t, err)
+	assert.False(t, closed)
+}
