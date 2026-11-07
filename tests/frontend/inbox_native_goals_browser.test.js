@@ -13,6 +13,9 @@ const { FOLDER_ROWS } = require('./helpers/folder_rows');
     try {
         await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false, inbox: 'native' });
 
+        // Exercise the allowed idle deadline: folder readiness must not stand in for the independent count's completion.
+        await Page.addScriptToEvaluateOnNewDocument({ source: `window.requestIdleCallback = callback => setTimeout(() => callback({ didTimeout: true, timeRemaining: () => 0 }), 4000);` });
+
         console.log('1. the owner: Goals and Artifacts are folders, with their counts');
         await open();
         assert.equal(await ev(`document.body.classList.contains('native-inbox')`), true, 'the Hub boots the native Inbox');
@@ -46,6 +49,7 @@ const { FOLDER_ROWS } = require('./helpers/folder_rows');
         assert.equal(await ev(`document.getElementById('group-table-view').textContent.includes('report-m2.md')`), false, 'm2 refused: none of its artifacts');
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('goals')).then(() => import((window.__coralStatic || '/static/') + 'inbox_tab.js')).then(m => m.selectInboxTab('artifacts')).then(() => true)`);
         assert.equal(await ev(`window.__remoteRequests.filter(r => {const q=new URLSearchParams(r.query);return r.server === 'm2' && r.path === '/api/team-artifacts' && !q.has('tag') && !q.has('waiting') && !q.has('digest');}).length`), 1, 'the refused Artifacts-folder count is asked once for the session');
+        await waitFor(`window.__remoteRequests.some(r=>r.server==='m2'&&r.path==='/api/team-artifacts'&&new URLSearchParams(r.query).get('tag')==='for review')`, 'the independent idle review-attention summary is requested', 10000);
         const summaries = await ev(`window.__remoteRequests.filter(r=>r.server==='m2'&&r.path==='/api/team-artifacts'&&new URLSearchParams(r.query).get('tag')==='for review')`);
         assert.equal(summaries.length, 1, 'the independent review-attention summary is also asked once');
         const summary = new URLSearchParams(summaries[0].query);
