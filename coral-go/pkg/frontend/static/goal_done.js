@@ -107,5 +107,6 @@ export async function hideGoalDone(team, g, mode) {
     const entry = mode === 'ignore' ? starOf(team, g) : keyOf(team, g);
     await post(team, g, mode);
     keep(SETTING, [...hiddenList().filter(e => e !== entry), entry]);
+    document.dispatchEvent(new Event('coral:action-result')); // the hidden list is saved: the table's one redraw for this action is not held under a resting pointer (#14373)
     return async () => { await post(team, g, 'show'); keep(SETTING, withoutGoal(hiddenList(), team, g)); };
 }

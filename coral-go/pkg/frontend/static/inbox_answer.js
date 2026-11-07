@@ -127,6 +127,7 @@ async function answer(s, o, ask, cell, step = '', trustFolder = '') { // step: t
             throw new Error(why.error || 'HTTP 409'); // nothing was sent (the selection did not move, Submit was not reached): the buttons stay, and the person is told
         }
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        document.dispatchEvent(new Event('coral:action-result')); // sent: the row's redraw is the person's own result, not held under a resting pointer (#14373)
         read.delete(askKey(s));
         cell.replaceChildren(Object.assign(document.createElement('span'), { className: 'inbox-answered', textContent: `Answered: ${o.label}` }));
         if (had) cell.closest('tr')?.querySelector('.dt-primary')?.focus({ preventScroll: true }); // the choices are gone: the keyboard stays in the row, on its Open
