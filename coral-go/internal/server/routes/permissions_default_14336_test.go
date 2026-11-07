@@ -224,3 +224,31 @@ func TestTheShippedFullSetCarriesNoGitAllowRule(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, string(b), "Bash(git")
 }
+
+// Build item (3): a team relaunch (board_id of a board that exists) keeps what the template stored: a member that names no mode starts in the CLI's confirm mode, as before; the new default is for
+// new teams. The form's explicit Default stays Default either way.
+func TestATeamRelaunchByBoardIDKeepsTheConfirmModeForAMemberThatNamesNothing(t *testing.T) {
+	rig := setupAgyTestRig(t)
+	fake := stubScript(t, filepath.Join(t.TempDir(), "mock-claude"), "#!/bin/sh\nexit 0\n")
+	require.NoError(t, rig.ss.SetSetting(context.Background(), agent.CLIPathSettingKey(at.Claude), fake))
+	code, out, cmd := teamOf(t, rig, at.Claude, "relaunch-board", map[string]any{"name": "A"}, nil)
+	require.Equal(t, http.StatusOK, code, out)
+	assert.Contains(t, cmd, "--permission-mode auto", "a new team: the new default")
+	var made struct {
+		BoardID string `json:"board_id"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(out), &made))
+	require.NotEmpty(t, made.BoardID, out)
+	relaunch := func(member map[string]any) string {
+		body, _ := json.Marshal(map[string]any{"board_id": made.BoardID, "working_dir": rig.workdir, "agent_type": at.Claude, "agents": []any{member}})
+		rec := httptest.NewRecorder()
+		rig.router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/sessions/launch-team", bytes.NewReader(body)))
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		return lastSentCommand(rig.term)
+	}
+	cmd = relaunch(map[string]any{"name": "B"})
+	assert.Contains(t, cmd, "--permission-mode default", "a relaunch keeps the confirm mode")
+	assert.NotContains(t, cmd, "--permission-mode auto")
+	cmd = relaunch(map[string]any{"name": "C", "flags": []string{"--permission-mode", "plan"}})
+	assert.Contains(t, cmd, "--permission-mode plan", "what a member names is what it gets")
+}
