@@ -10,12 +10,19 @@ import (
 // program (by name): "go test ./..." matches `go test -count=1 ./...` and `cd x && CGO=0 go test ./... | tail`, not `go test -run X ./one/pkg` and not `echo "go test ./..."` or a commit message (a quoted
 // text is one word). A command the reader cannot read within its bounds matches nothing: this is a guard against overlap, not a gate, so the command runs.
 func MatchCommand(command string, patterns []string) (string, bool) {
+	p, _, ok := matchWords(command, patterns)
+	return p, ok
+}
+
+// matchWords is MatchCommand that also says WHICH command matched, as a short redacted line for the log (#14170: an "auto:" claim on a run that was on another machine could not be traced to its text): the program's words
+// with a word that holds "=" (a value, a token) or is over 40 characters shown as "...", cut at 80 characters. It is never the whole command and never a file's text.
+func matchWords(command string, patterns []string) (pattern, matched string, ok bool) {
 	if len(patterns) == 0 || strings.TrimSpace(command) == "" {
-		return "", false
+		return "", "", false
 	}
-	cmds, ok := shellkill.Programs(command)
-	if !ok {
-		return "", false
+	cmds, okp := shellkill.Programs(command)
+	if !okp {
+		return "", "", false
 	}
 	for _, p := range patterns {
 		want := strings.Fields(p)
@@ -24,11 +31,26 @@ func MatchCommand(command string, patterns []string) (string, bool) {
 		}
 		for _, words := range cmds {
 			if inOrder(words, want) {
-				return p, true
+				return p, redactedWords(words), true
 			}
 		}
 	}
-	return "", false
+	return "", "", false
+}
+
+func redactedWords(words []string) string {
+	out := make([]string, 0, len(words))
+	for _, w := range words {
+		if strings.Contains(w, "=") || len(w) > 40 {
+			w = "..."
+		}
+		out = append(out, w)
+	}
+	s := strings.Join(out, " ")
+	if len(s) > 80 {
+		s = s[:80]
+	}
+	return strings.ToValidUTF8(s, "")
 }
 
 // inOrder reports whether want is a subsequence of words that starts at the program.

@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -454,12 +455,12 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 		return ""
 	}
 	var res resourcequeue.Resource
-	pattern := ""
+	pattern, matchedWords := "", ""
 	for _, st := range h.m.Queue().All() {
-		if p, hit := MatchCommand(command, st.Resource.Match); hit {
+		if p, words, hit := matchWords(command, st.Resource.Match); hit {
 			// a pattern kept on a plain resource (the Mac's own) is for that machine only and wins over a pool's: that is how a Mac-only pattern is written (#13751)
 			if pattern == "" || (len(res.Members) > 0 && len(st.Resource.Members) == 0) {
-				res, pattern = st.Resource, p
+				res, pattern, matchedWords = st.Resource, p, words
 			}
 		}
 	}
@@ -504,6 +505,7 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 		return ""
 	}
 	if mine == nil {
+		slog.Info("[resource-hook] auto claim", "resource", res.Key, "pattern", pattern, "matched", matchedWords, "agent", name) // the program words that matched, redacted and cut at 80: never the command (#14170)
 		r, err := h.m.Claim(WithSession(ctx, name), res.Key, agent, "auto: "+pattern)
 		if err != nil {
 			return "" // queue trouble never stops a command

@@ -1,6 +1,7 @@
 package resources
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,4 +28,14 @@ func TestATestRunOverSshIsNotMatchedByTheLocalPatterns(t *testing.T) {
 	// and a local test next to an ssh command is still the Mac's
 	_, hit := MatchCommand(`ssh epoch ls; go test ./internal/server/routes`, mac)
 	assert.True(t, hit)
+}
+
+// #14170: the log line says which program words matched, cut and redacted, never the command.
+func TestTheMatchedWordsForTheLogAreShortAndRedacted(t *testing.T) {
+	_, words, ok := matchWords(`cd /w && TOKEN=abc123 go test -run X ./internal/server/routes -ldflags=-X=secretvalue`, []string{"go test ./internal/server/routes"})
+	assert.True(t, ok)
+	assert.Equal(t, "go test -run X ./internal/server/routes ...", words, "a value is never shown")
+	_, words, _ = matchWords(`go test `+strings.Repeat("a", 200)+` ./internal/server/routes `+strings.Repeat("b ", 80), []string{"go test ./internal/server/routes"})
+	assert.LessOrEqual(t, len(words), 80)
+	assert.NotContains(t, words, "aaaa")
 }
