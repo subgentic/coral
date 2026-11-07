@@ -83,6 +83,7 @@ func (h *SessionsHandler) RegisterAgentArtifacts(r chi.Router) {
 	r.Get("/api/artifacts/series/{series_id}/versions", h.seriesVersions) // #6357
 	r.Delete("/api/artifacts/series/{series_id}", h.deleteSeries)         // #6357: the Operator's, every version
 	r.Get("/api/artifacts/{id}", h.getAgentArtifact)
+	r.Get("/api/artifacts/{id}/thumbnail", h.artifactThumbnail)
 	r.Get("/api/artifacts/{id}/meta", h.getAgentArtifactMeta) // metadata only: do you have it (#5465)
 	r.Get("/api/artifacts/{id}/versions", h.artifactVersions) // #6357: the list of its series, found from any version
 	r.Get("/api/artifacts/{id}/readers", h.artifactReaders)   // who can read it, for its owner (#5577)

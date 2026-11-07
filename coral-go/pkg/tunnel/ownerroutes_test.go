@@ -114,6 +114,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodGet && p == "/api/artifacts/resolve" {
 				continue
 			}
+			// Protected thumbnail reads are new in #14147, not in the historical list.
+			if m == http.MethodGet && strings.HasPrefix(p, "/api/artifacts/") && strings.HasSuffix(p, "/thumbnail") {
+				continue
+			}
 			// Starring an artifact (#9819) is the owner's alone through the hub: the old list never had it.
 			if strings.HasPrefix(p, "/api/artifacts/") && strings.HasSuffix(p, "/star") && (m == http.MethodPut || m == http.MethodDelete) {
 				continue

@@ -43,7 +43,7 @@ try {
     const sidebar = read('static/inbox_sidebar.js'), arts = read('static/team_artifacts_page.js');
     assert.match(sidebar, /mail: f => \(\{ lead: \{ text: f\.title \|\| f\.which, name: f\.title \|\| f\.which \}, title: f\.title \|\| f\.which, medium: true, snippet: f\.snip, time: f\.saved, data: \{ id: String\(f\.id\) \}, tip: multi && f\.serverName \? `\$\{f\.which\} \\u00b7 \$\{f\.serverName\}` : '' \}\)/, 'Saved: who it is from (a name, so medium), the message as its name cuts it, when it was saved, the computer on the hover, and its id on the button (Back finds the row again, #9783)');
     assert.doesNotMatch(sidebar, /dock \? \{\} : \{ mail:/, "the agent dock's Saved tab has the mail row too, the same one as the Inbox page (#9786: it was a table on a phone with a Done button on every row)");
-    assert.match(arts, /\.\.\.\(inbox \|\| phoneTeam \? \{ mail: item => \(\{ data: \{ artifactId: itemKey\(item\) \}, lead: \{ icon: 'description'/, 'Artifacts of the Inbox: a file glyph, the name, its team and task');
+    assert.match(arts, /\.\.\.\(inbox \|\| phoneTeam \? \{ mail: item => \(\{ data: \{ artifactId: itemKey\(item\) \}, lead: \{ node: artifactThumbnail\(/, 'Artifacts of the Inbox: a reserved file thumbnail/type-icon lead, the name, its team and task');
     assert.ok(!/mail:/.test(arts.slice(0, arts.indexOf('...(inbox || phoneTeam ? { mail:'))), 'only the Inbox list and a team list on a phone (#12230), not an agent or goal list');
     // a board of the group opens that board's messages in the Inbox (its address), not the Board history folder
     folderButtons().find(b => /^[a-z_]*Alpha team/.test(b.textContent.trim())).click(); await settle(500);
