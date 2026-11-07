@@ -26,7 +26,7 @@ import { unreadReviewCount, reviewAttentionCount } from './ask_filter.js'; // th
 import { build, keyRoute, parse as parseRoute, inboxFolderPath, BOARDS_FOLDER, BOARDS_SUB } from './routes.js';
 import { sessionServer, normServer, boardTeamKey, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox, nativeNeeds, decisionNeedsPerson, LOCAL_SERVER, serverUrl, isCloud } from './server_base.js';
 import { teamLabel, serverLabel } from './server_status.js';
-import { showView, showToast, OPERATOR_ID } from './utils.js';
+import { showView, showToast, OPERATOR_ID, versionLineOf } from './utils.js';
 import { registerActions, textOf } from './actions.js';
 import { tableMarkup, registerGroupSource, refreshGroupTable, openGroupTable, foldWayBack } from './sidebar_groups.js';
 import { isPhoneLayout } from './phone_layout.js';
@@ -183,7 +183,7 @@ const waitMark = s => {
 const phoneRow = (s, from, desc, extra = []) => { const wrap = DT.el('span', 'inbox-review-item inbox-agent-first'), name = DT.el('span', 'inbox-review-name', desc); DT.tipIf(name, desc, () => name.scrollHeight > name.clientHeight + 1); if (extra.length) name.append(' ', ...extra); wrap.append(from, name, ...waitMark(s)); return wrap; }; // a badge that is words (New comments) goes on the description's own line, after it; a row is three lines at most (#13911)
 const introNode = text => DT.el('span', 'inbox-review-from', text);
 const fromNode = s => {
-    const p = DT.el('span', 'inbox-review-from'), who = String(s.review.produced_by || '').trim(), n = (s.review.earlier || []).length, rest = n ? `${n} earlier version${n === 1 ? '' : 's'}` : '';
+    const p = DT.el('span', 'inbox-review-from'), who = String(s.review.produced_by || '').trim(), n = (s.review.earlier || []).length, rest = [versionLineOf(s.review), n ? `${n} earlier version${n === 1 ? '' : 's'}` : ''].filter(Boolean).join(' \u00b7 ');
     if (!who) { p.textContent = fromOf(s, false); return p; }
     p.append('from ', agentLink(who, { board: boardTeamKey(sessionServer(s), s.review.team) }), rest ? ' \u00b7 ' + rest : '');
     return p;
@@ -324,7 +324,7 @@ const needsState = DT.tableState();
 export async function openReview(row, extra = {}) {
     const { openArtifactViewer } = await importOnce('./artifact_viewer.js', 'the file viewer').catch(() => ({})); // a failed load is said (importOnce's toast) and the next click tries again: a page left open across an update must not have rows that do nothing (#11963)
     if (!openArtifactViewer) return;
-    openArtifactViewer(row.hex, { server: splitKey(row.team).server, filename: row.name, mediaType: row.media_type, board: splitKey(row.team).name, uploader: row.produced_by ? { role: String(row.produced_by), hex: row.hex, server: splitKey(row.team).server, board: splitKey(row.team).name, seriesId: String(row.series_id || '') } : undefined, goal: row.goal_id && row.goal_title ? String(row.goal_title) : '', goalId: row.goal_id ? String(row.goal_id) : '', goalTeam: row.team || '', task: row.task_id ? String(row.task_title || `Task #${row.task_id}`) : '', from: subOf({ review: row, board_project: splitKey(row.team).name, server: splitKey(row.team).server }, true), ...extra }); // the newest version itself: a diff only when Compare is pressed (#11628)
+    openArtifactViewer(row.hex, { server: splitKey(row.team).server, filename: row.name, mediaType: row.media_type, fileId: row.file_id, versionLine: row.version_line, board: splitKey(row.team).name, uploader: row.produced_by ? { role: String(row.produced_by), hex: row.hex, server: splitKey(row.team).server, board: splitKey(row.team).name, seriesId: String(row.series_id || '') } : undefined, goal: row.goal_id && row.goal_title ? String(row.goal_title) : '', goalId: row.goal_id ? String(row.goal_id) : '', goalTeam: row.team || '', task: row.task_id ? String(row.task_title || `Task #${row.task_id}`) : '', from: subOf({ review: row, board_project: splitKey(row.team).name, server: splitKey(row.team).server }, true), ...extra }); // the newest version itself: a diff only when Compare is pressed (#11628)
     markOpenedReadVisibly(row.hex, sayLive, row.team); // opening is reading it: the 'read' tag, so it stops counting everywhere (#9277); the viewer does the same for any for-review artifact, once; a failed save is said, and the item keeps counting
 }
 /** A row's action clears it from the list: the list is drawn again, and the person keeps their place (#11558). Called before the write, it notes where the page and the list are scrolled and the row beside this one (the next, or the

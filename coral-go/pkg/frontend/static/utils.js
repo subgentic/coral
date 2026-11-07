@@ -177,3 +177,21 @@ export function setRowCurrent(li, on) {
     const btn = li.querySelector(':scope > .row-btn');
     if (btn) { if (on) btn.setAttribute('aria-current', 'true'); else btn.removeAttribute('aria-current'); }
 }
+
+
+/* A file's stable id and the version line (#14145): the server tells both on every row ("version 3 of plan.md (file <32 hex>)"), and every surface (the Inbox row, the viewer's Details, Team Artifacts) shows that one line and copies that one id. Nothing here makes the words up: a row with no line shows none. */
+const FILE_ID = /^[0-9a-f]{32}$/;
+
+/** The row's file id, or '' when it has none or it is not a 32-hex id (a row from an older server). */
+export const fileIdOf = it => (it && typeof it.file_id === 'string' && FILE_ID.test(it.file_id) ? it.file_id : '');
+
+/** The row's version line exactly as the server told it ("version N of <name> (file <id>)"), or ''. */
+export const versionLineOf = it => (fileIdOf(it) && typeof it.version_line === 'string' ? it.version_line.slice(0, 300) : '');
+
+/** Copy the file id: the id an agent passes to --new-version-of (add @<version> for one version). toast(text, isError) tells the person. */
+export function copyFileId(it, toast) {
+    const id = fileIdOf(it);
+    if (!id) return Promise.resolve(false);
+    const say = (t, bad) => { try { toast?.(t, bad); } catch { /* the toast is a courtesy */ } };
+    return Promise.resolve(navigator.clipboard?.writeText(id)).then(() => { say('File ID copied'); return true; }, () => { say('The file ID could not be copied', true); return false; });
+}
