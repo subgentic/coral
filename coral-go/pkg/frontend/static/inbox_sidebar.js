@@ -693,7 +693,14 @@ function inboxActivityToolbar() {
     activityBar.bar.showField('server', false);
     return { node, signature: JSON.stringify([activityFilters, teams, AC.total()]) };
 }
-async function refreshGoals() {
+function refreshGoals(force = true) {
+    if (_goalsReading) return _goalsReading; // one in flight: whoever asks during it gets it
+    if (!force && (document.hidden || isPaused() || Date.now() - _goalsAt < goalsGap())) return null;
+    _goalsAt = Date.now();
+    _goalsReading = readGoals().then(ok => { _goalsFails = ok ? 0 : Math.min(_goalsFails + 1, 8); }, () => { _goalsFails = Math.min(_goalsFails + 1, 8); }).finally(() => { _goalsReading = null; });
+    return _goalsReading;
+}
+async function readGoals() {
     let ok = true;
     try {
         goals = await listInboxGoals(); ok = !goalsReadFailed();
@@ -790,15 +797,13 @@ const folderSections = () => {
     return [...sections, ...CH.chatSections(), ...boardSection()].map(section => ({ ...section, items: section.items.map(item => ({ ...item, tip: FOLDER_TIPS[item.key], icon: FOLDER_ICONS[item.key] || (item.key.startsWith(BOARD_ITEM) ? 'forum' : undefined) || (item.key.startsWith('chats-cli-') ? `cli:${item.key.slice(10)}` : undefined) })) }));
 };
 let _navKey = null, _folders = null, _poll = 0;
-// The goals are read again with the live updates (api.js's list of sessions -> updateInboxTab), under coral-hub Security's four conditions (#13389): only while the tab is visible; one read in flight, never overlapping; a failed or
-// refused read, or a Coral that is shedding load (429), backs the next read off (doubling, at most 10 minutes: no retry loop); and at most one read in 30 s, far inside the Hub's 60 reads a minute per computer.
-let _goalsAt = 0, _goalsBusy = false, _goalsFails = 0;
+// The goals are read again with the live updates (api.js's list of sessions -> updateInboxTab), under coral-hub Security's four conditions (#13389), kept at the reader's own entry (refreshGoals) so showInbox, a goal action
+// and the live update cannot overlap: one read in flight (a caller during it gets that read); a live update (not forced) only while the browser tab is visible, and not while a Coral is shedding load (429); a failed or
+// refused read backs the next live one off (doubling, at most 10 minutes: no retry loop); at most one live read in 30 s, far inside the Hub's 60 reads a minute per computer. showInbox and the actions force a read
+// (the person asked for the page, or changed a goal) but still never overlap another.
+let _goalsAt = 0, _goalsFails = 0, _goalsReading = null;
 const goalsGap = () => { const base = Number(globalThis.__coralGoalsMs) || 30000; return _goalsFails ? Math.min(base * 2 ** _goalsFails, 600000) : base; };
-function liveGoals() {
-    if (document.hidden || _goalsBusy || isPaused() || Date.now() - _goalsAt < goalsGap()) return;
-    _goalsAt = Date.now(); _goalsBusy = true;
-    Promise.resolve(refreshGoals()).then(ok => { _goalsFails = ok ? 0 : Math.min(_goalsFails + 1, 8); }, () => { _goalsFails = Math.min(_goalsFails + 1, 8); }).finally(() => { _goalsBusy = false; });
-}
+const liveGoals = () => { refreshGoals(false); };
 /** What the phone's ☰ drawer lists for the Inbox (#13596): every folder the sidebar has, with its count, the open one marked, and the pick. Read when the drawer opens. */
 state.inboxFolderRows = () => ({ sections: folderSections().filter(sec => !sec.items.some(it => String(it.key).startsWith(BOARD_ITEM))), current: navCurrent(), pick: pickFolder });
 /** A folder was picked: a page that is open gives way, and the folder's table opens with the keyboard at its heading. */
