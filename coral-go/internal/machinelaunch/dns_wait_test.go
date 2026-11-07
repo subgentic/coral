@@ -135,7 +135,9 @@ func TestTheUserDataKeepsRootsDNSStateWhereTheLaunchKeysUserCanRead(t *testing.T
 	ud, err := BuildUserData(goldenSpec())
 	require.NoError(t, err)
 	assert.Contains(t, ud, "/usr/local/sbin/coral-egress-check state > /run/coral/dns.txt")
-	assert.Contains(t, ud, "chmod 0644 /run/coral/setup.log /run/coral/setup.status /run/coral/dns.txt")
+	assert.Contains(t, ud, "chmod 0644 /run/coral/setup.log /run/coral/setup.status\n", "the log and the status are for the launch key's user")
+	assert.NotContains(t, ud, "setup.status /run/coral/dns.txt", "the DNS state is not world-readable")
+	assert.Contains(t, ud, "chmod 0600 /run/coral/dns.txt; chown root:coral /run/coral/dns.txt && chmod 0640 /run/coral/dns.txt", "root only first, then root and coral")
 	state := strings.Index(ud, "coral-egress-check state")
 	finish := strings.Index(ud, `[ "$rc" = 0 ] || exit "$rc"`)
 	require.Greater(t, state, 0)
@@ -149,4 +151,38 @@ func TestTheFailureReportReadsTheDNSStateAndEndsWithTheSetupsOwnOutput(t *testin
 	status := strings.Index(whyCommand, "setup exit status")
 	assert.Less(t, dns, setupOut)
 	assert.Less(t, setupOut, status, "the report is cut to its end: what matters most comes last")
+}
+
+// The DNS state is the machine's lookup history: 0640 root:coral, owner first so it is never group-readable by another group. The user-data's own lines are run, with the folder swapped and a stub chown.
+func TestTheDNSStateFileIsRootAndCoralOnly(t *testing.T) {
+	needSh(t)
+	ud, err := BuildUserData(goldenSpec())
+	require.NoError(t, err)
+	var step string
+	for _, l := range strings.Split(ud, "\n") {
+		if strings.Contains(l, "chown root:coral /run/coral/dns.txt") {
+			step = strings.TrimSpace(l)
+		}
+	}
+	require.NotEmpty(t, step)
+	dir := t.TempDir()
+	file := filepath.Join(dir, "dns.txt")
+	require.NoError(t, os.WriteFile(file, []byte("state"), 0o644)) // as the redirect makes it, world-readable until the step runs
+	chownLog := filepath.Join(dir, "chown.log")
+	bin := fakeBin(t, map[string]string{"chown": `echo "$@" > ` + chownLog})
+	script := "#!/bin/sh\nset -eu\n" + strings.ReplaceAll(step, "/run/coral/dns.txt", file) + "\n"
+	out, err := runWith(t, bin, script)
+	require.NoError(t, err, out)
+	fi, err := os.Stat(file)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o640), fi.Mode().Perm(), "root and coral only")
+	got, _ := os.ReadFile(chownLog)
+	assert.Equal(t, "root:coral "+file+"\n", string(got))
+	// chmod does not run when the owner could not be set: the file never ends up group-readable for nobody's group
+	bin = fakeBin(t, map[string]string{"chown": "exit 1"})
+	require.NoError(t, os.WriteFile(file, []byte("state"), 0o644))
+	require.NoError(t, os.Chmod(file, 0o644)) // as the redirect makes it
+	_, _ = runWith(t, bin, "#!/bin/sh\nset -u\n"+strings.ReplaceAll(step, "/run/coral/dns.txt", file)+"\n")
+	fi, _ = os.Stat(file)
+	assert.Equal(t, os.FileMode(0o600), fi.Mode().Perm(), "a failed chown leaves the file root-only, never 0644 and never group-readable for a group it was not given to")
 }
