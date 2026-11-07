@@ -28,6 +28,14 @@ type spawnRecorder struct {
 	commands []string
 }
 
+// sentCount is how many inputs the runtime was sent. They are recorded by the EMBEDDED mockRuntime under ITS mutex: spawnRecorder's own mu (which shadows it) guards only commands, so a read of sent
+// under s.mu raced with SendInput in the prompt's goroutine (#14281, the go-race red since v2.0.58).
+func (s *spawnRecorder) sentCount() int {
+	s.mockRuntime.mu.Lock()
+	defer s.mockRuntime.mu.Unlock()
+	return len(s.sent)
+}
+
 func (s *spawnRecorder) SpawnAgent(_ context.Context, _, _, _, command string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
