@@ -27,7 +27,7 @@ export function dismissAsked(s) {
 export const waitIgnored = s => !!(s && s.wait_ignored);
 
 /* Dismiss never answers a live terminal: retain the active wait until the agent clears it (#14152). */
-export const needsYou = s => (!!s && !s.sleeping && !s.archived && needsInputAttention(s)) || !!askedBefore(s);
+export const needsYou = s => (!!s && !s.sleeping && !s.archived && !s.wait_removed && needsInputAttention(s)) || !!askedBefore(s);
 
 /** The words that open what it asked: "before Coral restarted" when Coral's stop put it to sleep, else "before it went to sleep" (an operator's Sleep, an ended CLI). */
 export const askedWords = a => `Asked ${a && a.after_restart ? 'before Coral restarted' : 'before it went to sleep'}: ${a ? a.text : ''}`;

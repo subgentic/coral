@@ -687,3 +687,8 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .artifact-thumbnail.dt-mail-avatar { border-radius: var(--radius-sm); }
 
 .artifact-thumbnail-image { display: block; width: 100%; height: 100%; object-fit: contain; }
+
+/* A destructive-to-attention action explains its effect before a click or tap. */
+.inbox-remove-wait-help { flex-basis: 100%; min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; font-size: var(--fs-sm); }
+.inbox-answers:has(.inbox-remove-wait-help) { width: 280px; white-space: normal; }
+.dt-mail-menu .menu-item-with-help { display: block; white-space: normal; text-align: left; min-height: var(--control-touch-height, 44px); }

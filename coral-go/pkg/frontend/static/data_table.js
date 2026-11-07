@@ -131,6 +131,11 @@ function rowMore(actions, label) {
     const menu = el('div', 'menu dt-mail-menu'); menu.id = `${id}-menu`; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', `Actions for ${label}`);
     for (const a of actions) {
         const b = el('button', 'menu-item', a.label); b.type = 'button'; b.setAttribute('role', 'menuitem'); if (a.title) b.title = a.title;
+        if (a.help) {
+            b.classList.add('menu-item-with-help'); b.setAttribute('aria-label', a.label);
+            const help = el('span', 'menu-item-state', a.help); help.id = `${id}-help-${menu.children.length}`;
+            b.setAttribute('aria-describedby', help.id); b.append(help);
+        }
         if (a.off) { b.disabled = true; b.setAttribute('aria-disabled', 'true'); } // an action that is off right now stays in the menu, said off (the first in a line cannot move up)
         b.addEventListener('click', async e => {
             e.stopPropagation();

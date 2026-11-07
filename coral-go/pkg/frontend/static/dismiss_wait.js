@@ -1,11 +1,12 @@
 /* Dismiss a wait that is no longer true (#11352): a "Permission needed" card and its Needs you row that stay after the agent went on (the operator's report). Only the Operator: through Coral Hub the account this
  * computer is linked to alone (the machine answers anyone else 403 owner_only, and the toast says so). It clears Coral's own record of the wait (POST .../dismiss-wait); it sends nothing to the agent and presses nothing in its terminal. Offered for a request of the agent's own
  * kinds (permission, question, plan), never for a sign-in or a launch prompt, and not where the person may not act. */
-import { serverFetch, sessionServer } from './server_base.js';
+import { serverFetch, sessionServer, isCloud } from './server_base.js';
 import { loadLiveSessions } from './api.js';
 import { showToast } from './utils.js';
 import { askedBefore, dismissAsked } from './asked_before_restart.js';
 import { openAgent } from './agent_live.js';
+import { state } from './state.js';
 
 /** Whether the Dismiss is drawn for an agent's open request: every waiting agent has one (#11946). The machine clears a permission, question or plan in its record of the wait; any other request (an input prompt, a
  *  dialog, an elicitation, a sign-in) it keeps as hidden, per agent and request, until the agent asks something new; a request made before the agent slept is hidden in this browser. Nothing is sent to the agent. */
@@ -57,4 +58,30 @@ export async function dismissWait(session, button) {
         if (button) button.disabled = false;
         showToast('Could not dismiss it. Try again.', true);
     }
+}
+
+/** Explicit removal hides only this dismissed request, never answers its terminal. */
+export function canRemoveWait(session) {
+    return !isCloud() && sessionServer(session) === 'local' && canDismissWait(session) &&
+        !!session.waiting_for_input && !!session.wait_ignored && !session.wait_removed &&
+        !session.sleeping && !session.archived && Number.isFinite(Date.parse(session.waiting_since));
+}
+export const REMOVE_WAIT_LINE = 'Hides this request from Needs you. Nothing is sent to the agent.';
+export async function removeWait(session, button) {
+    const current = (state.liveSessions || []).find(row => row.session_id === session.session_id && sessionServer(row) === sessionServer(session));
+    if (!canRemoveWait(current) || current.waiting_since !== session.waiting_since || current.waiting_kind !== session.waiting_kind) {
+        showToast('This request has changed. Check the current request.', true); return;
+    }
+    if (button) button.disabled = true;
+    try {
+        const response = await serverFetch(sessionServer(session), `/api/sessions/live/${encodeURIComponent(session.name)}/dismiss-wait`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: session.session_id, agent_type: session.agent_type, remove: true }),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) { showToast(typeof body.error === 'string' ? body.error : `Could not remove it (HTTP ${response.status}).`, true); return; }
+        if (body.removed) showToast('Removed from Needs you. Nothing was sent to the agent.');
+        await loadLiveSessions();
+    } catch { showToast('Could not remove it. Try again.', true); }
+    finally { if (button) button.disabled = false; }
 }
