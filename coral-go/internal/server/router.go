@@ -263,6 +263,7 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 		sessHandler.SetTouches(touches)
 		s.touches = touches
 		terminalinput.SetPersonSink(touches.TypedTo)
+		terminalinput.SetPromptOpenCheck(sessHandler.PromptOpenFor) // a person's input to a session with a prompt open answers it: not talk to the agent, so its notices do not wait for it (#14106)
 	}
 	// Coral's own data folder (wherever --home or CORAL_DATA_DIR put it) is never served by Browse or a file read (#4531).
 	routes.ProtectDataDir(s.cfg.CoralDir())

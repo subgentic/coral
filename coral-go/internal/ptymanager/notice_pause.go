@@ -3,7 +3,7 @@ package ptymanager
 // Pausing Coral's notices to one agent (#11387; the operator: "User is talking to orchestrator, but screen keeps advancing due to notifications from Coral"). Two reasons hold Coral's own automated text
 // back from an agent's terminal, and neither drops it:
 //  1. the person paused it (PauseNotices: until they resume, or a cap), and
-//  2. the person typed to that agent within the last TypingHold (terminalinput.PersonTypedWithin): no toggle for the common case.
+//  2. the person typed to that agent within the last TypingHold (terminalinput.PersonTalkedWithin: the answer to a trust, permission or question prompt is not talk, #14106): no toggle for the common case.
 //
 // A held notice is NOT typed and is counted, by what it was (a board message, a task, ...), never by its text. When the hold ends (the person resumes, the cap passes, or they stop typing for TypingHold)
 // ONE short line is typed instead of the many: "[Coral] While you were talking: 3 board messages, 1 task. Run coral-board read." The person's own typing and sends are never held (DeliverNow), nor are an
@@ -147,7 +147,7 @@ func NoticeStatus(sessionID string) (paused bool, until time.Time, waiting int, 
 			waiting += n
 		}
 	}
-	typing = !paused && terminalinput.PersonTypedWithin(sessionID, typingHold())
+	typing = !paused && terminalinput.PersonTalkedWithin(sessionID, typingHold())
 	return
 }
 
@@ -163,7 +163,7 @@ func noticesHeld(sessionID string) bool {
 	st := notices.m[sessionID]
 	paused := st != nil && st.until.After(noticeNow())
 	notices.Unlock()
-	return paused || terminalinput.PersonTypedWithin(sessionID, typingHold())
+	return paused || terminalinput.PersonTalkedWithin(sessionID, typingHold())
 }
 
 // holdNotice counts a notice that was not typed, by what it was, and keeps where the summary will be typed.

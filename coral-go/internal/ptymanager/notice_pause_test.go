@@ -134,6 +134,28 @@ func TestTypingToAnAgentHoldsItsNoticesForSixtySecondsAfterTheLastKeystroke(t *t
 	assert.False(t, noticesHeld(other), "another agent's notices are not held by this one's typing")
 }
 
+// #14106: answering a prompt in the agent's terminal is not talking to it, so the notice that waits behind the prompt (a task assigned) is typed at once, not a minute later. Real typing still holds.
+func TestAnsweringAPromptDoesNotHoldItsNoticesButTypingStillDoes(t *testing.T) {
+	const sid = "11111111-1406-4000-8000-000000000001"
+	a, in := noticeRig(t, sid)
+	open := true
+	terminalinput.SetPromptOpenCheck(func(id string) bool { return open && id == sid })
+	t.Cleanup(func() { terminalinput.SetPromptOpenCheck(nil) })
+
+	terminalinput.Record(terminalinput.Person, "claude-"+sid+":0.0", terminalinput.Keys, "1") // "1. Yes", while the prompt is open
+	open = false
+	d, err := DeliverAutomated(context.Background(), in("task", "Task #1 assigned to you"))
+	require.NoError(t, err)
+	assert.Equal(t, Sent, d, "a prompt's answer is not typing: the first task is typed at once")
+	assert.Equal(t, []string{"Task #1 assigned to you"}, a.sent())
+
+	time.Sleep(3200 * time.Millisecond) // sleep-ok: the prompt's grace is a wall-clock time
+	terminalinput.Record(terminalinput.Person, "claude-"+sid+":0.0", terminalinput.Text, "now I am talking to you")
+	d, err = DeliverAutomated(context.Background(), in("board message", "while they type"))
+	require.NoError(t, err)
+	assert.Equal(t, Skipped, d, "real typing to the agent still holds its notices")
+}
+
 func TestAPersonsOwnSendAndNonNoticesAreNeverHeld(t *testing.T) {
 	const sid = "11111111-1387-4000-8000-000000000005"
 	a, in := noticeRig(t, sid)

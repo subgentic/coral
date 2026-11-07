@@ -109,6 +109,19 @@ func (w *dialogWatch) field(sid string) any {
 	return map[string]any{"since": e.first.UTC().Format(time.RFC3339), "after_min": e.afterMin, "notify": e.notify}
 }
 
+// open says the last pass saw a prompt on the agent's screen (one pass is enough here: a person who answers it has not waited for a second look).
+func (w *dialogWatch) open(sid string) bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.seen[sid] != nil
+}
+
+// PromptOpenFor says the session has a prompt open (#14106): the agent's own request is open (its hooks said so), or the dialog watcher saw a prompt on its screen. sessionID is lower case, as terminalinput keeps
+// it. A person's input to such a session answers the prompt: it is not talk to the agent, and Coral's notices to it do not wait for it.
+func (h *SessionsHandler) PromptOpenFor(sessionID string) bool {
+	return h.pending.requestIsOpen(sessionID) || h.dialogs.open(sessionID)
+}
+
 // forgetDialog clears an agent's dialog at once (an answer was sent); the next pass sees the screen again.
 func (h *SessionsHandler) forgetDialog(sessionID string) { h.dialogs.forget(sessionID) }
 
