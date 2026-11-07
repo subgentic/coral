@@ -45,6 +45,19 @@ function readsPromptsFromScreen(session) {
     );
 }
 
+// The Operator's phone, through the Hub: a QUESTION card stayed under messages the agent posted AFTER it, because the card's own state (the pending tool, the prompt's options, the row's waiting flag) had not been told
+// that the question was settled in the terminal. A blocked agent says nothing new, so an assistant message written more than MOVED_ON_MS after the question was raised (the row's waiting_since, or the pending
+// blocking tool's start) means it went on. The times are the computer's own (the transcript's, the event log's), so no clock of this page is compared with them.
+const MOVED_ON_MS = 3000;
+function agentMovedOn(row, pt) {
+    const lm = row && row.last_message;
+    if (!lm || lm.role !== "assistant") return false;
+    const said = Date.parse(lm.at || "");
+    if (Number.isNaN(said)) return false;
+    const raised = [Date.parse(row.waiting_since || ""), pt && BLOCKING_TOOLS[pt.tool_name] ? Date.parse(pt.at || "") : NaN].filter(n => !Number.isNaN(n));
+    return raised.length > 0 && said > Math.max(...raised) + MOVED_ON_MS;
+}
+
 function needsInputInfo(session) {
     const info = needsInputInfoOf(session);
     if (info && session.hubReadOnly) info.readOnly = (session.hubReadOnly.chip || "View only"); // part of the card's key: a change of access draws it again
@@ -59,6 +72,7 @@ function needsInputInfoOf(session) {
     if (login) return { kind: "login", reason: login.reason };
     const pt = pendingToolBySession.get(session.session_id) || null;
     const screen = promptOptionsBySession.get(session.session_id) || null;
+    if (agentMovedOn(row, pt)) return null; // the agent said something after it asked: the question is over (#14340)
     if (pt && BLOCKING_TOOLS[pt.tool_name]) return { kind: BLOCKING_TOOLS[pt.tool_name], tool: pt, screen, summary: askWords(String((row && row.waiting_summary) || "").replace(/^Notification:\s*/, "")) }; // the event's words stay: a question with no options on the screen (Hermes' free-text clarify) is its summary
     if (hasWorkingDisplayHint(row) && !(screen && screen.options.length)) return null;
     if (row.waiting_for_input && row.waiting_kind !== "login") {
