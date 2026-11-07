@@ -1,3 +1,6 @@
+// cdp-timeout: 180
+// Ten themed local layouts plus source-scoped Hub walks take 110–123s at CPU x20 under eight load processes.
+// There are no fixed sleeps to remove; keep every assertion and use the runner's named per-suite budget rather than the 120s global cap.
 // #13818: real team targets from independent row links; never answer/open/read the question.
 const assert=require('node:assert/strict');const fs=require('node:fs');
 const {connect}=require('./agent_view_harness');const {removeBoards}=require('./helpers/board_cleanup');
