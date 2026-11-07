@@ -12,6 +12,7 @@ const { initSectionDialog } = await importOnce('./section_dialog.js');
 const { segmentSelect } = await importOnce('./segmented.js');
 const { launchFlags } = await importOnce('./launch_flags.js');
 import { escapeHtml, escapeAttr } from './utils.js';
+import { restartHint } from './codex_mode.js';
 import { mountSettingsView } from './settings_view.js';
 const _mk0 = "<details class=\"acf-tools-details\"><summary title=\"Which tools this agent may use without asking, and which it may not.\">Tool permissions <span class=\"acf-perms-summary settings-hint\"></span></summary>";
 const _mk1 = "<label title=\"Extra command-line options passed to the agent's CLI, for example --verbose.\">Flags <span class=\"launch-optional\">optional</span>"; // the persona page's Behavior prompt is a field of it (a startup module)
@@ -292,6 +293,7 @@ function acfAutoPermissionsHtml(container, opts, { showAutoPermissions, agentTyp
         const modeWords = { default: 'Default', plan: 'Plan', acceptEdits: 'Accept edits', auto: 'Auto', bypassPermissions: 'Bypass permissions', dontAsk: "Don't ask" };
         const live = typeof v.liveMode === 'string' && modeWords[v.liveMode] && v.liveMode !== permModeVal ? v.liveMode : ''; // the agent runs in one mode and a restart uses another (the stored one): say so (#12481)
         const liveNote = live ? `<span class="settings-hint acf-mode-live" role="status">Running in ${escapeHtml(modeWords[live])} now; restarting uses ${escapeHtml(modeWords[permModeVal] || permModeVal)} unless you pick.</span>` : '';
+        const codexNote = v.codexNarrows ? `<span class="settings-hint acf-mode-live acf-codex-narrows" role="status">${escapeHtml(restartHint(v.codexNarrows))}</span>` : ''; // a Codex agent that runs wider than a restart will start it (#14051): said, never changed
         const permModeDesc = permissionDescription(v.agentType, permModeVal); // per CLI: Auto has safety checks on Claude only (#10000)
         autoPermissionsHTML = `
             <label>Permission mode
@@ -306,6 +308,7 @@ function acfAutoPermissionsHtml(container, opts, { showAutoPermissions, agentTyp
                 <span class="settings-hint perm-mode-desc">${escapeHtml(permModeDesc)}</span>
                 <span class="settings-hint acf-mode-override" role="status" hidden></span>
                 ${liveNote}
+                ${codexNote}
             </label>`;
     }
     return autoPermissionsHTML;

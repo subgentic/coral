@@ -259,6 +259,7 @@ type liveExtra struct {
 	Capabilities   *string
 	ContextWindow  int
 	PermissionMode *string // the launch's effective permission mode as stored (#10253): the empty chat says how the agent acts from it
+	Flags          *string // the stored launch flags: with the capabilities and the mode, what a relaunch would run with (#14051)
 }
 
 // liveIndex is the stored live sessions by session id: asleep, archived, launched when, the board (fallback for
@@ -291,7 +292,7 @@ func newLiveIndex(allLive []store.LiveSession) liveIndex {
 			lv.boardNames[session.SessionID] = [2]string{*session.BoardName, ptr.Value(session.DisplayName)}
 		}
 		lv.extras[session.SessionID] = liveExtra{
-			Prompt: session.Prompt, Model: session.Model, Thinking: session.Thinking, Observed: session.ObservedModel, Capabilities: session.Capabilities, ContextWindow: session.ContextWindow, PermissionMode: session.PermissionMode,
+			Prompt: session.Prompt, Model: session.Model, Thinking: session.Thinking, Observed: session.ObservedModel, Capabilities: session.Capabilities, ContextWindow: session.ContextWindow, PermissionMode: session.PermissionMode, Flags: session.Flags,
 		}
 	}
 	return lv
@@ -570,6 +571,9 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"first_prompt":          firstPrompt,
 		"last_message":          lastMessageRow(h, sid, agent.WorkingDir, agent.AgentType, skipExpensive, startedEv(latestEv, d.started[sid]) != ""), // {role, text, at} of the newest message, null at none (#11097)
 		"enrichment_pending":    skipExpensive && !sleeping,
+	}
+	if !skipExpensive { // the rollout read is the expensive part: a first paint leaves the keys out, so a later row fills them and an earlier answer is not blanked (#14051)
+		entry["codex_live_mode"], entry["codex_relaunch_narrows"] = h.codexModeFields(agent.AgentType, sid, agent.WorkingDir, lv.extras[sid])
 	}
 	if b := blockedField(sid, agent.AgentType, sleeping); b != nil {
 		entry["blocked"] = b // only a row that is blocked has the key (#13486)

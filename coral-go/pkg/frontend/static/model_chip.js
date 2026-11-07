@@ -10,6 +10,7 @@ import { importOnce } from './import_once.js';
 import { familyOf, addCustomModel, probeCanAdd, peekCanAdd } from './custom_model_add.js';
 import { modelLabel, readModelsCache, writeModelsCache, clearModelsCache, levelName } from './model_labels.js';
 import { setText, setHidden, setTitle, setData, setAttr } from './dom_write.js';
+import { modeChip } from './codex_mode.js';
 import { menuMove } from './menu_keys.js';
 
 /** The agent types whose CLI takes /model and /effort in a running session (the server's liveSwitchTypes). */
@@ -117,6 +118,11 @@ export function updateModelChip(session, server) {
         setAttr(chip, 'aria-label', labels[k]);    // the name holds what the chip shows (label in name), not a fixed phrase that hides it
     }
     setText(p.note, v.note); // the live region stays in the page, empty and out of the way (css), so a note that appears is announced
+    const mode = modeChip(s), modeWrap = $('codex-mode-wrap'), modeEl = $('codex-mode-chip'); // a Codex agent's live mode (#14051): read-only, said in plain text
+    if (modeWrap && modeEl) {
+        setHidden(modeWrap, !mode);
+        if (mode) { setText($('codex-mode-text'), mode.text); setTitle(modeEl, mode.title); setData(modeEl, 'warn', mode.warn ? 'on' : ''); setAttr(modeEl, 'aria-label', `Mode: ${mode.text}${mode.warn ? ', a restart would narrow it' : ''}`); }
+    }
     const st = v.model.state === 'failed' || v.thinking.state === 'failed' ? 'failed' : (v.thinking.state === 'requested' ? 'requested' : '');
     setData(p.note, 'state', st);
     if (_open) _renderMenu(_open);
@@ -246,7 +252,9 @@ function _renderOptions() {
     if (!menu || !s) return;
     const v = chipView(s, _cur.server);
     const row = (kind, word, text) => `<button type="button" role="menuitem" class="model-chip-item" data-options-open="${escapeAttr(kind)}"><span class="model-chip-item-label">${escapeHtml(word + ': ' + text)}</span></button>`;
-    const html = row('model', 'Model', v.model.text) + (p.thinking.wrap && !p.thinking.wrap.hidden ? row('thinking', 'Thinking', v.thinking.text) : '');
+    const mode = modeChip(s); // a phone shows no chips, only this sheet: a Codex agent's live mode is a plain line in it (#14051), not a button
+    const modeLine = mode ? `<div class="options-sheet-mode-note" role="note"${mode.warn ? ' data-warn="on"' : ''} title="${escapeAttr(mode.title)}">${escapeHtml('Mode: ' + mode.text)}</div>` : '';
+    const html = row('model', 'Model', v.model.text) + (p.thinking.wrap && !p.thinking.wrap.hidden ? row('thinking', 'Thinking', v.thinking.text) : '') + modeLine;
     if (menu.dataset.sig === html) return;
     menu.dataset.sig = html;
     menu.innerHTML = html;
