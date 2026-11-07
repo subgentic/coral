@@ -22,6 +22,8 @@ var columnMigrations = []struct {
 	// When the asked agent first read the comment's artifact threads or replied (seen_at), and when Coral reminded it to answer in the thread (nudged_at) (#11722); NULL: not yet.
 	{"artifact_comment_asks", "seen_at", "TEXT"},
 	{"artifact_comment_asks", "nudged_at", "TEXT"},
+	// When the Operator removed this agent's ignored wait from Needs you (#14266): the request the row names is out of /api/needs-you and its count; NULL: ignored only, still listed.
+	{"agent_wait_ignored", "removed_at", "TEXT"},
 	// The secret a self-hosted hub signs its owner stamps for this remote with (#11378): a "v1:" envelope under the master key like api_key, with its own AAD; "" when none. Set only by SetOwnerSecret.
 	{"remote_servers", "owner_secret", "TEXT NOT NULL DEFAULT ''"},
 	// A remote server the hub reaches over the owner's SSH session instead of a URL (#11370): transport is "http" (every server before this, and every one added by URL) or "ssh"; ssh_target is the
