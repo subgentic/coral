@@ -70,6 +70,7 @@ export function pollStartupStatus() {
                 if (data.database_warning) showDatabaseWarning(data.database_warning);
                 else setTimeout(recheckDatabases, DATABASE_RECHECK_MS);
                 dashboardStartupComplete();
+                importOnce('./launch_disclosure.js').then(m => m.refreshLaunchDisclosure()).catch(() => {});
                 // One question at a time: set a password (#3948, once, while none is set), then Coral Hub sign-in (#3966, once, for a
                 // computer already linked to Coral Hub). The second waits if the first is still open.
                 // On a fresh install the first-launch Connect screen is asked first (#11464): the password waits for its answer, for at most 15 s.

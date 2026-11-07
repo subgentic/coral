@@ -136,17 +136,17 @@ func TestPresetEnforcementTable(t *testing.T) {
 	}
 }
 
-// The rows Security's #4550 audit read from the real launch commands, pinned here too.
-func TestPresetEnforcementMatchesTheAudit(t *testing.T) {
+// Shipped full-tool presets remain sandboxed on Codex and use Agy's full mode.
+func TestPresetEnforcementMatchesTheShippedDefault(t *testing.T) {
 	byName := map[string]*Capabilities{}
 	for _, p := range readUIPresets(t) {
 		byName[p.Name] = p.Caps
 	}
 	for _, c := range []struct{ preset, codex, agy string }{
-		{"Security Reviewer", "sandbox=read-only approval=on-request search", "mode=plan"},
-		{"Frontend Dev", "sandbox=workspace-write approval=on-request search", "mode=accept-edits"},
-		{"QA Engineer", "sandbox=workspace-write approval=never", "mode=skip-permissions"},
-		{"Lead Developer", "sandbox=workspace-write approval=never", "mode=skip-permissions"},
+		{"Security Reviewer", "sandbox=workspace-write approval=never search", "mode=skip-permissions"},
+		{"Frontend Dev", "sandbox=workspace-write approval=never search", "mode=skip-permissions"},
+		{"QA Engineer", "sandbox=workspace-write approval=never search", "mode=skip-permissions"},
+		{"Lead Developer", "sandbox=workspace-write approval=never search", "mode=skip-permissions"},
 		{"Orchestrator", "sandbox=workspace-write approval=never search", "mode=skip-permissions"},
 	} {
 		caps := byName[c.preset]

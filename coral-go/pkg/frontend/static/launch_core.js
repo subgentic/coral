@@ -9,7 +9,7 @@ import { loadLiveSessions } from './api.js';
 import { isHub, normServer, LOCAL_SERVER, noteBoardLabels } from './server_base.js';
 import { chooseBoard, retryPayload, isBoardNameExists } from './board_choice.js';
 import { isHomeFolderAsk, askHomeFolder } from './home_folder_ask.js';
-import { serverLabel, launchBlockReason, postLaunch, waitForLaunched } from './launch_server.js';
+import { serverLabel, launchBlockReason, postLaunch as rawPostLaunch, waitForLaunched } from './launch_server.js';
 const { launchFlags } = await importOnce('./launch_flags.js');
 const { launch } = await importOnce('./launch_state.js');
 const { _loadServerSettings } = await importOnce('./launch_models.js');
@@ -118,6 +118,17 @@ function _launchBlocked(server) {
     return !!why;
 }
 
+async function postLaunch(server, path, payload) {
+    const snapshot = structuredClone(payload);
+    let result = await rawPostLaunch(server, path, snapshot);
+    if (result.status === 409 && result.data?.code === 'launch_disclosure_required') {
+        const { confirmLaunchDisclosure } = await importOnce('./launch_disclosure.js');
+        if (!(await confirmLaunchDisclosure(server, result.data.disclosure))) return { ok: false, cancelled: true, status: 0, data: {} };
+        result = await rawPostLaunch(server, path, snapshot);
+    }
+    return result;
+}
+
 /**
  * Send a launch to `server` and surface the outcome. Returns the response data
  * on success, or null after showing the error. Never falls back to another
@@ -141,6 +152,7 @@ export async function _launchOn(server, path, payload, agentType, { dirInput = n
         if (!(await askHomeFolder('Launch', res.data.message))) return null; // Pick a folder: nothing launched, the dialog stays for the change
         res = await postLaunch(server, path, { ...sent, home_folder_ask: true, confirm_home_folder: true });
     }
+    if (res.cancelled) return null;
     if (res.ok && res.data && res.data.board_id) noteBoardLabels([res.data], 'board_id', server); // the board it joined or started
     // A team in which no member started (#122): the answer carries each member's error. A caller that shows them per member (the team dialog, the
     // template launcher) takes the answer as it is (data.ok is false) instead of one toast of the joined text.

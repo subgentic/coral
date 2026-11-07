@@ -2,7 +2,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
-const { install: installTeam, openNewTeam, stubModels } = require('./helpers/new_team');
+const { install: installTeam, openNewTeam, stubModels, T, N } = require('./helpers/new_team');
 const BASE = require('./test_base').BASE;
 (async()=>{
  const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();
@@ -30,9 +30,47 @@ const BASE = require('./test_base').BASE;
    await openNewTeam(ev,waitFor);
    await waitFor(`!!document.getElementById('team-permission-mode')`,'team permission field');
    assert.equal(await ev(`document.getElementById('team-permission-mode').value`),'auto','new Claude team follows shipped default');
-   await ev(`const e=document.getElementById('team-permission-mode');e.value='default';e.dispatchEvent(new Event('change',{bubbles:true}));const t=document.getElementById('team-agent-type');t.value='codex';t.dispatchEvent(new Event('change',{bubbles:true}));true`);
+   const team=T(ev,waitFor);await team.to(3,{name:'permissions-probe',folder:'/work/payments-app'});
+   await ev(`(()=>{const real=window.fetch;window.__teamDefaultPosts=[];window.fetch=(input,options={})=>{if(new URL(String(input),location.href).pathname==='/api/sessions/launch-team'){window.__teamDefaultPosts.push(JSON.parse(options.body));return Promise.resolve(Response.json({error:'Test stopped before spawning'},{status:403}));}return real(input,options)};return true})()`);
+   await team.click('button',N.launch);await waitFor(`window.__teamDefaultPosts.length===1`,'new team launch payload');
+   assert.ok(await ev(`window.__teamDefaultPosts[0].flags.join(' ').includes('--permission-mode auto') && window.__teamDefaultPosts[0].agents.every(a=>a.permission_mode!=='default')`),'untouched members inherit the new Auto team default rather than sending explicit Default');
+   await waitFor(`!document.getElementById('launch-team-go').disabled`,'launch failure restores button');
+   await ev(`(()=>{const row=document.querySelector('#team-agents-list .team-agent-row');const e=document.getElementById(row.dataset.acfId).querySelector('.acf-permission-mode');e.value='default';e.dispatchEvent(new Event('change',{bubbles:true}));window.launchTeam();return true;})()`);
+   await waitFor(`window.__teamDefaultPosts.length===2`,'explicit member Default payload');
+   assert.equal(await ev(`window.__teamDefaultPosts[1].agents[0].permission_mode`),'default','member explicit Default is sent as Default');
+   await waitFor(`!document.getElementById('launch-team-go').disabled`,'second launch settles');
+   await ev(`(async()=>{const S=window.__coralStatic||'/static/';const {state}=await import(S+'state.js');state.settings.saved_team_templates=JSON.stringify([{name:'Saved narrow',agents:[{name:'Orchestrator',prompt:'Coordinate',capabilities:{allow:['file_read']}}]}]);(await import(S+'team_dialogs.js'))._pickTeamTemplate('Saved narrow');window.launchTeam();return true;})()`);
+   await waitFor(`window.__teamDefaultPosts.length===3`,'saved template launch payload');
+   assert.deepEqual(await ev(`({mode:window.__teamDefaultPosts[2].agents[0].permission_mode,caps:window.__teamDefaultPosts[2].agents[0].capabilities})`),{mode:'default',caps:{allow:['file_read']}},'saved template lower mode and capabilities keep their prior meaning');
+   await waitFor(`!document.getElementById('launch-team-go').disabled`,'saved narrow launch settles');
+   await ev(`(async()=>{const S=window.__coralStatic||'/static/';const {state}=await import(S+'state.js');state.settings.saved_team_templates=JSON.stringify([{name:'Saved plan',agents:[{name:'Orchestrator',prompt:'Coordinate',flags:'--permission-mode plan',capabilities:{allow:['file_read']}}]}]);(await import(S+'team_dialogs.js'))._pickTeamTemplate('Saved plan');window.launchTeam();return true;})()`);
+   await waitFor(`window.__teamDefaultPosts.length===4`,'saved explicit mode launch payload');
+   assert.deepEqual(await ev(`window.__teamDefaultPosts[3].agents[0].flags`),['--permission-mode','plan'],'saved member keeps its explicit Plan mode');
+   await ev(`(()=>{const e=document.getElementById('team-permission-mode');e.value='default';e.dispatchEvent(new Event('change',{bubbles:true}));const t=document.getElementById('team-agent-type');t.value='codex';t.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
    assert.equal(await ev(`document.getElementById('team-permission-mode').value`),'default','explicit Default survives provider change');
    assert.deepEqual(await ev(`import((window.__coralStatic||'/static/')+'preset_enforcement.js').then(m=>[m.defaultPermissionMode({default_permission_mode:'default'},'hermes'),m.defaultPermissionMode({},'hermes')])`),['default','bypassPermissions'],'stored lower Hermes choice wins over new shipped yolo default');
+   await ev(`(async()=>{const S=window.__coralStatic||'/static/';(await import(S+'launch_core.js')).hideLaunchModal();const real=window.fetch;window.__disclosure={id:'full-permissions-1',text:'Full tool permissions <b>are not role limits</b>. Change the default in Settings.',seen:false};window.__launchAudit={launch:[],ack:[],failAck:false};window.fetch=(input,options={})=>{const path=new URL(String(input),location.href).pathname;const json=(data,status=200)=>Promise.resolve(Response.json(data,{status}));if(path==='/api/launch-disclosure')return json(window.__disclosure);if(path==='/api/launch-disclosure/ack'){window.__launchAudit.ack.push(JSON.parse(options.body));if(window.__launchAudit.failAck)return json({error:'owner_only'},403);window.__disclosure.seen=true;return json({id:window.__disclosure.id,seen:true});}if(path==='/api/sessions/launch'||path==='/api/sessions/launch-team'){window.__launchAudit.launch.push({path,body:JSON.parse(options.body)});return window.__disclosure.seen?json({session_id:'new-agent',name:'new-agent',permission_mode:'auto'}):json({code:'launch_disclosure_required',disclosure:window.__disclosure},409);}return real(input,options)};await(await import(S+'launch_disclosure.js')).refreshLaunchDisclosure();return true;})()`);
+   await waitFor(`document.getElementById('launch-disclosure-banner')?.textContent.includes('Full tool permissions')`,'unseen disclosure stays in dashboard banner');
+   assert.equal(await ev(`!!document.querySelector('#launch-disclosure-banner b')`),false,'server text is text, never markup');
+   await ev(`import((window.__coralStatic||'/static/')+'settings_dialog.js').then(m=>m.showSettingsModal('agents')).then(()=>true)`);
+   await waitFor(`!!document.getElementById('settings-permission-mode')`,'settings default exists');
+   await ev(`import((window.__coralStatic||'/static/')+'launch_disclosure.js').then(m=>m.refreshLaunchDisclosure())`);
+   await waitFor(`document.getElementById('settings-launch-disclosure')?.textContent===window.__disclosure.text`,'Settings repeats disclosure beside default');
+   for(const outcome of ['cancel','refused','continue']){
+    await ev(`window.__launchAudit.failAck=${outcome==='refused'};window.__disclosure.seen=false;window.__launchResult='pending';window.__launchPayload={name:'frozen-name',working_dir:'/work/payments-app'};import((window.__coralStatic||'/static/')+'launch_core.js').then(m=>m._launchOn('local','/api/sessions/launch',window.__launchPayload,'claude')).then(result=>{window.__launchResult=result||'stopped'});true`);
+    await waitFor(`document.getElementById('confirm-modal-message')?.textContent===window.__disclosure.text && document.getElementById('confirm-modal')?.getClientRects().length>0`,'disclosure before launch');
+    const before=await ev('window.__launchAudit.launch.length');
+    await ev(`window.__launchPayload.name='edited-after-request';true`);
+    if(outcome==='cancel')await ev(`[...document.querySelectorAll('#confirm-modal button')].find(b=>b.textContent.trim()==='Cancel').click();true`);
+    else await ev(`document.getElementById('confirm-modal-yes').click();true`);
+    await waitFor(`window.__launchResult!=='pending'`,'launch choice settles');
+    assert.equal(await ev('window.__launchAudit.launch.length'),before+(outcome==='continue'?1:0),outcome+': no launch retry without successful owner acknowledgement');
+    if(outcome==='continue')assert.deepEqual(await ev(`window.__launchAudit.launch.slice(-2).map(x=>x.body)`),[{name:'frozen-name',working_dir:'/work/payments-app',home_folder_ask:true},{name:'frozen-name',working_dir:'/work/payments-app',home_folder_ask:true}],'retry uses frozen identical payload');
+   }
+   assert.deepEqual(await ev('window.__launchAudit.ack'),[{id:'full-permissions-1'},{id:'full-permissions-1'}],'reading/cancelling never acknowledges');
+   await ev(`import((window.__coralStatic||'/static/')+'launch_disclosure.js').then(m=>m.refreshLaunchDisclosure())`);
+   assert.equal(await ev(`!!document.getElementById('launch-disclosure-banner')`),false,'acknowledged server state removes banner');
+
   }
   console.log('PASS shipped full presets, visible role limits and explicit team Default at desktop/phone');
  }finally{await client.close()}
