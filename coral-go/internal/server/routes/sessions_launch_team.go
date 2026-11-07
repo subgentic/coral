@@ -371,6 +371,7 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := map[string]any{"ok": true, "board": body.BoardName, "board_id": body.BoardName, "board_label": h.boardLabel(body.BoardName), "agents": launched}
+	h.addLaunchNotice(ctx, resp)
 	if teamID > 0 {
 		resp["team_id"] = teamID
 	}
@@ -789,7 +790,7 @@ func (h *SessionsHandler) launchTeamMember(ctx context.Context, body launchTeamR
 			}
 		}
 	}
-	entry := map[string]any{"name": launchedName(result, def.Name), "session_id": sessionID, "session_name": result["session_name"]}
+	entry := map[string]any{"name": launchedName(result, def.Name), "session_id": sessionID, "session_name": result["session_name"], "permission_mode": result["permission_mode"]}
 	if worktreePath != "" {
 		entry["worktree_path"] = worktreePath
 	}

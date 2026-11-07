@@ -294,6 +294,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		result["board_id"] = body.BoardName
 		result["board_label"] = h.boardLabel(body.BoardName)
 	}
+	h.addLaunchNotice(r.Context(), result)
 	writeJSON(w, http.StatusOK, result)
 }
 
