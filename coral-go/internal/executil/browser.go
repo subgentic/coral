@@ -2,6 +2,7 @@ package executil
 
 import (
 	"fmt"
+	"github.com/subgentic/coral/internal/safego"
 	"html"
 	"log"
 	"net/url"
@@ -57,7 +58,7 @@ var startOpener = func(argv []string) bool {
 		return false
 	}
 	done := make(chan error, 1)
-	go func() { done <- cmd.Wait() }()
+	go func() { defer safego.Recover("executil/browser:cmd.Wait"); done <- cmd.Wait() }()
 	select {
 	case err := <-done: // macOS `open` ends with an error when no application takes the address
 		if err != nil {
