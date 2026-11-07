@@ -4,8 +4,11 @@ package ptymanager
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -20,34 +23,51 @@ import (
 // of its own, and six seconds later the process that started it exits: the helper is now the child of PID 1 and descent from the shell no longer reaches it. What finds it is the sampler, which saw it as
 // a descendant at a tick before that (every sampleEvery). Each case below ends the terminal a different way and expects the helper gone; without the sampler the helper survives on macOS.
 
-// lateDetachCmd is a shell command line: perl starts the helper (a session of its own, its pid in pidFile, then sleep) and exits six seconds later; the shell goes on.
+// lateDetachCmd is a shell command line: perl starts the helper (a session of its own, its pid in pidFile, then sleep), writes its own pid, the helper's starting parent, to pidFile+".parent", and exits six
+// seconds later; the shell goes on.
 func lateDetachCmd(pidFile string) string {
-	return `perl -e 'use POSIX; if (!fork) { POSIX::setsid(); open F, ">` + pidFile + `"; print F $$; close F; exec "sleep", "600" } select(undef, undef, undef, 6); exit 0'; sleep 600`
+	return `perl -e 'use POSIX; if (!fork) { POSIX::setsid(); open F, ">` + pidFile + `"; print F $$; close F; exec "sleep", "600" } open G, ">` + pidFile + `.parent"; print G $$; close G; select(undef, undef, undef, 6); exit 0'; sleep 600`
 }
 
-// waitOrphaned waits for the helper to lose its parent: the six seconds are over. The parent it had when first seen is the one that must go; whoever takes the helper after that is not named (PID 1 on a
-// plain Linux or a Mac, but systemd as pid 1 hands it to a subreaper of its own, as WSL does), so the test does not depend on how the machine's init adopts orphans (#14377).
-func waitOrphaned(t *testing.T, pid int) {
+// waitOrphaned waits for the helper to lose the parent that started it (perl, whose pid lateDetachCmd wrote to pidFile+".parent"): the six seconds are over. Whoever adopts the helper after that is not named
+// (PID 1 on a plain Linux or a Mac, but systemd as pid 1 hands it to a subreaper of its own, as WSL does), so the test does not depend on how the machine's init adopts orphans, and a helper already
+// adopted at the first sample is found too (#14377).
+func waitOrphaned(t *testing.T, pid int, pidFile string) {
 	t.Helper()
-	first := -1
+	starter := -1
 	for end := time.Now().Add(15 * time.Second); time.Now().Before(end); time.Sleep(50 * time.Millisecond) {
+		if starter < 0 {
+			b, _ := os.ReadFile(pidFile + ".parent")
+			if n, err := strconv.Atoi(strings.TrimSpace(string(b))); err == nil && n > 1 {
+				starter = n
+			}
+			continue
+		}
 		p, err := process.NewProcess(int32(pid))
 		if err != nil {
 			t.Fatalf("the helper %d is gone before its parent exited", pid)
 		}
-		pp, err := p.Ppid()
-		if err != nil {
-			continue
-		}
-		if first < 0 {
-			first = int(pp)
-			continue
-		}
-		if int(pp) != first {
+		if pp, err := p.Ppid(); err == nil && int(pp) != starter {
 			return
 		}
 	}
-	t.Fatalf("the helper %d was never orphaned (its parent stayed %d)", pid, first)
+	t.Fatalf("the helper %d was never orphaned (its starting parent is %d)", pid, starter)
+}
+
+// #14377: a helper already adopted by the time it is first looked at is orphaned too (the starting parent is the one that was known, not the first one seen).
+func TestWaitOrphanedFindsAHelperAlreadyAdopted(t *testing.T) {
+	pidFile := filepath.Join(t.TempDir(), "pid")
+	c := exec.Command("sh", "-c", `sleep 600 & echo $! > "$1"; echo $$ > "$1.parent"`, "sh", pidFile)
+	if err := c.Run(); err != nil { // the shell has exited when Run returns: the helper's parent is gone before the first sample
+		t.Fatal(err)
+	}
+	pid := pidFrom(t, pidFile)
+	t.Cleanup(func() { syscall.Kill(pid, syscall.SIGKILL) })
+	start := time.Now()
+	waitOrphaned(t, pid, pidFile)
+	if time.Since(start) > 3*time.Second {
+		t.Fatalf("an adopted helper took %v to be seen as orphaned", time.Since(start))
+	}
 }
 
 func TestPTYKillEndsAHelperThatDetachedSixSecondsIn(t *testing.T) {
@@ -74,7 +94,7 @@ func TestPTYKillEndsAHelperThatDetachedSixSecondsIn(t *testing.T) {
 				t.Fatal(err)
 			}
 			pid := pidFrom(t, pidFile)
-			waitOrphaned(t, pid)
+			waitOrphaned(t, pid, pidFile)
 			c.end(b, session)
 			waitGone(t, pid, 10*time.Second)
 		})
@@ -120,7 +140,7 @@ func TestTmuxKillAndRestartEndAHelperThatDetachedSixSecondsIn(t *testing.T) {
 				t.Fatal(err)
 			}
 			pid := pidFrom(t, pidFile)
-			waitOrphaned(t, pid)
+			waitOrphaned(t, pid, pidFile)
 			c.end(t, term, name)
 			waitGone(t, pid, 12*time.Second) // after the 3 s grace
 		})
@@ -130,8 +150,8 @@ func TestTmuxKillAndRestartEndAHelperThatDetachedSixSecondsIn(t *testing.T) {
 // The same helper, with Coral killed (SIGKILL) instead of a Kill: the guardian ended what it saw of the tree while the helper was still a descendant.
 func TestAHelperThatDetachedSixSecondsInIsEndedWhenCoralIsKilled(t *testing.T) {
 	t.Parallel() // its own parent process and folder; ~6 s of real time waiting for the helper to detach (#9432)
-	child, guardianPID, parent, _ := runGuardParent(t, false, "CORAL_GUARD_TEST_LATE=1")
-	waitOrphaned(t, child)
+	child, guardianPID, parent, dir := runGuardParent(t, false, "CORAL_GUARD_TEST_LATE=1")
+	waitOrphaned(t, child, filepath.Join(dir, "child"))
 	if err := syscall.Kill(parent.Process.Pid, syscall.SIGKILL); err != nil {
 		t.Fatal(err)
 	}
