@@ -112,8 +112,8 @@ function _build() {
                 <div class="menu artifact-viewer-menu" id="artifact-viewer-menu" role="menu" aria-label="More actions" hidden>
                     <button type="button" class="menu-item artifact-viewer-edit-item" role="menuitem" hidden>Edit text</button>
                     <button type="button" class="menu-item artifact-viewer-markup-item" role="menuitem" hidden>Mark up</button>
-                    <button type="button" class="menu-item artifact-viewer-copy-id" role="menuitem">Copy artifact ID</button>
-                    <button type="button" class="menu-item artifact-viewer-copyid-item" role="menuitem" hidden>Copy file ID</button>
+                    <button type="button" class="menu-item artifact-viewer-copyid-item" role="menuitem" title="The id that stays the same across versions" hidden>Copy file ID</button>
+                    <button type="button" class="menu-item artifact-viewer-copy-id" role="menuitem" title="The id of this version only">Copy version ID</button>
                     <a class="menu-item artifact-viewer-newtab" role="menuitem" target="_blank" rel="noopener noreferrer" hidden>Open in new tab</a>
                     <a class="menu-item artifact-viewer-download" role="menuitem" rel="noopener noreferrer" download>Download</a>
                 </div>

@@ -434,7 +434,7 @@ export function reviewActions(row, inSaved = false) { // inSaved (#11641, #11799
         if (inSaved) menu.push({ label: 'Move to Needs you', title: 'Put it back in Needs you as it was', run: unsave });
         else if (!bookmark) menu.push({ label: 'Save for later', title: 'Keep it in Saved, out of Needs you; nobody is told', run: save });
     }
-    menu.push({ label: 'Copy artifact ID', title: 'Copy this version’s link for an agent', run: b => { const hex = row.id; return importOnce('./artifact_clipboard.js').then(m => m.copyArtifactId(hex)).catch(error => failed(b, error)); } });
+    menu.push({ label: 'Copy version ID', title: 'The id of this version only', run: b => { const hex = row.id; return importOnce('./artifact_clipboard.js').then(m => m.copyArtifactId(hex)).catch(error => failed(b, error)); } });
     if (isRead(row) && !inSaved) { box.classList.add('inbox-review-actions-read'); menu.push({ label: 'Mark unread', title: 'Count it in Needs you again', run: unread }); }
     if (menu.length) { const more = moreMenu(menu, file); more.setAttribute('data-slot', 'dots'); box.append(more); }
     box.append(errorText); return box;

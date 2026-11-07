@@ -26,8 +26,8 @@ const BASE=require('./test_base').BASE;
   for(const [server,hex] of [['local',H1],['m1',H2]]){
    await ev(`(async()=>{const {reviewActions}=await import((window.__coralStatic||'/static/')+'inbox_sidebar.js');document.getElementById('copy-row')?.remove();const row=document.createElement('div');row.id='copy-row';row.style.cssText='position:fixed;top:160px;left:50px;z-index:10000;background:var(--bg-primary);padding:12px';row.append(reviewActions({id:'${hex}',name:'release-plan.md',uri:'coral://artifacts/${H3}',team:'${server==='local'?'copy-team':'@m1/copy-team'}',tags:['for review'],version:${hex===H1?1:2}}));document.body.append(row);})()`);
    await click('#copy-row .inbox-row-more-toggle');await waitFor(`!!document.querySelector('#copy-row .menu:not([hidden])')`,'row More menu');
-   await shot('row-'+server);assert.ok(await ev(`!![...document.querySelectorAll('#copy-row [role=menuitem]')].find(b=>b.textContent==='Copy artifact ID')`),server+' row offers Copy artifact ID');
-   await ev(`document.querySelectorAll('#copy-row [role=menuitem]').forEach(b=>{if(b.textContent==='Copy artifact ID')b.classList.add('copy-id-target')});true`);await click('#copy-row .copy-id-target');
+   await shot('row-'+server);assert.ok(await ev(`!![...document.querySelectorAll('#copy-row [role=menuitem]')].find(b=>b.textContent==='Copy version ID')`),server+' row offers Copy version ID');
+   await ev(`document.querySelectorAll('#copy-row [role=menuitem]').forEach(b=>{if(b.textContent==='Copy version ID')b.classList.add('copy-id-target')});true`);await click('#copy-row .copy-id-target');
    await waitFor(`navigator.clipboard.readText().then(t=>t==='coral://artifacts/${hex}')`,server+' row own-version clipboard');assert.equal(await ev('navigator.clipboard.readText()'),'coral://artifacts/'+hex);await dismissCopied();
   }
   await ev(`document.getElementById('copy-row').remove();true`);
