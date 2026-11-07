@@ -219,3 +219,35 @@ func TestAFailedReadIsRememberedForAFewSecondsSoABurstDoesNotWaitOnGitEachTime(t
 	_, _, _ = c.Read(context.Background(), "/repo", "main", since, until)
 	assert.EqualValues(t, 2, calls.Load(), "after it git is asked again")
 }
+
+// #14095 (the Operator: Tokens per commit showed no commits in 24 h, the repository got 455): the shared checkout's own `main` is parked on an old commit (agents never commit there; work lands on origin), while origin/main
+// has everything that landed. The commits of "main" are those of the further of the two when origin's contains the local one: the branch as landed. A local branch that has commits origin lacks, or that diverged, is read as it is.
+func TestTheBranchAsLandedIsReadWhenOriginsIsAheadOfAParkedLocalOne(t *testing.T) {
+	root := newRepo(t, "main")
+	commit(t, root, "Old Dev", "2026-10-01T10:00:00Z", "old.txt")
+	git(t, root, "x", "2026-10-01T11:00:00Z", "update-ref", "refs/remotes/origin/main", "refs/heads/main") // origin was here too
+	git(t, root, "x", "2026-11-01T10:00:00Z", "checkout", "-q", "-b", "landing", "refs/remotes/origin/main")
+	commit(t, root, "Backend Dev", "2026-11-05T10:00:00Z", "landed1.txt") // landed on origin since: the local main never moved
+	commit(t, root, "QA Engineer", "2026-11-05T11:00:00Z", "landed2.txt")
+	git(t, root, "x", "2026-11-05T12:00:00Z", "update-ref", "refs/remotes/origin/main", "refs/heads/landing")
+	git(t, root, "x", "2026-11-05T13:00:00Z", "checkout", "-q", "main") // the checkout is parked on the old main
+	since, until := time.Date(2026, 11, 4, 0, 0, 0, 0, time.UTC), time.Date(2026, 11, 7, 0, 0, 0, 0, time.UTC)
+	got, _, err := Read(context.Background(), root, "main", since, until)
+	require.NoError(t, err)
+	var authors []string
+	for _, c := range got {
+		authors = append(authors, c.Author)
+	}
+	assert.Equal(t, []string{"QA Engineer", "Backend Dev"}, authors, "what landed on origin is the branch's, though the local main never moved")
+
+	// a local main with a commit origin does not have (a diverged branch) is read as it is: that is the work this computer has
+	git(t, root, "x", "2026-11-06T10:00:00Z", "checkout", "-q", "-B", "main", "refs/remotes/origin/main~2")
+	commit(t, root, "Local Only Dev", "2026-11-06T11:00:00Z", "local.txt")
+	got, _, err = Read(context.Background(), root, "main", since, until)
+	require.NoError(t, err)
+	authors = nil
+	for _, c := range got {
+		authors = append(authors, c.Author)
+	}
+	assert.Equal(t, []string{"Local Only Dev"}, authors, "a diverged local branch is read as it is")
+}
