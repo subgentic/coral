@@ -241,6 +241,14 @@ export function saveTeamFromSidebar(boardName) {
     });
 }
 
+/** What a Wake that started some of the team and not all says: who did not start, and the first reason in the server's words (#14172). Plain text. */
+export function teamWakeFailureWords(team, failed) {
+    const name = f => String(f.name || 'An agent');
+    const first = failed[0];
+    const rest = failed.slice(1).map(name);
+    return `Team "${team}" is only partly awake. ${name(first)} did not start${first.error ? `: ${String(first.error)}` : ''}${rest.length ? `. Also not started: ${rest.join(', ')}` : ''}.`;
+}
+
 export function toggleTeamSleep(boardName, action) {
     const doIt = async () => {
         try {
@@ -249,12 +257,15 @@ export function toggleTeamSleep(boardName, action) {
             // The route answers 200 with ok: false when it did nothing (no sessions on that board): that is a refusal to say, not a team that is awake (#12417: Sleep Team "did nothing" and said nothing).
             if (!resp.ok || data.ok === false) { showToast(data.error || data.message || `Could not ${action} the team (HTTP ${resp.status})`, true); return; }
             const sleeping = !!data.sleeping;
+            const failed = Array.isArray(data.failed) ? data.failed.filter(f => f && typeof f.session_id === 'string') : []; // members whose terminal did not start (#14172): they stay asleep on the page
+            const failedIds = new Set(failed.map(f => f.session_id));
             for (const s of state.liveSessions) {
                 // Team wake leaves archived agents asleep (#3030).
-                if (inTeam(s, boardName) && !s.archived) s.sleeping = sleeping;
+                if (inTeam(s, boardName) && !s.archived && !failedIds.has(s.session_id)) s.sleeping = sleeping;
             }
             importOnce('./team_waking.js').then(m => m.noteTeamSleep(boardName, sleeping)).catch(() => {}); // the team page's status counts the agents that have reported since a Wake and says Asleep after a Sleep (#10052, #10359); loaded here, not at start (page weight)
             redrawLiveList();
+            if (failed.length) { showToast(teamWakeFailureWords(keyLabel(boardName), failed), true); return; }
             showToast(sleeping ? `Team "${keyLabel(boardName)}" is now sleeping` : `Team "${keyLabel(boardName)}" is awake`);
         } catch (e) {
             showToast('Failed to toggle team sleep', true);

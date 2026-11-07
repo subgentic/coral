@@ -157,12 +157,39 @@ export async function wakeMember(a, name) {
     const sub = (Array.isArray(subs) ? subs : []).find(x => x && x.subscriber_id === name);
     if (!sub || !sub.session_name) throw new Error(`${who} is not a member of this team that Coral can wake.`);
     const live = (state.liveSessions || []).find(s => sessionServer(s) === server && `${s.agent_type}-${s.session_id}` === sub.session_name);
-    if (!live) throw new Error(`${who} is not running on this computer.`);
+    if (!live) return resumeEndedMember(server, a, name, who, sub.session_name); // an agent Kill All (or its own exit) ended has no live row: its chat is resumed, as History's Resume does (#14172)
     if (!live.sleeping) throw new Error(`${who} is not asleep.`);
     const resp = await serverFetch(server, `/api/sessions/live/${encodeURIComponent(live.session_id)}/wake`, { method: 'POST' });
     if (!resp.ok) { // the server says why in a sentence (a CLI not installed, a path it cannot run: cli_not_found, cli_path_unusable, cli_untrusted_mount) and what to set: show it, not the status code (#12049)
         const why = await resp.json().then(b => (b && typeof b.error === 'string' ? b.error.trim() : ''), () => '');
         throw new Error(why ? `Could not wake ${who}: ${markHidden(why, { strict: true })}` : `Could not wake ${who} (HTTP ${resp.status}).`);
+    }
+}
+
+/** An ended agent's Restart from a question (#14172): no live row any more, so its earlier chat is resumed in its own folder on the question's computer, the way History's Resume does it (the same resume-info and
+ *  launch route), under its own name and team. Rejects in words when the chat, its folder or its type cannot be found. */
+async function resumeEndedMember(server, a, name, who, sessionName) {
+    const m = /^([a-z][a-z0-9]*)-([A-Za-z0-9][A-Za-z0-9._-]*)$/.exec(String(sessionName || ''));
+    if (!m) throw new Error(`${who} is not running on this computer.`);
+    const [, agentType, sid] = m;
+    const read = await serverFetch(server, `/api/sessions/history/${encodeURIComponent(sid)}/resume-info`);
+    if (!read.ok) throw new Error(`${who} is not running on this computer, and its earlier chat could not be read here (HTTP ${read.status}).`);
+    const info = await read.json().catch(() => ({}));
+    if (!info.working_dir) throw new Error(`${who} is not running, and Coral does not know the folder it worked in, so it cannot be resumed from here. Resume it from All chats.`);
+    if (info.working_dir_exists === false) throw new Error(`${who} is not running, and the folder it worked in is gone (${markHidden(info.working_dir, { strict: true })}). Resume it from All chats and pick a folder.`);
+    const payload = { working_dir: info.working_dir, agent_type: info.agent_type || agentType, resume_session_id: info.resume_session_id || sid, display_name: info.display_name || name };
+    if (a.board) payload.board_id = payload.board_name = a.board;
+    const mode = info.permission_mode || '';
+    if (mode === 'default') payload.permission_mode = 'default';
+    else if (mode) {
+        const { _getPermissionFlagsForAgentMode } = await importOnce('./permission_flags.js');
+        const flags = _getPermissionFlagsForAgentMode(payload.agent_type, mode).split(/\s+/).filter(Boolean);
+        if (flags.length) payload.flags = flags;
+    }
+    const resp = await serverFetch(server, '/api/sessions/launch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!resp.ok) {
+        const why = await resp.json().then(b => (b && typeof b.error === 'string' ? b.error.trim() : ''), () => '');
+        throw new Error(why ? `Could not resume ${who}: ${markHidden(why, { strict: true })}` : `Could not resume ${who} (HTTP ${resp.status}).`);
     }
 }
 

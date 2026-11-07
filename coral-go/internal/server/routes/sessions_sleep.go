@@ -115,6 +115,7 @@ func (h *SessionsHandler) Wake(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel = lifecycleCtxN(r.Context(), sleepingHere) // the bound grows with the team (#5213)
 
 	relaunched := 0
+	var failed []map[string]string // each member whose terminal did not start: the person is told which and why (#14172: Wake Team said the team was awake while its spawns failed)
 	for _, ls := range allLive {
 		if ls.IsSleeping != 1 || ls.IsArchived == 1 || ls.BoardName == nil || *ls.BoardName != boardName {
 			continue // archived agents stay asleep on team wake; they wake only one at a time
@@ -123,6 +124,7 @@ func (h *SessionsHandler) Wake(w http.ResponseWriter, r *http.Request) {
 		// Relaunch the session
 		if err := h.wakeExistingSession(ctx, &ls); err != nil {
 			log.Printf("Failed to wake session %s — keeping asleep: %v", ls.SessionID[:8], err)
+			failed = append(failed, map[string]string{"name": wakeFailureName(ls), "session_id": ls.SessionID, "error": err.Error()})
 			continue
 		}
 		if humanInputCaller(r) {
@@ -152,12 +154,38 @@ func (h *SessionsHandler) Wake(w http.ResponseWriter, r *http.Request) {
 		boardPaused = false
 	}
 
+	if relaunched == 0 && len(failed) > 0 { // nobody started: not a team that is awake
+		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "sleeping": true, "sessions_relaunched": 0, "failed": failed, "board_paused": boardPaused,
+			"error": "No one in this team could be started. " + wakeFailureWords(failed)})
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":                  true,
 		"sleeping":            false,
 		"sessions_relaunched": relaunched,
+		"failed":              failed,
 		"board_paused":        boardPaused,
 	})
+}
+
+// wakeFailureName is the name a person knows the agent by.
+func wakeFailureName(ls store.LiveSession) string {
+	if n := ptr.Value(ls.DisplayName); n != "" {
+		return n
+	}
+	return ls.AgentName
+}
+
+// wakeFailureWords says, for the toast, which members did not start and why (the first reason in full, the rest by name).
+func wakeFailureWords(failed []map[string]string) string {
+	if len(failed) == 0 {
+		return ""
+	}
+	out := failed[0]["name"] + ": " + failed[0]["error"]
+	for _, f := range failed[1:] {
+		out += "; " + f["name"]
+	}
+	return out + "."
 }
 
 // codexSessionSaved is agent.CodexSessionSaved (a variable so a test can say).

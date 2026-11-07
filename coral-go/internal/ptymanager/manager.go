@@ -37,8 +37,14 @@ func (m *PTYBackend) Spawn(name, agentType, workDir, sessionID, command string, 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if _, exists := m.sessions[name]; exists {
-		return fmt.Errorf("session %q already exists", name)
+	if old, exists := m.sessions[name]; exists {
+		if old.isRunning() {
+			return fmt.Errorf("session %q already exists", name)
+		}
+		// Its process has ended (Kill All, an agent that exited): the terminal left behind is stale, not a second agent. Starting the name again replaces it, as a restart does; before, every Wake of
+		// that agent failed with "already exists" while the team page said it was awake (#14172).
+		delete(m.sessions, name)
+		go old.kill() // releases what the ended terminal still holds, without holding the lock
 	}
 
 	s, err := newSession(name, agentType, workDir, sessionID, command, cols, rows)
