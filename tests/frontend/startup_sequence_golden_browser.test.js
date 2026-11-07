@@ -12,6 +12,16 @@ const GOLDEN = path.join(__dirname, 'fixtures', 'startup_sequence_golden.json');
 const RECORDER = `(() => {
     const log = window.__boot = [], known = new Set(Object.getOwnPropertyNames(window));
     window.__bootKnown = known;
+    // #13172 (3336eea26) deliberately loads review_counts at idle. Capture startup
+    // before that background phase, then release it and check its request below.
+    const nativeIdle = window.requestIdleCallback?.bind(window), nativeCancelIdle = window.cancelIdleCallback?.bind(window);
+    if (nativeIdle) {
+        const idle = new Map(); let idleId = 0;
+        window.requestIdleCallback = (fn, options) => { const id = ++idleId; idle.set(id, { fn, options }); return id; };
+        window.cancelIdleCallback = id => idle.delete(id);
+        log.runIdle = () => { window.requestIdleCallback = nativeIdle; window.cancelIdleCallback = nativeCancelIdle; for (const { fn, options } of idle.values()) nativeIdle(fn, options); idle.clear(); };
+    }
+
     let tell = () => {}; // set below: tells the document changes made so far before an event is logged, so the two are in the order they happened
     let outside = 0; // > 0 while a frame, timer or observer callback runs: what it does is not the handler's step, and lands in the handler's span where the CPU's speed puts it, so it is logged with a ~ and left out of the comparison
     const push = s => { tell(); log.push(outside ? '~' + s : s); };
@@ -73,6 +83,9 @@ const RECORDER = `(() => {
         // (what follows the handler, the answers' own requests, comes in the network's order and varies from run to run: it is not compared)
         cases['3 window hooks the page defined (sorted)'] = got.hooks.join('\n');
         cases['4 modules requested (sorted, the bundle folder is named by its content hash)'] = got.modules.map(m => m.replace(/^bb\/[0-9a-f]+\//, 'bb/<hash>/')).join('\n');
+        await ev(`window.__boot.runIdle?.(); true`);
+        await waitFor(`performance.getEntriesByType('resource').some(e => { const u = new URL(e.name); return u.pathname.endsWith('/review_counts.js'); })`, 'the deferred review-count module', 10000);
+        await waitFor(`performance.getEntriesByType('resource').some(e => { const u = new URL(e.name); return u.pathname === '/api/team-artifacts' && u.searchParams.get('waiting') === '1'; })`, 'the idle badge count request', 10000);
         const problems = compareGolden(GOLDEN, cases, 'The order the dashboard starts in (before the DOMContentLoaded handlers, the handler span in order, the window hooks, the modules requested), for startup_sequence_golden_browser.test.js. CORAL_UPDATE_GOLDEN=1 rewrites it.');
         if (problems.length) { console.error(problems.join('\n')); process.exitCode = 1; }
         else console.log(`PASS startup sequence golden: ${Object.keys(cases).length} sections identical`);
