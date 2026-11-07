@@ -44,7 +44,7 @@ func (m *PTYBackend) Spawn(name, agentType, workDir, sessionID, command string, 
 		// Its process has ended (Kill All, an agent that exited): the terminal left behind is stale, not a second agent. Starting the name again replaces it, as a restart does; before, every Wake of
 		// that agent failed with "already exists" while the team page said it was awake (#14172).
 		delete(m.sessions, name)
-		go old.kill() // releases what the ended terminal still holds, without holding the lock
+		safego.Go("ptymanager/kill-ended", func() { _ = old.kill() }) // releases what the ended terminal still holds, without holding the lock; a panic in it is recovered like any goroutine's (its error was not read before either)
 	}
 
 	s, err := newSession(name, agentType, workDir, sessionID, command, cols, rows)
