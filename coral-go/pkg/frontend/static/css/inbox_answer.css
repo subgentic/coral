@@ -2,3 +2,9 @@
 .inbox-answer-step { color: var(--text-secondary); font-size: .85em; flex: 1 1 100%; }
 .inbox-answer-step-line + .inbox-answer-step-line::before { content: ' \00b7 '; } /* a wide row runs the pairs on one line, separated by a dot; a phone puts each on its own line (below) */
 @media (max-width: 768px) { .inbox-answer-step-line { display: block; } .inbox-answer-step-line + .inbox-answer-step-line::before { content: none; } } /* which question these choices are for, or what Submit will send (#11981) */
+
+/* The folder-trust row (#14110): the folder as plain text and what Yes does, on their own full line; a long path breaks anywhere and never widens the row. */
+.inbox-trust-note { color: var(--text-secondary); font-size: .85em; flex: 1 1 100%; min-width: 0; overflow-wrap: anywhere; }
+.inbox-trust-path { font-family: var(--font-mono, ui-monospace, monospace); color: var(--text-primary); overflow-wrap: anywhere; }
+.inbox-trust-confirm { color: var(--text-primary); }
+@media (max-width: 768px) { .inbox-trust-go, .inbox-trust-cancel { min-height: 44px; } }

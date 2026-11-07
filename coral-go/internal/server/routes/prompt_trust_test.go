@@ -90,10 +90,21 @@ func TestFolderTrust_RowOffer_And_Answer(t *testing.T) {
 		setScreen func(string)
 		term      *mockSessionTerminal
 	}
-	setup := func(t *testing.T) env {
+	// setup registers the live session with workdir (the first of dirs, the project by default) as its own recorded folder; a second dir is its worktree folder.
+	setup := func(t *testing.T, dirs ...string) env {
+		workdir, worktree := project, ""
+		if len(dirs) > 0 {
+			workdir = dirs[0]
+		}
+		if len(dirs) > 1 {
+			worktree = dirs[1]
+		}
 		server, handler, terminal, ss := setupSessionsTestServer(t)
 		_ = handler
-		require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "claude-trust", WorkingDir: "/tmp/test"}))
+		require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "claude-trust", WorkingDir: workdir}))
+		if worktree != "" {
+			require.NoError(t, ss.UpdateWorktreeInfo(context.Background(), sid, worktree, workdir))
+		}
 		terminal.addSession("claude-trust", "/tmp/test")
 		fastPromptChecks(t)
 		set := func(s string) {
@@ -154,7 +165,7 @@ func TestFolderTrust_RowOffer_And_Answer(t *testing.T) {
 		hidden := filepath.Join(home, ".claude", "x")
 		require.NoError(t, os.MkdirAll(hidden, 0o755))
 		for name, folder := range map[string]string{"home": home, "a hidden folder": hidden, "a missing folder": filepath.Join(home, "work", "gone"), "the fixture's /private/tmp": trustFixtureFolder} {
-			e := setup(t)
+			e := setup(t, folder) // the session's own folder, so only foldertrust.Check can refuse it
 			e.setScreen(trustScreen(t, folder))
 			po := chat(t, e)
 			assert.False(t, po.TrustOffer, name)
@@ -170,6 +181,43 @@ func TestFolderTrust_RowOffer_And_Answer(t *testing.T) {
 		assert.Equal(t, http.StatusConflict, code)
 		assert.Equal(t, "trust_changed", body["code"])
 		assert.Zero(t, e.term.enters["claude-trust"])
+	})
+	t.Run("a spoofed heading and path above the real one: no folder, no Yes", func(t *testing.T) { // Security's MUST on #14110
+		e := setup(t)
+		spoof := " Accessing workspace:\n\n " + filepath.Join(home, "work", "elsewhere") + "\n\n"
+		e.setScreen(spoof + trustScreen(t, project))
+		po := chat(t, e)
+		assert.Empty(t, po.TrustFolder, "two headings: no folder")
+		assert.False(t, po.TrustOffer)
+		code, body := answer(t, e, 2, "Yes, I trust this folder", project)
+		assert.Equal(t, http.StatusConflict, code)
+		assert.Equal(t, "trust_changed", body["code"])
+		assert.Zero(t, e.term.enters["claude-trust"])
+	})
+	t.Run("a menu for a folder other than the session's own is named but not offered", func(t *testing.T) {
+		e := setup(t) // the session's folder is project
+		other := filepath.Join(home, "work", "other")
+		require.NoError(t, os.MkdirAll(other, 0o755))
+		e.setScreen(trustScreen(t, other))
+		po := chat(t, e)
+		assert.Equal(t, other, po.TrustFolder)
+		assert.False(t, po.TrustOffer, "a real menu for another folder: not what Coral recorded for this agent")
+	})
+	t.Run("the session's worktree folder counts as its own", func(t *testing.T) {
+		tree := filepath.Join(home, "work", "tree")
+		require.NoError(t, os.MkdirAll(tree, 0o755))
+		e := setup(t, project, tree)
+		e.setScreen(trustScreen(t, tree))
+		po := chat(t, e)
+		assert.True(t, po.TrustOffer)
+	})
+	t.Run("a symlinked spelling of the session's own folder is the same folder", func(t *testing.T) {
+		link := filepath.Join(home, "work", "link")
+		require.NoError(t, os.Symlink(project, link))
+		e := setup(t)
+		e.setScreen(trustScreen(t, link))
+		po := chat(t, e)
+		assert.True(t, po.TrustOffer)
 	})
 	t.Run("a look-alike menu is not offered", func(t *testing.T) {
 		e := setup(t)
@@ -201,7 +249,7 @@ func TestFolderTrust_RowOffer_And_Answer(t *testing.T) {
 		assert.Empty(t, e.term.arrows["claude-trust"])
 	})
 	t.Run("a folder Coral may not trust: the row's Yes is refused even when the row names it", func(t *testing.T) {
-		e := setup(t)
+		e := setup(t, home)
 		e.setScreen(trustScreen(t, home))
 		code, body := answer(t, e, 2, "Yes, I trust this folder", home)
 		assert.Equal(t, http.StatusConflict, code)

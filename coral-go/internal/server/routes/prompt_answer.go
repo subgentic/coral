@@ -699,7 +699,7 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 		errConflict(w, "The prompt changed. Answer it in the terminal.")
 		return
 	}
-	if body.TrustFolder != "" && isTrustYes(screen, opt) && (screen.TrustFolder != body.TrustFolder || !trustOffered(r, screen)) { // a row's lasting Yes: only for the folder it showed, a folder Coral may trust, from the person's own dashboard (#14110)
+	if body.TrustFolder != "" && isTrustYes(screen, opt) && (screen.TrustFolder != body.TrustFolder || !h.trustOffered(r, body.SessionID, screen)) { // a row's lasting Yes: only for the folder it showed, a folder Coral may trust, from the person's own dashboard (#14110)
 		writeError(w, http.StatusConflict, "trust_changed", "The folder to trust changed or cannot be trusted from here. Answer it in the agent's own chat.")
 		return
 	}
