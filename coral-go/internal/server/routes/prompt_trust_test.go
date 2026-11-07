@@ -1,0 +1,218 @@
+package routes
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/ptymanager"
+	"github.com/subgentic/coral/internal/store"
+)
+
+// #14110: a Needs you row may answer Claude's folder-trust menu (a lasting grant) as one named exception, found by the menu's structure and not by the word
+// "trust", for a folder the screen names and Coral may trust, from the person's own dashboard.
+
+const trustFixtureFolder = "/private/tmp/q4543/project"
+
+func trustScreen(t *testing.T, folder string) string {
+	t.Helper()
+	return strings.ReplaceAll(claudeUnnumbered(t, "trust.txt"), trustFixtureFolder, folder)
+}
+
+func TestFolderTrustMenu_ByStructure(t *testing.T) {
+	for _, backend := range []string{"tmux", "pty"} {
+		screen := claudeUnnumbered(t, "trust.txt")
+		if backend == "pty" {
+			screen = ptymanager.RenderScreen([]byte(claudeUnnumbered(t, "pty_trust.raw")), 120, 40)
+		}
+		s, ok := parsePromptScreen(screen)
+		require.True(t, ok, backend)
+		assert.True(t, isFolderTrustMenu(s), backend)
+		markFolderTrust(screen, &s)
+		want := trustFixtureFolder
+		if backend == "pty" {
+			want += "2" // the raw capture is a different run's: its folder is project2
+		}
+		assert.Equal(t, want, s.TrustFolder, backend)
+		assert.True(t, isTrustYes(s, s.Options[1]), backend)
+		assert.False(t, isTrustYes(s, s.Options[0]), "No is not the grant")
+	}
+
+	// Look-alikes get nothing: another menu, other labels, a third option, another question, the word trust somewhere else.
+	lookAlike := func(name, screen string) {
+		t.Helper()
+		s, ok := parsePromptScreen(screen)
+		if !ok {
+			return // not even a menu
+		}
+		markFolderTrust(screen, &s)
+		assert.False(t, isFolderTrustMenu(s), name)
+		assert.Empty(t, s.TrustFolder, name)
+	}
+	base := claudeUnnumbered(t, "trust.txt")
+	lookAlike("the API key menu", claudeUnnumbered(t, "apikey.txt"))
+	lookAlike("a lasting Yes with other words", strings.Replace(base, "Yes, I trust this folder", "Yes, always trust this folder", 1))
+	lookAlike("a No with other words", strings.Replace(base, "No, exit", "No", 1))
+	lookAlike("a third option", strings.Replace(base, "   Yes, I trust this folder\n", "   Yes, I trust this folder\n   Yes, and every folder under it\n", 1))
+	lookAlike("another question", strings.Replace(base, "Quick safety check: Is this a project you created or one you trust?", "Do you trust this folder with your keys?", 1))
+	lookAlike("options swapped", strings.Replace(strings.Replace(base, "No, exit", "TMP", 1), "Yes, I trust this folder", "No, exit", 1))
+
+	// A trust menu with no single folder line has a case but no folder, so nothing to offer.
+	noFolder := strings.Replace(base, " Accessing workspace:\n\n "+trustFixtureFolder+"\n", " Accessing workspace:\n", 1)
+	s, ok := parsePromptScreen(noFolder)
+	require.True(t, ok)
+	markFolderTrust(noFolder, &s)
+	assert.True(t, isFolderTrustMenu(s))
+	assert.Empty(t, s.TrustFolder, "the question is not a folder")
+}
+
+func TestFolderTrust_RowOffer_And_Answer(t *testing.T) {
+	const sid = "00000000-0000-0000-0000-00000000a5c3"
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	project := filepath.Join(home, "work", "project")
+	require.NoError(t, os.MkdirAll(project, 0o755))
+	if resolved, err := filepath.EvalSymlinks(project); err == nil {
+		project = resolved
+	}
+
+	type env struct {
+		base      string
+		setScreen func(string)
+		term      *mockSessionTerminal
+	}
+	setup := func(t *testing.T) env {
+		server, handler, terminal, ss := setupSessionsTestServer(t)
+		_ = handler
+		require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "claude-trust", WorkingDir: "/tmp/test"}))
+		terminal.addSession("claude-trust", "/tmp/test")
+		fastPromptChecks(t)
+		set := func(s string) {
+			terminal.mu.Lock()
+			terminal.outputs["claude-trust"] = s
+			terminal.mu.Unlock()
+		}
+		return env{base: server.URL + "/api/sessions/live/claude-trust", setScreen: set, term: terminal}
+	}
+	// A request from the dashboard carries Sec-Fetch-Site (the identity middleware classifies it as the person's own page); one without it is a tool on this computer.
+	do := func(t *testing.T, req *http.Request, dash bool) *http.Response {
+		if dash {
+			req.Header.Set("Sec-Fetch-Site", "same-origin")
+		}
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		return resp
+	}
+	chatAs := func(t *testing.T, e env, dash bool) promptScreen {
+		req, err := http.NewRequest(http.MethodGet, e.base+"/chat?"+url.Values{"session_id": {sid}, "agent_type": {"claude"}, "after": {"1"}}.Encode(), nil)
+		require.NoError(t, err)
+		resp := do(t, req, dash)
+		defer resp.Body.Close()
+		var reply struct {
+			PromptOptions promptScreen `json:"prompt_options"`
+		}
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&reply))
+		return reply.PromptOptions
+	}
+	chat := func(t *testing.T, e env) promptScreen { return chatAs(t, e, true) }
+	answerAs := func(t *testing.T, e env, n int, label, folder string, dash bool) (int, map[string]any) {
+		payload := map[string]any{"n": n, "label": label, "session_id": sid, "agent_type": "claude"}
+		if folder != "" {
+			payload["trust_folder"] = folder
+		}
+		b, _ := json.Marshal(payload)
+		req, err := http.NewRequest(http.MethodPost, e.base+"/answer-prompt", bytes.NewReader(b))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		resp := do(t, req, dash)
+		defer resp.Body.Close()
+		var body map[string]any
+		json.NewDecoder(resp.Body).Decode(&body)
+		return resp.StatusCode, body
+	}
+	answer := func(t *testing.T, e env, n int, label, folder string) (int, map[string]any) {
+		return answerAs(t, e, n, label, folder, true)
+	}
+
+	t.Run("a folder Coral may trust is named and offered", func(t *testing.T) {
+		e := setup(t)
+		e.setScreen(trustScreen(t, project))
+		po := chat(t, e)
+		assert.Equal(t, project, po.TrustFolder)
+		assert.True(t, po.TrustOffer)
+	})
+	t.Run("home, a hidden folder under it, a missing folder and the shared tmp are named but never offered", func(t *testing.T) {
+		hidden := filepath.Join(home, ".claude", "x")
+		require.NoError(t, os.MkdirAll(hidden, 0o755))
+		for name, folder := range map[string]string{"home": home, "a hidden folder": hidden, "a missing folder": filepath.Join(home, "work", "gone"), "the fixture's /private/tmp": trustFixtureFolder} {
+			e := setup(t)
+			e.setScreen(trustScreen(t, folder))
+			po := chat(t, e)
+			assert.False(t, po.TrustOffer, name)
+		}
+	})
+	t.Run("a tool on this computer (not the dashboard) is not offered Yes and its row Yes is refused", func(t *testing.T) {
+		e := setup(t)
+		e.setScreen(trustScreen(t, project))
+		po := chatAs(t, e, false)
+		assert.Equal(t, project, po.TrustFolder, "the folder is read for the card either way")
+		assert.False(t, po.TrustOffer)
+		code, body := answerAs(t, e, 2, "Yes, I trust this folder", project, false)
+		assert.Equal(t, http.StatusConflict, code)
+		assert.Equal(t, "trust_changed", body["code"])
+		assert.Zero(t, e.term.enters["claude-trust"])
+	})
+	t.Run("a look-alike menu is not offered", func(t *testing.T) {
+		e := setup(t)
+		e.setScreen(strings.Replace(trustScreen(t, project), "Yes, I trust this folder", "Yes, always trust this folder", 1))
+		po := chat(t, e)
+		assert.False(t, po.TrustOffer)
+		assert.Empty(t, po.TrustFolder)
+	})
+	t.Run("the row's Yes goes through for the folder it drew, and the chat's own Yes needs no folder", func(t *testing.T) {
+		e := setup(t)
+		e.setScreen(trustScreen(t, project))
+		e.term.onArrow = func(string) {
+			e.setScreen(strings.Replace(trustScreen(t, project), "❯ No, exit\n   Yes, I trust this folder", "  No, exit\n ❯ Yes, I trust this folder", 1))
+		}
+		e.term.onEnter = func(string) { e.setScreen(claudeUnnumbered(t, "ready.txt")) }
+		code, body := answer(t, e, 2, "Yes, I trust this folder", project)
+		assert.Equal(t, http.StatusOK, code, "%v", body)
+		assert.Equal(t, 1, e.term.enters["claude-trust"])
+	})
+	t.Run("the screen now names another folder: the row's Yes is refused and no key is sent", func(t *testing.T) {
+		e := setup(t)
+		other := filepath.Join(home, "work", "other")
+		require.NoError(t, os.MkdirAll(other, 0o755))
+		e.setScreen(trustScreen(t, other))
+		code, body := answer(t, e, 2, "Yes, I trust this folder", project)
+		assert.Equal(t, http.StatusConflict, code)
+		assert.Equal(t, "trust_changed", body["code"])
+		assert.Zero(t, e.term.enters["claude-trust"])
+		assert.Empty(t, e.term.arrows["claude-trust"])
+	})
+	t.Run("a folder Coral may not trust: the row's Yes is refused even when the row names it", func(t *testing.T) {
+		e := setup(t)
+		e.setScreen(trustScreen(t, home))
+		code, body := answer(t, e, 2, "Yes, I trust this folder", home)
+		assert.Equal(t, http.StatusConflict, code)
+		assert.Equal(t, "trust_changed", body["code"])
+		assert.Zero(t, e.term.enters["claude-trust"])
+	})
+	t.Run("No is never held back by the folder", func(t *testing.T) {
+		e := setup(t)
+		e.setScreen(trustScreen(t, home))
+		e.term.onEnter = func(string) { e.setScreen(claudeUnnumbered(t, "ready.txt")) }
+		code, body := answer(t, e, 1, "No, exit", home)
+		assert.Equal(t, http.StatusOK, code, "%v", body)
+	})
+}
