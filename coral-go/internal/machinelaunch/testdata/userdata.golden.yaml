@@ -357,11 +357,11 @@ runcmd:
       set -eu
       install -d -m 0755 -o root -g root /run/coral
       # The setup's own output and exit status are kept where the launch key's user can read them (the cloud-init log is root's), so a setup that does not finish can say why (#13876).
-      /usr/local/sbin/coral-egress-check state > /run/coral/dns.start.txt 2>&1 || true; chmod 0600 /run/coral/dns.start.txt; chown root:coral /run/coral/dns.start.txt && chmod 0640 /run/coral/dns.start.txt
+      ( umask 077; /usr/local/sbin/coral-egress-check state > /run/coral/dns.start.txt 2>&1 ) || true; chmod 0600 /run/coral/dns.start.txt; chown root:coral /run/coral/dns.start.txt && chmod 0640 /run/coral/dns.start.txt
       rc=0
       /usr/local/sbin/coral-machine-setup > /run/coral/setup.log 2>&1 || rc=$?
       echo "$rc" > /run/coral/setup.status
-      /usr/local/sbin/coral-egress-check state > /run/coral/dns.txt 2>&1 || true; chmod 0600 /run/coral/dns.txt; chown root:coral /run/coral/dns.txt && chmod 0640 /run/coral/dns.txt
+      ( umask 077; /usr/local/sbin/coral-egress-check state > /run/coral/dns.txt 2>&1 ) || true; chmod 0600 /run/coral/dns.txt; chown root:coral /run/coral/dns.txt && chmod 0640 /run/coral/dns.txt
       chmod 0644 /run/coral/setup.log /run/coral/setup.status
       [ "$rc" = 0 ] || exit "$rc"
       install -d -m 0700 -o coral -g coral /run/coral/bootstrap.d

@@ -615,9 +615,9 @@ done
 true`, seconds)
 }
 
-// keepStateStep is the shell that keeps root's DNS and egress state in /run/coral/<name> (#12885): written by the fixed `coral-egress-check state`, root-only first (a redirect makes a 0644 file), then the owner is set to
+// keepStateStep is the shell that keeps root's DNS and egress state in /run/coral/<name> (#12885): written by the fixed `coral-egress-check state` under umask 077 (the file is root-only from the moment it exists), then the owner is set to
 // root:coral and only then it is made 0640, so a failed chown leaves it root-only and it is never readable by every user of the machine. It never fails the setup.
 func keepStateStep(name string) string {
 	f := "/run/coral/" + name
-	return fmt.Sprintf("%s state > %s 2>&1 || true; chmod 0600 %s; chown root:coral %s && chmod 0640 %s", egressCheckPath, f, f, f, f)
+	return fmt.Sprintf("( umask 077; %s state > %s 2>&1 ) || true; chmod 0600 %s; chown root:coral %s && chmod 0640 %s", egressCheckPath, f, f, f, f)
 }

@@ -152,7 +152,29 @@ func TestTheUserDataKeepsRootsDNSStateWhereTheLaunchKeysUserCanRead(t *testing.T
 	assert.Less(t, state, finish, "kept whether the setup succeeded or not")
 }
 
+// Security's SHOULD: the file is root-only from the moment the redirect makes it, not after a chmod a second later; and the report no longer asks for the root-only cloud-init log the launch key's user cannot read.
+func TestTheStateFileIsRootOnlyFromTheMomentItExists(t *testing.T) {
+	assert.Contains(t, keepStateStep("dns.txt"), "( umask 077; /usr/local/sbin/coral-egress-check state > /run/coral/dns.txt 2>&1 )")
+	needSh(t)
+	dir := t.TempDir()
+	file := filepath.Join(dir, "s.txt")
+	// a stub 'state' that reports the mode of the file the shell made for its output, while it is still running
+	check := filepath.Join(dir, "check")
+	require.NoError(t, os.WriteFile(check, []byte("#!/bin/sh\nstat -c %a "+file+" 2>/dev/null || stat -f %Lp "+file+"\n"), 0o755))
+	step := strings.Replace(keepStateStep("dns.txt"), "/usr/local/sbin/coral-egress-check", check, 1)
+	step = strings.ReplaceAll(step, "/run/coral/dns.txt", file)
+	i := strings.Index(step, " || true") // only the write: what the file's mode is while it is being written, before any chmod
+	require.Greater(t, i, 0)
+	step = step[:i+len(" || true")]
+	out, err := runWith(t, "", "#!/bin/sh\numask 022\n"+step+"\n")
+	require.NoError(t, err, out)
+	got, _ := os.ReadFile(file)
+	assert.Equal(t, "600", strings.TrimSpace(string(got)), "the file's mode while the state is written, even at the root's umask 022")
+}
+
 func TestTheFailureReportReadsTheDNSStateAndEndsWithTheSetupsOwnOutput(t *testing.T) {
+	assert.NotContains(t, whyCommand, "cloud-init-output.log", "the launch key's user cannot read root's cloud-init log: permission denied")
+	assert.Contains(t, whyCommand, "tail -c 3800 /run/coral/dns.txt", "the whole file at its caps")
 	assert.Contains(t, whyCommand, "/run/coral/dns.txt")
 	assert.Contains(t, whyCommand, "/run/coral/dns.start.txt", "the state before the setup too: a setup that hangs never writes the one after")
 	assert.Less(t, strings.Index(whyCommand, "dns.start.txt"), strings.Index(whyCommand, "dns.txt 2>&1"), "before, then after")
@@ -227,11 +249,17 @@ func TestTheClockAndServiceStatesSurviveTheTailOfAWorstCaseStateFile(t *testing.
 	require.Len(t, m, 2, "the report's read of the file")
 	n, err := strconv.Atoi(m[1])
 	require.NoError(t, err)
-	assert.Greater(t, len(out), n, "this file really is bigger than what the report reads")
-	tail := out[len(out)-n:]
+	tail := out
+	if len(out) > n {
+		tail = out[len(out)-n:]
+	}
+	assert.LessOrEqual(t, len(out), n, "at its caps the whole file is what the report reads: the journal and the nft table are in it too")
+	for _, want := range []string{"== nft table", "== journal: coral-egress-resolvers, systemd-resolved", "== resolvectl status", "== /etc/resolv.conf"} {
+		assert.Contains(t, tail, want)
+	}
 	for _, want := range []string{"== date -u / uptime -s", "Thu Jan  1 00:02:00 UTC 1970", "1970-01-01 00:00:05", "== timedatectl", "NTPSynchronized=no", "== systemctl is-active", "inactive", "== cloud-init status --long"} {
 		assert.Contains(t, tail, want, "the last %d bytes keep it", n)
 	}
 	// and each bulky part is capped on its own, so the file is bounded however much the commands say
-	assert.Less(t, len(out), 4500, "capped per section")
+	assert.Less(t, len(out), 4000, "capped per section")
 }
