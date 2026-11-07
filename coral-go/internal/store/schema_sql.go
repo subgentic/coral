@@ -161,9 +161,20 @@ CREATE TABLE IF NOT EXISTS artifact_comment_asks (
 	replies       INTEGER NOT NULL DEFAULT 0,
 	seen_at       TEXT,
 	nudged_at     TEXT,
+	read_at       TEXT,
 	UNIQUE (comment_id, agent_session)
 );
 CREATE INDEX IF NOT EXISTS idx_artifact_comment_asks_artifact ON artifact_comment_asks(artifact_id);
+
+-- The board message that delivered a comment to one agent (#14130): coral-board read of that message by that agent is when the agent read the comment (artifact_comment_asks.read_at). One row per (board,
+-- message); the agent session is the one the message was for, so another member reading the message (an orchestrator reads every message) stamps nothing. No text is kept.
+CREATE TABLE IF NOT EXISTS artifact_comment_messages (
+	board         TEXT NOT NULL,
+	message_id    INTEGER NOT NULL,
+	comment_id    INTEGER NOT NULL,
+	agent_session TEXT NOT NULL,
+	PRIMARY KEY (board, message_id)
+);
 
 -- Agents that published a claude.ai artifact (#6583): one reminder per artifact. key is the kind and the sha256 of the rest (never a path or url): "tool:<session>:<artifact key>" for a publish seen in an agent's tool call,
 -- or "link:<claude.ai artifact id>" for a link on the board or in an agent's reply (one row for the whole board, so a link passed along nudges nobody twice).
