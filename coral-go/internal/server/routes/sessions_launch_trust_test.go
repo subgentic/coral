@@ -35,6 +35,7 @@ func newTrustRig(t *testing.T) *trustRig {
 	t.Helper()
 	_, h, _, ss := setupSessionsTestServer(t)
 	stubCLIPaths(t, ss)
+	ackLaunchDisclosure(t, ss) // a dashboard launch with the new default waits for the notice (#14353); these tests are about the folder
 	home, err := filepath.EvalSymlinks(t.TempDir())
 	require.NoError(t, err)
 	t.Setenv("HOME", home)
