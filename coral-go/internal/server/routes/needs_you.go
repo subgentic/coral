@@ -97,6 +97,9 @@ func needsYouAgentItems(rows []map[string]any, now time.Time) []NeedsYouItem {
 		if gone, _ := row["archived"].(bool); gone {
 			continue
 		}
+		if gone, _ := row["wait_removed"].(bool); gone {
+			continue // the Operator removed this request from Needs you (#14266): out of the list and the count, though the agent still waits and its held messages stay held
+		}
 		hid, _ := row["wait_ignored"].(bool) // the Operator dismissed this request (#11946, #14203): the agent still waits in its terminal, so it stays, flagged, and the count, the page and the team page agree
 		sid, _ := row["session_id"].(string)
 		name, _ := row["display_name"].(string)
