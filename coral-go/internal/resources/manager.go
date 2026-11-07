@@ -56,7 +56,7 @@ type Manager struct {
 
 // Open makes the Manager, loading the state file when there is one. A file that cannot be read is an error, never an empty queue: an agent holding the Mac would be forgotten.
 func Open(o Options) (*Manager, error) {
-	cfg := resourcequeue.Config{Now: o.Now, Alive: o.Alive, OnGrant: o.OnGrant, AgeStep: o.AgeStep, MaxPerAgent: o.MaxPerAgent}
+	cfg := resourcequeue.Config{Now: o.Now, Alive: o.Alive, OnGrant: o.OnGrant, AgeStep: o.AgeStep, MaxPerAgent: o.MaxPerAgent, WaitStale: resourcequeue.WaitStale}
 	var hist *History
 	if o.HistoryPath != "" {
 		if h, err := OpenHistory(o.HistoryPath); err != nil {
@@ -83,6 +83,11 @@ func (m *Manager) Queue() *resourcequeue.Queue { return m.q }
 // Claim asks for a slot for agent, ranked by its task (a failed lookup ranks 0 rather than refusing the claim).
 func (m *Manager) Claim(ctx context.Context, resource, agent, note string) (resourcequeue.Result, error) {
 	return m.claim(ctx, resource, resourcequeue.Claimant{Agent: agent, Note: note})
+}
+
+// ClaimPolling is Claim for a command that keeps asking about its place (the CLI's claim --wait, #14170): such a place is dropped from consideration when the asking stops.
+func (m *Manager) ClaimPolling(ctx context.Context, resource, agent, note string) (resourcequeue.Result, error) {
+	return m.claim(ctx, resource, resourcequeue.Claimant{Agent: agent, Note: note, Polls: true})
 }
 
 // ClaimAuto is the shell hook's claim (#13645): the same as Claim, marked as the hook's own with the pattern that fired (the record keeps the pattern, never the command).

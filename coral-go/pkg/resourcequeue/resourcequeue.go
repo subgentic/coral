@@ -48,6 +48,7 @@ type Claimant struct {
 	Priority int    // bigger goes first; supplied by the caller from the agent's task and goal
 	Note     string // why, for people to read
 	Via      string // how the claim came: "hook" for the shell hook's own, "" for a person's or an agent's (#13671)
+	Polls    bool   // #14170: the claim came from a command that keeps asking about its place (the CLI, every 3 s); only such a place can be taken for abandoned
 	Pattern  string // for a hook claim, the resource's match pattern that fired (never the command)
 }
 
@@ -61,6 +62,7 @@ type Entry struct {
 	Lease    time.Time // when the hold ends unless renewed; zero while waiting
 	Member   string    // on a pool's entry that holds a slot: the member (the machine) it was granted, "" otherwise (#13719)
 	Pin      int       // a person's override: bigger is nearer the front among the waiting (set by Move)
+	Polled   time.Time // #14170: when the agent last asked about this place (a waiting claim asks every few seconds); an entry nobody has asked about for WaitStale is not waited on: its command ended
 	Away     time.Time // #13706: the agent's wait ended without a turn (its --timeout, its tool call) and its place is kept until this time; a claim from it again clears it. Zero: present
 }
 
@@ -92,6 +94,7 @@ type Config struct {
 	OnGrant     func(Entry)             // called, outside the lock, for each entry that is granted by a release, a reap or a reorder (not for a claim answered at once: its Result says so)
 	OnEvent     func(Event)             // called, outside the lock, for each change (#13671, the analytics' record): a panic in it is dropped, and it must not block (the Manager's history queues and returns)
 	Persist     Persister               // optional: the state is saved after each change
+	WaitStale   time.Duration           // #14170: a waiting entry nobody has asked about for this long is taken for abandoned (0: never, as before). The server sets WaitStale (30 s) as its waiting CLI asks every 3 s
 }
 
 // Event is one change in a queue, for the record of its use (#13671): who, which resource, how long it waited or held. It carries no command and no note.
@@ -144,7 +147,9 @@ func (q *Queue) unlockEmit() {
 
 // Defaults.
 const (
-	DefaultLease       = 30 * time.Minute
+	DefaultLease = 30 * time.Minute
+	// WaitStale is how long a waiting entry may go unasked before it is taken for abandoned (#14170): a stopped `claim --wait` leaves its place, and a slot that came to it was held by nobody. The CLI asks every 3 s.
+	WaitStale          = 30 * time.Second
 	DefaultAwayGrace   = 10 * time.Minute // how long a place is kept for an agent whose wait ended without a turn (#13706)
 	DefaultMaxPerAgent = 3
 	DefaultAgeStep     = 3 * time.Minute // 10 points in about 30 minutes of waiting: one rank step of the board's task priorities (0, 10, 20, 30), so nothing starves behind a steady stream of the next class up
@@ -352,6 +357,9 @@ func (q *Queue) Claim(key string, who Claimant) (Result, error) {
 		return Result{}, ErrNotAllowed
 	}
 	if e := q.entryFor(key, who.Agent); e != nil {
+		if e.Waiting() {
+			e.Polled = q.now()
+		}
 		if who.Priority > e.Priority {
 			e.Priority = who.Priority
 		}
@@ -374,7 +382,7 @@ func (q *Queue) Claim(key string, who Claimant) (Result, error) {
 		q.unlockEmit()
 		return Result{}, ErrQueueFull
 	}
-	e := &Entry{ID: q.nextID, Resource: key, Claimant: who, Enqueued: q.now()}
+	e := &Entry{ID: q.nextID, Resource: key, Claimant: who, Enqueued: q.now(), Polled: q.now()}
 	q.nextID++
 	q.entries = append(q.entries, e)
 	q.note("enqueued", e)
@@ -455,6 +463,11 @@ func (q *Queue) Leave(key, agent string, grace time.Duration) error {
 	return err
 }
 
+// abandoned says a waiting entry's command has ended (only a place made by a claim that polls, the CLI's `claim --wait`: the hook's refusal puts an agent in line too, and that agent retries when it likes, not every few seconds): nobody has asked about its place for WaitStale (#14170). Not for an entry that was never asked after it was made by a person (Polled zero).
+func (q *Queue) abandoned(e *Entry) bool {
+	return q.cfg.WaitStale > 0 && e.Waiting() && e.Claimant.Polls && !e.Polled.IsZero() && q.now().Sub(e.Polled) > q.cfg.WaitStale
+}
+
 // Reap ends the holds whose lease ran out and drops the entries of agents that are no longer alive, then grants the waiting. Call it from a timer; every other call also keeps the line honest.
 func (q *Queue) Reap() (ended []Entry, err error) {
 	q.mu.Lock()
@@ -464,6 +477,10 @@ func (q *Queue) Reap() (ended []Entry, err error) {
 	for _, e := range q.entries {
 		dead := q.cfg.Alive != nil && !q.cfg.Alive(e.Claimant.Agent)
 		expired := !e.Waiting() && !e.Lease.IsZero() && !now.Before(e.Lease)
+		if e.Waiting() && e.Away.IsZero() && q.abandoned(e) { // a stopped `claim --wait` (#14170): its place is kept for the grace as for an agent that walked away, and skipped meanwhile; asking again clears it
+			e.Away = now.Add(DefaultAwayGrace)
+			q.note("away", e)
+		}
 		if e.Waiting() && !e.Away.IsZero() && !now.Before(e.Away) { // a place kept for an agent that did not come back (#13706)
 			ended = append(ended, *e)
 			keys[e.Resource] = true
@@ -736,7 +753,7 @@ func (q *Queue) bestWaiter(m string) *Entry {
 	var best *Entry
 	for _, key := range append([]string{m}, q.poolsWith(m)...) {
 		for _, x := range q.line(key) {
-			if !x.Away.IsZero() { // an agent that is away is skipped (#13706): the slot goes to the next one who is here, and the absent one keeps its place at the front
+			if !x.Away.IsZero() || q.abandoned(x) { // an agent that is away is skipped (#13706): the slot goes to the next one who is here, and the absent one keeps its place at the front; so is one whose waiting command ended (#14170)
 				continue
 			}
 			if best == nil || q.before(x, best) {

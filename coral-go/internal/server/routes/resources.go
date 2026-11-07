@@ -240,7 +240,7 @@ func (h *ResourcesHandler) Claim(w http.ResponseWriter, r *http.Request) {
 	}
 	h.reap()
 	name := chi.URLParam(r, "name")
-	res, err := h.M.Claim(resources.WithSession(r.Context(), callerActor(r).Session), name, who, cleanText(body.Note, 200))
+	res, err := h.M.ClaimPolling(resources.WithSession(r.Context(), callerActor(r).Session), name, who, cleanText(body.Note, 200))
 	if err != nil {
 		h.fail(w, err)
 		return
