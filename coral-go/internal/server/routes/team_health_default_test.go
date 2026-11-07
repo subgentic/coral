@@ -40,7 +40,7 @@ func TestLiveRowsCarryTheTeamsHealthCheckState(t *testing.T) {
 	h.addTeamHealth(httptest.NewRequest(http.MethodGet, "/api/sessions/live", nil), local)
 	assert.Equal(t, true, local[0]["team_health_on"])
 	assert.Equal(t, false, local[1]["team_health_on"])
-	assert.Equal(t, false, local[2]["team_health_on"], "a team with nothing stored has the new default: off")
+	assert.Equal(t, true, local[2]["team_health_on"], "a team with nothing stored has the default: on (#14091)")
 	assert.NotContains(t, local[3], "team_health_on", "an agent on no team has no field")
 	assert.NotContains(t, local[4], "team_health_on")
 
@@ -53,7 +53,8 @@ func TestLiveRowsCarryTheTeamsHealthCheckState(t *testing.T) {
 	}
 }
 
-// A team launched with the option on has its check on; without it (or false) the team keeps whatever it has, which for a new team is off.
+// A team launched with the option on has its check on; with the option false (the person unticked the box) a NEW team has it off, since the default is on (#14091); absent, the team keeps what it has (on, for a new team); a
+// relaunch never turns off a check the operator turned on.
 func TestLaunchTeamHealthOption(t *testing.T) {
 	bs := healthTestStore(t)
 	ctx := context.Background()
@@ -62,16 +63,20 @@ func TestLaunchTeamHealthOption(t *testing.T) {
 	h := &SessionsHandler{bs: bs, cfg: cfg}
 	yes, no := true, false
 
-	h.restoreTeamTemplate(ctx, &launchTeamRequest{BoardName: "new-off"})
-	assert.False(t, bs.GetHealthSettings(ctx, "new-off").On, "a team launched without the option has the check off")
+	h.restoreTeamTemplate(ctx, &launchTeamRequest{BoardName: "new-absent"})
+	assert.True(t, bs.GetHealthSettings(ctx, "new-absent").On, "a team launched without the option has the default: on")
+	assert.False(t, bs.HealthSettingStored(ctx, "new-absent"), "and nothing is stored for it")
 	h.restoreTeamTemplate(ctx, &launchTeamRequest{BoardName: "new-false", HealthMonitor: &no})
-	assert.False(t, bs.GetHealthSettings(ctx, "new-false").On)
+	assert.False(t, bs.GetHealthSettings(ctx, "new-false").On, "a new team whose person unticked the box has it off")
 	h.restoreTeamTemplate(ctx, &launchTeamRequest{BoardName: "new-on", HealthMonitor: &yes})
 	assert.True(t, bs.GetHealthSettings(ctx, "new-on").On, "the option turns it on")
 
 	require.NoError(t, bs.SetHealthOn(ctx, "kept", true))
 	h.restoreTeamTemplate(ctx, &launchTeamRequest{BoardName: "kept", HealthMonitor: &no})
 	assert.True(t, bs.GetHealthSettings(ctx, "kept").On, "a relaunch never turns off a check the operator turned on")
+	require.NoError(t, bs.SetHealthOn(ctx, "kept-off", false))
+	h.restoreTeamTemplate(ctx, &launchTeamRequest{BoardName: "kept-off", HealthMonitor: &yes})
+	assert.True(t, bs.GetHealthSettings(ctx, "kept-off").On, "and the option on turns on a check that was off")
 }
 
 // #5119: the icon blinked. A read of the health settings that fails for a tick (a busy database, a request that ended) used to read as every
