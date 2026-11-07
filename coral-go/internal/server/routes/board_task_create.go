@@ -36,7 +36,7 @@ func (h *BoardHandler) requireTaskPlanner(w http.ResponseWriter, r *http.Request
 		noteEnforceDiffers("task-planner", r)
 		return true
 	}
-	if err := h.bs.RequireTaskReviewer(r.Context(), project, actor); err != nil {
+	if err := h.bs.RequirePlanner(r.Context(), project, actor); err != nil {
 		errForbidden(w, "only Operator or an active registered orchestrator may create or reassign shared tasks; coordinate with your orchestrator")
 		return false
 	}
@@ -46,7 +46,7 @@ func (h *BoardHandler) requireTaskPlanner(w http.ResponseWriter, r *http.Request
 // isTaskPlanner reports whether actor plans this board's tasks: the Operator or an active
 // registered orchestrator.
 func (h *BoardHandler) isTaskPlanner(ctx context.Context, project, actor string) bool {
-	return actor == "Operator" || (actor != "" && h.bs.RequireTaskReviewer(ctx, project, actor) == nil)
+	return actor == "Operator" || (actor != "" && h.bs.RequirePlanner(ctx, project, actor) == nil)
 }
 
 // requirePlannerOrAssignee answers 400 without an actor, 403 unless actor plans tasks or is

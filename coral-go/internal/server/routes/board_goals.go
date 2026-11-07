@@ -65,9 +65,9 @@ var goalWriteWords = plannerWords{
 	notPlanner:   "only Operator or an active registered orchestrator may create or change goals; coordinate with your orchestrator",
 }
 
-// goalRequestSendWords is what the request send says for the board it sends from: its sentence names the job title, which is a literal word a worker does not have.
+// goalRequestSendWords is what the request send says for the board it sends from: its sentence names the job title (a literal word a worker does not have) and the team's Orchestrator seat (#14050).
 func goalRequestSendWords(from string) plannerWords {
-	msg := fmt.Sprintf("only the Operator or an active Orchestrator of %q can send its goal requests: the member's job title must be the word Orchestrator (a Developer or any other title is refused)", from)
+	msg := fmt.Sprintf("only the Operator or an active Orchestrator of %q can send its goal requests: the member's job title must be the word Orchestrator, or the member must be the team's Orchestrator seat (a Developer or any other title is refused)", from)
 	return plannerWords{counter: "goal-request-sender", operatorOnly: msg, notPlanner: msg}
 }
 
@@ -84,7 +84,7 @@ func (h *BoardHandler) requirePlanner(w http.ResponseWriter, r *http.Request, pr
 		noteEnforceDiffers(words.counter, r)
 		return true
 	}
-	if err := h.bs.RequireTaskReviewer(r.Context(), project, actor); err != nil {
+	if err := h.bs.RequirePlanner(r.Context(), project, actor); err != nil {
 		errForbidden(w, words.notPlanner)
 		return false
 	}
