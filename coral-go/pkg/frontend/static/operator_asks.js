@@ -203,3 +203,9 @@ export async function openAskDialog(a, onDone, runners = {}) {
 }
 /** Remove one answered/dismissed ask from the shared list, then notify its readers. */
 export function forgetAsk(a) { asks = asks.filter(x => askKey(x) !== askKey(a)); fire(); }
+
+/** Caution from the linked task’s recorded state; unlinked and older questions are never guessed from prose. */
+export function questionContextNote(a) {
+    const reason = { task_completed: 'The linked task is finished.', task_reassigned: 'The linked task has a different assignee.' }[a?.may_no_longer_apply];
+    return reason ? `May no longer apply. ${reason} The asker can close this question.` : '';
+}

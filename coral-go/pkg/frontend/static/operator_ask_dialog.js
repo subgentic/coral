@@ -8,7 +8,7 @@ import { loadStyles } from './lazy_styles.js';
 import { showToast } from './notifications.js';
 import { decisionNeedsPerson } from './server_base.js';
 import { importOnce } from './import_once.js';
-import { askParts, askSubjects, fromAnotherComputer, buttonsOf, yesNoButtons, buttonWords, claimButton, settleButton, wakeMember, refreshOperatorAsks, replyToAsk, forgetAsk } from './operator_asks.js';
+import { askParts, askSubjects, fromAnotherComputer, buttonsOf, yesNoButtons, buttonWords, claimButton, settleButton, wakeMember, refreshOperatorAsks, replyToAsk, forgetAsk, questionContextNote } from './operator_asks.js';
 await loadStyles('operator_ask_dialog.css');
 
 const isReply = action => /^reply$/.test(action);
@@ -109,7 +109,8 @@ export function openAskDialog(a, onDone, runners = {}) {
     const addSlot = document.createElement('div'); addSlot.className = 'inbox-ask-attach'; pics.append(addSlot);
     const sendRow = document.createElement('div'); sendRow.className = 'inbox-ask-sendrow'; const pickSlot = document.createElement('span'); pickSlot.className = 'inbox-ask-pick'; sendRow.append(pickSlot, send); addSlot.append(sendRow); // Add image on the left, Send reply on the right, the pictures note under them (#13148)
     compose.append(label, pics, err);
-    dlg.append(title, sub, ...(links.hidden ? [] : [links]), reading, compose, foot);
+    const contextNote = document.createElement('p'); contextNote.className = 'inbox-ask-sub'; contextNote.textContent = questionContextNote(a); contextNote.hidden = !contextNote.textContent;
+    dlg.append(title, sub, ...(contextNote.hidden ? [] : [contextNote]), ...(links.hidden ? [] : [links]), reading, compose, foot);
     drawOffers();
     if (!fromAnotherComputer(a)) { // the picture is stored on the question's own team, as a goal's pictures are
         Promise.all([importOnce('./artifact_comment_images.js'), importOnce('./artifact_comments_api.js')]).then(([m, api]) => {
