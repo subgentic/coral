@@ -19,7 +19,7 @@ const BASE = require('../test_base').BASE;
 const TEAM = 'census-' + Date.now().toString(36);
 const S = `(window.__coralStatic || '/static/')`;
 const { INBOX_WORLD } = require('./inbox_world');
-const { DATA_WORLD, httpJson, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING } = require('./census_world');
+const { DATA_WORLD, CENSUS_LIVE, terminalAtWindowSize, httpJson, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING } = require('./census_world');
 
 const VERSIONS = require('./artifact_versions_stub');
 const { coralReady } = require('./wait');
@@ -43,7 +43,7 @@ module.exports = part => (async () => {
         await httpJson('POST', `/api/board/${TEAM}/messages`, { subscriber_id: 'Boss', content: 'Then post the summary.' });
         await httpJson('POST', `/api/board/${TEAM}/messages`, { subscriber_id: 'Boss', content: 'And tell me when it is done.' });
         for (const [title, priority] of [['Ship the release notes', 'high'], ['Check the migration', 'medium'], ['Tidy the changelog', 'low']]) await httpJson('POST', `/api/board/${TEAM}/tasks`, { subscriber_id: 'Boss', title, body: 'A task for the census.', priority, assignee: 'Boss' });
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD }); await Page.addScriptToEvaluateOnNewDocument({ source: require('./scene_ready').FETCH_COUNTER }); // a scene is measured once its fetches are done (#416)
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD }); await Page.addScriptToEvaluateOnNewDocument({ source: CENSUS_LIVE }); await Page.addScriptToEvaluateOnNewDocument({ source: require('./scene_ready').FETCH_COUNTER }); // a scene is measured once its fetches are done (#416)
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await load();
         if (part === 'a') {
@@ -91,7 +91,7 @@ module.exports = part => (async () => {
             await ev(`document.body.click(); true`);
             await sc('chat: find bar', async () => { if (await ev(`getComputedStyle(document.getElementById('agent-bar-more')).display !== 'none' && document.getElementById('agent-bar-more').getAttribute('aria-expanded') !== 'true'`)) await tap('#agent-bar-more'); await tap('#chat-find-btn'); await waitFor(`!!document.querySelector('.chat-find-bar') && !document.querySelector('.chat-find-bar').hidden`, 'find bar', 5000); }, { min: 12, expect: `document.querySelector('.chat-find-input').getClientRects().length > 0` });
             await tap('.chat-find-close');
-            await sc('terminal view', async () => { await tapSwitch(); }, { min: 8, expect: `document.getElementById('live-view-btn-terminal').getAttribute('aria-pressed') === 'true' || document.getElementById('live-view-btn-terminal').classList.contains('active')` });
+            await sc('terminal view', async () => { await terminalAtWindowSize(ev, waitFor, tapSwitch); }, { min: 8, expect: `document.getElementById('live-view-btn-terminal').getAttribute('aria-pressed') === 'true' || document.getElementById('live-view-btn-terminal').classList.contains('active')` });
             await sc('terminal view: key bar', async () => { await ev(`window.closeSendMenu(); document.getElementById('keys-chip').click(); true`); await waitFor(`!!document.getElementById('terminal-key-bar') && document.getElementById('terminal-key-bar').getClientRects().length > 0`, 'the terminal key bar', 10000); }, { min: 11, expect: `document.querySelectorAll('#terminal-key-bar .tkb-key').length === 12` });
             await sc('terminal view: Copy screen', async () => { await waitFor(`!!document.getElementById('terminal-copy-screen-btn') && document.getElementById('terminal-copy-screen-btn').getClientRects().length > 0`, 'the Copy screen button', 10000); }, { min: 8, expect: `document.getElementById('terminal-copy-screen-btn').getAttribute('aria-label') === 'Copy screen'` });
             await sc('terminal view: header and composer controls', async () => { await waitFor(`document.getElementById('popout-panel-toggle-btn').getClientRects().length > 0`, 'the header buttons', 10000); }, { min: 5, expect: `document.querySelector('.attach-image-btn').getClientRects().length > 0 && document.querySelector('.mobile-send-btn').getClientRects().length > 0` });

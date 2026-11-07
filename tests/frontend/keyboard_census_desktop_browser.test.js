@@ -14,7 +14,7 @@ const { STUB, HEX } = require('./helpers/comments_scale');
 const kb = require('./helpers/keyboard_census');
 const { FETCH_COUNTER, sceneReady, KNOWN_SLOW } = require('./helpers/scene_ready');
 const { GOALS_STUB, SHOW_ALL_GOALS } = require('./helpers/goals_stub');
-const { DATA_WORLD, httpJson, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING } = require('./helpers/census_world');
+const { DATA_WORLD, CENSUS_LIVE, terminalAtWindowSize, httpJson, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING } = require('./helpers/census_world');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
@@ -48,7 +48,7 @@ const BUBBLES = [{ type: 'user', content: 'Is the build green?', key: 'c1', time
         await httpJson('POST', `/api/board/${TEAM}/subscribe`, { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-session' });
         for (const m of ['Please check the release notes.', 'Then post the summary.']) await httpJson('POST', `/api/board/${TEAM}/messages`, { subscriber_id: 'Boss', content: m });
         for (const [title, priority] of [['Ship the release notes', 'high'], ['Check the migration', 'medium'], ['Tidy the changelog', 'low']]) await httpJson('POST', `/api/board/${TEAM}/tasks`, { subscriber_id: 'Boss', title, body: 'A task for the census.', priority, assignee: 'Boss' });
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD }); await Page.addScriptToEvaluateOnNewDocument({ source: FETCH_COUNTER });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD }); await Page.addScriptToEvaluateOnNewDocument({ source: CENSUS_LIVE }); await Page.addScriptToEvaluateOnNewDocument({ source: FETCH_COUNTER });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
         await load();
         await sc('home (agent list)', async () => { await ev(`window.__m.add('rowa', 'Row A', 2, {}); window.__m.add('rowb', 'Row B', 2, {}); window.switchNavTab('agents'); true`); await waitFor(`document.querySelectorAll('#live-sessions-list li, [data-section="live-sessions"] .session-list > li').length >= 2`, 'agent rows', 10000); }, { min: 5 });
@@ -84,7 +84,7 @@ const BUBBLES = [{ type: 'user', content: 'Is the build green?', key: 'c1', time
             await tap('#model-chip');
         }, { min: 10, expect: `!document.getElementById('model-chip-menu').hidden` });
         await ev(`document.body.click(); true`);
-        await sc('terminal view', async () => { await tap('#live-view-btn-terminal'); await waitFor(`(() => { const l = document.getElementById('changed-files-list'); return !l || l.getClientRects().length === 0 || (l.textContent.trim().length > 0 && !/Loading/i.test(l.textContent)); })()`, 'the Files list has been read (a row that arrives after the Tab walk would be a control no press reached, #10753)', 15000); }, { min: 8, expect: `document.getElementById('live-view-btn-terminal').classList.contains('active') || document.getElementById('live-view-btn-terminal').getAttribute('aria-pressed') === 'true'` });
+        await sc('terminal view', async () => { await terminalAtWindowSize(ev, waitFor, () => tap('#live-view-btn-terminal')); await waitFor(`(() => { const l = document.getElementById('changed-files-list'); return !l || l.getClientRects().length === 0 || (l.textContent.trim().length > 0 && !/Loading/i.test(l.textContent)); })()`, 'the Files list has been read (a row that arrives after the Tab walk would be a control no press reached, #10753)', 15000); }, { min: 8, expect: `document.getElementById('live-view-btn-terminal').classList.contains('active') || document.getElementById('live-view-btn-terminal').getAttribute('aria-pressed') === 'true'` });
         await tap('#live-view-btn-chat');
         await ev(`window.toggleAgenticPanel && window.toggleAgenticPanel(true); true`);
         for (const tab of await ev(`[...document.querySelectorAll('#agentic-block-top .agentic-tab[data-tab]')].filter(e => e.getClientRects().length).map(e => e.dataset.tab)`)) await sc(`side panel: ${tab}`, async () => { await ev(`window.switchAgenticTab(${JSON.stringify(tab)}, 'top'); true`); }, { min: 5, expect: `document.querySelector('#agentic-block-top .agentic-tab[data-tab="${tab}"]').classList.contains('active')` });
