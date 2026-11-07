@@ -37,10 +37,10 @@ export function openAskDialog(a, onDone, runners = {}) {
     const whole = document.createElement('div'); whole.className = 'inbox-ask-text prose'; whole.setAttribute('role', 'region'); whole.setAttribute('aria-label', 'The question');
     whole.innerHTML = renderMarkdownStrict(parts.body + (a.cut ? '\n\n\u2026 (cut: the board has the rest)' : '')); // raw HTML in the words is written out as text; links keep the page's link policy
     importOnce('./artifact_refs.js').then(m => { if (whole.isConnected) m.linkArtifactRefsIn(whole, { asWritten: true, server: normServer(a.server) }); }).catch(() => {}); // a file named in the question opens in the viewer, the words as written (#12361); plain text until the helper is there
+    if (!fromAnotherComputer(a)) importOnce('./message_refs.js').then(m => { if (whole.isConnected) m.linkMessageRefsIn(whole, (id, b) => openWithQuestionReturn(b, async () => { const nav = await importOnce('./nav.js'); await nav.go({ view: 'team', id: boardTeamKey(a.server, a.board), sub: 'messages', item: id }); }).catch(e => { err.textContent = e.message || 'The message could not be opened.'; }), { who }); }).catch(() => {}); // "#8" in the question opens message 8 of the asker's team, and Back returns to the question (#14153)
     whole.hidden = !parts.body && !a.cut; // an empty question has no body
     const label = document.createElement('label'); label.className = 'inbox-ask-label'; label.textContent = 'Your reply';
     const box = document.createElement('textarea'); box.className = 'field inbox-ask-box'; box.rows = 6; box.placeholder = 'Write a reply…'; box.maxLength = 8000; label.append(box);
-    box.addEventListener('input', () => { box.style.height = 'auto'; box.style.height = `${box.scrollHeight + box.offsetHeight - box.clientHeight}px`; });
     const pics = document.createElement('div'); pics.className = 'inbox-ask-pics'; // pictures for the reply (#12173): the comment composer's tray, loaded with the dialog
     const err = document.createElement('p'); err.className = 'inbox-ask-error'; err.setAttribute('role', 'alert');
     const row = document.createElement('div'); row.className = 'inbox-ask-buttons';
