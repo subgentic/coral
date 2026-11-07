@@ -47,7 +47,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     const send = document.createElement('button'); send.type = 'button'; send.className = 'btn btn-primary inbox-ask-send'; send.textContent = 'Send reply';
     const close = document.createElement('button'); close.type = 'button'; close.className = 'btn'; close.textContent = 'Close';
     // Dismiss closes a question with no answer and nothing said to the agent, as the row's own Dismiss does (#12599): the same route and the same toast with Undo. A wait has no ask row to close, so it has no Dismiss.
-    const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'btn btn-quiet'; dismiss.textContent = 'Dismiss'; dismiss.title = 'Take it out of Needs you; nobody is told'; dismiss.hidden = a.kind !== 'ask' || fromAnotherComputer(a); // the close route is this computer's: a question from another computer is answered there
+    const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'btn btn-quiet'; dismiss.textContent = 'Dismiss'; dismiss.title = 'Take it out of Needs you; nobody is told'; dismiss.hidden = a.kind !== 'ask' || (fromAnotherComputer(a) && decisionNeedsPerson(a.server)); // the source close route authorizes Dismiss and Undo through the Hub
     row.append(close, ...(dismiss.hidden ? [] : [dismiss])); // Close and Dismiss stay in the footer; Send reply is on the row right under the reply box (#13148, the Operator: 'The send reply is too far away from text input')
     let tray = null;
     const finish = () => { if (tray) tray.destroy(); dlg.close(); dlg.remove(); if (onDone) onDone(); };
@@ -59,7 +59,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     const drawOffers = () => {
         offered?.remove(); offered = null; choices.length = 0;
         binary = yesNoButtons(a);
-        const offers = (fromAnotherComputer(a) && (!binary || decisionNeedsPerson(a.server))) ? [] : buttonsOf(a);
+        const offers = fromAnotherComputer(a) && decisionNeedsPerson(a.server) ? [] : buttonsOf(a).filter(b => !fromAnotherComputer(a) || isReply(b.action)); // offered replies use the source claim route; navigation and wake actions still need their local context
         if (offers.length) { // what the asker offered: one tap per choice, each with what it does
             offered = document.createElement('section'); offered.className = 'inbox-ask-offers'; offered.setAttribute('aria-label', `Buttons ${markHidden(a.asker, { strict: true })} offered`);
             const head = document.createElement('p'); head.className = 'inbox-ask-offers-head'; head.textContent = offers.every(b => isReply(b.action)) ? 'Choose a reply, or write your own.' : 'Choose an action, or write a reply.';
