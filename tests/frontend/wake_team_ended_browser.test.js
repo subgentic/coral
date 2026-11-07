@@ -36,7 +36,7 @@ const { coralReady } = require('./helpers/wait');
         assert.deepEqual(await toasts(), ['Lead, Dev and QA were ended, not asleep, so Wake does not apply. Resume them to bring the team back.'], 'the dashboard does not say the team is awake');
         const q = await confirmText();
         assert.equal(q.title, 'Resume agents'); assert.equal(q.yes, 'Resume agents');
-        assert.match(q.message, /^Lead, Dev and QA were ended in "b-crew".* Resume them\? Each starts again in its own folder with its earlier chat/);
+        assert.match(q.message, /^Lead, Dev and QA were ended in "b-crew".* Resume them\? Each starts again in its own folder with its earlier chat; a resume does not bring back its role's capabilities or Keep Full access\. Agents you ended one at a time are listed too\.$/);
         assert.deepEqual(await launches(), [], 'nothing is started before the answer');
 
         console.log('Cancel starts nothing');

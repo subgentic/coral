@@ -16,7 +16,7 @@ test('a session is trusted only when every part is a plain word', () => {
 });
 
 test('the question and the result say who and what', () => {
-    assert.equal(m.resumeEndedQuestion('crew', ['Lead']), 'Lead was ended in "crew", so Wake does not apply. Resume it? Each starts again in its own folder with its earlier chat, and nothing else changes.');
+    assert.equal(m.resumeEndedQuestion('crew', ['Lead']), 'Lead was ended in "crew", so Wake does not apply. Resume it? Each starts again in its own folder with its earlier chat; a resume does not bring back its role\'s capabilities or Keep Full access. Agents you ended one at a time are listed too.');
     assert.match(m.resumeEndedQuestion('crew', ['Lead', 'Dev', 'QA']), /^Lead, Dev and QA were ended in "crew".* Resume them\?/);
     assert.equal(m.resumeEndedWords('crew', { resumed: ['Lead', 'Dev'], failed: [] }), 'Lead and Dev are back in "crew".');
     assert.equal(m.resumeEndedWords('crew', { resumed: ['Lead'], failed: [{ name: 'QA', why: 'its folder is gone' }] }), 'Lead is back in "crew". QA did not start: its folder is gone');

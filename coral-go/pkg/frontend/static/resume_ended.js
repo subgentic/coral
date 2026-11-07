@@ -61,5 +61,5 @@ export function resumeEndedWords(team, result) {
 /** The question before a resume of the ended members Wake Team named. */
 export function resumeEndedQuestion(team, names) {
     const list = names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-    return `${list} ${names.length === 1 ? 'was' : 'were'} ended in "${team}", so Wake does not apply. Resume ${names.length === 1 ? 'it' : 'them'}? Each starts again in its own folder with its earlier chat, and nothing else changes.`;
+    return `${list} ${names.length === 1 ? 'was' : 'were'} ended in "${team}", so Wake does not apply. Resume ${names.length === 1 ? 'it' : 'them'}? Each starts again in its own folder with its earlier chat; a resume does not bring back its role's capabilities or Keep Full access. Agents you ended one at a time are listed too.`;
 }
