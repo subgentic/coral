@@ -50,6 +50,17 @@ const { connect } = require('./agent_view_harness');
             check(!s.bar && !s.inputDisabled, `${at}and the chat stays awake after it: ` + JSON.stringify(s));
             check(r2.filter(x => x.kind === 'wake').length <= 1, `${at}the page sent at most the one request for the second press: ` + JSON.stringify(r2.map(x => x.kind)));
 
+            // the server's real answer to a Wake on an agent that is not asleep (sessions_sleep.go): 200 {ok:false, error:'Session is not sleeping'}; the chat stays as it is and says so
+            await ev(`(() => { const R = window.fetch; window.__realFetch = R; window.fetch = (u, o = {}) => /\\/api\\/sessions\\/live\\/[^/]+\\/wake$/.test(String(u).split('?')[0]) ? Promise.resolve(new Response(JSON.stringify({ ok: false, error: 'Session is not sleeping' }), { status: 200, headers: { 'content-type': 'application/json' } })) : R(u, o); return true; })()`);
+            await clearReqs(); await ev(`document.querySelectorAll('.toast').forEach(e => e.remove()); true`);
+            const refused = await panelWake('pw-hist');
+            await ev(`window.fetch = window.__realFetch; true`);
+            check(refused === false, `${at}a Wake the server refuses ('Session is not sleeping') is not applied`);
+            check(await ev(`window.__selCalls`) === 0, `${at}and re-selects nothing`);
+            s = await asleepWords();
+            check(!s.bar && !s.wake && !s.paneSleeping && !s.inputDisabled, `${at}the chat stays awake after the refusal: ` + JSON.stringify(s));
+            check((await ev(`[...document.querySelectorAll('.toast')].map(e => e.textContent.trim())`)).some(t => /not sleeping/i.test(t)), `${at}the refusal is told`);
+
             // 2. a sleeping agent with no history: the empty chat's own notice
             await ev(`window.__m.add('pw-new', 'N', 0, { sleeping: true })`);
             await select('pw-new');
