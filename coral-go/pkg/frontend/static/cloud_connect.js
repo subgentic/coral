@@ -514,7 +514,7 @@ class CloudPanel {
         }); // the "Not chosen yet" placeholder saves nothing
         this.part('allow-auto-accept')?.addEventListener('change', (e) => {
             if (this.asking) { this.pickAuto = e.target.checked; return; } // held until Connect, which sends it
-            this.act('PUT', '/api/cloud/allow-auto-accept', { allow: e.target.checked }, e.target.checked ? 'Saved. Coral Hub can turn on auto-accept.' : 'Saved. Coral Hub cannot turn on auto-accept.');
+            this.act('PUT', '/api/cloud/allow-auto-accept', { allow: e.target.checked }, e.target.checked ? 'Saved. Coral Hub can turn on auto-accept.' : 'Saved. Coral Hub cannot turn on auto-accept. Agents already running keep the mode they have until their next restart; a keep-Full-access choice the hub made has ended.');
         });
         this.part('owner-record')?.addEventListener('click', () => this.confirmOwner());
         this.part('redact-tokens')?.addEventListener('change', (e) => this.act('PUT', '/api/cloud/redact-tokens', { redact: e.target.checked }, e.target.checked ? 'Saved. Tokens are hidden from view-only hub users.' : 'Saved. Tokens are visible to view-only hub users.'));

@@ -43,6 +43,7 @@ func readCodexTurnEventIncremental(path string, state *codexTurnCache) (string, 
 		state.event, state.at, state.active, state.activity, state.model, state.effort = "", time.Time{}, false, false, "", ""
 		state.calls = codexCallTracker{}
 		state.approvalPolicy, state.approvalsReviewer = "", ""
+		state.liveApproval, state.liveSandbox = "", ""
 	}, func(line []byte) {
 		if m, e := codexLineModelEffort(line); m != "" {
 			state.model, state.effort = m, e

@@ -147,6 +147,7 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"POST /api/board/{project}/asks/{messageID}/close":                     "owner-only", // Ignore and Undo in the owner's Needs you table on the Hub (#13446)
 		"POST /api/sessions/live/{name}/dismiss-wait":                          "owner-only",
 		"POST /api/sessions/live/{name}/auto-sleep":                            "owner-only", // an agent's auto-sleep switch (#12111)
+		"POST /api/sessions/live/{name}/keep-full-access":                      "owner-only", // a Codex agent's Full access across restarts (#14061)
 		"GET /api/board/{project}/artifacts/{digest}/edit":                     "owner-only",
 		"GET /api/board/{project}/artifacts/{digest}/edit/send":                "owner-only",
 		"POST /api/board/{project}/artifacts/{digest}/edit/send":               "owner-only",

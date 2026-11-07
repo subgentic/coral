@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"strconv"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -178,40 +179,51 @@ func TestTheAutoDefaultDoesNotGetPastTheHubGate(t *testing.T) {
 		require.NotNil(t, ls.PermissionMode)
 		return *ls.PermissionMode
 	}
-	teamMember := func(hub bool) string {
+	// a team member goes through the same gate as a single launch (#14336, Security's MUST 2): the answer is the mode it started in, or the refusal's code with nothing started
+	boardN := 0
+	teamMember := func(hub bool) (mode, code string) {
 		t.Helper()
-		b, _ := json.Marshal(map[string]any{"board_name": "t" + strings.ReplaceAll(t.Name(), "/", ""), "new_board": true, "working_dir": t.TempDir(), "agent_type": at.Claude,
+		b, _ := json.Marshal(map[string]any{"board_name": "t" + strings.ReplaceAll(t.Name(), "/", "") + strconv.Itoa(boardN), "new_board": true, "working_dir": t.TempDir(), "agent_type": at.Claude,
 			"agents": []map[string]any{{"name": "A", "agent_type": "claude"}}})
+		boardN++
 		req := httptest.NewRequest(http.MethodPost, "/api/sessions/launch-team", bytes.NewReader(b))
 		if hub {
 			stamp(req)
 		}
 		rec := httptest.NewRecorder()
 		h.LaunchTeam(rec, req)
-		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 		var res struct {
+			Code   string           `json:"code"`
 			Agents []map[string]any `json:"agents"`
 		}
-		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &res))
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &res), rec.Body.String())
+		if res.Code != "" { // refused for the whole request, before any member
+			return "", res.Code
+		}
 		require.Len(t, res.Agents, 1, rec.Body.String())
+		if c, _ := res.Agents[0]["code"].(string); c != "" {
+			return "", c
+		}
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 		ls, err := ss.GetLiveSession(ctx, res.Agents[0]["session_id"].(string))
 		require.NoError(t, err)
 		require.NotNil(t, ls.PermissionMode)
-		return *ls.PermissionMode
+		return *ls.PermissionMode, ""
 	}
+	member := func(hub bool) string { m, c := teamMember(hub); return m + c }
 
 	set("launch", "false") // the switch is off
 	assert.Equal(t, "default", launch(true), "Hub launch, switch off: the agent asks")
-	assert.Equal(t, "default", teamMember(true), "Hub team member, switch off: the agent asks")
+	assert.Equal(t, "hub_auto_accept_disabled", member(true), "Hub team member, switch off: refused, never started in Auto")
 	set("interact", "true") // the switch is on, below Launch
 	assert.Equal(t, "default", launch(true), "Hub launch, below Launch mode: the agent asks")
-	assert.Equal(t, "default", teamMember(true), "Hub team member, below Launch mode: the agent asks")
+	assert.Contains(t, []string{"hub_mode_too_low", "hub_auto_accept_disabled"}, member(true), "Hub team member, below Launch mode: refused")
 	set("launch", "true")
 	assert.Equal(t, "auto", launch(true), "Hub launch, switch on and Launch: Auto")
-	assert.Equal(t, "default", teamMember(true), "Hub team member, switch on and Launch: the CLI confirm mode (#6415), not Auto")
+	assert.Equal(t, "auto", member(true), "Hub team member, switch on and Launch: the new default, Auto")
 	set("view", "false")
 	assert.Equal(t, "auto", launch(false), "a launch from this computer: Auto, whatever the Hub's settings")
-	assert.Equal(t, "default", teamMember(false), "a team member from this computer: the CLI confirm mode (#6415)")
+	assert.Equal(t, "auto", member(false), "a team member from this computer: the new default, Auto")
 
 	// The same default gate protects Codex's workspace-write/-a never mode.
 	require.NoError(t, ss.SetSetting(ctx, "default_permission_mode", ""))
@@ -296,20 +308,18 @@ func TestAnAgentsLaunchIsNotStartedInAutoByDefault(t *testing.T) {
 	}
 	plain := map[string]any{"name": "A", "agent_type": "claude"}
 
+	// the parent's row records no mode: rank 0 (#14336). Every agent-made launch is capped by it; the Operator's is not.
 	assert.Equal(t, "auto", launch(false), "from the dashboard: Auto")
-	assert.Equal(t, "default", launch(true), "an agent's launch with no flags: not Auto")
-	assert.Equal(t, "default", team(false, plain), "a team member from the dashboard: the CLI confirm mode (#6415)")
-	assert.Equal(t, "default", team(true, plain), "a team member an agent launches: not Auto")
-	// a member that is exactly an entry of a template the Operator saved is the Operator's choice
+	assert.Equal(t, "default", launch(true), "an agent's launch with no flags: the new default capped at the caller's rank")
+	assert.Equal(t, "auto", team(false, plain), "a team member from the dashboard: the new default, Auto (#14336)")
+	assert.Equal(t, "default", team(true, plain), "a team member an agent launches: capped at the caller")
+	// a member that is exactly an entry of a template the Operator saved: the same cap
 	require.NoError(t, ss.SetSetting(ctx, "saved_team_templates", `[{"name":"t","agents":[{"name":"S","agent_type":"claude"}]}]`))
-	assert.Equal(t, "default", team(true, map[string]any{"name": "S", "agent_type": "claude"}), "a saved template member with nothing chosen: the CLI confirm mode (#6415)")
-	// a saved default that asks still wins for the agent's child, as before; one that skips the prompts is the Operator's, not an agent's to use (#7576, agent_launch_needs_mode_test.go)
+	assert.Equal(t, "default", team(true, map[string]any{"name": "S", "agent_type": "claude"}), "a saved template member with nothing chosen: capped")
+	// a saved default that skips the prompts is capped for the agent's child, never refused; the Operator's launch takes it
 	require.NoError(t, ss.SetSetting(ctx, "default_permission_mode", "default"))
 	assert.Equal(t, "default", launch(true))
 	require.NoError(t, ss.SetSetting(ctx, "default_permission_mode", "acceptEdits"))
-	b, _ := json.Marshal(map[string]any{"agent_type": at.Claude, "working_dir": parentDir})
-	rec := httptest.NewRecorder()
-	h.Launch(rec, asAgent(httptest.NewRequest(http.MethodPost, "/api/sessions/launch", bytes.NewReader(b))))
-	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+	assert.Equal(t, "default", launch(true), "capped at the caller: not acceptEdits")
 	assert.Equal(t, "acceptEdits", launch(false), "the Operator's launch takes it")
 }

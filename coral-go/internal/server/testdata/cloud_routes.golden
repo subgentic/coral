@@ -430,6 +430,7 @@ POST /api/sessions/live/{name}/dismiss-wait interact
 POST /api/sessions/live/{name}/events never
 POST /api/sessions/live/{name}/files/refresh interact
 POST /api/sessions/live/{name}/goal interact
+POST /api/sessions/live/{name}/keep-full-access launch
 POST /api/sessions/live/{name}/keys interact
 POST /api/sessions/live/{name}/kill launch
 POST /api/sessions/live/{name}/model launch

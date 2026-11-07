@@ -77,6 +77,7 @@ POST /api/hub-auto-accept launch owner-only-hub
 POST /api/saved interact owner-only
 POST /api/sessions/live/{name}/auto-sleep interact owner-only
 POST /api/sessions/live/{name}/dismiss-wait interact owner-only
+POST /api/sessions/live/{name}/keep-full-access launch owner-only
 POST /api/sessions/live/{name}/notices/pause interact owner-only
 POST /api/sessions/live/{name}/notices/resume interact owner-only
 POST /api/sessions/record-agents interact owner-only
