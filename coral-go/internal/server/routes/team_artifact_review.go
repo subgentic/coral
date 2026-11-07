@@ -215,6 +215,9 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 		out["text_kept"], out["comment_id"], out["delivered"] = true, wordsDone.CommentID, wordsDone.Delivery.To != ""
 		if wordsDone.Delivery.To != "" {
 			out["to"] = wordsDone.Delivery.To
+			if h.sessionAsleep != nil && item.SessionID != nil && h.sessionAsleep(r.Context(), *item.SessionID) { // a sleeping uploader has the notice stored and reads it when it wakes: said as the plain notice says it (an archived, ended or gone one is not stored for: asleep_or_gone, delivered false)
+				out["asleep"] = true
+			}
 		} else if wordsDone.Delivery.Reason != "" {
 			out["reason"] = wordsDone.Delivery.Reason
 		}
