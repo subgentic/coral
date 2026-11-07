@@ -10,7 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/httputil"
 )
 
 func TestProjectTrustProbeNamesAndLinks(t *testing.T) {
@@ -59,7 +62,11 @@ func TestProjectTrustProbeCallerAndRate(t *testing.T) {
 	}
 	require.Equal(t, 403, call("").Code, "no script/CLI caller")
 	require.Equal(t, 200, call(callerDashNoCookie).Code)
-	require.Equal(t, 429, call(callerDashNoCookie).Code)
+	limited := call(callerDashNoCookie)
+	require.Equal(t, 429, limited.Code)
+	assert.Equal(t, "action", limited.Header().Get(httputil.ActionLimitHeader), "a marked per-action limit: the overload watch must not read it as a busy server (#3434)")
+	assert.Equal(t, "1", limited.Header().Get("Retry-After"))
+	assert.JSONEq(t, `{"checked":false}`, limited.Body.String(), "the dialog's body keeps its shape")
 	h.trustProbeAt = time.Now().Add(-time.Second)
 	require.Equal(t, 200, call(callerDashCookie).Code)
 }

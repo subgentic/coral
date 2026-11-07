@@ -10,6 +10,7 @@ import (
 	"unicode"
 
 	"github.com/subgentic/coral/internal/foldertrust"
+	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/safefs"
 )
 
@@ -27,8 +28,8 @@ func (h *SystemHandler) TrustFolderProbe(w http.ResponseWriter, r *http.Request)
 	}
 	h.trustProbeMu.Unlock()
 	if limited {
-		w.Header().Set("Retry-After", "1")
-		writeJSON(w, http.StatusTooManyRequests, map[string]any{"checked": false})
+		// A per-action limit, not an overloaded server (#3434): the marker keeps the dashboard's overload watch from pausing its pollers, and the body keeps the dialog's shape ("checked": false).
+		httputil.WriteActionLimitBody(w, 1, map[string]any{"checked": false})
 		return
 	}
 	home, err := os.UserHomeDir()
