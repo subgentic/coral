@@ -17,6 +17,12 @@ import (
 	"github.com/subgentic/coral/internal/store"
 )
 
+// ackLaunchDisclosure records the owner's acknowledgement of the current notice, for the tests of other things that start a dashboard launch in the new default.
+func ackLaunchDisclosure(t *testing.T, ss *store.SessionStore) {
+	t.Helper()
+	require.NoError(t, ss.SetSetting(context.Background(), launchDisclosureAckSetting, `{"id":"`+LaunchDisclosureID+`","at":"2026-01-01T00:00:00Z"}`))
+}
+
 type discRig struct {
 	t    *testing.T
 	rig  *agyTestRig
@@ -175,4 +181,41 @@ func TestNonDialogLaunchesNeverBlockAndAnswerWithTheModeAndHowToLowerIt(t *testi
 	// an agent's launch is still capped (MUST 1): its row records no mode, so the member is Default, not Auto
 	_, out := d.launch(asAgentToken, nil)
 	assert.Equal(t, "default", out["permission_mode"])
+}
+
+// The dashboard's forms write their shipped Auto as the CLI's own flags, so a dialog launch that carries a mode that skips the prompts waits for the notice too (Frontend Dev's finding on #14353):
+// the server decides, not the page. Flags that keep asking, an explicit Default, and a saved default do not wait.
+func TestADialogLaunchThatWritesItsShippedModeAsFlagsStillWaitsForTheNotice(t *testing.T) {
+	d := newDiscRig(t)
+	dialog := withKind(callerDashCookie)
+	for _, flags := range [][]string{{"--permission-mode", "auto"}, {"--permission-mode=bypassPermissions"}, {"--dangerously-skip-permissions"}} {
+		before := d.sent()
+		code, out := d.launch(dialog, map[string]any{"flags": flags})
+		require.Equal(t, http.StatusConflict, code, "%v: %v", flags, out)
+		assert.Equal(t, launchDisclosureRequired, out["code"], "%v", flags)
+		code, out = d.team(dialog, map[string]any{"name": "A", "flags": flags})
+		require.Equal(t, http.StatusConflict, code, "team %v: %v", flags, out)
+		assert.Equal(t, before, d.sent(), "%v: nothing started", flags)
+	}
+	// the team's own flags count for a member that has none
+	d.n++
+	code, out := d.call(d.rig.h.LaunchTeam, http.MethodPost, "/api/sessions/launch-team", map[string]any{"board_name": "disc-teamflags", "new_board": true, "working_dir": d.rig.workdir, "agent_type": at.Claude,
+		"flags": []string{"--permission-mode", "auto"}, "agents": []any{map[string]any{"name": "A"}}}, dialog)
+	require.Equal(t, http.StatusConflict, code, "%v", out)
+	// modes that ask, an explicit Default and a saved default do not wait
+	code, out = d.launch(dialog, map[string]any{"flags": []string{"--permission-mode", "default"}})
+	assert.Equal(t, http.StatusOK, code, "%v", out)
+	code, out = d.launch(dialog, map[string]any{"permission_mode": "default"})
+	assert.Equal(t, http.StatusOK, code, "%v", out)
+	require.NoError(t, d.rig.ss.SetSetting(context.Background(), "default_permission_mode", "default"))
+	code, out = d.launch(dialog, map[string]any{"flags": []string{"--permission-mode", "auto"}})
+	assert.Equal(t, http.StatusOK, code, "the owner saved a default of their own: nothing is shipped to them unannounced: %v", out)
+}
+
+// Security's condition B on #14333: the notice names Hermes Bypass and the Bypass and Full access exception for the checks and Codex's folder.
+func TestTheLaunchNoticeNamesHermesBypassAndTheBypassException(t *testing.T) {
+	assert.Contains(t, LaunchDisclosureText, "Hermes starts in Bypass")
+	assert.Contains(t, LaunchDisclosureText, "Bypass or with Full access")
+	assert.Contains(t, LaunchDisclosureText, "Codex then leaves its folder")
+	assert.Equal(t, "full-permissions-2", LaunchDisclosureID, "new words, new id: an older acknowledgement no longer counts")
 }

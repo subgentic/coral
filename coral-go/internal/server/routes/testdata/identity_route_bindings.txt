@@ -12,6 +12,7 @@ DELETE /api/board/{project}/subscribe | board-claims
 DELETE /api/board/{project}/tasks/{taskID}/park | board-claims +token-session
 DELETE /api/board/{project}/tasks/{taskID}/reminder | board-claims
 DELETE /api/board/{project}/waits | board-claims
+DELETE /api/launch-disclosure/ack | token-session | operator-only
 DELETE /api/sessions/history/{sessionID}/tags/{tagID} | unbound | operator-only
 DELETE /api/sessions/live/{name}/events | token-bound
 DELETE /api/sessions/live/{name}/held/{id} | unbound | operator-only
@@ -84,6 +85,7 @@ GET /api/board/{project}/waits | board-claims
 GET /api/board/{project}/waits/poll | board-claims
 GET /api/board/{project}/working-mode | board-claims
 GET /api/board/{project}/working-mode/presets | board-claims
+GET /api/launch-disclosure | token-session | operator-only
 GET /api/needs-you | token-session | operator-only
 GET /api/operator-asks | token-session | operator-only
 GET /api/session-artifacts | token-session
@@ -226,6 +228,7 @@ POST /api/board/{project}/waits | board-claims
 POST /api/board/{project}/working-mode/presets | board-claims | operator-only
 POST /api/board/{project}/working-mode/presets/{presetID}/reset | board-claims | operator-only
 POST /api/chief/triggers/{triggerID}/state | token-session
+POST /api/launch-disclosure/ack | token-session | operator-only
 POST /api/notifications | token-bound
 POST /api/sessions/history/{sessionID}/resummarize | unbound | operator-only
 POST /api/sessions/history/{sessionID}/tags | unbound | operator-only
