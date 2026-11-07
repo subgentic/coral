@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
+const { safePaused } = require('./helpers/paused');
 const HEX = 'e'.repeat(64);
 const MD = ['# Release plan', '', 'Ship the report on Thursday, then the other files.', ''].join('\n');
 const RLO = '\u202E', PDF = '\u202C', LRI = '\u2066', PDI = '\u2069';
@@ -15,6 +16,9 @@ const COMMENTS = [
     { id: 2, parent_id: null, anchor: { quote: `then the${RLO} other${PDF} files` }, body: HEBREW, author: { kind: 'hub', issuer: 'coral-hub', subject: 'hub-user-9c11' }, created_at: new Date(Date.now() - 500000).toISOString() },
     { id: 3, parent_id: null, anchor: { whole: true }, body: `A fine plan ${LRI}and nothing odd${PDI} about it.`, author: { kind: 'hub', issuer: 'coral-hub', subject: 'hub-user-4d0e' }, created_at: new Date(Date.now() - 400000).toISOString() },
     { id: 4, parent_id: null, anchor: { whole: true }, body: 'Plain English, nothing to mark.', author: { kind: 'hub', issuer: 'coral-hub', subject: 'hub-user-7a21' }, created_at: new Date(Date.now() - 300000).toISOString() },
+    { id: 5, parent_id: null, anchor: { whole: true }, body: 'Written by a name with an override in it.', author: { kind: 'hub', issuer: 'coral-hub', subject: 'hub-user-5e5e', name: 'Mallory\u202Eesrever' }, created_at: new Date(Date.now() - 250000).toISOString() },
+    { id: 6, parent_id: null, anchor: { whole: true }, body: 'Written by a Hebrew name.', author: { kind: 'hub', issuer: 'coral-hub', subject: 'hub-user-6f6f', name: 'דנה כהן' }, created_at: new Date(Date.now() - 200000).toISOString() },
+    { id: 7, parent_id: null, anchor: { whole: true }, body: 'Written by a name that starts with an override.', author: { kind: 'hub', issuer: 'coral-hub', subject: 'hub-user-7a7a', name: '\u202Edan evil' }, created_at: new Date(Date.now() - 150000).toISOString() },
 ];
 
 (async () => {
@@ -24,20 +28,38 @@ const COMMENTS = [
     const S = `(window.__coralStatic || '/static/')`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        // if bidi_marks.js cannot load the drawer still draws, the text unmarked (Security's INFO 6): the module's request is failed at the network
+        await client.Network.enable(); await client.Network.setCacheDisabled({ cacheDisabled: true });
+        await client.Fetch.enable({ patterns: [{ urlPattern: '*bidi_marks.js*' }] });
+        safePaused(client, e => client.Fetch.failRequest({ requestId: e.requestId, errorReason: 'Failed' }));
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
+        await ev(`localStorage.clear(); (() => { const real = window.fetch, json = (o, s = 200) => Promise.resolve(new Response(JSON.stringify(o), { status: s, headers: { 'Content-Type': 'application/json' } })); const cs = ${JSON.stringify(COMMENTS)};
+            window.fetch = (u, o = {}) => { const url = String(u), m = (o.method || 'GET').toUpperCase();
+                if (url.includes('/api/artifacts/${HEX}/comments') && m === 'GET') return json({ comments: cs.map(c => ({ ...c, deleted: false, mine: false, can: { reply: true, edit: false, delete: false, resolve: true } })), locked: false, you: { kind: 'owner', can_comment: true, can_lock: true }, limits: {} });
+                if (url.includes('/api/artifacts/${HEX}')) return Promise.resolve(new Response(${JSON.stringify(MD)}, { status: 200, headers: { 'Content-Type': 'text/markdown' } }));
+                return real(u, o); }; return true; })()`);
+        await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'plan.md', board: 'ask-team' }); return true; })()`);
+        await waitFor(`!!document.querySelector('.ac-toggle')`, 'fallback: the comments toggle', 8000);
+        await ev(`(() => { const t = document.querySelector('.ac-toggle'); if (t && t.getAttribute('aria-expanded') !== 'true') t.click(); return true; })()`);
+        await waitFor(`document.querySelectorAll('#artifact-viewer .ac-card').length >= 7`, 'fallback: the drawer still draws its comments without bidi_marks.js', 8000);
+        const fb = await ev(`(() => { const b = document.querySelector('#artifact-viewer .ac-card[data-id="1"] .ac-body'); return { text: b.textContent, marks: document.querySelectorAll('.bidi-mark').length }; })()`);
+        check(fb.marks === 0 && fb.text.includes('report'), 'without bidi_marks.js the text is drawn unmarked and the drawer works: ' + JSON.stringify(fb));
+        await client.Fetch.disable(); await client.Network.setCacheDisabled({ cacheDisabled: false });
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             const at = `${w}: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`localStorage.clear(); (() => { const real = window.fetch, json = (o, s = 200) => Promise.resolve(new Response(JSON.stringify(o), { status: s, headers: { 'Content-Type': 'application/json' } })); const cs = ${JSON.stringify(COMMENTS)};
                 window.fetch = (u, o = {}) => { const url = String(u), m = (o.method || 'GET').toUpperCase();
-                    if (url.includes('/api/artifacts/${HEX}/comments') && m === 'GET') return json({ comments: cs.map(c => ({ ...c, deleted: false, mine: false, can: { reply: false, edit: false, delete: false, resolve: false } })), locked: false, you: { kind: 'owner', can_comment: true, can_lock: true }, limits: {} });
+                    if (url.includes('/api/artifacts/${HEX}/comments') && m === 'GET') return json({ comments: cs.map(c => ({ ...c, deleted: false, mine: false, can: { reply: true, edit: false, delete: false, resolve: true } })), locked: false, you: { kind: 'owner', can_comment: true, can_lock: true }, limits: {} });
                     if (url.includes('/api/artifacts/${HEX}')) return Promise.resolve(new Response(${JSON.stringify(MD)}, { status: 200, headers: { 'Content-Type': 'text/markdown' } }));
                     return real(u, o); }; return true; })()`);
             await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'plan.md', board: 'ask-team' }); return true; })()`);
             await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown')`, `${at}the document`, 8000);
             await waitFor(`!!document.querySelector('.ac-toggle')`, `${at}the comments toggle`, 8000);
             await ev(`(() => { const t = document.querySelector('.ac-toggle'); if (t && t.getAttribute('aria-expanded') !== 'true') t.click(); return true; })()`);
-            await waitFor(`document.querySelectorAll('#artifact-viewer .ac-card').length >= 4`, `${at}the four comments`, 8000);
+            await waitFor(`document.querySelectorAll('#artifact-viewer .ac-card').length >= 7`, `${at}the seven comments`, 8000);
             const m = await ev(`(() => { const card = id => document.querySelector('#artifact-viewer .ac-card[data-id="' + id + '"]'), info = (c, sel) => { const e = c.querySelector(sel); if (!e) return null; const cs = getComputedStyle(e); return { text: e.textContent, dir: e.getAttribute('dir'), ub: cs.unicodeBidi, direction: cs.direction, marks: [...e.querySelectorAll('.bidi-mark')].map(x => ({ text: x.textContent, title: x.title, w: Math.round(x.getBoundingClientRect().width), ub: getComputedStyle(x).unicodeBidi, dir: getComputedStyle(x).direction })) }; };
                 return [1, 2, 3, 4].map(id => ({ id, body: info(card(id), '.ac-body'), quote: info(card(id), '.ac-quote'), within: (() => { const c = card(id).getBoundingClientRect(), b = card(id).querySelector('.ac-body').getBoundingClientRect(); return b.left >= c.left - 1 && b.right <= c.right + 1; })() })); })()`);
             const [c1, c2, c3, c4] = m;
@@ -52,6 +74,13 @@ const COMMENTS = [
             // real right-to-left text is left exactly as written and reads right to left by itself
             check(c2.body.text === HEBREW && c2.body.marks.length === 0 && c2.body.direction === 'rtl', `${at}Hebrew is untouched, unmarked and reads right to left: ` + JSON.stringify([c2.body.text === HEBREW, c2.body.marks.length, c2.body.direction]));
             check(c4.body.text === 'Plain English, nothing to mark.' && c4.body.marks.length === 0 && c4.body.direction === 'ltr', `${at}plain English is untouched and reads left to right: ` + JSON.stringify(c4.body));
+            // the author's name is another person's text too (#14241): its controls are shown, a Hebrew name is left alone, the initials never carry a control, a label writes the controls out
+            const nm = await ev(`(() => { const card = id => document.querySelector('#artifact-viewer .ac-card[data-id="' + id + '"]'), a = id => { const c = card(id), n = c.querySelector('.ac-author'), av = c.querySelector('.ac-avatar'), rb = c.querySelector('.ac-replybox'), rs = c.querySelector('.ac-resolve'); return { name: n.textContent, dir: n.getAttribute('dir'), ub: getComputedStyle(n).unicodeBidi, marks: n.querySelectorAll('.bidi-mark').length, initials: av && av.textContent, reply: rb && rb.getAttribute('aria-label'), resolve: rs && rs.getAttribute('aria-label') }; }; return { m: a(5), h: a(6), s: a(7) }; })()`);
+            const RAW = /[\u202A-\u202E\u2066-\u2069]/;
+            check(nm.m.marks === 1 && nm.m.name.includes('⟦U+202E⟧') && !RAW.test(nm.m.name) && nm.m.dir === 'auto' && nm.m.ub === 'isolate', `${at}an author name's override is shown by code point, not applied, and the name is an isolate: ` + JSON.stringify(nm.m));
+            check(nm.h.name === 'דנה כהן' && nm.h.marks === 0, `${at}a Hebrew author name is left exactly as written: ` + JSON.stringify(nm.h));
+            check(nm.s.initials === 'DE' && !RAW.test(nm.s.initials) && nm.s.marks === 1, `${at}the initials never carry a control (the name starts with one): ` + JSON.stringify(nm.s));
+            check(nm.m.reply && nm.m.reply.includes('⟦U+202E⟧') && !RAW.test(nm.m.reply) && nm.m.resolve && nm.m.resolve.includes('⟦U+202E⟧') && !RAW.test(nm.m.resolve), `${at}the Reply and Resolve labels write the controls out and carry none: ` + JSON.stringify([nm.m.reply, nm.m.resolve]));
             // every piece of comment text is its own isolate
             check([c1, c2, c3, c4].every(c => c.body.dir === 'auto' && c.body.ub === 'isolate' && (!c.quote || c.quote.dir === 'auto' && c.quote.ub === 'isolate')) && [c1, c2, c3, c4].every(c => c.within), `${at}each comment text is its own isolate (dir=auto, unicode-bidi: isolate) and stays inside its card: ` + JSON.stringify(m.map(c => [c.id, c.body.dir, c.body.ub, c.within])));
         }

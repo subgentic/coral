@@ -201,5 +201,5 @@
 .artifact-private-say { margin: 0; color: var(--text-muted); font-size: var(--fs-base); }
 
 /* Another person's words (#14113): each piece of comment text is its own isolate, so it cannot reorder what stands beside it; a bidirectional control in it is shown as a mark naming its code point, not applied. The mark is left to right and an isolate too. */
-.bidi-isolate { unicode-bidi: isolate; }
+[data-bidi~="isolate"] { unicode-bidi: isolate; }
 .bidi-mark { unicode-bidi: isolate; direction: ltr; display: inline-block; padding: 0 .25em; border: 1px dashed var(--border); border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--text-secondary); font-family: var(--font-mono, ui-monospace, monospace); font-size: var(--fs-sm); line-height: var(--lh-label); white-space: nowrap; }
