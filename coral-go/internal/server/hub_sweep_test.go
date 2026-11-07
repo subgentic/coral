@@ -177,6 +177,9 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		if f[1] == "/api/artifacts/{id}/private" { // the manager's private mark on that artifact (#11457)
 			path = "/api/artifacts/" + artifactHex + "/private"
 		}
+		if f[1] == "/api/artifacts/{id}/thumbnail" { // use a real digest before the owner gate; the rig stores text, so its derivative is unavailable
+			path = "/api/artifacts/" + artifactHex + "/thumbnail"
+		}
 		if f[1] == "/api/artifacts/{id}/meta" { // the facts of that artifact (#5465)
 			path = "/api/artifacts/" + artifactHex + "/meta"
 		}
@@ -221,7 +224,8 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		versionsAbsent := ownerOnly[f[1]] && (strings.HasSuffix(f[1], "/versions") || strings.HasPrefix(f[1], "/api/artifacts/series/")) && (rec.Code == 404 || rec.Code == 400)
 		// The editor's capability read (#13757) names a file of the board; the rig's artifact is on no team, so the owner's answer is the route's own 404 (the plain hub caller was refused above).
 		editAbsent := ownerOnly[f[1]] && (strings.HasSuffix(f[1], "/edit") || strings.HasSuffix(f[1], "/edit/send")) && (rec.Code == 404 || rec.Code == 409) // 409 not_an_edit: the rig's artifact is no saved edit
-		if rec.Code == 200 || versionsAbsent || editAbsent || resolveAnswered || updateOff || savedAbsent || (strings.HasPrefix(f[1], "/api/templates/") && rec.Code == 404 && strings.Contains(rec.Body.String(), "template_not_found")) {
+		thumbnailAbsent := f[1] == "/api/artifacts/{id}/thumbnail" && rec.Code == 404 && strings.Contains(rec.Body.String(), "thumbnail unavailable")
+		if rec.Code == 200 || thumbnailAbsent || versionsAbsent || editAbsent || resolveAnswered || updateOff || savedAbsent || (strings.HasPrefix(f[1], "/api/templates/") && rec.Code == 404 && strings.Contains(rec.Body.String(), "template_not_found")) {
 			answered++
 		}
 		for _, home := range homes {
