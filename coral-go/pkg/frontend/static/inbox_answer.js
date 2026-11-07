@@ -86,7 +86,10 @@ async function readAsk(s) {
     // Beta Tester's phone check, #11981).
     const selectable = (po.options || []).filter(o => (o.action || 'select') === 'select' && o.label && Number.isInteger(Number(o.n)));
     const held = !permission && !onlyReject && picks.length < selectable.length;
-    return picks.length >= 1 && picks.length <= MAX_CHOICES ? { ask: String(po.ask_id || ''), picks, onlyReject, held, question: stepClean(po.question).slice(0, 120) } : none;
+    const target = permission && typeof po.target === 'string' ? po.target : ''; // what the permission wants to run, as the server read it whole (#14173)
+    // The row draws ALL of it, wrapped, and a Yes is a button only while the drawn block is not clipped (measured after layout and on resize, in fill): a request the row cannot show whole is refused or opened in the agent, never allowed blind (#14173, UI Reviewer and Security).
+    const targetNote = permission && typeof po.target_note === 'string' ? stepClean(po.target_note).slice(0, 240) : '';
+    return picks.length >= 1 && picks.length <= MAX_CHOICES ? { ask: String(po.ask_id || ''), picks, onlyReject, held, question: stepClean(po.question).slice(0, 120), target, targetNote } : { ...none, target, targetNote };
 }
 
 const askKey = s => `${sessionServer(s)}:${s.session_id}:${s.waiting_since || ''}`;
@@ -156,11 +159,40 @@ function confirmTrust(s, o, ask, cell, trust) {
 function fill(s, cell, withDismiss = true) {
     const key = askKey(s);
     if (!read.has(key)) read.set(key, readAsk(s).catch(() => ({ ask: '', picks: [], onlyReject: false })));
-    return read.get(key).then(({ ask, picks, onlyReject, held, step, stepFull, question, later, lines, trust, browser }) => {
+    return read.get(key).then(({ ask, picks, onlyReject, held, step, stepFull, question, later, lines, trust, browser, target, targetNote }) => {
+        cell._cmdObserver?.disconnect(); cell._cmdObserver = null; // the earlier block's observer goes with the block (#14173)
         cell.replaceChildren();
         const said = norm => String(norm || '').replace(/[?\s]+$/, '');
         const words = step || (question && (later || !said(s.waiting_summary).includes(said(question))) ? question : ''); // the question is named when the row's own words do not carry it (a later step's never does)
         if (lines && lines.length) { const t = document.createElement('span'); t.className = 'inbox-answer-step'; if (stepFull && stepFull !== words) t.title = stepFull; lines.forEach(l => { const ln = document.createElement('span'); ln.className = 'inbox-answer-step-line'; ln.textContent = l.length > 240 ? `${l.slice(0, 239)}…` : l; t.append(ln, ' '); }); cell.append(t); } else if (words) { const t = document.createElement('span'); t.className = 'inbox-answer-step'; t.textContent = words.length > 240 ? `${words.slice(0, 239)}…` : words; if (stepFull && stepFull !== words) t.title = stepFull; else if (words.length > 240) t.title = words; cell.append(t); } // text only; a cut line (a field or the whole) says so and keeps the uncut text as its hover; the review's lines have a space between them: one run of words for a screen reader
+        const yesButtons = [];
+        let gate = null;
+        if (target && target.trim()) { // the command on the row, all of it wrapped in a code block (3 lines, 4 on a phone), then Claude's own line under it, then what Yes allows (#14173)
+            const block = document.createElement('pre'); block.className = 'inbox-cmd-block'; block.textContent = target.trim();
+            block.setAttribute('aria-label', 'What it wants to run'); block.tabIndex = 0; // a keyboard can reach a block that scrolls
+            cell.append(block);
+            if (targetNote) { const nt = document.createElement('span'); nt.className = 'inbox-cmd-note'; nt.textContent = targetNote; cell.append(nt); }
+            const yes = document.createElement('span'); yes.className = 'inbox-trust-note inbox-yes-note'; cell.append(yes);
+            const more = document.createElement('button'); more.type = 'button'; more.className = 'btn btn-quiet btn-small inbox-cmd-more'; more.textContent = 'Show all'; more.hidden = true; more.setAttribute('aria-label', 'Show all of the command'); cell.insertBefore(more, yes);
+            let open = false, reached = false;
+            const laidOut = () => block.getClientRects().length > 0;
+            const clipped = () => !(laidOut() && block.scrollHeight <= block.clientHeight + 1); // not laid out is not shown: fail closed
+            const atEnd = () => laidOut() && block.scrollTop + block.clientHeight >= block.scrollHeight - 2;
+            const allowed = () => !clipped() || (open && reached); // Yes only for a command shown whole, or one the person has scrolled to the end of
+            const apply = () => {
+                const c = clipped();
+                if (open && atEnd()) reached = true;
+                more.hidden = open || !c;
+                const ok = allowed();
+                yesButtons.forEach(b => { b.hidden = !ok; });
+                yes.hidden = onlyReject || !picks.length;
+                yes.textContent = ok ? 'Yes lets it run this once. No refuses it. Open the agent to read all of it or to allow more.' : open ? 'Read the whole command to allow it: scroll to the end of it.' : 'Read the whole command to allow it: press Show all. Or open the agent.';
+            };
+            more.addEventListener('click', e => { e.stopPropagation(); open = true; block.classList.add('is-open'); apply(); block.focus({ preventScroll: true }); });
+            block.addEventListener('scroll', apply, { passive: true });
+            if (typeof ResizeObserver === 'function') { const ro = new ResizeObserver(() => { if (!block.isConnected) { ro.disconnect(); return; } apply(); }); ro.observe(block); cell._cmdObserver = ro; } // one observer per drawn block: it goes when the cell is drawn again (below) or the block leaves the page
+            gate = { clipped: () => !allowed(), apply };
+        }
         if (browser) { const note = document.createElement('span'); note.className = 'inbox-trust-note inbox-browser-note'; note.textContent = BROWSER_NOTE; cell.append(note); } // what the one button does, and why the other two are not buttons (#14151)
         if (trust) { // the folder, plain text, and what Yes does, before any choice (#14110)
             const note = document.createElement('span'); note.className = 'inbox-trust-note';
@@ -173,10 +205,13 @@ function fill(s, cell, withDismiss = true) {
             b.type = 'button'; b.className = 'btn btn-small inbox-answer'; b.textContent = o.label;
             b.dataset.session = s.session_id; b.dataset.n = String(Number(o.n)); // what finds this choice again after a redraw keeps the keyboard on it (sidebar_groups.js)
             b.setAttribute('aria-label', `Answer ${o.label} for ${resolveSessionIdentity(s)}`);
-            b.addEventListener('click', e => { e.stopPropagation(); if (trust && o === trust.yes) confirmTrust(s, o, ask, cell, trust); else answer(s, o, ask, cell, stepFull || ''); });
+            const isYes = gateOpt => !REJECT_FORM.test(wholeLabel(String(gateOpt.label)));
+            if (typeof gate === 'object' && gate && isYes(o)) { yesButtons.push(b); b.hidden = true; } // hidden until measured: a Yes is never drawn before the block is known to be whole
+            b.addEventListener('click', e => { e.stopPropagation(); if (gate && yesButtons.includes(b) && gate.clipped()) { gate.apply(); return; } if (trust && o === trust.yes) confirmTrust(s, o, ask, cell, trust); else answer(s, o, ask, cell, stepFull || ''); });
             b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
             cell.append(b);
         }
+        gate?.apply();
         if (held) { const more = document.createElement('span'); more.className = 'inbox-only-reject'; more.textContent = 'More choices: open the agent.'; cell.append(more); } // some of the question's choices are left to Open: said, so these do not read as all of them
         if (onlyReject) { // said in words, set as text: the full request is under Open
             const note = document.createElement('span');
