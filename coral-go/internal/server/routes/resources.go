@@ -260,6 +260,8 @@ func (h *ResourcesHandler) Claim(w http.ResponseWriter, r *http.Request) {
 		if ms, err := h.M.Queue().Status(ev.Member); err == nil {
 			ev.Machine = ms.Resource.Machine // a pool's grant says which machine it is on
 		}
+	} else if ms, err := h.M.Queue().Status(name); err == nil {
+		ev.Machine = ms.Resource.Machine // and a plain slot resource's grant says its own (#14262: a claim for the mini named no machine, and heavy run took it for the Mac)
 	}
 	writeJSON(w, code, map[string]any{"granted": res.Granted, "place": res.Place, "entry": ev})
 }
