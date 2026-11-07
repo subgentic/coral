@@ -76,7 +76,7 @@ func derefStr(s *string) string {
 // live target as for auto-sleep, and every change is logged.
 func (h *SessionsHandler) KeepFullAccessOpt(w http.ResponseWriter, r *http.Request) {
 	if agentCaller(r) { // the handler's own refusal, not only the identity table's: an agent never sets Full access for itself or another (QA, #14162)
-		writeJSON(w, http.StatusForbidden, map[string]string{"error": "Only the Operator can set Full access.", "code": "forbidden_for_agent"})
+		writeError(w, http.StatusForbidden, "forbidden_for_agent", "Only the Operator can set Full access.")
 		return
 	}
 	if refuseNonOwner(w, r) {
