@@ -4,6 +4,9 @@
 // All known Coral capabilities
 export const ALL_CAPABILITIES = ['file_read', 'file_write', 'shell', 'web_access', 'git_write', 'agent_spawn', 'notebook'];
 
+export const SHIPPED_CAPABILITIES = ['file_read', 'file_write', 'shell', 'web_access', 'agent_spawn'];
+const READ_ONLY_ROLES = new Set(['Security Reviewer', 'SEO Strategist', 'Research Analyst']);
+
 export const AGENT_PRESETS = [
     {
         name: "Lead Developer",
@@ -81,4 +84,9 @@ export const AGENT_PRESETS = [
         prompt: "You are an organizational expert. Help plan projects, create timelines, track deadlines, and organize information into actionable plans. Coordinate with the team via the message board.",
         capabilities: { allow: ['file_read', 'file_write','shell:coral-board *'] },
     },
-];
+].map(preset => ({
+    ...preset,
+    roleLimits: preset.capabilities,
+    roleNote: READ_ONLY_ROLES.has(preset.name) ? 'This role is a prompt, not a permission. It starts with full tool permissions; apply the role’s limits to restrict its tools.' : '',
+    capabilities: { allow: [...SHIPPED_CAPABILITIES], deny: [] },
+}));

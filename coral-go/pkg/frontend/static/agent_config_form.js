@@ -29,7 +29,7 @@ const CAPABILITY_LABELS = {
 // What a capability does beyond its name, per CLI (#4545, Security's D: for Codex, Git Write is what turns
 // off its sandbox).
 const CAPABILITY_TITLES = {
-    git_write: 'Claude: pre-approves git push, commit, branch, merge and rebase. Codex: Git Write does not change its sandbox; with Shell it can change files in its folder, use the network and never asks.',
+    git_write: 'Claude: Git Write lets the agent push, including force pushes, without a question in Default and Accept edits; in Auto, Coral leaves git to Auto’s own checks. Switching to Auto inside the CLI keeps the launch-time rules. Codex: Git Write does not change its sandbox; with Shell it can change files in its folder, use the network and never asks.',
 };
 
 export function _togglePermissions(containerId) {

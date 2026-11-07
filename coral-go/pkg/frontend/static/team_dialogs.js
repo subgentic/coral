@@ -13,7 +13,7 @@ import { serverFetch, boardFetch, identityKey, LOCAL_SERVER, isHub } from './ser
 const { launch } = await importOnce('./launch_state.js');
 const { goalWrite } = await importOnce('./goal_write.js');
 const { _acfServer, _effectiveServer, _settingsFor } = await importOnce('./launch_models.js');
-const { trackPermissionPick, _getPermissionFlagsForAgentMode, _normalizePermFlagsForAgent, _updatePermModeDescription, _hasPermFlag } = await importOnce('./permission_flags.js');
+const { defaultPermissionMode, trackPermissionPick, _getPermissionFlagsForAgentMode, _normalizePermFlagsForAgent, _updatePermModeDescription, _hasPermFlag } = await importOnce('./permission_flags.js');
 const { _findPersona, _getSavedTeamTemplates, _upsertSavedTeamTemplates } = await importOnce('./persona_store.js');
 const { getAgentConfig, renderAgentConfigForm, setAgentConfig, resetProviderChoices } = await importOnce('./agent_config_form.js');
 const { markFieldInvalid, _launchBlocked, _launchOn, _onServerSuffix, _refreshAfterLaunch, _resetDirInputs, _showLaunchStep, hideLaunchModal, showTeamLaunchFailures } = await importOnce('./launch_core.js');
@@ -389,12 +389,12 @@ async function _loadExistingTeamBoards() {
     _validateTeamName();
 }
 
-// The team form starts at the CLI's own confirm mode (Default), not Auto: the person's saved default wins, and a mode they pick stays (#6397).
+// New teams follow the shipped per-type default; a stored mode or a person's explicit Default still wins.
 function _applyTeamDefaultMode() {
     const el = document.getElementById('team-permission-mode');
     if (!el) return;
     trackPermissionPick(el);
-    if (!el.dataset.pickedByPerson) el.value = _settingsFor(_effectiveServer(launch.server)).default_permission_mode || 'default';
+    if (!el.dataset.pickedByPerson) el.value = defaultPermissionMode(_settingsFor(_effectiveServer(launch.server)), document.getElementById('team-agent-type')?.value || 'claude');
     _updatePermModeDescription(el);
 }
 

@@ -73,6 +73,18 @@ export function _renderPresetButtons(containerId, kind, opts = {}) {
     if (!blank) html += `<option value="">Custom</option>`;
     html += `</select>`;
     container.innerHTML = html;
+    const note = document.createElement('p'); note.className = 'settings-hint'; note.hidden = true;
+    const limits = document.createElement('button'); limits.type = 'button'; limits.className = 'btn btn-small'; limits.textContent = "Apply the role's limits"; limits.hidden = true;
+    const rolePreset = () => AGENT_PRESETS.find(p => p.name === (container.querySelector('select')?.value || document.getElementById(kind === 'agent' ? 'launch-agent-acf' : target)?.querySelector('.acf-name')?.value));
+    const syncRole = () => { const preset = rolePreset(); note.textContent = preset?.roleNote || ''; note.hidden = !preset?.roleNote; limits.hidden = !preset?.roleNote; };
+    container.append(note, limits); container.querySelector('select').addEventListener('change', syncRole); syncRole();
+    limits.addEventListener('click', async () => {
+        const preset = rolePreset();
+        if (!preset?.roleLimits) return;
+        const form = await importOnce('./agent_config_form.js'), destination = kind === 'agent' ? 'launch-agent-acf' : target;
+        form.setAgentConfig(destination, { ...form.getAgentConfig(destination), capabilities: structuredClone(preset.roleLimits) });
+    });
+
     if (blank) { const sel = container.querySelector('.agent-preset-select'); if ([...sel.options].some(o => o.value === keepOpt)) sel.value = keepOpt; }
 }
 

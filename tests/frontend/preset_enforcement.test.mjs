@@ -73,7 +73,7 @@ assert.equal(pe.defaultPermissionMode({}, ''), 'auto', 'no agent type named: Cla
 assert.equal(pe.defaultPermissionMode({}, undefined), 'auto');
 assert.equal(pe.defaultPermissionMode({}, 'codex'), 'auto', 'Codex uses the workspace sandbox');
 for (const other of ['agy', 'antigravity', 'gemini', 'pi']) assert.equal(pe.defaultPermissionMode({}, other), 'bypassPermissions', other + ' keeps its default');
-assert.equal(pe.defaultPermissionMode({}, 'hermes'), 'default', 'Hermes asks before a dangerous command unless --yolo: its default is the safe mode, as the server\'s is (#12169)');
+assert.equal(pe.defaultPermissionMode({}, 'hermes'), 'bypassPermissions', 'the shipped full Hermes default is yolo; saved lower modes still win');
 for (const saved of ['bypassPermissions', 'default', 'plan', 'acceptEdits', 'dontAsk', 'auto']) {
     for (const type of ['claude', 'codex', 'agy', 'pi', 'hermes']) assert.equal(pe.defaultPermissionMode({ default_permission_mode: saved }, type), saved, `a saved ${saved} stays for ${type}`);
 }
