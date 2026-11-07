@@ -23,7 +23,8 @@ func (h *SessionsHandler) DismissWait(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		SessionID string `json:"session_id"`
 		AgentType string `json:"agent_type"`
-		// Remove: the second action on a wait that is already dismissed and still waiting (#14266): the evidence never came, so the Operator takes the row out of Needs you and its count.
+		// Remove: the second action on a wait that is already dismissed and still waiting (#14266): the evidence never came, so the Operator takes the row out of Needs you and its count. A request is told from
+		// the next by when the agent raised it, so one raised AGAIN after the turn moved on (identical, the same kind or not) is a new ask and shows again; only a request the agent made itself has such a time.
 		Remove bool `json:"remove"`
 	}
 	if err := decodeJSON(r, &body); err != nil || body.SessionID == "" {
@@ -50,6 +51,10 @@ func (h *SessionsHandler) DismissWait(w http.ResponseWriter, r *http.Request) {
 		inboxActioned(r, tracking.InboxAgentWait, st.WaitingKind, "dismiss", st.WaitingSince) // the Inbox's numbers (#7512): the wait's kind, never the agent
 	}
 	if body.Remove { // "Remove from Needs you": the row and the count only. No event, no release of held messages (the gate stays held while the prompt may be on screen), nothing typed (#14266)
+		if st.WaitingSince.IsZero() { // Coral's own held notice, a sign-in or a launch prompt: no ask of the agent's, no time to tell one from the next, so a removal could hide a later one for ever
+			errConflict(w, "Only a request the agent made itself can be removed from Needs you")
+			return
+		}
 		removed, err := h.ss.SetWaitRemoved(r.Context(), sid, waitRequestKey(st))
 		if err != nil {
 			slog.Warn("could not record the Operator's removal of a wait", "session_id", sid, "error", err)

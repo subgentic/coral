@@ -3,13 +3,17 @@ package routes
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/sessionstate"
 )
 
 // #14266 (QA's question on #14203): Dismiss keeps a wait that never clears (its evidence never came) listed in Needs you, still waiting. "Remove from Needs you" is the second, explicit action on such a row:
@@ -129,4 +133,60 @@ func TestRemoveFromNeedsYouWithNoWaitIsANoOp(t *testing.T) {
 	rec := r.removeWait(r.sid, nil)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	assert.Contains(t, rec.Body.String(), `"dismissed":false`)
+}
+
+// Security's INFO 5 on #14266: a removed row is invisible in the count, so a new prompt must never stay hidden. A request is told from the next by when the agent raised it (WaitingSince), so the SAME request
+// raised again (identical text, the same kind and tool) after the turn moved on, after it was answered, or after a stop, is a NEW ask and shows again. A second request that opens while the first is still open is the
+// same wait (its start does not move) and stays removed; and a wait with no start time of the agent's own (Coral's held notice) cannot be removed at all.
+func TestAnIdenticalRequestRaisedAgainAfterARemovalShowsAgain(t *testing.T) {
+	for name, between := range map[string]func(r *holdRig){
+		"it was answered":    func(r *holdRig) { r.answered() },
+		"the turn stopped":   func(r *holdRig) { r.post(`{"event_type":"stop","summary":"Agent stopped"}`) },
+		"a new prompt began": func(r *holdRig) { r.post(`{"event_type":"prompt_submit","summary":"The person typed"}`) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := newHoldRig(t, true)
+			ctx := context.Background()
+			r.requestFor("Wants to run: go test ./...")
+			require.Equal(t, http.StatusOK, r.dismiss(r.sid).Code)
+			require.Equal(t, http.StatusOK, r.removeWait(r.sid, nil).Code)
+			listed, _ := r.needsYouHas(r.sid)
+			require.False(t, listed)
+
+			time.Sleep(3 * time.Millisecond) // the second ask is later than the first, as it is for real
+			between(r)
+			time.Sleep(3 * time.Millisecond)
+			r.requestFor("Wants to run: go test ./...") // the very same request again
+			require.True(t, r.h.deriveSingleSessionState(ctx, r.sid, 0).NeedsInput)
+			listed, flagged := r.needsYouHas(r.sid)
+			assert.True(t, listed, "the same request raised again is a new ask: it shows in Needs you")
+			assert.False(t, flagged, "and it is not marked still waiting")
+			_, removed, _ := r.rowFlags(r.sid)
+			assert.False(t, removed)
+		})
+	}
+
+	t.Run("a second request while the first is still open is the same wait", func(t *testing.T) {
+		r := newHoldRig(t, true)
+		r.requestFor("Wants to run: ls")
+		require.Equal(t, http.StatusOK, r.dismiss(r.sid).Code)
+		require.Equal(t, http.StatusOK, r.removeWait(r.sid, nil).Code)
+		time.Sleep(3 * time.Millisecond)
+		r.requestFor("Wants to run: ls") // nothing answered in between: the start of the wait does not move
+		listed, _ := r.needsYouHas(r.sid)
+		assert.False(t, listed, "the request is still the open one: it stays removed")
+	})
+}
+
+func TestACoralHeldNoticeWaitCannotBeRemoved(t *testing.T) {
+	r := newHoldRig(t, true)
+	r.post(fmt.Sprintf(`{"event_type":"notification","summary":%q}`, sessionstate.HeldInputSummary))
+	st := r.h.deriveSingleSessionState(context.Background(), r.sid, 0)
+	require.True(t, st.NeedsInput, "Coral's held notice is a wait")
+	require.True(t, st.WaitingSince.IsZero(), "with no start time of the agent's own")
+	require.Equal(t, http.StatusOK, r.dismiss(r.sid).Code)
+	rec := r.removeWait(r.sid, nil)
+	assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+	_, removed, _ := r.rowFlags(r.sid)
+	assert.False(t, removed, "nothing was marked removed")
 }
