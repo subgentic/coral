@@ -1,0 +1,178 @@
+package routes
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/agent"
+	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/store"
+)
+
+type discRig struct {
+	t    *testing.T
+	rig  *agyTestRig
+	n    int
+	sent func() int
+}
+
+func newDiscRig(t *testing.T) *discRig {
+	rig := setupAgyTestRig(t)
+	fake := stubScript(t, filepath.Join(t.TempDir(), "mock-claude"), "#!/bin/sh\nexit 0\n")
+	require.NoError(t, rig.ss.SetSetting(context.Background(), agent.CLIPathSettingKey(at.Claude), fake))
+	require.NoError(t, rig.ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: "11111111-2222-4333-8444-555555555555", AgentType: "claude", AgentName: "parent", WorkingDir: rig.workdir}))
+	return &discRig{t: t, rig: rig, sent: func() int { return len(rig.term.sentCommands()) }}
+}
+
+func withKind(kind string) func(*http.Request) *http.Request {
+	return func(r *http.Request) *http.Request { return r.WithContext(context.WithValue(r.Context(), callerKindKey{}, kind)) }
+}
+
+func asAgentToken(r *http.Request) *http.Request {
+	const sid = "11111111-2222-4333-8444-555555555555"
+	return r.WithContext(context.WithValue(r.Context(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: sid, SessionName: "claude-" + sid}))
+}
+
+func (d *discRig) call(handler http.HandlerFunc, method, path string, body any, mod func(*http.Request) *http.Request) (int, map[string]any) {
+	d.t.Helper()
+	b, _ := json.Marshal(body)
+	req := httptest.NewRequest(method, path, bytes.NewReader(b))
+	if mod != nil {
+		req = mod(req)
+	}
+	rec := httptest.NewRecorder()
+	handler(rec, req)
+	var out map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &out)
+	return rec.Code, out
+}
+
+func (d *discRig) launch(mod func(*http.Request) *http.Request, extra map[string]any) (int, map[string]any) {
+	d.n++
+	body := map[string]any{"agent_type": at.Claude, "working_dir": d.rig.workdir}
+	for k, v := range extra {
+		body[k] = v
+	}
+	return d.call(d.rig.h.Launch, http.MethodPost, "/api/sessions/launch", body, mod)
+}
+
+func (d *discRig) team(mod func(*http.Request) *http.Request, member map[string]any) (int, map[string]any) {
+	d.n++
+	body := map[string]any{"board_name": "disc" + string(rune('a'+d.n)), "new_board": true, "working_dir": d.rig.workdir, "agent_type": at.Claude, "agents": []any{member}}
+	return d.call(d.rig.h.LaunchTeam, http.MethodPost, "/api/sessions/launch-team", body, mod)
+}
+
+func TestTheLaunchNoticeIsReadAndAcknowledgedOnlyByTheOwner(t *testing.T) {
+	d := newDiscRig(t)
+	h := d.rig.h
+	code, v := d.call(h.GetLaunchDisclosure, "GET", "/api/launch-disclosure", nil, nil)
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, LaunchDisclosureID, v["id"])
+	assert.Equal(t, LaunchDisclosureText, v["text"])
+	assert.Equal(t, false, v["seen"])
+	assert.Contains(t, v["text"], "run as you, with every file you can reach")
+	assert.NotContains(t, v["text"], "data folder", "no claim that Coral fences its data folder")
+
+	// an agent's token can neither read, acknowledge nor clear it; nothing is stored
+	for name, hd := range map[string]http.HandlerFunc{"read": h.GetLaunchDisclosure, "ack": h.AckLaunchDisclosure, "clear": h.ClearLaunchDisclosure} {
+		code, out := d.call(hd, "POST", "/x", map[string]string{"id": LaunchDisclosureID}, asAgentToken)
+		assert.Equal(t, http.StatusForbidden, code, name)
+		assert.Equal(t, "forbidden_for_agent", out["code"], name)
+	}
+	_, v = d.call(h.GetLaunchDisclosure, "GET", "/x", nil, nil)
+	assert.Equal(t, false, v["seen"], "an agent's tries recorded nothing")
+
+	// a stale id is refused; the current one is recorded with its time
+	code, out := d.call(h.AckLaunchDisclosure, "POST", "/x", map[string]string{"id": "old-words"}, nil)
+	assert.Equal(t, http.StatusBadRequest, code)
+	assert.Equal(t, "stale_disclosure", out["code"])
+	code, v = d.call(h.AckLaunchDisclosure, "POST", "/x", map[string]string{"id": LaunchDisclosureID}, nil)
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, true, v["seen"])
+	assert.NotEmpty(t, v["acknowledged_at"])
+	// the record holds only the id and the time, and is hidden from the settings list
+	raw, err := d.rig.ss.GetSettings(context.Background())
+	require.NoError(t, err)
+	var rec map[string]string
+	require.NoError(t, json.Unmarshal([]byte(raw[launchDisclosureAckSetting]), &rec))
+	assert.Len(t, rec, 2)
+	assert.True(t, sensitiveKeys[launchDisclosureAckSetting], "GET /api/settings never lists it")
+	// only the owner takes it back
+	_, v = d.call(h.ClearLaunchDisclosure, "DELETE", "/x", nil, nil)
+	assert.Equal(t, false, v["seen"])
+	// a record for other words does not count
+	require.NoError(t, d.rig.ss.SetSetting(context.Background(), launchDisclosureAckSetting, `{"id":"old-words","at":"2020-01-01T00:00:00Z"}`))
+	_, v = d.call(h.GetLaunchDisclosure, "GET", "/x", nil, nil)
+	assert.Equal(t, false, v["seen"])
+}
+
+// A launch from the dashboard's own dialog that would use the new default waits for the acknowledgement: 409 with the notice, nothing started; then it goes. One that names its mode does not wait.
+func TestADialogLaunchWaitsForTheNoticeBeforeTheNewDefault(t *testing.T) {
+	d := newDiscRig(t)
+	dialog := withKind(callerDashCookie)
+	for route, run := range map[string]func() (int, map[string]any){
+		"launch": func() (int, map[string]any) { return d.launch(dialog, nil) },
+		"team":   func() (int, map[string]any) { return d.team(dialog, map[string]any{"name": "A"}) },
+	} {
+		before := d.sent()
+		code, out := run()
+		require.Equal(t, http.StatusConflict, code, "%s: %v", route, out)
+		assert.Equal(t, launchDisclosureRequired, out["code"], route)
+		disc, _ := out["disclosure"].(map[string]any)
+		assert.Equal(t, LaunchDisclosureText, disc["text"], route)
+		assert.Equal(t, before, d.sent(), "%s: nothing started", route)
+	}
+	// naming a mode is not the new default: no wait
+	code, out := d.launch(dialog, map[string]any{"permission_mode": "default"})
+	assert.Equal(t, http.StatusOK, code, "%v", out)
+	code, out = d.team(dialog, map[string]any{"name": "B", "permission_mode": "default"})
+	assert.Equal(t, http.StatusOK, code, "%v", out)
+	// after the owner's acknowledgement the same payloads start, in the new default
+	code, _ = d.call(d.rig.h.AckLaunchDisclosure, "POST", "/x", map[string]string{"id": LaunchDisclosureID}, nil)
+	require.Equal(t, http.StatusOK, code)
+	code, out = d.launch(dialog, nil)
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Equal(t, "auto", out["permission_mode"])
+	assert.NotContains(t, out, "launch_disclosure", "seen: not repeated")
+	code, out = d.team(dialog, map[string]any{"name": "C"})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+}
+
+// The paths with no person at the screen never block and never count as seen: they answer with the mode used, where to lower it and, while unseen, the notice.
+func TestNonDialogLaunchesNeverBlockAndAnswerWithTheModeAndHowToLowerIt(t *testing.T) {
+	d := newDiscRig(t)
+	for name, mod := range map[string]func(*http.Request) *http.Request{
+		"api key":      withKind(callerAPIKey),
+		"cli (signed)": withKind(callerCLISigned),
+		"no kind":      nil,
+		"agent token":  asAgentToken,
+	} {
+		code, out := d.launch(mod, nil)
+		require.Equal(t, http.StatusOK, code, "%s launch: %v", name, out)
+		assert.NotEmpty(t, out["permission_mode"], name)
+		assert.Equal(t, PermissionLoweringText, out["permission_lowering"], name)
+		disc, _ := out["launch_disclosure"].(map[string]any)
+		assert.Equal(t, LaunchDisclosureText, disc["text"], "%s: the notice rides in the answer while unseen", name)
+		code, out = d.team(mod, map[string]any{"name": "M"})
+		require.Equal(t, http.StatusOK, code, "%s team: %v", name, out)
+		assert.Equal(t, PermissionLoweringText, out["permission_lowering"], name)
+		assert.NotNil(t, out["launch_disclosure"], name)
+		agents, _ := out["agents"].([]any)
+		require.Len(t, agents, 1)
+		assert.NotEmpty(t, agents[0].(map[string]any)["permission_mode"], name)
+	}
+	// none of them counted as the owner having read it
+	_, v := d.call(d.rig.h.GetLaunchDisclosure, "GET", "/x", nil, nil)
+	assert.Equal(t, false, v["seen"])
+	// an agent's launch is still capped (MUST 1): its row records no mode, so the member is Default, not Auto
+	_, out := d.launch(asAgentToken, nil)
+	assert.Equal(t, "default", out["permission_mode"])
+}

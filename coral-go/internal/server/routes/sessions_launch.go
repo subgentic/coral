@@ -117,6 +117,14 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, err.Error())
 		return
 	}
+	// A launch from the dashboard's own dialog that would use the new default waits for the owner's acknowledgement of the notice first (#14353); nothing is started.
+	if body.ResumeSessionID == "" && !body.KeepFullAccess {
+		settings, _ := h.ss.GetSettings(r.Context())
+		if h.refuseUnseenDisclosure(w, r, launchDefaultSkips(body.AgentType, body.Flags, body.PermissionMode, settings)) {
+			attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+			return
+		}
+	}
 	// Through the Coral Hub, an agent that skips permission prompts needs the owner's local switch (#126 F4).
 	if refuseHubSkip(w, r, h.ss, hubAsksToSkip(body.AgentType, body.Flags, body.Capabilities, body.Tools, body.Hooks) || body.KeepFullAccess) { // Full access is the widest skip: through the Hub it meets the owner's switch like any other (#14193)
 		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
