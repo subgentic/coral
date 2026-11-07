@@ -345,7 +345,11 @@ func startAgentServices(ctx context.Context, db *store.DB, srv *server.Server, a
 
 	// Session reconciler — periodically detects crashed agents and marks them sleeping
 	reconciler := background.NewSessionReconciler(sessStore, agentRT, 30*time.Second)
-	reconciler.SetOnSlept(srv.AgentsSlept)     // the exit notice and auto-resume (#3613)
+	reconciler.SetOnSlept(srv.AgentsSlept)                                // the exit notice and auto-resume (#3613)
+	reconciler.SetAgentHasRun(func(ctx context.Context, id string) bool { // an agent that has sent an event has shown it ran: its exit is not held for the launch minute (#14257)
+		events, err := taskStore.GetSessionStateEvents(ctx, []string{id})
+		return err == nil && len(events[id]) > 0
+	})
 	reconciler.SetOnServerLost(srv.ServerLost) // the terminal server going away: one log line, one notice, the recovery (#12592)
 	safeGo(ctx, "session_reconciler", func() { reconciler.Run(ctx) })
 }

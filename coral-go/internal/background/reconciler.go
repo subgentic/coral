@@ -43,7 +43,9 @@ type SessionReconciler struct {
 	// onSlept hears the sessions one pass marked sleeping (an exited CLI or a gone terminal),
 	// for the exit notice (#3613). Unset: nothing is told.
 	onSlept func(ctx context.Context, sessionIDs []string)
-	slept   []string // this pass's
+	// hasRun says whether the agent has sent any state event (#14257): one that has shown it ran is not "still starting", so the launch grace does not hold back marking its exit. nil: every agent is held for the grace.
+	hasRun func(ctx context.Context, sessionID string) bool
+	slept  []string // this pass's
 	// The watch for the terminal server going away (#12592), for a runtime that can be asked (ServerWatcher).
 	onServerLost func(ctx context.Context, loss ServerLoss)
 	serverUp     bool // the server was seen up and has not been reported lost since
@@ -115,6 +117,11 @@ func (r *SessionReconciler) watchServer(ctx context.Context, live []store.LiveSe
 		r.onServerLost(ctx, loss)
 	}
 	return true
+}
+
+// SetAgentHasRun registers f to tell whether an agent has ever sent a state event; an agent that has is marked Ended at the first pass that finds its CLI gone, whatever its age (#14257).
+func (r *SessionReconciler) SetAgentHasRun(f func(ctx context.Context, sessionID string) bool) {
+	r.hasRun = f
 }
 
 // SetOnSlept registers f to hear, once per pass, the agents that pass found dead.
@@ -284,8 +291,8 @@ func (r *SessionReconciler) checkExited(ctx context.Context, ls store.LiveSessio
 	if r.cliMissing(ctx, ls, name) || r.hermesGatewayRefused(ctx, ls, name) {
 		return
 	}
-	if created, err := time.Parse(store.ISOFormat, ls.CreatedAt); err == nil && r.now().Sub(created) < exitedLaunchGrace {
-		return
+	if created, err := time.Parse(store.ISOFormat, ls.CreatedAt); err == nil && r.now().Sub(created) < exitedLaunchGrace && !(r.hasRun != nil && r.hasRun(ctx, ls.SessionID)) {
+		return // a fresh launch's shell is not an exited agent, unless the agent has already shown it ran (#14257: its exit was shown a minute and a pass late)
 	}
 	if err := r.sessionStore.SetSessionSleepingFor(ctx, ls.SessionID, store.SleepReasonAgentExited); err != nil {
 		r.logger.Error("failed to mark exited agent as sleeping", "session_id", ls.SessionID, "error", err)

@@ -85,10 +85,20 @@ SCENARIO="${CORAL_TEST_SCENARIO:-killall}"
 if [[ "$SCENARIO" == exited ]]; then
     # The agents' own processes end (each is a mock-agent started under the server, found by its PID below it): Kill All is not used, so the dead terminals stay in the terminal manager.
     log "THE AGENTS EXIT ON THEIR OWN: stopping each mock-agent process of this run by its PID"
-    for p in $(descendants "$SERVER_PID"); do
+    # the pty agents are below the server; the tmux agents are below the tmux server, which is not (#14257: the first version found none there, and the tmux run observed nothing)
+    CANDIDATES="$(descendants "$SERVER_PID")"
+    if [[ "$CORAL_TEST_BACKEND" == tmux ]]; then
+        for pp in $(tmux -S "$SOCK" list-panes -a -F '#{pane_pid}' 2>/dev/null); do CANDIDATES="$CANDIDATES $pp $(descendants "$pp")"; done
+    fi
+    for p in $CANDIDATES; do
         if ps -o command= -p "$p" 2>/dev/null | grep -q "$TMP/mock-agent"; then kill "$p" 2>/dev/null && echo "    stopped mock-agent pid $p"; fi
     done
-    sleep 20 # Coral notices a gone terminal on its next pass
+    # Coral marks a plain shell as Ended only after consecutive passes and not in the first minute after launch (exitedLaunchGrace); an orphaned terminal after its own grace. CORAL_EXITED_WAIT (default 20 s) is how long to look.
+    EXITED_WAIT="${CORAL_EXITED_WAIT:-20}"
+    for ((w = 0; w < EXITED_WAIT; w += 15)); do
+        sleep 15
+        log "  +$((w + 15)) s after the exit: team rows awake=$(live | awk -F'\t' -v b="$BOARD" '$3 == b && $4 == "awake"' | wc -l | tr -d ' ') asleep=$(live | awk -F'\t' -v b="$BOARD" '$3 == b && $4 == "asleep"' | wc -l | tr -d ' ') (live list rows for the team: $(live | awk -F'\t' -v b="$BOARD" '$3 == b' | wc -l | tr -d ' '))"
+    done
 else
     log "KILL ALL (POST /api/sessions/live/team/<board>/kill)"
     api POST "/api/sessions/live/team/${BOARD}/kill" | sed 's/^/    answer: /'; echo

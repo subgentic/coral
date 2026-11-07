@@ -142,6 +142,29 @@ func TestReconciler_ExitedWithinLaunchGraceIsNotMarked(t *testing.T) {
 	assert.False(t, isSleeping(t, ss, testUUID), "a fresh launch's shell is not an exited agent")
 }
 
+// #14257: an agent that has already sent a state event has shown it ran, so its CLI leaving the pane is its exit even in the first minute: it was shown awake for a minute and a reconcile pass longer.
+func TestReconciler_AnAgentThatHasRunIsMarkedExitedWithinTheLaunchGrace(t *testing.T) {
+	ss, rt, r := newExitedFixture(t)
+	r.now = time.Now // just launched
+	ran := false
+	r.SetAgentHasRun(func(context.Context, string) bool { return ran })
+	ctx := context.Background()
+	registerAwake(t, ss, "claude", testUUID)
+	rt.listed = []AgentInfo{{AgentType: "claude", SessionID: testUUID}}
+	rt.set(FormatSessionName("claude", testUUID), "zsh")
+	for i := 0; i < 3; i++ {
+		r.reconcileOnce(ctx)
+	}
+	assert.False(t, isSleeping(t, ss, testUUID), "no event yet: the CLI may still be starting, the grace holds")
+	ran = true // the agent sent an event: it ran
+	r.reconcileOnce(ctx)
+	assert.True(t, isSleeping(t, ss, testUUID), "it ran and its CLI is gone: ended at that pass, not a minute later")
+	ls, err := ss.GetLiveSession(ctx, testUUID)
+	require.NoError(t, err)
+	require.NotNil(t, ls.SleepReason)
+	assert.Equal(t, store.SleepReasonAgentExited, *ls.SleepReason)
+}
+
 // Orchestrator's must: a 'terminal' agent's shell IS the agent.
 func TestReconciler_TerminalAgentIsNeverMarked(t *testing.T) {
 	ss, rt, r := newExitedFixture(t)
