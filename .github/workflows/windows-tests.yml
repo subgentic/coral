@@ -367,7 +367,8 @@ jobs:
   cdp:
     name: cdp (windows-latest, ${{ matrix.name }})
     runs-on: windows-latest
-    timeout-minutes: 60
+    # Part 1/3 takes 57 to 59 minutes in a good run (3416 to 3558 s in six runs) and was cancelled at 60 by one slow runner (run 42389966511): 75 leaves it a quarter of headroom (#14308).
+    timeout-minutes: 75
     env:
       CORAL_TELEMETRY_DISABLED: "1"
     strategy:
