@@ -21,16 +21,16 @@ const { coralReady } = require('./helpers/wait');
             await coralReady(ev);
             await ev(`(() => {
                 const inner = window.__innerFetch || (window.__innerFetch = window.fetch);
-                window.__pending = null;
+                window.__pending = null; window.__screen = null;
                 window.fetch = (url, opts = {}) => {
                     if (/\\/api\\/sessions\\/live\\/ask-q[^/?]*\\/chat\\?/.test(String(url))) return inner(url, opts).then(async r => { const d = await r.clone().json().catch(() => null); if (!d) return r;
-                        d.pending = window.__pending || null; return new Response(JSON.stringify(d), { status: r.status, headers: { 'content-type': 'application/json' } }); });
+                        d.pending = window.__pending || null; if (window.__screen) d.prompt_options = window.__screen; return new Response(JSON.stringify(d), { status: r.status, headers: { 'content-type': 'application/json' } }); });
                     return inner(url, opts);
                 };
                 return true; })()`);
             await ev(`window.__m.add('ask-q', 'Q', 0, { sleeping: false, agent_type: 'claude' }); true`);
             await sleep(600); // sleep-ok: the first live list renders from several answers; no single completion event
-            const setRow = (patch, pending) => ev(`window.__pending = ${JSON.stringify(pending || null)}; import(${S} + 'state.js').then(st => { const row = st.state.liveSessions.find(s => s.session_id === 'ask-q-id' || s.name === 'ask-q'); Object.assign(row, ${JSON.stringify(patch)}); return import(${S} + 'needs_input_card.js'); }).then(m => { m.refreshNeedsInputCard(); return true; })`);
+            const setRow = (patch, pending, screen) => ev(`window.__pending = ${JSON.stringify(pending || null)}; window.__screen = ${JSON.stringify(screen || null)}; import(${S} + 'state.js').then(st => { const row = st.state.liveSessions.find(s => s.session_id === 'ask-q-id' || s.name === 'ask-q'); Object.assign(row, ${JSON.stringify(patch)}); return import(${S} + 'needs_input_card.js'); }).then(m => { m.refreshNeedsInputCard(); return true; })`);
             const card = () => ev(`(() => { const c = document.querySelector('#live-history-messages .chat-needs-input'); return c ? c.querySelector('.cni-kicker').textContent : null; })()`);
             const ASK = { waiting_for_input: true, waiting_kind: 'question', waiting_summary: 'Wants to know: Which fix do you want?', waiting_since: iso(0), last_message: { role: 'assistant', text: 'I will ask you something', at: iso(-5000) } };
             await setRow(ASK, { tool_name: 'AskUserQuestion', input: {}, at: iso(0) });
@@ -47,8 +47,25 @@ const { coralReady } = require('./helpers/wait');
             await setRow({ ...ASK, last_message: { role: 'assistant', text: 'Moving on without it', at: iso(20000) } }, { tool_name: 'AskUserQuestion', input: {}, at: iso(0) });
             await waitFor(`!document.querySelector('#live-history-messages .chat-needs-input')`, `${tag}: the card leaves when the agent has gone on (row and pending tool)`, 6000);
             check(`${tag}: no card after the agent went on`, (await card()) === null);
+            await setRow({ ...ASK, waiting_since: iso(90000), last_message: { role: 'assistant', text: 'Moving on without it', at: iso(20000) } }, { tool_name: 'AskUserQuestion', input: {}, at: iso(90000) });
+            await waitFor(`!!document.querySelector('#live-history-messages .chat-needs-input')`, `${tag}: a NEW question, asked after that message, shows its card again (its own time advanced; the message did not move)`, 6000);
+            // a fresh Bash permission after the old question, with a current screen prompt: the retained waiting_since (T0) and an assistant message at T0+20 s must not hide it (UI Reviewer)
+            const OLD = { waiting_for_input: true, waiting_kind: 'permission', waiting_summary: 'Notification: Claude needs your permission', waiting_since: iso(0), last_message: { role: 'assistant', text: 'Moving on', at: iso(20000) } };
+            await setRow(OLD, { tool_name: 'Bash', input: { command: 'rm -rf build' }, at: iso(30000) }, { question: 'Allow this command?', options: [{ n: 1, label: 'Yes', action: 'select' }, { n: 2, label: 'No', action: 'select' }] });
+            await waitFor(`!!document.querySelector('#live-history-messages .chat-needs-input .cni-answer')`, `${tag}: the new permission tool's card with its answers is drawn`, 6000).catch(e => console.log('waitFor: ' + e.message));
+            check(`${tag}: a new permission tool (T0+30 s) with its screen prompt stays actionable after an older question and a message at T0+20 s`, /Permission|Question/i.test(String(await card())) && !!(await ev(`!!document.querySelector('#live-history-messages .chat-needs-input .cni-answer')`)), String(await card()));
+            await setRow({ ...OLD, waiting_kind: 'question', waiting_summary: '' }, null, { question: 'Which one?', options: [{ n: 1, label: 'Red', action: 'select' }] });
+            await sleep(300); // sleep-ok: the card redraws
+            check(`${tag}: a screen prompt of its own (no pending tool) is not hidden by an older timestamp`, !!(await ev(`!!document.querySelector('#live-history-messages .chat-needs-input .cni-answer')`)), String(await card()));
             await setRow({ ...ASK, last_message: { role: 'assistant', text: 'again', at: iso(-1000) } }, { tool_name: 'AskUserQuestion', input: {}, at: iso(0) });
-            await waitFor(`!!document.querySelector('#live-history-messages .chat-needs-input')`, `${tag}: a new question shows its card again`, 6000);
+            await waitFor(`!!document.querySelector('#live-history-messages .chat-needs-input')`, `${tag}: the question card is back for the next case`, 6000);
+            // a PERMISSION card never vanishes by what the agent wrote: the same newer last_message on a permission row still draws it (Security)
+            const PERM = { waiting_for_input: true, waiting_kind: 'permission', waiting_summary: 'Notification: Claude needs your permission', waiting_since: iso(0), last_message: { role: 'assistant', text: 'Moving on', at: iso(60000) } };
+            await setRow(PERM, { tool_name: 'Bash', input: { command: 'rm -rf build' }, at: iso(0) });
+            await sleep(300); // sleep-ok: the card redraws
+            check(`${tag}: a permission card stays although the agent wrote 60 s after it`, /Permission/i.test(String(await card())), String(await card()));
+            await setRow({ ...ASK, last_message: { role: 'assistant', text: 'again', at: iso(-1000) } }, { tool_name: 'AskUserQuestion', input: {}, at: iso(0) });
+            await waitFor(`!!document.querySelector('#live-history-messages .chat-needs-input')`, `${tag}: the question card is back for the next case`, 6000);
             await setRow({ waiting_since: null, last_message: { role: 'assistant', text: 'Moving on', at: iso(25000) } }, { tool_name: 'AskUserQuestion', input: {}, at: iso(0) });
             await waitFor(`!document.querySelector('#live-history-messages .chat-needs-input')`, `${tag}: the pending tool's own start is enough to tell it went on`, 6000);
             check(`${tag}: and the card is gone`, (await card()) === null);
