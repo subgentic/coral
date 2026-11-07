@@ -22,7 +22,7 @@ export function knownOlder(server, kind, now = Date.now()) {
     return true;
 }
 /** For a test: forget every computer. */
-export const forgetOlderComputers = () => refused.clear();
+export const _resetForTests = () => refused.clear();
 
 /** True for the connector's own refusal of a path or query (the Hub's coded 403); the body is read from a copy. */
 export async function refusedByConnector(response) {

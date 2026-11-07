@@ -25,7 +25,7 @@ globalThis.fetch = window.fetch = async input => {
     return Response.json({});
 };
 const skew = await importUi('query_skew'), reviews = await importUi('inbox_reviews');
-const reset = () => { calls = []; skew.forgetOlderComputers(); mode = 'old'; hideServer = false; rows = [art(1), art(2), art(3)]; };
+const reset = () => { calls = []; skew._resetForTests(); mode = 'old'; hideServer = false; rows = [art(1), art(2), art(3)]; };
 const keysOf = u => [...u.searchParams.keys()].sort().join(',');
 
 test('a refused newer key is asked again once without it, and the computer is remembered', async () => {

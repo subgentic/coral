@@ -1,7 +1,7 @@
 import { artifactRevision, artifactsUnchanged } from './artifacts_feed.js';
 /* The Inbox's source identity and shared Server controls. No requests run at module load. */
 import { state } from './state.js';
-import { splitKey, serverFetch, identityKey, isCloud } from './server_base.js';
+import { splitKey, identityKey, isCloud } from './server_base.js';
 import { fetchSkewed } from './query_skew.js';
 /** On a Hub-served dashboard there is no "local" computer: the Hub has no chats or boards of its own, so the sources are the linked computers (online ones for a read; Goal #100). */
 export const serverChoices = () => [...(isCloud() ? [] : ['local']), ...new Set(state.hub ? (state.servers || []).filter(s => s.id && s.id !== 'local').map(s => s.id) : [])];
