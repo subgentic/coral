@@ -10,6 +10,7 @@ import { serverFetch, sessionServer } from './server_base.js';
 import { showToast } from './utils.js';
 import { blockedReason, hubBlocked } from './hub_access.js';
 import { resolveSessionIdentity } from './session_state.js';
+import { waitIgnored } from './asked_before_restart.js';
 import { openAgent } from './agent_live.js';
 import { importOnce } from './import_once.js';
 import { loadStyles } from './lazy_styles.js';
@@ -266,12 +267,21 @@ const answerable = s => !(s.review || s.autorun || !s.agent_type || !s.session_i
 
 /** The actions of a phone Needs you row's ⋯ menu (#137104): the Dismiss of a wait that is no longer true, offered by the rule the desktop row's button follows. */
 export function rowActions(s) {
+    if (s.waiting_for_input && waitIgnored(s)) return [];
     if (!canDismissWait(s, s.waiting_kind)) return []; // every waiting agent's row has one, a sign-in's too (#11946)
     return [{ label: 'Dismiss', title: 'Clear this if the agent is not waiting. Nothing is sent to the agent.', run: b => dismissWait(s, b) }];
 }
 
 /** The Answer cell of a Needs you row: empty for a review or a run, for a viewer through the Hub, otherwise the one-time choices once they are read. `dismiss: false` leaves the Dismiss to the row's ⋯ menu (a phone's). */
 export function answerCell(s, { dismiss = true } = {}) {
+    if (s.waiting_for_input && waitIgnored(s) && !s.sleeping && !s.archived) {
+        const cell = document.createElement('span'); cell.className = 'inbox-answers';
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-small inbox-open-agent'; button.textContent = 'Open agent';
+        button.setAttribute('aria-label', `Open ${resolveSessionIdentity(s)} to answer in its terminal`);
+        button.addEventListener('click', e => { e.stopPropagation(); openAgent(s); });
+        button.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
+        cell.append(button); return cell;
+    }
     if (!answerable(s)) { // a sign-in, or a viewer through the Hub: no answers, but the row can still be hidden (#11946)
         if (!dismiss || !canDismissWait(s, s.waiting_kind)) return '';
         const only = document.createElement('span'); only.className = 'inbox-answers';
