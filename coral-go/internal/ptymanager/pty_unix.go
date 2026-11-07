@@ -89,8 +89,19 @@ func (p *unixPTY) Resize(cols, rows uint16) error {
 // Terminate is what closing a terminal does, then the polite stop: SIGHUP to the process group, then SIGTERM. An interactive shell ignores SIGTERM
 // but exits on SIGHUP, so a terminal agent's kill waited the whole grace (5 s) for nothing (#4984); an agent that handles SIGTERM still gets it at
 // once. The caller force-kills after its grace.
+// ended says whether the terminal's own process has been waited for. Once it has, its pid is nobody's: the kernel may give it to an unrelated process hours later (a Wake after Kill All), and a signal to
+// it or to its group would end that one. Nothing is sent to an ended terminal's pid; what its tree left behind is found and ended by killTree, which checks each member's start time first.
+func (p *unixPTY) ended() bool {
+	select {
+	case <-p.done:
+		return true
+	default:
+		return false
+	}
+}
+
 func (p *unixPTY) Terminate() error {
-	if p.cmd.Process == nil {
+	if p.cmd.Process == nil || p.ended() {
 		return nil
 	}
 	tree := treeMembers(p.root, p.tag) // before the shell goes: what descends from it, and what is tagged, is found while it is still the parent (#6125)
@@ -111,7 +122,7 @@ func (p *unixPTY) Terminate() error {
 }
 
 func (p *unixPTY) ForceKill() error {
-	if p.cmd.Process == nil {
+	if p.cmd.Process == nil || p.ended() {
 		return nil
 	}
 	killTree(p.seen.all(), p.root, p.tag) // the whole tree, not only the shell's group (#6125)

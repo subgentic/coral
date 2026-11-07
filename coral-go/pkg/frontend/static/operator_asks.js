@@ -157,13 +157,21 @@ export async function wakeMember(a, name) {
     const sub = (Array.isArray(subs) ? subs : []).find(x => x && x.subscriber_id === name);
     if (!sub || !sub.session_name) throw new Error(`${who} is not a member of this team that Coral can wake.`);
     const live = (state.liveSessions || []).find(s => sessionServer(s) === server && `${s.agent_type}-${s.session_id}` === sub.session_name);
-    if (!live) throw new Error(`${who} is not running on this computer.`);
+    if (!live) return resumeEndedMember(server, a, name, who, sub.session_name); // an agent Kill All (or its own exit) ended has no live row: its chat is resumed, as History's Resume does (#14172)
     if (!live.sleeping) throw new Error(`${who} is not asleep.`);
     const resp = await serverFetch(server, `/api/sessions/live/${encodeURIComponent(live.session_id)}/wake`, { method: 'POST' });
     if (!resp.ok) { // the server says why in a sentence (a CLI not installed, a path it cannot run: cli_not_found, cli_path_unusable, cli_untrusted_mount) and what to set: show it, not the status code (#12049)
         const why = await resp.json().then(b => (b && typeof b.error === 'string' ? b.error.trim() : ''), () => '');
         throw new Error(why ? `Could not wake ${who}: ${markHidden(why, { strict: true })}` : `Could not wake ${who} (HTTP ${resp.status}).`);
     }
+}
+
+/** An ended agent's Restart from a question (#14172): no live row any more, so its earlier chat is resumed (resume_ended.js), under its own name and team. */
+async function resumeEndedMember(server, a, name, who, sessionName) {
+    const m = /^([a-z][a-z0-9]*)-([A-Za-z0-9][A-Za-z0-9._-]*)$/.exec(String(sessionName || ''));
+    if (!m) throw new Error(`${who} is not running on this computer.`);
+    const { resumeEndedAgent } = await importOnce('./resume_ended.js');
+    return resumeEndedAgent(server, { agentType: m[1], sid: m[2], name }, a.board);
 }
 
 /** The dialog names the asker and team; the complete question is shown once in its body (#12722). */
