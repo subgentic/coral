@@ -84,6 +84,7 @@ GET /api/board/{project}/waits | board-claims
 GET /api/board/{project}/waits/poll | board-claims
 GET /api/board/{project}/working-mode | board-claims
 GET /api/board/{project}/working-mode/presets | board-claims
+GET /api/filesystem/trust-probe | token-session | operator-only
 GET /api/goals | token-session | operator-only
 GET /api/needs-you | token-session | operator-only
 GET /api/operator-asks | token-session | operator-only

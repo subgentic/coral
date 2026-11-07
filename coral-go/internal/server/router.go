@@ -640,6 +640,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/system/network-info", sysHandler.NetworkInfo)
 	r.Get("/api/filesystem/list", sysHandler.ListFilesystem)
 	r.Get("/api/filesystem/is-git", sysHandler.IsGitDir)
+	r.Get("/api/filesystem/trust-probe", sysHandler.TrustFolderProbe)
 	r.Post("/api/indexer/refresh", sysHandler.RefreshIndexer)
 	r.With(routes.RefuseSignInLink).Post("/api/teams/import", sysHandler.ImportTeam)
 	r.With(routes.RefuseSignInLink).Post("/api/teams/generate", sysHandler.GenerateTeam)

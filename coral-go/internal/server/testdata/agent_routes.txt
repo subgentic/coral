@@ -135,6 +135,7 @@ b GET /api/cloud/owner-label
 c GET /api/cloud/status
 b GET /api/custom-models
 c GET /api/filesystem/is-git
+b GET /api/filesystem/trust-probe
 c GET /api/filesystem/list
 c GET /api/folder-tags
 c GET /api/folder-tags/{folderName}
