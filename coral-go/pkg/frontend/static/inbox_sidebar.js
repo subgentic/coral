@@ -24,7 +24,7 @@ import { go, note, backIs, currentRoute } from './nav.js';
 import { unreadReviewCount, reviewAttentionCount } from './ask_filter.js'; // the files waiting: the full read's once it has run, else what the computers counted (#13172)
 
 import { build, keyRoute, parse as parseRoute, inboxFolderPath, BOARDS_FOLDER, BOARDS_SUB } from './routes.js';
-import { sessionServer, normServer, boardTeamKey, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox, nativeNeeds, decisionNeedsPerson, LOCAL_SERVER, serverUrl } from './server_base.js';
+import { sessionServer, normServer, boardTeamKey, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox, nativeNeeds, decisionNeedsPerson, LOCAL_SERVER, serverUrl, isCloud } from './server_base.js';
 import { teamLabel, serverLabel } from './server_status.js';
 import { showView, showToast, OPERATOR_ID } from './utils.js';
 import { registerActions, textOf } from './actions.js';
@@ -218,9 +218,9 @@ const reviewRows = () => { const f = reviewFilters(); queryReviews(f || needsFil
 const runRows = () => failedUnread().map(r => ({ autorun: r, session_id: `automation-run:${r.key}`, display_name: r.name, board_project: '', server: '', waiting_kind: 'run', waiting_summary: failureWords(r) ? `Run failed: ${failureWords(r)}` : 'Run failed', waiting_since: r.finishedAt || r.at }));
 /** What agents asked to add to a team, waiting for the Operator (#11389): a row of Needs you like a review, opened in its dialog. */
 const proposalRows = () => proposalItems().map(p => ({ proposal: p, session_id: p.rowKey, display_name: markedText(p.proposer), board_project: splitKey(p.board_id).name, board_label: markedText(p.board_label || ''), server: p.server || LOCAL_SERVER, waiting_kind: 'proposal', waiting_summary: proposalSummary(p), waiting_since: p.created_at }));
-/** An active goal whose tasks are all done (#11825): ONE row of Needs you, "Goal #N looks done: <title>" with its Done-when line; Close goal, Not yet and Dismiss. This computer's goals only. */
-const goalTeamHere = g => { const k = splitKey(g.board_id); return k.server === LOCAL_SERVER ? k.name : ''; };
-const goalDoneRows = () => doneGoals(goals, goalTeamHere).map(g => ({ goalDone: g, session_id: `goal_done:${goalTeamHere(g)}:${g.id}`, display_name: `Goal #${g.id}`, board_project: goalTeamHere(g), server: LOCAL_SERVER, waiting_kind: 'goal_done', waiting_summary: (g.done_when || g.doneWhen) ? `Done when: ${markedText(g.done_when || g.doneWhen)}` : 'Every task is done.', waiting_since: quietEndsAt(g) ? new Date(quietEndsAt(g)).toISOString() : (g.looks_done_at || g.updated_at) })); // since the row appeared: its last task's completion (#12081) plus the quiet period (#12161), not since the goal was made or edited
+/** An active goal whose tasks are all done (#11825): ONE row of Needs you, "Goal #N looks done: <title>" with its Done-when line; Close goal, Not yet and Dismiss. Each computer keeps its own goal identity and actions. */
+const goalTeamHere = g => { const k = splitKey(g.board_id); return k.name ? identityKey(k.server, k.name) : ''; };
+const goalDoneRows = () => doneGoals(goals, goalTeamHere).map(g => ({ goalDone: g, session_id: `goal_done:${goalTeamHere(g)}:${g.id}`, display_name: `Goal #${g.id}`, board_project: splitKey(goalTeamHere(g)).name, server: splitKey(goalTeamHere(g)).server, waiting_kind: 'goal_done', waiting_summary: (g.done_when || g.doneWhen) ? `Done when: ${markedText(g.done_when || g.doneWhen)}` : 'Every task is done.', waiting_since: quietEndsAt(g) ? new Date(quietEndsAt(g)).toISOString() : (g.looks_done_at || g.updated_at) })); // since the row appeared: its last task's completion (#12081) plus the quiet period (#12161), not since the goal was made or edited
 const goalDoneLine = g => `Goal #${g.id} looks done: ${markedText(g.title)}`;
 /** A question an agent asked the Operator (post --ask, wait --operator, #11417): a row of Needs you, opened whole in a dialog with a Reply box. */
 const askRows = () => operatorAsks().map(a => ({ operatorAsk: a, session_id: askKey(a), display_name: a.asker, board_project: a.board, board_label: a.board_label || '', server: a.server || '', waiting_kind: 'ask', waiting_summary: askLine(a), waiting_since: a.at }));
@@ -705,7 +705,7 @@ async function readGoals() {
     try {
         goals = await listInboxGoals(); ok = !goalsReadFailed();
     } catch { goals = []; ok = false; }
-    try { // what was hidden from another browser or the phone (Not yet, Dismiss) is on the machine: read it with the goals
+    if (!isCloud()) try { // Local hidden state lives in this computer's settings; Hub goals carry per-computer done_state.
         const r = await fetch('/api/settings');
         if (r.ok) { const saved = (await r.json()).settings || {}; state.settings = { ...(state.settings || {}), [GOAL_DONE_SETTING]: saved[GOAL_DONE_SETTING] || '' }; }
     } catch { /* the list this page has stays */ }

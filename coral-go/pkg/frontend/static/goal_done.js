@@ -1,6 +1,6 @@
 /* "Goal #N looks done" (#11825): an active goal whose tasks are all done is ONE item of Needs you (it was a box on the goal screen). Close goal opens the goal's Close dialog set to Done; Not yet hides it until a
  * task is added; Dismiss hides it for good, with Undo. What is hidden is kept on the machine in the goal_done_hidden setting, a JSON list of "<team>|<goal>|<tasks>" (Not yet, at the all-done total it was pressed at)
- * and "<team>|<goal>|*" (Dismiss), so the Hub's phone push and every browser agree. This computer's goals only (the Operator's alone: a goal on another computer is closed there). */
+ * and "<team>|<goal>|*" (Dismiss), so the Hub's phone push and every browser agree. Remote goals use the source computer's owner-only done_state projection. */
 import { state } from './state.js';
 import { serverFetch, splitKey, pathId, LOCAL_SERVER } from './server_base.js';
 
@@ -38,10 +38,13 @@ export function quietEndsAt(g, settings = state.settings) {
     return Number.isFinite(t) ? t + quietMs(settings) : 0;
 }
 
+const remoteGoal = g => splitKey(g?.board_id || '').server !== LOCAL_SERVER;
+const hiddenGoal = (team, g, hidden) => remoteGoal(g) ? ['dismissed', 'not_yet'].includes(g.done_state?.hidden) : hidden.has(keyOf(team, g)) || hidden.has(starOf(team, g));
+
 /** The goals that look done and are not hidden, once their quiet period is over. teamOf(g) is the team's own id on this computer, or '' for a goal that is not on it. */
 export function doneGoals(goals, teamOf, settings = state.settings, now = Date.now()) {
     const hidden = new Set(hiddenList(settings));
-    return (goals || []).filter(g => { const team = teamOf(g); return team && readyToClose(g) && now >= quietEndsAt(g, settings) && !hidden.has(keyOf(team, g)) && !hidden.has(starOf(team, g)); });
+    return (goals || []).filter(g => { const team = teamOf(g); return team && readyToClose(g) && now >= quietEndsAt(g, settings) && !hiddenGoal(team, g, hidden); });
 }
 
 /** Milliseconds until the next goal that is all done and not hidden leaves its quiet period (so the page draws it then), or null when none is waiting. */
@@ -50,7 +53,7 @@ export function nextQuietEnd(goals, teamOf, settings = state.settings, now = Dat
     let next = null;
     for (const g of goals || []) {
         const team = teamOf(g), end = quietEndsAt(g, settings);
-        if (!team || !readyToClose(g) || end <= now || hidden.has(keyOf(team, g)) || hidden.has(starOf(team, g))) continue;
+        if (!team || !readyToClose(g) || end <= now || hiddenGoal(team, g, hidden)) continue;
         next = next === null ? end - now : Math.min(next, end - now);
     }
     return next;
@@ -64,6 +67,14 @@ async function post(team, g, mode) {
     const k = splitKey((g && g.board_id) || ''), server = (g && g.board_id && k.server) || LOCAL_SERVER, project = (g && g.board_id && k.name) || team;
     const r = await serverFetch(server, `/api/board/${encodeURIComponent(project)}/goals/${pathId(g.id)}/done-state`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ state: STATE_WORD[mode] }) });
     if (!r.ok) throw new Error(`could not save it (HTTP ${r.status})`);
+    if (remoteGoal(g)) {
+        const next = { ...g.done_state };
+        if (mode === 'ignore' || mode === 'not-yet') next.hidden = mode === 'ignore' ? 'dismissed' : 'not_yet';
+        else if (mode === 'show') delete next.hidden;
+        else if (mode === 'read') next.read = true;
+        else if (mode === 'unread') delete next.read;
+        g.done_state = next;
+    }
 }
 const keep = (setting, list) => { state.settings = { ...(state.settings || {}), [setting]: JSON.stringify(list.slice(-MAX)) }; };
 const withoutGoal = (list, team, g) => list.filter(e => !e.startsWith(`${team}|${g.id}|`));
@@ -77,7 +88,7 @@ export function readList(settings = state.settings) {
     try { const v = JSON.parse(String((settings || {})[READ_SETTING] || '[]')); return Array.isArray(v) ? v.filter(x => typeof x === 'string').slice(-MAX) : []; } catch { return []; }
 }
 /** Whether the Operator has opened this goal's item at its present total. */
-export const isGoalDoneRead = (team, g, settings = state.settings) => readList(settings).includes(readKeyOf(team, g));
+export const isGoalDoneRead = (team, g, settings = state.settings) => remoteGoal(g) ? g.done_state?.read === true : readList(settings).includes(readKeyOf(team, g));
 /** Marks the goal's item read (nothing is written when it already is). */
 export async function markGoalDoneRead(team, g) {
     if (isGoalDoneRead(team, g)) return;
@@ -86,7 +97,7 @@ export async function markGoalDoneRead(team, g) {
 }
 /** Counts the goal's item again. */
 export async function markGoalDoneUnread(team, g) {
-    if (!readList().some(e => e.startsWith(`${team}|${g.id}|`))) return;
+    if (remoteGoal(g) ? !isGoalDoneRead(team, g) : !readList().some(e => e.startsWith(`${team}|${g.id}|`))) return;
     await post(team, g, 'unread');
     keep(READ_SETTING, withoutGoal(readList(), team, g));
 }

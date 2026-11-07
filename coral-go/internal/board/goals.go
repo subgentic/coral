@@ -80,6 +80,13 @@ type GoalRollup struct {
 	Total   int `json:"total"`
 }
 
+// GoalDoneState is the Operator's state of a "looks done" row: Hidden is "dismissed" (hidden for good) or "not_yet" (hidden until another task is done), Read says they opened it at its current total and last change.
+// Only what applies NOW is said: a Not yet at an older total, or a read at an older last change, is no longer a state.
+type GoalDoneState struct {
+	Hidden string `json:"hidden,omitempty"`
+	Read   bool   `json:"read,omitempty"`
+}
+
 // Goal is one row of board_goals.
 type Goal struct {
 	ID        int64  `db:"id" json:"id"`
@@ -108,6 +115,9 @@ type Goal struct {
 	FollowUpsOpen int `db:"-" json:"follow_ups_open,omitempty"`
 	// NewComments: how many replies agents left in the Operator's comment threads on this goal since they last opened them (#12073); set on the way out for the Operator's own read, never stored.
 	NewComments int `db:"-" json:"new_comments,omitempty"`
+	// DoneState is what the Operator did to this goal's "looks done" row in Needs you (#14047): hidden by Not yet or Dismiss, or opened (read). Set on the way out for the Operator's own read only, never stored here (the
+	// entries live in the settings lists goal_done_hidden and goal_done_read) and absent when nothing applies now.
+	DoneState *GoalDoneState `db:"-" json:"done_state,omitempty"`
 	// Images are the pictures the Operator attached to the goal's description (#11650), in the order sent; filled where goals are read.
 	Images []GoalImage `db:"-" json:"images,omitempty"`
 }
