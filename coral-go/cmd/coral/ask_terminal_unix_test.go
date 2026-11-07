@@ -59,7 +59,7 @@ func TestFirstStartAsABackgroundJobDoesNotAsk(t *testing.T) {
 				t.Fatal(err)
 			}
 			cmd := exec.Command("/bin/sh", "-c", script)
-			cmd.Env = append(os.Environ(), "CORAL_DATA_DIR="+dataDir, "HOME="+dataDir, "CORAL_NO_DEMO_SEED=1", "CORAL_CLOUD_URL=")
+			cmd.Env = append(os.Environ(), "CORAL_DATA_DIR="+dataDir, "HOME="+dataDir, "CORAL_NO_DEMO_SEED=1", "CORAL_CLOUD_URL=", "CORAL_ASK_REMOTE_ACCESS=1")
 			cmd.Stdin, cmd.Stdout, cmd.Stderr = tty, tty, tty
 			cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true}
 			if err := cmd.Start(); err != nil {

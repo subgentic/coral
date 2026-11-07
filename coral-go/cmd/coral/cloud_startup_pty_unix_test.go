@@ -81,12 +81,11 @@ func TestCloudStartupPromptOnATerminal(t *testing.T) {
 				}
 				t.Fatalf("the terminal never showed %q; it showed:\n%s", text, seen())
 			}
-			// a first start asks about remote access before the Hub: declined with Enter, as most people do
-			waitFor("Enable remote access? [y/N]:")
-			if _, err := ptmx.Write([]byte("\r")); err != nil {
-				t.Fatal(err)
-			}
+			// #14107: this start is headless (--no-browser, and a loopback --host), so the remote-access question is not asked at all (it used to wait here for an answer nobody was there to give); the Hub question comes first
 			waitFor("Type yes to connect, or press Enter to skip:")
+			if strings.Contains(seen(), "Enable remote access?") {
+				t.Fatalf("a --no-browser start on a terminal asked about remote access:\n%s", seen())
+			}
 			if _, err := ptmx.Write([]byte(tc.typed)); err != nil {
 				t.Fatal(err)
 			}

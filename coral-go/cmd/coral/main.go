@@ -346,10 +346,10 @@ func announceDashboard(cfg *config.Config, rs *startup.RunningServer, sf *server
 func startupOptions(sf *serverFlags, instance *startup.Instance) startup.Options {
 	// Without someone at a terminal (a service, a CI runner, the tray, a shell that started
 	// Coral in the background) a prompt would block startup before the server listens. Skip
-	// the remote access question then: remote access stays off, nothing is saved, the log
+	// the remote access question then (and when --no-browser or a loopback-only --host already answered it, #14107): remote access stays off, nothing is saved, the log
 	// says how to turn it on, and the next interactive start still asks (#3271, #4052).
 	var remotePrompt func() bool
-	if canAskAtTerminal(os.Stdin, os.Stdout) {
+	if canAskAtTerminal(os.Stdin, os.Stdout) && (os.Getenv("CORAL_ASK_REMOTE_ACCESS") == "1" || !remoteQuestionMoot(*sf.noBrowser, *sf.host)) { // CORAL_ASK_REMOTE_ACCESS=1: ask on a terminal whatever the flags say (a person who wants the question with --no-browser; the suites that run it for real)
 		tlsOn := strings.TrimSpace(*sf.tlsCert) != "" && strings.TrimSpace(*sf.tlsKey) != ""
 		remotePrompt = func() bool { return promptRemoteAccess(os.Stdin, os.Stdout, tlsOn) }
 	}
