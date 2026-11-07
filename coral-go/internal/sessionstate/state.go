@@ -103,7 +103,15 @@ type Input struct {
 	// StartupSummary the prompt's question when it could be read.
 	StartupPrompt  string
 	StartupSummary string
+	// AssistantEntryAt is when the newest assistant entry of the agent's own transcript was written (zero when none was read): the computer's clock, like the event log's. A question that was raised
+	// more than MovedOnMargin before it is over (#14345): Claude does not write another assistant entry while its own question waits, because the next model call needs the answer. Only a transcript
+	// the agent wrote counts, so only the agent's own evidence clears the wait (#14203); the Operator's Dismiss still marks it ignored, never resolved.
+	AssistantEntryAt time.Time
 }
+
+// MovedOnMargin is how long after a question an assistant entry must have been written to say the agent went on: the entry that carries the question's own tool call is written by another writer than
+// the hook that raised the question, within a moment of it, and never answers it.
+const MovedOnMargin = 3 * time.Second
 
 // KindStartup is the WaitingKind of an agent held by a prompt its CLI draws at launch (#4543).
 const KindStartup = "startup"
@@ -188,9 +196,24 @@ func Derive(in Input) State {
 			d.state.Since = event.At
 		}
 	}
+	d.movedOn(in)
 	d.summarise(in)
 	d.override(in)
 	return d.state
+}
+
+// movedOn closes the agent's own open question when its transcript shows an assistant entry written after it (#14345). Only a question: a permission prompt, a plan and an elicitation wait for the person
+// whatever the agent has written, and a held notice of Coral's is not the agent's request (ownOpen).
+func (d *deriver) movedOn(in Input) {
+	if in.AssistantEntryAt.IsZero() || !d.state.NeedsInput || d.state.WaitingKind != "question" || !d.ownOpen || d.state.WaitingSince.IsZero() {
+		return
+	}
+	if !in.AssistantEntryAt.After(d.state.WaitingSince.Add(MovedOnMargin)) {
+		return
+	}
+	d.clearRequest()
+	d.latestType = "tool_use"
+	d.state.AwaitingUser = false
 }
 
 // deriver folds a session's events into its State.
