@@ -12,7 +12,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
     const failures = [];
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const mode of ['one', 'older', 'pictures', 'in-progress', 'not-delivered', 'already-sent', 'hub', 'held-close', 'held-switch', 'text-not-kept', 'unsupported-images', 'other-refusal', 'cloud']) {
+        for (const mode of ['one', 'older', 'older-comment-refused', 'older-comment-lost', 'older-send-refused', 'older-send-lost', 'pictures', 'in-progress', 'not-delivered', 'already-sent', 'hub', 'held-close', 'held-switch', 'text-not-kept', 'unsupported-images', 'other-refusal', 'cloud']) {
             try {
                 if (mode === 'cloud') await setupHubWorld({ client, Page, Emulation, width: 1280, height: 900, mobile: false, inbox: true, hubFeed: true });
                 await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
@@ -36,9 +36,13 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                                 if (mode === 'other-refusal') return json({code:'words_not_supported',message:'Write refused.'},400);
                                 if (mode === 'unsupported-images' && body.text) return json({code:'images_not_in_this_slice',message:'Use a comment for pictures.'},400);
                                 if (mode === 'in-progress') return json({code:'already_in_progress',message:'retry in a moment'},409);
-                                if (mode === 'older' || mode === 'pictures') return json({state:'changes requested',delivered:false});
+                                if (mode.startsWith('older') || mode === 'pictures') return json({state:'changes requested',delivered:false});
                                 return json({state:'changes requested',text_kept:true,comment_id:7,delivered:mode!=='not-delivered' && mode!=='already-sent',...(mode==='not-delivered'?{reason:'agent_unavailable'}:mode==='already-sent'?{reason:'already_sent'}:{to:'Writer A'})});
                             }
+                            if (path.endsWith('/comments') && mode === 'older-comment-refused') return json({error:'Comment refused'},403);
+                            if (path.endsWith('/comments') && mode === 'older-comment-lost') return Promise.reject(new TypeError('Connection lost'));
+                            if (path.endsWith('/send') && mode === 'older-send-lost' && !window.__retryDelivery) return Promise.reject(new TypeError('Delivery acknowledgement lost'));
+                            if (path.endsWith('/send') && mode === 'older-send-refused' && !window.__retryDelivery) return json({ok:false,error:'Delivery refused',results:[{agent:'Writer A',state:'refused'}]},403);
                             if (path.endsWith('/send')) return json({ok:true,results:[{state:'sent',agent:'Writer A'}]});
                             return json({id:7,body:body.body,images:body.images || []},201);
                         }
@@ -67,6 +71,26 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                     assert.equal(await ev(`window.__writes.length`),1,'switching never sends another request');
                     assert.ok((await ev(`window.__writes[0].path`)).includes(HEX),'the held write stays on the original file');
                     assert.equal(await ev(`[...document.querySelectorAll('.toast')].some(t=>/was asked/.test(t.textContent))`),false,'late success cannot announce another file as sent');
+                } else if (mode.startsWith('older-')) {
+                    await waitFor(`!!document.querySelector('#one-call-review .artifact-review-error').textContent`, 'the older-computer fallback outcome');
+                    const words = await ev(`document.querySelector('#one-call-review .artifact-review-error').textContent`);
+                    assert.match(words,/decision was recorded/i);
+                    assert.match(words,mode==='older-send-refused'?/words are in the thread.*could not be told/:mode==='older-send-lost'?/words are in the thread.*delivery.*not confirmed/:mode==='older-comment-lost'?/words were not confirmed.*draft is kept/:/words were not sent.*draft is kept/);
+                    const writes=await ev('window.__writes');
+                    assert.equal(writes.filter(w=>w.path.endsWith('/review')).length,1,'the older decision is not duplicated');
+                    assert.equal(writes.length,mode.startsWith('older-send')?3:2,'only the negotiated decision and necessary fallback calls');
+                    assert.equal(await ev('window.__reloads'),0,'fallback failure keeps the form open');
+                    assert.equal(await ev(`document.querySelector('#one-call-review textarea').value`),'Keep these exact words.');
+                    if(mode.startsWith('older-send')){
+                        await ev(`window.__retryDelivery=true;document.querySelector('#one-call-review form').requestSubmit();true`);
+                        await waitFor(`window.__reloads===1`,mode+' explicit retry succeeds');
+                        const retried=await ev('window.__writes');
+                        assert.equal(retried.filter(w=>w.path.endsWith('/review')).length,1,mode+': retry never repeats the recorded decision');
+                        assert.equal(retried.filter(w=>w.path.endsWith('/comments')).length,1,mode+': retry reuses the confirmed comment');
+                        const sends=retried.filter(w=>w.path.endsWith('/send'));
+                        assert.equal(sends.length,2,mode+': retry sends only the existing comment');
+                        assert.equal(sends[0].path,sends[1].path,mode+': both sends address the same comment');
+                    }
                 } else if (mode === 'text-not-kept' || mode === 'other-refusal') {
                     await waitFor(`!!document.querySelector('#one-call-review .artifact-review-error').textContent`, 'the refusal stays in the form');
                     const error = await ev(`document.querySelector('#one-call-review .artifact-review-error').textContent`);
@@ -104,7 +128,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                     if (mode === 'already-sent') assert.match(await ev(`[...document.querySelectorAll('.toast')].map(t=>t.textContent).join(' ')`),/Writer A was already told/);
                     if (mode === 'not-delivered') {
                         const toast=await ev(`[...document.querySelectorAll('.toast')].map(t=>t.textContent).join(' ')`);
-                        assert.match(toast,/Writer A.*not.*told/i); assert.match(toast,/agent unavailable/i); assert.doesNotMatch(toast,/was asked/);
+                        assert.match(toast,/Writer A.*not.*told/i); assert.match(toast,/agent unavailable/i); assert.match(toast,/words are in the thread/i); assert.doesNotMatch(toast,/was asked/);
                     }
                 }
                 console.log('PASS '+mode);
