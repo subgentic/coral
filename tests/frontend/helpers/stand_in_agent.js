@@ -51,6 +51,11 @@ async function launchStandIn(api, { workingDir = '', displayName = 'Stand-in Age
     // touching the files, and only an invocation that has a token writes one: before #3502 the
     // version probe could land last and overwrite the token with an empty file, which is the
     // "no token" flake, not a slow shell. "ran" marks the launched invocation (it has --session-id).
+    // Coral also asks the CLI for its models (agentmodels: -p with stream-json, an initialize request on stdin). That call was not answered,
+    // so it fell through to the sleep: the fetch timed out after 30 s and ended cmd.exe but not its ping, and every census run left 20 to 25
+    // ping -n 600 processes (QA's #509), each holding its coral-models-* folder. The stub reads the request line and answers it as the CLI
+    // does, with two models, so the call ends at once and starts nothing.
+    const MODELS_REPLY = '{"type":"control_response","response":{"subtype":"success","request_id":"coral-models","response":{"models":[{"value":"default","displayName":"Default","description":"The stand-in model"},{"value":"opus","displayName":"Opus","description":"The stand-in larger model"}]}}}';
     if (WIN) {
         // The same stand-in as a batch file: Coral's launch line runs it from PowerShell (`& 'claude.cmd' ...`), which a .cmd answers. ping is the sleep.
         const q = f => '"' + f + '"';
@@ -58,6 +63,7 @@ async function launchStandIn(api, { workingDir = '', displayName = 'Stand-in Age
             '@echo off',
             'if "%~1"=="--version" (echo 0.0.0 ^(stand-in^) & exit /b 0)',
             'if "%~1"=="auth" (echo {"loggedIn": true}& exit /b 0)', // the version probe and the sign-in check (#5838) are answered like the real CLI
+            `if "%~1"=="-p" (set /p REQ=& echo ${MODELS_REPLY}& exit /b 0)`, // the model list (no ping)
             `type nul > ${q(ranFile)}`,
             `if "%CORAL_SESSION_TOKEN%"=="" (echo stand-in: no CORAL_SESSION_TOKEN 1>&2 & type nul > ${q(tokenFile + '.none')} & ping -n 600 127.0.0.1 >nul & exit /b 0)`,
             `<nul set /p "=%CORAL_SESSION_TOKEN%" > ${q(tokenFile + '.tmp')}`,
@@ -69,6 +75,7 @@ async function launchStandIn(api, { workingDir = '', displayName = 'Stand-in Age
         fs.writeFileSync(cli, [
             '#!/bin/sh',
             'case "$1" in --version) echo "0.0.0 (stand-in)"; exit 0;; auth) echo \'{"loggedIn": true}\'; exit 0;; esac', // the version probe and the sign-in check (#5838) are answered like the CLI's, never a launch
+            `if [ "$1" = "-p" ]; then read -r _; echo '${MODELS_REPLY}'; exit 0; fi`, // the model list (no sleep)
             `: > '${ranFile}'`,
             `[ -n "$CORAL_SESSION_TOKEN" ] || { echo "stand-in: no CORAL_SESSION_TOKEN" >&2; : > '${tokenFile}.none'; exec sleep 600; }`,
             `printf '%s' "$CORAL_SESSION_TOKEN" > '${tokenFile}.tmp' && mv '${tokenFile}.tmp' '${tokenFile}'`,
