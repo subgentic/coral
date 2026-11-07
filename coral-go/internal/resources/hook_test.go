@@ -28,11 +28,16 @@ type hookRig struct {
 	plist  []proctree.Proc // the machine's processes (a fake ps)
 }
 
-func newHookRig(t *testing.T) *hookRig {
+func newHookRig(t *testing.T, mods ...func(*Options)) *hookRig {
 	t.Helper()
 	g := &hookRig{t: t, now: time.Date(2026, 11, 5, 9, 0, 0, 0, time.UTC), agents: map[string]string{"s-a": "Agent A", "s-b": "Agent B", "s-c": "Agent C"}, procs: map[string][]string{}}
-	m, err := Open(Options{Now: g.clock, AgeStep: -1})
+	opts := Options{Now: g.clock, AgeStep: -1}
+	for _, mod := range mods { // a test may add what it needs (a history file)
+		mod(&opts)
+	}
+	m, err := Open(opts)
 	require.NoError(t, err)
+	t.Cleanup(m.Close)
 	g.m = m
 	require.NoError(t, m.Queue().Define(resourcequeue.Resource{Key: "mac-heavy", Slots: 1, MaxLease: 30 * time.Minute, Match: []string{"go test ./...", "node run_cdp_suites.mjs"}}))
 	g.h = NewHook(m, HookOptions{

@@ -3,6 +3,8 @@ package resources
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -32,6 +34,74 @@ type HookOptions struct {
 	Event func(HookEvent)
 	// Procs lists the machine's processes (ps), for a hand claim's work (#13718); ok false: not known, and a claim then follows its tool call alone. nil: the claim follows its call alone.
 	Procs func() ([]proctree.Proc, bool)
+	// IdleGrace is how long a held hand claim may have no working process under it before the slot goes back (#14079; default 3 minutes). Only a claim whose shell is known is judged.
+	IdleGrace time.Duration
+	// Notify is told when an idle holder loses its slot (the board gets a notice); nil: nothing is told.
+	Notify func(agent, text string)
+}
+
+// DefaultIdleGrace is how long a holder with nothing running keeps the slot (#14079, the Operator: agents hold the queue beyond the time they need).
+const DefaultIdleGrace = 3 * time.Minute
+
+// cpuBusy is the CPU share (percent of a core) from which a process counts as working.
+const cpuBusy = 1.0
+
+var shellNames = map[string]bool{"bash": true, "sh": true, "zsh": true, "dash": true, "fish": true, "ksh": true}
+
+// waiterNames are what a command that only waits looks like: the claim itself, sleeps and log followers.
+var waiterNames = map[string]bool{"coral-board": true, "sleep": true, "tail": true, "cat": true, "less": true, "wait": true, "watch": true}
+
+// testRunnerMarks are command lines of runs that are work even while they wait on a browser or a disk and use no CPU for a while.
+var testRunnerMarks = []string{"go test", " test ", ".test ", "run_cdp_suites", "run_resource_hook", "npm run test", "npm test", "node --test", "playwright", "pytest", "cargo test", "make test", "go build", "go vet", "/compile ", "/link "}
+
+func exeName(cmd string) string {
+	f := strings.Fields(cmd)
+	if len(f) == 0 {
+		return ""
+	}
+	return filepath.Base(f[0])
+}
+
+// processWorks says whether one process is real work: not a shell (its children say), not a waiter, and either using CPU or a known test runner.
+func processWorks(p proctree.Proc) bool {
+	exe := exeName(p.Command)
+	if exe == "ssh" || (exe == "coral-board" && strings.Contains(p.Command, " heavy")) {
+		return true // a run on the other machine: its local end waits on the wire and uses no CPU (#13951)
+	}
+	if shellNames[exe] || waiterNames[exe] || exe == "" {
+		return false
+	}
+	if p.CPU >= cpuBusy {
+		return true
+	}
+	c := " " + p.Command + " "
+	for _, m := range testRunnerMarks {
+		if strings.Contains(c, m) {
+			return true
+		}
+	}
+	return false
+}
+
+// active says whether what the claim started really works (#14079): a process that was not there at the claim (or the shell itself, once it became the job) that uses CPU or is a known test runner. A waiting
+// shell, a sleep, a claim waiting for its turn or a log follower is not work.
+func (b handBind) active(procs []proctree.Proc) bool {
+	if b.shell <= 1 {
+		return false
+	}
+	me, alive := proctree.Find(procs, b.shell)
+	if !alive {
+		return false
+	}
+	if me.Command != b.shellAt && processWorks(me) {
+		return true
+	}
+	for _, d := range proctree.Descendants(procs, b.shell) {
+		if !b.before[d.PID] && processWorks(d) {
+			return true
+		}
+	}
+	return false
 }
 
 // HookEvent says what the hook did. Pattern is the manager's pattern, never the command.
@@ -61,12 +131,13 @@ type autoHold struct {
 // handBind is what a hand claim (coral-board resource claim, run by an agent) is tied to: the tool call it was made in and, for a job that outlives the call (Claude's run_in_background, Codex's background terminal), the work
 // the call started under the claiming shell.
 type handBind struct {
-	session string          // the session id
-	calls   map[string]bool // the tool calls in flight when the claim was made (it is one of them: a client cannot say which, so the claim waits for all of them)
-	shell   int             // the shell that ran the claim, in the agent's own process tree (0: not known or not believed: the claim follows its call alone)
-	shellAt string          // that shell's command line at the claim: a shell that exec'd the job has another one later
-	before  map[int]bool    // the processes below the shell at the claim: older jobs of a persistent shell are not this call's work
-	ended   bool            // the call (or its turn) has ended: the slot goes back as soon as the work is gone too
+	session   string          // the session id
+	calls     map[string]bool // the tool calls in flight when the claim was made (it is one of them: a client cannot say which, so the claim waits for all of them)
+	shell     int             // the shell that ran the claim, in the agent's own process tree (0: not known or not believed: the claim follows its call alone)
+	shellAt   string          // that shell's command line at the claim: a shell that exec'd the job has another one later
+	before    map[int]bool    // the processes below the shell at the claim: older jobs of a persistent shell are not this call's work
+	ended     bool            // the call (or its turn) has ended: the slot goes back as soon as the work is gone too
+	idleSince time.Time       // #14079: since when no process of the claim's work was using CPU or was a known test runner (zero: it is working, or not looked at yet)
 }
 
 // BindHand ties the hold or place agent has of resource to the tool call it was claimed in (#13718, the Operator: "coral tracks the tool call the agent does and when it's finished, release the slot"), and to the work the call
@@ -80,7 +151,7 @@ func (h *Hook) BindHand(session, agent, resource string, toolCalls []string, she
 			b.calls[c] = true
 		}
 	}
-	if h == nil || session == "" || len(b.calls) == 0 { // no known call: nothing to tie it to, the lease alone ends it
+	if h == nil || session == "" { // not an agent's claim (the Operator's command line): the lease alone ends it
 		return
 	}
 	if shell > 1 && agentPID > 1 && h.o.Procs != nil {
@@ -94,6 +165,11 @@ func (h *Hook) BindHand(session, agent, resource string, toolCalls []string, she
 			}
 		}
 	}
+	if len(b.calls) == 0 && b.shell <= 1 { // no known call and no shell to look at: nothing to tie it to, the lease alone ends it
+		return
+	}
+	// #14079: most agent claims arrive with no call known (the tray log's calls_known=0): with a shell that is believed they are bound to it all the same, so the work under the shell (or its absence) is judged and
+	// the turn's end gives the slot back.
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if ah := h.hold[holdKey{resource, agent}]; ah != nil && ah.calls != nil && len(ah.refused) > 0 {
@@ -189,7 +265,7 @@ func (h *Hook) giveBack(keys []holdKey, why string) {
 		if why == "gone" {
 			grace = 0
 		}
-		if err := h.m.Queue().Leave(k.resource, k.agent, grace); err == nil { // already released by hand: nothing to do
+		if err := h.m.Queue().LeaveWhy(k.resource, k.agent, grace, why); err == nil { // already released by hand: nothing to do
 			h.event(HookEvent{Kind: "released", Resource: k.resource, Agent: k.agent, Why: why})
 		}
 	}
@@ -201,7 +277,7 @@ func (h *Hook) sweepHands() {
 	procs, known := h.handsWork(func(b handBind) bool { return b.shell > 1 })
 	now := h.o.Now()
 	h.mu.Lock()
-	var gone []holdKey
+	var gone, idle []holdKey
 	for k, b := range h.hand {
 		if b.ended && !(known && b.workRuns(procs)) {
 			gone = append(gone, k)
@@ -214,17 +290,70 @@ func (h *Hook) sweepHands() {
 			continue
 		}
 		// A claim whose work is still going stays held (#13951, the Hub Lead's 2 h pre-run kept running after its lease lapsed and the queue showed the mini free): while the work the claim's call started under its shell
-		// is alive, the lease is renewed, up to the longest a heavy run is kept. A claim whose work is gone, or that never had a shell to look at, is left to its lease as before.
-		if known && b.shell > 1 && b.workRuns(procs) {
-			for _, e := range st.Holders {
-				if e.Agent == k.agent && !e.Granted.IsZero() && now.Sub(e.Granted) <= remoteCap {
+		// is alive, the lease is renewed, up to the longest a heavy run is kept. #14079: "alive" now means a process using CPU or a known test runner; a shell that only waits renews nothing, and a granted claim with no
+		// working process for the grace loses the slot, with a notice. A claim that never had a shell to look at is left to its lease as before.
+		if known && b.shell > 1 {
+			var held *resourcequeue.Entry
+			for i := range st.Holders {
+				if st.Holders[i].Agent == k.agent && !st.Holders[i].Granted.IsZero() {
+					held = &st.Holders[i]
+				}
+			}
+			if held == nil {
+				continue // still waiting in line: nothing to be idle with
+			}
+			if b.active(procs) {
+				if !b.idleSince.IsZero() {
+					b.idleSince = time.Time{}
+					h.hand[k] = b
+				}
+				if now.Sub(held.Granted) <= remoteCap {
 					_, _ = h.m.Queue().Renew(k.resource, k.agent)
 				}
+				continue
+			}
+			if b.idleSince.IsZero() {
+				b.idleSince = now
+				if held.Granted.After(now) {
+					b.idleSince = held.Granted
+				}
+				h.hand[k] = b
+			}
+			if now.Sub(b.idleSince) >= h.idleGrace() {
+				idle = append(idle, k)
+				delete(h.hand, k)
 			}
 		}
 	}
 	h.mu.Unlock()
 	h.giveBack(gone, "job ended")
+	h.giveBack(idle, "idle")
+	for _, k := range idle {
+		if h.o.Notify != nil {
+			h.o.Notify(k.agent, fmt.Sprintf("%s's hold of %s was taken back: nothing of it had been running for %s (a claim is kept only while a test runs; claim and run in one command).", k.agent, k.resource, graceWords(h.idleGrace())))
+		}
+	}
+}
+
+func (h *Hook) idleGrace() time.Duration {
+	if h.o.IdleGrace > 0 {
+		return h.o.IdleGrace
+	}
+	return DefaultIdleGrace
+}
+
+// IdleFor is how long the hand claim of agent on resource has had nothing running under it (0, false: it is working, not looked at, or not a bound claim). The list shows it as "idle for N min".
+func (h *Hook) IdleFor(resource, agent string) (time.Duration, bool) {
+	if h == nil {
+		return 0, false
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	b, ok := h.hand[holdKey{resource, agent}]
+	if !ok || b.idleSince.IsZero() {
+		return 0, false
+	}
+	return h.o.Now().Sub(b.idleSince), true
 }
 
 func hasEntry(st resourcequeue.Status, agent string) bool {
@@ -326,12 +455,12 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 		return ""
 	}
 	var res resourcequeue.Resource
-	pattern := ""
+	pattern, matchedWords := "", ""
 	for _, st := range h.m.Queue().All() {
-		if p, hit := MatchCommand(command, st.Resource.Match); hit {
+		if p, words, hit := matchWords(command, st.Resource.Match); hit {
 			// a pattern kept on a plain resource (the Mac's own) is for that machine only and wins over a pool's: that is how a Mac-only pattern is written (#13751)
 			if pattern == "" || (len(res.Members) > 0 && len(st.Resource.Members) == 0) {
-				res, pattern = st.Resource, p
+				res, pattern, matchedWords = st.Resource, p, words
 			}
 		}
 	}
@@ -376,6 +505,7 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 		return ""
 	}
 	if mine == nil {
+		slog.Info("[resource-hook] auto claim", "resource", res.Key, "pattern", pattern, "matched", matchedWords, "agent", name) // the program words that matched, redacted and cut at 80: never the command (#14170)
 		r, err := h.m.Claim(WithSession(ctx, name), res.Key, agent, "auto: "+pattern)
 		if err != nil {
 			return "" // queue trouble never stops a command
@@ -708,7 +838,7 @@ func (h *Hook) pastFirstLeaseLocked(k holdKey, ah *autoHold) bool {
 }
 
 func (h *Hook) releaseLocked(k holdKey, ah *autoHold, why string) {
-	_ = h.m.Queue().Release(k.resource, k.agent)
+	_ = h.m.Queue().ReleaseWhy(k.resource, k.agent, why)
 	delete(h.hold, k)
 	h.event(HookEvent{Kind: "released", Resource: k.resource, Pattern: ah.pattern, Agent: k.agent, Session: ah.session, Why: why})
 }
@@ -734,4 +864,11 @@ func claimsFirst(command string, res resourcequeue.Resource) bool {
 		}
 	}
 	return false
+}
+
+func graceWords(d time.Duration) string {
+	if d >= time.Minute {
+		return fmt.Sprintf("%d minutes", int(d/time.Minute))
+	}
+	return fmt.Sprintf("%d seconds", int(d/time.Second))
 }

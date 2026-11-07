@@ -43,3 +43,14 @@ func Snapshot(ctx context.Context) (procs []Proc, ok bool) {
 	}
 	return Parse(string(out)), true
 }
+
+// SnapshotCPU is Snapshot with each process's CPU share (ps pcpu); ok is false when that cannot be known.
+func SnapshotCPU(ctx context.Context) (procs []Proc, ok bool) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, psPath(), "-axo", "pid=,ppid=,pcpu=,command=").Output()
+	if err != nil {
+		return nil, false
+	}
+	return ParseCPU(string(out)), true
+}

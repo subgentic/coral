@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -405,12 +406,12 @@ func TestAClaimWithNoWorkOrNoShellIsLeftToItsLease(t *testing.T) {
 func TestARenewedClaimStopsAtTheHeavyRunCap(t *testing.T) {
 	g := newHookRig(t)
 	g.setProcs(proctree.Proc{PID: agentPID, PPID: 1, Command: "claude"}, proctree.Proc{PID: 500, PPID: agentPID, Command: "bash"},
-		proctree.Proc{PID: 502, PPID: 500, Command: "sleep forever"})
+		proctree.Proc{PID: 502, PPID: 500, Command: "server run", CPU: 40})
 	_, err := g.m.Claim(context.Background(), "mac-heavy", "Agent A", "bg")
 	require.NoError(t, err)
 	g.dropProc(502) // not there at the claim, so it is the work the call started
 	g.h.BindHand("s-a", "Agent A", "mac-heavy", []string{"call-1"}, 500, agentPID)
-	g.addProc(proctree.Proc{PID: 502, PPID: 500, Command: "sleep forever"})
+	g.addProc(proctree.Proc{PID: 502, PPID: 500, Command: "server run", CPU: 40})
 	for i := 0; i < 7; i++ {
 		g.add(20 * time.Minute) // 140 minutes: inside the cap, still held
 	}
@@ -483,4 +484,120 @@ func TestACombinedWaitingClaimIsLetThroughInsideAShellWrapper(t *testing.T) {
 	} {
 		assert.NotEmpty(t, g.h.Before(ctx, "s-b", "s-b", "call-held", held), "still held: "+held)
 	}
+}
+
+// #14079 (the Operator: "agents are holding the resource queue beyond the time they need it"): a hold is kept only while something real runs under it.
+func idleRig(t *testing.T, work proctree.Proc) (*hookRig, *[]string) {
+	g := newHookRig(t)
+	var told []string
+	g.h.o.Notify = func(agent, text string) { told = append(told, agent+": "+text) }
+	g.setProcs(proctree.Proc{PID: agentPID, PPID: 1, Command: "codex"}, proctree.Proc{PID: 500, PPID: agentPID, Command: "bash"},
+		proctree.Proc{PID: 501, PPID: 500, Command: "coral-board resource claim mac-heavy --wait"})
+	g.bgClaim("s-a", "Agent A", "call-1", 500)
+	g.dropProc(501)
+	g.addProc(work)
+	return g, &told
+}
+
+func TestAHolderWhoseShellOnlyWaitsLosesTheSlotAfterTheGraceAndTheBoardIsTold(t *testing.T) {
+	for _, cmd := range []string{"sleep 600", "tail -f /tmp/x.log", "coral-board resource claim mac-heavy --wait", "bash -lc sleep"} {
+		g, told := idleRig(t, proctree.Proc{PID: 502, PPID: 500, Command: cmd, CPU: 0})
+		g.add(15 * time.Second) // the first look: idle since now
+		idle, ok := g.h.IdleFor("mac-heavy", "Agent A")
+		assert.True(t, ok, cmd)
+		assert.Zero(t, idle, cmd)
+		g.add(2 * time.Minute)
+		assert.Equal(t, []string{"Agent A"}, g.holders(), cmd+": inside the grace")
+		g.add(time.Minute + time.Second) // 3 minutes idle
+		assert.Empty(t, g.holders(), cmd+": the slot is taken back")
+		require.NotEmpty(t, g.events, cmd)
+		assert.Equal(t, "idle", g.events[len(g.events)-1].Why, cmd+": the record says why")
+		require.Len(t, *told, 1, cmd)
+		assert.Contains(t, (*told)[0], "Agent A")
+		assert.Contains(t, (*told)[0], "3 minutes")
+	}
+}
+
+func TestAHolderWhoseProcessUsesCpuOrIsATestRunnerKeepsTheSlotPastTheLease(t *testing.T) {
+	for name, w := range map[string]proctree.Proc{
+		"busy":        {PID: 502, PPID: 500, Command: "some-tool --flag", CPU: 55},
+		"test runner": {PID: 502, PPID: 500, Command: "node run_cdp_suites.mjs --only x", CPU: 0}, // waiting on a browser
+		"go test":     {PID: 502, PPID: 500, Command: "/usr/local/go/bin/go test ./internal/server", CPU: 0},
+		"remote run":  {PID: 502, PPID: 500, Command: "ssh mini coral-test", CPU: 0},
+	} {
+		g, told := idleRig(t, w)
+		for i := 0; i < 4; i++ {
+			g.add(20 * time.Minute) // past the 30 minute lease, inside the cap
+		}
+		assert.Equal(t, []string{"Agent A"}, g.holders(), name)
+		_, idle := g.h.IdleFor("mac-heavy", "Agent A")
+		assert.False(t, idle, name+": working is not idle")
+		assert.Empty(t, *told, name)
+	}
+}
+
+func TestAHolderWhoStartsWorkingAgainIsNotIdleAnyMore(t *testing.T) {
+	g, told := idleRig(t, proctree.Proc{PID: 502, PPID: 500, Command: "sleep 600"})
+	g.add(15 * time.Second)
+	g.add(2 * time.Minute)
+	_, idle := g.h.IdleFor("mac-heavy", "Agent A")
+	assert.True(t, idle)
+	g.dropProc(502)
+	g.addProc(proctree.Proc{PID: 503, PPID: 500, Command: "go test ./...", CPU: 90})
+	g.add(2 * time.Minute)
+	_, idle = g.h.IdleFor("mac-heavy", "Agent A")
+	assert.False(t, idle, "the clock starts again")
+	g.add(10 * time.Minute)
+	assert.Equal(t, []string{"Agent A"}, g.holders())
+	assert.Empty(t, *told)
+}
+
+// #14079: a claim made with no tool call known (the common case: calls_known=0) is still judged by the work under its believed shell.
+func TestAHolderWithNoKnownCallIsJudgedByItsShellToo(t *testing.T) {
+	g := newHookRig(t)
+	g.setProcs(proctree.Proc{PID: agentPID, PPID: 1, Command: "codex"}, proctree.Proc{PID: 500, PPID: agentPID, Command: "bash"})
+	_, err := g.m.Claim(context.Background(), "mac-heavy", "Agent A", "bg")
+	require.NoError(t, err)
+	g.h.BindHand("s-a", "Agent A", "mac-heavy", nil, 500, agentPID)
+	g.addProc(proctree.Proc{PID: 502, PPID: 500, Command: "sleep 600"})
+	g.add(15 * time.Second)
+	g.add(3*time.Minute + time.Second)
+	assert.Empty(t, g.holders(), "idle with no known call: taken back")
+
+	g2 := newHookRig(t)
+	g2.setProcs(proctree.Proc{PID: agentPID, PPID: 1, Command: "codex"}, proctree.Proc{PID: 500, PPID: agentPID, Command: "bash"})
+	_, err = g2.m.Claim(context.Background(), "mac-heavy", "Agent A", "bg")
+	require.NoError(t, err)
+	g2.h.BindHand("s-a", "Agent A", "mac-heavy", nil, 500, agentPID)
+	g2.addProc(proctree.Proc{PID: 502, PPID: 500, Command: "go test ./...", CPU: 80})
+	for i := 0; i < 4; i++ {
+		g2.add(20 * time.Minute)
+	}
+	assert.Equal(t, []string{"Agent A"}, g2.holders(), "working with no known call: kept past the lease")
+	g2.h.TurnEnded("s-a")
+	g2.dropProc(502)
+	g2.h.Sweep()
+	assert.Empty(t, g2.holders(), "the turn ended and the work is gone: back")
+}
+
+// #14222: a slot the hook gives back (its call ended, its session ended) leaves ONE end event with the reason in the queue's record. Before, it went through Leave, which told nobody: 200 of 918 holds in one record
+// had no end at all.
+func TestAHandClaimGivenBackByTheHookLeavesAnEndEventWithItsReason(t *testing.T) {
+	hist := filepath.Join(t.TempDir(), "resource_history.db")
+	g := newHookRig(t, func(o *Options) { o.HistoryPath = hist })
+	g.handClaim("s-a", "Agent A", "call-1")
+	g.h.After("s-a", "call-1") // the call ended: the hook gives the slot back
+	g.handClaim("s-b", "Agent B", "call-9")
+	g.h.SessionEnded("s-b") // the session ended
+	g.m.History().Flush()
+	evs, err := g.m.History().Events(g.now.Add(-time.Hour), g.now.Add(time.Hour))
+	require.NoError(t, err)
+	var ends []string
+	for _, e := range evs {
+		if e.Kind == "released" || e.Kind == "gone" || e.Kind == "expired" || e.Kind == "kicked" {
+			ends = append(ends, e.Agent+":"+e.Kind+":"+e.Why)
+		}
+	}
+	assert.Contains(t, ends, "Agent A:released:call ended")
+	require.Len(t, ends, 2, "one end event for each hold: %v", ends)
 }
