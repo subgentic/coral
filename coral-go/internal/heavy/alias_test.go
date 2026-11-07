@@ -31,7 +31,7 @@ func TestAliasForIsTheGrantsMachineAndNothingElse(t *testing.T) {
 
 // A grant that names no machine, or one that is nothing but punctuation, has no alias: no run is sent anywhere (Slug's "agent" fallback would have picked a destination).
 func TestAliasForRefusesAGrantWithNoMachine(t *testing.T) {
-	for _, machine := range []string{"", "   ", "---", "///", "‮"} {
+	for _, machine := range []string{"", "   ", "---", "///", string(rune(0x202e))} {
 		got, err := AliasFor(machine)
 		assert.Error(t, err, "%q", machine)
 		assert.Empty(t, got, "%q", machine)
