@@ -658,3 +658,11 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 /* Needs you goal dividers and document pins (#13888/#13889). */
 .inbox-needs-results .dt-group th { white-space: pre-line; text-transform: none; letter-spacing: normal; font-size: var(--fs-sm); line-height: var(--lh-body); overflow-wrap: anywhere; color: var(--text-secondary); padding-block: 10px; }
 .inbox-needs-results .inbox-review-star.dt-star-on { color: var(--accent); }
+
+/* Reserve the old file-icon space before previews load; the fallback never changes row geometry. */
+.artifact-thumbnail { display: inline-grid; place-items: center; width: var(--artifact-thumbnail-size, 16px); height: var(--artifact-thumbnail-size, 16px); flex: none; overflow: hidden; vertical-align: middle; }
+.artifact-thumbnail > .explorer-file-icon { max-width: 100%; max-height: 100%; }
+.inbox-kind-icon.inbox-artifact-thumbnail::before { content: none; }
+.artifact-thumbnail.dt-mail-avatar { border-radius: var(--radius-sm); }
+
+.artifact-thumbnail-image { display: block; width: 100%; height: 100%; object-fit: contain; }

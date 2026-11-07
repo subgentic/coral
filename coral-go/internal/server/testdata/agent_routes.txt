@@ -73,6 +73,7 @@ a GET /api/artifacts/{id}
 a GET /api/artifacts/{id}/comments
 a GET /api/artifacts/{id}/meta
 b GET /api/artifacts/{id}/private
+b GET /api/artifacts/{id}/thumbnail
 a GET /api/artifacts/{id}/versions
 b GET /api/artifacts/{id}/readers
 b GET /api/auth/hub-origins

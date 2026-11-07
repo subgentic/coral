@@ -256,6 +256,7 @@ var routeTable = cat(
 		"/api/artifacts",
 		// The same artifact without its bytes (#5465, coral-hub): id, size, the media type a download is served as and the stored name, 404 exactly as the content read is, never cached.
 		"/api/artifacts/{hex64}/meta",
+		"/api/artifacts/{hex64}/thumbnail",
 		// Who can read an artifact (#5577): the owners that hold it and the teams whose agents read it. No query.
 		"/api/artifacts/{hex64}/readers",
 		// The comments on an artifact (#5176): reads here; the owner's writes are the block below. Editing, deleting, sending a thread to an agent, the lock and an agent's reply are unlisted (never) from here.

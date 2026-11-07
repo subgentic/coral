@@ -151,7 +151,8 @@ const mailCell = (m, label, open, pick, showTeam = false, gap = false) => { // o
     const td = el('td', 'dt-mail-cell'); td.setAttribute('role', 'cell');
     const lead = el(pick ? 'button' : 'span', 'dt-mail-lead');
     if (pick) { lead.type = 'button'; lead.setAttribute('role', 'checkbox'); lead.setAttribute('aria-label', `Select ${label}`); lead.setAttribute('aria-checked', 'false'); lead.addEventListener('click', pick); } else lead.setAttribute('aria-hidden', 'true'); // a list that can be selected: the avatar is its checkbox (a tap, no gesture), as the desktop's is
-    const l = m.lead || {}, shape = l.icon ? el('span', 'dt-mail-avatar material-icons', l.icon) : el('span', 'dt-mail-avatar', [...String(l.text || m.title || '?')][0].toUpperCase());
+    const l = m.lead || {}, shape = l.node || (l.icon ? el('span', 'dt-mail-avatar material-icons', l.icon) : el('span', 'dt-mail-avatar', [...String(l.text || m.title || '?')][0].toUpperCase()));
+    shape.classList.add('dt-mail-avatar');
     if (l.square) shape.classList.add('dt-mail-square');
     shape.style.background = `var(--avatar-${(hash(String(l.name || m.title || '').toLowerCase()) % 8) + 1})`;
     const tick = el('span', 'dt-mail-avatar dt-mail-tick material-icons', 'check'); tick.setAttribute('aria-hidden', 'true'); // the avatar of a selected row
