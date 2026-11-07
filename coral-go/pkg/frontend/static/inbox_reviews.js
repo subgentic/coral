@@ -268,6 +268,24 @@ export async function reviewOfTeam(team, digest, { anyState = false } = {}) {
     return data.artifacts.find(a => a.available && !a.tags?.includes('ignored') && !a.tags?.includes('superseded')) || null;
 }
 
+/** Expand a capped legacy collapse only when deciding it; ordinary Inbox reads stay bounded.
+ * The reviewed row fixes the source, uploader/name group and upper version boundary. */
+export async function legacyEarlierVersions(row) {
+    const source = splitKey(row.team), query = new URLSearchParams({ team: source.name, tag: 'for review', versions: 'all', q: row.name || '' });
+    if (row.produced_by) query.set('by', row.produced_by);
+    const older = new Map(), seen = new Set();
+    let cursor = '';
+    do {
+        const page = await readComputerPage(source.server, { query: query.toString(), cursor, limit: 50, revisionBound: false });
+        if (page.ownerOnly) throw new Error('Earlier versions are available only to this computer’s owner.');
+        for (const a of page.artifacts) if (a.team === row.team && vkey(a) === vkey(row) && a.hex !== row.hex && byAge(a, row) < 0) older.set(a.hex, a);
+        if (!page.has_more) return [...older.values()];
+        if (!page.next_cursor || seen.has(page.next_cursor)) throw new Error('Earlier versions could not be read completely.');
+        cursor = page.next_cursor; seen.add(cursor);
+    } while (cursor);
+    return [...older.values()];
+}
+
 // The Inbox owns two bounded windows per computer, not a scan of every team.
 // Facets/attention policy is layered on this metadata when its server contract is
 // present. A raw for-review total is not an authoritative attention count.
