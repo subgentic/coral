@@ -25,8 +25,8 @@ const BASE = require('./test_base').BASE;
    await client.Input.dispatchKeyEvent({type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
    await client.Input.dispatchKeyEvent({type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
    if(!await ev(`document.activeElement===document.querySelector('.inbox-ask-box')`))failures.push(width+': Tab from final quick reply reaches the reply box');
-   const growth=await ev(`(()=>{const b=document.querySelector('.inbox-ask-box'),before=b.getBoundingClientRect().height;b.value=('A line of the reply\\n').repeat(20);b.dispatchEvent(new Event('input',{bubbles:true}));return {before,after:b.getBoundingClientRect().height};})()`);
-   if(growth.after<=growth.before)failures.push(width+': textarea still grows with text');
+   const growth=await ev(`(()=>{const b=document.querySelector('.inbox-ask-box'),before=b.getBoundingClientRect().height;b.value=('A line of the reply\\n').repeat(20);b.dispatchEvent(new Event('input',{bubbles:true}));return {before,after:b.getBoundingClientRect().height,scrolls:b.scrollHeight>b.clientHeight+4};})()`);
+   if(growth.after!==growth.before||!growth.scrolls)failures.push(width+': the reply box is fixed and scrolls inside (#14153: a box that grew pushed Send reply down) '+JSON.stringify(growth));
    await client.Input.dispatchKeyEvent({type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
    await client.Input.dispatchKeyEvent({type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
   }
