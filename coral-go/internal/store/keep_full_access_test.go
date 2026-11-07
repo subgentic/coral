@@ -75,3 +75,44 @@ func TestAReplacedSessionKeepsItsFullAccessChoiceUnlessTheCapabilitiesChange(t *
 	on, _ = ss.KeepFullAccess(ctx, "r4")
 	assert.True(t, on, "unchanged capabilities keep it")
 }
+
+// A choice the hub made ends with the hub's switch; one made locally does not, and a local on over a hub one makes it local (#14193).
+func TestAHubMadeChoiceEndsWithTheHubsSwitchAndALocalOneDoesNot(t *testing.T) {
+	s := autoSleepStore(t)
+	ctx := context.Background()
+	for _, id := range []string{"hub-1", "local-1", "both-1"} {
+		require.NoError(t, s.RegisterLiveSession(ctx, &store.LiveSession{SessionID: id, AgentType: "codex", AgentName: id, WorkingDir: "/tmp"}))
+	}
+	_, err := s.SetKeepFullAccessFrom(ctx, "hub-1", true, store.KeepSourceHub)
+	require.NoError(t, err)
+	_, err = s.SetKeepFullAccess(ctx, "local-1", true)
+	require.NoError(t, err)
+	_, err = s.SetKeepFullAccessFrom(ctx, "both-1", true, store.KeepSourceHub)
+	require.NoError(t, err)
+	changed, err := s.SetKeepFullAccess(ctx, "both-1", true) // the Operator then chooses it locally too
+	require.NoError(t, err)
+	require.False(t, changed, "already on: not a new choice")
+
+	n, err := s.ClearHubKeepFullAccess(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, n, "only the hub-made one ended")
+	for id, want := range map[string]bool{"hub-1": false, "local-1": true, "both-1": true} {
+		on, err := s.KeepFullAccess(ctx, id)
+		require.NoError(t, err)
+		require.Equal(t, want, on, id)
+	}
+}
+
+// The source goes with the choice to the replacing session.
+func TestTheSourceOfAChoiceIsCarriedToTheReplacingSession(t *testing.T) {
+	s := autoSleepStore(t)
+	ctx := context.Background()
+	caps := `{"allow":["file_read"]}`
+	require.NoError(t, s.RegisterLiveSession(ctx, &store.LiveSession{SessionID: "old-hub", AgentType: "codex", AgentName: "a", WorkingDir: "/tmp", Capabilities: &caps}))
+	_, err := s.SetKeepFullAccessFrom(ctx, "old-hub", true, store.KeepSourceHub)
+	require.NoError(t, err)
+	require.NoError(t, s.ReplaceLiveSession(ctx, "old-hub", &store.LiveSession{SessionID: "new-hub", AgentType: "codex", AgentName: "a", WorkingDir: "/tmp", Capabilities: &caps}))
+	n, err := s.ClearHubKeepFullAccess(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, n, "the replacing session's choice is still the hub's")
+}

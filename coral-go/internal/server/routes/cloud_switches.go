@@ -27,6 +27,7 @@ func (h *CloudHandler) applyMaxMode(ctx context.Context, mode tunnel.Mode) error
 		if _, err := h.ss.ClearHubAutoAccept(ctx, store.AutoAcceptModeLowered); err != nil {
 			return errors.New("Could not turn off Coral Hub auto-accept")
 		}
+		h.clearHubKeepFullAccess(ctx, "the hub's mode was lowered below Launch")
 	}
 	if m := h.manager(); m != nil {
 		m.ModeChanged(ctx)
@@ -156,6 +157,7 @@ func (h *CloudHandler) applyAllowAutoAccept(ctx context.Context, allow bool) err
 		if _, err := h.ss.ClearHubAutoAccept(ctx, store.AutoAcceptHubAllowOff); err != nil {
 			return errors.New("Could not turn off Coral Hub auto-accept")
 		}
+		h.clearHubKeepFullAccess(ctx, "the hub's auto-accept switch was turned off")
 	}
 	h.recordAutoAcceptChange(ctx, "local", "")
 	return nil
@@ -225,6 +227,7 @@ func (h *CloudHandler) HubOwnerSetAutoAccept(w http.ResponseWriter, r *http.Requ
 			return
 		}
 		ended = n
+		h.clearHubKeepFullAccess(r.Context(), "the hub's auto-accept switch was turned off by its owner")
 	}
 	change := h.recordAutoAcceptChange(r.Context(), "hub", id.pseudo)
 	recordHubOwnerAction(r.Context(), h.bs, id, r.Method, r.URL.Path+" allow="+v, "", http.StatusOK)
@@ -312,4 +315,17 @@ func (h *CloudHandler) RestartServer(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Info("[system] restarting at the dashboard's request")
 	writeJSON(w, http.StatusAccepted, map[string]bool{"ok": true})
+}
+
+// clearHubKeepFullAccess ends every Keep Full access choice the hub made when the hub's switch goes off or its mode is lowered, as ClearHubAutoAccept ends what the hub enabled: Full access
+// through the hub needs the switch, so a choice the hub made ends with it. A choice made locally stays (#14193). Logged with how many.
+func (h *CloudHandler) clearHubKeepFullAccess(ctx context.Context, why string) {
+	n, err := h.ss.ClearHubKeepFullAccess(ctx)
+	if err != nil {
+		slog.Warn("[keep-full-access] could not end the choices the hub made", "why", why, "error", err)
+		return
+	}
+	if n > 0 {
+		slog.Info("[keep-full-access] cleared", "why", why, "choices_ended", n)
+	}
 }

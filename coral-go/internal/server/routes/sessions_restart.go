@@ -44,6 +44,7 @@ type restartRequest struct {
 // restartPlan is a restart worked out before anything is touched: the agent, where it runs, its new identity and
 // the settings it starts with.
 type restartPlan struct {
+	keepSource   string // where the request came from (store.KeepSourceLocal or Hub): the source of a choice this restart stores (#14193)
 	req          restartRequest
 	agentType    string
 	stored       *store.LiveSession // the session being restarted (nil: unknown to the store)
@@ -99,6 +100,7 @@ func (h *SessionsHandler) Restart(w http.ResponseWriter, r *http.Request) {
 		fail(w)
 		return
 	}
+	plan.keepSource = keepSourceOf(r)
 	if req.KeepFullAccess {
 		if status, msg := h.keepFullAccessRequestRefusal(r, plan.agentType); status != 0 {
 			writeError(w, status, "", msg)
@@ -106,7 +108,7 @@ func (h *SessionsHandler) Restart(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	// Through the Coral Hub, extra flags or capabilities that skip permission prompts need the owner's local switch (#126 F4).
-	if refuseHubSkip(w, r, h.ss, hubAsksToSkip(plan.agentType, strings.Fields(req.ExtraFlags), req.Capabilities, nil, nil)) {
+	if refuseHubSkip(w, r, h.ss, hubAsksToSkip(plan.agentType, strings.Fields(req.ExtraFlags), req.Capabilities, nil, nil) || req.KeepFullAccess) { // #14193
 		return
 	}
 	plan.restartSettings()
@@ -685,7 +687,7 @@ func (h *SessionsHandler) restartRecord(ctx context.Context, p *restartPlan) {
 		}(),
 	})
 	if p.req.KeepFullAccess { // the form's choice goes to the NEW session even when the same restart edited the capabilities (which ends an earlier choice): the person just made it (#14085)
-		if _, err := h.ss.SetKeepFullAccess(ctx, p.newSessionID, true); err != nil {
+		if _, err := h.ss.SetKeepFullAccessFrom(ctx, p.newSessionID, true, p.keepSource); err != nil {
 			log.Printf("[keep-full-access] could not store the choice on the restarted session %s: %v", p.newSessionID, err)
 		}
 	}

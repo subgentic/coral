@@ -10,6 +10,7 @@ import (
 	"github.com/subgentic/coral/internal/board"
 
 	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/store"
 )
 
 // keepFullAccessField is the row key that says a Codex agent keeps Full access across restarts. With codex_live_mode and codex_relaunch_narrows it says who runs with what access, so it is the
@@ -116,7 +117,10 @@ func (h *SessionsHandler) KeepFullAccessOpt(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusNotFound, "", "live session not found")
 		return
 	}
-	changed, err := h.ss.SetKeepFullAccess(r.Context(), body.SessionID, *body.On)
+	if *body.On && refuseHubSkip(w, r, h.ss, true) { // turning Full access on through the Hub needs the owner's switch and Launch mode, as any skip does; turning it off is always allowed (#14193)
+		return
+	}
+	changed, err := h.ss.SetKeepFullAccessFrom(r.Context(), body.SessionID, *body.On, keepSourceOf(r))
 	if err != nil {
 		errInternalServer(w, "Could not save it. Try again.")
 		return
@@ -151,7 +155,7 @@ func (h *SessionsHandler) keepFullAccessRequestRefusal(r *http.Request, agentTyp
 
 // storeKeepFullAccess stores the choice for a session the form just launched or restarted with it, logs it, and asks the recorder for the Activity row (a person's click only).
 func (h *SessionsHandler) storeKeepFullAccess(ctx context.Context, r *http.Request, sessionID, name, via string) {
-	changed, err := h.ss.SetKeepFullAccess(ctx, sessionID, true)
+	changed, err := h.ss.SetKeepFullAccessFrom(ctx, sessionID, true, keepSourceOf(r))
 	if err != nil {
 		slog.Warn("[keep-full-access] could not store the choice made in the form", "session_id", sessionID, "via", via, "error", err)
 		return
@@ -160,4 +164,12 @@ func (h *SessionsHandler) storeKeepFullAccess(ctx context.Context, r *http.Reque
 		slog.Info("[keep-full-access] set", "session_id", sessionID, "agent", name, "via", via)
 		noteActivity(r, board.ActKeepFullAccess, "agent", name, "", "", "on")
 	}
+}
+
+// keepSourceOf is where a request that sets the choice came from: the hub when it came through the tunnel, else local. A hub-made choice ends with the hub's switch (ClearHubKeepFullAccess).
+func keepSourceOf(r *http.Request) string {
+	if cloud.Tunneled(r) {
+		return store.KeepSourceHub
+	}
+	return store.KeepSourceLocal
 }

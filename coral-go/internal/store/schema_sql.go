@@ -39,7 +39,8 @@ CREATE INDEX IF NOT EXISTS idx_agent_ui_events ON agent_ui_events(session_id,pan
 -- registered again does not lose it, and only the Operator's route writes it.
 CREATE TABLE IF NOT EXISTS keep_full_access (
 	session_id TEXT PRIMARY KEY,
-	set_at     INTEGER NOT NULL
+	set_at     INTEGER NOT NULL,
+	source     TEXT NOT NULL DEFAULT 'local' -- 'local' (the dashboard, the command line, the API key) or 'hub' (the Hub owner, through the tunnel): a choice the hub made ends with the hub's switch, as a hub-enabled auto-accept does (#14193)
 );
 
 CREATE TABLE IF NOT EXISTS auto_sleep_state (
