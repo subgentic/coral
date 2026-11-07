@@ -124,6 +124,27 @@ func (h *SessionsHandler) launchSession(ctx context.Context, spec launchSpec) (_
 	if spec.ResumeSessionID != "" && !isTerminal {
 		agent.TryPrepareResume(agentImpl, spec.ResumeSessionID, absDir)
 	}
+	launchMode := agent.PermissionModeForCLI(agentType, func() string {
+		if spec.PermissionMode != "" {
+			return spec.PermissionMode
+		}
+		if m := agent.PermissionModeFromFlags(spec.Flags); m != "" {
+			return m
+		}
+		if agentType == at.Codex && agent.CodexFlagsAreAuto(spec.Flags) {
+			return "auto" // the form's Auto for Codex: its own pair, recorded as the mode it is, so the chat does not say Default for an agent that never asks (#10381)
+		}
+		if carried, _ := agent.SplitPermissionFlags(spec.Flags); len(carried) > 0 {
+			return "default" // permission flags nobody here can read as a mode: never widened to a saved default or Auto (#6423)
+		}
+		if def := setreg.Enum(userSettings, "default_permission_mode"); def != "" {
+			return def
+		}
+		if spec.AutoByDefault {
+			return agent.DefaultLaunchPermissionMode(agentType) // Claude: Auto (#5836)
+		}
+		return "default"
+	}())
 	launchParams := agent.LaunchParams{
 		SessionID:    sessionID,
 		SessionName:  sessionName,
@@ -143,31 +164,16 @@ func (h *SessionsHandler) launchSession(ctx context.Context, spec launchSpec) (_
 		Hooks:           spec.Hooks,
 		CLIPath:         cliPath,
 		// a mode the CLI does not have is recorded as Default (agent.PermissionModeForCLI, #10466)
-		PermissionMode: agent.PermissionModeForCLI(agentType, func() string {
-			if spec.PermissionMode != "" {
-				return spec.PermissionMode
-			}
-			if m := agent.PermissionModeFromFlags(spec.Flags); m != "" {
-				return m
-			}
-			if agentType == at.Codex && agent.CodexFlagsAreAuto(spec.Flags) {
-				return "auto" // the form's Auto for Codex: its own pair, recorded as the mode it is, so the chat does not say Default for an agent that never asks (#10381)
-			}
-			if carried, _ := agent.SplitPermissionFlags(spec.Flags); len(carried) > 0 {
-				return "default" // permission flags nobody here can read as a mode: never widened to a saved default or Auto (#6423)
-			}
-			if def := setreg.Enum(userSettings, "default_permission_mode"); def != "" {
-				return def
-			}
-			if spec.AutoByDefault {
-				return agent.DefaultLaunchPermissionMode(agentType) // Claude: Auto (#5836)
-			}
-			return "default"
-		}()),
-		CoralDir:  h.cfg.CoralDir(),
-		CoralHost: h.cfg.AgentHost(),
-		CoralPort: h.cfg.Port,
-		RunTag:    h.runTagFor(ctx, sessionID, "", spec.ResumeSessionID),
+		PermissionMode: launchMode,
+		CoralDir:       h.cfg.CoralDir(),
+		CoralHost:      h.cfg.AgentHost(),
+		CoralPort:      h.cfg.Port,
+		RunTag:         h.runTagFor(ctx, sessionID, "", spec.ResumeSessionID),
+	}
+	if agentType == at.Hermes && launchMode == "bypassPermissions" { // Hermes's adapter does not read the mode: Bypass is its --yolo flag, unless the flags already carry a permission flag of their own (#14336)
+		if carried, _ := agent.SplitPermissionFlags(launchParams.Flags); len(carried) == 0 {
+			launchParams.Flags = append(append([]string{}, launchParams.Flags...), agent.PermissionFlagsForAgent(at.Hermes, launchMode)...)
+		}
 	}
 	defer func() {
 		if retErr != nil {

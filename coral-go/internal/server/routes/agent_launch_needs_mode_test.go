@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"strconv"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -96,12 +97,11 @@ func TestAnAgentsCodexLaunchOnABoardNeedsAMode(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	assert.NotContains(t, cmd, "network_access=true")
 
-	// a saved default mode is the person's choice for every launch: an agent's Codex on a board starts as that says ("default" is bare ask-first, as for everyone)
+	// the cap (#14336): a saved default is capped by the caller's rank; a Codex caller with no recorded mode (rank 0) still cannot start a Codex on a board that asks first and cannot reach Coral
 	require.NoError(t, rig.ss.SetSetting(ctx, "default_permission_mode", "default"))
-	rec, cmd = launch(true, onBoard(nil))
-	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-	assert.NotContains(t, cmd, "network_access=true")
-	assert.NotContains(t, cmd, "-a never")
+	rec, _ = launch(true, onBoard(nil))
+	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+	assert.Equal(t, agentLaunchNeedsModeCode, jsonCode(t, rec))
 	// and the Operator's explicit "default" stays bare ask-first too
 	rec, cmd = launch(false, onBoard(nil))
 	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
@@ -155,31 +155,46 @@ func TestAnAgentDoesNotStartInASavedDefaultThatSkipsThePrompts(t *testing.T) {
 		return rec
 	}
 
+	// the cap replaces the refusal (#14336): whatever the saved default, an agent's launch starts, and never above the caller's rank (the caller's row records no mode: rank 0, ask first)
 	for _, c := range []struct {
 		agentType, mode string
 		refused         bool
 	}{
 		{at.Codex, "auto", true}, {at.Codex, "dontAsk", true}, {at.Codex, "bypassPermissions", true}, {at.Codex, "acceptEdits", true},
-		{at.Codex, "default", false}, {at.Codex, "plan", false},
-		{at.Claude, "auto", true}, {at.Claude, "dontAsk", true}, {at.Claude, "bypassPermissions", true}, {at.Claude, "acceptEdits", true}, {at.Claude, "plan", true},
+		{at.Codex, "default", true}, {at.Codex, "plan", true},
+		{at.Claude, "auto", false}, {at.Claude, "dontAsk", false}, {at.Claude, "bypassPermissions", false}, {at.Claude, "acceptEdits", false}, {at.Claude, "plan", false},
 		{at.Claude, "default", false},
 	} {
 		require.NoError(t, rig.ss.SetSetting(ctx, "default_permission_mode", c.mode))
 		before := sent()
-		rec := launch(true, map[string]any{"agent_type": c.agentType})
+		body := map[string]any{"agent_type": c.agentType}
+		if c.agentType == at.Codex {
+			body["board_name"], body["new_board"] = "inherit-"+c.mode, true
+		}
+		rec := launch(true, body)
 		if c.refused {
 			require.Equal(t, http.StatusForbidden, rec.Code, "%s %s: %s", c.agentType, c.mode, rec.Body.String())
-			var refusal map[string]string
-			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &refusal))
-			assert.Equal(t, agentLaunchNeedsModeCode, refusal["code"], c.mode)
-			assert.Contains(t, refusal["error"], "saved default permission mode ("+c.mode+")")
-			assert.Contains(t, refusal["error"], "ask the Operator")
+			assert.Equal(t, agentLaunchNeedsModeCode, jsonCode(t, rec), c.mode)
 			assert.Equal(t, before, sent(), "%s %s: nothing started", c.agentType, c.mode)
 		} else {
-			assert.Equal(t, http.StatusOK, rec.Code, "%s %s: %s", c.agentType, c.mode, rec.Body.String())
+			require.Equal(t, http.StatusOK, rec.Code, "%s %s: %s", c.agentType, c.mode, rec.Body.String())
+			rig.term.mu.Lock()
+			var last string
+			for _, cmds := range rig.term.sent {
+				if len(cmds) > 0 {
+					last = cmds[len(cmds)-1]
+				}
+			}
+			rig.term.mu.Unlock()
+			assert.NotContains(t, strings.ToLower(last), "skip-permissions", "%s %s: capped to the caller", c.agentType, c.mode)
+			assert.NotContains(t, last, "bypassPermissions", c.mode)
 		}
 		// the Operator's launch takes any saved default, as before
-		assert.Equal(t, http.StatusOK, launch(false, map[string]any{"agent_type": c.agentType}).Code, "operator %s %s", c.agentType, c.mode)
+		opBody := map[string]any{"agent_type": c.agentType}
+		if c.agentType == at.Codex {
+			opBody["board_name"], opBody["new_board"] = "op-"+c.mode, true
+		}
+		assert.Equal(t, http.StatusOK, launch(false, opBody).Code, "operator %s %s", c.agentType, c.mode)
 	}
 
 	// as a team member: not started, the member says why
@@ -282,29 +297,20 @@ func TestAnOrchestratorsLaunchStartsAskFirstWhereAnotherAgentIsRefused(t *testin
 	}
 	for _, mode := range []string{"auto", "bypassPermissions", "dontAsk", "acceptEdits", "plan"} {
 		require.NoError(t, rig.ss.SetSetting(ctx, "default_permission_mode", mode))
-		// the Orchestrator: started, ask first, none of the saved default's words on the command line
-		rec, cmd := launch(as(orch), at.Claude)
-		require.Equal(t, http.StatusOK, rec.Code, "orchestrator, saved %s: %s", mode, rec.Body.String())
-		assert.NotContains(t, strings.ToLower(cmd), "skip-permissions", "saved %s", mode)
-		assert.NotContains(t, cmd, "bypassPermissions", "saved %s", mode)
-		assert.NotContains(t, cmd, "--permission-mode "+mode, "saved %s: the saved default is not inherited", mode)
-		// another agent: refused as before
-		rec, _ = launch(as(worker), at.Claude)
-		assert.Equal(t, http.StatusForbidden, rec.Code, "worker, saved %s", mode)
-		// the Operator: unchanged
-		rec, _ = launch(nil, at.Claude)
-		assert.Equal(t, http.StatusOK, rec.Code, "operator, saved %s", mode)
-		// a Codex asks first and cannot reach Coral: the Orchestrator's Codex stays refused
-		if mode == "auto" || mode == "bypassPermissions" || mode == "dontAsk" || mode == "acceptEdits" {
-			rec, _ = launch(as(orch), at.Codex)
-			assert.Equal(t, http.StatusForbidden, rec.Code, "orchestrator's codex, saved %s", mode)
+		// no special case for an Orchestrator (#14336): every agent is capped by its own rank, and both rows record no mode (rank 0): ask first
+		for _, who := range []string{orch, worker} {
+			rec, cmd := launch(as(who), at.Claude)
+			require.Equal(t, http.StatusOK, rec.Code, "%s, saved %s: %s", who, mode, rec.Body.String())
+			assert.NotContains(t, strings.ToLower(cmd), "skip-permissions", "saved %s", mode)
+			assert.NotContains(t, cmd, "bypassPermissions", "saved %s", mode)
+			assert.NotContains(t, cmd, "--permission-mode "+mode, "saved %s: the saved default is capped by the caller", mode)
 		}
+		// the Operator: unchanged
+		rec, _ := launch(nil, at.Claude)
+		assert.Equal(t, http.StatusOK, rec.Code, "operator, saved %s", mode)
+		// a Codex caller of rank 0 cannot start a Codex on a board that asks first
 	}
-	// no saved default: as before
-	require.NoError(t, rig.ss.SetSetting(ctx, "default_permission_mode", ""))
-	rec, _ := launch(as(orch), at.Claude)
-	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-	// As a team member: the Orchestrator's member starts (ask first), another agent's member is not started.
+	// As a team member: the Orchestrator's and another agent's member alike start capped to the caller.
 	require.NoError(t, rig.ss.SetSetting(ctx, "default_permission_mode", "auto"))
 	team := func(from func(*http.Request) *http.Request, board string) []map[string]any {
 		b, _ := json.Marshal(map[string]any{"board_name": board, "new_board": true, "working_dir": rig.workdir, "agent_type": at.Claude, "agents": []map[string]any{{"name": "Member"}}})
@@ -316,33 +322,31 @@ func TestAnOrchestratorsLaunchStartsAskFirstWhereAnotherAgentIsRefused(t *testin
 		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out), rec.Body.String())
 		return out.Agents
 	}
-	orchTeam := team(as(orch), "orch-team")
-	require.Len(t, orchTeam, 1)
-	assert.Empty(t, orchTeam[0]["error"], "the Orchestrator's member starts: %v", orchTeam[0])
-	memberSID, _ := orchTeam[0]["session_id"].(string)
-	require.NotEmpty(t, memberSID, "the member's session: %v", orchTeam[0])
-	memberCmd := ""
-	rig.term.mu.Lock()
-	for name, cmds := range rig.term.sent {
-		if strings.Contains(name, memberSID) && len(cmds) > 0 {
-			memberCmd = cmds[len(cmds)-1]
+	for i, who := range []string{orch, worker} {
+		got := team(as(who), "team-"+strconv.Itoa(i))
+		require.Len(t, got, 1)
+		assert.Empty(t, got[0]["error"], "the member starts: %v", got[0])
+		sid, _ := got[0]["session_id"].(string)
+		require.NotEmpty(t, sid, "the member's session: %v", got[0])
+		memberCmd := ""
+		rig.term.mu.Lock()
+		for name, cmds := range rig.term.sent {
+			if strings.Contains(name, sid) && len(cmds) > 0 {
+				memberCmd = cmds[len(cmds)-1]
+			}
 		}
+		rig.term.mu.Unlock()
+		require.NotEmpty(t, memberCmd, "the member's launch command")
+		assert.NotContains(t, strings.ToLower(memberCmd), "skip-permissions")
+		assert.NotContains(t, memberCmd, "bypassPermissions")
+		assert.NotContains(t, memberCmd, "--permission-mode auto", "the saved Auto is capped by the caller's rank")
 	}
-	rig.term.mu.Unlock()
-	require.NotEmpty(t, memberCmd, "the member's launch command")
-	assert.NotContains(t, strings.ToLower(memberCmd), "skip-permissions", "the member starts ask first, not in the saved Auto")
-	assert.NotContains(t, memberCmd, "bypassPermissions")
-	assert.NotContains(t, memberCmd, "--permission-mode auto", "the saved default is not inherited by the member")
-	workerTeam := team(as(worker), "worker-team")
-	require.Len(t, workerTeam, 1)
-	assert.Equal(t, agentLaunchNeedsModeCode, workerTeam[0]["code"], "another agent's member is refused: %v", workerTeam[0])
-	// An Orchestrator that has left the board (its subscription is inactive) is any other agent: refused, as a worker is (QA's SHOULD).
+	// an agent that left its board is still capped by its own row, not refused: the Orchestrator exception is gone
 	left, err := bs.Unsubscribe(ctx, "launch-board", "orch")
 	require.NoError(t, err)
 	require.True(t, left)
-	rec, _ = launch(as(orch), at.Claude)
-	assert.Equal(t, http.StatusForbidden, rec.Code, "an Orchestrator that left the board is refused like any agent: %s", rec.Body.String())
-	assert.Equal(t, agentLaunchNeedsModeCode, jsonCode(t, rec), "and for the same reason")
+	rec, _ := launch(as(orch), at.Claude)
+	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 }
 
 func jsonCode(t *testing.T, rec *httptest.ResponseRecorder) string {

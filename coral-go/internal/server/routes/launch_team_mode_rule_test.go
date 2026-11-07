@@ -28,12 +28,12 @@ func TestTheTeamModeReachesEveryMemberAndCapabilitiesOnlyNarrowIt(t *testing.T) 
 		at.Claude: {
 			"plan":   {"none": {[]string{"--permission-mode plan"}, nil}, "four chips": {[]string{"--permission-mode plan"}, nil}, "read-only": {[]string{"--permission-mode plan"}, nil}},
 			"bypass": {"none": {[]string{"--permission-mode bypassPermissions"}, nil}, "four chips": {[]string{"--permission-mode bypassPermissions"}, nil}, "read-only": {[]string{"--permission-mode bypassPermissions"}, nil}},
-			"":       {"none": {nil, []string{"--permission-mode auto"}}, "four chips": {nil, []string{"--permission-mode auto"}}, "read-only": {nil, []string{"--permission-mode auto"}}},
+			"":       {"none": {[]string{"--permission-mode auto"}, nil}, "four chips": {[]string{"--permission-mode auto"}, nil}, "read-only": {[]string{"--permission-mode auto"}, nil}}, // the new default for a new team (#14336)
 		},
 		at.Codex: {
 			"plan":   {"none": {[]string{"--sandbox read-only -a on-request"}, []string{"-a never", "bypass"}}, "four chips": {[]string{"--sandbox read-only -a on-request"}, []string{"-a never", "bypass"}}, "read-only": {[]string{"--sandbox read-only -a on-request"}, []string{"-a never", "bypass"}}},
 			"bypass": {"none": {[]string{"--dangerously-bypass-approvals-and-sandbox"}, nil}, "four chips": {[]string{"--dangerously-bypass-approvals-and-sandbox"}, nil}, "read-only": {[]string{"--sandbox read-only -a on-request"}, []string{"bypass"}}},
-			"":       {"none": {nil, []string{"--sandbox", "bypass", "-a never"}}, "four chips": {[]string{"--sandbox workspace-write -a never"}, []string{"bypass"}}, "read-only": {[]string{"--sandbox read-only -a on-request"}, nil}},
+			"":       {"none": {[]string{"--sandbox workspace-write -a never"}, []string{"bypass"}}, "four chips": {[]string{"--sandbox workspace-write -a never"}, []string{"bypass"}}, "read-only": {[]string{"--sandbox read-only -a on-request"}, nil}},
 		},
 		at.Agy: {
 			"plan":   {"none": {[]string{"--mode plan"}, []string{"skip-permissions"}}, "four chips": {[]string{"--mode plan"}, []string{"skip-permissions"}}, "read-only": {[]string{"--mode plan"}, nil}},
