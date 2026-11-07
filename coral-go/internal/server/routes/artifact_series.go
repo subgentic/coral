@@ -7,6 +7,7 @@ package routes
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -16,11 +17,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/secfile"
 )
 
@@ -135,6 +138,13 @@ func newSeriesID() (string, error) {
 	return hex.EncodeToString(b[:]), nil
 }
 
+// virtualFileID is the file id of an artifact that was never versioned (#14145): derived, never stored, so no old record is rewritten and nothing changes on upgrade. It names the board as well as the bytes, so another
+// team's file with the same bytes is not the same id. When the file is first versioned its series is made with exactly this id, so the id shown before does not change.
+func virtualFileID(board, digest string) string {
+	sum := sha256.Sum256([]byte("coral file v1\x00" + board + "\x00" + digest))
+	return hex.EncodeToString(sum[:16])
+}
+
 // seriesRecord is an upload record that carries series fields, with the session it is in.
 type seriesRecord struct {
 	session string
@@ -222,6 +232,8 @@ type seriesMember struct {
 	Role     string
 	Board    string
 	Source   string // the server's own record of how the version came: "edit" (the Operator's editor), "share" (the Operator's file), empty for an agent's upload (#13792)
+	Name     string // the name this version was uploaded under: a file's name is its newest version's (#14145)
+	Virtual  bool   // a file that was never versioned, found by its derived id: version 1 of a series that does not exist yet
 }
 
 // byPerson says a person made this version, from the server's own record of it (the editor's save or an Operator share), never from anything a request said (#13792).
@@ -261,6 +273,14 @@ func membersOfSeries(coralDir, id string, full bool) []seriesMember {
 			if rec.SeriesID == id && !seen[digest] {
 				seen[digest] = true
 				out = append(out, memberOf(digest, session, rec))
+			} else if rec.SeriesID == "" && rec.Board != "" && !seen[digest] && virtualFileID(rec.Board, digest) == id {
+				// A file never versioned, named by its derived id (#14145): version 1, unless its bytes are in a series by another record (then that series is the file).
+				if _, _, in := digestSeries(coralDir, digest); !in {
+					seen[digest] = true
+					m := memberOf(digest, session, rec)
+					m.N, m.Virtual = 1, true
+					out = append(out, m)
+				}
 			}
 			return true
 		})
@@ -270,7 +290,7 @@ func membersOfSeries(coralDir, id string, full bool) []seriesMember {
 }
 
 func memberOf(digest, session string, rec agentUploadRecord) seriesMember {
-	return seriesMember{Digest: digest, N: rec.Version, Session: session, At: rec.CreatedAt, Uploader: rec.Uploader, Role: rec.Role, Board: rec.Board, Source: rec.Source}
+	return seriesMember{Digest: digest, N: rec.Version, Session: session, At: rec.CreatedAt, Uploader: rec.Uploader, Role: rec.Role, Board: rec.Board, Source: rec.Source, Name: rec.Name}
 }
 
 // seriesMemberSet is every artifact that belongs to a series: they count as kept for pruning (pick 4, keep all: only an explicit delete removes a version).
@@ -285,22 +305,33 @@ func seriesMemberSet(coralDir string) map[string]bool {
 	return out
 }
 
-// newVersionRef parses the header: exactly a 64-hex digest or a 32-hex series id, bare or as a coral://artifacts/ link (series links as coral://artifacts/series/<id>); anything else is refused
-// before any lookup.
-func newVersionRef(v string) (digest, series string, ok bool) {
+// newVersionRef parses the header: a 64-hex digest, or a file id (32 hex) with an optional @<n> (the version the upload was made from), bare or as a coral://artifacts/ link (file links as
+// coral://artifacts/series/<id> too); anything else is refused before any lookup (#14145). base is 0 for a digest and for an id with no @<n>.
+func newVersionRef(v string) (digest, series string, base int, ok bool) {
 	v = strings.TrimSpace(v)
 	v = strings.TrimPrefix(v, "coral://artifacts/")
-	if s, isSeries := strings.CutPrefix(v, "series/"); isSeries {
-		return "", s, seriesIDRe.MatchString(s)
+	v = strings.TrimPrefix(v, "series/")
+	if id, n, has := strings.Cut(v, "@"); has {
+		if !seriesIDRe.MatchString(id) || !versionNumRe.MatchString(n) {
+			return "", "", 0, false
+		}
+		base, _ = strconv.Atoi(n)
+		if base > seriesVersionCap {
+			return "", "", 0, false
+		}
+		return "", id, base, true
 	}
 	switch {
 	case objectNameRe.MatchString(v):
-		return v, "", true
+		return v, "", 0, true
 	case seriesIDRe.MatchString(v):
-		return "", v, true
+		return "", v, 0, true
 	}
-	return "", "", false
+	return "", "", 0, false
 }
+
+// versionNumRe is a version number as a link writes it: a whole number from 1, at most three digits (the series cap is 100).
+var versionNumRe = regexp.MustCompile(`^[1-9][0-9]{0,2}$`)
 
 // seriesStamp is what a version's own upload record carries.
 type seriesStamp struct {
@@ -318,9 +349,11 @@ type seriesPlan struct {
 	base      seriesRecord   // for a new series: the record that becomes version 1
 	stamp     seriesStamp
 	same      *seriesMember // set when the bytes are the newest version: nothing to add
-	refDigest string        // the version the upload names as the one it edited (a 64-hex digest link); empty for a series link, which names no base (#13792)
-	unlock    func()
-	created   string
+	refDigest string        // the version the upload names as the one it edited (a digest link, or <file id>@<n>); empty for a bare file id, which names no base (#13792)
+	// caller is who is uploading (its name on the board), set by the handler: a bare file id is a good base only when the newest version is this caller's own (#14145).
+	caller  string
+	unlock  func()
+	created string
 }
 
 type seriesRefusal struct {
@@ -343,9 +376,9 @@ func errSeriesFull() *seriesRefusal {
 
 // planNewVersion works out where an upload of the bytes newDigest goes as a new version of ref (a digest or a series id), for an agent on callerBoard. On success the series lock is held (plan.unlock).
 func planNewVersion(coralDir, ref, callerBoard, newDigest string) (*seriesPlan, error) {
-	digest, series, ok := newVersionRef(ref)
+	digest, series, base, ok := newVersionRef(ref)
 	if !ok {
-		return nil, &seriesRefusal{http.StatusBadRequest, "bad_request", "new version of: give a 64-hex artifact link or a 32-hex series link"}
+		return nil, &seriesRefusal{http.StatusBadRequest, "bad_request", "new version of: give the file's id (32 hex, with @<version> for the version you edited) or a 64-hex artifact link"}
 	}
 	if callerBoard == "" {
 		return nil, errSeriesNoBoard
@@ -381,11 +414,7 @@ func planNewVersion(coralDir, ref, callerBoard, newDigest string) (*seriesPlan, 
 		}
 	}
 	if p.id == "" {
-		id, err := newSeriesID()
-		if err != nil {
-			return nil, err
-		}
-		p.id, p.create = id, true
+		p.id, p.create = virtualFileID(callerBoard, digest), true // the file's id is derived, so the one shown before it was versioned is the one it keeps (#14145)
 	}
 	unlockSeries := lockSeries(p.id)
 	p.unlock = unlockSeries
@@ -399,6 +428,18 @@ func planNewVersion(coralDir, ref, callerBoard, newDigest string) (*seriesPlan, 
 		p.rows = membersOfSeries(coralDir, p.id, true)
 		if len(p.rows) == 0 || p.rows[0].Board != callerBoard {
 			return fail(errSeriesNotYours) // not found and not yours look the same
+		}
+		if len(p.rows) == 1 && p.rows[0].Virtual { // the id of a file never versioned: this upload makes its series, with that id, and the file becomes version 1
+			v := p.rows[0]
+			rec, found := readUploadRecord(coralDir, v.Session, v.Digest)
+			if !found {
+				return fail(errSeriesNotYours)
+			}
+			digest, p.create = v.Digest, true
+			p.base = seriesRecord{session: v.Session, rec: rec}
+			if digest == newDigest {
+				return fail(&seriesRefusal{http.StatusOK, "same_as_latest", "these bytes are the file it is a version of: nothing to add"})
+			}
 		}
 		if len(p.rows) >= seriesVersionCap {
 			return fail(errSeriesFull())
@@ -415,6 +456,17 @@ func planNewVersion(coralDir, ref, callerBoard, newDigest string) (*seriesPlan, 
 		}
 	} else if digest == newDigest {
 		return fail(&seriesRefusal{http.StatusOK, "same_as_latest", "these bytes are the artifact it is a version of: nothing to add"})
+	}
+	if base > 0 { // <file id>@<n>: the version the upload was made from; a version that is not there is refused like an unknown file
+		p.refDigest = ""
+		for _, m := range p.rows {
+			if m.N == base {
+				p.refDigest = m.Digest
+			}
+		}
+		if p.refDigest == "" {
+			return fail(&seriesRefusal{http.StatusNotFound, "version_not_found", fmt.Sprintf("this file has no version %d", base)})
+		}
 	}
 	// Bytes already in ANOTHER series are refused, in words that name nothing of it.
 	if other, _, in := digestSeries(coralDir, newDigest); in && other != p.id {
@@ -452,7 +504,10 @@ func (p *seriesPlan) staleBase() (staleBase, bool) {
 	}
 	out.newest = p.rows[len(p.rows)-1]
 	out.newestByMan = out.newest.byPerson()
-	if p.refDigest == "" { // a series link: no base
+	if p.refDigest == "" { // a bare file id names no version: it is a good base only when the newest version is this caller's own (nobody else saved since, #13792), otherwise the agent says which version it edited with <file id>@<n>
+		if p.caller != "" && !out.newestByMan && board.SameIdentity(out.newest.Uploader, p.caller) {
+			return out, false
+		}
 		out.seriesLink = true
 		return out, true
 	}
@@ -526,7 +581,7 @@ func forgetVersion(coralDir, id, digest string) {
 func staleSentence(sb staleBase) string {
 	newest := "coral://artifacts/" + sb.newest.Digest
 	if sb.seriesLink {
-		return fmt.Sprintf("A series link names no version, so it cannot be the base of a new version. Download the newest (version %d: coral-agent artifact download %s), edit that, and upload with --new-version-of %s. Nothing was stored.", sb.newest.N, newest, newest)
+		return fmt.Sprintf("The file's newest version (version %d) was not saved by you, and a bare file id names no version, so it cannot be the base of a new version. Download the newest (coral-agent artifact download %s), edit that, and upload with --new-version-of <file id>@%d. Nothing was stored.", sb.newest.N, newest, sb.newest.N)
 	}
 	who := "another agent"
 	if sb.newestByMan {
@@ -544,4 +599,21 @@ func staleBaseRefusal(w http.ResponseWriter, plan *seriesPlan, sb staleBase) {
 		"error": staleSentence(sb), "code": "stale_base", "latest_digest": sb.newest.Digest, "latest_version": sb.newest.N, "latest_by_person": sb.newestByMan,
 		"uri": "coral://artifacts/" + sb.newest.Digest, "series_id": plan.id,
 	})
+}
+
+// versionLine is how a file's id and version are told everywhere: the upload's answer, artifact info, the Inbox row, the viewer, Team Artifacts and the board's announcement (#14145). The page script has the same format.
+func versionLine(n int, name, fileID string) string {
+	return fmt.Sprintf("version %d of %s (file %s)", n, name, fileID)
+}
+
+// currentName is the name of the file the plan adds a version to: its newest version's name ("" when no record kept one, which is never a reason to refuse).
+func (p *seriesPlan) currentName() string {
+	if len(p.rows) == 0 {
+		return ""
+	}
+	return p.rows[len(p.rows)-1].Name
+}
+
+func nameDiffersSentence(fileID, current, got string) string {
+	return fmt.Sprintf("File %s is named %q and this upload is named %q. If it is the same file under a new name, upload again with --rename; if it is another file, upload it without --new-version-of. Nothing was stored.", fileID, current, got)
 }
