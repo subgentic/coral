@@ -70,3 +70,34 @@ func TestProjectTrustProbeCallerAndRate(t *testing.T) {
 	h.trustProbeAt = time.Now().Add(-time.Second)
 	require.Equal(t, 200, call(callerDashCookie).Code)
 }
+
+// Each case keeps all the other inputs valid: the refusal is about the named
+// policy category rather than a second bad file, missing path or invalid home.
+func TestProjectTrustProbeLeadingConfigDirectoryLink(t *testing.T) {
+	home := t.TempDir()
+	dir := filepath.Join(home, "Code", "project")
+	target := filepath.Join(dir, "project-settings")
+	require.NoError(t, os.MkdirAll(target, 0700))
+	require.NoError(t, os.WriteFile(filepath.Join(target, "settings.json"), []byte("not read"), 0600))
+	if err := os.Symlink("project-settings", filepath.Join(dir, ".claude")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	require.Equal(t, map[string]any{"checked": false}, probeProjectTrust(dir, home), "a leading config-directory link is unchecked even when it points inside the eligible project")
+}
+
+func TestProjectTrustProbeNonRegularConfig(t *testing.T) {
+	home := t.TempDir()
+	dir := filepath.Join(home, "Code", "project")
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".mcp.json"), 0700))
+	require.Equal(t, map[string]any{"checked": false}, probeProjectTrust(dir, home), "an existing config name that is a directory is not a regular file")
+}
+
+func TestProjectTrustProbeRelativePathInEligibleWorkingDirectory(t *testing.T) {
+	home := t.TempDir()
+	parent := filepath.Join(home, "Code")
+	dir := filepath.Join(parent, "project")
+	require.NoError(t, os.MkdirAll(dir, 0700))
+	t.Chdir(parent)
+	require.Equal(t, true, probeProjectTrust(dir, home)["checked"], "positive control: this absolute project is eligible")
+	require.Equal(t, map[string]any{"checked": false}, probeProjectTrust("project", home), "an otherwise eligible project must not accept a relative request or silently normalize it")
+}
