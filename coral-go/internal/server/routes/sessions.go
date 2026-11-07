@@ -103,10 +103,12 @@ type SessionsHandler struct {
 	// commentOwner names the owner on new artifact comments (nil: this computer's user, #5176); commentLimit is the per-author write rate limit.
 	commentOwner commentOwnerIdentity
 	// editPost posts the message of Send to agent with the diff; nil is the board store's own post (a test sets it to make the post fail, #13802).
-	editPost     func(ctx context.Context, project, content string) error
-	commentLimit commentLimiter
-	changeLocks  sync.Map    // artifact id -> *sync.Mutex: the lock of one artifact's Request changes words (#13976)
-	sendLimit    sendLimiter // Send to agent: asks per owner per hour (#6443)
+	editPost         func(ctx context.Context, project, content string) error
+	commentLimit     commentLimiter
+	changeLocks      sync.Map    // artifact id -> *sync.Mutex: the lock of one artifact's Request changes words (#13976)
+	changeClaims     sync.Map    // comment id -> struct{}: the notice of a Request changes comment is being delivered (#13998)
+	changeDelivering func()      // a test's hook: called after the notice is claimed and the lock released, before it is delivered (nil outside tests)
+	sendLimit        sendLimiter // Send to agent: asks per owner per hour (#6443)
 	// wsHeartbeat overrides wsHeartbeatInterval when set (nanoseconds; tests).
 	wsHeartbeat  atomic.Int64
 	remoteAgents background.RemoteAgentSource
