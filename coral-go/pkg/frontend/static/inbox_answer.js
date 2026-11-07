@@ -87,11 +87,9 @@ async function readAsk(s) {
     const selectable = (po.options || []).filter(o => (o.action || 'select') === 'select' && o.label && Number.isInteger(Number(o.n)));
     const held = !permission && !onlyReject && picks.length < selectable.length;
     const target = permission && typeof po.target === 'string' ? po.target : ''; // what the permission wants to run, as the server read it whole (#14173)
-    // The row shows ONE line of it, cut at 160: a request that is more than that line is not shown whole here, so no Yes is a button on the row (Security's SHOULD on #14173); No stays, the whole request is in Open agent.
-    const shownWhole = !target || (target.trim().split('\n').filter(l => l.trim()).length === 1 && target.trim().length <= 160);
-    const rowPicks = shownWhole ? picks : picks.filter(o => REJECT_FORM.test(wholeLabel(String(o.label))));
-    const clipped = !shownWhole && rowPicks.length < picks.length;
-    return rowPicks.length >= 1 && rowPicks.length <= MAX_CHOICES ? { ask: String(po.ask_id || ''), picks: rowPicks, onlyReject, held: held || clipped, question: stepClean(po.question).slice(0, 120), target, shownWhole } : { ...none, target, shownWhole, held: clipped };
+    // The row draws ALL of it, wrapped, and a Yes is a button only while the drawn block is not clipped (measured after layout and on resize, in fill): a request the row cannot show whole is refused or opened in the agent, never allowed blind (#14173, UI Reviewer and Security).
+    const targetNote = permission && typeof po.target_note === 'string' ? stepClean(po.target_note).slice(0, 240) : '';
+    return picks.length >= 1 && picks.length <= MAX_CHOICES ? { ask: String(po.ask_id || ''), picks, onlyReject, held, question: stepClean(po.question).slice(0, 120), target, targetNote } : { ...none, target, targetNote };
 }
 
 const askKey = s => `${sessionServer(s)}:${s.session_id}:${s.waiting_since || ''}`;
@@ -161,17 +159,23 @@ function confirmTrust(s, o, ask, cell, trust) {
 function fill(s, cell, withDismiss = true) {
     const key = askKey(s);
     if (!read.has(key)) read.set(key, readAsk(s).catch(() => ({ ask: '', picks: [], onlyReject: false })));
-    return read.get(key).then(({ ask, picks, onlyReject, held, step, stepFull, question, later, lines, trust, browser, target, shownWhole }) => {
+    return read.get(key).then(({ ask, picks, onlyReject, held, step, stepFull, question, later, lines, trust, browser, target, targetNote }) => {
         cell.replaceChildren();
         const said = norm => String(norm || '').replace(/[?\s]+$/, '');
         const words = step || (question && (later || !said(s.waiting_summary).includes(said(question))) ? question : ''); // the question is named when the row's own words do not carry it (a later step's never does)
         if (lines && lines.length) { const t = document.createElement('span'); t.className = 'inbox-answer-step'; if (stepFull && stepFull !== words) t.title = stepFull; lines.forEach(l => { const ln = document.createElement('span'); ln.className = 'inbox-answer-step-line'; ln.textContent = l.length > 240 ? `${l.slice(0, 239)}…` : l; t.append(ln, ' '); }); cell.append(t); } else if (words) { const t = document.createElement('span'); t.className = 'inbox-answer-step'; t.textContent = words.length > 240 ? `${words.slice(0, 239)}…` : words; if (stepFull && stepFull !== words) t.title = stepFull; else if (words.length > 240) t.title = words; cell.append(t); } // text only; a cut line (a field or the whole) says so and keeps the uncut text as its hover; the review's lines have a space between them: one run of words for a screen reader
-        if (target && target.trim()) { // the command on the row: the first line of it, one line cut with an ellipsis (the whole text is its tooltip and the card's), then what Yes allows (#14173)
-            const first = target.split('\n').map(l => l.trim()).find(Boolean) || '', more = target.trim().split('\n').filter(l => l.trim()).length > 1;
-            const cmd = document.createElement('span'); cmd.className = 'inbox-cmd'; cmd.title = target; cmd.setAttribute('aria-label', `Wants to run: ${target.length > 600 ? target.slice(0, 599) + '…' : target}`);
-            const code = document.createElement('code'); code.textContent = first.length > 160 ? `${first.slice(0, 159)}…` : first + (more ? ' …' : '');
-            cmd.append('Wants to run ', code); cell.append(cmd);
-            if (picks.length && !onlyReject) { const yes = document.createElement('span'); yes.className = 'inbox-trust-note inbox-yes-note'; yes.textContent = shownWhole === false ? 'This request is longer than one line, so it can only be refused here. Open the agent to read all of it and allow it there.' : 'Yes lets it run this once. No refuses it. Open the agent to read all of it or to allow more.'; cell.append(yes); }
+        const yesButtons = [];
+        let gate = null;
+        if (target && target.trim()) { // the command on the row, all of it wrapped in a code block (3 lines, 4 on a phone), then Claude's own line under it, then what Yes allows (#14173)
+            const block = document.createElement('pre'); block.className = 'inbox-cmd-block'; block.textContent = target.trim();
+            block.setAttribute('aria-label', 'What it wants to run'); block.tabIndex = 0; // a keyboard can reach a block that scrolls
+            cell.append(block);
+            if (targetNote) { const nt = document.createElement('span'); nt.className = 'inbox-cmd-note'; nt.textContent = targetNote; cell.append(nt); }
+            const yes = document.createElement('span'); yes.className = 'inbox-trust-note inbox-yes-note'; cell.append(yes);
+            const clipped = () => !(block.getClientRects().length > 0 && block.scrollHeight <= block.clientHeight + 1); // not laid out is not shown: fail closed
+            const apply = () => { const c = clipped(); yesButtons.forEach(b => { b.hidden = c; }); yes.hidden = onlyReject || !picks.length; yes.textContent = c ? 'This request is longer than the row shows, so it can only be refused here. Open the agent to read all of it and allow it there.' : 'Yes lets it run this once. No refuses it. Open the agent to read all of it or to allow more.'; };
+            if (typeof ResizeObserver === 'function') new ResizeObserver(apply).observe(block);
+            gate = { clipped, apply };
         }
         if (browser) { const note = document.createElement('span'); note.className = 'inbox-trust-note inbox-browser-note'; note.textContent = BROWSER_NOTE; cell.append(note); } // what the one button does, and why the other two are not buttons (#14151)
         if (trust) { // the folder, plain text, and what Yes does, before any choice (#14110)
@@ -185,10 +189,13 @@ function fill(s, cell, withDismiss = true) {
             b.type = 'button'; b.className = 'btn btn-small inbox-answer'; b.textContent = o.label;
             b.dataset.session = s.session_id; b.dataset.n = String(Number(o.n)); // what finds this choice again after a redraw keeps the keyboard on it (sidebar_groups.js)
             b.setAttribute('aria-label', `Answer ${o.label} for ${resolveSessionIdentity(s)}`);
-            b.addEventListener('click', e => { e.stopPropagation(); if (trust && o === trust.yes) confirmTrust(s, o, ask, cell, trust); else answer(s, o, ask, cell, stepFull || ''); });
+            const isYes = gateOpt => !REJECT_FORM.test(wholeLabel(String(gateOpt.label)));
+            if (typeof gate === 'object' && gate && isYes(o)) { yesButtons.push(b); b.hidden = true; } // hidden until measured: a Yes is never drawn before the block is known to be whole
+            b.addEventListener('click', e => { e.stopPropagation(); if (gate && yesButtons.includes(b) && gate.clipped()) { gate.apply(); return; } if (trust && o === trust.yes) confirmTrust(s, o, ask, cell, trust); else answer(s, o, ask, cell, stepFull || ''); });
             b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
             cell.append(b);
         }
+        gate?.apply();
         if (held) { const more = document.createElement('span'); more.className = 'inbox-only-reject'; more.textContent = 'More choices: open the agent.'; cell.append(more); } // some of the question's choices are left to Open: said, so these do not read as all of them
         if (onlyReject) { // said in words, set as text: the full request is under Open
             const note = document.createElement('span');

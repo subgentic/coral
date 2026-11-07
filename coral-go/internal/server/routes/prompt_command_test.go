@@ -9,10 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// The layout is the real one (the Beta Tester's run 2: every one of 16 real Bash prompts has ONE line of Claude's own under the closing rule, then the question).
 // #14173 (the Beta Tester): a long command showed only its last lines, because the prompt's context was three lines. A permission prompt draws its request between two dashed rules; the whole block is the target.
 func claudeBashScreen(command string) string {
 	rule := strings.Repeat("╌", 110)
-	return "⏺ Bash(something)\n  ⎿  Waiting…\n\n" + strings.Repeat("─", 110) + "\n Bash command\n Run a long thing\n" + rule + "\n" + command + "\n" + rule + "\n Do you want to proceed?\n ❯ 1. Yes\n   2. No\n\n Esc to cancel · Tab to amend\n"
+	return "⏺ Bash(something)\n  ⎿  Waiting…\n\n" + strings.Repeat("─", 110) + "\n Bash command\n Run a long thing\n" + rule + "\n" + command + "\n" + rule + "\n This command requires approval\n\n Do you want to proceed?\n ❯ 1. Yes\n   2. No\n\n Esc to cancel · Tab to amend\n"
 }
 
 func TestPermissionTarget_IsTheWholeBlockBetweenTheRules(t *testing.T) {
@@ -32,6 +33,8 @@ func TestPermissionTarget_IsTheWholeBlockBetweenTheRules(t *testing.T) {
 	one, ok := parsePromptScreen(claudeBashScreen(" touch probe.txt"))
 	require.True(t, ok)
 	assert.Equal(t, "touch probe.txt", one.Target)
+	assert.Equal(t, "This command requires approval", one.TargetNote, "Claude's own line under the request is its note, not part of the command")
+	assert.False(t, one.OnlyReject)
 
 	// the ask is still told from the next one by its last lines: the same command with another first line is the same ask (context is unchanged), another last line is another ask
 	other := strings.Replace(strings.Join(lines, "\n"), "step14 --flag=14", "step14 --flag=99", 1)
@@ -61,9 +64,27 @@ func TestPermissionTarget_TooLongIsOnlyReject(t *testing.T) {
 // Security's SHOULD on #14173: a closing dashed rule with no opening rule in reach is a request that cannot be read whole: only Reject.
 func TestPermissionTarget_NoOpeningRuleIsOnlyReject(t *testing.T) {
 	rule := strings.Repeat("╌", 110)
-	screen := "⏺ Bash(x)\n" + strings.Repeat(" more output\n", 3) + " touch a\n" + rule + "\n Do you want to proceed?\n ❯ 1. Yes\n   2. No\n\n Esc to cancel\n"
+	screen := "⏺ Bash(x)\n" + strings.Repeat(" more output\n", 3) + " touch a\n" + rule + "\n This command requires approval\n\n Do you want to proceed?\n ❯ 1. Yes\n   2. No\n\n Esc to cancel\n"
 	s, ok := parsePromptScreen(screen)
 	require.True(t, ok)
 	assert.True(t, s.OnlyReject, "the opening rule is not on the screen")
 	assert.Contains(t, s.Note, "top of this request")
+}
+
+// A real prompt may carry up to three lines of Claude's own under the request; four or more is not this layout (the screen keeps the old three-line context).
+func TestPermissionTarget_DescriptionLines(t *testing.T) {
+	rule := strings.Repeat("╌", 110)
+	mk := func(desc string) string {
+		return strings.Repeat("─", 110) + "\n Bash command\n" + rule + "\n touch a\n" + rule + "\n" + desc + "\n\n Do you want to proceed?\n ❯ 1. Yes\n   2. No\n\n Esc to cancel\n"
+	}
+	s, ok := parsePromptScreen(mk(" A variable in this command can't be checked before it runs"))
+	require.True(t, ok)
+	assert.Equal(t, "touch a", s.Target)
+	assert.Equal(t, "A variable in this command can't be checked before it runs", s.TargetNote)
+	three, ok := parsePromptScreen(mk(" one\n two\n three"))
+	require.True(t, ok)
+	assert.Equal(t, "touch a", three.Target)
+	four, ok := parsePromptScreen(mk(" one\n two\n three\n four"))
+	require.True(t, ok)
+	assert.Empty(t, four.command, "four lines under the rule is not a request block")
 }

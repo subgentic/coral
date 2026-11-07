@@ -98,6 +98,8 @@ type promptScreen struct {
 	command string
 	// commandOpenMissing: the dashed rule that closes the request is just above the question but the one that opens it was not found within commandMaxLines: the request cannot be shown whole, so only Reject is offered (#14173, Security).
 	commandOpenMissing bool
+	// TargetNote: Claude's own line under the request ("Contains brace with quote character", "This command requires approval"), plain text, shown beneath the command (#14173).
+	TargetNote string `json:"target_note,omitempty"`
 	// Target is the lines above the question (a permission prompt's command) as permreview shows them: whole up to its limit, hidden characters written out. OnlyReject and Note: the request holds a character
 	// that hides what it does, or is longer than a card shows, so only Reject is offered and an Allow answer is refused (#11399). A cut the CLI itself makes on its screen cannot be known.
 	Target     string `json:"target,omitempty"`
@@ -206,6 +208,7 @@ func askID(s promptScreen) string {
 func cleanPromptScreen(s promptScreen) promptScreen {
 	s.Title = clitext.CleanName(s.Title)
 	s.Question = clitext.CleanName(s.Question)
+	s.TargetNote = clitext.CleanName(s.TargetNote)
 	opts := make([]promptOption, len(s.Options))
 	for i, o := range s.Options {
 		o.Label = clitext.CleanName(o.Label)
@@ -368,7 +371,7 @@ func parsePromptScreenRaw(capture string) (promptScreen, bool) {
 			}
 		}
 	}
-	return promptScreen{Title: title, Question: question, Options: opts, Review: parseReview(lines, questionAt), Multi: multi, Submit: submit, boxes: boxes, context: promptContext(lines, questionAt), command: cmdOf(lines, questionAt), commandOpenMissing: cmdOpenMissing(lines, questionAt)}, true
+	return promptScreen{Title: title, Question: question, Options: opts, Review: parseReview(lines, questionAt), Multi: multi, Submit: submit, boxes: boxes, context: promptContext(lines, questionAt)}.withCommand(lines, questionAt), true
 }
 
 var (
@@ -484,7 +487,7 @@ func parseUnnumberedMenu(lines []string) (promptScreen, bool) {
 	if questionAt < 0 {
 		questionAt = first
 	}
-	return promptScreen{Question: question, Options: opts, Unnumbered: true, context: promptContext(lines, questionAt), command: cmdOf(lines, questionAt), commandOpenMissing: cmdOpenMissing(lines, questionAt)}, true
+	return promptScreen{Question: question, Options: opts, Unnumbered: true, context: promptContext(lines, questionAt)}.withCommand(lines, questionAt), true
 }
 
 // paragraphAt is the paragraph (non-blank lines between blank lines and rules) holding lines[i], joined, and
@@ -523,23 +526,27 @@ const commandMaxLines = 400
 
 var dashedRuleRe = regexp.MustCompile(`^\s*[╌┄]{8,}\s*$`)
 
-func cmdOf(lines []string, questionAt int) string { c, _ := promptCommand(lines, questionAt); return c }
-
-func cmdOpenMissing(lines []string, questionAt int) bool {
-	_, m := promptCommand(lines, questionAt)
-	return m
-}
-
 // promptCommand is the whole request Claude draws between its two dashed rules just above a permission question (a Bash command, an edit's diff), so a card and a row can show all of it and not the last three lines
 // promptContext keeps for telling one ask from the next (#14173, the Beta Tester: a long command showed only its last 2 lines). It is "" unless the nearest non-blank line above the question is a dashed rule and
 // the rule that opens the block is within commandMaxLines: any other screen keeps the old three lines. Each line keeps its own indentation, one leading space (the dialog's margin) dropped.
-func promptCommand(lines []string, questionAt int) (string, bool) {
-	i := questionAt - 1
-	for i >= 0 && strings.TrimSpace(lines[i]) == "" {
-		i--
+func promptCommand(lines []string, questionAt int) (cmd, note string, missing bool) {
+	i, seen := questionAt-1, 0
+	var desc []string
+	for ; i >= 0; i-- { // Claude's own line or two under the request sit between the closing rule and the question (every real Bash prompt has one)
+		t := strings.TrimSpace(lines[i])
+		if t == "" {
+			continue
+		}
+		if dashedRuleRe.MatchString(lines[i]) {
+			break
+		}
+		if seen++; seen > 3 {
+			return "", "", false
+		}
+		desc = append([]string{t}, desc...)
 	}
-	if i < 0 || !dashedRuleRe.MatchString(lines[i]) {
-		return "", false
+	if i < 0 {
+		return "", "", false
 	}
 	end := i
 	for j := end - 1; j >= 0 && j >= end-commandMaxLines; j-- {
@@ -548,10 +555,16 @@ func promptCommand(lines []string, questionAt int) (string, bool) {
 			for _, l := range lines[j+1 : end] {
 				block = append(block, strings.TrimRight(strings.TrimPrefix(l, " "), " \t\r"))
 			}
-			return strings.Trim(strings.Join(block, "\n"), "\n"), false
+			return strings.Trim(strings.Join(block, "\n"), "\n"), strings.Join(desc, " "), false
 		}
 	}
-	return "", true // a closing rule with no opening rule in reach: the request is not shown whole
+	return "", "", true // a closing rule with no opening rule in reach: the request is not shown whole
+}
+
+// withCommand sets the request block, Claude's line under it and the missing-opening-rule flag from the screen above the question.
+func (s promptScreen) withCommand(lines []string, questionAt int) promptScreen {
+	s.command, s.TargetNote, s.commandOpenMissing = promptCommand(lines, questionAt)
+	return s
 }
 
 // samePrompt reports whether two reads show the same prompt, wherever its selection is.
