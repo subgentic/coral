@@ -174,7 +174,7 @@ const fromOf = (s, withTeam) => { if (s.operatorAsk) return [`from ${markHidden(
 /** The wait, again, inside the item cell (#13795): a phone's row puts it at the right of the sender's line, so the Waiting column is hidden there; hidden everywhere else (the column says it). */
 const waitMark = s => {
     const text = waitingText(s.waiting_since); if (!text) return [];
-    const elapsed = text.replace(/^waiting /, '').replace('under 1 min', '<1m').replace(/ (min|h|d)/g, '$1').split(' ')[0];
+    const elapsed = text.replace(/^waiting /, '').replace('under 1 min', '<1m').replace(/ min/g, 'm').replace(/ (h|d)/g, '$1').split(' ')[0];
     const mark = DT.el('span', 'inbox-review-wait'); mark.title = text;
     const visible = DT.el('span', 'inbox-review-elapsed'); visible.dataset.elapsed = elapsed; visible.setAttribute('aria-hidden', 'true');
     mark.append(DT.el('span', 'sr-only', text), visible); return [mark];
