@@ -27,6 +27,7 @@ const { coralReady } = require('./helpers/wait');
                     if(p.endsWith('/api/board/same-team/tasks/1'))return json(task);
                     if(p.endsWith('/api/board/same-team/goals/1'))return json(goal);
                     if(p.endsWith('/api/board/same-team/tasks'))return json({tasks:[task]});
+                    if(p.endsWith('/api/team-artifacts'))return json(window.__reviewFixturePage(url,location.href,{'same-team':[]}));
                     if(p.endsWith('/api/board/same-team/artifacts'))return json({artifacts:[]});
                     if(p.endsWith('/api/board/same-team/messages/all'))return json([]);
                     if(remote)return json({});
