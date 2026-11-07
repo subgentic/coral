@@ -72,7 +72,7 @@ const BASE = require('./test_base').BASE;
                 { id: 1, project: 'gamma', subscriber_id: 'hub-user-0a1b2c3d', job_title: 'hub-user-0a1b2c3d', origin: 'hub_user', content: 'from the hub', created_at: '2026-10-14T08:00:01Z' },
                 { id: 2, project: 'gamma', subscriber_id: 'hub-user-99999999', job_title: 'hub-user-99999999', content: 'looks like one', created_at: '2026-10-14T08:00:02Z' },
                 { id: 3, project: 'gamma', subscriber_id: 'Lead Developer', job_title: 'Lead Developer', content: 'an agent', created_at: '2026-10-14T08:00:03Z' },
-                { id: 4, project: 'gamma', subscriber_id: 'Operator', job_title: 'Operator', origin: 'hub_operator', hub_user: 'hub-user-0a1b2c3d', content: '[Operator via Coral Hub, hub-user-0a1b2c3d] ship it', created_at: '2026-10-14T08:00:04Z' },
+                { id: 4, project: 'gamma', subscriber_id: 'hub-user-0a1b2c3d', job_title: 'hub-user-0a1b2c3d', origin: 'hub_operator', hub_user: 'hub-user-0a1b2c3d', content: '[Operator via Coral Hub, hub-user-0a1b2c3d] ship it', created_at: '2026-10-14T08:00:04Z' },
             ];
             window.fetch = async (url, opts) => {
                 const u = String(url);
@@ -112,6 +112,15 @@ const BASE = require('./test_base').BASE;
             assert.ok(chip, `${w}: the Operator via Coral Hub chip is rendered`);
             assert.equal(chip.text, 'Operator via Coral Hub', `${w}: the chip shows no Hub user id (#14292)`);
             assert.match(chip.title, /hub-user-0a1b2c3d/, `${w}: the id is in the hover title`);
+            // Reply pre-fills '@' + this name (replyToMessage, board_composer.js): the name the button draws is what the box gets (#14292)
+            const reply = await ev(`(() => { const row = [...document.querySelectorAll('#board-panel-msgs .mb-message')].find(x => x.querySelector('.mb-hub-user-badge.is-operator'));
+                const t = row.querySelector(':scope > .mb-row-toggle'); if (t && t.getAttribute('aria-expanded') !== 'true') t.click();
+                const b = row.querySelector('[data-on-click="mb-msg-reply"]'); if (!b) return null;
+                const who = b.dataset.sender;
+                return { who, label: b.getAttribute('aria-label') }; })()`);
+            assert.ok(reply, `${w}: an open row has Reply`);
+            assert.equal(reply.who, 'Operator', `${w}: Reply names the Operator, not the Hub user id`);
+            assert.ok(!/hub-user-/.test(String(reply.label)), `${w}: the Reply label has no id: ` + reply.label);
         }
         await Emulation.setDeviceMetricsOverride({ width: 1400, height: 900, deviceScaleFactor: 1, mobile: false });
         console.log("   ✓ team chat: the badge on the Hub user's message only");

@@ -51,6 +51,12 @@ export function askBadge(m) {
 
 /** A board chat message a Coral Hub user sent through the Hub (#3377). origin is set by the
  *  server on tunnel chat posts, never taken from a client and never inferred from the name. */
+/** Who a message is from, as a row and a reply say it: a post the Hub made as the Operator is from the Operator (never from the Hub user's id, #14292); else the job title, the sender name, 'Unknown'. */
+export function boardSenderName(m) {
+    if (m && m.origin === 'hub_operator') return 'Operator';
+    return (m && (m.job_title || m.sender_name)) || 'Unknown';
+}
+
 export function hubUserBadge(m) {
     // The Operator, acting through Coral Hub (#3404): which Hub user did it is recorded by the
     // server from the validated header (hub_user), never taken from the name.
