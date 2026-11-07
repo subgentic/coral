@@ -28,6 +28,8 @@ const id = n => n.toString(16).padStart(64, '0');
             window.__items = [mk(1, 30, ['for review', 'internal']), mk(2, 20, ['for review', 'internal']), mk(3, 10, ['for review', 'internal'])];
             const R = window.fetch, json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } }));
             window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin), m = (opts.method || 'GET').toUpperCase();
+                const page = u.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(u.href, location.href, {'${team}':window.__items}) : null;
+                if (page && m === 'GET') return json(page);
                 if (u.pathname === '/api/board/${team}/artifacts' && m === 'GET') { const t = u.searchParams.get('tag'); const list = window.__items.filter(a => !t || a.tags.includes(t)); return json({ project: '${team}', artifacts: list, has_more: false }); }
                 if (u.pathname.startsWith('/api/board/${team}/artifacts/') && u.pathname.endsWith('/review') && m === 'POST') { const hex = u.pathname.split('/').at(-2), body = JSON.parse(opts.body), it = window.__items.find(a => a.id === hex); window.__decisions.push({ id: hex, decision: body.decision });
                     /* ignore swaps for review and ignored as the real route does (IgnoreArtifactReview) */ const add = t => { if (!it.tags.includes(t)) it.tags.push(t); }, del = t => { it.tags = it.tags.filter(x => x !== t); };

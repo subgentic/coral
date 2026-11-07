@@ -15,9 +15,11 @@ const HEX = n => String(n).repeat(64);
         await Page.addScriptToEvaluateOnNewDocument({source:`(() => {
             const real=window.fetch, json=(b,status=200)=>Promise.resolve(new Response(JSON.stringify(b),{status,headers:{'content-type':'application/json'}}));
             window.__puts=[]; window.__rejects=[];window.__requests=[];window.__decisions=[];
-            window.__files=[1,2].map(n=>({id:String(n).repeat(64),uri:'coral://artifacts/'+String(n).repeat(64),name:'plan-'+n+'.md',media_type:'text/markdown',source:'upload',available:true,size:32,produced_by:'Writer '+n,session_id:'writer-'+n,created_at:'2026-11-04T00:00:00Z',tags:['for review','internal','draft','final']}));
+            window.__files=[1,2].map(n=>({board_id:'same-team',id:String(n).repeat(64),uri:'coral://artifacts/'+String(n).repeat(64),name:'plan-'+n+'.md',media_type:'text/markdown',source:'upload',available:true,size:32,produced_by:'Writer '+n,session_id:'writer-'+n,created_at:'2026-11-04T00:00:00Z',tags:['for review','internal','draft','final']}));
             window.fetch=(u,o={})=>{
                 const url=new URL(String(u),location.href), p=url.pathname;window.__requests.push(p+url.search);
+                const page = window.__reviewFixturePage(u, location.href, p.startsWith('/api/remote/m1/') ? {'same-team':window.__files} : {});
+                if (page) return json(page);
                 const review=/^\\/api\\/remote\\/m1\\/api\\/board\\/same-team\\/artifacts\\/([a-f0-9]{64})\\/review$/.exec(p);
                 if(review && o.method==='POST') {
                     const a=window.__files.find(a=>a.id===review[1]), {decision,quiet}=JSON.parse(o.body);

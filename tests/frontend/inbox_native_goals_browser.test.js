@@ -45,7 +45,11 @@ const { FOLDER_ROWS } = require('./helpers/folder_rows');
         await waitFor(`document.getElementById('group-table-view') && document.getElementById('group-table-view').textContent.includes('report-m1.md')`, 'm1\'s artifact is listed', 10000);
         assert.equal(await ev(`document.getElementById('group-table-view').textContent.includes('report-m2.md')`), false, 'm2 refused: none of its artifacts');
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('goals')).then(() => import((window.__coralStatic || '/static/') + 'inbox_tab.js')).then(m => m.selectInboxTab('artifacts')).then(() => true)`);
-        assert.equal(await ev(`window.__remoteRequests.filter(r => r.server === 'm2' && r.path === '/api/team-artifacts').length`), 1, 'the computer that refused is asked once for the session');
+        assert.equal(await ev(`window.__remoteRequests.filter(r => {const q=new URLSearchParams(r.query);return r.server === 'm2' && r.path === '/api/team-artifacts' && !q.has('tag') && !q.has('waiting') && !q.has('digest');}).length`), 1, 'the refused Artifacts-folder count is asked once for the session');
+        const summaries = await ev(`window.__remoteRequests.filter(r=>r.server==='m2'&&r.path==='/api/team-artifacts'&&new URLSearchParams(r.query).get('tag')==='for review')`);
+        assert.equal(summaries.length, 1, 'the independent review-attention summary is also asked once');
+        const summary = new URLSearchParams(summaries[0].query);
+        assert.deepEqual(Object.fromEntries(summary), {tag:'for review',waiting:'1',muted:'0',versions:'newest',limit:'1'}, 'the separate summary retains its exact bounded query');
         assert.equal(await ev(`(${FOLDER_ROWS}).some(w => /^Artifacts/.test(w))`), true, 'the folder stays while one computer allows it');
 
         console.log('5. a grantee on every computer: no Artifacts folder, a kept Artifacts tab falls back to Needs you, no error');
