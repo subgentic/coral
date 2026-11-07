@@ -104,6 +104,27 @@ log "server log lines about spawn failures since the launch:"
 grep -n 'pty spawn failed\|already exists\|Failed to wake' "$TMP/server.log" | sed 's/^/    /' | tail -8
 echo "    (matching lines: $(grep -c 'pty spawn failed\|already exists' "$TMP/server.log"), before Kill All: $WS_BEFORE)"
 
+if [[ "$SCENARIO" == killall ]]; then
+    # Confirm of Wake Team's offer: every member the wake answer listed as ended is resumed in turn, through History's two calls (resume-info, then launch with resume_session_id on the team's board), as the dashboard does.
+    log "CONFIRM THE RESUME OF EVERY ENDED MEMBER THE WAKE ANSWER LISTED"
+    echo "$wake" | python3 -c '
+import json, sys
+for e in (json.load(sys.stdin).get("ended") or []): print(e["session_id"], e["name"], sep="\t")' > "$TMP/ended.tsv"
+    echo "    listed: $(cut -f2 "$TMP/ended.tsv" | paste -sd, -)"
+    while IFS=$'\t' read -r esid ename; do
+        einfo=$(api GET "/api/sessions/history/${esid}/resume-info")
+        ewd=$(echo "$einfo" | python3 -c "import sys,json; print(json.load(sys.stdin).get('working_dir',''))" 2>/dev/null)
+        erid=$(echo "$einfo" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('resume_session_id') or '$esid')" 2>/dev/null)
+        ename2=$(echo "$einfo" | python3 -c "import sys,json; print(json.load(sys.stdin).get('display_name') or '$ename')" 2>/dev/null)
+        eres=$(api POST "/api/sessions/launch" -d "{\"working_dir\":\"$ewd\",\"agent_type\":\"claude\",\"resume_session_id\":\"$erid\",\"display_name\":\"$ename2\",\"board_id\":\"$BOARD\",\"board_name\":\"$BOARD\",\"backend\":\"$CORAL_TEST_BACKEND\"}")
+        echo "    $ename: resume-info working_dir=$ewd; launch ok=$(echo "$eres" | python3 -c "import sys,json; print(json.load(sys.stdin).get('ok'))" 2>/dev/null)"
+    done < "$TMP/ended.tsv"
+    sleep 4
+    log "AFTER CONFIRM: live list for the team (expect Lead, Dev and QA awake):"; live | awk -F'\t' -v b="$BOARD" '$3 == b' | sed 's/^/    /'
+    back=$(live | awk -F'\t' -v b="$BOARD" '$3 == b && $4 == "awake" {print $2}' | sort | paste -sd, -)
+    log "RESULT: awake in the team after Confirm: $back"
+    log "server log: any spawn failure after the resume: $(grep -c 'pty spawn failed\|already exists' "$TMP/server.log")"
+fi
 log "INBOX RESTART of one ended member (the dashboard's resume: resume-info, then launch on the team's board)"
 SID=$(echo "$BEFORE_IDS" | head -1)
 info=$(api GET "/api/sessions/history/${SID}/resume-info"); echo "    resume-info: $info" | cut -c1-300
