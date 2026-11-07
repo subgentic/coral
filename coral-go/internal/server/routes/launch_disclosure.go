@@ -16,7 +16,7 @@ const (
 	// LaunchDisclosureID versions the words: a change of the text is a new id, and an old acknowledgement then no longer counts.
 	LaunchDisclosureID = "full-permissions-1"
 	// LaunchDisclosureText is the measured behaviour in plain words (Auto still judges a force push or a delete outside the project; Codex stays in its sandbox).
-	LaunchDisclosureText = "Agents you start here begin with full permissions: they can read and change files, run commands and use the web in their folder without asking you first. " +
+	LaunchDisclosureText = "Agents you start here begin with full permissions. They run as you, with every file you can reach: they can read and change files, run commands and use the web without asking you first. " +
 		"The agent's own safety checks still apply to destructive commands such as a force push or a delete outside the project, and Codex agents stay inside their project folder. " +
 		"To start one with fewer permissions, pick a lower permission mode when you launch it, or set a default permission mode in Settings."
 	// PermissionLoweringText is where to lower it, carried in every launch answer.

@@ -163,6 +163,12 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 	// Through the Coral Hub, a team with any member that skips permission prompts needs the owner's local switch, checked
 	// before anything is written or started (#126 F4). A member that is exactly one of the owner's saved templates may keep
 	// its allow rules, tools and hooks; its flags are checked all the same.
+	if dialogLaunch(r) { // a launch from the dashboard's own dialog waits for the notice when any member would start in the new default (#14353)
+		settings, _ := h.ss.GetSettings(r.Context())
+		if h.refuseUnseenDisclosure(w, r, teamUsesNewDefault(body, settings)) {
+			return
+		}
+	}
 	if cloud.Tunneled(r) {
 		settings, err := h.ss.GetSettings(r.Context())
 		if err != nil {
@@ -460,6 +466,23 @@ func (h *SessionsHandler) rollBackTeamLaunch(ctx context.Context, body launchTea
 func teamAsksToSkip(body launchTeamRequest, settings map[string]string) bool {
 	for _, def := range body.Agents {
 		if memberAsksToSkip(body, def, settings) {
+			return true
+		}
+	}
+	return false
+}
+
+// teamUsesNewDefault is whether any member of the team would start in the new default (a member that names no mode, flags or saved default, on a team that is not a relaunch).
+func teamUsesNewDefault(body launchTeamRequest, settings map[string]string) bool {
+	for _, def := range body.Agents {
+		agentType, flags := body.AgentType, def.Flags
+		if def.AgentType != "" {
+			agentType = def.AgentType
+		}
+		if len(flags) == 0 {
+			flags = body.Flags
+		}
+		if memberDefaultSkips(body, def, settings, agentType, flags) {
 			return true
 		}
 	}
