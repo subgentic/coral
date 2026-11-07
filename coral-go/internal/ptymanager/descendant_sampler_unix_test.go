@@ -25,19 +25,29 @@ func lateDetachCmd(pidFile string) string {
 	return `perl -e 'use POSIX; if (!fork) { POSIX::setsid(); open F, ">` + pidFile + `"; print F $$; close F; exec "sleep", "600" } select(undef, undef, undef, 6); exit 0'; sleep 600`
 }
 
-// waitOrphaned waits for the helper's parent to be gone (PID 1 has it): the six seconds are over.
+// waitOrphaned waits for the helper to lose its parent: the six seconds are over. The parent it had when first seen is the one that must go; whoever takes the helper after that is not named (PID 1 on a
+// plain Linux or a Mac, but systemd as pid 1 hands it to a subreaper of its own, as WSL does), so the test does not depend on how the machine's init adopts orphans (#14377).
 func waitOrphaned(t *testing.T, pid int) {
 	t.Helper()
+	first := -1
 	for end := time.Now().Add(15 * time.Second); time.Now().Before(end); time.Sleep(50 * time.Millisecond) {
 		p, err := process.NewProcess(int32(pid))
 		if err != nil {
 			t.Fatalf("the helper %d is gone before its parent exited", pid)
 		}
-		if pp, err := p.Ppid(); err == nil && pp == 1 {
+		pp, err := p.Ppid()
+		if err != nil {
+			continue
+		}
+		if first < 0 {
+			first = int(pp)
+			continue
+		}
+		if int(pp) != first {
 			return
 		}
 	}
-	t.Fatalf("the helper %d was never orphaned", pid)
+	t.Fatalf("the helper %d was never orphaned (its parent stayed %d)", pid, first)
 }
 
 func TestPTYKillEndsAHelperThatDetachedSixSecondsIn(t *testing.T) {
