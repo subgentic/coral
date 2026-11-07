@@ -464,14 +464,14 @@ func defaultShell() ([]string, error) {
 			log.Printf("[pty] CORAL_SHELL=%q is ignored for agents: Coral starts Windows agents through PowerShell, since cmd.exe can't run their launch line", os.Getenv("CORAL_SHELL"))
 		})
 	}
-	return withoutProfileForTests(sh, config.TestHooksEnvHonoured && os.Getenv("CORAL_TEST_HOOKS") == "1"), err
+	return withoutProfileUnderTestHooks(sh, config.TestHooksEnvHonoured && os.Getenv("CORAL_TEST_HOOKS") == "1"), err
 }
 
-// withoutProfileForTests adds -NoProfile to a PowerShell when testHooks is set: the dashboard test suites' server (a dev build with
+// withoutProfileUnderTestHooks (not a test-only function, so not named ...ForTests: it runs in production code under the CORAL_TEST_HOOKS gate that only a dev build honours) adds -NoProfile to a PowerShell when testHooks is set: the dashboard test suites' server (a dev build with
 // CORAL_TEST_HOOKS=1, which every other tier ignores) must not run the person's own PowerShell profile in its agents' terminals, and
 // PowerShell finds that profile through the Documents folder, which no environment variable moves (#384). A real launch keeps it.
 // Only the arguments change: the program, and with it how the launch line is quoted, stays the one pickShell chose.
-func withoutProfileForTests(sh []string, testHooks bool) []string {
+func withoutProfileUnderTestHooks(sh []string, testHooks bool) []string {
 	if !testHooks || len(sh) == 0 || !winshell.IsPowerShell(sh[0]) {
 		return sh
 	}
