@@ -172,10 +172,25 @@ function fill(s, cell, withDismiss = true) {
             cell.append(block);
             if (targetNote) { const nt = document.createElement('span'); nt.className = 'inbox-cmd-note'; nt.textContent = targetNote; cell.append(nt); }
             const yes = document.createElement('span'); yes.className = 'inbox-trust-note inbox-yes-note'; cell.append(yes);
-            const clipped = () => !(block.getClientRects().length > 0 && block.scrollHeight <= block.clientHeight + 1); // not laid out is not shown: fail closed
-            const apply = () => { const c = clipped(); yesButtons.forEach(b => { b.hidden = c; }); yes.hidden = onlyReject || !picks.length; yes.textContent = c ? 'This request is longer than the row shows, so it can only be refused here. Open the agent to read all of it and allow it there.' : 'Yes lets it run this once. No refuses it. Open the agent to read all of it or to allow more.'; };
+            const more = document.createElement('button'); more.type = 'button'; more.className = 'btn btn-quiet btn-small inbox-cmd-more'; more.textContent = 'Show all'; more.hidden = true; more.setAttribute('aria-label', 'Show all of the command'); cell.insertBefore(more, yes);
+            let open = false, reached = false;
+            const laidOut = () => block.getClientRects().length > 0;
+            const clipped = () => !(laidOut() && block.scrollHeight <= block.clientHeight + 1); // not laid out is not shown: fail closed
+            const atEnd = () => laidOut() && block.scrollTop + block.clientHeight >= block.scrollHeight - 2;
+            const allowed = () => !clipped() || (open && reached); // Yes only for a command shown whole, or one the person has scrolled to the end of
+            const apply = () => {
+                const c = clipped();
+                if (open && atEnd()) reached = true;
+                more.hidden = open || !c;
+                const ok = allowed();
+                yesButtons.forEach(b => { b.hidden = !ok; });
+                yes.hidden = onlyReject || !picks.length;
+                yes.textContent = ok ? 'Yes lets it run this once. No refuses it. Open the agent to read all of it or to allow more.' : open ? 'Read the whole command to allow it: scroll to the end of it.' : 'Read the whole command to allow it: press Show all. Or open the agent.';
+            };
+            more.addEventListener('click', e => { e.stopPropagation(); open = true; block.classList.add('is-open'); apply(); block.focus({ preventScroll: true }); });
+            block.addEventListener('scroll', apply, { passive: true });
             if (typeof ResizeObserver === 'function') new ResizeObserver(apply).observe(block);
-            gate = { clipped, apply };
+            gate = { clipped: () => !allowed(), apply };
         }
         if (browser) { const note = document.createElement('span'); note.className = 'inbox-trust-note inbox-browser-note'; note.textContent = BROWSER_NOTE; cell.append(note); } // what the one button does, and why the other two are not buttons (#14151)
         if (trust) { // the folder, plain text, and what Yes does, before any choice (#14110)

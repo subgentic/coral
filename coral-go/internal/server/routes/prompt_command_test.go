@@ -2,6 +2,7 @@ package routes
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -87,4 +88,20 @@ func TestPermissionTarget_DescriptionLines(t *testing.T) {
 	four, ok := parsePromptScreen(mk(" one\n two\n three\n four"))
 	require.True(t, ok)
 	assert.Empty(t, four.command, "four lines under the rule is not a request block")
+}
+
+// A REAL long Bash prompt (Beta Tester's run 2, Claude Code 2.1.314, paths and ids replaced, from a raw terminal log whose spacing is lost): 17 screen lines, about 1100 characters, Claude's own line under the closing rule.
+func TestPermissionTarget_RealLongCapture(t *testing.T) {
+	b, err := os.ReadFile("testdata/claude_bash_long_real.txt")
+	require.NoError(t, err)
+	s, ok := parsePromptScreen(string(b))
+	require.True(t, ok)
+	assert.False(t, s.OnlyReject, "a 1.1 KB request is under the card's limit")
+	assert.GreaterOrEqual(t, len(strings.Split(s.Target, "\n")), 15, "every line of the real command is in the target")
+	assert.Contains(t, s.Target, "mktemp")
+	assert.Contains(t, s.Target, "curl")
+	assert.NotContains(t, s.Target, "╌")
+	assert.NotEmpty(t, s.TargetNote, "Claude's own line under the request is its note")
+	assert.NotContains(t, s.Target, s.TargetNote)
+	assert.Len(t, s.Options, 3)
 }
