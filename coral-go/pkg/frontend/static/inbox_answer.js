@@ -160,6 +160,7 @@ function fill(s, cell, withDismiss = true) {
     const key = askKey(s);
     if (!read.has(key)) read.set(key, readAsk(s).catch(() => ({ ask: '', picks: [], onlyReject: false })));
     return read.get(key).then(({ ask, picks, onlyReject, held, step, stepFull, question, later, lines, trust, browser, target, targetNote }) => {
+        cell._cmdObserver?.disconnect(); cell._cmdObserver = null; // the earlier block's observer goes with the block (#14173)
         cell.replaceChildren();
         const said = norm => String(norm || '').replace(/[?\s]+$/, '');
         const words = step || (question && (later || !said(s.waiting_summary).includes(said(question))) ? question : ''); // the question is named when the row's own words do not carry it (a later step's never does)
@@ -189,7 +190,7 @@ function fill(s, cell, withDismiss = true) {
             };
             more.addEventListener('click', e => { e.stopPropagation(); open = true; block.classList.add('is-open'); apply(); block.focus({ preventScroll: true }); });
             block.addEventListener('scroll', apply, { passive: true });
-            if (typeof ResizeObserver === 'function') new ResizeObserver(apply).observe(block);
+            if (typeof ResizeObserver === 'function') { const ro = new ResizeObserver(() => { if (!block.isConnected) { ro.disconnect(); return; } apply(); }); ro.observe(block); cell._cmdObserver = ro; } // one observer per drawn block: it goes when the cell is drawn again (below) or the block leaves the page
             gate = { clipped: () => !allowed(), apply };
         }
         if (browser) { const note = document.createElement('span'); note.className = 'inbox-trust-note inbox-browser-note'; note.textContent = BROWSER_NOTE; cell.append(note); } // what the one button does, and why the other two are not buttons (#14151)

@@ -61,6 +61,8 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
             // what the row draws: the block (every line of the command, wrapped), Claude's own line under it, the Yes sentence, and whether a Yes is on the row; the invariant: Yes is on the row exactly when the block is not clipped
             const rowState = () => ev(`(() => { const c = document.querySelector('#group-table-view .inbox-answers'); const blk = c && c.querySelector('.inbox-cmd-block'); if (!blk) return null; const r = blk.getBoundingClientRect(); const yes = [...c.querySelectorAll('button:not(.inbox-dismiss):not(.inbox-cmd-more)')].filter(b => b.textContent === 'Yes' && !b.hidden && b.getClientRects().length > 0); return { text: blk.textContent, note: (c.querySelector('.inbox-cmd-note') || {}).textContent || '', sentence: (c.querySelector('.inbox-yes-note') || {}).textContent || '', clipped: blk.scrollHeight > blk.clientHeight + 1, yes: yes.length, no: [...c.querySelectorAll('button')].filter(b => b.textContent === 'No').length, h: Math.round(r.height), lines: Math.round(blk.clientHeight / (parseFloat(getComputedStyle(blk).lineHeight) || 1)), left: Math.round(r.left), right: Math.round(r.right), vw: innerWidth, mono: /mono|courier|menlo|consolas|ui-monospace/i.test(getComputedStyle(blk).fontFamily) }; })()`);
             const consistent = (s, what) => check(s && (s.yes === 1) === !s.clipped && s.no === 1, `${at}${what}: Yes is on the row exactly when the block is not clipped, No always: ` + JSON.stringify(s));
+            // observers: a command block's ResizeObserver goes when its cell is drawn again, so repeated redraws do not pile them up
+            await ev(`(() => { const R = window.ResizeObserver; if (!window.__roLive) { window.__roLive = new Set(); window.ResizeObserver = class extends R { observe(t, o) { if (t && t.classList && t.classList.contains('inbox-cmd-block')) window.__roLive.add(this); return super.observe(t, o); } disconnect() { window.__roLive.delete(this); return super.disconnect(); } }; } return true; })()`);
             // 1) a one-line command, with Claude's own line under it: whole, in code type, Yes and No
             const ONE = 'git status --short';
             await show(MENU({ target: ONE, target_note: 'This command requires approval' }), 2);
@@ -68,6 +70,11 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
             check(st && st.text === ONE && st.note === 'This command requires approval' && st.mono && !st.clipped && st.yes === 1 && st.no === 1 && st.left >= 0 && st.right <= st.vw, `${at}a one-line command with Claude's line under it: ` + JSON.stringify(st));
             check(/Yes lets it run this once\. No refuses it/.test(st.sentence), `${at}the row says what Yes allows: ` + JSON.stringify(st.sentence));
             await shot(`command-row-${w}`);
+            // five cells drawn and thrown away (a row drawn again, a row gone): each one's observer goes with its block
+            await ev(`window.__po = ${JSON.stringify(MENU({ target: 'echo one\\necho two' }))}; true`);
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'inbox_answer.js'); const s = window.__qaState.liveSessions[0]; for (let i = 0; i < 5; i++) { const c = m.answerCell({ ...s, waiting_since: 'obs' + i }); document.body.append(c); await new Promise(r => setTimeout(r, 500)); /* sleep-ok: the cell reads its ask and draws */ c.remove(); await new Promise(r => setTimeout(r, 250)); /* sleep-ok: the observer reports the removal */ } return true; })()`);
+            const live = await ev(`window.__roLive.size`);
+            check(live <= 1, `${at}after five cells drawn and removed at most one command-block observer is live (the row's own), not ${live}`);
             // 2) the three-line command: all of it is on the row and not clipped (3 lines on a desktop, 4 on a phone), so Yes stays
             await show(MENU({ target: ['npm run build', 'npm test -- --reporter=dot', 'git status --short'].join('\n') }), 2);
             st = await rowState(); consistent(st, 'three short lines');

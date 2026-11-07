@@ -164,9 +164,18 @@ func indentOf(s string) int {
 // Its text (title, question, option labels, review lines, the Submit label) comes out clean (cleanPromptScreen): what an agent's
 // screen can carry is shown on the card, matched by auto-accept and kept in the session state.
 func parsePromptScreen(capture string) (promptScreen, bool) {
+	return parsePromptScreenFor(at.Claude, capture)
+}
+
+// parsePromptScreenFor is parsePromptScreen for a session of agentType: the request block between Claude's two dashed rules is read ONLY for a Claude session (#14173, Security): another agent's program can print
+// dashed rules and a question of its own, and that must not become the "request" a person is shown or the part of it that is judged.
+func parsePromptScreenFor(agentType, capture string) (promptScreen, bool) {
 	s, ok := parsePromptScreenRaw(capture)
 	if !ok {
 		return s, false
+	}
+	if agentType != at.Claude {
+		s.command, s.TargetNote, s.commandOpenMissing = "", "", false
 	}
 	// Judged on the raw text, before cleanPromptScreen drops what hides: the terminal still holds it.
 	rv := permreview.Merge(permreview.Of(s.context), permreview.Of(s.command), permreview.Of(s.Question), permreview.Of(s.Title))
@@ -551,6 +560,9 @@ func promptCommand(lines []string, questionAt int) (cmd, note string, missing bo
 	end := i
 	for j := end - 1; j >= 0 && j >= end-commandMaxLines; j-- {
 		if dashedRuleRe.MatchString(lines[j]) {
+			if !requestDialogHeader(lines, j) {
+				return "", "", false // rules printed by the agent above a prompt are not Claude's request dialog
+			}
 			block := make([]string, 0, end-j-1)
 			for _, l := range lines[j+1 : end] {
 				block = append(block, strings.TrimRight(strings.TrimPrefix(l, " "), " \t\r"))
@@ -559,6 +571,32 @@ func promptCommand(lines []string, questionAt int) (cmd, note string, missing bo
 		}
 	}
 	return "", "", true // a closing rule with no opening rule in reach: the request is not shown whole
+}
+
+var (
+	solidRuleRe        = regexp.MustCompile(`^\s*─{8,}\s*$`)
+	dialogHeaderLineRe = regexp.MustCompile(`(?i)\b(?:command|files?)\s*$`)
+)
+
+// requestDialogHeader says whether the dashed rule at open is the one that opens Claude's request dialog: within a few lines above it, a solid rule and under it the dialog's header ("Bash command", "Edit file", "Create
+// file"). Without that header the rules and the question are text something else printed (#14173, Security's SHOULD).
+func requestDialogHeader(lines []string, open int) bool {
+	seen := 0
+	for k := open - 1; k >= 0 && seen < 6; k-- {
+		if strings.TrimSpace(lines[k]) == "" {
+			continue
+		}
+		seen++
+		if solidRuleRe.MatchString(lines[k]) {
+			for h := k + 1; h < open; h++ {
+				if t := strings.TrimSpace(lines[h]); t != "" {
+					return dialogHeaderLineRe.MatchString(t)
+				}
+			}
+			return false
+		}
+	}
+	return false
 }
 
 // withCommand sets the request block, Claude's line under it and the missing-opening-rule flag from the screen above the question.
@@ -664,7 +702,7 @@ func (h *SessionsHandler) readPromptScreenText(ctx context.Context, name, agentT
 // are not a prompt of Claude's, and an arrow key and Enter into that program would answer whatever it is waiting for (Security's MUST on #14151). Every caller that reads a screen for an offer or an answer comes here, so the
 // gate holds at offer time and again at answer time.
 func parseAgentScreen(agentType, text string) (promptScreen, bool) {
-	s, ok := parsePromptScreen(text)
+	s, ok := parsePromptScreenFor(agentType, text)
 	if !ok && agentType == at.Claude {
 		lines := strings.Split(strings.ReplaceAll(text, "\r", ""), "\n")
 		for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
