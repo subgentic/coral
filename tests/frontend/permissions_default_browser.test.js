@@ -4,7 +4,9 @@ const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
 const { install: installTeam, openNewTeam, stubModels, T, N } = require('./helpers/new_team');
 const BASE = require('./test_base').BASE;
+const { guardSettings } = require('./helpers/settings_guard');
 (async()=>{
+ const guard=await guardSettings();
  const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();
  const full=['agent_spawn','file_read','file_write','shell','web_access'];
  try{
@@ -12,6 +14,18 @@ const BASE = require('./test_base').BASE;
   for(const width of [1280,390]){
    await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
    await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev,'startup','settings');await installTeam(ev);await stubModels(ev);
+   const actual=await ev(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(async r=>({status:r.status,body:await r.json()}))`);
+   assert.equal(actual.status,200,'real integrated owner disclosure route is readable');
+   assert.match(actual.body.text,/run as you, with every file you can reach/,'real server text states the operating-system authority');
+   assert.match(actual.body.text,/Hermes/,'real server disclosure names Hermes Bypass');
+   await ev(`fetch('/api/launch-disclosure/ack',{method:'DELETE'}).then(r=>r.ok)`);
+   await ev(`import((window.__coralStatic||'/static/')+'launch_disclosure.js').then(m=>m.refreshLaunchDisclosure())`);
+   await waitFor(`!!document.getElementById('launch-disclosure-banner')`,'real unseen server record shows the banner');
+   await ev(`[...document.querySelectorAll('#launch-disclosure-banner button')].find(b=>b.textContent==="I've read this").click();true`);
+   await waitFor(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json()).then(d=>d.seen===true)`,'owner acknowledgement persisted on the real server');
+   await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev,'startup','settings');await installTeam(ev);await stubModels(ev);
+   await ev(`import((window.__coralStatic||'/static/')+'launch_disclosure.js').then(m=>m.refreshLaunchDisclosure())`);
+   assert.equal(await ev(`!!document.getElementById('launch-disclosure-banner')`),false,'real acknowledgement survives full reload');
    await ev(`import((window.__coralStatic||'/static/')+'state.js').then(m=>{delete m.state.settings.default_permission_mode;return true})`);
    const presets=await ev(`import((window.__coralStatic||'/static/')+'agent_presets.js').then(m=>m.AGENT_PRESETS.map(p=>({name:p.name,allow:p.capabilities.allow.slice().sort(),deny:p.capabilities.deny||[]})))`);
    assert.ok(presets.length>0);for(const p of presets){assert.deepEqual(p.allow,full,p.name+' shipped capabilities');assert.deepEqual(p.deny,[]);}
@@ -52,7 +66,7 @@ const BASE = require('./test_base').BASE;
    await ev(`(async()=>{const S=window.__coralStatic||'/static/';(await import(S+'launch_core.js')).hideLaunchModal();const real=window.fetch;window.__disclosure={id:'full-permissions-1',text:'Full tool permissions <b>are not role limits</b>. Change the default in Settings.',seen:false};window.__launchAudit={launch:[],ack:[],failAck:false};window.fetch=(input,options={})=>{const path=new URL(String(input),location.href).pathname;const json=(data,status=200)=>Promise.resolve(Response.json(data,{status}));if(path==='/api/launch-disclosure')return json(window.__disclosure);if(path==='/api/launch-disclosure/ack'){window.__launchAudit.ack.push(JSON.parse(options.body));if(window.__launchAudit.failAck)return json({error:'owner_only'},403);window.__disclosure.seen=true;return json({id:window.__disclosure.id,seen:true});}if(path==='/api/sessions/launch'||path==='/api/sessions/launch-team'){window.__launchAudit.launch.push({path,body:JSON.parse(options.body)});return window.__disclosure.seen?json({session_id:'new-agent',name:'new-agent',permission_mode:'auto'}):json({code:'launch_disclosure_required',disclosure:window.__disclosure},409);}return real(input,options)};await(await import(S+'launch_disclosure.js')).refreshLaunchDisclosure();return true;})()`);
    await waitFor(`document.getElementById('launch-disclosure-banner')?.textContent.includes('Full tool permissions')`,'unseen disclosure stays in dashboard banner');
    assert.equal(await ev(`!!document.querySelector('#launch-disclosure-banner b')`),false,'server text is text, never markup');
-   await ev(`import((window.__coralStatic||'/static/')+'settings_dialog.js').then(m=>m.showSettingsModal('agents')).then(()=>true)`);
+   await ev(`window.showSettingsModal('agents').then(()=>true)`);
    await waitFor(`!!document.getElementById('settings-permission-mode')`,'settings default exists');
    await ev(`import((window.__coralStatic||'/static/')+'launch_disclosure.js').then(m=>m.refreshLaunchDisclosure())`);
    await waitFor(`document.getElementById('settings-launch-disclosure')?.textContent===window.__disclosure.text`,'Settings repeats disclosure beside default');
@@ -73,5 +87,5 @@ const BASE = require('./test_base').BASE;
 
   }
   console.log('PASS shipped full presets, visible role limits and explicit team Default at desktop/phone');
- }finally{await client.close()}
+ }finally{try{await guard.restore()}finally{await client.close()}}
 })().catch(e=>{console.error(e);process.exitCode=1});
