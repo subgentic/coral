@@ -50,7 +50,7 @@ const SUBAGENTS = [{ id: 'a1', description: 'Search the repo', subagent_type: 'E
             return true; })()`);
         const SNAP = `(() => { const q = id => document.getElementById(id), sec = q('board-tasks-section'), norm = s => s.replace(/>(just now|\\d+m|\\d+h \\d+m|\\d+d \\d+h)</g, '>…<');
             const rows = [...document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)')];
-            return { html: norm(q('board-task-list').innerHTML).replace(/dt-sort-[a-z0-9]+/g, 'dt-sort-fixture'), toggle: (() => { const e = document.querySelector('.board-task-hide-toggle'); return e && !e.hidden ? e.innerHTML : null; })(), count: q('task-bar-count') ? q('task-bar-count').textContent : null,
+            return { html: norm(q('board-task-list').innerHTML).replace(/dt-sort-[a-z0-9]+/g, 'dt-sort-fixture').replace(/dt-cols-hidden-\\d+/g, 'dt-cols-hidden-1'), toggle: (() => { const e = document.querySelector('.board-task-hide-toggle'); return e && !e.hidden ? e.innerHTML : null; })(), count: q('task-bar-count') ? q('task-bar-count').textContent : null,
                 section: sec ? sec.style.display : null, label: null, // the section has no title row any more (#7924): the bar is the one top row
                 ids: rows.map(r => r.dataset.key).join(','), text: q('board-task-list').textContent.replace(/\\s+/g, ' ').trim() }; })()`;
         const record = async name => { out[name] = await ev(SNAP); };
