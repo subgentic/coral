@@ -265,7 +265,7 @@ func (h *Hook) giveBack(keys []holdKey, why string) {
 		if why == "gone" {
 			grace = 0
 		}
-		if err := h.m.Queue().Leave(k.resource, k.agent, grace); err == nil { // already released by hand: nothing to do
+		if err := h.m.Queue().LeaveWhy(k.resource, k.agent, grace, why); err == nil { // already released by hand: nothing to do
 			h.event(HookEvent{Kind: "released", Resource: k.resource, Agent: k.agent, Why: why})
 		}
 	}
@@ -838,7 +838,7 @@ func (h *Hook) pastFirstLeaseLocked(k holdKey, ah *autoHold) bool {
 }
 
 func (h *Hook) releaseLocked(k holdKey, ah *autoHold, why string) {
-	_ = h.m.Queue().Release(k.resource, k.agent)
+	_ = h.m.Queue().ReleaseWhy(k.resource, k.agent, why)
 	delete(h.hold, k)
 	h.event(HookEvent{Kind: "released", Resource: k.resource, Pattern: ah.pattern, Agent: k.agent, Session: ah.session, Why: why})
 }

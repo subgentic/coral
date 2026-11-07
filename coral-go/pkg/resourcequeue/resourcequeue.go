@@ -62,6 +62,7 @@ type Entry struct {
 	Lease    time.Time // when the hold ends unless renewed; zero while waiting
 	Member   string    // on a pool's entry that holds a slot: the member (the machine) it was granted, "" otherwise (#13719)
 	Pin      int       // a person's override: bigger is nearer the front among the waiting (set by Move)
+	Renews   int       // #14222: how many times the lease was renewed while held, told once in the hold's end event (a row per renewal buried the record: 46,260 in 31 hours)
 	Polled   time.Time // #14170: when the agent last asked about this place (a waiting claim asks every few seconds); an entry nobody has asked about for WaitStale is not waited on: its command ended
 	Away     time.Time // #13706: the agent's wait ended without a turn (its --timeout, its tool call) and its place is kept until this time; a claim from it again clears it. Zero: present
 }
@@ -109,15 +110,23 @@ type Event struct {
 	Pattern  string
 	Wait     time.Duration // granted: time in line; cancelled and kicked while waiting: time waited
 	Held     time.Duration // released, kicked, expired and gone while holding: time held
+	Why      string        // #14222: on an end event, why the hold or place ended: released (the agent), call ended, idle, lease (ran out), gone (the session ended), cap, kicked (a person), away (a kept place nobody came back to), left, resource removed. "" for the other kinds
+	Renews   int           // on an end event: how many times the hold's lease was renewed
 }
 
 // note records an event of e, to be told to the sink after the lock is let go.
-func (q *Queue) note(kind string, e *Entry) {
+func (q *Queue) note(kind string, e *Entry) { q.noteWhy(kind, "", e) }
+
+// noteWhy is note for an event that ENDS a hold or a place: it says why, and carries how many times the lease was renewed (#14222). Every way an entry leaves the queue goes through it once.
+func (q *Queue) noteWhy(kind, why string, e *Entry) {
 	if q.cfg.OnEvent == nil {
 		return
 	}
 	now := q.now()
-	ev := Event{At: now, Kind: kind, Resource: e.Resource, Agent: e.Agent, Task: e.Task, Entry: e.ID, Via: e.Via, Pattern: e.Pattern}
+	ev := Event{At: now, Kind: kind, Resource: e.Resource, Agent: e.Agent, Task: e.Task, Entry: e.ID, Via: e.Via, Pattern: e.Pattern, Why: why}
+	if why != "" {
+		ev.Renews = e.Renews
+	}
 	if e.Waiting() {
 		ev.Wait = now.Sub(e.Enqueued)
 	} else {
@@ -325,7 +334,7 @@ func (q *Queue) poolsWith(key string) []string {
 // Remove deletes a resource and every entry on it. A resource that is in a pool is not removed from under it.
 func (q *Queue) Remove(key string) error {
 	q.mu.Lock()
-	defer q.mu.Unlock()
+	defer q.unlockEmit()
 	if _, ok := q.res[key]; !ok {
 		return ErrNoResource
 	}
@@ -337,6 +346,10 @@ func (q *Queue) Remove(key string) error {
 	for _, e := range q.entries {
 		if e.Resource != key {
 			kept = append(kept, e)
+		} else if e.Waiting() { // an entry the removal drops ends in the record too (#14222)
+			q.noteWhy("cancelled", "resource removed", e)
+		} else {
+			q.noteWhy("released", "resource removed", e)
 		}
 	}
 	q.entries = kept
@@ -405,12 +418,15 @@ func (q *Queue) Renew(key, agent string) (Entry, error) {
 		return Entry{}, ErrNotHolder
 	}
 	e.Lease = q.now().Add(q.leaseOf(e, q.res[e.Resource]))
-	q.note("renewed", e)
+	e.Renews++ // counted on the hold, told in its end event: no row per renewal (#14222)
 	return *e, q.save()
 }
 
 // Release gives up a slot, or leaves the line; the next in line is granted.
-func (q *Queue) Release(key, agent string) error {
+func (q *Queue) Release(key, agent string) error { return q.ReleaseWhy(key, agent, "released") }
+
+// ReleaseWhy is Release that says why in the end event (#14222): the hook gives a hold back because its call ended, it sat idle, it hit the cap.
+func (q *Queue) ReleaseWhy(key, agent, why string) error {
 	q.mu.Lock()
 	if _, ok := q.res[key]; !ok {
 		q.unlockEmit()
@@ -422,9 +438,9 @@ func (q *Queue) Release(key, agent string) error {
 		return ErrNotHolder
 	}
 	if e.Waiting() {
-		q.note("cancelled", e)
+		q.noteWhy("cancelled", "left", e)
 	} else {
-		q.note("released", e)
+		q.noteWhy("released", why, e)
 	}
 	at := e.Resource // the entry may have been found through a name that shares its slots
 	q.drop(e.ID)
@@ -438,6 +454,11 @@ func (q *Queue) Release(key, agent string) error {
 // Leave is for an agent whose wait ended without a turn (its --timeout, the tool call it waited in): a place in line is kept for grace, the agent's own claim again takes it back at the same place, and
 // when the grace ends (Reap) it goes. A slot that comes while the agent is away goes to the next one who is here, and the absent one keeps its place at the front for its return. A slot the agent already holds is given back, as Release does (#13706).
 func (q *Queue) Leave(key, agent string, grace time.Duration) error {
+	return q.LeaveWhy(key, agent, grace, "left")
+}
+
+// LeaveWhy is Leave that says why in the end event of a hold it gives back (#14222): before, a hold given back through Leave left no event at all, and 200 of 918 holds in one record had no end.
+func (q *Queue) LeaveWhy(key, agent string, grace time.Duration, why string) error {
 	q.mu.Lock()
 	if _, ok := q.res[key]; !ok {
 		q.mu.Unlock()
@@ -450,10 +471,15 @@ func (q *Queue) Leave(key, agent string, grace time.Duration) error {
 	}
 	if !e.Waiting() || grace <= 0 {
 		at := e.Resource
+		if e.Waiting() {
+			q.noteWhy("cancelled", why, e)
+		} else {
+			q.noteWhy("released", why, e)
+		}
 		q.drop(e.ID)
 		granted := q.fill(at)
 		err := q.save()
-		q.mu.Unlock()
+		q.unlockEmit()
 		q.notify(granted)
 		return err
 	}
@@ -482,15 +508,16 @@ func (q *Queue) Reap() (ended []Entry, err error) {
 			q.note("away", e)
 		}
 		if e.Waiting() && !e.Away.IsZero() && !now.Before(e.Away) { // a place kept for an agent that did not come back (#13706)
+			q.noteWhy("cancelled", "away", e)
 			ended = append(ended, *e)
 			keys[e.Resource] = true
 			continue
 		}
 		if dead || expired {
 			if dead {
-				q.note("gone", e)
+				q.noteWhy("gone", "gone", e)
 			} else {
-				q.note("expired", e)
+				q.noteWhy("expired", "lease", e)
 			}
 			ended = append(ended, *e)
 			keys[e.Resource] = true
@@ -558,7 +585,7 @@ func (q *Queue) Cancel(id int64) error {
 		return ErrNoEntry
 	}
 	key := e.Resource
-	q.note("kicked", e)
+	q.noteWhy("kicked", "kicked", e)
 	q.drop(id)
 	granted := q.fill(key)
 	err := q.save()

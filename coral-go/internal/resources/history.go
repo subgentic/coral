@@ -48,6 +48,60 @@ func (h *History) prune(now time.Time) {
 	_, _ = h.db.Exec(`DELETE FROM resource_events WHERE at < ?`, now.Add(-HistoryDays*24*time.Hour).UnixMilli())
 }
 
+// endKinds are the events that end a hold (or a place in line): each carries the why and the number of renewals (#14222).
+const endKinds = `'released','expired','gone','kicked','cancelled'`
+
+// migrateHistory brings an older file up to the v2.0.60 shape without losing what it records (#14222): the columns why and renews are added, and the 'renewed' rows (one per renewal: 46,260 in 31 hours on one
+// resource) are folded into a count on the hold's end row, then removed. A renewal row of a hold with no end row stays (the hold may still be running). It runs in one transaction and again does nothing.
+func migrateHistory(db *sql.DB) error {
+	have := map[string]bool{}
+	rows, err := db.Query(`SELECT name FROM pragma_table_info('resource_events')`)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			rows.Close()
+			return err
+		}
+		have[n] = true
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if !have["why"] {
+		if _, err := tx.Exec(`ALTER TABLE resource_events ADD COLUMN why TEXT NOT NULL DEFAULT ''`); err != nil {
+			return err
+		}
+	}
+	if !have["renews"] {
+		if _, err := tx.Exec(`ALTER TABLE resource_events ADD COLUMN renews INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+	}
+	// an index on the hold's key first: the count below looks up each end row's renewals, and without it that is a scan of every row per end row (about 100 s on a 31-hour record of 50,000 rows)
+	if _, err := tx.Exec(`CREATE INDEX IF NOT EXISTS resource_events_entry ON resource_events(resource, entry)`); err != nil {
+		return err
+	}
+	// counts first, then the rows they came from
+	if _, err := tx.Exec(`UPDATE resource_events SET renews = (SELECT COUNT(*) FROM resource_events r WHERE r.kind = 'renewed' AND r.resource = resource_events.resource AND r.entry = resource_events.entry)
+		WHERE kind IN (` + endKinds + `) AND renews = 0 AND entry <> 0`); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM resource_events WHERE kind = 'renewed' AND (resource, entry) IN (SELECT resource, entry FROM resource_events WHERE kind IN (` + endKinds + `))`); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // OpenHistory opens (and makes) the file and starts its writer. Rows older than HistoryDays are removed.
 func OpenHistory(path string) (*History, error) {
 	if f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600); err != nil { // made private before SQLite opens it (it makes its -wal and -shm with the file's mode)
@@ -64,6 +118,10 @@ func OpenHistory(path string) (*History, error) {
 		at INTEGER NOT NULL, kind TEXT NOT NULL, resource TEXT NOT NULL, agent TEXT NOT NULL, task INTEGER NOT NULL DEFAULT 0,
 		entry INTEGER NOT NULL DEFAULT 0, via TEXT NOT NULL DEFAULT '', pattern TEXT NOT NULL DEFAULT '', wait_ms INTEGER NOT NULL DEFAULT 0, held_ms INTEGER NOT NULL DEFAULT 0);
 		CREATE INDEX IF NOT EXISTS resource_events_at ON resource_events(at)`); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	if err := migrateHistory(db); err != nil { // a failed migration leaves the old file as it was: the record still opens, without the new columns' help
 		_ = db.Close()
 		return nil, err
 	}
@@ -97,8 +155,8 @@ func (h *History) run() {
 		if h.writeGate != nil {
 			h.writeGate()
 		}
-		_, err := h.db.Exec(`INSERT INTO resource_events (at, kind, resource, agent, task, entry, via, pattern, wait_ms, held_ms) VALUES (?,?,?,?,?,?,?,?,?,?)`,
-			e.At.UnixMilli(), e.Kind, e.Resource, e.Agent, e.Task, e.Entry, e.Via, e.Pattern, e.Wait.Milliseconds(), e.Held.Milliseconds())
+		_, err := h.db.Exec(`INSERT INTO resource_events (at, kind, resource, agent, task, entry, via, pattern, wait_ms, held_ms, why, renews) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+			e.At.UnixMilli(), e.Kind, e.Resource, e.Agent, e.Task, e.Entry, e.Via, e.Pattern, e.Wait.Milliseconds(), e.Held.Milliseconds(), e.Why, e.Renews)
 		if err != nil {
 			slog.Warn("resource history write failed", "error", err) // the detail is the log's; the queue goes on
 			h.dropped.Add(1)
@@ -166,7 +224,7 @@ func (h *History) Events(since, until time.Time) ([]resourcequeue.Event, error) 
 	if h == nil {
 		return nil, fmt.Errorf("resources: no history")
 	}
-	rows, err := h.db.Query(`SELECT at, kind, resource, agent, task, entry, via, pattern, wait_ms, held_ms FROM resource_events WHERE at >= ? AND at < ? ORDER BY at, rowid`, since.UnixMilli(), until.UnixMilli())
+	rows, err := h.db.Query(`SELECT at, kind, resource, agent, task, entry, via, pattern, wait_ms, held_ms, why, renews FROM resource_events WHERE at >= ? AND at < ? ORDER BY at, rowid`, since.UnixMilli(), until.UnixMilli())
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +233,7 @@ func (h *History) Events(since, until time.Time) ([]resourcequeue.Event, error) 
 	for rows.Next() {
 		var e resourcequeue.Event
 		var at, wait, held int64
-		if err := rows.Scan(&at, &e.Kind, &e.Resource, &e.Agent, &e.Task, &e.Entry, &e.Via, &e.Pattern, &wait, &held); err != nil {
+		if err := rows.Scan(&at, &e.Kind, &e.Resource, &e.Agent, &e.Task, &e.Entry, &e.Via, &e.Pattern, &wait, &held, &e.Why, &e.Renews); err != nil {
 			return nil, err
 		}
 		e.At, e.Wait, e.Held = time.UnixMilli(at).UTC(), time.Duration(wait)*time.Millisecond, time.Duration(held)*time.Millisecond

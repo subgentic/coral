@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -577,4 +578,26 @@ func TestAHolderWithNoKnownCallIsJudgedByItsShellToo(t *testing.T) {
 	g2.dropProc(502)
 	g2.h.Sweep()
 	assert.Empty(t, g2.holders(), "the turn ended and the work is gone: back")
+}
+
+// #14222: a slot the hook gives back (its call ended, its session ended) leaves ONE end event with the reason in the queue's record. Before, it went through Leave, which told nobody: 200 of 918 holds in one record
+// had no end at all.
+func TestAHandClaimGivenBackByTheHookLeavesAnEndEventWithItsReason(t *testing.T) {
+	hist := filepath.Join(t.TempDir(), "resource_history.db")
+	g := newHookRig(t, func(o *Options) { o.HistoryPath = hist })
+	g.handClaim("s-a", "Agent A", "call-1")
+	g.h.After("s-a", "call-1") // the call ended: the hook gives the slot back
+	g.handClaim("s-b", "Agent B", "call-9")
+	g.h.SessionEnded("s-b") // the session ended
+	g.m.History().Flush()
+	evs, err := g.m.History().Events(g.now.Add(-time.Hour), g.now.Add(time.Hour))
+	require.NoError(t, err)
+	var ends []string
+	for _, e := range evs {
+		if e.Kind == "released" || e.Kind == "gone" || e.Kind == "expired" || e.Kind == "kicked" {
+			ends = append(ends, e.Agent+":"+e.Kind+":"+e.Why)
+		}
+	}
+	assert.Contains(t, ends, "Agent A:released:call ended")
+	require.Len(t, ends, 2, "one end event for each hold: %v", ends)
 }
