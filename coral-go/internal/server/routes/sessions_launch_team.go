@@ -486,7 +486,7 @@ func teamUsesNewDefault(body launchTeamRequest, settings map[string]string) bool
 			return true
 		}
 		// the form writes its shipped Auto as the CLI's own flags: judged by what they say, unless the member names Default, the owner saved a default, or it is a relaunch (#14353)
-		if !teamIsRelaunch(body) && def.PermissionMode == "" && savedDefaultMode(settings) == "" && effectiveLaunchSkips(agentType, flags) {
+		if !teamIsRelaunch(body) && def.PermissionMode != "default" && savedDefaultMode(settings) == "" && effectiveLaunchSkips(agentType, flags) {
 			return true
 		}
 	}
@@ -522,7 +522,7 @@ func memberAsksToSkip(body launchTeamRequest, def launchTeamAgent, settings map[
 // hub_auto_accept_disabled, never started in Default and never in Auto. A member that names a mode (its own flags, the team's, or an explicit Default) is judged by what it names; the Operator's own
 // saved default is the owner's choice and is not counted, as before.
 func memberDefaultSkips(body launchTeamRequest, def launchTeamAgent, settings map[string]string, agentType string, flags []string) bool {
-	if teamIsRelaunch(body) || def.PermissionMode != "" || savedDefaultMode(settings) != "" {
+	if teamIsRelaunch(body) || def.PermissionMode == "default" || savedDefaultMode(settings) != "" { // only "default" names a mode (the launch honours no other value)
 		return false
 	}
 	if carried, _ := agent.SplitPermissionFlags(flags); len(carried) > 0 || agent.PermissionModeFromFlags(flags) != "" {

@@ -14,11 +14,11 @@ import (
 // dialog uses that default. The text and its id live here; the acknowledgement is an operator-only record of the id and when (never a browser flag, never set by an agent route or by any launch).
 const (
 	// LaunchDisclosureID versions the words: a change of the text is a new id, and an old acknowledgement then no longer counts.
-	LaunchDisclosureID = "full-permissions-2"
+	LaunchDisclosureID = "full-permissions-3"
 	// LaunchDisclosureText is the measured behaviour in plain words (Auto still judges a force push or a delete outside the project; Codex stays in its sandbox).
 	LaunchDisclosureText = "Agents you start here begin with full permissions. They run as you, with every file you can reach: they can read and change files, run commands and use the web without asking you first. " +
 		"Claude's own safety checks still apply to destructive commands such as a force push or a delete outside the project, and Codex stays inside its project folder. " +
-		"Hermes starts in Bypass with no such checks, and so does any agent you start in Bypass or with Full access (Codex then leaves its folder too). " +
+		"Hermes, OpenCode and Pi agents run with no such checks at all, and so does any agent you start in Bypass or with Full access (Codex then leaves its folder too). " +
 		"To start one with fewer permissions, pick a lower permission mode when you launch it, or set a default permission mode in Settings."
 	// PermissionLoweringText is where to lower it, carried in every launch answer.
 	PermissionLoweringText = "To lower it: pass a lower permission mode when you launch (a CLI permission flag, or permission_mode default), or set a default permission mode in Settings."
@@ -122,7 +122,7 @@ func dialogLaunch(r *http.Request) bool {
 // (the dashboard's forms send their shipped Auto that way, so the flags cannot be a way round the notice). An explicit Default, a saved default (the owner's own choice) and a mode that asks do not
 // count. The server enforces it; the page is not the only gate.
 func launchDefaultSkips(agentType string, flags []string, permissionMode string, settings map[string]string) bool {
-	if permissionMode != "" || savedDefaultMode(settings) != "" {
+	if permissionMode == "default" || savedDefaultMode(settings) != "" { // only "default" names a mode: the launch honours no other value, so another one is as good as none
 		return false
 	}
 	return effectiveLaunchSkips(agentType, flags)
