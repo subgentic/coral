@@ -106,6 +106,9 @@ func TestListProjectsAgreesWithTheOldQueryThroughPostsDeletesMovesAndProjectDele
 			}
 		}
 	}
+	if raceEnabled {
+		return // few seeds under -race: the coverage floors are for the plain run (#14281)
+	}
 	assert.Greater(t, compared, 250)
 	assert.Greater(t, withMessages, 40, "boards with messages were compared")
 	assert.Greater(t, emptyAfterDelete, 20, "whole-board deletes were compared")

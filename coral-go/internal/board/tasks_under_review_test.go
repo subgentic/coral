@@ -76,6 +76,9 @@ func TestTasksUnderReviewAgreesWithTheOldQueryOnRandomBoards(t *testing.T) {
 		withReview += n
 		withPendingReview += np
 	}
+	if raceEnabled {
+		return // few seeds under -race: the coverage floors are for the plain run (#14281)
+	}
 	assert.Greater(t, nonEmpty, 100, "the boards are not all empty answers")
 	assert.Greater(t, withReview, 50, "in_progress tasks with a completion review were compared")
 	assert.Greater(t, withPendingReview, 50, "review_pending tasks were compared")

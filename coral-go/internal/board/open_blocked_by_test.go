@@ -141,6 +141,9 @@ func TestOpenTaskStatesDependenciesAgreeWithTheOldLoadBlockedByOnRandomBoards(t 
 			}
 		}
 	}
+	if raceEnabled {
+		return // few seeds under -race: the coverage floors are for the plain run (#14281)
+	}
 	assert.Greater(t, withDeps, 300, "tasks with dependencies were compared")
 	assert.Greater(t, multi, 50, "tasks with more than one")
 	assert.Greater(t, crossBoard, 50, "dependencies on another board's tasks")
