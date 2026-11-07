@@ -131,8 +131,8 @@ func TestTheStartPathSpacesCodexStartsWithoutBlockingTheRequest(t *testing.T) {
 	for _, name := range []string{"codex-a", "codex-b", "codex-c"} {
 		require.NoError(t, h.startAgentCLI(context.Background(), "", "codex", name, "codex"))
 	}
-	assert.Less(t, time.Since(start), 200*time.Millisecond, "the three calls returned at once")
+	assert.Less(t, time.Since(start), 200*time.Millisecond*raceSlowdown(), "the three calls returned at once") // a clock bound: widened under -race (#14280)
 	require.Len(t, deferred, 2, "the first start is typed now, the others later")
-	assert.InDelta(t, float64(500*time.Millisecond), float64(deferred[0]), float64(100*time.Millisecond))
-	assert.InDelta(t, float64(time.Second), float64(deferred[1]), float64(100*time.Millisecond))
+	assert.InDelta(t, float64(500*time.Millisecond), float64(deferred[0]), float64(100*time.Millisecond*raceSlowdown()))
+	assert.InDelta(t, float64(time.Second), float64(deferred[1]), float64(100*time.Millisecond*raceSlowdown()))
 }
