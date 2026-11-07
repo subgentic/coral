@@ -54,7 +54,7 @@ log "Building coral, its hooks and the stand-in agent..."
     && go build -o "$BIN/mock-agent$EXE" ./cmd/mock-agent/) 2>&1 | grep -v "ld: warning" || true
 coral_test_sandbox
 log "Starting an isolated server on $PORT (data $DATA)..."
-env -u CORAL_CLOUD_URL -u CLAUDE_PROJECTS_DIR CORAL_RESOURCE_IDLE_GRACE=40s HOME="$TMP/h" PATH="$CORAL_TEST_STUB_BIN:$PATH" \
+env -u CORAL_CLOUD_URL -u CLAUDE_PROJECTS_DIR CORAL_RESOURCE_IDLE_GRACE="${IDLE_GRACE_FOR_TEST:-15s}" HOME="$TMP/h" PATH="$CORAL_TEST_STUB_BIN:$PATH" \
     CORAL_NO_DEMO_SEED=1 CORAL_NO_WELCOME=1 CORAL_TMUX_NO_FALLBACK=1 MOCK_AGENT_CORAL_BOARD="$BIN/coral-board" \
     "$BIN/coral" --home "$DATA" --no-browser --cloud-url off --host 127.0.0.1 --port "$PORT" --backend "$CORAL_TEST_BACKEND" --strict-local-auth=false >"$TMP/server.log" 2>&1 &
 SERVER_PID=$!
@@ -131,13 +131,18 @@ sleep 12
 holder_is Ann && pass "the hand claim stays while the shell of her background job runs" || fail "the background hand claim was freed while its shell runs: holders=$(holders)"
 wait_until 60 "the job to end and the slot to go back" nobody && pass "the hand claim went back once the job's shell was gone" || fail "the background hand claim stayed: holders=$(holders)"
 
-# idle (#14079): a hand claim whose shell only waits (sleep: no CPU, not a test runner) loses the slot after the grace (40 s here, 3 min by default) and the board is told; the list says it is idle meanwhile
+# idle (#14079): a hand claim whose shell only waits (sleep: no CPU, not a test runner) loses the slot after the grace (15 s here, 3 min by default), well before its 60 s lease would end it; the list says it is idle
+# meanwhile, the release is recorded as why=idle, and the notice for the Orchestrator is logged
 send "$ann_name" "$ann_sid" "MOCK_BASH nowait $BIN/coral-board resource claim mac-heavy --note idle-hand; sleep 300"
 wait_until 20 "Ann's idle hand claim" holder_is Ann || fail "no idle hand claim"
+idle_at=$SECONDS
 list_says_idle() { operator resource status mac-heavy | grep -q "idle for"; }
-wait_until 40 "the list to say idle" list_says_idle && pass "the list says the waiting holder is idle" || fail "the list never said idle: $(operator resource status mac-heavy)"
-wait_until 90 "the idle hold to be taken back" nobody && pass "a holder with nothing running lost the slot after the grace, while its shell still waited" || fail "the idle holder kept the slot: holders=$(holders)"
-operator board read 2>/dev/null | grep -q "nothing of it had been running" && pass "the board was told" || log "note: the board notice was not found by this read (the Orchestrator's inbox)"
+wait_until 40 "the list to say idle" list_says_idle && pass "the list says the waiting holder is idle: $(operator resource status mac-heavy | grep 'idle for' | head -1 | tr -s ' ')" || fail "the list never said idle: $(operator resource status mac-heavy)"
+wait_until 90 "the idle hold to be taken back" nobody && pass "a holder with nothing running lost the slot while its shell still waited" || fail "the idle holder kept the slot: holders=$(holders)"
+held_for=$((SECONDS - idle_at))
+[[ $held_for -lt 50 ]] && pass "it went back after ${held_for}s, before the 60 s lease could have ended it: the idle rule, not the lease" || fail "it went back after ${held_for}s: that is the lease's end, not the idle rule"
+grep -q "why=idle" "$TMP/server.log" && pass "the release is recorded as why=idle" || fail "no why=idle in the server log: $(grep -n 'shell hook kind=released' "$TMP/server.log" | tail -2)"
+grep -q "nothing of it had been running" "$TMP/server.log" && pass "the notice for the Orchestrator was raised: $(grep -o 'idle holder released.*' "$TMP/server.log" | head -1 | cut -c1-160)" || fail "no idle notice in the server log"
 sleep 1
 
 # ── a pool (#13751): a match on the pool claims it; a grant on the other machine is not run here and the agent is told how ──

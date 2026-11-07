@@ -45,11 +45,11 @@ func (s *Server) registerResources(r chi.Router, sess *routes.SessionsHandler) {
 		},
 		IdleGrace: idleGraceFromEnv(),
 		Notify: func(agent, text string) { // an idle holder lost its slot: the Orchestrator of its team is told
+			slog.Info("[resource] idle holder released", "agent", agent, "text", text)
 			sub, err := s.boardStore.GetSubscription(context.Background(), agent)
 			if err != nil || sub == nil {
 				return
 			}
-			slog.Info("[resource] idle holder released", "agent", agent, "text", text)
 			_, _ = s.boardStore.PostSystemMessage(context.Background(), sub.Project, "Coral Queue", "@Orchestrator "+text, nil)
 		},
 		Agent: func(ctx context.Context, sessionName string) (string, bool) {

@@ -329,7 +329,7 @@ func (h *Hook) sweepHands() {
 	h.giveBack(idle, "idle")
 	for _, k := range idle {
 		if h.o.Notify != nil {
-			h.o.Notify(k.agent, fmt.Sprintf("%s's hold of %s was taken back: nothing of it had been running for %d minutes (a claim is kept only while a test runs; claim and run in one command).", k.agent, k.resource, int(h.idleGrace()/time.Minute)))
+			h.o.Notify(k.agent, fmt.Sprintf("%s's hold of %s was taken back: nothing of it had been running for %s (a claim is kept only while a test runs; claim and run in one command).", k.agent, k.resource, graceWords(h.idleGrace())))
 		}
 	}
 }
@@ -862,4 +862,11 @@ func claimsFirst(command string, res resourcequeue.Resource) bool {
 		}
 	}
 	return false
+}
+
+func graceWords(d time.Duration) string {
+	if d >= time.Minute {
+		return fmt.Sprintf("%d minutes", int(d/time.Minute))
+	}
+	return fmt.Sprintf("%d seconds", int(d/time.Second))
 }
