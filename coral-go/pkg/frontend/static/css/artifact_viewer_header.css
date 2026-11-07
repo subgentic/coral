@@ -107,3 +107,4 @@
 
 /* A long name is cut with an ellipsis; a tap or click on it shows the whole name (#13979) */
 .artifact-viewer-header .artifact-viewer-title.is-open { white-space: normal; overflow-wrap: anywhere; }
+.artifact-viewer-chips .av-note { color: var(--text-muted); font-size: var(--fs-sm); } /* a file two teams hold has no version bar from a direct link: said quietly (#14015) */
