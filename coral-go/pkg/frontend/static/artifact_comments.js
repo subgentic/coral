@@ -351,7 +351,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     }
     const act = (text, label, fn) => { if (typeof label === 'function') { fn = label; label = ''; } const b = btn('ac-act', text, label); b.addEventListener('click', fn); return b; };
 
-    const { resetAsk, canAsk, askSetup, openAsk, openMany, askBlock, askedNow, fillStatus } = createAsk({ st, panel, render, announce, refresh, ownHex, uploaderHint: opts.uploader });
+    const { resetAsk, canAsk, askSetup, openAsk, openMany, askBlock, askedNow, fillStatus } = createAsk({ st, panel, render, announce, refresh, ownHex, uploaderHint: opts.uploader, ago });
     function confirmThen(msg, fn) { if (window.showConfirmModal) window.showConfirmModal('Delete comment', msg, fn, undefined, { label: 'Delete comment', danger: true }); else fn(); }
     async function run(fn, said) {
         if (st.busy) return;
