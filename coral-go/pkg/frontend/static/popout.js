@@ -137,8 +137,17 @@ export async function initPopout() {
     applyPopoutBodyClass();
     if (document.body.dataset.chief === 'true') {
         document.addEventListener('keydown', e => {
-            if (!platform.isNative || e.defaultPrevented || e.repeat || [...document.querySelectorAll('dialog[open], [aria-modal="true"]')].some(el => el.getClientRects().length > 0)) return;
-            if (e.key !== 'Escape' && !(e.metaKey && !e.altKey && !e.ctrlKey && e.key === '[')) return;
+            if (!platform.isNative || e.defaultPrevented || e.repeat || e.isComposing) return;
+            const focus = document.activeElement;
+            const editing = [focus, ...e.composedPath()].some(el => el instanceof HTMLElement && (
+                (el.matches('textarea, input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"])') && el.value.length > 0)
+                || (el.isContentEditable && el.textContent.length > 0)
+            ));
+            // The focused editor or popup gets its own Escape before page navigation (#14165).
+            if (editing || [...document.querySelectorAll('dialog[open], [aria-modal="true"], [role="menu"], [role="listbox"], :popover-open')].some(el => el.getClientRects().length > 0)) return;
+            const escape = e.key === 'Escape' && !e.metaKey && !e.altKey && !e.ctrlKey && !e.shiftKey;
+            const back = e.key === '[' && e.metaKey && !e.altKey && !e.ctrlKey && !e.shiftKey;
+            if (!escape && !back) return;
             e.preventDefault(); e.stopPropagation();
             location.assign('/');
         }, true);
