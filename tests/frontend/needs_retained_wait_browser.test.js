@@ -21,6 +21,10 @@ const { removeBoards } = require('./helpers/board_cleanup');
    await waitFor(`document.querySelector('#group-table-view')?.textContent.includes('Still waiting in its terminal')`,'retained wait explanation');
    await waitFor(`!!document.querySelector('#group-table-view .inbox-open-agent')`,'Open agent remains available');
    assert.equal(await ev(`document.querySelectorAll('#group-table-view .inbox-answer, #group-table-view .inbox-dismiss').length`),0,'no stale answers or repeat Dismiss');
+   if(width===390){
+    await waitFor(`!!document.querySelector('#group-table-view tr[data-key="local:retained-agent-id"].dt-mailed')`,'retained row uses phone layout');
+    assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tr[data-key="local:retained-agent-id"] [role="menuitem"]')].map(item=>item.textContent.trim()).filter(text=>text==='Dismiss')`),[],'phone row menu cannot dismiss an already still-waiting request again');
+   }
    await ev(`window.T.state.liveSessions=window.T.state.liveSessions.filter(row=>row!==window.__retained);window.openTeamPage(${JSON.stringify(team)})`);
    await waitFor(`document.querySelector('#team-page-status')?.textContent.trim()==='Checking attention status'`,'explicit checking status after availability arrives before local live snapshot');
    assert.notEqual(await ev(`document.querySelector('#team-page-status').textContent.trim()`),'All well',width+': missing live row cannot certify zero attention');
