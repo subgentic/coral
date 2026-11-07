@@ -155,8 +155,11 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"POST /api/board/{project}/operator-artifacts/message":                 "owner-only",
 		"POST /api/board/{project}/messages":                                   "owner-sees", "POST /api/board/{project}/subscribe": "owner-sees", "POST /api/board/{project}/tasks": "owner-sees", "POST /api/board/{project}/goals": "owner-sees", // they can start a new board (#11627)
 		"POST /api/board/{project}/working-mode/presets": "owner-sees", "PUT /api/board/{project}/working-mode": "owner-sees",
-		"GET /api/sessions/live":            "owner-sees", // the live list: everyone gets it, the stamped owner also gets waits_on_this (#12377)
-		"GET /api/board/{project}/settings": "owner-sees", "GET /api/system/update": "owner-update",
+		"GET /api/sessions/live":              "owner-sees", // the live list: everyone gets it, the stamped owner also gets waits_on_this (#12377)
+		"GET /api/goals":                      "owner-sees", // the goals reads (#14047): everyone gets the goals, the stamped owner also gets each one's done-state
+		"GET /api/board/{project}/goals":      "owner-sees",
+		"GET /api/board/{project}/goals/{id}": "owner-sees",
+		"GET /api/board/{project}/settings":   "owner-sees", "GET /api/system/update": "owner-update",
 		"POST /api/system/update/relaunch": "owner-only", "POST /api/system/update/check-hub": "owner-only", // the Hub updates a computer only as its stamped owner, behind the person's switch (#13258)
 	}
 	got := map[string]string{}
