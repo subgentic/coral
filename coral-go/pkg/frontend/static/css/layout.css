@@ -220,6 +220,7 @@ body.panel-dragging .sidebar {
 .sidebar-search-clear { position: absolute; right: 0.125rem; top: 50%; transform: translateY(-50%); }
 .sidebar-search-clear[hidden] { display: none; }
 #agent-search-input::-webkit-search-cancel-button { display: none; -webkit-appearance: none; } /* one clear button: ours, not that and the browser's built-in one (#10512) */
+#agent-search-input { text-overflow: ellipsis; } /* a placeholder wider than the box is cut with an ellipsis, said honestly, not at the box's edge */
 .sidebar-search:has(.sidebar-search-clear:not([hidden])) .sidebar-search-input { padding-right: 1.75rem; }
 
 .sidebar-search-icon {
