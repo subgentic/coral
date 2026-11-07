@@ -79,11 +79,12 @@ export async function readInboxArtifacts(params, filters = {}, signal) {
         throw new Error(bad.length === 1 && failed.length === 1 ? bad[0].message : `Artifacts could not be read from ${failed.map(serverLabel).join(', ')}.`);
     }
     const next = Object.fromEntries(results.map(({ artifacts, ...data }) => [data.server, data]));
-    return { artifact_revisions: Object.fromEntries(results.filter(d => !d.failed && !d.ownerOnly).map(d => [d.server, { rev: artifactRevision(d.artifacts_rev), team: d.artifacts_board || d.teams?.find(t => t.board_id)?.board_id }])),
+    return { artifact_revisions: Object.fromEntries(results.filter(d => !d.failed && !d.ownerOnly && !d.partial && !d.failed_boards?.length).map(d => [d.server, { rev: artifactRevision(d.artifacts_rev), team: d.artifacts_board || d.teams?.find(t => t.board_id)?.board_id }])),
         artifacts: results.flatMap(d => d.artifacts), teams: results.flatMap(d => d.teams || []),
         all: results.reduce((n,d) => n + (d.all || 0), 0), total: results.reduce((n,d) => n + (d.total || 0), 0),
         tag_counts: results.reduce((counts,d) => { for (const [tag,n] of Object.entries(d.tag_counts || {})) counts[tag] = (counts[tag] || 0) + n; return counts; }, Object.create(null)),
-        has_more: results.some(d => !d.done), next_cursor: JSON.stringify(next), truncated: results.some(d => d.truncated),
+        has_more: results.some(d => !d.done), next_cursor: JSON.stringify(next), truncated: results.some(d => d.truncated || d.partial || d.failed_boards?.length),
+        partial: results.some(d => d.partial || d.failed_boards?.length), failed_boards: results.flatMap(d => (d.failed_boards || []).map(id => identityKey(d.server, id))),
         failed: [...new Set(failed)], answered: read.length, expected, versionless: results.filter(d => d.versionless).map(d => d.server) };
 }
 

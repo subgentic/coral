@@ -11,7 +11,7 @@ const C = await import('../../coral-go/pkg/frontend/static/review_counts.js');
 
 // no computer online: nothing to ask, and the number stays unknown (the badge shows what it always did)
 state.hub = true; state.servers = [];
-assert.equal(await C.refreshCounts(), false); assert.equal(asked.length, 0, 'nothing asked'); assert.equal(C.countedUnread(), null);
+assert.equal(await C.refreshCounts(), true, 'unknown source metadata is published'); assert.equal(asked.length, 0, 'nothing asked'); assert.equal(C.countedUnread(), null);
 // a computer online: asked through the proxy; this page's own address is never counted
 state.servers = [{ id: 'box-2', status: 'online' }, { id: 'local', status: 'online' }];
 assert.equal(await C.refreshCounts(true), true);

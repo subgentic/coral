@@ -1,3 +1,4 @@
+import { reviewFixtureURL } from './helpers/review_fixture.js';
 import assert from 'node:assert/strict';
 import cp from './helpers/child_process.js';
 const { spawnSync } = cp;
@@ -9,11 +10,12 @@ const {state}=await importUi('state');state.hub=true;state.servers=[{id:'srv1',s
 const M=await importUi('inbox_reviews');
 const ui=await importUi('artifact_review');
 const ids=['a'.repeat(64),'b'.repeat(64)];
-const rows=ids.map((id,i)=>({id,name:'Film',session_id:'writer',produced_by:'Writer',uri:'coral://artifacts/'+id,tags:['for review'],available:true,created_at:`2026-11-03T10:0${i}:00Z`}));
+const rows=ids.map((id,i)=>({id,board_id:'team',name:'Film',session_id:'writer',produced_by:'Writer',uri:'coral://artifacts/'+id,tags:['for review'],available:true,created_at:`2026-11-03T10:0${i}:00Z`}));
 let mode='ok',calls=[];
 globalThis.fetch=async(url,opts={})=>{
- const u=new URL(String(url),'https://hub.example/');
+ const u=reviewFixtureURL(String(url),'https://hub.example/');
  if(u.pathname.endsWith('/api/board/projects'))return Response.json([{project:'team'}]);
+ if(u.pathname.endsWith('/api/team-artifacts'))return Response.json({artifacts:u.searchParams.get('tag')==='saved'?[]:rows.filter(r=>!u.searchParams.has('digest')||r.id===u.searchParams.get('digest')),total:u.searchParams.get('tag')==='saved'?0:rows.length,has_more:false});
  if(u.pathname.endsWith('/artifacts'))return Response.json({artifacts:rows,has_more:false});
  if(u.pathname.endsWith('/tags') && opts.method==='PUT')return Response.json({error:'local write failed'},{status:404});
  if(u.pathname.endsWith('/review')){
@@ -24,7 +26,7 @@ globalThis.fetch=async(url,opts={})=>{
  return Response.json({}, {status:404});
 };
 await M.refreshReviews(true);
-let row=M.reviewItems()[0];assert.equal(M.earlierVersions(row).length,1,'fixture has a real earlier version');
+let row=local?M.reviewItems().find(r=>r.team==='team'):M.reviewItems()[0];assert.equal(M.earlierVersions(row).length,1,'fixture has a real earlier version');
 if(local) {
  const out=await ui.approveRow(row.team,row);
  assert.deepEqual(out.earlier,{settled:0,failed:1},'a real 404 on this computer still counts as failed');

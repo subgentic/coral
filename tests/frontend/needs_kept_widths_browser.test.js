@@ -36,7 +36,7 @@ const AGENTS = []; // the operator's table is files for review and questions: no
                 const hex = (1).toString(16).padStart(64, '0');
                 const item = { id: hex, name: 'checkout-mockup.html', media_type: 'text/html', size: 30, created_at: new Date(Date.now() - 4 * 3600000).toISOString(), task_id: 5, goal_id: 7, goal_title: 'Checkout redesign', waits_on_this: { count: 1, top_title: 'Tag batch-88', priority: 'high', closes_goal: 'Checkout redesign' }, source: 'upload', available: true, session_id: 'writer-a', produced_by: 'Frontend Dev', tags: ['for review', 'read'], uri: 'coral://artifacts/' + hex };
                 const item2 = { ...item, id: (2).toString(16).padStart(64, '0'), name: 'security-design-note.md', waits_on_this: undefined, task_id: 6, uri: 'coral://artifacts/' + (2).toString(16).padStart(64, '0'), created_at: new Date(Date.now() - 2 * 3600000).toISOString() };
-                window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin);
+                window.fetch = (url, opts = {}) => { const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, {'${team}': [item, item2]}) : null; if (reviewPage) return json(reviewPage); const u = window.__reviewFixtureURL(String(url), location.origin);
                     if (u.pathname === '/api/board/${team}/artifacts') return json({ project: '${team}', artifacts: !u.searchParams.has('tag') || u.searchParams.get('tag') === 'for review' ? [item, item2] : [], has_more: false });
                     return original(url, opts); };
                 return true; })()`);

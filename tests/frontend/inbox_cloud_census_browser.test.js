@@ -15,8 +15,11 @@ const HISTORY_KEYS = ['type', 'source_types', 'date_from', 'date_to', 'q', 'page
 // What the plan adds (section 3, rows 1 to 6).
 const ADDED_ROUTE = '/api/sessions/history/counts';
 // The Hub-served Inbox's Goals and Artifacts folders (#11071): two more View routes, each read once a computer with their own query keys. A route outside these is still a stray.
-const FOLDER_ROUTES = { '/api/goals': ['limit'], '/api/team-artifacts': ['limit', 'offset', 'sort', 'versions'] };
+const FOLDER_ROUTES = { '/api/goals': ['limit'], '/api/team-artifacts': ['limit', 'offset', 'sort', 'versions', 'starred', 'starred_first'] };
 const ADDED_KEYS = ['active', 'agent_name', 'archived', 'starred', 'with_notes'];
+// #13958: the Inbox badge is dashboard chrome on every tab. It reads one
+// owner-protected attention summary per computer; it never loads a file window.
+const REVIEW_BADGE_QUERY = { tag: 'for review', waiting: '1', muted: '0', versions: 'newest', limit: '1' };
 // The plan's "not called in cloud mode" list: none of these is asked for through the Hub by this Inbox.
 // GET /api/goals and GET /api/team-artifacts left this list with #11071: coral-hub asked for the Goals and Artifacts folders in the native Inbox (coral-hub #132368, the Orchestrator's task); both are View routes of the Hub's tier (cloud_routes.golden).
 const NOT_CALLED = [/^\/api\/saved(\/|$)/, /^\/api\/board\/tasks$/, /^\/api\/scheduled\/runs\/recent$/, /^\/api\/workflows\/runs\/recent$/, /^\/api\/artifacts\//,
@@ -26,6 +29,7 @@ const NOT_CALLED = [/^\/api\/saved(\/|$)/, /^\/api\/board\/tasks$/, /^\/api\/sch
 const BASELINE = Object.fromEntries(Object.entries({
     '/api/sessions/history': HISTORY_KEYS, '/api/sessions/history/search': HISTORY_KEYS, '/api/sessions/history/{id}': ['limit'], '/api/sessions/history/{id}/agent-notes': [], '/api/sessions/history/{id}/events': ['limit'],
     '/api/sessions/history/{id}/git': [], '/api/sessions/history/{id}/notes': [], '/api/sessions/history/{id}/tags': [], '/api/sessions/history/{id}/tasks': [], '/api/sessions/{id}/changes': [], '/api/tags': [], '/api/token-usage': ['session_id'],
+    '/api/team-artifacts': Object.keys(REVIEW_BADGE_QUERY),
     '/api/board/projects': [], '/api/board/{team}': [], '/api/board/{team}/artifacts': ['limit'], '/api/board/{team}/goals': ['limit', 'state'], '/api/board/{team}/messages/all': ['format', 'limit', 'offset'], '/api/board/{team}/paused': [],
     '/api/board/{team}/status': [], '/api/board/{team}/subscribers': [], '/api/board/{team}/tasks': ['counts'], '/api/sessions/live/team/{team}/sleep-status': [], '/api/teams/detail/{team}/knowledge': [],
 }).map(([k, v]) => [`GET ${k}`, v]));
@@ -43,7 +47,7 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
 (async () => {
     const { client, Page, Emulation, ev, waitFor } = await connect();
         const RECORDER = `(() => { const inner = window.fetch; window.__census = []; window.fetch = function (u, o = {}) { try { const url = new URL(String(u), location.href);
-        window.__census.push({ m: (o.method || 'GET').toUpperCase(), p: url.pathname, keys: [...new Set([...url.searchParams.keys()])].sort() }); } catch (e) {} return inner.call(this, u, o); };
+        window.__census.push({ m: (o.method || 'GET').toUpperCase(), p: url.pathname, query: Object.fromEntries(url.searchParams), keys: [...new Set([...url.searchParams.keys()])].sort() }); } catch (e) {} return inner.call(this, u, o); };
         window.__quiet = async () => { let n = -1, still = 0; while (still < 5) { await new Promise(r => setTimeout(r, 50)); if (window.__census.length === n) still++; else { still = 0; n = window.__census.length; } } }; })();`;
     const take = () => ev(`(() => { const r = window.__census.slice(); window.__census.length = 0; return r; })()`);
     const open = async (url) => {
@@ -52,7 +56,7 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
         await coralReady(ev, 'startup', 'liveList', 'settings');
     };
     // the requests as a set of "METHOD path ?keys", the page's own chrome left out and a computer's id replaced
-    const shape = reqs => reqs.map(r => { const proxied = /^\/api\/remote\//.test(r.p), p = norm(r.p); return { proxied, m: r.m, p, keys: r.keys, chrome: !proxied && `${r.m} ${p}` in CHROME }; });
+    const shape = reqs => reqs.map(r => { const proxied = /^\/api\/remote\//.test(r.p), p = norm(r.p); return { proxied, m: r.m, p, keys: r.keys, query: r.query, chrome: !proxied && `${r.m} ${p}` in CHROME }; });
     // the requests that are neither the fixed baseline's (through a computer) nor the dashboard's own: the fixed lists above are the whole allowance
     const outsideBaseline = (reqs, { localHistory = false } = {}) => reqs.filter(r => r.m !== 'MARK').flatMap(r => {
         const key = `${r.m} ${r.p}`;
@@ -84,6 +88,9 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
         // the tabs send nothing beyond the fixed baseline (and the dashboard's own chrome): a new route or key on the Chats or Board tab fails here, before the Inbox is looked at
         const tabsOutside = outsideBaseline([...bootA, ...chatsTab, ...boardTab]);
         assert.deepEqual(tabsOutside, [], 'the Chats and Board tabs stay inside the fixed baseline: ' + JSON.stringify(tabsOutside));
+        const badgeReads = [...bootA, ...chatsTab, ...boardTab].filter(r => r.p === '/api/team-artifacts');
+        assert.ok(badgeReads.length > 0, 'the shared Inbox badge was exercised');
+        for (const request of badgeReads) assert.deepEqual(request.query, REVIEW_BADGE_QUERY, 'cross-tab artifact reads are only the bounded attention summary');
         assert.ok(chatsTab.some(r => r.p === '/api/sessions/history') && boardTab.some(r => /\/messages\/all$/.test(r.p)), 'the baseline was driven: the Chats tab and the Board tab read');
         assert.ok(![...chatsTab, ...boardTab].some(r => r.p === ADDED_ROUTE), 'the Chats and Board tabs do not call the counts route');
         const baseline = new Map(Object.entries(BASELINE).map(([k, keys]) => [k, new Set(keys)]));
@@ -123,6 +130,8 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
         let tabbed = [];
         const fieldsTyped = [];
         await ev(`window.__census.push({ m: 'MARK', p: 'ui-open', keys: [] }); window.switchNavTab('hub-inbox'); true`); await ev(`window.__quiet()`);
+        await waitFor(`!!document.getElementById('inbox-frame') || document.querySelectorAll('#inbox-nav-list .view-list-item').length > 0`, 'the Inbox tab finishes mounting its folders', 15000);
+        await ev(`window.__quiet()`);
         const ui = await ev(`(() => ({ frame: !!document.getElementById('inbox-frame'), local: !!document.getElementById('inbox-local') && !document.getElementById('inbox-local').hidden, folders: [...document.querySelectorAll('#inbox-nav-list button')].length }))()`);
         if (ui.local && ui.folders > 0) {
             const n = ui.folders;
@@ -172,8 +181,8 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
         const stray = [], newKeys = new Set(), newRoutes = new Set();
         for (const [route, keys] of keysByPath(proxied)) {
             const base = baseline.get(route);
-            if (!base) { if (route === `GET ${ADDED_ROUTE}`) { newRoutes.add(route); if (keys.size) stray.push(`${route} sent keys ${[...keys]}`); } else if (route.startsWith('GET ') && FOLDER_ROUTES[route.slice(4)]) { for (const k of keys) if (!FOLDER_ROUTES[route.slice(4)].includes(k)) stray.push(`${route} ?${k} is not a key of the Goals or Artifacts folder`); } else stray.push(`${route} is not a route the Chats and Board tabs call, nor the plan's`); continue; }
-            for (const k of keys) if (!base.has(k)) { if (route === 'GET /api/sessions/history' && ADDED_KEYS.includes(k)) newKeys.add(k); else stray.push(`${route} ?${k} is not a key of the baseline or the plan`); }
+            if (!base) { if (route === `GET ${ADDED_ROUTE}`) { newRoutes.add(route); if (keys.size) stray.push(`${route} sent keys ${[...keys]}`); } else if (route.startsWith('GET ') && FOLDER_ROUTES[route.slice(4)]) { for (const k of keys) if (!FOLDER_ROUTES[route.slice(4)].includes(k)) stray.push(`${route} ?${k} is not a key of the Goals, Artifacts or Starred folder`); } else stray.push(`${route} is not a route the Chats and Board tabs call, nor the plan's`); continue; }
+            for (const k of keys) if (!base.has(k)) { if (route === 'GET /api/sessions/history' && ADDED_KEYS.includes(k)) newKeys.add(k); else if (!(route.startsWith('GET ') && FOLDER_ROUTES[route.slice(4)]?.includes(k))) stray.push(`${route} ?${k} is not a key of the baseline or the plan`); }
         }
         assert.deepEqual(stray, [], 'every request is the baseline or the plan\'s: ' + JSON.stringify(stray));
         assert.deepEqual([...newRoutes], [`GET ${ADDED_ROUTE}`], 'the one route beyond the Chats and Board tabs is the counts route');

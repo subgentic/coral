@@ -23,7 +23,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 const hex = n => n.toString(16).padStart(64, '0');
                 const item = (i, name, q) => ({ id: hex(i), name, media_type: 'text/markdown', size: 30, created_at: new Date(Date.now() - (9 - i) * 60000).toISOString(), source: 'upload', available: true, tags: ['for review', 'internal'], uri: 'coral://artifacts/' + hex(i), produced_by: 'Writer', session_id: 's' + i, ...(q ? { review_question: q } : {}) });
                 window.__items = [item(1, 'plan-a.md', 'Which port should the test server use?'), item(2, 'plan-b.md', 'Ship the second\\u202e design?'), item(3, 'plan-c.md', '')];
-                window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin);
+                window.fetch = (url, opts = {}) => { const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, {'qn': window.__items}) : null; if (reviewPage) return json(reviewPage); const u = window.__reviewFixtureURL(String(url), location.origin);
                     if (u.pathname.startsWith('/api/artifacts/')) return Promise.resolve(new Response('Review preview text', { headers: { 'Content-Type': 'text/plain' } }));
                     if (!/^\\/api\\/board\\/qn\\/artifacts$/.test(u.pathname)) return original(url, opts);
                     return json({ project: 'qn', artifacts: window.__items.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))), has_more: false }); }; return true; })()`);

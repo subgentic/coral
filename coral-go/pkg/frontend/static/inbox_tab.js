@@ -11,7 +11,7 @@ import { syncWelcome } from './welcome_items.js';
 
 import { state } from './state.js';
 import { reportInboxOpened } from './dashboard_analytics.js';
-import { unreadReviewItems, unreadReviewCount, setReviewCounter, refreshReviews } from './ask_filter.js';
+import { unreadReviewItems, refreshReviews, reviewAttentionCount, setReviewCounter } from './ask_filter.js';
 import { failedUnread, refreshRuns, onRunsChanged } from './automation_runs.js';
 import { pendingProposals, refreshProposals, onProposalsChanged } from './proposals_state.js';
 import { goalDoneCount } from './goal_done.js';
@@ -24,7 +24,7 @@ import { resolveSessionIdentity, sessionStateInfo, askWords } from './session_st
 import './safe_markdown.js'; // the shared Inbox renderer's wrapper: the lazy Inbox modules import it, and a lazy module imports only what loads at startup (import_hygiene)
 
 const INBOX_URL = '/inbox';
-document.addEventListener('coral:reviews-changed', () => updateInboxTab());
+document.addEventListener('coral:reviews-changed', () => { countsRefresh?.(true); updateInboxTab(); });
 onProposalsChanged(() => updateInboxTab()); // what agents asked to add and wait for the Operator's approval is a Needs you row (#11389)
 onRunsChanged(() => updateInboxTab()); // a failed run nobody has opened is a Needs you row (#9296)
 onOperatorAsksChanged(() => updateInboxTab()); // a question an agent asked the Operator is a Needs you row (#11417)
@@ -59,8 +59,8 @@ function scheduleReviewCounts() {
     if (countsAsked) return;
     countsAsked = true;
     const go = () => importOnce('./review_counts.js').then(m => {
-        setReviewCounter(m.countedUnread);
-        countsRefresh = () => m.refreshCounts().then(changed => { if (changed) updateInboxTab(); }).catch(() => {});
+        setReviewCounter(m.countedUnread, m.countSummary);
+        countsRefresh = force => m.refreshCounts(force).then(changed => { if (changed) updateInboxTab(); }).catch(() => {});
         countsRefresh();
     }).catch(() => {});
     if (typeof requestIdleCallback === 'function') requestIdleCallback(go, { timeout: 4000 }); else setTimeout(go, 2000);
@@ -78,7 +78,8 @@ export function updateInboxTab() {
     syncWelcome(); // a welcome step seen is remembered (#11443); the items are not in the badge
     refreshProposals(); // after the Inbox was first opened, and at most once in 20 seconds (proposals_state.js)
     if (!isCloud()) refreshRuns(); // the runs are read from this Coral only, and only once the Inbox or Automations has been shown
-    const n = waitingCount() + unreadReviewCount() + failedUnread().length + pendingProposals().length + operatorAsks().length + goalDoneCount() + skillCount(); // a goal that looks done is one item (#11825); a review artifact the operator has read stays listed but is not counted (#9277); a failed run nobody has opened is (#9296)
+    const reviewCount = reviewAttentionCount();
+    const n = waitingCount() + reviewCount.value + failedUnread().length + pendingProposals().length + operatorAsks().length + goalDoneCount() + skillCount(); // a goal that looks done is one item (#11825); a review artifact the operator has read stays listed but is not counted (#9277); a failed run nobody has opened is (#9296)
     const text = n > 9 ? '9+' : n > 0 ? String(n) : ''; // two characters at most: the pill fits the tabs' own 24 px gap, so the gap after Inbox is the same as the others (#9821); the exact count is in the tab's name
     // Only what changed is written: nav_tabs.js redraws the row on any change to it, and this runs for every message of the feed (setting hidden to
     // the value it has is still a change to a MutationObserver).
@@ -86,7 +87,7 @@ export function updateInboxTab() {
     if (badge.hidden !== (n === 0)) badge.hidden = n === 0;
     const phone = document.getElementById('phone-nav-inbox-badge'); // the phone's floating nav carries the same count (#11116)
     if (phone) { if (phone.textContent !== text) phone.textContent = text; if (phone.hidden !== (n === 0)) phone.hidden = n === 0; }
-    const label = n > 0 ? unreadReviewCount() || failedUnread().length || operatorAsks().length ? `Inbox, ${n} need your attention` : `Inbox, ${n} waiting for input` : null;
+    const label = n > 0 ? reviewCount.value || failedUnread().length || operatorAsks().length ? `Inbox, ${reviewCount.complete ? '' : 'at least '}${n} need your attention` : `Inbox, ${reviewCount.complete ? '' : 'at least '}${n} waiting for input` : reviewCount.complete ? null : 'Inbox, attention count incomplete';
     if (tab.getAttribute('aria-label') !== label) { if (label) tab.setAttribute('aria-label', label); else tab.removeAttribute('aria-label'); }
     setInboxCount('needs', n);
     tellAttention(n);

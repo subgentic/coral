@@ -401,6 +401,7 @@ export function openArtifactViewer(hex, opts = {}) {
     Promise.resolve(renderArtifact(body, `coral://artifacts/${hex}`, { server: opts.server, board: opts.board, sourceNamed: opts.sourceNamed, filename: opts.filename, mediaType: opts.mediaType }, {
         signal: _abort.signal,
         isStale: () => gen !== _gen || d.hidden,
+        opened: () => { if (opts.sourceNamed && gen === _gen && !d.hidden) importOnce('./inbox_reviews.js').then(m => m.recordOpenedVersion(hex, { server: opts.server, board: opts.board })).catch(() => {}); },
         typeResolved: metadata => {
             if (gen !== _gen || d.hidden) return;
             _layoutType = layoutType(metadata) || layoutType(opts) || 'application/octet-stream';

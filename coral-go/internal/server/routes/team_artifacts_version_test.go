@@ -1,7 +1,12 @@
 package routes
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/go-chi/chi/v5"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -43,4 +48,49 @@ func TestSameBytesOfTwoTeamsNeverCarryTheOtherTeamsSeries(t *testing.T) {
 		h.attachSeriesVersions(rows, c.project)
 		assert.Equal(t, c.want, [2]int{rows[0].Version, rows[0].Versions}, "project %q team %q", c.project, c.team)
 	}
+}
+
+// #13988: an all-teams row follows its board's ID, never its display label. A board whose label differs from its id ("Product" for alpha) lost its version, its series id and its opened version on the cross-team
+// list, because the series was looked up under the label; a team's own list (a project given) is unchanged.
+func TestAnAllTeamsRowOfALabelledBoardCarriesItsSeriesFacts(t *testing.T) {
+	p := newPinnedRig(t)
+	k := p.k
+	ctx := context.Background()
+	b := struct{ ID, Label string }{"alpha", "Product"} // the rig's team is alpha: its label is Product
+	require.NoError(t, k.h.bs.RenameBoard(ctx, b.ID, b.Label))
+	root, err := k.h.bs.CreateTask(ctx, b.ID, "OPERATOR the document", "", "medium", "lead", "Backend")
+	require.NoError(t, err)
+	var d []string
+	for _, body := range []string{"the document, version one", "the document, version two", "the document, version three"} {
+		code, out := k.upTask("s1", root.ID, body, "&name=doc.md")
+		require.Equal(t, 201, code, out)
+		d = append(d, digestOfURI(out["uri"].(string)))
+	}
+	code, list := p.get(t, "/api/team-artifacts?tag=for+review&team="+b.ID, nil)
+	require.Equal(t, 200, code, list)
+	arts, _ := list["artifacts"].([]any)
+	require.NotEmpty(t, arts, list)
+	row := arts[0].(map[string]any)
+	assert.Equal(t, b.ID, row["board_id"])
+	assert.Equal(t, "Product", row["team"], "the label is for display")
+	assert.EqualValues(t, 3, row["version"], "the row's own version")
+	assert.EqualValues(t, 3, row["versions"])
+	assert.NotEmpty(t, row["series_id"], "the series the row belongs to")
+	// the opened version (#13959) of a labelled board
+	req := httptest.NewRequest(http.MethodPost, "/api/artifacts/"+d[1]+"/opened", nil)
+	req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+	rc := chi.NewRouteContext()
+	rc.URLParams.Add("id", d[1])
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rc))
+	rec := httptest.NewRecorder()
+	k.h.openedArtifactRoute(rec, req)
+	require.Equal(t, 200, rec.Code, rec.Body.String())
+	_, list = p.get(t, "/api/team-artifacts?tag=for+review&team="+b.ID, nil)
+	row = list["artifacts"].([]any)[0].(map[string]any)
+	assert.EqualValues(t, 2, row["opened_version"], "what the Operator opened, on the labelled board's row")
+	// the team's own list keeps its version
+	_, own := p.get(t, "/api/board/"+b.ID+"/artifacts?tag=for+review", nil)
+	oa, _ := own["artifacts"].([]any)
+	require.NotEmpty(t, oa, own)
+	assert.EqualValues(t, 3, oa[0].(map[string]any)["version"])
 }

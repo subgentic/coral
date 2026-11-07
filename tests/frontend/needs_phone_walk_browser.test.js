@@ -25,7 +25,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 const v = i => ({ id: hex(i), name: 'plan.md', media_type: 'text/markdown', size: 30, created_at: new Date(Date.now() - (9 - i) * 60000).toISOString(), source: 'upload', available: true, tags: ['for review'], produced_by: 'Orchestrator', review_question: 'Is the launch plan ready to go to the whole team, with the three milestones as written, and who should announce it first?' });
                 const items = [v(1), v(2), v(3)];
                 window.__asks = [{ board: '${team}', kind: 'ask', id: 41, asker: 'Lead', text: 'Which port should the test server use?', at: '2026-10-31T01:00:00Z' }];
-                window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin);
+                window.fetch = (url, opts = {}) => { const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, {'${team}': items}) : null; if (reviewPage) return json(reviewPage); const u = window.__reviewFixtureURL(String(url), location.origin);
                     if (u.pathname === '/api/operator-asks') return json(window.__asks);
                     if ((opts.method || 'GET') === 'GET' && u.pathname === '/api/board/${team}/artifacts') return json({ project: '${team}', artifacts: items.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))), has_more: false });
                     return original(url, opts); };
