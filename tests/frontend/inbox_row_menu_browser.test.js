@@ -53,28 +53,31 @@ const AGENTS = [
             check(at + 'the inline Dismiss under the line is gone on a phone (the menu holds it)', rows.every(x => !x.inline), JSON.stringify(rows.map(x => [x.title, x.inline])));
             check(at + 'no sideways scroll', await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`));
             const ax = await axName(client, `${T} tr.dt-mailed:nth-of-type(1) .dt-mail-more-toggle`).catch(() => null);
-            await ev(`document.querySelector('${T} tr.dt-mailed .dt-mail-more-toggle').setAttribute('data-menu-probe', '1'); true`);
+            // The row can redraw while CDP awaits another answer: keep its identity, not a transient DOM marker.
+            const probeKey = await ev(`document.querySelector('${T} tr.dt-mailed').dataset.key`);
+            const probe = `[...document.querySelectorAll('${T} tr.dt-mailed')].find(r => r.dataset.key === ${JSON.stringify(probeKey)})?.querySelector('.dt-mail-more-toggle')`;
+            const clickCurrent = (expression, why) => waitFor(`(() => { const e = (${expression}); if (!e?.isConnected || !e.getClientRects().length) return false; e.click(); return true; })()`, at + why, 4000);
             // a tap opens the menu: Dismiss first, on the screen, focused; the row itself did not open
             const url0 = await ev(`location.href`);
-            await ev(`document.querySelector('[data-menu-probe]').click(); true`);
-            await waitFor(`!document.querySelector('[data-menu-probe]').parentElement.querySelector('.menu').hidden`, at + 'the menu opens', 4000);
-            const menu = await ev(`(() => { const t = document.querySelector('[data-menu-probe]'), m = t.parentElement.querySelector('.menu'), r = m.getBoundingClientRect(), items = [...m.querySelectorAll('[role=menuitem]')]; return { expanded: t.getAttribute('aria-expanded'), items: items.map(i => i.textContent), focus: document.activeElement === items[0], role: m.getAttribute('role'), left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), bottom: Math.round(r.bottom), vw: innerWidth, vh: innerHeight, itemH: Math.round(items[0].getBoundingClientRect().height), url: location.href }; })()`);
+            await clickCurrent(probe, 'tap the current row menu');
+            await waitFor(`!!(${probe}) && !(${probe}).parentElement.querySelector('.menu').hidden`, at + 'the menu opens', 4000);
+            const menu = await ev(`(() => { const t = (${probe}), m = t.parentElement.querySelector('.menu'), r = m.getBoundingClientRect(), items = [...m.querySelectorAll('[role=menuitem]')]; return { expanded: t.getAttribute('aria-expanded'), items: items.map(i => i.textContent), focus: document.activeElement === items[0], role: m.getAttribute('role'), left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), bottom: Math.round(r.bottom), vw: innerWidth, vh: innerHeight, itemH: Math.round(items[0].getBoundingClientRect().height), url: location.href }; })()`);
             check(at + 'the menu opens: Dismiss is its first action, focused, a 44 px row', menu.expanded === 'true' && menu.items[0] === 'Dismiss' && menu.focus && menu.role === 'menu' && menu.itemH >= 44, JSON.stringify(menu));
             check(at + 'the menu is whole on the screen (not cut by the list)', menu.left >= 0 && menu.right <= menu.vw && menu.top >= 0 && menu.bottom <= menu.vh, JSON.stringify(menu));
             check(at + 'the press on the ⋯ did not open the row', menu.url === url0);
             await shot(`inbox-row-menu-${w}-${theme}`);
             // Escape closes it and gives the focus back to the button
             await key('Escape', 'Escape', 27);
-            await waitFor(`document.querySelector('[data-menu-probe]').getAttribute('aria-expanded') === 'false'`, at + 'Escape closes the menu', 4000);
-            check(at + 'Escape closes it and the focus is on the ⋯ again', await ev(`document.activeElement === document.querySelector('[data-menu-probe]')`));
+            await waitFor(`(${probe})?.getAttribute('aria-expanded') === 'false'`, at + 'Escape closes the menu', 4000);
+            check(at + 'Escape closes it and the focus is on the ⋯ again', await ev(`document.activeElement === (${probe})`));
             // the keyboard opens it from the button (Enter), and Dismiss is a real press
             await key('Enter', 'Enter', 13);
-            await waitFor(`document.querySelector('[data-menu-probe]').getAttribute('aria-expanded') === 'true'`, at + 'Enter opens the menu', 4000);
-            await ev(`document.querySelector('[data-menu-probe]').parentElement.querySelector('[role=menuitem]').click(); true`);
+            await waitFor(`(${probe})?.getAttribute('aria-expanded') === 'true'`, at + 'Enter opens the menu', 4000);
+            await clickCurrent(`(${probe})?.parentElement.querySelector('[role=menuitem]')`, 'press the current Dismiss action');
             await waitFor(`window.__dismissed.length === 1`, at + 'Dismiss posts to the dismiss-wait route', 6000);
             const sent = await ev(`window.__dismissed[0]`);
             check(at + 'Dismiss asks the route for that agent only', /\/api\/sessions\/live\/ag-one\/dismiss-wait$/.test(sent.url) && sent.body.session_id === AGENTS[0].session_id, JSON.stringify(sent));
-            check(at + 'the menu is closed after the choice', await ev(`document.querySelector('[data-menu-probe]') ? document.querySelector('[data-menu-probe]').getAttribute('aria-expanded') === 'false' : true`));
+            check(at + 'the menu is closed after the choice', await ev(`(${probe}) ? (${probe}).getAttribute('aria-expanded') === 'false' : true`));
         }
     } catch (e) { console.log('ERROR ' + (e.stack || e)); failures.push('error'); }
     await client.close();
