@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -452,4 +453,33 @@ func TestOnlyTheClaimingAgentsClaimIsRenewedByItsWork(t *testing.T) {
 		g.add(20 * time.Minute)
 	}
 	assert.Equal(t, []string{"Agent A"}, g.holders(), "A's work keeps A's slot; B, with no work of its own, is left to its lease and went")
+
+// #14026: a Codex agent's shell is a wrapper: the command the hook sees is `bash -lc "<what the agent typed>"` (or zsh -lc, /bin/bash -c). The combined form `claim --wait && <work>` must be let through there as it is bare,
+// and the work behind a claim that does not wait, or after the work, is still held.
+func TestACombinedWaitingClaimIsLetThroughInsideAShellWrapper(t *testing.T) {
+	g := newHookRig(t)
+	g.handClaim("s-a", "Agent A", "call-a") // A holds the only slot
+	ctx := context.Background()
+	inner := "coral-board resource claim mac-heavy --wait && cd coral-go && go test ./..."
+	for _, wrap := range []string{
+		"%s",
+		"bash -lc '%s'",
+		`bash -lc "%s"`,
+		`zsh -lc "%s"`,
+		"/bin/bash -c '%s'",
+		`sh -c "%s"`,
+		"env FOO=1 bash -lc '%s'",
+		"timeout 7200 bash -lc '%s'",
+	} {
+		cmd := fmt.Sprintf(wrap, inner)
+		assert.Equal(t, "", g.h.Before(ctx, "s-b", "s-b", "call-"+wrap, cmd), "let through: "+cmd)
+	}
+	for _, held := range []string{
+		`bash -lc "coral-board resource claim mac-heavy && go test ./..."`,
+		`bash -lc "go test ./... && coral-board resource claim mac-heavy --wait"`,
+		`zsh -lc "coral-board resource claim mini --wait && go test ./..."`,
+		`bash -lc 'echo "coral-board resource claim mac-heavy --wait"; go test ./...'`,
+	} {
+		assert.NotEmpty(t, g.h.Before(ctx, "s-b", "s-b", "call-held", held), "still held: "+held)
+	}
 }
