@@ -197,7 +197,7 @@ const { coralReady } = require('./helpers/wait');
         console.log('Phone: at 390 px with the root text at 100% and at 200% (32 px), in both themes: the files and their text stay inside the panel, nothing runs sideways, a file opens from the keyboard and is read-only');
         await ev(`window.__file = { body: { text: 'Be careful with the memory text.\\nSecond line.' }, status: 200 }; window.__sk = { body: { skills: [{ name: 'release-notes', version: 2, loads: 3, status: 'approved' }] }, status: 200 };
             window.__mem = { body: { files: [{ id: 'a'.repeat(32), file: 'CLAUDE.md', kind: 'instructions', level: 'project' }, { id: 'b'.repeat(32), file: 'notes.md', kind: 'memory', level: 'user' }] }, status: 200 };
-            window.__answer = { body: { agent_name: 'tab a', agent_type: 'claude', tmux_session_name: 'tm-1', tmux_command: 'tmux attach -t a-rather-long-session-name-so-the-line-has-to-wrap', working_directory: '/a/very/long/working/directory/that/has/to/wrap/somewhere/on/a/phone', log_path: '/logs/tab-a.log', pane_title: 'tab a pane', git_repo: 'repo', git_branch: 'main', git_commit_hash: '0123456789abcdef', git_commit_subject: 'Fix the thing', prompt: 'You are a helper with a prompt long enough to wrap onto several lines of a narrow screen.' }, status: 200 }; true`);
+            window.__answer = { body: { agent_name: 'tab a', agent_type: 'claude', tmux_session_name: 'tm-1', tmux_command: 'tmux attach -t a-rather-long-session-name-so-the-line-has-to-wrap', working_directory: '/' + 'x'.repeat(80), log_path: '/logs/tab-a.log', pane_title: 'tab a pane', git_repo: 'repo', git_branch: 'main', git_commit_hash: '0123456789abcdef', git_commit_subject: 'Fix the thing', prompt: 'You are a helper with a prompt long enough to wrap onto several lines of a narrow screen.' }, status: 200 }; true`);
         await ev(`window.__m.add('tab-bot', 'A', 3, { sleeping: false }); true`);
         await waitFor(`!!window.selectLiveSession`, 'the page\'s live view');
         await ev(`window.selectLiveSession('tab-bot', 'claude', 'sid-1', 'local'); true`); // the agent's page is on screen: the side panel belongs to it
@@ -210,6 +210,26 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); document.documentElement.style.fontSize = ${JSON.stringify(rootPx || '')}; true`);
                 await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); true`); // the earlier cases' toasts are not part of this look
                 await show(); await waitFor(`document.querySelectorAll('#info-memory button').length === 2`, `${tag}: two files`);
+                if (rootPx) {
+                    // A person's wheel must reach the long path and final section; scrollIntoView also scrolls overflow:hidden and hid this regression.
+                    const wheel = await ev(`(() => {
+                        const panel = document.getElementById('agentic-panel-info'), sc = document.querySelector('#info-tab');
+                        panel.scrollTop = 0; sc.scrollTop = 0;
+                        const box = sc.getBoundingClientRect(), path = document.getElementById('info-working-dir').getBoundingClientRect();
+                        return { x: box.left + box.width / 2, y: Math.max(box.top + 10, Math.min(box.bottom - 10, box.top + box.height / 2)), delta: Math.max(80, path.top - box.top - 20) };
+                    })()`);
+                    await client.Input.dispatchMouseEvent({ type: 'mouseWheel', x: wheel.x, y: wheel.y, deltaX: 0, deltaY: wheel.delta });
+                    await waitFor(`document.querySelector('#info-tab').scrollTop > 0 || document.getElementById('agentic-panel-info').scrollTop > 0`, `${tag}: a wheel scrolls Info rather than the clipped page`, 3000);
+                    const path = await ev(`(() => {
+                        const el = document.getElementById('info-working-dir'), box = document.getElementById('agentic-panel-info').getBoundingClientRect();
+                        const range = document.createRange(); range.selectNodeContents(el);
+                        return { text: el.textContent, rects: [...range.getClientRects()].map(r => ({left:r.left,right:r.right,top:r.top,bottom:r.bottom})), box:{left:box.left,right:box.right,top:box.top,bottom:box.bottom} };
+                    })()`);
+                    assert.equal(path.text, '/' + 'x'.repeat(80), `${tag}: the unbroken path is present`);
+                    assert.ok(path.rects.length > 1 && path.rects.every(r => r.left >= path.box.left - 1 && r.right <= path.box.right + 1 && r.top >= path.box.top - 1 && r.bottom <= path.box.bottom + 1), `${tag}: every wrapped path line is reachable without clipping: ${JSON.stringify(path)}`);
+                    await client.Input.dispatchMouseEvent({ type: 'mouseWheel', x: wheel.x, y: wheel.y, deltaX: 0, deltaY: 10000 });
+                    await waitFor(`(() => { const b = [...document.querySelectorAll('#info-memory button')].at(-1).getBoundingClientRect(), p = document.getElementById('agentic-panel-info').getBoundingClientRect(); return b.top >= p.top && b.bottom <= p.bottom; })()`, `${tag}: a wheel reaches the final Memory section`, 3000);
+                }
                 await ev(`document.querySelector('#info-memory button').focus(); true`);
                 assert.equal(await ev(`document.activeElement === document.querySelector('#info-memory button')`), true, `${tag}: the file button takes the focus (the sheet is open on the Info tab)`);
                 await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' }); // a real key event through the browser, not a script click
