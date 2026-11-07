@@ -242,3 +242,48 @@ func TestTheGoalReadsAreOwnerSeesRoutesAtViewTier(t *testing.T) {
 		assert.Equal(t, tunnel.TierView, tier, p)
 	}
 }
+
+// QA's SHOULD on #14047: a Not yet written at total N is no longer a state once the goal's total is N+1, on its own (no read beside it to hide the case), and it is a state again when written at the new total; a Dismiss
+// has no total and stays. The older entry never comes back: it is a different total.
+func TestANotYetAtTotalNIsNoStateAtNPlusOneAndOnlyThatEntryGoesStale(t *testing.T) {
+	d := newDoneReadRig(t)
+	gl := d.doneGoal()
+	require.Equal(t, 1, gl.Rollup.Total)
+	done := func() { // one more task, done: the all-done total goes up by one
+		ctx := context.Background()
+		tk, err := d.bs.CreateTaskWithOpts(ctx, "alpha", "more", "", "medium", "Lead", &board.CreateTaskOpts{GoalID: &gl.ID})
+		require.NoError(t, err)
+		_, err = d.bs.ClaimTask(ctx, "alpha", "Dev", tk.ID)
+		require.NoError(t, err)
+		_, err = d.bs.CompleteTask(ctx, "alpha", tk.ID, "Dev", nil)
+		require.NoError(t, err)
+	}
+	hidden := func() any {
+		var seen any
+		for name, row := range d.reads(gl.ID, drPerson) {
+			ds, _ := row["done_state"].(map[string]any)
+			var h any
+			if ds != nil {
+				h = ds["hidden"]
+			}
+			if seen == nil {
+				seen = h
+			}
+			assert.Equal(t, seen, h, "the three reads agree: %s", name)
+		}
+		return seen
+	}
+	d.state(gl.ID, "not_yet", drPerson) // at total 1
+	assert.Equal(t, "not_yet", hidden())
+	done() // total 2
+	assert.Nil(t, hidden(), "a Not yet at total 1 is no state at total 2")
+	d.state(gl.ID, "not_yet", drPerson) // at total 2
+	assert.Equal(t, "not_yet", hidden())
+	assert.Equal(t, []string{"alpha|" + strconv.FormatInt(gl.ID, 10) + "|1", "alpha|" + strconv.FormatInt(gl.ID, 10) + "|2"}, d.ls.get("goal_done_hidden"), "the old entry is still in the list, and still no state")
+	done() // total 3
+	assert.Nil(t, hidden(), "neither the entry at 1 nor the one at 2 applies at total 3")
+	d.state(gl.ID, "dismiss", drPerson)
+	assert.Equal(t, "dismissed", hidden())
+	done() // total 4
+	assert.Equal(t, "dismissed", hidden(), "a Dismiss has no total: it stays")
+}
