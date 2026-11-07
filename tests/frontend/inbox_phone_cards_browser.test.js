@@ -25,7 +25,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`(() => { const real = window.fetch, now = Date.now(), hex = n => n.toString(16).padStart(64, '0');
                 const rows = [{ id: hex(1), name: 'Desktop film with local voice over (Samantha, v3).mp4', media_type: 'text/html', size: 900, created_at: new Date(now - 10 * 3600e3).toISOString(), available: true, tags: ['for review'], produced_by: 'Developer experience', review_question: 'v3: fuller captions over the whole film, same words spoken. Good? A longer second sentence that must not make the card taller.', version: 3, earlier_digests: [hex(8), hex(9)] },
                     { id: hex(2), name: 'release-plan.md', media_type: 'text/markdown', size: 1200, created_at: new Date(now - 20 * 3600e3).toISOString(), available: true, tags: ['for review'], produced_by: 'Orchestrator', review_question: 'On v2.0.57, do the main pages look consistent on a phone?' }];
-                window.fetch = (u, o = {}) => { const page = window.__reviewFixturePage(u, location.origin, { 'team-a': rows }); if (page) return Promise.resolve(new Response(JSON.stringify(page), { status: 200, headers: { 'Content-Type': 'application/json' } })); return real(u, o); }; return true; })()`);
+                window.fetch = (u, o = {}) => { if (/\\/api\\/board\\/team-a\\/artifacts\\/[0-9a-f]{64}\\/tags/.test(String(u)) && (o.method || 'GET').toUpperCase() === 'PUT') return Promise.resolve(new Response(JSON.stringify({ tags: ['for review', 'read'] }), { status: 200, headers: { 'Content-Type': 'application/json' } })); const page = window.__reviewFixturePage(u, location.origin, { 'team-a': rows }); if (page) return Promise.resolve(new Response(JSON.stringify(page), { status: 200, headers: { 'Content-Type': 'application/json' } })); return real(u, o); }; return true; })()`);
             await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr.dt-row').length === 2`, `${at}two cards`, 15000);
@@ -59,6 +59,8 @@ const { coralReady } = require('./helpers/wait');
                 const search = [...document.querySelectorAll('input[type=search]')].find(vis), tog = view.querySelector('.inbox-group-review-toggle'), sel = view.querySelector('.dt-sortbar-select'), note = view.querySelector('.inbox-alerts-link'), alerts = note && note.querySelector('button');
                 return { title: text(view.querySelector('h2')), search: search && Math.round(search.getBoundingClientRect().left + parseFloat(cs(search).paddingLeft) + parseFloat(cs(search).borderLeftWidth)), group: tog && left(tog), chips: left(sel), card: left(view.querySelector('tbody tr.dt-row')), note: note && text(note), alerts: alerts && text(alerts) - parseFloat(cs(alerts).paddingLeft) + parseFloat(cs(alerts).paddingLeft) }; })()`);
             check(Object.entries(edges).filter(([, v]) => v !== null && v !== undefined).every(([, v]) => Math.abs(v - 12) <= 1), `${at}one left edge (12 px) for the title, the search, the grouping box, the chips, the cards and the notice: ` + JSON.stringify(edges));
+            if (w === 390 && theme === 'dark' && font === 16) await shot('phone-cards-390');
+            if (w === 430) await shot('phone-cards-430');
             // the whole question is ONE TAP away: a tap on the card opens the file, and its header says the full question the card cut
             if (w === 390 && theme === 'dark' && font === 16) {
                 await ev(`document.querySelector('#group-table-view tbody tr.dt-row .dt-primary').click(); true`);
@@ -69,8 +71,6 @@ const { coralReady } = require('./helpers/wait');
             }
             const badge = await ev(`document.getElementById('nav-tab-hub-inbox-badge')?.textContent`);
             check(badge === '2', `${at}the count is the number of cards (2): ` + badge);
-            if (w === 390 && theme === 'dark' && font === 16) await shot('phone-cards-390');
-            if (w === 430) await shot('phone-cards-430');
         }
     } finally { await client.close(); }
     if (failures.length) { console.error('FAIL\n  ' + failures.join('\n  ')); process.exit(1); }
