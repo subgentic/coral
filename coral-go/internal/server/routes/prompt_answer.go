@@ -550,6 +550,10 @@ func promptCommand(lines []string, questionAt int) (cmd, note string, missing bo
 			break
 		}
 		if seen++; seen > descriptionLines {
+			// More text than a request's description under the closing rule: when a real Claude dialog (its header, then dashed rules) is above it, the request was never shown whole: Reject only (#14271, Security's extra on #14173)
+			if tailUnderRealDialog(lines, i) {
+				return "", "", true
+			}
 			return "", "", false
 		}
 		desc = append([]string{t}, desc...)
@@ -604,6 +608,31 @@ func requestDialogHeader(lines []string, open int) bool {
 	}
 	return false
 }
+
+// tailUnderRealDialog says whether, looking up from line from (a line of a long tail of text under a rule), a closing dashed rule is within tailScanLines non-blank lines, an opening dashed rule above it, and Claude's dialog
+// header above that: the shape of a real request whose own description was made long.
+func tailUnderRealDialog(lines []string, from int) bool {
+	seen := 0
+	for i := from; i >= 0 && seen < tailScanLines; i-- {
+		if strings.TrimSpace(lines[i]) == "" {
+			continue
+		}
+		seen++
+		if !dashedRuleRe.MatchString(lines[i]) {
+			continue
+		}
+		for j := i - 1; j >= 0 && j >= i-commandMaxLines; j-- {
+			if dashedRuleRe.MatchString(lines[j]) {
+				return requestDialogHeader(lines, j)
+			}
+		}
+		return false
+	}
+	return false
+}
+
+// tailScanLines: how far above the question the closing rule of a request with a very long description is looked for.
+const tailScanLines = 200
 
 // withCommand sets the request block, Claude's line under it and the missing-opening-rule flag from the screen above the question.
 func (s promptScreen) withCommand(lines []string, questionAt int) promptScreen {

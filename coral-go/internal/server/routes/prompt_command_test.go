@@ -92,7 +92,9 @@ func TestPermissionTarget_DescriptionLines(t *testing.T) {
 	assert.Equal(t, "touch a", four.Target, "four lines under the rule is still the request block")
 	many, ok := parsePromptScreen(mk(strings.Repeat(" more\n", 13)))
 	require.True(t, ok)
-	assert.Empty(t, many.command, "thirteen lines under the rule is not this layout (the old three-line context)")
+	assert.Empty(t, many.command, "thirteen lines under the rule is not this layout")
+	assert.True(t, many.OnlyReject, "a real dialog with a tail of 13 lines under its closing rule fails closed: Reject only (#14271)")
+	assert.Contains(t, many.Note, "top of this request")
 }
 
 // A REAL long Bash prompt (Beta Tester's run 2, Claude Code 2.1.314, paths and ids replaced, from a raw terminal log whose spacing is lost): 17 screen lines, about 1100 characters, Claude's own line under the closing rule.
@@ -162,4 +164,28 @@ func TestPermissionTarget_LongDescriptionStillFindsTheHeader(t *testing.T) {
 	s, ok := parsePromptScreen(far)
 	require.True(t, ok)
 	assert.True(t, s.OnlyReject, "a header that is out of reach is Reject only, not an Allow on a command whose top was never read")
+}
+
+// #14271: a REAL Claude capture whose description is made long (13 and 40 lines) is Reject-only; a screen with no dialog above the tail keeps the old behaviour.
+func TestPermissionTarget_RealCaptureWithALongTailIsRejectOnly(t *testing.T) {
+	b, err := os.ReadFile("testdata/claude_bash_long_real.txt")
+	require.NoError(t, err)
+	real := string(b)
+	i := strings.Index(real, "\n\n Do you want to proceed?") // the tail goes under Claude's own line, before the blank line that sets the question apart (a tail glued to the question line is part of the question)
+	require.Greater(t, i, 0)
+	for _, n := range []int{13, 40} {
+		tail := strings.Repeat("\n an agent-written line under the rule", n)
+		s, ok := parsePromptScreen(real[:i] + tail + real[i:])
+		require.True(t, ok, n)
+		assert.True(t, s.OnlyReject, "a %d-line tail under a real request", n)
+		assert.Empty(t, s.command, n)
+	}
+	s, ok := parsePromptScreen(real)
+	require.True(t, ok)
+	assert.False(t, s.OnlyReject, "the capture itself is unchanged")
+	// no dialog above the tail: the old context, as before
+	bare := "output\n" + strings.Repeat("text line\n", 20) + " Do you want to proceed?\n ❯ 1. Yes\n   2. No\n"
+	p, ok := parsePromptScreen(bare)
+	require.True(t, ok)
+	assert.False(t, p.OnlyReject)
 }
