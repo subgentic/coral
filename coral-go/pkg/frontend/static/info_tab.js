@@ -5,9 +5,9 @@
 import { state } from './state.js';
 import { showToast } from './utils.js';
 import { setHidden, setText } from './dom_write.js';
-import { serverFetch, currentServer, identityKey, keyLabel, isCloud, isLocalServer, sessionServer } from './server_base.js';
+import { serverFetch, currentServer, identityKey, keyLabel, isCloud, isLocalServer, sessionServer, normServer } from './server_base.js';
 import { importOnce } from './import_once.js';
-import { keepInfo } from './codex_mode.js';
+import { keepInfo, keepEventMatches } from './codex_mode.js';
 
 /** The lines the Info tab shows for an agent's MCP servers (#9769): one per server, "name: transport, scope"; [] when the CLI is not one Coral reads, and one line saying none when it reads it and finds none. */
 export function mcpLines(result) {
@@ -58,7 +58,7 @@ function fillKeep(s, server) {
     setText($('info-keep-text'), k.text);
     if (k.on) { off.dataset.name = s.name; off.dataset.agentType = s.agent_type || ''; off.dataset.sessionId = s.session_id || ''; }
 }
-document.addEventListener('coral:keep-full-access-changed', () => { if ($('agentic-panel-info')?.classList.contains('active') && state.currentSession && state.currentSession.type === 'live') fillKeep(state.currentSession, currentServer()); }); // listener-ok: one for the page's life, like the agent-selected one below
+document.addEventListener('coral:keep-full-access-changed', e => { const s = state.currentSession; if ($('agentic-panel-info')?.classList.contains('active') && s && s.type === 'live' && keepEventMatches(e.detail, s.session_id, normServer(currentServer()))) fillKeep(s, currentServer()); }); // listener-ok: one for the page's life, like the agent-selected one below
 
 function fillFields(info, server) {
     const set = (id, v) => { $(id).textContent = v; };

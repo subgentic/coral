@@ -50,4 +50,11 @@ assert.equal(m.keepInfo({ agent_type: 'codex', keep_full_access: true }).on, tru
 assert.match(m.keepInfo({ agent_type: 'codex', keep_full_access: true }).text, /^Kept: every restart/);
 assert.equal(m.keepInfo({ agent_type: 'codex', keep_full_access: false }).on, false);
 assert.match(m.keepInfo({ agent_type: 'codex', keep_full_access: false }).text, /^Not kept/);
+// A change answered for one computer never touches the same session id on another (UI Reviewer, #14061)
+assert.equal(m.keepEventMatches({ sessionId: 'sid-1', on: false, server: 'm1' }, 'sid-1', 'm1'), true);
+assert.equal(m.keepEventMatches({ sessionId: 'sid-1', on: false, server: 'm1' }, 'sid-1', 'm2'), false, 'the same id on another computer');
+assert.equal(m.keepEventMatches({ sessionId: 'sid-1', on: false, server: 'm1' }, 'sid-2', 'm1'), false);
+assert.equal(m.keepEventMatches({ sessionId: 'sid-1', on: false }, 'sid-1', 'm1'), false, 'no computer in the event: not matched');
+assert.equal(m.keepEventMatches({ sessionId: '', server: '' }, '', ''), false);
+assert.equal(m.keepEventMatches(null, 'sid-1', 'm1'), false);
 console.log('PASS codex_mode');

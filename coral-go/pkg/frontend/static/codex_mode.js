@@ -47,6 +47,11 @@ export function keepMenuItem(row) {
     return row && row.keep_full_access === true ? { label: 'Stop keeping Full access on restart', mode: 'off' } : { label: 'Keep Full access on restart', mode: 'on' };
 }
 
+/** Does a "keep Full access changed" event belong to the agent on screen? Both the session id AND the computer must match, each as the page normalises it: two computers can hold the same session id, and an answer for one must never change the row of the other (UI Reviewer, #14061). */
+export function keepEventMatches(detail, sessionId, server) {
+    return !!detail && typeof detail.sessionId === 'string' && detail.sessionId !== '' && detail.sessionId === sessionId && typeof detail.server === 'string' && detail.server === server;
+}
+
 /** The Info tab's line for the same setting (#14061): {on, text}, or null unless the row says it either way (a Codex row of the Operator's). The Off button is shown only while it is on. */
 export function keepInfo(row) {
     if (!row || row.agent_type !== 'codex' || typeof row.keep_full_access !== 'boolean') return null;

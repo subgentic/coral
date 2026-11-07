@@ -4,13 +4,13 @@
  * type the CLI's own command (POST /api/sessions/live/{name}/model); the chip then says "Switching…" until the transcript confirms, and
  * says why when it does not (model_switch). A CLI with no live switch shows "Apply with restart": the Restart dialog opens with the
  * choice filled in. Typing in the composer is never held up by any of it. */
-import { serverFetch } from './server_base.js';
+import { serverFetch, normServer } from './server_base.js';
 import { escapeHtml, escapeAttr, showToast } from './utils.js';
 import { importOnce } from './import_once.js';
 import { familyOf, addCustomModel, probeCanAdd, peekCanAdd } from './custom_model_add.js';
 import { modelLabel, readModelsCache, writeModelsCache, clearModelsCache, levelName } from './model_labels.js';
 import { setText, setHidden, setTitle, setData, setAttr } from './dom_write.js';
-import { modeChip, keepChip } from './codex_mode.js';
+import { modeChip, keepChip, keepEventMatches } from './codex_mode.js';
 import { menuMove } from './menu_keys.js';
 
 /** The agent types whose CLI takes /model and /effort in a running session (the server's liveSwitchTypes). */
@@ -137,7 +137,7 @@ export function updateModelChip(session, server) {
 /** The Operator turned "keep Full access on restart" on or off (agent_actions.js): the chip on screen and the phone's Options row follow, from the same list row, without waiting for the next list read (#14061). */
 document.addEventListener('coral:keep-full-access-changed', e => { // listener-ok: one for the page's life, like the chip's own wiring
     const d = e.detail || {};
-    if (!_cur || !d.sessionId || _cur.session.session_id !== d.sessionId) return;
+    if (!_cur || !keepEventMatches(d, _cur.session.session_id, normServer(_cur.server))) return; // the same session id on another computer is not this agent
     _cur.session = { ..._cur.session, keep_full_access: d.on === true };
     updateModelChip(_cur.session, _cur.server);
 });

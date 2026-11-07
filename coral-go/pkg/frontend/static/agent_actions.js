@@ -3,7 +3,7 @@ import { relaunchNarrowing, wakeQuestion } from './codex_mode.js';
 import { state } from './state.js';
 import { worktreeConfirmWords } from './worktree_words.js';
 import { showWorktreeNotice } from './worktree_notice.js';
-import { serverFetch, serverForSession, sessionServer } from './server_base.js';
+import { serverFetch, serverForSession, sessionServer, normServer } from './server_base.js';
 import { killLiveSession, dropKilledRows } from './kill_live.js';
 import { showToast, showView } from './utils.js';
 import { redrawLiveList } from './list_hooks.js';
@@ -127,7 +127,7 @@ export async function setKeepFullAccess(name, agentType, sessionId, mode) {
         const row = state.liveSessions.find(x => x.session_id === sessionId && sessionServer(x) === server);
         if (row) row.keep_full_access = on;
         redrawLiveList();
-        document.dispatchEvent(new CustomEvent('coral:keep-full-access-changed', { detail: { sessionId, on } }));
+        document.dispatchEvent(new CustomEvent('coral:keep-full-access-changed', { detail: { sessionId, on, server: normServer(server) } }));
         const who = agentWords(row, row ? resolveSessionIdentity(row) : name).label;
         showToast(on ? `${who} will keep Full access when it restarts` : `${who} will restart with the permissions it was launched with`);
         return true;

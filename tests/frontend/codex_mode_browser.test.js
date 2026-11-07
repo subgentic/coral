@@ -157,6 +157,18 @@ const NARROWS = { live: 'Full access', launch: 'Workspace write, asks when neede
         await ev(`document.documentElement.removeAttribute('data-theme'); document.documentElement.style.fontSize = ''; true`);
         await Emulation.clearDeviceMetricsOverride();
 
+        console.log('The same session id on another computer: its answer does not change this agent (held m1 answer, m2 on screen)');
+        await ev(`window.__rows['cx-keep-id'] = { ...window.__rows['cx-keep-id'], keep_full_access: true }; window.__state_.liveSessions.find(x => x.session_id === 'cx-keep-id').keep_full_access = true; true`);
+        await pick('cx-narrow', 'codex', 'cx-narrow-id'); await pick('cx-keep', 'codex', 'cx-keep-id');
+        await waitFor(`!document.getElementById('codex-keep-wrap').hidden`, 'the chip on the agent');
+        const cur = await ev(`(async () => { const sb = await import((window.__coralStatic || '/static/') + 'server_base.js'); return sb.normServer(sb.currentServer()); })()`);
+        await ev(`document.dispatchEvent(new CustomEvent('coral:keep-full-access-changed', { detail: { sessionId: 'cx-keep-id', on: false, server: ${JSON.stringify(cur + '-other-computer')} } })); true`);
+        await new Promise(r => setTimeout(r, 200)); // sleep-ok: proving a negative (no change follows an answer for another computer); the positive case just below waits on its condition
+        assert.equal(await ev(`document.getElementById('codex-keep-wrap').hidden`), false, 'an answer for another computer leaves the chip');
+        await ev(`document.dispatchEvent(new CustomEvent('coral:keep-full-access-changed', { detail: { sessionId: 'cx-keep-id', on: false, server: ${JSON.stringify(cur)} } })); true`);
+        await waitFor(`document.getElementById('codex-keep-wrap').hidden`, 'the same computer\'s answer takes the chip away');
+        await ev(`window.__rows['cx-keep-id'] = { ...window.__rows['cx-keep-id'], keep_full_access: true }; window.__state_.liveSessions.find(x => x.session_id === 'cx-keep-id').keep_full_access = true; true`);
+
         console.log('Phone, 390 px: the Options sheet has the kept line with its Off (a button of the sheet), on screen; one tap is one write, the exact target');
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
         await pick('cx-keep', 'codex', 'cx-keep-id');
