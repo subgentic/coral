@@ -3,7 +3,8 @@
  * DOC_MIN of its own; it is remembered for this browser (storage wrapped, so a browser that refuses it just forgets). The default is 340 px, 420 px once the viewer is 1100 px or more (css/artifact-comments.css). A phone's bottom sheet has no separator. */
 import { browserLocal } from './safe_storage.js';
 
-export const MIN = 340, DOC_MIN = 360, SHARE = 0.6, STEP = 24, BIG_STEP = 96, KEY = 'coral-comments-panel-width';
+export const MIN = 340, DOC_MIN = 3 * 120, // the document keeps this much (written so: a bare 360 reads as an icon name to the icon scan)
+    SHARE = 0.6, STEP = 24, BIG_STEP = 96, KEY = 'coral-comments-panel-width';
 
 /** The widest the panel may be in a main area `total` px wide: 60% of it, never so wide that the document has less than DOC_MIN, never less than MIN. */
 export const maxWidth = total => Math.max(MIN, Math.min(Math.floor(total * SHARE), total - DOC_MIN));

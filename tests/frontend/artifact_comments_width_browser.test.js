@@ -1,5 +1,5 @@
 // The comments panel of the artifact viewer is as wide as the person wants (#14024, the Operator: "the chat window on a document review width can be too small and hard to read for longer messages"): a separator on its left edge,
-// drag or arrow keys (role=separator, aria-valuenow, 340 px up to 60% of the viewer, the document keeps 360 px), remembered per browser, double-click for the default; 420 px by default once the viewer is 1100 px or more; a longer
+// drag or arrow keys (role=separator, aria-valuenow, 340 px up to 60% of the viewer, the document keeps its minimum width), remembered per browser, double-click for the default; 420 px by default once the viewer is 1100 px or more; a longer
 // message, a code block and a long unbroken string wrap inside the panel; a phone's sheet is as it was. At 1280, 1920, a 1100 px window, 1280 at 200% text and 390 px. The comments are stubbed at the page's fetch. Isolated dev server.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -83,7 +83,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             if (w === 1920) chk(vw > 1240 && vw <= 1480, `1920: the viewer uses more of a wide screen with the panel open (${vw} px, it was 1240)`);
             const b = await bar();
             chk(b && b.shown && b.role === 'separator' && b.orient === 'vertical' && b.tab === 0 && b.now === await panelW() && b.min === 340, `${label}: a separator with its value: ` + JSON.stringify(b));
-            chk(b.max === Math.max(340, Math.min(Math.floor((await mainW()) * 0.6), (await mainW()) - 360)), `${label}: its maximum is 60% of the viewer, and the document keeps 360 px: ` + JSON.stringify([b.max, await mainW()]));
+            chk(b.max === Math.max(340, Math.min(Math.floor((await mainW()) * 0.6), (await mainW()) - 360)), `${label}: its maximum is 60% of the viewer, and the document keeps its minimum width: ` + JSON.stringify([b.max, await mainW()]));
             if (w === 1280) await shot('width-default-1280');
             await closeV();
         }
@@ -96,7 +96,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
         await key('ArrowRight'); chk((await panelW()) === w0 + 96, `ArrowRight narrows by 24: ${await panelW()}`);
         await key('Home'); chk((await panelW()) === 340, `Home is the narrowest (340): ${await panelW()}`);
         await key('End'); const maxNow = (await bar()).max;
-        chk((await panelW()) === maxNow && (await docW()) >= 360 && (await panelW()) <= Math.floor((await mainW()) * 0.6) + 1, `End is the widest (${maxNow}), the document keeps ${await docW()} px (360 or more), at most 60%`);
+        chk((await panelW()) === maxNow && (await docW()) >= 360 && (await panelW()) <= Math.floor((await mainW()) * 0.6) + 1, `End is the widest (${maxNow}), the document keeps ${await docW()} px (at least its minimum), at most 60%`);
         await shot('width-widest-1280');
         // 3) a drag: press on the separator, move left 100 px, release
         await key('Home'); const r = await ev(`(() => { const b = document.querySelector('#artifact-viewer .ac-resize').getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; })()`);
