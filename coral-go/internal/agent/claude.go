@@ -162,17 +162,25 @@ func claudeSettingsFile(files *launchFiles, params LaunchParams, effectiveID str
 		merged["systemPrompt"] = strings.Join(sysParts, "\n\n")
 	}
 
-	// Inject permissions from capabilities
+	// Inject permissions from capabilities (as they always did: a capability set replaces the user's own permissions block), else keep the user's; then Coral's own baseline on top: the board's
+	// talk is pre-approved whatever the mode (#14105; coral_board_allow.go says which subcommands and why). Nothing the user wrote is removed: the baseline only adds rules.
+	permMap := map[string]any{}
 	if perms := TranslateToClaudePermissions(params.Capabilities); perms != nil {
-		permMap := map[string]any{}
 		if len(perms.Allow) > 0 {
 			permMap["allow"] = perms.Allow
 		}
 		if len(perms.Deny) > 0 {
 			permMap["deny"] = perms.Deny
 		}
-		merged["permissions"] = permMap
+	} else if existing, ok := merged["permissions"].(map[string]any); ok {
+		for k, v := range existing {
+			permMap[k] = v
+		}
 	}
+	baseAllow, baseAsk := coralBoardBaselineRules()
+	permMap["allow"] = mergeRules(ruleList(permMap["allow"]), baseAllow)
+	permMap["ask"] = mergeRules(ruleList(permMap["ask"]), baseAsk)
+	merged["permissions"] = permMap
 
 	// Inject allowed tools
 	if len(params.Tools) > 0 {
@@ -545,4 +553,21 @@ func writeNoFollow(path string, data []byte) error {
 		return err
 	}
 	return f.Close()
+}
+
+// ruleList is a permissions list as a settings file or a capability translation gives it: strings.
+func ruleList(v any) []string {
+	switch l := v.(type) {
+	case []string:
+		return append([]string(nil), l...)
+	case []any:
+		out := make([]string, 0, len(l))
+		for _, e := range l {
+			if s, ok := e.(string); ok {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+	return nil
 }

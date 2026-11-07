@@ -89,7 +89,7 @@ The field name is `capabilities` (an object with `allow` and `deny` lists). An u
 | `agent_spawn` | Spawn sub-agents |
 | `notebook` | Edit Jupyter notebooks |
 
-Coral grants no permission on its own. The dashboard's presets that use the message board list `shell:coral-board *`, which only Claude enforces (see below).
+Coral grants no permission on its own, with one exception for Claude agents: so that an ask-first agent (every agent another agent starts) is not stopped by a prompt for each message to its own board, Coral adds allow rules for the board's own talk to the settings of every Claude agent's own session, whatever its mode: `coral-board post`, `read`, `task`, `goal`, `wait` and `status`, each with or without arguments, and nothing else. `coral-board heavy` (it runs any command), `resource`, `send`, `workflow`, `export` and every other `coral-board` subcommand, and `coral-agent`, still ask. A command that chains something else onto an allowed one, or has a `$(...)`, backtick or `<(...)` in it, still asks. Codex and Antigravity agents have no such rule and stay ask-first. The dashboard's presets that use the message board list `shell:coral-board *`, which only Claude enforces (see below).
 
 ### What each CLI enforces
 
