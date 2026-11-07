@@ -100,7 +100,16 @@ function startingMode(ranMode, ranFrom) {
 async function fillResumeModes(agentType) {
     const modal = document.getElementById("resume-modal"), row = document.getElementById("resume-mode-row"), sel = document.getElementById("resume-mode");
     if (!modal || !row || !sel) return;
-    const { modeOffered } = await importOnce("./permission_flags.js");
+    const { modeOffered, PI_NO_PERMISSIONS } = await importOnce("./permission_flags.js");
+    sel.disabled = false; sel.removeAttribute("title");
+    if (String(agentType || "").toLowerCase() === "pi") { // Pi has no permission flag: nothing to choose, nothing sent (#14371)
+        sel.replaceChildren(new Option("No permission modes", ""));
+        sel.value = ""; sel.disabled = true; sel.title = PI_NO_PERMISSIONS;
+        modal.dataset.startMode = ""; modal.dataset.noModes = "1"; row.hidden = false;
+        const note = document.getElementById("resume-mode-note"); if (note) { note.textContent = PI_NO_PERMISSIONS; note.hidden = false; }
+        return;
+    }
+    delete modal.dataset.noModes;
     const saved = savedMode();
     sel.replaceChildren(new Option(`Saved default (${MODE_WORDS[saved] || saved})`, ""), ...Object.keys(MODE_WORDS).filter(m => modeOffered(agentType, m)).map(m => new Option(MODE_WORDS[m], m)));
     sel.value = startingMode(modal.dataset.ranMode || "", modal.dataset.ranModeFrom || "");
@@ -113,6 +122,7 @@ async function fillResumeModes(agentType) {
 function syncResumeModeNote() {
     const modal = document.getElementById("resume-modal"), note = document.getElementById("resume-mode-note"), sel = document.getElementById("resume-mode");
     if (!modal || !note) return;
+    if (modal.dataset.noModes) return; // Pi: its own line is already there
     const ran = modal.dataset.ranMode || "", from = modal.dataset.ranModeFrom || "", pick = sel ? sel.value : "";
     const name = m => `${MODE_WORDS[m] || m} mode`, saved = savedMode();
     let words;
