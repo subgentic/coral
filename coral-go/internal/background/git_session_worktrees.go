@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/subgentic/coral/internal/coralnames"
 	"github.com/subgentic/coral/internal/gitutil"
 	"github.com/subgentic/coral/internal/logsafe"
 	"github.com/subgentic/coral/internal/store"
@@ -54,13 +55,13 @@ func registeredWorktrees(ctx context.Context, dir string) []registeredWorktree {
 	if !filepath.IsAbs(common) {
 		common = filepath.Join(dir, common)
 	}
-	entries, err := os.ReadDir(filepath.Join(common, "worktrees"))
+	entries, err := os.ReadDir(coralnames.WorktreesRoot(common))
 	if err != nil {
 		return nil
 	}
 	var list []registeredWorktree
 	for _, e := range entries {
-		base := filepath.Join(common, "worktrees", e.Name())
+		base := filepath.Join(coralnames.WorktreesRoot(common), e.Name())
 		b, err := os.ReadFile(filepath.Join(base, "gitdir"))
 		if err != nil {
 			continue
