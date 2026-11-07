@@ -12,7 +12,7 @@ const { coralReady } = require('./helpers/wait');
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const [w, h, mobile] of [[1440, 900, false], [390, 844, true]]) {
+        for (const [w, h, mobile] of [[1280, 800, false], [1440, 900, false], [390, 844, true]]) {
             const tag = `${w}px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
@@ -24,7 +24,7 @@ const { coralReady } = require('./helpers/wait');
                     if (m === 'POST' && p.pathname === '/api/sessions/launch-team') { window.__reqs.push(JSON.parse(o.body)); return json({ agents: [{ name: 'A', session_id: 's' }] }); }
                     if (p.pathname === '/api/board/projects') return json([]);
                     if (p.pathname === '/api/filesystem/is-git') return json({ is_git: false });
-                    if (p.pathname === '/api/filesystem/list') { const d = (p.searchParams.get('path') || '').replace(/\\/+$/, ''); return there.has(d) ? json({ entries: [] }) : json({ error: 'directory not found' }, 404); }
+                    if (p.pathname === '/api/filesystem/list') { const d = (p.searchParams.get('path') || '').replace(/\\/+$/, ''); const answer=()=>there.has(d) ? json({ entries: [] }) : json({ error: 'access denied' }, 403); if(window.__holdFolder===d) return new Promise(resolve=>(window.__folderGates ||= []).push(()=>resolve(answer()))); return answer(); }
                     return real(u, o); };
                 await window.showLaunchModal(); window.hideLaunchModal(); return true; })()`);
             const fill = (id, v) => ev(`(() => { const e = document.getElementById(${JSON.stringify(id)}); e.value = ${JSON.stringify(v)}; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
@@ -43,6 +43,31 @@ const { coralReady } = require('./helpers/wait');
                 return ev(`window.__reqs[${n0}]`);
             };
             const close = () => ev(`window.hideLaunchModal(); true`);
+
+            // A fast Next must await the actual folder, not the 500 ms background debounce.
+            await open('/work/existing');
+            await ev(`(()=>{window.__holdFolder='/work/fast-new';window.__folderGates=[];const d=document.getElementById('launch-team-dir');d.value=window.__holdFolder;d.dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('launch-team-next').click();return true;})()`);
+            await sleep(80); // sleep-ok: deliberately hold filesystem I/O across the Next action
+            check(`${tag}: Next stays at the folder step while its check is unanswered`, await ev(`document.getElementById('launch-step-team').dataset.stage==='team'`));
+            await waitFor(`window.__folderGates.length>0`, 'the folder check begins');
+            await ev(`window.__holdFolder=null;window.__folderGates.forEach(done=>done());true`);
+            await waitFor(`document.getElementById('launch-step-team').dataset.stage==='members'`, 'validated folder advances');
+            check(`${tag}: the fast path captures creation before leaving step 1`, await ev(`document.getElementById('launch-team-dir').dataset.createNew==='/work/fast-new'`));
+            await close();
+            // Only a Coral suggestion follows the name; a person’s own folder stays.
+            await ev(`(async()=>{const {browserLocal}=await import((window.__coralStatic||'/static/')+'safe_storage.js');const {recentDirsKey}=await import((window.__coralStatic||'/static/')+'launch_server.js');browserLocal.remove(recentDirsKey('local'));window.showLaunchModal();window._selectLaunchType('team');return true;})()`);
+            await waitFor(`document.getElementById('launch-step-team').dataset.stage==='team'`, 'fresh team');
+            await ev(`(()=>{const d=document.getElementById('launch-team-dir');d.dataset.coralRoot='/home/tester';d.value='/home/tester/Coral/first-team';d.dataset.suggested=d.value;return true;})()`);
+            await fill('team-board-name','reading-list');
+            check(`${tag}: the suggestion follows the team name`, await ev(`document.getElementById('launch-team-dir').value==='/home/tester/Coral/reading-list'`));
+            await fill('launch-team-dir','/work/existing');await fill('team-board-name','other-name');
+            check(`${tag}: a chosen folder never follows a later name`, await ev(`document.getElementById('launch-team-dir').value==='/work/existing'`));await close();
+            // A confirmation’s position may vary with the viewport; its visible button must be clickable at each width.
+            await ev(`(async()=>{window.__confirmed=0;window.showConfirmModal('Kill all agents','Kill all 3 agents? Their chats stay in History.',()=>window.__confirmed++,undefined,{label:'Kill all',danger:true});return true;})()`);
+            const point=await ev(`(()=>{const b=document.getElementById('confirm-modal-yes'),r=b.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2,visible:r.width>0&&r.height>0&&r.top>=0&&r.bottom<=innerHeight};})()`);
+            check(`${tag}: Kill All confirmation is reachable`,point.visible);
+            await client.Input.dispatchMouseEvent({type:'mousePressed',x:point.x,y:point.y,button:'left',clickCount:1});await client.Input.dispatchMouseEvent({type:'mouseReleased',x:point.x,y:point.y,button:'left',clickCount:1});
+            check(`${tag}: a click on the visible Kill All button confirms once`,await ev('window.__confirmed===1'));
 
             // a new folder inside one that exists: the line says so at step 1, and Launch asks for it
             await open('/work/planner-shop');
