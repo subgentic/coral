@@ -23,6 +23,8 @@ func (h *SessionsHandler) DismissWait(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		SessionID string `json:"session_id"`
 		AgentType string `json:"agent_type"`
+		// Remove: the second action on a wait that is already dismissed and still waiting (#14266): the evidence never came, so the Operator takes the row out of Needs you and its count.
+		Remove bool `json:"remove"`
 	}
 	if err := decodeJSON(r, &body); err != nil || body.SessionID == "" {
 		errBadRequest(w, "session_id is required")
@@ -44,7 +46,24 @@ func (h *SessionsHandler) DismissWait(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sid := body.SessionID
-	inboxActioned(r, tracking.InboxAgentWait, st.WaitingKind, "dismiss", st.WaitingSince) // the Inbox's numbers (#7512): the wait's kind, never the agent
+	if !body.Remove { // a removal is not counted as a dismiss: the Inbox's numbers have no such action (#14266)
+		inboxActioned(r, tracking.InboxAgentWait, st.WaitingKind, "dismiss", st.WaitingSince) // the Inbox's numbers (#7512): the wait's kind, never the agent
+	}
+	if body.Remove { // "Remove from Needs you": the row and the count only. No event, no release of held messages (the gate stays held while the prompt may be on screen), nothing typed (#14266)
+		removed, err := h.ss.SetWaitRemoved(r.Context(), sid, waitRequestKey(st))
+		if err != nil {
+			slog.Warn("could not record the Operator's removal of a wait", "session_id", sid, "error", err)
+			errInternalServer(w, "Could not remove it. Try again.")
+			return
+		}
+		if !removed {
+			errConflict(w, "Dismiss it first: only a wait that is already dismissed and still waiting can be removed")
+			return
+		}
+		h.kickFeedForRequestChange(sid, "request_resolved")
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "removed": true})
+		return
+	}
 	// Every kind the same (permission, question, plan, an input prompt, an elicitation, a sign-in): the Operator's seeing it is kept per agent and request, so the row, the count and /api/needs-you agree
 	// (#11946, #14203). The agent's own state is untouched and nothing is sent to it; its next request is its own.
 	if err := h.ss.SetWaitIgnored(r.Context(), sid, waitRequestKey(st)); err != nil {

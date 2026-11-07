@@ -186,7 +186,8 @@ CREATE TABLE IF NOT EXISTS chat_flags (
 CREATE TABLE IF NOT EXISTS agent_wait_ignored (
     session_id  TEXT PRIMARY KEY,
     request_key TEXT NOT NULL,
-    ignored_at  TEXT NOT NULL
+    ignored_at  TEXT NOT NULL,
+    removed_at  TEXT
 );
 
 CREATE TABLE IF NOT EXISTS session_index (
