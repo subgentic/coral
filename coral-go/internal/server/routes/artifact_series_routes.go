@@ -120,8 +120,8 @@ func (h *SessionsHandler) artifactVersions(w http.ResponseWriter, r *http.Reques
 	coralDir := h.cfg.CoralDir()
 	var sid string
 	var in bool
-	if board := r.URL.Query().Get("board"); board != "" && !isGuideCaller(r) {
-		// The version bar passes its team (#13999): the series that team holds of the bytes, never another team's. A board that is not a board's name is refused; a team that holds the bytes in no series is not found.
+	if board := r.URL.Query().Get("board"); board != "" && isOwnerSeriesRead(r) {
+		// The version bar passes its team (#13999): the series that team holds of the bytes, never another team's. An agent or a guide never picks a team: the key is ignored for them (callerSeries below), so the answer does not say whether another team holds a series. A board that is not a board's name is refused; a team that holds the bytes in no series is not found.
 		if !validCommentBoard(board) {
 			errBadRequest(w, "invalid board")
 			return

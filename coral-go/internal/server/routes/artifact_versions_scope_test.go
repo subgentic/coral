@@ -73,3 +73,13 @@ func TestAnAgentKeepsItsOwnTeamsSeriesAndIsNeverToldAboutAnother(t *testing.T) {
 	require.Equal(t, http.StatusOK, code, body)
 	assert.Equal(t, []string{same, aSecond}, versionDigests(t, body))
 }
+
+// Security's small add: an agent's ?board= is ignored, as a guide's is, so the answer never tells it whether another team holds a series of the bytes (no 200-vs-404 hint, no other team's list).
+func TestAnAgentsBoardKeyIsIgnored(t *testing.T) {
+	rig, same, aSecond, _ := twoTeamsHoldTheSameBytes(t)
+	for _, board := range []string{"team-a", "team-b", "team-o", "not%20a%20board"} {
+		code, body := rig.getAs("a1", "/api/artifacts/"+same+"/versions?board="+board)
+		require.Equal(t, http.StatusOK, code, "board=%s: %s", board, body)
+		assert.Equal(t, []string{same, aSecond}, versionDigests(t, body), "board=%s: its own team's series, whatever it asked for", board)
+	}
+}
