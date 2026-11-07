@@ -12,6 +12,7 @@ import (
 	"github.com/robfig/cron/v3"
 
 	"github.com/subgentic/coral/internal/background"
+	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -65,6 +66,18 @@ func (h *SessionsHandler) knowledgeJobOf(ctx context.Context, team string) *stor
 	return nil
 }
 
+// candidateVisible says the caller may read the waiting candidate and its diff: the person at this computer, and through Coral Hub the owner alone. The candidate is text distilled from transcripts and not yet
+// reviewed by anyone, so a Hub viewer or grantee (who may see the switch and the last run) and an agent's token never get it.
+func candidateVisible(r *http.Request) bool {
+	if agentCaller(r) {
+		return false
+	}
+	if cloud.Tunneled(r) {
+		return hubOwnerRequest(r).owner
+	}
+	return true
+}
+
 // DailyKnowledgeStatus answers GET .../daily-knowledge.
 func (h *SessionsHandler) DailyKnowledgeStatus(w http.ResponseWriter, r *http.Request) {
 	team := chi.URLParam(r, "name")
@@ -105,7 +118,9 @@ func (h *SessionsHandler) DailyKnowledgeStatus(w http.ResponseWriter, r *http.Re
 	if st.LastRunAt != "" {
 		out["last_distilled_at"], out["approx_tokens"], out["calls"] = st.LastRunAt, st.ApproxTokens, st.Calls
 	}
-	if cand, err := background.ReadCandidate(h.cfg.CoralDir(), team); err == nil && cand != nil {
+	if cand, err := background.ReadCandidate(h.cfg.CoralDir(), team); err == nil && cand != nil && !candidateVisible(r) {
+		out["candidate_waiting"] = true // the switch, the last run and that one waits: its words are unreviewed transcript text, the owner's to read (Security's SHOULD on #13928)
+	} else if err == nil && cand != nil {
 		names := make([]string, 0, len(cand.Files))
 		for n := range cand.Files {
 			names = append(names, n)

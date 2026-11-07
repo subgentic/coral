@@ -135,6 +135,7 @@ GET /api/sessions/{sessionID}/changes.diff | unbound
 GET /api/sessions/{sessionID}/resolve | token-session
 GET /api/sessions/{sessionID}/status | unbound
 GET /api/team-artifacts | token-session | operator-only
+GET /api/teams/detail/{name}/daily-knowledge | token-session
 GET /api/token-usage/summary | token-session
 GET /api/token-usage/timeseries | token-session
 GET /api/token-usage/turns | token-session | operator-only
@@ -274,6 +275,8 @@ POST /api/sessions/live/{sessionID}/sleep | unbound | operator-only
 POST /api/sessions/live/{sessionID}/unarchive | unbound | operator-only
 POST /api/sessions/live/{sessionID}/wake | unbound | operator-only
 POST /api/sessions/record-agents | unbound | operator-only
+POST /api/teams/detail/{name}/daily-knowledge/accept | token-session | operator-only
+POST /api/teams/detail/{name}/daily-knowledge/revert | token-session | operator-only
 PUT /api/agent/ui/{id} | token-bound
 PUT /api/board/{project}/artifacts/{id}/review | board-claims | operator-only
 PUT /api/board/{project}/artifacts/{id}/tags | board-claims | operator-only
@@ -290,3 +293,5 @@ PUT /api/sessions/live/{name}/file-content | unbound | operator-only
 PUT /api/sessions/live/{name}/icon | unbound | operator-only
 PUT /api/sessions/live/{name}/instructions | unbound | operator-only
 PUT /api/sessions/live/{name}/name-color | unbound | operator-only
+PUT /api/teams/detail/{name}/daily-knowledge | token-session | operator-only
+PUT /api/teams/detail/{name}/daily-knowledge/auto-apply | token-session | operator-only
