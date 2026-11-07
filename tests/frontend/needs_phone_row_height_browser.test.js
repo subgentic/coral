@@ -40,7 +40,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                     return { name: nm.textContent, seen, nameBottom: Math.round(nb.bottom), waitTop: Math.round(wtext.getBoundingClientRect().top), h: Math.round(b.height), nameBase: Math.round(base(nm) * 10) / 10, waitBase: Math.round(base(wtext) * 10) / 10, nameRight: Math.round(nm.getBoundingClientRect().right), waitLeft: Math.round(wtext.getBoundingClientRect().left), waitCut: wtext.scrollWidth > wtext.clientWidth + 1, gap: Math.round(b.bottom - lowest), q: !!q }; }); })()`);
             rows.forEach((r, i) => {
                 check(r.h >= 60 && r.h <= 135, `${at}row ${i + 1} is as tall as its content (one line taller than before is the Operator's choice), 60 to 135 px: ${r.h}`);
-                check(r.gap <= 12, `${at}row ${i + 1} has no empty line under its text (${r.gap} px below the last cell, 8 px padding): ${JSON.stringify(r)}`);
+                check(r.gap <= 14, `${at}row ${i + 1} has no empty line under its text (${r.gap} px below the last cell, the card's 12 px padding and 1 px border): ${JSON.stringify(r)}`);
                 check(r.waitTop >= r.nameBottom - 1, `${at}row ${i + 1}: "waiting N min" is under the file name, not beside it (name ends ${r.nameBottom}, wait starts ${r.waitTop})`);
                 check(!r.waitCut, `${at}row ${i + 1}: the wait text is not cut: ${JSON.stringify(r)}`);
             });
