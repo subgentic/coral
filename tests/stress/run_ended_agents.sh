@@ -84,6 +84,8 @@ WS_BEFORE="$(grep -c 'pty spawn failed\|already exists' "$TMP/server.log")"
 SCENARIO="${CORAL_TEST_SCENARIO:-killall}"
 if [[ "$SCENARIO" == exited ]]; then
     # The agents' own processes end (each is a mock-agent started under the server, found by its PID below it): Kill All is not used, so the dead terminals stay in the terminal manager.
+    # CORAL_EXITED_AFTER: wait this many seconds after the launch before the exit, to see an agent that exits after its first minute (the launch grace) as well as one that exits in it
+    [[ -n "${CORAL_EXITED_AFTER:-}" ]] && { log "waiting ${CORAL_EXITED_AFTER} s before the agents exit"; sleep "$CORAL_EXITED_AFTER"; }
     log "THE AGENTS EXIT ON THEIR OWN: stopping each mock-agent process of this run by its PID"
     # the pty agents are below the server; the tmux agents are below the tmux server, which is not (#14257: the first version found none there, and the tmux run observed nothing)
     CANDIDATES="$(descendants "$SERVER_PID")"
