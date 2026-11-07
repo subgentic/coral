@@ -16,7 +16,7 @@ const { coralReady } = require('./helpers/wait');
             const tag = `${w} px${fs16 === 32 ? ' 200% text' : ''}`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
-            await ev(`document.documentElement.style.fontSize = '${fs16}px'; (() => { window.__asks = [{ board: 'coral-hub', board_label: 'coral-hub', kind: 'ask', id: 41, asker: 'Orchestrator', text: 'You approved #8 and I used your #6 answer, but task #12 and Goal #5 are not messages. Run \x60echo #9\x60 and see (#7). Which first?', at: new Date(Date.now() - 7 * 60000).toISOString() }];
+            await ev(`document.documentElement.style.fontSize = '${fs16}px'; (() => { window.__asks = [{ board: 'coral-hub', board_label: 'coral-hub', kind: 'ask', id: 41, asker: 'Orchestrator', text: 'You approved #8 and I used your #6 answer, but task #12 and Goal #5 are not messages. Run \x60echo #9\x60 and see (#7). Also abc#10 and #08 and 12#13 are not references. Which first?', at: new Date(Date.now() - 7 * 60000).toISOString() }];
                 window.__posts = []; const orig = window.fetch.bind(window);
                 window.fetch = (u, o) => { const url = String(u); const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } }));
                     if (url === '/api/operator-asks') return json(window.__asks);
