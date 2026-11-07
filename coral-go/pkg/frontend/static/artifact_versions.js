@@ -58,17 +58,21 @@ export function attachVersions(dialog, hooks) {
     let flip = false;
     const say = (msg) => { flip = !flip; live.textContent = msg + (flip ? '' : ' '); };
     (dialog.querySelector('.artifact-viewer-chips') || dialog.querySelector('.artifact-viewer-header')).append(bar); // the version chip is on the header's one row (#12223)
+    const note = el('span', 'av-note'); note.hidden = true; // a file two teams hold has no version bar from a link with no team: said quietly, not as an error (#14015)
+    bar.after(note);
     dialog.append(live);
-    const st = { hex: null, server: undefined, rows: null, listOpen: false, comparing: false, view: 'changes', gen: 0, abort: null };
+    const st = { hex: null, server: undefined, board: '', ambiguous: false, rows: null, listOpen: false, comparing: false, view: 'changes', gen: 0, abort: null };
     let liveTimer = 0, liveBusy = -1;
     async function refreshVersions() {
         if (!st.hex || dialog.hidden || !dialog.isConnected || st.comparing || st.listOpen || liveBusy === st.gen) return;
-        const gen = st.gen, hex = st.hex, server = st.server;
+        const gen = st.gen, hex = st.hex, server = st.server, board = st.board;
         liveBusy = gen;
         try {
-            const rows = await load(hex, server);
-            if (gen !== st.gen || hex !== st.hex || server !== st.server || dialog.hidden || st.comparing || st.listOpen || !rows || JSON.stringify(rows) === JSON.stringify(st.rows)) return;
-            st.rows = rows;
+            const { rows, ambiguous } = await load(hex, server, board);
+            if (gen !== st.gen || hex !== st.hex || server !== st.server || board !== st.board || dialog.hidden || st.comparing || st.listOpen) return; // the file, computer or team changed meanwhile: this answer is not for it
+            if (ambiguous) { if (st.rows || !st.ambiguous) { st.rows = null; st.ambiguous = true; draw(); } return; } // a second team now holds the bytes: the bar that was valid is gone, and the note says why
+            if (!rows || JSON.stringify(rows) === JSON.stringify(st.rows)) return;
+            st.ambiguous = false; st.rows = rows;
             draw();
             say('A new version is available');
         } finally { if (liveBusy === gen) liveBusy = -1; }
@@ -76,13 +80,16 @@ export function attachVersions(dialog, hooks) {
     const cur = () => st.rows ? st.rows.findIndex(r => r.digest === st.hex) : -1;
     const nameOf = (r) => `v${r.version}`;
 
-    async function load(hex, server) {
+    /** One read of the version list: { rows, ambiguous }. The answer carries its own state: it is applied only by the caller whose generation, file, computer and team it was asked for, so an older answer can never change a newer context (#14015). */
+    async function load(hex, server, board = '') {
         try {
-            const r = await fetch(serverUrl(`/api/artifacts/${hex}/versions`, server));
-            if (!r.ok) return null;
+            // The version bar asks for its own team's series: bytes two teams hold are two series, and the route will not guess between them (#13999, #14015). A direct link with no team asks without one.
+            const r = await fetch(serverUrl(`/api/artifacts/${hex}/versions${board ? `?board=${encodeURIComponent(board)}` : ''}`, server));
+            if (r.status === 409) { const d = await r.json().catch(() => ({})); return { rows: null, ambiguous: !!(d && d.code === 'ambiguous_series') }; } // no bar, a quiet note
+            if (!r.ok) return { rows: null, ambiguous: false };
             const d = await r.json();
-            return Array.isArray(d) && d.length > 1 ? d.slice().sort((p, q) => p.version - q.version) : null; // one version is no series to move in
-        } catch { return null; }
+            return { rows: Array.isArray(d) && d.length > 1 ? d.slice().sort((p, q) => p.version - q.version) : null, ambiguous: false }; // one version is no series to move in
+        } catch { return { rows: null, ambiguous: false }; }
     }
 
     // Open or close the list in place: the bar's buttons are not redrawn (a Tab walk or a screen reader holds them).
@@ -114,6 +121,7 @@ export function attachVersions(dialog, hooks) {
         bar.replaceChildren();
         const i = cur();
         bar.hidden = !st.rows || i < 0;
+        note.hidden = !st.ambiguous || !bar.hidden; note.textContent = note.hidden ? '' : 'Held by more than one team: open it from a team to see its versions.';
         hooks.version?.(bar.hidden ? 0 : st.rows[i].version);
         dialog.classList.toggle('av-has-versions', !bar.hidden);
         if (bar.hidden) return;
@@ -262,14 +270,16 @@ export function attachVersions(dialog, hooks) {
 
     return {
         /** A version of an artifact is on show: draw the bar when it is one of a series. `switched` says it was chosen from the bar (said once, and the keyboard stays on the bar). */
-        async open(hex, server, { switched = false } = {}) {
+        async open(hex, server, { switched = false, board = '' } = {}) {
             st.gen++;
             clearInterval(liveTimer);
             liveTimer = pollEvery(refreshVersions, Number(globalThis.__coralVersionsPollMs) || 8000, { machine: () => st.server || '' });
-            const same = st.rows && st.hex !== hex && st.server === server && st.rows.some(r => r.digest === hex);
-            st.hex = hex; st.server = server; st.listOpen = false;
+            const scope = String(board || ''), scoped = st.rows && st.server === server && st.board === scope; // rows are another team's or computer's when either differs: never shown for this one
+            const same = scoped && st.hex !== hex && st.rows.some(r => r.digest === hex);
+            if (!scoped) st.rows = null;
+            st.hex = hex; st.server = server; st.board = scope; st.listOpen = false; st.ambiguous = false;
             if (!switched) { st.comparing = false; dialog.classList.remove('av-comparing', 'av-keep-wide'); }
-            if (!same && !(st.rows && st.rows.some(r => r.digest === hex))) { st.rows = null; draw(); const gen = st.gen; const rows = await load(hex, server); if (gen !== st.gen || st.hex !== hex) return; st.rows = rows; }
+            if (!same && !(st.rows && st.rows.some(r => r.digest === hex))) { st.rows = null; draw(); const gen = st.gen, scopeNow = st.board; const res = await load(hex, server, scopeNow); if (gen !== st.gen || st.hex !== hex || st.server !== server || st.board !== scopeNow) return; st.rows = res.rows; st.ambiguous = res.ambiguous; }
             draw();
             if (switched && !bar.hidden) {
                 const row = st.rows[cur()], w = whenOf(row.at);

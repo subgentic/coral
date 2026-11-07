@@ -18,6 +18,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/linktest"
+
 	"github.com/subgentic/coral/internal/board"
 )
 
@@ -121,7 +123,7 @@ func TestAHubVerdictNeedsTheStoredDigestToMatchTheId(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, os.WriteFile(real, b, 0o644))
 			require.NoError(t, os.Remove(obj))
-			require.NoError(t, os.Symlink(real, obj))
+			linktest.Symlink(t, real, obj) // skips where this account can't make a link (Windows without Developer Mode)
 		}},
 		"stamped, digest confirmed":          {true, false, true, http.StatusOK, nil},
 		"stamped, no digest record":          {false, false, true, http.StatusConflict, nil},
@@ -130,43 +132,45 @@ func TestAHubVerdictNeedsTheStoredDigestToMatchTheId(t *testing.T) {
 		"on this computer, no digest record": {false, false, false, http.StatusOK, nil},
 		"on this computer, digest confirmed": {true, false, false, http.StatusOK, nil},
 	} {
-		srv, h, coralDir := teamArtifactServer(t)
-		_ = srv
-		r := chi.NewRouter()
-		r.Get("/api/board/{project}/artifacts", h.ListTeamArtifacts)
-		r.Put("/api/board/{project}/artifacts/{id}/tags", h.SetArtifactTags)
-		r.Post("/api/board/{project}/artifacts/{id}/review", func(w http.ResponseWriter, req *http.Request) {
-			kind := callerDashCookie
+		t.Run(name, func(t *testing.T) { // a case that can't make its symbolic link skips alone
+			srv, h, coralDir := teamArtifactServer(t)
+			_ = srv
+			r := chi.NewRouter()
+			r.Get("/api/board/{project}/artifacts", h.ListTeamArtifacts)
+			r.Put("/api/board/{project}/artifacts/{id}/tags", h.SetArtifactTags)
+			r.Post("/api/board/{project}/artifacts/{id}/review", func(w http.ResponseWriter, req *http.Request) {
+				kind := callerDashCookie
+				if c.hub {
+					kind = callerHub
+				}
+				if c.stamp {
+					kind = callerHubOwner
+				}
+				h.ReviewArtifact(w, req.WithContext(context.WithValue(req.Context(), callerKindKey{}, kind)))
+			})
+			s := httptest.NewServer(r)
+			t.Cleanup(s.Close)
+			subscribeSession(t, h, "alpha", "Alice", sessAlice)
+			subscribeSession(t, h, "alpha", "Bob", sessBob)
+			id := storeManagedArtifact(t, coralDir, "# the plan "+name, true, c.withMeta)
+			if c.tweak != nil {
+				c.tweak(t, coralDir, id)
+			}
+			completeWithArtifactsAs(t, h, "alpha", "Alice", "A work", []board.TaskArtifact{{Name: "plan.md", URI: "coral://artifacts/" + id}})
+			e := &reviewEnv{srv: s, h: h, id: id, name: "plan.md"}
+			e.tag(t, `["for review"]`)
+			req, err := http.NewRequest(http.MethodPost, s.URL+"/api/board/alpha/artifacts/"+id+"/review", strings.NewReader(`{"decision":"approve"}`))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
 			if c.hub {
-				kind = callerHub
+				for k, v := range ownerHeaders(ownerLabel) {
+					req.Header.Set(k, v)
+				}
 			}
-			if c.stamp {
-				kind = callerHubOwner
-			}
-			h.ReviewArtifact(w, req.WithContext(context.WithValue(req.Context(), callerKindKey{}, kind)))
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			resp.Body.Close()
+			assert.Equal(t, c.want, resp.StatusCode, name)
 		})
-		s := httptest.NewServer(r)
-		t.Cleanup(s.Close)
-		subscribeSession(t, h, "alpha", "Alice", sessAlice)
-		subscribeSession(t, h, "alpha", "Bob", sessBob)
-		id := storeManagedArtifact(t, coralDir, "# the plan "+name, true, c.withMeta)
-		if c.tweak != nil {
-			c.tweak(t, coralDir, id)
-		}
-		completeWithArtifactsAs(t, h, "alpha", "Alice", "A work", []board.TaskArtifact{{Name: "plan.md", URI: "coral://artifacts/" + id}})
-		e := &reviewEnv{srv: s, h: h, id: id, name: "plan.md"}
-		e.tag(t, `["for review"]`)
-		req, err := http.NewRequest(http.MethodPost, s.URL+"/api/board/alpha/artifacts/"+id+"/review", strings.NewReader(`{"decision":"approve"}`))
-		require.NoError(t, err)
-		req.Header.Set("Content-Type", "application/json")
-		if c.hub {
-			for k, v := range ownerHeaders(ownerLabel) {
-				req.Header.Set(k, v)
-			}
-		}
-		resp, err := http.DefaultClient.Do(req)
-		require.NoError(t, err)
-		resp.Body.Close()
-		assert.Equal(t, c.want, resp.StatusCode, name)
 	}
 }

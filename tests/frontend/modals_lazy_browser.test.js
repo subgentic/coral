@@ -115,10 +115,10 @@ const BASE = require('./test_base').BASE;
         const before = reqs.length;
         await ev(`window.showSettingsModal(); true`);
         await waitFor(`(() => { const m = document.getElementById('settings-modal'); return m && m.style.display !== 'none'; })()`, 'the settings dialog on a cold page', 5000);
-        for (const m of ['modals.js', 'team_dialogs.js', 'launch_dialog.js', 'team_wizard.js', 'launch_core.js', 'board_launches.js', 'persona_io.js']) assert.equal(count(m), 0, 'opening Settings does not request ' + m);
+        for (const m of ['modals.js', 'team_dialogs.js', 'launch_dialog.js', 'team_wizard.js', 'launch_core.js', 'board_launches.js', 'persona_io.js', 'inbox_reviews.js', 'review_pages.js', 'inbox_review_state.js']) assert.equal(count(m), 0, 'opening Settings does not request ' + m);
         assert.equal(count('settings_modal.js'), 1); assert.equal(count('settings_dialog.js'), 0, 'the Settings dialog is bundled in its modal family'); assert.equal(count('settings_fields.js'), 0, 'the field schemas share that family too');
         const nStatic = reqs.slice(before).filter(u => /\/static\//.test(u)).length;
-        assert.ok(nStatic <= 24, 'opening Settings loads at most 24 static files (46 before): ' + nStatic);
+        assert.ok(nStatic <= 24, 'opening Settings loads at most 24 static files (46 before): ' + nStatic + ' ' + JSON.stringify(reqs.slice(before).filter(u => /\/static\//.test(u)).map(u => new URL(u).pathname)));
         await escape();
         console.log('   ✓ Settings opens on its own module, ' + nStatic + ' static files, none of the launch, team or wizard dialogs');
 

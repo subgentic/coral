@@ -189,6 +189,7 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/artifacts/resolve":                                           "resolve a shortened artifact link",
 	"PUT /api/artifacts/{id}/star":                                         "star an artifact",
 	"DELETE /api/artifacts/{id}/star":                                      "unstar an artifact",
+	"POST /api/artifacts/{id}/opened":                                      "record the version of a file the Operator opened",
 	"POST /api/artifacts/{id}/comments":                                    "comment on an artifact",
 	"PATCH /api/artifacts/{id}/comments/{cid}":                             "edit a comment on an artifact",
 	"DELETE /api/artifacts/{id}/comments/{cid}":                            "delete a comment on an artifact",
@@ -326,6 +327,10 @@ var operatorOnlyRoutes = map[string]string{
 	"PUT /api/board/{project}/working-mode/presets/{presetID}":        "change a working-mode preset",
 	"POST /api/board/{project}/working-mode/presets/{presetID}/reset": "reset a working-mode preset",
 	"PUT /api/teams/detail/{name}/knowledge/{agentName}":              "change a team's knowledge",
+	"PUT /api/teams/detail/{name}/daily-knowledge":                    "switch a team's daily knowledge on or off",
+	"PUT /api/teams/detail/{name}/daily-knowledge/auto-apply":         "change whether a team's daily knowledge is applied by itself",
+	"POST /api/teams/detail/{name}/daily-knowledge/accept":            "accept a team's new knowledge",
+	"POST /api/teams/detail/{name}/daily-knowledge/revert":            "take back a team's last knowledge update",
 	// Reads across every session, board and team (#5013): an agent reads its own session and board (agentSessionRoutes, checkBoard), and its own
 	// history through /api/agent/history; none of these is called by an agent tool.
 	"POST /api/skills":                                   "publish a skill as the Operator",

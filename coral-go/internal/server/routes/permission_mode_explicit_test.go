@@ -25,8 +25,9 @@ func TestEveryClaudeLaunchThatMeansAskCarriesAnExplicitDefaultMode(t *testing.T)
 	ctx := context.Background()
 	require.NoError(t, ss.SetSetting(ctx, MaxModeSetting, "launch"))
 	require.NoError(t, ss.SetSetting(ctx, AllowHubAutoAcceptSetting, "false")) // the owner's switch is off
+	parentDir := t.TempDir()                                                   // an agent starts agents in its team's folder (#13891)
 	const parent = "11111111-2222-4333-8444-555555555555"
-	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: parent, AgentType: "claude", AgentName: "parent", WorkingDir: t.TempDir()}))
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: parent, AgentType: "claude", AgentName: "parent", WorkingDir: parentDir}))
 	asAgent := func(r *http.Request) *http.Request {
 		return r.WithContext(context.WithValue(r.Context(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: parent, SessionName: "claude-" + parent}))
 	}
@@ -44,14 +45,14 @@ func TestEveryClaudeLaunchThatMeansAskCarriesAnExplicitDefaultMode(t *testing.T)
 	}
 	launch := func(req func(*http.Request) *http.Request) {
 		t.Helper()
-		b, _ := json.Marshal(map[string]any{"agent_type": at.Claude, "working_dir": t.TempDir()})
+		b, _ := json.Marshal(map[string]any{"agent_type": at.Claude, "working_dir": parentDir})
 		rec := httptest.NewRecorder()
 		h.Launch(rec, req(httptest.NewRequest(http.MethodPost, "/api/sessions/launch", bytes.NewReader(b))))
 		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	}
 	team := func(name string, req func(*http.Request) *http.Request) {
 		t.Helper()
-		b, _ := json.Marshal(map[string]any{"board_name": "ask-" + name, "new_board": true, "working_dir": t.TempDir(), "agent_type": at.Claude,
+		b, _ := json.Marshal(map[string]any{"board_name": "ask-" + name, "new_board": true, "working_dir": parentDir, "agent_type": at.Claude,
 			"agents": []map[string]any{{"name": "A", "agent_type": "claude"}}})
 		rec := httptest.NewRecorder()
 		h.LaunchTeam(rec, req(httptest.NewRequest(http.MethodPost, "/api/sessions/launch-team", bytes.NewReader(b))))

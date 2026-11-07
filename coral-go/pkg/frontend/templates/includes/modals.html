@@ -503,57 +503,6 @@
     </div>
 
     <!-- Info Modal -->
-    <template data-lazy="info-modal">
-    <div id="info-modal" class="modal" role="dialog" aria-labelledby="info-title" aria-modal="true" style="display:none">
-        <div class="modal-content dlg-flow session-info-modal">
-            <div class="modal-header">
-                <h3 id="info-title">Session info</h3>
-            </div>
-            <div class="modal-body">
-                <dl class="info-grid session-info-grid">
-                    <dt>Agent Name</dt>
-                    <dd id="info-agent-name" class="info-value-emphasis"></dd>
-                    <dt>Agent Type</dt>
-                    <dd id="info-agent-type"></dd>
-                    <dt>Tmux Session</dt>
-                    <dd id="info-tmux-session" class="info-value-mono"></dd>
-                    <dt>Attach Command</dt>
-                    <dd class="info-command-row">
-                        <code id="info-tmux-command" class="info-code-block"></code>
-                        <button class="btn btn-small copy-btn" id="info-copy-btn" data-on-click="m-copy-info-command" title="Copy to clipboard">Copy</button>
-                        <span id="info-attach-note" hidden>This agent runs in Coral's own terminal, so there is nothing to attach to. <button type="button" class="cni-link" data-on-click="m-open-terminal-settings">Use tmux in Settings</button> to attach from your own terminal.</span>
-                    </dd>
-                    <dt>Working Directory</dt>
-                    <dd id="info-working-dir" class="info-value-path"></dd>
-                    <dt>Log Path</dt>
-                    <dd id="info-log-path" class="info-value-path"></dd>
-                    <dt>Pane Title</dt>
-                    <dd id="info-pane-title"></dd>
-                    <dt>Branch</dt>
-                    <dd id="info-git-branch"></dd>
-                    <dt>Latest Commit</dt>
-                    <dd id="info-git-commit"></dd>
-                    <dt id="info-prompt-label" style="display:none">Prompt</dt>
-                    <dd id="info-prompt" class="info-text-block" style="display:none"></dd>
-                    <dt id="info-board-label" style="display:none">Message Board</dt>
-                    <dd id="info-board" style="display:none"></dd>
-                    <dt id="info-mcp-label" hidden>MCP servers</dt>
-                    <dd id="info-mcp" class="info-text-block" hidden></dd>
-                    <dt id="info-skills-label" hidden>Skills loaded</dt>
-                    <dd id="info-skills" class="info-text-block" hidden></dd>
-                    <dt id="info-memory-label" hidden>Memory and instructions</dt>
-                    <dd id="info-memory" class="info-text-block" hidden></dd>
-                    <dt id="info-subgent-label" style="display:none">Board Server</dt>
-                    <dd id="info-subgent" class="info-value-path" style="display:none"></dd>
-                </dl>
-            </div>
-            <div class="modal-actions modal-footer">
-                <button class="btn" data-on-click="m-hide-info-modal">Close</button>
-            </div>
-        </div>
-    </div>
-    </template>
-
     <!-- Resume Modal -->
     <div id="resume-modal" class="modal" role="dialog" aria-labelledby="resume-title" aria-modal="true" style="display:none">
         <div class="modal-content dlg-confirm">

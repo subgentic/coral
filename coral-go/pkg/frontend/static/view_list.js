@@ -4,7 +4,7 @@
  * A colour dot (a tag's colour) is a hex colour only. Text is set with textContent only.
  *
  *   build({ id, label, sections, current, onPick, drawer, tabs })  -> the element (the column and the select; with `tabs` the nav is a tab list (role=tablist, tab, aria-selected, aria-controls the page's panel `<id>-panel`) for the phone's strip, #11281; with `drawer`, the column and, on a phone, a drawer opened by a button that names the current view, in place of the select: the Inbox's, #9545)
- *   sections: [{ title?, items: [{ key, label, count?, unread?, total?, alert?, dot?, icon?, soon? }] }]      unread: the number is the unread count (its name says "3 unread", its tooltip "N in all" from total)      onPick(key) is not called for a disabled item; a section's title is also the select's group label
+ *   sections: [{ title?, items: [{ key, label, count?, unread?, total?, words?, alert?, dot?, icon?, soon? }] }]      unread: the number is the unread count (its name says "3 unread", its tooltip "N in all" from total)      onPick(key) is not called for a disabled item; a section's title is also the select's group label
  *   update(root, { sections, current })               -> draws the same element again with new counts or another current view; the keyboard stays on the item it was on */
 import { loadStyles } from './lazy_styles.js';
 import { importOnce } from './import_once.js';
@@ -45,8 +45,9 @@ function draw(root, { sections, current }) {
             lab.append(el('span', 'view-list-name', it.label));
             b.append(lab);
             const total = it.unread && it.count == null && it.total != null ? it.total : null; // a chat folder with nothing unread says how many it holds, as the other folders do (#10319): the unread number, when there is one, is the pill
-            b.setAttribute('aria-label', it.soon ? `${it.label}, soon` : total != null ? `${it.label}, ${total}` : (it.count != null ? `${it.label}, ${it.count}${it.unread ? ' unread' : ''}` : it.label)); // a number that is the unread count says so
+            b.setAttribute('aria-label', it.soon ? `${it.label}, soon` : it.words ? `${it.label}, ${it.words}` : total != null ? `${it.label}, ${total}` : (it.count != null ? `${it.label}, ${it.count}${it.unread ? ' unread' : ''}` : it.label)); // a number that is the unread count says so
             if (it.tip) b.title = it.tip; // what is behind the row, in one line (#10074)
+            if (it.words) b.title = it.words; // a count that is part of a larger list says both in words (#13979)
             if (it.unread && it.total != null) b.title = `${it.total} in all`; // the name and the count are read apart ("Board history, 1"), the count once (it is not in the name's text twice)
             if (it.soon) { b.disabled = true; b.classList.add('view-list-soon'); b.append(el('span', 'view-list-count', 'soon')); }
             else if (total != null) b.append(el('span', 'view-list-count', total));

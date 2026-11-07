@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/subgentic/coral/internal/board"
@@ -27,10 +28,10 @@ import (
 // (so % and _ are ordinary characters), the rest are enum words, names compared for equality, and times.
 
 var teamArtifactParamNames = map[string]bool{"limit": true, "offset": true, "session_id": true,
-	"q": true, "kind": true, "origin": true, "by": true, "board": true, "kept": true, "starred": true, "task": true, "goal": true, "tag": true, "since": true, "until": true, "sort": true, "cursor": true, "versions": true, "read": true}
+	"q": true, "kind": true, "origin": true, "by": true, "board": true, "kept": true, "starred": true, "task": true, "goal": true, "tag": true, "since": true, "until": true, "sort": true, "cursor": true, "versions": true, "read": true, "facets": true, "muted": true, "waiting": true, "starred_first": true, "digest": true}
 
 // teamArtifactQueryParams are the parameters that make the reply a query (the others are the list's original ones).
-var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "kept", "starred", "task", "goal", "tag", "since", "until", "sort", "cursor", "versions", "read"}
+var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "kept", "starred", "task", "goal", "tag", "since", "until", "sort", "cursor", "versions", "read", "facets", "muted", "waiting", "starred_first", "digest"}
 
 var (
 	teamArtifactKinds   = []string{"image", "pdf", "text", "other"}
@@ -54,23 +55,31 @@ const (
 )
 
 type teamArtifactQuery struct {
-	q        string // lower-cased
-	kinds    []string
-	origins  []string
-	by       []string // lower-cased
-	boards   []string // lower-cased
-	kept     *bool
-	read     *bool // read=1: the files the Operator has read (a read tag and no news in their thread); read=0: the ones still unread (#13162, Needs you's unread filter, applied by the computer before the page is cut)
-	starred  *bool
-	tags     []string // any of these tags (#8583), normalised
-	goal     int64    // 0: any; a goal's number: only what the tasks that work toward it hold (#8579)
-	task     int64    // 0: any; a task's number: only what is attached to or linked to that task (#7739, the task page's Artifacts)
-	since    *time.Time
-	until    *time.Time
-	sortName string
-	collapse bool // versions=newest (#11700): the versions of one file are one row, the newest; the totals and the tag counts follow
-	cursor   *teamArtifactCursor
-	finger   string
+	q            string // lower-cased
+	kinds        []string
+	origins      []string
+	by           []string // lower-cased
+	boards       []string // lower-cased
+	kept         *bool
+	waiting      *bool // waiting=1|0 (#13172): the files that wait for the Operator, by the server's own rule (needsYouFile: for review and not opened, or news in a decided file's thread; never saved, ignored or superseded) and still available, or the ones that do not
+	muted        *bool // muted=1|0 (#13172): the files the Operator's inbox settings mute (#12144), or the ones they do not; only the Operator's own read marks any row muted
+	read         *bool // read=1: the files the Operator has read (a read tag and no news in their thread); read=0: the ones still unread (#13162, Needs you's unread filter, applied by the computer before the page is cut)
+	starred      *bool
+	newVersion   map[string]bool // set per request when a waiting or read filter is asked by the Operator: the files read on an earlier version whose newer one they have not opened (#13959); never shared, never cached
+	digests      map[string]bool // digest=<64 hex> (repeatable, at most maxDigestFilter): exactly these stored files, for one file's review state without scanning pages (#13971); the cross-team list alone
+	starredFirst bool            // starred_first=true (#13910): the starred series first, one row each at its newest version, then the rest in the sort; paged by position (the cursor carries it)
+	tags         []string        // any of these tags (#8583), normalised
+	goal         int64           // 0: any; a goal's number: only what the tasks that work toward it hold (#8579)
+	task         int64           // 0: any; a task's number: only what is attached to or linked to that task (#7739, the task page's Artifacts)
+	since        *time.Time
+	until        *time.Time
+	sortName     string
+	crossTeam    bool // the owner-only cross-team list (GET /api/team-artifacts): the one list that carries the star-following fields (#13910)
+	collapse     bool // versions=newest (#11700): the versions of one file are one row, the newest; the totals and the tag counts follow
+	cursor       *teamArtifactCursor
+	finger       string
+	teams        []string // the cross-team list's team= restriction, as a filter (set by the handler, not parsed): with facets=team the other teams' rows are collected too, so the team facet can leave this one out (#13378)
+	facets       []string // facets=team,by,goal (#13172): the distinct values of the matching set, each with its own filter left out
 }
 
 type teamArtifactCursor struct {
@@ -230,6 +239,42 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 			return nil, taErr("read must be 1 or 0")
 		}
 	}
+	if v, ok, serr := taSingle("waiting", vals["waiting"]); serr != nil {
+		return nil, serr
+	} else if ok {
+		switch v {
+		case "1", "0":
+			b := v == "1"
+			q.waiting = &b
+		default:
+			return nil, taErr("waiting must be 1 or 0")
+		}
+	}
+	if v, ok, serr := taSingle("muted", vals["muted"]); serr != nil {
+		return nil, serr
+	} else if ok {
+		switch v {
+		case "1", "0":
+			b := v == "1"
+			q.muted = &b
+		default:
+			return nil, taErr("muted must be 1 or 0")
+		}
+	}
+	if v, ok, serr := taSingle("facets", vals["facets"]); serr != nil {
+		return nil, serr
+	} else if ok {
+		seen := map[string]bool{}
+		for _, f := range strings.Split(v, ",") {
+			if f != "team" && f != "by" && f != "goal" {
+				return nil, taErr("facets is a list of team, by and goal")
+			}
+			if !seen[f] {
+				seen[f] = true
+				q.facets = append(q.facets, f)
+			}
+		}
+	}
 	if v, ok, serr := taSingle("starred", vals["starred"]); serr != nil {
 		return nil, serr
 	} else if ok {
@@ -239,6 +284,27 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 			q.starred = &b
 		default:
 			return nil, taErr("starred must be true or false")
+		}
+	}
+	if ds, derr := taDigests(vals["digest"]); derr != nil {
+		return nil, derr
+	} else if len(ds) > 0 {
+		if vals.Get(crossTeamScopeParam) == "" {
+			return nil, taErr("digest is only on the cross-team list (GET /api/team-artifacts)")
+		}
+		q.digests = ds
+	}
+	if v, ok, serr := taSingle("starred_first", vals["starred_first"]); serr != nil {
+		return nil, serr
+	} else if ok {
+		switch v {
+		case "true", "false":
+			if v == "true" && vals.Get(crossTeamScopeParam) == "" {
+				return nil, taErr("starred_first is only on the cross-team list (GET /api/team-artifacts)")
+			}
+			q.starredFirst = v == "true"
+		default:
+			return nil, taErr("starred_first must be true or false")
 		}
 	}
 	if v, ok, serr := taSingle("task", vals["task"]); serr != nil {
@@ -296,7 +362,9 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 	}
 	// What a cursor is tied to: every filter and the sort (not limit, offset or the cursor itself).
 	fp := sha256.New()
-	fmt.Fprintf(fp, "%s|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%s|%s|%v", q.q, q.kinds, q.origins, q.by, q.boards, q.kept, q.starred, q.task, q.goal, q.tags, q.since, q.until, q.collapse, q.sortName, vals.Get("session_id"), q.read)
+	fmt.Fprintf(fp, "%s|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%s|%s|%v|%v|%v", q.q, q.kinds, q.origins, q.by, q.boards, q.kept, q.starred, q.task, q.goal, q.tags, q.since, q.until, q.collapse, q.sortName, vals.Get("session_id"), q.read, q.muted, q.waiting)
+	fmt.Fprintf(fp, "|sf=%v", q.starredFirst)
+	fmt.Fprintf(fp, "|dg=%v", sortedDigestKeys(q.digests))
 	if scope := vals.Get(crossTeamScopeParam); scope != "" { // the cross-team list: its cursors are its own (a team route's is refused there) and tied to the teams asked for
 		fmt.Fprintf(fp, "|%s|%v", scope, vals["team"])
 	}
@@ -398,7 +466,7 @@ func parseArtifactTime(s string) (time.Time, bool) {
 }
 
 // cheapMatch applies the filters that need no file system: origin, by, board, kept and the time range.
-func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept, starred map[string]bool) bool {
+func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept map[string]bool, starred map[string]starInfo) bool {
 	if len(q.origins) > 0 {
 		o, ok := teamArtifactOrigin(it), false
 		for _, w := range q.origins {
@@ -419,8 +487,20 @@ func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept, starred map[string
 			return false
 		}
 	}
+	if len(q.teams) > 0 {
+		in := false
+		for _, t := range q.teams {
+			in = in || t == it.BoardID || t == it.Team
+		}
+		if !in {
+			return false
+		}
+	}
 	if len(q.boards) > 0 && !teamArtifactMatchesBoard(it, q.boards) {
 		return false
+	}
+	if len(q.digests) > 0 && !q.digests[artifactStoreID(it)] {
+		return false // exactly the files asked for (#13971): a row with no stored object has no digest and never matches
 	}
 	if q.task != 0 && it.TaskID != q.task {
 		return false
@@ -431,7 +511,13 @@ func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept, starred map[string
 	if len(q.tags) > 0 && !hasAnyTag(it.Tags, q.tags) && !(it.NewComments > 0 && hasAnyTag([]string{tagNewComments}, q.tags)) && !(hasAnyTag([]string{"for review"}, q.tags) && decidedWithNews(it.Tags, it.NewComments)) {
 		return false // the tag "new comments" is not stored: it matches the rows the Operator's list says have news (#12026); and the list tagged "for review" also holds the decided files that have news, so the page reads one list (#12097)
 	}
-	if q.read != nil && artifactIsRead(it) != *q.read {
+	if q.waiting != nil && needsYouFileV(it.Tags, it.NewComments, q.newVersion[attentionKey(it.BoardID, artifactStoreID(it))]) != *q.waiting {
+		return false
+	}
+	if q.muted != nil && it.Muted != *q.muted {
+		return false // Muted is set only on the Operator's own read (attachArtifactKinds): for anyone else no row is muted
+	}
+	if q.read != nil && artifactIsReadV(it, q.newVersion[attentionKey(it.BoardID, artifactStoreID(it))]) != *q.read {
 		return false
 	}
 	if q.kept != nil {
@@ -441,7 +527,7 @@ func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept, starred map[string
 		}
 	}
 	if q.starred != nil {
-		isStarred := it.managed != "" && starred[it.managed]
+		_, isStarred := starOf(starred, it.BoardID, it.managed)
 		if isStarred != *q.starred {
 			return false
 		}
@@ -506,7 +592,7 @@ func (q *teamArtifactQuery) kindMatch(it teamArtifact) bool {
 // needsEnrichment: the name (a digest-named object takes its sidecar's name), the type and the size of managed files come from the
 // store, so searching, kind and the name and size sorts read each candidate's sidecar and stat its blob (never its bytes).
 func (q *teamArtifactQuery) needsEnrichment() bool {
-	return q.q != "" || len(q.kinds) > 0 || q.sortName == "name" || q.sortName == "name_desc" || q.sortName == "size" || q.sortName == "size_asc" || q.sortName == "type" || q.sortName == "type_desc" || q.sortName == "tags" || q.sortName == "tags_desc" // the text sorts read the shown text: through the Hub they are redacted before they sort (redactItemForTunnel)
+	return q.q != "" || len(q.kinds) > 0 || (q.waiting != nil && *q.waiting) || q.sortName == "name" || q.sortName == "name_desc" || q.sortName == "size" || q.sortName == "size_asc" || q.sortName == "type" || q.sortName == "type_desc" || q.sortName == "tags" || q.sortName == "tags_desc" // the text sorts read the shown text: through the Hub they are redacted before they sort (redactItemForTunnel)
 }
 
 func finishTeamArtifactName(it *teamArtifact) {
@@ -677,12 +763,14 @@ func clipKey(s string, n int) string {
 
 // teamArtifactSelection is one page of a query over a collected list.
 type teamArtifactSelection struct {
-	page    []teamArtifact
-	total   int            // the rows the filters matched
-	start   int            // where the page starts in them
-	hasMore bool           // another page follows
-	next    string         // its cursor ("" when none)
-	tags    map[string]int // the tag words of the whole list, with their counts (the Tag filter's choices)
+	page         []teamArtifact
+	total        int                             // the rows the filters matched
+	start        int                             // where the page starts in them
+	hasMore      bool                            // another page follows
+	next         string                          // its cursor ("" when none)
+	tags         map[string]int                  // the tag words of the whole list, with their counts (the Tag filter's choices)
+	starredTotal int                             // starred_first: the starred series the filters matched, before paging (#13910)
+	facets       map[string][]artifactFacetValue // facets=: the distinct values of the matching set (#13172), nil when none were asked for
 }
 
 // selectTeamArtifacts filters, sorts and pages items (the collected, merged list) by q: the one rule behind a team's list and the cross-team list.
@@ -694,13 +782,23 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 			return nil, err
 		}
 	}
-	starred, err := h.bs.StarredArtifactIDs(r.Context()) // a small set: read for every list, the rows say whether they are starred
-	if err != nil {
-		if q.starred != nil {
-			return nil, err // the Starred view cannot be answered without it
-		}
-		starred = map[string]bool{} // a star is a bookmark: the list still answers, its rows unstarred
+	if q.waiting != nil || q.read != nil { // the person's own opened versions decide what still waits for them and what is read, before the page is cut (#13959)
+		q.newVersion = h.newVersionUnopened(r, "", items)
 	}
+	var follow map[string]starInfo
+	if starVisible(r) { // the Operator's own attention: an agent's token and a Hub caller that is not the owner see no bookmark, and a starred filter finds none
+		times, err := h.bs.StarredArtifactTimes(r.Context(), openedPersonKey(r)) // a small set: read for every list, the rows say whether they are starred
+		switch {
+		case err != nil && q.starred != nil:
+			return nil, err // the Starred view cannot be answered without it
+		case err != nil:
+			times = map[string]string{} // a star is a bookmark: the list still answers, its rows unstarred
+		}
+		follow = starFollowIf(h.coralDir, times, q.crossTeam)
+	} else {
+		follow = map[string]starInfo{}
+	}
+	starred := follow
 	dir := h.artifactObjectDir()
 	tunneled := cloud.Tunneled(r)
 	if tunneled {
@@ -712,11 +810,47 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 	if q.collapse {
 		counts = teamTagCountsByFile(items) // files, not versions (#11700)
 	}
-	// A list with no text match, kind filter, name-like sort or collapse (the Operator's walk of the for-review tag, a page after a page) keeps the matching rows as positions in items: a copy of every matching row, for every page of a
-	// big board, was 20,000 rows allocated 400 times (#13614: the walk at the 50 cap). Only the page's own rows are copied out below.
-	fast := !q.needsEnrichment() && !q.collapse
+	// filtered is the matching set of a query (qq): the cheap filters, then the ones that need each file's sidecar (search, kind). The facets run it again with one filter left out.
+	// A file's sidecar is read (its name, type and size) once however many of the passes want it: the list and each facet are separate passes over a changing set of files, and the search and the kind test are the same for a file in all of them (#13378).
+	type enrichedRow struct {
+		it teamArtifact
+	}
+	memo := map[int]enrichedRow{}
+	filtered := func(qq *teamArtifactQuery) (set []teamArtifact, enriched bool) {
+		needs := qq.needsEnrichment()
+		for i, it := range items {
+			if !qq.cheapMatch(it, kept, starred) {
+				continue
+			}
+			if !needs {
+				set = append(set, it)
+				continue
+			}
+			enriched = true
+			e, ok := memo[i]
+			if !ok {
+				e.it = it
+				teamArtifactEnrichments.Add(1)
+				enrichTeamArtifact(&e.it, dir)
+				finishTeamArtifactName(&e.it)
+				if tunneled {
+					redactItemForTunnel(&e.it) // the sidecar's name and type are new text
+				}
+				memo[i] = e
+			}
+			if qq.textMatch(e.it) && qq.kindMatch(e.it) && !(qq.waiting != nil && *qq.waiting && !e.it.Available) { // a file that waits is one the Operator can open: its stored file is there
+				set = append(set, e.it)
+			}
+		}
+		return set, enriched
+	}
+	// A list with no text match, kind filter, name-like sort, facets or collapse (the Operator's walk of the for-review tag, a page after a page) keeps the matching rows as positions in items: a copy of every matching row, for every page of a
+	// big board, was 20,000 rows allocated 400 times (#13614: the walk at the 50 cap). Only the page's own rows are copied out below. Facets (#13172) need the matching set (and a set per facet) as rows: they take the copying path.
+	pinMode := q.crossTeam && (q.starredFirst || (q.starred != nil && *q.starred)) // a pinned list shows each starred series once, at its newest version (#13910)
+	fast := !q.needsEnrichment() && !q.collapse && !pinMode && len(q.facets) == 0
 	var set []teamArtifact
 	var idx []int
+	enriched := false
 	if fast {
 		for i := range items {
 			if q.cheapMatch(items[i], kept, starred) {
@@ -724,32 +858,49 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 			}
 		}
 	} else {
-		for _, it := range items {
-			if q.cheapMatch(it, kept, starred) {
-				set = append(set, it)
-			}
-		}
+		set, enriched = filtered(q)
 	}
-	enriched := false
-	if !fast && q.needsEnrichment() {
-		enriched = true
-		for i := range set {
-			enrichTeamArtifact(&set[i], dir)
-			finishTeamArtifactName(&set[i])
-			if tunneled {
-				redactItemForTunnel(&set[i]) // the sidecar's name and type are new text
+	var facets map[string][]artifactFacetValue
+	if len(q.facets) > 0 {
+		facets = map[string][]artifactFacetValue{}
+		for _, f := range q.facets {
+			qq := *q
+			own := set
+			switch f {
+			case "by":
+				if len(qq.by) > 0 {
+					qq.by = nil
+					own, _ = filtered(&qq)
+				}
+			case "team":
+				if len(qq.teams) > 0 {
+					qq.teams = nil
+					own, _ = filtered(&qq)
+				}
+			case "goal":
+				if qq.goal != 0 {
+					qq.goal = 0
+					own, _ = filtered(&qq)
+				}
 			}
-		}
-		var out []teamArtifact
-		for _, it := range set {
-			if q.textMatch(it) && q.kindMatch(it) {
-				out = append(out, it)
+			if q.collapse {
+				own = collapseVersions(append([]teamArtifact(nil), own...)) // files, not versions, as the totals say
 			}
+			facets[f] = artifactFacetOf(f, own)
 		}
-		set = out
 	}
 	if q.collapse {
 		set = collapseVersions(set) // after the filters: a version that matches stands for its file, as Needs you does (#11700)
+	}
+	if pinMode { // one row per starred series: its newest version; the older versions of a starred series are the same document
+		kept := set[:0:0]
+		for _, it := range set {
+			if info, ok := starOf(follow, it.BoardID, it.managed); ok && !info.Latest {
+				continue
+			}
+			kept = append(kept, it)
+		}
+		set = kept
 	}
 	n := len(set)
 	if fast {
@@ -796,9 +947,29 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 	if !fast {
 		n = len(set)
 	}
-	sel := &teamArtifactSelection{total: n, tags: counts}
+	pinned := 0
+	if pinMode && q.starredFirst { // the starred series first, the newest star first, then everything else in the order asked for; paged by position, which the cursor carries
+		var pins, rest []teamArtifact
+		for _, it := range set {
+			if info, ok := starOf(follow, it.BoardID, it.managed); ok && info.Latest {
+				pins = append(pins, it)
+			} else {
+				rest = append(rest, it)
+			}
+		}
+		sort.SliceStable(pins, func(i, j int) bool {
+			a, _ := starOf(follow, pins[i].BoardID, pins[i].managed)
+			b, _ := starOf(follow, pins[j].BoardID, pins[j].managed)
+			return a.At > b.At
+		})
+		pinned = len(pins)
+		set = append(pins, rest...)
+	}
+	sel := &teamArtifactSelection{total: n, tags: counts, facets: facets, starredTotal: pinned}
 	start := offset
-	if q.cursor != nil {
+	if q.cursor != nil && q.starredFirst {
+		start = q.cursor.Index // the pinned order is not a sort order: the cursor is a position in it
+	} else if q.cursor != nil {
 		ck := artifactSortKey{At: q.cursor.At, Name: q.cursor.Name, Size: q.cursor.Size, Type: q.cursor.Type, Tags: q.cursor.Tags, Uploader: q.cursor.Uploader, TaskID: q.cursor.TaskID, Source: q.cursor.Source, Index: q.cursor.Index, ID: q.cursor.ID}
 		start = sort.Search(n, func(i int) bool { return artifactAfter(q.sortName, keyOfP(rowAt(i)), ck) })
 	}
@@ -829,7 +1000,15 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 		}
 	}
 	for i := range sel.page {
-		sel.page[i].Starred = sel.page[i].managed != "" && starred[sel.page[i].managed]
+		_, sel.page[i].Starred = starOf(starred, sel.page[i].BoardID, sel.page[i].managed)
+		if q.crossTeam && sel.page[i].Starred { // the star-following fields, on the owner-only cross-team list alone (#13910)
+			if info, ok := starOf(follow, sel.page[i].BoardID, sel.page[i].managed); ok {
+				sel.page[i].StarredAt, sel.page[i].SeriesID = info.At, info.Series
+				if info.Latest {
+					sel.page[i].EarlierDigests = info.Earlier
+				}
+			}
+		}
 	}
 	if sel.page == nil {
 		sel.page = []teamArtifact{}
@@ -847,6 +1026,9 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 		}
 		if q.sortName != "uploader" && q.sortName != "uploader_desc" {
 			k.Uploader = ""
+		}
+		if q.starredFirst {
+			k.Index = end
 		}
 		sel.next = teamArtifactCursor{Uploader: k.Uploader, Sort: q.sortName, Finger: q.finger, At: k.At, Name: k.Name, Size: k.Size, Type: k.Type, Tags: k.Tags, TaskID: k.TaskID, Source: k.Source, Index: k.Index, ID: k.ID}.encode()
 	}
@@ -876,6 +1058,9 @@ func (h *BoardHandler) queryTeamArtifacts(w http.ResponseWriter, r *http.Request
 	}
 	if len(sel.tags) > 0 {
 		resp["tag_counts"] = sel.tags
+	}
+	if sel.facets != nil {
+		resp["facets"] = sel.facets
 	}
 	if sessionFilter != "" {
 		resp["session_id"] = sessionFilter
@@ -924,6 +1109,16 @@ func collapseVersions(items []teamArtifact) []teamArtifact {
 			newest[k] = i
 		}
 	}
+	// The older versions' digests, oldest first and at most maxEarlierDigests (#14086): the same team, uploader and name the collapse uses, so they are the digests of rows this list would have shown for the same file. A
+	// decision on the newest version settles them (the client removes their review tags quietly), as it does for a starred series; without them an approved file's older legacy version, which has no series, stays for review and
+	// comes back in Needs you. A file with more than the cap says so by EarlierVersions (the whole count) being greater than the digests it carries; the rest follow once these are settled and the list is read again (the next
+	// read has the next oldest as its earlier digests), so there is no endpoint to page.
+	earlier := map[string][]teamArtifact{}
+	for i, it := range items {
+		if k := artifactVersionKey(it); k != "" && newest[k] != i {
+			earlier[k] = append(earlier[k], it)
+		}
+	}
 	out := make([]teamArtifact, 0, len(items))
 	for i, it := range items {
 		if k := artifactVersionKey(it); k != "" {
@@ -931,6 +1126,16 @@ func collapseVersions(items []teamArtifact) []teamArtifact {
 				continue
 			}
 			it.EarlierVersions = count[k] - 1
+			if older := earlier[k]; len(older) > 0 {
+				sort.SliceStable(older, func(a, b int) bool { return newerVersion(older[b], older[a]) }) // oldest first
+				if len(older) > maxEarlierDigests {
+					older = older[:maxEarlierDigests]
+				}
+				it.EarlierDigests = make([]string, len(older))
+				for j, o := range older {
+					it.EarlierDigests[j] = o.managed
+				}
+			}
 		}
 		out = append(out, it)
 	}
@@ -949,8 +1154,11 @@ func artifactUploaderLabel(it teamArtifact) string {
 }
 
 // artifactIsRead is whether the Operator has read a file, as Needs you says it (inbox_reviews.js isRead): it has the read tag and its thread has no news (replies an agent left since the Operator last opened it).
-func artifactIsRead(it teamArtifact) bool {
-	if it.NewComments > 0 {
+func artifactIsRead(it teamArtifact) bool { return artifactIsReadV(it, false) }
+
+// artifactIsReadV is artifactIsRead for the person who is asking, version-aware (#13959): a file whose newer version they have not opened is not read, though the read tag is on it (that tag was set on an earlier version).
+func artifactIsReadV(it teamArtifact, newVersion bool) bool {
+	if it.NewComments > 0 || newVersion {
 		return false
 	}
 	for _, t := range it.Tags {
@@ -959,4 +1167,124 @@ func artifactIsRead(it teamArtifact) bool {
 		}
 	}
 	return false
+}
+
+// artifactFacetValue is one choice of a facet: the value, how many files (versions without versions=newest) of the matching set have it, and a goal's number.
+type artifactFacetValue struct {
+	V  string `json:"v"`
+	N  int    `json:"n"`
+	ID int64  `json:"id,omitempty"`
+}
+
+// maxFacetValues is how many choices one facet answers: the most files first, then by name. A computer with more says so by the count of what is left out (the page's filter box still takes any word).
+const maxFacetValues = 100
+
+// artifactFacetOf counts the values of one facet over a set of rows, after the viewer's redaction (the set was redacted for a Hub viewer already).
+func artifactFacetOf(facet string, set []teamArtifact) []artifactFacetValue {
+	counts := map[string]*artifactFacetValue{}
+	add := func(v string, id int64) {
+		if v == "" {
+			return
+		}
+		key := v
+		if id != 0 {
+			key = strconv.FormatInt(id, 10) + "\x00" + v
+		}
+		if c, ok := counts[key]; ok {
+			c.N++
+			return
+		}
+		counts[key] = &artifactFacetValue{V: v, N: 1, ID: id}
+	}
+	for _, it := range set {
+		switch facet {
+		case "by":
+			if who := ptrOr(it.ProducedBy); who != "" {
+				add(who, 0)
+			} else {
+				add(it.SentBy, 0)
+			}
+		case "team":
+			add(it.Team, 0)
+		case "goal":
+			if it.GoalID != nil {
+				add(it.GoalTitle, *it.GoalID)
+			}
+		}
+	}
+	out := make([]artifactFacetValue, 0, len(counts))
+	for _, c := range counts {
+		out = append(out, *c)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].N != out[j].N {
+			return out[i].N > out[j].N
+		}
+		if out[i].V != out[j].V {
+			return out[i].V < out[j].V
+		}
+		return out[i].ID < out[j].ID
+	})
+	if len(out) > maxFacetValues {
+		out = out[:maxFacetValues]
+	}
+	return out
+}
+
+func hasFacet(list []string, f string) bool {
+	for _, x := range list {
+		if x == f {
+			return true
+		}
+	}
+	return false
+}
+
+// teamArtifactEnrichments counts the files whose sidecar a list query has read (a test seam: each file once per query, however many facets are asked, #13378).
+var teamArtifactEnrichments atomic.Int64
+
+// starFollowIf is the stars with their series followed on the cross-team list, and as plain digests everywhere else (the per-board list keeps its one-digest star).
+func starFollowIf(coralDir string, times map[string]string, follow bool) map[string]starInfo {
+	if follow && coralDir != "" {
+		return starFollow(coralDir, times)
+	}
+	out := make(map[string]starInfo, len(times))
+	for d, at := range times {
+		out["|"+d] = starInfo{At: at, Latest: true}
+	}
+	return out
+}
+
+// maxDigestFilter is how many digests one list may ask for.
+const maxDigestFilter = 20
+
+// taDigests reads digest=<64 hex> (repeatable, or comma-separated) into the set asked for: each exactly 64 hex characters (case folded), at most maxDigestFilter of them, nothing else (#13971).
+func taDigests(vals []string) (map[string]bool, error) {
+	var out map[string]bool
+	for _, v := range vals {
+		for _, p := range strings.Split(v, ",") {
+			p = strings.ToLower(strings.TrimSpace(p))
+			if !objectNameRe.MatchString(p) {
+				return nil, taErr("digest must be the 64 hex characters of a stored file")
+			}
+			if out == nil {
+				out = map[string]bool{}
+			}
+			out[p] = true
+			if len(out) > maxDigestFilter {
+				return nil, taErr("digest has more than %d values", maxDigestFilter)
+			}
+		}
+	}
+	return out, nil
+}
+
+// sortedDigestKeys is the set in a fixed order, for the cursor's fingerprint.
+func sortedDigestKeys(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }

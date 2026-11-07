@@ -25,9 +25,12 @@
                         <span class="material-icons" aria-hidden="true">checklist</span><span class="agentic-tab-word">Tasks</span>
                         <span class="tab-count agentic-tab-count" id="task-bar-count"></span>
                     </button>
-                    <button class="tab agentic-tab" data-on-click="agentic-tab" data-tab="notes" data-where="top" id="agentic-tab-notes" title="Notes — agent notes and observations" aria-label="Notes">
+                    <button class="tab agentic-tab" data-on-click="agentic-tab" data-tab="notes" data-rare data-where="top" id="agentic-tab-notes" title="Notes — agent notes and observations" aria-label="Notes">
                         <span class="material-icons" aria-hidden="true">edit_note</span><span class="agentic-tab-word">Notes</span>
                         <span class="tab-count agentic-tab-count" id="note-bar-count"></span>
+                    </button>
+                    <button class="tab agentic-tab" data-on-click="agentic-tab" data-tab="info" data-where="top" data-scope="agent" id="agentic-tab-info" title="Info: this agent's session, MCP servers, skills and memory" aria-label="Info">
+                        <span class="material-icons" aria-hidden="true">info</span><span class="agentic-tab-word">Info</span>
                     </button>
                     <button class="tab agentic-tab" data-on-click="agentic-tab" data-tab="activity" data-rare data-where="top" data-scope="agent" id="agentic-tab-activity" title="Activity — tool use and event timeline" aria-label="Activity">
                         <span class="material-icons" aria-hidden="true">timeline</span><span class="agentic-tab-word">Activity</span>
@@ -94,6 +97,46 @@
                         <button type="button" class="note-add" aria-label="Add a note">Add notes</button>
                     </div>
                     <textarea id="note-md-editor" class="note-md-editor" placeholder="Write notes in markdown..." style="display:none"></textarea>
+                </div>
+                <!-- Info tab (#13917): the agent's session info (it was the Info dialog), then its MCP servers, skills and memory, read-only (info_tab.js) -->
+                <div id="agentic-panel-info" class="agentic-panel">
+                    <div class="agent-sections" id="info-tab" role="region" aria-label="Info: session, MCP servers, skills and memory">
+                        <p class="agent-sections-note" id="info-tab-note" role="status" hidden></p>
+                        <dl class="info-grid session-info-grid" id="info-tab-grid">
+                            <dt>Agent Name</dt>
+                            <dd id="info-agent-name" class="info-value-emphasis"></dd>
+                            <dt>Agent Type</dt>
+                            <dd id="info-agent-type"></dd>
+                            <dt>Tmux Session</dt>
+                            <dd id="info-tmux-session" class="info-value-mono"></dd>
+                            <dt>Attach Command</dt>
+                            <dd class="info-command-row">
+                                <code id="info-tmux-command" class="info-code-block"></code>
+                                <button class="btn btn-small copy-btn" id="info-copy-btn" data-on-click="m-copy-info-command" title="Copy to clipboard">Copy</button>
+                                <span id="info-attach-note" hidden>This agent runs in Coral's own terminal, so there is nothing to attach to. <button type="button" class="cni-link" data-on-click="m-open-terminal-settings">Use tmux in Settings</button> to attach from your own terminal.</span>
+                            </dd>
+                            <dt>Working Directory</dt>
+                            <dd id="info-working-dir" class="info-value-path"></dd>
+                            <dt>Log Path</dt>
+                            <dd id="info-log-path" class="info-value-path"></dd>
+                            <dt>Pane Title</dt>
+                            <dd id="info-pane-title"></dd>
+                            <dt>Branch</dt>
+                            <dd id="info-git-branch"></dd>
+                            <dt>Latest Commit</dt>
+                            <dd id="info-git-commit"></dd>
+                            <dt id="info-prompt-label" hidden>Prompt</dt>
+                            <dd id="info-prompt" class="info-text-block" hidden></dd>
+                            <dt id="info-board-label" hidden>Message Board</dt>
+                            <dd id="info-board" hidden></dd>
+                            <dt id="info-mcp-label" hidden>MCP servers</dt>
+                            <dd id="info-mcp" class="info-text-block" hidden></dd>
+                            <dt id="info-skills-label" hidden>Skills loaded</dt>
+                            <dd id="info-skills" class="info-text-block" hidden></dd>
+                            <dt id="info-memory-label" hidden>Memory and instructions</dt>
+                            <dd id="info-memory" class="info-text-block" hidden></dd>
+                        </dl>
+                    </div>
                 </div>
                 <!-- Board chat panel -->
                 <div id="agentic-panel-board" class="agentic-panel"></div>

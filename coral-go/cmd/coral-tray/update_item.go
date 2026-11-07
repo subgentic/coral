@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"sync/atomic"
 	"time"
@@ -141,17 +142,28 @@ func (u *updateItem) run(ctx context.Context) {
 	}
 }
 
-// open is what a click does: the dashboard's Updates pane, or the release page (and then the offer is counted, as the page the notice offers was opened).
-func (u *updateItem) open(openPane func(), openPage func(string), trackOffer func(version, channel string)) {
+// open is what a click does: the dashboard's Updates pane, or the release page (and then the offer is counted, as the page the notice offers was opened). A click always does something
+// visible or says why not (#14064): a pane that cannot be opened falls back to the release page, and when nothing opens, notify tells the person; every step is logged.
+func (u *updateItem) open(openPane func() bool, openPage func(string) bool, trackOffer func(version, channel string), notify func(string)) {
 	c := u.choice()
 	if !c.Show {
+		log.Printf("[update] menu click with nothing to offer (the item is stale)")
+		notify("Coral: there is no update to open right now. Check for updates from the menu.")
 		return
 	}
 	if c.Pane {
-		openPane()
+		if openPane() {
+			log.Printf("[update] menu click: opened the Updates pane for v%s", c.Version)
+			return
+		}
+		log.Printf("[update] menu click: could not open the Updates pane; opening the release page")
+	}
+	if !openPage(c.Page) {
+		log.Printf("[update] menu click: could not open the release page %s", c.Page)
+		notify("Coral could not open your browser. The update is at " + c.Page)
 		return
 	}
-	openPage(c.Page)
+	log.Printf("[update] menu click: opened the release page for v%s", c.Version)
 	trackOffer(c.Version, c.Channel)
 }
 

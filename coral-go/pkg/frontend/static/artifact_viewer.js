@@ -109,6 +109,7 @@ function _build() {
                 <div class="menu artifact-viewer-menu" id="artifact-viewer-menu" role="menu" aria-label="More actions" hidden>
                     <button type="button" class="menu-item artifact-viewer-edit-item" role="menuitem" hidden>Edit text</button>
                     <button type="button" class="menu-item artifact-viewer-markup-item" role="menuitem" hidden>Mark up</button>
+                    <button type="button" class="menu-item artifact-viewer-copy-id" role="menuitem">Copy artifact ID</button>
                     <a class="menu-item artifact-viewer-newtab" role="menuitem" target="_blank" rel="noopener noreferrer" hidden>Open in new tab</a>
                     <a class="menu-item artifact-viewer-download" role="menuitem" rel="noopener noreferrer" download>Download</a>
                 </div>
@@ -134,6 +135,7 @@ function _build() {
     d.querySelector('.artifact-viewer-fullscreen').addEventListener('click', () => setFullScreen(d, !d.classList.contains('av-fullscreen'), true));
     const more = d.querySelector('.artifact-viewer-more'), menu = d.querySelector('.artifact-viewer-menu');
     more.addEventListener('click', async (e) => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(more); });
+    d.querySelector('.artifact-viewer-copy-id').addEventListener('click', () => { const hex = _hex; importOnce('./artifact_clipboard.js').then(m => m.copyArtifactId(hex)).catch(() => showToast('Could not copy artifact ID', true)); });
     menu.addEventListener('click', async () => { (await importOnce('./menu_button.js')).closeMenus(); }); // a choice closes the menu
     // Mark up (#12367, the operator: "I don't see any way to markup the image in the window"): for a picture, the comment composer's drawing tool opens on the file's own image, and Done starts a comment on the file with the marked copy attached; the file itself is not changed
     const markUp = async () => {
@@ -175,11 +177,12 @@ function _build() {
         else if (e.key === 'Tab') trapTab(d, e);
     });
     keepFragmentsInside(d.querySelector('.artifact-viewer-body'));
+    window.addEventListener('resize', () => { if (!d.hidden) syncTitleExpand(d); });
     // Mark up is for a picture, and for someone who can write a comment on it: a view-only viewer (through the Hub) or a locked file does not see it (#12394)
     let _isPicture = false, _canWrite = false;
     const syncMarkUp = () => { d.querySelector('.artifact-viewer-markup').hidden = d.querySelector('.artifact-viewer-markup-item').hidden = !(_isPicture && _canWrite); };
     d._markUp = { picture: on => { _isPicture = on; syncMarkUp(); }, write: on => { _canWrite = on; syncMarkUp(); } };
-    _comments = attachComments(d, d.querySelector('.artifact-viewer-body'), d.querySelector('.artifact-viewer-main'), { shown: () => !d.hidden && !_editor, readOnly: () => _lastOpts.sourceNamed === false, onCanWrite: ok => d._markUp.write(ok), preferenceKey: () => _layoutType ? 'coral-artifact-comments:' + _layoutType : null });
+    _comments = attachComments(d, d.querySelector('.artifact-viewer-body'), d.querySelector('.artifact-viewer-main'), { shown: () => !d.hidden && !_editor, readOnly: () => _lastOpts.sourceNamed === false, uploader: () => _lastOpts.uploader, onCanWrite: ok => d._markUp.write(ok), preferenceKey: () => _layoutType ? 'coral-artifact-comments:' + _layoutType : null });
     _versions = attachVersions(d, {
         version: n => { const t = d.querySelector('.artifact-viewer-title'); t.querySelector('.artifact-viewer-version')?.remove(); if (n > 1) t.append(Object.assign(document.createElement('span'), { className: 'artifact-viewer-version', textContent: ` · version ${n}` })); }, // Coral numbers the versions: the name is the agent's (#11865)
         body: () => d.querySelector('.artifact-viewer-body'),
@@ -296,6 +299,21 @@ function openAfterInventory(hex, opts, intent) {
     }).catch(error => { if (intent === _openIntent) { showToast(error.message, true); opts.onClose?.(); } }).finally(() => { clearTimeout(timer); window.removeEventListener('popstate', cancel); document.removeEventListener('coral:route-changed', cancel); });
 }
 /** Open the artifact `hex` (64 lowercase hex). opts: { server, filename, mediaType }. */
+/** The viewer's name when it is cut: a button that opens it whole, only while it is cut or open (#13979). */
+function syncTitleExpand(d) {
+    const t = d.querySelector('.artifact-viewer-title'), n = t.querySelector('.artifact-viewer-title-name');
+    if (!n) return;
+    if (!n._wired) {
+        n._wired = true;
+        const flip = () => { const on = !t.classList.contains('is-open'); t.classList.toggle('is-open', on); n.setAttribute('aria-expanded', String(on)); };
+        n.addEventListener('click', () => { if (n.getAttribute('role') === 'button') flip(); });
+        n.addEventListener('keydown', e => { if (n.getAttribute('role') === 'button' && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); flip(); } });
+    }
+    const cut = t.classList.contains('is-open') || t.scrollWidth > t.clientWidth + 1;
+    if (cut) { n.tabIndex = 0; n.setAttribute('role', 'button'); n.setAttribute('aria-expanded', String(t.classList.contains('is-open'))); n.setAttribute('aria-label', n.textContent); }
+    else { n.removeAttribute('tabindex'); n.removeAttribute('role'); n.removeAttribute('aria-expanded'); n.removeAttribute('aria-label'); }
+}
+
 export function openArtifactViewer(hex, opts = {}) {
     const intent = ++_openIntent;
     hex = String(hex || '').toLowerCase();
@@ -327,6 +345,8 @@ export function openArtifactViewer(hex, opts = {}) {
     const url = serverUrl(artifactPath(hex), opts.server);
     const title = d.querySelector('.artifact-viewer-title');
     title.textContent = visibleName(opts.filename) || 'Artifact'; // the uploader's text, without what hides or reorders it (Security on #220)
+    // A long name is cut with an ellipsis (#13979): the heading keeps its text; a name that is cut holds a button (focusable, aria-expanded, Enter, Space, a tap or a click) that shows it whole. A name that fits has no extra Tab stop.
+    const nameEl = document.createElement('span'); nameEl.className = 'artifact-viewer-title-name'; nameEl.textContent = title.textContent; title.replaceChildren(nameEl); title.title = nameEl.textContent; title.classList.remove('is-open');
     const fromLine = d.querySelector('.artifact-viewer-from'); fromLine.textContent = visibleName(opts.from) || ''; fromLine.hidden = !fromLine.textContent; fromLine.title = fromLine.textContent; fromLine.classList.remove('is-open'); fromLine.setAttribute('aria-expanded', 'false'); d.querySelector('.artifact-viewer-sandbox').hidden = true; d._markUp.picture(false); d._markUp.write(false); // who uploaded a file opened for review (#11456), as text
     const sourceNote = d.querySelector('.artifact-viewer-source'); sourceNote.hidden = !!opts.sourceNamed; sourceNote.textContent = '';
     if (!opts.sourceNamed) { const computer = (state.servers || []).find(s => s.id === opts.server), name = opts.server === 'local' ? 'this computer' : (computer?.label || computer?.name || opts.server); sourceNote.textContent = `Viewing from ${markHidden(name, { strict: true })}. Source inferred; read only.`; }
@@ -347,10 +367,11 @@ export function openArtifactViewer(hex, opts = {}) {
     if (typeof opts.onClose === 'function') _onClose = opts.onClose;
     else if (!wasOpen) _onClose = null;
     d.hidden = false;
+    syncTitleExpand(d);
     if (!wasOpen && isPhoneLayout()) document.querySelectorAll('#toast-host > .toast:not(.error):not(.has-action)').forEach(t => t.remove()); // a plain toast was announced and sat over the viewer's header and versions at the top of a phone (#11621)
     if (!wasOpen && isPhoneLayout() && !_overlay) _overlay = pushOverlay(() => closeArtifactViewer({ popped: true })); // Back closes it, above the preview's full screen, under its comments sheet
     _comments.open(hex, opts.server, opts.board, true); // true: the comments of earlier versions of a series too (the server answers the plain list for an artifact in none)
-    _versions.open(hex, opts.server, { switched: !!opts.switched });
+    _versions.open(hex, opts.server, { switched: !!opts.switched, board: opts.board || '' });
     _review.open(hex, opts);
     // "Who can read this", for the Operator (the owner through Coral Hub): drawn only when the machine answers it; anyone else sees nothing.
     _details.clear();
@@ -380,6 +401,7 @@ export function openArtifactViewer(hex, opts = {}) {
     Promise.resolve(renderArtifact(body, `coral://artifacts/${hex}`, { server: opts.server, board: opts.board, sourceNamed: opts.sourceNamed, filename: opts.filename, mediaType: opts.mediaType }, {
         signal: _abort.signal,
         isStale: () => gen !== _gen || d.hidden,
+        opened: () => { if (opts.sourceNamed && gen === _gen && !d.hidden) importOnce('./inbox_reviews.js').then(m => m.recordOpenedVersion(hex, { server: opts.server, board: opts.board })).catch(() => {}); },
         typeResolved: metadata => {
             if (gen !== _gen || d.hidden) return;
             _layoutType = layoutType(metadata) || layoutType(opts) || 'application/octet-stream';

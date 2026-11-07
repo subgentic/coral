@@ -148,18 +148,21 @@ func TestTheReferenceIsExactlyADigestOrASeriesLinkAndNothingIsLookedUpForAnythin
 	}
 }
 
-func TestBytesThatBelongToAnotherSeriesAreRefusedWithoutSayingWhichOrWhose(t *testing.T) {
+// Bytes that sit in ANOTHER TEAM's series are that team's file, not a series of the caller's team (#13942): a team that holds the same bytes on its own does not learn that any other team has them in a series (the old
+// refusal "these bytes already belong to another series" was exactly that answer), and its version lands in its own series, never in the other team's. Bytes in ANOTHER SERIES OF THE SAME TEAM are still refused.
+func TestBytesInAnotherTeamsSeriesAreTheCallersOwnAndTheOtherTeamsSeriesIsUntouched(t *testing.T) {
 	rig, _ := ownerRig(t)
 	sid, _ := seriesOf(t, rig) // team-a's series holds "plan, second draft"
+	before := len(seriesMembers(rig.coralDir, sid))
 	own := rig.uploadText("b1", "b.txt", "bob's own artifact")
 	code, out := rig.uploadVersion("b1", "b2.txt", "plan, second draft", "coral://artifacts/"+own)
-	assert.Equal(t, http.StatusConflict, code, out)
-	assert.Equal(t, "these bytes already belong to another series", out["message"])
-	for _, secret := range []string{sid, "team-a", "alice", "a1", "a2", "version"} {
-		assert.NotContains(t, strings.ToLower(fmt.Sprint(out)), secret, "the answer names nothing of the other series: %q", secret)
+	assert.Equal(t, http.StatusCreated, code, "team-b's version is team-b's: it learns nothing of team-a's series: %v", out)
+	assert.NotEqual(t, sid, out["series_id"], "a series of team-b's own")
+	assert.EqualValues(t, 2, out["version"])
+	assert.Equal(t, before, len(seriesMembers(rig.coralDir, sid)), "team-a's series did not gain a member")
+	for _, m := range seriesMembers(rig.coralDir, sid) {
+		assert.Equal(t, "team-a", m.Board)
 	}
-	assert.Empty(t, seriesMembers(rig.coralDir, ""), "no series id, no members")
-	assert.Len(t, seriesMemberSet(rig.coralDir), 3, "and no series was made for bob: only team-a's three versions are in one")
 }
 
 func TestASeriesHoldsAtMostTheCap(t *testing.T) {

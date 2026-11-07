@@ -218,6 +218,7 @@ var routeTable = cat(
 		"/api/teams/detail/{name}/knowledge/{agent}",
 		// A distillation run's status (#3518): fixed keys, bounded text, no paths.
 		"/api/teams/detail/{name}/distill-knowledge",
+		"/api/teams/detail/{name}/daily-knowledge", // the team's daily knowledge: the switch, the last run, the waiting candidate with its diff (#13928)
 		"/api/token-usage", "/api/token-usage/summary", "/api/token-usage/timeseries",
 		"/api/token-usage/by-team", "/api/token-usage/by-branch", "/api/token-usage/session/{id}/turns", "/api/token-usage/turns",
 		"/api/goals/metrics", "/api/call-metrics/summary",
@@ -343,6 +344,9 @@ var routeTable = cat(
 	// Record for all agents (#13834, Security): the bulk route only, after the dry run (?dry_run=1, two signed targets). The OWNER's alone; the machine refuses a request through the Hub with no list of the agents shown (and ?all=1, which the query table drops). The single record-agent, which carries acknowledge_nested, stays never.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/sessions/record-agents")),
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/goals/{id}/driver", "/api/board/{project}/goals/{id}/move")), // the Operator's own two changes to a goal, who drives it and which team it is on (#12693, #13517): a person's, as the question buttons are
+	// The team's daily knowledge (#13928): what every agent of the team is told at its start, and what spends the person's model usage each day. The owner's alone, a person's click, refused before the handler for anyone else.
+	owner(OwnerRefuse, rules(http.MethodPut, TierInteract, "/api/teams/detail/{name}/daily-knowledge", "/api/teams/detail/{name}/daily-knowledge/auto-apply")),
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/teams/detail/{name}/daily-knowledge/accept", "/api/teams/detail/{name}/daily-knowledge/revert")),
 	owner(OwnerRefuse, rules(http.MethodPatch, TierInteract, "/api/saved/{id}")),
 	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/saved/{id}")),
 	// What a viewer sees of a board's settings is the machine's to decide (the health setup is the owner's, #5307): the marker is stamped, the handler gives a non-owner less.
@@ -546,6 +550,8 @@ var routeTable = cat(
 	// Starring an artifact to find it again (#9819): a personal bookmark, Interact like the saved items, and the machine refuses anyone but the owner.
 	owner(OwnerRefuse, rules(http.MethodPut, TierInteract, "/api/artifacts/{hex64}/star")),
 	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/artifacts/{hex64}/star")),
+	// The Operator opened a version of a series (#13910, the row's "New version"): the OWNER's alone; no body is read and the machine works the series and the version out from its own upload records. Interact: it moves no work.
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/artifacts/{hex64}/opened")),
 	owner(OwnerRefuse, rules(http.MethodGet, TierLaunch, PromptInspectionPath)),
 	owner(OwnerRefuse, rules(http.MethodPost, TierLaunch, UpdateRelaunchPath)), // installing and restarting a computer is the owner's alone, refused before the handler (a grantee at any tier gets 403 owner_only); the machine linked before the owner label was recorded must link again (#13258)
 	owner(OwnerRefuse, rules(http.MethodPost, TierLaunch, UpdateCheckPath)),    // ask this computer to check for and stage an update (never installs): no body, no query, the owner's alone and only with the person's switch on (#13258)

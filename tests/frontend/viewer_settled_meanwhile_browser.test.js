@@ -19,6 +19,11 @@ const HEX = 'ab'.repeat(32), HEX_B = 'cd'.repeat(32);
             const files = [['a', '${HEX}', 'plan.html'], ['b', '${HEX_B}', 'other.html']];
             const rows = (state) => files.filter(([k]) => state === window.__st[k]).map(([k, hex, name]) => art('a-' + k, hex, name, [state === 'pending' ? 'for review' : 'approved']));
             window.fetch = (u, o) => { const url = new URL(String(u), location.href), p = url.pathname;
+                const page = p === '/api/team-artifacts' ? window.__reviewFixturePage(u, location.href, {t3:[...rows('pending'),...rows('approved')]}) : null;
+                if (page) {
+                    if (url.searchParams.has('digest') && window.__holdApproved && page.artifacts.some(a=>a.tags.includes('approved'))) return new Promise(r=>window.__held.push(()=>r(new Response(JSON.stringify(page),{status:200,headers:{'Content-Type':'application/json'}})))); // hold only the exact settled-file read, not the bounded Inbox list
+                    return json(page);
+                }
                 if (p === '/api/board/projects') return json([{ project: 't3' }]);
                 const m = /^\\/api\\/board\\/t3\\/artifacts$/.exec(p);
                 if (m) { const tag = url.searchParams.get('tag');

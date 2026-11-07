@@ -3,12 +3,14 @@
 import { serverFetch, identityKey, splitKey } from './server_base.js';
 import { readOutcome } from './needs_incomplete.js';
 import { inboxSources } from './inbox_servers.js';
+import { isPaused } from './overload.js';
 import { browserLocal } from './safe_storage.js';
 import { visibleName } from './artifact_names.js';
 
 const DISMISSED_KEY = 'coral.proposals.dismissed.v1';
 const dismissed = () => { try { return new Set(JSON.parse(browserLocal.get(DISMISSED_KEY) || '[]')); } catch { return new Set(); } };
-let items = [], reading = null, activated = false, lastRead = 0;
+let items = [], reading = null, activated = false, lastRead = 0, fails = 0; // fails: reads in a row with a computer that failed, refused or was shedding load: the next unforced read waits longer (doubling, at most 10 minutes: coral-hub Security, #13389)
+const gap = () => { const base = Number(globalThis.__coralProposalsMs) || 20000; return fails ? Math.min(base * 2 ** fails, 600000) : base; };
 const listeners = [];
 
 /** The proposals on the list: pending ones, and the expired ones not yet dismissed here. */
@@ -22,7 +24,7 @@ export function refreshProposals(force = false) {
     if (force) activated = true;
     if (!activated) return null;
     if (reading) return reading;
-    if (!force && Date.now() - lastRead < 20000) return null;
+    if (!force && (document.hidden || isPaused() || Date.now() - lastRead < gap())) return null; // a hidden tab and a Coral shedding load pause it; a failing computer backs it off
     reading = (async () => {
         try {
             // Every computer the Inbox reads is asked on its own (#13454): a Hub-served page has none of its own, and a linked computer's teams are there. One that refuses (a grantee there, 403) has no
@@ -33,7 +35,7 @@ export function refreshProposals(force = false) {
             const settled = await Promise.all(sources.map(async server => {
                 try {
                     const r = await serverFetch(server, '/api/proposals?state=pending,approving,expired');
-                    if (!r.ok) { readOutcome('proposals', server, false); return r.status === 401 || r.status === 403 ? { server, rows: [] } : { server, keep: true }; } // access was taken away (401, 403): no rows, and the note says so (#13454, #13841); a missing route (404), a server error, a failure or a bad body keeps the rows
+                    if (!r.ok) { readOutcome('proposals', server, false); return r.status === 401 || r.status === 403 ? { server, rows: [], refused: true } : { server, keep: true }; } // access was taken away (401, 403): no rows, and the note says so (#13454, #13841); a missing route (404), a server error, a failure or a bad body keeps the rows
                     const got = (await r.json()).proposals;
                     if (!Array.isArray(got)) { readOutcome('proposals', server, false); return { server, keep: true }; }
                     readOutcome('proposals', server, true);
@@ -41,6 +43,7 @@ export function refreshProposals(force = false) {
                 } catch { readOutcome('proposals', server, false); return { server, keep: true }; }
             }));
             lastRead = Date.now();
+            fails = settled.some(res => res.keep || (res.rows && res.refused)) ? Math.min(fails + 1, 8) : 0;
             const next = [];
             settled.forEach(res => {
                 const server = res.server;

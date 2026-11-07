@@ -94,6 +94,15 @@ const TERMINAL_FIELDS = [
 
 const PERMISSION_OPTIONS = [{ value: '', label: 'Not set (Auto)' }, { value: 'default', label: 'Default' }, { value: 'plan', label: 'Plan' }, { value: 'acceptEdits', label: 'Accept edits' }, { value: 'auto', label: 'Auto' }, { value: 'bypassPermissions', label: 'Bypass permissions (turns off safety checks)' }, { value: 'dontAsk', label: "Don't ask" }];
 const THINKING_OPTIONS = [{ value: '', label: "The CLI's own default" }, { value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }, { value: 'xhigh', label: 'Extra high' }, { value: 'max', label: 'Max' }];
+// The levels Coral passes to each CLI (agentmodels/thinking.go, #4969): a type with none (Gemini, terminal) has no row. Pinned to the Go table by settings_orchestrator_defaults.test.mjs.
+const THINKING_LEVELS = { claude: ['low', 'medium', 'high', 'xhigh', 'max'], codex: ['minimal', 'low', 'medium', 'high', 'xhigh'], agy: ['low', 'medium', 'high', 'xhigh', 'max'], pi: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] };
+const LEVEL_WORD = { minimal: 'Minimal', off: 'Off', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max' };
+const thinkingOptions = (type, empty) => [{ value: '', label: empty }, ...THINKING_LEVELS[type].map(v => ({ value: v, label: LEVEL_WORD[v] }))];
+// Workers' thinking for the types that take levels (Claude's row is the first one, kept as it was), and the Orchestrator's model and thinking for each (#13899): empty means the same as the workers.
+const workersThinking = (type, label) => ({ key: `default_thinking_${type}`, type: 'select', id: `settings-default-thinking-${type}`, label: `${label} default thinking`, options: thinkingOptions(type, "The CLI's own default"), attrs: { 'aria-label': `${label} default thinking` } });
+const orchestratorModel = (type, label) => ({ key: `default_orchestrator_model_${type}`, type: 'text', id: `settings-orchestrator-model-${type}`, label: `${label} Orchestrator model`, placeholder: 'Same as workers',
+    attrs: { autocomplete: 'off', 'aria-label': `${label} Orchestrator model` }, setup: el => el.classList.add('settings-mono-input') });
+const orchestratorThinking = (type, label) => ({ key: `default_orchestrator_thinking_${type}`, type: 'select', id: `settings-orchestrator-thinking-${type}`, label: `${label} Orchestrator thinking`, options: thinkingOptions(type, 'Same as workers'), attrs: { 'aria-label': `${label} Orchestrator thinking` } });
 // One default-model row: the text box with the model list of its provider (filled by the dialog's model fetch into the datalist).
 const modelRow = (provider, label) => ({ key: `default_model_${provider}`, type: 'text', id: `settings-default-model-${provider}`, label, placeholder: 'Leave blank for none',
     attrs: { list: `settings-models-${provider}`, autocomplete: 'off', 'aria-label': `${label} default model` }, setup: el => { el.classList.add('settings-mono-input'); const dl = document.createElement('datalist'); dl.id = `settings-models-${provider}`; el.after(dl); } });
@@ -117,6 +126,11 @@ const AGENTS_FIELDS = host => [
     { key: 'working_dir', type: 'text', id: 'settings-working-dir', label: 'Default working directory', help: moreOnly('The folder a new agent starts in.'), placeholder: host.dataset.coralRoot || '', attrs: { 'data-coral-root': host.dataset.coralRoot || '' } },
     { key: 'default_thinking_claude', type: 'select', id: 'settings-default-thinking-claude', label: 'Default thinking', options: THINKING_OPTIONS, attrs: { 'aria-label': 'Claude default thinking' },
         help: moreOnly('How hard Claude thinks before it answers, when a launch does not say.', 'How much Claude thinks before it answers, for agents launched with no choice of their own. A model that does not take a level uses the nearest one it does.') },
+    workersThinking('codex', 'Codex'), workersThinking('agy', 'Antigravity'), workersThinking('pi', 'Pi'),
+    // The Orchestrator's own defaults (#13899): its model and thinking level, when it should not start like the workers; empty means the same as the workers. Gemini and terminal agents have no thinking levels, so no row.
+    { key: 'orchestrator_defaults', type: 'heading', id: 'settings-orchestrator-defaults', label: 'Orchestrator defaults', fold: true },
+    orchestratorModel('claude', 'Claude'), orchestratorThinking('claude', 'Claude'), orchestratorModel('codex', 'Codex'), orchestratorThinking('codex', 'Codex'),
+    orchestratorModel('agy', 'Antigravity'), orchestratorThinking('agy', 'Antigravity'), orchestratorModel('pi', 'Pi'), orchestratorThinking('pi', 'Pi'),
     // the CLI paths: a closed disclosure of four path fields, each with its verify result under it, and Verify All (#8460); the dialog opens it when the default agent's CLI is missing (openCliPathsWhenMissing), which also says on the closed row whether the default CLI was found; it sits under Defaults, not at the foot of the page, where a person whose agent will not start looks (#9955)
     { key: 'cli_paths', type: 'heading', id: 'settings-cli-paths', label: 'CLI paths (empty uses PATH)', fold: true },
     cliPath('claude', 'Claude'), cliPath('codex', 'Codex'), cliPath('agy', 'Antigravity'), cliPath('pi', 'Pi'),

@@ -51,6 +51,7 @@ type shellNever struct {
 
 // shellNeverRoutes: a never route one script calls, with what it does today. The key is "script METHOD route" with {} for a variable segment.
 var shellNeverRoutes = map[string]shellNever{
+	"info_tab.js GET /api/sessions/live/{}/mcp-servers":         {bHidden, `if \(!lines\.length\) return`, "the Info tab asks the agent's own computer for its MCP servers; where that read is refused through a Hub (or is empty) no row is drawn and nothing says why: a hidden row, not a wrong one (#13917)", 0},
 	"launch_skills.js GET /api/skills":                          {bExplains, `Skills stay on the computer`, "another computer's launch (and the Hub's) draws the row with the reason and nothing to tick; a refused read on this computer says so (#13871)", 0},
 	"chat_bubbles.js GET /api/system/editors":                   {bExplains, `editorsClosed\(\)`, "no request is sent through a Hub or for another computer's agent: the menu shows Open in editor dimmed, with the reason beside it (#13871)", 0},
 	"chat_bubbles.js POST /api/sessions/live/{}/open-in-editor": {bExplains, `data-hub-closed`, "never through a Hub; the control is not offered there, and the dimmed Open in editor item says why (#13871)", 0},
@@ -91,7 +92,6 @@ var shellNeverFiles = map[string]shellNever{
 	"hub_notice.js":             {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 4},
 	"hub_pending.js":            {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"inbox_sidebar.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
-	"info_dialog.js":            {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"job_form.js":               {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
 	"launch_dialog.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"launch_models.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
@@ -151,7 +151,7 @@ var shellNeverFiles = map[string]shellNever{
 	"xterm_renderer.js":         {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 }
 
-const shellUnreviewedMax = 87
+const shellUnreviewedMax = 86
 
 type shellCall struct {
 	file, method, route, raw string

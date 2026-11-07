@@ -238,6 +238,7 @@ b GET /api/team-artifacts
 c GET /api/teams/all
 c GET /api/teams/detail/{name}
 c GET /api/teams/detail/{name}/availability
+c GET /api/teams/detail/{name}/daily-knowledge
 c GET /api/teams/detail/{name}/distill-knowledge
 b GET /api/teams/detail/{name}/knowledge
 b GET /api/teams/detail/{name}/knowledge/{agentName}
@@ -303,6 +304,7 @@ b POST /api/artifacts/{id}/comments/{cid}/reopen
 b POST /api/artifacts/{id}/comments/{cid}/resolve
 b POST /api/artifacts/{id}/comments/{cid}/send
 b POST /api/artifacts/{id}/comment-images
+b POST /api/artifacts/{id}/opened
 b POST /api/auth/hub-signin/dismiss
 b POST /api/auth/password/change
 b POST /api/auth/password/reset
@@ -456,6 +458,8 @@ b POST /api/system/update/check-hub
 b POST /api/tags
 b POST /api/tasks/run
 b POST /api/tasks/runs/{runID}/kill
+b POST /api/teams/detail/{name}/daily-knowledge/accept
+b POST /api/teams/detail/{name}/daily-knowledge/revert
 c POST /api/teams/detail/{name}/distill-knowledge
 b POST /api/teams/detail/{name}/resurrect
 b POST /api/teams/generate
@@ -566,3 +570,5 @@ a POST /api/resources/{name}/claim
 a POST /api/resources/{name}/release
 a POST /api/resources/{name}/renew
 a PUT /api/resources/{name}
+b PUT /api/teams/detail/{name}/daily-knowledge
+b PUT /api/teams/detail/{name}/daily-knowledge/auto-apply

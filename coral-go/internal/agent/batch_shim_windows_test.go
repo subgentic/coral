@@ -351,3 +351,36 @@ func TestAPlainPromptStillReachesAWrapperThatIsNotNpms(t *testing.T) {
 		})
 	}
 }
+
+// A wrapper that sets _prog to something other than node is not read as node's shim.
+func TestAShimThatSetsItsProgramToSomethingOtherThanNodeIsNotUnwrapped(t *testing.T) {
+	const dir = `C:\w`
+	all := func(string) bool { return true }
+	run := func(set string) bool {
+		_, ok := shimTarget("@echo off\r\n"+set+"\r\n\"%_prog%\" \"%dp0%\\x.js\" %*\r\n", dir, all, nodeFound)
+		return ok
+	}
+	assert.True(t, run(`SET "_prog=node"`))
+	assert.True(t, run(`SET "_prog=%dp0%\node.exe"`))
+	assert.False(t, run(`SET "_prog=python"`))
+	assert.False(t, run(`SET "_prog=C:\other\runner.exe"`))
+	assert.False(t, run(`SET "_other=1"`), "never set at all")
+}
+
+// Dropping a prompt that was the value of an option drops the option with it, so the next option is not read as its value.
+func TestADroppedPromptTakesItsOptionWithIt(t *testing.T) {
+	wrapper := `C:\w\other.cmd`
+	prompt := promptFileMarker + `'C:\t\p.txt')"`
+	instr := "developer_instructions=" + promptFileMarker + `'C:\t\i.md')"`
+	parts := []string{wrapper, "-c", "model=x", "-c", instr, "-c", "hooks=y", "--", prompt}
+	got, _, _, changed := withoutPromptForBatch(parts, []string{instr, prompt})
+	require.True(t, changed)
+	assert.Equal(t, []string{wrapper, "-c", "model=x", "-c", "hooks=y"}, got)
+
+	got, _, _, _ = withoutPromptForBatch([]string{wrapper, "--append-system-prompt", prompt, "--print"}, []string{prompt})
+	assert.Equal(t, []string{wrapper, "--print"}, got)
+
+	// agy passes its prompt after -i
+	got, _, _, _ = withoutPromptForBatch([]string{wrapper, "--add-dir", `C:\d`, "-i", prompt}, []string{prompt})
+	assert.Equal(t, []string{wrapper, "--add-dir", `C:\d`}, got)
+}

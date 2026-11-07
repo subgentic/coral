@@ -31,6 +31,7 @@ async function inboxRows(path, field) {
         noteBoardLabels(rows, 'board_id', server);
         return rows.map(row => ({ ...row, server, board_id: identityKey(server, row.board_id) }));
     }));
+    inboxRows.failed = results.some(result => result.status === 'rejected'); // a read that failed or was refused is told to the caller, which backs off (#13389)
     // Each source is ordered independently; merge by update time, not server order.
     const updated = row => { const time = Date.parse(row.updated_at); return Number.isFinite(time) ? time : -Infinity; };
     return results.flatMap(result => result.status === 'fulfilled' ? result.value : [])
@@ -38,6 +39,7 @@ async function inboxRows(path, field) {
 }
 
 /** Open goals from this Coral and its registered machines, preserving team identity. */
+export const goalsReadFailed = () => !!inboxRows.failed;
 export function listInboxGoals() { return inboxRows('/api/goals?limit=100', 'goals'); }
 
 const ARTIFACT_LINK_RE = /coral:\/\/artifacts\/([0-9a-f]{64})(?![0-9a-f])/g;

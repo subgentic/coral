@@ -32,7 +32,7 @@ const { coralReady } = require('./helpers/wait');
                     window.__reviewItems=[1,2,3].map(i=>({id:i.toString(16).padStart(64,'0'),name:'Read me '+i+'.txt',media_type:'text/plain',size:30,created_at:new Date(Date.now()-(10-i)*60000).toISOString(),task_id:0,source:'upload',available:true,session_id:'writer-a',produced_by:'Writer A',tags:['for review']}));
                     const original=window.fetch, json=(body,status=200)=>Promise.resolve(new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}}));
                     window.fetch=(url,opts={})=>{
-                        const u=new URL(String(url),location.origin);
+                        const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, {'${team}': window.__reviewItems}) : null; if (reviewPage) return json(reviewPage); const u=window.__reviewFixtureURL(String(url), location.origin);
                         if(u.pathname==='/api/board/${team}/artifacts'){
                             const items=window.__reviewItems.filter(a=>!u.searchParams.has('tag')||a.tags.includes(u.searchParams.get('tag')));
                             return json({project:'${team}',artifacts:items,has_more:false});
@@ -98,7 +98,7 @@ const { coralReady } = require('./helpers/wait');
                 assert.equal(await ev(`window.__tagWrites.length`),writes3,'an artifact that is not for review is never tagged');
                 await ev(`document.querySelector('.artifact-viewer-close')?.click();true`);
                 assert.ok(writes3 === before3 + 1, 'one write for the open, however many places render the artifact: ' + (writes3 - before3));
-                await ev(`window.__reviewItems[2].tags=['for review'];true`);
+                // Keep file 3's acknowledged read and team tags on the fixture server.
                 // mark unread: it counts again
                 await click('Read me 1.txt','Mark unread');
                 await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent==='2'`,'the badge counts it again (the viewer-opened item stays read)');

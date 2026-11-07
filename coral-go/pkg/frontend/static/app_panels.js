@@ -23,11 +23,11 @@ export const { showDocsTab, selectDoc } = lazyFns(loadDocs, ['showDocsTab', 'sel
 export const { showThemeConfigurator, hideThemeConfigurator } = lazyFns(loadThemeConfig, ['showThemeConfigurator', 'hideThemeConfigurator']);
 
 export const {
-    showLaunchModal, hideLaunchModal, launchSession, hideInfoModal, copyInfoCommand,
+    showLaunchModal, hideLaunchModal, launchSession,
     toggleFlag, showAddAgentToBoard, launchTerminalToBoard, launchDefaultAgent,
     showAddStandaloneAgent, launchStandaloneTerminal, exportPersonas, importPersonas, importTeamTemplates, exportTeamTemplate,
 } = lazyFns(loadModals, [
-    'showLaunchModal', 'hideLaunchModal', 'launchSession', 'hideInfoModal', 'copyInfoCommand', 'toggleFlag', 'showAddAgentToBoard', 'launchTerminalToBoard', 'launchDefaultAgent', 'showAddStandaloneAgent', 'launchStandaloneTerminal', 'exportPersonas', 'importPersonas', 'importTeamTemplates', 'exportTeamTemplate']);
+    'showLaunchModal', 'hideLaunchModal', 'launchSession', 'toggleFlag', 'showAddAgentToBoard', 'launchTerminalToBoard', 'launchDefaultAgent', 'showAddStandaloneAgent', 'launchStandaloneTerminal', 'exportPersonas', 'importPersonas', 'importTeamTemplates', 'exportTeamTemplate']);
 
 export const { showSettingsModal, hideSettingsModal, applySettings } = lazyFns(loadSettingsDialog, ['showSettingsModal', 'hideSettingsModal', 'applySettings']);
 

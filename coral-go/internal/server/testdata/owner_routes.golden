@@ -45,6 +45,7 @@ POST /api/artifacts/{id}/comments interact owner-only
 POST /api/artifacts/{id}/comments/{cid}/reopen interact owner-only
 POST /api/artifacts/{id}/comments/{cid}/resolve interact owner-only
 POST /api/artifacts/{id}/comments/{cid}/send launch owner-only
+POST /api/artifacts/{id}/opened interact owner-only
 POST /api/board/{project}/artifacts/{digest}/edit interact owner-only
 POST /api/board/{project}/artifacts/{digest}/edit/send interact owner-only
 POST /api/board/{project}/artifacts/{id}/review interact owner-only
@@ -77,6 +78,8 @@ POST /api/sessions/live/{name}/notices/resume interact owner-only
 POST /api/sessions/record-agents interact owner-only
 POST /api/system/update/check-hub launch owner-only
 POST /api/system/update/relaunch launch owner-only
+POST /api/teams/detail/{name}/daily-knowledge/accept interact owner-only
+POST /api/teams/detail/{name}/daily-knowledge/revert interact owner-only
 PUT /api/artifacts/{id}/comments/lock interact owner-only
 PUT /api/artifacts/{id}/private interact owner-only
 PUT /api/artifacts/{id}/star interact owner-only
@@ -87,3 +90,5 @@ PUT /api/board/{project}/orchestrator-grant launch owner-only
 PUT /api/board/{project}/settings launch owner-only
 PUT /api/board/{project}/working-mode interact owner-sees
 PUT /api/custom-models launch owner-only
+PUT /api/teams/detail/{name}/daily-knowledge interact owner-only
+PUT /api/teams/detail/{name}/daily-knowledge/auto-apply interact owner-only

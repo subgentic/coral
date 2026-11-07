@@ -28,7 +28,7 @@ export async function openNeed({ kind, server, team, id }) {
     let list = ask ? m.operatorAsks() : m.reviewItems(), at = await teamKeyOf(server, team, list), item = pick(list, at);
     if (!item) {
         if (ask) { await m.refreshOperatorAsks(true); list = m.operatorAsks(); at = await teamKeyOf(server, team, list); item = pick(list, at); }
-        else { try { item = pick(await m.reviewsOfTeam(at), at); } catch { item = null; } }
+        else { try { item = await m.reviewOfTeam(at, id); } catch (error) { showToast(error.message || 'That review file could not be read.'); return; } }
     }
     Promise.resolve((ask ? m.refreshOperatorAsks(true) : m.refreshReviews(true, { reuse: true }))).catch(() => {});
     if (!item) showToast(`That ${ask ? 'question' : 'file'} is not waiting for you any more.`);

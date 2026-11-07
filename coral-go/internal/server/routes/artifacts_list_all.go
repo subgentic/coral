@@ -277,9 +277,13 @@ func (h *SessionsHandler) listAllArtifacts(w http.ResponseWriter, r *http.Reques
 		starredFilter = &b
 	}
 	rows := listAllArtifactRows(h.cfg.CoralDir())
-	stars := h.starredArtifactIDs(r.Context())
+	stars, serr := h.starredArtifacts(r.Context(), openedPersonKey(r))
+	if serr != nil { // a failed star read is an error, never a list that quietly shows nothing starred (#13910)
+		errInternalServer(w, "could not read the stars")
+		return
+	}
 	for i := range rows {
-		rows[i].Starred = stars[rows[i].ID]
+		_, rows[i].Starred = starOf(stars, rows[i].Board, rows[i].ID)
 	}
 	if starredFilter != nil {
 		kept := rows[:0]
@@ -329,20 +333,29 @@ func (h *SessionsHandler) listAllArtifacts(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, out)
 }
 
-// starredArtifactIDs is the set of starred artifact ids (#9819); empty when the table cannot be read.
-func (h *SessionsHandler) starredArtifactIDs(ctx context.Context) map[string]bool {
-	out := map[string]bool{}
+// starredArtifacts is what counts as starred (#9819) per row, "board|id": each starred artifact and, since the star follows the series (#13910), every version of the SAME TEAM's series. An error means the answer is unknown.
+func (h *SessionsHandler) starredArtifacts(ctx context.Context, person string) (map[string]starInfo, error) {
 	if h.db == nil {
-		return out
+		return map[string]starInfo{}, nil
 	}
-	var ids []string
-	if err := h.db.Reader().SelectContext(ctx, &ids, "SELECT hex FROM artifact_stars"); err != nil {
-		return out
+	var rows []struct {
+		Hex string `db:"hex"`
+		At  string `db:"starred_at"`
 	}
-	for _, id := range ids {
-		out[id] = true
+	var err error
+	if person == "" || person == ownerPersonKey {
+		err = h.db.Reader().SelectContext(ctx, &rows, "SELECT hex, starred_at FROM artifact_stars")
+	} else {
+		err = h.db.Reader().SelectContext(ctx, &rows, "SELECT hex, starred_at FROM artifact_person_stars WHERE person = ?", person)
 	}
-	return out
+	if err != nil {
+		return nil, err
+	}
+	times := make(map[string]string, len(rows))
+	for _, r := range rows {
+		times[r.Hex] = r.At
+	}
+	return starFollow(h.cfg.CoralDir(), times), nil
 }
 
 // labelAllArtifactBoards fills BoardLabel from the board names, for the boards the page names.

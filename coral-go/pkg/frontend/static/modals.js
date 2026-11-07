@@ -1,18 +1,16 @@
 import { importOnce } from './import_once.js';
-/* Modal management: launch and info dialogs */
+/* Modal management: launch and settings dialogs */
 
 import { registerActions, tokenOf, textOf } from './actions.js';
 import { ensureBuilt } from './lazy_dom.js';
 
-// The Launch, Info and Settings dialogs are built from their templates when this module loads, which is their first use
+// The Launch and Settings dialogs are built from their templates when this module loads, which is their first use
 // (#4500): everything below finds them in the page. Settings' load-time writers (settings_core.js and others) find nothing
 // until then, and showSettingsModal fills every field as it opens.
 ensureBuilt('launch-modal');
-ensureBuilt('info-modal');
 ensureBuilt('settings-modal');
 const { _togglePermChip, _togglePermissions } = await importOnce('./agent_config_form.js');
 const settingsDialog = await importOnce('./settings_dialog.js');
-const infoDialog = await importOnce('./info_dialog.js');
 const flagShortcuts = await importOnce('./flag_shortcuts.js');
 const launchCore = await importOnce('./launch_core.js');
 const teamDialogs = await importOnce('./team_dialogs.js');
@@ -28,7 +26,6 @@ export const { showAddAgentToBoard, launchTerminalToBoard, launchDefaultAgent, s
 export const { exportPersonas, importPersonas, exportTeamTemplates, exportTeamTemplate, importTeamTemplates } = personaIo;
 export const { _launchOn, hideLaunchModal } = launchCore; // _launchOn is exported for board_ids_browser
 export const { toggleFlag } = flagShortcuts;
-export const { showInfoModal, hideInfoModal, copyInfoCommand } = infoDialog;
 export const { showSettingsModal, hideSettingsModal, applySettings } = settingsDialog;
 // Kept on modals.js's surface (app.js and others import them from here).
 export { loadSettings, applyTheme } from './settings_core.js';

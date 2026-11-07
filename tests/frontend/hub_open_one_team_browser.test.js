@@ -15,9 +15,11 @@ const BOARDS = 9;
             const real = window.fetch, json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
             window.__requests = []; window.__puts = [];
             const boards = Array.from({ length: ${BOARDS} }, (_, i) => 'team-' + (i + 1));
-            window.__files = boards.map((b, i) => ({ id: String(i + 1).repeat(64), uri: 'coral://artifacts/' + String(i + 1).repeat(64), name: 'plan-' + (i + 1) + '.md', media_type: 'text/markdown', source: 'upload', available: true, size: 32, produced_by: 'Writer ' + (i + 1), session_id: 's' + (i + 1), tags: ['for review'], created_at: new Date(Date.now() - i * 1000).toISOString(), task_id: 7 }));
+            window.__files = boards.map((b, i) => ({ board_id: b, id: String(i + 1).repeat(64), uri: 'coral://artifacts/' + String(i + 1).repeat(64), name: 'plan-' + (i + 1) + '.md', media_type: 'text/markdown', source: 'upload', available: true, size: 32, produced_by: 'Writer ' + (i + 1), session_id: 's' + (i + 1), tags: ['for review'], created_at: new Date(Date.now() - i * 1000).toISOString(), task_id: 7 }));
             window.fetch = (u, o = {}) => {
                 const url = new URL(String(u), location.href), p = url.pathname; window.__requests.push(p + url.search);
+                const page = window.__reviewFixturePage(u, location.href, p.startsWith('/api/remote/m1/') ? Object.fromEntries(boards.map(b => [b, window.__files.filter(a => a.board_id === b)])) : {});
+                if (page) return json(page);
                 if (p === '/api/remote/m1/api/board/projects') return json(boards.map(b => ({ project: b, board_label: b, message_count: 1, subscriber_count: 1 })));
                 if (/^\\/api\\/remote\\/m2\\/api\\/board\\/projects$/.test(p)) return json([]);
                 const t = /^\\/api\\/remote\\/m1\\/api\\/board\\/(team-\\d+)\\/artifacts(?:\\/([a-f0-9]{64})\\/tags)?$/.exec(p);
@@ -45,10 +47,10 @@ const BOARDS = 9;
             await ev(open);
             await waitFor(`window.__files[${n - 1}].tags.includes('read')`, `opening the file by ${how} marks it read`, 15000);
             await ev(`new Promise(r => setTimeout(r, 1500))`); // sleep-ok: the scan a click used to start finishes before it is counted
-            const lists = (await ev(`window.__requests.slice()`)).filter(r => /\/artifacts\?tag=/.test(r));
-            const boardsRead = new Set(lists.map(r => /board\/(team-\d+)\//.exec(r)?.[1]));
-            assert.ok(boardsRead.size <= 1 && (boardsRead.size === 0 || boardsRead.has(board)), `${how}: one click read the review lists of ${boardsRead.size} boards (${lists.length} list requests: ${lists.join(' , ')}); the file's own board is enough`);
-            assert.ok(lists.length <= 3, `${how}: one click made ${lists.length} review/saved list requests: ${lists.join(' , ')}`);
+            const lists = (await ev(`window.__requests.slice()`)).filter(r => new URL(r, BASE).pathname.endsWith('/api/team-artifacts') && new URL(r, BASE).searchParams.has('digest'));
+            assert.ok(lists.length >= 1 && lists.length <= 3, `${how}: bounded exact-file reads: ${lists.join(' , ')}`);
+            for (const r of lists) { const u = new URL(r, BASE); assert.equal(u.pathname, '/api/remote/m1/api/team-artifacts'); assert.equal(u.searchParams.get('team'), board); assert.equal(u.searchParams.get('digest'), HEX(n)); assert.equal(u.searchParams.get('limit'), '50'); assert.equal(u.searchParams.has('cursor'), false); }
+            assert.equal((await ev(`window.__requests.slice()`)).filter(r => /\/board\/team-\d+\/artifacts\?/.test(r) && new URL(r, BASE).searchParams.has('tag')).length, 0, 'no old per-board review scan');
             assert.equal(await ev(`window.__puts.length`), 1, `${how}: the file was tagged read once`);
             assert.ok(reqs0(await ev(`window.__requests.slice()`), n), `${how}: the file's bytes were fetched through the computer (/api/remote/m1/...), never from the Hub itself`);
             const reqs = await ev(`window.__requests.slice()`); // the 404s the Hub's operator saw: each is asked at most once per open, and a 404 draws nothing again (UI Accessibility's SHOULD on #13489)

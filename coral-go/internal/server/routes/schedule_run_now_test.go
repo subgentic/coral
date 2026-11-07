@@ -35,13 +35,23 @@ func TestRunJobNow(t *testing.T) {
 		return rec
 	}
 	ctx := context.Background()
-	job, err := ss.CreateScheduledJob(ctx, &store.ScheduledJob{Name: "nightly", CronExpr: "0 9 * * *", Timezone: "UTC", RepoPath: "/tmp", Prompt: "p", JobType: "agent", Enabled: 0})
+	job, err := ss.CreateScheduledJob(ctx, &store.ScheduledJob{Name: "nightly", CronExpr: "0 9 * * *", Timezone: "UTC", RepoPath: "/tmp", Prompt: "p", JobType: "agent", Enabled: 0, NoWorktree: 1}) // no worktree: the folder is not a git repository, and a worktree that cannot be made failed the run within milliseconds, before the second request below (#14280)
 	require.NoError(t, err)
 
 	assert.Equal(t, http.StatusServiceUnavailable, post("/api/scheduled/jobs/1/run").Code, "no scheduler wired")
 
 	sched := background.NewJobScheduler(ss, time.Minute)
-	sched.SetLaunchFn(func(context.Context, store.ScheduledJob, int64) error { return nil })
+	// The launch holds until the test ends, so the run stays running while the second request below is made, however long the first takes to answer (a launch that returned at once let the scheduler finish the run in that
+	// gap). Cleanups run last in, first out: this one runs before the database is closed (#14280).
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
+	sched.SetLaunchFn(func(ctx context.Context, _ store.ScheduledJob, _ int64) error {
+		select {
+		case <-release:
+		case <-ctx.Done():
+		}
+		return nil
+	})
 	h.SetScheduler(sched)
 
 	rec := post("/api/scheduled/jobs/99999/run")

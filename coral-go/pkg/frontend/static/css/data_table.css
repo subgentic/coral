@@ -614,12 +614,22 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-box:not(.dt-folded) .inbox-kind-row > td[data-key="agent"] { position: relative; }
 .inbox-kind-column { position: absolute; inset: 0 auto 0 0; width: 3rem; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .dt-box.dt-folded .inbox-kind-row { padding-left: 3.5rem; }
-.dt-box.dt-folded .inbox-kind-column { justify-content: flex-start; padding-left: 16px; box-sizing: border-box; }
+.dt-box.dt-folded .inbox-kind-column { justify-content: flex-start; align-items: flex-start; padding: 10px 0 0 16px; box-sizing: border-box; } /* one spot for the icon in every row, top left, not centred on rows of different heights (#13911) */
+@media (max-width: 760px) { .inbox-needs-results .dt-row:has(.inbox-agent-first) > td:not([data-key=agent]):not([data-key=waiting]):not([data-key=review]) { display: none; } } /* what a row holds up is moved onto the description's lines, so its own cell is empty */ /* the old row's chips (the CLI, the folder, the team) are not part of a phone's two lines */
 .dt-box.dt-folded .inbox-kind-row > td[data-key="agent"] { padding-left: 0; }
 /* A narrow dashboard panel can fold while desktop action slots are active. Wrap the buttons inside their cell instead of letting the fixed grid spill into the icon gutter. */
 @media (min-width: 768px) and (min-height: 501px), (min-width: 768px) and (pointer: fine), (min-width: 951px) {
     .dt-box.dt-folded .inbox-review-actions.inbox-slots { display: flex; flex-wrap: wrap; }
     .dt-box.dt-folded .inbox-review-actions.inbox-slots > .btn { width: auto; }
+}
+/* Folded desktop panels give Item its own line; time and actions follow below.
+ * The desktop query also excludes a touch phone turned sideways (phone_layout.js). */
+@media (min-width: 768px) and (min-height: 501px), (min-width: 768px) and (pointer: fine), (min-width: 951px) {
+    .inbox-needs-results .dt-box.dt-fold-column.dt-folded .inbox-kind-row > td[data-key="agent"] { flex: 1 1 100%; }
+    .inbox-needs-results .dt-box.dt-folded .inbox-kind-row > [data-key="waiting"],
+    .inbox-needs-results .dt-box.dt-folded .inbox-kind-row > td:has(> .inbox-review-actions) { order: 4; min-width: 0; }
+    .inbox-needs-results .dt-box.dt-folded .inbox-kind-row > [data-key="waiting"] { flex: 0 1 auto; white-space: normal; }
+    .inbox-needs-results .dt-box.dt-folded .inbox-kind-row > td:has(> .inbox-review-actions) { flex: 1 1 auto; }
 }
 /* Choices keep the full row width (#10874); only title/excerpt share the icon gutter. */
 .dt-box.dt-mail-on tr.dt-mailed:has(.dt-mail-kind) { padding-left: 0; }
@@ -644,3 +654,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .inbox-kind-icon[data-kind="goal_done"]::before { content: 'flag'; }
 .inbox-kind-icon[data-kind="skill_review"]::before { content: 'auto_awesome'; }
 .inbox-kind-icon[data-kind="welcome"]::before { content: 'info'; }
+
+/* Needs you goal dividers and document pins (#13888/#13889). */
+.inbox-needs-results .dt-group th { white-space: pre-line; text-transform: none; letter-spacing: normal; font-size: var(--fs-sm); line-height: var(--lh-body); overflow-wrap: anywhere; color: var(--text-secondary); padding-block: 10px; }
+.inbox-needs-results .inbox-review-star.dt-star-on { color: var(--accent); }

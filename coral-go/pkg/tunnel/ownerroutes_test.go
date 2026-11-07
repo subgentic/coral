@@ -173,6 +173,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodPost && regexp.MustCompile(`^/api/board/[^/]+/goals/[^/]+/(driver|move)$`).MatchString(p) {
 				continue
 			}
+			// A team's daily knowledge (#13928): its switch, the apply-by-itself switch, accepting a candidate and taking an update back are the owner's alone through the hub: the old list never had them.
+			if (m == http.MethodPut || m == http.MethodPost) && regexp.MustCompile(`^/api/teams/detail/[^/]+/daily-knowledge(/auto-apply|/accept|/revert)?$`).MatchString(p) {
+				continue
+			}
 			// Asking this computer to check for an update (#13258) is the owner's alone through the hub: the old list never had it.
 			if m == http.MethodPost && p == UpdateCheckPath {
 				continue
@@ -191,6 +195,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			}
 			// The done-state of a goal-looks-done row (#13834) and the bulk Record for all agents (#13834) are the owner's alone: the old list never had them.
 			if m == http.MethodPost && ((strings.HasPrefix(p, "/api/board/") && strings.HasSuffix(p, "/done-state")) || p == "/api/sessions/record-agents") {
+				continue
+			}
+			// The Operator's opened version of a series (#13910) is the owner's alone: the old list never had it.
+			if m == http.MethodPost && strings.HasPrefix(p, "/api/artifacts/") && strings.HasSuffix(p, "/opened") {
 				continue
 			}
 			// The one difference of #5610: the table's {id} is any one segment, so a task artifact-content path with a non-number id is stamped too (its handler refuses it).

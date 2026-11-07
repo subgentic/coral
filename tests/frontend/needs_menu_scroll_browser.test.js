@@ -22,11 +22,13 @@ const BASE = require('./test_base').BASE;
             await waitFor(`document.querySelectorAll('.inbox-goaldone-actions .inbox-row-more-toggle').length === 24`, 'read goal menus');
             await ev(`window.__toggle=[...document.querySelectorAll('.inbox-goaldone-actions .inbox-row-more-toggle')].at(-1); __toggle.focus({preventScroll:true}); __toggle.scrollIntoView({block:'end'}); true`);
             await ev(framesJs(2));
+            // Scrolling may redraw virtual rows; acquire the connected last-row control.
+            await ev(`window.__toggle=[...document.querySelectorAll('.inbox-goaldone-actions .inbox-row-more-toggle')].at(-1); __toggle.focus({preventScroll:true}); true`);
             const measure = `(() => { const t=__toggle.closest('table'), rows=[...t.rows].map(r=>r.getBoundingClientRect().top), scroll=[]; for(let e=__toggle.parentElement;e;e=e.parentElement) scroll.push([e.tagName,e.id,e.scrollTop,e.scrollHeight]); const b=t.getBoundingClientRect(); return {rows,scroll,height:b.height}; })()`;
             const before = await ev(measure);
             await shot(`closed-${width}`);
             await ev(`__toggle.click(); true`);
-            await waitFor(`__toggle.getAttribute('aria-expanded')==='true'`, 'menu open');
+            await waitFor(`__toggle.getAttribute('aria-expanded')==='true'`, 'menu open '+width).catch(async e=>{throw new Error(e.message+' '+JSON.stringify(await ev(`({connected:__toggle.isConnected,expanded:__toggle.getAttribute('aria-expanded'),rect:__toggle.getBoundingClientRect().toJSON(),menu:!!document.getElementById(__toggle.getAttribute('aria-controls'))})`)));});
             await ev(framesJs(2));
             const after = await ev(measure);
             const menu = await ev(`(() => {const m=document.getElementById(__toggle.getAttribute('aria-controls')),r=m.getBoundingClientRect(),t=__toggle.getBoundingClientRect();return {position:getComputedStyle(m).position,top:r.top,bottom:r.bottom,left:r.left,right:r.right,above:r.bottom<=t.top,hit:m.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2))};})()`);

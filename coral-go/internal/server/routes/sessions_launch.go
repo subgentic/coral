@@ -90,6 +90,10 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "working_dir is required")
 		return
 	}
+	// An agent that names no board starts the agent on its own team's board where that team's grant is on (#13903). Whatever it names, the launch is held to that team's caps and log below.
+	if body.BoardName == "" && body.BoardID == "" && (body.BoardServer == "" || body.BoardServer == "local") {
+		body.BoardID = h.callersBoardWithGrant(r)
+	}
 	// Which board on this Coral the agent joins or starts (#3536); a remote board's Coral decides its own.
 	if (body.BoardName != "" || body.BoardID != "") && (body.BoardServer == "" || body.BoardServer == "local") {
 		key, ok := h.launchBoard(w, r, body.BoardID, body.BoardName, body.NewBoard)
@@ -98,6 +102,11 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		body.BoardName = key
+	}
+	// An agent on a team whose grant is on starts agents in that team's folders, wherever the agent is placed (#13891, #13903).
+	if h.refuseAgentLaunchOutsideTeam(w, r, body.WorkingDir) {
+		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+		return
 	}
 	// An unknown agent_type used to fall through to Claude and return 200
 	// ok:true, silently starting an agent the caller never asked for.
@@ -182,7 +191,8 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Resolve model: request wins, else per-type default from settings.
-	effectiveModel := h.resolveModel(r.Context(), body.AgentType, body.Model)
+	takesSeat := h.launchTakesTheSeat(r.Context(), r, body.DisplayName, body.AgentType, body.BoardName, body.BoardServer)
+	effectiveModel := h.resolveModelFor(r.Context(), body.AgentType, body.Model, takesSeat)
 	if effectiveModel != "" && !agentmodels.ValidModelValue(effectiveModel) {
 		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": errInvalidModel, "field": "model"})
@@ -190,7 +200,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Thinking level: the request's, else the Settings default for the type.
-	effectiveThinking, thinkingErr := h.resolveThinking(r.Context(), body.AgentType, body.Thinking)
+	effectiveThinking, thinkingErr := h.resolveThinkingFor(r.Context(), body.AgentType, body.Thinking, takesSeat)
 	if thinkingErr != "" {
 		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": thinkingErr, "field": "thinking"})
@@ -205,8 +215,9 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	// Everything before this could be refused with nothing made; from here the terminal is made and the agent started whatever the request does (#5213).
 	// An agent's launch onto a board is logged (the switch on or off) and, with the Operator's switch on, held to the board's caps (#11432).
 	var lifeID int64
-	if agentCaller(r) && body.BoardName != "" && (body.BoardServer == "" || body.BoardServer == "local") {
-		id, ok := h.beginAgentLaunch(w, r, body.BoardName, launchTargetName(body.DisplayName, body.AgentType))
+	acct := h.accountingBoard(r, body.BoardName, body.BoardServer) // the team the launch is held to, wherever the agent is placed (#13903)
+	if agentCaller(r) && acct != "" {
+		id, ok := h.beginAgentLaunch(w, r, acct, launchTargetName(body.DisplayName, body.AgentType))
 		if !ok {
 			attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
 			return
@@ -228,7 +239,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		AutoByDefault: !agentCaller(r) && autoDefaultAllowed(lctx, r, h.ss), // not for an agent's launch (it may not start a less-restricted agent, #4032), and a Hub request the owner does not let skip prompts asks instead (#5836)
 	})
 	if err != nil {
-		h.endAgentLaunch(r.Context(), body.BoardName, lifeID, false, "")
+		h.endAgentLaunch(r.Context(), acct, lifeID, false, "", "")
 		var refused *modelRefusedError
 		if errors.As(err, &refused) { // a model Pi does not list: the request's fault, refused before anything was made (#11105)
 			attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
@@ -244,7 +255,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	attempt.Finish(tracking.OutcomeSuccess, "", 1, 0)
-	h.endAgentLaunch(r.Context(), body.BoardName, lifeID, true, launcherWords(h.orchActorOf(r))+" started "+orchName(launchTargetName(body.DisplayName, body.AgentType)))
+	h.endAgentLaunch(r.Context(), acct, lifeID, true, launcherWords(h.orchActorOf(r))+" started "+orchName(launchTargetName(body.DisplayName, body.AgentType)), fmt.Sprint(result["session_id"]))
 
 	// Setup board subscription in background (prompt is passed as CLI arg, not via tmux send-keys)
 	if body.BoardName != "" {
@@ -288,6 +299,11 @@ func errInvalidThinking(agentType string) string {
 // A request's level the type does not take is refused (the message is the reply's error); a saved default that no longer fits is
 // ignored, as the CLI's own default then applies. Terminal agents have none.
 func (h *SessionsHandler) resolveThinking(ctx context.Context, agentType, requested string) (level, refused string) {
+	return h.resolveThinkingFor(ctx, agentType, requested, false)
+}
+
+// resolveThinkingFor is resolveThinking for a launch whose role is known (#13899): an Orchestrator falls back to default_orchestrator_thinking_<type> before the workers' default_thinking_<type>.
+func (h *SessionsHandler) resolveThinkingFor(ctx context.Context, agentType, requested string, orchestrator bool) (level, refused string) {
 	if agentType == "" {
 		agentType = at.Claude
 	}
@@ -302,11 +318,17 @@ func (h *SessionsHandler) resolveThinking(ctx context.Context, agentType, reques
 	if err != nil {
 		return "", ""
 	}
-	return defaultThinkingFromSettings(settings, agentType, ""), ""
+	return defaultThinkingForRole(settings, agentType, "", orchestrator), ""
 }
 
 // defaultThinkingFromSettings is requested, else the saved default_thinking_<type> when the type takes it.
 func defaultThinkingFromSettings(settings map[string]string, agentType, requested string) string {
+	return defaultThinkingForRole(settings, agentType, requested, false)
+}
+
+// defaultThinkingForRole is the level a launch starts on, first that is set and that the type takes winning: the one named in the launch, for an Orchestrator default_orchestrator_thinking_<type>, the
+// type's default_thinking_<type>, none (#13899).
+func defaultThinkingForRole(settings map[string]string, agentType, requested string, orchestrator bool) string {
 	if requested = strings.TrimSpace(requested); requested != "" {
 		if agentmodels.ValidThinking(agentType, requested) {
 			return requested
@@ -315,6 +337,11 @@ func defaultThinkingFromSettings(settings map[string]string, agentType, requeste
 	}
 	if agentType == at.Terminal || settings == nil {
 		return ""
+	}
+	if orchestrator {
+		if d := setreg.TextFamily(settings, setreg.DefaultOrchestratorThinkingPrefix+agentType); d != "" && agentmodels.ValidThinking(agentType, d) {
+			return d
+		}
 	}
 	if d := setreg.TextFamily(settings, setreg.DefaultThinkingPrefix+agentType); agentmodels.ValidThinking(agentType, d) {
 		return d

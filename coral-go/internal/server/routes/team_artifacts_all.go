@@ -119,16 +119,18 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 	for _, t := range teams {
 		wanted[t] = true
 	}
-	var items []teamArtifact
+	var items, pool []teamArtifact // pool: rows of the teams not asked for, kept only for the team facet
 	var refs []teamArtifactTeamRef
 	truncated, cut := false, false
+	var failedBoards []string
 	walked := 0
 	for _, p := range projects {
 		label := p.BoardLabel
 		if label == "" {
 			label = p.Project
 		}
-		if len(teams) > 0 && !wanted[p.Project] && !wanted[label] {
+		unwanted := len(teams) > 0 && !wanted[p.Project] && !wanted[label]
+		if unwanted && !(tq != nil && hasFacet(tq.facets, "team")) {
 			continue
 		}
 		if walked == maxTeamArtifactTeams {
@@ -138,12 +140,16 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 		walked++
 		rows, scanCut, err := h.projectArtifactItems(r, p.Project, "")
 		if err != nil {
-			errInternalServer(w, "could not list artifacts")
-			return
+			failedBoards = append(failedBoards, p.Project)
+			continue
 		}
 		truncated = truncated || scanCut
 		for i := range rows {
 			rows[i].BoardID, rows[i].Team = p.Project, label
+		}
+		if unwanted { // read only so the team facet can offer it (facets=team): it is no part of the list, its count or its refs
+			pool = append(pool, rows...)
+			continue
 		}
 		if len(rows) > 0 {
 			refs = append(refs, teamArtifactTeamRef{BoardID: p.Project, Team: label, All: filesOrVersions(tq, rows)})
@@ -152,7 +158,7 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 	}
 	// The files of agents that belong to no team (their own Artifacts tab lists them, GET /api/session-artifacts) are one more "team" of this list, so the Inbox does not say 0 artifacts for a pasted
 	// screenshot that the agent's tab shows (#10312). Each file is listed once: one a team's list already holds is not repeated.
-	if len(teams) == 0 || wanted[noTeamLabel] || wanted["No team"] {
+	if len(teams) == 0 || wanted[noTeamLabel] || wanted["No team"] || wanted[noTeamBoardID] { // the no-team files are asked for by their label or by the key they are kept under (#13910: a client that walks by board id)
 		if rows := h.standaloneUploadItems(r, items, projects); len(rows) > 0 {
 			for i := range rows {
 				rows[i].Team, rows[i].BoardID = noTeamLabel, noTeamBoardID // the board key a file for review is kept under (#13527): the Inbox reads the row as a review of that key
@@ -162,6 +168,11 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 		}
 	}
 	all := filesOrVersions(tq, items) // with versions=newest the unfiltered count is files, as the total and the team route's own all are (#11700, #13151)
+	tq.crossTeam = true
+	if len(pool) > 0 { // facets=team with a team asked for: the rows of the other teams join the pass, the asked-for teams stay the list (the team= filter), and the team facet leaves that filter out (#13378)
+		items = append(items, pool...)
+		tq.teams = teams
+	}
 	sel, err := h.selectTeamArtifacts(r, items, limit, offset, tq)
 	if err != nil {
 		errInternalServer(w, "could not list artifacts")
@@ -169,6 +180,7 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 	}
 	h.addWaitsOnThis(r, "", sel.page) // each row names its own board
 	h.attachSeriesVersions(sel.page, "")
+	h.attachOpenedVersions(r, sel.page)
 	if refs == nil {
 		refs = []teamArtifactTeamRef{}
 	}
@@ -181,11 +193,20 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 		"artifacts":     sel.page, "limit": limit, "offset": sel.start, "has_more": sel.hasMore, "truncated": truncated || cut,
 		"total": sel.total, "all": all, "teams": refs,
 	}
+	if tq.starredFirst {
+		resp["starred_total"] = sel.starredTotal
+	}
+	if len(failedBoards) > 0 { // a team whose rows could not be read: the list says so and carries the others (#13910), never a quietly short list
+		resp["partial"], resp["failed_boards"] = true, failedBoards
+	}
 	if sel.next != "" {
 		resp["next_cursor"] = sel.next
 	}
 	if len(sel.tags) > 0 {
 		resp["tag_counts"] = sel.tags
+	}
+	if sel.facets != nil {
+		resp["facets"] = sel.facets
 	}
 	writeJSON(w, http.StatusOK, resp)
 }

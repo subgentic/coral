@@ -171,6 +171,12 @@ function drawTable() {
     const back = isPhoneLayout() && !lead0 ? `<button type="button" class="back-link group-table-back" data-on-click="sgroup-list" data-kind="${escapeAttr(open.kind)}">\u2190 ${escapeHtml(TAB_NAME[open.kind] || 'List')}</button>` : '';
     const bar = src.toolbar ? src.toolbar(open.key) : null;
     const html = (bar && !bar.node ? toolbarHtml(bar, tables[0]) : '') + tables.map((x, i) => tableHtml(x, i, i ? '' : back, !!bar)).join('');
+    const scrollPlaces = [];
+    if (host.dataset.group === open.kind + ':' + open.key) {
+        for (let e = host; e; e = e.parentElement) if (e.scrollTop > 0) scrollPlaces.push([e, e.scrollTop]);
+        const page = document.scrollingElement;
+        if (page?.scrollTop > 0 && !scrollPlaces.some(([e]) => e === page)) scrollPlaces.push([page, page.scrollTop]);
+    }
     host.dataset.group = open.kind + ':' + open.key; // which table is on screen (saved.js asks for the Inbox's Saved)
     const a = document.activeElement, typing = a && host.contains(a) && a.id === 'gt-search' ? { start: a.selectionStart, end: a.selectionEnd } : null;
     // A component toolbar keeps its own listeners, open panel, search, and focus across table redraws.
@@ -179,7 +185,8 @@ function drawTable() {
     const folderPage = bar?.node && tables[0] && tables[0].noun ? tables[0] : null;
     const drawn = html + (src.signature?.() || '') + (folderPage ? `|head:${folderPage.title}:${folderPage.count === undefined ? folderPage.rows.length : folderPage.count}` : '') + (bar?.signature || '') + tables.map(x => (x.node ? `|${x.signature || ''}` : '')).join('') + (lead ? `|${lead.signature}` : ''); // a table with its own rows says what they are (signature): the same rows are not drawn again
     // A row the keyboard is on keeps it across a redraw (the Inbox's "waiting 4 min" moves on every 30 seconds while the table is the only list, #7004): it is found again by its class and data attributes
-    const held = host.contains(a) && a.matches('.group-chip, .dt-primary, .dt-quiet, .inbox-answer') ? { cls: a.className, data: JSON.stringify(a.dataset), row: a.closest('tbody tr') ? [...a.closest('tbody').children].indexOf(a.closest('tr')) : -1 } : null;
+    const focusTargets = '.group-chip, .dt-primary, .dt-quiet, .inbox-answer, a.inbox-ask-subject-link';
+    const held = host.contains(a) && a.matches(focusTargets) ? { cls: a.className, data: JSON.stringify(a.dataset), href: a.getAttribute('href'), row: a.closest('tbody tr') ? [...a.closest('tbody').children].indexOf(a.closest('tr')) : -1 } : null;
     if (host.dataset.drawn !== drawn) {
         host.innerHTML = html; host.dataset.drawn = drawn; // a redraw of what is there would drop the focus from a row the keyboard is on
         if (bar?.node) host.prepend(bar.node);
@@ -194,11 +201,14 @@ function drawTable() {
         for (const x of tables) if (x.node && (x.rows.length || !x.empty)) slots[k++]?.replaceWith(x.node());
         for (const x of tables) { const f = x.foot && x.foot(); if (f) host.querySelector('.vl-panel') ? host.querySelector('.vl-panel').append(f) : host.append(f); } // a line under the page that is not part of the table (Needs you's alerts offer, #11837); a phone's panel holds the page
     }
+    // Replacing rows temporarily empties the scroller and clamps its position.
+    // Keep the current folder's place through every refresh, including count-only updates.
+    for (const [element, top] of scrollPlaces) element.scrollTop = top;
     if (toolbarFocus && toolbarFocus.isConnected && document.activeElement !== toolbarFocus) {
         toolbarFocus.focus({ preventScroll: true });
         if (toolbarCaret) toolbarFocus.setSelectionRange(...toolbarCaret);
     }
-    if (held && host.dataset.drawn === drawn && !host.contains(document.activeElement)) [...host.querySelectorAll('.group-chip, .dt-primary, .dt-quiet, .inbox-answer')].find(e => e.className === held.cls && JSON.stringify(e.dataset) === held.data)?.focus({ preventScroll: true });
+    if (held && host.dataset.drawn === drawn && !host.contains(document.activeElement)) [...host.querySelectorAll(focusTargets)].find(e => e.className === held.cls && JSON.stringify(e.dataset) === held.data && e.getAttribute('href') === held.href)?.focus({ preventScroll: true });
     // the row the keyboard was on is gone (answered, or the agent stopped waiting): the keyboard goes to the row that took its place, or the last one, not to the page (#10560)
     if (held && held.row >= 0 && !host.contains(document.activeElement)) { const rows = [...host.querySelectorAll('tbody tr')]; rows[Math.min(held.row, rows.length - 1)]?.querySelector('.dt-primary')?.focus({ preventScroll: true }); }
     if (typing) { const again = document.getElementById('gt-search'); if (again && again !== a) { again.focus({ preventScroll: true }); try { again.setSelectionRange(typing.start, typing.end); } catch { /* a search field has a caret */ } } } // the person is typing in the page's search: the redraw keeps their caret

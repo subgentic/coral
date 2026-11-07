@@ -12,9 +12,11 @@ const HEX = String(5).repeat(64);
         await Page.addScriptToEvaluateOnNewDocument({ source: `(() => {
             const real = window.fetch, json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
             window.__requests = []; window.__puts = [];
-            window.__file = { id: '${HEX}', uri: 'coral://artifacts/${HEX}', name: 'plan.md', media_type: 'text/markdown', source: 'upload', available: true, size: 32, produced_by: 'Writer', session_id: 's1', tags: ['for review'], created_at: new Date().toISOString() };
+            window.__file = { board_id:'team-1', id: '${HEX}', uri: 'coral://artifacts/${HEX}', name: 'plan.md', media_type: 'text/markdown', source: 'upload', available: true, size: 32, produced_by: 'Writer', session_id: 's1', tags: ['for review'], created_at: new Date().toISOString() };
             window.fetch = (u, o = {}) => {
                 const url = new URL(String(u), location.href), p = url.pathname; window.__requests.push(p + url.search);
+                const page = p === '/api/team-artifacts' ? window.__reviewFixturePage(u, location.href, {'team-1':[window.__file]}) : null;
+                if (page) return json(page);
                 if (p === '/api/board/projects') return json([{ project: 'team-1', board_label: 'team-1', message_count: 1, subscriber_count: 1 }, { project: 'team-2', board_label: 'team-2', message_count: 1, subscriber_count: 1 }]);
                 const t = /^\\/api\\/board\\/(team-\\d+)\\/artifacts(?:\\/([a-f0-9]{64})\\/tags)?$/.exec(p);
                 if (t && (o.method || 'GET') === 'PUT') { window.__file.tags = JSON.parse(o.body).tags; window.__puts.push(p); return json({ tags: window.__file.tags }); }
@@ -29,8 +31,13 @@ const HEX = String(5).repeat(64);
         await waitFor(`window.__file.tags.includes('read')`, 'the file is tagged read', 10000);
         const reqs = await ev(`window.__requests.slice()`);
         assert.equal(reqs.filter(r => /^\/api\/board\/projects/.test(r)).length, 0, 'no board list: ' + reqs.join(' , '));
-        assert.deepEqual([...new Set(reqs.filter(r => /\/artifacts\?tag=/.test(r)).map(r => /board\/(team-\d+)\//.exec(r)[1]))], ['team-1'], 'only the file\'s own team is read');
-        assert.equal(reqs.filter(r => /\/artifacts\?tag=/.test(r)).length, 1, 'its review list once: ' + reqs.join(' , '));
+        const pages = reqs.filter(r => new URL(r, BASE).pathname === '/api/team-artifacts' && new URL(r, BASE).searchParams.has('digest'));
+        assert.equal(pages.length, 1, 'one protected exact-file read: ' + reqs.join(' , '));
+        const totals = reqs.filter(r => new URL(r, BASE).pathname === '/api/team-artifacts' && !new URL(r, BASE).searchParams.has('digest'));
+        assert.ok(totals.every(r => {const q=new URL(r,BASE).searchParams;return q.get('limit')==='1' && q.get('waiting')==='1' && q.get('muted')==='0' && q.get('versions')==='newest' && q.get('tag')==='for review' && [...q].length===5;}), 'any independent badge total stays bounded');
+        const query = new URL(pages[0], BASE).searchParams;
+        assert.equal(query.get('team'), 'team-1'); assert.equal(query.get('digest'), HEX); assert.equal(query.get('tag'), 'for review'); assert.equal(query.get('limit'), '50'); assert.equal(query.has('cursor'), false);
+        assert.equal(reqs.filter(r => /\/board\/team-\d+\/artifacts\?/.test(r)).length, 0, 'no old per-board scan');
         assert.equal(await ev(`window.__puts.length`), 1, 'tagged read once');
         console.log('PASS local Coral: opening a file reads its own team once and tags it read once');
     } finally { await client.close(); }

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -116,12 +117,54 @@ func (h *SessionsHandler) artifactVersions(w http.ResponseWriter, r *http.Reques
 		errNotFound(w, "artifact not found")
 		return
 	}
-	sid, _, in := digestSeries(h.cfg.CoralDir(), digest)
+	coralDir := h.cfg.CoralDir()
+	var sid string
+	var in bool
+	if board := r.URL.Query().Get("board"); board != "" && isOwnerSeriesRead(r) {
+		// The version bar passes its team (#13999): the series that team holds of the bytes, never another team's. An agent or a guide never picks a team: the key is ignored for them (callerSeries below), so the answer does not say whether another team holds a series. A board that is not a board's name is refused; a team that holds the bytes in no series is not found.
+		if !validCommentBoard(board) {
+			errBadRequest(w, "invalid board")
+			return
+		}
+		sid, _, in = digestSeriesOnBoard(coralDir, digest, board)
+	} else {
+		sid, _, in = callerSeries(r, coralDir, digest)
+		// The owner reads every team: bytes that two teams hold in two series are two answers, and the first is a guess. Say so, and name the teams so the caller can ask for one.
+		if in && isOwnerSeriesRead(r) {
+			if boards := boardsHoldingSeries(coralDir, digest); len(boards) > 1 {
+				writeJSON(w, http.StatusConflict, map[string]any{"error": "more than one team holds these bytes in a series: ask for one with ?board=", "code": "ambiguous_series", "boards": boards})
+				return
+			}
+		}
+	}
 	if !in {
 		errNotFound(w, "artifact not found")
 		return
 	}
 	h.versionsOf(w, r, sid)
+}
+
+// isOwnerSeriesRead says callerSeries read every team's records for this caller (the owner: not an agent, not a guide).
+func isOwnerSeriesRead(r *http.Request) bool {
+	if isGuideCaller(r) {
+		return false
+	}
+	_, isAgent := agentSessionOf(r)
+	return !isAgent
+}
+
+// boardsHoldingSeries are the boards that hold the digest in a series, sorted.
+func boardsHoldingSeries(coralDir, digest string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, r := range recordsOfDigest(coralDir, digest) {
+		if seriesIDRe.MatchString(r.rec.SeriesID) && r.rec.Board != "" && !seen[r.rec.Board] {
+			seen[r.rec.Board] = true
+			out = append(out, r.rec.Board)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // deleteSeries: DELETE /api/artifacts/series/{series_id}, the Operator removes every version of a series and its index. A person only (the dashboard or the signed command line); never through
@@ -159,12 +202,16 @@ func (h *SessionsHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
 		freed += f
 		if h.db != nil {
 			_, _ = h.db.ExecContext(r.Context(), "DELETE FROM artifact_keep WHERE hex = ?", m.Digest)
-			_, _ = h.db.ExecContext(r.Context(), "DELETE FROM artifact_stars WHERE hex = ?", m.Digest) // and its star (#9819)
+			_, _ = h.db.ExecContext(r.Context(), "DELETE FROM artifact_stars WHERE hex = ?", m.Digest)        // and its star (#9819)
+			_, _ = h.db.ExecContext(r.Context(), "DELETE FROM artifact_person_stars WHERE hex = ?", m.Digest) // and every person's (#13910)
 		}
 		h.dropArtifactComments(r.Context(), m.Digest)
 	}
 	if p := seriesPath(coralDir, id); p != "" {
 		_ = os.Remove(p)
+	}
+	if h.db != nil {
+		_, _ = h.db.ExecContext(r.Context(), "DELETE FROM artifact_series_opened WHERE series_id = ?", id) // the opened-version rows follow their series (#13910)
 	}
 	slog.Info("[artifacts] a series deleted by the Operator", "series", id, "versions", len(members), "bytes", freed)
 	writeJSON(w, http.StatusOK, map[string]any{"deleted": true, "versions": len(members), "bytes": freed})

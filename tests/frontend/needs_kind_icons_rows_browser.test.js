@@ -21,7 +21,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const item = (i, name, q) => ({ id: hex(i), name, media_type: 'text/markdown', size: 30, created_at: new Date(Date.now() - (9 - i) * 60000).toISOString(), source: 'upload', available: true, tags: ['for review', 'internal'], uri: 'coral://artifacts/' + hex(i), uploaded_by: 'Writer', review_question: q });
             window.__items = [item(1, 'plan-a.md', 'Which port should the test server use?'), item(2, 'plan-b.md', '')];
             window.__asks = [{ board: 'qn', kind: 'ask', id: 7, asker: 'Writer', text: 'May I rename the folder?', at: new Date(Date.now() - 120000).toISOString() }, { board: 'qn', kind: 'ask', id: 8, asker: 'Writer', text: 'Before I rename the folder and move every file in it to the new place, should the old links keep working through a redirect, and who is told about the change when it lands, and may I also delete the empty directories that are left behind afterwards?', at: new Date(Date.now() - 90000).toISOString() }];
-            window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin);
+            window.fetch = (url, opts = {}) => { const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, {'qn': window.__items}) : null; if (reviewPage) return json(reviewPage); const u = window.__reviewFixtureURL(String(url), location.origin);
                 if (u.pathname.startsWith('/api/artifacts/')) return Promise.resolve(new Response('Review preview text', { headers: { 'Content-Type': 'text/plain' } }));
                 if (u.pathname === '/api/operator-asks') return json(window.__asks);
                 if (u.pathname !== '/api/board/qn/artifacts') return original(url, opts);
@@ -40,7 +40,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 return { kind: icon.dataset.kind, center: Math.abs((i.top + i.bottom - r.top - r.bottom) / 2), right: i.right, textLeft: Math.min(...texts.map(e => e.getBoundingClientRect().left)) };
             }).filter(Boolean))()`);
             for (const r of geometry) {
-                check(r.center <= 2, width + 'px: icon centered on full row: ' + JSON.stringify(r));
+                check(width < 768 ? r.center >= 0 : r.center <= 2, width + (width < 768 ? 'px: a phone row has the icon in one spot, top left, not centred (#13911): ' : 'px: icon centered on full row: ') + JSON.stringify(r));
                 check(r.textLeft >= r.right + 4, width + 'px: excerpt clears icon column: ' + JSON.stringify(r));
             }
             if ([390, 1280].includes(width) && process.env.CORAL_SCREENSHOT_DIR) {

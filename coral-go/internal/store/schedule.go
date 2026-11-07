@@ -27,6 +27,7 @@ type ScheduledJob struct {
 	Flags           string `db:"flags" json:"flags"`
 	JobType         string `db:"job_type" json:"job_type"`
 	WorkflowID      *int64 `db:"workflow_id" json:"workflow_id,omitempty"`
+	TeamName        string `db:"team_name" json:"team_name,omitempty"` // the team of a "knowledge" job (#13928); set when the job is made and never edited
 	CreatedAt       string `db:"created_at" json:"created_at"`
 	UpdatedAt       string `db:"updated_at" json:"updated_at"`
 	// PausedReason says why the scheduler paused the job itself; empty
@@ -120,11 +121,11 @@ func (s *ScheduleStore) CreateScheduledJob(ctx context.Context, job *ScheduledJo
 		`INSERT INTO scheduled_jobs
 		 (name, description, cron_expr, timezone, agent_type, repo_path,
 		  base_branch, prompt, enabled, max_duration_s, cleanup_worktree, no_worktree,
-		  flags, job_type, workflow_id, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		  flags, job_type, workflow_id, team_name, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		job.Name, job.Description, job.CronExpr, job.Timezone, job.AgentType,
 		job.RepoPath, job.BaseBranch, job.Prompt, job.Enabled, job.MaxDurationS,
-		job.CleanupWorktree, job.NoWorktree, job.Flags, job.JobType, job.WorkflowID, now, now)
+		job.CleanupWorktree, job.NoWorktree, job.Flags, job.JobType, job.WorkflowID, job.TeamName, now, now)
 	if err != nil {
 		return nil, err
 	}

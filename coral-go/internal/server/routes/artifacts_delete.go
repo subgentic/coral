@@ -5,6 +5,7 @@ package routes
 import (
 	"errors"
 	"github.com/go-chi/chi/v5"
+	"github.com/subgentic/coral/internal/board"
 	"log/slog"
 	"net/http"
 	"os"
@@ -22,12 +23,18 @@ func deleteArtifactFiles(coralDir, id string) (freed int64, records int, found b
 		return 0, 0, false, nil
 	}
 	// A version of a series is deleted under its series' lock first, the digest's second (#6357), and the series' index forgets it.
-	if sid, _, in := digestSeries(coralDir, id); in {
-		defer lockSeries(sid)()
+	// The object is one file of bytes that every team holding them shares (the Operator's delete removes the object and every row that lists it, #4379), so the digest is forgotten in EVERY team's series that has it,
+	// not in the first one's alone (#13949); another version of any of those series is untouched. The series locks are taken in id order (a second delete of other bytes cannot take them the other way round).
+	if sids := seriesOfDigest(coralDir, id); len(sids) > 0 {
+		for _, sid := range sids {
+			defer lockSeries(sid)()
+		}
 		defer lockArtifact(id)()
 		freed, records, found, err = deleteArtifactFilesLocked(coralDir, id)
 		if found && err == nil {
-			forgetVersion(coralDir, sid, id)
+			for _, sid := range sids {
+				forgetVersion(coralDir, sid, id)
+			}
 		}
 		return freed, records, found, err
 	}
@@ -120,6 +127,7 @@ func (h *SessionsHandler) deleteArtifactCore(w http.ResponseWriter, r *http.Requ
 		errBadRequest(w, "invalid artifact id")
 		return
 	}
+	teams := teamsHolding(h.cfg.CoralDir(), id) // counted before the delete: the object and every team's record of it go together (#13949)
 	freed, removed, found, err := deleteArtifactFiles(h.cfg.CoralDir(), id)
 	if h.bs != nil && (found || freed > 0 || removed > 0) {
 		h.bs.NoteAllArtifactsChanged()
@@ -134,9 +142,15 @@ func (h *SessionsHandler) deleteArtifactCore(w http.ResponseWriter, r *http.Requ
 	}
 	if h.db != nil { // an explicit delete also drops the Operator's keep mark (#3554)
 		_, _ = h.db.ExecContext(r.Context(), "DELETE FROM artifact_keep WHERE hex = ?", id)
-		_, _ = h.db.ExecContext(r.Context(), "DELETE FROM artifact_stars WHERE hex = ?", id) // and its star (#9819)
+		_, _ = h.db.ExecContext(r.Context(), "DELETE FROM artifact_stars WHERE hex = ?", id)        // and its star (#9819)
+		_, _ = h.db.ExecContext(r.Context(), "DELETE FROM artifact_person_stars WHERE hex = ?", id) // and every person's (#13910)
 	}
 	h.dropArtifactComments(r.Context(), id) // and the comments on it (#5176)
 	slog.Info("[artifacts] deleted by the Operator", "digest", id, "bytes", freed, "upload_records", removed)
-	writeJSON(w, http.StatusOK, map[string]any{"deleted": true, "bytes": freed})
+	out := map[string]any{"deleted": true, "bytes": freed}
+	if teams > 1 {
+		out["also_in_teams"] = teams - 1 // the confirmation and the Activity row say the file was in other teams too (Security, #13949)
+		noteActivity(r, board.ActFileDelete, "file", id, "", "", alsoInTeamsNote(teams))
+	}
+	writeJSON(w, http.StatusOK, out)
 }

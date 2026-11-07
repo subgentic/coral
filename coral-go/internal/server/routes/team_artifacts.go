@@ -46,8 +46,16 @@ type teamArtifact struct {
 	MediaType  string `json:"media_type,omitempty"`
 	Size       *int64 `json:"size"`
 	// Starred: the Operator starred this stored object on this computer (#9819); false for a row with no stored object.
-	Starred   bool   `json:"starred"`
-	CreatedAt string `json:"created_at"`
+	Starred bool `json:"starred"`
+	// StarredAt and SeriesID (#13910): only on the owner-only cross-team list (GET /api/team-artifacts), only on a starred row. StarredAt is when the row's series was last starred (RFC 3339); SeriesID is the series
+	// whose star it follows. The Operator's own attention: never on the per-board list an agent reads.
+	StarredAt string `json:"starred_at,omitempty"`
+	// EarlierDigests: on the newest version of a starred series, the older versions' digests, oldest first and at most 50 (#13910): the list shows the series once, and a decision on that row settles these too.
+	EarlierDigests []string `json:"earlier_digests,omitempty"`
+	SeriesID       string   `json:"series_id,omitempty"`
+	// OpenedVersion (#13910): the newest version of this row's series the Operator has opened on this computer; absent when none. The row says "New version" when Version is above it. The owner-only cross-team list alone.
+	OpenedVersion int    `json:"opened_version,omitempty"`
+	CreatedAt     string `json:"created_at"`
 	// ReviewSentAt is when the file was sent for review (RFC 3339, UTC), present only while it carries the tag "for review" and was sent after the time was kept (#13231): "waiting for review" counts from it, a re-send starts it again.
 	ReviewSentAt string `json:"review_sent_at,omitempty"`
 	TaskID       int64  `json:"task_id"`
@@ -223,8 +231,8 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 	}
 	page := append([]teamArtifact(nil), items[offset:end]...) // this page's own rows: the list it was cut from may be the kept one
 	dir := h.artifactObjectDir()
-	starred, serr := h.bs.StarredArtifactIDs(r.Context()) // a bookmark: an unreadable set leaves the rows unstarred
-	if serr != nil {
+	starred, serr := h.bs.StarredArtifactIDs(r.Context(), openedPersonKey(r)) // a bookmark: an unreadable set leaves the rows unstarred
+	if serr != nil || !starVisible(r) {                                       // and an agent's token, or a Hub caller that is not the owner, sees none (#13910)
 		starred = map[string]bool{}
 	}
 	for i := range page {
@@ -1091,7 +1099,10 @@ func (h *BoardHandler) attachSeriesVersions(rows []teamArtifact, project string)
 		}
 		board := project // the same bytes can be uploaded by two teams into two series: the row is its own team's (all-teams rows say theirs)
 		if board == "" {
-			board = rows[i].Team
+			board = rows[i].BoardID // the board's id, never its display label (#13988: a board called Product that is alpha has its series under alpha)
+		}
+		if board == "" {
+			board = rows[i].Team // a row that names only its team
 		}
 		sid, n, ok := digestSeriesOnBoard(h.coralDir, id, board)
 		if !ok {

@@ -19,7 +19,7 @@ const { coralReady } = require('./helpers/wait');
             const hex = n => n.toString(16).padStart(64, '0');
             const item = i => ({ id: hex(i), name: 'bulk-0' + i + '.md', media_type: 'text/markdown', size: 30, created_at: new Date(Date.now() - (9 - i) * 60000).toISOString(), source: 'upload', available: true, tags: ['for review', 'internal'], uri: 'coral://artifacts/' + hex(i), produced_by: 'Writer', session_id: 's' + i });
             window.__items = [1, 2, 3].map(item); window.__ntDelay = 0;
-            window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin), method = (opts.method || 'GET').toUpperCase();
+            window.fetch = (url, opts = {}) => { const pageURL = new URL(String(url), location.href), page = pageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(pageURL, location.href, {'bulk': window.__items}) : null; if (page) return new Promise(done => setTimeout(() => done(json(page)), window.__ntDelay || 0)); /* sleep-ok: fixture response delay preserves the stale-read ordering */ const u = window.__reviewFixtureURL(String(url), location.origin), method = (opts.method || 'GET').toUpperCase();
                 if (u.pathname.startsWith('/api/artifacts/')) return Promise.resolve(new Response('Review preview text', { headers: { 'Content-Type': 'text/plain' } }));
                 if (u.pathname === '/api/team-artifacts') return new Promise(done => setTimeout(() => done(json({ artifacts: [], has_more: false })), window.__ntDelay || 0));
                 const m = u.pathname.match(/^\\/api\\/board\\/bulk\\/artifacts(?:\\/([0-9a-f]{64})\\/review)?$/);
@@ -43,7 +43,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`[...document.querySelectorAll('.dt-bar button')].find(b => (b.getAttribute('aria-label') || b.textContent).trim().startsWith('Dismiss')).click(); true`);
         await waitFor(`document.querySelectorAll('${T} tbody tr').length === 1`, 'the two dismissed files leave Needs you', 10000);
         await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Dismissed 2/.test(t.textContent) && [...t.querySelectorAll('button')].some(b => b.textContent.trim() === 'Undo'))`, 'the toast says Dismissed 2, with Undo', 8000);
-        await ev(`window.__ntDelay = 1500; import(${S} + 'inbox_reviews.js').then(m => { window.__inFlight = m.refreshReviews(true); return true; })`); // a read starts now: its team list is taken before the Undo, its no-team read is slow
+        await ev(`window.__ntDelay = 1500; import(${S} + 'inbox_reviews.js').then(m => { window.__inFlight = m.refreshReviews(true); return true; })`); // a read starts now: the protected computer page is captured before Undo and resolves late
         await new Promise(r => setTimeout(r, 400)); // sleep-ok: the read's team list comes back (before the Undo writes) while its no-team read is still held
         await ev(`[...document.querySelectorAll('.toast')].filter(t => /Dismissed 2/.test(t.textContent)).forEach(t => t.querySelectorAll('button').forEach(b => { if (b.textContent.trim() === 'Undo') b.click(); })); true`);
         await waitFor(`document.querySelectorAll('${T} tbody tr').length === 3`, 'Undo with a read in flight brings both back to Needs you', 9000);

@@ -43,6 +43,10 @@ func (s *JobScheduler) reapStaleRuns(ctx context.Context) {
 			}
 			continue
 		}
+		if job.JobType == "knowledge" { // a run the server was stopped in the middle of: it ends failed, in fixed words; the next slot runs again
+			s.store.FinishScheduledRunIfActive(ctx, run.ID, "failed", "the server stopped during the run", "the server stopped during the run", AutoCodeFailed, now.Format(store.ISOFormat))
+			continue
+		}
 		maxDur := time.Duration(job.MaxDurationS) * time.Second
 		if maxDur == 0 {
 			maxDur = time.Hour

@@ -11,11 +11,12 @@ const { coralReady } = require('./helpers/wait');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const S = `(window.__coralStatic || '/static/')`;
-    // Counts the page's limit=1 reads (window.__counts) and its board /status checks (window.__statuses). With window.__teamStub the count's answer names a team ('stub-team') at revision 7 and that team's /status answers 7 for ever:
+    // Counts the Artifacts folder's unfiltered limit=1 reads (not the separate tag/waiting review-attention summary) (window.__counts) and its board /status checks (window.__statuses). With window.__teamStub the count's answer names a team ('stub-team') at revision 7 and that team's /status answers 7 for ever:
     // a server whose only artifacts never change.
-    const wrap = () => ev(`(() => { window.__counts = []; window.__statuses = []; const real = window.fetch; window.fetch = async function (u, o) { const url = typeof u === 'string' ? u : u.url;
+    const wrap = () => ev(`(() => { window.__counts = []; window.__reviewCounts = []; window.__statuses = []; const real = window.fetch; window.fetch = async function (u, o) { const url = typeof u === 'string' ? u : u.url;
         if (/\\/api\\/board\\/[^/]+\\/status(\\?|$)/.test(url)) { window.__statuses.push(url); if (window.__teamStub && /\\/stub-team\\/status/.test(url)) return new Response(JSON.stringify({ artifacts_rev: 7, artifacts_all_rev: 7, board: 'stub-team' }), { status: 200, headers: { 'Content-Type': 'application/json' } }); }
-        if (/\\/api\\/team-artifacts\\?[^#]*limit=1(&|$)/.test(url)) { window.__counts.push(url); if (window.__teamStub) { const d = await (await real.apply(this, arguments)).json(); return new Response(JSON.stringify({ ...d, artifacts_board: 'stub-team', artifacts_rev: 7 }), { status: 200, headers: { 'Content-Type': 'application/json' } }); } }
+        if (/\\/api\\/team-artifacts\\?[^#]*limit=1(&|$)/.test(url) && (new URL(url, location.href).searchParams.has('tag') || new URL(url, location.href).searchParams.has('waiting'))) window.__reviewCounts.push(url);
+        if (/\\/api\\/team-artifacts\\?[^#]*limit=1(&|$)/.test(url) && !new URL(url, location.href).searchParams.has('tag') && !new URL(url, location.href).searchParams.has('waiting')) { window.__counts.push(url); if (window.__teamStub) { const d = await (await real.apply(this, arguments)).json(); return new Response(JSON.stringify({ ...d, artifacts_board: 'stub-team', artifacts_rev: 7 }), { status: 200, headers: { 'Content-Type': 'application/json' } }); } }
         return real.apply(this, arguments); }; return true; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -33,6 +34,9 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`window.__counts.length >= 1`, 'the first count read', 8000);
             const first = await asks();
             assert.equal(first, 1, 'one count read on opening: ' + first);
+            const reviewReads = await ev(`window.__reviewCounts`);
+            assert.equal(reviewReads.length, 1, 'the tagged waiting summary is also read exactly once on opening');
+            assert.deepEqual(Object.fromEntries(new URL(reviewReads[0], BASE).searchParams), {tag:'for review',waiting:'1',muted:'0',versions:'newest',limit:'1'}, 'the second stream is only the bounded review-attention summary');
             const url = await ev(`window.__counts[0]`);
             assert.match(url, /[?&]versions=newest(&|$)/, 'the badge counts files, as the list shows them (#11777): one row per file, not one per version: ' + url);
             console.log('2. Switching folders and opening the Inbox again do not ask again');
@@ -69,7 +73,7 @@ const { coralReady } = require('./helpers/wait');
 
         console.log('4. Two asks at once are one read (the read in flight is shared)');
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
-        await ev(`(() => { window.__counts = []; const real = window.fetch; window.fetch = function (u, o) { const url = typeof u === 'string' ? u : u.url; if (/\\/api\\/team-artifacts\\?[^#]*limit=1(&|$)/.test(url)) { window.__counts.push(url); return new Promise(r => setTimeout(r, 500)).then(() => real.apply(this, arguments)); } return real.apply(this, arguments); }; return true; })()`); // sleep-ok: a slow read keeps the first ask in flight while the second comes
+        await ev(`(() => { window.__counts = []; const real = window.fetch; window.fetch = function (u, o) { const url = typeof u === 'string' ? u : u.url; if (/\\/api\\/team-artifacts\\?[^#]*limit=1(&|$)/.test(url) && !new URL(url, location.href).searchParams.has('tag') && !new URL(url, location.href).searchParams.has('waiting')) { window.__counts.push(url); return new Promise(r => setTimeout(r, 500)).then(() => real.apply(this, arguments)); } return real.apply(this, arguments); }; return true; })()`); // sleep-ok: a slow read keeps the first ask in flight while the second comes
         await ev(`import(${S} + 'inbox_artifacts.js').then(m => Promise.all([m.refreshArtifactCount(), m.refreshArtifactCount(), m.refreshArtifactCount()])).then(() => true)`);
         assert.equal(await asks(), 1, 'three asks while the first is in flight: one read');
         console.log('   ✓');

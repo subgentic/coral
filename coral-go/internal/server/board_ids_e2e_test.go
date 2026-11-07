@@ -204,10 +204,11 @@ func TestAgentNewBoardRecordedInDefaultMode(t *testing.T) {
 	_, err = srv.boardStore.Subscribe(ctx, b.ID, "Lead", "Lead", "", nil, "all")
 	require.NoError(t, err)
 	sid := "ffffffff-3536-0000-0000-00000000000f"
-	require.NoError(t, store.NewSessionStore(srv.db).RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "dev", WorkingDir: t.TempDir()}))
+	work := strictWorkDir(t, dir) // an agent starts agents in its team's folder (#13891)
+	require.NoError(t, store.NewSessionStore(srv.db).RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "dev", WorkingDir: work}))
 	tok, err := srv.db.MintSessionToken(ctx, sid, "claude-"+sid)
 	require.NoError(t, err)
-	req, _ := http.NewRequest("POST", ts.URL+"/api/sessions/launch", strings.NewReader(`{"working_dir":`+jsonString(strictWorkDir(t, dir))+`,"agent_type":"terminal","board_name":"team","new_board":true}`))
+	req, _ := http.NewRequest("POST", ts.URL+"/api/sessions/launch", strings.NewReader(`{"working_dir":`+jsonString(work)+`,"agent_type":"terminal","board_name":"team","new_board":true}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(store.SessionTokenHeader, tok)
 	resp, err := http.DefaultClient.Do(req)

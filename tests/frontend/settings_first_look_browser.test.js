@@ -13,7 +13,9 @@ const { coralReady } = require('./helpers/wait');
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev);
         await ev(`(() => { const f = window.fetch; window.fetch = (u, o) => String(u).split('?')[0] === '/api/themes' ? Promise.resolve(new Response(JSON.stringify({ themes: [{ name: 'Dark' }, { name: 'Obsidian' }] }), { headers: { 'Content-Type': 'application/json' } })) : f(u, o); return true; })()`);
-        await ev(`window.showSettingsModal(); true`);
+        // Theme options are filled before telemetry and the dirty baseline. Wait for
+        // the open promise so the real pointer press targets the visible dialog.
+        await ev(`window.showSettingsModal()`);
         await waitFor(`!!document.getElementById('settings-theme') && document.getElementById('settings-theme').options.length > 3`, 'the theme list with the saved themes', 15000);
         console.log('1. the theme list names Dark once');
         const labels = await ev(`[...document.getElementById('settings-theme').options].filter(o => !o.disabled).map(o => o.textContent)`);
@@ -25,7 +27,7 @@ const { coralReady } = require('./helpers/wait');
         for (const [i, t] of ['claude', 'codex', 'agy', 'pi'].entries()) assert.ok(ph[i].startsWith(`Full path, e.g. ${win ? `C:\\Program Files\\${t}\\${t}.exe` : `/usr/local/bin/${t}`}`), `${t}: ${ph[i]}`);
         console.log('3. Close with a change not saved opens the Discard dialog on the first click');
         await ev(`(() => { const s = document.getElementById('settings-theme'); s.value = 'light'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-        const at = await ev(`(() => { const b = document.getElementById('settings-cancel-btn').getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; })()`);
+        const at = await ev(`(() => { const b = document.getElementById('settings-cancel-btn').getBoundingClientRect(); if (!b.width || !b.height) throw new Error('Settings Close must be visible before the pointer press'); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; })()`);
         await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: at.x, y: at.y });
         await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: at.x, y: at.y, button: 'left', clickCount: 1 });
         await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: at.x, y: at.y, button: 'left', clickCount: 1 });

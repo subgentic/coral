@@ -57,8 +57,8 @@ export function killSessionDirect(name, agentType, sessionId) {
 export async function showInfoDirect(name, agentType, sessionId) {
     const { selectLiveSession } = await importOnce('./sessions.js');
     await selectLiveSession(name, agentType, sessionId, serverForSession(name, sessionId));
-    const { showInfoModal } = await importOnce('./modals.js');
-    showInfoModal();
+    const { openInfoTab } = await importOnce('./info_tab.js');
+    openInfoTab();
 }
 
 export async function attachDirect(name, agentType, sessionId) {

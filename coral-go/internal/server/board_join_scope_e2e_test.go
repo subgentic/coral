@@ -159,12 +159,12 @@ func TestAgentTokenCannotLaunchOntoAnotherBoard(t *testing.T) {
 	ops, err := bs.CreateBoard(ctx, "ops", "Operator")
 	require.NoError(t, err)
 	sid := "bbbbbbbb-1101-4000-8000-000000000001"
-	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "dev", WorkingDir: "/w", BoardName: &a.ID}))
+	work := strictWorkDir(t, dir) // an agent starts agents in its team's folder (#13891)
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "dev", WorkingDir: work, BoardName: &a.ID}))
 	tok, err := srv.db.MintSessionToken(ctx, sid, "claude-"+sid)
 	require.NoError(t, err)
 	_, err = bs.Subscribe(ctx, a.ID, "Dev", "Orchestrator", "claude-"+sid, nil, "all")
 	require.NoError(t, err)
-	work := strictWorkDir(t, dir)
 	liveCount := func() int {
 		all, err := ss.GetAllLiveSessions(ctx)
 		require.NoError(t, err)

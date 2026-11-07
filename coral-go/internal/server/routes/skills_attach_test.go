@@ -286,7 +286,8 @@ func TestEveryLaunchedAgentHasUsingCoralAttachedAndItIsNotInTheNote(t *testing.T
 	assert.Len(t, attached, 2, "the named skill and using-coral, once each")
 }
 
-var settingsFileRe = regexp.MustCompile(`--settings (\S+\.json)`)
+// The path may be single-quoted: a Windows launch line quotes a path that holds a backslash.
+var settingsFileRe = regexp.MustCompile(`--settings '?([^'\s]+\.json)'?`)
 
 // systemPromptOf is the system prompt of the Claude launch that made session sessionName ("" while its command has not been sent): the settings file its command names.
 func (e *launchEnv) systemPromptOf(sessionName string) string {
@@ -342,4 +343,53 @@ func TestARealLaunchCarriesTheProtocolForATeamAgentAndTheCoralSectionForEveryAge
 	assert.False(t, strings.Contains(sys[0], "# Coral Agent Protocol"), "a plain agent has no use for the orchestrator's manual")
 	assert.True(t, strings.Contains(sys[1], "coral-agent skills search using-coral"), "a team agent too")
 	assert.True(t, strings.Contains(sys[1], "# Coral Agent Protocol"), "a team agent in a release build carries the compiled-in protocol")
+}
+
+// #13894: a team launch attaches the team-builder skill to the member that takes the Orchestrator seat, names it in that member's launch note, and to no other member; a store without the skill adds nothing.
+func TestATeamLaunchGivesTheOrchestratorSeatTheTeamBuilderSkill(t *testing.T) {
+	e := newLaunchEnv(t)
+	ctx := context.Background()
+	agents := []map[string]any{{"name": "Orchestrator", "agent_type": "claude"}, {"name": "Dev", "agent_type": "claude"}}
+	launch := func(board string) map[string]string {
+		code, out := e.post("/api/sessions/launch-team", e.h.LaunchTeam, map[string]any{"board_name": board, "working_dir": t.TempDir(), "agents": agents})
+		require.Equal(t, http.StatusOK, code, "%v", out)
+		got := map[string]string{}
+		for _, a := range out["agents"].([]any) {
+			m := a.(map[string]any)
+			attached, err := e.ss.AttachedSkills(ctx, m["session_id"].(string))
+			require.NoError(t, err)
+			names := []string{}
+			for _, r := range attached {
+				row, err := e.ss.GetSkill(ctx, r.SkillID)
+				require.NoError(t, err)
+				names = append(names, row.Name)
+			}
+			got[m["name"].(string)] = strings.Join(names, ",")
+		}
+		return got
+	}
+	none := launch("no-skill")
+	assert.Empty(t, none["Orchestrator"], "a store without the skill adds nothing")
+
+	zips, err := skills.StarterZips()
+	require.NoError(t, err)
+	for _, z := range zips {
+		if z.Name != skills.TeamBuilderName {
+			continue
+		}
+		sk, perr := skills.Parse(z.Data)
+		require.NoError(t, perr)
+		_, _, err = e.ss.AddSkill(ctx, store.AddSkillInput{Skill: sk, Digest: sk.Digest, Kind: store.PublisherCoral})
+		require.NoError(t, err)
+	}
+	got := launch("with-skill")
+	assert.Equal(t, skills.TeamBuilderName, got["Orchestrator"], "the Orchestrator seat has it attached")
+	assert.Empty(t, got["Dev"], "no other member does")
+	var orch string
+	for _, c := range e.prompts() {
+		if strings.Contains(c, skills.TeamBuilderName) {
+			orch = c
+		}
+	}
+	assert.NotEmpty(t, orch, "the Orchestrator's launch note names the skill")
 }

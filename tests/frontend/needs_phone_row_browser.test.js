@@ -32,7 +32,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
                 const hex = n => n.toString(16).padStart(64, '0'), made = n => new Date(Date.now() - n * 3600000).toISOString();
                 const item = (n, name, extra) => ({ id: hex(n), name, media_type: 'text/html', size: 30, created_at: made(n), source: 'upload', available: true, tags: ['for review', 'internal'], uri: 'coral://artifacts/' + hex(n), ...extra });
                 const items = { '${team}': [item(1, 'Plan 1 - review the release notes for the tag run.html', { session_id: 'w-a', produced_by: 'Lead Developer of the platform team with a very long title' }), item(2, 'Plan 2 - review the release notes for the tag run.html', { session_id: 'w-b', produced_by: 'DevOps Engineer' })] };
-                window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin), m = u.pathname.match(/^\\/api\\/board\\/([^/]+)\\/artifacts$/);
+                window.fetch = (url, opts = {}) => { const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, items) : null; if (reviewPage) return json(reviewPage); const u = window.__reviewFixtureURL(String(url), location.origin), m = u.pathname.match(/^\\/api\\/board\\/([^/]+)\\/artifacts$/);
                     if (m && items[m[1]]) return json({ project: m[1], artifacts: !u.searchParams.has('tag') || u.searchParams.get('tag') === 'for review' ? items[m[1]] : [], has_more: false });
                     if (u.pathname === '/api/proposals') return json({ proposals: [{ id: 11, board_id: '${team}', kind: 'task', title: 'Fix the login page on Safari', proposer: 'Backend Dev of the platform team', state: 'pending', created_at: new Date(Date.now() - 5400000).toISOString(), payload: { title: 'Fix the login page on Safari', body: 'It fails on Safari.' } }] });
                     if (u.pathname === '/api/operator-asks') return json([{ board: '${team}', board_label: 'Acme web', kind: 'ask', id: 41, asker: 'Lead Developer', text: '@Operator Ship batch-120 tonight, or wait for the phone check on the new release candidate?', at: new Date(Date.now() - 7 * 60000).toISOString() }]);
@@ -51,12 +51,12 @@ const { coralReady, framesJs } = require('./helpers/wait');
                     check(g.fromBottom <= g.nameTop + 2 && Math.abs(g.nameLeft - g.fromLeft) <= 2 && g.fromWeight >= 600, `${at}${what}: the agent's name is line one (strong) and the ask line two, under it: ${JSON.stringify(g)}`);
                     check(g.subjectsDrawn === 0, `${at}${what}: no Goal or Task link is drawn: ${JSON.stringify(g)}`);
                     check(String(g.clamp) === '2' && g.boxH <= 48 && g.nameFull, `${at}${what}: the ask is on line two, at most two lines, an ellipsis only after the second (the button holds all of it): ${JSON.stringify(g)}`);
-                    check(g.waitShown && g.waitLeft >= g.nameRight - 4 && Math.abs(g.waitTop - g.nameTop) <= 10 && /waiting/.test(g.waitText), `${at}${what}: the time since is at the right of the ask's first line: ${JSON.stringify(g)}`);
+                    check(g.waitShown && g.waitLeft > g.fromLeft && Math.abs(g.waitTop - g.fromBoxTop) <= 8 && /waiting/.test(g.waitText), `${at}${what}: the time since is at the right of line one, the sender's (Layout A, #13911): ${JSON.stringify(g)}`);
                     check(!g.colShown, `${at}${what}: the Waiting column is not drawn twice`);
                     check(g.kindWords === 0, `${at}${what}: the kind's words are left to the icon: ${g.kindWords}`);
                 }
-                // a proposal row is not one of these rows: it is as it was on the tag (the sender before the title on one line, its own wait cell drawn, no wait copy, no grid)
-                check(pr && pr.hasItem && !pr.titleFirst && pr.grid !== 'grid' && !pr.waitSpan && pr.colShown && /waiting/.test(pr.colText) && pr.fromLeft < pr.nameLeft && Math.abs(pr.fromTop - pr.nameTop) <= 6, `${at}a proposal row keeps its order and its visible wait: ` + JSON.stringify(pr));
+                // a proposal row follows the same pattern (#13911, the Operator: "this one is not following the pattern")
+                check(pr && pr.hasItem && pr.titleFirst && pr.grid === 'grid' && pr.waitSpan && !pr.colShown && Math.abs(pr.fromLeft - pr.nameLeft) <= 2 && pr.fromTop < pr.nameTop - 6, `${at}a proposal row follows the pattern too (#13911): the proposer's name is line one, the proposal line two with the time since, the Waiting column not drawn twice: ` + JSON.stringify(pr));
                 check(!short.fromCut, `${at}a short sender is whole: ${JSON.stringify(short)}`);
                 check(!(await ev(`document.documentElement.scrollWidth > innerWidth + 1`)), at + 'no sideways scroll');
             } else {

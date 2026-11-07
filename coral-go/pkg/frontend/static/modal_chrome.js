@@ -27,7 +27,6 @@ export function lastFocusOutsideDialogs() {
 const byWindow = name => () => window[name]?.();
 const DIALOGS = Object.assign(Object.create(null), { // no prototype: an element id like "constructor" finds nothing
     'launch-modal': { hide: byWindow('hideLaunchModal'), backdrop: true },
-    'info-modal': { hide: byWindow('hideInfoModal'), backdrop: true },
     'resume-modal': { hide: byWindow('hideResumeModal'), backdrop: true },
     'settings-modal': { hide: byWindow('hideSettingsModal'), backdrop: true },
     'restart-modal': { hide: () => hideRestartModal(), backdrop: true },

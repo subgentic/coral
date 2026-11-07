@@ -51,6 +51,27 @@ const hexOf = data => String(data.digest || data.hex || data.id || '').replace(/
         await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
         await Emulation.setDeviceMetricsOverride({width:1280,height:900,deviceScaleFactor:1,mobile:false});
         await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev,'startup','liveList','liveListLoaded','settings');
+        // Supersede the real protected read before it can write tags. Neither
+        // a live-region callback nor a toast should report a cancelled read.
+        for (const withSay of [true, false]) {
+            await ev(`(async()=>{
+                const M=await import((window.__coralStatic||'/static/')+'inbox_reviews.js');
+                const original=window.fetch, hex='${'e'.repeat(64)}';
+                const p=window.__supersededRead={say:[],release:null};
+                window.fetch=(input,options)=>{
+                    const u=new URL(String(input),location.href);
+                    if(u.pathname.endsWith('/api/team-artifacts')&&u.searchParams.get('digest')===hex)
+                        return new Promise(resolve=>{p.release=()=>resolve(Response.json({artifacts:[],has_more:false}));});
+                    return original(input,options);
+                };
+                p.done=M.markOpenedReadVisibly(hex,${withSay ? 'text=>p.say.push(text)' : 'undefined'},'${B}').finally(()=>{window.fetch=original;});
+            })()`);
+            await waitFor(`!!window.__supersededRead?.release`,'protected read held before supersession');
+            await ev(`(async()=>{const M=await import((window.__coralStatic||'/static/')+'inbox_reviews.js');M.reviewsChangedOnServer();window.__supersededRead.release();await window.__supersededRead.done;})()`);
+            await ev(framesJs(2));
+            assert.deepEqual(await ev(`window.__supersededRead.say`),[],'superseded read must not announce a failure');
+            assert.equal(await ev(`Array.from(document.querySelectorAll('.toast')).some(t=>t.textContent.includes('Could not mark the file read'))`),false,'superseded read must not cover editor controls with an error toast');
+        }
         author=await launchStandIn(httpJson,{displayName:'Markdown Writer'});assert.ok(author.sid && author.token,'real stand-in agent token');
         const liveReply=await (await fetch(BASE+'/api/sessions/live')).json();const live=(Array.isArray(liveReply)?liveReply:liveReply.sessions||[]).find(s=>s.session_id===author.sid);assert.ok(live);
         assert.ok((await httpJson('POST',`/api/board/${B}/subscribe`,{subscriber_id:'Markdown Writer',job_title:'Writer',session_name:`${live.agent_type}-${author.sid}`})).status<300);

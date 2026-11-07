@@ -52,6 +52,7 @@ type BoardHandler struct {
 	pauseMu                       sync.Mutex                                                                 // one pause change at a time, its check, maps and stored row together (Security on #119)
 	keepQuestion                  func(ctx context.Context, project string, old *board.RegisteredWait) error // keeps an operator question as an ask (#11919); nil: postKeptQuestion. A seam for tests
 	notifyFn                      func(project string)                                                       // triggers an immediate notification pass for project's board
+	changeWords                   func(r *http.Request, project, hex, text string) (ChangeWords, error)      // the thread comment and the agent's notice of a Request changes with words (#13976)
 	reviewPost                    func(ctx context.Context, project, msg string) error                       // a test's replacement for posting the approval message (team_artifact_review.go)
 	coralDir                      string
 	alsoMu                        sync.Mutex    // serialises adding a later receipt to a received row (#4449)
@@ -174,6 +175,11 @@ func (h *BoardHandler) SetSessionThinkingLookup(fn func(ctx context.Context, ses
 // SetLiveSessionLookup tells the board how to find a live session's agent type (#3864).
 func (h *BoardHandler) SetLiveSessionLookup(fn func(ctx context.Context, sessionID string) (string, bool, error)) {
 	h.liveSessionType = fn
+}
+
+// SetChangeWords wires the words' half of Request changes (#13976): the thread comment and the agent's notice.
+func (h *BoardHandler) SetChangeWords(fn func(r *http.Request, project, hex, text string) (ChangeWords, error)) {
+	h.changeWords = fn
 }
 
 // SetSessionAsleepLookup tells the board how to find whether a session is asleep, ended or archived (the approval of an artifact says so).

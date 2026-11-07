@@ -181,6 +181,9 @@ func (h *BoardHandler) proposalNotice(ctx context.Context, project string, p *bo
 		msg = fmt.Sprintf("@%s [Coral] Your %s %s was not decided in 7 days, so it expired and nothing was made. Propose it again if it still matters.", to, p.Kind, title)
 	}
 	h.postNotice(ctx, project, msg)
+	if outcome == board.ProposalApproved || outcome == board.ProposalRejected { // the Operator's decision: a wait --from Operator matches it though the notice is shown as Coral's (#13947); an expiry is nobody's decision
+		h.resolveOperatorWaits(project, msg)
+	}
 	if h.notifyFn != nil {
 		h.notifyFn(project)
 	}

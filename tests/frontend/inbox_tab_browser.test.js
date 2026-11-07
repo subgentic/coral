@@ -35,17 +35,24 @@ async function run() {
     const { framesJs } = require('./helpers/wait');
 const { settle } = require('./helpers/wait');
     const sleep = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: proves a negative (nothing loaded) and lets the page's first requests settle
-    let cloud = true, inboxHits = 0;
+    let cloud = true, inboxHits = 0, countUnknown = false, countHits = 0;
     const SW = path.join(__dirname, '..', '..', 'coral-go', 'pkg', 'frontend', 'static');
     try {
         await Promise.all([Page.enable(), Runtime.enable(), Network.enable()]);
         await Network.setCacheDisabled({ cacheDisabled: true });
         await Fetch.enable({ patterns: [{ urlPattern: `${BASE}/`, resourceType: 'Document', requestStage: 'Response' }, { urlPattern: `${BASE}/auth/session`, requestStage: 'Request' },
-            { urlPattern: `${BASE}/api/servers*`, requestStage: 'Request' }, { urlPattern: `${BASE}/api/sessions/live*`, requestStage: 'Request' }, { urlPattern: `${BASE}/inbox*`, requestStage: 'Request' }] });
+            { urlPattern: `${BASE}/api/servers*`, requestStage: 'Request' }, { urlPattern: `${BASE}/api/sessions/live*`, requestStage: 'Request' }, { urlPattern: `${BASE}/inbox*`, requestStage: 'Request' }, { urlPattern: `${BASE}/api/*team-artifacts*`, requestStage: 'Request' }] });
         const json = (id, status, body) => Fetch.fulfillRequest({ requestId: id, responseCode: status, responseHeaders: [{ name: 'Content-Type', value: 'application/json' }], body: Buffer.from(JSON.stringify(body)).toString('base64') });
         let csp = '';
         safePaused(client, async e => {
             const u = e.request.url;
+            const q = new URL(u);
+            if (q.pathname.endsWith('/api/team-artifacts') && q.searchParams.get('limit') === '1' && q.searchParams.get('waiting') === '1') {
+                check('attention total uses the reviewed bounded query', q.searchParams.get('tag') === 'for review' && q.searchParams.get('muted') === '0' && q.searchParams.get('versions') === 'newest' && [...q.searchParams].length === 5);
+                countHits++;
+                return json(e.requestId, countUnknown ? 503 : 200, countUnknown ? {error:'unavailable'} : {artifacts:[],total:0});
+            }
+
             if (u.endsWith('/auth/session')) return json(e.requestId, 200, { authenticated: true, email: 'tester@example.com', csrf: 'x' });
             if (/\/api\/servers(\?|$)/.test(u)) return json(e.requestId, 200, { servers: [{ id: 'box-a', label: 'Box A', online: true, created_at: '2026-10-01T00:00:00Z', last_seen: '2026-10-18T00:00:00Z' }] });
             if (/\/api\/sessions\/live(\?|$)/.test(u)) return json(e.requestId, 200, cloud ? { sessions: [], servers: [{ id: 'box-a', label: 'Box A', status: 'online' }] } : []);
@@ -67,7 +74,7 @@ const { settle } = require('./helpers/wait');
         };
         const visible = id => ev(`(() => { const e = document.getElementById(${JSON.stringify(id)}); return !!e && !e.hidden && getComputedStyle(e).display !== 'none' && e.getClientRects().length > 0; })()`);
         const feed = n => ev(`(async () => { const w = await import((window.__coralStatic || '/static/') + 'websocket.js');
-            w.handleCoralMessage({ type: 'coral_update', sessions: Array.from({ length: ${n.total} }, (_, i) => ({ name: 'a' + i, session_id: 'a' + i + '-id', agent_type: 'claude', status: 'Idle', waiting_for_input: i < ${n.waiting} })), servers: [] }); return true; })()`);
+            w.handleCoralMessage({ type: 'coral_update', sessions: Array.from({ length: ${n.total} }, (_, i) => ({ name: 'a' + i, session_id: 'a' + i + '-id', agent_type: 'claude', status: 'Idle', waiting_for_input: i < ${n.waiting} })), servers: ${cloud ? JSON.stringify([{id:'box-a',label:'Box A',status:'online'}]) : '[]'} }); return true; })()`);
         const badge = () => ev(`(() => { const b = document.getElementById('nav-tab-hub-inbox-badge'), t = document.getElementById('nav-tab-hub-inbox'); return { text: b.textContent, hidden: b.hidden, label: t.getAttribute('aria-label') }; })()`);
 
         console.log('2. Where the hub serves the dashboard: after Agents, before Docs');
@@ -79,6 +86,11 @@ const { settle } = require('./helpers/wait');
         check('its name is Inbox, with no number yet', (await ev(`document.getElementById('nav-tab-hub-inbox').firstChild.textContent`)) === 'Inbox' && (await badge()).hidden === true);
 
         console.log('3. The badge is the number of agents waiting for input');
+        await feed({ total: 0, waiting: 0 });
+        await ev(`import((window.__coralStatic || '/static/') + 'review_counts.js').then(m => m.refreshCounts(true)).then(() => true)`);
+        await waitFor(`import((window.__coralStatic || '/static/') + 'review_counts.js').then(m => m.countSummary()?.complete === true)`, 'the authoritative zero review total');
+        check('the plain-name case has a confirmed zero review count', countHits > 0);
+
         await feed({ total: 5, waiting: 2 });
         let b = await badge();
         check('two waiting: the badge says 2 and the tab says so', b.text === '2' && !b.hidden && /2 waiting/.test(b.label || ''), JSON.stringify(b));
@@ -88,6 +100,14 @@ const { settle } = require('./helpers/wait');
         b = await badge(); check('past 9 it says 9+', b.text === '9+', JSON.stringify(b));
         await feed({ total: 5, waiting: 0 });
         b = await badge(); check('none waiting: no badge and the plain name', b.hidden && b.text === '' && b.label === null, JSON.stringify(b));
+        countUnknown = true;
+        await ev(`import((window.__coralStatic || '/static/') + 'review_counts.js').then(m => m.refreshCounts(true)).then(() => import((window.__coralStatic || '/static/') + 'inbox_tab.js')).then(m => { m.updateInboxTab(); return true; })`);
+        b = await badge();
+        check('an unavailable review total is not a confirmed zero', b.hidden && b.text === '' && b.label === 'Inbox, attention count incomplete', JSON.stringify(b));
+        countUnknown = false;
+        await ev(`import((window.__coralStatic || '/static/') + 'review_counts.js').then(m => m.refreshCounts(true)).then(() => import((window.__coralStatic || '/static/') + 'inbox_tab.js')).then(m => { m.updateInboxTab(); return true; })`);
+        b = await badge();
+        check('a recovered authoritative zero restores the plain name', b.hidden && b.text === '' && b.label === null, JSON.stringify(b));
         await ev(framesJs(4)); // the row's own redraw after the badge changed has finished
         await ev(`window.__navMut = 0; new MutationObserver(r => { window.__navMut += r.length; window.__navWhat = (window.__navWhat || []).concat(r.map(x => x.type + ':' + (x.target.id || x.target.className || x.target.nodeName) + ':' + (x.attributeName || ''))); }).observe(document.querySelector('.top-nav-tabs'), { attributes: true, childList: true, characterData: true, subtree: true }); true`);
         await feed({ total: 3, waiting: 0 }); await feed({ total: 3, waiting: 0 });

@@ -11,6 +11,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -35,10 +36,18 @@ const (
 
 type cmtRig struct {
 	t          *testing.T
-	lastHeader http.Header // the headers of the answer rig.do last got
+	headerMu   sync.Mutex  // the rig is used by goroutines at once (the replies at once): the last answer's headers are kept under this
+	lastHeader http.Header // the headers of the answer rig.do last got; read it with lastHeaders()
 	srv        *httptest.Server
 	h          *SessionsHandler
 	ss         *store.SessionStore
+}
+
+// lastHeaders is the headers of the answer rig.do last got, safe beside other calls.
+func (rig *cmtRig) lastHeaders() http.Header {
+	rig.headerMu.Lock()
+	defer rig.headerMu.Unlock()
+	return rig.lastHeader
 }
 
 func newCmtRig(t *testing.T) *cmtRig {
@@ -132,7 +141,9 @@ func (rig *cmtRig) do(method, path string, header map[string]string, body any) (
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(rig.t, err)
 	defer resp.Body.Close()
+	rig.headerMu.Lock()
 	rig.lastHeader = resp.Header
+	rig.headerMu.Unlock()
 	var out map[string]any
 	_ = json.NewDecoder(resp.Body).Decode(&out)
 	return resp.StatusCode, out
@@ -532,7 +543,9 @@ func TestArtifactCommentsRateLimitIsAMarkedActionLimit(t *testing.T) {
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()
+	rig.headerMu.Lock()
 	rig.lastHeader = resp.Header
+	rig.headerMu.Unlock()
 	assert.Equal(t, 429, resp.StatusCode)
 	assert.Equal(t, "action", resp.Header.Get("X-Coral-Limit"))
 	assert.Equal(t, "60", resp.Header.Get("Retry-After"))

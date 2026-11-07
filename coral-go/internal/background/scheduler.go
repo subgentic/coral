@@ -110,6 +110,7 @@ func (e *ConcurrencyLimitError) Error() string {
 // JobScheduler polls scheduled_jobs, fires due runs, and manages watchdog goroutines.
 type JobScheduler struct {
 	checkDeliveryFn func(context.Context, store.ScheduledJob, int64) error
+	knowledgeRunFn  func(context.Context, store.ScheduledJob, int64) AutoResult // the body of a "knowledge" job (#13928)
 	checkPollFn     func(context.Context)
 
 	store          *store.ScheduleStore
@@ -335,6 +336,8 @@ func (s *JobScheduler) startRun(ctx context.Context, job store.ScheduledJob, now
 	// Dispatch based on job type
 	if job.JobType == "check" {
 		s.deliverCheckRun(runID, job)
+	} else if job.JobType == "knowledge" {
+		s.runKnowledgeJob(runID, job, trigger)
 	} else if job.JobType == "workflow" && job.WorkflowID != nil {
 		go func() {
 			defer safego.Recover("background/scheduler:s.triggerWorkflowForJob")

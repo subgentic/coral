@@ -30,10 +30,16 @@ const { coralReady } = require('./helpers/wait');
             check(`${tag}: the chosen access's line is shown under the select (View, Interact)`, /^Look at terminals, chats, files and boards\. Changes nothing\.$/.test(by('Laptop').line) && /^Also type into running agents and post on boards\.$/.test(by('Desktop').line), JSON.stringify([by('Laptop').line, by('Desktop').line]));
             check(`${tag}: the select is described by that line`, / [^ ]+-line$/.test(by('Laptop').described), by('Laptop').described);
             const lineShown = () => ev(`[...document.querySelectorAll('#servers-tab-body .cs-access-line')].map(e => getComputedStyle(e).display !== 'none')`);
-            check(`${tag}: at rest no row shows the access line`, (await lineShown()).every(v => v === false), JSON.stringify(await lineShown()));
+            check(`${tag}: at rest every row shows the access line, the words a closed picker needs (#13921)`, (await lineShown()).length >= 1 && (await lineShown()).every(v => v === true), JSON.stringify(await lineShown()));
             await ev(`document.querySelector('#servers-tab-body .cs-launch select').focus(); true`);
-            check(`${tag}: only the row whose access is being changed shows it`, JSON.stringify(await lineShown().then(a => a.filter(Boolean).length)) === '1', JSON.stringify(await lineShown()));
+            check(`${tag}: focusing a picker leaves every row's line shown`, (await lineShown()).every(v => v === true), JSON.stringify(await lineShown()));
             await ev(`document.activeElement.blur(); true`);
+            // 200% text (and a phone at it): the line wraps inside its column, is not cut, and the page does not scroll sideways (#13921)
+            await ev(`document.documentElement.style.fontSize = '200%'; true`); await sleep(300); // sleep-ok: the layout settles
+            const big = await ev(`(() => ({ over: document.documentElement.scrollWidth > innerWidth + 1, lines: [...document.querySelectorAll('#servers-tab-body .cs-access-line')].map(e => { const r = e.getBoundingClientRect(), p = e.closest('td, .cs-access-wrap').getBoundingClientRect(); return { shown: getComputedStyle(e).display !== 'none', inside: r.right <= p.right + 1 && e.scrollWidth <= e.clientWidth + 1, h: Math.round(r.height) }; }) }))()`);
+            check(`${tag}: at 200% text every line is shown, whole and inside its column, with no sideways scroll`, !big.over && big.lines.length >= 1 && big.lines.every(l => l.shown && l.inside && l.h > 0), JSON.stringify(big));
+            await shot(`after-200-${w}`);
+            await ev(`document.documentElement.style.fontSize = ''; true`);
             const clicked = await click('#servers-tab-body .cs-name');
             await sleep(500); // sleep-ok: the page draws
             check(`${tag}: a real click on the computer's name opens its page`, clicked && (await ev(`!!document.querySelector('#servers-tab-body .cs-page-name')`)), String(clicked));

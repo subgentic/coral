@@ -15,7 +15,10 @@ const HEX = n => String(n).repeat(64);
             window.__requests = [];
             window.__files = [1, 2].map(n => ({ id: String(n).repeat(64), uri: 'coral://artifacts/' + String(n).repeat(64), name: 'plan-' + n + '.md', media_type: 'text/markdown', source: 'upload', available: true, size: 32, produced_by: 'Writer ' + n, session_id: 's' + n, tags: ['for review'], created_at: new Date(Date.now() - n * 1000).toISOString() }));
             window.fetch = (u, o = {}) => {
-                const url = new URL(String(u), location.href), p = url.pathname; window.__requests.push(p + url.search);
+                const originalURL = new URL(String(u), location.href); window.__requests.push(originalURL.pathname + originalURL.search);
+                const page = originalURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(originalURL, location.href, Object.fromEntries([1,2].map(n => ['team-' + n, window.__files.filter(a => a.id[0] === String(n))]))) : null;
+                if (page) return json(page);
+                const url = window.__reviewFixtureURL(String(u), location.href), p = url.pathname;
                 if (p === '/api/board/projects') return json([1, 2].map(n => ({ project: 'team-' + n, board_label: 'team-' + n, message_count: 1, subscriber_count: 1 })));
                 const t = /^\\/api\\/board\\/team-(\\d)\\/artifacts$/.exec(p);
                 if (t) { const tag = url.searchParams.get('tag'); const rows = window.__files.filter(a => a.id[0] === t[1] && (!tag || a.tags.includes(tag))); return json({ project: 'team-' + t[1], artifacts: rows, has_more: false, total: rows.length }); }
@@ -23,7 +26,7 @@ const HEX = n => String(n).repeat(64);
             };
         })()` });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await coralReady(ev, 'startup', 'liveList', 'settings');
-        const lists = () => ev(`window.__requests.filter(r => /\\/artifacts\\?tag=/.test(r)).length`);
+        const lists = () => ev(`window.__requests.filter(r => /\\/api\\/team-artifacts\\?/.test(r) && !new URL(r, location.href).searchParams.has('waiting') && !new URL(r, location.href).searchParams.has('team')).length`);
         const mark = () => ev(`window.__requests.length = 0; true`);
         await ev(`import(${S}+'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true)`);
         assert.equal(await ev(`import(${S}+'inbox_reviews.js').then(m => m.reviewItems().length)`), 2, 'both files are for review after a scan');
