@@ -34,3 +34,5 @@ func CommandsBelow(ctx context.Context, root int) (cmds []string, ok bool) {
 
 // Snapshot: not known on Windows for a hand claim (it follows its tool call alone).
 func Snapshot(ctx context.Context) (procs []Proc, ok bool) { return nil, false }
+
+func SnapshotCPU(ctx context.Context) (procs []Proc, ok bool) { return Snapshot(ctx) }

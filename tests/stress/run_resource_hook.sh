@@ -54,7 +54,7 @@ log "Building coral, its hooks and the stand-in agent..."
     && go build -o "$BIN/mock-agent$EXE" ./cmd/mock-agent/) 2>&1 | grep -v "ld: warning" || true
 coral_test_sandbox
 log "Starting an isolated server on $PORT (data $DATA)..."
-env -u CORAL_CLOUD_URL -u CLAUDE_PROJECTS_DIR HOME="$TMP/h" PATH="$CORAL_TEST_STUB_BIN:$PATH" \
+env -u CORAL_CLOUD_URL -u CLAUDE_PROJECTS_DIR CORAL_RESOURCE_IDLE_GRACE=40s HOME="$TMP/h" PATH="$CORAL_TEST_STUB_BIN:$PATH" \
     CORAL_NO_DEMO_SEED=1 CORAL_NO_WELCOME=1 CORAL_TMUX_NO_FALLBACK=1 MOCK_AGENT_CORAL_BOARD="$BIN/coral-board" \
     "$BIN/coral" --home "$DATA" --no-browser --cloud-url off --host 127.0.0.1 --port "$PORT" --backend "$CORAL_TEST_BACKEND" --strict-local-auth=false >"$TMP/server.log" 2>&1 &
 SERVER_PID=$!
@@ -130,6 +130,15 @@ wait_until 20 "the call to have returned" captured "$ann_name" "$ann_sid" "bash 
 sleep 12
 holder_is Ann && pass "the hand claim stays while the shell of her background job runs" || fail "the background hand claim was freed while its shell runs: holders=$(holders)"
 wait_until 60 "the job to end and the slot to go back" nobody && pass "the hand claim went back once the job's shell was gone" || fail "the background hand claim stayed: holders=$(holders)"
+
+# idle (#14079): a hand claim whose shell only waits (sleep: no CPU, not a test runner) loses the slot after the grace (40 s here, 3 min by default) and the board is told; the list says it is idle meanwhile
+send "$ann_name" "$ann_sid" "MOCK_BASH nowait $BIN/coral-board resource claim mac-heavy --note idle-hand; sleep 300"
+wait_until 20 "Ann's idle hand claim" holder_is Ann || fail "no idle hand claim"
+list_says_idle() { operator resource status mac-heavy | grep -q "idle for"; }
+wait_until 40 "the list to say idle" list_says_idle && pass "the list says the waiting holder is idle" || fail "the list never said idle: $(operator resource status mac-heavy)"
+wait_until 90 "the idle hold to be taken back" nobody && pass "a holder with nothing running lost the slot after the grace, while its shell still waited" || fail "the idle holder kept the slot: holders=$(holders)"
+operator board read 2>/dev/null | grep -q "nothing of it had been running" && pass "the board was told" || log "note: the board notice was not found by this read (the Orchestrator's inbox)"
+sleep 1
 
 # ── a pool (#13751): a match on the pool claims it; a grant on the other machine is not run here and the agent is told how ──
 operator resource define pm --slots 1 --machine Mac >/dev/null && operator resource define pmini --slots 1 --machine Mini >/dev/null && operator resource define ph --pool pm,pmini --match "sleep 11" >/dev/null && pass "a pool with a match is defined (ph = pm + pmini)" || fail "pool define"

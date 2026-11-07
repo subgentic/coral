@@ -94,8 +94,9 @@ type resEntry struct {
 	Lease    string `json:"lease_until"`
 	Place    int    `json:"place"`
 	Priority int    `json:"priority"`
-	Member   string `json:"member"`  // a pool's hold: the member it was granted
-	Machine  string `json:"machine"` // and where that is
+	Member   string `json:"member"`   // a pool's hold: the member it was granted
+	Machine  string `json:"machine"`  // and where that is
+	IdleMin  *int   `json:"idle_min"` // nothing has run under the claim for this many minutes (#14079)
 }
 
 type resView struct {
@@ -124,7 +125,7 @@ func printResource(v resView, me string) {
 		} else if h.Member != "" {
 			on = " on " + h.Member
 		}
-		fmt.Printf("  holds   #%d %s%s%s%s\n", h.ID, plainText(h.Agent), plainText(on), taskWords(h), leaseWords(h.Lease))
+		fmt.Printf("  holds   #%d %s%s%s%s%s\n", h.ID, plainText(h.Agent), plainText(on), taskWords(h), idleWords(h.IdleMin), leaseWords(h.Lease))
 	}
 	for _, q := range v.Queue {
 		mine := ""
@@ -144,6 +145,13 @@ func taskWords(e resEntry) string {
 		s += ": " + plainText(e.Note)
 	}
 	return s
+}
+
+func idleWords(m *int) string {
+	if m == nil {
+		return ""
+	}
+	return fmt.Sprintf(" [idle for %d min: nothing running; the slot goes back after 3]", *m)
 }
 
 func leaseWords(lease string) string {

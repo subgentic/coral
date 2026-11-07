@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -40,7 +41,16 @@ func (s *Server) registerResources(r chi.Router, sess *routes.SessionsHandler) {
 		Procs: func() ([]proctree.Proc, bool) {
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
-			return proctree.Snapshot(ctx)
+			return proctree.SnapshotCPU(ctx) // with each process's CPU share: a hold is kept only while something uses it (#14079)
+		},
+		IdleGrace: idleGraceFromEnv(),
+		Notify: func(agent, text string) { // an idle holder lost its slot: the Orchestrator of its team is told
+			sub, err := s.boardStore.GetSubscription(context.Background(), agent)
+			if err != nil || sub == nil {
+				return
+			}
+			slog.Info("[resource] idle holder released", "agent", agent, "text", text)
+			_, _ = s.boardStore.PostSystemMessage(context.Background(), sub.Project, "Coral Queue", "@Orchestrator "+text, nil)
 		},
 		Agent: func(ctx context.Context, sessionName string) (string, bool) {
 			sub, err := s.boardStore.GetSubscriptionBySessionName(ctx, sessionName)
@@ -153,4 +163,13 @@ func (s *Server) commandsBelowSessionKnown(sessionName string) ([]string, bool) 
 		return nil, false
 	}
 	return proctree.CommandsBelow(ctx, pid)
+}
+
+// idleGraceFromEnv is CORAL_RESOURCE_IDLE_GRACE (a duration like 40s) for the isolated runs that test the idle release; unset or bad: the default of 3 minutes.
+func idleGraceFromEnv() time.Duration {
+	d, err := time.ParseDuration(os.Getenv("CORAL_RESOURCE_IDLE_GRACE"))
+	if err != nil || d < 10*time.Second {
+		return 0
+	}
+	return d
 }
