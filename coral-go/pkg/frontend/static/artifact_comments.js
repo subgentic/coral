@@ -7,6 +7,9 @@ import { isPhoneLayout, PHONE_QUERY } from './phone_layout.js';
 import { importOnce } from './import_once.js';
 const { buildAnchor } = await importOnce('./artifact_anchor.js');
 const api = await importOnce('./artifact_comments_api.js');
+const bidi = await importOnce('./bidi_marks.js').catch(() => null); // another person's text: their bidirectional controls are shown, not applied (#14113, #14241); if the module cannot load the text is drawn unmarked rather than the drawer failing
+const markBidi = bidi ? bidi.markBidi : el => el, bidiWritten = bidi ? bidi.bidiWritten : t => String(t == null ? '' : t), bidiStripped = bidi ? bidi.bidiStripped : t => String(t == null ? '' : t);
+const nameOf = c => c.authorName || c.authorId || 'unknown', nameSaid = c => bidiWritten(nameOf(c)); // nameSaid: for a label or a tooltip, where a mark cannot be drawn
 const { linkArtifactRefsIn } = await importOnce('./artifact_refs.js'); // a coral://artifacts/<hex> in a comment is a link (#11416)
 const { createAsk } = await importOnce('./artifact_comment_ask.js');
 const { createComposer } = await importOnce('./artifact_comment_composer.js');
@@ -52,7 +55,7 @@ function ago(iso) {
 // colour in every thread. Decoration only (the name is beside it): aria-hidden.
 const AVATAR_HUES = [212, 262, 330, 8, 28, 150, 186, 48];
 function avatar(c) {
-    const name = c.authorName || c.authorId || '?';
+    const name = bidiStripped(c.authorName || c.authorId || '?'); // a control is never the initial
     const parts = name.split(/[\s._-]+/).filter(Boolean);
     const initials = ((parts[0] || '?')[0] + (parts.length > 1 ? parts[1][0] : '')).toUpperCase();
     let h = 0; for (const ch of (c.authorId || name)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
@@ -273,7 +276,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         const av = avatar(c); e.append(c.authorKind === 'agent' ? linkAvatar(av, c.authorName || c.authorId, { board: boardTeamKey(st.server, st.board) }) : av); // an agent's circle and name open its chat (#12168)
         const main = el('div', 'ac-entry-main');
         const m = el('div', 'ac-meta');
-        m.append(c.authorKind === 'agent' ? agentLink(c.authorName || c.authorId, { board: boardTeamKey(st.server, st.board), cls: 'ac-author' }) : el('span', 'ac-author', c.authorName || c.authorId || 'unknown'));
+        m.append(markBidi(c.authorKind === 'agent' ? agentLink(c.authorName || c.authorId, { board: boardTeamKey(st.server, st.board), cls: 'ac-author' }) : el('span', 'ac-author', nameOf(c)))); // the author's name is another person's text too (#14241)
         if (KIND[c.authorKind]) m.append(el('span', 'ac-kind', KIND[c.authorKind]));
         const dot = el('span', 'ac-dot', '·'); dot.setAttribute('aria-hidden', 'true'); m.append(dot);
         const time = el('span', 'ac-time', ago(c.createdAt)); time.title = c.createdAt; m.append(time);
@@ -292,13 +295,13 @@ export function attachComments(dialog, body, host, opts = {}) {
             if (opts.outdated && opts.outdated(c)) m.append(el('span', 'chip ac-pill ac-pill-orphan', 'outdated')); // a comment on an agent's diff whose lines are no longer in it (#12536): kept, never dropped, and never sent again
             if (!c.deleted && c.can.resolve) {
                 const r = act(c.resolved ? 'Reopen' : 'Resolve', () => run(() => (c.resolved ? api.reopenComment : api.resolveComment)(ownHex(c), st.server, c.id), c.resolved ? 'Comment reopened' : 'Comment resolved'));
-                r.classList.add('ac-resolve'); r.setAttribute('aria-label', `${c.resolved ? 'Reopen' : 'Resolve'} the thread by ${c.authorName || c.authorId || 'unknown'}`);
+                r.classList.add('ac-resolve'); r.setAttribute('aria-label', `${c.resolved ? 'Reopen' : 'Resolve'} the thread by ${nameSaid(c)}`);
                 resolveBtn = r;
             }
         }
         if (resolveBtn) { const row = el('div', 'ac-headrow'); row.append(m, resolveBtn); main.append(row); } // Resolve at the top right: the name line wraps beside it, never under it
         else main.append(m);
-        main.append(editing(c) || (c.deleted ? el('p', 'ac-body ac-deleted', 'Comment deleted') : linkArtifactRefsIn(el('p', 'ac-body', c.body), { server: st.server })));
+        main.append(editing(c) || (c.deleted ? el('p', 'ac-body ac-deleted', 'Comment deleted') : markBidi(linkArtifactRefsIn(el('p', 'ac-body', c.body), { server: st.server })))); // another person's words: their bidirectional controls are shown, not applied, and the text is its own isolate (#14113)
         if (!c.deleted && c.images && c.images.length && !editing(c)) main.append(pictures(c));
         if (top && c.fromVersion != null && groupOf(c) !== 'main') main.append(el('p', 'ac-from ac-from-note', groupOf(c) === 'look' ? `From v${c.fromVersion}. The quote is in this version more than once, so it is not pinned to either.` : `On v${c.fromVersion}. Its text is not in this version.`));
         main.append(actions(c, top));
@@ -318,16 +321,16 @@ export function attachComments(dialog, body, host, opts = {}) {
     }
     function card({ c, replies }) {
         // ac-composing: a card with its reply box open keeps its actions row when the box loses the focus, so nothing under it moves between a press and its release (#12301)
-        const li = el('li', 'ac-card' + (st.active === c.id ? ' ac-active' : '') + (c.resolved ? ' ac-resolved' : '') + (st.composing && st.composing.parentId === c.id ? ' ac-composing' : '')); li.dataset.id = String(c.id); li.setAttribute('aria-label', `Comment by ${c.authorName || c.authorId || 'unknown'}`); li.setAttribute('role', 'group');
+        const li = el('li', 'ac-card' + (st.active === c.id ? ' ac-active' : '') + (c.resolved ? ' ac-resolved' : '') + (st.composing && st.composing.parentId === c.id ? ' ac-composing' : '')); li.dataset.id = String(c.id); li.setAttribute('aria-label', `Comment by ${nameSaid(c)}`); li.setAttribute('role', 'group');
         const a = c.anchor || {};
-        const q = el('blockquote', 'ac-quote' + (st.orphan.has(c.id) ? ' ac-orphan' : ''), st.video && c.atS != null ? `Video: ${stampRange(c)}` : a.whole ? (opts.words?.quote || 'The whole document') : a.quote || '');
+        const q = markBidi(el('blockquote', 'ac-quote' + (st.orphan.has(c.id) ? ' ac-orphan' : ''), st.video && c.atS != null ? `Video: ${stampRange(c)}` : a.whole ? (opts.words?.quote || 'The whole document') : a.quote || '')); // the quoted text is the commenter's too (#14113)
         li.append(q);
         li.append(entry(c, true));
         for (const r of replies) li.append(entry(r, false));
         if (st.ask && st.ask.id === c.id) li.append(askBlock());
         // The reply box at the foot of the card, where Docs has it; it opens the composer in place.
         if (!c.deleted && c.can.reply && !(st.composing && st.composing.parentId === c.id)) {
-            const rb = btn('ac-replybox', 'Reply…', `Reply to the comment by ${c.authorName || c.authorId || 'unknown'}`);
+            const rb = btn('ac-replybox', 'Reply…', `Reply to the comment by ${nameSaid(c)}`);
             rb.addEventListener('click', () => { st.composing = { parentId: c.id, hex: ownHex(c) }; st.error = ''; render(); panel.querySelector('.ac-input')?.focus(); });
             li.append(rb);
         }
@@ -340,11 +343,11 @@ export function attachComments(dialog, body, host, opts = {}) {
     function actions(c, top) {
         const row = el('div', 'ac-actions');
         if (c.deleted) return row;
-        const who = c.authorName || c.authorId || 'unknown';
+        const who = nameSaid(c);
         if (c.can.edit) row.append(act('Edit', `Edit the comment by ${who}`, () => { st.composing = { editId: c.id }; st.error = ''; render(); panel.querySelector('.ac-input')?.focus(); }));
         if (c.can.delete) row.append(act('Delete', `Delete the comment by ${who}`, () => confirmThen('Delete this comment?', () => run(() => api.deleteComment(ownHex(c), st.server, c.id), 'Comment deleted'))));
         // Send to agent (#6357, #6456): the owner, on this computer, for a thread of this board that is open; never through Coral Hub
-        if (top && canAsk(c)) { const b = act('Send to agent', () => openAsk(c)); b.classList.add('ac-ask-open'); b.setAttribute('aria-label', `Send the comment by ${c.authorName || c.authorId || 'unknown'} to an agent`); b.setAttribute('aria-expanded', String(!!st.ask && st.ask.id === c.id)); row.append(b); }
+        if (top && canAsk(c)) { const b = act('Send to agent', () => openAsk(c)); b.classList.add('ac-ask-open'); b.setAttribute('aria-label', `Send the comment by ${nameSaid(c)} to an agent`); b.setAttribute('aria-expanded', String(!!st.ask && st.ask.id === c.id)); row.append(b); }
         // not an .ac-act: it writes nothing, so a read-only viewer has it too
         if (top && st.ranges.has(c.id)) { const j = btn('ac-jump', 'Show in text', `Show the text of the comment by ${who} in the document`); j.addEventListener('click', () => jumpTo(c.id)); row.append(j); }
         return row;
@@ -376,7 +379,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         const id = ids[at < 0 ? (dir > 0 ? 0 : ids.length - 1) : (at + dir + ids.length) % ids.length];
         activate(id, true); st.scrollCard = true; paint();
         const c = threads().find(t => t.c.id === id);
-        announce(`Comment ${ids.indexOf(id) + 1} of ${ids.length}: ${c ? c.c.body.slice(0, 80) : ''}`);
+        announce(`Comment ${ids.indexOf(id) + 1} of ${ids.length}: ${c ? bidiWritten(c.c.body).slice(0, 80) : ''}`);
     }
     body.addEventListener('keydown', (e) => {
         if (e.target !== body || e.ctrlKey || e.metaKey || e.altKey || !st.data) return;
