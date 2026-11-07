@@ -348,3 +348,7 @@ d024f94132f33d22320ab6da094a94e85d4b010a:coral-go/internal/agent/first_user_mess
 d024f94132f33d22320ab6da094a94e85d4b010a:coral-go/internal/agent/summary_redact_test.go:aws-access-token:18
 d024f94132f33d22320ab6da094a94e85d4b010a:coral-go/internal/server/routes/agent_history_excerpt_redact_test.go:aws-access-token:14
 f1918eaa64f6fb1d4809c1af5c794b77007b439e:coral-go/internal/machinelaunch/diag_test.go:private-key:25
+
+# triaged after the list above (#13976): QA's redaction-test fixture const changesSecret = "ghp_..." in team_artifact_changes_test.go is an invented test input, not a real token (commit b66ae65b7, in v2.0.59's batch).
+# One fingerprint; it holds its commit id, so it is used only while that commit keeps its id.
+b66ae65b77d17091e8407d437ed8da01cb192097:coral-go/internal/server/routes/team_artifact_changes_test.go:github-pat:268
