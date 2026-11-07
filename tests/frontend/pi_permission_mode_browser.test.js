@@ -15,7 +15,7 @@ const BASE = require('./test_base').BASE;
     const { coralReady } = require('./helpers/wait').bind(ev);
     const WHY = 'Pi has no permission prompts: it always acts on its own.';
     const setType = t => ev(`(() => { const s = document.querySelector('#fixture .acf-agent-type'); s.value = ${JSON.stringify(t)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-    const mode = () => ev(`(() => { const s = document.querySelector('#fixture .acf-permission-mode'); const hint = s.parentElement.querySelector('.perm-mode-desc'); return { value: s.value, disabled: s.disabled, title: s.title, shown: [...s.options].filter(o => !o.hidden && !o.disabled).map(o => o.value), hint: hint ? hint.textContent : null }; })()`);
+    const mode = () => ev(`(() => { const s = document.querySelector('#fixture .acf-permission-mode'); const hint = s.parentElement.querySelector('.perm-mode-desc'); return { text: s.selectedOptions[0] && s.selectedOptions[0].textContent, value: s.value, disabled: s.disabled, title: s.title, shown: [...s.options].filter(o => !o.hidden && !o.disabled).map(o => o.value), hint: hint ? hint.textContent : null }; })()`);
     try {
         await c.Page.enable();
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
@@ -34,15 +34,18 @@ const BASE = require('./test_base').BASE;
             await setType('pi');
             m = await mode();
             console.log(`${w}px Pi:`, JSON.stringify(m));
+            if (process.env.CORAL_SCREENSHOT_DIR) { require('node:fs').mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); const { data } = await c.Page.captureScreenshot({ format: 'png' }); require('node:fs').writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/pi-agent-form-${w}.png`, Buffer.from(data, 'base64')); }
             assert.equal(m.disabled, true, `${w}px: Pi's mode select is disabled`);
             assert.equal(m.value, 'default', `${w}px: and sits on Default, not the Bypass it had`);
             assert.deepEqual(m.shown, ['default'], `${w}px: no Plan, Bypass or Auto offered for Pi`);
+            assert.equal(m.text, 'No permission modes', `${w}px: it reads No permission modes, not Default`);
             assert.equal(m.title, WHY, `${w}px: the reason is on the select`);
             assert.equal(m.hint, WHY, `${w}px: and in the line under it`);
             await setType('claude');
             m = await mode();
             assert.equal(m.disabled, false, `${w}px: the choice comes back for Claude`);
             assert.equal(m.title, '', `${w}px: and the Pi reason is gone`);
+            assert.notEqual(m.text, 'No permission modes', `${w}px: and the select reads a mode again`);
             assert.ok(m.shown.includes('plan') && m.shown.includes('bypassPermissions'), `${w}px: Claude's modes are offered again`);
         }
         console.log('pi_permission_mode: ok');

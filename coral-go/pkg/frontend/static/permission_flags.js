@@ -66,8 +66,16 @@ function offerModesFor(selectEl, type) {
     for (const o of selectEl.options) { const on = modeOffered(type, o.value); o.hidden = !on; o.disabled = !on; }
     if (!modeOffered(type, selectEl.value)) selectEl.value = 'default';
     // Pi has no modes: the choice would change nothing, so it is shown fixed on Default and says why (#14360); another CLI gives the select back
-    if (String(type).toLowerCase() === 'pi') { selectEl.disabled = true; selectEl.dataset.noModes = '1'; selectEl.title = PI_NO_PERMISSIONS; }
-    else if (selectEl.dataset.noModes) { selectEl.disabled = false; delete selectEl.dataset.noModes; selectEl.removeAttribute('title'); }
+    // The one option left reads 'No permission modes' (its value stays 'default'), and goes back to its own words for another CLI
+    const dflt = [...selectEl.options].find(o => o.value === 'default');
+    if (String(type).toLowerCase() === 'pi') {
+        if (dflt && !selectEl.dataset.noModes) dflt.dataset.ownText = dflt.textContent;
+        if (dflt) dflt.textContent = 'No permission modes';
+        selectEl.disabled = true; selectEl.dataset.noModes = '1'; selectEl.title = PI_NO_PERMISSIONS;
+    } else if (selectEl.dataset.noModes) {
+        if (dflt && dflt.dataset.ownText) { dflt.textContent = dflt.dataset.ownText; delete dflt.dataset.ownText; }
+        selectEl.disabled = false; delete selectEl.dataset.noModes; selectEl.removeAttribute('title');
+    }
 }
 
 // `unset`: nothing is saved, so nothing is refused, though the select reads Auto (Security's #7587 point: only a saved mode, or a pick that will be saved, refuses)
