@@ -31,6 +31,12 @@
       "type": "index"
     },
     {
+      "name": "idx_board_goal_task_moves_task",
+      "sql": "CREATE INDEX idx_board_goal_task_moves_task ON board_goal_task_moves(board_id, task_id)",
+      "tbl_name": "board_goal_task_moves",
+      "type": "index"
+    },
+    {
       "name": "idx_board_goals_board",
       "sql": "CREATE INDEX idx_board_goals_board ON board_goals(board_id, state, id)",
       "tbl_name": "board_goals",
@@ -890,7 +896,7 @@
     },
     {
       "name": "board_tasks_goal_seq_delete",
-      "sql": "CREATE TRIGGER board_tasks_goal_seq_delete AFTER DELETE ON board_tasks\n            WHEN OLD.goal_id IS NOT NULL OR EXISTS(SELECT 1 FROM board_goal_task_moves m WHERE m.board_id=OLD.board_id AND m.task_id=OLD.id)\n            BEGIN INSERT INTO board_goal_meta (board_id, seq, updated_at) VALUES (OLD.board_id, 1, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))\n\t\tON CONFLICT(board_id) DO UPDATE SET seq = seq + 1, updated_at = excluded.updated_at; INSERT INTO board_goal_events (board_id, goal_id, kind, seq, at) SELECT OLD.board_id, OLD.goal_id, 'task_unlinked', seq, strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM board_goal_meta WHERE board_id = OLD.board_id AND (OLD.goal_id IS NOT NULL); INSERT INTO board_goal_events(board_id,goal_id,kind,seq,at)\n            SELECT m.board_id,m.goal_id,'task_unlinked',meta.seq,strftime('%Y-%m-%dT%H:%M:%SZ','now')\n            FROM board_goal_task_moves m JOIN board_goal_meta meta ON meta.board_id=m.board_id\n            JOIN board_goals g ON g.board_id=m.board_id AND g.id=m.goal_id\n            WHERE m.board_id=OLD.board_id AND m.task_id=OLD.id AND m.goal_id IS NOT OLD.goal_id; END",
+      "sql": "CREATE TRIGGER board_tasks_goal_seq_delete AFTER DELETE ON board_tasks\n            WHEN OLD.goal_id IS NOT NULL OR EXISTS(SELECT 1 FROM board_goal_task_moves m WHERE m.board_id=OLD.board_id AND m.task_id=OLD.id)\n            BEGIN INSERT INTO board_goal_meta (board_id, seq, updated_at) VALUES (OLD.board_id, 1, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))\n\t\tON CONFLICT(board_id) DO UPDATE SET seq = seq + 1, updated_at = excluded.updated_at; INSERT INTO board_goal_events (board_id, goal_id, kind, seq, at) SELECT OLD.board_id, OLD.goal_id, 'task_unlinked', seq, strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM board_goal_meta WHERE board_id = OLD.board_id AND (OLD.goal_id IS NOT NULL); INSERT INTO board_goal_events(board_id,goal_id,kind,seq,at)\n            SELECT m.board_id,m.goal_id,'task_unlinked',meta.seq,strftime('%Y-%m-%dT%H:%M:%SZ','now')\n            FROM board_goal_task_moves m JOIN board_goal_meta meta ON meta.board_id=m.board_id\n            JOIN board_goals g ON g.board_id=m.board_id AND g.id=m.goal_id\n            WHERE m.board_id=OLD.board_id AND m.task_id=OLD.id AND m.goal_id IS NOT OLD.goal_id; DELETE FROM board_goal_task_moves WHERE board_id=OLD.board_id AND task_id=OLD.id; END",
       "tbl_name": "board_tasks",
       "type": "trigger"
     },
@@ -2770,6 +2776,39 @@
               "seqno": 0
             },
             {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "task_id",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "idx_board_goal_task_moves_task",
+          "origin": "c",
+          "partial": 0,
+          "seq": 0,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
               "cid": 1,
               "coll": "BINARY",
               "desc": 0,
@@ -2797,7 +2836,7 @@
           "name": "sqlite_autoindex_board_goal_task_moves_1",
           "origin": "pk",
           "partial": 0,
-          "seq": 0,
+          "seq": 1,
           "unique": 1
         }
       ]

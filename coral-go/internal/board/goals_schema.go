@@ -111,6 +111,9 @@ func (s *Store) ensureGoalsSchema(ctx context.Context) error {
 		// The rollup's grouped count reads (board_id, goal_id, status) and nothing else of the task, so the index holds status and the count is index-only (#9584: 1.6 to 0.36 ms for a page of 40 goals). It is the older
 		// (board_id, goal_id) index with a column more, so that one is dropped: the same write cost, the same lookups.
 		`CREATE INDEX IF NOT EXISTS idx_board_tasks_goal_status ON board_tasks(board_id, goal_id, status) WHERE goal_id IS NOT NULL`,
+		// The moves are looked up by (board, task) on every status change of a task that has no goal (the EXISTS in board_tasks_goal_seq_state) and in departedEvent; the primary key leads with (board, goal), so without this
+		// those lookups walked all of the board's move rows (#14368, found reading #14174's triggers).
+		`CREATE INDEX IF NOT EXISTS idx_board_goal_task_moves_task ON board_goal_task_moves(board_id, task_id)`,
 		`DROP INDEX IF EXISTS idx_board_tasks_goal`,
 		// A board's own uid (boards.board_uid) is set by CreateBoard only, is unique where there is one, and is never changed once set: no backfill (a board made before it has none).
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_boards_board_uid ON boards(board_uid) WHERE board_uid IS NOT NULL`,
@@ -150,7 +153,9 @@ func (s *Store) ensureGoalsSchema(ctx context.Context) error {
 		`DROP TRIGGER IF EXISTS board_tasks_goal_seq_delete`,
 		`CREATE TRIGGER board_tasks_goal_seq_delete AFTER DELETE ON board_tasks
             WHEN OLD.goal_id IS NOT NULL OR EXISTS(SELECT 1 FROM board_goal_task_moves m WHERE m.board_id=OLD.board_id AND m.task_id=OLD.id)
-            BEGIN ` + moved("OLD.board_id") + event("OLD.board_id", "OLD.goal_id", "task_unlinked", "OLD.goal_id IS NOT NULL") + departedEvent("OLD.board_id", "OLD.id", "OLD.goal_id", "task_unlinked") + ` END`,
+            BEGIN ` + moved("OLD.board_id") + event("OLD.board_id", "OLD.goal_id", "task_unlinked", "OLD.goal_id IS NOT NULL") + departedEvent("OLD.board_id", "OLD.id", "OLD.goal_id", "task_unlinked") +
+            // the task is gone, so are its move rows (after the events above, which read them): nothing else ever removed them (#14368)
+            ` DELETE FROM board_goal_task_moves WHERE board_id=OLD.board_id AND task_id=OLD.id; END`,
 	} {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil {
 			return err
