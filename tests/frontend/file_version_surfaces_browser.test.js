@@ -1,5 +1,5 @@
 // The file's id and version line through the REAL entry paths (#14178): the Inbox review row opens the viewer with the row's line, and choosing another version replaces it; the Team Artifacts page's details sheet says the line as a
-// fact, and its Open shows it in the viewer header. Stubbed lists (the page answers them); the versions come from artifact_versions_stub. The Inbox path at 1280 and 390 px, the Team Artifacts page at 1280.
+// fact, and its Open shows it in the viewer header. Stubbed lists (the page answers them); the versions come from artifact_versions_stub. The Inbox path at 1280 and 390 px, the Team Artifacts page at 1280, the Artifacts list's phone row at 390.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -44,6 +44,29 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(lineOf(2))}`, at + 'choosing v2 replaces the line', 8000);
             check(!(await head()).includes('version 3'), at + 'a v2 is never labelled v3');
             await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`);
+            await removeBoards(ev, [team]).catch(() => {});
+        }
+
+        // ---- the Artifacts list on a phone (390): the row's snippet carries the version line
+        {
+            const at = '390 px, the Artifacts list row: ';
+            const team = 'fvp-' + Date.now().toString(36);
+            await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
+            await ev(`fetch('/api/board/${team}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Plan Writer', job_title: 'Writer' }) }).then(() => true)`);
+            await ev(`(() => { const original = window.fetch;
+                const row = (id, name, extra) => Object.assign({ id, name, media_type: 'text/markdown', size: 4200, created_at: new Date(Date.now() - 3600000).toISOString(), updated_at: new Date(Date.now() - 3600000).toISOString(), source: 'upload', available: true, uri: 'coral://artifacts/' + id, produced_by: 'Plan Writer', board_id: ${JSON.stringify(team)}, tags: [] }, extra);
+                const items = [row('${H3}', 'release-plan.md', { file_id: '${FILE}', version_line: ${JSON.stringify(lineOf(3))} }), row('${'7'.repeat(64)}', 'plain-notes.md', {})];
+                window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin);
+                    if (u.pathname === '/api/team-artifacts') return Promise.resolve(new Response(JSON.stringify({ artifacts: items, teams: [], all: 2, total: 2, tag_counts: {}, has_more: false, truncated: false }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+                    return original(url, opts); };
+                return true; })()`);
+            await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('artifacts')).then(() => true)`);
+            try { await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 2`, at + 'the two rows', 15000); }
+            catch (e) { const d = await ev(`JSON.stringify({ rows: document.querySelectorAll('tbody tr').length, text: (document.getElementById('group-table-view') || document.body).innerText.slice(0, 300) })`).catch(x => String(x)); throw new Error(e.message + ' | page: ' + d); }
+            const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => r.textContent)`);
+            check(rows.some(t => t.includes('release-plan.md') && t.includes(lineOf(3))), at + `the row with a file id says its line: ${JSON.stringify(rows)}`);
+            check(rows.filter(t => t.includes('plain-notes.md')).every(t => !/version \d+ of/.test(t)), at + `a row with no id says none: ${JSON.stringify(rows)}`);
             await removeBoards(ev, [team]).catch(() => {});
         }
 

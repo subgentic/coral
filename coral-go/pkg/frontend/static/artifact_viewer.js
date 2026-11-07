@@ -43,7 +43,7 @@ let _versions = null;    // the version bar of the viewer (#6472)
 let _review = null;      // Approve and Request changes of a for-review artifact (#136584)
 let _hex = '';           // the artifact on show and what it was opened with, for a version chosen from the bar
 let _lastOpts = {};
-let _line = null;       // the file id and version line a caller gave for ONE hex ({ hex, fileId, versionLine }): shown only while that hex is the one shown (#14178)
+let _line = null;       // the file id and version line a caller gave for ONE file as seen from ONE computer and team ({ hex, server, board, fileId, versionLine }): shown only while that hex, computer and team are the ones shown; cleared by every open that carries none and by a close (#14178)
 let _barLine = null;    // the same for the version the bar shows, from the server's list: it replaces the caller's on a switch and after a save
 let _lineChip = null;   // the line's chip in Details, made on the first line this open has
 let _details = null;     // the Details button and its panel (the readers' row)
@@ -303,7 +303,8 @@ function openAfterInventory(hex, opts, intent) {
 /** The file id and version line of the version SHOWN now: the bar's, from the server's list of versions, else the one a caller gave for exactly this hex; never a line that belongs to another version (#14178). */
 function shownLine() {
     if (_barLine && _barLine.hex === _hex) return _barLine;
-    if (_line && _line.hex === _hex) return _line;
+    // a caller's line is for the digest AND the computer and team it was read from: the same digest opened from another team or computer is another row (#14178, round 3)
+    if (_line && _line.hex === _hex && _line.server === String(_lastOpts.server || '') && _line.board === String(_lastOpts.board || '')) return _line;
     return null;
 }
 /** Draw the version line in the header and in Details (with its Copy file ID button), or clear both when the shown version has none. */
@@ -406,7 +407,8 @@ export function openArtifactViewer(hex, opts = {}) {
     if (opts.task) { const t = document.createElement('span'); t.className = 'chip detail-chip'; t.textContent = `Task: ${markHidden(opts.task, { strict: true })}`; t.title = t.textContent; chips.append(t); }
     if (chips.children.length) _details.add(chips);
     _lineChip = null;
-    if (fileIdOf({ file_id: opts.fileId }) && opts.versionLine) _line = { hex: opts.lineHex, fileId: opts.fileId, versionLine: opts.versionLine }; // a caller's line is for the hex it opened; a later hex (a version switch, a save) never inherits it
+    // Every open sets the line afresh: a caller's valid id and line (bound to its hex, computer and team), else NONE. An earlier open's line never survives into one that carries none (the same digest from another team, a plain reopen).
+    _line = fileIdOf({ file_id: opts.fileId }) && opts.versionLine ? { hex: opts.lineHex, server: String(opts.server || ''), board: String(opts.board || ''), fileId: opts.fileId, versionLine: opts.versionLine } : null;
     paintLine(d);
     readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) { _details.add(readersBlock(hex, opts.server, _details)); if (opts.sourceNamed) _details.add(privateBlock(hex, opts.server, _details)); } }).catch(() => {});
     if (!opts.switched) d.querySelector('.artifact-viewer-close').focus(); // a version chosen from the bar keeps the keyboard on the bar
@@ -456,6 +458,7 @@ export function openArtifactViewer(hex, opts = {}) {
         }
     }
     stopEditSend(); stopMarkdownEdit();
+    _line = null; _barLine = null; _lineChip = null; // a closed viewer keeps no file's id for the next one (#14178)
     _versions?.close();
     _review?.close();
     _comments?.close(); // the sheet (above it) goes first, so Back's order and ours agree

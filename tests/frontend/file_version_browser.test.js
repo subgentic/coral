@@ -69,6 +69,27 @@ const { coralReady } = require('./helpers/wait');
             assert.ok(!(await toast()).includes('File ID copied'), `${at}: not "copied" when there is no clipboard`);
             await closeViewer();
 
+            console.log(`${at}: a line never outlives its open: no metadata on a reopen, another team's row, a close`);
+            await ev(STUB);
+            const X = '8'.repeat(64); // a hex the stub lists no versions for: only the caller's opts could give it a line
+            const L_A = `version 2 of notes.md (file ${FILE})`, FILE_B = 'b1b2b3b4b5b6b7b8b9babbbcbdbebf00', L_B = `version 5 of notes.md (file ${FILE_B})`;
+            await open(X, { fileId: FILE, versionLine: L_A, board: 'team-a', server: undefined });
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(L_A)}`, `${at}: team A's row says its line`, 6000);
+            await closeViewer();
+            await open(X, { board: 'team-a' }); // the same digest again from a caller with no metadata (an older server, a plain link)
+            await waitFor(`!!document.getElementById('artifact-viewer') && !document.getElementById('artifact-viewer').hidden && !!document.querySelector('#artifact-viewer .artifact-viewer-body')?.textContent`, `${at}: reopened`, 6000);
+            assert.equal(await headShown(), false, `${at}: a reopen with no metadata shows no line (it must not reuse the first open's)`);
+            assert.equal(await chip(), '', `${at}: and no Copy chip`);
+            await closeViewer();
+            await open(X, { fileId: FILE, versionLine: L_A, board: 'team-a' });
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(L_A)}`, `${at}: A again`, 6000);
+            await open(X, { fileId: FILE_B, versionLine: L_B, board: 'team-b' }); // the same digest from another team, with that team's own id and line
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(L_B)}`, `${at}: team B's own line replaces A's`, 6000);
+            assert.equal(await chip(), L_B, `${at}: Details says B's too, never A's`);
+            await open(X, { board: 'team-b' }); // and without metadata from team B: none, not B's, not A's
+            await waitFor(`!document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent`, `${at}: cleared`, 6000);
+            await closeViewer();
+
             console.log(`${at}: a file with no id, or a made-up one, shows no line`);
             await ev(STUB);
             for (const extra of [{}, { fileId: 'not-an-id', versionLine: 'version 9 of x (file not-an-id)' }, { fileId: FILE }, { fileId: FILE, versionLine: lineOf(3), lineHex: H3 }]) { // the last: a line given for v3 and carried onto a hex with no versions list (what a switch or a save spreads)
