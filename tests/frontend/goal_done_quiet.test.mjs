@@ -37,3 +37,10 @@ assert.equal(nextQuietEnd([goal(1, 10), goal(2, 3), goal(3, 40)], team, {}, now)
 assert.equal(nextQuietEnd([goal(3, 40)], team, {}, now), null, 'nothing waiting');
 assert.equal(nextQuietEnd([goal(1, 10, { rollup: { done: 1, active: 1, blocked: 0, queued: 0 } })], team, {}, now), null, 'a goal with an open task is not waiting for its period');
 console.log('goal_done_quiet: ok');
+
+assert.deepEqual(ids([goal(9,60,{moved_open:1})]),[],'old completed tasks cannot hide unfinished work moved to another goal');
+assert.equal(nextQuietEnd([goal(9,60,{moved_open:1})],team,{},now),null,'no timer can promote a goal while moved work is unfinished');
+assert.equal(quietEndsAt(goal(9,15,{updated_at:'2000-01-01T00:00:00Z',moved_open:0}),{}),now,'the arrival time follows the completion candidate and quiet period, not the goal’s old edit time');
+
+const {toGoal}=await import(pathToFileURL(path.resolve(here,'../../coral-go/pkg/frontend/static/goals_adapter.js')).href);
+assert.deepEqual(ids([toGoal(goal(10,60,{moved_open:1}))]),[],'the goal detail adapter preserves the moved-work eligibility guard');
