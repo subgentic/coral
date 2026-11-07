@@ -48,10 +48,15 @@ async function httpJson(method, path, body, headers = {}) {
             await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: width < 768 });
             await Emulation.setTouchEmulationEnabled({ enabled: width < 768 });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
+            await ev(`(()=>{const original=window.fetch;window.__maskAskButtons=true;window.fetch=async(u,o)=>{const mask=window.__maskAskButtons&&new URL(String(u),location.href).pathname==='/api/operator-asks',r=await original(u,o);if(!mask||!r.ok)return r;const rows=await r.json();for(const a of rows)if(a.id===${binary})delete a.buttons;return Response.json(rows);};return true;})()`);
             await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => import(${S} + 'inbox_tab.js')).then(m => m.selectInboxTab('needs')).then(() => true)`);
+            await ev(`window.__maskAskButtons=false;true`);
             const row = `[...document.querySelectorAll('#group-table-view tbody tr')].find(r => r.textContent.includes('(yes-no)'))`;
             await waitFor(`!!(${row})`, width + ': explicit question in phone/desktop list', 15000);
-            await ev(`(${row}).querySelector('button[aria-label^="Answer the question of"]').click(); true`);
+            if(width===390) await ev(`(${row}).querySelector('.inbox-review-name').click();true`);
+            else if(width===320) await ev(`import(${S}+'inbox_link.js').then(m=>m.openNeed({kind:'ask',server:'',team:'${B}',id:'${binary}'})).then(()=>true)`);
+            else if(width===1440) { const stale={...binaryAsk};delete stale.buttons;await ev(`import(${S}+'operator_ask_dialog.js').then(m=>m.openAskDialog(${JSON.stringify(stale)})).then(()=>true)`); }
+            else await ev(`(${row}).querySelector('button[aria-label^="Answer the question of"]').click(); true`);
             await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open]')`, 'yes/no question opens', 6000);
             const geometry = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'), buttons = [...d.querySelectorAll('.inbox-ask-offer button')], box = d.querySelector('textarea').getBoundingClientRect(), send = d.querySelector('.inbox-ask-send').getBoundingClientRect(); return { labels: buttons.map(b => b.getAttribute('aria-label').split(',')[0]), buttons: buttons.map(b => { const r = b.getBoundingClientRect(); return { h: r.height, w: r.width, right: r.right, left: r.left, below: r.top >= box.bottom && Math.abs(r.top - send.top) <= 2 }; }), compose: !!d.querySelector('.inbox-ask-compose .inbox-ask-offers'), box: !!d.querySelector('textarea'), scrolls: document.documentElement.scrollWidth > innerWidth }; })()`);
             if (JSON.stringify(geometry.labels) !== JSON.stringify(['Approve', 'Deny']) || !geometry.compose || !geometry.box || geometry.scrolls || geometry.buttons.some(b => b.h < 44 || b.w < 44 || !b.below)) geometryFailures.push(width + ': ' + JSON.stringify(geometry));

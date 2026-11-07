@@ -1,5 +1,5 @@
 /* The question's reply box, pictures and offered actions; loaded when opened, not for the Inbox badge. */
-import { LOCAL_SERVER, boardTeamKey, normServer } from './server_base.js';
+import { LOCAL_SERVER, boardTeamKey, normServer, serverFetch } from './server_base.js';
 import { openWithQuestionReturn } from './suspend_native_dialog.js';
 import { markHidden } from './visible_marks.js';
 import { renderMarkdownStrict } from './utils.js';
@@ -13,8 +13,21 @@ await loadStyles('operator_ask_dialog.css');
 
 const isReply = action => /^reply$/.test(action);
 
-export function openAskDialog(a, onDone, runners = {}) {
+export async function openAskDialog(a, onDone, runners = {}) {
     a = { ...a, server: a.server || LOCAL_SERVER }; // freeze the question's computer across navigation
+    let choiceError = '';
+    // A list/deep-link snapshot can precede the stored button metadata. Read the
+    // captured computer before deciding that this question has no quick replies.
+    if (a.kind === 'ask' && !Array.isArray(a.buttons)) {
+        try {
+            const response = await serverFetch(a.server, '/api/operator-asks', { signal: AbortSignal.timeout(5000) });
+            if (!response.ok) throw new Error('Question choices could not be read.');
+            const rows = await response.json();
+            if (!Array.isArray(rows)) throw new Error('Question choices were not a list.');
+            const current = rows.find(row => row.kind === 'ask' && row.board === a.board && String(row.id) === String(a.id));
+            if (current) a.buttons = Array.isArray(current.buttons) ? current.buttons : [];
+        } catch { choiceError = 'Could not load answer choices. Close and reopen the question to try again.'; }
+    }
     const dlg = document.createElement('dialog');
     dlg.className = 'modal-content dlg-flow inbox-ask-dialog'; // shared flow size on wide screens; narrow CSS keeps the form size and phone sheet
     dlg.setAttribute('aria-labelledby', 'inbox-ask-title');
@@ -42,7 +55,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     const box = document.createElement('textarea'); box.className = 'field inbox-ask-box'; box.rows = 6; box.placeholder = 'Write a reply…'; box.maxLength = 8000; label.append(box);
     box.addEventListener('input', () => { box.style.height = 'auto'; box.style.height = `${box.scrollHeight + box.offsetHeight - box.clientHeight}px`; });
     const pics = document.createElement('div'); pics.className = 'inbox-ask-pics'; // pictures for the reply (#12173): the comment composer's tray, loaded with the dialog
-    const err = document.createElement('p'); err.className = 'inbox-ask-error'; err.setAttribute('role', 'alert');
+    const err = document.createElement('p'); err.className = 'inbox-ask-error'; err.setAttribute('role', 'alert'); err.textContent = choiceError;
     const row = document.createElement('div'); row.className = 'inbox-ask-buttons';
     const send = document.createElement('button'); send.type = 'button'; send.className = 'btn btn-primary inbox-ask-send'; send.textContent = 'Send reply';
     const close = document.createElement('button'); close.type = 'button'; close.className = 'btn'; close.textContent = 'Close';
