@@ -453,6 +453,7 @@ func TestOnlyTheClaimingAgentsClaimIsRenewedByItsWork(t *testing.T) {
 		g.add(20 * time.Minute)
 	}
 	assert.Equal(t, []string{"Agent A"}, g.holders(), "A's work keeps A's slot; B, with no work of its own, is left to its lease and went")
+}
 
 // #14026: a Codex agent's shell is a wrapper: the command the hook sees is `bash -lc "<what the agent typed>"` (or zsh -lc, /bin/bash -c). The combined form `claim --wait && <work>` must be let through there as it is bare,
 // and the work behind a claim that does not wait, or after the work, is still held.
