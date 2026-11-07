@@ -20,6 +20,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
     const problems = [];
     let tag = '';
         const scan = async (name, root, { sideways = true } = {}) => {
+                await ev(`document.fonts.ready.then(() => true)`); // the icons are measured in the icon font, not the fallback glyph that is still being swapped out ('414|agents list: 1 clipped: span.material-icons 21>18 menu', about 1 in 10 under load, #14319)
                 await ev(`window.__scanRoot = ${JSON.stringify(root || '')}; true`);
                 const r = await ev(SCAN);
                 if (r.missing) { problems.push(`${tag}|${name}: scene not found`); return; }
