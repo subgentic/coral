@@ -1620,10 +1620,10 @@ button.server-update-badge { background: transparent; font: inherit; cursor: poi
 .server-group-header .server-group-more { position: static; }
 .server-group-more:not([open]) > .server-switcher-panel { display: none; } /* a closed menu has no boxes */
 .server-group-more > .server-switcher-panel { left: auto; right: 0; top: calc(100% - 2px); min-width: min(16em, 100%); max-width: 100%; box-sizing: border-box; }
-/* Keep the search box usable: it gives up width down to 7em (the whole "Search agents" placeholder still shows, #10050) and only a very narrow sidebar wraps the header (#3085, #4062); at 200% text the buttons stay on the search box's row (UI/UX's #7562 point). */
+/* Keep the search box usable: it gives up width down to 8em (the whole "Search agents" placeholder still shows, #10050) and only a very narrow sidebar wraps the header (#3085, #4062); at 200% text the buttons stay on the search box's row (UI/UX's #7562 point). */
 .sidebar-header { flex-wrap: wrap; }
-.sidebar-header .sidebar-search { flex: 1 1 7em; min-width: 8em; container-type: inline-size; } /* 8 em, not 7: on macOS 26 with Chrome 157 the input loses 14 px of its width to something inside it (not its border, a scrollbar, the font or the platform look: measured on the mini, 88.7 px of text in 82 px), and at 7 em the placeholder 'Search agents' was cut; 16 px more is room on every machine (papercuts) */
-/* In a box that narrow (at 200% text the header's buttons leave it 7em) the magnifier goes and the placeholder takes its room: the whole placeholder is shown, and the box's name is the same. */
+.sidebar-header .sidebar-search { flex: 1 1 8em; min-width: 8em; container-type: inline-size; } /* 8 em, not 7: on macOS 26 with Chrome 157 the input loses 14 px of its width to something inside it (not its border, a scrollbar, the font or the platform look: measured on the mini, 88.7 px of text in 82 px), and at 7 em the placeholder 'Search agents' was cut; 16 px more is room on every machine (papercuts) */
+/* In a box that narrow (at 200% text the header's buttons leave it 8em) the magnifier goes and the placeholder takes its room: the whole placeholder is shown, and the box's name is the same. */
 @container (max-width: 8rem) { .sidebar-search-icon { display: none; } .sidebar-search-input.field-search { padding-left: 0.625rem; padding-right: 0.25rem; } }
 /* Status text for screen readers only (the dot carries it visually). */
 .group-server-line .sr-only {
