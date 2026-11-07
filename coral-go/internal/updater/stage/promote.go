@@ -116,9 +116,14 @@ func (c *checker) findPromotion(ctx context.Context, onlyTag string) (p *promoti
 			bundle, berr = c.cfg.Fetcher.Get(ctx, base+ManifestBundleFile, verify.MaxBundleBytes)
 		}
 		if merr != nil || berr != nil {
-			// A file the list says the release has and that answers 404 is not junk: it is a promotion published seconds ago that the download host doesn't serve yet. Skipping it
-			// would let an older promotion win this pass, so a revocation could lose to the promotion it revokes; it stops the pass like any other fetch error, and the network
-			// back-off tries again (Security's #337).
+			// A release named by the feed, which lists no assets, whose files answer 404 is a promote-* release without them: junk, not a promotion, and it must not stop every check.
+			if r.fromFeed && (notFound(merr) || notFound(berr)) {
+				junk++
+				continue
+			}
+			// A file the list says the release has (the API's list shows its assets) and that answers 404 is not junk: it is a promotion published seconds ago that the download host
+			// doesn't serve yet. Skipping it would let an older promotion win this pass, so a revocation could lose to the promotion it revokes; it stops the pass like any other fetch
+			// error, and the network back-off tries again (Security's #337).
 			if errors.Is(merr, verify.ErrTooLarge) || errors.Is(berr, verify.ErrTooLarge) {
 				skip(version, &verify.Failure{Stage: verify.StageManifestDocument, Reason: "a file of the promotion release is larger than the limit"}) // junk, not an outage: it must not hide the releases behind it
 				continue
