@@ -42,7 +42,7 @@ func TestRepoSettingsNeverReachTheSettingsFlag(t *testing.T) {
 	// Both the merged map and the whole launch's settings file.
 	merged := buildMergedSettings(nil)
 	files := &launchFiles{}
-	path := claudeSettingsFile(files, LaunchParams{WorkingDir: repo, SessionID: "0b7f0f4e-3c1b-4c55-9b0e-0f6b1b2f1a11"}, "0b7f0f4e-3c1b-4c55-9b0e-0f6b1b2f1a11")
+	path := claudeSettingsFile(files, LaunchParams{WorkingDir: repo, SessionID: "0b7f0f4e-3c1b-4c55-9b0e-0f6b1b2f1a11"}, "0b7f0f4e-3c1b-4c55-9b0e-0f6b1b2f1a11", true)
 	require.NoError(t, files.err)
 	t.Cleanup(func() { os.Remove(path) })
 	data, err := os.ReadFile(path)
@@ -81,7 +81,7 @@ func TestClaudeSettingsPutsTheToolsDirFirstOnPath(t *testing.T) {
 	rest := filepath.Join(t.TempDir(), "bin")
 	t.Setenv("PATH", rest)
 	files := &launchFiles{}
-	path := claudeSettingsFile(files, LaunchParams{WorkingDir: t.TempDir(), SessionID: "0b7f0f4e-3c1b-4c55-9b0e-0f6b1b2f1a11"}, "0b7f0f4e-3c1b-4c55-9b0e-0f6b1b2f1a11")
+	path := claudeSettingsFile(files, LaunchParams{WorkingDir: t.TempDir(), SessionID: "0b7f0f4e-3c1b-4c55-9b0e-0f6b1b2f1a11"}, "0b7f0f4e-3c1b-4c55-9b0e-0f6b1b2f1a11", true)
 	require.NoError(t, files.err)
 	t.Cleanup(func() { os.Remove(path) })
 	data, err := os.ReadFile(path)
