@@ -102,7 +102,7 @@ const MENU = (extra = {}) => ({ question: 'Quick safety check: Is this a project
             const cases = {
                 'no offer': [MENU({ trust_offer: false }), 1],
                 'no folder': [MENU({ trust_folder: '' }), 1],
-                'a hidden character in the folder': [MENU({ trust_folder: '/Users/qa/work/pro‮ject' }), 1],
+                'a hidden character in the folder': [MENU({ trust_folder: '/Users/qa/work/pro\u202Eject' }), 1],
                 'a lasting Yes with other words': [MENU({ options: [{ n: 1, label: 'No, exit', action: 'select' }, { n: 2, label: 'Yes, always trust this folder', action: 'select' }] }), 0],
                 'a third option': [MENU({ options: [{ n: 1, label: 'No, exit', action: 'select' }, { n: 2, label: 'Yes, I trust this folder', action: 'select' }, { n: 3, label: 'Yes, and every folder under it', action: 'select' }] }), 0],
             };
