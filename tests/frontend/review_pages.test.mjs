@@ -105,3 +105,48 @@ assert.equal(retained.snapshot()[0].total, null, 'a local decision invalidates s
 assert.deepEqual(retained.snapshot()[0].artifacts.map(r => r.id), ['new-two']);
 
 console.log('review_pages: bounded first reads, isolated cursors, stable append/retry, authoritative metadata and stale-query rejection pass');
+
+// A background refresh may skip only a source whose complete loaded window has
+// one explicit revision. Forced refresh and invalidation always read again.
+const freshReads = [], checked = [];
+let rev = 7, mixed = false;
+const fresh = createReviewPages({ key, read: async (server, options) => {
+    freshReads.push([server, options.cursor]);
+    return page([row(server, options.cursor || 'first')], { artifacts_rev: mixed && options.cursor ? rev + 1 : rev, artifacts_board: 'anchor',
+        has_more: !options.cursor, next_cursor: options.cursor ? '' : 'next' });
+} });
+fresh.reset(['one', 'two']); await fresh.load(); await fresh.more('one');
+const unchanged = async (server, stamp) => { checked.push([server, stamp]); return server === 'one'; };
+freshReads.length = 0;
+await fresh.refresh({ unchanged });
+assert.deepEqual(freshReads, [['two', '']], 'unchanged source retains both loaded pages; changed source alone rereads');
+assert.deepEqual(checked, [['one', { rev: 7, team: 'anchor' }], ['two', { rev: 7, team: 'anchor' }]]);
+assert.equal(fresh.status()[0].loadedCount, 2);
+freshReads.length = 0; await fresh.refresh();
+assert.deepEqual(freshReads, [['one', ''], ['two', ''], ['one', 'next']], 'forced refresh retains loaded depth');
+fresh.remove(() => false); checked.length = 0;
+await fresh.refresh({ unchanged });
+assert.equal(checked.length, 0, 'local invalidation discards freshness without dropping rows');
+mixed = true; await fresh.refresh(); checked.length = 0;
+await fresh.refresh({ unchanged });
+assert.deepEqual(checked.map(c => c[0]), ['two'], 'mixed page revisions cannot skip the next refresh');
+
+// Unknown/legacy revisions and a failed refresh must never freeze a window.
+let stamp = {}, broken = false, reads = 0, skips = 0;
+const fallback = createReviewPages({ key, read: async () => {
+    reads++; if (broken) throw new Error('offline');
+    return page([row('team', 'only')], stamp);
+} });
+fallback.reset(['box']); await fallback.load();
+const saysUnchanged = async () => { skips++; return true; };
+await fallback.refresh({ unchanged: saysUnchanged });
+assert.equal(reads, 2); assert.equal(skips, 0, 'legacy pages have no freshness hint');
+stamp = { artifacts_rev: 4 }; await fallback.refresh();
+await fallback.refresh({ unchanged: saysUnchanged });
+assert.equal(skips, 0, 'a revision without an anchor cannot suppress reads');
+stamp.artifacts_board = 'anchor'; await fallback.refresh();
+broken = true; await fallback.refresh(); broken = false;
+const beforeRecovery = reads;
+await fallback.refresh({ unchanged: saysUnchanged });
+assert.equal(reads, beforeRecovery + 1, 'a failed window retries even when its old revision still matches');
+assert.equal(skips, 0);

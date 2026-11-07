@@ -14,7 +14,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await ev(`(async () => {
             const base = window.__coralStatic || '/static/';
             const team = 'idle-artifacts-probe', hex = '1'.repeat(64);
-            const probe = window.__artifactIdle = { rev: 1, lists: 0, statuses: 0, legacy: false, fail: false, rows: [] };
+            const probe = window.__artifactIdle = { rev: 1, lists: 0, statuses: 0, reads: [], legacy: false, fail: false, rows: [] };
             const original = window.fetch;
             const json = (body, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }));
             window.fetch = (u, o) => {
@@ -22,9 +22,9 @@ const { coralReady, framesJs } = require('./helpers/wait');
                 if (url.pathname === '/api/board/projects') return json([{ project: team }]);
                 if (url.pathname === '/api/board/' + team + '/status' || url.pathname === '/api/board/~no-team/status') { probe.statuses++; return probe.fail ? json({}, 503) : json(probe.legacy ? {} : { artifacts_rev: url.pathname.includes('~no-team') ? probe.rev + 1000 : probe.rev, artifacts_all_rev: probe.rev }); }
                 if (url.pathname === '/api/system/artifact-store/kept') return json({ kept: [] });
-                if (url.pathname === '/api/team-artifacts') { probe.lists++; return json({ artifacts: probe.rows.map(a => ({ ...a, board_id: team, team })), teams: [], artifacts_board: team, artifacts_rev: probe.rev, all: probe.rows.length, total: probe.rows.length, has_more: false }); }
+                if (url.pathname === '/api/team-artifacts') { probe.lists++; probe.reads.push({ url: url.pathname + url.search, stack: new Error().stack }); return json({ artifacts: probe.rows.map(a => ({ ...a, board_id: team, team })), teams: [], artifacts_board: team, artifacts_rev: probe.rev, all: probe.rows.length, total: probe.rows.length, has_more: false }); }
                 if (url.pathname === '/api/board/' + team + '/artifacts') {
-                    probe.lists++;
+                    probe.lists++; probe.reads.push({ url: url.pathname + url.search, stack: new Error().stack });
                     return json({ project: team, artifacts: url.searchParams.get('tag') === 'saved' ? [] : probe.rows, has_more: false, ...(probe.legacy ? {} : { artifacts_rev: probe.rev }) });
                 }
                 return original(u, o);
@@ -40,12 +40,12 @@ const { coralReady, framesJs } = require('./helpers/wait');
             const counts = await import(base + 'inbox_artifacts.js');
             await counts.refreshArtifactCount();
             await ${framesJs(2)};
-            probe.lists = 0;
+            probe.lists = 0; probe.reads = [];
             probe.interval = setInterval(() => { probe.module.refreshReviews(); counts.refreshArtifactCount(); }, 1000);
             probe.hex = hex; probe.team = team;
         })()`);
         console.log('artifacts_idle_browser: observing 60 seconds of unchanged-board idle');
-        const idle = await ev(`new Promise(resolve => setTimeout(() => { const p = window.__artifactIdle; clearInterval(p.interval); resolve({ lists: p.lists, statuses: p.statuses }); }, 60000))`);
+        const idle = await ev(`new Promise(resolve => setTimeout(() => { const p = window.__artifactIdle; clearInterval(p.interval); resolve({ lists: p.lists, statuses: p.statuses, reads: p.reads }); }, 60000))`);
         assert.equal(idle.lists, 0, 'unchanged board must make zero artifact list reads in 60 s: ' + JSON.stringify(idle));
         assert.ok(idle.statuses > 0, 'freshness is checked, rather than disabling refresh');
         const result = await ev(`(async () => {
