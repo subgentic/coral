@@ -62,3 +62,45 @@ func TestAPoolIsDefinedClaimedAndListedWithTheMachineEachHolderGot(t *testing.T)
 	code, _ = g.do("operator", "DELETE", "/api/resources/mini", nil)
 	assert.Equal(t, 409, code, "a resource in a pool is not removed from under it: told as a conflict")
 }
+
+// #14354: where a run through a resource happens is defined by the Operator or an Orchestrator (here, remote or nothing), and the claim's answer carries it: for a pool's grant the member's, for a plain
+// resource its own. Anything else is refused.
+func TestAResourceIsDefinedHereOrRemoteAndAClaimCarriesIt(t *testing.T) {
+	g := newResRig(t)
+	g.subscribe("alpha", "Dev A", "Developer", false)
+	g.subscribe("alpha", "Dev B", "Developer", false)
+	code, _ := g.do("operator", "PUT", "/api/resources/box", map[string]any{"slots": 1, "where": "elsewhere"})
+	assert.Equal(t, 400, code, "only here or remote")
+	code, _ = g.do("token:Dev A", "PUT", "/api/resources/box", map[string]any{"slots": 1, "where": "remote"})
+	assert.Equal(t, 403, code, "an agent that is not a manager cannot say where a resource runs")
+	code, v := g.do("operator", "PUT", "/api/resources/near", map[string]any{"slots": 1, "machine": "Mac", "where": "here"})
+	require.Equal(t, 200, code)
+	assert.Equal(t, "here", v["where"])
+	code, _ = g.do("operator", "PUT", "/api/resources/far", map[string]any{"slots": 1, "machine": "Far", "where": "remote"})
+	require.Equal(t, 200, code)
+	code, _ = g.do("operator", "PUT", "/api/resources/silent", map[string]any{"slots": 1, "machine": "Epoch"})
+	require.Equal(t, 200, code)
+	code, _ = g.do("operator", "PUT", "/api/resources/both", map[string]any{"members": []string{"near", "far"}})
+	require.Equal(t, 200, code)
+
+	// a plain resource's claim carries its own where; one that says nothing carries none
+	code, a := g.do("token:Dev A", "POST", "/api/resources/silent/claim", map[string]any{})
+	require.Equal(t, 200, code)
+	assert.NotContains(t, a["entry"].(map[string]any), "where", "a resource that says nothing: nothing is carried")
+	code, _ = g.do("token:Dev A", "POST", "/api/resources/silent/release", map[string]any{})
+	require.Equal(t, 200, code)
+	code, b := g.do("token:Dev A", "POST", "/api/resources/far/claim", map[string]any{})
+	require.Equal(t, 200, code)
+	assert.Equal(t, "remote", b["entry"].(map[string]any)["where"])
+	code, _ = g.do("token:Dev A", "POST", "/api/resources/far/release", map[string]any{})
+	require.Equal(t, 200, code)
+	// a pool's grant carries the member's
+	code, c := g.do("token:Dev A", "POST", "/api/resources/both/claim", map[string]any{})
+	require.Equal(t, 200, code)
+	assert.Equal(t, "near", c["entry"].(map[string]any)["member"])
+	assert.Equal(t, "here", c["entry"].(map[string]any)["where"])
+	code, d := g.do("token:Dev B", "POST", "/api/resources/both/claim", map[string]any{})
+	require.Equal(t, 200, code)
+	assert.Equal(t, "far", d["entry"].(map[string]any)["member"])
+	assert.Equal(t, "remote", d["entry"].(map[string]any)["where"])
+}

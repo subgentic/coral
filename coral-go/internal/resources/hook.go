@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	heavypkg "github.com/subgentic/coral/internal/heavy"
 	"github.com/subgentic/coral/internal/proctree"
 	"github.com/subgentic/coral/internal/shellkill"
 	"github.com/subgentic/coral/pkg/resourcequeue"
@@ -356,7 +355,7 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 	// already in the line or holding?
 	mine, holding := entryOf(st, agent)
 	if mine != nil && holding {
-		if machine, remote := h.onMini(res, mine); remote { // the pool's slot is on the mini: not run here (#13751)
+		if machine, remote := h.onRemote(res, mine); remote { // the pool's slot is on a remote machine: not run here (#13751)
 			if ah := h.hold[key]; ah != nil {
 				ah.session = session
 				ah.window = h.o.Now().Add(h.o.ClaimWindow)
@@ -383,7 +382,7 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 		ah := &autoHold{entry: r.Entry.ID, session: session, name: name, pattern: pattern, calls: map[string]bool{}, refused: map[string]bool{}}
 		h.hold[key] = ah
 		if r.Granted {
-			if machine, remote := h.onMini(res, &r.Entry); remote { // granted a slot on the mini: not run here; the agent is told how, and keeps the slot a moment for the follow-up
+			if machine, remote := h.onRemote(res, &r.Entry); remote { // granted a slot on a remote machine: not run here; the agent is told how, and keeps the slot a moment for the follow-up
 				ah.granted = h.o.Now()
 				ah.window = ah.granted.Add(h.o.ClaimWindow)
 				h.event(HookEvent{Kind: "redirected", Resource: res.Key, Pattern: pattern, Agent: agent, Session: session})
@@ -417,22 +416,22 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 // redirection is what an agent is told when the pool gave it a slot on another machine: the command did not run here. It names the pool and the machine, never the command.
 func redirection(pool, machine string, window time.Duration) string {
 	if machine == "" {
-		machine = "the mini"
+		machine = "a remote machine"
 	}
 	return fmt.Sprintf("Coral did NOT run this command here: the %s pool gave your slot on %s. Run the SAME command there with: coral-board heavy run -- <your command>   (one tool call; it runs there and gives the slot back when it ends). "+
 		"Your slot is kept for %d minutes. Do not retry the command here.", pool, machine, int(window/time.Minute))
 }
 
-// onMini says whether the pool entry holds a slot on the mini, and that machine's name for the message.
-func (h *Hook) onMini(res resourcequeue.Resource, e *resourcequeue.Entry) (string, bool) {
+// onRemote says whether the pool entry holds a slot on a remote machine (its resource is defined remote, #14354), and that machine's name for the message.
+func (h *Hook) onRemote(res resourcequeue.Resource, e *resourcequeue.Entry) (string, bool) {
 	if len(res.Members) == 0 || e == nil || e.Member == "" {
 		return "", false
 	}
-	machine := ""
+	machine, remote := "", false
 	if ms, err := h.m.Queue().Status(e.Member); err == nil {
-		machine = ms.Resource.Machine
+		machine, remote = ms.Resource.Machine, ms.Resource.Where == resourcequeue.WhereRemote
 	}
-	return machine, heavypkg.OnMini(e.Member, machine)
+	return machine, remote
 }
 
 // attachHeavyRun ties the agent's pool hold to the heavy-run call that follows a redirect: the slot is then the call's, kept while it runs and given back when it ends.

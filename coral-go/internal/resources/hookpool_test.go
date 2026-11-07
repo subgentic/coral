@@ -20,8 +20,8 @@ func poolRig(t *testing.T) *hookRig {
 	g := newHookRig(t)
 	q := g.m.Queue()
 	require.NoError(t, q.Remove("mac-heavy"))
-	require.NoError(t, q.Define(resourcequeue.Resource{Key: "mac-heavy", Slots: 1, Machine: "Mac", MaxLease: 30 * time.Minute, Match: []string{"node run_cdp_suites.mjs"}})) // the Mac-only patterns live on the Mac's own resource
-	require.NoError(t, q.Define(resourcequeue.Resource{Key: "mini", Slots: 1, Machine: "Mini", MaxLease: 10 * time.Minute}))
+	require.NoError(t, q.Define(resourcequeue.Resource{Key: "mac-heavy", Slots: 1, Machine: "Mac", Where: resourcequeue.WhereHere, MaxLease: 30 * time.Minute, Match: []string{"node run_cdp_suites.mjs"}})) // the Mac-only patterns live on the Mac's own resource
+	require.NoError(t, q.Define(resourcequeue.Resource{Key: "mini", Slots: 1, Machine: "Mini", Where: resourcequeue.WhereRemote, MaxLease: 10 * time.Minute}))
 	require.NoError(t, q.Define(resourcequeue.Resource{Key: "heavy", Members: []string{"mac-heavy", "mini"}, Match: []string{"go test ./..."}}))
 	g.agents["s-d"] = "Agent D"
 	return g
@@ -109,27 +109,39 @@ var _ = context.Background
 
 // QA Reviewer 2's pins on #13751.
 
-// The mini is told by its machine as well as by its member's name: a member called something else whose machine is Mini is still the mini.
-func TestAMemberNamedOtherwiseWhoseMachineIsMiniIsStillRedirected(t *testing.T) {
+// A slot is remote by what its resource's definition says (#14354), not by a name: a member called anything whose resource says remote is redirected.
+func TestAMemberWhoseResourceSaysRemoteIsRedirectedWhateverItIsCalled(t *testing.T) {
 	g := newHookRig(t)
 	q := g.m.Queue()
 	require.NoError(t, q.Remove("mac-heavy"))
-	require.NoError(t, q.Define(resourcequeue.Resource{Key: "studio", Slots: 1, Machine: "Mac", MaxLease: 30 * time.Minute}))
-	require.NoError(t, q.Define(resourcequeue.Resource{Key: "box2", Slots: 1, Machine: "Mini", MaxLease: 30 * time.Minute})) // named otherwise, machine Mini
+	require.NoError(t, q.Define(resourcequeue.Resource{Key: "studio", Slots: 1, Machine: "Mac", Where: resourcequeue.WhereHere, MaxLease: 30 * time.Minute}))
+	require.NoError(t, q.Define(resourcequeue.Resource{Key: "box2", Slots: 1, Machine: "Mini", Where: resourcequeue.WhereRemote, MaxLease: 30 * time.Minute})) // named otherwise: its definition says remote
 	require.NoError(t, q.Define(resourcequeue.Resource{Key: "heavy", Members: []string{"studio", "box2"}, Match: []string{"go test ./..."}}))
 	require.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy), "the first member is a Mac: it runs")
 	msg := g.h.Before(t.Context(), "s-b", "s-b", "call-2", heavy)
-	assert.Contains(t, msg, "coral-board heavy run --", "granted box2 whose machine is Mini: not run here")
+	assert.Contains(t, msg, "coral-board heavy run --", "granted box2 whose resource says remote: not run here")
 	assert.Contains(t, msg, "Mini")
-	// and the reverse: a member named mini whose machine says Mac is the mini by its name (the CLI's rule is the same)
+	// and the reverse: a member named mini whose resource says here runs here: the name decides nothing (the CLI's rule is the same)
 	g2 := newHookRig(t)
 	q2 := g2.m.Queue()
 	require.NoError(t, q2.Remove("mac-heavy"))
-	require.NoError(t, q2.Define(resourcequeue.Resource{Key: "one", Slots: 1, Machine: "Mac", MaxLease: 30 * time.Minute}))
-	require.NoError(t, q2.Define(resourcequeue.Resource{Key: "mini", Slots: 1, Machine: "Mac", MaxLease: 30 * time.Minute}))
+	require.NoError(t, q2.Define(resourcequeue.Resource{Key: "one", Slots: 1, Machine: "Mac", Where: resourcequeue.WhereHere, MaxLease: 30 * time.Minute}))
+	require.NoError(t, q2.Define(resourcequeue.Resource{Key: "mini", Slots: 1, Machine: "Mac", Where: resourcequeue.WhereHere, MaxLease: 30 * time.Minute}))
 	require.NoError(t, q2.Define(resourcequeue.Resource{Key: "heavy", Members: []string{"one", "mini"}, Match: []string{"go test ./..."}}))
 	require.Equal(t, "", g2.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy))
-	assert.Contains(t, g2.h.Before(t.Context(), "s-b", "s-b", "call-2", heavy), "coral-board heavy run --")
+	assert.Equal(t, "", g2.h.Before(t.Context(), "s-b", "s-b", "call-2", heavy), "a member named mini whose resource says here is run here: no redirect")
+}
+
+// A resource that says nothing about where it runs is not redirected by the hook either (heavy run refuses it, #14354): the hook only redirects what is defined remote.
+func TestAMemberWhoseResourceSaysNothingIsNotRedirected(t *testing.T) {
+	g := newHookRig(t)
+	q := g.m.Queue()
+	require.NoError(t, q.Remove("mac-heavy"))
+	require.NoError(t, q.Define(resourcequeue.Resource{Key: "one", Slots: 1, Machine: "Mac", MaxLease: 30 * time.Minute}))
+	require.NoError(t, q.Define(resourcequeue.Resource{Key: "mini", Slots: 1, Machine: "Mini", MaxLease: 30 * time.Minute}))
+	require.NoError(t, q.Define(resourcequeue.Resource{Key: "heavy", Members: []string{"one", "mini"}, Match: []string{"go test ./..."}}))
+	require.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy))
+	assert.Equal(t, "", g.h.Before(t.Context(), "s-b", "s-b", "call-2", heavy), "no Where: no redirect")
 }
 
 // Once the follow-up heavy run has started, the sweep never frees the slot, however far the clock goes past the claim window, while the call is running; and each sweep keeps the lease renewed.

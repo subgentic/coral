@@ -27,7 +27,7 @@ the Orchestrator can move you.
                                                   A slot now (exit 0), or a place in line: with --wait the command waits until the slot is yours
   resource release <name>                         Give the slot back, or leave the line
   resource renew <name>                           A full lease from now
-  resource define <name> (--slots N | --pool a,b) [--machine M] [--lease 30m] [--allow a,b] [--match "go test ./..."]...
+  resource define <name> (--slots N | --pool a,b) [--machine M] [--here | --remote] [--lease 30m] [--allow a,b] [--match "go test ./..."]...
                                                   The Operator or an Orchestrator: make or change a resource
   resource remove <name>                          The Operator or an Orchestrator
   resource move <entry-id> first|up|down          The Operator or an Orchestrator: reorder the line
@@ -102,6 +102,7 @@ type resView struct {
 	Name     string     `json:"name"`
 	Slots    int        `json:"slots"`
 	Machine  string     `json:"machine"`
+	Where    string     `json:"where"` // here or remote; empty says nothing (#14354)
 	MaxLease int        `json:"max_lease_seconds"`
 	Members  []string   `json:"members"`
 	Holders  []resEntry `json:"holders"`
@@ -112,6 +113,9 @@ func printResource(v resView, me string) {
 	where := ""
 	if v.Machine != "" {
 		where = " on " + v.Machine
+	}
+	if v.Where != "" {
+		where += " (" + v.Where + ")" // a run through it happens here or remotely (#14354)
 	}
 	if len(v.Members) > 0 {
 		where = " (pool of " + strings.Join(v.Members, ", ") + ")"
@@ -291,12 +295,19 @@ func resourceDefine(rest []string) {
 	fs := flag.NewFlagSet("resource-define", flag.ContinueOnError)
 	slots := fs.Int("slots", 0, "how many may hold it at once")
 	machine := fs.String("machine", "", "where it is, for people to read")
+	here := fs.Bool("here", false, "a run through it happens on the machine this Coral is on (coral-board heavy run)")
+	remote := fs.Bool("remote", false, "a run through it happens on another machine, through the ssh alias coral-heavy-<machine> (coral-board heavy run)")
 	lease := fs.Duration("lease", 0, "how long a claim lasts unless renewed (default 30m)")
 	pool := fs.String("pool", "", "a pool: comma-separated resources whose slots it hands out, first free one in order (no --slots)")
 	allow := fs.String("allow", "", "comma-separated agents that may claim it (default: everyone)")
 	var match listFlag
 	fs.Var(&match, "match", `a shell command that claims it by itself, such as "go test ./..." (repeat for more; the hook, off without one)`)
 	clihelp.ParseFlags(fs, rest[1:], func() string { return resourceUsageText })
+	if *here && *remote {
+		fmt.Fprintln(os.Stderr, "--here or --remote, not both")
+		exitFn(1)
+		return
+	}
 	if *pool != "" && *slots != 0 {
 		fmt.Fprintln(os.Stderr, "A pool has no slots of its own: --pool a,b or --slots N, not both")
 		exitFn(1)
@@ -308,6 +319,11 @@ func resourceDefine(rest []string) {
 		return
 	}
 	body := map[string]any{"slots": *slots, "machine": *machine, "max_lease_seconds": int(lease.Seconds())}
+	if *here {
+		body["where"] = "here"
+	} else if *remote {
+		body["where"] = "remote"
+	}
 	if *pool != "" {
 		body["members"] = strings.Split(*pool, ",")
 	}

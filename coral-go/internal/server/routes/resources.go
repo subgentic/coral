@@ -59,12 +59,14 @@ type entryView struct {
 	StuckMin  int    `json:"stuck_min,omitempty"` // how long, in minutes
 	Member    string `json:"member,omitempty"`    // a pool's hold: the member it was granted (#13719)
 	Machine   string `json:"machine,omitempty"`   // and that member's machine, for people to read
+	Where     string `json:"where,omitempty"`     // here or remote, of the resource that was granted (the member's for a pool): what heavy run decides by (#14354)
 }
 
 type resourceView struct {
 	Name     string      `json:"name"`
 	Slots    int         `json:"slots"`
 	Machine  string      `json:"machine,omitempty"`
+	Where    string      `json:"where,omitempty"` // here or remote; empty says nothing (#14354)
 	MaxLease int         `json:"max_lease_seconds"`
 	Members  []string    `json:"members,omitempty"` // a pool: its members, in the order they are tried
 	Allowed  []string    `json:"allowed,omitempty"`
@@ -87,7 +89,7 @@ func viewStatus(st resourcequeue.Status) resourceView {
 	if lease <= 0 {
 		lease = resourcequeue.DefaultLease
 	}
-	v := resourceView{Name: st.Resource.Key, Slots: st.Resource.Slots, Machine: st.Resource.Machine, MaxLease: int(lease / time.Second), Members: st.Resource.Members, Allowed: st.Resource.Allowed, Match: st.Resource.Match, Holders: []entryView{}, Queue: []entryView{}}
+	v := resourceView{Name: st.Resource.Key, Slots: st.Resource.Slots, Machine: st.Resource.Machine, Where: st.Resource.Where, MaxLease: int(lease / time.Second), Members: st.Resource.Members, Allowed: st.Resource.Allowed, Match: st.Resource.Match, Holders: []entryView{}, Queue: []entryView{}}
 	for _, e := range st.Holders {
 		v.Holders = append(v.Holders, viewEntry(e, 0))
 	}
@@ -256,10 +258,15 @@ func (h *ResourcesHandler) Claim(w http.ResponseWriter, r *http.Request) {
 		code = http.StatusAccepted
 	}
 	ev := viewEntry(res.Entry, res.Place)
-	if ev.Member != "" {
-		if ms, err := h.M.Queue().Status(ev.Member); err == nil {
+	granted := ev.Member // a pool's grant is on its member; any other is on the resource itself
+	if granted == "" {
+		granted = res.Entry.Resource
+	}
+	if ms, err := h.M.Queue().Status(granted); err == nil {
+		if ev.Member != "" {
 			ev.Machine = ms.Resource.Machine // a pool's grant says which machine it is on
 		}
+		ev.Where = ms.Resource.Where // and whether that is here or remote (#14354)
 	}
 	writeJSON(w, code, map[string]any{"granted": res.Granted, "place": res.Place, "entry": ev})
 }
@@ -340,6 +347,7 @@ func (h *ResourcesHandler) Define(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Slots     int      `json:"slots"`
 		Machine   string   `json:"machine"`
+		Where     string   `json:"where"` // here or remote (#14354)
 		MaxLeaseS int      `json:"max_lease_seconds"`
 		Allowed   []string `json:"allowed"`
 		Match     []string `json:"match"`
@@ -354,13 +362,17 @@ func (h *ResourcesHandler) Define(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "name: letters, digits, dot, dash and underscore, up to 64; slots 1 to 100 (none for a pool, which lists up to 8 members); a lease up to a day; at most 100 allowed agents")
 		return
 	}
+	if body.Where != "" && body.Where != resourcequeue.WhereHere && body.Where != resourcequeue.WhereRemote {
+		errBadRequest(w, "where: here (runs on the machine this Coral is on) or remote (runs on another one, through the Operator's ssh alias for it), or leave it out")
+		return
+	}
 	allowed := make([]string, 0, len(body.Allowed))
 	for _, a := range body.Allowed {
 		if a = cleanText(a, 128); a != "" {
 			allowed = append(allowed, a)
 		}
 	}
-	if err := h.M.Queue().Define(resourcequeue.Resource{Key: name, Slots: body.Slots, Members: cleanMembers(body.Members), Machine: cleanText(body.Machine, 128), MaxLease: time.Duration(body.MaxLeaseS) * time.Second, Allowed: allowed, Match: body.Match}); err != nil {
+	if err := h.M.Queue().Define(resourcequeue.Resource{Key: name, Slots: body.Slots, Members: cleanMembers(body.Members), Machine: cleanText(body.Machine, 128), Where: body.Where, MaxLease: time.Duration(body.MaxLeaseS) * time.Second, Allowed: allowed, Match: body.Match}); err != nil {
 		h.fail(w, err)
 		return
 	}

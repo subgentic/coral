@@ -19,19 +19,18 @@ import (
 	"github.com/subgentic/coral/internal/gitutil"
 	"github.com/subgentic/coral/internal/heavy"
 	"github.com/subgentic/coral/internal/safego"
+	"github.com/subgentic/coral/pkg/resourcequeue"
 )
 
 const heavyUsageText = `Usage: coral-board heavy run [--pool heavy] [--timeout 90m] -- <command...>
 
-Runs a heavy command on whichever machine the pool gives you (the Mac or the mini); you never name the machine.
+Runs a heavy command on whichever machine the pool gives you (this one or a remote machine of the pool); you never name the machine.
 It claims the pool (waiting in line if it is busy), runs the command there, streams its output, returns its exit
-code and gives the slot back. On the Mac the command runs here. On the mini your worktree (git's file list, minus
+code and gives the slot back. On this machine the command runs here. On a remote machine your worktree (git's file list, minus
 secret-looking names and links that leave it) is sent and the command runs in a fresh private folder there with a
 small allowlisted environment; the folder is deleted afterwards. One argument is a shell line; several are quoted.
-Commands for the Mac only (those that name ~/.coral or port 8420) are refused on the mini: use coral-board resource claim mac-heavy.`
-
-// heavyOnMini says whether a pool grant is the mini (by the member's name or its machine).
-func heavyOnMini(member, machine string) bool { return heavy.OnMini(member, machine) }
+Commands for this machine only (those that name ~/.coral or port 8420) are refused on a remote machine: claim a resource of this machine and run them yourself.
+A resource that does not say where it runs (here or remote) is refused: the Operator or an Orchestrator defines it with coral-board resource define <name> ... --here or --remote.`
 
 var heavyWord = regexp.MustCompile(`^[A-Za-z0-9_./:=@%+,-]+$`)
 
@@ -51,7 +50,7 @@ func heavyCommand(args []string) string {
 	return strings.Join(parts, " ")
 }
 
-// heavyMacOnly: a command that names the person's Coral folder or its port is for the Mac (a guard against mistakes, not a boundary: the boundary is the restricted account).
+// heavyMacOnly: a command that names the person's Coral folder or its port is for this machine (a guard against mistakes, not a boundary: the boundary is the restricted account).
 var heavyMacOnly = regexp.MustCompile(`(^|[ /~="'])\.coral(/|\b)|\b8420\b`)
 
 func cmdHeavy() {
@@ -90,6 +89,7 @@ func cmdHeavy() {
 		Entry   struct {
 			Member     string `json:"member"`
 			Machine    string `json:"machine"`
+			Where      string `json:"where"`
 			LeaseUntil string `json:"lease_until"`
 		} `json:"entry"`
 	}
@@ -121,10 +121,18 @@ func cmdHeavy() {
 	if where == "" {
 		where = res.Entry.Member
 	}
-	mini := heavyOnMini(res.Entry.Member, res.Entry.Machine)
-	if mini && heavyMacOnly.MatchString(command) {
+	// Where the run happens is what the granted resource's definition says (#14354), never a name in this code: remote goes through the Operator's ssh alias for the machine, here runs in this folder, and a resource
+	// that says neither is refused, so a run is never silently done on the wrong machine (epoch-go once ran on the Mac).
+	if res.Entry.Where != resourcequeue.WhereHere && res.Entry.Where != resourcequeue.WhereRemote {
 		release()
-		fmt.Printf("[heavy] the pool gave you %s, and this command is for the Mac only (it names ~/.coral or port 8420): run it with coral-board resource claim mac-heavy.\n", plainText(where))
+		fmt.Printf("[heavy] the pool gave you %s, but its resource does not say where it runs, so nothing was run. Ask the Operator or an Orchestrator to define it: coral-board resource define <name> ... --here (runs on this machine) or --remote (runs on another one).\n", plainText(where))
+		exitFn(2)
+		return
+	}
+	remote := res.Entry.Where == resourcequeue.WhereRemote
+	if remote && heavyMacOnly.MatchString(command) {
+		release()
+		fmt.Printf("[heavy] the pool gave you %s, and this command is for this machine only (it names ~/.coral or port 8420): claim a resource of this machine and run it yourself.\n", plainText(where))
 		exitFn(2)
 		return
 	}
@@ -155,7 +163,7 @@ func cmdHeavy() {
 		}
 	}()
 	var code int
-	if mini {
+	if remote {
 		code = heavyRunRemote(runCtx, command, *timeout, where)
 	} else {
 		code = heavyRunLocal(runCtx, command)
@@ -204,7 +212,7 @@ func heavyRenewEvery(lease time.Duration) time.Duration {
 	return d
 }
 
-// heavyRunLocal runs the command here, in this folder, with this environment: the pool gave the Mac.
+// heavyRunLocal runs the command here, in this folder, with this environment: the pool gave this machine.
 func heavyRunLocal(ctx context.Context, command string) int {
 	c := exec.CommandContext(ctx, "sh", "-c", command)
 	heavyOwnGroup(c) // its own process group, killed whole when the run is stopped: the shell dying alone would leave the command running
@@ -228,7 +236,7 @@ func heavyRunRemote(ctx context.Context, command string, timeout time.Duration, 
 	}
 	topOut, err := gitutil.Command(ctx, "", "rev-parse", "--show-toplevel").Output()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "[heavy] the mini runs a copy of a git worktree: run this from inside one (or claim mac-heavy)")
+		fmt.Fprintln(os.Stderr, "[heavy] a remote machine runs a copy of a git worktree: run this from inside one (or claim a resource of this machine)")
 		return 1
 	}
 	top := strings.TrimSpace(string(topOut))
@@ -274,4 +282,3 @@ func heavyRunRemote(ctx context.Context, command string, timeout time.Duration, 
 	}
 	return code
 }
-
