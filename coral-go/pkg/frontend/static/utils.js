@@ -6,6 +6,7 @@ import './agent_view.js';
 import { browserLocal } from './safe_storage.js';
 import './dock_page.js';
 import { showToast } from './notifications.js';
+import { markHidden } from './visible_marks.js';
 export { MORE_DOTS_SVG, escapeAttr, escapeHtml, tagColor } from './html_escape.js';
 export { notificationLinkTarget, showAlertNotification, showNotificationToast, showToast, showWorkflowNotification } from './notifications.js';
 export { buildWelcome, showView, viewChanges } from './view_switch.js';
@@ -185,13 +186,15 @@ const FILE_ID = /^[0-9a-f]{32}$/;
 /** The row's file id, or '' when it has none or it is not a 32-hex id (a row from an older server). */
 export const fileIdOf = it => (it && typeof it.file_id === 'string' && FILE_ID.test(it.file_id) ? it.file_id : '');
 
-/** The row's version line exactly as the server told it ("version N of <name> (file <id>)"), or ''. */
-export const versionLineOf = it => (fileIdOf(it) && typeof it.version_line === 'string' ? it.version_line.slice(0, 300) : '');
+/** The row's version line as the server told it ("version N of <name> (file <id>)"), or ''. The file's name is an agent's text, so every hidden or reordering character in it is written out (<U+202E>) on every surface that shows the line (#14178). */
+export const versionLineOf = it => (fileIdOf(it) && typeof it.version_line === 'string' ? markHidden(it.version_line.slice(0, 300), { strict: true }) : '');
 
 /** Copy the file id: the id an agent passes to --new-version-of (add @<version> for one version). toast(text, isError) tells the person. */
 export function copyFileId(it, toast) {
     const id = fileIdOf(it);
     if (!id) return Promise.resolve(false);
     const say = (t, bad) => { try { toast?.(t, bad); } catch { /* the toast is a courtesy */ } };
-    return Promise.resolve(navigator.clipboard?.writeText(id)).then(() => { say('File ID copied'); return true; }, () => { say('The file ID could not be copied', true); return false; });
+    const failed = () => { say('The file ID could not be copied', true); return false; };
+    if (typeof navigator === 'undefined' || !navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') return Promise.resolve(failed()); // no clipboard is a failed copy, never "copied" (UI Reviewer, #14178)
+    try { return Promise.resolve(navigator.clipboard.writeText(id)).then(() => { say('File ID copied'); return true; }, failed); } catch { return Promise.resolve(failed()); }
 }

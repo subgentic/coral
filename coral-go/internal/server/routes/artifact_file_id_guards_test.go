@@ -23,7 +23,8 @@ func TestATaskChainJoinNeverRefusesOnAFileName(t *testing.T) {
 	require.NoError(t, err)
 	code, out := k.upTask("s1", root.ID, "plan, version one", "")
 	require.Equal(t, 201, code, out)
-	sid := fmt.Sprint(out["file_id"]) // a file with one version has a file id and no series yet: its id is the one the second version's series carries (asserted below)
+	sid := fmt.Sprint(out["file_id"]) // a first upload has no series yet: its file id is the one the series will have
+	require.Regexp(t, fileIDRe, sid)
 	// the same agent's next upload for the task, under ANOTHER name, and with no --new-version-of: it joins the chain's file, as before the name rule
 	code, out = k.post("s1&tag=for+review&question=Does+it+work%3F", "plan, version two", map[string]string{"X-Artifact-Task": strconv.FormatInt(root.ID, 10), "X-Artifact-Name": "plan-renamed.md"})
 	assert.Equal(t, http.StatusCreated, code, "a chain join is never refused for a name: %v", out)
@@ -93,6 +94,7 @@ func TestAnUnstampedRecordOfBytesAlreadyInASeriesIsNotAVersionOneOfItsOwn(t *tes
 	require.Equal(t, http.StatusCreated, code, out)
 	sid := fmt.Sprint(out["file_id"])
 	require.Equal(t, same, rig.uploadText("a1", "plan.txt", "the same first draft"), "a1 uploads the same bytes: an unstamped record, visited before a2's")
+	require.NoError(t, os.Remove(seriesPath(rig.coralDir, sid)), "the index is gone (a lost or damaged one is found by the walk of the records, which is where a bare record could be mistaken for a file)")
 	members := membersOfSeries(rig.coralDir, sid, true)
 	require.Len(t, members, 2, "the series has its two versions, whatever record the walk meets first")
 	for _, m := range members {
