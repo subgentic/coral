@@ -49,7 +49,7 @@ const { coralReady } = require('./helpers/wait');
             assert.ok(first >= 1, label + ': the stub refused a newer key (the page did send one first)');
             assert.ok(first <= 5, label + ': the refused keys are tried by the first reads only, not on every read: ' + first);
             await ev(`import(${S} + 'inbox_reviews.js').then(m => { m.refreshReviews(true); return true; })`);
-            await ev(`new Promise(r => setTimeout(r, 1500))`);
+            await ev(`new Promise(r => { let last = -1, still = 0; const t = setInterval(() => { const n = window.__oldReads.length; still = n === last ? still + 1 : 0; last = n; if (still >= 8) { clearInterval(t); r(true); } }, 150); })`); // the refresh's reads have all landed when the reads of that computer stop growing
             assert.equal(await ev(`window.__oldRefused`), first, label + ': a later read sends no newer key to that computer again: ' + JSON.stringify(await ev(`window.__oldRefusedAt`)));
             assert.ok(await ev(`[...document.querySelectorAll('${T} tbody tr')].some(r => r.textContent.includes('Old computer plan.md'))`), label + ': the file is still listed after a later read');
             console.log(`PASS ${label}: the older computer's review file is listed; ${first} refused read(s), none after`);
