@@ -11,12 +11,12 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await require('./helpers/new_team').stubFolders(ev); // the made-up wizard folder exists: Next checks it first (#14437, acfb782ec)
         await coralReady('startup', 'liveList', 'settings');
         const vis = sel => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); return !!e && e.checkVisibility({ checkVisibilityCSS: true }); })()`;
         await ev(`(async () => { await window.showLaunchModal(); window._selectLaunchType('team'); return true; })()`);
         await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none'`, 'the team step', 8000);
-        await ev(`{ const n = document.getElementById('team-board-name'); n.value = 'draft-x'; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = '/work/x'; d.dispatchEvent(new Event('input', { bubbles: true })); } document.getElementById('launch-team-next').click(); true`);
+        await ev(`{ const n = document.getElementById('team-board-name'); n.value = 'draft-x'; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = '/work/repo'; d.dispatchEvent(new Event('input', { bubbles: true })); } document.getElementById('launch-team-next').click(); true`);
         await waitFor(vis('#team-template-select'), 'the Members step', 8000);
         const before = await ev(`[...document.querySelectorAll('#team-agents-list [role=listitem], #team-agents-list > *')].map(r => r.textContent.replace(/\\s+/g, ' ').trim().slice(0, 40))`);
         assert.ok(before.length > 0, 'the template has members to replace: ' + JSON.stringify(before));
@@ -46,7 +46,7 @@ const BASE = require('./test_base').BASE;
         assert.equal(note, 'Drafted: 3 members. Change anything below before you launch.', 'the step says it is a draft: ' + note);
         // the person's team name and folder are kept (the sample renamed 'shop' to 'sample-team' and cleared the folder, #10658)
         assert.equal(await ev(`document.getElementById('team-board-name').value`), 'draft-x', 'the team name the person typed is kept');
-        assert.equal(await ev(`document.getElementById('launch-team-dir').value`), '/work/x', 'and so is the folder');
+        assert.equal(await ev(`document.getElementById('launch-team-dir').value`), '/work/repo', 'and so is the folder');
         // the sample is a team that can go on (#10658): Next from the Members step is not blocked for want of an Orchestrator
         await ev(`document.getElementById('launch-team-next').click(); true`); await settle(500);
         const next = await ev(`({ members: getComputedStyle(document.getElementById('team-panel-members')).display, recap: (document.getElementById('team-recap') || {}).textContent || '' })`);

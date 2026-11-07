@@ -375,12 +375,14 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 					timedText = label + "\n" + text
 				}
 				msg := sendMessage(title, author, version, sendReplyCommand(id, t.ID), timedText, snippet, mentionNames, commentPictureLinks(t.ImagesJSON)...)
-				if _, err := h.bs.PostDefusedMessage(r.Context(), t.Board, board.OperatorName, msg); err != nil {
+				posted, err := h.bs.PostDefusedMessage(r.Context(), t.Board, board.OperatorName, msg)
+				if err != nil {
 					slog.Warn("[artifact comments] message not posted", "board", t.Board, "error", err)
 					_ = h.ss.CloseArtifactAsk(r.Context(), t.ID, ls.SessionID, time.Now())
 					res.State = "failed"
 					break
 				}
+				h.linkCommentMessage(r.Context(), t.Board, posted, t.ID, ls.SessionID)
 				h.operatorPosted(t.Board, msg)
 				res.State, res.AskID = "sent", ask.ID
 				sent++

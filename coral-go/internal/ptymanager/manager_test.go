@@ -610,3 +610,32 @@ func TestReadUntilReadsPastAnEarlierLinesLateOutput(t *testing.T) {
 		t.Fatalf("readUntil should read past the first line's late chunk to the next line: %q", got)
 	}
 }
+
+// An agent whose process has ended (Kill All, an agent that exited) leaves its terminal behind in the manager, not running. Starting that name again must replace the dead one, not fail with "session
+// already exists": Wake Team reported every member awake while its spawns failed that way (#14172). A terminal that is still running is never replaced.
+func TestPTYBackendSpawnReplacesAnEndedSessionButNeverARunningOne(t *testing.T) {
+	canFork(t)
+	backend := NewPTYBackend()
+	defer backend.Close()
+
+	if err := backend.Spawn("ended-test", "test", t.TempDir(), "sid-old", "true", 80, 24); err != nil {
+		t.Fatalf("first Spawn failed: %v", err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for backend.IsRunning("ended-test") && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond) // sleep-ok: waiting for a short-lived process to end
+	}
+	if backend.IsRunning("ended-test") {
+		t.Skip("the short-lived process did not end in time")
+	}
+	if err := backend.Spawn("ended-test", "test", t.TempDir(), "sid-new", "sh", 80, 24); err != nil {
+		t.Fatalf("starting again over an ended session must work, got: %v", err)
+	}
+	if !backend.IsRunning("ended-test") {
+		t.Error("the new terminal should be running")
+	}
+	if err := backend.Spawn("ended-test", "test", t.TempDir(), "sid-third", "sh", 80, 24); err == nil {
+		t.Error("a terminal that is still running must not be replaced")
+	}
+	backend.Kill("ended-test")
+}

@@ -80,6 +80,13 @@ type GoalRollup struct {
 	Total   int `json:"total"`
 }
 
+// GoalDoneState is the Operator's state of a "looks done" row: Hidden is "dismissed" (hidden for good) or "not_yet" (hidden until another task is done), Read says they opened it at its current total and last change.
+// Only what applies NOW is said: a Not yet at an older total, or a read at an older last change, is no longer a state.
+type GoalDoneState struct {
+	Hidden string `json:"hidden,omitempty"`
+	Read   bool   `json:"read,omitempty"`
+}
+
 // Goal is one row of board_goals.
 type Goal struct {
 	ID        int64  `db:"id" json:"id"`
@@ -102,12 +109,17 @@ type Goal struct {
 	// MadeByOrchestrator is set on the way out (never stored) when the team's Orchestrator wrote this goal itself (#11887): the goal page says so instead of "nobody was told".
 	MadeByOrchestrator bool       `db:"-" json:"made_by_orchestrator,omitempty"`
 	Rollup             GoalRollup `db:"-" json:"rollup"`
-	// LooksDoneAt is when the last of an active goal's tasks was completed, set (on the list pages) only for a goal whose tasks are all done: "Goal #N looks done" waits from then, not from the goal's creation (#12081).
+	// LooksDoneAt is the latest relevant completion or task move for an active goal with all current and moved work finished. The quiet period starts there, never at goal creation.
 	LooksDoneAt *string `db:"-" json:"looks_done_at,omitempty"`
+	// MovedOpen prevents a completion hint when unfinished work was moved off a goal whose current tasks are all done.
+	MovedOpen int `db:"-" json:"moved_open,omitempty"`
 	// FollowUpsOpen: the open tasks of the goal that were made as follow-ups of another task (task add --follow-up); filled where one goal is read (GetGoal), never in a list.
 	FollowUpsOpen int `db:"-" json:"follow_ups_open,omitempty"`
 	// NewComments: how many replies agents left in the Operator's comment threads on this goal since they last opened them (#12073); set on the way out for the Operator's own read, never stored.
 	NewComments int `db:"-" json:"new_comments,omitempty"`
+	// DoneState is what the Operator did to this goal's "looks done" row in Needs you (#14047): hidden by Not yet or Dismiss, or opened (read). Set on the way out for the Operator's own read only, never stored here (the
+	// entries live in the settings lists goal_done_hidden and goal_done_read) and absent when nothing applies now.
+	DoneState *GoalDoneState `db:"-" json:"done_state,omitempty"`
 	// Images are the pictures the Operator attached to the goal's description (#11650), in the order sent; filled where goals are read.
 	Images []GoalImage `db:"-" json:"images,omitempty"`
 }
@@ -245,8 +257,10 @@ func (s *Store) GetGoal(ctx context.Context, board string, id int64) (*Goal, err
 	if err = s.fillGoalImages(ctx, one); err != nil {
 		return nil, err
 	}
-	g.Images = one[0].Images
-	return &g, nil
+	if err = s.fillLooksDone(ctx, one); err != nil {
+		return nil, err
+	}
+	return &one[0], nil
 }
 
 // ListGoals is the first page of a board's goals (GoalPage without a cursor), for a caller that wants the goals and not the paging.

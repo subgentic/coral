@@ -22,6 +22,9 @@ const { coralReady } = require('./helpers/wait');
         const line = await ev(`(() => { const l = document.querySelector('.chat-standing'), t = l.querySelector('.chat-standing-text'); return { text: t.textContent, oneLine: t.getBoundingClientRect().height < 32, btn: l.querySelector('button').textContent.trim() }; })()`);
         assert.match(line.text, /^Instructions: Review only; never push to main\./, line.text); assert.ok(line.text.endsWith('…') && line.text.length <= 160, 'cut with an ellipsis: ' + line.text.length);
         assert.ok(line.oneLine, 'one line'); assert.equal(line.btn, 'Edit');
+        // the id rides on the Edit button only while the line is shown (#14318: a hidden button holding a session id tripped agent_popout's leak scan)
+        const wantId = await ev(`window.T.state.liveSessions.find(s => s.name === 'with-instr').session_id`);
+        assert.ok(wantId, 'the row has a session id'); assert.equal(await ev(`document.querySelector('.chat-standing button').dataset.sessionId`), wantId, 'shown: Edit carries its own session id, which routes its click');
         await ev(`document.querySelector('.chat-standing button').click(); true`);
         await waitFor(`!!document.getElementById('instructions-dialog') && document.getElementById('instructions-dialog').open`, 'the Edit instructions dialog', 6000);
         assert.ok((await ev(`document.getElementById('instructions-text').value`)).startsWith('Review only; never push to main.'), 'it holds the saved text');
@@ -31,12 +34,17 @@ const { coralReady } = require('./helpers/wait');
         await select('no-instr');
         await waitFor(`!!document.querySelector('.chat-empty')`, 'the empty chat', 8000);
         assert.equal(await ev(`(() => { const l = document.querySelector('.chat-standing'); return !l || l.hidden; })()`), true, 'hidden with no instructions');
+        assert.equal(await ev(`(() => { const b = document.querySelector('.chat-standing button'); return !!b && b.hasAttribute('data-session-id'); })()`), false, 'an agent with no instructions: the hidden Edit button holds no session id');
 
         console.log('3. the row hover card has an Instructions line');
         const tip = await ev(`import((window.__coralStatic || '/static/') + 'session_state.js').then(m => { const r = window.T.state.liveSessions.find(s => s.name === 'with-instr'); const d = document.createElement('div'); d.innerHTML = m.buildSessionTooltip(r); return [...d.querySelectorAll('.fact-label, dt')].map(e => e.textContent.trim()).concat([d.textContent]); })`);
         assert.ok(tip.includes('Instructions') || /Instructions/.test(tip.join(' ')), 'the hover card says Instructions: ' + JSON.stringify(tip).slice(0, 200));
         const none = await ev(`import((window.__coralStatic || '/static/') + 'session_state.js').then(m => /Instructions/.test(m.buildSessionTooltip(window.T.state.liveSessions.find(s => s.name === 'no-instr'))))`);
         assert.equal(none, false, 'no Instructions line with none');
+        console.log('4. the line hides once its instructions are gone, and the Edit button gives its id up');
+        await ev(`window.T.state.liveSessions.find(s => s.name === 'with-instr').prompt = ''; true`); await select('with-instr');
+        await waitFor(`(() => { const l = document.querySelector('.chat-standing'); return !!l && l.hidden; })()`, 'the line hides once its instructions are gone', 8000);
+        assert.equal(await ev(`document.querySelector('.chat-standing button').hasAttribute('data-session-id')`), false, 'after the line hides, the Edit button holds no session id again');
         console.log('PASS the instructions are shown in the empty chat and the hover card');
     } finally { await client.close(); }
 })().catch(e => { console.error('FAIL', e); process.exit(1); });

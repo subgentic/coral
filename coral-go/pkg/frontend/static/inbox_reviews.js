@@ -3,9 +3,10 @@ import { setReviewCacheReader } from './ask_filter.js';
 /* Review artifacts use the same owner-protected team list and tags routes as Artifacts.
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
 import { sourcesKey } from './board_fetch.js';
-import { inboxSources, serverLabel } from './inbox_servers.js';
+import { inboxSources, serverLabel, isOwnerOnlyAnswer } from './inbox_servers.js';
 import { boardFetch, nextArtifactPage, splitKey, serverFetch, identityKey, noteBoardLabels, normServer } from './server_base.js';
 import { SORT_PARAM } from './filter_model.js';
+import { fetchSkewed } from './query_skew.js';
 import { hideAsksWhen } from './ask_filter.js';
 import { importOnce } from './import_once.js';
 const { createReviewPages } = await importOnce('./review_pages.js');
@@ -144,8 +145,8 @@ async function readTeam(team, mutedOut = null, stamp = {}) {
     const rows = [], seen = new Set();
     for (let at = { cursor: '', offset: 0 }, pages = 0; pages < 200; pages++) { // 50 a page, by the computer's cursor (#13161)
         const key = splitKey(team), query = new URLSearchParams({ team: key.name, tag: 'for review', starred_first: 'true', limit: '50', ...(at.cursor ? { cursor: at.cursor } : at.offset ? { offset: String(at.offset) } : {}) });
-        const r = await serverFetch(key.server, `/api/team-artifacts?${query}`);
-        if (r.status === 403) break; // owner-only lists never fall back to a less private board route
+        const { response: r } = await fetchSkewed(key.server, '/api/team-artifacts', query); // a computer on an older release is asked again without the keys it refuses (#14317)
+        if (r.status === 403 && await isOwnerOnlyAnswer(r)) break; // owner-only lists never fall back to a less private board route; any other 403 is an error, not an empty list
         if (!r.ok) throw new Error('Could not read review artifacts');
         const data = await r.json();
         if (!Array.isArray(data.artifacts)) throw new Error('Review documents could not be read.');
@@ -229,7 +230,7 @@ export function queryReviews(f) {
         if (!options.cursor && !data.ownerOnly) {
             const query = new URLSearchParams(options.query);
             query.set('waiting', '1'); query.set('muted', '0'); query.delete('facets');
-            try { const count = await readComputerPage(server, { ...options, query: query.toString(), limit: 1 }); data.attention_total = count.truncated ? null : count.total; }
+            try { const count = await readComputerPage(server, { ...options, query: query.toString(), limit: 1 }); data.attention_total = count.truncated || count.skewed?.some(k => k === 'waiting' || k === 'muted') ? null : count.total; } // an older computer cannot count what waits: no number, never the plain total
             catch { data.attention_total = null; }
         }
         return data;
@@ -297,8 +298,9 @@ async function readComputerPage(server, { query, cursor, limit, signal, revision
     const started = revision, params = new URLSearchParams(query);
     params.set('limit', String(limit));
     if (cursor) params.set('cursor', cursor); else params.delete('cursor');
-    const response = await serverFetch(server, `/api/team-artifacts?${params}`, { signal });
+    const { response, dropped } = await fetchSkewed(server, '/api/team-artifacts', params, { signal }); // dropped: the keys an older computer refused (#14317)
     const data = await response.json().catch(() => ({}));
+    const asked = dropped.includes('digest') ? new Set((params.get('digest') || '').split(',').filter(Boolean)) : null; // the list came back whole: only the files asked for are kept
     if (signal?.aborted || (revisionBound && started !== revision)) throw Object.assign(new Error('The review read was superseded.'), { name: 'AbortError' });
     if (response.status === 403 && (data.code === 'owner_only' || data.error === 'owner_only')) return { artifacts: [], total: 0, tag_counts: {}, has_more: false, ownerOnly: true };
     if (!response.ok) throw new Error(`Review artifacts could not be read (HTTP ${response.status}).`);
@@ -312,10 +314,11 @@ async function readComputerPage(server, { query, cursor, limit, signal, revision
         // A computer response must name the owning board. A display label is not
         // a routing identity, and a missing source never becomes the Hub/local.
         if (!hex || !rawBoard(a.board_id)) continue;
+        if (asked && !asked.has(hex)) continue;
         const team = identityKey(server, a.board_id);
         artifacts.push({ ...a, id: hex, server: normServer(server), team, hex, reviewKey: `${team}:${hex}` });
     }
-    return { ...data, artifacts };
+    return { ...data, artifacts, skewed: dropped };
 }
 const pageKey = row => row.reviewKey;
 const reviewPager = createReviewPages({ read: readComputerPage, key: pageKey });

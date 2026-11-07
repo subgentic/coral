@@ -64,19 +64,38 @@ func (s *Store) goalRollups(ctx context.Context, board string, ids []int64) (map
 	return s.goalRollupsByID(ctx, goals)
 }
 
-// fillLooksDone sets LooksDoneAt on each goal that is active and has all its tasks done: the latest completion among them (one small read per such goal; a goal with open tasks costs nothing).
+// fillLooksDone verifies current and moved work before setting the completion candidate time. It reads one indexed aggregate per otherwise-eligible goal.
 func (s *Store) fillLooksDone(ctx context.Context, goals []Goal) error {
 	for i := range goals {
 		g := &goals[i]
 		if g.State != GoalActive || g.Rollup.Total == 0 || g.Rollup.Done != g.Rollup.Total {
 			continue
 		}
-		var at *string
-		if err := s.reader().GetContext(ctx, &at, `SELECT MAX(completed_at) FROM board_tasks WHERE board_id = ? AND goal_id = ? AND status IN ('completed', 'skipped')`, g.BoardID, g.ID); err != nil {
+		var candidate struct {
+			At        *string `db:"at"`
+			MovedOpen int     `db:"moved_open"`
+		}
+		// Both joins are board-qualified. A departed task that no longer belongs to this board is
+		// unconfirmed work, not evidence that this goal finished; never read another board's status.
+		err := s.reader().GetContext(ctx, &candidate, `SELECT MAX(at) AS at, COALESCE(SUM(is_open),0) AS moved_open FROM (
+            SELECT completed_at AS at, 0 AS is_open FROM board_tasks
+                WHERE board_id=? AND goal_id=? AND status IN ('completed','skipped')
+            UNION ALL
+            SELECT CASE WHEN t.completed_at > m.moved_at THEN t.completed_at ELSE m.moved_at END AS at,
+                CASE WHEN t.status IN ('completed','skipped') THEN 0 ELSE 1 END AS is_open
+            FROM board_goal_task_moves m LEFT JOIN board_tasks t ON t.board_id=m.board_id AND t.id=m.task_id
+            WHERE m.board_id=? AND m.goal_id=? AND m.moved_at<>'' AND (t.goal_id IS NULL OR t.goal_id<>m.goal_id)
+            UNION ALL
+            SELECT m.arrived_at AS at, 0 AS is_open
+            FROM board_goal_task_moves m JOIN board_tasks t ON t.board_id=m.board_id AND t.id=m.task_id AND t.goal_id=m.goal_id
+            WHERE m.board_id=? AND m.goal_id=? AND m.arrived_at<>''
+        )`, g.BoardID, g.ID, g.BoardID, g.ID, g.BoardID, g.ID)
+		if err != nil {
 			return err
 		}
-		if at != nil && *at != "" {
-			g.LooksDoneAt = at
+		g.MovedOpen = candidate.MovedOpen
+		if candidate.MovedOpen == 0 && candidate.At != nil && *candidate.At != "" {
+			g.LooksDoneAt = candidate.At
 		}
 	}
 	return nil

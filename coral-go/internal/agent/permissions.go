@@ -45,9 +45,19 @@ func TranslateToClaudePermissions(caps *Capabilities) *ClaudePermissions {
 	return TranslateToClaudePermissionsForMode(caps, "default")
 }
 
+// gitRulesAllowedIn is whether git_write's allow rules may be emitted for a launch in mode. Fail closed (#14350): only a mode that is written and keeps asking, or is "allow nothing else" (default,
+// plan, acceptEdits, dontAsk). Auto, an empty mode (a print-mode run: scheduled jobs, workflow steps), Bypass and anything unrecognised get none.
+func gitRulesAllowedIn(mode string) bool {
+	switch mode {
+	case "default", "plan", "acceptEdits", "dontAsk":
+		return true
+	}
+	return false
+}
+
 // TranslateToClaudePermissionsForMode is TranslateToClaudePermissions for the permission mode the launch really uses. In Auto the git_write capability emits NO Bash(git ...) allow rule (#14350,
 // found by #14338): an allow rule decides before Auto's own judgement, so Bash(git push *) let a force push run unasked. A blanket Bash allow still lets Auto's judgement cover git, and destructive
-// git stays judged. In every other mode the rules stay: they only stop the question (Default, Plan, Accept edits), or are what is allowed at all (Don't ask); in Bypass the list is moot.
+// git stays judged. In Default, Plan, Accept edits and Don't ask the rules stay: they only stop the question, or are what is allowed at all. Every other mode, an empty one and an unrecognised one get none.
 func TranslateToClaudePermissionsForMode(caps *Capabilities, mode string) *ClaudePermissions {
 	if caps.IsEmpty() {
 		return nil
@@ -65,7 +75,7 @@ func TranslateToClaudePermissionsForMode(caps *Capabilities, mode string) *Claud
 	}
 
 	for _, cap := range caps.Allow {
-		if cap == CapGitWrite && mode == "auto" {
+		if cap == CapGitWrite && !gitRulesAllowedIn(mode) {
 			continue // Auto's own judgement stays in charge of git (#14350)
 		}
 		allow = append(allow, mapCapToClaudeTools(cap)...)

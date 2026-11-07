@@ -2,6 +2,7 @@
  * Unknown and partial sources never become an authoritative zero. */
 import { state } from './state.js';
 import { serverFetch, isCloud } from './server_base.js';
+import { knownOlder, markOlder, refusedByConnector, LIST_KIND } from './query_skew.js';
 
 export const COUNT_PATH = '/api/team-artifacts?tag=for%20review&waiting=1&muted=0&versions=newest&limit=1';
 const EVERY_MS = 30000;
@@ -17,7 +18,12 @@ export function refreshCounts(force = false) {
     pending = (async () => {
         const replies = await Promise.all(list.map(async server => {
             try {
-                const response = await serverFetch(server, COUNT_PATH), data = await response.json();
+                // A computer on an older release refuses waiting and muted (#14317). Without them the total would count muted and not-waiting files too, so there is no plain fallback: that computer's count is unknown (no number from it), never a wrong one,
+                // and it is not asked again while it is known to refuse.
+                if (knownOlder(server, LIST_KIND)) return { server, total: null };
+                const response = await serverFetch(server, COUNT_PATH);
+                if (await refusedByConnector(response)) { markOlder(server, LIST_KIND); return { server, total: null }; }
+                const data = await response.json();
                 if (response.status === 403 && (data.code === 'owner_only' || data.error === 'owner_only')) return { server, total: 0, ownerOnly: true };
                 if (!response.ok || data.partial || data.truncated || data.failed_boards?.length || !Number.isSafeInteger(data.total) || data.total < 0) throw new Error('count unavailable');
                 return { server, total: data.total };

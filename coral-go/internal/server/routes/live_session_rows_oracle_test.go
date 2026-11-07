@@ -71,6 +71,7 @@ func lsrRows(t *testing.T, h *SessionsHandler, old, full bool) string {
 			delete(r, "keep_full_access")       // new in #14061 (the Operator's Full access across restarts, Codex rows only): the old implementation has no such field
 			delete(r, "permission_effective")   // new in #14085 (what the launch really gives an agent next to the mode chosen, agy always, Codex when narrowed): the old implementation has no such field
 			delete(r, "at_dialog")              // new in #11437 (an agent at a prompt, read from its screen by the dialog watcher): the old implementation has no such field; dialog_watch_test.go pins it through the list
+			delete(r, "wait_removed")           // new in #14266: the old implementation has no such field
 		}
 	}
 	b, merr := json.Marshal(rows)

@@ -1,6 +1,6 @@
-/* A link to one item of Needs you (#11797): /inbox/needs/<review|ask|goal>/[@<server>/]<team>/<id>, the address a push notification opens. The Inbox is on Needs you and the item opens on its own card: a file in the viewer with
- * Approve and Request changes, a question in its dialog with the Reply box, a "Goal looks done" item on the goal's own page. The item is looked for in the lists the Inbox reads with the viewer's own access (the address alone fetches nothing); one that is not there, or
- * is not waiting any more, says so and the Inbox stays as it is. Lazy: loaded by the route. */
+/* A link to one Inbox item (including a Saved review) (#11797): /inbox/needs/<review|ask|goal>/[@<server>/]<team>/<id>, the address a push notification opens. The Inbox is on Needs you and the item opens on its own card: a file in the viewer with
+ * Approve and Request changes, a question in its dialog with the Reply box, a "Goal looks done" item on the goal's own page. The item is looked for in cached lists or a protected lookup of its exact board/digest, with the viewer's own access; one that is not there, or
+ * is neither waiting nor Saved any more, says so and the Inbox stays as it is. Lazy: loaded by the route. */
 import { importOnce } from './import_once.js';
 import { showToast } from './utils.js';
 import { identityKey } from './server_base.js';
@@ -25,10 +25,18 @@ export async function openNeed({ kind, server, team, id }) {
     const pick = (list, at) => (ask ? list.find(a => a.board === at && String(a.id) === id) : list.find(a => a.team === at && a.hex === id));
     // The item is opened from what the Inbox already has (#13116: the link used to wait for a scan of every team, eight seconds through the Hub, twice if a scan was running); not loaded yet: a review reads only its own
     // team; a question reads as before. The lists are brought up to date after the viewer is open, in the background.
-    let list = ask ? m.operatorAsks() : m.reviewItems(), at = await teamKeyOf(server, team, list), item = pick(list, at);
+    let list = ask ? m.operatorAsks() : [...m.reviewItems(), ...m.savedFiles()], at = await teamKeyOf(server, team, list), item = pick(list, at);
     if (!item) {
         if (ask) { await m.refreshOperatorAsks(true); list = m.operatorAsks(); at = await teamKeyOf(server, team, list); item = pick(list, at); }
-        else { try { item = await m.reviewOfTeam(at, id); } catch (error) { showToast(error.message || 'That review file could not be read.'); return; } }
+        else { try {
+            item = await m.reviewOfTeam(at, id);
+            if (!item) {
+                // A cold Saved link is absent from the waiting-only list. Ask
+                // the same protected route for this exact board/digest only.
+                const saved = await m.reviewOfTeam(at, id, { anyState: true });
+                if (saved?.tags?.includes('saved') && saved.tags.includes('for review')) item = saved;
+            }
+        } catch (error) { showToast(error.message || 'That review file could not be read.'); return; } }
     }
     Promise.resolve((ask ? m.refreshOperatorAsks(true) : m.refreshReviews(true, { reuse: true }))).catch(() => {});
     if (!item) showToast(`That ${ask ? 'question' : 'file'} is not waiting for you any more.`);

@@ -1,6 +1,9 @@
 // Loaded only when the comment subject contains a video. All times stay numeric.
 import { el } from './dom_el.js';
 import { loadStyles } from './lazy_styles.js';
+import { importOnce } from './import_once.js';
+const bidi = await importOnce('./bidi_marks.js').catch(() => null); // a marker's label is another person's text: the controls in it are written out as code points (#14241); unloadable: drawn as it is
+const bidiWritten = bidi ? bidi.bidiWritten : t => String(t == null ? '' : t);
 await loadStyles('artifact-video-comments.css');
 
 export function videoTime(value) {
@@ -71,7 +74,7 @@ export function attachVideoComments(video, { onComment, onActivate }) {
         for (const c of comments) {
             const dot = el('button', `avc-dot${c.resolved ? ' avc-resolved' : ''}${c.id === active ? ' avc-active' : ''}`);
             dot.type = 'button'; dot.dataset.id = String(c.id);
-            const label = `${videoTime(c.atS)}${c.endS != null ? '–' + videoTime(c.endS) : ''}: ${c.body}${c.resolved ? ' (resolved)' : ''}${c.fromVersion != null ? ' (earlier version)' : ''}`;
+            const label = `${videoTime(c.atS)}${c.endS != null ? '–' + videoTime(c.endS) : ''}: ${bidiWritten(c.body)}${c.resolved ? ' (resolved)' : ''}${c.fromVersion != null ? ' (earlier version)' : ''}`;
             dot.setAttribute('aria-label', label); dot.title = label;
             dot.style.left = `${duration() ? Math.min(100, c.atS / duration() * 100) : 0}%`;
             dot.addEventListener('click', () => { range = null; seek(c.atS); onActivate(c.id); });

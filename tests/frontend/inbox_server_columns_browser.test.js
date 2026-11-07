@@ -51,13 +51,15 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
     // A phone's rows are mail rows (#9545): one cell each, no Server column or sort. What holds there: rows of both origins are listed and the Server filter in the panel narrows them (the columns are checked at 1280).
     if(width===390)await waitFor(`!!document.querySelector('#group-table-view tr.dt-mailed')||!!document.querySelector('#group-table-view th[data-key="server"]')`,'the '+folder+' rows, as mail rows or as a table',8000); // Artifacts rows come after the folder opens
     if(width===390&&await ev(`!!document.querySelector('#group-table-view tr.dt-mailed')`)){
-     const rows=`document.querySelectorAll('#group-table-view tr.dt-mailed').length`,pick=`[...document.querySelectorAll('.list-bar-field')].find(e=>e.querySelector('.list-bar-field-label')?.textContent.trim()==='Computer')?.querySelector('select')`;
+     // The needs list draws mail rows only while it holds agents alone; a review file that arrives (a computer's files are read after its agents) turns the same rows into folded ones (#14300, found under load): count the rows of either layout, and take the first count once the list has stopped changing.
+     const rows=`document.querySelectorAll('#group-table-view tbody tr.dt-row').length`,pick=`[...document.querySelectorAll('.list-bar-field')].find(e=>e.querySelector('.list-bar-field-label')?.textContent.trim()==='Computer')?.querySelector('select')`;
      await waitFor(`${rows}>=2`,'rows of both origins in '+folder+' on a phone',8000);
-     const all=await ev(rows);
+     if(folder==='needs')await waitFor(`(()=>{const t=[...document.querySelectorAll('#group-table-view tbody tr.dt-row')].map(r=>r.textContent);return t.some(x=>x.includes('Local agent'))&&t.some(x=>x.includes('Remote agent'));})()`,'rows of BOTH computers in needs on a phone (the local agent and the remote one; the remote one alone is two rows that the filter would not narrow)',8000);
+     let all=await ev(rows);for(let i=0;i<8;i++){await new Promise(r=>setTimeout(r,350));/* sleep-ok: the list settles as the other computer's files arrive */const next=await ev(rows);if(next===all)break;all=next;}
      await ev(`document.querySelector('#group-table-view .list-bar-toggle').click();true`);
      await waitFor(`!!(${pick})&&(${pick}).getClientRects().length>0`,'Server filter in '+folder+' on a phone');
      await ev(`(()=>{const s=${pick};s.value='box-2';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
-     await waitFor(`${rows}>0&&${rows}<${all}`,'the Server filter narrows '+folder+' on a phone');
+     if(folder==='needs')await waitFor(`(()=>{const t=[...document.querySelectorAll('#group-table-view tbody tr.dt-row')].map(r=>r.textContent);return t.length>0&&t.some(x=>x.includes('Remote agent'))&&!t.some(x=>x.includes('Local agent'));})()`,'the Server filter narrows needs to the remote computer on a phone (no Local agent row left; a count taken before can be overtaken by a row that arrives later)');else await waitFor(`${rows}>0&&${rows}<${all}`,'the Server filter narrows '+folder+' on a phone');
      await ev(`(()=>{const s=${pick};s.value='';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
      assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth+1`),folder+': no horizontal overflow on a phone');
      continue;

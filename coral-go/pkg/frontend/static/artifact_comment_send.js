@@ -17,6 +17,9 @@ const RESULT_WORDS = {
 };
 export const resultWords = (r) => RESULT_WORDS[r.state] || r.reason || 'Not asked';
 
+/** Where an agent's ask stands (#14129, the Operator: 'tell me when the agent has read the message'): replied (it answered in the thread), read (the server saw the agent's OWN read call return the thread or the message that delivered the comment: read_at, with its time; an older server's 'seen' alone is read without a time) or sent. Never 'unread': an absent read_at is unknown. */
+export const askState = k => (k.replies > 0 ? 'replied' : (k.readAt || k.seen) ? 'read' : 'sent');
+
 /** What an agent with an open ask into this thread is called in the picker: asked, how many times it has replied, whether it has seen the thread and whether it was reminded. */
 export const askedWords = (k) => (k.replies > 0 ? `Already asked, ${k.replies} repl${k.replies === 1 ? 'y' : 'ies'} so far` : 'Already asked') + (k.seen ? `, seen by ${k.agent}` : '') + (k.nudged ? ', reminded' : ''); // seen: the agent read the thread; nudged: Coral typed it ONE reminder (#11722)
 

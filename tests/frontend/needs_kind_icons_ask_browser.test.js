@@ -1,12 +1,12 @@
 // Needs you row icons say what is asked (#13819, the Operator: an arrow into a box on a question reads as "input", not "someone is asking you"): a question put to the Operator is a question mark, a file for review is a
-// document, a proposal is a checklist, a wait for typed input is a note being written. Real rows (a question, a yes/no question, a file, a proposal) at 390 and 1280, light and dark; each icon is drawn by the icon font
+// document, a proposal is a checklist, a wait for typed input is a note being written. Real rows (a question, a yes/no question, a file, a proposal) at 390 and 1280, light and dark; agent/proposal icons use the icon font and files reuse the shared SVG type artwork
 // (never its name as text), keeps its screen-reader name, and a question is not called "Needs input". The artifacts, the question and the proposal are stubbed. Isolated dev server.
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady, framesJs } = require('./helpers/wait');
 
-const WANT = { 'Which hub': ['help_outline', 'Question'], 'Ship batch': ['help_outline', 'Question'], 'Plan 1': ['description', 'For review'], 'Fix the login': ['checklist', 'To approve'] };
+const WANT = { 'Which hub': ['help_outline', 'Question'], 'Ship batch': ['help_outline', 'Question'], 'Plan 1': ['file-type', 'For review'], 'Fix the login': ['checklist', 'To approve'] };
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -14,7 +14,7 @@ const WANT = { 'Which hub': ['help_outline', 'Question'], 'Ship batch': ['help_o
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const icon = needle => ev(`(() => { const tr = [...document.querySelectorAll('${T} tbody tr')].find(r => r.textContent.includes(${JSON.stringify(needle)})); const i = tr && tr.querySelector('.inbox-kind-icon'); if (!i) return null; const cs = getComputedStyle(i), b = i.getBoundingClientRect();
-        return { glyph: getComputedStyle(i, '::before').content.replace(/"/g, ''), label: i.getAttribute('aria-label'), role: i.getAttribute('role'), text: i.textContent, font: cs.fontFamily, w: Math.round(b.width), color: cs.color, bg: cs.backgroundColor }; })()`);
+        const svg=i.querySelector('.artifact-thumbnail > svg'); return { svg:svg?.outerHTML||'',svgHidden:svg?.getAttribute('aria-hidden'),glyph: getComputedStyle(i, '::before').content.replace(/"/g, ''), label: i.getAttribute('aria-label'), role: i.getAttribute('role'), text: i.textContent, font: cs.fontFamily, w: Math.round(b.width), color: cs.color, bg: cs.backgroundColor }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[390, 844, true], [1280, 820, false]]) {
@@ -43,9 +43,12 @@ const WANT = { 'Which hub': ['help_outline', 'Question'], 'Ship batch': ['help_o
                     const i = await icon(needle), what = `${at}${theme} ${needle}`;
                     check(!!i, what + ': the row has its icon');
                     if (!i) continue;
-                    check(i.glyph === glyph, `${what}: the glyph is ${glyph}: ${JSON.stringify(i)}`);
+                    if (glyph === 'file-type') {
+                        const expected=await ev(`import((window.__coralStatic||'/static/')+'file_icons.js').then(m=>m.fileIconHtml('Plan 1 - review the release notes.html','text/html'))`);
+                        check(i.glyph === 'none' && i.svg === expected && i.svgHidden === 'true', `${what}: shared decorative HTML type icon replaces the generic review glyph: ${JSON.stringify(i)}`);
+                    } else check(i.glyph === glyph, `${what}: the glyph is ${glyph}: ${JSON.stringify(i)}`);
                     check(i.label === label && i.role === 'img' && i.text === '', `${what}: named "${label}" for a screen reader, no text of its own: ${JSON.stringify(i)}`);
-                    check(/Material Icons/.test(i.font) && i.w >= 24, `${what}: drawn by the icon font in its tile: ${JSON.stringify(i)}`);
+                    check((glyph === 'file-type' ? !!i.svg : /Material Icons/.test(i.font)) && i.w >= 24, `${what}: drawn by the icon font in its tile: ${JSON.stringify(i)}`);
                 }
                 await shot(`needs-icons-${w}-${theme}`);
             }

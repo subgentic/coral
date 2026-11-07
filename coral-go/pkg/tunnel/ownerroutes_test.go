@@ -94,6 +94,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodGet && p == "/api/sessions/live" {
 				continue
 			}
+			// The goals reads are OwnerSees routes since #14047 (the owner's goals carry their done-state): the old list never had them.
+			if m == http.MethodGet && (p == "/api/goals" || (strings.HasPrefix(p, "/api/board/") && strings.Contains(p, "/goals"))) {
+				continue
+			}
 			// The owner's switch of one agent's auto-sleep (#12111) is new: the old list never had it.
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/sessions/live/") && (strings.HasSuffix(p, "/auto-sleep") || strings.HasSuffix(p, "/keep-full-access")) { // the second is the owner's Full access across restarts (#14061)
 				continue
@@ -108,6 +112,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			}
 			// Resolving a shortened artifact link (#9841) is the owner's alone through the hub: the old list never had it.
 			if m == http.MethodGet && p == "/api/artifacts/resolve" {
+				continue
+			}
+			// Protected thumbnail reads are new in #14147, not in the historical list.
+			if m == http.MethodGet && strings.HasPrefix(p, "/api/artifacts/") && strings.HasSuffix(p, "/thumbnail") {
 				continue
 			}
 			// Starring an artifact (#9819) is the owner's alone through the hub: the old list never had it.

@@ -316,6 +316,7 @@ func (h *BoardHandler) ListGoals(w http.ResponseWriter, r *http.Request) {
 	}
 	h.markMadeByOrchestrator(r.Context(), project, made...)
 	h.attachGoalNews(r, made...)
+	h.attachGoalDoneState(r, made...)
 	writeJSON(w, http.StatusOK, page)
 }
 
@@ -411,7 +412,8 @@ func (h *BoardHandler) ListAllGoals(w http.ResponseWriter, r *http.Request) {
 	for i := range page.Goals {
 		listed[i] = &page.Goals[i]
 	}
-	h.attachGoalNews(r, listed...) // the Operator's list of every board's goals (the Inbox's) says which have new comments (#12073)
+	h.attachGoalNews(r, listed...)      // the Operator's list of every board's goals (the Inbox's) says which have new comments (#12073)
+	h.attachGoalDoneState(r, listed...) // and what they did to each goal's "looks done" row (#14047)
 	writeJSON(w, http.StatusOK, page)
 }
 
@@ -432,6 +434,7 @@ func (h *BoardHandler) GetGoal(w http.ResponseWriter, r *http.Request) {
 	// The requests this goal sent that were accepted (#7361): where it asked, never what the other team made of it (no task, count or title). The cap is 20; the total says how many more.
 	h.markMadeByOrchestrator(r.Context(), project, g)
 	h.attachGoalNews(r, g)
+	h.attachGoalDoneState(r, g)
 	refs, total, err := h.bs.AcceptedGoalRequests(r.Context(), project, id)
 	if err != nil {
 		errInternalServer(w, err.Error())

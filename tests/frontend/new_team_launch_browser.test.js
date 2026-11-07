@@ -46,7 +46,7 @@ const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'mod
             assert.ok(q.working_mode && q.working_mode.asks_are_tasks === true, 'a new team has Requests for work are tasks on: working_mode.asks_are_tasks is sent true (goal #21)');
             await waitFor(`!window.__nt.dlg(${N.team})`, 'the dialog closes on a launch', 6000);
         });
-        await S.run('step 3 working mode and health: the request carries working_mode {mode, dependency_guidance, custom_instructions} and health_monitor true', async () => {
+        await S.run('step 3 working mode and health: the request carries working_mode {mode, dependency_guidance, custom_instructions} and no health_monitor (on is the default, #14091)', async () => {
             await install_stub(200); await fresh(); await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250); await t.click('button', N.next); await t.step(3);
             await tab('Start'); await t.type('textarea', /^Additional instructions/i, 'Keep the diff small.', N.team); await t.type('textarea', /^What should the team work on/i, 'Look at the build.', N.team);
             await tab('Workflow'); assert.ok(await t.pick(/^Working mode$/i, /Worktrees/i), 'a Working mode choice Worktrees'); assert.ok(await check(/^Guidance for dependent tasks$/i, true), 'the Guidance for dependent tasks switch');
@@ -54,7 +54,7 @@ const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'mod
             await t.click('button', N.launch); await waitFor(`window.__qa.launch.length === 1`, 'the launch request', 6000);
             const q = (await sent()).launch[0];
             assert.ok(q.working_mode, 'working_mode is in the request'); assert.equal(typeof q.working_mode.mode, 'string'); assert.equal(q.working_mode.dependency_guidance, true); assert.equal(q.working_mode.custom_instructions, 'Keep the diff small.', 'the additional instructions are custom_instructions');
-            assert.equal(q.health_monitor, true, 'health_monitor is true');
+            assert.ok(!('health_monitor' in q), 'the check is on for a new team (#14091): nothing is sent, the server default applies');
         });
         const boardStub = `(() => { const R = window.fetch; window.__qa.board = []; window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); const m = (o.method || 'GET').toUpperCase();
                 const hit = /^\\/api\\/board\\/[^/]+\\/(goals|tasks|messages)$/.exec(url.pathname);
@@ -85,6 +85,13 @@ const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'mod
             assert.ok(!b.some(x => x.kind === 'goals'), 'no goal was made'); assert.equal(task.body.goal_id, undefined, 'and the task has none');
             assert.ok(task.body.title.length <= 61 && task.body.title.endsWith('\u2026') && long.startsWith(task.body.title.slice(0, -1)), 'a short title cut at a word: ' + task.body.title);
             assert.equal(task.body.body, long, 'the full text is the body');
+        });
+        await S.run('step 3 health check is ON in a new team\'s dialog (#14091); unticking it sends health_monitor false', async () => {
+            await install_stub(200); await fresh(); await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250); await t.click('button', N.next); await t.step(3);
+            await tab('Health check'); assert.equal(await ev(`(() => { const e = window.__nt.find(window.__nt.dlg(${N.team}), 'input', /^Send health check/i); return e && e.type === 'checkbox' ? e.checked : null; })()`), true, 'the Send health check switch is on before anyone touches it (read, not clicked)');
+            assert.ok(await check(/^Send health check/i, false), 'the person unticks it');
+            await t.click('button', N.launch); await waitFor(`window.__qa.launch.length === 1`, 'the launch request', 6000);
+            assert.equal((await sent()).launch[0].health_monitor, false, 'an unticked box says so, so the server does not apply its default on');
         });
         await S.run('step 3 health number out of range (#8455): Launch team sends nothing, opens the Health check tab, names the number and focuses it', async () => {
             await install_stub(200); await fresh(); await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250); await t.click('button', N.next); await t.step(3);
@@ -130,13 +137,13 @@ const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'mod
         await S.run('board settings (Require a goal, health Every, Send it to, Post when all is well, Messaging): ONE PUT /api/board/<the id the launch returned>/settings, after the launch answered, with those values', async () => {
             await install_stub(200); await fresh(); await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250); await t.click('button', N.next); await t.step(3);
             await tab('Workflow'); assert.ok(await check(/^Require a goal/i, true), 'a Require a goal switch');
-            await tab('Health check'); assert.ok(await check(/^Send health check/i, true), 'Send health check'); await t.type('input', /^Every/i, '20'); assert.ok(await check(/^Post when all is well/i, true), 'Post when all is well');
+            await tab('Health check'); assert.ok(await check(/^Send health check/i, true), 'Send health check (already on for a new team, #14091)'); await t.type('input', /^Look every/i, '20'); assert.ok(await check(/^Post when all is well/i, true), 'Post when all is well');
             await tab('Messaging'); assert.ok(await check(/^Message teams on other computers/i, true), 'Message teams switch is on, as the team will start'); assert.ok(await check(/^Share files with teams on other computers/i, false), 'Share files switch turned off'); assert.match(await ev(`document.querySelector('.team-start-lead').closest('.sv').textContent`), /Teams on this computer: not allowed yet\./, 'the line about teams on this computer (#11788)');
             await t.click('button', N.launch); await waitFor(`window.__qa.put.length >= 1`, 'the board settings PUT', 8000); await settle(500);
             const s = await sent(); assert.equal(s.put.length, 1, 'one PUT, not one per setting'); assert.equal(s.put[0].path, '/api/board/qa-board-7/settings', 'to the board the launch returned');
             assert.deepEqual(s.order, ['launch', 'put'], 'the PUT is after the launch');
             const b = s.put[0].body; assert.equal(b.require_goal, true, 'require_goal'); assert.equal('cross_team_messaging' in b, false, 'a switch left on is not stored: the default is not an explicit on'); assert.equal(b.cross_team_artifacts, false, 'a switch turned off is stored off');
-            assert.ok(b.health && (b.health.on === true || b.health.enabled === true || JSON.stringify(b.health).includes('true')), `the health setting is in the PUT (${JSON.stringify(b.health)})`);
+            assert.ok(b.health && b.health.on === true && b.health.interval_min === 20, `the health setting is in the PUT, on, with the 20 minutes typed (${JSON.stringify(b.health)})`);
         });
         await S.run('if the board settings PUT fails the team is already running: the dialog closes, one toast names the setting that was not saved', async () => {
             await install_stub(500); await fresh(); await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250); await t.click('button', N.next); await t.step(3);

@@ -326,6 +326,7 @@ func listedName(stored, terminal string) string {
 type listData struct {
 	displayNames, icons, nameColors, latestGoals map[string]string
 	waitIgnored                                  map[string]string // {session id: the request the Operator hid from Needs you} (#11946)
+	waitRemoved                                  map[string]string // {session id: the request the Operator removed from Needs you after hiding it} (#14266)
 	goalAt                                       map[string]string // when each row's goal was written (#10123)
 	gitState                                     map[string]*store.GitSnapshot
 	fileCounts                                   map[string]int
@@ -361,6 +362,7 @@ func (h *SessionsHandler) readListData(ctx context.Context, trace *phaseTrace, a
 		func() { d.icons, _ = h.ss.GetIcons(ctx, sessionIDs) },
 		func() { d.nameColors, _ = h.ss.GetNameColors(ctx, sessionIDs) },
 		func() { d.waitIgnored, _ = h.ss.WaitIgnoredKeys(ctx) },
+		func() { d.waitRemoved, _ = h.ss.WaitRemovedKeys(ctx) },
 		func() { d.gitState, _ = h.gs.GetLiveGitState(ctx, sessionAgents) },
 		func() { d.fileCounts, _ = h.ts.GetEditedFileCounts(ctx, sessionIDs) },
 		func() { d.latestEvents, _ = h.ts.GetLatestEventTypes(ctx, sessionIDs) },
@@ -562,6 +564,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"waiting_since":         waitingSince(state), // when the request began, for "waiting 4 min" (#6981)
 		"waiting_kind":          nilIf(!state.NeedsInput || state.WaitingKind == "", state.WaitingKind),
 		"wait_ignored":          state.NeedsInput && d.waitIgnored[sid] != "" && d.waitIgnored[sid] == waitRequestKey(state), // the Operator hid this request (#11946)
+		"wait_removed":          state.NeedsInput && d.waitRemoved[sid] != "" && d.waitRemoved[sid] == waitRequestKey(state), // and removed it from Needs you and its count: the agent still waits (#14266)
 		"asked_before_restart":  askedBefore,
 		"last_answer":           h.lastAnswerOf(agent.SessionID),                                                         // the prompt answered last, for a second screen's note (#10301)
 		"pending_sends":         h.pendingSendsOf(agent.SessionID),                                                       // a person's messages typed into the agent that its transcript does not have yet, for a second screen (#10467)

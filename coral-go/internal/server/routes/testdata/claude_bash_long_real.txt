@@ -1,0 +1,30 @@
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Bash command
+ Run the acceptance checks
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ SP=/private/tmp/claude-501/-Users-user-Coral-reading-list/00000000-0000-0000-0000-000000000000/scratchpad
+ exportPATH=$SP/node/node-v22.23.4-darwin-arm64/bin:$PATH
+ │ cd/Users/user/Cal/reading-list
+ T=$(mktemp-d$SP/rl.XXXX)
+ node -e "require('./server').createServer('$T/links.json').listen(3101)"&PID=$!;sleep1
+ {
+ │ echo; echo '--- curl checks on served HTML/CSS (PORT 3101, temp data file) ---'
+ H=$(curl-slocalhost:3101/)
+ for p in 'id="add-form"''id="add-url"''id="add-title"''id="add-tags"''id="add-error"''id="search"''id="tag-select"''id="clear-filter"''id="links"''id="empty"''<scriptsrc="app.js">'
+ 'href="style.css"''name="viewport"';do
+ │   echo "$H"| grep -qF "$p" && ech "PASS  / contains$p" || echo "FAIL  /missing $p";done
+ C=$(curl-slocalhost:3101/style.css)
+ │ echo "$C"| grp-qF '.link-item.is-ad .link-body{opacity'&&echo'PASSstyle.cssmutesreaditems(.is-readopacity)'||echo'FAILreadmutingrule'
+ │ echo "$C" | grep -qF 'prefers-color-scheme: dark' && echo 'PASS  style.css has dark mode'
+ echo "PASS  GET /nope -> $(curl -s -o /dev/null -w %{http_code}localhost:3101/nope)"
+ }| tee -a $SP/task2-ui-check.txt
+ kill $PID; rm -rf $T
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ Containsbracewithquotecharacter(expansionobfuscation)
+
+ Do you want to proceed?
+ ❯ 1. Yes
+   2. Yes, and switch to auto mode · auto mode handles these prompts for you
+   3. No
+
+ Esc to cancel · Tab to amend

@@ -69,6 +69,7 @@ GET /api/artifacts/{id}/comments view
 GET /api/artifacts/{id}/meta view
 GET /api/artifacts/{id}/private view
 GET /api/artifacts/{id}/readers view
+GET /api/artifacts/{id}/thumbnail view
 GET /api/artifacts/{id}/versions view
 GET /api/auth/hub-origins never
 GET /api/auth/hub-signin never
@@ -136,6 +137,7 @@ GET /api/cloud/status never
 GET /api/custom-models view
 GET /api/filesystem/is-git launch
 GET /api/filesystem/list launch
+GET /api/filesystem/trust-probe never
 GET /api/folder-tags view
 GET /api/folder-tags/{folderName} view
 GET /api/goal-links never

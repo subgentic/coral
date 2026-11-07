@@ -6,7 +6,7 @@
  * Download button keeps the original bytes one click away, through Coral Hub too. */
 import { isPhoneLayout } from './phone_layout.js';
 import { markHidden } from './visible_marks.js';
-import { escapeHtml, renderMarkdownStrict, highlightCodeIn, keepFragmentsInside } from './utils.js';
+import { escapeHtml, renderMarkdownStrict, highlightCodeIn, keepFragmentsInside, fileIdOf, versionLineOf, copyFileId } from './utils.js';
 import { serverUrl, artifactPath, isCloud, boardTeamKey, contextServer, normServer } from './server_base.js';
 import { renderArtifact, manifestDownload } from './artifact_preview.js';
 import { downloadArtifact, sanitizeDownloadName } from './artifact_download.js';
@@ -43,6 +43,9 @@ let _versions = null;    // the version bar of the viewer (#6472)
 let _review = null;      // Approve and Request changes of a for-review artifact (#136584)
 let _hex = '';           // the artifact on show and what it was opened with, for a version chosen from the bar
 let _lastOpts = {};
+let _line = null;       // the file id and version line the CURRENT open's caller gave, for the hex it was given for ({ hex, fileId, versionLine }). It is rebuilt from that open's own options on every open, so it cannot outlive its open or cross to another computer or team (those travel in the same options): an open that carries none has none. Shown only while its hex is the one shown (#14178)
+let _barLine = null;    // the same for the version the bar shows, from the server's list: it replaces the caller's on a switch and after a save
+let _lineChip = null;   // the line's chip in Details, made on the first line this open has
 let _details = null;     // the Details button and its panel (the readers' row)
 let _editor = null;
 let _editAbort = null;
@@ -110,11 +113,13 @@ function _build() {
                     <button type="button" class="menu-item artifact-viewer-edit-item" role="menuitem" hidden>Edit text</button>
                     <button type="button" class="menu-item artifact-viewer-markup-item" role="menuitem" hidden>Mark up</button>
                     <button type="button" class="menu-item artifact-viewer-copy-id" role="menuitem">Copy artifact ID</button>
+                    <button type="button" class="menu-item artifact-viewer-copyid-item" role="menuitem" hidden>Copy file ID</button>
                     <a class="menu-item artifact-viewer-newtab" role="menuitem" target="_blank" rel="noopener noreferrer" hidden>Open in new tab</a>
                     <a class="menu-item artifact-viewer-download" role="menuitem" rel="noopener noreferrer" download>Download</a>
                 </div>
             </span>
         </div>
+        <p class="artifact-viewer-versionline" hidden></p>
         <p class="artifact-viewer-source" role="note" hidden></p>
         <div class="artifact-viewer-readers" hidden></div>
         <p class="artifact-edit-send-note" role="status" hidden></p>
@@ -124,6 +129,7 @@ function _build() {
     _details = makeDetails({ panel: d.querySelector('.artifact-viewer-readers'), remember: false, hide: true }); // closed on every open of the viewer: one open Details no longer fills the next file's screen (#12725)
     _details.button.classList.add('artifact-viewer-details'); d.querySelector('.artifact-viewer-morewrap').before(_details.button); // Details is a button in the header row, beside ⋯: where a person looks to close it (#12725) header row (#12223)
     // the HTML preview's banner is said once; after that a "Sandboxed" chip in the header says it, and a tap shows or hides the banner (#12224)
+    d.querySelector('.artifact-viewer-copyid-item').addEventListener('click', e => { const id = e.currentTarget.dataset.fileId; copyFileId({ file_id: id }, showToast); }); // the menu closes itself on a choice // Copy file ID: the id alone; a failed copy says so (#14178)
     const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'chip artifact-viewer-sandbox'; chip.hidden = true; chip.setAttribute('aria-expanded', 'false');
     chip.textContent = 'Sandboxed'; // words only: the icon font is a subset and has no shield
     d.querySelector('.artifact-viewer-chips').append(chip);
@@ -188,6 +194,7 @@ function _build() {
         body: () => d.querySelector('.artifact-viewer-body'),
         show: (row) => openArtifactViewer(row.digest, { ..._lastOpts, filename: row.name || _lastOpts.filename, mediaType: row.media_type, switched: true }),
         reload: () => openArtifactViewer(_hex, { ..._lastOpts, switched: false }),
+        line: (row) => { _barLine = row && row.file_id && row.version_line ? { hex: row.digest, fileId: row.file_id, versionLine: row.version_line } : null; if (_dialog) paintLine(_dialog); },
         sheetOpen: () => _comments.sheetOpen(),
         setSheet: (open) => _comments.setSheet(open),
     });
@@ -298,6 +305,35 @@ function openAfterInventory(hex, opts, intent) {
         if (openArtifactViewer(hex, opts) === false) opts.onClose?.();
     }).catch(error => { if (intent === _openIntent) { showToast(error.message, true); opts.onClose?.(); } }).finally(() => { clearTimeout(timer); window.removeEventListener('popstate', cancel); document.removeEventListener('coral:route-changed', cancel); });
 }
+/** The file id and version line of the version SHOWN now: the bar's, from the server's list of versions, else the one a caller gave for exactly this hex; never a line that belongs to another version (#14178). */
+function shownLine() {
+    if (_barLine && _barLine.hex === _hex) return _barLine;
+    // a caller's line is for the hex it was given for: a version switch or a save spreads the options onto ANOTHER hex (the line stays with the first)
+    if (_line && _line.hex === _hex) return _line;
+    return null;
+}
+/** Draw the version line in the header and in Details (with its Copy file ID button), or clear both when the shown version has none. */
+function paintLine(d) {
+    const L = shownLine();
+    const text = L ? versionLineOf({ file_id: L.fileId, version_line: L.versionLine }) : ''; // hidden characters of the name are written out by versionLineOf
+    const head = d.querySelector('.artifact-viewer-versionline');
+    head.textContent = text; head.hidden = !text; // the full line is in Details too; no tooltip repeating the text (title_repeats_census)
+    const copyItem = d.querySelector('.artifact-viewer-copyid-item'); // Copy file ID is always reachable from the ⋯ menu: a file id and line never add a Details button of their own (#14178: it joined row one on a phone)
+    copyItem.hidden = !text; copyItem.dataset.fileId = text ? L.fileId : '';
+    if (!text) { if (_lineChip) _lineChip.hidden = true; return; }
+    if (!_lineChip) {
+        const chip = document.createElement('span'); chip.className = 'chip detail-chip artifact-viewer-fileid';
+        const label = document.createElement('span'); label.className = 'artifact-viewer-fileid-text';
+        const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'dt-link detail-chip-link'; copy.textContent = 'Copy file ID';
+        copy.addEventListener('click', () => { copyFileId({ file_id: chip.dataset.fileId }, showToast); });
+        chip.append(label, ' ', copy);
+        const wrap = document.createElement('div'); wrap.className = 'detail-chips'; wrap.append(chip);
+        if (_details.button.hidden) _details.panel.append(wrap); // nothing else is in Details: the chip waits in the closed panel, and shows if something else (a goal, a task, who can read) makes the button appear
+        else _details.add(wrap);
+        _lineChip = chip;
+    }
+    _lineChip.dataset.fileId = L.fileId; _lineChip.firstChild.textContent = text; _lineChip.hidden = false;
+}
 /** Open the artifact `hex` (64 lowercase hex). opts: { server, filename, mediaType }. */
 /** The viewer's name when it is cut: a button that opens it whole, only while it is cut or open (#13979). */
 function syncTitleExpand(d) {
@@ -335,7 +371,9 @@ export function openArtifactViewer(hex, opts = {}) {
     _abort?.abort();
     _abort = new AbortController();
     const gen = ++_gen;
+    opts = { ...opts, lineHex: opts.lineHex || hex }; // the hex a caller's file id and line were given for: a version switch or a save spreads these opts onto ANOTHER hex, and the line must stay with its own (#14178)
     _hex = hex; _lastOpts = opts;
+    _barLine = null; // before the bar is opened below: it may draw at once and tell the version it shows, and that line must survive the rest of this open
     _sendCapability = null; const sendButton = d.querySelector('.artifact-edit-send-action'); sendButton.hidden = true; sendButton.disabled = false; const sendNote = d.querySelector('.artifact-edit-send-note'); sendNote.hidden = !opts.editSaved; sendNote.textContent = opts.editSaved ? 'Saved as a new version. Nothing was sent to an agent automatically.' : '';
     _editCapability = null; const editButton = d.querySelector('.artifact-viewer-edit'); editButton.hidden = true; d.querySelector('.artifact-viewer-edit-item').hidden = true; d.querySelector('.artifact-viewer-edit-item').disabled = false; editButton.disabled = false; editButton.textContent = 'Edit text';
     _layoutType = null;
@@ -395,6 +433,10 @@ export function openArtifactViewer(hex, opts = {}) {
     } else if (opts.goal) { const g = document.createElement('span'); g.className = 'chip detail-chip'; g.textContent = `Goal: ${markHidden(opts.goal, { strict: true })}`; g.title = g.textContent; chips.append(g); }
     if (opts.task) { const t = document.createElement('span'); t.className = 'chip detail-chip'; t.textContent = `Task: ${markHidden(opts.task, { strict: true })}`; t.title = t.textContent; chips.append(t); }
     if (chips.children.length) _details.add(chips);
+    _lineChip = null;
+    // Every open sets the line afresh: a caller's valid id and line (bound to its hex, computer and team), else NONE. An earlier open's line never survives into one that carries none (the same digest from another team, a plain reopen).
+    _line = fileIdOf({ file_id: opts.fileId }) && opts.versionLine ? { hex: opts.lineHex, fileId: opts.fileId, versionLine: opts.versionLine } : null;
+    paintLine(d);
     readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) { _details.add(readersBlock(hex, opts.server, _details)); if (opts.sourceNamed) _details.add(privateBlock(hex, opts.server, _details)); } }).catch(() => {});
     if (!opts.switched) d.querySelector('.artifact-viewer-close').focus(); // a version chosen from the bar keeps the keyboard on the bar
     let textShown = false; // the strict text view drew it: comments can point into it. Anything else (a frame, a picture, a PDF, a table, a video, a download) takes whole-document comments (#11444).

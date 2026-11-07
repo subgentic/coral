@@ -226,3 +226,14 @@ func TestAPoolClaimAndListSayWhichMachine(t *testing.T) {
 		}
 	}
 }
+
+// #14079: the list says a holder with nothing running is idle, and says nothing of one that works.
+func TestTheListShowsAnIdleHolder(t *testing.T) {
+	three, none := 3, (*int)(nil)
+	out := captureStdout(t, func() {
+		printResource(resView{Name: "mac-heavy", Slots: 2, Holders: []resEntry{{ID: 1, Agent: "Idle Dev", IdleMin: &three}, {ID: 2, Agent: "Busy Dev", IdleMin: none}}}, "Me")
+	})
+	if !strings.Contains(out, "Idle Dev [idle for 3 min") || strings.Contains(strings.Split(out, "Busy Dev")[1], "idle") {
+		t.Fatalf("the list: %q", out)
+	}
+}
