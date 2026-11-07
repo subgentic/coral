@@ -12,7 +12,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
     const failures = [];
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const mode of ['one', 'older', 'older-comment-refused', 'older-comment-lost', 'older-send-refused', 'older-send-lost', 'pictures', 'in-progress', 'not-delivered', 'already-sent', 'hub', 'held-close', 'held-switch', 'text-not-kept', 'unsupported-images', 'other-refusal', 'cloud']) {
+        for (const mode of ['one', 'older', 'older-comment-refused', 'older-comment-lost', 'older-send-refused', 'older-send-lost', 'older-send-lost-file', 'older-send-lost-words', 'pictures', 'in-progress', 'not-delivered', 'already-sent', 'hub', 'held-close', 'held-switch', 'text-not-kept', 'unsupported-images', 'other-refusal', 'cloud']) {
             try {
                 if (mode === 'cloud') await setupHubWorld({ client, Page, Emulation, width: 1280, height: 900, mobile: false, inbox: true, hubFeed: true });
                 await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
@@ -27,7 +27,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                     const prefix = server === 'local' ? '' : '/api/remote/review-box';
                     window.fetch = (input,opts={}) => {
                         const u = new URL(String(input),location.href), path = u.pathname, method = opts.method || 'GET';
-                        if (method === 'GET' && (path === prefix+'/api/board/alpha/artifacts' || path === prefix+'/api/team-artifacts')) { if (path.endsWith('/api/board/alpha/artifacts') || u.searchParams.has('digest')) window.__stateReads++; const rows = [row, ...(mode === 'held-switch' ? [{...row,id:'${OTHER}',uri:'coral://artifacts/${OTHER}',name:'Replacement.md'}] : [])].filter(r=>!u.searchParams.has('digest') || r.id===u.searchParams.get('digest')); return json({artifacts:rows,total:rows.length,tag_counts:{'for review':rows.length},has_more:false}); }
+                        if (method === 'GET' && (path === prefix+'/api/board/alpha/artifacts' || path === prefix+'/api/team-artifacts')) { if (path.endsWith('/api/board/alpha/artifacts') || u.searchParams.has('digest')) window.__stateReads++; const rows = [row, ...((mode === 'held-switch' || mode.startsWith('older-send-lost-')) ? [{...row,id:'${OTHER}',uri:'coral://artifacts/${OTHER}',name:'Replacement.md'}] : [])].filter(r=>!u.searchParams.has('digest') || r.id===u.searchParams.get('digest')); return json({artifacts:rows,total:rows.length,tag_counts:{'for review':rows.length},has_more:false}); }
                         if (method === 'POST' && path.startsWith(prefix+'/api/') && (path.endsWith('/review') || path.endsWith('/comments') || path.endsWith('/send'))) {
                             const body = JSON.parse(opts.body); window.__writes.push({path,body});
                             if (path.endsWith('/review')) {
@@ -41,10 +41,10 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                             }
                             if (path.endsWith('/comments') && mode === 'older-comment-refused') return json({error:'Comment refused'},403);
                             if (path.endsWith('/comments') && mode === 'older-comment-lost') return Promise.reject(new TypeError('Connection lost'));
-                            if (path.endsWith('/send') && mode === 'older-send-lost' && !window.__retryDelivery) return Promise.reject(new TypeError('Delivery acknowledgement lost'));
+                            if (path.endsWith('/send') && mode.startsWith('older-send-lost') && !window.__retryDelivery) return Promise.reject(new TypeError('Delivery acknowledgement lost'));
                             if (path.endsWith('/send') && mode === 'older-send-refused' && !window.__retryDelivery) return json({ok:false,error:'Delivery refused',results:[{agent:'Writer A',state:'refused'}]},403);
                             if (path.endsWith('/send')) return json({ok:true,results:[{state:'sent',agent:'Writer A'}]});
-                            return json({id:7,body:body.body,images:body.images || []},201);
+                            return json({id:path.includes('${OTHER}')?8:7,body:body.body,images:body.images || []},201);
                         }
                         if (method === 'POST' && path === prefix+'/api/artifacts/${HEX}/comment-images') return json({hex:'${PIC}',name:'example.png',content_type:'image/png',size:70});
                         return real(input,opts);
@@ -71,6 +71,28 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                     assert.equal(await ev(`window.__writes.length`),1,'switching never sends another request');
                     assert.ok((await ev(`window.__writes[0].path`)).includes(HEX),'the held write stays on the original file');
                     assert.equal(await ev(`[...document.querySelectorAll('.toast')].some(t=>/was asked/.test(t.textContent))`),false,'late success cannot announce another file as sent');
+                } else if (mode.startsWith('older-send-lost-')) { // #14263: QA Reviewer 2's two surviving mutants on #14187: the kept comment of a lost send is the FILE's and the WORDS'
+                    await waitFor(`!!document.querySelector('#one-call-review .artifact-review-error').textContent`, mode + ': the lost send leaves the form with its error');
+                    assert.equal(await ev(`window.__writes.filter(w=>w.path.endsWith('/comments')).length`),1,mode+': one comment after the first, lost, send');
+                    if (mode === 'older-send-lost-file') {
+                        await ev(`window.__control.open('${OTHER}',{server:'local',board:'alpha',sourceNamed:true,requestChanges:true}).then(()=>true)`);
+                        await waitFor(`!document.querySelector('#one-call-review .artifact-review-form').hidden`, 'the form opens for the other file');
+                        await ev(`document.querySelector('#one-call-review textarea').value='Keep these exact words.'; document.querySelector('#one-call-review form').requestSubmit(); true`); // the SAME words, another file
+                    } else {
+                        await ev(`document.querySelector('#one-call-review textarea').value='Different words after the loss.'; document.querySelector('#one-call-review form').requestSubmit(); true`);
+                    }
+                    await waitFor(`window.__writes.filter(w=>w.path.endsWith('/comments')).length === 2`, mode + ': a second comment is posted; the lost one is not reused');
+                    const writes = await ev(`window.__writes`), comments = writes.filter(w=>w.path.endsWith('/comments')), reviews = writes.filter(w=>w.path.endsWith('/review'));
+                    if (mode === 'older-send-lost-file') {
+                        assert.ok(comments[0].path.includes(HEX) && comments[1].path.includes(OTHER), mode+': the second comment goes to the OTHER file, not the first');
+                        assert.equal(comments[1].body.body,'Changes requested: Keep these exact words.');
+                        assert.equal(reviews.length,2,mode+': the other file is decided too: the first file\'s recorded decision is not reused for it');
+                        assert.ok(reviews[0].path.includes(HEX) && reviews[1].path.includes(OTHER),mode+': each decision is on its own file');
+                    } else {
+                        assert.ok(comments[1].path.includes(HEX),mode+': the same file');
+                        assert.equal(comments[1].body.body,'Changes requested: Different words after the loss.',mode+': changed words are a NEW comment with the new words');
+                        assert.equal(reviews.length,1,mode+': the recorded decision is not repeated for changed words');
+                    }
                 } else if (mode.startsWith('older-')) {
                     await waitFor(`!!document.querySelector('#one-call-review .artifact-review-error').textContent`, 'the older-computer fallback outcome');
                     const words = await ev(`document.querySelector('#one-call-review .artifact-review-error').textContent`);
