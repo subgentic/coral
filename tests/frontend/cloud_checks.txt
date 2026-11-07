@@ -46,6 +46,7 @@ node sleep_hygiene.test.js
 node heap_growth_bounds.test.js
 node waitfor_hygiene.test.js
 node ready_wait_hygiene.test.js
+node step_bound.test.mjs
 node waitfor_helper.test.js
 node stand_in_agent.test.js
 node raf_hygiene.test.js

@@ -6,19 +6,24 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
 const { removeBoards } = require('./helpers/board_cleanup');
+const { bound } = require('./helpers/step_bound');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const failures = [], team = 'rcp-' + Date.now().toString(36), T = '#group-table-view', S = `(window.__coralStatic || '/static/')`;
     const check = (ok, what) => { if (!ok) failures.push(what); };
+    // a step that waits on the network has a limit of its own and names itself and the page's unanswered requests when it hits it (#14286: this suite hung once in three runs, killed at 120 s with nothing said)
+    const WAITING = `[document.readyState, ...(window.__pend ? [...window.__pend.values()] : [])].join(', ')`;
+    const step = (what, expr, ms = 20000) => bound(ev(expr), ms, what, () => ev(WAITING));
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
     const PIC = 'a'.repeat(63) + 'b';
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const f = window.fetch; window.__pend = new Map(); let n = 0; window.fetch = function (u, o) { const id = ++n; window.__pend.set(id, ((o && o.method) || 'GET') + ' ' + String((u && u.url) || u).slice(0, 120)); const p = f.apply(this, arguments); p.then(() => window.__pend.delete(id), () => window.__pend.delete(id)); return p; }; })()` }); // the requests not yet answered, for the step limits below
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
-        await ev(`fetch('/api/board/${team}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Review Writer', job_title: 'Writer' }) }).then(r => r.status)`);
+        await step('the board subscribe call', `fetch('/api/board/${team}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Review Writer', job_title: 'Writer' }) }).then(r => r.status)`);
         await ev(`(() => { const original = window.fetch, json = (b, st = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: st, headers: { 'Content-Type': 'application/json' } }));
             const hex = (1).toString(16).padStart(64, '0');
             const item = { id: hex, name: 'Review file.txt', media_type: 'text/plain', size: 30, created_at: new Date(Date.now() - 600000).toISOString(), task_id: 0, source: 'upload', available: true, session_id: 'writer-a', produced_by: 'Writer A', tags: ['for review'], uri: 'coral://artifacts/' + hex };
@@ -35,7 +40,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 return original(url, opts); };
             return true; })()`);
         await ev(`window.switchNavTab('hub-inbox'); true`);
-        await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
+        await step('opening the Inbox tab (selectInboxTab)', `import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
         await waitFor(`!![...document.querySelectorAll('${T} tbody tr')].find(r => r.textContent.includes('Review file.txt'))`, 'the review row', 15000);
         await ev(`[...document.querySelectorAll('${T} tbody tr')].find(r => r.textContent.includes('Review file.txt')).querySelector('.inbox-review-name').click(); true`);
         await waitFor(`!!document.querySelector('.artifact-review-changes:not([hidden])')`, 'Request changes in the viewer', 8000);
@@ -57,7 +62,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         const c = await ev(`window.__comments[0]`);
         check(!!c && c.anchor.whole === true && /The totals row is missing/.test(c.body) && JSON.stringify(c.images) === JSON.stringify([PIC]), 'the comment carries the words and the picture: ' + JSON.stringify(c));
         check(await ev(`document.querySelectorAll('.artifact-review-form .ac-thumb').length`) === 0, 'the tray is empty after the request is sent');
-    } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
+    } finally { await bound(removeBoards(ev, [team]), 15000, 'removing the suite\'s board').catch(() => {}); await bound(client.close(), 10000, 'closing the page connection').catch(() => {}); }
     if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
     console.log('review_changes_picture_browser: ok');
 })().catch(e => { console.error(e); process.exit(1); });
