@@ -40,12 +40,17 @@ const {coralReady}=require('./helpers/wait');const BASE=require('./test_base').B
    for(const kind of ['goal','task']){
     const id=kind==='goal'?goal:task;
     await ev(`document.querySelector('.inbox-review-earlier a[data-subject-kind="${kind}"]').focus();true`);
+    if(kind==='task'){
+     await ev(`window.__focusedSubject=document.activeElement;import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.filterInbox('Please')).then(()=>true)`);
+     assert.equal(await ev(`window.__focusedSubject.isConnected`),false,'the independent subject anchor was replaced by a real list redraw');
+     assert.equal(await ev(`document.activeElement===document.querySelector('.inbox-review-earlier a[data-subject-kind="task"]')`),true,'a focused Task link survives the Inbox redraw before Enter');
+    }
     if(kind==='goal'){const p=await ev(`(()=>{const a=document.querySelector('.inbox-review-earlier a[data-subject-kind="goal"]'),r=a.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};})()`);await Input.dispatchMouseEvent({type:'mousePressed',...p,button:'left',clickCount:1});await Input.dispatchMouseEvent({type:'mouseReleased',...p,button:'left',clickCount:1});}else{await Input.dispatchKeyEvent({type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});await Input.dispatchKeyEvent({type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});}
     await waitFor(`location.pathname===${JSON.stringify('/team/'+board+'/'+kind+'s/'+id)}`,'team '+kind+' URL');
     await waitFor(kind==='goal'?`document.querySelector('#team-panel-goals #goals-detail-title')?.textContent==='Actual subject goal'`:`document.querySelector('#team-panel-item #team-task-title')?.textContent.includes('Actual subject task')`,'actual '+kind+' content',15000);
     assert.equal(await ev(`!!document.querySelector('dialog.inbox-ask-dialog')`),false,'link does not open question');
     assert.deepEqual(await ev('window.__subjectWrites'),[],'link performs no read/answer mutation');
-    await ev(`window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);await waitFor(`document.querySelectorAll('.inbox-review-earlier a').length===2`,'row returns');
+    await ev(`window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);await waitFor(`document.querySelectorAll('.inbox-review-earlier a').length===2`,'row returns');await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.filterInbox('')).then(()=>true)`);
    }
    await ev(`document.querySelector('.inbox-ask-name').click();true`);await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open]')`,'rest of row still opens question');await ev(`document.querySelector('dialog.inbox-ask-dialog .inbox-ask-buttons .btn').click();true`);
   }
