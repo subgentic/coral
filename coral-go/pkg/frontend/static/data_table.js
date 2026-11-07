@@ -186,6 +186,8 @@ const mailCell = (m, label, open, pick, showTeam = false, gap = false) => { // o
     return td;
 };
 
+// Menu controls belong to table instances, including multiple tables on one page.
+let hiddenSeq = 0;
 export function dataTable(cfg) {
     if (cfg.oneLine) cfg = { ...cfg, fold: 'none', layout: 'fixed', resize: cfg.resize === true };
     const st = cfg.state || tableState();
@@ -219,9 +221,8 @@ export function dataTable(cfg) {
     const colgroup = el('colgroup');
     table.append(colgroup, thead, tbody);
     // the columns left out to fit the panel are never silently gone (#11943): a quiet control says how many, lists them and brings one back (it then keeps its place and the others give way by the same rules)
-    let hiddenSeq = 0;
     const hiddenBar = el('div', 'cols-hidden-bar'); hiddenBar.hidden = true;
-    const hiddenId = `dt-cols-hidden-${++hiddenSeq}`; // a counter, not a random suffix: the markup is the same on every draw (task_list_golden)
+    const hiddenId = `dt-cols-hidden-${++hiddenSeq}`; // unique even while several tables or an old and new draw coexist
     const hiddenMenu = el('div', 'menu cols-hidden-menu'); hiddenMenu.id = `${hiddenId}-menu`; hiddenMenu.hidden = true; hiddenMenu.setAttribute('role', 'menu'); hiddenMenu.setAttribute('aria-label', 'Hidden columns');
     const hiddenBtn = button('btn btn-quiet btn-small cols-hidden-btn', '', async (e) => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(hiddenBtn); });
     hiddenBtn.id = hiddenId; hiddenBtn.setAttribute('aria-haspopup', 'menu'); hiddenBtn.setAttribute('aria-expanded', 'false'); hiddenBtn.setAttribute('aria-controls', hiddenMenu.id);

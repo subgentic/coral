@@ -19,7 +19,7 @@ import { isPhoneBar } from './phone_layout.js';
 
 const { mutedReviewItems, mutedWords, reviewItems, reviewStarChanged, unreadReviewItems, reviewErrors, refreshReviews, reviewsChangedOnServer, reviewGroups, setReviewRead, markOpenedReadVisibly, isRead, savedFiles, reviewPages, savedReviewPages, loadMoreReviews, loadMoreSavedFiles, queryReviews, queriedReviews, moreQueriedReviews, retryQueriedReviews, reviewQueryState, reviewQueryKey, reviewFilterOptions, countSavedReviews, reviewPageSummary } = await importOnce('./inbox_reviews.js');
 import { failedUnread, finishedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
-import { operatorAsks, refreshOperatorAsks, askLine, askPlain, askKey, openAskDialog, askSubjects } from './operator_asks.js';
+import { operatorAsks, refreshOperatorAsks, askLine, askPlain, askKey, openAskDialog, askSubjects, questionContextNote } from './operator_asks.js';
 import { go, note, backIs, currentRoute } from './nav.js';
 import { unreadReviewCount, reviewAttentionCount } from './ask_filter.js'; // the files waiting: the full read's once it has run, else what the computers counted (#13172)
 
@@ -200,7 +200,8 @@ const needsUnread = s => !(s.welcome || (s.review && !needsReviewAttention(s.rev
 const hoverRows = () => !isPhoneLayout() && matchMedia('(hover: hover) and (pointer: fine) and (min-width: 768px)').matches;
 const hoverWrap = (s, box) => { if (!box || !hoverRows()) return box; const wrap = DT.el('div', 'inbox-actions-hover'), when = waitingText(s.waiting_since); wrap.append(box); if (when) wrap.append(DT.el('span', 'inbox-row-when', when)); return wrap; };
 /** What goes under a question to the Operator: the whole question when the name above is only its first words, and "Needs your answer" when the name already says all of it (a short question was on the row twice, #11776). */
-const askUnder = a => { // the line under a question's title: the rest of its words. A title that is the start of the text is not said twice (#12649: the row said "Sorry, the test question..." and again, under it, "Sorry, the test question...")
+const askUnder = a => {
+    if (questionContextNote(a)) return questionContextNote(a); // the line under a question's title: the rest of its words. A title that is the start of the text is not said twice (#12649: the row said "Sorry, the test question..." and again, under it, "Sorry, the test question...")
     const whole = askPlain(a), one = whole.replace(/\s+/g, ' ').trim(), line = askLine(a), head = line.endsWith('\u2026') ? line.slice(0, -1).trimEnd() : line;
     if (one === line) return 'Needs your answer';
     if (head && one.startsWith(head)) { const rest = one.slice(head.length).replace(/^[\s.,;:\u2026-]+/, ''); return rest || 'Needs your answer'; }
