@@ -51,7 +51,7 @@ func TestPermissionTarget_IsTheWholeBlockBetweenTheRules(t *testing.T) {
 }
 
 func TestPermissionTarget_AHiddenCharacterInAnEarlyLineIsJudged(t *testing.T) {
-	cmd := " echo safe\n echo ‮evil\n echo one\n echo two\n echo three"
+	cmd := " echo safe\n echo \u202eevil\n echo one\n echo two\n echo three"
 	s, ok := parsePromptScreen(claudeBashScreen(cmd))
 	require.True(t, ok)
 	assert.True(t, s.OnlyReject, "a hidden character four lines up was never judged before; the whole block is now")
