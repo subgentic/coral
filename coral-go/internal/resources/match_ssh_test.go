@@ -30,12 +30,11 @@ func TestATestRunOverSshIsNotMatchedByTheLocalPatterns(t *testing.T) {
 	assert.True(t, hit)
 }
 
-// #14170: the log line says which program words matched, cut and redacted, never the command.
-func TestTheMatchedWordsForTheLogAreShortAndRedacted(t *testing.T) {
-	_, words, ok := matchWords(`cd /w && TOKEN=abc123 go test -run X ./internal/server/routes -ldflags=-X=secretvalue`, []string{"go test ./internal/server/routes"})
+// #14170 (Security's SHOULD): the log line names the matched command's program only, never an argument, so no value or token can reach the log.
+func TestTheMatchedWordForTheLogIsTheProgramOnly(t *testing.T) {
+	_, word, ok := matchWords(`cd /w && TOKEN=abc123 go test -run X ./internal/server/routes -ldflags=-X=secretvalue`, []string{"go test ./internal/server/routes"})
 	assert.True(t, ok)
-	assert.Equal(t, "go test -run X ./internal/server/routes ...", words, "a value is never shown")
-	_, words, _ = matchWords(`go test `+strings.Repeat("a", 200)+` ./internal/server/routes `+strings.Repeat("b ", 80), []string{"go test ./internal/server/routes"})
-	assert.LessOrEqual(t, len(words), 80)
-	assert.NotContains(t, words, "aaaa")
+	assert.Equal(t, "go", word)
+	_, word, _ = matchWords(strings.Repeat("a", 200)+` test ./x`, []string{strings.Repeat("a", 200) + " test ./x"})
+	assert.LessOrEqual(t, len(word), 40)
 }

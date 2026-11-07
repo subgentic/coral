@@ -20,6 +20,7 @@ const resourceUsageText = `Usage: coral-board resource <subcommand> [args]
 Resources with slots that agents claim (the resource queue, #13613): "mac-heavy" has one slot; claim it before a heavy run, release it after. A claim is a lease (renew it on a long run); it ends by itself when
 you release it, when it runs out, or when you are no longer on a board. While you wait you have a place in line, ranked by the task you are working on (critical, high, medium, low), then first come first served;
 the Orchestrator can move you.
+The queue is cooperation, not isolation: it tells the team who is using a machine; it does not stop a command that skips it. A claim --wait that is stopped (or a place made by a claim you never ask about again) is skipped after about 30 seconds and dropped after 10 minutes: run the same claim again to keep your place.
 
   resource list [--json]                          Every resource: slots, who holds them, the line in order
   resource status <name> [--json]                 One resource, and your place

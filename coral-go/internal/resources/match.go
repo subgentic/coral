@@ -14,8 +14,7 @@ func MatchCommand(command string, patterns []string) (string, bool) {
 	return p, ok
 }
 
-// matchWords is MatchCommand that also says WHICH command matched, as a short redacted line for the log (#14170: an "auto:" claim on a run that was on another machine could not be traced to its text): the program's words
-// with a word that holds "=" (a value, a token) or is over 40 characters shown as "...", cut at 80 characters. It is never the whole command and never a file's text.
+// matchWords is MatchCommand that also says WHICH command matched, as a short redacted line for the log (#14170: an "auto:" claim on a run that was on another machine could not be traced to its text): the matched command's program (its first word). It is never an argument, the whole command or a file's text.
 func matchWords(command string, patterns []string) (pattern, matched string, ok bool) {
 	if len(patterns) == 0 || strings.TrimSpace(command) == "" {
 		return "", "", false
@@ -38,19 +37,16 @@ func matchWords(command string, patterns []string) (pattern, matched string, ok 
 	return "", "", false
 }
 
+// redactedWords is the matched command's PROGRAM only (its first word, cut at 40): Security's SHOULD on #14170, no argument and so no value or token can reach the log.
 func redactedWords(words []string) string {
-	out := make([]string, 0, len(words))
-	for _, w := range words {
-		if strings.Contains(w, "=") || len(w) > 40 {
-			w = "..."
-		}
-		out = append(out, w)
+	if len(words) == 0 {
+		return ""
 	}
-	s := strings.Join(out, " ")
-	if len(s) > 80 {
-		s = s[:80]
+	w := words[0]
+	if len(w) > 40 {
+		w = w[:40]
 	}
-	return strings.ToValidUTF8(s, "")
+	return strings.ToValidUTF8(w, "")
 }
 
 // inOrder reports whether want is a subsequence of words that starts at the program.
