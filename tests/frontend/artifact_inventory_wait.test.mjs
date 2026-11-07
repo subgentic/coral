@@ -6,6 +6,19 @@ const {openArtifactViewer}=await importUi('artifact_viewer');
 const until=condition=>new Promise((resolve,reject)=>{let timer;const observer=new MutationObserver(check);function check(){if(condition()){clearTimeout(timer);observer.disconnect();resolve();}}observer.observe(document.body,{childList:true,subtree:true,attributes:true});timer=setTimeout(()=>{observer.disconnect();reject(new Error('condition did not settle'));},2000);check();});
 test('first message click waits for inventory and keeps its captured source across selection changes',async()=>{state.servers=[];state.serversKnown=false;state.selectedTeam='@m1/dev';assert.equal(openArtifactViewer(hex,{server:'m1',board:'@m1/dev',filename:'doc.md'}),true);assert.deepEqual(calls,['/api/servers']);assert.equal(document.querySelector('#artifact-viewer:not([hidden])'),null);state.selectedTeam='@m2/other';release();await until(()=>document.querySelector('.artifact-viewer-edit')&&!document.querySelector('.artifact-viewer-edit').hidden);assert.ok(calls.some(u=>u.startsWith('/api/remote/m1/api/artifacts/')));assert.ok(calls.some(u=>u.includes('/api/remote/m1/api/board/dev/')));assert.ok(calls.filter(u=>u.includes('/api/artifacts/')||u.includes('/api/board/')).every(u=>u.startsWith('/api/remote/m1/')),JSON.stringify(calls));document.querySelector('.artifact-viewer-close').click();});
 test('known inventory still refuses an unlisted computer without a probe or fallback',()=>{calls=[];assert.equal(openArtifactViewer(hex,{server:'unknown',board:'dev'}),false);assert.deepEqual(calls,[]);assert.equal(document.querySelector('#artifact-viewer:not([hidden])'),null);});
-test('navigation cancels a pending open rather than opening a file on the new page',async()=>{state.servers=[];state.serversKnown=false;calls=[];openArtifactViewer(hex,{server:'m1',board:'dev'});document.dispatchEvent(new CustomEvent('coral:route-changed'));release();await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(calls,['/api/servers']);assert.equal(document.querySelector('#artifact-viewer:not([hidden])'),null);});
+test('navigation cancels a pending open rather than opening a file on the new page',async()=>{
+    state.servers=[];state.serversKnown=false;calls=[];
+    const cancelledHex='e'.repeat(64);
+    openArtifactViewer(cancelledHex,{server:'m1',board:'dev'});
+    document.dispatchEvent(new CustomEvent('coral:route-changed'));release();
+    await new Promise(resolve=>setImmediate(resolve));
+    // The preceding test really viewed hex on m1: its deferred review/opened
+    // bookkeeping may finish after Close. It is not this cancelled open.
+    // Only that exact previous source+digest is excluded; any new-file probe,
+    // unscoped list read or request on another computer still fails this check.
+    const cancelledCalls=calls.filter(u=>!(u.startsWith('/api/remote/m1/')&&u.includes(hex)));
+    assert.deepEqual(cancelledCalls,['/api/servers']);
+    assert.equal(document.querySelector('#artifact-viewer:not([hidden])'),null);
+});
 test('an inventory answer that omits the requested computer refuses without probing it',async()=>{state.servers=[];state.serversKnown=false;calls=[];let resumed=0;openArtifactViewer(hex,{server:'missing',board:'dev',onClose:()=>{resumed++;}});release();await until(()=>resumed===1);assert.deepEqual(calls,['/api/servers']);assert.equal(document.querySelector('#artifact-viewer:not([hidden])'),null);});
 test.after(()=>{document.querySelector('.artifact-viewer-close')?.click();dom.window.close();});

@@ -1,7 +1,7 @@
 /* The Operator's review of an artifact a team tagged "for review" (#136584, #136588), in the artifact viewer: Approve (the row leaves Needs you, the uploading agent is told) and Request changes (a comment
- * on the whole document, sent to the uploader through the comments' own Send to agent, and the file leaves Needs you: it is the agent's turn, and its next version comes back as a new item). The state is read from the team's artifact list (its tags and,
+ * on the whole document, sent to the uploader through the comments' own Send to agent, and the file remains visible, uncounted, while it is the agent's turn; its next version returns for review). The state is read from the team's artifact list (its tags and,
  * once decided, the time); the buttons show only for a pending one; through Coral Hub the owner has both: the change-request send is the owner's too (#11354). */
-import { boardFetch, boardArtifactPage, nextArtifactPage, identityKey, decisionNeedsPerson, isCloud } from './server_base.js';
+import { boardFetch, identityKey, decisionNeedsPerson, isCloud, serverFetch, splitKey } from './server_base.js';
 import { showToast, announceNotice } from './notifications.js';
 import { markHidden } from './visible_marks.js';
 import { importOnce } from './import_once.js';
@@ -14,22 +14,13 @@ const rowHex = a => HEX.exec(a.uri || a.digest || a.id || '')?.[1]?.toLowerCase(
 
 /** The team's row for the artifact and the state of its review: pending, changes, approved or reviewed (the old Mark reviewed); null when it was never for review. */
 export async function reviewStateOf(team, hex) {
-    for (const tag of ['for%20review', 'approved', 'reviewed']) {
-        for (let at = { cursor: '', offset: 0 }, pages = 0; pages < 200; pages++) { // 50 a page, by the computer's cursor (#13161)
-            const r = await boardArtifactPage(team, tag, at);
-            if (!r.ok) return null;
-            const data = await r.json(), list = data.artifacts || [];
-            const row = list.find(a => rowHex(a) === hex);
-            if (row) {
-                const tags = row.tags || [];
-                if (!['approved', 'for review', 'reviewed'].some(t => tags.includes(t))) break; // the list is asked by tag, and a row without any of them is not a review (never "Reviewed" by default)
-                const state = tags.includes('approved') ? 'approved' : tags.includes('for review') ? (tags.includes('changes requested') ? 'changes' : 'pending') : 'reviewed';
-                return { row, state, at: row.review?.at || '' };
-            }
-            if (!nextArtifactPage(at, data)) break;
-        }
-    }
-    return null;
+    const { reviewOfTeam } = await importOnce('./inbox_reviews.js');
+    const row = await reviewOfTeam(team, hex, { anyState: true });
+    if (!row) return null;
+    const tags = row.tags || [];
+    if (!['approved', 'for review', 'reviewed'].some(t => tags.includes(t))) return null;
+    const state = tags.includes('approved') ? 'approved' : tags.includes('for review') ? (tags.includes('changes requested') ? 'changes' : 'pending') : 'reviewed';
+    return { row, state, at: row.review?.at || '' };
 }
 
 const timeWords = at => { const t = Date.parse(at); return Number.isNaN(t) ? '' : new Date(t).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }); };
@@ -42,9 +33,23 @@ async function decide(team, row, decision, reason, note, quiet = false, words = 
 }
 
 /** Approving or denying a version settles the ones before it quietly (no review or message): locally their 'for review' tag comes off; through the Hub automatic superseded settlement keeps the restricted tags route out of it. Resolves { settled, failed }. */
+async function decisionEarlier(m, row) {
+    const older = m.earlierVersions(row);
+    if (!row.series_id || !Number.isSafeInteger(row.version) || row.version <= older.length + 1) return older;
+    // earlier_digests is capped at 50. Expand only on a decision, and never
+    // settle a version uploaded after the one the person actually reviewed.
+    const hex = row.hex || rowHex(row), response = await serverFetch(splitKey(row.team).server, `/api/artifacts/series/${encodeURIComponent(row.series_id)}/versions`);
+    if (!response.ok) throw new Error('Earlier versions could not be read.');
+    const versions = await response.json();
+    if (!Array.isArray(versions)) throw new Error('Earlier versions could not be read.');
+    const found = new Map(older.map(a => [a.hex, a]));
+    for (const v of versions) if (Number.isSafeInteger(v.version) && v.version < row.version && /^[a-f0-9]{64}$/.test(v.digest || '') && v.digest !== hex && !found.has(v.digest)) found.set(v.digest, { ...row, id: v.digest, hex: v.digest, version: v.version, reviewKey: `${row.team}:${v.digest}`, earlier: undefined, earlier_digests: undefined });
+    return [...found.values()];
+}
+
 async function settleEarlierVersions(m, row) {
     let settled = 0, failed = 0;
-    for (const e of m.earlierVersions(row)) {
+    for (const e of await decisionEarlier(m, row)) {
         try {
             const current = await m.currentTags(e);
             if (current !== null) {
@@ -68,7 +73,7 @@ export async function approveRow(team, row, note = '') { // note (#11888): one s
     const out = await decide(team, row, 'approve', undefined, String(note || '').replace(/\s+/g, ' ').trim());
     document.dispatchEvent(new CustomEvent('coral:review-approved', { detail: { team, id: row.id, at: out.review?.at || new Date().toISOString() } })); // an open viewer of this file says Approved at once, whoever approved it (the Inbox row, the viewer, a note)
     const m = await importOnce('./inbox_reviews.js').catch(() => null);
-    if (m) { out.earlier = await settleEarlierVersions(m, row).catch(() => ({ settled: 0, failed: 0 })); m.settleReview(row); m.refreshReviews(true).catch(() => {}); } // the versions before the approved one are settled with it (#11533)
+    if (m) { out.earlier = await settleEarlierVersions(m, row).catch(() => ({ settled: 0, failed: 1 })); m.settleReview(row); m.refreshReviews(true).catch(() => {}); } // the versions before the approved one are settled with it (#11533)
     return out;
 }
 
@@ -82,14 +87,14 @@ const fromWords = out => (out.delivered && out.asleep ? `${out.to} is asleep: it
 async function onEarlier(row, run) {
     const m = await importOnce('./inbox_reviews.js').catch(() => null);
     let done = 0, failed = 0;
-    if (m) for (const e of m.earlierVersions(row)) { try { await run(e); done++; } catch { failed++; } }
+    if (m) { let earlier; try { earlier = await decisionEarlier(m, row); } catch { return { done: 0, failed: 1 }; } for (const e of earlier) { try { if (await m.currentTags(e) !== null) await run(e); done++; } catch { failed++; } } }
     return { done, failed };
 }
 
 export async function denyRow(team, row, reason) {
     const out = await decide(team, row, 'deny', reason);
     const m = await importOnce('./inbox_reviews.js').catch(() => null);
-    if (m) out.earlier = await settleEarlierVersions(m, row).catch(() => ({ settled: 0, failed: 0 })); // the older versions leave Needs you with it, quietly: the agent is told once, about the newest
+    if (m) out.earlier = await settleEarlierVersions(m, row).catch(() => ({ settled: 0, failed: 1 })); // the older versions leave Needs you with it, quietly: the agent is told once, about the newest
     settled(row); return out;
 }
 /** Dismiss a review row: out of Needs you with no verdict and nobody told; the file stays where it is. Unignore puts it back as it was. */

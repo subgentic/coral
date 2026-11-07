@@ -171,6 +171,12 @@ function drawTable() {
     const back = isPhoneLayout() && !lead0 ? `<button type="button" class="back-link group-table-back" data-on-click="sgroup-list" data-kind="${escapeAttr(open.kind)}">\u2190 ${escapeHtml(TAB_NAME[open.kind] || 'List')}</button>` : '';
     const bar = src.toolbar ? src.toolbar(open.key) : null;
     const html = (bar && !bar.node ? toolbarHtml(bar, tables[0]) : '') + tables.map((x, i) => tableHtml(x, i, i ? '' : back, !!bar)).join('');
+    const scrollPlaces = [];
+    if (host.dataset.group === open.kind + ':' + open.key) {
+        for (let e = host; e; e = e.parentElement) if (e.scrollTop > 0) scrollPlaces.push([e, e.scrollTop]);
+        const page = document.scrollingElement;
+        if (page?.scrollTop > 0 && !scrollPlaces.some(([e]) => e === page)) scrollPlaces.push([page, page.scrollTop]);
+    }
     host.dataset.group = open.kind + ':' + open.key; // which table is on screen (saved.js asks for the Inbox's Saved)
     const a = document.activeElement, typing = a && host.contains(a) && a.id === 'gt-search' ? { start: a.selectionStart, end: a.selectionEnd } : null;
     // A component toolbar keeps its own listeners, open panel, search, and focus across table redraws.
@@ -194,6 +200,9 @@ function drawTable() {
         for (const x of tables) if (x.node && (x.rows.length || !x.empty)) slots[k++]?.replaceWith(x.node());
         for (const x of tables) { const f = x.foot && x.foot(); if (f) host.querySelector('.vl-panel') ? host.querySelector('.vl-panel').append(f) : host.append(f); } // a line under the page that is not part of the table (Needs you's alerts offer, #11837); a phone's panel holds the page
     }
+    // Replacing rows temporarily empties the scroller and clamps its position.
+    // Keep the current folder's place through every refresh, including count-only updates.
+    for (const [element, top] of scrollPlaces) element.scrollTop = top;
     if (toolbarFocus && toolbarFocus.isConnected && document.activeElement !== toolbarFocus) {
         toolbarFocus.focus({ preventScroll: true });
         if (toolbarCaret) toolbarFocus.setSelectionRange(...toolbarCaret);

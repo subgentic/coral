@@ -13,6 +13,7 @@ const BASE = require('./test_base').BASE;
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady();
         await ev(`(() => { const json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'content-type': 'application/json' } }));
             window.fetch = (u, o = {}) => { const url = new URL(String(u && u.url || u), location.origin);
+                if (url.pathname === '/api/team-artifacts') return json({artifacts:[],total:0,all:0,has_more:false});
                 if (url.pathname === '/api/sessions/history/counts') return json({ all: 0, group: 0, notes: 0, active: 0, starred: 0, archived: 0, by_agent_type: {}, tags: [] });
                 if (url.pathname === '/api/sessions/history') return json({ sessions: [], total: 0, page: 1, page_size: 50 });
                 return Promise.resolve(new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } })); };

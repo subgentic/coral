@@ -20,10 +20,13 @@ const BASE = require('./test_base').BASE;
                 const original = window.fetch;
                 const json = body => Promise.resolve(new Response(JSON.stringify(body), {headers:{'Content-Type':'application/json'}}));
                 window.fetch = (url, opts = {}) => {
-                    const u = new URL(String(url), location.origin);
+                    const u = window.__reviewFixtureURL(String(url), location.origin);
                     const target = ${remote ? "'/api/remote/solo-pc'" : "''"};
                     const p = u.pathname.startsWith(target) ? u.pathname.slice(target.length) : u.pathname;
                     const item = {id:'${'ab'.repeat(32)}',name:'Solo report.txt',team:'No team',board_id:'~no-team',available:true,media_type:'text/plain',size:12,created_at:new Date().toISOString(),produced_by:'Solo writer',session_id:'solo',tags:window.__soloTags,review_question:'Is this ready to ship?'};
+                    const originalURL = new URL(String(url), location.href);
+                    if (originalURL.pathname === target + '/api/team-artifacts') { window.__soloReads.push(originalURL.pathname); return json(window.__reviewFixturePage(originalURL, location.href, {'~no-team':{team:'No team',artifacts:[item]}})); }
+                    if (${remote} && originalURL.pathname === '/api/team-artifacts') return json(window.__reviewFixturePage(originalURL, location.href, {}));
                     if (p.endsWith('/comments')) return json({comments:[],you:{can_comment:true,can_lock:true},locked:false});
                     if (p === '/api/board/projects') return json([]);
                     if (${remote} && u.pathname === '/api/team-artifacts') return json({artifacts:[],has_more:false});
@@ -46,7 +49,7 @@ const BASE = require('./test_base').BASE;
             await ev(`document.querySelector('#group-table-view .inbox-review-name').click(); true`);
             await waitFor(`!document.getElementById('artifact-viewer')?.hidden`, 'solo file opens');
             await waitFor(`window.__soloWrites.some(tags=>tags.includes('read'))`, 'opening marks read');
-            await waitFor(`Array.from(document.querySelectorAll('.artifact-review-approve,.artifact-review-changes,.ac-toggle')).filter(e=>!e.hidden && e.getClientRects().length).length===3`, 'viewer decisions and comments available');
+            await waitFor(`Array.from(document.querySelectorAll('.artifact-review-approve,.artifact-review-changes,.ac-toggle')).filter(e=>!e.hidden && e.getClientRects().length).length===3`, 'viewer decisions and comments available').catch(async error => { console.error('no-team diagnostic', remote, await ev(`JSON.stringify({controls:[...document.querySelectorAll('.artifact-review-approve,.artifact-review-changes,.ac-toggle')].map(e=>({class:e.className,hidden:e.hidden,rects:e.getClientRects().length})),state:document.querySelector('.artifact-review')?.textContent,reads:window.__soloReads})`)); throw error; });
         }
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

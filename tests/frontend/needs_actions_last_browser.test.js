@@ -27,7 +27,7 @@ const { coralReady } = require('./helpers/wait');
                 const mk = (n, tags) => ({ id: n.toString(16).padStart(64, '0'), name: 'Review file 0' + n + '.txt', media_type: 'text/plain', size: 30, created_at: new Date(Date.now() - (10 - n) * 60000).toISOString(), tags, available: true, uri: 'coral://artifacts/' + n.toString(16).padStart(64, '0'), produced_by: 'Review Writer' });
                 window.__reviewItems = [mk(1, ['for review']), mk(2, ['for review', 'read']), mk(3, ['for review'])];
                 const original = window.fetch, json = (body, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }));
-                window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin);
+                window.fetch = (url, opts = {}) => { const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, {'${team}': window.__reviewItems}) : null; if (reviewPage) return json(reviewPage); const u = window.__reviewFixtureURL(String(url), location.origin);
                     if (u.pathname === '/api/board/${team}/artifacts') { const items = window.__reviewItems.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))); return json({ project: '${team}', artifacts: items, has_more: false }); }
                     return original(url, opts); };
                 return true; })()`);

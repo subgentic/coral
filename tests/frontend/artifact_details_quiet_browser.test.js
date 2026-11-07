@@ -15,7 +15,9 @@ const STUB = `(() => {
     const R = window.fetch; window.__req = []; window.__data = ${JSON.stringify(DATA)};
     const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } }));
     window.fetch = (u, o = {}) => {
-        const url = new URL(String(u), location.origin); const q = url.searchParams;
+        const page = window.__reviewFixturePage(u, location.origin, { ${JSON.stringify(TEAM)}: window.__data });
+        if (page) return json(page);
+        const url = window.__reviewFixtureURL(String(u), location.origin); const q = url.searchParams;
         const m = url.pathname.match(/^\\/api\\/board\\/([^/]+)\\/artifacts$/);
         if (m && (o.method || 'GET').toUpperCase() === 'GET') {
             window.__req.push({ kind: 'board', project: decodeURIComponent(m[1]), query: Object.fromEntries(q.entries()) });

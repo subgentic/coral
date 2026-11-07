@@ -13,7 +13,10 @@ const { coralReady } = require('./helpers/wait');
         await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const real = window.fetch; window.__asked = [];
             const json = b => new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } });
             const HEX = 'ab'.repeat(32);
-            window.fetch = (u, o) => { const url = new URL(String(u), location.href), p = url.pathname; window.__asked.push(p + url.search);
+            window.fetch = (u, o) => { const originalURL = new URL(String(u), location.href); window.__asked.push(originalURL.pathname + originalURL.search);
+                const page = originalURL.pathname === '/api/remote/box-2/api/team-artifacts' ? window.__reviewFixturePage(originalURL, location.href, {'alpha': [{id:'a-1',uri:'coral://artifacts/'+HEX,tags:['for review'],name:'remote-report.md',created_at:'2026-11-04T00:00:01Z',available:true,produced_by:'Dev',session_id:'s-1'}]}) : null;
+                if(page) return Promise.resolve(json(page));
+                const url = window.__reviewFixtureURL(String(u), location.href), p = url.pathname;
                 if (p === '/api/remote/box-2/api/board/projects') return Promise.resolve(json([{ project: 'alpha' }]));
                 if (p === '/api/remote/box-2/api/board/alpha/artifacts') { const tag = url.searchParams.get('tag');
                     return Promise.resolve(json(tag === 'for review' ? { has_more: false, artifacts: [{ id: 'a-1', uri: 'coral://artifacts/' + HEX, tags: ['for review'], name: 'remote-report.md', created_at: '2026-11-04T00:00:01Z', available: true, produced_by: 'Dev', session_id: 's-1' }] } : { has_more: false, artifacts: [] })); }
@@ -30,7 +33,7 @@ const { coralReady } = require('./helpers/wait');
         // the list arrives (the live list's answer or the feed's frame, which both call updateServersTabVisibility)
         await ev(`(async () => { const { state } = await import(${S} + 'state.js'); state.servers = [{ id: 'box-2', label: 'box-2', status: 'online' }]; state.serversKnown = true; const T = await import(${S} + 'servers_tab.js'); T.updateServersTabVisibility(); return true; })()`);
         await waitFor(`/remote-report/.test(document.getElementById('group-table-view').innerText)`, 'the computer that arrived late is read at once, not after 30 s', 6000);
-        assert.ok(await ev(`window.__asked.some(p => p.startsWith('/api/remote/box-2/api/board/alpha/artifacts'))`), 'its team was read');
+        assert.ok(await ev(`window.__asked.some(p => p.startsWith('/api/remote/box-2/api/team-artifacts?'))`), 'the arriving computer protected page was read');
         console.log('PASS');
     } finally { try { client.close(); } catch (e) {} }
 })().catch(e => { console.error(e); process.exitCode = 1; });

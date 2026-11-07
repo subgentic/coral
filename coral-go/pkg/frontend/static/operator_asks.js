@@ -4,7 +4,7 @@
  * for an ask): it answers the ask, ends a wait, and tells the asker by the post itself. The text is the agent's, so it is written out through markHidden (strict) before it is drawn, then cut. */
 import { markHidden } from './visible_marks.js';
 import { readOutcome } from './needs_incomplete.js';
-import { isHiddenAsk } from './ask_filter.js';
+import { isHiddenAsk, prepareAskReviews } from './ask_filter.js';
 import { importOnce } from './import_once.js';
 import { OPERATOR_ID } from './utils.js';
 import { state } from './state.js';
@@ -64,19 +64,23 @@ export function refreshOperatorAsks(force = false) {
             return rows.map(a => (server === LOCAL_SERVER || !a || typeof a !== 'object' ? a : { ...a, server }));
         } catch { readOutcome('questions', server, false); return null; }
     };
-    pending = Promise.all(asked.map(readAsks)).then(results => {
+    pending = Promise.all(asked.map(readAsks)).then(async results => {
         const next = [];
         results.forEach((rows, k) => {
             const server = asked[k];
             if (rows === null) { next.push(...asks.filter(a => (server === LOCAL_SERVER ? !a.server : a.server === server))); return; } // refused or failed: what is drawn stays (a viewer who may not read it has none)
             next.push(...rows.filter(a => a && typeof a.board === 'string' && typeof a.asker === 'string' && Number.isFinite(Number(a.id))));
         });
-        if (JSON.stringify(next) === JSON.stringify(asks)) return;
+        await prepareAskReviews(next);
+        if (JSON.stringify(next) === JSON.stringify(asks)) { fire(); return; }
         asks = next;
         fire();
     }).catch(() => {}).finally(() => { pending = null; });
     return pending;
 }
+
+/** Recheck already loaded asks when the bounded review window first arrives. */
+export async function refreshReviewAskVisibility() { await prepareAskReviews(asks); fire(); }
 
 /** Post the reply as the Operator. An ask is answered with reply_to; either way the asker is @named so the board tells it. Rejects with the server's words when the post is refused. */
 export async function replyToAsk(a, text) {

@@ -205,6 +205,7 @@ async function _renderArtifactInto(body, uri, options, ctx, source, kind) {
         _renderSandboxed(body, { url: externalURL, name: options.filename, isStale: ctx.isStale });
         return;
     }
+    let rendered = false;
     try {
         // Managed/inline artifact paths live on the viewed server; external URLs are absolute.
         const requestURL = externalURL ? url : serverUrl(url, source.server);
@@ -258,7 +259,7 @@ async function _renderArtifactInto(body, uri, options, ctx, source, kind) {
             if (ctx.isStale()) return;
             if (isHTML) {
                 _renderSandboxed(body, { content, name: filename, isStale: ctx.isStale });
-                return;
+                rendered = true; return;
             }
             const delimited = [type, declaredType].some(v => v === 'text/tab-separated-values') || filenameHints.some(n => /\.tsv$/i.test(n)) ? 'tsv'
                 : [type, declaredType].some(v => v === 'text/csv' || v === 'application/csv' || v === 'text/x-csv') || filenameHints.some(n => /\.csv$/i.test(n)) ? 'csv' : '';
@@ -266,7 +267,7 @@ async function _renderArtifactInto(body, uri, options, ctx, source, kind) {
                 const { renderCsvTable } = await importOnce('./csv_table.js');
                 if (ctx.isStale()) return;
                 renderCsvTable(body, content, { name: filename, tsv: delimited === 'tsv', raw: host => ctx.renderContent(host, content, artifactPath, source.server) });
-                return;
+                rendered = true; return;
             }
             const manifest = isJSON ? _parseManifest(content) : null;
             if (manifest) {
@@ -281,8 +282,10 @@ async function _renderArtifactInto(body, uri, options, ctx, source, kind) {
                 ctx.renderContent(body, content, isMarkdown ? 'artifact.md' : artifactPath, source.server); // the file's server: a reference in it names a file on that computer (#12373)
             }
         }
+    rendered = true;
     } catch (error) {
+        rendered = false;
         if (error?.name === 'AbortError' || ctx.isStale()) return;
         body.innerHTML = `<div class="inline-preview-error">${escapeHtml(error.message)}</div>`;
-    }
+    } finally { if (rendered && !ctx.isStale()) ctx.opened?.(); }
 }

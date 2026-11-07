@@ -4,12 +4,14 @@
 // what the reader sees. Everything else goes to the isolated test server.
 const assert = require('node:assert/strict');
 const CDP = require('chrome-remote-interface');
+const { reviewFixtureURL, reviewFixturePage, reviewFixtureDigest } = require('./helpers/review_fixture');
 const { isNavigationError } = require('./helpers/wait');
 
 // opts.target: the id of a tab to drive instead of the first one (a suite of two devices opens a browser context each, #10301).
 async function connect(opts = {}) {
     const client = await CDP({ port: Number(process.env.CDP_PORT || 9222), ...(opts.target ? { target: opts.target } : {}) });
     const { Page, Runtime, Emulation, Network } = client;
+    await Page.addScriptToEvaluateOnNewDocument({ source: '(() => { const reviewFixtureDigest = ' + reviewFixtureDigest.toString() + '; window.__reviewFixtureDigest = reviewFixtureDigest; window.__reviewFixtureURL = ' + reviewFixtureURL.toString() + '; window.__reviewFixturePage = ' + reviewFixturePage.toString() + '; })();' });
     // A look pass (#9804): LOOK_THEME=light|dark and LOOK_FONT=32px make every page this suite opens come up in that theme and at that root font size, so the pictures a suite saves (CORAL_SCREENSHOT_DIR) show the screen in light or at 200% text. Off unless set; the suite's own assertions are for 100% and are not meant to pass at 200%.
     if (process.env.LOOK_THEME || process.env.LOOK_FONT) {
         const theme = JSON.stringify(process.env.LOOK_THEME || ''), font = JSON.stringify(process.env.LOOK_FONT || '');

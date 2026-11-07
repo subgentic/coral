@@ -1,7 +1,7 @@
 // #8628: the Inbox review data source pages, groups producers, and cannot resurrect a review from a stale read (an approved one, #136584).
 import assert from 'node:assert/strict';
 const M = await import('../../coral-go/pkg/frontend/static/inbox_reviews.js');
-const row = (i, team = 'a', session = 'writer') => ({ id: i.toString(16).padStart(64, '0'), name: `File ${i}`, team, session_id: session, produced_by: session, tags: ['for review', 'internal'], available: true, created_at: '2026-10-26T10:00:00Z' });
+const row = (i, team = 'a', session = 'writer') => ({ id: i.toString(16).padStart(64, '0'), name: `File ${i}`, board_id: team, team, session_id: session, produced_by: session, tags: ['for review', 'internal'], available: true, created_at: '2026-10-26T10:00:00Z' });
 const groups = M.reviewGroups([...Array.from({length:11},(_,i)=>row(i)),row(20,'b'),row(21,'@remote/a')]);
 assert.equal(groups.length,2,'same session on another server is a separate producer');
 assert.equal(groups[0].rows.length,10); assert.equal(groups[0].more.length,2,'same agent across teams shares its cap');
@@ -12,7 +12,6 @@ const started = new Promise(resolve => { entered = resolve; });
 globalThis.fetch = async (url, options = {}) => {
     reads++;
     const u = new URL(url, 'http://localhost');
-    if (u.pathname === '/api/team-artifacts') return Response.json({artifacts:[],has_more:false});
     if(u.pathname==='/api/board/projects')return Response.json([{project:'a'}]);
     if(u.pathname.endsWith('/tags')) {
         if(fail)return Response.json({error:'Try again'}, {status:500});
@@ -20,9 +19,10 @@ globalThis.fetch = async (url, options = {}) => {
         artifacts=artifacts.filter(a=>a.id!==u.pathname.split('/').at(-2));
         return Response.json(body);
     }
+    if (u.searchParams.get('tag') === 'saved') return Response.json({ artifacts: [], total: 0, has_more: false });
     assert.equal(u.searchParams.get('tag'),'for review');
     if(failRead)return Response.json({}, {status:503});
-    const offset=Number(u.searchParams.get('offset')), snapshot={artifacts:artifacts.slice(offset,offset+200),has_more:offset+200<artifacts.length};
+    const offset=Number(u.searchParams.get('cursor') || 0), more=offset+50<artifacts.length, snapshot={artifacts:artifacts.slice(offset,offset+50),total:artifacts.length,has_more:more,...(more?{next_cursor:String(offset+50)}:{})};
     if(slow){slow=false; await new Promise(resolve=>{release=resolve; entered();});}
     return Response.json(snapshot);
 };
@@ -30,7 +30,9 @@ await M.refreshReviews();
 assert.equal(reads,0,'badge updates before opening Inbox must not read projects or artifacts');
 await M.refreshReviews(true);
 assert.ok(reads>0,'opening Inbox starts review reads');
-assert.equal(M.reviewItems().length,201,'reads beyond the first page');
+assert.equal(M.reviewItems().length,50,'opening reads only the first page');
+for (let page = 0; page < 4; page++) await M.loadMoreReviews('local');
+assert.equal(M.reviewItems().length,201,'explicit paging reaches every later row');
 const first=M.reviewItems()[0];
 slow=true;
 const pending=M.refreshReviews(true);
@@ -41,7 +43,7 @@ release(); await pending;
 assert.equal(M.reviewItems().length,200,'an older list cannot resurrect an approved item');
 failRead=true; await M.refreshReviews(true);
 assert.equal(M.reviewItems().length,200,'failed refresh retains last known rows');
-assert.equal(M.reviewErrors().length,1);
+assert.equal(M.reviewErrors().length,1,'the failed review stream is visible');
 failRead=false; artifacts=[]; await M.refreshReviews(true);
 assert.equal(M.reviewItems().length,0,'deletion removes rows at next refresh');
 console.log('inbox_reviews: ok');
@@ -51,10 +53,9 @@ let token = 100, rows = [row(301)], hold = false, resolveList, sawList;
 let heldList = new Promise(resolve => { sawList = resolve; });
 globalThis.fetch = async url => {
     const u = new URL(url, 'http://localhost');
-    if (u.pathname === '/api/team-artifacts') return Response.json({artifacts:[],has_more:false});
     if (u.pathname === '/api/board/projects') return Response.json([{ project: 'a' }]);
     if (u.pathname.endsWith('/status')) return Response.json({ artifacts_rev: token });
-    const data = { artifacts: u.searchParams.get('tag') === 'saved' ? [] : rows.slice(), has_more: false, artifacts_rev: token };
+    const data = { artifacts: u.searchParams.get('tag') === 'saved' ? [] : rows.slice(), has_more: false, total: u.searchParams.get('tag') === 'saved' ? 0 : rows.length, artifacts_rev: token };
     if (hold && u.searchParams.get('tag') !== 'saved') {
         hold = false; sawList(); await new Promise(resolve => { resolveList = resolve; });
     }
@@ -79,20 +80,20 @@ const { state } = await import('../../coral-go/pkg/frontend/static/state.js');
 const feed = await import('../../coral-go/pkg/frontend/static/artifacts_feed.js');
 state.hub = true; state.serversKnown = true;
 state.servers = [{ id: 'box-1', status: 'online' }];
-let projectScans = 0, unblock, inList;
+let projectScans = 0, firstPageReads = 0, unblock, inList;
 const listStarted = new Promise(resolve => { inList = resolve; });
 let pauseFirst = true;
 globalThis.fetch = async url => {
     const u = new URL(url, 'http://localhost');
-    if (u.pathname === '/api/team-artifacts') return Response.json({artifacts:[],has_more:false});
     if (u.pathname === '/api/board/projects') { projectScans++; return Response.json([]); }
     if (u.pathname.endsWith('/projects')) return Response.json([{ project: 'alpha' }]);
     if (u.pathname.endsWith('/status')) return Response.json({ artifacts_rev: 201 });
+    if (u.pathname === '/api/team-artifacts' && u.searchParams.get('tag') === 'for review') firstPageReads++;
     const remote = u.pathname.includes('/box-2/') ? 2 : 1;
     if (pauseFirst && remote === 1 && u.searchParams.get('tag') === 'for review') {
         pauseFirst = false; inList(); await new Promise(resolve => { unblock = resolve; });
     }
-    return Response.json({ artifacts_rev: 201, has_more: false, artifacts: u.searchParams.get('tag') === 'saved' ? [] : [row(400 + remote)] });
+    return Response.json({ artifacts_rev: 201, has_more: false, total: u.searchParams.get('tag') === 'saved' ? 0 : 1, artifacts: u.searchParams.get('tag') === 'saved' ? [] : [row(400 + remote)] });
 };
 const withLateSource = M.refreshReviews(true);
 await listStarted;
@@ -103,11 +104,12 @@ for (let i = 0; i < 100 && !M.reviewItems().some(a => a.id === row(402).id); i++
 assert.ok(M.reviewItems().some(a => a.id === row(401).id), 'the original source stays');
 assert.ok(M.reviewItems().some(a => a.id === row(402).id), 'the source arriving during the scan is included');
 await new Promise(setImmediate);
-assert.equal(projectScans, 2, 'the source change and queued revision share exactly one rescan');
+assert.equal(projectScans, 0, 'source discovery does not scan projects');
+assert.equal(firstPageReads, 2, 'the source change and queued revision share exactly one bounded refresh');
 console.log('inbox_reviews: late source and pending revision coalesce');
 
-// An older computer may ignore the No team filter and return every team's files.
-// Neither those rows nor rows without the reserved board identity belong in Needs you.
+// A cross-team computer read accepts its raw board IDs, never a prequalified
+// board supplied by another source or a missing routing identity.
 state.hub = true;
 state.serversKnown = true;
 state.servers = [{ id: 'old-box', status: 'online' }];
@@ -120,14 +122,15 @@ globalThis.fetch = async url => {
         return Response.json({ artifacts: [
             { ...row(901), board_id: 'another-team' },
             { ...row(902), board_id: '@old-box/another-team' },
-            row(903),
+            { ...row(903), board_id: undefined },
         ], has_more: false });
     }
     return Response.json({ artifacts: [], has_more: false });
 };
 await M.refreshReviews(true);
-assert.equal(M.reviewItems().length, 0, 'an old source returning every team must add no no-team review rows');
+assert.equal(M.reviewItems().length, 2, 'a valid raw board ID is qualified by each of the two responding computers');
+assert.ok(M.reviewItems().every(a => a.id === row(901).id), 'prequalified and missing board IDs are rejected');
 assert.equal(M.savedFiles().length, 0, 'an old source must add no no-team saved rows either');
-assert.ok(oldSourceReads.includes('/api/team-artifacts'), 'the local reserved source was scanned');
-assert.ok(oldSourceReads.includes('/api/remote/old-box/api/team-artifacts'), 'the remote reserved source was scanned');
-console.log('inbox_reviews: older unfiltered local and remote sources add no reserved review rows');
+assert.ok(oldSourceReads.includes('/api/team-artifacts'), 'the local computer was read');
+assert.ok(oldSourceReads.includes('/api/remote/old-box/api/team-artifacts'), 'the remote computer was read');
+console.log('inbox_reviews: cross-team source identity stays bound to its responding computer');

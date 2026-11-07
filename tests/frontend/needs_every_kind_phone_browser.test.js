@@ -7,9 +7,11 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady, framesJs } = require('./helpers/wait');
+const { guardSettings } = require('./helpers/settings_guard');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const guard = await guardSettings();
     const failures = [], T = '#group-table-view', team = 'ek' + Date.now().toString(36), S = `(window.__coralStatic || '/static/')`;
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const api = async (method, path, body) => ev(`fetch('/api/board/${team}${path}', { method: '${method}', headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, json: await r.json().catch(() => ({})) }))`);
@@ -27,7 +29,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             const hex = n => n.toString(16).padStart(64, '0'), ago = m => new Date(Date.now() - m * 60000).toISOString();
             const file = { id: hex(1), name: 'Release notes for the tag run.html', media_type: 'text/html', size: 30, created_at: ago(60), source: 'upload', available: true, tags: ['for review', 'internal'], uri: 'coral://artifacts/' + hex(1), session_id: 'w-a', produced_by: 'Lead Developer', review_question: 'Is the wording right?' };
             const heavy = { id: hex(2), name: 'Quarterly planning and release schedule for the whole company with every open question.md', media_type: 'text/markdown', size: 30, created_at: ago(120), source: 'upload', available: true, tags: ['for review', 'internal'], uri: 'coral://artifacts/' + hex(2), session_id: 'w-b', produced_by: 'Technical Writer of the documentation team', version: 3, new_comments: 2, waits_on_this: { count: 2, top_title: 'Publish the release notes', priority: 'high' }, review_question: 'Which of the two dates do you want?' };
-            window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin), m = u.pathname.match(/^\\/api\\/board\\/([^/]+)\\/artifacts$/);
+            window.fetch = (url, opts = {}) => { const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, {'${team}': [file, heavy]}) : null; if (reviewPage) return json(reviewPage); const u = window.__reviewFixtureURL(String(url), location.origin), m = u.pathname.match(/^\\/api\\/board\\/([^/]+)\\/artifacts$/);
                 if (m && m[1] === '${team}') return json({ project: m[1], artifacts: !u.searchParams.has('tag') || u.searchParams.get('tag') === 'for review' ? [file, heavy] : [], has_more: false });
                 if (u.pathname === '/api/proposals') return json({ proposals: [{ id: 11, board_id: '${team}', kind: 'task', title: 'Fix the login page on Safari', proposer: 'Backend Dev', state: 'pending', created_at: ago(90), payload: { title: 'Fix the login page on Safari', body: 'It fails on Safari.' } }] });
                 if (u.pathname === '/api/operator-asks') return json([{ board: '${team}', board_label: 'Acme web', kind: 'ask', id: 41, asker: 'Orchestrator', text: '@Operator Which hub do we ship to: self-hosted or app.coralhub.dev?', at: ago(7) }]);
@@ -42,7 +44,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
         await ev(`import(${S} + 'automation_runs.js').then(m => m.refreshRuns(true)).then(() => true)`);
-        await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 7`, 'the rows of every kind', 20000).catch(() => {});
+        await waitFor(`['permission','question','ask','review','proposal','goal_done','skill_review','run','welcome'].every(k=>document.querySelector('${T} .inbox-kind-icon[data-kind="'+k+'"]')) && document.querySelectorAll('${T} [data-review-artifact]').length===2`, 'the rows of every kind', 20000);
         const table = [];
         for (const [w, h] of [[390, 1500], [320, 1500]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: true });
@@ -70,7 +72,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             if (process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/needs-every-kind-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
         }
         if (process.env.CORAL_SCREENSHOT_DIR) fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/needs-every-kind.json`, JSON.stringify(table, null, 1));
-    } finally { await ev(`fetch('/api/board/${team}', { method: 'DELETE' }).then(r => r.status)`).catch(() => {}); await client.close(); }
+    } finally { await ev(`fetch('/api/board/${team}', { method: 'DELETE' }).then(r => r.status)`).catch(() => {}); await guard.restore(); await client.close(); }
     if (failures.length) { console.error('FAIL\n  ' + failures.join('\n  ')); process.exit(1); }
     console.log('PASS every kind of Needs you row on a phone: review, question and proposal lead with the agent');
 })().catch(e => { console.error(e); process.exit(1); });

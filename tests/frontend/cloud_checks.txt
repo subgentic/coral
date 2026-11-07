@@ -214,6 +214,10 @@ node artifact_sort_words.test.mjs
 node automation_filters.test.mjs
 node inbox_servers.test.mjs
 node inbox_reviews.test.mjs
+node review_fixture.test.js
+node review_pages.test.mjs
+node review_loading.test.mjs
+node review_attention_count.test.mjs
 node inbox_reviews_query.test.mjs
 node review_counts.test.mjs
 node review_counts_cloud.test.mjs
@@ -377,3 +381,16 @@ node artifact_viewer_callers.test.mjs
 node artifact_message_source.test.mjs
 
 node artifact_inventory_wait.test.mjs
+node inbox_review_groups.test.mjs
+node inbox_review_star_cache.test.mjs
+
+node starred_review_pages.test.mjs
+
+node inbox_review_waiting.test.mjs
+node inbox_review_read_version.test.mjs
+
+node review_fixture_url.test.mjs
+
+node artifact_opened_version.test.mjs
+
+node artifact_pinned_cleanup.test.mjs

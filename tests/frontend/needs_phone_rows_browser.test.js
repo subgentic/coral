@@ -26,7 +26,7 @@ const { coralReady } = require('./helpers/wait');
                 const mk = n => ({ id: n.toString(16).padStart(64, '0'), name: 'Phone review ' + n + '.txt', media_type: 'text/plain', size: 30, created_at: new Date(Date.now() - (10 - n) * 60000).toISOString(), tags: ['for review'], available: true, uri: 'coral://artifacts/' + n.toString(16).padStart(64, '0'), produced_by: 'Review Writer', session_id: 'rw-1', task_id: n });
                 window.__reviewItems = [mk(1), mk(2), mk(3), mk(4), mk(5)]; window.__asks = [{ board: '${team}', kind: 'ask', id: 71, asker: 'Lead', text: 'Which port should the test server use?', at: '2026-10-31T01:00:00Z' }];
                 window.__calls = []; const original = window.fetch.bind(window), json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } }));
-                window.fetch = (u, o = {}) => { const url = String(u), x = new URL(url, location.origin), method = o.method || 'GET';
+                window.fetch = (u, o = {}) => { const pageURL = new URL(String(u), location.href), page = pageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(pageURL, location.href, {'${team}': window.__reviewItems}) : null; if (page) return json(page); const url = String(u), x = window.__reviewFixtureURL(url, location.origin), method = o.method || 'GET';
                     if (x.pathname === '/api/board/${team}/artifacts') { const items = window.__reviewItems.filter(a => !x.searchParams.has('tag') || a.tags.includes(x.searchParams.get('tag'))); return json({ project: '${team}', artifacts: items, has_more: false }); }
                     const rv = x.pathname.match(/^\\/api\\/board\\/${team}\\/artifacts\\/([0-9a-f]+)\\/review$/);
                     if (rv && method === 'POST') { const body = JSON.parse(o.body); window.__calls.push({ review: rv[1], decision: body.decision }); if (['approve', 'ignore', 'save'].includes(body.decision)) window.__reviewItems = window.__reviewItems.filter(a => a.id !== rv[1]); return json({ ok: true }); }
@@ -53,9 +53,9 @@ const { coralReady } = require('./helpers/wait');
             const pressBar = label => ev(`[...document.querySelectorAll('.dt-bar button')].find(x => (x.getAttribute('aria-label') || x.textContent) === ${JSON.stringify(label)}).click(); true`);
             const selected = () => ev(`[...document.querySelectorAll('${T} tbody tr.dt-selected')].map(r => r.textContent.slice(0, 60))`);
 
-            // no button is on a phone row
+            // Phone rows keep navigation and the approved review star; other actions stay in selection.
             const visible = await ev(`[...document.querySelectorAll('${T} tbody tr button')].filter(b => { const c = (b.closest('.dt-td') || b).getBoundingClientRect(); return c.width > 2 && c.height > 2 && getComputedStyle(b).visibility !== 'hidden'; }).map(b => b.getAttribute('aria-label') || b.textContent)`);
-            assert.deepEqual(visible.filter(l => !/^(Open |Task: )/.test(l)), [], at + 'a phone row carries no action button (only its name and its task link, which open things): ' + JSON.stringify(visible));
+            assert.deepEqual(visible.filter(l => !/^(Open |Task: |Star |Remove the star from )/.test(l)), [], at + 'a phone row carries only navigation and the review star: ' + JSON.stringify(visible));
             // a tap opens the question
             await tap('Which port should the test server use?');
             await waitFor(`!!document.querySelector('dialog[open]')`, at + 'a tap opens the question', 6000);
