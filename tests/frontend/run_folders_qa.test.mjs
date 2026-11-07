@@ -6,13 +6,18 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), 'qa-strip-')); const outside 
 const H = 3600e3, NOW = Date.now();
 // Windows has no directory lock for chmod to set (only the read-only flag of a file), and a symbolic link there needs a privilege most test runs do not have: those two checks run where the platform has them.
 const win = process.platform === 'win32';
-let canLink = !win; if (win) { try { const probe = path.join(os.tmpdir(), 'qa-link-probe-' + process.pid); fs.symlinkSync(os.tmpdir(), probe, 'junction'); fs.unlinkSync(probe); canLink = true; } catch { canLink = false; } }
+let canLink = !win;
+if (win) { // both kinds step 1 makes: a link to a FILE (a privilege on Windows, Developer Mode or an administrator) and a junction to a directory (none)
+  const probe = path.join(os.tmpdir(), 'qa-link-probe-' + process.pid), target = probe + '-target';
+  try { fs.writeFileSync(target, 'x'); fs.symlinkSync(target, probe + '-file', 'file'); fs.symlinkSync(os.tmpdir(), probe + '-dir', 'junction'); canLink = true; } catch { canLink = false; }
+  for (const p of [probe + '-file', probe + '-dir', target]) { try { fs.rmSync(p, { force: true }); } catch { /* the probe's own leftovers */ } }
+}
 try {
   fs.writeFileSync(path.join(outside, 'precious.txt'), 'keep me'); fs.mkdirSync(path.join(outside, 'dir')); fs.writeFileSync(path.join(outside, 'dir', 'inner.txt'), 'inner');
   const mk = (name, ageH) => { const p = path.join(root, name); fs.mkdirSync(path.join(p, 'shard1'), { recursive: true }); fs.writeFileSync(path.join(p, 'coral'), 'bin'); fs.writeFileSync(path.join(p, 'results.json'), '{}'); fs.writeFileSync(path.join(p, 'shard1', 'coral.log'), 'l'); const t = new Date(NOW - ageH * H); fs.utimesSync(p, t, t); return p; };
   // 1. a symlink INSIDE an old folder, to a file and to a directory outside: the links go, the targets stay
   const killed = mk('coral-cdp-killed', 5);
-  if (canLink) { fs.symlinkSync(path.join(outside, 'precious.txt'), path.join(killed, 'link-to-file')); fs.symlinkSync(path.join(outside, 'dir'), path.join(killed, 'shard1', 'link-to-dir'), win ? 'junction' : undefined); }
+  if (canLink) { fs.symlinkSync(path.join(outside, 'precious.txt'), path.join(killed, 'link-to-file'), win ? 'file' : undefined); fs.symlinkSync(path.join(outside, 'dir'), path.join(killed, 'shard1', 'link-to-dir'), win ? 'junction' : undefined); }
   { const t = new Date(NOW - 5 * H); fs.utimesSync(killed, t, t); } // adding entries moved the folder's own time: set it back
   const freed = stripOldRunFolders(root, { now: NOW });
   assert.equal(freed.length, 1);
