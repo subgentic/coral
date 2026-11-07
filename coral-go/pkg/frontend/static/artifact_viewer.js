@@ -141,7 +141,7 @@ function _build() {
     d.querySelector('.artifact-viewer-fullscreen').addEventListener('click', () => setFullScreen(d, !d.classList.contains('av-fullscreen'), true));
     const more = d.querySelector('.artifact-viewer-more'), menu = d.querySelector('.artifact-viewer-menu');
     more.addEventListener('click', async (e) => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(more); });
-    d.querySelector('.artifact-viewer-copy-id').addEventListener('click', () => { const hex = _hex; importOnce('./artifact_clipboard.js').then(m => m.copyArtifactId(hex)).catch(() => showToast('Could not copy artifact ID', true)); });
+    d.querySelector('.artifact-viewer-copy-id').addEventListener('click', () => { const hex = _hex; importOnce('./artifact_clipboard.js').then(m => m.copyArtifactId(hex)).catch(() => showToast('Could not copy the version ID', true)); });
     menu.addEventListener('click', async () => { (await importOnce('./menu_button.js')).closeMenus(); }); // a choice closes the menu
     // Mark up (#12367, the operator: "I don't see any way to markup the image in the window"): for a picture, the comment composer's drawing tool opens on the file's own image, and Done starts a comment on the file with the marked copy attached; the file itself is not changed
     const markUp = async () => {

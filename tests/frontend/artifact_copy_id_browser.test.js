@@ -15,8 +15,8 @@ const BASE=require('./test_base').BASE;
   await client.Input.dispatchMouseEvent({type:'mousePressed',...p,button:'left',clickCount:1});await client.Input.dispatchMouseEvent({type:'mouseReleased',...p,button:'left',clickCount:1});
  };
  const dismissCopied=async()=>{
-  await waitFor(`!![...document.querySelectorAll('#toast-host .toast')].find(t=>t.querySelector('.toast-message')?.textContent==='Artifact ID copied')`,'copy success notice');
-  await ev(`[...document.querySelectorAll('#toast-host .toast')].find(t=>t.querySelector('.toast-message')?.textContent==='Artifact ID copied').classList.add('copy-toast');true`);
+  await waitFor(`!![...document.querySelectorAll('#toast-host .toast')].find(t=>t.querySelector('.toast-message')?.textContent==='Version ID copied')`,'copy success notice');
+  await ev(`[...document.querySelectorAll('#toast-host .toast')].find(t=>t.querySelector('.toast-message')?.textContent==='Version ID copied').classList.add('copy-toast');true`);
   await click('.copy-toast .toast-close');await waitFor(`!document.querySelector('.copy-toast')`,'success notice dismissed');
  };
  try{
