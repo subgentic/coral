@@ -30,7 +30,11 @@ const { coralReady } = require('./helpers/wait');
             const up = await api('POST', `/api/agent/artifacts?session_id=${sid}`, 'content of ' + n + ' ' + Date.now(), { 'X-Artifact-Name': n, 'X-Artifact-Media-Type': 'text/plain' });
             assert.equal(up.status, 201, JSON.stringify(up)); files.push(/[a-f0-9]{64}/.exec(up.body.uri)[0]);
         }
-        const tagsOf = async hex => (await api('GET', `/api/board/${B}/artifacts?limit=50`)).body.artifacts.find(a => a.id === hex || (a.uri || '').includes(hex))?.tags || [];
+        // The tags the test edits. "read" is the Operator's own mark, not one of them: opening a file starts a read of the review list, and when that read ends AFTER the file was tagged "for review" the
+        // file counts as for-review and unread, so Coral tags it read (markOpenedRead). On a slow machine (Windows, cdp-gate on 2f97abee8: a retry-pass) that happens between the click and the next
+        // read of the server, and an exact comparison saw ['for review', 'read']. The mark is Coral's and is covered by its own suites; these assertions are about the tags a person adds and removes.
+        const tagsOf = async hex => ((await api('GET', `/api/board/${B}/artifacts?limit=50`)).body.artifacts.find(a => a.id === hex || (a.uri || '').includes(hex))?.tags || []).filter(t => t !== 'read');
+        const rawTagsOf = async hex => (await api('GET', `/api/board/${B}/artifacts?limit=50`)).body.artifacts.find(a => a.id === hex || (a.uri || '').includes(hex))?.tags || [];
         await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'artifacts' }); true`);
         await waitFor(`document.querySelectorAll('#team-panel-artifacts [data-artifact-id]').length === 3`, 'the three files', 15000);
 
@@ -51,6 +55,10 @@ const { coralReady } = require('./helpers/wait');
         await ev(`[...document.querySelectorAll('.detail-head .artifact-tag-offer')].find(b => b.textContent === 'for review').click(); true`);
         await waitFor(`[...document.querySelectorAll('.detail-head .artifact-tag-list .artifact-tag')].some(t => t.textContent.startsWith('for review'))`, 'the chip', 8000);
         assert.deepEqual(await tagsOf(files[0]), ['for review'], 'the server kept it');
+        // the slow-machine ordering, made certain: the Operator's read mark lands now, after the tag, as a late read of the review list would put it. The assertions that follow must not care.
+        assert.equal((await api('PUT', `/api/board/${B}/artifacts/${files[0]}/tags`, { tags: ['for review', 'read'] })).status, 200);
+        assert.deepEqual(await rawTagsOf(files[0]), ['for review', 'read'], 'the late read mark is on the server');
+        assert.deepEqual(await tagsOf(files[0]), ['for review'], 'the tags the test edits do not include the Operator\'s read mark');
         await ev(`(() => { document.querySelector('.detail-head .artifact-tag-add').click(); const i = document.querySelector('.detail-head .artifact-tag-input'); i.value = '  Needs  QA '; i.form.requestSubmit(); return true; })()`);
         await waitFor(`[...document.querySelectorAll('.detail-head .artifact-tag-list .artifact-tag')].some(t => t.textContent.startsWith('needs qa'))`, 'a typed tag, normalised', 8000);
         assert.deepEqual(await tagsOf(files[0]), ['for review', 'needs qa']);
