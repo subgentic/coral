@@ -3,6 +3,7 @@ package executil
 import (
 	"fmt"
 	"html"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,17 +16,33 @@ import (
 // handed to the system's opener, which would otherwise open or run a file or start a custom
 // scheme's handler (#78 T1); anything else is not opened. A file Coral wants shown (its log) goes
 // through OpenFile.
-func OpenBrowser(url string) {
+func OpenBrowser(url string) { TryOpenBrowser(url) }
+
+// TryOpenBrowser is OpenBrowser that says whether the system's opener ran and succeeded (#14064). A refused address or an opener that fails is logged, with the query (a sign-in value) left out.
+func TryOpenBrowser(url string) bool {
 	u, ok := WebURL(url)
 	if !ok {
-		return
+		log.Printf("[open] not opened: %s is not a plain http or https address", redactForLog(url))
+		return false
 	}
-	tryOpenBrowser(u)
+	return tryOpenBrowser(u)
+}
+
+// redactForLog keeps a link's query out of the log: the address up to it.
+func redactForLog(u string) string {
+	if i := strings.IndexAny(u, "?#"); i >= 0 {
+		return u[:i] + "?..."
+	}
+	return u
 }
 
 // tryOpenBrowser starts the system's opener on an address that is already a web address, and says whether it started.
 func tryOpenBrowser(u string) bool {
-	return startOpener(browserCommand(runtime.GOOS, u))
+	if !startOpener(browserCommand(runtime.GOOS, u)) {
+		log.Printf("[open] the system's opener failed for %s", redactForLog(u))
+		return false
+	}
+	return true
 }
 
 // startOpener runs the system's opener with argv (a test seam) and reports whether it started.
@@ -34,7 +51,21 @@ var startOpener = func(argv []string) bool {
 	if runtime.GOOS == "windows" {
 		HideWindow(cmd)
 	}
-	return cmd.Start() == nil
+	if err := cmd.Start(); err != nil {
+		log.Printf("[open] could not start %s: %v", argv[0], err)
+		return false
+	}
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	select {
+	case err := <-done: // macOS `open` ends with an error when no application takes the address
+		if err != nil {
+			log.Printf("[open] %s ended with an error: %v", argv[0], err)
+		}
+		return err == nil
+	case <-time.After(5 * time.Second):
+		return true // still running: it handed the address on and stays; a later exit is not waited for
+	}
 }
 
 // OpenLogin opens a sign-in link in the user's browser without putting the link in an argument list (#12546, Security #3970): every account on the computer can read a process's arguments, and the
@@ -47,6 +78,7 @@ func OpenLogin(link string) { TryOpenLogin(link) }
 func TryOpenLogin(link string) bool {
 	u, ok := WebURL(link)
 	if !ok {
+		log.Printf("[open] not opened: %s is not a plain http or https address", redactForLog(link))
 		return false
 	}
 	if !strings.Contains(u, "login_token=") {
