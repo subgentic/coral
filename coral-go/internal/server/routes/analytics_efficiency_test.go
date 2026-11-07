@@ -480,3 +480,16 @@ func TestEfficiencyTheSharedCommitReadServesTheUsualWindowAndKeepsEachWindowsSla
 	require.NotNil(t, avg["usual"], "the usual figure has its commits")
 	assert.InDelta(t, 100.0/3, avg["usual"], 0.001, "the usual window's one task, 100 tokens over u1, far and old (a shared read that stopped at 21 days would lose u1: 50)")
 }
+
+// #14095: a page with no commit must not say "no commits" when it cannot see where the sessions commit: the read carries what the sessions did in the window (how many had usage, and how many tokens), so the
+// page can say "no commits recorded from these sessions" instead.
+func TestEfficiencyCarriesTheUsageOfTheWindowSoAnEmptyPageCanBeHonest(t *testing.T) {
+	e := newEffEnv(t)
+	_, body := e.get(t, "metric=tokens_per_commit&group_by=provider&range=7d")
+	u, ok := body["usage"].(map[string]any)
+	require.True(t, ok, "the read carries usage: %v", body)
+	assert.EqualValues(t, 2, u["sessions"], "A and B had usage in the window (the old row is out of it)")
+	assert.EqualValues(t, 2000, u["tokens"])
+	_, body = e.get(t, "metric=task_time&group_by=provider&range=7d")
+	assert.Contains(t, body, "usage", "both metrics carry it")
+}
