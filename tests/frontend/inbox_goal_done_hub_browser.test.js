@@ -6,12 +6,11 @@ const { setupHubWorld, BASE } = require('./helpers/hub_world');
 const { coralReady } = require('./helpers/wait');
 
 (async () => {
-    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const { client, Page, Emulation, ev, waitFor } = await connect();
     const S = `(window.__coralStatic || '/static/')`, T = '#group-table-view';
     const row = source => `document.querySelector('${T} tr[data-key^="${source}:goal_done:"]')`;
     try {
         await setupHubWorld({ client, Page, Emulation, width: 1280, height: 1000, mobile: false, inbox: 'native', needs: true, hubPages: true });
-        await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.addScriptToEvaluateOnNewDocument({ source: `(() => {
             const original = window.fetch, json = (body, status = 200) => Promise.resolve(Response.json(body, { status }));
             window.__goalOwner = true; window.__goalWrites = []; window.__localGoalWrites = [];
@@ -44,7 +43,7 @@ const { coralReady } = require('./helpers/wait');
         for (const width of [1280,390]) {
             await Emulation.setDeviceMetricsOverride({width,height:1000,deviceScaleFactor:1,mobile:width<760});
             await Emulation.setTouchEmulationEnabled({enabled:width<760});
-            await Page.navigate({url:BASE+'/'}); await Page.loadEventFired(); await install(); await coralReady(ev,'startup','settings');
+            await Page.navigate({url:BASE+'/'}); await Page.loadEventFired(); await coralReady(ev,'startup','settings');
             await ev(`window.switchNavTab('hub-inbox'); import(${S}+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
             await waitFor(`!!(${row('m1')}) && !!(${row('m2')})`, width+': equal goal ids from both computers appear',8000);
             const keys = await ev(`[...document.querySelectorAll('${T} tr[data-key*="goal_done:"]')].map(r=>r.dataset.key)`);
@@ -77,5 +76,5 @@ const { coralReady } = require('./helpers/wait');
             assert.deepEqual(await ev(`window.__localGoalWrites`),[],'no write falls back to the Hub/local board');
         }
         console.log('PASS Hub done-goal rows and source-scoped actions on desktop/phone, with non-owner refusal');
-    } finally { await client.close(); }
+    } catch (error) { console.error('Hub goal diagnostics:', await ev(`JSON.stringify({goals:window.__remoteDone,requests:window.__remoteRequests,rows:[...document.querySelectorAll('#group-table-view tr')].map(r=>({key:r.dataset.key,text:r.textContent})),body:document.body.innerText.slice(-3000)})`)); throw error; } finally { await client.close(); }
 })().catch(error=>{console.error(error);process.exitCode=1;});
