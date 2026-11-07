@@ -69,3 +69,64 @@ func TestWakeTeamNamesTheMembersThatDidNotStart(t *testing.T) {
 	asleep, _ := r.asleep(sid(92))
 	require.True(t, asleep, "the one that did not start is still asleep")
 }
+
+// Wake Team with no one asleep does not say the team is awake (#14208, the live reproduction): Kill All unregisters the agents and an agent that exited leaves a row Coral still lists as awake, so the
+// team has no sleeping member to wake, and the answer used to be ok, sleeping false, nothing started. It now says why, in the dashboard's refusal path (as Sleep Team already does, #12417): a team
+// whose members are all running is told so, and a board with no live agents is told they were ended and where to resume them.
+func TestWakeTeamWithNoOneAsleepSaysSoInsteadOfAwake(t *testing.T) {
+	r := newWakeRig(t)
+	ctx := context.Background()
+	const team = "wake-none"
+	wake := func() map[string]any {
+		rec := httptest.NewRecorder()
+		r.h.Wake(rec, dropAt2(httptest.NewRequest(http.MethodPost, "/wake", nil), map[string]string{"boardName": team}))
+		require.Equal(t, http.StatusOK, rec.Code)
+		var out map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+		return out
+	}
+
+	// a board with nothing on it at all
+	out := wake()
+	require.Equal(t, false, out["ok"], "nothing was started: not awake")
+	require.EqualValues(t, 0, out["sessions_relaunched"])
+	require.Contains(t, out["error"], "no agents Coral can wake")
+
+	// members Kill All ended: named, with what a Resume needs
+	for i, name := range []string{"Ended One", "Ended Two"} {
+		id := sid(97 + i)
+		r.add(id, name, "", "", false)
+		_, err := r.h.db.ExecContext(ctx, "UPDATE live_sessions SET board_name = ? WHERE session_id = ?", team, id)
+		require.NoError(t, err)
+		require.NoError(t, r.ss.UnregisterLiveSession(ctx, id)) // what Kill All does
+	}
+	out = wake()
+	require.Equal(t, false, out["ok"], "ended members are not a team that is awake")
+	require.Contains(t, out["error"], "Ended One and Ended Two were ended")
+	require.Contains(t, out["error"], "Resume them")
+	endedList, _ := out["ended"].([]any)
+	require.Len(t, endedList, 2, "the ended members are listed so the dashboard can offer to resume each")
+	first := endedList[0].(map[string]any)
+	require.NotEmpty(t, first["session_id"])
+	require.Equal(t, "claude", first["agent_type"])
+	require.NotEmpty(t, first["name"])
+
+	// every member is running: nothing to wake
+	for i, name := range []string{"Dev One", "Dev Two"} {
+		id := sid(95 + i)
+		r.add(id, name, "", "", false)
+		_, err := r.h.db.ExecContext(ctx, "UPDATE live_sessions SET board_name = ?, is_sleeping = 0 WHERE session_id = ?", team, id)
+		require.NoError(t, err)
+	}
+	out = wake()
+	require.Equal(t, false, out["ok"])
+	require.Contains(t, out["error"], "No one in this team is asleep")
+
+	// one asleep: it is woken and the answer is ok as before
+	_, err := r.h.db.ExecContext(ctx, "UPDATE live_sessions SET is_sleeping = 1 WHERE session_id = ?", sid(96))
+	require.NoError(t, err)
+	require.NoError(t, r.ss.SetSetting(ctx, "cli_path_claude", stubCLI(t)))
+	out = wake()
+	require.Equal(t, true, out["ok"])
+	require.EqualValues(t, 1, out["sessions_relaunched"])
+}

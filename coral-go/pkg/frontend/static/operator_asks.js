@@ -166,31 +166,12 @@ export async function wakeMember(a, name) {
     }
 }
 
-/** An ended agent's Restart from a question (#14172): no live row any more, so its earlier chat is resumed in its own folder on the question's computer, the way History's Resume does it (the same resume-info and
- *  launch route), under its own name and team. Rejects in words when the chat, its folder or its type cannot be found. */
+/** An ended agent's Restart from a question (#14172): no live row any more, so its earlier chat is resumed (resume_ended.js), under its own name and team. */
 async function resumeEndedMember(server, a, name, who, sessionName) {
     const m = /^([a-z][a-z0-9]*)-([A-Za-z0-9][A-Za-z0-9._-]*)$/.exec(String(sessionName || ''));
     if (!m) throw new Error(`${who} is not running on this computer.`);
-    const [, agentType, sid] = m;
-    const read = await serverFetch(server, `/api/sessions/history/${encodeURIComponent(sid)}/resume-info`);
-    if (!read.ok) throw new Error(`${who} is not running on this computer, and its earlier chat could not be read here (HTTP ${read.status}).`);
-    const info = await read.json().catch(() => ({}));
-    if (!info.working_dir) throw new Error(`${who} is not running, and Coral does not know the folder it worked in, so it cannot be resumed from here. Resume it from All chats.`);
-    if (info.working_dir_exists === false) throw new Error(`${who} is not running, and the folder it worked in is gone (${markHidden(info.working_dir, { strict: true })}). Resume it from All chats and pick a folder.`);
-    const payload = { working_dir: info.working_dir, agent_type: info.agent_type || agentType, resume_session_id: info.resume_session_id || sid, display_name: info.display_name || name };
-    if (a.board) payload.board_id = payload.board_name = a.board;
-    const mode = info.permission_mode || '';
-    if (mode === 'default') payload.permission_mode = 'default';
-    else if (mode) {
-        const { _getPermissionFlagsForAgentMode } = await importOnce('./permission_flags.js');
-        const flags = _getPermissionFlagsForAgentMode(payload.agent_type, mode).split(/\s+/).filter(Boolean);
-        if (flags.length) payload.flags = flags;
-    }
-    const resp = await serverFetch(server, '/api/sessions/launch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    if (!resp.ok) {
-        const why = await resp.json().then(b => (b && typeof b.error === 'string' ? b.error.trim() : ''), () => '');
-        throw new Error(why ? `Could not resume ${who}: ${markHidden(why, { strict: true })}` : `Could not resume ${who} (HTTP ${resp.status}).`);
-    }
+    const { resumeEndedAgent } = await importOnce('./resume_ended.js');
+    return resumeEndedAgent(server, { agentType: m[1], sid: m[2], name }, a.board);
 }
 
 /** The dialog names the asker and team; the complete question is shown once in its body (#12722). */

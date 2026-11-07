@@ -154,9 +154,22 @@ func (h *SessionsHandler) Wake(w http.ResponseWriter, r *http.Request) {
 		boardPaused = false
 	}
 
+	// Members Kill All (or their own exit) ended are not asleep: Wake finds nothing to wake in them. They are named so the dashboard can offer to resume each one (#14208).
+	ended, _ := h.ss.EndedSessionsOnBoard(ctx, boardName)
 	if relaunched == 0 && len(failed) > 0 { // nobody started: not a team that is awake
-		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "sleeping": true, "sessions_relaunched": 0, "failed": failed, "board_paused": boardPaused,
+		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "sleeping": true, "sessions_relaunched": 0, "failed": failed, "ended": ended, "board_paused": boardPaused,
 			"error": "No one in this team could be started. " + wakeFailureWords(failed)})
+		return
+	}
+	if relaunched == 0 { // nothing was asleep: the team is not "awake" because of this call
+		awakeHere := 0
+		for _, ls := range allLive {
+			if ls.IsArchived != 1 && ls.IsSleeping != 1 && ls.BoardName != nil && *ls.BoardName == boardName {
+				awakeHere++
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "sleeping": false, "sessions_relaunched": 0, "failed": failed, "ended": ended, "board_paused": boardPaused,
+			"error": nobodyAsleepWords(awakeHere, ended)})
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -164,8 +177,41 @@ func (h *SessionsHandler) Wake(w http.ResponseWriter, r *http.Request) {
 		"sleeping":            false,
 		"sessions_relaunched": relaunched,
 		"failed":              failed,
+		"ended":               ended,
 		"board_paused":        boardPaused,
 	})
+}
+
+// nobodyAsleepWords is what Wake Team says when it woke no one and no start failed: that no one is asleep (some are running), or that the agents were ended and can be resumed, or that Coral has nothing
+// to wake on this board at all.
+func nobodyAsleepWords(awake int, ended []store.EndedSession) string {
+	var parts []string
+	if awake > 0 {
+		parts = append(parts, "No one in this team is asleep.")
+	}
+	if len(ended) > 0 {
+		names := make([]string, 0, len(ended))
+		for _, e := range ended {
+			names = append(names, e.Name)
+		}
+		one := len(names) == 1
+		parts = append(parts, joinNames(names)+" "+map[bool]string{true: "was", false: "were"}[one]+" ended, not asleep, so Wake does not apply. Resume "+map[bool]string{true: "it", false: "them"}[one]+" to bring the team back.")
+	}
+	if len(parts) == 0 {
+		return "This team has no agents Coral can wake: none are running, asleep or ended."
+	}
+	return strings.Join(parts, " ")
+}
+
+// joinNames is "A", "A and B", "A, B and C".
+func joinNames(names []string) string {
+	switch len(names) {
+	case 0:
+		return ""
+	case 1:
+		return names[0]
+	}
+	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
 }
 
 // wakeFailureName is the name a person knows the agent by.
