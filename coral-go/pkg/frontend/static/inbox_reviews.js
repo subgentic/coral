@@ -1,4 +1,4 @@
-import { artifactRevision, onArtifactsRev } from './artifacts_feed.js';
+import { artifactRevision, artifactsUnchanged, onArtifactsRev } from './artifacts_feed.js';
 import { setReviewCacheReader } from './ask_filter.js';
 /* Review artifacts use the same owner-protected team list and tags routes as Artifacts.
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
@@ -12,9 +12,10 @@ const { createReviewPages } = await importOnce('./review_pages.js');
 const { needsReviewAttention, hasNewVersion, waitingOnAgent } = await importOnce('./inbox_review_state.js');
 
 let items = [], saved = [], muted = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => { if (typeof document !== 'undefined') document.dispatchEvent(new Event('coral:reviews-changed')); };
-let activated = false, refreshAgain = false;
+let activated = false, refreshAgain = false, freshnessDirty = false;
 onArtifactsRev(() => {
     if (!activated) return;
+    freshnessDirty = true;
     lastRead = 0;
     if (pending) refreshAgain = true; else refreshReviews();
 });
@@ -368,20 +369,21 @@ async function appendReviews(pager, server) {
 }
 export const loadMoreReviews = server => appendReviews(reviewPager, server);
 export const loadMoreSavedFiles = server => appendReviews(savedPager, server);
-async function refreshActiveQuery() {
+const unchangedComputer = (server, stamp) => artifactsUnchanged(identityKey(server, stamp.team), stamp.rev, true);
+async function refreshActiveQuery(unchanged = null) {
     const mine = fview;
     if (!mine) return;
     if (mine.pager.status().some(page => page.loading)) {
         await mine.promise;
-        return fview === mine ? refreshActiveQuery() : undefined;
+        return fview === mine ? refreshActiveQuery(unchanged) : undefined;
     }
     const started = revision;
     mine.at = Date.now();
-    mine.promise = mine.pager.refresh().then(() => {
+    mine.promise = mine.pager.refresh({ unchanged }).then(results => {
         if (fview !== mine || started !== revision) return;
         mine.started = started;
         mine.invalidCounts = false;
-        changed();
+        if (results.some(result => result !== false)) changed();
     });
     return mine.promise;
 }
@@ -392,11 +394,15 @@ export function refreshReviews(force = false, { reuse = false } = {}) {
     const sources = sourcesKey();
     if (force && reuse && finishedAt && Date.now() - finishedAt < 30000 && finishedRev === revision && sources === lastSources) return Promise.resolve();
     if (!force && Date.now() - lastRead < 30000 && sources === lastSources) return null;
+    const sourceSetChanged = sources !== lastSources;
     lastSources = sources; pendingStarted = revision; lastRead = Date.now();
     const started = revision;
     syncPageSources();
-    pending = Promise.all([reviewPager.refresh(), savedPager.refresh(), refreshActiveQuery()]).then(() => {
+    const unchanged = !force && !freshnessDirty && finishedRev === revision ? unchangedComputer : null;
+    freshnessDirty = false;
+    pending = Promise.all([reviewPager.refresh({ unchanged }), savedPager.refresh({ unchanged }), refreshActiveQuery(unchanged)]).then(([reviews, saved]) => {
         if (started !== revision) return;
+        if (!sourceSetChanged && [...reviews, ...saved].every(result => result === false)) return;
         publishPages();
         if (typeof document !== 'undefined') importOnce('./operator_asks.js').then(m => m.refreshReviewAskVisibility()).catch(() => {});
         if (!errors.length) { finishedAt = Date.now(); finishedRev = revision; }
