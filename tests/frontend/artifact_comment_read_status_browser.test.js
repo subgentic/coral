@@ -16,6 +16,7 @@ const COMMENTS = [
     { id: 4, parent_id: null, anchor: { whole: true }, body: 'Not sent to anyone.', asks: [] },
     { id: 5, parent_id: null, anchor: { whole: true }, body: 'A view with no read_at at all.', asks: [ASK('Writer D', { nudged: true })] },
     { id: 6, parent_id: null, anchor: { whole: true }, body: 'An older server: seen, no read_at key at all.', asks: [ASK('Writer E', { seen: true })] },
+    { id: 8, parent_id: null, anchor: { whole: true }, body: 'Backend Dev\'s real format: microseconds and +00:00.', asks: [ASK('Writer I', { seen: true, read_at: new Date(Date.now() - 4 * 60000).toISOString().replace(/\.(\d{3})Z$/, '.$1456+00:00') })] },
     { id: 7, parent_id: null, anchor: { whole: true }, body: 'One comment, three agents, three states.', asks: [ASK('Writer F'), ASK('Writer G', { seen: true, read_at: ago(5 * 60000) }), ASK('Writer H', { seen: true, replies: 1, read_at: ago(8 * 60000) })] },
 ].map(c => ({ ...c, author: { kind: 'owner', issuer: 'local', subject: 'Operator' }, created_at: ago(20 * 60000) }));
 
@@ -38,9 +39,9 @@ const COMMENTS = [
             await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'plan.md', board: 'ask-team' }); return true; })()`);
             await waitFor(`!!document.querySelector('.ac-toggle')`, `${at}the comments toggle`, 8000);
             await ev(`(() => { const t = document.querySelector('.ac-toggle'); if (t && t.getAttribute('aria-expanded') !== 'true') t.click(); return true; })()`);
-            await waitFor(`document.querySelectorAll('#artifact-viewer .ac-card').length >= 7`, `${at}the seven comments`, 8000);
+            await waitFor(`document.querySelectorAll('#artifact-viewer .ac-card').length >= 8`, `${at}the eight comments`, 8000);
             const line = id => ev(`(() => { const p = document.querySelector('#artifact-viewer .ac-card[data-id="${id}"] .ac-ask-status'); return p && { text: p.textContent.replace(/\\s+/g, ' ').trim(), names: [...p.children].map(e => e.textContent.trim()), times: [...p.querySelectorAll('[title]')].map(e => e.title).filter(t => /^\\d{4}-\\d\\d-\\d\\dT/.test(t)) }; })()`);
-            const [l1, l2, l3, l4, l5, l6, l7] = [await line(1), await line(2), await line(3), await line(4), await line(5), await line(6), await line(7)];
+            const [l1, l2, l3, l4, l5, l6, l7, l8] = [await line(1), await line(2), await line(3), await line(4), await line(5), await line(6), await line(7), await line(8)];
             check(l1 && /^Sent to Writer A\b/.test(l1.text) && !/\bread\b|\breplied\b/i.test(l1.text), `${at}an ask with no sign yet says Sent to the agent: ` + JSON.stringify(l1));
             check(l2 && l2.text === 'Read by Writer B, 3 minutes ago' && l2.times.length === 1 && Date.parse(l2.times[0]), `${at}an ask the agent has read says Read by it with the time, the exact time in the tooltip: ` + JSON.stringify(l2));
             check(l3 && l3.text === 'Writer C replied (2 times)', `${at}an ask the agent answered says it replied: ` + JSON.stringify(l3));
@@ -48,10 +49,12 @@ const COMMENTS = [
             check(l5 && /^Sent to Writer D\b/.test(l5.text) && /reminded/.test(l5.text) && !/\bread\b|unread|not read/i.test(l5.text), `${at}no read_at in the view is unknown: it says Sent and never claims unread or read: ` + JSON.stringify(l5));
             // an older server: 'seen' (the comments-GET stamp) and no read_at key: read, without a time, never a guessed one
             check(l6 && l6.text === 'Read by Writer E' && l6.times.length === 0, `${at}an older server's seen with no read_at says Read by the agent with no time: ` + JSON.stringify(l6));
+            // the server's real stamp (#14130, Backend Dev's JSON): six fractional digits and +00:00, not the milliseconds and Z of an ISO string from a browser
+            check(l8 && l8.text === 'Read by Writer I, 4 minutes ago' && l8.times.length === 1 && /\.\d{6}\+00:00$/.test(l8.times[0]), `${at}read_at as the server writes it (microseconds, +00:00) is read and shown with its time: ` + JSON.stringify(l8));
             // one comment sent to several agents, each in its own state, in the server's order
             check(l7 && l7.text === 'Sent to Writer F (already asked); Read by Writer G, 5 minutes ago; Writer H replied' && l7.names.includes('Writer F') && l7.names.includes('Writer G') && l7.names.includes('Writer H'), `${at}one comment sent to three agents says each agent's own state (sent / read with its time / replied): ` + JSON.stringify(l7));
             // the three move on independently: F reads it, G replies
-            await ev(`window.__cs[6].asks[0].read_at = new Date().toISOString(); window.__cs[6].asks[1].replies = 2; true`);
+            await ev(`const c7 = window.__cs.find(c => c.id === 7); c7.asks[0].read_at = new Date().toISOString(); c7.asks[1].replies = 2; true`);
             await waitFor(`(document.querySelector('#artifact-viewer .ac-card[data-id="7"] .ac-ask-status')?.textContent || '').replace(/\\s+/g, ' ').trim() === 'Read by Writer F, just now; Writer G replied (2 times); Writer H replied'`, `${at}each of the three agents moves on by itself`, 8000);
             check(l1.names.includes('Writer A') && l2.names.includes('Writer B') && l3.names.includes('Writer C'), `${at}each agent's name is its own element (the link to its chat, or its label when it is not running): ` + JSON.stringify([l1.names, l2.names, l3.names]));
             // the line moves on by itself while the panel is open: the agent reads the comment, the next poll draws it
