@@ -158,6 +158,9 @@ type commentAskView struct {
 	// Seen: the agent has read the artifact's threads or replied (#11722): the thread says "seen by <agent>". Nudged: Coral reminded it to answer in the thread.
 	Seen   bool `json:"seen"`
 	Nudged bool `json:"nudged"`
+	// ReadAt is when the agent first read the comment, as an RFC 3339 UTC time: the earlier of the comments-GET stamp and the board-read stamp (coral-board read of the message that delivered it) (#14130);
+	// "" while neither is set. On the owner's list only, like the asks themselves.
+	ReadAt string `json:"read_at"`
 }
 
 type commentAuthor struct {
@@ -958,7 +961,7 @@ func (h *SessionsHandler) attachAsks(ctx context.Context, views []commentView) {
 		}
 		byComment := map[int64][]commentAskView{}
 		for _, a := range asks {
-			byComment[a.CommentID] = append(byComment[a.CommentID], commentAskView{Agent: a.AgentName, Open: a.OpenAt(now), Replies: a.Replies, Seen: a.SeenAt != nil, Nudged: a.NudgedAt != nil})
+			byComment[a.CommentID] = append(byComment[a.CommentID], commentAskView{Agent: a.AgentName, Open: a.OpenAt(now), Replies: a.Replies, Seen: a.SeenAt != nil, Nudged: a.NudgedAt != nil, ReadAt: a.ReadStamp()})
 		}
 		for _, i := range idx {
 			views[i].Asks = byComment[views[i].ID]
