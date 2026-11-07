@@ -31,7 +31,8 @@ const BASE=require('./test_base').BASE;
    await waitFor(`navigator.clipboard.readText().then(t=>t==='coral://artifacts/${hex}')`,server+' row own-version clipboard');assert.equal(await ev('navigator.clipboard.readText()'),'coral://artifacts/'+hex);await dismissCopied();
   }
   await ev(`document.getElementById('copy-row').remove();true`);
-  for(const [server,hex] of [['local',H1],['m1',H3]]){
+  await ev(`import((window.__coralStatic||'/static/')+'state.js').then(({state})=>{state.servers=[...(state.servers||[]).filter(s=>s&&s.id!=='m1'),{id:'m1',label:'m1'}];state.serversKnown=true;return true;})`); // the viewer opens a file only on a computer the page lists (#13949)
+ for(const [server,hex] of [['local',H1],['m1',H3]]){
    await ev(`import((window.__coralStatic||'/static/')+'artifact_viewer.js').then(v=>v.openArtifactViewer('${hex}',{server:'${server}',board:'copy-team',filename:'release-plan.md',mediaType:'text/markdown'}))`);
    await waitFor(`!!document.querySelector('.artifact-viewer-markdown')`,'rendered requested version');await click('.artifact-viewer-more');await waitFor(`!document.querySelector('.artifact-viewer-menu').hidden`,'viewer More menu');
    await shot('viewer-'+server);assert.ok(await ev(`!!document.querySelector('.artifact-viewer-copy-id')`),'viewer offers same action');await click('.artifact-viewer-copy-id');await waitFor(`navigator.clipboard.readText().then(t=>t==='coral://artifacts/${hex}')`,'viewer current-version clipboard');await dismissCopied();await click('.artifact-viewer-close');
