@@ -205,7 +205,7 @@ func Derive(in Input) State {
 // movedOn closes the agent's own open question when its transcript shows an assistant entry written after it (#14345). Only a question: a permission prompt, a plan and an elicitation wait for the person
 // whatever the agent has written, and a held notice of Coral's is not the agent's request (ownOpen).
 func (d *deriver) movedOn(in Input) {
-	if in.AssistantEntryAt.IsZero() || !d.state.NeedsInput || d.state.WaitingKind != "question" || !d.ownOpen || d.state.WaitingSince.IsZero() {
+	if in.AssistantEntryAt.IsZero() || !d.state.NeedsInput || d.state.WaitingKind != "question" || !d.ownOpen { // ownOpen is also what sets WaitingSince: Coral's held notice has neither
 		return
 	}
 	if !in.AssistantEntryAt.After(d.state.WaitingSince.Add(MovedOnMargin)) {

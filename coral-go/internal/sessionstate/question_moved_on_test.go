@@ -78,3 +78,17 @@ func TestAQuestionAskedAfterTheEntryStaysOpen(t *testing.T) {
 	assert.True(t, st.NeedsInput, "the entry is from before the second question")
 	assert.Equal(t, "question", st.WaitingKind)
 }
+
+// Coral's own held notice is not the agent's request (ownOpen is false for it): whatever the transcript holds, it stays until Coral's own delivery clears it (QA's SHOULD on #14345). Even one that says
+// "question" (a held notice written with that kind) is Coral's, so an assistant entry never closes it.
+func TestAHeldNoticeOfCoralsStaysWhateverTheTranscriptHolds(t *testing.T) {
+	t0 := time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC)
+	for _, summary := range []string{HeldInputSummary, HeldDialogSummary} {
+		events := []Event{
+			{Type: "prompt_submit", At: t0},
+			{Type: "permission_request", Kind: "question", Summary: summary, ToolName: "AskUserQuestion", At: t0.Add(10 * time.Second)},
+		}
+		st := Derive(Input{Events: events, AssistantEntryAt: t0.Add(10 * time.Minute)})
+		assert.True(t, st.NeedsInput, "%q: Coral's held notice stays open", summary)
+	}
+}
