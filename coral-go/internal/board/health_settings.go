@@ -420,6 +420,7 @@ func (s *Store) SetHealthOn(ctx context.Context, project string, on bool) error 
 }
 
 const healthDefaultOffMarker = "migration:health_default_off"
+const healthDefaultOnMarker = "migration:health_default_on" // #14255: the one-time "existing teams stay off" migration for the default that became ON (#14091)
 
 // migrateHealthDefaultOff keeps the teams that were running the health check when its default became OFF (#4962): a team that never
 // stored a health setting had the check on by default, so the first time this runs it stores "on" for every board that exists and has
@@ -445,6 +446,38 @@ func (s *Store) migrateHealthDefaultOff(ctx context.Context) error {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO board_settings (project, key, value) VALUES ('~store', ?, 'done')`, healthDefaultOffMarker); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// migrateHealthDefaultOn keeps every team that exists when the default became ON (#14091) as it was (#14255): a team that never stored a health setting had the check OFF (#4962), so the first time this
+// runs it stores "off" for every board that exists and has none, and no existing team starts sending health checks, and spending tokens, when Coral is upgraded. A board that stored on or off keeps what it
+// stored. It runs once (a marker row in board_settings under the project "~store"); a board made later has the new default, on. It runs after migrateHealthDefaultOff, which stores "on" for the teams of a much
+// older release first, so those stay on.
+func (s *Store) migrateHealthDefaultOn(ctx context.Context) error {
+	var done []string
+	if err := s.db.SelectContext(ctx, &done, `SELECT value FROM board_settings WHERE project = '~store' AND key = ?`, healthDefaultOnMarker); err != nil {
+		return err
+	}
+	if len(done) > 0 {
+		return nil
+	}
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	// Every board that exists: one with a member (active or not) or a message (migrateHealthDefaultOff counted the boards with an active member or a message). The task table is left out: on an older database its project column is
+	// added by a later step than this one, and a board with tasks has had a member or a message.
+	if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO board_settings (project, key, value)
+		SELECT p.project, ?, '{"on":false}' FROM (
+			SELECT DISTINCT project FROM board_subscribers
+			UNION SELECT DISTINCT project FROM board_messages
+		) p WHERE p.project <> '' AND p.project <> '~store'`, settingHealth); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO board_settings (project, key, value) VALUES ('~store', ?, 'done')`, healthDefaultOnMarker); err != nil {
 		return err
 	}
 	return tx.Commit()
