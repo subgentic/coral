@@ -339,8 +339,8 @@ func runHealthOracle(t *testing.T, seed int64) {
 		c := m.Content
 		switch {
 		case strings.Contains(c, "escalated to the orchestrator:"):
-			healthKinds["claim escalation"] += strings.Count(c, "has not claimed")
-			healthKinds["status escalation"] += strings.Count(c, "silent on #")
+			healthAdd("claim escalation", strings.Count(c, "has not claimed")) // through the lock: runs go in parallel (#14372, 'concurrent map writes' on epoch)
+			healthAdd("status escalation", strings.Count(c, "silent on #"))
 		case strings.Contains(c, "waiting at a dialog"):
 			healthAdd("held notice", 1)
 		case strings.Contains(c, "[Coral health actions paused]"):
