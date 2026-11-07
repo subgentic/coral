@@ -485,6 +485,10 @@ func teamUsesNewDefault(body launchTeamRequest, settings map[string]string) bool
 		if memberDefaultSkips(body, def, settings, agentType, flags) {
 			return true
 		}
+		// the form writes its shipped Auto as the CLI's own flags: judged by what they say, unless the member names Default, the owner saved a default, or it is a relaunch (#14353)
+		if !teamIsRelaunch(body) && def.PermissionMode == "" && savedDefaultMode(settings) == "" && effectiveLaunchSkips(agentType, flags) {
+			return true
+		}
 	}
 	return false
 }
