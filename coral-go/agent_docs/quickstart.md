@@ -65,7 +65,7 @@ curl -fsSL https://raw.githubusercontent.com/subgentic/coral/main/install.sh | b
 ```
 
 What `install.sh` does:
-- Downloads the latest release package for your OS and CPU over HTTPS and checks it against `SHA256SUMS.txt` (and verifies the Sigstore signature when `cosign` is installed).
+- Downloads the latest release package for your OS and CPU over HTTPS and checks it against `SHA256SUMS.txt` (and verifies the Sigstore signature when `cosign` is installed; pass `-s -- --require-signature` after `bash` to stop the install unless `cosign` verifies it).
 - On **macOS**, verifies that `Coral.app` is signed and notarized, installs `Coral.app` in `~/Applications` (without `sudo`), and links the command-line tools into `~/.local/bin`.
 - On **Linux**, unpacks Coral's programs (`coral`, `coral-board`, `coral-agent`, `launch-coral`, `coral-update`, and the hooks) into `~/.local/bin`.
 - Pass `-s -- --dry-run` after `bash` to see what would be downloaded and installed without changing anything.
@@ -333,7 +333,7 @@ Sixteen subtests (6 for `Reverse`, 10 for `Capitalize`, including multi-byte UTF
 | Symptom | Cause |
 |---|---|
 | Agent launched, no output, looks hung | A trust, hook-review or sign-in prompt may be waiting. Open **Inbox > Needs you** or **Terminal** and read it; a launched process alone does not prove provider access. |
-| Teammates launched by Orchestrator sit waiting before their first post | Agents launched via `coral-agent launch` always start in ask-first (`default`) permission mode. Approve their first command in **Inbox > Needs you** or **Terminal** (or choose Claude's `Yes, and switch to auto mode`). |
+| Teammates launched by Orchestrator sit waiting before their first post | Agents launched via `coral-agent launch` start ask-first (`default`) unless the person sets otherwise. Approve their first command in **Inbox > Needs you** or **Terminal** (or choose Claude's `Yes, and switch to auto mode`). |
 | Board nudges pause after you type in an agent's Terminal | Typing in an agent's terminal activates a 60-second `TypingHold` so Coral does not interrupt you mid-command. After 60 seconds without keystrokes, Coral flushes `[Coral] While you were talking: ...`. |
 | `coral: command not found` in your own terminal after a DMG install | Agents launched by Coral get the CLI tools automatically, but your own shell needs `/Applications/Coral.app/Contents/MacOS/install-cli.sh` and `~/.local/bin` on `PATH` (or install via `install.sh`). |
 | `coral` starts something unfamiliar | The retired `agent-coral` pip package is shadowing it. Run `which -a coral` and `pip uninstall agent-coral`. |

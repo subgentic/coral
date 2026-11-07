@@ -36,7 +36,7 @@ curl -fsSL https://raw.githubusercontent.com/subgentic/coral/main/install.sh | b
 ```
 
 What it does:
-- Downloads the latest release package for your OS and CPU over HTTPS and checks it against `SHA256SUMS.txt` (and verifies the Sigstore signature when `cosign` is installed).
+- Downloads the latest release package for your OS and CPU over HTTPS and checks it against `SHA256SUMS.txt` (and verifies the Sigstore signature when `cosign` is installed; pass `-s -- --require-signature` after `bash` to stop the install unless `cosign` verifies it).
 - On **macOS**, verifies that `Coral.app` is signed and notarized, installs `Coral.app` in `~/Applications` (without `sudo`), and links the command-line tools into `~/.local/bin`.
 - On **Linux**, unpacks Coral's programs (`coral`, `coral-board`, `coral-agent`, `launch-coral`, `coral-update`, and the hooks) into `~/.local/bin`.
 - Pass `-s -- --dry-run` after `bash` to inspect what would be downloaded and installed without changing anything.
@@ -117,7 +117,7 @@ Agents upload plans, test reports, diffs, and screenshots to Coral's content-add
 | What you see | Why it happens & how to fix it |
 |---|---|
 | **Newly launched agent looks idle and produces no output** | On its first run in a repository, Claude Code (`claude`) or Codex (`codex`) stops at an interactive folder-trust prompt (`Quick safety check: Is this a project you created or one you trust?`) or a hook/permission prompt. Check **Inbox -> Needs you** or open the agent's **Terminal** tab and press `Down` then `Enter` to trust the folder (or toggle **Trust this folder** in Step 1 of **New team** before launching). |
-| **Teammates launched by the Orchestrator sit waiting before their first post** | Agents started by the Orchestrator via `coral-agent launch` always start in ask-first (`default`) permission mode for safety. Open **Inbox -> Needs you** or their **Terminal** tab to approve their first command (or choose Claude's `Yes, and switch to auto mode`, or turn on **Auto-accept prompts** in the agent's `⋮` menu). |
+| **Teammates launched by the Orchestrator sit waiting before their first post** | Agents started by the Orchestrator via `coral-agent launch` start ask-first (`default`) unless the person sets otherwise. Open **Inbox -> Needs you** or their **Terminal** tab to approve their first command (or choose Claude's `Yes, and switch to auto mode`, or turn on **Auto-accept prompts** in the agent's `⋮` menu). |
 | **You typed in an agent's Terminal and board notifications stopped arriving** | After you type in an agent's terminal, Coral pauses board nudges for **60 seconds** (`TypingHold`) so it never interrupts you mid-command. Wait 60 seconds after your last keystroke and Coral automatically flushes `[Coral] While you were talking: ...`. |
 | **Codex agent cannot reach the board or upload artifacts** | Codex's default sandbox blocks `localhost` network calls. Launch Codex with Coral's default settings (or pass `-c sandbox_workspace_write.network_access=true`). |
 | **`coral` starts an unfamiliar old server in a terminal** | The retired Python package (`pip install agent-coral`) is shadowing Coral on your `PATH`. Run `which -a coral` and `pip uninstall agent-coral`. |
