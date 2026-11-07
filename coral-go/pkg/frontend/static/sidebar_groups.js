@@ -187,7 +187,7 @@ function drawTable() {
     // A row the keyboard is on keeps it across a redraw (the Inbox's "waiting 4 min" moves on every 30 seconds while the table is the only list, #7004): it is found again by its class and data attributes
     const held = host.contains(a) && a.matches('.group-chip, .dt-primary, .dt-quiet, .inbox-answer') ? { cls: a.className, data: JSON.stringify(a.dataset), row: a.closest('tbody tr') ? [...a.closest('tbody').children].indexOf(a.closest('tr')) : -1 } : null;
     if (host.dataset.drawn !== drawn) {
-        host.innerHTML = html; host.dataset.drawn = drawn; // a redraw of what is there would drop the focus from a row the keyboard is on
+        host.innerHTML = html; host.dataset.drawn = drawn; drawnUrgent = src.urgentSignature ? src.urgentSignature() : ''; // the waiting agents this drawing shows (a module variable: a data attribute is an injection the payload census refuses) // a redraw of what is there would drop the focus from a row the keyboard is on
         if (bar?.node) host.prepend(bar.node);
         if (folderPage) folderHead(bar.node, folderPage);
         if (lead) { // a phone: the strip is a tab list and everything under it is its panel (#11281); the panel adds no box (display: contents)
@@ -242,12 +242,13 @@ if (typeof document !== 'undefined') {
 }
 
 // The same for a pointer that only RESTS over the list (#14173, the Beta Tester: a new permission row arrived, the rows moved and a click opened the wrong item): while a mouse pointer is over the table of a source with
-// holdRedraw, a redraw waits and the table says so in one line ("New items are waiting; they appear when the pointer leaves the list"); it happens once when the pointer leaves. A hold is never longer than HOVER_HOLD_MS
+// holdRedraw, a redraw waits and the table says so in one line ("New items are waiting; they appear when the pointer leaves the list"); it happens once when the pointer leaves. A hold is never longer than its cap (2 s for a waiting agent, 10 s otherwise)
 // from the first redraw it held, so a pointer left over the list does not freeze it. Only a fine, hovering pointer: a touch screen has no hover (its press is held above).
-const HOVER_HOLD_MS = 30000;
+const HOVER_HOLD_MS = 10000, URGENT_HOLD_MS = 2000; // a row that needs the person (a waiting agent, a permission) is held 2 s at most: enough that a row does not jump under a click, not enough to hide that an agent is waiting (QA Reviewer 2 on #14173); other new rows, 10 s
 const canHover = () => typeof matchMedia === 'function' && matchMedia('(hover: hover)').matches; // a touch screen has no hover: only a pointer that can rest on the list holds it
 let hoverOver = false, hoverHeldSince = null;
-const hovering = () => hoverOver && hoverHeldSince !== null ? Date.now() - hoverHeldSince < HOVER_HOLD_MS : hoverOver;
+let holdCap = HOVER_HOLD_MS, drawnUrgent = '';
+const hovering = () => hoverOver && hoverHeldSince !== null ? Date.now() - hoverHeldSince < holdCap : hoverOver;
 function showHeldNote() {
     const host = document.getElementById('group-table-view');
     if (!host || host.querySelector('.group-table-held')) return;
@@ -266,7 +267,7 @@ export function refreshGroupTable(kind) {
     const src = sources.get(kind);
     if (open && open.kind === kind) {
         if (src?.holdRedraw && holding()) { deferredKind = kind; flushLater(); return; }
-        if (src?.holdRedraw && hoverOver) { if (hoverHeldSince === null) hoverHeldSince = Date.now(); if (hovering()) { deferredKind = kind; showHeldNote(); setTimeout(() => { const k = deferredKind; if (k && !holding()) { deferredKind = null; refreshGroupTable(k); } }, Math.max(60, HOVER_HOLD_MS - (Date.now() - hoverHeldSince) + 60)); return; } } // a pointer resting on the list: the rows stay where they are, up to HOVER_HOLD_MS
+        if (src?.holdRedraw && hoverOver) { if (hoverHeldSince === null) hoverHeldSince = Date.now(); holdCap = src.urgentSignature && src.urgentSignature() !== drawnUrgent ? URGENT_HOLD_MS : HOVER_HOLD_MS; if (hovering()) { deferredKind = kind; showHeldNote(); setTimeout(() => { const k = deferredKind; if (k && !holding()) { deferredKind = null; refreshGroupTable(k); } }, Math.max(60, holdCap - (Date.now() - hoverHeldSince) + 60)); return; } } // a pointer resting on the list: the rows stay where they are, up to HOVER_HOLD_MS
         const host = document.getElementById('group-table-view');
         if (!host || host.style.display === 'none') { open = null; return; }
         if (drawTable()) return;

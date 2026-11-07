@@ -140,12 +140,17 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
                 await ev(`window.__m.add('qa2', 'B', 5, { sleeping: false, board_project: 'team-a', session_id: 'qa2-id' }); window.__ws += 1; true`);
                 await ev(`window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, ...window.__m.entry(window.__m.agents[s.session_id]) })); true`);
                 await refresh();
-                await new Promise(r => setTimeout(r, 1200)); // sleep-ok: the table would have redrawn by now
+                await new Promise(r => setTimeout(r, 900)); // sleep-ok: the table would have redrawn by now
                 const held = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr').getBoundingClientRect(); return { top: Math.round(r.top), rows: document.querySelectorAll('#group-table-view tbody tr').length, note: (document.querySelector('#group-table-view .group-table-held') || {}).textContent || '' }; })()`);
                 check(held.top === top0.top && held.rows === top0.rows && /New items are waiting/.test(held.note), `${at}with the pointer on the list the rows did not move and the table says new items wait: before ` + JSON.stringify(top0) + ' after ' + JSON.stringify(held));
                 await shot(`hover-held-${w}`);
+                // a WAITING AGENT is a row that needs the person: held about 2 s at most, so it is drawn with the pointer still where it was (QA Reviewer 2's MUST on #14173)
+                const t0 = Date.now();
+                await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === ${top0.rows + 1}`, `${at}the waiting agent's row is drawn although the pointer still rests on the list`, 8000);
+                const took = Date.now() - t0 + 900;
+                check(took <= 3600, `${at}a row that needs the person waits about 2 s at most under a resting pointer (took ${took} ms)`);
+                check(!(await ev(`!!document.querySelector('#group-table-view .group-table-held')`)), `${at}the 'new items wait' line goes when the row is drawn`);
                 await Input.dispatchMouseEvent({ type: 'mouseMoved', x: 4, y: 4 });
-                await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === ${top0.rows + 1} && !document.querySelector('#group-table-view .group-table-held')`, `${at}the new row appears once the pointer leaves the list, and the note goes`, 8000);
             }
         }
     } finally { await client.close(); }
