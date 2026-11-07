@@ -6,9 +6,8 @@ import { renderMarkdownStrict } from './utils.js';
 import { whenText } from './when_text.js';
 import { loadStyles } from './lazy_styles.js';
 import { showToast } from './notifications.js';
-import { decisionNeedsPerson } from './server_base.js';
 import { importOnce } from './import_once.js';
-import { askParts, askSubjects, fromAnotherComputer, buttonsOf, yesNoButtons, buttonWords, claimButton, settleButton, wakeMember, refreshOperatorAsks, replyToAsk, forgetAsk } from './operator_asks.js';
+import { askParts, askSubjects, fromAnotherComputer, buttonsOffered, noteButtonsOwnerOnly, yesNoButtons, buttonWords, claimButton, settleButton, wakeMember, refreshOperatorAsks, replyToAsk, forgetAsk } from './operator_asks.js';
 await loadStyles('operator_ask_dialog.css');
 
 const isReply = action => /^reply$/.test(action);
@@ -59,7 +58,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     const drawOffers = () => {
         offered?.remove(); offered = null; choices.length = 0;
         binary = yesNoButtons(a);
-        const offers = (fromAnotherComputer(a) && (!binary || decisionNeedsPerson(a.server))) ? [] : buttonsOf(a);
+        const offers = buttonsOffered(a);
         if (offers.length) { // what the asker offered: one tap per choice, each with what it does
             offered = document.createElement('section'); offered.className = 'inbox-ask-offers'; offered.setAttribute('aria-label', `Buttons ${markHidden(a.asker, { strict: true })} offered`);
             const head = document.createElement('p'); head.className = 'inbox-ask-offers-head'; head.textContent = offers.every(b => isReply(b.action)) ? 'Choose a reply, or write your own.' : 'Choose an action, or write a reply.';
@@ -81,7 +80,7 @@ export function openAskDialog(a, onDone, runners = {}) {
                         const navigates = ['open:new-agent', 'open:task', 'open:artifact'].includes(got.action);
                         finish(); // the dialog is modal: it goes before the page it opens
                         try {
-                            if (got.action === 'open:new-agent') { if (!window.showLaunchModal) throw new Error('The New agent dialog is not available here.'); await window.showLaunchModal(); }
+                            if (got.action === 'open:new-agent') { if (!window.showLaunchModal) throw new Error('The New agent dialog is not available here.'); await window.showLaunchModal(fromAnotherComputer(a) ? normServer(a.server) : undefined); } // the computer the question came from is the one the dialog starts on (#14396)
                             else if (got.action === 'open:task') { if (!runners.task) throw new Error('Tasks cannot be opened here.'); await runners.task(a, String(got.arg)); }
                             else if (got.action === 'open:artifact') { if (!runners.artifact) throw new Error('Files cannot be opened here.'); await runners.artifact(a, String(got.arg)); }
                             else if (got.action === 'wake') { await wakeMember(a, String(got.arg)); showToast(`Woke ${markHidden(got.arg, { strict: true })}.`); }
@@ -92,7 +91,10 @@ export function openAskDialog(a, onDone, runners = {}) {
                             if (!navigates) await settleButton(a, b, 'failed').catch(() => {}); // give a failed wake back; navigation never claims an answer
                         }
                         refreshOperatorAsks(true);
-                    } catch (e) { err.textContent = e.message || 'Not done.'; sending = false; sync(); }
+                    } catch (e) {
+                        if (e && e.code === 'owner_only') { noteButtonsOwnerOnly(a.server); err.textContent = 'Only this computer\u2019s owner can use these buttons. Write a reply instead.'; sending = false; drawOffers(); sync(); return; } // a grantee: they are taken away, the text box stays
+                        err.textContent = e.message || 'Not done.'; sending = false; sync();
+                    }
                 });
                 choices.push(btn); item.append(btn, what); list.append(item);
             }
