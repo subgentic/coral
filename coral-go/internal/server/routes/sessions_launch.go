@@ -51,6 +51,8 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		// ConfirmHomeFolder: the person was asked about starting in the home folder itself and said Launch anyway (#13425).
 		HomeFolderAsk     bool `json:"home_folder_ask"` // the page can answer the home-folder question (#13425); a page that cannot never gets it, so no launch is stopped for it
 		ConfirmHomeFolder bool `json:"confirm_home_folder"`
+		// KeepFullAccess: the form's "Use Full access for this agent" (#14085): the agent starts with Full access whatever its capabilities say, and keeps it on every restart. The Operator's alone.
+		KeepFullAccess bool `json:"keep_full_access"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -115,14 +117,16 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, err.Error())
 		return
 	}
-	// An agent never starts a type that never asks (#5901): 403, nothing starts. The Operator (dashboard, command line, API key) and the Hub with the owner's switch are unchanged.
-	if agentCaller(r) && agentLaunchUnsupervised(body.AgentType) {
-		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
-		writeError(w, http.StatusForbidden, agentLaunchUnsupervisedCode, agentLaunchUnsupervisedMessage(body.AgentType))
-		return
+	// A launch from the dashboard's own dialog that would use the new default waits for the owner's acknowledgement of the notice first (#14353); nothing is started.
+	if body.ResumeSessionID == "" && !body.KeepFullAccess {
+		settings, _ := h.ss.GetSettings(r.Context())
+		if h.refuseUnseenDisclosure(w, r, launchDefaultSkips(body.AgentType, body.Flags, body.PermissionMode, settings)) {
+			attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+			return
+		}
 	}
 	// Through the Coral Hub, an agent that skips permission prompts needs the owner's local switch (#126 F4).
-	if refuseHubSkip(w, r, h.ss, hubAsksToSkip(body.AgentType, body.Flags, body.Capabilities, body.Tools, body.Hooks)) {
+	if refuseHubSkip(w, r, h.ss, hubAsksToSkip(body.AgentType, body.Flags, body.Capabilities, body.Tools, body.Hooks) || body.KeepFullAccess) { // Full access is the widest skip: through the Hub it meets the owner's switch like any other (#14193)
 		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
 		return
 	}
@@ -167,27 +171,33 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// An agent never starts a less-restricted agent (#4032).
-	if agentCaller(r) {
-		body.Flags, body.Capabilities, body.Tools, body.Hooks = limitAgentLaunch("launch", body.Flags, body.Capabilities, body.Tools, body.Hooks)
-		// ... and it never starts in the Operator's saved default when that skips the prompts (Security's #7576 finding), and a Codex it starts on a board needs a mode: with none it
-		// would ask first and could not reach Coral (#7552). Both are refused before anything is made.
-		if userSettings, err := h.launchSettings(r.Context()); err == nil {
-			if mode, inherits := agentLaunchInheritsSkippingDefault(body.AgentType, body.Flags, userSettings); inherits {
-				if h.orchestratorLaunchAsksFirst(r, body.AgentType) {
-					body.PermissionMode = "default" // an Orchestrator's launch starts ask-first, never less restricted than itself; the Operator raises it later (#11713)
-				} else {
-					attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
-					writeError(w, http.StatusForbidden, agentLaunchNeedsModeCode, agentLaunchInheritsSkippingDefaultMessage(body.AgentType, mode))
-					return
-				}
-			}
-			if (body.BoardName != "" || body.BoardID != "") && agentLaunchNeedsMode(body.AgentType, body.Flags, true, userSettings) {
-				attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
-				writeError(w, http.StatusForbidden, agentLaunchNeedsModeCode, agentLaunchNeedsModeMessage)
-				return
-			}
+	// An agent never starts an agent that can do more without asking than itself (#4032, #5901, #7576, #11713, #7552), and the member that names nothing gets the new default CAPPED by the launching agent
+	// (#14336, Security's ruling on #14333): one rule, capAgentLaunchFor, for every agent-made launch. The caller's authority is read from its stored row, never from the request. An explicit request above
+	// it is refused with the reason; the Operator (the dashboard, the command line, the API key) keeps every choice.
+	grantedMode := ""
+	if body.KeepFullAccess && agentCaller(r) { // Keep Full access is never set by an agent: first, so the answer says so (#14336)
+		if status, msg := h.keepFullAccessRequestRefusal(r, body.AgentType); status != 0 {
+			attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+			writeError(w, status, "", msg)
+			return
 		}
+	}
+	if agentCaller(r) {
+		userSettings, serr := h.launchSettings(r.Context())
+		if serr != nil {
+			userSettings = nil // unreadable settings cap nothing less: the shipped default applies, and the cap still holds
+		}
+		grant, refusal := capAgentLaunchFor(h.callerAuthorityOf(r.Context(), r), agentLaunchAsk{
+			AgentType: body.AgentType, Flags: body.Flags, PermissionMode: body.PermissionMode, Caps: body.Capabilities, Tools: body.Tools, Hooks: body.Hooks,
+			OnBoard: body.BoardName != "" || body.BoardID != "", DefaultMode: defaultModeFor(body.AgentType, userSettings),
+		})
+		if refusal != nil {
+			attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+			writeError(w, http.StatusForbidden, refusal.Code, refusal.Message)
+			return
+		}
+		body.Flags, body.Capabilities, body.Tools, body.Hooks = grant.Flags, grant.Caps, grant.Tools, grant.Hooks
+		grantedMode = grant.Mode
 	}
 
 	// Resolve model: request wins, else per-type default from settings.
@@ -230,13 +240,21 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": serr.Error(), "field": "skills"})
 		return
 	}
+	if body.KeepFullAccess {
+		if status, msg := h.keepFullAccessRequestRefusal(r, body.AgentType); status != 0 {
+			attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+			writeError(w, status, "", msg)
+			return
+		}
+	}
 	lctx, cancel := lifecycleCtx(r.Context())
 	defer cancel()
 	result, err := h.launchSession(lctx, launchSpec{
 		WorkDir: body.WorkingDir, AgentType: body.AgentType, DisplayName: body.DisplayName, ResumeSessionID: body.ResumeSessionID,
 		Flags: launchFlags, Prompt: withSkillNote(body.Prompt, launchSkillNote(skillRows)), BoardName: body.BoardName, BoardServer: body.BoardServer, Backend: body.Backend,
-		BoardType: body.BoardType, Model: effectiveModel, Thinking: effectiveThinking, Capabilities: body.Capabilities, Tools: body.Tools, Hooks: body.Hooks, PermissionMode: explicitDefaultMode(body.PermissionMode, launchFlags),
-		AutoByDefault: !agentCaller(r) && autoDefaultAllowed(lctx, r, h.ss), // not for an agent's launch (it may not start a less-restricted agent, #4032), and a Hub request the owner does not let skip prompts asks instead (#5836)
+		BoardType: body.BoardType, Model: effectiveModel, Thinking: effectiveThinking, Capabilities: body.Capabilities, Tools: body.Tools, Hooks: body.Hooks, PermissionMode: launchModeOf(agentCaller(r), grantedMode, body.PermissionMode, launchFlags),
+		KeepFullAccess: body.KeepFullAccess,
+		AutoByDefault:  !agentCaller(r) && autoDefaultAllowed(lctx, r, h.ss), // not for an agent's launch (it may not start a less-restricted agent, #4032), and a Hub request the owner does not let skip prompts asks instead (#5836)
 	})
 	if err != nil {
 		h.endAgentLaunch(r.Context(), acct, lifeID, false, "", "")
@@ -255,6 +273,11 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	attempt.Finish(tracking.OutcomeSuccess, "", 1, 0)
+	if body.KeepFullAccess {
+		if sid, _ := result["session_id"].(string); sid != "" {
+			h.storeKeepFullAccess(r.Context(), r, sid, launchTargetName(body.DisplayName, body.AgentType), "launch")
+		}
+	}
 	h.endAgentLaunch(r.Context(), acct, lifeID, true, launcherWords(h.orchActorOf(r))+" started "+orchName(launchTargetName(body.DisplayName, body.AgentType)), fmt.Sprint(result["session_id"]))
 
 	// Setup board subscription in background (prompt is passed as CLI arg, not via tmux send-keys)
@@ -279,6 +302,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		result["board_id"] = body.BoardName
 		result["board_label"] = h.boardLabel(body.BoardName)
 	}
+	h.addLaunchNotice(r.Context(), result)
 	writeJSON(w, http.StatusOK, result)
 }
 
@@ -358,4 +382,12 @@ func explicitDefaultMode(requested string, flags []string) string {
 		return ""
 	}
 	return "default"
+}
+
+// launchModeOf is the mode a launch starts in explicitly: for an agent caller the one the cap granted (#14336), else the request's own explicit Default.
+func launchModeOf(fromAgent bool, granted, requested string, flags []string) string {
+	if fromAgent {
+		return granted
+	}
+	return explicitDefaultMode(requested, flags)
 }

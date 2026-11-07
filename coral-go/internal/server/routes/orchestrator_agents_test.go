@@ -526,18 +526,22 @@ func TestAnAgentsLaunchIsLoggedAndHeldToTheCapsWhenTheSwitchIsOn(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, code, "another board's: %v", out)
 	assert.Equal(t, "forbidden_for_agent", out["code"])
 
-	// the Operator's saved default skips the prompts: an agent's launch is refused with the switch on, as before; the Orchestrator's starts ask-first instead (#11713)
+	// the Operator's saved default skips the prompts: an agent's launch is no longer refused (#14336); it starts capped at the launching agent's own mode (these rows record none: ask first)
 	require.NoError(t, r.ss.SetSetting(ctx, "default_permission_mode", "bypassPermissions"))
 	require.NoError(t, r.h.bs.SetOrchGrant(ctx, board.OrchGrant{Project: orchBoard, Enabled: true, SeatSession: r.sid["Orchestrator"], MaxPerHour: 50, MaxLive: 50, IdleMin: 5}, "Operator"))
-	beforeSkip, _ := r.ss.CountActiveLiveSessions(ctx)
-	code, out = launch("Dev2", orchBoard)
-	assert.Equal(t, http.StatusForbidden, code, "an agent cannot inherit a saved default that skips the permission prompts: %v", out)
-	assert.Contains(t, out["error"], "permission", "the refusal says why")
-	started, _ := r.ss.CountActiveLiveSessions(ctx)
-	assert.Equal(t, beforeSkip, started, "nothing more was started")
-	code, out = launch("Orchestrator", orchBoard)
-	assert.Equal(t, http.StatusOK, code, "the Orchestrator's launch starts ask-first where another agent's is refused: %v", out)
-
+	for _, who := range []string{"Dev2", "Orchestrator"} {
+		beforeSkip, _ := r.ss.CountActiveLiveSessions(ctx)
+		code, out = launch(who, orchBoard)
+		assert.Equal(t, http.StatusOK, code, "%s: an agent starts the member capped at its own mode, not refused: %v", who, out)
+		started, _ := r.ss.CountActiveLiveSessions(ctx)
+		assert.Equal(t, beforeSkip+1, started, who)
+		ls, err := r.ss.GetLiveSession(ctx, out["session_id"].(string))
+		require.NoError(t, err)
+		require.NotNil(t, ls)
+		if ls.PermissionMode != nil {
+			assert.NotEqual(t, "bypassPermissions", *ls.PermissionMode, "%s: never above the caller's rank", who)
+		}
+	}
 }
 
 // The Orchestrator's ruling on #11432: a team launch is not a way round the log and the caps. Each member an agent's launch-team starts is logged, and with the switch on counted against the same caps; a member over the cap is not started and says which.

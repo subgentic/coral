@@ -2,6 +2,7 @@
 import { getDotClass, resolveSessionIdentity, sessionGoalText, sessionStateInfo, sessionUnreadCount } from './session_state.js';
 import { _saveSessionOrder } from './list_order.js';
 import { MORE_DOTS_SVG, escapeHtml, escapeAttr, agentNameColor } from './utils.js';
+import { keepMenuItem } from './codex_mode.js';
 import { getAgentColor } from './agent_colors.js';
 import { _getBoardColor } from './board_accents.js';
 import { autoAcceptChip, autoAcceptMenuItem } from './auto_accept.js';
@@ -189,7 +190,11 @@ ${_archiveItem}            <button class="menu-item overflow-menu-item" data-on-
                 ${SVGO.o0}<path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/><path d="M3 3l10 10"/></svg>
                 ${s.auto_sleep_off ? 'Allow auto-sleep' : "Don't auto-sleep"}
             </button>
-${_archiveItem}
+${['codex', 'claude', 'agy'].includes(s.agent_type) && typeof s.keep_full_access === 'boolean' ? (() => { const k = keepMenuItem(s); return `            <button class="menu-item overflow-menu-item" data-on-click="agent-keep-full-access" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="${escapeAttr(k.mode)}">
+                ${SVGO.o0}<path d="M8 2l5 2v4c0 3-2 5-5 6-3-1-5-3-5-6V4z"/></svg>
+                ${escapeHtml(k.label)}
+            </button>
+`; })() : ''}${_archiveItem}
             ${autoAcceptMenuItem(s)}
             ${!instructionsOffered(s, isCloud()) ? '' : `<button class="menu-item overflow-menu-item" data-on-click="agent-instructions" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" title="What this agent is told each time it starts; saved now, used at its next restart">
                 ${SVGO.o0}${_mk0}`}

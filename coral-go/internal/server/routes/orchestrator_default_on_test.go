@@ -412,6 +412,9 @@ func TestOnlyTheHubOwnersTeamLaunchSeedsTheGrant(t *testing.T) {
 	r := newOrchRig(t)
 	resetOwnerState(t)
 	withLabel(t, ownerLabel, nil)
+	// the members start in the new default, which skips prompts: through the Hub that needs the owner's switch on and Launch mode (#14336)
+	require.NoError(t, r.ss.SetSetting(context.Background(), MaxModeSetting, "launch"))
+	require.NoError(t, r.ss.SetSetting(context.Background(), AllowHubAutoAcceptSetting, "true"))
 	hub := func(boardName string, hdr map[string]string) map[string]any {
 		t.Helper()
 		req := httptest.NewRequest(http.MethodPost, "/api/sessions/launch-team", strings.NewReader(defTeamBody(boardName, r.work, "Orchestrator", "Dev")))

@@ -99,7 +99,7 @@ func team(board, agentType string, teamFlags, geminiFlags []string) map[string]a
 		gemini["flags"] = geminiFlags
 	}
 	return map[string]any{"board_name": board, "new_board": true, "agent_type": agentType, "flags": teamFlags,
-		"agents": []map[string]any{{"name": "A", "agent_type": "claude"}, gemini}}
+		"agents": []map[string]any{{"name": "A", "agent_type": "claude", "permission_mode": "default"}, gemini}} // A names Default: a member that names nothing now starts in the new default, which a Hub launch has its own gate for (#14336)
 }
 
 // #126 F4: through the Coral Hub, launch, launch-team and restart start an agent that skips
@@ -217,11 +217,11 @@ func TestHubTeamLaunchOfTheOwnersSavedTemplate(t *testing.T) {
 		`{"name":"Dev","prompt":"build it","agent_type":"claude","capabilities":{"allow":["file_read","file_write","shell"]},"tools":["Bash"],"knowledge":"notes"},` +
 		`{"name":"Reviewer","prompt":"review it","agent_type":"claude","capabilities":{"allow":["file_read"]}}]}]`
 	dev := func() map[string]any {
-		return map[string]any{"name": "Dev", "prompt": "build it", "agent_type": "claude",
+		return map[string]any{"name": "Dev", "prompt": "build it", "agent_type": "claude", "permission_mode": "default", // a saved template stores no mode; the form sends Default explicitly (#14336)
 			"capabilities": map[string]any{"allow": []string{"file_read", "file_write", "shell"}}, "tools": []string{"Bash"}, "knowledge": "notes"}
 	}
-	reviewer := map[string]any{"name": "Reviewer", "prompt": "review it", "agent_type": "claude", "capabilities": map[string]any{"allow": []string{"file_read"}}}
-	builtin := map[string]any{"name": "Lead Developer", "agent_type": "claude", // the built-in Coding Team's member, as the dashboard sends it
+	reviewer := map[string]any{"name": "Reviewer", "prompt": "review it", "agent_type": "claude", "permission_mode": "default", "capabilities": map[string]any{"allow": []string{"file_read"}}}
+	builtin := map[string]any{"name": "Lead Developer", "agent_type": "claude", "permission_mode": "default", // the built-in Coding Team's member, as the dashboard sends it
 		"prompt":       "You are the lead developer. Implement features, write code, and coordinate with the team via the message board. Wait for instructions from the Orchestrator before starting.",
 		"capabilities": map[string]any{"allow": []string{"file_read", "file_write", "shell", "git_write", "agent_spawn", "web_access"}}}
 
@@ -271,7 +271,7 @@ func TestHubTeamLaunchOfTheOwnersSavedTemplate(t *testing.T) {
 	untyped := `[{"name":"Untyped","agents":[{"name":"Dev2","prompt":"p","capabilities":{"allow":["shell","file_write"]}}]}]`
 	typed := `[{"name":"Typed","agents":[{"name":"Dev2","prompt":"p","agent_type":"claude","capabilities":{"allow":["shell","file_write"]}}]}]`
 	dev2 := func(agentType string) map[string]any {
-		m := map[string]any{"name": "Dev2", "prompt": "p", "capabilities": map[string]any{"allow": []string{"shell", "file_write"}}}
+		m := map[string]any{"name": "Dev2", "prompt": "p", "permission_mode": "default", "capabilities": map[string]any{"allow": []string{"shell", "file_write"}}}
 		if agentType != "" {
 			m["agent_type"] = agentType
 		}

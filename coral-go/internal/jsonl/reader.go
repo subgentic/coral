@@ -84,6 +84,8 @@ type piTurnCache struct {
 type codexTurnCache struct {
 	approvalPolicy    string
 	approvalsReviewer string
+	liveApproval      string // the newest turn_context's approval policy, kept across task_started (display only, #14051)
+	liveSandbox       string // the newest turn_context's sandbox type: danger-full-access, workspace-write, read-only or external-sandbox
 	calls             codexCallTracker
 	transcriptReadState
 	event  string

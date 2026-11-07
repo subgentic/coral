@@ -99,7 +99,7 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 				continue
 			}
 			// The owner's switch of one agent's auto-sleep (#12111) is new: the old list never had it.
-			if m == http.MethodPost && strings.HasPrefix(p, "/api/sessions/live/") && strings.HasSuffix(p, "/auto-sleep") {
+			if m == http.MethodPost && strings.HasPrefix(p, "/api/sessions/live/") && (strings.HasSuffix(p, "/auto-sleep") || strings.HasSuffix(p, "/keep-full-access")) { // the second is the owner's Full access across restarts (#14061)
 				continue
 			}
 			// The owner's read of one team's cross-team state (#5636) is new: the old list never had it.

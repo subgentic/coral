@@ -316,6 +316,7 @@ var routeTable = cat(
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/sessions/live/{name}/dismiss-wait")),
 	// The Operator's per-agent auto-sleep switch (#12111) is the OWNER's alone through the hub: it changes Coral's own record and types and kills nothing, so Interact.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/sessions/live/{name}/auto-sleep")),
+	owner(OwnerRefuse, rules(http.MethodPost, TierLaunch, "/api/sessions/live/{name}/keep-full-access")),                                                   // the Operator's alone, and Launch like every route that widens what an agent may do (#14061, Security)
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/operator-artifacts", "/api/board/{project}/operator-artifacts/message")), // a file the Operator shares with an agent (#11376)
 	// The Markdown editor (#13757): the owner's alone through the hub. What a file allows is a view of the owner's artifacts; the save writes a new version, Interact.
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/board/{project}/artifacts/{digest}/edit")),
