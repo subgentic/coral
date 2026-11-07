@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-import { pruneOldRunFolders, liveRunFolders, KEEP_RUNS, KEEP_HOURS } from './helpers/run_folders.mjs';
+import { pruneOldRunFolders, stripOldRunFolders, liveRunFolders, KEEP_RUNS, KEEP_HOURS, BINARY_HOURS } from './helpers/run_folders.mjs';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rf-test-'));
 try {
@@ -37,5 +37,20 @@ try {
     assert.deepEqual(pruneOldRunFolders(root2, { keep: 10, hours: 24, now: NOW }), [], 'fifteen folders from the last 15 hours all stay');
     assert.equal(pruneOldRunFolders(root2, { keep: 3, hours: 6, now: NOW }).length, 10, 'with keep 3 and 6 h: the five under 6 hours old stay (they include the newest three); the other 10 go');
   } finally { fs.rmSync(root2, { recursive: true, force: true }); }
+  // #14022: a folder older than BINARY_HOURS loses its binaries, profiles and data (SIGKILLed runs and --keep leave them) and keeps results.json and the coral.log files; a young one, this run's own and a live runner's are whole
+  const root3 = fs.mkdtempSync(path.join(os.tmpdir(), 'rf-test3-'));
+  try {
+    const big = (name, ageH) => { const p = path.join(root3, name); fs.mkdirSync(path.join(p, 'shard1', 'profile'), { recursive: true }); for (const f of ['coral', 'coral-agent', 'mock-agent']) fs.writeFileSync(path.join(p, f), 'x'.repeat(1000));
+      fs.writeFileSync(path.join(p, 'results.json'), '{}'); fs.writeFileSync(path.join(p, 'shard1', 'coral.log'), 'log'); fs.writeFileSync(path.join(p, 'shard1', 'profile', 'Cookies'), 'c'); const t = new Date(NOW - ageH * H); fs.utimesSync(p, t, t); return p; };
+    const killed = big('coral-cdp-killed', BINARY_HOURS + 1), fresh = big('coral-cdp-fresh1', 1), mine = big('coral-cdp-mineXX', 50), liveR = big('coral-cdp-liveR2', 60), empty = path.join(root3, 'coral-cdp-nothng');
+    fs.mkdirSync(empty); fs.writeFileSync(path.join(empty, 'results.json'), '{}'); fs.utimesSync(empty, new Date(NOW - 80 * H), new Date(NOW - 80 * H));
+    const freed = stripOldRunFolders(root3, { own: mine, live: new Set([path.resolve(liveR)]), now: NOW });
+    assert.deepEqual(freed.map(p => path.basename(p)), ['coral-cdp-killed'], 'only the old folder that held binaries was freed');
+    assert.deepEqual(fs.readdirSync(killed).sort(), ['results.json', 'shard1'], 'the old folder keeps results.json and the shard folder with its log');
+    assert.deepEqual(fs.readdirSync(path.join(killed, 'shard1')), ['coral.log'], 'only the log stays of the shard');
+    for (const p of [fresh, mine, liveR]) assert.ok(fs.existsSync(path.join(p, 'coral')) && fs.existsSync(path.join(p, 'shard1', 'profile', 'Cookies')), `${path.basename(p)} is whole`);
+    assert.ok(fs.existsSync(path.join(empty, 'results.json')), 'a folder with nothing big is left alone');
+    assert.deepEqual(stripOldRunFolders(root3, { own: mine, live: new Set([path.resolve(liveR)]), now: NOW }), [], 'a second pass frees nothing');
+  } finally { fs.rmSync(root3, { recursive: true, force: true }); }
   console.log('run_folders: ok (the newest 10 and the last 24 h stay; own, live, symlink, file and other names are never touched)');
 } finally { fs.rmSync(root, { recursive: true, force: true }); }

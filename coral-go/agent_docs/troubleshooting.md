@@ -453,8 +453,11 @@ Clear it while no build is running: a build that loses its cache files halfway f
 `run_cdp_suites.mjs` builds into a temp folder (`$TMPDIR/coral-cdp-*`, about 250 MB with the
 Chrome profiles). It deletes the folder on exit when every suite passed; after a failure, a
 flaky suite or an interrupt it keeps only `results.json` and the `coral.log` files, and
-`--keep` keeps everything. Delete worktrees, built binaries and kept results folders yourself
-when you're done with them.
+`--keep` keeps everything. A run that is killed outright (SIGKILL, a harness timeout) leaves
+the whole folder; the next run of the same user removes the binaries and profiles of any run
+folder older than 3 hours (`CORAL_CDP_BINARY_HOURS`), `--keep`'s included, and the whole folder
+once it is past the newest 10 and 24 hours. Delete worktrees and built binaries yourself when
+you're done with them.
 
 ### Port already in use
 
