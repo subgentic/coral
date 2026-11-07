@@ -98,7 +98,7 @@ const STUB = `(() => {
             if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); if (s) { s.value = 'needs'; s.dispatchEvent(new Event('change', { bubbles: true })); } return true; })()`); else await ev(`(() => { const b = document.querySelector('.view-list-item[data-key="needs"]'); if (b && !b.classList.contains('view-list-current')) b.click(); return true; })()`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 2`, `${at}the two failed runs in Needs you`, 10000);
             const needs = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(tr => ({ name: (tr.querySelector('.inbox-review-name') || {}).textContent, text: tr.textContent.replace(/\\s+/g, ' ').trim() }))`);
-            const rowsText = await needs(), byName = n => rowsText.find(r => r.name === n);
+            const rowsText = await needs(), byName = n => rowsText.find(r => mobile ? r.name.split(' · ')[0] === n && r.name.includes(' · ') : r.name === n);
             assert.ok(byName('nightly-build-job') && /Run failed: step 2 \(Test\) failed with exit code 3/.test(byName('nightly-build-job').text), `${at}the job's failed run says why: ${JSON.stringify(rowsText)}`);
             assert.ok(byName('nightly-build') && /Run failed: Step 2, Test, failed with exit code 3/.test(byName('nightly-build').text), `${at}and the workflow's: ${JSON.stringify(rowsText)}`);
             assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`), '2', `${at}the Inbox badge counts them`);

@@ -66,7 +66,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`${row('Review file 02.txt')}.querySelector('.inbox-row-more-toggle').click(); true`);
         await waitFor(`!!document.querySelector('.inbox-row-more-toggle[aria-expanded="true"]')`, '390: the More menu opens', 4000).catch(() => {});
         const items = await ev(`[...document.querySelectorAll('.dt-mail-menu:not([hidden]) .menu-item')].map(b => b.textContent.trim())`);
-        check(JSON.stringify(items) === JSON.stringify(['Approve with a note', 'Dismiss', 'Deny', 'Save for later', 'Mark unread']), '390: the More menu of a read row is Approve with a note, Dismiss, Deny, Save for later, Mark unread: ' + JSON.stringify(items));
+        check(JSON.stringify(items) === JSON.stringify(['Approve with a note', 'Dismiss', 'Deny', 'Save for later', 'Copy artifact ID', 'Mark unread']), '390: the More menu of a read row is Approve with a note, Dismiss, Deny, Save for later, Mark unread: ' + JSON.stringify(items));
         await shot('needs-actions-last-390');
     } finally { await removeBoards(ev, [team]).catch(() => {}); await ev(`localStorage.removeItem('coral-dt-widths:Needs you'); true`).catch(() => {}); await client.close(); }
     if (found.length) { console.error(found.join('\n')); process.exit(1); }

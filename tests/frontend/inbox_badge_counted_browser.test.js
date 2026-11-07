@@ -16,6 +16,7 @@ const { coralReady } = require('./helpers/wait');
             const art = i => ({ id: 'a-' + i, uri: 'coral://artifacts/' + hex(i), tags: ['for review'], name: 'report-' + i + '.md', created_at: new Date(Date.UTC(2026, 10, 4) - i * 1000).toISOString(), available: true, produced_by: 'Dev', session_id: 's-1' });
             window.fetch = (u, o) => { const url = new URL(String(u), location.href), p = url.pathname; window.__asked.push(p + url.search);
                 if (p === '/api/team-artifacts' && url.searchParams.get('waiting') === '1') return Promise.resolve(json({ total: 7, artifacts: [], has_more: false }));
+                if (p === '/api/team-artifacts') return Promise.resolve(json(window.__reviewFixturePage(url, location.href, {t1:Array.from({length:7},(_,i)=>art(i))})));
                 if (p === '/api/board/projects') return Promise.resolve(json([{ project: 't1' }]));
                 if (p === '/api/board/t1/artifacts') { const tag = url.searchParams.get('tag'); return Promise.resolve(json(tag === 'for review' ? { has_more: false, artifacts: Array.from({ length: 7 }, (_, i) => art(i)) } : { has_more: false, artifacts: [] })); }
                 return real(u, o); }; })();` });
