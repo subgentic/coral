@@ -27,7 +27,7 @@ func TestAQuestionSettledInTheTerminalClearsFromTheRowAndTheGate(t *testing.T) {
 	t.Setenv("CLAUDE_PROJECTS_DIR", projects)
 	server, h, terminal, ss := setupSessionsTestServer(t)
 	ctx := context.Background()
-	sid := "dddddddd-14345-4a00-8000-000000000001"
+	sid := "dddddddd-1434-4a00-8000-000000000001"
 	name := "claude-" + sid
 	terminal.addSession(name, "/work")
 	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "asker", WorkingDir: "/work", CreatedAt: time.Now().UTC().Format(time.RFC3339)}))
@@ -107,7 +107,7 @@ func TestAPermissionPromptStaysOpenWhateverTheTranscriptHolds(t *testing.T) {
 	t.Setenv("CLAUDE_PROJECTS_DIR", projects)
 	server, h, _, ss := setupSessionsTestServer(t)
 	ctx := context.Background()
-	sid := "dddddddd-14345-4a00-8000-000000000002"
+	sid := "dddddddd-1434-4a00-8000-000000000002"
 	name := "claude-" + sid
 	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "asker2", WorkingDir: "/work"}))
 	require.NoError(t, ss.SetCLIVersion(ctx, sid, "2.1.300"))
