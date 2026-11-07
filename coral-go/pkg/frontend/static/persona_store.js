@@ -90,7 +90,7 @@ export function syncRoleLimits(containerId, name) {
         const note = document.createElement('p'); note.className = 'settings-hint';
         const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-small'; button.textContent = "Apply the role's limits";
         box.append(note, button);
-        (container.querySelector('[data-section="persona"]') || container).append(box);
+        (container.querySelector('[data-section="persona"], .acf-persona-page') || container).append(box);
         button.addEventListener('click', async () => {
             const preset = AGENT_PRESETS.find(p => p.name === box.dataset.rolePreset);
             if (!preset?.roleLimits) return;
@@ -99,6 +99,6 @@ export function syncRoleLimits(containerId, name) {
         });
     }
     const preset = AGENT_PRESETS.find(p => p.name === name);
-    box.dataset.rolePreset = preset?.name || ''; box.hidden = !preset?.roleNote;
-    box.querySelector('p').textContent = preset?.roleNote || '';
+    box.dataset.rolePreset = preset?.name || ''; box.hidden = !preset?.roleLimits;
+    box.querySelector('p').textContent = preset?.roleNote || (preset?.roleLimits ? 'This role is a prompt, not a permission. Apply the role’s limits to use its saved tool choices; check the tool list and permission mode below.' : '');
 }

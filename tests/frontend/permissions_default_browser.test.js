@@ -39,14 +39,17 @@ const { guardSettings } = require('./helpers/settings_guard');
    assert.ok(presets.length>0);for(const p of presets){assert.deepEqual(p.allow,full,p.name+' shipped capabilities');assert.deepEqual(p.deny,[]);}
    const templates=await ev(`import((window.__coralStatic||'/static/')+'team_templates_ui.js').then(m=>m.BUILTIN_TEAM_TEMPLATES.flatMap(t=>t.agents.map(a=>a.capabilities.allow.slice().sort())))`);
    for(const caps of templates)assert.deepEqual(caps,full,'built-in team member starts full');
-   for(const role of ['Security Reviewer','SEO Strategist','Research Analyst']){
+   assert.equal(presets.length,15,'exercise every shipped preset');
+   for(const role of presets.map(p=>p.name)){
     await ev(`(async()=>{const S=window.__coralStatic||'/static/';const p=(await import(S+'agent_presets.js')).AGENT_PRESETS.find(p=>p.name===${JSON.stringify(role)});const f=await import(S+'agent_config_form.js');document.getElementById('role-default-probe')?.remove();const host=document.createElement('main');host.id='role-default-probe';host.style.cssText='position:fixed;inset:0;overflow:auto;z-index:10000;background:var(--bg-primary);padding:12px';document.body.append(host);f.renderAgentConfigForm(host.id,{showPreset:false,value:{...p,agentType:'claude'}});return true;})()`);
     const hint=await ev(`(()=>{const h=document.getElementById('role-default-probe'),b=[...h.querySelectorAll('button')].find(b=>b.textContent==="Apply the role's limits");return{words:h.textContent,visible:!!b&&!b.hidden&&b.getBoundingClientRect().height>0}})()`);
     assert.ok(hint.visible&&hint.words.includes('This role is a prompt, not a permission.'),role+' shows truthful role description and one-click limits');
+    await ev(`import((window.__coralStatic||'/static/')+'agent_presets.js').then(m=>window.__expectedRoleLimits=m.AGENT_PRESETS.find(p=>p.name===${JSON.stringify(role)}).roleLimits.allow.slice().sort())`);
     await ev(`[...document.querySelectorAll('#role-default-probe button')].find(b=>b.textContent==="Apply the role's limits").click();true`);
-    await waitFor(`import((window.__coralStatic||'/static/')+'agent_config_form.js').then(m=>!m.getAgentConfig('role-default-probe').capabilities.allow.includes('file_write'))`,'role limits actually narrow the form');
+    await waitFor(`import((window.__coralStatic||'/static/')+'agent_config_form.js').then(m=>JSON.stringify(m.getAgentConfig('role-default-probe').capabilities.allow.slice().sort())===JSON.stringify(window.__expectedRoleLimits))`,'role limits actually narrow the form');
     const config=await ev(`import((window.__coralStatic||'/static/')+'agent_config_form.js').then(m=>m.getAgentConfig('role-default-probe'))`);
-    assert.equal(config.name,role);assert.equal(config.permissionMode,'auto','narrowing tools preserves the selected mode');assert.ok(config.prompt.length>0,'role instructions survive');
+    assert.equal(config.name,role);assert.equal(config.permissionMode,'auto','narrowing tools preserves the selected mode');if(role!=='Terminal')assert.ok(config.prompt.length>0,'role instructions survive');
+    assert.deepEqual(config.capabilities.allow.slice().sort(),await ev('window.__expectedRoleLimits'),role+' applies its exact saved tool choices');
    }
    await ev(`document.getElementById('role-default-probe').remove();true`);
    await openNewTeam(ev,waitFor);
