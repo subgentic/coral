@@ -6,6 +6,7 @@
 //   - a grantee (the computer answers a claim 403 owner_only): the buttons go away, the text box stays, and the next dialog for that computer offers none.
 // The Hub (cloud mode) and two computers are the stubbed Hub world (helpers/hub_world.js); the questions and the claim answers are stubbed in the page on top of it. 1280 and 390 px.
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { setupHubWorld } = require('./helpers/hub_world');
 const BASE = require('./test_base').BASE;
@@ -62,12 +63,14 @@ const BUTTONS = [
             const offers = () => ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); return { buttons: [...d.querySelectorAll('.inbox-ask-offer button')].map(b => b.textContent.trim()), box: !!d.querySelector('.inbox-ask-box'), hint: (d.querySelector('.inbox-ask-offers-hint') || {}).textContent || '', error: d.querySelector('.inbox-ask-error').textContent }; })()`);
             const clickOffer = label => ev(`(() => { const b = [...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-offer button')].find(x => x.textContent.trim() === ${JSON.stringify(label)}); b.click(); return true; })()`);
             const calls = () => ev(`window.__calls.map(c => ({ ...c }))`);
+            const snap = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR; if (!dir) return; fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(`${dir}/hub-ask-${name}-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
             const dialogGone = () => waitFor(`!document.querySelector('dialog.inbox-ask-dialog[open]')`, `${at}the dialog closes`, 8000);
 
             // the owner's computer (m1): every button is offered
             await openAnswer(0);
             const o = await offers();
             check(JSON.stringify(o.buttons) === JSON.stringify(BUTTONS.map(b => b.label)), `${at}the Hub offers every button the agent declared: ` + JSON.stringify(o.buttons));
+            await snap('owner-actions');
             check(o.box, `${at}and the text box stays`);
             check(/run as you/.test(o.hint), `${at}and says the actions run as you: ` + JSON.stringify(o.hint));
             // reply
@@ -107,6 +110,7 @@ const BUTTONS = [
             await clickOffer('Ship tonight');
             await waitFor(`!document.querySelector('dialog.inbox-ask-dialog .inbox-ask-offer') && /owner/i.test(document.querySelector('dialog.inbox-ask-dialog .inbox-ask-error').textContent)`, `${at}the refused claim takes the buttons away and says why`, 8000).catch(() => {});
             const g1 = await offers();
+            await snap('grantee-refused');
             check(g1.buttons.length === 0 && g1.box && /owner/i.test(g1.error), `${at}after the refusal: no buttons, the text box stays, the owner is named: ` + JSON.stringify(g1));
             await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); if (d) { d.close(); d.remove(); } return true; })()`);
             await openAnswer(1);
