@@ -75,6 +75,10 @@ func derefStr(s *string) string {
 // KeepFullAccessOpt turns "Keep Full access when this agent restarts" on or off for one Codex agent (#14061). Operator only (refuseNonOwner: an agent's token and a Hub viewer are refused), the exact
 // live target as for auto-sleep, and every change is logged.
 func (h *SessionsHandler) KeepFullAccessOpt(w http.ResponseWriter, r *http.Request) {
+	if agentCaller(r) { // the handler's own refusal, not only the identity table's: an agent never sets Full access for itself or another (QA, #14162)
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "Only the Operator can set Full access.", "code": "forbidden_for_agent"})
+		return
+	}
 	if refuseNonOwner(w, r) {
 		return
 	}

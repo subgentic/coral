@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
+	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/store"
@@ -140,6 +142,83 @@ func TestSettingAndClearingItAreActivityRows(t *testing.T) {
 		require.Equal(t, board.ActKeepFullAccess, row.Action)
 		require.Equal(t, "agent", row.ItemKind)
 	}
-	require.Equal(t, http.StatusOK, as(false)(true))
+	require.Equal(t, http.StatusForbidden, agentKeepCall(t, r, name, sid(64), true), "an agent's token")
 	require.Len(t, rows(), 2, "an agent's token writes no Activity row")
+}
+
+// agentKeepCall posts to the handler ALONE (no identity table, no route table) with an agent session's token on the request, as the verified session an agent's hooks would carry.
+func agentKeepCall(t *testing.T, r *wakeRig, name, sessionID string, on bool) int {
+	t.Helper()
+	body, _ := json.Marshal(map[string]any{"session_id": sessionID, "agent_type": "codex", "on": on})
+	rt := chi.NewRouter()
+	rt.Post("/api/sessions/live/{name}/keep-full-access", r.h.KeepFullAccessOpt)
+	req := httptest.NewRequest(http.MethodPost, "/api/sessions/live/"+name+"/keep-full-access", strings.NewReader(string(body)))
+	req = req.WithContext(context.WithValue(req.Context(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: sessionID, SessionName: name}))
+	rec := httptest.NewRecorder()
+	rt.ServeHTTP(rec, req)
+	return rec.Code
+}
+
+// (c) The handler itself refuses an agent token, for its own session and for another's, and sets nothing.
+func TestTheHandlerItselfRefusesAnAgentToken(t *testing.T) {
+	r := newWakeRig(t)
+	ctx := context.Background()
+	codexSleeper(t, r, sid(65), "Dev Self", "team-14162", store.SleepReasonCoralStopped, "never", "danger-full-access")
+	codexSleeper(t, r, sid(66), "Dev Other", "team-14162", store.SleepReasonCoralStopped, "never", "danger-full-access")
+	own, other := naming.SessionName("codex", sid(65)), naming.SessionName("codex", sid(66))
+	require.Equal(t, http.StatusForbidden, agentKeepCall(t, r, own, sid(65), true), "an agent setting its own")
+	require.Equal(t, http.StatusForbidden, func() int {
+		body, _ := json.Marshal(map[string]any{"session_id": sid(66), "agent_type": "codex", "on": true})
+		rt := chi.NewRouter()
+		rt.Post("/api/sessions/live/{name}/keep-full-access", r.h.KeepFullAccessOpt)
+		req := httptest.NewRequest(http.MethodPost, "/api/sessions/live/"+other+"/keep-full-access", strings.NewReader(string(body)))
+		req = req.WithContext(context.WithValue(req.Context(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: sid(65), SessionName: own}))
+		rec := httptest.NewRecorder()
+		rt.ServeHTTP(rec, req)
+		return rec.Code
+	}(), "an agent setting another's")
+	for _, id := range []string{sid(65), sid(66)} {
+		on, err := r.ss.KeepFullAccess(ctx, id)
+		require.NoError(t, err)
+		require.False(t, on, "nothing was set")
+	}
+	require.Equal(t, http.StatusOK, keepCall(t, r, own, sid(65), "codex", true), "the Operator still can")
+}
+
+// (a) A read failure of the choice means OFF: Full access is never granted on a guess. The store is closed under the handler, so the read fails.
+func TestAReadFailureOfTheChoiceMeansOff(t *testing.T) {
+	r := newWakeRig(t)
+	ctx := context.Background()
+	codexSleeper(t, r, sid(67), "Dev Read", "team-14162b", store.SleepReasonCoralStopped, "never", "danger-full-access")
+	require.Equal(t, http.StatusOK, keepCall(t, r, naming.SessionName("codex", sid(67)), sid(67), "codex", true))
+	require.True(t, r.h.keepFullAccessForRelaunch(ctx, "codex", sid(67), "wake", nil, nil), "the choice is on and readable")
+	require.NoError(t, r.h.db.Close())
+	_, err := r.ss.KeepFullAccess(ctx, sid(67))
+	require.Error(t, err, "the read fails now")
+	require.False(t, r.h.keepFullAccessForRelaunch(ctx, "codex", sid(67), "wake", nil, nil), "a read failure starts the agent without Full access")
+}
+
+// (b) A Restart that picks a mode ends the stored choice, so a later wake does not bring Full access back.
+func TestARestartThatPicksAModeClearsTheStoredChoice(t *testing.T) {
+	rig := setupAgyTestRig(t)
+	ctx := context.Background()
+	sess := "44444444-5555-4666-8777-888888888888"
+	name := naming.SessionName(at.Codex, sess)
+	require.NoError(t, rig.ss.SetSetting(ctx, "cli_path_codex", stubCLI(t)))
+	require.NoError(t, rig.term.CreateSession(ctx, name, rig.workdir))
+	require.NoError(t, rig.ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sess, AgentType: at.Codex, AgentName: "pick", WorkingDir: rig.workdir}))
+	_, err := rig.ss.SetKeepFullAccess(ctx, sess, true)
+	require.NoError(t, err)
+	body, _ := json.Marshal(map[string]any{"agent_type": at.Codex, "session_id": sess, "permission_mode": "plan"})
+	rec := httptest.NewRecorder()
+	rig.router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/sessions/live/"+name+"/restart", bytes.NewReader(body)))
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Contains(t, lastSentCommand(rig.term), "--sandbox read-only", "the pick (Plan) is what it restarted with")
+	live, err := rig.ss.GetAllLiveSessions(ctx)
+	require.NoError(t, err)
+	for _, s := range live {
+		on, err := rig.ss.KeepFullAccess(ctx, s.SessionID)
+		require.NoError(t, err)
+		require.False(t, on, "no session keeps the choice after a restart that picked a mode: "+s.SessionID)
+	}
 }
