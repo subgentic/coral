@@ -40,6 +40,7 @@ type LaunchParams struct {
 	Hooks           map[string]interface{} // per-agent hooks to merge into settings (Claude-native) or fire via runner (Antigravity/Codex)
 	CLIPath         string                 // custom path to agent binary (empty = default from PATH)
 	PermissionMode  string                 // --permission-mode value (empty or "default" means omit the flag)
+	KeepFullAccess  bool                   // the Operator's "Keep Full access when this agent restarts" for a Codex agent (#14061): every launch is the bypass switch alone, whatever the capabilities, the mode and the stored flags say
 	CoralDir        string                 // path to coral data directory (~/.coral) for CA cert location
 	CoralHost       string                 // host this Coral server is bound to
 	CoralPort       int                    // port this Coral server is listening on

@@ -44,7 +44,7 @@ import { _renderSidebarRail } from './sidebar_rail.js';
 import { _passesFilters, _pinMatchesFilter } from './list_filter_match.js';
 import { _renderGroups } from './group_cards.js';
 import { UPDOWN, W, dirOf, menu, withAgent, withBoard } from './action_helpers.js';
-export { KILL_LOG_NOTE, KILL_LOG_NOTE_MANY, RESET_LOG_NOTE, attachDirect, killSessionDirect, restartDirect, restartSameDirect, showInfoDirect, toggleAgentArchive, toggleAgentSleep, sleepTerminalGone, setAgentAutoSleep } from './agent_actions.js';
+export { KILL_LOG_NOTE, KILL_LOG_NOTE_MANY, RESET_LOG_NOTE, attachDirect, killSessionDirect, restartDirect, restartSameDirect, showInfoDirect, toggleAgentArchive, toggleAgentSleep, sleepTerminalGone, setAgentAutoSleep, setKeepFullAccess } from './agent_actions.js';
 export { copyFolderPath, hideAlertModal, hidePromptModal, showAlertModal, showPromptModal } from './prompt_modals.js';
 export { killBoard, killGroup, saveTeamFromSidebar, shareAgentTeam, toggleTeamSleep } from './team_actions.js';
 export { expandSleepingGroup, toggleGroupByServer, toggleGroupByTeam, toggleShowServer, toggleRowLine } from './list_display_settings.js';
@@ -476,6 +476,7 @@ registerActions({
     'agent-sleep': withAgent('toggleAgentSleep', ['sleep', 'wake']),
     'agent-sleep-gone': menu(el => { const ids = String(el.dataset.ids || '').split(',').filter(x => /^[A-Za-z0-9_.:-]{1,128}$/.test(x)).slice(0, 500); if (ids.length) W('sleepTerminalGone')(ids); }), // Sleep all terminal-gone (#13171)
     'agent-auto-sleep': withAgent('setAgentAutoSleep', ['off', 'on']), // the Operator's per-agent switch for auto-sleep (#12111)
+    'agent-keep-full-access': withAgent('setKeepFullAccess', ['on', 'off']), // the Operator's per-Codex-agent Full access across restarts (#14061)
     'agent-archive': withAgent('toggleAgentArchive', ['archive', 'unarchive']),
     'agent-move': menu(el => { const sid = textOf(el.dataset.sessionId); if (sid && UPDOWN[el.dataset.dir]) W(el.dataset.dir === 'up' ? 'moveSessionUp' : 'moveSessionDown')(sid); }),
     'team-sleep': menu(el => { const b = textOf(el.dataset.board); if (b && ['sleep', 'wake'].includes(el.dataset.mode)) W('toggleTeamSleep')(b, el.dataset.mode); }),

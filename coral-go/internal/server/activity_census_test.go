@@ -19,6 +19,7 @@ import (
 
 // activityByHandler: the handler writes the row itself (in the store transaction of the decision, after the post, or by asking the recorder), for a person only.
 var activityByHandler = map[string]string{
+	"POST /api/sessions/live/{name}/keep-full-access":                     "the Operator turned keep-Full-access-on-restart on or off for a Codex agent (keep_full_access, #14061): the handler asks the recorder for the row, the note says on or off",
 	"DELETE /api/board/{project}/artifacts/{id}/review":                   "take out of review (unsend_review)",
 	"POST /api/artifacts/{id}/opened":                                     "the version of a series the Operator opened (#13910): the Operator's own reading state, kept so a row can say New version; it is not a decision, so no Activity row",
 	"POST /api/board/{project}/artifacts/{id}/review":                     "a file's review: approve, changes, deny, ignore, unignore, save, unsave, supersede (board.DecideArtifactReview and friends)",

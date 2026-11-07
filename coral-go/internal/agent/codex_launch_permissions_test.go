@@ -36,7 +36,7 @@ func TestCodexLaunchPermissionsAreWhatTheLaunchBuilderGives(t *testing.T) {
 		{"config overrides", []string{"-c", "sandbox_mode=danger-full-access", "-c", "approval_policy=never"}, nil, "", "danger-full-access", "never"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			sandbox, approval := CodexLaunchPermissions(tc.flags, tc.caps, tc.mode)
+			sandbox, approval := CodexLaunchPermissions(tc.flags, tc.caps, tc.mode, false)
 			require.Equal(t, [2]string{tc.sandbox, tc.approval}, [2]string{sandbox, approval})
 		})
 	}

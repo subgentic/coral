@@ -118,8 +118,11 @@ func narrowAgyPermissions(caps *AgyPermissions, mode int) *AgyPermissions {
 // CodexLaunchPermissions is the sandbox and the approval policy a Codex launch with these stored settings runs with: the flags, the capabilities and the permission mode go through the same
 // steps the launch builder takes (capabilities first, then the stored flags, then the mode), and the permission flags that come out are read back as a pair. It is what a wake, a restart
 // or an auto-wake would give the agent, to be compared with the mode it runs in now (#14051). "" and "" when the settings carry no permission at all: the CLI's own config decides then,
-// and nothing can be said to be narrower or wider.
-func CodexLaunchPermissions(flags []string, caps *Capabilities, mode string) (sandbox, approval string) {
+// and nothing can be said to be narrower or wider. With the Operator's keepFullAccess it is Full access whatever the rest says.
+func CodexLaunchPermissions(flags []string, caps *Capabilities, mode string, keepFullAccess bool) (sandbox, approval string) {
+	if keepFullAccess { // the Operator's choice (#14061): every relaunch is the bypass switch
+		return codexSandboxNone, "never"
+	}
 	parts, bypass, applied := codexCapabilityFlags(nil, caps, mode)
 	presetApplied := applied
 	parts, bypass, applied = codexUserFlags(parts, flags, bypass, applied)

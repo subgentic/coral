@@ -115,6 +115,25 @@ export async function setAgentAutoSleep(name, agentType, sessionId, mode) {
     } catch { showToast('Could not change auto-sleep', true); return false; }
 }
 
+/** The Operator's per-agent "keep Full access when this agent restarts" (#14061), Codex only: mode 'on' sets it, 'off' clears it. Only Coral's own record changes; the agent's running mode does not. */
+export async function setKeepFullAccess(name, agentType, sessionId, mode) {
+    const on = mode === 'on';
+    const server = serverForSession(name, sessionId);
+    try {
+        const resp = await serverFetch(server, `/api/sessions/live/${encodeURIComponent(name)}/keep-full-access`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: sessionId, agent_type: agentType, on }) });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.ok) { showToast(data.error || 'Could not change the Full access setting', true); return false; }
+        const row = state.liveSessions.find(x => x.session_id === sessionId && sessionServer(x) === server);
+        if (row) row.keep_full_access = on;
+        redrawLiveList();
+        document.dispatchEvent(new CustomEvent('coral:keep-full-access-changed', { detail: { sessionId, on } }));
+        const who = agentWords(row, row ? resolveSessionIdentity(row) : name).label;
+        showToast(on ? `${who} will keep Full access when it restarts` : `${who} will restart with the permissions it was launched with`);
+        return true;
+    } catch { showToast('Could not change the Full access setting', true); return false; }
+}
+
 export function toggleAgentSleep(name, agentType, sessionId, action) {
     const server = serverForSession(name, sessionId);
     const wakeRow = action === 'wake' ? state.liveSessions.find(x => x.session_id === sessionId && sessionServer(x) === server) : null;

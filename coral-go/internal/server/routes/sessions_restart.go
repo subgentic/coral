@@ -444,10 +444,15 @@ func (h *SessionsHandler) restartCommand(ctx context.Context, p *restartPlan) (s
 		refuse, _ := cliPathRefusal(ctx, cerr)
 		return "", refuse
 	}
+	keepFull := false
+	if p.stored != nil && !p.pickedMode { // a mode picked in the restart dialog is the person asking for something else: it ends the choice (below)
+		keepFull = h.keepFullAccessForRelaunch(ctx, p.agentType, p.stored.SessionID, "restart", p.stored.Capabilities, p.capsJSON)
+	}
 	cmd, err := h.launchCommand(ctx, agent.GetAgent(p.agentType), agent.LaunchParams{
-		SessionID:    p.newSessionID,
-		SessionName:  p.newSessionName,
-		ProtocolPath: h.protocolPath(), EmbeddedProtocol: true,
+		KeepFullAccess: keepFull,
+		SessionID:      p.newSessionID,
+		SessionName:    p.newSessionName,
+		ProtocolPath:   h.protocolPath(), EmbeddedProtocol: true,
 		Flags:           p.flags,
 		WorkingDir:      p.workdir,
 		CLIPath:         cliPath, // Settings > CLI paths (#3205)
@@ -467,6 +472,9 @@ func (h *SessionsHandler) restartCommand(ctx context.Context, p *restartPlan) (s
 	})
 	if err != nil {
 		return "", func(w http.ResponseWriter) { errInternalServer(w, fmt.Sprintf("launch command failed: %v", err)) }
+	}
+	if p.stored != nil && p.pickedMode && p.agentType == at.Codex {
+		h.clearKeepFullAccess(ctx, p.stored.SessionID, "the restart picked a permission mode")
 	}
 	return cmd, nil
 }

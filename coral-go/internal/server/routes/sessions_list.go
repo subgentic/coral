@@ -196,6 +196,16 @@ func (h *SessionsHandler) liveSessionRows(r *http.Request, trace *phaseTrace, fu
 		slog.Warn("failed to read auto-accept states", "error", err)
 	}
 	lv := newLiveIndex(allLive)
+	if keep, kerr := h.ss.KeepFullAccessSessions(ctx); kerr != nil {
+		slog.Warn("failed to read keep-full-access choices", "error", kerr)
+	} else {
+		for sid := range keep {
+			if ex, ok := lv.extras[sid]; ok {
+				ex.KeepFull = true
+				lv.extras[sid] = ex
+			}
+		}
+	}
 	// A sleeping row can briefly outlive its terminal during shutdown. Use
 	// the stored placeholder below instead of scanning that terminal's files.
 	awakeAgents := agents[:0]
@@ -232,6 +242,7 @@ func (h *SessionsHandler) liveSessionRows(r *http.Request, trace *phaseTrace, fu
 	h.addBoardLabels(r.Context(), sessions)
 	h.addSessionGoals(r.Context(), sessions)
 	h.addWaitsOnThis(r, sessions)
+	dropOwnerOnlyCodexFields(r, sessions)
 	h.addTeamHealth(r, sessions)
 	if off, err := h.ss.AutoSleepOffSessions(r.Context()); err == nil && len(off) > 0 { // the Operator's per-agent opt-out (#12111), for the menu's wording
 		for _, row := range sessions {
@@ -260,6 +271,7 @@ type liveExtra struct {
 	ContextWindow  int
 	PermissionMode *string // the launch's effective permission mode as stored (#10253): the empty chat says how the agent acts from it
 	Flags          *string // the stored launch flags: with the capabilities and the mode, what a relaunch would run with (#14051)
+	KeepFull       bool    // the Operator's "keep Full access when this agent restarts" choice (#14061): a relaunch runs with Full access whatever the rest says
 }
 
 // liveIndex is the stored live sessions by session id: asleep, archived, launched when, the board (fallback for
@@ -574,6 +586,9 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 	}
 	if !skipExpensive { // the rollout read is the expensive part: a first paint leaves the keys out, so a later row fills them and an earlier answer is not blanked (#14051)
 		entry["codex_live_mode"], entry["codex_relaunch_narrows"] = h.codexModeFields(agent.AgentType, sid, agent.WorkingDir, lv.extras[sid])
+	}
+	if agent.AgentType == "codex" {
+		entry[keepFullAccessField] = lv.extras[sid].KeepFull // Codex only; the owner sees it (personTextFields), an agent or a Hub viewer does not (#14061)
 	}
 	if b := blockedField(sid, agent.AgentType, sleeping); b != nil {
 		entry["blocked"] = b // only a row that is blocked has the key (#13486)

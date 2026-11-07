@@ -87,7 +87,7 @@ func codexNarrows(liveSandbox, liveApproval, launchSandbox, launchApproval strin
 }
 
 // codexLaunchPair is what a relaunch of the row would run with: the stored flags, capabilities and permission mode through the launch builder's own steps.
-func codexLaunchPair(flags, capabilities, mode *string) (sandbox, approval string) {
+func codexLaunchPair(flags, capabilities, mode *string, keepFullAccess bool) (sandbox, approval string) {
 	var caps *agent.Capabilities
 	if capabilities != nil && *capabilities != "" {
 		c := &agent.Capabilities{}
@@ -95,7 +95,7 @@ func codexLaunchPair(flags, capabilities, mode *string) (sandbox, approval strin
 			caps = c
 		}
 	}
-	return agent.CodexLaunchPermissions(store.UnmarshalFlags(flags), caps, ptr.Value(mode))
+	return agent.CodexLaunchPermissions(store.UnmarshalFlags(flags), caps, ptr.Value(mode), keepFullAccess)
 }
 
 // codexModeFields are the two row keys: the live mode ({approval, sandbox, label}, nil when there is no turn_context to read) and the narrowing ({live, launch}, nil unless a relaunch would give
@@ -110,7 +110,7 @@ func (h *SessionsHandler) codexModeFields(agentType, sid, workingDir string, ext
 		return nil, nil
 	}
 	live = map[string]any{"approval": approval, "sandbox": sandbox, "label": label}
-	launchSandbox, launchApproval := codexLaunchPair(extra.Flags, extra.Capabilities, extra.PermissionMode)
+	launchSandbox, launchApproval := codexLaunchPair(extra.Flags, extra.Capabilities, extra.PermissionMode, extra.KeepFull)
 	if codexNarrows(sandbox, approval, launchSandbox, launchApproval) {
 		narrows = map[string]any{"live": label, "launch": codexModeLabel(launchApproval, launchSandbox)}
 	}
@@ -128,7 +128,8 @@ func (h *SessionsHandler) relaunchNarrowing(ls store.LiveSession) (live, launch 
 	if label == "" {
 		return "", ""
 	}
-	launchSandbox, launchApproval := codexLaunchPair(ls.Flags, ls.Capabilities, ls.PermissionMode)
+	keep, _ := h.ss.KeepFullAccess(context.Background(), ls.SessionID)
+	launchSandbox, launchApproval := codexLaunchPair(ls.Flags, ls.Capabilities, ls.PermissionMode, keep)
 	if !codexNarrows(sandbox, approval, launchSandbox, launchApproval) {
 		return "", ""
 	}

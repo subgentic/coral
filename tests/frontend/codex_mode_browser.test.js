@@ -81,13 +81,62 @@ const NARROWS = { live: 'Full access', launch: 'Workspace write, asks when neede
         await pick('cx-narrow', 'codex', 'cx-narrow-id');
         await ev(`window.restartSession(); true`);
         await waitFor(`!!document.querySelector('#restart-modal .acf-codex-narrows')`, 'the restart note');
-        assert.equal(await ev(`document.querySelector('#restart-modal .acf-codex-narrows').textContent`), 'Running with Full access now; restarting starts Codex with Workspace write, asks when needed. A mode set inside Codex is not kept.');
+        assert.equal(await ev(`document.querySelector('#restart-modal .acf-codex-narrows').textContent`), 'Running with Full access now; restarting starts Codex with Workspace write, asks when needed, unless you change the permission mode or flags below. A mode set inside Codex is not kept.');
         await ev(`window.hideRestartModal(); true`);
         await pick('cx-same', 'codex', 'cx-same-id');
         await ev(`window.restartSession(); true`);
         await waitFor(`getComputedStyle(document.getElementById('restart-modal')).display !== 'none'`, 'the restart dialog');
         assert.equal(await ev(`!!document.querySelector('#restart-modal .acf-codex-narrows')`), false, 'no note when a restart gives the same');
         await ev(`window.hideRestartModal(); true`);
+
+        console.log('Keep Full access (#14061): the chip with its one-click Off, the menu item, and the phone row; Off posts the exact target');
+        await rowsSet('cx-keep-id', { codex_live_mode: FULL, codex_relaunch_narrows: null, keep_full_access: true });
+        await add('cx-keep', 'codex', false); await pick('cx-keep', 'codex', 'cx-keep-id');
+        await waitFor(`!document.getElementById('codex-keep-wrap').hidden`, 'the keep chip');
+        assert.equal(await ev(`document.getElementById('codex-keep-text').textContent`), 'Full access kept on restart');
+        assert.equal(await ev(`document.getElementById('codex-keep-off').textContent`), 'Off');
+        await pick('cx-narrow', 'codex', 'cx-narrow-id');
+        await waitFor(`document.getElementById('codex-keep-wrap').hidden`, 'no keep chip without the setting');
+        // every request the page makes that is not a read, so "no unintended permission writes" is a fact of the run: the Off click makes exactly one, to the keep route, with exactly the target and the word
+        await ev(`window.__writes = []; window.__keepReply = 'refuse'; const pf = window.fetch; window.fetch = (u, o) => { const m = String((o && o.method) || 'GET').toUpperCase(); const url = String(u);
+            if (m !== 'GET' && m !== 'HEAD') window.__writes.push({ m, u: url, b: o && o.body ? String(o.body) : '' });
+            if (url.includes('/keep-full-access') && m === 'POST') return Promise.resolve(window.__keepReply === 'refuse' ? new Response(JSON.stringify({ error: 'Could not save it. Try again.' }), { status: 500 }) : (window.__rows['cx-keep-id'] = { ...window.__rows['cx-keep-id'], keep_full_access: false }, new Response(JSON.stringify({ ok: true, keep_full_access: false }), { status: 200 })));
+            if (/\\/api\\/sessions\\/live\\/cx-keep\\/info/.test(url)) return Promise.resolve(new Response(JSON.stringify({ agent_name: 'cx-keep', agent_type: 'codex', tmux_session_name: '', working_directory: '/w' }), { status: 200 }));
+            return pf(u, o); }; true`);
+        const keepWrites = () => ev(`window.__writes.filter(w => w.u.includes('/keep-full-access'))`);
+        await pick('cx-keep', 'codex', 'cx-keep-id');
+        await waitFor(`!document.getElementById('codex-keep-wrap').hidden`, 'the chip, back on the agent');
+        await ev(`window.__writes.length = 0; true`); // selecting an agent makes the page's own calls: only what the click writes is counted
+
+        console.log('A refusal keeps the state: the server says no, the chip stays, the row still says kept, the toast says so, and nothing else was written');
+        await ev(`document.getElementById('codex-keep-off').click(); true`);
+        await waitFor(`window.__writes.some(w => w.u.includes('/keep-full-access'))`, 'the refused Off post');
+        const keepOnly = await keepWrites();
+        assert.deepEqual(keepOnly.map(w => ({ m: w.m, b: JSON.parse(w.b) })), [{ m: 'POST', b: { session_id: 'cx-keep-id', agent_type: 'codex', on: false } }], 'one keep write: the exact target and the word');
+        assert.match(keepOnly[0].u, /\/api\/sessions\/live\/cx-keep\/keep-full-access$/);
+        const others = await ev(`window.__writes.filter(w => !w.u.includes('/keep-full-access')).map(w => w.m + ' ' + w.u.replace(location.origin, ''))`);
+        console.log('  other writes the page made around the click (not this feature): ' + JSON.stringify(others));
+        assert.deepEqual(others.filter(u => /permission|capabilit|flags|mode|restart|settings|wake|launch/i.test(u)), [], 'no permission, capability, flag, mode or restart write came with the click');
+        assert.equal(await ev(`window.__state_.liveSessions.find(x => x.session_id === 'cx-keep-id').keep_full_access`), true, 'a refusal does not change the row');
+        assert.equal(await ev(`document.getElementById('codex-keep-wrap').hidden`), false, 'the chip stays after a refusal');
+
+        console.log('The Info tab says it plainly with a one-click Off (a refusal keeps it; Off turns it off and says so)');
+        await ev(`window.toggleAgenticPanel(true); window.switchAgenticTab('info', 'top'); true`);
+        await waitFor(`!document.getElementById('info-keep').hidden`, 'the Info tab line');
+        assert.match(await ev(`document.getElementById('info-keep-label').textContent`), /Full access on restart/);
+        assert.match(await ev(`document.getElementById('info-keep-text').textContent`), /^Kept: every restart/);
+        assert.equal(await ev(`document.getElementById('info-keep-off').hidden`), false, 'the Off button');
+        await ev(`window.__writes.length = 0; document.getElementById('info-keep-off').click(); true`);
+        await waitFor(`window.__writes.some(w => w.u.includes('/keep-full-access'))`, 'the Info tab Off post (refused)');
+        assert.equal(await ev(`document.getElementById('info-keep-off').hidden`), false, 'a refusal keeps the Info line and its button');
+        await ev(`window.__keepReply = 'ok'; window.__writes.length = 0; document.getElementById('info-keep-off').click(); true`);
+        await waitFor(`window.__writes.some(w => w.u.includes('/keep-full-access'))`, 'the Info tab Off post');
+        assert.deepEqual((await keepWrites()).map(w => JSON.parse(w.b)), [{ session_id: 'cx-keep-id', agent_type: 'codex', on: false }], 'one keep write, the exact target');
+        await waitFor(`document.getElementById('info-keep-off').hidden && /^Not kept/.test(document.getElementById('info-keep-text').textContent)`, 'the Info line says Not kept after Off');
+        await waitFor(`document.getElementById('codex-keep-wrap').hidden`, 'the chip goes after Off');
+        assert.equal(await ev(`window.__state_.liveSessions.find(x => x.session_id === 'cx-keep-id').keep_full_access`), false);
+        await ev(`window.toggleAgenticPanel(false); true`);
+        await ev(`window.__rows['cx-keep-id'] = { ...window.__rows['cx-keep-id'], keep_full_access: true }; window.__state_.liveSessions.find(x => x.session_id === 'cx-keep-id').keep_full_access = true; true`);
 
         console.log('Phone, 390 px, text 100% and 200%, both themes: no chip (the phone shows only its Options button), the mode is a line in the Options sheet, inside the screen, no sideways scroll');
         await pick('cx-narrow', 'codex', 'cx-narrow-id');
@@ -106,6 +155,19 @@ const NARROWS = { live: 'Full access', launch: 'Workspace write, asks when neede
             await ev(`document.getElementById('options-chip').click(); true`); // close the sheet
         }
         await ev(`document.documentElement.removeAttribute('data-theme'); document.documentElement.style.fontSize = ''; true`);
+        await Emulation.clearDeviceMetricsOverride();
+
+        console.log('Phone, 390 px: the Options sheet has the kept line with its Off (a button of the sheet), on screen; one tap is one write, the exact target');
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+        await pick('cx-keep', 'codex', 'cx-keep-id');
+        await ev(`document.getElementById('options-chip').click(); true`);
+        await waitFor(`!!document.querySelector('#options-chip-menu [data-on-click="agent-keep-full-access"]')`, 'the phone Off row');
+        const pk = await ev(`(() => { const b = document.querySelector('#options-chip-menu [data-on-click="agent-keep-full-access"]'), r = b.getBoundingClientRect(); return { text: b.textContent.trim(), mode: b.dataset.mode, sid: b.dataset.sessionId, shown: r.width > 0 && r.height > 0, inView: r.left >= 0 && r.right <= window.innerWidth + 1, tall: r.height >= 40 }; })()`);
+        assert.equal(pk.text, 'Full access kept on restart: turn off'); assert.equal(pk.mode, 'off'); assert.equal(pk.sid, 'cx-keep-id');
+        assert.ok(pk.shown && pk.inView, `the phone row is on screen: ${JSON.stringify(pk)}`);
+        await ev(`window.__keepReply = 'ok'; window.__writes.length = 0; document.querySelector('#options-chip-menu [data-on-click="agent-keep-full-access"]').click(); true`);
+        await waitFor(`window.__writes.some(w => w.u.includes('/keep-full-access'))`, 'the phone Off post');
+        assert.deepEqual((await keepWrites()).map(w => JSON.parse(w.b)), [{ session_id: 'cx-keep-id', agent_type: 'codex', on: false }]);
         await Emulation.clearDeviceMetricsOverride();
         console.log('PASS codex mode');
     } finally { await client.close(); }

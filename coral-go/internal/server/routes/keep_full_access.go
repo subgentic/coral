@@ -1,0 +1,128 @@
+package routes
+
+import (
+	"context"
+	"log/slog"
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
+	"github.com/subgentic/coral/internal/board"
+
+	"github.com/subgentic/coral/internal/cloud"
+)
+
+// keepFullAccessField is the row key that says a Codex agent keeps Full access across restarts. With codex_live_mode and codex_relaunch_narrows it says who runs with what access, so it is the
+// Operator's alone: an agent's token never gets it (personTextFields) and neither does a Hub viewer (dropOwnerOnlyCodexFields) (#14061, Security's INFO on #14051).
+const keepFullAccessField = "keep_full_access"
+
+// dropOwnerOnlyCodexFields removes those three keys from the rows of a request that is not the Operator's: an agent's token, or a Hub viewer who is not the authentic owner.
+func dropOwnerOnlyCodexFields(r *http.Request, rows []map[string]any) {
+	if _, agent := VerifiedSession(r.Context()); !agent && !(cloud.Tunneled(r) && !hubOwnerRequest(r).owner) {
+		return
+	}
+	for _, row := range rows {
+		delete(row, "codex_live_mode")
+		delete(row, "codex_relaunch_narrows")
+		delete(row, keepFullAccessField)
+	}
+}
+
+// keepFullAccessForRelaunch says whether a relaunch of this Codex session runs with Full access whatever its capabilities and mode say (#14061, the Operator's "Keep Full access when this agent
+// restarts"). newCaps is the capabilities the relaunched row will store: a relaunch that edits them is the person changing what the agent may do, so the choice does not apply (and is cleared
+// when the row is replaced). The application is logged each time. A read failure means off: Full access is never granted on a guess.
+func (h *SessionsHandler) keepFullAccessForRelaunch(ctx context.Context, agentType, sessionID, via string, oldCaps, newCaps *string) bool {
+	if agentType != "codex" || sessionID == "" || h.ss == nil {
+		return false
+	}
+	on, err := h.ss.KeepFullAccess(ctx, sessionID)
+	if err != nil {
+		slog.Warn("[keep-full-access] could not read the choice; starting without it", "session_id", sessionID, "error", err)
+		return false
+	}
+	if !on {
+		return false
+	}
+	if newCaps != nil && derefStr(newCaps) != derefStr(oldCaps) {
+		return false
+	}
+	slog.Info("[keep-full-access] applied", "session_id", sessionID, "via", via)
+	return true
+}
+
+// clearKeepFullAccess ends the choice and logs why. Used when a relaunch asks for something else on purpose.
+func (h *SessionsHandler) clearKeepFullAccess(ctx context.Context, sessionID, why string) {
+	if h.ss == nil {
+		return
+	}
+	changed, err := h.ss.SetKeepFullAccess(ctx, sessionID, false)
+	if err != nil {
+		slog.Warn("[keep-full-access] could not clear the choice", "session_id", sessionID, "why", why, "error", err)
+		return
+	}
+	if changed {
+		slog.Info("[keep-full-access] cleared", "session_id", sessionID, "why", why)
+	}
+}
+
+func derefStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+// KeepFullAccessOpt turns "Keep Full access when this agent restarts" on or off for one Codex agent (#14061). Operator only (refuseNonOwner: an agent's token and a Hub viewer are refused), the exact
+// live target as for auto-sleep, and every change is logged.
+func (h *SessionsHandler) KeepFullAccessOpt(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) {
+		return
+	}
+	name := chi.URLParam(r, "name")
+	var body struct {
+		SessionID string `json:"session_id"`
+		AgentType string `json:"agent_type"`
+		On        *bool  `json:"on"`
+	}
+	if err := decodeJSON(r, &body); err != nil || body.SessionID == "" || body.On == nil {
+		errBadRequest(w, "session_id and on are required")
+		return
+	}
+	// The exact target by id and type, as for the other per-agent switches, but a sleeping agent is a target too: the choice matters most for the wake that comes next.
+	if _, perr := uuid.Parse(body.SessionID); perr != nil {
+		errBadRequest(w, "invalid session_id")
+		return
+	}
+	if body.AgentType != "codex" {
+		errBadRequest(w, "Only a Codex agent has this setting.")
+		return
+	}
+	ls, gerr := h.ss.GetLiveSession(r.Context(), body.SessionID)
+	if gerr != nil {
+		errInternalServer(w, "Agent metadata is temporarily unavailable; try again.")
+		return
+	}
+	if ls == nil || ls.AgentType != "codex" {
+		writeError(w, http.StatusNotFound, "", "live session not found")
+		return
+	}
+	changed, err := h.ss.SetKeepFullAccess(r.Context(), body.SessionID, *body.On)
+	if err != nil {
+		errInternalServer(w, "Could not save it. Try again.")
+		return
+	}
+	if changed {
+		note := "off"
+		if *body.On {
+			note = "on"
+		}
+		noteActivity(r, board.ActKeepFullAccess, "agent", name, "", "", note) // the Operator's click, in the Activity record (#14061, Security): written after the 2xx, for a person only
+		if *body.On {
+			slog.Info("[keep-full-access] set", "session_id", body.SessionID, "agent", name)
+		} else {
+			slog.Info("[keep-full-access] cleared", "session_id", body.SessionID, "agent", name, "why", "the person turned it off")
+		}
+	}
+	h.kickWS()
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "keep_full_access": *body.On})
+}
