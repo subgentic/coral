@@ -4,19 +4,22 @@ import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'
 import { stripOldRunFolders, BINARY_HOURS } from './helpers/run_folders.mjs';
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'qa-strip-')); const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'qa-outside-'));
 const H = 3600e3, NOW = Date.now();
+// Windows has no directory lock for chmod to set (only the read-only flag of a file), and a symbolic link there needs a privilege most test runs do not have: those two checks run where the platform has them.
+const win = process.platform === 'win32';
+let canLink = !win; if (win) { try { const probe = path.join(os.tmpdir(), 'qa-link-probe-' + process.pid); fs.symlinkSync(os.tmpdir(), probe, 'junction'); fs.unlinkSync(probe); canLink = true; } catch { canLink = false; } }
 try {
   fs.writeFileSync(path.join(outside, 'precious.txt'), 'keep me'); fs.mkdirSync(path.join(outside, 'dir')); fs.writeFileSync(path.join(outside, 'dir', 'inner.txt'), 'inner');
   const mk = (name, ageH) => { const p = path.join(root, name); fs.mkdirSync(path.join(p, 'shard1'), { recursive: true }); fs.writeFileSync(path.join(p, 'coral'), 'bin'); fs.writeFileSync(path.join(p, 'results.json'), '{}'); fs.writeFileSync(path.join(p, 'shard1', 'coral.log'), 'l'); const t = new Date(NOW - ageH * H); fs.utimesSync(p, t, t); return p; };
   // 1. a symlink INSIDE an old folder, to a file and to a directory outside: the links go, the targets stay
   const killed = mk('coral-cdp-killed', 5);
-  fs.symlinkSync(path.join(outside, 'precious.txt'), path.join(killed, 'link-to-file')); fs.symlinkSync(path.join(outside, 'dir'), path.join(killed, 'shard1', 'link-to-dir'));
+  if (canLink) { fs.symlinkSync(path.join(outside, 'precious.txt'), path.join(killed, 'link-to-file')); fs.symlinkSync(path.join(outside, 'dir'), path.join(killed, 'shard1', 'link-to-dir'), win ? 'junction' : undefined); }
   { const t = new Date(NOW - 5 * H); fs.utimesSync(killed, t, t); } // adding entries moved the folder's own time: set it back
   const freed = stripOldRunFolders(root, { now: NOW });
   assert.equal(freed.length, 1);
   assert.ok(fs.existsSync(path.join(outside, 'precious.txt')), 'a symlink to a file: the target stays');
   assert.ok(fs.existsSync(path.join(outside, 'dir', 'inner.txt')), 'a symlink to a directory is not followed');
   // 2. an old folder that is itself a SYMLINK named like a run folder: never entered
-  fs.symlinkSync(outside, path.join(root, 'coral-cdp-link01'));
+  if (canLink) fs.symlinkSync(outside, path.join(root, 'coral-cdp-link01'), win ? 'junction' : undefined);
   stripOldRunFolders(root, { now: NOW });
   assert.ok(fs.existsSync(path.join(outside, 'precious.txt')), 'a symlinked run folder is not entered');
   // 3. the boundary: exactly BINARY_HOURS old is stripped, just under is not
@@ -29,11 +32,11 @@ try {
   stripOldRunFolders(root, { now: NOW });
   assert.ok(fs.existsSync(path.join(other, 'x')) && fs.existsSync(path.join(root, 'coral-cdp-file01')), 'only run folders');
   // 5. a read-only subfolder does not abort the sweep of the others
-  const ro = mk('coral-cdp-readon', 9); fs.mkdirSync(path.join(ro, 'locked')); fs.writeFileSync(path.join(ro, 'locked', 'f'), 'f'); fs.chmodSync(path.join(ro, 'locked'), 0o500); { const t = new Date(NOW - 9 * H); fs.utimesSync(ro, t, t); }
+  const ro = mk('coral-cdp-readon', 9); fs.mkdirSync(path.join(ro, 'locked')); fs.writeFileSync(path.join(ro, 'locked', 'f'), 'f'); if (!win) fs.chmodSync(path.join(ro, 'locked'), 0o500); { const t = new Date(NOW - 9 * H); fs.utimesSync(ro, t, t); }
   const next = mk('coral-cdp-nextXX', 9);
   stripOldRunFolders(root, { now: NOW });
   assert.ok(!fs.existsSync(path.join(next, 'coral')), 'the next folder is still stripped after a locked one');
-  fs.chmodSync(path.join(ro, 'locked'), 0o700);
+  if (!win) fs.chmodSync(path.join(ro, 'locked'), 0o700);
   // 6. the wiring: the runner imports the sweep and calls it with its own folder, the live runners' folders and the hours setting, once per run (without this call the whole fix is a function nobody runs)
   const runner = fs.readFileSync(new URL('./run_cdp_suites.mjs', import.meta.url), 'utf8');
   assert.match(runner, /import \{[^}]*stripOldRunFolders[^}]*\} from '\.\/helpers\/run_folders\.mjs'/, 'the runner imports the sweep');
