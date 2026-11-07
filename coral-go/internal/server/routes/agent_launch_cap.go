@@ -117,11 +117,37 @@ func capsRank(agentType string, caps *agent.Capabilities) (rank int, ok bool) {
 	return 0, false
 }
 
+// claudeLike is a type whose modes are Claude's (not Codex, agy, Hermes, Pi or opencode, which rank their own).
+func claudeLike(agentType string) bool {
+	return agentType != at.Codex && agentType != at.Hermes && agentType != at.Pi && agentType != at.Opencode && !isAgyType(agentType)
+}
+
+// dontAskRank is the rank of Claude's Don't ask mode from the allow list that is all it can do: nothing allowed asks for nothing (and so can do nothing), a bare shell allow runs commands with
+// no question and no judgement (open), a file-write allow edits, anything else only reads.
+func dontAskRank(caps *agent.Capabilities) int {
+	if caps == nil {
+		return rankAsks
+	}
+	r := rankAsks
+	for _, a := range caps.Allow {
+		switch {
+		case a == agent.CapShell || a == "Bash":
+			return rankOpen
+		case a == agent.CapFileWrite || a == "Write" || a == "Edit" || strings.HasPrefix(a, "shell:"):
+			r = rankEdits
+		}
+	}
+	return r
+}
+
 // effectiveRank is the rank of a launch with this mode, capabilities and Keep Full access. Capabilities only narrow an explicit mode (#6425); with no mode named they are the rank (agy's yolo from
 // full capabilities). Keep Full access is the top of the scale.
 func effectiveRank(agentType, mode string, caps *agent.Capabilities, keepFull bool) int {
 	if keepFull {
 		return rankOpen
+	}
+	if mode == "dontAsk" && claudeLike(agentType) {
+		return dontAskRank(caps) // Don't ask denies whatever the allow list does not cover: its rank is what that list covers (Security's SHOULD on #14336)
 	}
 	r := modeRank(agentType, mode)
 	if cr, ok := capsRank(agentType, caps); ok {
@@ -207,6 +233,9 @@ func authorityFromRow(ls *store.LiveSession, keepFull bool) callerAuthority {
 		return a // a row that records no mode: unknown, rank 0 (fail closed)
 	}
 	a.Rank = effectiveRank(ls.AgentType, mode, caps, keepFull)
+	if mode == "dontAsk" && !keepFull && claudeLike(ls.AgentType) {
+		a.Rank = rankAsks // as a CALLER a Don't ask agent has no standing to hand out more than asking: its list limits it, not a mode that was chosen to widen
+	}
 	return a
 }
 

@@ -115,12 +115,16 @@ func TestAnAgentsCodexLaunchOnABoardNeedsAMode(t *testing.T) {
 }
 
 func TestAgentLaunchNeedsModeIsOnlyForCodexOnABoardWithNoMode(t *testing.T) {
-	none := map[string]string{}
-	assert.True(t, agentLaunchNeedsMode("codex", nil, true, none))
-	assert.False(t, agentLaunchNeedsMode("codex", nil, false, none), "not on a board")
-	assert.False(t, agentLaunchNeedsMode("claude", nil, true, none))
-	assert.False(t, agentLaunchNeedsMode("codex", []string{"--sandbox", "read-only", "-a", "on-request"}, true, none), "a mode in the flags")
-	assert.False(t, agentLaunchNeedsMode("codex", nil, true, map[string]string{"default_permission_mode": "default"}), "a saved default")
+	// the cap's version of #7552: a caller with no standing to hand out a mode that reaches Coral cannot start a Codex on a board that would have to ask first
+	needs := func(typ string, flags []string, onBoard bool, def string) bool {
+		_, refusal := capAgentLaunchFor(callerAuthority{}, agentLaunchAsk{AgentType: typ, Flags: flags, OnBoard: onBoard, DefaultMode: def})
+		return refusal != nil && refusal.Code == agentLaunchNeedsModeCode
+	}
+	assert.True(t, needs("codex", nil, true, ""))
+	assert.False(t, needs("codex", nil, false, ""), "not on a board")
+	assert.False(t, needs("claude", nil, true, ""))
+	assert.False(t, needs("codex", []string{"--sandbox", "read-only", "-a", "on-request"}, true, ""), "a mode in the flags is judged by what it names")
+	assert.True(t, needs("codex", nil, true, "default"), "a saved default of default still leaves a Codex that asks first")
 }
 
 // Security's #7576 finding: a saved default permission mode reached an AGENT's launch (launchSession takes the flags' mode, else the saved default), so a saved Auto, Don't ask or Bypass gave an
