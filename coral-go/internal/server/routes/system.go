@@ -35,6 +35,8 @@ func (h *HistoryHandler) SetIndexKick(f func()) { h.indexKick = f }
 
 // SystemHandler handles settings, tags, and filesystem endpoints.
 type SystemHandler struct {
+	trustProbeMu sync.Mutex
+	trustProbeAt time.Time
 	// models lists each agent CLI's models (#4065).
 	models  *agentmodels.Service
 	db      *store.DB
