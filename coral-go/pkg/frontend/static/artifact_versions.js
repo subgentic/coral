@@ -85,8 +85,9 @@ export function attachVersions(dialog, hooks) {
     async function load(hex, server, board = '') {
         try {
             // The version bar asks for its own team's series: bytes two teams hold are two series, and the route will not guess between them (#13999, #14015). A direct link with no team asks without one.
-            // A computer on an older release refuses ?board= (its versions route takes no query): asked again without it, as a direct link is (#14317). The same bytes in two teams then answer 409, a quiet note.
-            const { response: r } = await fetchSkewed(server, `/api/artifacts/${hex}/versions`, board ? { board } : {}, { kind: 'versions', keys: VERSIONS_KEYS });
+            // A computer on an older release refuses ?board= (its versions route takes no query): there is no bar then. Asked again without the team, its answer would be that computer's guess at a series, and a hidden bar is honest where a guess is not (#14317, Security's INFO 4).
+            const { response: r, dropped } = await fetchSkewed(server, `/api/artifacts/${hex}/versions`, board ? { board } : {}, { kind: 'versions', keys: VERSIONS_KEYS, retry: false });
+            if (dropped.length) return { rows: null, ambiguous: false };
             if (r.status === 409) { const d = await r.json().catch(() => ({})); return { rows: null, ambiguous: !!(d && d.code === 'ambiguous_series') }; } // no bar, a quiet note
             if (!r.ok) return { rows: null, ambiguous: false };
             const d = await r.json();

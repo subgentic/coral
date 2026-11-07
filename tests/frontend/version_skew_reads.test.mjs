@@ -142,4 +142,14 @@ test('the Inbox badge count: a v2.0.58 computer has no number (never the plain t
     assert.equal(countReads().length, 1, 'a refresh does not ask it again while it is known to refuse');
     state.hub = false; state.servers = [];
 });
+test('a read with no honest plain form (retry: false, the version bar) makes one refused call and then none while the computer is known to refuse', async () => {
+    reset();
+    const opts = { kind: 'versions', keys: skew.VERSIONS_KEYS, retry: false }, path = `/api/artifacts/${hex(1)}/versions`;
+    const a = await skew.fetchSkewed('old', path, { board: 'dev' }, opts);
+    assert.equal(a.response.status, 403); assert.deepEqual(a.dropped, ['board']); assert.equal(calls.length, 1, 'no second, plain call');
+    const b = await skew.fetchSkewed('old', path, { board: 'dev' }, opts);
+    assert.equal(b.response, null, 'known to refuse: nothing is sent'); assert.deepEqual(b.dropped, ['board']); assert.equal(calls.length, 1);
+    const c = await skew.fetchSkewed('old', path, {}, opts);
+    assert.equal(c.response.status, 200, 'a direct link (no team) carries no newer key and is read as before'); assert.equal(calls.length, 2);
+});
 test.after(() => dom.window.close());
