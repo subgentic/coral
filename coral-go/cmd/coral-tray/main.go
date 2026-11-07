@@ -521,7 +521,9 @@ func runForeground(host string, port int, noBrowser, debugMode bool, backendType
 				case <-mUpdateAvail.ClickedCh:
 					go func() {
 						defer safego.Recover("coral-tray/main:updateItemOpen")
-						upd.open(func() { executil.OpenLogin(loginlink.OnPage(loginlink.Or(url, mintLink), updatesPaneLink)) }, executil.OpenBrowser, trackTrayOffer)
+						upd.open(func() bool {
+							return executil.TryOpenLogin(loginlink.OnPage(loginlink.Or(url, mintLink), updatesPaneLink))
+						}, executil.TryOpenBrowser, trackTrayOffer, func(m string) { beeep.Notify("Coral", m, "") })
 					}()
 				case <-mSetupCode.ClickedCh:
 					go func() { defer safego.Recover("coral-tray/main:setupCodeClick"); setup.click(url, dataDir) }()

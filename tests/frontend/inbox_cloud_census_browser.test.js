@@ -30,6 +30,7 @@ const BASELINE = Object.fromEntries(Object.entries({
     '/api/sessions/history': HISTORY_KEYS, '/api/sessions/history/search': HISTORY_KEYS, '/api/sessions/history/{id}': ['limit'], '/api/sessions/history/{id}/agent-notes': [], '/api/sessions/history/{id}/events': ['limit'],
     '/api/sessions/history/{id}/git': [], '/api/sessions/history/{id}/notes': [], '/api/sessions/history/{id}/tags': [], '/api/sessions/history/{id}/tasks': [], '/api/sessions/{id}/changes': [], '/api/tags': [], '/api/token-usage': ['session_id'],
     '/api/team-artifacts': Object.keys(REVIEW_BADGE_QUERY),
+    '/api/needs-you': ['kind'], // the skills that wait for approval, read at each computer through the Hub (#14046: needs_skills.js loadPendingSkills, ?kind=skill)
     '/api/board/projects': [], '/api/board/{team}': [], '/api/board/{team}/artifacts': ['limit'], '/api/board/{team}/goals': ['limit', 'state'], '/api/board/{team}/messages/all': ['format', 'limit', 'offset'], '/api/board/{team}/paused': [],
     '/api/board/{team}/status': [], '/api/board/{team}/subscribers': [], '/api/board/{team}/tasks': ['counts'], '/api/sessions/live/team/{team}/sleep-status': [], '/api/teams/detail/{team}/knowledge': [],
 }).map(([k, v]) => [`GET ${k}`, v]));

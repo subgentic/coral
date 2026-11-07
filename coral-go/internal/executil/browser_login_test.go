@@ -117,7 +117,7 @@ func TestOldLoginPagesAreRemovedAndYoungOnesKept(t *testing.T) {
 	}
 }
 
-// When the page cannot be written, or the opener fails on it, the link is opened as OpenBrowser always did: the sign-in is never lost to a temp folder.
+// When the page cannot be written, or the opener fails on it, the address is opened WITHOUT the token (#14064, Security: the token never travels in an argument, #3970); the dashboard asks to sign in.
 func TestOpenLoginFallsBackToTheLinkWhenThePageOrTheOpenerFails(t *testing.T) {
 	link := "http://127.0.0.1:8420/?login_token=test-token-placeholder"
 
@@ -130,7 +130,7 @@ func TestOpenLoginFallsBackToTheLinkWhenThePageOrTheOpenerFails(t *testing.T) {
 		t.Setenv("TMP", gone)
 		OpenLogin(link)
 		require.Len(t, started, 1)
-		assert.Equal(t, link, started[0][len(started[0])-1], "the link itself, as before")
+		assert.Equal(t, "http://127.0.0.1:8420/", started[0][len(started[0])-1], "the address without the token")
 	})
 
 	t.Run("the opener fails on the page", func(t *testing.T) {
@@ -146,6 +146,6 @@ func TestOpenLoginFallsBackToTheLinkWhenThePageOrTheOpenerFails(t *testing.T) {
 		OpenLogin(link)
 		require.Len(t, started, 2)
 		assert.True(t, strings.HasSuffix(started[0][len(started[0])-1], ".html"), "the page first")
-		assert.Equal(t, link, started[1][len(started[1])-1], "then the link")
+		assert.Equal(t, "http://127.0.0.1:8420/", started[1][len(started[1])-1], "then the address without the token")
 	})
 }

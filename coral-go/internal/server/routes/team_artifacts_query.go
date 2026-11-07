@@ -1109,6 +1109,16 @@ func collapseVersions(items []teamArtifact) []teamArtifact {
 			newest[k] = i
 		}
 	}
+	// The older versions' digests, oldest first and at most maxEarlierDigests (#14086): the same team, uploader and name the collapse uses, so they are the digests of rows this list would have shown for the same file. A
+	// decision on the newest version settles them (the client removes their review tags quietly), as it does for a starred series; without them an approved file's older legacy version, which has no series, stays for review and
+	// comes back in Needs you. A file with more than the cap says so by EarlierVersions (the whole count) being greater than the digests it carries; the rest follow once these are settled and the list is read again (the next
+	// read has the next oldest as its earlier digests), so there is no endpoint to page.
+	earlier := map[string][]teamArtifact{}
+	for i, it := range items {
+		if k := artifactVersionKey(it); k != "" && newest[k] != i {
+			earlier[k] = append(earlier[k], it)
+		}
+	}
 	out := make([]teamArtifact, 0, len(items))
 	for i, it := range items {
 		if k := artifactVersionKey(it); k != "" {
@@ -1116,6 +1126,16 @@ func collapseVersions(items []teamArtifact) []teamArtifact {
 				continue
 			}
 			it.EarlierVersions = count[k] - 1
+			if older := earlier[k]; len(older) > 0 {
+				sort.SliceStable(older, func(a, b int) bool { return newerVersion(older[b], older[a]) }) // oldest first
+				if len(older) > maxEarlierDigests {
+					older = older[:maxEarlierDigests]
+				}
+				it.EarlierDigests = make([]string, len(older))
+				for j, o := range older {
+					it.EarlierDigests[j] = o.managed
+				}
+			}
 		}
 		out = append(out, it)
 	}
