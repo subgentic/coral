@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -27,8 +28,13 @@ const (
 	worktreeCommitsMax  = 500 // the most new reflog lines taken in one read
 )
 
+// worktreesPerPass is the most worktrees read for new commits in one pass. Timed on this repository (1,081 registered worktrees, 400 of them some session's own) the first read of everything took 12 to 16 s and an idle
+// pass about 60 ms; a pass that long would hold up the poller's other work (it warns past 5 s), so the first read is spread: each worktree's progress is its own, and the ones not reached wait for the next pass.
+var worktreesPerPass = 25
+
 type registeredWorktree struct {
 	path   string // the worktree's folder
+	entry  string // its registry folder in the repository (<common dir>/worktrees/<name>)
 	reflog string // its HEAD reflog
 }
 
@@ -60,7 +66,7 @@ func registeredWorktrees(ctx context.Context, dir string) []registeredWorktree {
 			continue
 		}
 		if g := strings.TrimSpace(string(b)); g != "" {
-			list = append(list, registeredWorktree{path: filepath.Dir(g), reflog: filepath.Join(base, "logs", "HEAD")}) // the worktree's .git file is directly inside it
+			list = append(list, registeredWorktree{path: filepath.Dir(g), entry: base, reflog: filepath.Join(base, "logs", "HEAD")}) // the worktree's .git file is directly inside it
 		}
 	}
 	return list
@@ -79,6 +85,28 @@ func pathNamesSession(path, sessionID string) bool {
 	return false
 }
 
+// objectID is a full commit id: 40 hex digits (SHA-1) or 64 (SHA-256). A reflog is a file a program can write: only an id of this shape is ever handed to git, so nothing in it can be taken for an option.
+var objectID = regexp.MustCompile(`^(?:[0-9a-f]{40}|[0-9a-f]{64})$`)
+
+// ownedBy reports whether the folder at real is still the worktree the repository registered under entry: its .git file names that very registry folder. Replace the worktree's folder with a link to another
+// repository (whose .git is a folder, or a file naming another registry) and this is false. It reads one small file and runs no git.
+func ownedBy(real, entry string) bool {
+	b, err := os.ReadFile(filepath.Join(real, ".git"))
+	if err != nil {
+		return false
+	}
+	g, ok := strings.CutPrefix(strings.TrimSpace(string(b)), "gitdir: ")
+	if !ok {
+		return false
+	}
+	if !filepath.IsAbs(g) {
+		g = filepath.Join(real, g)
+	}
+	a, errA := filepath.EvalSymlinks(g)
+	e, errE := filepath.EvalSymlinks(entry)
+	return errA == nil && errE == nil && a == e
+}
+
 // madeHere returns the commits a reflog says were made in its worktree, in order: lines "<old> <new> <ident>\tcommit: <subject>" (also "commit (amend):" and "commit (initial):"; not "commit (merge):").
 func madeHere(reflog string) []string {
 	var shas []string
@@ -88,7 +116,7 @@ func madeHere(reflog string) []string {
 			continue
 		}
 		f := strings.Fields(line)
-		if len(f) >= 2 && len(f[1]) >= 40 {
+		if len(f) >= 2 && objectID.MatchString(f[1]) {
 			shas = append(shas, f[1])
 		}
 	}
@@ -102,6 +130,7 @@ func (p *GitPoller) scanOwnWorktrees(ctx context.Context, agents []AgentInfo) {
 	}
 	listed := map[string][]registeredWorktree{}
 	live := map[string]bool{}
+	budget := worktreesPerPass
 	for _, a := range agents {
 		if a.SessionID == "" || a.WorkingDirectory == "" {
 			continue
@@ -116,12 +145,14 @@ func (p *GitPoller) scanOwnWorktrees(ctx context.Context, agents []AgentInfo) {
 				continue
 			}
 			real, err := filepath.EvalSymlinks(wt.path)
-			if err != nil || !gitutil.SameRepo(ctx, a.WorkingDirectory, real) { // what is read is what was checked
+			if err != nil || !ownedBy(real, wt.entry) { // what is read is what the repository registered: no git run, one small file
 				continue
 			}
 			key := a.SessionID + "\x00" + real
 			live[key] = true
-			p.recordWorktreeCommits(ctx, a, real, key, wt.reflog)
+			if budget > 0 && p.recordWorktreeCommits(ctx, a, real, key, wt.reflog) { // true: it had new commits to read (git ran)
+				budget--
+			}
 		}
 	}
 	for k := range p.scanned { // forget the worktrees that are gone, so the map stays bounded
@@ -132,10 +163,10 @@ func (p *GitPoller) scanOwnWorktrees(ctx context.Context, agents []AgentInfo) {
 }
 
 // recordWorktreeCommits records the commits made in one worktree since the last read, oldest first. The lines read are remembered only when every commit was written.
-func (p *GitPoller) recordWorktreeCommits(ctx context.Context, a AgentInfo, wt, key, reflogPath string) {
+func (p *GitPoller) recordWorktreeCommits(ctx context.Context, a AgentInfo, wt, key, reflogPath string) bool {
 	raw, err := os.ReadFile(reflogPath)
 	if err != nil {
-		return
+		return false
 	}
 	lines := strings.Split(strings.TrimRight(string(raw), "\n"), "\n") // the lines that are there, not the empty piece after the last newline
 	done := p.scanned[key]
@@ -143,7 +174,7 @@ func (p *GitPoller) recordWorktreeCommits(ctx context.Context, a AgentInfo, wt, 
 		done = 0
 	}
 	if done == len(lines) {
-		return
+		return false
 	}
 	shas := madeHere(strings.Join(lines[done:], "\n"))
 	if len(shas) > worktreeCommitsMax {
@@ -151,14 +182,14 @@ func (p *GitPoller) recordWorktreeCommits(ctx context.Context, a AgentInfo, wt, 
 	}
 	if len(shas) == 0 {
 		p.scanned[key] = len(lines)
-		return
+		return false
 	}
 	ctx, cancel := context.WithTimeout(ctx, worktreeReadTimeout)
 	defer cancel()
 	type commit struct{ hash, at, name, email, subject string }
 	var commits []commit
 	read := func(ids []string) bool {
-		args := append([]string{"log", "--no-walk=unsorted", "-z", "--format=%H%x00%aI%x00%an%x00%ae%x00%s"}, ids...)
+		args := append([]string{"log", "--no-walk=unsorted", "-z", "--format=%H%x00%aI%x00%an%x00%ae%x00%s", "--end-of-options"}, ids...) // the ids are full hex (objectID); the marker says so to git as well
 		out, err := gitutil.Command(ctx, wt, args...).Output()
 		if err != nil {
 			return false
@@ -196,8 +227,9 @@ func (p *GitPoller) recordWorktreeCommits(ctx context.Context, a AgentInfo, wt, 
 		}
 		if err := p.store.UpsertGitSnapshot(ctx, snap); err != nil {
 			p.logger.Warn("worktree commit snapshot failed", "agent", a.AgentName, "worktree", logsafe.Dir(wt), "error", err)
-			return // the lines are not marked read: the next pass reads these again
+			return true // the lines are not marked read: the next pass reads these again
 		}
 	}
 	p.scanned[key] = len(lines)
+	return true
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -185,4 +186,66 @@ func TestCommitsBroughtInByTheBaseAMergeOfMainOrARebaseAreNotTheSessions(t *test
 	for _, g := range got {
 		assert.NotContains(t, g, "Merge", "a merge commit is not work")
 	}
+}
+
+// Security's MUST on #14095: the commit ids come from a reflog, a file a program can write. Only a full hex id is ever handed to git; a field that looks like an option writes nothing and stops nothing.
+func TestAReflogLineWithAnOptionInPlaceOfACommitIdIsNeverHandedToGit(t *testing.T) {
+	r := newWTRig(t, "sess-a")
+	wt := r.worktree(t, "sess-a", "wt-a", "feat-a")
+	runGit(t, wt, "commit", "-q", "--allow-empty", "-m", "real one")
+	target := filepath.Join(t.TempDir(), "injected.txt")
+	// a line a hostile program appended to the worktree's reflog, in git's own layout, with an option where the new commit id goes
+	common := filepath.Join(r.repo, ".git", "worktrees")
+	entries, err := os.ReadDir(common)
+	require.NoError(t, err)
+	var reflog string
+	for _, e := range entries {
+		reflog = filepath.Join(common, e.Name(), "logs", "HEAD")
+	}
+	f, err := os.OpenFile(reflog, os.O_APPEND|os.O_WRONLY, 0o644)
+	require.NoError(t, err)
+	zero := "0000000000000000000000000000000000000000"
+	_, err = f.WriteString(zero + " --output=" + target + " Evil <e@e> 1700000000 +0000\tcommit: evil\n")
+	require.NoError(t, err)
+	_, err = f.WriteString(zero + " -p Evil <e@e> 1700000000 +0000\tcommit: evil two\n")
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+	require.NoError(t, r.p.PollOnce(context.Background()))
+	_, statErr := os.Stat(target)
+	assert.True(t, os.IsNotExist(statErr), "git was not given the option: it wrote no file")
+	assert.Contains(t, r.madeInWorktrees(t, "sess-a"), "real one", "the real commit is still recorded")
+	assert.Equal(t, []string{"a" + strings.Repeat("0", 39)}, madeHere(zero+" a"+strings.Repeat("0", 39)+" X <x@x> 1 +0000\tcommit: ok"), "a full id passes")
+	assert.Empty(t, madeHere(zero+" --output=/tmp/x X <x@x> 1 +0000\tcommit: bad"), "an option does not")
+	assert.Empty(t, madeHere(zero+" abc123 X <x@x> 1 +0000\tcommit: short"), "a short id does not")
+}
+
+// Timed on the real repository (1,081 registered worktrees, 400 of them some session's own): an idle pass is about 60 ms, but the first pass reads every worktree's commits and took 12 to 16 s. A pass must not hold the poller
+// that long: at most worktreesPerPass worktrees are read for new commits in one pass, the rest wait for the next ones (each worktree's progress is its own), so the first read is spread over a few passes.
+func TestTheFirstReadOfManyWorktreesIsSpreadOverPassesNotDoneInOne(t *testing.T) {
+	old := worktreesPerPass
+	worktreesPerPass = 2
+	t.Cleanup(func() { worktreesPerPass = old })
+	r := newWTRig(t, "sess-a")
+	for i, name := range []string{"w1", "w2", "w3", "w4", "w5"} {
+		wt := r.worktree(t, "sess-a", name, "feat-"+name)
+		runGit(t, wt, "commit", "-q", "--allow-empty", "-m", "commit in "+name)
+		_ = i
+	}
+	count := func() int {
+		n := 0
+		for _, s := range r.madeInWorktrees(t, "sess-a") {
+			if strings.HasPrefix(s, "commit in ") {
+				n++
+			}
+		}
+		return n
+	}
+	require.NoError(t, r.p.PollOnce(context.Background()))
+	assert.Equal(t, 2, count(), "the first pass reads two worktrees, not all five")
+	require.NoError(t, r.p.PollOnce(context.Background()))
+	assert.Equal(t, 4, count())
+	require.NoError(t, r.p.PollOnce(context.Background()))
+	assert.Equal(t, 5, count(), "and the third finishes: nothing is skipped for good")
+	require.NoError(t, r.p.PollOnce(context.Background()))
+	assert.Equal(t, 5, count(), "and a pass with nothing new does no more")
 }
