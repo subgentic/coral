@@ -23,7 +23,13 @@ func feedBytesRig(t *testing.T) (*RemoteAgentHub, *websocket.Conn) {
 	a := newFakeRemote(t, sess("one", "a-1"))
 	reg := newFakeRegistry()
 	reg.put("a", a.URL)
-	h := fastHub(reg)
+	// The hub's own poll of the remote (80 ms in fastHub) replaces what the feed delivered; under -race on a slow runner a poll lands between the rows and the checks and the rows are gone
+	// (#14281, CI: 'the first rows are kept'). These tests are about what the FEED keeps, so the poll is made slow: the first one (the connection) is all they need.
+	h := NewRemoteAgentHub(reg, regResolver{reg}, RemoteAgentHubConfig{
+		PollInterval: time.Hour, RequestTimeout: 300 * time.Millisecond,
+		RegistryRefresh: 50 * time.Millisecond, MinBackoff: 20 * time.Millisecond, MaxBackoff: 100 * time.Millisecond,
+		OfflineGrace: -1,
+	})
 	startHub(t, h)
 	var conn *websocket.Conn
 	select {
