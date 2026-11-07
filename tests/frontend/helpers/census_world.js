@@ -92,4 +92,54 @@ const DATA_WORLD = `(() => {
 })();`;
 async function httpJson(method, p, body) { const r = await fetch(BASE + p, { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) }); let data = null; try { data = await r.json(); } catch { /* no body */ } return { status: r.status, data }; }
 
-module.exports = { WF, RUN, RUN_OK, RUN_LIVE, JOB, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING, DATA_WORLD, httpJson };
+// What only the censuses' world adds (#417), installed after the harness's PRELOAD (which makes window.__m):
+//   - the live list is the census's own. The harness serves GET /api/sessions/live from its mocked agents and detaches the feed in install(), but a feed
+//     message that landed before install() still carried the server's list: a coral_diff with the stand-in agent added it next to the mocked rows, and
+//     install() reloads the list only when a mocked row is missing, so the stand-in's row (a group of its own) stayed for the whole walk in 1 run of 3
+//     (+3 stops in 4 keyboard scenes). Every feed message that carries the list now carries the mocked agents' list, from the first one; the rest of the
+//     message (machine health, goals, artifacts) is as the server sent it.
+//   - the pane's size as the server last reported it on the terminal socket (window.__qaPaneSize), for terminalAtWindowSize.
+const CENSUS_LIVE = `(() => {
+    const Real = window.WebSocket;
+    if (!Real || Real.__census) return;
+    function W(u, p) {
+        const ws = p === undefined ? new Real(u) : new Real(u, p), url = String(u);
+        if (/\\/ws\\/coral(\\?|$)/.test(url)) ws.addEventListener('message', e => {
+            if (e.__census || !window.__m || typeof e.data !== 'string') return;
+            let d; try { d = JSON.parse(e.data); } catch { return; }
+            if (d.type !== 'coral_update' && d.type !== 'coral_diff') return;
+            e.stopImmediatePropagation(); // added when the socket was made, so before the page's onmessage: the page sees only the copy below
+            delete d.changed; delete d.removed; delete d.removed_remote; // a diff then changes no row
+            if (d.type === 'coral_update') d.sessions = Object.values(window.__m.agents).map(a => window.__m.entry(a));
+            const copy = new MessageEvent('message', { data: JSON.stringify(d) }); copy.__census = true; ws.dispatchEvent(copy);
+        });
+        if (/\\/ws\\/terminal\\//.test(url)) ws.addEventListener('message', e => {
+            if (typeof e.data !== 'string') return;
+            try { const d = JSON.parse(e.data); if (d && d.type === 'terminal_size') window.__qaPaneSize = { cols: Number(d.cols), rows: Number(d.rows) }; } catch { /* not a control frame */ }
+        });
+        return ws;
+    }
+    W.prototype = Real.prototype; W.CONNECTING = 0; W.OPEN = 1; W.CLOSING = 2; W.CLOSED = 3; W.__census = true;
+    window.WebSocket = W;
+})()`;
+
+// The Terminal view, settled and with no scrollback (#417). The terminal's size is the same in every run (74 x 41 at 1280 x 800 here, measured), but
+// what it holds is not: the server seeds a new terminal socket with the pane's output so far (its replay), written while the pane was still 200 x 50,
+// before this window resized it. Replayed into 41 rows, that left 9 lines of scrollback in some runs and none in others (6 of 10 runs and 4 of 10,
+// measured), and with scrollback xterm's viewport scrolls, which makes it a Tab stop: terminal view 52 or 53 stops. Opening the view again replays the
+// same output, so it does not help. So the view is opened, waited on until the server reports the pane at the terminal's size and the replay has stopped
+// growing the buffer, and then this window's terminal clears its own scrollback (ESC [3J, written to xterm here, never sent to the agent's pane; the
+// screen itself is left as it is). The census measures the view without scrollback, the same way each run. openTerminal is the scene's own tap (a
+// phone's one switch); it is tapped only when the Chat view is showing.
+async function terminalAtWindowSize(ev, waitFor, openTerminal) {
+    const isTerminal = `(() => { const b = document.getElementById('live-view-btn-terminal'); return !!b && (b.classList.contains('active') || b.getAttribute('aria-pressed') === 'true'); })()`;
+    const atSize = `(() => { const t = window.getTerminal && window.getTerminal(), p = window.__qaPaneSize; return !!t && t.rows > 0 && !!p && p.cols === t.cols && p.rows === t.rows; })()`;
+    if (!(await ev(isTerminal))) await openTerminal();
+    await waitFor(atSize, "the agent's pane at this window's terminal size", 15000);
+    // the buffer has stopped growing: the same length for 5 samples 100 ms apart (at most 5 s)
+    await ev(`new Promise(r => { let last = -1, same = 0, n = 0; const t = setInterval(() => { const b = window.getTerminal().buffer.active, len = b.length; same = len === last ? same + 1 : 0; last = len; if (same >= 5 || ++n >= 50) { clearInterval(t); r(true); } }, 100); })`); // interval-ok: a bounded sampling of the buffer's length
+    await ev(`window.getTerminal().write('\\x1b[3J'); true`);
+    await waitFor(`window.getTerminal().buffer.active.baseY === 0`, "the terminal's own scrollback cleared", 5000);
+}
+
+module.exports = { WF, RUN, RUN_OK, RUN_LIVE, JOB, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING, DATA_WORLD, CENSUS_LIVE, terminalAtWindowSize, httpJson };
