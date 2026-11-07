@@ -9,8 +9,8 @@ import { importOnce } from './import_once.js';
 import { OPERATOR_ID } from './utils.js';
 import { state } from './state.js';
 import { showToast } from './notifications.js';
-import { isCloud, isLocalServer, serverFetch, LOCAL_SERVER, normServer, sessionServer } from './server_base.js';
-import { inboxSources } from './inbox_servers.js';
+import { isCloud, isLocalServer, serverFetch, LOCAL_SERVER, normServer, sessionServer, decisionNeedsPerson } from './server_base.js';
+import { inboxSources, ownerOnlyAt } from './inbox_servers.js';
 
 const FRESH_MS = 15000, LINE_MAX = 140;
 let asks = [], pending = null, lastRead = 0;
@@ -106,8 +106,17 @@ export async function replyToAsk(a, text) {
 // our own words in its accessible name and tooltip, so a label like "Cancel" cannot hide that it wakes an agent. A click claims the button on the server, which answers with the STORED action: the page runs only that, never anything it
 // holds itself. A reply is run by the server (posted as the Operator, said to be a click, the question closed); open and wake run here through the routes the dashboard already uses, then the page settles.
 
-/** Whether the question came from another computer, or the page is the Hub's (#11757, Security's INFO on #11643): the claim and settle routes are not served through Coral Hub, so a button there would only fail with an error. */
+/** Whether the question came from another computer, or the page is the Hub's. A button of such a question is claimed and settled through the Hub, which serves those two routes for the computer's live OWNER only (#14396, coral-hub batch-125):
+ *  POST /api/board/<team>/asks/<id>/buttons/<id>/claim (an empty body or {}) and .../settle ({outcome: done|failed}), no query, for reply, open:new-agent, open:task, open:artifact and wake; a grantee is refused. (Before that, #11757 and Security's INFO on #11643:
+ *  the routes were not served through Coral Hub, so a button there only failed.) */
 export const fromAnotherComputer = a => isCloud() || (!!a && typeof a.server === 'string' && a.server !== '' && !isLocalServer(a.server));
+
+const refusedByOwner = new Set(); // computers that answered a claim owner_only: this person is not their owner (#14396)
+/** Remember that `server` refuses this person's button clicks as a grantee's, so the next dialog does not offer them. */
+export const noteButtonsOwnerOnly = server => { refusedByOwner.add(normServer(server)); };
+/** The buttons the dialog offers for `a`: all it declared, where this person may use them. A question of another computer (or the Hub's page) has them only for the computer's owner: not where the hub cannot sign the person's
+ *  decision (decisionNeedsPerson), not where a grantee was already refused (the artifacts read or an owner_only answer to a click). */
+export const buttonsOffered = a => (fromAnotherComputer(a) && (decisionNeedsPerson(a.server) || ownerOnlyAt(normServer(a.server)) || refusedByOwner.has(normServer(a.server)))) ? [] : buttonsOf(a);
 
 /** The buttons of a question that can still be used: only a question (not a wait) has them, and a used one is gone. */
 export const buttonsOf = a => (a && a.kind === 'ask' && Array.isArray(a.buttons) ? a.buttons.filter(b => b && b.state === 'pending' && Number.isFinite(Number(b.id)) && typeof b.label === 'string' && typeof b.action === 'string') : []);
@@ -138,7 +147,7 @@ const buttonUrl = (a, b, verb) => `/api/board/${encodeURIComponent(a.board)}/ask
 async function buttonCall(a, b, verb, body) {
     const resp = await serverFetch(a.server, buttonUrl(a, b, verb), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
     let data = null; try { data = await resp.json(); } catch { /* no body */ }
-    if (!resp.ok) throw new Error((data && (data.message || data.error)) || `Not done (HTTP ${resp.status}).`);
+    if (!resp.ok) throw Object.assign(new Error((data && (data.message || data.error)) || `Not done (HTTP ${resp.status}).`), { code: data && (data.code || data.error) });
     return data || {};
 }
 /** Claim the button: the server answers with its stored action, argument and label. */
