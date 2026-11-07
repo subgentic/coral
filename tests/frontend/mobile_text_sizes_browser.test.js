@@ -51,7 +51,7 @@ const { coralReady } = require('./helpers/wait');
         console.log('1280 px: desktop keeps its sizes');
         await open(1280, 800, false);
         const d = await probe();
-        assert.equal(d.servers.empty, 14); // the one empty state's line (#9097) assert.equal(d.servers.meta, 12); assert.equal(d.servers.healthTitle, 11);
+        assert.equal(d.servers.empty, 14); assert.equal(d.servers.meta, 12); assert.equal(d.servers.healthTitle, 11); // the one empty state's line (#9097)
         for (const v of d.list.name) assert.equal(v, 14, 'the agent name on a desktop is the sidebar row style, 14px (#9926; it was 13/500, #9686)');
         for (const v of d.list.count) assert.equal(v, 11, 'a group count on a desktop is 11px');
         console.log('   ✓');
