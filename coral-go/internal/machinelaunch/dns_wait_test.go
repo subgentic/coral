@@ -4,7 +4,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -138,6 +140,12 @@ func TestTheUserDataKeepsRootsDNSStateWhereTheLaunchKeysUserCanRead(t *testing.T
 	assert.Contains(t, ud, "chmod 0644 /run/coral/setup.log /run/coral/setup.status\n", "the log and the status are for the launch key's user")
 	assert.NotContains(t, ud, "setup.status /run/coral/dns.txt", "the DNS state is not world-readable")
 	assert.Contains(t, ud, "chmod 0600 /run/coral/dns.txt; chown root:coral /run/coral/dns.txt && chmod 0640 /run/coral/dns.txt", "root only first, then root and coral")
+	assert.Contains(t, ud, "/usr/local/sbin/coral-egress-check state > /run/coral/dns.start.txt")
+	assert.Contains(t, ud, "chmod 0600 /run/coral/dns.start.txt; chown root:coral /run/coral/dns.start.txt && chmod 0640 /run/coral/dns.start.txt")
+	start := strings.Index(ud, "state > /run/coral/dns.start.txt")
+	setupRun := strings.Index(ud, "/usr/local/sbin/coral-machine-setup > /run/coral/setup.log")
+	require.Greater(t, start, 0)
+	assert.Less(t, start, setupRun, "the state is kept BEFORE the setup too: a setup that hangs never reaches the one after")
 	state := strings.Index(ud, "coral-egress-check state")
 	finish := strings.Index(ud, `[ "$rc" = 0 ] || exit "$rc"`)
 	require.Greater(t, state, 0)
@@ -146,6 +154,8 @@ func TestTheUserDataKeepsRootsDNSStateWhereTheLaunchKeysUserCanRead(t *testing.T
 
 func TestTheFailureReportReadsTheDNSStateAndEndsWithTheSetupsOwnOutput(t *testing.T) {
 	assert.Contains(t, whyCommand, "/run/coral/dns.txt")
+	assert.Contains(t, whyCommand, "/run/coral/dns.start.txt", "the state before the setup too: a setup that hangs never writes the one after")
+	assert.Less(t, strings.Index(whyCommand, "dns.start.txt"), strings.Index(whyCommand, "dns.txt 2>&1"), "before, then after")
 	dns := strings.Index(whyCommand, "dns.txt")
 	setupOut := strings.Index(whyCommand, "setup output")
 	status := strings.Index(whyCommand, "setup exit status")
@@ -158,19 +168,26 @@ func TestTheDNSStateFileIsRootAndCoralOnly(t *testing.T) {
 	needSh(t)
 	ud, err := BuildUserData(goldenSpec())
 	require.NoError(t, err)
+	for _, name := range []string{"dns.txt", "dns.start.txt"} {
+		testStateFileMode(t, ud, name)
+	}
+}
+
+func testStateFileMode(t *testing.T, ud, name string) {
+	t.Helper()
 	var step string
 	for _, l := range strings.Split(ud, "\n") {
-		if strings.Contains(l, "chown root:coral /run/coral/dns.txt") {
+		if strings.Contains(l, "chown root:coral /run/coral/"+name) {
 			step = strings.TrimSpace(l)
 		}
 	}
-	require.NotEmpty(t, step)
+	require.NotEmpty(t, step, name)
 	dir := t.TempDir()
-	file := filepath.Join(dir, "dns.txt")
+	file := filepath.Join(dir, name)
 	require.NoError(t, os.WriteFile(file, []byte("state"), 0o644)) // as the redirect makes it, world-readable until the step runs
 	chownLog := filepath.Join(dir, "chown.log")
 	bin := fakeBin(t, map[string]string{"chown": `echo "$@" > ` + chownLog})
-	script := "#!/bin/sh\nset -eu\n" + strings.ReplaceAll(step, "/run/coral/dns.txt", file) + "\n"
+	script := "#!/bin/sh\nset -eu\n" + strings.ReplaceAll(step, "/run/coral/"+name, file) + "\n"
 	out, err := runWith(t, bin, script)
 	require.NoError(t, err, out)
 	fi, err := os.Stat(file)
@@ -182,7 +199,39 @@ func TestTheDNSStateFileIsRootAndCoralOnly(t *testing.T) {
 	bin = fakeBin(t, map[string]string{"chown": "exit 1"})
 	require.NoError(t, os.WriteFile(file, []byte("state"), 0o644))
 	require.NoError(t, os.Chmod(file, 0o644)) // as the redirect makes it
-	_, _ = runWith(t, bin, "#!/bin/sh\nset -u\n"+strings.ReplaceAll(step, "/run/coral/dns.txt", file)+"\n")
+	_, _ = runWith(t, bin, "#!/bin/sh\nset -u\n"+strings.ReplaceAll(step, "/run/coral/"+name, file)+"\n")
 	fi, _ = os.Stat(file)
 	assert.Equal(t, os.FileMode(0o600), fi.Mode().Perm(), "a failed chown leaves the file root-only, never 0644 and never group-readable for a group it was not given to")
+}
+
+// DevOps's finding on f73cf1bae: the report keeps the END of the file, so the short high-value lines (the clock, the service states, the NTP state) must be last and survive a worst-case file. Every command is stubbed to
+// say as much as it can; the last bytes the report reads (the size is read from whyCommand itself) still hold the date, the is-active lines and timedatectl.
+func TestTheClockAndServiceStatesSurviveTheTailOfAWorstCaseStateFile(t *testing.T) {
+	needSh(t)
+	long := strings.Repeat("x", 300)
+	many := `i=0; while [ $i -lt 60 ]; do echo "` + long + `"; i=$((i+1)); done`
+	dir := t.TempDir()
+	nft := filepath.Join(dir, "nft")
+	require.NoError(t, os.WriteFile(nft, []byte("#!/bin/sh\n"+many+"\n"), 0o755))
+	bin := fakeBin(t, map[string]string{
+		"resolvectl": many, "journalctl": many, "cloud-init": many,
+		"timedatectl": `echo NTPSynchronized=no; echo Timezone=Etc/UTC`,
+		"systemctl":   `echo inactive`,
+		"date":        `echo "Thu Jan  1 00:02:00 UTC 1970"`,
+		"uptime":      `echo "1970-01-01 00:00:05"`,
+	})
+	script := strings.ReplaceAll(EgressCheckScript(), "/usr/sbin/nft", nft)
+	out, err := runWith(t, bin, script, "state")
+	require.NoError(t, err, out)
+	m := regexp.MustCompile(`tail -c (\d+) /run/coral/dns\.txt`).FindStringSubmatch(whyCommand)
+	require.Len(t, m, 2, "the report's read of the file")
+	n, err := strconv.Atoi(m[1])
+	require.NoError(t, err)
+	assert.Greater(t, len(out), n, "this file really is bigger than what the report reads")
+	tail := out[len(out)-n:]
+	for _, want := range []string{"== date -u / uptime -s", "Thu Jan  1 00:02:00 UTC 1970", "1970-01-01 00:00:05", "== timedatectl", "NTPSynchronized=no", "== systemctl is-active", "inactive", "== cloud-init status --long"} {
+		assert.Contains(t, tail, want, "the last %d bytes keep it", n)
+	}
+	// and each bulky part is capped on its own, so the file is bounded however much the commands say
+	assert.Less(t, len(out), 4500, "capped per section")
 }

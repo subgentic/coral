@@ -190,15 +190,16 @@ write_files:
         ;;
       state)
         # what the machine knows about its DNS and the egress table, for the launcher's failure report (#12885): read by root, kept in /run/coral/dns.txt for the launch key's user. It only reports and always exits 0.
-        echo "== date -u / uptime -s"; date -u 2>&1 || true; uptime -s 2>&1 || true
-        echo "== timedatectl"; timedatectl show -p NTPSynchronized -p Timezone 2>&1 || true
-        echo "== cloud-init status --long"; cloud-init status --long 2>&1 | head -n 12 || true
+        # Order matters: the launcher's report keeps only the END of this file, so the bulky parts (each capped) come first and the short, high-value lines last: the clock, the service states, the NTP state, cloud-init.
+        echo "== nft table"; /usr/sbin/nft list table inet coral_egress 2>&1 | head -c 600 || true
+        echo "== journal: coral-egress-resolvers, systemd-resolved"; journalctl -u coral-egress-resolvers -u systemd-resolved --no-pager 2>&1 | tail -n 40 | tail -c 1200 || true
+        echo "== upstream resolvers (resolved)"; cat /run/systemd/resolve/resolv.conf 2>&1 | grep -v '^#' | head -c 250 || true
+        echo "== /etc/resolv.conf"; cat /etc/resolv.conf 2>&1 | grep -v '^#' | head -c 400 || true
+        echo "== resolvectl status"; resolvectl status 2>&1 | head -n 20 | head -c 800 || true
+        echo "== cloud-init status --long"; cloud-init status --long 2>&1 | head -n 8 | head -c 300 || true
         echo "== systemctl is-active (network-online, timesyncd, resolved)"; systemctl is-active network-online.target 2>&1 || true; systemctl is-active systemd-timesyncd 2>&1 || true; systemctl is-active systemd-resolved 2>&1 || true
-        echo "== resolvectl status"; resolvectl status 2>&1 | head -n 40 || true
-        echo "== /etc/resolv.conf"; cat /etc/resolv.conf 2>&1 || true
-        echo "== upstream resolvers (resolved)"; cat /run/systemd/resolve/resolv.conf 2>&1 | grep -v '^#' || true
-        echo "== journal: coral-egress-resolvers, systemd-resolved"; journalctl -u coral-egress-resolvers -u systemd-resolved --no-pager 2>&1 | tail -n 40 || true
-        echo "== nft table"; /usr/sbin/nft list table inet coral_egress 2>&1 || true
+        echo "== timedatectl"; timedatectl show -p NTPSynchronized -p Timezone 2>&1 || true
+        echo "== date -u / uptime -s"; date -u 2>&1 || true; uptime -s 2>&1 || true
         ;;
       *) echo "usage: coral-egress-check rules|resolvers|state" >&2; exit 2 ;;
       esac
@@ -356,12 +357,12 @@ runcmd:
       set -eu
       install -d -m 0755 -o root -g root /run/coral
       # The setup's own output and exit status are kept where the launch key's user can read them (the cloud-init log is root's), so a setup that does not finish can say why (#13876).
+      /usr/local/sbin/coral-egress-check state > /run/coral/dns.start.txt 2>&1 || true; chmod 0600 /run/coral/dns.start.txt; chown root:coral /run/coral/dns.start.txt && chmod 0640 /run/coral/dns.start.txt
       rc=0
       /usr/local/sbin/coral-machine-setup > /run/coral/setup.log 2>&1 || rc=$?
       echo "$rc" > /run/coral/setup.status
-      /usr/local/sbin/coral-egress-check state > /run/coral/dns.txt 2>&1 || true # the DNS and egress state, for the launcher's failure report (#12885)
+      /usr/local/sbin/coral-egress-check state > /run/coral/dns.txt 2>&1 || true; chmod 0600 /run/coral/dns.txt; chown root:coral /run/coral/dns.txt && chmod 0640 /run/coral/dns.txt
       chmod 0644 /run/coral/setup.log /run/coral/setup.status
-      chmod 0600 /run/coral/dns.txt; chown root:coral /run/coral/dns.txt && chmod 0640 /run/coral/dns.txt # the lookup history: root only until the owner is set, then root and the launch key's user (coral) only, never every user of the machine
       [ "$rc" = 0 ] || exit "$rc"
       install -d -m 0700 -o coral -g coral /run/coral/bootstrap.d
       systemctl daemon-reload

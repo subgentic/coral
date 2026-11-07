@@ -20,11 +20,12 @@ const (
 	// The text is cut to its END, so the part that matters most comes last: the setup's own output (its DNS wait says which way it went), then its exit status.
 	whyCommand = `echo "== cloud-init status"; cloud-init status --long 2>&1 | head -c 1000; ` +
 		`echo "== cloud-init output (tail)"; tail -c 1000 /var/log/cloud-init-output.log 2>&1; ` +
-		`echo "== dns state (root's report, #12885)"; tail -c 1800 /run/coral/dns.txt 2>&1; ` +
+		`echo "== dns state before the setup (root's report, #12885)"; tail -c 900 /run/coral/dns.start.txt 2>&1; ` +
+		`echo "== dns state after the setup (root's report)"; tail -c 1800 /run/coral/dns.txt 2>&1; ` +
 		`echo "== setup output (tail)"; tail -c 2000 /run/coral/setup.log 2>&1; ` +
 		`echo "== setup exit status: $(cat /run/coral/setup.status 2>&1)"`
 	whyReadMax   = 12 << 10 // read from the machine at most this much
-	whyShown     = 6000     // bytes printed, the END of what the machine said
+	whyShown     = 7500     // bytes printed, the END of what the machine said
 	whyLineShown = 240
 	whyTimeout   = 20 * time.Second
 )

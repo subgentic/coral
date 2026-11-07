@@ -274,12 +274,12 @@ func BuildUserData(spec UserDataSpec) (string, error) {
 	w("      set -eu")
 	w("      install -d -m 0755 -o root -g root /run/coral")
 	w("      # The setup's own output and exit status are kept where the launch key's user can read them (the cloud-init log is root's), so a setup that does not finish can say why (#13876).")
+	w("      %s", keepStateStep("dns.start.txt")) // the state BEFORE the setup: a setup that hangs never reaches the one after
 	w("      rc=0")
 	w("      /usr/local/sbin/coral-machine-setup > /run/coral/setup.log 2>&1 || rc=$?")
 	w("      echo \"$rc\" > /run/coral/setup.status")
-	w("      %s state > /run/coral/dns.txt 2>&1 || true # the DNS and egress state, for the launcher's failure report (#12885)", egressCheckPath)
+	w("      %s", keepStateStep("dns.txt")) // the state AFTER the setup, pass or fail (#12885)
 	w("      chmod 0644 /run/coral/setup.log /run/coral/setup.status")
-	w("      chmod 0600 /run/coral/dns.txt; chown root:coral /run/coral/dns.txt && chmod 0640 /run/coral/dns.txt # the lookup history: root only until the owner is set, then root and the launch key's user (coral) only, never every user of the machine")
 	w("      [ \"$rc\" = 0 ] || exit \"$rc\"")
 	w("      install -d -m 0700 -o coral -g coral /run/coral/bootstrap.d")
 	w("      systemctl daemon-reload")
@@ -613,4 +613,11 @@ until [ "$(date -u +%%Y 2>/dev/null || echo 0)" -ge 2025 ] || timedatectl show -
 done
 [ "$waited" -lt %[1]d ] && echo "$(stamp) coral-machine-setup: the clock is plausible after $waited s"
 true`, seconds)
+}
+
+// keepStateStep is the shell that keeps root's DNS and egress state in /run/coral/<name> (#12885): written by the fixed `coral-egress-check state`, root-only first (a redirect makes a 0644 file), then the owner is set to
+// root:coral and only then it is made 0640, so a failed chown leaves it root-only and it is never readable by every user of the machine. It never fails the setup.
+func keepStateStep(name string) string {
+	f := "/run/coral/" + name
+	return fmt.Sprintf("%s state > %s 2>&1 || true; chmod 0600 %s; chown root:coral %s && chmod 0640 %s", egressCheckPath, f, f, f, f)
 }
