@@ -86,7 +86,8 @@ async function readAsk(s) {
     // Beta Tester's phone check, #11981).
     const selectable = (po.options || []).filter(o => (o.action || 'select') === 'select' && o.label && Number.isInteger(Number(o.n)));
     const held = !permission && !onlyReject && picks.length < selectable.length;
-    return picks.length >= 1 && picks.length <= MAX_CHOICES ? { ask: String(po.ask_id || ''), picks, onlyReject, held, question: stepClean(po.question).slice(0, 120) } : none;
+    const target = permission && typeof po.target === 'string' ? po.target : ''; // what the permission wants to run, as the server read it whole (#14173)
+    return picks.length >= 1 && picks.length <= MAX_CHOICES ? { ask: String(po.ask_id || ''), picks, onlyReject, held, question: stepClean(po.question).slice(0, 120), target } : { ...none, target };
 }
 
 const askKey = s => `${sessionServer(s)}:${s.session_id}:${s.waiting_since || ''}`;
@@ -156,11 +157,18 @@ function confirmTrust(s, o, ask, cell, trust) {
 function fill(s, cell, withDismiss = true) {
     const key = askKey(s);
     if (!read.has(key)) read.set(key, readAsk(s).catch(() => ({ ask: '', picks: [], onlyReject: false })));
-    return read.get(key).then(({ ask, picks, onlyReject, held, step, stepFull, question, later, lines, trust, browser }) => {
+    return read.get(key).then(({ ask, picks, onlyReject, held, step, stepFull, question, later, lines, trust, browser, target }) => {
         cell.replaceChildren();
         const said = norm => String(norm || '').replace(/[?\s]+$/, '');
         const words = step || (question && (later || !said(s.waiting_summary).includes(said(question))) ? question : ''); // the question is named when the row's own words do not carry it (a later step's never does)
         if (lines && lines.length) { const t = document.createElement('span'); t.className = 'inbox-answer-step'; if (stepFull && stepFull !== words) t.title = stepFull; lines.forEach(l => { const ln = document.createElement('span'); ln.className = 'inbox-answer-step-line'; ln.textContent = l.length > 240 ? `${l.slice(0, 239)}…` : l; t.append(ln, ' '); }); cell.append(t); } else if (words) { const t = document.createElement('span'); t.className = 'inbox-answer-step'; t.textContent = words.length > 240 ? `${words.slice(0, 239)}…` : words; if (stepFull && stepFull !== words) t.title = stepFull; else if (words.length > 240) t.title = words; cell.append(t); } // text only; a cut line (a field or the whole) says so and keeps the uncut text as its hover; the review's lines have a space between them: one run of words for a screen reader
+        if (target && target.trim()) { // the command on the row: the first line of it, one line cut with an ellipsis (the whole text is its tooltip and the card's), then what Yes allows (#14173)
+            const first = target.split('\n').map(l => l.trim()).find(Boolean) || '', more = target.trim().split('\n').filter(l => l.trim()).length > 1;
+            const cmd = document.createElement('span'); cmd.className = 'inbox-cmd'; cmd.title = target; cmd.setAttribute('aria-label', `Wants to run: ${target.length > 600 ? target.slice(0, 599) + '…' : target}`);
+            const code = document.createElement('code'); code.textContent = first.length > 160 ? `${first.slice(0, 159)}…` : first + (more ? ' …' : '');
+            cmd.append('Wants to run ', code); cell.append(cmd);
+            if (picks.length && !onlyReject) { const yes = document.createElement('span'); yes.className = 'inbox-trust-note inbox-yes-note'; yes.textContent = 'Yes lets it run this once. No refuses it. Open the agent to read all of it or to allow more.'; cell.append(yes); }
+        }
         if (browser) { const note = document.createElement('span'); note.className = 'inbox-trust-note inbox-browser-note'; note.textContent = BROWSER_NOTE; cell.append(note); } // what the one button does, and why the other two are not buttons (#14151)
         if (trust) { // the folder, plain text, and what Yes does, before any choice (#14110)
             const note = document.createElement('span'); note.className = 'inbox-trust-note';
