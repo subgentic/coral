@@ -41,8 +41,8 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                             }
                             if (path.endsWith('/comments') && mode === 'older-comment-refused') return json({error:'Comment refused'},403);
                             if (path.endsWith('/comments') && mode === 'older-comment-lost') return Promise.reject(new TypeError('Connection lost'));
-                            if (path.endsWith('/send') && mode === 'older-send-lost') return Promise.reject(new TypeError('Delivery acknowledgement lost'));
-                            if (path.endsWith('/send') && mode === 'older-send-refused') return json({ok:false,error:'Delivery refused',results:[{agent:'Writer A',state:'refused'}]},403);
+                            if (path.endsWith('/send') && mode === 'older-send-lost' && !window.__retryDelivery) return Promise.reject(new TypeError('Delivery acknowledgement lost'));
+                            if (path.endsWith('/send') && mode === 'older-send-refused' && !window.__retryDelivery) return json({ok:false,error:'Delivery refused',results:[{agent:'Writer A',state:'refused'}]},403);
                             if (path.endsWith('/send')) return json({ok:true,results:[{state:'sent',agent:'Writer A'}]});
                             return json({id:7,body:body.body,images:body.images || []},201);
                         }
@@ -81,6 +81,16 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                     assert.equal(writes.length,mode.startsWith('older-send')?3:2,'only the negotiated decision and necessary fallback calls');
                     assert.equal(await ev('window.__reloads'),0,'fallback failure keeps the form open');
                     assert.equal(await ev(`document.querySelector('#one-call-review textarea').value`),'Keep these exact words.');
+                    if(mode.startsWith('older-send')){
+                        await ev(`window.__retryDelivery=true;document.querySelector('#one-call-review form').requestSubmit();true`);
+                        await waitFor(`window.__reloads===1`,mode+' explicit retry succeeds');
+                        const retried=await ev('window.__writes');
+                        assert.equal(retried.filter(w=>w.path.endsWith('/review')).length,1,mode+': retry never repeats the recorded decision');
+                        assert.equal(retried.filter(w=>w.path.endsWith('/comments')).length,1,mode+': retry reuses the confirmed comment');
+                        const sends=retried.filter(w=>w.path.endsWith('/send'));
+                        assert.equal(sends.length,2,mode+': retry sends only the existing comment');
+                        assert.equal(sends[0].path,sends[1].path,mode+': both sends address the same comment');
+                    }
                 } else if (mode === 'text-not-kept' || mode === 'other-refusal') {
                     await waitFor(`!!document.querySelector('#one-call-review .artifact-review-error').textContent`, 'the refusal stays in the form');
                     const error = await ev(`document.querySelector('#one-call-review .artifact-review-error').textContent`);

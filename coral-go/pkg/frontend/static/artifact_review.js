@@ -204,6 +204,9 @@ export function attachReview(d, { reload }) {
     (d.querySelector('.artifact-viewer-chips') || bar).append(stateEl); (d.querySelector('.artifact-viewer-actions') || bar).append(approve, changes); (d.querySelector('.artifact-viewer-menu') || bar).prepend(approveNote);
     const $ = s => bar.querySelector(s);
     const form = $('.artifact-review-form'), text = $('#artifact-review-text'), error = $('.artifact-review-error');
+    // Keep confirmed legacy writes while this form is open: an explicit delivery
+    // retry must address the same comment without recording the decision again.
+    let legacyDecision = false, legacyComment = null;
     let cur = null, gen = 0, sending = false, done = false, inProgress = false, progressTimer = null;
     const progress = $('.artifact-review-pending');
     const clearProgress = () => { clearTimeout(progressTimer); progressTimer = null; inProgress = false; progress.hidden = true; };
@@ -271,20 +274,24 @@ export function attachReview(d, { reload }) {
         try {
             const who = was.row.produced_by, images = tray.hexes();
             let out = null, decided = false;
-            if (!images.length) {
+            if (legacyDecision) { out = {}; decided = true; recorded = true; }
+            else if (!images.length) {
                 try { out = await decide(was.team, was.row, 'changes', undefined, undefined, false, body); decided = true; recorded = true; }
                 catch (err) { if (err.status !== 400 || err.code !== 'images_not_in_this_slice') throw err; }
                 if (!current()) return;
                 if (out && Object.hasOwn(out, 'text_kept') && out.text_kept !== true) throw new Error('The computer did not confirm that your words were kept. Your draft is still here.');
             }
             kept = out?.text_kept === true; older = decided && !Object.hasOwn(out || {}, 'text_kept');
+            if (older) legacyDecision = true;
             if (!out?.text_kept) {
                 // Pictures retain their existing comment route. An older computer
                 // already applied the decision but ignored text: do not decide twice.
                 if (!who) throw new Error('No agent is recorded for this artifact, so there is nobody to ask: use a comment.');
-                const c = await createComment(was.hex, was.server, { body: `Changes requested: ${body}`, anchor: { whole: true }, board: was.name, images });
+                const commentKey = JSON.stringify([body, images, who]);
+                const c = legacyComment?.key === commentKey ? legacyComment : await createComment(was.hex, was.server, { body: `Changes requested: ${body}`, anchor: { whole: true }, board: was.name, images });
                 if (!current()) return;
                 if (!Number.isSafeInteger(c.id) || c.id <= 0) throw new Error('The comment was not confirmed.');
+                legacyComment = { key: commentKey, id: c.id };
                 kept = true;
                 const sent = await sendComment(was.hex, was.server, c.id, [who]);
                 if (!current()) return;
@@ -326,6 +333,7 @@ export function attachReview(d, { reload }) {
     });
     return {
         async open(hex, opts = {}) {
+            legacyDecision = false; legacyComment = null;
             const g = ++gen; clearProgress(); sending = false; text.readOnly = false; syncSend(); show(null); sendCtx = null; syncSendItem(); if (!opts.switched) done = false;
             if (!opts.board || opts.sourceNamed === false) return;
             const team = identityKey(opts.server, opts.board);
@@ -337,6 +345,6 @@ export function attachReview(d, { reload }) {
             show({ ...s, team, hex, server: opts.server, name: opts.board });
             if (opts.requestChanges && !opts.switched && !done && (s.state === 'pending' || s.state === 'changes')) openForm(true); // not on the reload after a send: the form stays closed
         },
-        close() { gen++; clearProgress(); show(null); sendCtx = null; syncSendItem(); form.hidden = true; tray.clear(); },
+        close() { legacyDecision = false; legacyComment = null; gen++; clearProgress(); show(null); sendCtx = null; syncSendItem(); form.hidden = true; tray.clear(); },
     };
 }
