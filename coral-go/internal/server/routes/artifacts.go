@@ -480,6 +480,7 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 					fileID, fileVersion = sidOf, n
 				}
 			} else {
+				reply["version"] = 1
 				fileID, fileVersion = virtualFileID(callerBoard, hexID), 1 // never versioned: its id is derived, and it is version 1
 			}
 		}
