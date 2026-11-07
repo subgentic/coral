@@ -12,6 +12,7 @@
  * visible text, tooltips or document.title. */
 
 import { importOnce } from './import_once.js';
+import { platform } from './platform/detect.js';
 import { isSignedOut } from './overload.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { state } from './state.js';
@@ -134,6 +135,15 @@ export function applyPopoutBodyClass() {
 export async function initPopout() {
     if (!isPopout()) return;
     applyPopoutBodyClass();
+    if (document.body.dataset.chief === 'true') {
+        document.addEventListener('keydown', e => {
+            if (!platform.isNative || e.defaultPrevented || e.repeat || [...document.querySelectorAll('dialog[open], [aria-modal="true"]')].some(el => el.getClientRects().length > 0)) return;
+            if (e.key !== 'Escape' && !(e.metaKey && !e.altKey && !e.ctrlKey && e.key === '[')) return;
+            e.preventDefault(); e.stopPropagation();
+            location.assign('/');
+        }, true);
+    }
+
     // The workspace is the whole page: show it before anything resolves so
     // loading / not-found / ended states render inside the real shell.
     showView('live-session-view');
