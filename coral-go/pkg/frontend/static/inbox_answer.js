@@ -18,7 +18,7 @@ const { canDismissWait, dismissButton, dismissWait } = await importOnce('./dismi
 
 const MAX_CHOICES = 4;
 // Choices that last past this one answer, or change how the agent runs: never a button on a list row (each CLI's own words: Claude's "Yes, and don't ask again for ..." and "Yes, allow all edits during this session", Codex's "Yes, and don't ask again", Antigravity's "always allow").
-const LASTING = /don.?t ask|always|allow all|all edits|session|conversation|switch to|persist|remember|from now on|auto mode|accept edits/i;
+const LASTING = /don.?t ask|install|always|allow all|all edits|session|conversation|switch to|persist|remember|from now on|auto mode|accept edits/i;
 // A permission's choice is a button only when the WHOLE label (a trailing key hint like "(y)" and final punctuation dropped) is one of these one-time forms, and nothing else (Security Reviewer, #10462): Yes, Allow or Approve,
 // optionally "once", "this once", "proceed", "continue", Antigravity's "run command"; No, Deny or Reject, optionally "cancel" or Codex's "and tell <CLI> what to do differently". Everything else, including every phrasing that
 // lasts ("never ask again", "forever", "trust this workspace", "for the rest of this task") and every one that names a place, is left to Open.
@@ -47,6 +47,18 @@ const trustMenu = po => {
     return { no, yes, folder: po.trust_offer === true && folder && stepClean(folder) === folder ? folder : '' }; // a folder with a hidden or control character is never offered
 };
 
+// Claude's "Claude wants to use your browser" menu (#14151): the server reads it by structure (browser_menu: the title, then exactly these three rows in this order, one marked, no numbers, no footer). The row takes ONE of
+// them: "Not now" (Claude goes on without browser tools; nothing is installed, nothing is remembered). "Install extension" opens the person's Chrome and "Don't ask again" is lasting, so neither is a button: the row says so.
+// This side checks the same three labels again, so a menu that is not exactly this one gets no button.
+const BROWSER_LABELS = ['install extension', 'not now', "don't ask again"];
+const browserMenu = po => {
+    const o = po && po.options;
+    if (!po || po.browser_menu !== true || !po.unnumbered || po.multi || !Array.isArray(o) || o.length !== 3) return null;
+    if (!o.every((x, i) => String(x && x.label || '').trim().toLowerCase() === BROWSER_LABELS[i] && Number.isInteger(Number(x.n)))) return null;
+    return { notNow: o[1] };
+};
+const BROWSER_NOTE = 'Not now: Claude goes on without browser tools; nothing is installed. To install the extension, or to stop being asked, open the agent.';
+
 /** The card's one-time choices and the ask they belong to: { ask, picks, onlyReject } ({ ask: '', picks: [] } when the card cannot be answered by one choice). onlyReject: the request can only be rejected, and picks are then only the No form. */
 async function readAsk(s) {
     const params = new URLSearchParams({ after: '0', limit: '1', session_id: s.session_id, agent_type: s.agent_type || '' });
@@ -63,6 +75,8 @@ async function readAsk(s) {
         const lines = ['Submit these answers?', ...po.review.map(r => `${stepCut(stepClean(r.question))}: ${stepCut(stepClean(r.answer))}`)];
         return submit && !onlyReject ? { ask: String(po.ask_id || ''), picks: [submit], onlyReject, step: `Submit these answers? ${drawn}`, stepFull: `Submit these answers? ${full}`, lines } : none; // exactly what the screen shows now, every question with its answer: the click compares the UNCUT text, a field cut for drawing wears an ellipsis and the hover is the whole line (#11997, Security)
     }
+    const browser = browserMenu(po);
+    if (browser) return { ask: String(po.ask_id || ''), picks: [browser.notNow], onlyReject, browser: true, question: '' }; // only Not now is a button; Install and Don't ask again are left to Open, and the row says so
     const trust = trustMenu(po);
     if (trust) return trust.folder ? { ask: String(po.ask_id || ''), picks: [trust.no, trust.yes], onlyReject, trust: { folder: trust.folder, yes: trust.yes } } : { ask: String(po.ask_id || ''), picks: [trust.no], onlyReject, held: true }; // No only, and the row says the rest is left to Open
     const permission = (po.options || []).some(o => PERMISSION_WORDS.test(String(o.label || ''))); // a permission card: only a plain Yes or No is a button; a question's own choices (Red, Blue) are
@@ -141,11 +155,12 @@ function confirmTrust(s, o, ask, cell, trust) {
 function fill(s, cell, withDismiss = true) {
     const key = askKey(s);
     if (!read.has(key)) read.set(key, readAsk(s).catch(() => ({ ask: '', picks: [], onlyReject: false })));
-    return read.get(key).then(({ ask, picks, onlyReject, held, step, stepFull, question, later, lines, trust }) => {
+    return read.get(key).then(({ ask, picks, onlyReject, held, step, stepFull, question, later, lines, trust, browser }) => {
         cell.replaceChildren();
         const said = norm => String(norm || '').replace(/[?\s]+$/, '');
         const words = step || (question && (later || !said(s.waiting_summary).includes(said(question))) ? question : ''); // the question is named when the row's own words do not carry it (a later step's never does)
         if (lines && lines.length) { const t = document.createElement('span'); t.className = 'inbox-answer-step'; if (stepFull && stepFull !== words) t.title = stepFull; lines.forEach(l => { const ln = document.createElement('span'); ln.className = 'inbox-answer-step-line'; ln.textContent = l.length > 240 ? `${l.slice(0, 239)}…` : l; t.append(ln, ' '); }); cell.append(t); } else if (words) { const t = document.createElement('span'); t.className = 'inbox-answer-step'; t.textContent = words.length > 240 ? `${words.slice(0, 239)}…` : words; if (stepFull && stepFull !== words) t.title = stepFull; else if (words.length > 240) t.title = words; cell.append(t); } // text only; a cut line (a field or the whole) says so and keeps the uncut text as its hover; the review's lines have a space between them: one run of words for a screen reader
+        if (browser) { const note = document.createElement('span'); note.className = 'inbox-trust-note inbox-browser-note'; note.textContent = BROWSER_NOTE; cell.append(note); } // what the one button does, and why the other two are not buttons (#14151)
         if (trust) { // the folder, plain text, and what Yes does, before any choice (#14110)
             const note = document.createElement('span'); note.className = 'inbox-trust-note';
             const path = document.createElement('code'); path.className = 'inbox-trust-path'; path.textContent = trust.folder;
