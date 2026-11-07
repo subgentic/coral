@@ -120,6 +120,8 @@ const B = 'goal-done-' + Date.now().toString(36);
             try {
                 await openNeeds();
                 await waitFor(`import((window.__coralStatic||'/static/')+'state.js').then(m => JSON.parse(m.state.settings.goal_done_hidden || '[]').includes(${JSON.stringify(hidden)}))`, label + ': reload reads the other client\'s local choice', 10000);
+                // the settings read lands before the Inbox has redrawn without the goal: wait for the redraw, then assert (a read-before-redraw flaked this 4 of 5 under --stress)
+                await waitFor(`[...document.querySelectorAll('${T} tbody tr')].filter(tr => /looks done/.test(tr.textContent)).length === 0`, label + ': the local Inbox hides the goal after reload', 10000);
                 assert.equal((await doneRows()).length, 0, label + ': the local Inbox hides the goal after reload');
             } finally { await Page.removeScriptToEvaluateOnNewDocument({ identifier: staleBootstrap.identifier }); }
             await root('PUT', '/api/settings', { goal_done_hidden: '[]' });
