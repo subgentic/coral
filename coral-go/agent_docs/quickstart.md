@@ -58,42 +58,42 @@ setting. Coral launches only the agent CLIs listed above; adding another one nee
 
 ## 1. Install
 
-Download from [GitHub Releases](https://github.com/subgentic/coral/releases/latest). The stable
+On **macOS** and **Linux**, you can install the latest verified release with one command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/subgentic/coral/main/install.sh | bash
+```
+
+What `install.sh` does:
+- Downloads the latest release package for your OS and CPU over HTTPS and checks it against `SHA256SUMS.txt` (and verifies the Sigstore signature when `cosign` is installed).
+- On **macOS**, verifies that `Coral.app` is signed and notarized, installs `Coral.app` in `~/Applications` (without `sudo`), and links the command-line tools into `~/.local/bin`.
+- On **Linux**, unpacks Coral's programs (`coral`, `coral-board`, `coral-agent`, `launch-coral`, `coral-update`, and the hooks) into `~/.local/bin`.
+- Pass `-s -- --dry-run` after `bash` to see what would be downloaded and installed without changing anything.
+
+Or download directly from [GitHub Releases](https://github.com/subgentic/coral/releases/latest). The stable
 names always point to the newest release: `Coral.dmg`, `Coral-x64.msi`, `Coral-x64-portable.zip`,
 `coral-linux-amd64.tar.gz` and `coral-linux-arm64.tar.gz`. Each release also keeps versioned names
 (`Coral.v<version>.dmg`, `coral-linux-<arch>-<version>.tar.gz`, `Coral-<version>-x64.msi`,
 `Coral-<version>-x64-portable.zip`): the same files.
 
-**macOS** — open the `.dmg` and drag `Coral.app` to Applications.
+- **macOS (`Coral.dmg`):** Open the `.dmg` and drag `Coral.app` to `Applications`. Agents that Coral launches can run Coral's own command-line tools without you changing PATH.
+  - *Optional — use `coral` from your own terminal:* Run `/Applications/Coral.app/Contents/MacOS/install-cli.sh` to symlink the CLI tools into `~/.local/bin`, and add `export PATH="$HOME/.local/bin:$PATH"` to `~/.zshrc` or `~/.bashrc`.
+- **Windows (`Coral-x64.msi`):** Run the MSI installer, which installs Coral to `Program Files\Coral`, adds it to your `PATH`, creates a **Coral** Start Menu shortcut, and offers to launch Coral when setup finishes.
+- **Linux (`coral-linux-amd64.tar.gz` or `coral-linux-arm64.tar.gz`):** Extract the binaries into `~/.local/bin`:
+  ```console
+  $ uname -m        # x86_64 → the amd64 tarball, aarch64 → the arm64 tarball
+  $ mkdir -p "$HOME/.local/bin" && tar xzf coral-linux-amd64.tar.gz -C "$HOME/.local/bin"
+  ```
 
-**Linux** — the tarball contains bare binaries (`coral`, `coral-board`, the hook helpers
-and `launch-coral`) and no installer:
+## 2. Open Coral
 
-```console
-$ uname -m        # x86_64 → the amd64 tarball, aarch64 → the arm64 tarball
-$ tar xzf coral-linux-amd64.tar.gz
-```
+- **macOS:** Open **Coral** from `Applications` (or `~/Applications`). Coral starts its menu-bar tray icon and opens the native Coral window.
+- **Windows:** Open **Coral** from the Start menu (or leave **Launch Coral** checked at the end of the MSI installer).
+- **Linux:** Run `~/.local/bin/coral`, which starts the server and opens the dashboard in your default browser at `http://localhost:8420`.
 
-Put the extracted tools in a directory on your `PATH`, or run `./coral` from the extracted folder. See the [public installation walkthrough](https://subgentic.github.io/coral/getting-started/) for complete installation commands.
+On first launch, review the Terms of Service and accept them if you agree, then set a password when **Protect Coral with a password** appears.
 
-### Getting the CLI tools on macOS
-
-The DMG does **not** put `coral` or `coral-board` on your `PATH`. A script inside the
-bundle does that:
-
-```bash
-/Applications/Coral.app/Contents/MacOS/install-cli.sh
-```
-
-It symlinks the tools into `~/.local/bin` by default (`--dir <path>` or `CORAL_LINK_DIR`
-choose another directory, `--force` replaces non-Coral files). Add
-`export PATH="$HOME/.local/bin:$PATH"` to your shell's startup file and run it in the
-current terminal too. Earlier versions linked into `/usr/local/bin` and failed on a clean
-Apple Silicon Mac.
-
-You can skip this entirely and run the binary by its full path.
-
-## 2. Start the server
+*Optional — starting the server from a terminal:*
 
 ```console
 $ coral --host 127.0.0.1 --port 8420 --no-browser
@@ -101,11 +101,8 @@ Coral dashboard: http://localhost:8420
 Press Ctrl+C to stop
 ```
 
-On first launch, review the Terms of Service and accept them if you agree. Keep the
-terminal open while the server runs. Agents run in the built-in terminal; tmux is not needed.
-
-Useful flags: `--home <dir>` (data directory, default `~/.coral`), `--port` (default
-8420), `--host` (one address or a comma list, see [below](#listening-on-a-tailnet-address)),
+Useful flags: `--home <dir>` (data directory, default `~/.coral`, also `CORAL_DATA_DIR`), `--port` (default
+8420 on macOS/Linux, 8450 on Windows), `--host` (one address or a comma list, see [below](#listening-on-a-tailnet-address)),
 `--backend pty|tmux`, `--no-browser`. Coral listens on `127.0.0.1` unless
 [remote access](#remote-access) is enabled and restarted.
 
@@ -267,7 +264,7 @@ $ curl -H "Authorization: Bearer $(coral api-key)" -s -X POST http://127.0.0.1:8
 
 ### Or start a team
 
-Choose **New team** on Home. The dialog opens on the **Default team (3 members)**: an Orchestrator, a Lead Developer and a QA Engineer, already in **Members** and each removable; **Blank team** in the same list starts with none. Name the team, choose the folder it works in, and launch it. The agents share a message board and split the work; see [Teams](teams.md).
+Choose **New team** on Home. In Step 1, name the team and choose the folder it works in. In Step 2, start from the **Default team (3 members)** template (an Orchestrator, a Lead Developer and a QA Engineer, already in **Members** and each removable), click **Describe your team** to generate a roster, or launch an Orchestrator on its own and tell it in **Chat** what teammates and goal you want. The Orchestrator's built-in `orchestrator-team-builder` skill writes a `team-plan.md` artifact and puts an approval card in **Inbox > Needs you**; once you click **Approve**, the Orchestrator launches the teammates via `coral-agent launch`, creates the goal and tasks, and delegates reviews; see [Teams](teams.md).
 
 ### If your first agent is waiting for input
 
@@ -281,18 +278,17 @@ Quick safety check: Is this a project you created or one you trust?
 Enter to confirm · Esc to cancel
 ```
 
-The agent can look alive and idle while it waits. Open **Terminal** in the dashboard,
-read the current prompt and answer it. Coral detects known startup prompts, but this
+The agent can look alive and idle while it waits. Open **Terminal** in the dashboard
+(or check **Inbox > Needs you**), read the current prompt and answer it (or toggle **Trust this folder** in Step 1 of **New team** before launching). Coral detects known startup prompts, but this
 has not been verified for every provider/version. Codex can also ask you to review
 Coral's hooks before it starts; read that request in Terminal.
 
-For a script you run yourself, the keys API accepts named keys. Inspect the
-current menu before choosing a key; the `Down` then `Enter` example below applies
-only when those keys select the answer you intend:
+Note that `/api/sessions/live/$NAME/keys` refuses API-key (`Authorization: Bearer`) calls while a startup trust prompt or permission dialog is open (`"nothing was typed: a prompt is open"`), because only the person at the computer (via the dashboard or a signed-in browser cookie from `coral open` / `login_token`) may answer a prompt. For ordinary terminal input in a script you run yourself when no prompt is open, the keys API accepts named keys:
 
 ```bash
 # a script you run yourself, never an agent
 # NAME and SID are the agent's "name" and "session_id" from GET /api/sessions/live.
+# Note: requires a signed-in dashboard session cookie when answering a startup/permission prompt.
 curl -H "Authorization: Bearer $(coral api-key)" -s -X POST "http://127.0.0.1:8420/api/sessions/live/$NAME/keys" \
   -H "Content-Type: application/json" \
   -d "{\"keys\":[\"Down\"],\"agent_type\":\"claude\",\"session_id\":\"$SID\"}"
@@ -304,36 +300,43 @@ curl -H "Authorization: Bearer $(coral api-key)" -s -X POST "http://127.0.0.1:84
 The CLI may remember your answer for that repository. Coral does not answer these
 startup trust or hook-review questions for you.
 
-## 5. Watch it finish
+## 5. First review and artifact
 
-Given a small Go package and this task —
+In a team run, workers submit completed tasks for review and attach verification artifacts:
+
+1. **Submit for review:** When the developer finishes implementing and testing a task, it runs `coral-board task submit-review <id>`.
+2. **Delegate and verify:** The Orchestrator delegates the review with `coral-board task review <id> --to "<Reviewer>"` (or Coral auto-delegates when `default_reviewers` is set). The reviewer claims the review task, runs the test suite independently, uploads a review report with `coral-agent artifact upload <file>` (which returns an immutable `coral://artifacts/<sha256>` URI visible in the **Artifacts** tab and, when tagged `--tag "for review"`, in **Inbox > Needs you**), and runs `coral-board task approve <id> --round 1`.
+3. **Completion:** The last reviewer's approval automatically marks the task **completed** on the board.
+
+Given our `stringutil` Go package and this task —
 
 > Add a function `Capitalize(s string) string` to `stringutil.go`. Then create
 > `stringutil_test.go` with table-driven tests for **both** `Reverse` and `Capitalize`.
-> Run `go test ./...` and make sure it passes. Then `git add -A` and
-> `git commit -m "add Capitalize + tests"`.
+> Run `go test ./...` and make sure it passes.
 
-— the result of that test run, about 90 seconds after Coral started:
+— the result of that walkthrough on `v2.0.59`, after `Dev` implemented `Capitalize` and `Reviewer` verified and approved round 1:
 
 ```console
-$ git log --oneline
-0392df2 add Capitalize + tests
-47dc160 initial: Reverse
-
-$ go test ./...
-ok      example.com/stringutil
+$ gofmt -l . && go vet ./... && go test ./... -v -count=1
+=== RUN   TestReverse
+--- PASS: TestReverse (0.00s)
+=== RUN   TestCapitalize
+--- PASS: TestCapitalize (0.00s)
+PASS
+ok  	example.com/stringutil	0.145s
 ```
 
-Eleven test cases including a unicode case. Verified by running the tests directly, not
-by trusting the agent's summary.
+Sixteen subtests (6 for `Reverse`, 10 for `Capitalize`, including multi-byte UTF-8 and invalid UTF-8), verified independently by `Reviewer` and recorded in `review-task1-round1.md`.
 
 ## Where a first run actually goes wrong
 
 | Symptom | Cause |
 |---|---|
-| Agent launched, no output, looks hung | A trust, hook-review or sign-in prompt may be waiting. Open Terminal and read it; a launched process alone does not prove provider access. |
-| `coral: command not found` after a DMG install | `install-cli.sh` was never run, or its link directory (`~/.local/bin` by default) is not on your `PATH`. |
-| `coral` starts something unfamiliar | The retired `agent-coral` pip package is shadowing it. Run `which -a coral`. |
+| Agent launched, no output, looks hung | A trust, hook-review or sign-in prompt may be waiting. Open **Inbox > Needs you** or **Terminal** and read it; a launched process alone does not prove provider access. |
+| Teammates launched by Orchestrator sit waiting before their first post | Agents launched via `coral-agent launch` always start in ask-first (`default`) permission mode. Approve their first command in **Inbox > Needs you** or **Terminal** (or choose Claude's `Yes, and switch to auto mode`). |
+| Board nudges pause after you type in an agent's Terminal | Typing in an agent's terminal activates a 60-second `TypingHold` so Coral does not interrupt you mid-command. After 60 seconds without keystrokes, Coral flushes `[Coral] While you were talking: ...`. |
+| `coral: command not found` in your own terminal after a DMG install | Agents launched by Coral get the CLI tools automatically, but your own shell needs `/Applications/Coral.app/Contents/MacOS/install-cli.sh` and `~/.local/bin` on `PATH` (or install via `install.sh`). |
+| `coral` starts something unfamiliar | The retired `agent-coral` pip package is shadowing it. Run `which -a coral` and `pip uninstall agent-coral`. |
 | Agents launch but never post to the board | Confirm the server's view with `/api/board/<project>/subscribers`. Agents are given `CORAL_URL` and `CORAL_DATA_DIR`; a custom wrapper that clears the environment can lose them. |
 | Agent launch fails with a tmux error | tmux was chosen (Settings > Terminal or `--backend tmux`) and is missing. The macOS app bundles it. Coral starts anyway and only fails at launch time; choose the built-in terminal (Settings > Terminal, or `--backend pty`) or install tmux. |
 

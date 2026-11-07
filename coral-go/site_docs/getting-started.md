@@ -11,7 +11,7 @@ Coral runs the agent CLIs you already use, each in its own terminal session, and
 
 | Requirement | Notes |
 |---|---|
-| **An agent CLI** | At least one of Claude Code (`claude`), Codex (`codex`), Antigravity (`agy`) or Pi (`pi`), installed **and signed in**. Coral does not install or authenticate these. Follow each vendor's own instructions: [Claude Code](https://code.claude.com/docs/en/overview), [Codex](https://github.com/openai/codex), [Antigravity](https://antigravity.google), [Pi](https://pi.dev). |
+| **An agent CLI** | Claude Code (`claude`) or Codex (`codex`), installed **and signed in**. Coral does not install or authenticate these. Follow each vendor's own instructions: [Claude Code](https://code.claude.com/docs/en/overview), [Codex](https://github.com/openai/codex). (Coral also supports Antigravity `agy` and Pi `pi`.) |
 | **git** | Needed for worktree, branch and diff features. |
 | **tmux** | Optional. Coral runs agents in its own built-in terminal by default; tmux is for agents that keep running when Coral quits. Included in the macOS app; Linux needs your own tmux if you choose it. See [Platforms](#platforms). |
 
@@ -27,43 +27,30 @@ These file names always point to the newest release. Each release also keeps ver
 
 The macOS 13 minimum is checked in the shipped binaries. It has not been tested on a macOS 13 machine.
 
-## Install
+## 1. Install
 
-Download the [latest release](https://github.com/subgentic/coral/releases/latest) from GitHub.
-
-**macOS.** Open the DMG and drag `Coral.app` to Applications. To use `coral` and `coral-board` from a terminal, run:
+On **macOS** and **Linux**, you can install the latest verified release with one command:
 
 ```bash
-/Applications/Coral.app/Contents/MacOS/install-cli.sh
+curl -fsSL https://raw.githubusercontent.com/subgentic/coral/main/install.sh | bash
 ```
 
-It links the tools into `~/.local/bin` by default. Make them available in this terminal:
+What it does:
+- Downloads the latest release package for your OS and CPU over HTTPS and checks it against `SHA256SUMS.txt` (and verifies the Sigstore signature when `cosign` is installed).
+- On **macOS**, verifies that `Coral.app` is signed and notarized, installs `Coral.app` in `~/Applications` (without `sudo`), and links the command-line tools into `~/.local/bin`.
+- On **Linux**, unpacks Coral's programs (`coral`, `coral-board`, `coral-agent`, `launch-coral`, `coral-update`, and the hooks) into `~/.local/bin`.
+- Pass `-s -- --dry-run` after `bash` to inspect what would be downloaded and installed without changing anything.
 
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
+Or download directly from [GitHub Releases](https://github.com/subgentic/coral/releases/latest):
 
-Add that line to your shell's startup file (`~/.zshrc` for zsh, `~/.bashrc` for bash) for later terminals. Use `install-cli.sh --dir <path>` for another directory.
-
-**Windows.** Run the MSI, then open **Coral** from the Start menu. For the portable ZIP, extract it, open PowerShell in the extracted folder, and run:
-
-```powershell
-.\coral.exe --no-browser
-```
-
-Both downloads are listed under [Platforms](#platforms).
-
-**Linux.** In the folder containing your download, extract the tools and add them to your `PATH` (ARM64: replace `amd64` with `arm64`):
-
-```bash
-mkdir -p "$HOME/.local/share/coral"
-tar -xzf coral-linux-amd64.tar.gz -C "$HOME/.local/share/coral"
-export PATH="$HOME/.local/share/coral:$PATH"
-```
-
-Add that `PATH` line to your shell's startup file for later terminals. There is no installer or service unit.
-
-**Homebrew (macOS).** `brew install --cask cdknorow/coral/coral` installs the same signed app from the release; the release workflow updates the tap with each release's checksum. Then run `install-cli.sh` as above for the command-line tools.
+- **macOS (`Coral.dmg`):** Open the DMG and drag `Coral.app` to `Applications`. Agents that Coral launches can run Coral's own command-line tools without you changing PATH.
+  - *Optional — use `coral` from your own terminal:* Run `/Applications/Coral.app/Contents/MacOS/install-cli.sh` to symlink the CLI tools into `~/.local/bin`, and add `export PATH="$HOME/.local/bin:$PATH"` to `~/.zshrc` or `~/.bashrc`.
+- **Windows (`Coral-x64.msi`):** Run the MSI installer, which installs Coral to `Program Files\Coral`, adds it to your `PATH`, creates a **Coral** Start Menu shortcut, and offers to launch Coral when setup finishes. (For `Coral-x64-portable.zip`, extract the zip and run `.\coral-tray.exe` or `.\coral.exe`.)
+- **Linux (`coral-linux-amd64.tar.gz` or `coral-linux-arm64.tar.gz`):** Extract the tools into `~/.local/bin`:
+  ```bash
+  mkdir -p "$HOME/.local/bin"
+  tar -xzf coral-linux-amd64.tar.gz -C "$HOME/.local/bin"
+  ```
 
 **If you once installed the old Python package** (`pip install agent-coral`), remove it. It installs commands with the same names and uses the same `~/.coral` directory and port, and can shadow this program. Check with `which -a coral` and remove it with `pip uninstall agent-coral`. Coral logs a warning at startup when it detects this.
 
@@ -76,38 +63,64 @@ Coral on a Mac, on Windows and on Linux keeps itself up to date. In the backgrou
 - **Windows:** only a Coral installed from the MSI updates this way; a portable copy never does (download the new zip). The Windows package is not code-signed yet: Coral accepts it on its checksum and the Sigstore signature alone. A rollback package is kept only when the version you had was itself a promoted release.
 - **Linux:** a tarball install in a folder only Coral's own programs are in, and that you can write, updates by swapping the folder, and keeps the old one for the rollback. An install a package manager owns, a shared folder or one you cannot write is left alone: download the new release as for a first install. Development, beta and Coral For Dropbox builds do not check at all.
 
-## Start Coral
+## 2. Open Coral
 
-Open Coral from Applications on macOS or the Start menu on Windows. From a terminal with the tools on your `PATH`:
+- **macOS:** Open **Coral** from `Applications` (or `~/Applications` if installed with `install.sh`). Coral starts its menu-bar tray icon and opens the Coral window.
+- **Windows:** Open **Coral** from the Start menu (or leave **Launch Coral** checked on the installer's final screen).
+- **Linux:** Run `~/.local/bin/coral`, which starts the server and opens the dashboard in your default browser at `http://localhost:8420`.
 
-```bash
-coral --no-browser
-```
+On first launch, review the Terms of Service and accept them if you agree, then set a password when **Protect Coral with a password** appears.
 
-On Linux, start it with `coral --no-browser`. Keep the terminal open while the server runs: agents run in Coral's built-in terminal and stop when you quit Coral. To keep agents running after Coral quits, install tmux and choose it in Settings > Terminal, or start with `--backend tmux`. On first launch, review the Terms of Service and accept them if you agree.
+By default Coral stores data in `~/.coral`, uses port **8420** (port **8450** on Windows), and listens on this computer only (`127.0.0.1`). Agents run in Coral's built-in terminal (`pty`) and stop when you quit Coral; to keep agents running after Coral quits on macOS or Linux, choose `tmux` in **Settings > Terminal**. For a server on another computer, follow [Remote access](remote-access.md).
 
-By default Coral stores data in `~/.coral`, uses port **8420**, and listens on this computer only (`127.0.0.1`). Open `http://localhost:8420`.
+*Optional — starting from a terminal:* If you put `coral` on your `PATH`, `coral open` opens a signed-in browser tab for a running server, and `coral --version` prints the version. When running a server directly from a terminal (`coral --no-browser`), useful flags are `--home <dir>` (data directory, also `CORAL_DATA_DIR`), `--port <n>` (`CORAL_PORT`), `--host <addr>` (`CORAL_HOST`, only honored for network addresses when [remote access](remote-access.md) is enabled), `--remote`, and `--backend tmux|pty`.
 
-Use the address printed at startup if it differs from the default. If the browser shows **Create a password**, enter and confirm a password, then choose **Create password and open Coral**. Later, sign in with that password. The desktop app can open a signed-in browser directly; `coral open` does the same from a terminal on the server. For a server on another computer, follow [Remote access](remote-access.md).
+## 3. Your first team (with the team builder and Orchestrator launch)
 
-| Flag | Meaning |
+When you open Coral, the workspace screen asks **What do you want to work on?** with **New agent**, **New team**, and **New goal**.
+
+1. **Start a team:** Choose **New team**.
+   - **Step 1 of 3 (Your team):** Enter a team name (for example `first-team`) and choose your repository folder.
+   - **Step 2 of 3 (Members):** You have three ways to pick your roster:
+     - **Default team (3 members):** Starts an **Orchestrator**, a **Lead Developer**, and a **QA Engineer** right away.
+     - **Describe your team:** Click **Describe your team** to generate a custom roster from a plain-English description.
+     - **Let the Orchestrator build and launch the team (`orchestrator-team-builder`):** Launch just the **Orchestrator** (or start from **Default team** and remove the other members), then tell the Orchestrator in **Chat** what teammates and goal you want.
+2. **What you see with `orchestrator-team-builder`:**
+   - The Orchestrator inspects your repository (read-only), drafts a `team-plan.md` naming each teammate's role, CLI (`claude` or `codex`), model, thinking level, and initial tasks, and uploads it for your review:
+     ```text
+     coral://artifacts/d26734243be993e7ab199178398dffee04482b60dadfeb5af0cf5414a0435f6c
+     ```
+   - A red badge appears on **Inbox -> Needs you** with the question: *"Launch Dev and Reviewer on first-team as in team-plan.md?"*
+   - Click **Approve** in **Needs you**.
+   - The Orchestrator wakes up automatically, launches **Dev** and **Reviewer** on the team board (`[Coral] Orchestrator started Dev`, `[Coral] Orchestrator started Reviewer`), creates **Goal #1**, and assigns **Task #1** to **Dev**.
+
+## 4. Your first review
+
+1. **Worker submits for review:** **Dev** claims Task #1, writes the code and tests, verifies that `gofmt`, `go vet`, and `go test ./...` pass, and submits the task for review (`coral-board task submit-review 1`).
+2. **What you see on the board and Tasks tab:**
+   - Task #1 moves to `review_pending`.
+   - The Orchestrator delegates the review to **Reviewer** (`[Task #1 delegated for review by Orchestrator] Reviewer (#2)`), creating review task **#2**.
+   - **Reviewer** claims Task #2, inspects `git diff` and runs `gofmt -l .`, `go vet ./...`, and `go test ./... -v` independently in the repository, and approves the round (`coral-board task approve 1 --round 1`).
+   - Coral automatically marks Task #1 **completed** (`[Task #1 completed by Orchestrator (approved by Reviewer)]`).
+
+## 5. Your first artifact
+
+Agents upload plans, test reports, diffs, and screenshots to Coral's content-addressed artifact store (`coral-agent artifact upload <file>`). Every artifact gets a SHA-256 digest and a `coral://artifacts/<digest>` link.
+
+- **Where you see it:**
+  - Open the team's **Artifacts** tab (or **Files -> Artifacts** in the left sidebar) to browse, search, preview, or comment on every file produced by the team.
+  - When an agent tags an artifact `"for review"` (`--tag "for review" --question "..."`), it lands directly in **Inbox -> Needs you** under **For review**, where you can read the rendered Markdown or image, leave inline comments, and click **Approve** or **Request changes**.
+  - For example, in our walkthrough, **Reviewer** uploaded `review-task1-round1.md` (`coral://artifacts/626cb21024f59101ebeb1564974d489bb148f91097b9fa1ea4b5a605eb3f5ddf`) summarizing the 16 passing subtests and verification checks.
+
+## 6. What to do when stuck
+
+| What you see | Why it happens & how to fix it |
 |---|---|
-| `--home <dir>` | Data directory (default `~/.coral`; also `CORAL_DATA_DIR`) |
-| `--host <addr>` | Address to bind (also `CORAL_HOST`). Only honored for network addresses when [remote access](remote-access.md) is enabled. |
-| `--remote` | Allow remote access for this run without saving the setting (see [remote access](remote-access.md)). With no `--host`, Coral then listens on every interface. |
-| `--port <n>` | Port (default 8420; also `CORAL_PORT`) |
-| `--backend tmux\|pty` | Terminal backend. Default `pty` (the built-in terminal: agents stop when you quit Coral); `tmux` keeps agents running after Coral quits. Windows has only `pty`. |
-| `--no-browser` | Do not open a browser on startup |
-
-`coral --version` (or `coral -v`, or `coral version`) prints the version of the program you run. A running server's version is in its startup log and in `/api/system/status`.
-
-## Your first agent
-
-1. On Home, choose **Launch agent**. Enter an existing project folder on the computer running Coral under **Working Directory**, or use **Browse**. In other views, use **+ New > AI Agent**.
-2. To choose your installed CLI, open **More options > Agent**. Otherwise Coral uses your default. Choose **Launch** to open the agent.
-3. Open **Terminal** and answer any folder-trust or sign-in prompt from the CLI. Switch to **Chat**, type a task in the composer, and press Enter to send it.
-
-A successful launch means the agent process started; check its Terminal if it stays idle. For several agents sharing a board, choose **Launch team** on Home, give the team a name and project folder, add agents or choose a template, then choose **Launch Team**.
+| **Newly launched agent looks idle and produces no output** | On its first run in a repository, Claude Code (`claude`) or Codex (`codex`) stops at an interactive folder-trust prompt (`Quick safety check: Is this a project you created or one you trust?`) or a hook/permission prompt. Check **Inbox -> Needs you** or open the agent's **Terminal** tab and press `Down` then `Enter` to trust the folder (or toggle **Trust this folder** in Step 1 of **New team** before launching). |
+| **Teammates launched by the Orchestrator sit waiting before their first post** | Agents started by the Orchestrator via `coral-agent launch` always start in ask-first (`default`) permission mode for safety. Open **Inbox -> Needs you** or their **Terminal** tab to approve their first command (or choose Claude's `Yes, and switch to auto mode`, or turn on **Auto-accept prompts** in the agent's `⋮` menu). |
+| **You typed in an agent's Terminal and board notifications stopped arriving** | After you type in an agent's terminal, Coral pauses board nudges for **60 seconds** (`TypingHold`) so it never interrupts you mid-command. Wait 60 seconds after your last keystroke and Coral automatically flushes `[Coral] While you were talking: ...`. |
+| **Codex agent cannot reach the board or upload artifacts** | Codex's default sandbox blocks `localhost` network calls. Launch Codex with Coral's default settings (or pass `-c sandbox_workspace_write.network_access=true`). |
+| **`coral` starts an unfamiliar old server in a terminal** | The retired Python package (`pip install agent-coral`) is shadowing Coral on your `PATH`. Run `which -a coral` and `pip uninstall agent-coral`. |
 
 ## Permission mode
 
