@@ -17,7 +17,7 @@ const { KNOWN_SLOW } = require('./scene_ready');
 const { requiredScenes } = require('./census_required'); // the scenes the suite must visit: one file each, so commits that add scenes do not conflict
 const { INBOX_WORLD } = require('./inbox_world');
 const { STUB, HEX } = require('./comments_scale');
-const { DATA_WORLD, httpJson, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING } = require('./census_world');
+const { DATA_WORLD, CENSUS_LIVE, terminalAtWindowSize, httpJson, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING } = require('./census_world');
 const BASE = require('../test_base').BASE;
 const { coralReady } = require('./wait');
 const TEAM = 'census-d-' + Date.now().toString(36);
@@ -37,7 +37,7 @@ module.exports = part => (async () => {
         await httpJson('POST', `/api/board/${TEAM}/subscribe`, { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-session' });
         for (const m of ['Please check the release notes.', 'Then post the summary.']) await httpJson('POST', `/api/board/${TEAM}/messages`, { subscriber_id: 'Boss', content: m });
         for (const [title, priority] of [['Ship the release notes', 'high'], ['Check the migration', 'medium'], ['Tidy the changelog', 'low']]) await httpJson('POST', `/api/board/${TEAM}/tasks`, { subscriber_id: 'Boss', title, body: 'A task for the census.', priority, assignee: 'Boss' });
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD }); await Page.addScriptToEvaluateOnNewDocument({ source: require('./scene_ready').FETCH_COUNTER }); // a scene is measured once its fetches are done (#416)
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD }); await Page.addScriptToEvaluateOnNewDocument({ source: CENSUS_LIVE }); await Page.addScriptToEvaluateOnNewDocument({ source: require('./scene_ready').FETCH_COUNTER }); // a scene is measured once its fetches are done (#416)
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
         await load();
         if (part === 'a') {
@@ -72,7 +72,7 @@ module.exports = part => (async () => {
                 await tap('#model-chip');
             }, { min: 10, expect: `!document.getElementById('model-chip-menu').hidden` });
             await ev(`document.body.click(); true`);
-            await sc('terminal view', async () => { await tap('#live-view-btn-terminal'); }, { min: 8, expect: `document.getElementById('live-view-btn-terminal').classList.contains('active') || document.getElementById('live-view-btn-terminal').getAttribute('aria-pressed') === 'true'` });
+            await sc('terminal view', async () => { await terminalAtWindowSize(ev, waitFor, () => tap('#live-view-btn-terminal')); }, { min: 8, expect: `document.getElementById('live-view-btn-terminal').classList.contains('active') || document.getElementById('live-view-btn-terminal').getAttribute('aria-pressed') === 'true'` });
             await tap('#live-view-btn-chat');
             await ev(`window.toggleAgenticPanel && window.toggleAgenticPanel(true); true`);
             for (const tab of await ev(`[...document.querySelectorAll('#agentic-block-top .agentic-tab[data-tab]')].filter(e => e.getClientRects().length).map(e => e.dataset.tab)`)) await sc(`side panel: ${tab}`, async () => { await ev(`window.switchAgenticTab(${JSON.stringify(tab)}, 'top'); true`); }, { min: 5, expect: `document.querySelector('#agentic-block-top .agentic-tab[data-tab="${tab}"]').classList.contains('active')` });
