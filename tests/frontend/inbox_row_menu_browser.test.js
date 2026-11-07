@@ -59,8 +59,18 @@ const AGENTS = [
             const clickCurrent = (expression, why) => waitFor(`(() => { const e = (${expression}); if (!e?.isConnected || !e.getClientRects().length) return false; e.click(); return true; })()`, at + why, 4000);
             // a tap opens the menu: Dismiss first, on the screen, focused; the row itself did not open
             const url0 = await ev(`location.href`);
-            await clickCurrent(probe, 'tap the current row menu');
-            await waitFor(`!!(${probe}) && !(${probe}).parentElement.querySelector('.menu').hidden`, at + 'the menu opens', 4000);
+            await clickCurrent(`(() => { const toggle = (${probe}); window.__rowMenuClicked = toggle; return toggle; })()`, 'tap the current row menu');
+            await waitFor(`!!(${probe}) && !(${probe}).parentElement.querySelector('.menu').hidden`, at + 'the menu opens', 4000).catch(async error => {
+                const diagnostic = await ev(`(() => {
+                    const original = window.__rowMenuClicked, current = (${probe}), menu = current?.parentElement.querySelector('.menu');
+                    return { originalConnected: original?.isConnected ?? false, currentConnected: current?.isConnected ?? false,
+                        expanded: current?.getAttribute('aria-expanded') ?? null, originalExpanded: original?.getAttribute('aria-expanded') ?? null,
+                        menuPresent: !!menu, menuConnected: menu?.isConnected ?? false, menuHidden: menu?.hidden ?? null,
+                        menuVisible: !!menu && !menu.hidden && menu.getClientRects().length > 0 && getComputedStyle(menu).visibility !== 'hidden',
+                        menuDisplay: menu ? getComputedStyle(menu).display : null, redraw: original !== current };
+                })()`).catch(diagnosticError => ({ diagnosticError: String(diagnosticError) }));
+                throw new Error(error.message + ' row-menu diagnostic: ' + JSON.stringify(diagnostic));
+            });
             const menu = await ev(`(() => { const t = (${probe}), m = t.parentElement.querySelector('.menu'), r = m.getBoundingClientRect(), items = [...m.querySelectorAll('[role=menuitem]')]; return { expanded: t.getAttribute('aria-expanded'), items: items.map(i => i.textContent), focus: document.activeElement === items[0], role: m.getAttribute('role'), left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), bottom: Math.round(r.bottom), vw: innerWidth, vh: innerHeight, itemH: Math.round(items[0].getBoundingClientRect().height), url: location.href }; })()`);
             check(at + 'the menu opens: Dismiss is its first action, focused, a 44 px row', menu.expanded === 'true' && menu.items[0] === 'Dismiss' && menu.focus && menu.role === 'menu' && menu.itemH >= 44, JSON.stringify(menu));
             check(at + 'the menu is whole on the screen (not cut by the list)', menu.left >= 0 && menu.right <= menu.vw && menu.top >= 0 && menu.bottom <= menu.vh, JSON.stringify(menu));
