@@ -41,7 +41,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
                 if (me !== 'owner' && sub !== '') return json({ error: 'Your Coral Hub access is view only.' }, 403);
                 if (method !== 'GET' && window.__failNext) { window.__failNext = false; window.__posts++; return waitHold(() => new Response(JSON.stringify({ error: 'The comment could not be saved: the file is locked.' }), { status: 409, headers: { 'Content-Type': 'application/json' } })); }
                 if (method === 'POST' && sub === '') window.__posts++;
-                if (method === 'POST' && sub === '') { const b = JSON.parse(o.body); const c = { id: window.__next++, parent_id: b.parent_id == null ? null : b.parent_id, anchor: b.anchor, body: b.body, author: { kind: 'owner', issuer: 'local', subject: 'Operator' }, created_at: new Date().toISOString() }; window.__cs.push(c); return json({ ...c, can: can(c) }, 201); }
+                if (method === 'POST' && sub === '') { const b = JSON.parse(o.body); const c = { id: window.__next++, parent_id: b.parent_id == null ? null : b.parent_id, anchor: b.anchor, body: b.body, author: { kind: 'owner', issuer: 'local', subject: 'Operator' }, created_at: new Date().toISOString(), ...(window.__sentTo ? { sent_to: window.__sentTo } : {}) }; window.__cs.push(c); return json({ ...c, can: can(c) }, 201); }
                 const m = /^\\/(\\d+)(\\/(resolve|reopen))?$/.exec(sub); const c = m && window.__cs.find(x => x.id === Number(m[1]));
                 if (m && c) {
                     if (method === 'PATCH') { c.body = JSON.parse(o.body).body; c.edited_at = new Date().toISOString(); return json({ ...c, can: can(c) }); }
@@ -100,6 +100,15 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             await ev(`window.__release(); window.__hold = null; true`);
             await waitFor(`!document.querySelector('.ac-composer') && [...document.querySelectorAll('.ac-card')].some(c => /Is the lock per table/.test(c.textContent))`, at + 'the comment appears and the box clears', 8000);
             chk(!(await ev(vis('.ac-working'))), at + 'and the working line is gone');
+            // 1b) once sent, one short line (the Operator, comment 232): an agent was told -> 'Sent. The agent will respond shortly.'; none was -> says so, and never 'Sent to <name>' or silence
+            const toastsNow = () => ev(`[...document.querySelectorAll('.toast .toast-message, #toast-host .toast')].map(t => t.textContent.trim())`);
+            chk((await toastsNow()).some(t => t.startsWith('Saved. No agent was told.')), at + 'no agent told: the line says so: ' + JSON.stringify(await toastsNow()));
+            await ev(`document.querySelectorAll('#toast-host .toast, .toast').forEach(e => e.remove()); window.__sentTo = 'Writer A'; document.querySelector('.ac-whole').click(); true`);
+            await waitFor(`!!document.querySelector('.ac-composer .ac-input')`, 'the composer for the sent case', 5000);
+            await type('.ac-composer .ac-input', 'Is Thursday firm?'); await submit();
+            await waitFor(`[...document.querySelectorAll('.toast')].some(t => /^Sent\\. The agent will respond shortly\\./.test(t.textContent.trim()))`, at + 'an agent told: Sent. The agent will respond shortly.', 8000);
+            chk(!(await toastsNow()).some(t => /^Sent to /.test(t)), at + 'and no Sent to <name> toast: ' + JSON.stringify(await toastsNow()));
+            await ev(`window.__sentTo = null; true`);
             // 2) a failure keeps the draft and says why
             await ev(`document.querySelector('.ac-whole').click(); true`);
             await waitFor(`!!document.querySelector('.ac-composer .ac-input')`, 'the composer again', 5000);

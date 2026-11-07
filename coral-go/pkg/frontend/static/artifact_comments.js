@@ -367,7 +367,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (st.busy) return;
         st.busy = true;
         if (working) { setWorking(working); announce(working); }
-        try { const sentTo = await fn(); st.error = ''; st.composing = null; await refresh(); if (said) announce(said + (typeof sentTo === 'string' && sentTo ? `. Sent to ${sentTo}` : '')); if (typeof sentTo === 'string' && sentTo) showToast(`Sent to ${sentTo}`, false); } // the owner's comment reaches the agent on its own (#12203): the person sees who got it
+        try { const sentTo = await fn(); st.error = ''; st.composing = null; await refresh(); const told = typeof sentTo === 'string' ? (sentTo ? 'Sent. The agent will respond shortly.' : 'Saved. No agent was told.') : ''; if (said) announce(told ? said + '. ' + told : said); if (told) showToast(told, false); } // a new comment or reply (the create answers with sent_to, '' when no agent was told); an edit or a delete answers with no string and keeps its own words // the owner's comment reaches the agent on its own (#12203): the person sees who got it
         catch (e) { st.error = e.message || 'The change was refused.'; showToast(st.error, true); render(); announce(`Not done: ${st.error}`); }
         finally { st.busy = false; setWorking(''); }
     }
