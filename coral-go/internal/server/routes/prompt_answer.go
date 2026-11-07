@@ -94,6 +94,8 @@ type promptScreen struct {
 	// The few lines above the question (a permission prompt's command): with the question and the labels,
 	// what tells this prompt from the next one the agent opens (samePrompt).
 	context string
+	// command: the whole request a permission prompt draws between its two dashed rules (a long command, an edit's diff), read from the screen up to commandMaxLines (#14173); "" when the screen draws no such block.
+	command string
 	// Target is the lines above the question (a permission prompt's command) as permreview shows them: whole up to its limit, hidden characters written out. OnlyReject and Note: the request holds a character
 	// that hides what it does, or is longer than a card shows, so only Reject is offered and an Allow answer is refused (#11399). A cut the CLI itself makes on its screen cannot be known.
 	Target     string `json:"target,omitempty"`
@@ -163,11 +165,14 @@ func parsePromptScreen(capture string) (promptScreen, bool) {
 		return s, false
 	}
 	// Judged on the raw text, before cleanPromptScreen drops what hides: the terminal still holds it.
-	rv := permreview.Merge(permreview.Of(s.context), permreview.Of(s.Question), permreview.Of(s.Title))
+	rv := permreview.Merge(permreview.Of(s.context), permreview.Of(s.command), permreview.Of(s.Question), permreview.Of(s.Title))
 	target := permreview.Of(s.context).Shown
+	if s.command != "" {
+		target = permreview.Of(s.command).Shown // the whole block between the rules, not its last three lines (#14173)
+	}
 	s = cleanPromptScreen(s)
 	s.AskID = askID(s)
-	if s.context != "" {
+	if s.context != "" || s.command != "" {
 		s.Target = target
 	}
 	if !rv.Allowed() {
@@ -359,7 +364,7 @@ func parsePromptScreenRaw(capture string) (promptScreen, bool) {
 			}
 		}
 	}
-	return promptScreen{Title: title, Question: question, Options: opts, Review: parseReview(lines, questionAt), Multi: multi, Submit: submit, boxes: boxes, context: promptContext(lines, questionAt)}, true
+	return promptScreen{Title: title, Question: question, Options: opts, Review: parseReview(lines, questionAt), Multi: multi, Submit: submit, boxes: boxes, context: promptContext(lines, questionAt), command: promptCommand(lines, questionAt)}, true
 }
 
 var (
@@ -475,7 +480,7 @@ func parseUnnumberedMenu(lines []string) (promptScreen, bool) {
 	if questionAt < 0 {
 		questionAt = first
 	}
-	return promptScreen{Question: question, Options: opts, Unnumbered: true, context: promptContext(lines, questionAt)}, true
+	return promptScreen{Question: question, Options: opts, Unnumbered: true, context: promptContext(lines, questionAt), command: promptCommand(lines, questionAt)}, true
 }
 
 // paragraphAt is the paragraph (non-blank lines between blank lines and rules) holding lines[i], joined, and
@@ -507,6 +512,35 @@ func promptContext(lines []string, questionAt int) string {
 		}
 	}
 	return strings.Join(above, "\n")
+}
+
+// commandMaxLines bounds the walk up from the question for a permission prompt's command block.
+const commandMaxLines = 400
+
+var dashedRuleRe = regexp.MustCompile(`^\s*[╌┄]{8,}\s*$`)
+
+// promptCommand is the whole request Claude draws between its two dashed rules just above a permission question (a Bash command, an edit's diff), so a card and a row can show all of it and not the last three lines
+// promptContext keeps for telling one ask from the next (#14173, the Beta Tester: a long command showed only its last 2 lines). It is "" unless the nearest non-blank line above the question is a dashed rule and
+// the rule that opens the block is within commandMaxLines: any other screen keeps the old three lines. Each line keeps its own indentation, one leading space (the dialog's margin) dropped.
+func promptCommand(lines []string, questionAt int) string {
+	i := questionAt - 1
+	for i >= 0 && strings.TrimSpace(lines[i]) == "" {
+		i--
+	}
+	if i < 0 || !dashedRuleRe.MatchString(lines[i]) {
+		return ""
+	}
+	end := i
+	for j := end - 1; j >= 0 && j >= end-commandMaxLines; j-- {
+		if dashedRuleRe.MatchString(lines[j]) {
+			block := make([]string, 0, end-j-1)
+			for _, l := range lines[j+1 : end] {
+				block = append(block, strings.TrimRight(strings.TrimPrefix(l, " "), " \t\r"))
+			}
+			return strings.Trim(strings.Join(block, "\n"), "\n")
+		}
+	}
+	return ""
 }
 
 // samePrompt reports whether two reads show the same prompt, wherever its selection is.
