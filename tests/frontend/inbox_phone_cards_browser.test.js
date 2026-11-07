@@ -11,7 +11,7 @@ const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const failures = [];
+    const { Input } = client; const failures = [];
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     try {
@@ -48,6 +48,17 @@ const { coralReady } = require('./helpers/wait');
             check(m.sortLabelPx && m.sortLabelPx[0] <= 1 && m.sortLabelPx[1] <= 1, `${at}"Sort by" is for a screen reader, not drawn: ` + JSON.stringify(m.sortLabelPx));
             check(!m.wide && m.cards.every(c => c.rect[0] >= 0 && c.rect[2] <= m.vw && !c.over), `${at}nothing runs off the screen: ` + JSON.stringify([m.wide, m.vw, m.cards.map(c => c.rect)]));
             check(m.tailTop === null || m.tailTop >= b.rect[3], `${at}the footer notice is after the last card, not over it: ` + JSON.stringify([m.tailTop, b.rect[3]]));
+            // QA's SHOULD: an unread (or hovered) row's tint must never paint over the card: the row is the chat's colour and none of its cells paints a colour of its own
+            await Input.dispatchMouseEvent({ type: 'mouseMoved', x: Math.round(a.rect[0] + 40), y: Math.round(a.rect[1] + 30) });
+            const paint = await ev(`(() => { const trs = [...document.querySelectorAll('#group-table-view tbody tr.dt-row')]; return trs.map(tr => ({ unread: tr.classList.contains('dt-unread'), bg: getComputedStyle(tr).backgroundColor, cells: [...tr.children].map(td => getComputedStyle(td).backgroundColor).filter(c => c !== 'rgba(0, 0, 0, 0)') })); })()`);
+            check(paint.some(p => p.unread) && paint.every(p => p.bg === m.chat.bg && p.cells.length === 0), `${at}an unread row's tint (and the hover) never paints over the card: ` + JSON.stringify({ chat: m.chat.bg, paint }));
+            // the Operator: "the search bar is offset": ONE left edge, 12 px, for everything on the page (text, controls and cards), at this width
+            const edges = await ev(`(() => { const left = e => e && Math.round(e.getBoundingClientRect().left), cs = e => getComputedStyle(e), view = document.getElementById('group-table-view');
+                const text = e => { const w2 = document.createTreeWalker(e, NodeFilter.SHOW_TEXT, { acceptNode: n => n.textContent.trim() ? 1 : 3 }), n = w2.nextNode(); if (!n) return null; const rg = document.createRange(); rg.selectNodeContents(n); return Math.round(rg.getBoundingClientRect().left); };
+                const vis = e => !!e && !!e.getClientRects().length && e.getBoundingClientRect().width > 0;
+                const search = [...document.querySelectorAll('input[type=search]')].find(vis), tog = view.querySelector('.inbox-group-review-toggle'), sel = view.querySelector('.dt-sortbar-select'), note = view.querySelector('.inbox-alerts-link'), alerts = note && note.querySelector('button');
+                return { title: text(view.querySelector('h2')), search: search && Math.round(search.getBoundingClientRect().left + parseFloat(cs(search).paddingLeft) + parseFloat(cs(search).borderLeftWidth)), group: tog && left(tog), chips: left(sel), card: left(view.querySelector('tbody tr.dt-row')), note: note && text(note), alerts: alerts && text(alerts) - parseFloat(cs(alerts).paddingLeft) + parseFloat(cs(alerts).paddingLeft) }; })()`);
+            check(Object.entries(edges).filter(([, v]) => v !== null && v !== undefined).every(([, v]) => Math.abs(v - 12) <= 1), `${at}one left edge (12 px) for the title, the search, the grouping box, the chips, the cards and the notice: ` + JSON.stringify(edges));
             const badge = await ev(`document.getElementById('nav-tab-hub-inbox-badge')?.textContent`);
             check(badge === '2', `${at}the count is the number of cards (2): ` + badge);
             if (w === 390 && theme === 'dark' && font === 16) await shot('phone-cards-390');
