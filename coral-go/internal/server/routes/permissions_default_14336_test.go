@@ -341,3 +341,28 @@ func TestAKeepFullAccessCallerMayStartABypassMember(t *testing.T) {
 	require.NotNil(t, refusal)
 	assert.Equal(t, agentLaunchAboveCallerCode, refusal.Code)
 }
+
+// QA Reviewer 2's SHOULD on #14336: claudeLike's type list is pinned. Hermes, Codex, agy and its kin, Pi and opencode rank their own modes and are NOT Claude-like, so a Don't ask Hermes (or Codex) is
+// never ranked by a Claude allow list: that would hand a Hermes caller rank 3 from a bare shell allow.
+func TestClaudeLikeIsOnlyTheTypesWithClaudesModes(t *testing.T) {
+	for typ, want := range map[string]bool{
+		at.Claude: true,
+		at.Hermes: false, at.Codex: false, at.Agy: false, at.Pi: false, at.Opencode: false,
+		"gemini": false, "antigravity": false,
+	} {
+		assert.Equal(t, want, claudeLike(typ), typ)
+	}
+	shell := &agent.Capabilities{Allow: []string{"shell", "file_write"}}
+	// a Don't ask Claude with a bare shell allow runs commands unasked: open. The others are ranked by their own mode, never by a Claude allow list.
+	assert.Equal(t, rankOpen, effectiveRank(at.Claude, "dontAsk", shell, false))
+	assert.Equal(t, rankAsks, effectiveRank(at.Hermes, "dontAsk", shell, false), "Hermes has no Don't ask: it asks")
+	assert.NotEqual(t, rankOpen, effectiveRank(at.Codex, "dontAsk", shell, false), "Codex's Don't ask stays in its sandbox")
+	assert.Equal(t, rankAsks, effectiveRank(at.Agy, "dontAsk", &agent.Capabilities{Allow: []string{"file_read"}}, false), "agy has no Don't ask flag")
+	// and as a CALLER a Hermes row in dontAsk is ranked by Hermes's own table (asks), not lowered or raised by the Claude rule
+	mode := "dontAsk"
+	for _, typ := range []string{at.Hermes, at.Codex, at.Agy} {
+		caps := `{"allow":["shell","file_write"]}`
+		auth := authorityFromRow(&store.LiveSession{SessionID: "s", AgentType: typ, PermissionMode: &mode, Capabilities: &caps}, false)
+		assert.Equal(t, effectiveRank(typ, "dontAsk", &agent.Capabilities{Allow: []string{"shell", "file_write"}}, false), auth.Rank, "%s ranks by its own mode table", typ)
+	}
+}
