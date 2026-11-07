@@ -1078,12 +1078,13 @@ registerGroupSource('hub-inbox', {
     const reasons = reviewChangeLabels(s.review);
     if (waitingOnAgent(s.review)) reasons.unshift(`Changes requested · waiting on ${markHidden(s.review.produced_by || 'the agent', { strict: true })}`);
     for (const text of reasons) { if (isPhoneLayout() && hasNewVersion(s.review) && text.startsWith('New version')) continue; const reason = DT.el('span', 'inbox-review-reason', ` · ${text}`); if (/^\d+ new comments?$/.test(text)) reason.classList.add('inbox-new-comments'); name.append(reason); }
-    name.setAttribute('aria-label', [`Open ${markTitle(s.review.name)}`, ...(versionOf(s.review) > 1 && !hasNewVersion(s.review) ? [`v${versionOf(s.review)}`] : []), ...reasons].join(', '));
+    name.setAttribute('aria-label', [`Open ${markTitle(s.review.name)}`, ...(versionOf(s.review) > 1 && !hasNewVersion(s.review) ? [`version ${versionOf(s.review)}`] : []), ...reasons].join(', '));
     const wrap = DT.el('span', 'inbox-review-item inbox-agent-first'), sender = agentLink(markHidden(s.review.produced_by, { strict: true }).trim() || 'sender unknown', { board: boardTeamKey(sessionServer(s), s.review.team), cls: 'inbox-review-from' });
     const readWords = `${isRead(s.review) ? ', read' : ', unread'}${waitingOnAgent(s.review) && !(s.review.new_comments > 0) ? ', waiting on agent, not counted' : ''}`;
     if (isPhoneLayout()) {
-        if (versionOf(s.review) > 1) { const version = DT.el('span', 'inbox-review-version', hasNewVersion(s.review) ? ` · New version v${versionOf(s.review)}` : ` · version ${versionOf(s.review)}`); name.append(version); }
-        wrap.append(sender, name);
+        const tags = DT.el('span', 'inbox-review-tags');
+        if (versionOf(s.review) > 1) { const version = DT.el('span', 'inbox-review-version', `v${versionOf(s.review)}`); version.title = hasNewVersion(s.review) ? `New version v${versionOf(s.review)}` : `Version ${versionOf(s.review)}`; version.setAttribute('aria-hidden', 'true'); tags.append(version); }
+        wrap.append(sender, name); if (tags.childNodes.length) wrap.append(tags);
         wrap.append(DT.el('span', 'sr-only', `${earlierWords(s.review) ? `, ${earlierWords(s.review)}` : ''}${readWords}`), ...waitMark(s)); return wrap;
     }
     const ver = DT.el('span', 'inbox-review-version', versionOf(s.review) > 1 ? ` · version ${versionOf(s.review)}` : ''); ver.hidden = !(versionOf(s.review) > 1);
