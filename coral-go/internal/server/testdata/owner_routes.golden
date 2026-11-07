@@ -15,6 +15,7 @@ GET /api/artifacts/{id}/comments view owner-only
 GET /api/artifacts/{id}/meta view owner-only
 GET /api/artifacts/{id}/private view owner-only
 GET /api/artifacts/{id}/readers view owner-only
+GET /api/artifacts/{id}/thumbnail view owner-only
 GET /api/artifacts/{id}/versions view owner-only
 GET /api/board/{project}/artifacts view owner-only
 GET /api/board/{project}/artifacts/{digest}/edit view owner-only

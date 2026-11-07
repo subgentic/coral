@@ -1,3 +1,6 @@
+import { importOnce } from './import_once.js';
+import { serverUrl } from './server_base.js';
+const { artifactThumbnail, thumbnailPath } = await importOnce('./artifact_thumbnail.js');
 import { serverFilter } from './inbox_servers.js';
 /* The Inbox Needs you folder's search, pills and Filters (#8604, UI/UX #8589 section 9): what they are, how they are kept in the browser, and how a waiting agent is matched against them. Pure (no DOM; it
  * imports the model and the browser store) so it is tested on its own; inbox_toolbar.js draws the controls on the shared list bar. Every field is one the rows already carry (the agent, its team, the kind of
@@ -36,6 +39,7 @@ export const saveFilters = f => kept.save('inbox-needs', { ...f, q: '' }, browse
 export function kindIcon(s) {
     const k = s && s.waiting_kind === 'ask' ? 'ask' : kindOf(s), i = document.createElement('span'); // a question put to the Operator is a question, not "needs input" (#13819); it is still the 'other' pill's, so no filter changes
     i.className = 'material-icons inbox-kind-icon'; i.dataset.kind = k; i.setAttribute('role', 'img'); i.setAttribute('aria-label', KIND_LABEL[k]); i.title = KIND_LABEL[k];
+    if (s?.review) { i.classList.add('inbox-artifact-thumbnail'); i.append(artifactThumbnail(s.review, { size: 32, url: typeof s.server === 'string' && thumbnailPath(s.review) ? serverUrl(thumbnailPath(s.review), s.server) : '' })); }
     return i;
 }
 /** A row's item cell with its kind's icon in front (a string cell becomes a span). */

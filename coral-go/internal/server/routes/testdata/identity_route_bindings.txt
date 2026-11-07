@@ -34,6 +34,7 @@ GET /api/artifacts/series/{series_id}/versions | token-session
 GET /api/artifacts/{id} | token-session
 GET /api/artifacts/{id}/comments | token-session
 GET /api/artifacts/{id}/meta | token-session
+GET /api/artifacts/{id}/thumbnail | token-session | operator-only
 GET /api/artifacts/{id}/versions | token-session
 GET /api/board/projects | board-unchecked
 GET /api/board/remotes | board-unchecked | operator-only

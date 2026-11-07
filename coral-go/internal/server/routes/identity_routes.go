@@ -31,6 +31,7 @@ func isAgentTool(r *http.Request) bool {
 // an API key, the signed command line). Each agent call is recorded in the identity report.
 var operatorOnlyRoutes = map[string]string{
 	"GET /api/filesystem/trust-probe":      "check project configuration names before choosing folder trust",
+	"GET /api/artifacts/{id}/thumbnail":    "read an artifact thumbnail",
 	"GET /api/chief/checks":                "read scheduled checks",
 	"POST /api/chief/checks":               "create scheduled checks",
 	"GET /api/chief/checks/{checkID}":      "read a scheduled check",

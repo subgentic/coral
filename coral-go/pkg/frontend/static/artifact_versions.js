@@ -1,3 +1,5 @@
+import { importOnce } from './import_once.js';
+const { artifactThumbnail, thumbnailPath } = await importOnce('./artifact_thumbnail.js');
 /* Versions of an artifact in the viewer (#6357, #6472 layout A): a bar under the title for an artifact that is one of several versions of a series: Previous and Next, "v3 of 3" opening the list of
  * every version (a listbox, newest first), and "Compare with v2". Compare draws the text's lines that were added and removed since the version before (Changes) or the two versions side by side. All
  * text is set with textContent. The server's list is GET /api/artifacts/{digest}/versions (an artifact in no series is a 404: no bar). A switch and a compare are said once in a polite line. */
@@ -153,7 +155,7 @@ export function attachVersions(dialog, hooks) {
             // the shown version is the list's one Tab stop; the arrow keys move between the rest (a roving tabindex)
             const li = el('li', 'av-option'); li.setAttribute('role', 'option'); li.id = `av-opt-${r.version}`; li.tabIndex = r.digest === st.hex ? 0 : -1; li.dataset.version = String(r.version);
             li.setAttribute('aria-selected', String(r.digest === st.hex)); li.title = w.full;
-            li.append(el('span', 'av-vname', `v${r.version}${r.is_latest ? ' (latest)' : ''}`), el('span', 'av-who', [w.label, r.role || r.uploader].filter(Boolean).join(' · ')), el('span', 'av-size', sizeOf(r.size || 0)));
+            li.append(artifactThumbnail(r, { url: thumbnailPath(r) ? serverUrl(thumbnailPath(r), st.server) : '' }), el('span', 'av-vname', `v${r.version}${r.is_latest ? ' (latest)' : ''}`), el('span', 'av-who', [w.label, r.role || r.uploader].filter(Boolean).join(' · ')), el('span', 'av-size', sizeOf(r.size || 0)));
             li.addEventListener('click', () => choose(r));
             li.addEventListener('focus', () => { for (const o of options()) o.tabIndex = o === li ? 0 : -1; });
             list.append(li);
