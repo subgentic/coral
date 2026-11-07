@@ -58,13 +58,16 @@ const WORKERS_REFUSED = { plan: 'Claude agents cannot start workers in this mode
 const WORKERS_REFUSED_ANY = 'Agents cannot start workers in this mode.';
 
 // A CLI offers only the modes it has (#10381): Codex has no Accept edits (its sandbox and approval pair for it is Codex's own default, which Default is) and no Don't ask (it is Auto's launch), so its list is Default, Plan, Auto and Bypass permissions.
-const MODES_A_CLI_LACKS = { codex: ['acceptEdits', 'dontAsk'], hermes: ['acceptEdits', 'plan', 'auto', 'dontAsk'] }; // Hermes has one switch: it asks before a dangerous command, or --yolo (Bypass) does not (agent.PermissionFlagsForAgent, #12169)
+const MODES_A_CLI_LACKS = { codex: ['acceptEdits', 'dontAsk'], hermes: ['acceptEdits', 'plan', 'auto', 'dontAsk'], pi: ['', 'plan', 'acceptEdits', 'auto', 'dontAsk', 'bypassPermissions'] }; // Hermes has one switch: it asks before a dangerous command, or --yolo (Bypass) does not (agent.PermissionFlagsForAgent, #12169) Pi has no permission flag at all (#14360): only Default is left, and the select is disabled with the reason
 export function modeOffered(type, value) { return !(MODES_A_CLI_LACKS[String(type || '').toLowerCase()] || []).includes(value); }
 /** Hides the modes the CLI lacks; a pick that is one of them (the type was changed to this CLI) falls to Default. */
 function offerModesFor(selectEl, type) {
     if (!type) return; // Settings' own select is for every CLI
     for (const o of selectEl.options) { const on = modeOffered(type, o.value); o.hidden = !on; o.disabled = !on; }
     if (!modeOffered(type, selectEl.value)) selectEl.value = 'default';
+    // Pi has no modes: the choice would change nothing, so it is shown fixed on Default and says why (#14360); another CLI gives the select back
+    if (String(type).toLowerCase() === 'pi') { selectEl.disabled = true; selectEl.dataset.noModes = '1'; selectEl.title = PI_NO_PERMISSIONS; }
+    else if (selectEl.dataset.noModes) { selectEl.disabled = false; delete selectEl.dataset.noModes; selectEl.removeAttribute('title'); }
 }
 
 // `unset`: nothing is saved, so nothing is refused, though the select reads Auto (Security's #7587 point: only a saved mode, or a pick that will be saved, refuses)
