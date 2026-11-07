@@ -20,7 +20,7 @@ export function dismissButton(className, session) {
     b.type = 'button';
     b.className = className;
     b.textContent = 'Dismiss';
-    b.title = 'Clear this if the agent is not waiting; if it asks again it comes back. Nothing is sent to the agent.';
+    b.title = 'Dismiss this notice. An active terminal wait stays listed until the agent continues. Nothing is sent to the agent.';
     b.dataset.dismissSession = session.session_id;
     return b;
 }
@@ -28,7 +28,7 @@ export function dismissButton(className, session) {
 /** What a Dismiss says (#12465): it clears Coral's record and sends nothing, so an agent that is still waiting (Hermes on a prompt in its terminal) keeps waiting there with no way to answer from Coral once the card is gone: the
  *  notice says so and offers the agent. */
 function saidDismiss(text, session) {
-    showToast(`${text} If it is still waiting, it waits in its terminal.`, false, 30000, { action: { label: 'Open agent', onClick: () => openAgent(session) } });
+    showToast(`${text} If it is still waiting, open its terminal to continue.`, false, 30000, { action: { label: 'Open agent', onClick: () => openAgent(session) } });
 }
 
 /** Clears the wait of a session and says so; the live list is read again so the card and the row go. */
@@ -51,7 +51,7 @@ export async function dismissWait(session, button) {
         }
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const said = await resp.json().catch(() => ({}));
-        if (said.hidden || said.dismissed) saidDismiss(said.hidden ? 'Hidden until the agent asks something new. Nothing was sent to the agent.' : 'Dismissed. Nothing was sent to the agent.', session); else showToast('It was not waiting any more.', false, 4000); // hidden: a request the machine cannot clear, kept as hidden on the machine (#11946)
+        if (said.hidden || said.dismissed) saidDismiss(said.hidden ? 'Dismissed. An active wait stays in Needs you. Nothing was sent to the agent.' : 'Dismissed. Nothing was sent to the agent.', session); else showToast('It was not waiting any more.', false, 4000); // hidden: a request the machine cannot clear, kept as hidden on the machine (#11946)
         await loadLiveSessions();
     } catch {
         if (button) button.disabled = false;

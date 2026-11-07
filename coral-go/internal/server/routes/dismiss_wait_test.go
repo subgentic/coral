@@ -23,24 +23,62 @@ func (r *holdRig) dismiss(sessionID string) *httptest.ResponseRecorder {
 	return rec
 }
 
-// #11352: the Operator's Dismiss clears a stale "Permission needed": the state, the held-message gate and the Inbox row all follow the events, and nothing is typed to the agent.
-func TestDismissWaitClearsAnOpenPermissionAndTypesNothing(t *testing.T) {
-	r := newHoldRig(t, true)
-	ctx := context.Background()
-	r.requestFor("Wants to run: go test ./...")
-	require.True(t, r.h.deriveSingleSessionState(ctx, r.sid, 0).NeedsInput)
-	typedBefore := len(r.typed())
+// #14203 (#14152, beta finding 3): the Operator's Dismiss does NOT resolve a permission, question or plan wait. It marks the current request ignored and the wait stays until the agent's own evidence clears it
+// (the box is answered or the turn moves on). So the agent is still waiting, the held-message gate stays held (the box is on screen: nothing is typed into it), /api/needs-you still lists it with a flag
+// and the Inbox, the count and the team page read one source. Nothing is typed to the agent.
+func TestDismissWaitKeepsAPermissionQuestionOrPlanWaitingAndMarksItIgnored(t *testing.T) {
+	for _, kind := range []string{"permission", "question", "plan"} {
+		t.Run(kind, func(t *testing.T) {
+			r := newHoldRig(t, true)
+			ctx := context.Background()
+			r.box(kind)
+			st := r.h.deriveSingleSessionState(ctx, r.sid, 0)
+			require.True(t, st.NeedsInput)
+			require.Equal(t, kind, st.WaitingKind)
+			typedBefore := len(r.typed())
+			eventsBefore := r.eventCount()
 
-	rec := r.dismiss(r.sid)
-	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-	assert.Contains(t, rec.Body.String(), `"dismissed":true`)
-	assert.False(t, r.h.deriveSingleSessionState(ctx, r.sid, 0).NeedsInput)
-	assert.False(t, r.h.blockedOnBox(ctx, r.name, "claude", r.sid))
-	assert.Equal(t, typedBefore, len(r.typed()), "nothing was typed into the agent's terminal")
+			rec := r.dismiss(r.sid)
+			require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+			assert.Contains(t, rec.Body.String(), `"dismissed":true`)
+			assert.Contains(t, rec.Body.String(), `"hidden":true`, "it says it marked the request ignored, not that it cleared the wait")
+			assert.True(t, r.h.deriveSingleSessionState(ctx, r.sid, 0).NeedsInput, "the agent is still waiting: Dismiss gives no evidence from the terminal")
+			assert.True(t, r.h.blockedOnBox(ctx, r.name, "claude", r.sid), "the held-message gate stays held while the box is on screen")
+			assert.Equal(t, typedBefore, len(r.typed()), "nothing was typed into the agent's terminal")
+			assert.Equal(t, eventsBefore, r.eventCount(), "no request_resolved event was recorded for the agent")
 
-	rec = r.dismiss(r.sid)
-	require.Equal(t, http.StatusOK, rec.Code)
-	assert.Contains(t, rec.Body.String(), `"dismissed":false`, "nothing is open any more")
+			ignored, err := r.h.ss.WaitIgnoredKeys(ctx)
+			require.NoError(t, err)
+			assert.Equal(t, waitRequestKey(r.h.deriveSingleSessionState(ctx, r.sid, 0)), ignored[r.sid], "the ignored request is this one")
+
+			// /api/needs-you keeps it, flagged: the Inbox count and the team page read the same row
+			req := httptest.NewRequest(http.MethodGet, "/api/sessions/live", nil)
+			items, err := r.h.NeedsYouAgents(req)
+			require.NoError(t, err)
+			var got *NeedsYouItem
+			for i := range items {
+				if items[i].ID == "agent:"+r.sid {
+					got = &items[i]
+				}
+			}
+			require.NotNil(t, got, "an ignored wait that is still active stays in /api/needs-you")
+			assert.True(t, got.StillWaiting, "flagged: still waiting in its terminal")
+
+			// a second Dismiss is the same answer, nothing changes
+			rec = r.dismiss(r.sid)
+			require.Equal(t, http.StatusOK, rec.Code)
+			assert.True(t, r.h.deriveSingleSessionState(ctx, r.sid, 0).NeedsInput)
+
+			// the agent's own evidence clears it: the box is answered, so the wait, the flag and the item go
+			r.answered()
+			assert.False(t, r.h.deriveSingleSessionState(ctx, r.sid, 0).NeedsInput, "the agent's own evidence clears the wait")
+			items, err = r.h.NeedsYouAgents(req)
+			require.NoError(t, err)
+			for _, it := range items {
+				assert.NotEqual(t, "agent:"+r.sid, it.ID, "answered: gone from /api/needs-you")
+			}
+		})
+	}
 }
 
 // The exact target: an agent's name with another session's id is refused, not applied to whichever agent the name matches.
@@ -57,7 +95,7 @@ func TestDismissWaitRefusesAnotherSessionsId(t *testing.T) {
 func TestDismissWaitAnswersAStoreFailureWithAFixedSentence(t *testing.T) {
 	r := newHoldRig(t, true)
 	r.requestFor("Wants to run: go test ./...")
-	_, err := r.h.db.Exec(`CREATE TRIGGER refuse_dismissal BEFORE INSERT ON agent_events WHEN NEW.event_type = 'request_resolved' BEGIN SELECT RAISE(ABORT, 'secret database text: /Users/x/.coral/sessions.db'); END`)
+	_, err := r.h.db.Exec(`CREATE TRIGGER refuse_dismissal BEFORE INSERT ON agent_wait_ignored BEGIN SELECT RAISE(ABORT, 'secret database text: /Users/x/.coral/sessions.db'); END`)
 	require.NoError(t, err)
 
 	rec := r.dismiss(r.sid)
@@ -65,7 +103,7 @@ func TestDismissWaitAnswersAStoreFailureWithAFixedSentence(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "Could not dismiss it. Try again.")
 	assert.NotContains(t, rec.Body.String(), "secret database text")
 	assert.NotContains(t, rec.Body.String(), "sessions.db")
-	assert.True(t, r.h.deriveSingleSessionState(context.Background(), r.sid, 0).NeedsInput, "nothing was cleared")
+	assert.True(t, r.h.deriveSingleSessionState(context.Background(), r.sid, 0).NeedsInput, "nothing was changed")
 }
 
 // #11946 (the Operator's bug, and QA's INFO against "one number"): a request the machine cannot clear (an elicitation, an input prompt, a sign-in) is HIDDEN by the Dismiss, and the hiding is kept on the machine,
@@ -107,9 +145,14 @@ func TestDismissWaitHidesARequestTheMachineCannotClearAndKeepsItOnTheMachine(t *
 	require.True(t, found, "the agent is on the live list")
 	items, err := r.h.NeedsYouAgents(req)
 	require.NoError(t, err)
+	var listed bool
 	for _, it := range items {
-		assert.NotEqual(t, "agent:"+r.sid, it.ID, "the hidden request is not in /api/needs-you")
+		if it.ID == "agent:"+r.sid {
+			listed = true
+			assert.True(t, it.StillWaiting, "flagged: still waiting in its terminal (#14203)")
+		}
 	}
+	assert.True(t, listed, "the hidden request is still in /api/needs-you while the agent waits (#14203)")
 
 	// the agent asks something new: a different request, so it is not hidden by the old one
 	r.post(`{"event_type":"stop","summary":"Agent stopped"}`)
@@ -119,12 +162,15 @@ func TestDismissWaitHidesARequestTheMachineCannotClearAndKeepsItOnTheMachine(t *
 	assert.NotEqual(t, key, waitRequestKey(st2), "a later request has its own key")
 }
 
-func TestARequestTheOperatorHidSaysSoOnTheLiveRowAndLeavesNeedsYou(t *testing.T) {
+func TestARequestTheOperatorIgnoredSaysSoOnTheLiveRowAndStaysInNeedsYouFlagged(t *testing.T) {
 	rows := []map[string]any{
 		{"session_id": "a1", "name": "claude-a1", "display_name": "Hidden one", "waiting_for_input": true, "waiting_summary": "Needs input", "waiting_since": "2026-11-02T01:00:00Z", "wait_ignored": true},
 		{"session_id": "b2", "name": "claude-b2", "display_name": "Open one", "waiting_for_input": true, "waiting_summary": "Needs input", "waiting_since": "2026-11-02T01:00:00Z"},
 	}
 	items := needsYouAgentItems(rows, time.Now())
-	require.Len(t, items, 1, "the hidden request is not in what waits for the Operator (the count, the phone push)")
-	assert.Equal(t, "agent:b2", items[0].ID)
+	require.Len(t, items, 2, "an ignored wait that is still active stays in what waits for the Operator, flagged (#14203)")
+	assert.Equal(t, "agent:a1", items[0].ID)
+	assert.True(t, items[0].StillWaiting, "the ignored one says it is still waiting in its terminal")
+	assert.Equal(t, "agent:b2", items[1].ID)
+	assert.False(t, items[1].StillWaiting, "the open one is not flagged")
 }

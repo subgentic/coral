@@ -6,14 +6,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/tracking"
 )
 
-// DismissWait is the Operator's way to clear a wait that is no longer true (#11352): a "Permission needed" card and its Inbox row that stay after the agent went on. It writes a request_resolved
-// event marked dismissed, which the state derivation reads as the open request being gone. It types nothing to the agent and answers nothing in its terminal: only Coral's own record of the
-// wait changes. Operator-only (an agent's token is refused: the route is in the census as b), and only for a request of the agent's own kinds, never a sign-in or a launch prompt.
-// POST /api/sessions/live/{name}/dismiss-wait
+// DismissWait is the Operator's way to put away a wait they have seen (#11352, changed by #14203): it marks the agent's CURRENT request ignored, per agent and request, and never resolves it. It used to write a
+// request_resolved event for a permission, question or plan, which cleared the wait and the held-message gate with no evidence from the terminal: Needs you showed 0 and the team page "1 needs attention"
+// while the agent sat at its prompt (beta finding 3). Now the wait stays until the agent's own evidence clears it (the box is answered, the prompt is gone, the turn moves on), the held-message gate stays
+// held while the box is on screen, and /api/needs-you keeps the agent, flagged still_waiting, so the Inbox, its count and the team page read one source. It types nothing to the agent and answers nothing in
+// its terminal: only Coral's own record of what the Operator has seen changes. Operator-only (an agent's token is refused: the route is in the census as b), and only for a request of the agent's own kinds,
+// never a sign-in or a launch prompt. POST /api/sessions/live/{name}/dismiss-wait
 func (h *SessionsHandler) DismissWait(w http.ResponseWriter, r *http.Request) {
 	if refuseNonOwner(w, r) { // through Coral Hub the owner's alone: a guest or a grantee gets 403 owner_only (the operator's rule)
 		return
@@ -44,28 +45,13 @@ func (h *SessionsHandler) DismissWait(w http.ResponseWriter, r *http.Request) {
 	}
 	sid := body.SessionID
 	inboxActioned(r, tracking.InboxAgentWait, st.WaitingKind, "dismiss", st.WaitingSince) // the Inbox's numbers (#7512): the wait's kind, never the agent
-	switch st.WaitingKind {
-	case "permission", "question", "plan":
-	default:
-		// A request the machine cannot clear (an input prompt, an elicitation, a sign-in): the Operator hides it from Needs you instead, and the hiding is kept here, per agent and request, so the row, the
-		// count and /api/needs-you agree (#11946). The agent's own state is untouched and nothing is sent to it; its next request is its own.
-		if err := h.ss.SetWaitIgnored(r.Context(), sid, waitRequestKey(st)); err != nil {
-			slog.Warn("could not record the Operator's hiding of a wait", "session_id", sid, "error", err)
-			errInternalServer(w, "Could not dismiss it. Try again.")
-			return
-		}
-		h.kickFeedForRequestChange(sid, "request_resolved")
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "dismissed": true, "hidden": true})
-		return
-	}
-	detail := `{"dismissed":true}`
-	ev := &store.AgentEvent{AgentName: ls.AgentName, SessionID: &sid, EventType: "request_resolved", Summary: "The Operator dismissed the wait", DetailJSON: &detail}
-	if _, err := h.ts.InsertAgentEvent(r.Context(), ev); err != nil {
+	// Every kind the same (permission, question, plan, an input prompt, an elicitation, a sign-in): the Operator's seeing it is kept per agent and request, so the row, the count and /api/needs-you agree
+	// (#11946, #14203). The agent's own state is untouched and nothing is sent to it; its next request is its own.
+	if err := h.ss.SetWaitIgnored(r.Context(), sid, waitRequestKey(st)); err != nil {
 		slog.Warn("could not record the Operator's dismissal of a wait", "session_id", sid, "error", err) // the cause is logged, never sent: no database text in a response
 		errInternalServer(w, "Could not dismiss it. Try again.")
 		return
 	}
-	h.pending.markRequest(body.SessionID, false)
-	h.kickFeedForRequestChange(body.SessionID, "request_resolved")
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "dismissed": true})
+	h.kickFeedForRequestChange(sid, "request_resolved")
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "dismissed": true, "hidden": true})
 }
