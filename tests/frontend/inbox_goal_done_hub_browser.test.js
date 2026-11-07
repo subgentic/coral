@@ -14,7 +14,7 @@ const { coralReady } = require('./helpers/wait');
         await Page.addScriptToEvaluateOnNewDocument({ source: `(() => {
             const original = window.fetch, json = (body, status = 200) => Promise.resolve(Response.json(body, { status }));
             window.__goalOwner = true; window.__goalWrites = []; window.__localGoalWrites = [];
-            window.__remoteDone = Object.fromEntries(['m1','m2'].map(server => [server, { id:7, board_id:'same-team', board_label:'Release team', title:'Ship on '+server, state:'active', done_when:'The release ships', created_by:'Operator', driver:'Dev', created_at:'2026-11-01T00:00:00Z', updated_at:'2026-11-01T00:00:00Z', looks_done_at:'2026-11-01T00:00:00Z', rollup:{active:0,blocked:0,queued:0,done:1,total:1} }]));
+            window.__remoteDone = JSON.parse(sessionStorage.getItem('hub-done-goals') || 'null') || Object.fromEntries(['m1','m2'].map(server => [server, { id:7, board_id:'same-team', board_label:'Release team', title:'Ship on '+server, state:'active', done_when:'The release ships', created_by:'Operator', driver:'Dev', created_at:'2026-11-01T00:00:00Z', updated_at:'2026-11-01T00:00:00Z', looks_done_at:'2026-11-01T00:00:00Z', rollup:{active:0,blocked:0,queued:0,done:1,total:1} }]));
             window.fetch = (input, options = {}) => {
                 const url = new URL(String(input), location.href), method = options.method || 'GET';
                 if (method !== 'GET' && url.pathname.startsWith('/api/board/')) window.__localGoalWrites.push(url.pathname);
@@ -25,6 +25,12 @@ const { coralReady } = require('./helpers/wait');
                 if (path === '/api/board/same-team/goals/7/done-state' && method === 'POST') {
                     const body = JSON.parse(options.body); window.__goalWrites.push({source,path,body});
                     if (!window.__goalOwner) return json({error:'owner_only'},403);
+                    const next = {...goal.done_state};
+                    if (body.state === 'dismiss' || body.state === 'not_yet') next.hidden = body.state === 'dismiss' ? 'dismissed' : 'not_yet';
+                    else if (body.state === 'show') delete next.hidden;
+                    else if (body.state === 'read') next.read = true;
+                    else if (body.state === 'unread') delete next.read;
+                    goal.done_state = next; sessionStorage.setItem('hub-done-goals',JSON.stringify(window.__remoteDone));
                     return json({ok:true});
                 }
                 if (path === '/api/board/same-team/goals/7/close' && method === 'POST') {
@@ -69,11 +75,28 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`/403/.test(document.body.textContent)`,'non-owner refusal is stated');
             assert.equal(await ev(`!!(${row('m2')}) && !!(${row('m1')})`),true,'refused write does not hide either goal');
             await ev(`window.__goalOwner=true;true`);
+            const reloadNeeds = async () => {
+                await Page.navigate({url:BASE+'/'}); await Page.loadEventFired(); await coralReady(ev,'startup','settings');
+                await ev(`window.switchNavTab('hub-inbox'); import(${S}+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
+                await waitFor(`!!(${row('m1')})`,'other computer remains after reload');
+            };
+            for (const label of ['Not yet','Dismiss']) {
+                await action(label); await waitFor(`!(${row('m2')})`,'hidden before reload');
+                await reloadNeeds();
+                assert.equal(await ev(`!!(${row('m2')})`),false,label+' remains hidden after full reload');
+                await ev(`import(${S}+'server_base.js').then(m=>m.serverFetch('m2','/api/board/same-team/goals/7/done-state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({state:'show'})})).then(()=>true)`);
+                await reloadNeeds(); await waitFor(`!!(${row('m2')})`,'source show restores row after reload');
+            }
+            await ev(`(${row('m2')}).click();true`);
+            await waitFor(`window.__goalWrites.some(w=>w.source==='m2'&&w.body.state==='read')`,'opening marks source read');
+            await reloadNeeds(); await waitFor(`(${row('m2')})?.classList.contains('dt-read')`,'source read survives reload');
+            assert.equal(await ev(`(${row('m1')}).classList.contains('dt-read')`),false,'other computer stays unread');
             await action('Close goal'); await waitFor(`!!document.querySelector('dialog.goals-close-dialog[open]')`,'remote close dialog');
             await ev(`document.querySelector('dialog.goals-close-dialog form').requestSubmit();true`);
             await waitFor(`window.__goalWrites.some(w=>w.source==='m2'&&w.path.endsWith('/close'))`,'Close goal uses Desktop');
             assert.equal(await ev(`window.__remoteDone.m2.state`),'done'); assert.equal(await ev(`window.__remoteDone.m1.state`),'active');
             assert.deepEqual(await ev(`window.__localGoalWrites`),[],'no write falls back to the Hub/local board');
+            await ev(`sessionStorage.removeItem('hub-done-goals');true`);
         }
         console.log('PASS Hub done-goal rows and source-scoped actions on desktop/phone, with non-owner refusal');
     } catch (error) { console.error('Hub goal diagnostics:', await ev(`JSON.stringify({goals:window.__remoteDone,requests:window.__remoteRequests,rows:[...document.querySelectorAll('#group-table-view tr')].map(r=>({key:r.dataset.key,text:r.textContent})),body:document.body.innerText.slice(-3000)})`)); throw error; } finally { await client.close(); }
