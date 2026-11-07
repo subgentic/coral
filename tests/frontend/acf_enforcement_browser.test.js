@@ -38,11 +38,11 @@ const BASE = require('./test_base').BASE;
             p.style.cssText = 'position:fixed;top:20px;left:20px;width:620px;height:860px;overflow:auto;z-index:99999;background:var(--bg-primary);padding:16px';
             document.body.append(p);
             const { AGENT_PRESETS } = await import((window.__coralStatic || '/static/') + 'agent_presets.js');
-            window.__presets = Object.fromEntries(AGENT_PRESETS.map(x => [x.name, x.capabilities]));
+            window.__presets = Object.fromEntries(AGENT_PRESETS.map(x => [x.name, x.roleLimits || x.capabilities]));
             window.renderAgentConfigForm('fixture', { showPreset: false, showName: false, value: { agentType: 'codex', capabilities: window.__presets['Frontend Dev'] } });
             document.querySelector('#fixture .permissions-toggle-btn').click(); return true; })()`);
 
-        console.log('Codex, Frontend Dev: a sandbox and an approval mode only; Deny and patterns marked');
+        console.log('Codex, explicitly applied Frontend Dev limits: a sandbox and an approval mode only; Deny and patterns marked');
         let t = await line();
         assert.match(t, /^Codex keeps only a sandbox and an approval mode: a sandbox that can change files in its folder, with no network, and it asks only when the model requests it/);
         assert.match(t, /web search on.*Deny entries and shell patterns are not enforced/);
