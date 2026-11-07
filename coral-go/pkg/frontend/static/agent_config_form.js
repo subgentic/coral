@@ -122,11 +122,20 @@ function _syncEnforcement(container) {
         || defaultPermissionMode(_settingsFor(_acfServer(container)), agentType);
     const caps = _getPermissions(`${uid}-perms`) || {};
     const e = presetEnforcement(agentType, caps, permMode);
-    // Codex and Antigravity keep only a sandbox and an approval mode: an explicit Mode is applied and the capabilities may only narrow it; with no Mode the capabilities decide (#6425). Say so beside the Mode.
+    // The Operator's "Use Full access for this agent" (#14085): the checkbox is there only in a form that offers it (launch, restart) and only for the three CLIs that have it (the server refuses anyone else and says so)
+    const useFull = container.querySelector('.acf-use-full-access');
+    if (useFull) useFull.hidden = !['claude', 'codex', 'agy'].includes(agentType);
+    const offered = !!useFull && !useFull.hidden;
+    const fullOn = offered && !!useFull.querySelector('.acf-use-full-access-input')?.checked;
+    // Codex and Antigravity keep only a sandbox and an approval mode: an explicit Mode is applied and the capabilities may only narrow it; with no Mode the capabilities decide (#6425). Say so beside the Mode,
+    // and say what the Full access box does: it is pointed to only where it is, and once ticked the note says Full access, not the narrowing it overrides.
     const override = container.querySelector('.acf-mode-override');
     if (override) {
         const lm = launchedMode(agentType, permMode, caps);
-        override.textContent = !lm.narrowed ? '' : permMode === 'default' ? `No Mode chosen, so the capabilities decide: ${lm.text}.` : `The capabilities narrow this Mode: ${lm.text}.`;
+        override.textContent = !lm.narrowed ? ''
+            : fullOn ? 'Use Full access is ticked: this agent runs with Full access whatever its capabilities say.'
+            : permMode === 'default' ? `No Mode chosen, so the capabilities decide: ${lm.text}.${offered ? ' Tick Use Full access for this agent, below, to override that.' : ''}`
+            : `The capabilities narrow this Mode: ${lm.text}.${offered ? ' Tick Use Full access for this agent, below, to override that.' : ''}`;
         override.hidden = !override.textContent;
     }
     // The form's own line, and any line elsewhere that mirrors it (the Launch dialog shows it under the
@@ -309,7 +318,10 @@ function acfAutoPermissionsHtml(container, opts, { showAutoPermissions, agentTyp
                 <span class="settings-hint acf-mode-override" role="status" hidden></span>
                 ${liveNote}
                 ${codexNote}
-            </label>`;
+            </label>
+            ${opts.offerUseFullAccess ? `<label class="acf-use-full-access" hidden><input type="checkbox" class="acf-use-full-access-input"> Use Full access for this agent
+                <span class="settings-hint">It runs with Full access whatever its role's capabilities say, and every time it restarts. Only you can set it.</span>
+            </label>` : ''}`;
     }
     return autoPermissionsHTML;
 }
@@ -444,6 +456,7 @@ function initAcfPermissions(container, uid, { caps, v }) {
     trackPermissionPick(container.querySelector('.acf-permission-mode')); // a mode picked here is the person's, whatever the agent type does next (#5836)
     container.querySelector('.acf-permission-mode')?.addEventListener('change', () => _syncEnforcement(container));
     container.querySelector('.perms-shell-input')?.addEventListener('input', () => _syncEnforcement(container));
+    container.querySelector('.acf-use-full-access-input')?.addEventListener('change', () => _syncEnforcement(container)); // the note follows the box (#14085)
 }
 
 function initAcfPresets(containerId, uid, opts, { showPreset }) {
@@ -686,6 +699,7 @@ export function getAgentConfig(containerId) {
         flags,
         permissionMode: permMode, // what the form's select says: a launch on Default asks nothing about skipping prompts (#7620)
         capabilities: uid ? _getPermissions(`${uid}-perms`) : null,
+        useFullAccess: !!container.querySelector('.acf-use-full-access:not([hidden]) .acf-use-full-access-input')?.checked, // the Operator's choice, sent as keep_full_access (#14085)
     };
 }
 window.getAgentConfig = getAgentConfig;

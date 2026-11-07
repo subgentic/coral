@@ -34,6 +34,7 @@ async function showRestartModal() {
     // Render unified config form pre-filled from session
     if (window.renderAgentConfigForm) {
         window.renderAgentConfigForm('restart-acf', {
+            offerUseFullAccess: true, // #14085
             showPreset: false,
             showName: false,
             sections: true,
@@ -154,6 +155,7 @@ async function runRestart(config) {
         if (config.model !== undefined) payload.model = config.model;
         if (config.thinking !== undefined) payload.thinking = config.thinking; // only when chosen: a restart keeps the agent's level otherwise (#4969)
         if (config.capabilities) payload.capabilities = config.capabilities;
+        if (config.useFullAccess) payload.keep_full_access = true; // the Operator's "Use Full access for this agent" (#14085)
         if (config.pickedMode) payload.permission_mode = config.pickedMode; // the server uses it over the stored mode and flags; an extra flag could not do that, it is stripped (#12481)
         const resp = await serverFetch(currentServer(), `/api/sessions/live/${encodeURIComponent(state.currentSession.name)}/restart`, {
             method: "POST",

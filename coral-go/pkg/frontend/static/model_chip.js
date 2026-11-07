@@ -121,12 +121,12 @@ export function updateModelChip(session, server) {
     const mode = modeChip(s), modeWrap = $('codex-mode-wrap'), modeEl = $('codex-mode-chip'); // a Codex agent's live mode (#14051): read-only, said in plain text
     if (modeWrap && modeEl) {
         setHidden(modeWrap, !mode);
-        if (mode) { setText($('codex-mode-text'), mode.text); setTitle(modeEl, mode.title); setData(modeEl, 'warn', mode.warn ? 'on' : ''); setAttr(modeEl, 'aria-label', `Mode: ${mode.text}${mode.warn ? ', a restart would narrow it' : ''}`); }
+        if (mode) { setText($('codex-mode-key'), mode.key); setText($('codex-mode-text'), mode.text); setTitle(modeEl, mode.title); setData(modeEl, 'warn', mode.warn ? 'on' : ''); setAttr(modeEl, 'aria-label', `${mode.key.trim()} ${mode.text}${mode.warn ? (s.agent_type === 'agy' ? ', less than was chosen' : ', a restart would narrow it') : ''}`); }
     }
     const keep = keepChip(s), keepWrap = $('codex-keep-wrap'), keepEl = $('codex-keep-chip'), keepOff = $('codex-keep-off'); // the Operator's Full access across restarts (#14061), with its one-click Off
     if (keepWrap && keepEl && keepOff) {
         setHidden(keepWrap, !keep);
-        if (keep) { setText($('codex-keep-text'), keep.text); setTitle(keepEl, keep.title); setData(keepOff, 'name', s.name); setData(keepOff, 'agentType', s.agent_type); setData(keepOff, 'sessionId', s.session_id); }
+        if (keep) { setText($('codex-keep-text'), keep.text); setTitle(keepEl, keep.title); setData(keepEl, 'warn', keep.warn ? 'on' : ''); setText(keepOff, keep.button.label); setAttr(keepOff, 'aria-label', keep.button.aria); setData(keepOff, 'mode', keep.button.mode); setData(keepOff, 'name', s.name); setData(keepOff, 'agentType', s.agent_type); setData(keepOff, 'sessionId', s.session_id); }
     }
     const st = v.model.state === 'failed' || v.thinking.state === 'failed' ? 'failed' : (v.thinking.state === 'requested' ? 'requested' : '');
     setData(p.note, 'state', st);
@@ -266,9 +266,9 @@ function _renderOptions() {
     const v = chipView(s, _cur.server);
     const row = (kind, word, text) => `<button type="button" role="menuitem" class="model-chip-item" data-options-open="${escapeAttr(kind)}"><span class="model-chip-item-label">${escapeHtml(word + ': ' + text)}</span></button>`;
     const mode = modeChip(s); // a phone shows no chips, only this sheet: a Codex agent's live mode is a plain line in it (#14051), not a button
-    const modeLine = mode ? `<div class="options-sheet-mode-note" role="note"${mode.warn ? ' data-warn="on"' : ''} title="${escapeAttr(mode.title)}">${escapeHtml('Mode: ' + mode.text)}</div>` : '';
+    const modeLine = mode ? `<div class="options-sheet-mode-note" role="note"${mode.warn ? ' data-warn="on"' : ''} title="${escapeAttr(mode.title)}">${escapeHtml(mode.key + mode.text)}</div>` : '';
     const keep = keepChip(s); // the Operator's Full access across restarts (#14061): its one-click Off is a row of the sheet on a phone
-    const keepRow = keep ? `<button type="button" role="menuitem" class="model-chip-item" data-on-click="agent-keep-full-access" data-mode="off" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(s.session_id)}" title="${escapeAttr(keep.title)}"><span class="model-chip-item-label">${escapeHtml(keep.text + ': turn off')}</span></button>` : '';
+    const keepRow = keep ? `<button type="button" role="menuitem" class="model-chip-item" data-on-click="agent-keep-full-access" data-mode="${escapeAttr(keep.button.mode)}" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(s.session_id)}" title="${escapeAttr(keep.title)}"><span class="model-chip-item-label">${escapeHtml(keep.text + ': ' + (keep.button.mode === 'off' ? 'turn off' : 'use Full access'))}</span></button>` : '';
     const html = row('model', 'Model', v.model.text) + (p.thinking.wrap && !p.thinking.wrap.hidden ? row('thinking', 'Thinking', v.thinking.text) : '') + modeLine + keepRow;
     if (menu.dataset.sig === html) return;
     menu.dataset.sig = html;

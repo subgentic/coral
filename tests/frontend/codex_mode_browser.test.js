@@ -169,6 +169,43 @@ const NARROWS = { live: 'Full access', launch: 'Workspace write, asks when neede
         await waitFor(`document.getElementById('codex-keep-wrap').hidden`, 'the same computer\'s answer takes the chip away');
         await ev(`window.__rows['cx-keep-id'] = { ...window.__rows['cx-keep-id'], keep_full_access: true }; window.__state_.liveSessions.find(x => x.session_id === 'cx-keep-id').keep_full_access = true; true`);
 
+        console.log('An agy agent launched with Bypass that runs narrower (#14085): the chip says what it was started with, the keep chip says what runs and offers Use Full access; Cancel sends nothing; Confirm sets the choice and restarts');
+        const AGY_NARROW = { chosen: 'Bypass permissions', effective: 'Accept edits', narrowed: true, why: 'the capabilities this agent was given allow less than the mode that was chosen' };
+        await rowsSet('ag-narrow-id', { permission_effective: AGY_NARROW, keep_full_access: false });
+        await add('ag-narrow', 'agy', false); await pick('ag-narrow', 'agy', 'ag-narrow-id');
+        await waitFor(`!document.getElementById('codex-mode-wrap').hidden && !document.getElementById('codex-keep-wrap').hidden`, 'both chips for the narrowed agy agent');
+        assert.equal(await ev(`document.getElementById('codex-mode-key').textContent`), 'Started with: ');
+        assert.equal(await ev(`document.getElementById('codex-mode-text').textContent`), 'Accept edits');
+        assert.equal(await ev(`document.getElementById('codex-mode-chip').dataset.warn`), 'on');
+        assert.equal(await ev(`document.getElementById('codex-keep-text').textContent`), 'Runs with Accept edits, not Bypass permissions');
+        assert.equal(await ev(`document.getElementById('codex-keep-off').textContent`), 'Use Full access');
+        assert.equal(await ev(`document.getElementById('codex-keep-off').dataset.mode`), 'use');
+        await ev(`window.__keepReply = 'ok'; window.__writes.length = 0; document.getElementById('codex-keep-off').click(); true`);
+        await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the Use Full access question');
+        const uq = await confirmText();
+        assert.equal(uq.title, 'Restart agent'); assert.equal(uq.yes, 'Use Full access');
+        assert.match(uq.message, /started with Bypass permissions chosen, but the capabilities this agent was given allow less than the mode that was chosen, so it runs with Accept edits\. Coral restarts it now with Full access/);
+        assert.match(uq.message, /It also lifts the limits this role's capabilities set on what it may do\.$/, 'the question says the role\'s own limits go too (agy\'s words)');
+        assert.deepEqual(await ev(`window.__writes`), [], 'nothing is sent before the answer');
+        await ev(`document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)').click(); true`);
+        assert.deepEqual(await ev(`window.__writes`), [], 'Cancel sends nothing');
+        await ev(`document.getElementById('codex-keep-off').click(); true`);
+        await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the question again');
+        await ev(`document.getElementById('confirm-modal-yes').click(); true`);
+        await waitFor(`window.__writes.some(w => w.u.includes('/keep-full-access')) && window.__writes.some(w => w.u.includes('/restart'))`, 'the choice, then the restart');
+        const order = await ev(`window.__writes.map(w => w.u.includes('/keep-full-access') ? 'keep' : (w.u.includes('/restart') ? 'restart' : 'other'))`);
+        assert.equal(order.indexOf('keep') < order.indexOf('restart'), true, 'the choice is stored before the restart that applies it: ' + JSON.stringify(order));
+        assert.deepEqual((await keepWrites()).map(w => JSON.parse(w.b)), [{ session_id: 'ag-narrow-id', agent_type: 'agy', on: true }]);
+        await ev(`window.hideRestartModal?.(); true`);
+
+        console.log('Team reset: the question says how many agents keep Full access');
+        await rowsSet('tr-a-id', { board_project: 'reset-team', keep_full_access: true }); await rowsSet('tr-b-id', { board_project: 'reset-team', keep_full_access: false }); await rowsSet('tr-c-id', { board_project: 'reset-team', keep_full_access: true });
+        await add('tr-a', 'codex', false); await add('tr-b', 'codex', false); await add('tr-c', 'agy', false);
+        await ev(`window.resetTeam('reset-team'); true`);
+        await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the reset question');
+        assert.match((await confirmText()).message, / 2 agents keep Full access\./);
+        await ev(`document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)').click(); true`);
+
         console.log('Phone, 390 px: the Options sheet has the kept line with its Off (a button of the sheet), on screen; one tap is one write, the exact target');
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
         await pick('cx-keep', 'codex', 'cx-keep-id');

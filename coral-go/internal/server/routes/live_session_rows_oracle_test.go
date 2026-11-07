@@ -69,6 +69,7 @@ func lsrRows(t *testing.T, h *SessionsHandler, old, full bool) string {
 			delete(r, "codex_live_mode")        // new in #14051 (a Codex agent's live mode, read from its rollout): the old implementation has no such field; codex_live_mode_14051_test.go pins it through the list
 			delete(r, "codex_relaunch_narrows") // new in #14051 (what a relaunch would give a Codex agent, when that is less): the old implementation has no such field; the same test pins it
 			delete(r, "keep_full_access")       // new in #14061 (the Operator's Full access across restarts, Codex rows only): the old implementation has no such field
+			delete(r, "permission_effective")   // new in #14085 (what the launch really gives an agent next to the mode chosen, agy always, Codex when narrowed): the old implementation has no such field
 			delete(r, "at_dialog")              // new in #11437 (an agent at a prompt, read from its screen by the dialog watcher): the old implementation has no such field; dialog_watch_test.go pins it through the list
 		}
 	}

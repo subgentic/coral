@@ -56,13 +56,19 @@ func TestAWakeKeepsFullAccessWhenTheOperatorAsked(t *testing.T) {
 	}
 }
 
-func TestTheChoiceIsCodexOnlyAndNeedsTheExactTarget(t *testing.T) {
+func TestTheChoiceIsForTheThreeCLIsAndNeedsTheExactTarget(t *testing.T) {
 	r := newWakeRig(t)
+	ctx := context.Background()
 	r.add(sid(62), "Dev Claude", "", "", false)
-	require.Equal(t, http.StatusBadRequest, keepCall(t, r, naming.SessionName("claude", sid(62)), sid(62), "claude", true))
-	on, err := r.ss.KeepFullAccess(context.Background(), sid(62))
+	require.Equal(t, http.StatusBadRequest, keepCall(t, r, naming.SessionName("terminal", sid(62)), sid(62), "terminal", true), "a plain terminal has no permissions to keep")
+	require.Equal(t, http.StatusNotFound, keepCall(t, r, naming.SessionName("codex", sid(62)), sid(62), "codex", true), "the type must be the stored session's own (#14085)")
+	on, err := r.ss.KeepFullAccess(ctx, sid(62))
 	require.NoError(t, err)
 	require.False(t, on)
+	require.Equal(t, http.StatusOK, keepCall(t, r, naming.SessionName("claude", sid(62)), sid(62), "claude", true), "Claude has it too (#14085)")
+	on, err = r.ss.KeepFullAccess(ctx, sid(62))
+	require.NoError(t, err)
+	require.True(t, on)
 }
 
 // An edit of the capabilities is the person changing what the agent may do: a later relaunch with new capabilities does not keep Full access, and the choice is gone.

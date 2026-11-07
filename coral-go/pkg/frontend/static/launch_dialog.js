@@ -101,6 +101,7 @@ function _selectLaunchType(type) {
         { const row = document.getElementById('launch-skills-row'), park = document.getElementById('launch-advanced-extra'); if (row && park && !park.contains(row)) park.prepend(row); } // the form's panes are built again: the skills row goes back to the part that is kept, and is placed in the Agent section after (#12569)
         // Render agent config form
         renderAgentConfigForm('launch-agent-acf', {
+            offerUseFullAccess: !launch.member, // the Operator's "Use Full access for this agent" (#14085): a launch has it; the member being edited for a team does not (a team launch carries no such field, so a box there would do nothing)
             showPreset: false,
             showName: false,
             cliSlot: 'launch-cli-slot', // a missing CLI is said under the provider, in the reserved note slot (#5835, #7391)
@@ -512,6 +513,7 @@ export async function launchSession() {
     if (launch.mode !== "terminal") {
         const config = getAgentConfig('launch-agent-acf');
         if (config.capabilities) payload.capabilities = config.capabilities;
+        if (config.useFullAccess) payload.keep_full_access = true; // the Operator's "Use Full access for this agent": started with it and keeping it (#14085)
         if (config.prompt) payload.prompt = config.prompt;
         if (config.model) payload.model = config.model;
         if (config.thinking !== undefined) payload.thinking = config.thinking; // chosen on the form (#4969)

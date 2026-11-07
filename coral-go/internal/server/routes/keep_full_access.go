@@ -25,14 +25,20 @@ func dropOwnerOnlyCodexFields(r *http.Request, rows []map[string]any) {
 		delete(row, "codex_live_mode")
 		delete(row, "codex_relaunch_narrows")
 		delete(row, keepFullAccessField)
+		delete(row, permissionEffectiveField)
 	}
+}
+
+// keepFullAccessType says which agents have the choice: the three CLIs whose launch builders apply it after the capabilities (#14061 Codex, #14085 Claude and agy).
+func keepFullAccessType(agentType string) bool {
+	return agentType == "codex" || agentType == "claude" || agentType == "agy"
 }
 
 // keepFullAccessForRelaunch says whether a relaunch of this Codex session runs with Full access whatever its capabilities and mode say (#14061, the Operator's "Keep Full access when this agent
 // restarts"). newCaps is the capabilities the relaunched row will store: a relaunch that edits them is the person changing what the agent may do, so the choice does not apply (and is cleared
 // when the row is replaced). The application is logged each time. A read failure means off: Full access is never granted on a guess.
 func (h *SessionsHandler) keepFullAccessForRelaunch(ctx context.Context, agentType, sessionID, via string, oldCaps, newCaps *string) bool {
-	if agentType != "codex" || sessionID == "" || h.ss == nil {
+	if !keepFullAccessType(agentType) || sessionID == "" || h.ss == nil {
 		return false
 	}
 	on, err := h.ss.KeepFullAccess(ctx, sessionID)
@@ -97,8 +103,8 @@ func (h *SessionsHandler) KeepFullAccessOpt(w http.ResponseWriter, r *http.Reque
 		errBadRequest(w, "invalid session_id")
 		return
 	}
-	if body.AgentType != "codex" {
-		errBadRequest(w, "Only a Codex agent has this setting.")
+	if !keepFullAccessType(body.AgentType) {
+		errBadRequest(w, "Only a Claude, Codex or Antigravity agent has this setting.")
 		return
 	}
 	ls, gerr := h.ss.GetLiveSession(r.Context(), body.SessionID)
@@ -106,7 +112,7 @@ func (h *SessionsHandler) KeepFullAccessOpt(w http.ResponseWriter, r *http.Reque
 		errInternalServer(w, "Agent metadata is temporarily unavailable; try again.")
 		return
 	}
-	if ls == nil || ls.AgentType != "codex" {
+	if ls == nil || ls.AgentType != body.AgentType {
 		writeError(w, http.StatusNotFound, "", "live session not found")
 		return
 	}
@@ -129,4 +135,29 @@ func (h *SessionsHandler) KeepFullAccessOpt(w http.ResponseWriter, r *http.Reque
 	}
 	h.kickWS()
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "keep_full_access": *body.On})
+}
+
+// keepFullAccessRequestRefusal answers a launch or restart body that asks for the choice (the form's "Use Full access for this agent", #14085): only the Operator can (an agent's token, or a Hub user who
+// is not the authentic owner, cannot start an agent with Full access: the same rule as the route), and only for the three CLIs. 0 and "" when it may go on.
+func (h *SessionsHandler) keepFullAccessRequestRefusal(r *http.Request, agentType string) (int, string) {
+	if agentCaller(r) || (cloud.Tunneled(r) && !hubOwnerRequest(r).owner) {
+		return http.StatusForbidden, "Only the Operator can start an agent with Full access."
+	}
+	if !keepFullAccessType(agentType) {
+		return http.StatusBadRequest, "Only a Claude, Codex or Antigravity agent has this setting."
+	}
+	return 0, ""
+}
+
+// storeKeepFullAccess stores the choice for a session the form just launched or restarted with it, logs it, and asks the recorder for the Activity row (a person's click only).
+func (h *SessionsHandler) storeKeepFullAccess(ctx context.Context, r *http.Request, sessionID, name, via string) {
+	changed, err := h.ss.SetKeepFullAccess(ctx, sessionID, true)
+	if err != nil {
+		slog.Warn("[keep-full-access] could not store the choice made in the form", "session_id", sessionID, "via", via, "error", err)
+		return
+	}
+	if changed {
+		slog.Info("[keep-full-access] set", "session_id", sessionID, "agent", name, "via", via)
+		noteActivity(r, board.ActKeepFullAccess, "agent", name, "", "", "on")
+	}
 }

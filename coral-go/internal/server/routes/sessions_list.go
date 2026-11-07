@@ -242,6 +242,7 @@ func (h *SessionsHandler) liveSessionRows(r *http.Request, trace *phaseTrace, fu
 	h.addBoardLabels(r.Context(), sessions)
 	h.addSessionGoals(r.Context(), sessions)
 	h.addWaitsOnThis(r, sessions)
+	addPermissionFields(sessions, lv.extras) // the Operator's keep-Full-access choice and the effective mode (#14061, #14085), for Claude, Codex and agy, awake or asleep
 	dropOwnerOnlyCodexFields(r, sessions)
 	h.addTeamHealth(r, sessions)
 	if off, err := h.ss.AutoSleepOffSessions(r.Context()); err == nil && len(off) > 0 { // the Operator's per-agent opt-out (#12111), for the menu's wording
@@ -586,9 +587,6 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 	}
 	if !skipExpensive { // the rollout read is the expensive part: a first paint leaves the keys out, so a later row fills them and an earlier answer is not blanked (#14051)
 		entry["codex_live_mode"], entry["codex_relaunch_narrows"] = h.codexModeFields(agent.AgentType, sid, agent.WorkingDir, lv.extras[sid])
-	}
-	if agent.AgentType == "codex" {
-		entry[keepFullAccessField] = lv.extras[sid].KeepFull // Codex only; the owner sees it (personTextFields), an agent or a Hub viewer does not (#14061)
 	}
 	if b := blockedField(sid, agent.AgentType, sleeping); b != nil {
 		entry["blocked"] = b // only a row that is blocked has the key (#13486)

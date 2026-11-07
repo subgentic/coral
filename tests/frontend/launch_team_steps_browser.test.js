@@ -109,7 +109,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`for (const cap of ['shell', 'git_write', 'file_write']) document.querySelector('#launch-agent-acf .perm-chip[data-type="allow"][data-cap="' + cap + '"]').click(); true`);
         assert.equal(await line(), 'No Mode chosen, so the capabilities decide: Read-only sandbox.', 'it follows the chips');
         await ev(`{ const m = document.querySelector('#launch-agent-acf .acf-permission-mode'); m.value = 'bypassPermissions'; m.dispatchEvent(new Event('change', { bubbles: true })); } true`);
-        assert.equal(await line(), 'The capabilities narrow this Mode: Read-only sandbox.', 'an explicit Mode is narrowed, not replaced');
+        assert.equal(await line(), 'The capabilities narrow this Mode: Read-only sandbox.', 'an explicit Mode is narrowed, not replaced; the team member form has no Full access box, so the note does not point to one (#14085)');
         await ev(`{ const m = document.querySelector('#launch-agent-acf .acf-permission-mode'); m.value = 'plan'; m.dispatchEvent(new Event('change', { bubbles: true })); } true`);
         assert.equal(await line(), '', 'Plan is already read-only: nothing to say');
         await ev(`window.cancelTeamMember(); window.showTeamAgentModal([...document.querySelectorAll('#team-agents-list .team-agent-row')].find(r => r.querySelector('.team-agent-role-name').textContent === 'Plain')); true`);

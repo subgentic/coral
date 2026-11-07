@@ -476,7 +476,7 @@ registerActions({
     'agent-sleep': withAgent('toggleAgentSleep', ['sleep', 'wake']),
     'agent-sleep-gone': menu(el => { const ids = String(el.dataset.ids || '').split(',').filter(x => /^[A-Za-z0-9_.:-]{1,128}$/.test(x)).slice(0, 500); if (ids.length) W('sleepTerminalGone')(ids); }), // Sleep all terminal-gone (#13171)
     'agent-auto-sleep': withAgent('setAgentAutoSleep', ['off', 'on']), // the Operator's per-agent switch for auto-sleep (#12111)
-    'agent-keep-full-access': withAgent('setKeepFullAccess', ['on', 'off']), // the Operator's per-Codex-agent Full access across restarts (#14061)
+    'agent-keep-full-access': withAgent('setKeepFullAccess', ['on', 'off', 'use']), // the Operator's per-Codex-agent Full access across restarts (#14061)
     'agent-archive': withAgent('toggleAgentArchive', ['archive', 'unarchive']),
     'agent-move': menu(el => { const sid = textOf(el.dataset.sessionId); if (sid && UPDOWN[el.dataset.dir]) W(el.dataset.dir === 'up' ? 'moveSessionUp' : 'moveSessionDown')(sid); }),
     'team-sleep': menu(el => { const b = textOf(el.dataset.board); if (b && ['sleep', 'wake'].includes(el.dataset.mode)) W('toggleTeamSleep')(b, el.dataset.mode); }),

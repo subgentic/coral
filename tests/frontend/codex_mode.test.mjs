@@ -37,15 +37,42 @@ assert.match(m.modeChip({ agent_type: 'codex', codex_live_mode: { label: 'Full a
 assert.equal(m.keepChip(null), null);
 assert.equal(m.keepChip({ agent_type: 'codex' }), null, 'no key: not shown (an agent or a Hub viewer never gets it)');
 assert.equal(m.keepChip({ agent_type: 'codex', keep_full_access: false }), null);
-assert.equal(m.keepChip({ agent_type: 'claude', keep_full_access: true }), null, 'Codex only');
+assert.equal(m.keepChip({ agent_type: 'terminal', keep_full_access: true }), null, 'only the three CLIs');
+assert.equal(m.keepChip({ agent_type: 'claude', keep_full_access: true }).button.mode, 'off', 'Claude has it too (#14085)');
 assert.equal(m.keepChip({ agent_type: 'codex', keep_full_access: true }).text, 'Full access kept on restart');
 assert.match(m.keepChip({ agent_type: 'codex', keep_full_access: true }).title, /capabilities/);
 assert.deepEqual(m.keepMenuItem({ keep_full_access: true }), { label: 'Stop keeping Full access on restart', mode: 'off' });
 assert.deepEqual(m.keepMenuItem({ keep_full_access: false }), { label: 'Keep Full access on restart', mode: 'on' });
 assert.deepEqual(m.keepMenuItem(null), { label: 'Keep Full access on restart', mode: 'on' });
+
+// What the capabilities do to the chosen mode (#14085): the Operator's report, an agy Technical Writer launched with Bypass that ran in accept-edits
+const narrowedRow = { agent_type: 'agy', keep_full_access: false, permission_effective: { chosen: 'Bypass permissions', effective: 'Accept edits', narrowed: true, why: 'the capabilities this agent was given allow less than the mode that was chosen' } };
+assert.deepEqual(m.permissionNarrowing(narrowedRow), { chosen: 'Bypass permissions', effective: 'Accept edits', why: 'the capabilities this agent was given allow less than the mode that was chosen' });
+assert.equal(m.permissionNarrowing({ ...narrowedRow, keep_full_access: true }), null, 'the Operator chose Full access: nothing narrowed');
+assert.equal(m.permissionNarrowing({ ...narrowedRow, permission_effective: { ...narrowedRow.permission_effective, narrowed: false } }), null);
+assert.equal(m.permissionNarrowing({ agent_type: 'claude', keep_full_access: false, permission_effective: null }), null);
+assert.equal(m.permissionNarrowing({ ...narrowedRow, permission_effective: { chosen: 'Bypass permissions', narrowed: true } }), null, 'half an answer says nothing');
+const nchip = m.keepChip(narrowedRow);
+assert.equal(nchip.text, 'Runs with Accept edits, not Bypass permissions'); assert.equal(nchip.button.mode, 'use'); assert.equal(nchip.button.label, 'Use Full access'); assert.equal(nchip.warn, true);
+assert.deepEqual(m.keepMenuItem(narrowedRow), { label: 'Use Full access for this agent', mode: 'use' });
+const ni = m.keepInfo(narrowedRow);
+assert.equal(ni.on, false); assert.match(ni.text, /^Runs with Accept edits, not the Bypass permissions that was chosen/); assert.equal(ni.button.mode, 'use');
+assert.equal(m.keepInfo({ agent_type: 'agy', keep_full_access: true }).button.label, 'Turn off');
+assert.equal(m.keepInfo({ agent_type: 'agy', keep_full_access: false }).button, null, 'nothing narrowed, not kept: no button');
+const nn = m.permissionNarrowing(narrowedRow), base = 'Use Full access for Technical Writer? It was started with Bypass permissions chosen, but the capabilities this agent was given allow less than the mode that was chosen, so it runs with Accept edits. Coral restarts it now with Full access and starts it that way every time it restarts, whatever its role\'s capabilities say.';
+assert.equal(m.useFullAccessQuestion('Technical Writer', nn, 'agy'), base + ' It also lifts the limits this role\'s capabilities set on what it may do.');
+assert.equal(m.useFullAccessQuestion('Technical Writer', nn, 'claude'), base + " It also lifts the commands this role is blocked from (Claude's deny rules).");
+assert.equal(m.useFullAccessQuestion('Technical Writer', nn, 'codex'), base + ' It also lifts the limits this role\'s capabilities set on what it may touch (its sandbox and approval rules).');
+assert.equal(m.keepResetNote(0), ''); assert.equal(m.keepResetNote(1), ' 1 agent keeps Full access.'); assert.equal(m.keepResetNote(3), ' 3 agents keep Full access.');
+// agy says what it was started with (no mode of its own to read back)
+const agyChip = m.modeChip(narrowedRow);
+assert.equal(agyChip.key, 'Started with: '); assert.equal(agyChip.text, 'Accept edits'); assert.equal(agyChip.warn, true); assert.match(agyChip.title, /agy does not tell Coral/);
+assert.equal(m.modeChip({ agent_type: 'agy', permission_effective: null }), null);
+assert.equal(m.modeChip({ agent_type: 'agy', keep_full_access: true, permission_effective: { chosen: 'Bypass permissions', effective: 'Bypass permissions', narrowed: false } }).warn, false);
+assert.equal(m.modeChip({ agent_type: 'codex', codex_live_mode: { label: 'Full access' } }).key, 'Mode: ');
 assert.equal(m.keepInfo(null), null);
 assert.equal(m.keepInfo({ agent_type: 'codex' }), null, 'no key: nothing (an agent or a Hub viewer never gets it)');
-assert.equal(m.keepInfo({ agent_type: 'claude', keep_full_access: true }), null, 'Codex only');
+assert.equal(m.keepInfo({ agent_type: 'terminal', keep_full_access: true }), null, 'only the three CLIs');
 assert.equal(m.keepInfo({ agent_type: 'codex', keep_full_access: true }).on, true);
 assert.match(m.keepInfo({ agent_type: 'codex', keep_full_access: true }).text, /^Kept: every restart/);
 assert.equal(m.keepInfo({ agent_type: 'codex', keep_full_access: false }).on, false);

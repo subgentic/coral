@@ -1,5 +1,5 @@
 /* What the sidebar's menus do to one agent: kill, info, attach, restart, sleep and archive (moved out of render.js, #4996; no behaviour change). */
-import { relaunchNarrowing, wakeQuestion } from './codex_mode.js';
+import { relaunchNarrowing, wakeQuestion, permissionNarrowing, useFullAccessQuestion } from './codex_mode.js';
 import { state } from './state.js';
 import { worktreeConfirmWords } from './worktree_words.js';
 import { showWorktreeNotice } from './worktree_notice.js';
@@ -115,10 +115,22 @@ export async function setAgentAutoSleep(name, agentType, sessionId, mode) {
     } catch { showToast('Could not change auto-sleep', true); return false; }
 }
 
-/** The Operator's per-agent "keep Full access when this agent restarts" (#14061), Codex only: mode 'on' sets it, 'off' clears it. Only Coral's own record changes; the agent's running mode does not. */
+/** The Operator's per-agent "keep Full access when this agent restarts" (#14061, #14085; Claude, Codex and agy): mode 'on' sets it, 'off' clears it, and 'use' (the button that says what the capabilities did to the chosen mode) asks
+ *  first, then sets it AND restarts the agent now, since that is the only way a running agent takes it. Only Coral's own record changes, apart from that restart. */
 export async function setKeepFullAccess(name, agentType, sessionId, mode) {
-    const on = mode === 'on';
     const server = serverForSession(name, sessionId);
+    if (mode === 'use') {
+        const row = state.liveSessions.find(x => x.session_id === sessionId && sessionServer(x) === server);
+        const n = permissionNarrowing(row);
+        const who = agentWords(row, row ? resolveSessionIdentity(row) : name).label;
+        showConfirmModal('Restart agent', useFullAccessQuestion(who, n || { chosen: 'the mode that was chosen', effective: 'less', why: 'its capabilities allow less' }, agentType),
+            async () => { if (await postKeepFullAccess(name, agentType, sessionId, server, true)) await restartSameDirect(name, agentType, sessionId); }, undefined, { danger: false, label: 'Use Full access' });
+        return false;
+    }
+    return postKeepFullAccess(name, agentType, sessionId, server, mode === 'on');
+}
+
+async function postKeepFullAccess(name, agentType, sessionId, server, on) {
     try {
         const resp = await serverFetch(server, `/api/sessions/live/${encodeURIComponent(name)}/keep-full-access`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: sessionId, agent_type: agentType, on }) });

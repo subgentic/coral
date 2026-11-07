@@ -52,11 +52,11 @@ function fillKeep(s, server) {
     const row = s && state.liveSessions.find(x => x.session_id === s.session_id && sessionServer(x) === server);
     const k = keepInfo(row);
     for (const id of ['info-keep-label', 'info-keep']) setHidden($(id), !k);
-    const off = $('info-keep-off');
-    setHidden(off, !k || !k.on);
+    const btn = $('info-keep-off');
+    setHidden(btn, !k || !k.button);
     if (!k) return;
     setText($('info-keep-text'), k.text);
-    if (k.on) { off.dataset.name = s.name; off.dataset.agentType = s.agent_type || ''; off.dataset.sessionId = s.session_id || ''; }
+    if (k.button) { setText(btn, k.button.label); btn.setAttribute('aria-label', k.button.aria); btn.dataset.mode = k.button.mode; btn.dataset.name = s.name; btn.dataset.agentType = s.agent_type || ''; btn.dataset.sessionId = s.session_id || ''; }
 }
 document.addEventListener('coral:keep-full-access-changed', e => { const s = state.currentSession; if ($('agentic-panel-info')?.classList.contains('active') && s && s.type === 'live' && keepEventMatches(e.detail, s.session_id, normServer(currentServer()))) fillKeep(s, currentServer()); }); // listener-ok: one for the page's life, like the agent-selected one below
 
