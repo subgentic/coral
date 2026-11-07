@@ -194,6 +194,26 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(`window.hideLaunchModal();true`);
 
 
+        console.log('A scripted or remembered folder never receives the default trust tick');
+        await open();
+        await ev(`window.__probeMode='clean';window.__probePath='';true`);
+        await setDir('/home/p/Code/scripted',false);
+        await ev(`new Promise(resolve=>setTimeout(resolve,650))`); // sleep-ok: negative authorization assertion must outlast the 400 ms trust-default debounce
+        assert.equal(await ev(`document.getElementById('launch-team-trust').checked`),false,'an untrusted input event without trustChosen cannot auto-tick trust');
+        assert.equal(await ev(`window.__probePath`),'','a scripted folder never even requests default-trust advice');
+        sent = await go(); assert.equal(sent.trust_folder,undefined,'scripted input sends no trust opt-in');
+        await ev(`window.hideLaunchModal();true`);
+        await ev(`import((window.__coralStatic||'/static/')+'state.js').then(({state})=>{window.__oldTrustDefault=state.settings.default_working_dir;state.settings.default_working_dir='/home/p/Code/remembered';window.__probeMode='clean';window.__probePath='';})`);
+        await open();
+        await waitFor(`document.getElementById('launch-team-dir').value==='/home/p/Code/remembered'`,'remembered Settings folder is restored');
+        // Restored inputs can dispatch an untrusted event to update their hints.
+        await ev(`document.getElementById('launch-team-dir').dispatchEvent(new Event('input',{bubbles:true}));true`);
+        await ev(`new Promise(resolve=>setTimeout(resolve,650))`); // sleep-ok: the remembered-folder refusal must survive the deferred default check
+        assert.equal(await ev(`document.getElementById('launch-team-trust').checked`),false,'a remembered default remains off until the person explicitly ticks it');
+        assert.equal(await ev(`window.__probePath`),'','a remembered folder is not treated as a new folder choice');
+        sent = await go(); assert.equal(sent.trust_folder,undefined,'remembered folder sends no trust opt-in');
+        await ev(`import((window.__coralStatic||'/static/')+'state.js').then(({state})=>{if(window.__oldTrustDefault===undefined)delete state.settings.default_working_dir;else state.settings.default_working_dir=window.__oldTrustDefault;window.hideLaunchModal();})`);
+
     } finally { await removeBoards(ev, Array.from({ length: 20 }, (_, i) => 'trust-' + (i + 1))); await client.close(); }
     console.log('team_trust_folder_browser: ok');
 })().catch(e => { console.error(e); process.exit(1); });
