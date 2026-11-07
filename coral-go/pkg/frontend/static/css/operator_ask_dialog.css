@@ -39,7 +39,7 @@
 .inbox-ask-pics .ac-add-image { width: 44px; min-height: 44px; padding: 0; }
 
 /* #13583: quick choices follow the question; the reply keeps the freed lines and grows with input. */
-.inbox-ask-dialog .inbox-ask-box { height: 9em; min-height: 9em; max-height: 40dvh; resize: none; overflow-y: auto; } /* a fixed box that scrolls inside (#14153): a box that grew as you typed pushed Send reply down from under the pointer */
+.inbox-ask-dialog .inbox-ask-box { height: min(9em, 40dvh); min-height: min(9em, 40dvh); max-height: 40dvh; resize: none; overflow-y: auto; } /* a fixed box that scrolls inside (#14153): a box that grew as you typed pushed Send reply down from under the pointer */
 .inbox-ask-reading .inbox-ask-offers { margin-top: 16px; }
 
 /* Binary decisions sit below the draft, directly beside Send reply. */
