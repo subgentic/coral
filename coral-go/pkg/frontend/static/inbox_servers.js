@@ -2,6 +2,7 @@ import { artifactRevision, artifactsUnchanged } from './artifacts_feed.js';
 /* The Inbox's source identity and shared Server controls. No requests run at module load. */
 import { state } from './state.js';
 import { splitKey, serverFetch, identityKey, isCloud } from './server_base.js';
+import { fetchSkewed } from './query_skew.js';
 /** On a Hub-served dashboard there is no "local" computer: the Hub has no chats or boards of its own, so the sources are the linked computers (online ones for a read; Goal #100). */
 export const serverChoices = () => [...(isCloud() ? [] : ['local']), ...new Set(state.hub ? (state.servers || []).filter(s => s.id && s.id !== 'local').map(s => s.id) : [])];
 export const multipleServers = () => !!state.hub && serverChoices().length > 1;
@@ -21,7 +22,7 @@ export const serverColumns = () => multipleServers() ? [{ key: 'server', label: 
 /** The computers that answered 403 owner_only to the artifacts list: this person is a grantee there. Kept for the session, per computer: no later read asks them again. */
 const ownerOnly = new Set();
 const emptyArtifacts = server => ({ server, artifacts: [], teams: [], all: 0, total: 0, offset: 0, cursor: '', done: true, ownerOnly: true });
-const isOwnerOnlyAnswer = async response => { const body = await response.clone().json().catch(() => ({})); return body.code === 'owner_only' || body.error === 'owner_only'; };
+export const isOwnerOnlyAnswer = async response => { const body = await response.clone().json().catch(() => ({})); return body.code === 'owner_only' || body.error === 'owner_only'; };
 /** True when there is at least one online computer and every one of them refused: the Hub-served Inbox then has no Artifacts folder. With one that allows it, the folder lists that computer's artifacts. */
 export const artifactsOwnerOnlyEverywhere = () => { const sources = inboxSources(); return sources.length > 0 && sources.every(server => ownerOnly.has(server)); };
 
@@ -51,10 +52,10 @@ export async function readInboxArtifacts(params, filters = {}, signal) {
         if (team) query.set('team', team.name);
         if (prior?.cursor) query.set('cursor', prior.cursor);
         else query.set('offset', String(prior?.offset || 0));
-        let response = await serverFetch(server, `/api/team-artifacts?${query}`, { signal });
+        let { response } = await fetchSkewed(server, '/api/team-artifacts', query, { signal }); // an older computer refuses a newer key (starred_first): asked again without it (#14317)
         let versionless = !!prior?.versionless;
         // Only a 400 means "this Coral does not know the key": a 404 is a route that is not there (an older Coral without the list at all), which asking again without the key cannot fix.
-        if (response.status === 400 && query.has('versions')) { query.delete('versions'); versionless = true; response = await serverFetch(server, `/api/team-artifacts?${query}`, { signal }); } // an older Coral does not know versions: its list is whole, and its count is of versions
+        if (response.status === 400 && query.has('versions')) { query.delete('versions'); versionless = true; ({ response } = await fetchSkewed(server, '/api/team-artifacts', query, { signal })); } // an older Coral does not know versions: its list is whole, and its count is of versions
         if (response.status === 403 && await isOwnerOnlyAnswer(response)) { ownerOnly.add(server); return emptyArtifacts(server); } // a grantee on that computer: its artifacts are View plus owner-only, so it a
         if (!response.ok) throw Object.assign(new Error(`${serverLabel(server)} artifacts could not be read (${response.status}).`), { server });
         const data = await response.json();
