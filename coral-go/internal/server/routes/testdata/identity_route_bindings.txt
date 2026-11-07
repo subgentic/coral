@@ -105,7 +105,7 @@ GET /api/sessions/live/{name} | unbound
 GET /api/sessions/live/{name}/attachment/{ref} | unbound
 GET /api/sessions/live/{name}/capture | unbound
 GET /api/sessions/live/{name}/changes.diff | unbound
-GET /api/sessions/live/{name}/chat | unbound
+GET /api/sessions/live/{name}/chat | token-session
 GET /api/sessions/live/{name}/diff | unbound
 GET /api/sessions/live/{name}/events | unbound
 GET /api/sessions/live/{name}/events/counts | unbound
@@ -238,7 +238,7 @@ POST /api/sessions/live/team/{boardName}/reset | unbound | operator-only
 POST /api/sessions/live/team/{boardName}/sleep | unbound | operator-only
 POST /api/sessions/live/team/{boardName}/wake | unbound | operator-only
 POST /api/sessions/live/wake-all | unbound | operator-only
-POST /api/sessions/live/{name}/answer-prompt | unbound | operator-only
+POST /api/sessions/live/{name}/answer-prompt | token-session | operator-only
 POST /api/sessions/live/{name}/attach | unbound | operator-only
 POST /api/sessions/live/{name}/auto-accept/disable | unbound | operator-only
 POST /api/sessions/live/{name}/auto-accept/enable | unbound | operator-only

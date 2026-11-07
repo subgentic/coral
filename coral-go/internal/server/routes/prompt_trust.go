@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/subgentic/coral/internal/foldertrust"
+	"github.com/subgentic/coral/internal/safefs"
 )
 
 // The one named exception to "a Needs you row never grants more than this one time" (#10400): Claude's folder-trust menu (#14110, Security's conditions).
@@ -76,11 +77,11 @@ func sameFolder(a, b string) bool {
 	if a == "" || b == "" {
 		return false
 	}
-	ra, err := filepath.EvalSymlinks(filepath.Clean(a))
+	ra, err := safefs.Resolve(filepath.Clean(a))
 	if err != nil {
 		return false
 	}
-	rb, err := filepath.EvalSymlinks(filepath.Clean(b))
+	rb, err := safefs.Resolve(filepath.Clean(b))
 	if err != nil {
 		return false
 	}

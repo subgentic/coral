@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	at "github.com/subgentic/coral/internal/agenttypes"
 )
 
 // #14151: Claude's browser menu has no numbers and no footer; it is read by structure, and nothing near it is.
@@ -22,7 +24,7 @@ const browserScreen = `───────────────────
 `
 
 func TestBrowserMenu_ReadByStructure(t *testing.T) {
-	s, ok := parsePromptScreen(browserScreen)
+	s, ok := parseAgentScreen(at.Claude, browserScreen)
 	require.True(t, ok, "the menu is read although it has no numbers and no footer")
 	assert.True(t, isBrowserPromptMenu(s))
 	require.Len(t, s.Options, 3)
@@ -33,7 +35,7 @@ func TestBrowserMenu_ReadByStructure(t *testing.T) {
 
 	lookAlike := func(name, screen string) {
 		t.Helper()
-		if s, ok := parsePromptScreen(screen); ok {
+		if s, ok := parseAgentScreen(at.Claude, screen); ok {
 			assert.False(t, isBrowserPromptMenu(s), name)
 		}
 	}
@@ -46,4 +48,24 @@ func TestBrowserMenu_ReadByStructure(t *testing.T) {
 	lookAlike("the title twice (a spoofed copy above)", " Claude wants to use your browser\n\n"+browserScreen)
 	lookAlike("text after the rows", browserScreen+"\n⏺ Working\n")
 	lookAlike("the title far above the rows", strings.Replace(browserScreen, "\n    Install extension", strings.Repeat("\n more text", 14)+"\n    Install extension", 1))
+}
+
+// Security's MUST on #14151: only a Claude session is read as either menu. The same screen on another agent type (or none) is no prompt, so there is nothing to offer and nothing to answer.
+func TestBrowserAndTrustMenus_OnlyForClaude(t *testing.T) {
+	trust := claudeUnnumbered(t, "trust.txt")
+	for _, agent := range []string{at.Codex, at.Agy, at.Gemini, at.Terminal, at.Pi, "", "unknown"} {
+		_, ok := parseAgentScreen(agent, browserScreen)
+		assert.False(t, ok, "browser menu on %q", agent)
+		if s, ok := parseAgentScreen(agent, trust); ok {
+			assert.False(t, isFolderTrustMenu(s) && s.TrustFolder != "", "folder-trust folder read on %q", agent)
+			assert.Empty(t, s.TrustFolder, "folder-trust folder read on %q", agent)
+		}
+	}
+	b, ok := parseAgentScreen(at.Claude, browserScreen)
+	require.True(t, ok)
+	assert.True(t, isBrowserPromptMenu(b))
+	s, ok := parseAgentScreen(at.Claude, trust)
+	require.True(t, ok)
+	assert.True(t, isFolderTrustMenu(s))
+	assert.NotEmpty(t, s.TrustFolder)
 }

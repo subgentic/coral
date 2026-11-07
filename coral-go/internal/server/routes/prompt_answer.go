@@ -226,9 +226,6 @@ func parsePromptScreenRaw(capture string) (promptScreen, bool) {
 	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
 		lines = lines[:len(lines)-1]
 	}
-	if b, ok := parseBrowserPromptMenu(lines); ok {
-		return b, true
-	}
 	// The option list ends within a few lines of the bottom (a footer such
 	// as "Enter to select · Esc to cancel" may follow it).
 	end := -1
@@ -595,15 +592,35 @@ func (h *SessionsHandler) readPromptScreenText(ctx context.Context, name, agentT
 	if err != nil {
 		return promptScreen{}, false, "", err
 	}
-	s, ok := parsePromptScreen(text)
+	s, ok := parseAgentScreen(agentType, text)
 	if ok {
-		markApprovalKinds(agentType, text, &s)
-		markFolderTrust(text, &s)
 		if agentType == at.Hermes && s.Kind == promptKindApproval {
 			applyHermesCommand(&s, h.hermesStoredCommand(ctx, sessionID)) // the screen drops a hidden character; Hermes's stored call has it (#12170)
 		}
 	}
 	return s, ok, text, nil
+}
+
+// parseAgentScreen reads the prompt on an agent's screen the way a row, a card and an answer all must: the generic parse, plus the two Claude-only menus that a row may answer (the folder-trust menu, #14110,
+// and Claude's browser menu, #14151). Those two are read ONLY when the session's stored agent type is Claude: three lines shaped like either menu printed by a Codex, agy, Gemini or terminal agent's own program
+// are not a prompt of Claude's, and an arrow key and Enter into that program would answer whatever it is waiting for (Security's MUST on #14151). Every caller that reads a screen for an offer or an answer comes here, so the
+// gate holds at offer time and again at answer time.
+func parseAgentScreen(agentType, text string) (promptScreen, bool) {
+	s, ok := parsePromptScreen(text)
+	if !ok && agentType == at.Claude {
+		lines := strings.Split(strings.ReplaceAll(text, "\r", ""), "\n")
+		for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
+			lines = lines[:len(lines)-1]
+		}
+		s, ok = parseBrowserPromptMenu(lines)
+	}
+	if ok {
+		markApprovalKinds(agentType, text, &s)
+		if agentType == at.Claude {
+			markFolderTrust(text, &s)
+		}
+	}
+	return s, ok
 }
 
 // menuStillDrawn says whether text still shows the menu `before`: at least two of its option labels (or all, for a short
