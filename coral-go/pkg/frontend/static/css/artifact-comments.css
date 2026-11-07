@@ -199,3 +199,9 @@
 .artifact-private-title { font-size: var(--fs-sm, 0.8125rem); }
 .artifact-private-help { color: var(--text-muted); font-size: var(--fs-sm, 0.8125rem); }
 .artifact-private-say { margin: 0; color: var(--text-muted); font-size: var(--fs-base); }
+
+/* A change on its way (#14027): the Send button says Sending… and waits, the words stay in the box, and a delete or resolve says what it is doing on one line above the threads. */
+.ac-composer.ac-sending .ac-input { opacity: 0.7; }
+.ac-composer.ac-sending .ac-send { cursor: progress; }
+.ac-working { position: sticky; top: 0; z-index: 2; margin: 0 0 8px; padding: 6px 10px; border-radius: var(--radius-md); background: var(--bg-tertiary); color: var(--text-secondary); font-size: var(--fs-sm); }
+.ac-working-on .ac-act { pointer-events: none; opacity: 0.6; }

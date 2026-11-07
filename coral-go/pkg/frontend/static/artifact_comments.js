@@ -181,6 +181,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     function render() {
         const kept = focusKey();
         panel.replaceChildren();
+        if (st.working) { const w = el('p', 'ac-working'); w.setAttribute('role', 'status'); w.textContent = st.working; panel.append(w); panel.classList.add('ac-working-on'); } else panel.classList.remove('ac-working-on'); // a redraw while a change is on its way keeps its line (#14027)
         const show = (st.text || st.whole) && !st.gone && !!st.data;
         panel.hidden = !show; st.shownNow = show; syncToggle();
         syncOn();
@@ -342,7 +343,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (c.deleted) return row;
         const who = c.authorName || c.authorId || 'unknown';
         if (c.can.edit) row.append(act('Edit', `Edit the comment by ${who}`, () => { st.composing = { editId: c.id }; st.error = ''; render(); panel.querySelector('.ac-input')?.focus(); }));
-        if (c.can.delete) row.append(act('Delete', `Delete the comment by ${who}`, () => confirmThen('Delete this comment?', () => run(() => api.deleteComment(ownHex(c), st.server, c.id), 'Comment deleted'))));
+        if (c.can.delete) row.append(act('Delete', `Delete the comment by ${who}`, () => confirmThen('Delete this comment?', () => run(() => api.deleteComment(ownHex(c), st.server, c.id), 'Comment deleted', 'Deleting the comment…'))));
         // Send to agent (#6357, #6456): the owner, on this computer, for a thread of this board that is open; never through Coral Hub
         if (top && canAsk(c)) { const b = act('Send to agent', () => openAsk(c)); b.classList.add('ac-ask-open'); b.setAttribute('aria-label', `Send the comment by ${c.authorName || c.authorId || 'unknown'} to an agent`); b.setAttribute('aria-expanded', String(!!st.ask && st.ask.id === c.id)); row.append(b); }
         // not an .ac-act: it writes nothing, so a read-only viewer has it too
@@ -353,12 +354,22 @@ export function attachComments(dialog, body, host, opts = {}) {
 
     const { resetAsk, canAsk, askSetup, openAsk, openMany, askBlock, askedNow, fillStatus } = createAsk({ st, panel, render, announce, refresh, ownHex });
     function confirmThen(msg, fn) { if (window.showConfirmModal) window.showConfirmModal('Delete comment', msg, fn, undefined, { label: 'Delete comment', danger: true }); else fn(); }
-    async function run(fn, said) {
+    /** A change on its way: `working` is what to say meanwhile ("Deleting the comment…"), shown as one line in the panel (role=status) and announced; the panel's buttons wait (a second press does nothing, run() refuses it too) and the line is gone when it is answered (#14027). */
+    const setWorking = words => {
+        st.working = words || '';
+        panel.classList.toggle('ac-working-on', !!words);
+        let w = panel.querySelector('.ac-working');
+        if (!words) { w?.remove(); return; }
+        if (!w) { w = el('p', 'ac-working'); w.setAttribute('role', 'status'); panel.prepend(w); }
+        w.textContent = words;
+    };
+    async function run(fn, said, working) {
         if (st.busy) return;
         st.busy = true;
+        if (working) { setWorking(working); announce(working); }
         try { const sentTo = await fn(); st.error = ''; st.composing = null; await refresh(); if (said) announce(said + (typeof sentTo === 'string' && sentTo ? `. Sent to ${sentTo}` : '')); if (typeof sentTo === 'string' && sentTo) showToast(`Sent to ${sentTo}`, false); } // the owner's comment reaches the agent on its own (#12203): the person sees who got it
-        catch (e) { st.error = e.message || 'The change was refused.'; showToast(st.error, true); render(); }
-        finally { st.busy = false; }
+        catch (e) { st.error = e.message || 'The change was refused.'; showToast(st.error, true); render(); announce(`Not done: ${st.error}`); }
+        finally { st.busy = false; setWorking(''); }
     }
 
     const { composer, editing } = createComposer({ st, render, run, ownHex });

@@ -28,14 +28,20 @@ export function createComposer({ st, render, run, ownHex }) {
         const err = el('p', 'ac-error', st.error); err.setAttribute('role', 'alert'); err.hidden = !st.error;
         const row = el('div', 'ac-composer-row'); row.append(count, ...(tray ? [tray.picker()] : []), cancel, send);
         box.append(ta, ...(tray ? [tray.node, tray.hint()] : []), err, row);
-        if (tray) { tray.attach(box, ta); tray.listen(() => { send.disabled = tray.busy() || tray.failed(); }); send.disabled = tray.busy() || tray.failed(); } // Send waits for a picture still going up, and for a failed one to be removed
+        const sendingWords = editOf ? 'Saving…' : cm.parentId != null ? 'Sending reply…' : 'Sending…', idleWords = send.textContent;
+        const showSending = on => { send.disabled = on || (tray ? tray.busy() || tray.failed() : false); send.textContent = on ? sendingWords : idleWords; send.setAttribute('aria-busy', String(!!on)); ta.readOnly = !!on; cancel.disabled = !!on; box.classList.toggle('ac-sending', !!on); }; // the words stay in the box while it is answered (#14027)
+        if (tray) { tray.attach(box, ta); tray.listen(() => { send.disabled = !!cm.sending || tray.busy() || tray.failed(); }); send.disabled = !!cm.sending || tray.busy() || tray.failed(); } // a picture that changes while the comment is on its way never makes Send ready again (#14027) // Send waits for a picture still going up, and for a failed one to be removed
+        if (cm.sending) showSending(true); // a redraw while it is on its way keeps the busy button and the words
         box.addEventListener('submit', (e) => {
             e.preventDefault();
             const text = ta.value.trim(), pictures = tray ? tray.hexes() : [];
             if (!text && !pictures.length) { st.error = 'Write something first.'; err.textContent = st.error; err.hidden = false; return; }
-            send.disabled = true;
-            if (editOf) run(() => api.editComment(ownHex(editOf), st.server, editOf.id, text), 'Comment saved');
-            else run(async () => { const c = await api.createComment(cm.hex || st.hex, st.server, { body: text, anchor: cm.anchor, parentId: cm.parentId, board: st.board, images: pictures, atS: cm.atS, endS: cm.endS }); if (tray) tray.destroy(); st.active = c.id; st.scrollCard = true; return c.sentTo; }, cm.parentId != null ? 'Reply posted' : 'Comment posted');
+            if (st.busy || cm.sending) return; // a second press while it is on its way sends nothing
+            cm.sending = true; cm.draft = ta.value; showSending(true);
+            const working = editOf ? 'Saving your comment…' : cm.parentId != null ? 'Sending your reply…' : 'Sending your comment…';
+            const failed = e => { cm.sending = false; throw e; }; // a refusal keeps the words and the box, and the error says why
+            if (editOf) run(() => api.editComment(ownHex(editOf), st.server, editOf.id, text).catch(failed), 'Comment saved', working);
+            else run(async () => { try { const c = await api.createComment(cm.hex || st.hex, st.server, { body: text, anchor: cm.anchor, parentId: cm.parentId, board: st.board, images: pictures, atS: cm.atS, endS: cm.endS }); if (tray) tray.destroy(); st.active = c.id; st.scrollCard = true; return c.sentTo; } catch (e) { failed(e); } }, cm.parentId != null ? 'Reply posted' : 'Comment posted', working);
         });
         ta.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); cancel.click(); } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) box.requestSubmit(); });
         return box;
