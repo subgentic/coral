@@ -7,7 +7,8 @@ import { installDom, importUi } from './helpers/jsdom_env.mjs';
 const dom = installDom({ mode: 'local' }), hex = n => n.toString(16).padStart(64, '0');
 const OLD_LIST = new Set('board,by,cursor,goal,kept,kind,limit,offset,origin,q,read,since,sort,starred,tag,task,team,until,versions'.split(','));
 const art = (n, over = {}) => ({ id: hex(n), board_id: 'dev', name: 'Plan ' + n + '.md', produced_by: 'Writer', session_id: 'w', available: true, tags: ['for review'], created_at: '2026-11-06T10:00:00Z', uri: 'coral://artifacts/' + hex(n), goal_id: 7, ...over });
-const refusal = server => Response.json({ error: 'path not allowed', code: 'path_not_allowed', server }, { status: 403 });
+let hideServer = false; // some Hub routes answer the refusal with no server member (HideServerID): the fallback keys on the code only
+const refusal = server => Response.json({ error: 'path not allowed', code: 'path_not_allowed', ...(hideServer ? {} : { server }) }, { status: 403 });
 let calls = [], mode = 'old', rows = [art(1), art(2), art(3)];
 globalThis.fetch = window.fetch = async input => {
     const u = new URL(String(input), location.href); calls.push(u);
@@ -24,7 +25,7 @@ globalThis.fetch = window.fetch = async input => {
     return Response.json({});
 };
 const skew = await importUi('query_skew'), reviews = await importUi('inbox_reviews');
-const reset = () => { calls = []; skew.forgetOlderComputers(); mode = 'old'; rows = [art(1), art(2), art(3)]; };
+const reset = () => { calls = []; skew.forgetOlderComputers(); mode = 'old'; hideServer = false; rows = [art(1), art(2), art(3)]; };
 const keysOf = u => [...u.searchParams.keys()].sort().join(',');
 
 test('a refused newer key is asked again once without it, and the computer is remembered', async () => {
@@ -90,5 +91,41 @@ test('the version bar read drops ?board= on a computer whose versions route take
     calls = [];
     const b = await skew.fetchSkewed('old', `/api/artifacts/${hex(1)}/versions`, { board: 'dev' }, { kind: 'versions', keys: skew.VERSIONS_KEYS });
     assert.equal(b.response.status, 200); assert.equal(calls.length, 1, 'remembered: one call');
+});
+test('the filtered Needs you view lists a v2.0.58 computer, and its attention count is blank, never the plain total', async () => {
+    reset(); rows = [art(1), art(2), art(3)];
+    const { state } = await importUi('state'); state.hub = true; state.servers = [{ id: 'old', label: 'Old box', status: 'online' }];
+    const f = { q: 'plan', server: 'old' }; // the one computer on the older release
+    await reviews.queryReviews(f);
+    const shown = reviews.queriedReviews(f);
+    assert.deepEqual((shown || []).map(a => a.hex).sort(), [hex(1), hex(2), hex(3)].sort(), 'the three files are listed');
+    const st = reviews.reviewQueryState();
+    assert.equal(st.error, '', 'no "could not be asked"');
+    assert.equal(st.attentionTotal, null, 'the computer cannot count what waits: no number, not the plain total of 3');
+    const NEW = ['digest', 'facets', 'muted', 'starred_first', 'waiting'], newer = calls.filter(u => u.pathname.startsWith('/api/remote/old/') && NEW.some(k => u.searchParams.has(k)));
+    assert.equal(newer.length, 1, 'the older computer is sent the newer keys once (the first read); the count read after it, and every later one, are plain');
+    state.hub = false; state.servers = [];
+});
+test('the refusal with no server member is retried the same way (keyed on the code only)', async () => {
+    reset(); hideServer = true;
+    const r = await skew.fetchSkewed('old', '/api/team-artifacts', new URLSearchParams({ starred_first: 'true', tag: 'for review' }));
+    assert.equal(r.response.status, 200); assert.deepEqual(r.dropped, ['starred_first']); assert.equal(calls.length, 2);
+    reset(); hideServer = true; rows = [art(1), art(2)];
+    assert.equal((await reviews.reviewsOfGoal('@old/dev', 7)).length, 2, 'the per-team review read lists the files');
+});
+
+test('needs_skills: a computer below v2.0.58 refuses the skills read, which clears its rows and shows the note (pinned, with the no-server body)', async () => {
+    reset(); hideServer = true;
+    const skills = await importUi('needs_skills'), gaps = await importUi('needs_incomplete');
+    const urlOf = (path, server) => `/api/remote/${server}${path}`;
+    globalThis.fetch = window.fetch = async input => {
+        const u = new URL(String(input), location.href); calls.push(u);
+        if (u.pathname === '/api/remote/old/api/needs-you') return refusal('old');
+        return Response.json({});
+    };
+    await skills.loadPendingSkills({ hub: true, sources: ['old'], urlOf });
+    assert.deepEqual(skills.skillRows(), [], 'no rows are drawn from that computer');
+    assert.deepEqual(gaps.readGaps().filter(g => g.kind === 'skills').map(g => g.source), ['old'], 'the Inbox is told it could not read them');
+    assert.match(gaps.incompleteNote(), /skills from old could not be read/);
 });
 test.after(() => dom.window.close());
