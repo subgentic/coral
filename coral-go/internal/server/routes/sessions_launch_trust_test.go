@@ -59,7 +59,7 @@ func (r *trustRig) launch(t *testing.T, dir string, create, tick bool, as func(*
 	t.Helper()
 	r.n++
 	b, _ := json.Marshal(map[string]any{"board_name": "trust" + string(rune('a'+r.n)), "new_board": true, "working_dir": dir, "create_dir": create, "trust_folder": tick, "agent_type": "claude",
-		"agents": []map[string]any{{"name": "A", "agent_type": "claude"}, {"name": "B", "agent_type": "codex"}, {"name": "C", "agent_type": "agy"}}})
+		"agents": []map[string]any{{"name": "A", "agent_type": "claude", "permission_mode": "default"}, {"name": "B", "agent_type": "codex", "permission_mode": "default"}, {"name": "C", "agent_type": "agy"}}}) // Default: these tests are about the folder, not the Hub gate (#14336)
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/sessions/launch-team", bytes.NewReader(b))
 	r.h.LaunchTeam(rec, as(req))

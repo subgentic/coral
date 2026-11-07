@@ -246,3 +246,42 @@ func TestATeamRelaunchByBoardIDKeepsTheConfirmModeForAMemberThatNamesNothing(t *
 	cmd = relaunch(map[string]any{"name": "C", "flags": []string{"--permission-mode", "plan"}})
 	assert.Contains(t, cmd, "--permission-mode plan", "what a member names is what it gets")
 }
+
+// The real proof for what a team member that names NO mode is spawned with (Frontend Dev's request on #14337, the Orchestrator's on #14336): the launch line of each type. Claude Auto, Codex's
+// workspace-write with no approvals (never no-sandbox), Hermes Bypass (--yolo), Antigravity stays Default (no skip flag). The stored row says the same.
+func TestATeamMemberThatNamesNoModeIsSpawnedWithEachTypesMapping(t *testing.T) {
+	for _, c := range []struct {
+		cli       string
+		has, not  []string
+		wantStore string
+	}{
+		{at.Claude, []string{"--permission-mode auto"}, []string{"bypassPermissions", "skip-permissions"}, "auto"},
+		{at.Codex, []string{"--sandbox workspace-write -a never"}, []string{"--dangerously-bypass-approvals-and-sandbox", "danger-full-access"}, "auto"},
+		{at.Hermes, []string{"--yolo"}, nil, "bypassPermissions"},
+		{at.Agy, nil, []string{"--dangerously-skip-permissions", "--yolo"}, "default"},
+	} {
+		t.Run(c.cli, func(t *testing.T) {
+			rig := setupAgyTestRig(t)
+			fake := stubScript(t, filepath.Join(t.TempDir(), "mock-"+c.cli), "#!/bin/sh\nexit 0\n")
+			require.NoError(t, rig.ss.SetSetting(context.Background(), agent.CLIPathSettingKey(c.cli), fake))
+			code, out, cmd := teamOf(t, rig, c.cli, "map-"+c.cli, map[string]any{"name": "A"}, nil)
+			require.Equal(t, http.StatusOK, code, out)
+			for _, h := range c.has {
+				assert.Contains(t, cmd, h, c.cli)
+			}
+			for _, n := range c.not {
+				assert.NotContains(t, cmd, n, c.cli)
+			}
+			var res struct {
+				Agents []map[string]any `json:"agents"`
+			}
+			require.NoError(t, json.Unmarshal([]byte(out), &res))
+			require.Len(t, res.Agents, 1)
+			ls, err := rig.ss.GetLiveSession(context.Background(), res.Agents[0]["session_id"].(string))
+			require.NoError(t, err)
+			require.NotNil(t, ls)
+			require.NotNil(t, ls.PermissionMode, "the row stores the mode the member started in")
+			assert.Equal(t, c.wantStore, *ls.PermissionMode, c.cli)
+		})
+	}
+}

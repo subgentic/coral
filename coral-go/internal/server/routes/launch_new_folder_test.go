@@ -29,7 +29,7 @@ func newFolderTeam(t *testing.T) (*SessionsHandler, func(dir string, create bool
 	n := 0
 	return h, func(dir string, create bool, mod func(*http.Request)) (int, map[string]any) {
 		n++
-		body := map[string]any{"board_name": "nf-team-" + string(rune('a'+n)), "working_dir": dir, "agent_type": "claude", "agents": []map[string]any{{"name": "A", "prompt": "x"}}}
+		body := map[string]any{"board_name": "nf-team-" + string(rune('a'+n)), "working_dir": dir, "agent_type": "claude", "agents": []map[string]any{{"name": "A", "prompt": "x", "permission_mode": "default"}}} // Default: the new default would meet the Hub gate first (#14336), and these tests are about the folder
 		if create {
 			body["create_new_folder"] = true
 		}
