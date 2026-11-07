@@ -56,9 +56,10 @@ func TestAnUploadWithNoTaskInProgressIsNotedForTheHealthCheck(t *testing.T) {
 func TestAnUploadIsNotNotedWhenTheSwitchOrTheCheckIsOff(t *testing.T) {
 	l := newLinkRig(t)
 	ctx := context.Background()
+	require.NoError(t, l.h.bs.SetHealthOn(ctx, "alpha", false)) // the team turned its check off (the default is on since #14091)
 	code, _ := l.post("s1", "check off", nil)
 	require.Equal(t, http.StatusCreated, code)
-	assert.Empty(t, l.offBooks(), "the team's check is off by default: nothing is kept for it")
+	assert.Empty(t, l.offBooks(), "the team's check is off: nothing is kept for it")
 
 	require.NoError(t, l.h.bs.SetHealthOn(ctx, "alpha", true))
 	hs := l.h.bs.GetHealthSettings(ctx, "alpha")

@@ -273,11 +273,12 @@ type HealthMentionNudge struct {
 	AfterMin int  `json:"after_min"`
 }
 
-// DefaultHealthSettings are the design's values. The check is OFF for a team that has not turned it on (#4962, the operator: it
-// uses tokens each time and a user may not know what it does); the rules and numbers below are what it uses once it is on.
+// DefaultHealthSettings are the design's values. The check is ON for a team that has not set it (the operator, 2026-11-07: "turn health check on for teams by default", #14091, which reverses #4962's off-by-default):
+// a team that stored OFF keeps off, and the migration that kept the older teams on stays as it is. The rules and numbers below are what it uses; its cost is bounded (a check goes out only when something changed,
+// and the heartbeat is off: see TestANewTeamsFirstHourOfHealthChecksIsFew).
 func DefaultHealthSettings() HealthSettings {
 	return HealthSettings{
-		On: false, IntervalMin: 10, AllClear: true, HeartbeatMin: 0,
+		On: true, IntervalMin: 10, AllClear: true, HeartbeatMin: 0,
 		AutoDelegate:   HealthRuleOn{On: true},
 		ClaimNudge:     HealthClaimNudge{On: true, AfterMin: 10, Nudges: 2},
 		StatusNudge:    HealthStatusNudge{On: true, AfterMin: 20, EscalateAfterMin: 10},
@@ -403,6 +404,12 @@ func (s *Store) HealthOnByProject(ctx context.Context) (map[string]bool, error) 
 		}
 	}
 	return out, nil
+}
+
+// HealthSettingStored says the board has a stored health setting: the Operator (or a launch) chose, as opposed to the default applying (#14091).
+func (s *Store) HealthSettingStored(ctx context.Context, project string) bool {
+	v, err := s.boardSettingValue(ctx, project, settingHealth)
+	return err == nil && v != ""
 }
 
 // SetHealthOn turns a board's health check on or off, leaving every other health setting as it is stored (or the defaults).

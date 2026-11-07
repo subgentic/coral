@@ -9,32 +9,38 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// #4962, the operator: the team health check is OFF for a team that has not turned it on (it uses tokens each time).
-func TestHealthCheckIsOffByDefault(t *testing.T) {
+// #14091, the operator (2026-11-07, "turn health check on for teams by default"; this reverses #4962): a team that has not set the health check has it ON, with the current rules and intervals; a team that stored OFF keeps
+// off, and turning it on or off keeps the numbers the operator set.
+func TestHealthCheckIsOnByDefault(t *testing.T) {
 	s := testStore(t)
 	ctx := context.Background()
-	assert.False(t, DefaultHealthSettings().On)
-	assert.False(t, s.GetHealthSettings(ctx, "never-set").On, "a board with no stored setting")
+	assert.True(t, DefaultHealthSettings().On)
+	got := s.GetHealthSettings(ctx, "never-set")
+	assert.True(t, got.On, "a board with no stored setting")
+	assert.Equal(t, 10, got.IntervalMin, "the current interval")
+	assert.Equal(t, 0, got.HeartbeatMin, "and no 'no change' heartbeat: a quiet team hears nothing")
+	assert.True(t, got.ClaimNudge.On, "its rules are on with it")
+	assert.False(t, got.Landing.On, "the opt-in rules stay opt-in")
+	assert.False(t, got.DialogTimeout.On, "Coral acting in an agent's terminal on its own is still the operator's choice")
+	assert.False(t, got.AutoRecommend.On)
 	assert.Empty(t, healthOn(t, s, ctx), "nothing stored: nothing in the map")
 
-	require.NoError(t, s.SetHealthOn(ctx, "team", true))
-	got := s.GetHealthSettings(ctx, "team")
-	assert.True(t, got.On)
-	assert.Equal(t, 10, got.IntervalMin, "turning it on keeps the rest as it was (the defaults)")
-	assert.True(t, got.ClaimNudge.On, "its rules are on once the check is")
-	assert.Equal(t, map[string]bool{"team": true}, healthOn(t, s, ctx))
-
+	// a person's choice is never flipped: stored OFF stays off, with the numbers they set
 	got.IntervalMin = 30
 	require.NoError(t, s.setHealthSettings(ctx, "team", got))
 	require.NoError(t, s.SetHealthOn(ctx, "team", false))
 	off := s.GetHealthSettings(ctx, "team")
-	assert.False(t, off.On)
-	assert.Equal(t, 30, off.IntervalMin, "turning it off keeps the operator's numbers")
+	assert.False(t, off.On, "a team that stored off keeps off")
+	assert.Equal(t, 30, off.IntervalMin)
 	assert.Equal(t, map[string]bool{"team": false}, healthOn(t, s, ctx))
+	require.NoError(t, s.SetHealthOn(ctx, "team", true))
+	assert.True(t, s.GetHealthSettings(ctx, "team").On)
+	assert.Equal(t, 30, s.GetHealthSettings(ctx, "team").IntervalMin, "turning it on keeps the operator's numbers")
+	assert.Equal(t, map[string]bool{"team": true}, healthOn(t, s, ctx))
 }
 
 // A team that was running the check when the default became off (it had none stored: on by default) stays on: the first start
-// after the change stores "on" for it; a team that had it off keeps that, and a team made after the change has the new default.
+// after the change stores "on" for it; a team that had it off keeps that (the migration marker stays as it is, #14091).
 func TestHealthDefaultOffKeepsTheTeamsThatHadItOn(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "board.db")
 	ctx := context.Background()
@@ -63,15 +69,16 @@ func TestHealthDefaultOffKeepsTheTeamsThatHadItOn(t *testing.T) {
 
 	_, err = s.Subscribe(ctx, "made-after", "Lead", "Orchestrator", "claude-c", nil, "all")
 	require.NoError(t, err)
-	assert.False(t, s.GetHealthSettings(ctx, "made-after").On, "a team made after the change has the new default")
+	assert.True(t, s.GetHealthSettings(ctx, "made-after").On, "a team made after the change has the default, which is on since #14091")
 
-	// A later start does not run it again: the team made after the change is not turned on.
+	// A later start does not run the migration again: a stored OFF is never turned on.
 	require.NoError(t, s.Close())
 	s, err = NewStoreWithKey(path, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = s.Close() })
-	assert.False(t, s.GetHealthSettings(ctx, "made-after").On)
+	assert.True(t, s.GetHealthSettings(ctx, "made-after").On)
 	assert.True(t, s.GetHealthSettings(ctx, "had-default").On)
+	assert.False(t, s.GetHealthSettings(ctx, "turned-off").On, "and a team that turned it off still has it off")
 }
 
 func healthOn(t *testing.T, s *Store, ctx context.Context) map[string]bool {
