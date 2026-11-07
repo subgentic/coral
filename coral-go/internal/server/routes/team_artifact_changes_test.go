@@ -332,7 +332,7 @@ func (c *changesEnv) changesNoT(body string) (int, map[string]any) {
 		return 0, nil
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := (&http.Client{Timeout: changeSecondDeadline}).Do(req) // its own short deadline: a request that waits for another one fails fast instead of hanging the run
 	if err != nil {
 		return 0, nil
 	}
@@ -366,6 +366,9 @@ func TestAnyoneButTheOwnerGetsOwnerOnlyAndNothingIsWritten(t *testing.T) {
 
 // #13998: the notice is claimed under the artifact's lock and delivered outside it. A slow delivery holds no other request for the same artifact; a request of the same words while it is open answers 409
 // already_in_progress and changes nothing (never "ok" about a comment the first one may yet undo).
+// changeSecondDeadline is how long a second request of the same words may take while the first one's delivery is held open: it must answer 409 at once, so a few seconds is plenty and a hold of the lock fails the test in that time (QA's SHOULD on #13998).
+const changeSecondDeadline = 3 * time.Second
+
 func slowFirstDelivery(t *testing.T, c *changesEnv) (entered, release chan struct{}) {
 	t.Helper()
 	entered, release = make(chan struct{}), make(chan struct{})
@@ -392,7 +395,7 @@ func TestASecondRequestWhileTheNoticeIsBeingDeliveredGets409AndTheFirstStillMake
 	case r := <-secondDone:
 		assert.Equal(t, http.StatusConflict, r[0], "not ok: the first may yet fail")
 		assert.Equal(t, "already_in_progress", r[1].(map[string]any)["code"])
-	case <-time.After(10 * time.Second):
+	case <-time.After(changeSecondDeadline):
 		close(release)
 		t.Fatal("the second request waited for the first one's delivery")
 	}
@@ -418,6 +421,10 @@ func TestWhenTheFirstDeliveryFailsAfterASecondGot409NobodyWasTold(t *testing.T) 
 	go func() { code, _ := c.changesNoT(words); firstDone <- code }()
 	<-entered
 	code, out := c.changesNoT(words)
+	if code == 0 {
+		close(release)
+		t.Fatal("the second request did not answer within its short deadline: it waited for the first one's delivery")
+	}
 	assert.Equal(t, http.StatusConflict, code, out)
 	assert.Equal(t, "already_in_progress", out["code"])
 	_, err := c.sh.db.ExecContext(context.Background(), `ALTER TABLE artifact_comment_asks RENAME TO asks_away`) // the first one's delivery now fails
