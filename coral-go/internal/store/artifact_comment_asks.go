@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"sync"
 	"time"
 )
@@ -198,12 +199,31 @@ func (s *SessionStore) LinkCommentMessage(ctx context.Context, board string, mes
 }
 
 // MarkCommentMessagesRead records that the agent session read the board messages messageIDs (coral-board read): for each that delivered a comment TO THAT SESSION, the thread's open ask gets its read_at, the
-// first time only (#14130). A message that was for another agent stamps nothing, whoever reads it. It returns how many asks were stamped.
+// first time only (#14130). A message that was for another agent stamps nothing, whoever reads it. coral-board read is the busiest call there is, so a board with no comment-message links does no write at all
+// (one indexed read says so), and otherwise the ids go in one UPDATE per chunk of 500. It returns how many asks were stamped.
 func (s *SessionStore) MarkCommentMessagesRead(ctx context.Context, board, agentSession string, messageIDs []int64, now time.Time) (int, error) {
+	if len(messageIDs) == 0 {
+		return 0, nil
+	}
+	var linked int
+	if err := s.reader().GetContext(ctx, &linked, `SELECT EXISTS(SELECT 1 FROM artifact_comment_messages WHERE board = ? AND agent_session = ?)`, board, agentSession); err != nil {
+		return 0, err
+	}
+	if linked == 0 {
+		return 0, nil // nothing was ever delivered to this agent on this board: no write
+	}
 	stamped := 0
-	for _, id := range messageIDs {
+	stamp := now.UTC().Format(ISOFormat)
+	for from := 0; from < len(messageIDs); from += commentReadChunk {
+		chunk := messageIDs[from:min(from+commentReadChunk, len(messageIDs))]
+		marks := strings.TrimSuffix(strings.Repeat("?,", len(chunk)), ",")
+		args := make([]any, 0, len(chunk)+5)
+		args = append(args, stamp, agentSession, board, agentSession)
+		for _, id := range chunk {
+			args = append(args, id)
+		}
 		res, err := s.db.ExecContext(ctx, `UPDATE artifact_comment_asks SET read_at = ? WHERE read_at IS NULL AND closed_at IS NULL AND agent_session = ?
- AND comment_id IN (SELECT comment_id FROM artifact_comment_messages WHERE board = ? AND message_id = ? AND agent_session = ?)`, now.UTC().Format(ISOFormat), agentSession, board, id, agentSession)
+ AND comment_id IN (SELECT comment_id FROM artifact_comment_messages WHERE board = ? AND agent_session = ? AND message_id IN (`+marks+`))`, args...)
 		if err != nil {
 			return stamped, err
 		}
@@ -213,6 +233,9 @@ func (s *SessionStore) MarkCommentMessagesRead(ctx context.Context, board, agent
 	}
 	return stamped, nil
 }
+
+// commentReadChunk is how many message ids one read stamp UPDATE takes (#14130).
+const commentReadChunk = 500
 
 // AwaitingAsks are the asks still open at now that the agent has not answered (no reply in the thread) and that Coral has not reminded it about, oldest first, at most limit (#11722). Only asks of a session that is
 // live, awake and not archived: an agent that sleeps or is gone cannot be typed into, and its asks must not fill the batch and starve newer ones.
