@@ -22,6 +22,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 window.__asks = [{ board: '${team}', kind: 'ask', id: 71, asker: 'Orchestrator', text: '@Operator Which port should the test server use?', at: new Date(Date.now() - 120000).toISOString() }];
                 window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin);
                     if (String(url) === '/api/operator-asks') return json(window.__asks);
+                    // the Needs you rows are read through the per-computer protected page route since the inbox's bounded review pages (#13958): the same files, each naming its owning board, in the page shape
+                    if ((opts.method || 'GET') === 'GET' && u.pathname === '/api/team-artifacts') { const rows = items.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))).map(a => ({ ...a, uri: 'coral://artifacts/' + a.id, board_id: '${team}', team: '${team}' })); return json({ artifacts: rows, limit: 50, offset: 0, has_more: false, next_cursor: '', truncated: false, total: rows.length, all: rows.length, teams: [{ board_id: '${team}', team: '${team}', all: rows.length }] }); }
                     if ((opts.method || 'GET') === 'GET' && u.pathname === '/api/board/${team}/artifacts') return json({ project: '${team}', artifacts: items.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))), has_more: false });
                     return original(url, opts); }; return true; })()`);
             await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
