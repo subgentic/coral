@@ -68,7 +68,8 @@ for(const width of [1280,390,320]){
  await ev(`window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
  await waitFor(`document.querySelectorAll('.inbox-review-star').length===2`,'both source rows in native Hub Needs you');
  await ev(`document.querySelector('.inbox-group-review-toggle input').click();true`);
- await waitFor(`document.querySelectorAll('.inbox-needs-results .dt-group').length===2`,'same goal id remains two source groups');
+ // #14046: each computer also lists the skills waiting for its approval (hub_world's per-computer skill rows); they are not a goal's rows and sit in their own 'Other items' group, so the goal groups are counted by their heading
+ await waitFor(`[...document.querySelectorAll('.inbox-needs-results .dt-group')].filter(g=>g.textContent.startsWith('Goal #1')).length===2`,'same goal id remains two source groups');
  const sourceNews=await ev(`[...document.querySelectorAll('.inbox-needs-results .dt-row')].map(r=>({source:r.dataset.key.split(':')[0],text:r.querySelector('.inbox-review-name').getAttribute('aria-label')}))`);
  assert.match(sourceNews.find(r=>r.source==='m1').text,/New version v3.*2 new comments/,'Laptop keeps its own newness baseline');
  assert.doesNotMatch(sourceNews.find(r=>r.source==='m2').text,/New version|new comments/,'Desktop stays independently opened and without news');
