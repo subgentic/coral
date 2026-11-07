@@ -85,6 +85,8 @@ type promptScreen struct {
 	// only to the person's own dashboard and for a folder Coral may trust (#14110, prompt_trust.go).
 	TrustFolder string `json:"trust_folder,omitempty"`
 	TrustOffer  bool   `json:"trust_offer,omitempty"`
+	// BrowserMenu: Claude's "Claude wants to use your browser" menu, read by structure (prompt_browser.go, #14151): a row may take its "Not now" only.
+	BrowserMenu bool `json:"browser_menu,omitempty"`
 	// Multi: every option has a box (a multi-select question, #5232): a digit toggles the box and nothing is
 	// answered until Submit is taken. Submit is the row under the options (nil when it is not on screen).
 	Multi  bool          `json:"multi,omitempty"`
@@ -223,6 +225,9 @@ func parsePromptScreenRaw(capture string) (promptScreen, bool) {
 	lines := strings.Split(strings.ReplaceAll(capture, "\r", ""), "\n")
 	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
 		lines = lines[:len(lines)-1]
+	}
+	if b, ok := parseBrowserPromptMenu(lines); ok {
+		return b, true
 	}
 	// The option list ends within a few lines of the bottom (a footer such
 	// as "Enter to select · Esc to cancel" may follow it).
