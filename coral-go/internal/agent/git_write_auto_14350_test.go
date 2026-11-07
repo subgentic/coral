@@ -23,7 +23,7 @@ func hasGitRule(allow []string) bool {
 // Bash(git ...) rule; a blanket Bash allow stays (Auto still judges destructive git). In the other modes the rules stay: they only stop the question.
 func TestGitWriteEmitsNoGitAllowRuleInAutoOnly(t *testing.T) {
 	caps := &Capabilities{Allow: []string{CapFileRead, CapFileWrite, CapShell, CapGitWrite, CapAgentSpawn, CapWebAccess}}
-	for mode, wantGit := range map[string]bool{"default": true, "": true, "plan": true, "acceptEdits": true, "dontAsk": true, "bypassPermissions": true, "auto": false} {
+	for mode, wantGit := range map[string]bool{"default": true, "": false, "plan": true, "acceptEdits": true, "dontAsk": true, "bypassPermissions": false, "auto": false, "somethingNew": false} {
 		p := TranslateToClaudePermissionsForMode(caps, mode)
 		require.NotNil(t, p, mode)
 		assert.Equal(t, wantGit, hasGitRule(p.Allow), "mode %q: %v", mode, p.Allow)
@@ -38,22 +38,55 @@ func TestGitWriteEmitsNoGitAllowRuleInAutoOnly(t *testing.T) {
 	assert.False(t, hasGitRule(p.Allow))
 	// the one-argument translator is the Default one
 	assert.True(t, hasGitRule(TranslateToClaudePermissions(caps).Allow))
+	// an empty mode (a print-mode run) is not Default: fail closed
+	assert.False(t, hasGitRule(TranslateToClaudePermissionsForMode(caps, "").Allow))
 }
 
-// The mode the list is built from is the one the launch really uses: a mode in the flags wins, then the launch's mode, else Default.
+// The mode the list is built from is the one appendPermissionMode writes (one function): a mode in the flags wins, then the launch's mode, else Default for an interactive launch; a print-mode run
+// with Default or none writes nothing (""), and a permission flag nobody can read is "".
 func TestTheClaudeLaunchModeIsTheOneTheCommandLineCarries(t *testing.T) {
 	for _, c := range []struct {
-		params LaunchParams
-		want   string
+		params      LaunchParams
+		interactive bool
+		want        string
 	}{
-		{LaunchParams{}, "default"},
-		{LaunchParams{PermissionMode: "auto"}, "auto"},
-		{LaunchParams{PermissionMode: "default", Flags: []string{"--permission-mode", "auto"}}, "auto"},
-		{LaunchParams{PermissionMode: "auto", Flags: []string{"--permission-mode=plan"}}, "plan"},
-		{LaunchParams{PermissionMode: "auto", Flags: []string{"--dangerously-skip-permissions"}}, "bypassPermissions"},
+		{LaunchParams{}, true, "default"},
+		{LaunchParams{}, false, ""},
+		{LaunchParams{PermissionMode: "default"}, false, ""},
+		{LaunchParams{PermissionMode: "auto"}, true, "auto"},
+		{LaunchParams{PermissionMode: "auto"}, false, "auto"},
+		{LaunchParams{PermissionMode: "default", Flags: []string{"--permission-mode", "auto"}}, true, "auto"},
+		{LaunchParams{PermissionMode: "auto", Flags: []string{"--permission-mode=plan"}}, true, "plan"},
+		{LaunchParams{PermissionMode: "auto", Flags: []string{"--dangerously-skip-permissions"}}, true, "bypassPermissions"},
+		{LaunchParams{PermissionMode: "default", Flags: []string{"--permission-mode", "nonsense"}}, true, ""},
 	} {
-		assert.Equal(t, c.want, claudeLaunchMode(c.params), "%+v", c.params)
+		assert.Equal(t, c.want, claudeLaunchMode(c.params, c.interactive), "%+v interactive=%v", c.params, c.interactive)
+		// and the command line agrees with it
+		args := appendPermissionMode(nil, c.params, c.interactive)
+		if _, fromFlags := claudePermissionMode(c.params, c.interactive); !fromFlags && c.want != "" {
+			assert.Equal(t, []string{"--permission-mode", c.want}, args)
+		}
 	}
+}
+
+// A non-interactive launch (a scheduled job, a workflow step, PrintArgs) with no mode and git_write has no Bash(git ...) rule: nothing is written for the mode, so Auto's own default may apply.
+func TestAPrintModeRunWithNoModeAndGitWriteHasNoGitRule(t *testing.T) {
+	setTestHome(t, t.TempDir())
+	a := &ClaudeAgent{}
+	for _, mode := range []string{"", "default", "auto"} {
+		args, settingsFile, err := a.PrintArgs(LaunchParams{WorkingDir: t.TempDir(), SessionID: "0b7f0f4e-3c1b-4c55-9b0e-0f6b1b2f1a11", PermissionMode: mode,
+			Capabilities: &Capabilities{Allow: []string{CapShell, CapGitWrite}}})
+		require.NoError(t, err, args)
+		t.Cleanup(func() { os.Remove(settingsFile) })
+		b, err := os.ReadFile(settingsFile)
+		require.NoError(t, err)
+		assert.NotContains(t, string(b), "Bash(git", "mode %q", mode)
+	}
+	args, settingsFile, err := a.PrintArgs(LaunchParams{WorkingDir: t.TempDir(), SessionID: "0b7f0f4e-3c1b-4c55-9b0e-0f6b1b2f1a11", PermissionMode: "plan", Capabilities: &Capabilities{Allow: []string{CapShell, CapGitWrite}}})
+	require.NoError(t, err, args)
+	t.Cleanup(func() { os.Remove(settingsFile) })
+	b, _ := os.ReadFile(settingsFile)
+	assert.Contains(t, string(b), "Bash(git push *)", "a mode that is written and asks keeps the rules")
 }
 
 // The settings file a launch writes: the same capabilities give the git rules in Default and none in Auto, whatever way Auto was asked for (the launch's mode or the flags); a relaunch of the same
@@ -66,7 +99,7 @@ func TestTheSettingsFileDropsTheGitRulesWhenTheLaunchIsInAuto(t *testing.T) {
 		const sid = "0b7f0f4e-3c1b-4c55-9b0e-0f6b1b2f1a11"
 		p.Capabilities, p.SessionID, p.WorkingDir = caps, sid, t.TempDir()
 		files := &launchFiles{}
-		path := claudeSettingsFile(files, p, sid)
+		path := claudeSettingsFile(files, p, sid, true)
 		require.NoError(t, files.err)
 		t.Cleanup(func() { os.Remove(path) })
 		b, err := os.ReadFile(path)

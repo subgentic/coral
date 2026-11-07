@@ -91,15 +91,21 @@ func TestTheInheritedDefaultGuardsReadOnlyTheStoredSetting(t *testing.T) {
 // Build item (1): Codex stays in its sandbox. Full capabilities never translate to "no sandbox" (that is the Bypass mode, or Keep Full access, alone). Pinned per release of the translation:
 // for every mode but Bypass, with and without the full capability set, the command carries no bypass flag and no danger-full-access.
 func TestCodexWithFullCapabilitiesStaysInItsSandbox(t *testing.T) {
-	for _, mode := range []string{"", "default", "plan", "acceptEdits", "auto", "dontAsk"} {
+	// a member names Default with permission_mode, any other mode as the CLI's own flags
+	byFlags := map[string][]string{"": nil, "default": nil, "plan": {"--sandbox", "read-only", "-a", "on-request"}, "acceptEdits": {"--sandbox", "workspace-write", "-a", "on-request"},
+		"auto": {"--sandbox", "workspace-write", "-a", "never"}}
+	for _, mode := range []string{"", "default", "plan", "acceptEdits", "auto"} {
 		for _, withCaps := range []bool{false, true} {
 			t.Run(fmt.Sprintf("mode %q caps=%v", mode, withCaps), func(t *testing.T) {
 				rig := setupAgyTestRig(t)
 				fake := stubScript(t, filepath.Join(t.TempDir(), "mock-codex"), "#!/bin/sh\nexit 0\n")
 				require.NoError(t, rig.ss.SetSetting(context.Background(), agent.CLIPathSettingKey(at.Codex), fake))
 				m := map[string]any{"name": "A"}
-				if mode != "" {
-					m["permission_mode"] = mode
+				if mode == "default" {
+					m["permission_mode"] = "default"
+				}
+				if f := byFlags[mode]; f != nil {
+					m["flags"] = f
 				}
 				if withCaps {
 					m["capabilities"] = map[string]any{"allow": fullCapsList14336}
@@ -116,7 +122,7 @@ func TestCodexWithFullCapabilitiesStaysInItsSandbox(t *testing.T) {
 	rig := setupAgyTestRig(t)
 	fake := stubScript(t, filepath.Join(t.TempDir(), "mock-codex"), "#!/bin/sh\nexit 0\n")
 	require.NoError(t, rig.ss.SetSetting(context.Background(), agent.CLIPathSettingKey(at.Codex), fake))
-	code, out, cmd := teamOf(t, rig, at.Codex, "cx-bypass", map[string]any{"name": "A", "permission_mode": "bypassPermissions"}, nil)
+	code, out, cmd := teamOf(t, rig, at.Codex, "cx-bypass", map[string]any{"name": "A", "flags": []string{"--dangerously-bypass-approvals-and-sandbox"}}, nil)
 	require.Equal(t, http.StatusOK, code, out)
 	assert.Contains(t, cmd, "--dangerously-bypass-approvals-and-sandbox")
 }
@@ -144,7 +150,7 @@ func TestAFullCapabilityLaunchCarriesCoralsOwnProtections(t *testing.T) {
 		require.Contains(t, cmd, "--permission-mode auto")
 		return settingsOf(cmd)
 	}
-	plain := run("prot-plain", map[string]any{"name": "A", "permission_mode": "default"})
+	plain := run("prot-plain", map[string]any{"name": "A"})
 	full := run("prot-full", map[string]any{"name": "A", "capabilities": map[string]any{"allow": fullCapsList14336, "deny": []string{"Bash(rm -rf *)"}}})
 	assert.Equal(t, plain["hooks"], full["hooks"], "the same Coral hooks in every mode")
 	require.NotNil(t, full["hooks"])
@@ -194,4 +200,27 @@ func TestAHubTeamMemberThatNamesNothingMeetsTheSameGateAsASingleLaunch(t *testin
 	code, out, _ = try(map[string]string{tunnel.ViaHeader: "forged"})
 	assert.NotEqual(t, http.StatusOK, code, out)
 	assert.Equal(t, before+1, len(rig.term.sentCommands()), "a forged stamp started nothing")
+}
+
+// Security's MUST 4 (#14333): the shipped full set for Claude is Read Glob Grep Write Edit Bash WebFetch WebSearch Agent, with NO Bash(git ...) rule (git_write is a capability a person picks on purpose;
+// it turns off Auto's check on git pushes). A launch that names nothing but the set, in the new default (Auto), writes exactly that allow list.
+func TestTheShippedFullSetCarriesNoGitAllowRule(t *testing.T) {
+	shipped := []string{agent.CapFileRead, agent.CapFileWrite, agent.CapShell, agent.CapWebAccess, agent.CapAgentSpawn}
+	for _, mode := range []string{"default", "plan", "acceptEdits", "auto", "dontAsk"} {
+		p := agent.TranslateToClaudePermissionsForMode(&agent.Capabilities{Allow: shipped}, mode)
+		require.NotNil(t, p)
+		assert.ElementsMatch(t, []string{"Read", "Glob", "Grep", "Write", "Edit", "Bash", "WebFetch", "WebSearch", "Agent"}, p.Allow, mode)
+		assert.Empty(t, p.Deny)
+	}
+	rig := setupAgyTestRig(t)
+	fake := stubScript(t, filepath.Join(t.TempDir(), "mock-claude"), "#!/bin/sh\nexit 0\n")
+	require.NoError(t, rig.ss.SetSetting(context.Background(), agent.CLIPathSettingKey(at.Claude), fake))
+	code, out, cmd := teamOf(t, rig, at.Claude, "shipped-set", map[string]any{"name": "A", "capabilities": map[string]any{"allow": shipped}}, nil)
+	require.Equal(t, http.StatusOK, code, out)
+	require.Contains(t, cmd, "--permission-mode auto")
+	m := regexp.MustCompile(`--settings (\S+)`).FindStringSubmatch(cmd)
+	require.NotNil(t, m)
+	b, err := os.ReadFile(strings.Trim(m[1], `'"`))
+	require.NoError(t, err)
+	assert.NotContains(t, string(b), "Bash(git")
 }

@@ -271,7 +271,7 @@ func TestHubTeamLaunchOfTheOwnersSavedTemplate(t *testing.T) {
 	untyped := `[{"name":"Untyped","agents":[{"name":"Dev2","prompt":"p","capabilities":{"allow":["shell","file_write"]}}]}]`
 	typed := `[{"name":"Typed","agents":[{"name":"Dev2","prompt":"p","agent_type":"claude","capabilities":{"allow":["shell","file_write"]}}]}]`
 	dev2 := func(agentType string) map[string]any {
-		m := map[string]any{"name": "Dev2", "prompt": "p", "capabilities": map[string]any{"allow": []string{"shell", "file_write"}}}
+		m := map[string]any{"name": "Dev2", "prompt": "p", "permission_mode": "default", "capabilities": map[string]any{"allow": []string{"shell", "file_write"}}}
 		if agentType != "" {
 			m["agent_type"] = agentType
 		}
