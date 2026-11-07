@@ -6,7 +6,7 @@ const BASE=require('./test_base').BASE;
 (async()=>{
  const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();
  try{
-  await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
+  await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});await Page.addScriptToEvaluateOnNewDocument({source:"localStorage.setItem('coral-inbox-group-review-goal','false');"});
   for(const width of [1280,390]){
    await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});await Emulation.setTouchEmulationEnabled({enabled:width===390});
    await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev,'startup','liveList','liveListLoaded','settings');
@@ -26,7 +26,8 @@ const BASE=require('./test_base').BASE;
     if(name==='remote-series.md')assert.match(team,/Laptop/,width+': remote team keeps its computer');
    }
    if(width===1280){
-    await ev(`document.querySelector('#group-table-view th[data-key="team"]').click();true`);
+    await ev(`document.querySelector('#group-table-view th[data-key="team"] .dt-sort').click();true`);
+    await waitFor(`document.querySelector('#group-table-view th[data-key="team"]')?.getAttribute('aria-sort')==='ascending'`,'Team column really sorted ascending');
     const order=await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(r=>r.querySelector('[data-key="team"]')?.textContent.trim()).filter(Boolean)`);
     assert.equal(order.length,3);assert.match(order[0],/^Alpha questions/,'question team sorts before review teams; treating reviews as empty would reverse this');assert.deepEqual(order,[...order].sort((a,b)=>a.localeCompare(b)),'Team sort includes review rows');
    }

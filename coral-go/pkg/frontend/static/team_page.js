@@ -299,12 +299,13 @@ async function readCounts() {
     drawCounts();
 }
 // A Wake or a Sleep from here: the status is read and drawn at once, not at the next poll (#10359).
-document.addEventListener('coral:needs-updated', () => {
+function syncNeedsCount() {
     if (!S.team || !currentTeamPage()) return;
-    drawStatus(S.statusData);
     const team = S.team;
     importOnce('./inbox_sidebar.js').then(m => { if (S.team !== team) return; const count = m.teamNeedsCount(team); S.counts.needs = count.complete ? count.value : count.value ? `${count.value}+` : '…'; drawCounts(); });
-});
+}
+document.addEventListener('coral:needs-updated', () => { if (S.team && currentTeamPage()) drawStatus(S.statusData); syncNeedsCount(); });
+document.addEventListener('coral:team-needs-count', e => { if (e.detail?.team === S.team) syncNeedsCount(); });
 document.addEventListener('coral:team-sleep-changed', e => { if (S.team && e.detail && e.detail.team === S.team) readCounts(); });
 function startCounts() {
     readCounts();

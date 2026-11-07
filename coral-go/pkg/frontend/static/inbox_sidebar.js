@@ -1,10 +1,11 @@
 import { multipleServers, serverColumns, serverMatches, syncServerField, serverLabel as pagingServerLabel, inboxSources } from './inbox_servers.js';
 import { keepMenuOnScreen } from './menu_fit.js';
 import { rememberFocus } from './dom_morph.js';
+import { onArtifactsRev } from './artifacts_feed.js';
 import { needsYou, askedRow } from './asked_before_restart.js';
 import { unrecordedItem, recordAllAgents } from './waiting.js';
 import { welcomeRows, runWelcome, dismissWelcome, hideAllWelcome } from './welcome_items.js';
-import { incompleteNote } from './needs_incomplete.js';
+import { incompleteNote, readGaps } from './needs_incomplete.js';
 import { loadPendingSkills, skillRows, skillLine, skillName, skillCount, openSkill } from './needs_skills.js';
 import { doneGoals, nextQuietEnd, quietEndsAt, hideGoalDone, setGoalDoneCount, isGoalDoneRead, markGoalDoneRead, markGoalDoneUnread, SETTING as GOAL_DONE_SETTING } from './goal_done.js';
 /* The dashboard's own Inbox on the shared sidebar (#7472), loaded the first time the Inbox tab is shown (inbox_tab.js keeps the badge and the counts, which are always there).
@@ -93,9 +94,9 @@ function dayOldWords(rows) {
     return rows.length === 1 ? `1 muted file is more than a day old: ${names}. ` : `${rows.length} muted files are more than a day old: ${names}. `;
 }
 function mutedLine() {
-    const words = mutedWords(mutedReviewItems());
+    const words = mutedWords(mutedReviewItems().filter(row => !activeNeedsTeam || row.team === activeNeedsTeam));
     if (!words) return null;
-    const old = dayOldMutedFiles();
+    const old = dayOldMutedFiles().filter(row => !activeNeedsTeam || row.team === activeNeedsTeam);
     for (const a of old) { oldShownNow.add(a.hex); oldSeen.add(a.hex); }
     if (old.length) browserLocal.set(OLD_SEEN_KEY, JSON.stringify([...oldSeen].slice(-200)));
     const p = DT.el('p', 'goals-note inbox-muted-line', `Muted by your settings: ${words}. ${dayOldWords(old)}`);
@@ -1048,26 +1049,37 @@ function hubFrameTable(key) {
 
 // The team badge is unfiltered, independent of which review pages the table has loaded.
 const teamReviewTotals = new Map();
+onArtifactsRev(team => {
+    for (const [key, entry] of teamReviewTotals) {
+        if (team && team !== key) continue;
+        entry.at = 0; entry.complete = false; entry.dirty = true;
+        if (!entry.pending && state.selectedTeam === key && $('team-page-view')?.getClientRects().length) refreshTeamNeedsCount(key, true);
+    }
+});
 export function teamNeedsCount(team) {
     const rows = [...waitingSessions(), ...askRows(), ...proposalRows(), ...goalDoneRows(), ...skillRows()].filter(row => forNeedsTeam(row, team));
     const nonReview = rows.filter(needsUnread).length;
     const review = teamReviewTotals.get(team);
-    return { value: nonReview + (review?.value || 0), complete: !!review?.complete };
+    const source = splitKey(team).server;
+    const incomplete = readGaps().some(gap => gap.source === source);
+    return { value: nonReview + (review?.value || 0), complete: !!review?.complete && !incomplete };
 }
 export function refreshTeamNeedsCount(team, force = false) {
     const previous = teamReviewTotals.get(team);
     if (previous?.pending) return previous.pending;
     if (!force && previous?.at && Date.now() - previous.at < 30000) return Promise.resolve(teamNeedsCount(team));
-    const source = splitKey(team), entry = { value: previous?.value || 0, complete: false, at: Date.now(), pending: null };
+    const source = splitKey(team), entry = { value: previous?.value || 0, complete: false, at: Date.now(), pending: null, dirty: false };
     teamReviewTotals.set(team, entry);
+    refreshOperatorAsks(); refreshProposals();
     const query = new URLSearchParams({ tag: 'for review', waiting: '1', muted: '0', versions: 'newest', limit: '1', team: source.name });
     entry.pending = (async () => {
         try {
-            const response = await serverFetch(source.server, `/api/team-artifacts?${query}`), body = await response.json();
+            const response = await serverFetch(source.server, `/api/team-artifacts?${query}`, { signal: AbortSignal.timeout(5000) }), body = await response.json();
             if (response.status === 403 && (body.code === 'owner_only' || body.error === 'owner_only')) { entry.value = 0; entry.complete = true; }
             else if (response.ok && Number.isSafeInteger(body.total) && body.total >= 0 && !body.partial && !body.truncated && !body.failed_boards?.length) { entry.value = body.total; entry.complete = true; }
         } catch { /* no unread source is certified as zero */ }
         finally { entry.pending = null; }
+        if (entry.dirty) return refreshTeamNeedsCount(team, true);
         document.dispatchEvent(new CustomEvent('coral:team-needs-count', { detail: { team } }));
         return teamNeedsCount(team);
     })();
@@ -1230,7 +1242,7 @@ wrap.append(DT.el('span', 'sr-only', `${earlierWords(s.review) ? `, ${earlierWor
                 for (const team of new Set(g.more.map(a => a.team))) p.append(DT.link(`Open ${keyLabel(team)} artifacts`, () => go(keyRoute('team', team, 'artifacts'))));
                 wrap.append(p);
             }
-            const finished = finishedUnread().length;
+            const finished = activeNeedsTeam ? 0 : finishedUnread().length;
             if (finished > 0) { // a run that passed is not something that needs the person, so it is a line under the list, not a row (#10515)
                 const p = DT.el('p', 'goals-note inbox-runs-finished', `${finished} ${finished === 1 ? 'run' : 'runs'} finished since you looked. `);
                 p.append(DT.link('See them', () => go({ view: 'automations', folder: 'recent' })));
