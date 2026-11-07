@@ -47,6 +47,7 @@ const MENU = (extra = {}) => ({ question: 'Quick safety check: Is this a project
             const rowButtons = () => ev(`[...document.querySelectorAll('#group-table-view .inbox-answers button:not(.inbox-dismiss)')].map(b => b.textContent)`);
             // a real click on a button of the row: scrolled into view, the point on it is the button itself, never something over it
             const click = async text => {
+                await waitFor(`!document.querySelector('#group-table-view .inbox-answers button.inbox-arming')`, `${at}a freshly drawn Yes is armed after 400 ms (#14302)`, 3000).catch(() => {});
                 const p = await ev(`(() => { const b = [...document.querySelectorAll('#group-table-view .inbox-answers button')].find(x => x.textContent === ${JSON.stringify(text)}); if (!b) return null; b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2, hit = document.elementFromPoint(x, y); return { x, y, ok: !!hit && (hit === b || b.contains(hit)), w: Math.round(r.width), h: Math.round(r.height), right: Math.round(r.right) }; })()`);
                 if (!p) return null;
                 await Input.dispatchMouseEvent({ type: 'mousePressed', x: p.x, y: p.y, button: 'left', clickCount: 1 }); await Input.dispatchMouseEvent({ type: 'mouseReleased', x: p.x, y: p.y, button: 'left', clickCount: 1 });

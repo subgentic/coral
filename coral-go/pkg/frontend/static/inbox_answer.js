@@ -155,6 +155,30 @@ function confirmTrust(s, o, ask, cell, trust) {
     cancel.focus({ preventScroll: true }); // the safe choice has the keyboard; Enter does not trust by accident
 }
 
+// A Yes on a permission row ignores clicks for ARM_MS after it is drawn or shown (#14302, Security's INFO on #14173): a row that arrives under a click, or a Yes that a measured block has just turned on, must not be approved by
+// the click that was already on its way. The pointer leaving and entering the button again is a deliberate return: it arms the button at once.
+const ARM_MS = 400;
+const armedAsks = new Map(); // ask key -> { at: when its Yes is armed (0: armed by a deliberate return), seen: when a drawing last showed it }: kept per ask, so a Yes drawn again for the same ask (Needs you redraws often) stays armed (#14302)
+const ASK_FORGET_MS = 30 * 60000;
+function armYes(b, reshown = false) {
+    const key = b._armKey, now = Date.now();
+    for (const [k, e] of armedAsks) if (e.seen < now - ASK_FORGET_MS) armedAsks.delete(k); // an ask no drawing has shown for half an hour has left the list; armed time never decides this
+    let e = key ? armedAsks.get(key) : null;
+    if (!e) { e = { at: now + ARM_MS, seen: now }; if (key) armedAsks.set(key, e); }
+    e.seen = now;
+    if (reshown) e.at = now + ARM_MS; // the command gate turned a hidden Yes back on: armed again from this moment (Security)
+    b._armEntry = e;
+    if (Date.now() < e.at) b.classList.add('inbox-arming'); else b.classList.remove('inbox-arming');
+    if (!b._armHooks) {
+        b._armHooks = true;
+        let left = false;
+        b.addEventListener('pointerleave', () => { left = true; });
+        b.addEventListener('pointerenter', () => { if (left) { b._armEntry.at = 0; b.classList.remove('inbox-arming'); } }); // the pointer left and came back: a deliberate return arms it at once, and the ask stays armed across redraws
+    }
+    setTimeout(() => { if (Date.now() >= b._armEntry.at) b.classList.remove('inbox-arming'); }, Math.max(0, e.at - Date.now()) + 30);
+}
+const stillArming = b => !!b._armEntry && Date.now() < b._armEntry.at;
+
 /** Draws the choices into the cell once they are read (again after a question changed). */
 function fill(s, cell, withDismiss = true) {
     const key = askKey(s);
@@ -184,7 +208,7 @@ function fill(s, cell, withDismiss = true) {
                 if (open && atEnd()) reached = true;
                 more.hidden = open || !c;
                 const ok = allowed();
-                yesButtons.forEach(b => { b.hidden = !ok; });
+                yesButtons.forEach(b => { if (ok && b.hidden) { armYes(b, !!b._shownBefore); b._shownBefore = true; } b.hidden = !ok; }); // a Yes turned on for the first time in this drawing is armed as its ask is; one the gate turns off and on again is armed again from now
                 yes.hidden = onlyReject || !picks.length;
                 yes.textContent = ok ? 'Yes lets it run this once. No refuses it. Open the agent to read all of it or to allow more.' : open ? 'Read the whole command to allow it: scroll to the end of it.' : 'Read the whole command to allow it: press Show all. Or open the agent.';
             };
@@ -207,7 +231,8 @@ function fill(s, cell, withDismiss = true) {
             b.setAttribute('aria-label', `Answer ${o.label} for ${resolveSessionIdentity(s)}`);
             const isYes = gateOpt => !REJECT_FORM.test(wholeLabel(String(gateOpt.label)));
             if (typeof gate === 'object' && gate && isYes(o)) { yesButtons.push(b); b.hidden = true; } // hidden until measured: a Yes is never drawn before the block is known to be whole
-            b.addEventListener('click', e => { e.stopPropagation(); if (gate && yesButtons.includes(b) && gate.clipped()) { gate.apply(); return; } if (trust && o === trust.yes) confirmTrust(s, o, ask, cell, trust); else answer(s, o, ask, cell, stepFull || ''); });
+            const permissionYes = s.waiting_kind === 'permission' && isYes(o); if (permissionYes) b._armKey = `${sessionServer(s)}:${s.session_id}:${s.waiting_since || ''}:${ask}:${o.label}`; if (permissionYes && !(gate && yesButtons.includes(b))) armYes(b); // a Yes of a permission is armed 400 ms after it is drawn (a gated one, when it is turned on)
+            b.addEventListener('click', e => { e.stopPropagation(); if (permissionYes && stillArming(b)) return; if (gate && yesButtons.includes(b) && gate.clipped()) { gate.apply(); return; } if (trust && o === trust.yes) confirmTrust(s, o, ask, cell, trust); else answer(s, o, ask, cell, stepFull || ''); });
             b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
             cell.append(b);
         }

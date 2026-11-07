@@ -27,7 +27,7 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
                     if (m === 'POST' && /\\/answer-prompt$/.test(url)) { window.__answers.push(JSON.parse(o.body)); return Promise.resolve(new Response(JSON.stringify(window.__status === 200 ? { ok: true } : { code: 'trust_changed', error: 'The folder to trust changed.' }), { status: window.__status, headers: { 'content-type': 'application/json' } })); }
                     if (m === 'GET' && /\\/api\\/sessions\\/live\\/[^/]+\\/chat\\?/.test(url)) return Promise.resolve(new Response(JSON.stringify({ messages: [], total: 0, prompt_options: window.__po }), { headers: { 'content-type': 'application/json' } }));
                     return real(u, o); };
-                const entry = window.__m.entry.bind(window.__m); window.__m.entry = a => ({ ...entry(a), board_job_title: 'QA Engineer', waiting_for_input: window.__waiting, waiting_kind: 'permission', waiting_summary: 'Notification: Claude needs your permission', waiting_since: 'w' + window.__ws });
+                const entry = window.__m.entry.bind(window.__m); window.__m.entry = a => ({ ...entry(a), board_job_title: 'QA Engineer', waiting_for_input: window.__waiting, waiting_kind: 'permission', waiting_summary: window.__sum || 'Notification: Claude needs your permission', waiting_since: 'w' + window.__ws });
                 window.__m.add('qa', 'A', 4, { sleeping: false, board_project: 'team-a', session_id: 'qa-id' }); true`);
             await waitFor(`(window.__qaState && window.__qaState.liveSessions || []).length === 1`, `${at}the agent`, 8000);
             const refresh = () => ev(`window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, ...window.__m.entry(window.__m.agents[s.session_id]) })); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.updateInboxTab()); true`);
@@ -75,6 +75,86 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'inbox_answer.js'); const s = window.__qaState.liveSessions[0]; for (let i = 0; i < 5; i++) { const c = m.answerCell({ ...s, waiting_since: 'obs' + i }); document.body.append(c); await new Promise(r => setTimeout(r, 500)); /* sleep-ok: the cell reads its ask and draws */ c.remove(); await new Promise(r => setTimeout(r, 250)); /* sleep-ok: the observer reports the removal */ } return true; })()`);
             const live = await ev(`window.__roLive.size`);
             check(live <= 1, `${at}after five cells drawn and removed at most one command-block observer is live (the row's own), not ${live}`);
+            // a freshly drawn Yes ignores clicks for about 400 ms, so a row that arrives under a click cannot be approved by it (#14302); a deliberate return of the pointer arms it at once
+            await show(MENU({ target: ONE }), 2);
+            await ev(`window.__answers = []; window.__ws += 1; true`); await refresh();
+            await waitFor(`!!document.querySelector('#group-table-view .inbox-answers button.inbox-arming')`, `${at}a freshly drawn Yes is arming`, 4000);
+            await ev(`[...document.querySelectorAll('#group-table-view .inbox-answers button')].filter(b => b.textContent === 'Yes').forEach(b => b.click()); true`);
+            await new Promise(r => setTimeout(r, 250)); // sleep-ok: a click that is ignored settles
+            check((await ev(`window.__answers.length`)) === 0, `${at}a click on a freshly drawn Yes answers nothing`);
+            await new Promise(r => setTimeout(r, 450)); // sleep-ok: the 400 ms pass
+            check(!(await ev(`!!document.querySelector('#group-table-view .inbox-answers button.inbox-arming')`)), `${at}after 400 ms the Yes is armed`);
+            await ev(`[...document.querySelectorAll('#group-table-view .inbox-answers button')].filter(b => b.textContent === 'Yes').forEach(b => b.click()); true`);
+            await waitFor(`window.__answers.length === 1`, `${at}the Yes answers once armed`, 5000);
+            // a redraw of the SAME ask keeps its Yes armed (Needs you redraws often): arm, wait 400 ms, force a real redraw (the list filtered and cleared), click at once: it answers
+            await show(MENU({ target: ONE }), 2);
+            await ev(`window.__answers = []; true`);
+            await new Promise(r => setTimeout(r, 650)); // sleep-ok: the 400 ms of the first drawing pass
+            await ev(`window.__oldYes = [...document.querySelectorAll('#group-table-view .inbox-answers button')].find(b => b.textContent === 'Yes'); (async () => { const m = await import((window.__coralStatic || '/static/') + 'inbox_sidebar.js'); m.filterInbox('qa'); await new Promise(r => setTimeout(r, 300)); m.filterInbox(''); return true; })()`); // sleep-ok: the list redraws for the filter before it is cleared
+            await waitFor(`(() => { const b = [...document.querySelectorAll('#group-table-view .inbox-answers button')].find(x => x.textContent === 'Yes'); return !!b && b !== window.__oldYes; })()`, `${at}the row is drawn again (a new Yes button)`, 6000);
+            check(!(await ev(`!!document.querySelector('#group-table-view .inbox-answers button.inbox-arming')`)), `${at}the Yes of the same ask is not arming again after a redraw`);
+            await ev(`[...document.querySelectorAll('#group-table-view .inbox-answers button')].filter(b => b.textContent === 'Yes').forEach(b => b.click()); true`);
+            await waitFor(`window.__answers.length === 1`, `${at}a click right after a redraw of the same ask answers`, 5000);
+            // helpers for a REAL redraw of Needs you (the list filtered, then cleared): the row is drawn again with new buttons
+            const redraw = async () => {
+                await ev(`window.__oldYes = [...document.querySelectorAll('#group-table-view .inbox-answers button')].find(b => b.textContent === 'Yes'); (async () => { const m = await import((window.__coralStatic || '/static/') + 'inbox_sidebar.js'); m.filterInbox('qa'); await new Promise(r => setTimeout(r, 300)); m.filterInbox(''); return true; })()`); // sleep-ok: the list redraws for the filter before it is cleared
+                await waitFor(`(() => { const b = [...document.querySelectorAll('#group-table-view .inbox-answers button')].find(x => x.textContent === 'Yes'); return !!b && b !== window.__oldYes; })()`, `${at}the row is drawn again (a new Yes button)`, 6000);
+            };
+            const clickYes = () => ev(`[...document.querySelectorAll('#group-table-view .inbox-answers button')].filter(b => b.textContent === 'Yes' && !b.hidden).forEach(b => b.click()); true`);
+            const arming = () => ev(`!!document.querySelector('#group-table-view .inbox-answers button.inbox-arming')`);
+            // a still-open ask more than ten minutes old stays armed: the clock jumps 11 minutes, the row is drawn again, a click answers at once (armed time does not decide that an ask has left)
+            await show(MENU({ target: ONE }), 2);
+            await ev(`window.__answers = []; true`);
+            await new Promise(r => setTimeout(r, 650)); // sleep-ok: the 400 ms of the first drawing
+            await ev(`window.__realNow = Date.now; Date.now = () => window.__realNow() + 11 * 60000; true`);
+            await redraw();
+            check(!(await arming()), `${at}an ask still open after 11 minutes is not armed again by a redraw`);
+            await clickYes();
+            await waitFor(`window.__answers.length === 1`, `${at}a click right after a redraw of an 11-minute-old ask answers`, 5000);
+            await ev(`Date.now = window.__realNow; true`);
+            // the command gate turns a Yes off and on again: armed again from that moment, a click at once is ignored (the block is clipped by style, then freed: the observer reports each change)
+            await show(MENU({ target: 'a\nb\nc' }), 2);
+            await ev(`window.__answers = []; true`);
+            await new Promise(r => setTimeout(r, 650)); // sleep-ok: the first 400 ms pass
+            const yesShown = () => ev(`!![...document.querySelectorAll('#group-table-view .inbox-answers button')].find(b => b.textContent === 'Yes' && !b.hidden && b.getClientRects().length)`);
+            check(await yesShown(), `${at}the three short lines show Yes`);
+            await ev(`document.querySelector('#group-table-view .inbox-cmd-block').style.maxHeight = '1.2em'; true`);
+            await waitFor(`![...document.querySelectorAll('#group-table-view .inbox-answers button')].find(b => b.textContent === 'Yes' && !b.hidden)`, `${at}clipping the block hides Yes (the gate)`, 4000);
+            await ev(`document.querySelector('#group-table-view .inbox-cmd-block').style.maxHeight = ''; true`);
+            await waitFor(`!![...document.querySelectorAll('#group-table-view .inbox-answers button')].find(b => b.textContent === 'Yes' && !b.hidden)`, `${at}freeing the block shows Yes again`, 4000);
+            await clickYes();
+            await new Promise(r => setTimeout(r, 250)); // sleep-ok: an ignored click settles
+            check((await ev(`window.__answers.length`)) === 0, `${at}a Yes the gate has turned on again ignores a click at once (armed again from that moment)`);
+            await waitFor(`!document.querySelector('#group-table-view .inbox-answers button.inbox-arming')`, `${at}it is armed after 400 ms`, 3000);
+            await clickYes();
+            await waitFor(`window.__answers.length === 1`, `${at}and then it answers`, 5000);
+            // QA's #14173 SHOULD: real redraws leave at most one observer on the command block (the row's own)
+            await show(MENU({ target: ONE }), 2);
+            for (let i = 0; i < 5; i++) await redraw();
+            check((await ev(`window.__roLive.size`)) <= 2, `${at}after five real redraws at most the row's own command-block observers are live (not ${await ev('window.__roLive.size')})`);
+            if (!mobile) { // the pointer leaves the Yes and enters it again: armed at once
+                await show(MENU({ target: ONE }), 2);
+                await ev(`window.__answers = []; window.__ws += 1; true`); await refresh();
+                await waitFor(`!!document.querySelector('#group-table-view .inbox-answers button.inbox-arming')`, `${at}arming again`, 4000);
+                const yp = await ev(`(() => { const b = [...document.querySelectorAll('#group-table-view .inbox-answers button')].find(x => x.textContent === 'Yes'); b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+                await Input.dispatchMouseEvent({ type: 'mouseMoved', x: yp.x, y: yp.y });
+                await Input.dispatchMouseEvent({ type: 'mouseMoved', x: 4, y: 4 });
+                await Input.dispatchMouseEvent({ type: 'mouseMoved', x: yp.x, y: yp.y });
+                check(!(await ev(`!!document.querySelector('#group-table-view .inbox-answers button.inbox-arming')`)), `${at}the pointer leaving and entering the Yes arms it at once`);
+                await Input.dispatchMouseEvent({ type: 'mousePressed', x: yp.x, y: yp.y, button: 'left', clickCount: 1 }); await Input.dispatchMouseEvent({ type: 'mouseReleased', x: yp.x, y: yp.y, button: 'left', clickCount: 1 });
+                await waitFor(`window.__answers.length === 1`, `${at}a click right after the pointer came back answers`, 5000);
+                // the deliberate return stays armed across a real redraw: a new Yes, a click at once, answers
+                await show(MENU({ target: ONE }), 2);
+                await ev(`window.__answers = []; window.__ws += 1; true`); await refresh();
+                await waitFor(`!!document.querySelector('#group-table-view .inbox-answers button.inbox-arming')`, `${at}arming (for the re-entry case)`, 4000);
+                const yp2 = await ev(`(() => { const b = [...document.querySelectorAll('#group-table-view .inbox-answers button')].find(x => x.textContent === 'Yes'); b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+                await Input.dispatchMouseEvent({ type: 'mouseMoved', x: yp2.x, y: yp2.y }); await Input.dispatchMouseEvent({ type: 'mouseMoved', x: 4, y: 4 }); await Input.dispatchMouseEvent({ type: 'mouseMoved', x: yp2.x, y: yp2.y });
+                await Input.dispatchMouseEvent({ type: 'mouseMoved', x: 4, y: 4 });
+                await redraw();
+                check(!(await arming()), `${at}a deliberate return stays armed across a real redraw`);
+                await clickYes();
+                await waitFor(`window.__answers.length === 1`, `${at}a click right after a redraw of a deliberately armed ask answers`, 5000);
+            }
             // 2) the three-line command: all of it is on the row and not clipped (3 lines on a desktop, 4 on a phone), so Yes stays
             await show(MENU({ target: ['npm run build', 'npm test -- --reporter=dot', 'git status --short'].join('\n') }), 2);
             st = await rowState(); consistent(st, 'three short lines');
@@ -150,6 +230,12 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
                 const took = Date.now() - t0 + 900;
                 check(took <= 3600, `${at}a row that needs the person waits about 2 s at most under a resting pointer (took ${took} ms)`);
                 check(!(await ev(`!!document.querySelector('#group-table-view .group-table-held')`)), `${at}the 'new items wait' line goes when the row is drawn`);
+                // QA's #14173 SHOULD: a change that is NOT a new waiting agent keeps the longer hold: still held at 3 s (the urgent cap is 2 s), drawn by about 10 s
+                await ev(`window.__sum = 'Notification: Claude needs a different permission'; true`); await refresh();
+                await new Promise(r => setTimeout(r, 3200)); // sleep-ok: past the 2 s cap of a waiting agent
+                check(!(await ev(`document.querySelector('#group-table-view tbody').textContent.includes('a different permission')`)) && /New items are waiting/.test(await ev(`(document.querySelector('#group-table-view .group-table-held') || {}).textContent || ''`)), `${at}a change that is not a waiting agent is still held at 3 s`);
+                await waitFor(`document.querySelector('#group-table-view tbody').textContent.includes('a different permission')`, `${at}and drawn by about 10 s`, 12000);
+                await ev(`window.__sum = undefined; true`);
                 await Input.dispatchMouseEvent({ type: 'mouseMoved', x: 4, y: 4 });
             }
         }
