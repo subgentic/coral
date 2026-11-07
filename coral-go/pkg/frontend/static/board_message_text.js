@@ -57,7 +57,7 @@ export function hubUserBadge(m) {
     if (m && m.origin === 'hub_operator') {
         const who = /^hub-user-[0-9a-f]{8}$/.test(String(m.hub_user || '')) ? m.hub_user : 'unknown Hub user';
         const title = `Posted as the Operator by ${who} through Coral Hub, not by you at this computer.`;
-        return `<span class="chip chip-tag mb-external-badge mb-hub-user-badge is-operator" title="${escapeAttr(title)}">Operator via Coral Hub · ${escapeHtml(who)}</span>`;
+        return `<span class="chip chip-tag mb-external-badge mb-hub-user-badge is-operator" title="${escapeAttr(title)}">Operator via Coral Hub</span>`;
     }
     // A Coral Hub that doesn't say which of its users sent it (an older hub): sent as the
     // reserved 'Coral Hub', origin hub_user_unknown. Never shown as a known user.

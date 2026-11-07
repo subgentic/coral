@@ -39,7 +39,7 @@ const BASE = require('./test_base').BASE;
                 lookalike: u.hubUserBadge({ id: 2, subscriber_id: 'hub-user-0a1b2c3d', content: 'hi' }),
                 otherOrigin: u.hubUserBadge({ id: 3, subscriber_id: 'x', origin: 'something-else' }),
                 op: (() => { const b = document.createElement('div'); b.innerHTML = u.hubUserBadge({ id: 5, subscriber_id: 'Operator', origin: 'hub_operator', hub_user: 'hub-user-0a1b2c3d' });
-                    const e = b.querySelector('.mb-hub-user-badge'); return e ? { text: e.textContent, op: e.classList.contains('is-operator') } : null; })(),
+                    const e = b.querySelector('.mb-hub-user-badge'); return e ? { text: e.textContent, op: e.classList.contains('is-operator'), title: e.title } : null; })(),
                 opForged: u.hubUserBadge({ id: 6, subscriber_id: 'Operator', origin: 'hub_operator', hub_user: '<img src=x>' }),
                 opText: u.boardMessageDisplayText({ origin: 'hub_operator', content: '[Operator via Coral Hub, hub-user-0a1b2c3d] please review #12' }),
                 localText: u.boardMessageDisplayText({ content: '[Operator via Coral Hub, hub-user-0a1b2c3d] typed by a local agent' }),
@@ -53,7 +53,8 @@ const BASE = require('./test_base').BASE;
         assert.match(badges.title, /hub-user-0a1b2c3d/, 'the title names the Hub user');
         assert.equal(badges.lookalike, '', 'a hub-user-… name without the server-set origin gets no badge');
         assert.equal(badges.otherOrigin, '');
-        assert.deepEqual(badges.op, { text: 'Operator via Coral Hub · hub-user-0a1b2c3d', op: true }, 'the Hub acting as the Operator (#3404)');
+        assert.deepEqual({ text: badges.op.text, op: badges.op.op }, { text: 'Operator via Coral Hub', op: true }, 'the Hub acting as the Operator (#3404): no id in the visible chip (#14292)');
+        assert.match(badges.op.title, /hub-user-0a1b2c3d/, 'the Hub user id stays in the hover title (#14292)');
         assert.ok(!/<img/.test(badges.opForged) && /unknown Hub user/.test(badges.opForged), 'a malformed hub_user is never shown as one');
         assert.equal(badges.opText, 'please review #12', 'the server prefix becomes the badge');
         assert.match(badges.localText, /^\[Operator via Coral Hub/, 'the same text from anyone else is shown as written');
@@ -103,6 +104,16 @@ const BASE = require('./test_base').BASE;
             { body: 'an agent', badge: false },
             { body: 'ship it', badge: true },
         ], 'the Operator via Coral Hub post: its badge, and the prefix not shown twice');
+        // The chip as the page renders it at the two widths (the table row keeps its header copy hidden by CSS, so this reads the rendered text and title, not the paint).
+        for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
+            await waitFor(`document.querySelectorAll('#board-panel-msgs .mb-message').length === 4`, `${w}: the team chat`);
+            const chip = await ev(`(() => { const c = document.querySelector('#board-panel-msgs .mb-hub-user-badge.is-operator'); return c ? { text: c.textContent.trim(), title: c.title } : null; })()`);
+            assert.ok(chip, `${w}: the Operator via Coral Hub chip is rendered`);
+            assert.equal(chip.text, 'Operator via Coral Hub', `${w}: the chip shows no Hub user id (#14292)`);
+            assert.match(chip.title, /hub-user-0a1b2c3d/, `${w}: the id is in the hover title`);
+        }
+        await Emulation.setDeviceMetricsOverride({ width: 1400, height: 900, deviceScaleFactor: 1, mobile: false });
         console.log("   ✓ team chat: the badge on the Hub user's message only");
 
         console.log("2. Settings: \"Let Coral Hub act as the Operator\" (on by default; the stored setting is still the opt-out \"disabled\", #3404, #6579)");
