@@ -24,6 +24,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const item = { id: hex, name: 'Review file.txt', media_type: 'text/plain', size: 30, created_at: new Date(Date.now() - 600000).toISOString(), task_id: 0, source: 'upload', available: true, session_id: 'writer-a', produced_by: 'Writer A', tags: ['for review'], uri: 'coral://artifacts/' + hex };
             window.__comments = []; window.__uploads = []; window.__decisions = [];
             window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin), m = opts.method || 'GET';
+                const page = u.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(u.href, location.href, {'${team}':[item]}) : null;
+                if (page && m === 'GET') return json(page);
                 if (m === 'GET' && u.pathname === '/api/board/${team}/artifacts') return json({ project: '${team}', artifacts: !u.searchParams.has('tag') || u.searchParams.get('tag') === 'for review' ? [item] : [], has_more: false });
                 if (u.pathname.startsWith('/api/board/${team}/artifacts/') && u.pathname.endsWith('/review') && m === 'POST') { window.__decisions.push(JSON.parse(opts.body).decision); return json({ id: hex, state: 'changes requested', changed: true, tags: ['for review', 'changes requested'], review: null }); }
                 if (u.pathname === '/api/artifacts/' + hex + '/comment-images' && m === 'POST') { window.__uploads.push(String(opts.body && opts.body.type)); return json({ hex: '${PIC}', name: 'screenshot.png', content_type: 'image/png', size: 70 }); }

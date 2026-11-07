@@ -41,7 +41,13 @@ function collapseVersions(list) {
     for (const a of list) { const k = vkey(a); if (groups.has(k)) groups.get(k).push(a); else groups.set(k, [a]); }
     const newest = new Map(); // the newest version of each series -> the versions before it
     for (const group of groups.values()) { const top = group.reduce((m, b) => (byAge(m, b) < 0 ? b : m)); newest.set(top, group.filter(b => b !== top && byAge(b, top) < 0)); }
-    return list.filter(a => newest.has(a)).map(a => (newest.get(a).length ? { ...a, earlier: newest.get(a) } : a)); // the list's own order: oldest newest-version first
+    return list.filter(a => newest.has(a)).map(a => {
+        const older = new Map(newest.get(a).map(row => [row.hex, row]));
+        // A bounded newest-version page carries authoritative older digests rather than those rows.
+        // Keep that history on the collapsed row too, including Saved's sender/version line.
+        for (const hex of a.earlier_digests || []) if (/^[a-f0-9]{64}$/.test(hex) && hex !== a.hex && !older.has(hex)) older.set(hex, { ...a, id: hex, hex, version: 0, reviewKey: `${a.team}:${hex}`, earlier: undefined, earlier_digests: undefined });
+        return older.size ? { ...a, earlier: [...older.values()] } : a;
+    }); // the list's own order: oldest newest-version first
 }
 export const reviewItems = () => {
     if (viewFor === items && viewRev === revision) return view;
