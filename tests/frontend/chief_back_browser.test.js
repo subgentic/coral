@@ -49,7 +49,7 @@ const BASE=require('./test_base').BASE;
    assert.equal(result.path,'/chief','guard retains Chief: '+setup);
    if(setup.includes('Unsent Chief draft'))assert.equal(result.draft,'Unsent Chief draft');
   }
-  for(const props of [{key:'[',metaKey:true,shiftKey:true},{key:'[',metaKey:true,altKey:true},{key:'[',metaKey:true,ctrlKey:true},{key:'['},{key:']',metaKey:true},{key:'Escape',repeat:true}]){
+  for(const props of [{key:'[',metaKey:true,shiftKey:true},{key:'[',metaKey:true,altKey:true},{key:'[',metaKey:true,ctrlKey:true},{key:'['},{key:']',metaKey:true},{key:'Escape',shiftKey:true},{key:'Escape',repeat:true}]){
    assert.equal(await ev(`(()=>{document.activeElement?.blur();const e=new KeyboardEvent('keydown',{bubbles:true,cancelable:true,...${JSON.stringify(props)}});document.body.dispatchEvent(e);return e.defaultPrevented})()`),false,'wrong shortcut untouched '+JSON.stringify(props));
   }
   for(const key of ['Escape','[']){
