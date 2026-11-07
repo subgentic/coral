@@ -6,7 +6,7 @@ import { scrollBehavior } from './motion.js';
 import { showToast, escapeHtml, escapeAttr, boardNameProblem, OPERATOR_ID } from './utils.js';
 import { loadLiveSessions } from './api.js';
 import { recordRecentDir, getRecentDirs, pruneMissingRecents } from './browser.js';
-import { teamForm, showTeamWorktree, showTeamWorkers, syncSuggestionExists, dropStaleTrustTick, trustTicked } from './team_form.js';
+import { teamForm, showTeamWorktree, showTeamWorkers, syncSuggestionExists, trustTicked, resetFolderTrust, scheduleFolderTrust } from './team_form.js';
 import { agentNameForm, agentStatus } from './agent_form.js';
 import { cliPathButton } from './prerequisites.js';
 import { serverFetch, boardFetch, identityKey, LOCAL_SERVER, isHub } from './server_base.js';
@@ -163,7 +163,8 @@ function _syncTeamGate() {
 document.addEventListener('team-step-shown', _syncTeamGate);
 document.addEventListener('cli-blocks-launch', e => { if (e.target.closest?.('#launch-step-team')) _syncTeamGate(); }); // a CLI check that answers while step 3 shows
 document.addEventListener('team-page-open', e => { const page = e.target.closest && e.target.closest('.team-page'); if (page && page.dataset.page) showTeamStep(page.dataset.page); });
-document.addEventListener('input', e => { if (e.target && (e.target.id === 'team-board-name' || e.target.id === 'launch-team-dir')) _syncTeamGate(); if (e.target && e.target.id === 'launch-team-dir') { dropStaleTrustTick(); teamForm()?.refresh(); syncSuggestionExists(); } }); // the folder decides which trust row shows (#11889)
+document.addEventListener('change', e => { if (e.target?.id === 'launch-team-dir') scheduleFolderTrust(e); });
+document.addEventListener('input', e => { if (e.target && (e.target.id === 'team-board-name' || e.target.id === 'launch-team-dir')) _syncTeamGate(); if (e.target && e.target.id === 'launch-team-dir') { scheduleFolderTrust(e); teamForm()?.refresh(); syncSuggestionExists(); } }); // the folder decides which trust row shows (#11889)
 
 // Remove keeps the row aside for Undo (one removal back); a new removal, a template or a closed dialog makes the last one final.
 let _removedTeamAgent = null;
@@ -424,6 +425,7 @@ async function _initTeamForm() {
     showTeamStep('team');
     _applyTeamDefaultMode();
 
+    resetFolderTrust();
     // Pre-fill working dir from the target server's settings
     const s = _settingsFor(_effectiveServer(launch.server));
     const dirInput = document.getElementById("launch-team-dir");
