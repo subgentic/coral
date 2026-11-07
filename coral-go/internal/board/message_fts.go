@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -468,20 +469,32 @@ var (
 	messageIndexCheckHook    = func() {} // a test counts the runs
 )
 
+// messageIndexTuningMu guards the check's timings and hook above. Production never changes them; a test does, while a store opened earlier may still have its check goroutine reading them, so every read goes through
+// messageIndexTuning and every test write through setMessageIndexTuning (#14281: a data race under -race, in the tests only).
+var messageIndexTuningMu sync.RWMutex
+
+func messageIndexTuning() (delay, quiet, poll, waitMax time.Duration, hook func()) {
+	messageIndexTuningMu.RLock()
+	defer messageIndexTuningMu.RUnlock()
+	return messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax, messageIndexCheckHook
+}
+
 // waitForQuietBoard returns when nobody has read the board for messageIndexQuiet, or after messageIndexQuietWaitMax, or when ctx ends (it reports false then).
 func (s *Store) waitForQuietBoard(ctx context.Context) bool {
-	deadline := time.Now().Add(messageIndexQuietWaitMax)
+	_, _, _, waitMax, _ := messageIndexTuning()
+	deadline := time.Now().Add(waitMax)
 	for {
 		if ctx.Err() != nil {
 			return false // the store was closed (or the check cancelled): never run a check on it, quiet or not
 		}
-		if time.Since(time.Unix(0, s.lastRead.Load())) >= messageIndexQuiet || time.Now().After(deadline) {
+		_, quiet, poll, _, _ := messageIndexTuning()
+		if time.Since(time.Unix(0, s.lastRead.Load())) >= quiet || time.Now().After(deadline) {
 			return true
 		}
 		select {
 		case <-ctx.Done():
 			return false
-		case <-time.After(messageIndexQuietPoll):
+		case <-time.After(poll):
 		}
 	}
 }
@@ -493,15 +506,17 @@ func (s *Store) startMessageSearchIndexCheck() {
 	}
 	go func() {
 		defer safego.Recover("board/message_fts:check")
+		delay, _, _, _, _ := messageIndexTuning()
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(messageIndexCheckDelay):
+		case <-time.After(delay):
 		}
 		if !s.waitForQuietBoard(ctx) {
 			return
 		}
-		messageIndexCheckHook()
+		_, _, _, _, hook := messageIndexTuning()
+		hook()
 		if _, err := s.CheckMessageSearchIndex(ctx); err != nil && ctx.Err() == nil {
 			log.Printf("board: checking the message search index: %v", err)
 		}

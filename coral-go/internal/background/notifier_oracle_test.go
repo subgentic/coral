@@ -66,7 +66,7 @@ func TestRunPassAgreesWithBefore4599(t *testing.T) {
 	// Each seed has its own notifiers (each delivers through its own recorder: n.deliverNudge), boards and random source, so the 150
 	// seeds run in parallel (#4982: 58 s of the package on epoch), inside one group so the floors are read after every seed has finished.
 	t.Run("seeds", func(t *testing.T) {
-		for seed := int64(1); seed <= 150; seed++ {
+		for seed := int64(1); seed <= int64(oracleSeeds(150)); seed++ {
 			t.Run(fmt.Sprint(seed), func(t *testing.T) {
 				t.Parallel()
 				runNotifierOracle(t, seed)

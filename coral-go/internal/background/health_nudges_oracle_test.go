@@ -48,7 +48,7 @@ func TestRunProjectAgreesWithBefore4599(t *testing.T) {
 	// Each seed has its own boards, databases and random source: the seeds run in parallel (#4982: 139 s of the package on epoch),
 	// inside one group so the floors are read after every seed has finished.
 	t.Run("seeds", func(t *testing.T) {
-		for seed := int64(1); seed <= 13; seed++ {
+		for seed := int64(1); seed <= int64(oracleSeeds(13)); seed++ {
 			t.Run(fmt.Sprint(seed), func(t *testing.T) {
 				t.Parallel()
 				runHealthOracle(t, seed)
@@ -56,6 +56,9 @@ func TestRunProjectAgreesWithBefore4599(t *testing.T) {
 		}
 	})
 	t.Logf("compared, per rule: %v", healthKinds)
+	if raceEnabled {
+		return // few seeds under -race: the coverage floors are for the plain run (#14281)
+	}
 	for kind, floor := range map[string]int{
 		"claim nudge": 15, "status nudge": 15, "claim escalation": 5, "status escalation": 5,
 		"mention renudge": 10, "held notice": 10, "claim held back by a wait": 10, "failed delivery": 10, "budget line": 5,

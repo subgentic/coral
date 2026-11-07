@@ -78,7 +78,7 @@ func TestOpenTaskStatesDependenciesAgreeWithTheOldLoadBlockedByOnRandomBoards(t 
 	conds := []string{"success", "any", "artifacts", ""}
 	ctx := context.Background()
 	withDeps, multi, crossBoard, ruled, missing := 0, 0, 0, 0, 0
-	for seed := int64(1); seed <= 60; seed++ {
+	for seed := int64(1); seed <= int64(oracleSeeds(60)); seed++ {
 		rng := rand.New(rand.NewSource(seed))
 		s := testStore(t)
 		boards := []string{"alpha", "beta"}

@@ -50,7 +50,7 @@ func seenVerdict(outcome string) {
 func TestReviewVerdictAgreesWithBefore4599(t *testing.T) {
 	verdictSeen = map[string]int{}
 	t.Run("seeds", func(t *testing.T) {
-		for seed := int64(1); seed <= 60; seed++ {
+		for seed := int64(1); seed <= int64(oracleSeeds(60)); seed++ {
 			t.Run(fmt.Sprint(seed), func(t *testing.T) {
 				t.Parallel()
 				runVerdictOracle(t, seed)
@@ -58,6 +58,9 @@ func TestReviewVerdictAgreesWithBefore4599(t *testing.T) {
 		}
 	})
 	t.Logf("compared, per outcome: %v", verdictSeen)
+	if raceEnabled {
+		return // few seeds under -race: the coverage floors are for the plain run (#14281)
+	}
 	for outcome, floor := range verdictOutcomes {
 		require.GreaterOrEqual(t, verdictSeen[outcome], floor, "%q went (almost) unexercised", outcome)
 	}

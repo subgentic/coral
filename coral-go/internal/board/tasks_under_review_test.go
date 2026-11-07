@@ -36,7 +36,7 @@ func TestTasksUnderReviewAgreesWithTheOldQueryOnRandomBoards(t *testing.T) {
 	workflows := []string{"", `{}`, `{"completion_review": {"candidate": "x"}}`, `{"completion_review": null}`, `{"other": {"completion_review": 1}}`, `{"completion_review": 0}`, `{"completion_review": ""}`, `not json at all`}
 	ctx := context.Background()
 	nonEmpty, withReview, withPendingReview := 0, 0, 0
-	for seed := int64(1); seed <= 60; seed++ {
+	for seed := int64(1); seed <= int64(oracleSeeds(60)); seed++ {
 		rng := rand.New(rand.NewSource(seed))
 		s := testStore(t)
 		boards := []string{"alpha", "beta", "gamma"}
