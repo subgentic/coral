@@ -1,5 +1,6 @@
 import { multipleServers, serverColumns, serverMatches, syncServerField, serverLabel as pagingServerLabel, inboxSources } from './inbox_servers.js';
 import { keepMenuOnScreen } from './menu_fit.js';
+import { rememberFocus } from './dom_morph.js';
 import { needsYou, askedRow } from './asked_before_restart.js';
 import { unrecordedItem, recordAllAgents } from './waiting.js';
 import { welcomeRows, runWelcome, dismissWelcome, hideAllWelcome } from './welcome_items.js';
@@ -24,7 +25,7 @@ import { go, note, backIs, currentRoute } from './nav.js';
 import { unreadReviewCount, reviewAttentionCount } from './ask_filter.js'; // the files waiting: the full read's once it has run, else what the computers counted (#13172)
 
 import { build, keyRoute, parse as parseRoute, inboxFolderPath, BOARDS_FOLDER, BOARDS_SUB } from './routes.js';
-import { sessionServer, normServer, boardTeamKey, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox, nativeNeeds, decisionNeedsPerson, LOCAL_SERVER, serverUrl, isCloud } from './server_base.js';
+import { serverFetch, sessionServer, normServer, boardTeamKey, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox, nativeNeeds, decisionNeedsPerson, LOCAL_SERVER, serverUrl, isCloud } from './server_base.js';
 import { teamLabel, serverLabel } from './server_status.js';
 import { showView, showToast, OPERATOR_ID, versionLineOf } from './utils.js';
 import { registerActions, textOf } from './actions.js';
@@ -280,7 +281,7 @@ function inboxNeedsToolbar() {
             ],
             model: { EMPTY: NF.EMPTY, clean: NF.clean, chips: NF.chips, isFiltered: NF.isFiltered, without: NF.without },
         }, next => {
-            needsFilters = next; NF.saveFilters(next); queries.needs = next.q.toLowerCase();
+            needsFilters = next; persistNeedsFilters(); queries.needs = next.q.toLowerCase();
             const input = $('inbox-search'); if (input && group === 'needs') input.value = next.q; // the sidebar's box shows the same words
             renderInboxNav(true);
         });
@@ -308,7 +309,7 @@ function inboxNeedsToolbar() {
         options: { team: { values: teams, labels: {} }, agent: { values: names, labels: {} }, goal: { values: goalNames, labels: {} } },
         pills: { label: 'Show agents waiting on', current: needsFilters.kind || 'all',
             items: [{ key: 'all', label: 'All', count: attention !== null && attention !== undefined ? pillCount(rows.filter(s => !s.review && needsUnread(s)).length + attention, rows.filter(s => !s.review).length + listedReviews) : said(rows.filter(needsUnread).length, rows.length) }, ...NF.KINDS.filter(kindShown).map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: k === 'review' && attention !== null && attention !== undefined ? pillCount(attention, listedReviews) : said(counts[i], listed[i]) }))],
-            onPick: key => { needsFilters = { ...needsFilters, kind: key === 'all' ? '' : key }; NF.saveFilters(needsFilters); renderInboxNav(true); } },
+            onPick: key => { needsFilters = { ...needsFilters, kind: key === 'all' ? '' : key }; persistNeedsFilters(); renderInboxNav(true); } },
     });
     if (!node.querySelector('.inbox-group-review-toggle')) {
         const label = DT.el('label', 'inbox-group-review-toggle');
@@ -325,7 +326,7 @@ const RANK = { high: 0, medium: 1, low: 2 };
 const TASK_GLYPH = { Waiting: 'schedule', Queued: 'schedule', 'In progress': 'hourglass_top', Blocked: 'block', 'In review': 'rate_review', Done: 'check_circle' }; // a phone row's leading glyph: the task's state
 const stateOf = t => TV.taskWord(t);
 const inboxTasksState = DT.tableState();
-const needsState = DT.tableState();
+let needsState = DT.tableState();
 
 export async function openReview(row, extra = {}) {
     const { openArtifactViewer } = await importOnce('./artifact_viewer.js', 'the file viewer').catch(() => ({})); // a failed load is said (importOnce's toast) and the next click tries again: a page left open across an update must not have rows that do nothing (#11963)
@@ -1046,44 +1047,81 @@ function hubFrameTable(key) {
     } };
 }
 
+// The team badge is unfiltered, independent of which review pages the table has loaded.
+const teamReviewTotals = new Map();
+export function teamNeedsCount(team) {
+    const rows = [...waitingSessions(), ...askRows(), ...proposalRows(), ...goalDoneRows(), ...skillRows()].filter(row => forNeedsTeam(row, team));
+    const nonReview = rows.filter(needsUnread).length;
+    const review = teamReviewTotals.get(team);
+    return { value: nonReview + (review?.value || 0), complete: !!review?.complete };
+}
+export function refreshTeamNeedsCount(team, force = false) {
+    const previous = teamReviewTotals.get(team);
+    if (previous?.pending) return previous.pending;
+    if (!force && previous?.at && Date.now() - previous.at < 30000) return Promise.resolve(teamNeedsCount(team));
+    const source = splitKey(team), entry = { value: previous?.value || 0, complete: false, at: Date.now(), pending: null };
+    teamReviewTotals.set(team, entry);
+    const query = new URLSearchParams({ tag: 'for review', waiting: '1', muted: '0', versions: 'newest', limit: '1', team: source.name });
+    entry.pending = (async () => {
+        try {
+            const response = await serverFetch(source.server, `/api/team-artifacts?${query}`), body = await response.json();
+            if (response.status === 403 && (body.code === 'owner_only' || body.error === 'owner_only')) { entry.value = 0; entry.complete = true; }
+            else if (response.ok && Number.isSafeInteger(body.total) && body.total >= 0 && !body.partial && !body.truncated && !body.failed_boards?.length) { entry.value = body.total; entry.complete = true; }
+        } catch { /* no unread source is certified as zero */ }
+        finally { entry.pending = null; }
+        document.dispatchEvent(new CustomEvent('coral:team-needs-count', { detail: { team } }));
+        return teamNeedsCount(team);
+    })();
+    return entry.pending;
+}
+
 const needsProfiles = new Map();
+function persistNeedsFilters() { if (!activeNeedsTeam) NF.saveFilters(needsFilters); }
 export function showTeamNeeds(host, team, { onCount = () => {} } = {}) {
     teamNeedsMount?.dispose();
-    const prior = { filters: needsFilters, bar: needsBar, order: needsOrder, query: queries.needs };
-    const profile = needsProfiles.get(team) || { filters: NF.clean({ ...NF.EMPTY }), bar: null, order: null, query: '' };
+    const prior = { filters: needsFilters, bar: needsBar, order: needsOrder, query: queries.needs, state: needsState, table: needsTable };
+    const profile = needsProfiles.get(team) || { filters: NF.clean({ ...NF.EMPTY }), bar: null, order: null, query: '', state: DT.tableState(), table: null };
     activeNeedsTeam = team;
-    needsFilters = profile.filters; needsBar = profile.bar; needsOrder = profile.order; queries.needs = profile.query;
+    needsFilters = profile.filters; needsBar = profile.bar; needsOrder = profile.order; queries.needs = profile.query; needsState = profile.state; needsTable = profile.table;
+    const toolbarHost = DT.el('div', 'gt-toolbar'), body = DT.el('div', 'team-needs-body');
+    host.replaceChildren(toolbarHost, body);
     let disposed = false, drawing = false, signature = '';
     const redraw = () => {
         if (disposed || drawing || !host.isConnected || host.hidden) return;
         drawing = true;
         try {
             const spec = needsListSpec(), toolbar = inboxNeedsToolbar();
-            const counted = allNeeds().filter(needsUnread).length, summary = reviewQueryState();
-            const complete = !!summary && Number.isSafeInteger(summary.attentionTotal);
-            onCount(complete ? counted : counted ? `${counted}+` : '…');
+            const count = teamNeedsCount(team);
+            onCount(count.complete ? count.value : count.value ? `${count.value}+` : '…');
             if (spec.signature === signature && host.contains(toolbar.node)) return;
             signature = spec.signature;
+            if (!toolbarHost.contains(toolbar.node)) toolbarHost.replaceChildren(toolbar.node);
+            const restoreFocus = rememberFocus(body);
+            const focused = document.activeElement, href = focused?.getAttribute('href'), key = focused?.closest('tr')?.dataset.key;
             const list = spec.node();
-            const bar = DT.el('div', 'gt-toolbar'); bar.append(toolbar.node);
-            host.replaceChildren(bar, list);
+            body.replaceChildren(list);
+            const foot = spec.foot?.(); if (foot) body.append(foot);
+            if (href) [...body.querySelectorAll('a[href]')].find(link => link.getAttribute('href') === href && link.closest('tr')?.dataset.key === key)?.focus({ preventScroll: true });
+            else restoreFocus();
             host.classList.add('team-needs-list');
         } finally { drawing = false; }
     };
     const dispose = () => {
         if (disposed) return;
         disposed = true;
-        needsProfiles.set(team, { filters: needsFilters, bar: needsBar, order: needsOrder, query: queries.needs });
-        needsFilters = prior.filters; needsBar = prior.bar; needsOrder = prior.order; queries.needs = prior.query;
-        NF.saveFilters(needsFilters);
-        activeNeedsTeam = ''; teamNeedsMount = null;
+        needsProfiles.set(team, { filters: needsFilters, bar: needsBar, order: needsOrder, query: queries.needs, state: needsState, table: needsTable });
+        needsFilters = prior.filters; needsBar = prior.bar; needsOrder = prior.order; queries.needs = prior.query; needsState = prior.state; needsTable = prior.table;
+        activeNeedsTeam = '';
+        persistNeedsFilters(); teamNeedsMount = null;
         document.removeEventListener('coral:needs-updated', redraw);
+        document.removeEventListener('coral:team-needs-count', redraw);
         queryReviews(needsFilters);
     };
     teamNeedsMount = { redraw, dispose, host };
     document.addEventListener('coral:needs-updated', redraw);
+    document.addEventListener('coral:team-needs-count', redraw);
     redraw();
-    Promise.allSettled([refreshReviews(), refreshOperatorAsks()]).then(redraw);
+    Promise.allSettled([refreshReviews(), refreshOperatorAsks(), refreshTeamNeedsCount(team)]).then(redraw);
     return dispose;
 }
 
@@ -1161,7 +1199,7 @@ wrap.append(DT.el('span', 'sr-only', `${earlierWords(s.review) ? `, ${earlierWor
                 ...(rows.some(s => s.agent_type) ? [{ key: 'cli', label: 'CLI', drop: oneLineNeeds ? 7 : 1, ...(oneLineNeeds ? { width: '6rem', dropAt: 36 } : {}), sort: true, sortValue: s => providerName(s.agent_type) || '', line: 2, cell: s => (s.agent_type ? DT.tag(providerName(s.agent_type)) : '') }] : []),
                 ...(rows.some(dirOf) ? [{ key: 'folder', label: 'Folder', drop: 5, ...(oneLineNeeds ? { width: '10rem', dropAt: rows.some(blocksOf) ? 62 : 52 } : {}), sort: true, sortValue: s => dirOf(s) || '', line: 0, cell: s => dirOf(s) || '' }] : []), // the folder an agent works in tells two of one name apart (#7122)
                 ...serverColumns().map(c => (oneLineNeeds ? { ...c, width: '8rem', dropAt: 52 } : c)),
-                ...(rows.every(s => s.autorun || s.unrecorded || s.welcome) ? [] : [{ key: 'team', label: 'Team', ...(oneLineNeeds ? { width: '13rem', dropAt: 36 } : { max: 26, drop: 7 }), sort: true, sortValue: s => teamOf(s), line: 0, cell: s => ((s.review || s.autorun) && !oneLineNeeds ? '' : teamOf(s)) }]), // a run belongs to no team: with only runs there is no Team column
+                ...(rows.every(s => s.autorun || s.unrecorded || s.welcome) ? [] : [{ key: 'team', label: 'Team', ...(oneLineNeeds ? { width: '13rem', dropAt: 36 } : { max: 26, drop: 7 }), sort: true, sortValue: s => teamOf(s), line: 0, cell: s => teamOf(s) }]), // a run belongs to no team: with only runs there is no Team column
                 ...(goal || rows.some(s => s.review) ? [{ key: 'goal', label: 'Goal', ...(oneLineNeeds ? { width: '10rem', dropAt: 36 } : { min: 16, share: 1, drop: 3 }), sort: true, sortValue: s => (goalOf(s) ? s.goal.title : '\uffff'), line: rows.some(isItem) ? 2 : 0, cell: s => {
                     // a review's goal and task come from its artifact's roll-up (#8579); they open in the Inbox, in place; "No goal" when it serves none
                     if (s.review && !oneLineNeeds) return ''; // the goal and the task are in the opened file and the filters (#11719)
@@ -1185,7 +1223,7 @@ wrap.append(DT.el('span', 'sr-only', `${earlierWords(s.review) ? `, ${earlierWor
             if (hidden > 0) {
                 const only = needsFilters.kind && !needsFilters.q && !needsFilters.team && !needsFilters.agent && !needsFilters.goal && !needsFilters.longer && !needsFilters.server;
                 const p = DT.el('p', 'goals-note inbox-filter-hidden', `${hidden} hidden by the ${only ? `${NF.KIND_LABEL[needsFilters.kind] || needsFilters.kind} filter` : 'filters'}. `);
-                p.append(DT.link('Show all', () => { needsFilters = NF.clean({ ...NF.EMPTY }); NF.saveFilters(needsFilters); queries.needs = ''; const input = $('inbox-search'); if (input && group === 'needs') input.value = ''; renderInboxNav(true); }));
+                p.append(DT.link('Show all', () => { needsFilters = NF.clean({ ...NF.EMPTY }); persistNeedsFilters(); queries.needs = ''; const input = $('inbox-search'); if (input && group === 'needs') input.value = ''; renderInboxNav(true); }));
                 wrap.prepend(p);
             }
             for (const g of needsOverflow()) {
@@ -1308,7 +1346,7 @@ export function filterInbox(value) {
     queries[group] = CH.CHAT_KEY.test(group) || group === 'tasks' ? text : text.toLowerCase();
     if (group === 'tasks') { inboxTasksState.selected.clear(); taskFilters = { ...taskFilters, q: text }; } // a chat search goes to the server as typed
     if (CH.CHAT_KEY.test(group)) { chatFilters.set(group, { ...chatFiltersOf(group), q: text }); if (nativeInbox()) CH.resetChatLists(group); } // the sidebar's box and the page's share the one search (#8603); on a Hub it is sent on Enter, one read of each online computer every time
-    if (group === 'needs') { needsFilters = { ...needsFilters, q: text }; NF.saveFilters(needsFilters); } // the sidebar's box and the page's share the one search (#8604)
+    if (group === 'needs') { needsFilters = { ...needsFilters, q: text }; persistNeedsFilters(); } // the sidebar's box and the page's share the one search (#8604)
     if (group === 'activity') { activityFilters = { ...activityFilters, q: text }; AF.saveFilters(activityFilters); } // the sidebar's box and the page's share the one search (#12070)
     if (group === 'goals') { goalFilters = { ...goalFilters, q: text }; GF.saveFilters(goalFilters); } // the sidebar's box and the page's share the one search (#8596)
     renderInboxNav(true);
@@ -1412,7 +1450,7 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
     let auto = false; // Needs you was chosen for the person: it is not stored as the remembered folder
     if (!_mounted) {
         _mounted = true;
-        new MutationObserver(() => { if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') { _wasShown = false; needsOrder = null; needsState.shown = null; if (needsFilters.kind) { needsFilters = { ...needsFilters, kind: '' }; NF.saveFilters(needsFilters); } } }).observe(document.body, { attributes: true, attributeFilter: ['data-nav-tab'] });
+        new MutationObserver(() => { if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') { _wasShown = false; needsOrder = null; needsState.shown = null; if (needsFilters.kind) { needsFilters = { ...needsFilters, kind: '' }; persistNeedsFilters(); } } }).observe(document.body, { attributes: true, attributeFilter: ['data-nav-tab'] });
         $('inbox-view').addEventListener('click', () => quietFocus($('inbox-view')), true);
         if (nativeInbox()) $('inbox-search')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); if (e.repeat) return; /* a held Enter is one search */ filterInbox(e.target.value); } }); // a chat search runs when it is asked for, not on each key (coral-hub's rate condition)
         onInboxHooks({ goals: liveGoals, needs: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); }, counts: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); } });
