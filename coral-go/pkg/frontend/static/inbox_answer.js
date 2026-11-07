@@ -151,7 +151,7 @@ const answerable = s => !(s.review || s.autorun || !s.agent_type || !s.session_i
 
 /** The actions of a phone Needs you row's ⋯ menu (#137104): the Dismiss of a wait that is no longer true, offered by the rule the desktop row's button follows. */
 export function rowActions(s) {
-    if (s.waiting_for_input && waitIgnored(s)) return canRemoveWait(s) ? [{ label: 'Remove from Needs you', title: REMOVE_WAIT_LINE, run: b => removeWait(s, b) }] : [];
+    if (s.waiting_for_input && waitIgnored(s)) return canRemoveWait(s) ? [{ label: 'Remove from Needs you', title: REMOVE_WAIT_LINE, help: REMOVE_WAIT_LINE, run: b => removeWait(s, b) }] : [];
     if (!canDismissWait(s, s.waiting_kind)) return []; // every waiting agent's row has one, a sign-in's too (#11946)
     return [{ label: 'Dismiss', title: 'Clear this if the agent is not waiting. Nothing is sent to the agent.', run: b => dismissWait(s, b) }];
 }
@@ -169,7 +169,8 @@ export function answerCell(s, { dismiss = true } = {}) {
             const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'btn btn-small btn-quiet inbox-remove-wait';
             remove.textContent = 'Remove from Needs you'; remove.title = REMOVE_WAIT_LINE;
             remove.addEventListener('click', event => { event.stopPropagation(); removeWait(s, remove); });
-            cell.append(remove);
+            const help = document.createElement('span'); help.className = 'inbox-remove-wait-help'; help.textContent = REMOVE_WAIT_LINE;
+            cell.append(remove, help);
         }
         return cell;
     }
