@@ -275,6 +275,11 @@ function drawCounts() {
 async function readCounts() {
     const team = S.team, seq = ++S.countSeq;
     if (!team) return;
+    S.counts.needs ??= '…';
+    importOnce('./inbox_sidebar.js').then(m => m.refreshTeamNeedsCount(team)).then(count => {
+        if (seq !== S.countSeq || team !== S.team) return;
+        S.counts.needs = count.complete ? count.value : count.value ? `${count.value}+` : '…'; drawCounts();
+    }).catch(() => { if (seq === S.countSeq && team === S.team) { S.counts.needs = '…'; drawCounts(); } });
     const knowledge = S.knowledgeFor === team ? null : (S.knowledgeFor = team, teamFetch(team, n => `/api/teams/detail/${encodeURIComponent(n)}/knowledge`).then(async r => { const data = await r.json(); return r.ok ? data : null; }).catch(() => null)); // the Knowledge tab's count once per team, with the others (the notes are read again when the tab opens)
     const [goals, tasks, avail, kn] = await Promise.allSettled([
         boardFetch(team, '/goals?state=proposed,active,blocked,done,dropped&limit=200').then(async r => { const data = await r.json(); return r.ok ? data : null; }),
@@ -294,7 +299,12 @@ async function readCounts() {
     drawCounts();
 }
 // A Wake or a Sleep from here: the status is read and drawn at once, not at the next poll (#10359).
-document.addEventListener('coral:needs-updated', () => { if (S.team && currentTeamPage()) drawStatus(S.statusData); });
+document.addEventListener('coral:needs-updated', () => {
+    if (!S.team || !currentTeamPage()) return;
+    drawStatus(S.statusData);
+    const team = S.team;
+    importOnce('./inbox_sidebar.js').then(m => { if (S.team !== team) return; const count = m.teamNeedsCount(team); S.counts.needs = count.complete ? count.value : count.value ? `${count.value}+` : '…'; drawCounts(); });
+});
 document.addEventListener('coral:team-sleep-changed', e => { if (S.team && e.detail && e.detail.team === S.team) readCounts(); });
 function startCounts() {
     readCounts();
