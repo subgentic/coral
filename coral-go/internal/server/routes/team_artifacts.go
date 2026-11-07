@@ -74,6 +74,9 @@ type teamArtifact struct {
 	// from them, with no request of its own. They come from the upload records, the authority (digestSeries, seriesMembers).
 	Version  int `json:"version,omitempty"`
 	Versions int `json:"versions,omitempty"`
+	// FileID and VersionLine (#14145): the file's stable id and "version N of <name> (file <id>)", on every row, told the same way as an upload and the viewer tell it.
+	FileID      string `json:"file_id,omitempty"`
+	VersionLine string `json:"version_line,omitempty"`
 	// EarlierVersions: how many older versions of this file (the same team, uploader and name) a collapsed list leaves out (#11700): only on a list asked with versions=newest, and absent for none.
 	EarlierVersions int `json:"earlier_versions,omitempty"`
 	// Review is the Operator's decision on an artifact tagged for review, with its time (#136584): absent until one is made.
@@ -1080,8 +1083,9 @@ func (h *BoardHandler) attachSeriesVersions(rows []teamArtifact, project string)
 	if h.coralDir == "" || len(rows) == 0 {
 		return
 	}
-	if es, err := os.ReadDir(filepath.Join(h.coralDir, "artifacts", "series")); err != nil || len(es) == 0 {
-		return
+	hasSeries := false
+	if es, err := os.ReadDir(filepath.Join(h.coralDir, "artifacts", "series")); err == nil && len(es) > 0 {
+		hasSeries = true
 	}
 	count := map[string]int{}
 	for i := range rows {
@@ -1093,10 +1097,17 @@ func (h *BoardHandler) attachSeriesVersions(rows []teamArtifact, project string)
 		if board == "" {
 			board = rows[i].Team
 		}
-		sid, n, ok := digestSeriesOnBoard(h.coralDir, id, board)
-		if !ok {
+		sid, n, ok := "", 0, false
+		if hasSeries {
+			sid, n, ok = digestSeriesOnBoard(h.coralDir, id, board)
+		}
+		if !ok { // never versioned: its id is derived (nothing stored) and it is version 1
+			if board != "" {
+				rows[i].FileID, rows[i].VersionLine = virtualFileID(board, id), versionLine(1, rows[i].Name, virtualFileID(board, id))
+			}
 			continue
 		}
+		rows[i].FileID, rows[i].VersionLine = sid, versionLine(n, rows[i].Name, sid)
 		c, seen := count[sid]
 		if !seen {
 			c = len(seriesMembers(h.coralDir, sid))

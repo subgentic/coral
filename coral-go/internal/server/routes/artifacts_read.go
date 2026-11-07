@@ -117,6 +117,7 @@ func (h *SessionsHandler) getAgentArtifactMeta(w http.ResponseWriter, r *http.Re
 		if sid, n, in := digestSeries(h.cfg.CoralDir(), id); in {
 			ms := seriesMembers(h.cfg.CoralDir(), sid)
 			out["series_id"], out["version"], out["versions"], out["is_latest"] = sid, n, len(ms), len(ms) > 0 && ms[len(ms)-1].Digest == id
+			out["file_id"], out["version_line"] = sid, versionLine(n, meta.Name, sid) // #14145: the same words everywhere
 		}
 	}
 	w.Header().Set("Cache-Control", "no-store")

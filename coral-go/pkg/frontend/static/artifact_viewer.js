@@ -6,7 +6,7 @@
  * Download button keeps the original bytes one click away, through Coral Hub too. */
 import { isPhoneLayout } from './phone_layout.js';
 import { markHidden } from './visible_marks.js';
-import { escapeHtml, renderMarkdownStrict, highlightCodeIn, keepFragmentsInside } from './utils.js';
+import { escapeHtml, renderMarkdownStrict, highlightCodeIn, keepFragmentsInside, fileIdOf, versionLineOf, copyFileId } from './utils.js';
 import { serverUrl, artifactPath, isCloud, boardTeamKey, contextServer, normServer } from './server_base.js';
 import { renderArtifact, manifestDownload } from './artifact_preview.js';
 import { downloadArtifact, sanitizeDownloadName } from './artifact_download.js';
@@ -373,6 +373,14 @@ export function openArtifactViewer(hex, opts = {}) {
         wrap.append('Goal: ', link); chips.append(wrap);
     } else if (opts.goal) { const g = document.createElement('span'); g.className = 'chip detail-chip'; g.textContent = `Goal: ${markHidden(opts.goal, { strict: true })}`; g.title = g.textContent; chips.append(g); }
     if (opts.task) { const t = document.createElement('span'); t.className = 'chip detail-chip'; t.textContent = `Task: ${markHidden(opts.task, { strict: true })}`; t.title = t.textContent; chips.append(t); }
+    if (opts.versionLine && fileIdOf({ file_id: opts.fileId })) { // the file's version and stable id, the same line everywhere (#14145)
+        const idChip = document.createElement('span'); idChip.className = 'chip detail-chip artifact-viewer-fileid';
+        const shown = markHidden(versionLineOf({ file_id: opts.fileId, version_line: opts.versionLine }), { strict: true });
+        idChip.append(shown); idChip.title = shown;
+        const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'dt-link detail-chip-link'; copy.textContent = 'Copy file ID';
+        copy.addEventListener('click', () => { copyFileId({ file_id: opts.fileId }, showToast); });
+        idChip.append(' ', copy); chips.append(idChip);
+    }
     if (chips.children.length) _details.add(chips);
     readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) { _details.add(readersBlock(hex, opts.server, _details)); if (opts.sourceNamed) _details.add(privateBlock(hex, opts.server, _details)); } }).catch(() => {});
     if (!opts.switched) d.querySelector('.artifact-viewer-close').focus(); // a version chosen from the bar keeps the keyboard on the bar

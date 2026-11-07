@@ -25,7 +25,7 @@ import { go, note, backIs, currentRoute } from './nav.js';
 import { build, keyRoute, parse as parseRoute, inboxFolderPath, BOARDS_FOLDER, BOARDS_SUB } from './routes.js';
 import { sessionServer, normServer, boardTeamKey, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox, nativeNeeds, decisionNeedsPerson, LOCAL_SERVER } from './server_base.js';
 import { teamLabel } from './server_status.js';
-import { showView, showToast, OPERATOR_ID } from './utils.js';
+import { showView, showToast, OPERATOR_ID, versionLineOf } from './utils.js';
 import { registerActions, textOf } from './actions.js';
 import { tableMarkup, registerGroupSource, refreshGroupTable, openGroupTable, foldWayBack } from './sidebar_groups.js';
 import { isPhoneLayout } from './phone_layout.js';
@@ -160,7 +160,7 @@ const fromOf = (s, withTeam) => { if (s.operatorAsk) return [`from ${markHidden(
 /** The wait, again, inside the item cell (#13795): a phone's row puts it at the right of the sender's line, so the Waiting column is hidden there; hidden everywhere else (the column says it). */
 const waitMark = s => { const t = waitingText(s.waiting_since); if (!t) return []; const e = DT.el('span', 'inbox-review-wait', t); e.setAttribute('aria-hidden', 'true'); return [e]; }; // the Waiting cell says it to a screen reader
 const fromNode = s => {
-    const p = DT.el('span', 'inbox-review-from'), who = String(s.review.produced_by || '').trim(), n = (s.review.earlier || []).length, rest = n ? `${n} earlier version${n === 1 ? '' : 's'}` : '';
+    const p = DT.el('span', 'inbox-review-from'), who = String(s.review.produced_by || '').trim(), n = (s.review.earlier || []).length, rest = [versionLineOf(s.review), n ? `${n} earlier version${n === 1 ? '' : 's'}` : ''].filter(Boolean).join(' \u00b7 ');
     if (!who) { p.textContent = fromOf(s, false); return p; }
     p.append('from ', agentLink(who, { board: boardTeamKey(sessionServer(s), s.review.team) }), rest ? ' \u00b7 ' + rest : '');
     return p;
@@ -276,7 +276,7 @@ const needsState = DT.tableState();
 export async function openReview(row, extra = {}) {
     const { openArtifactViewer } = await importOnce('./artifact_viewer.js', 'the file viewer').catch(() => ({})); // a failed load is said (importOnce's toast) and the next click tries again: a page left open across an update must not have rows that do nothing (#11963)
     if (!openArtifactViewer) return;
-    openArtifactViewer(row.hex, { server: splitKey(row.team).server, filename: row.name, mediaType: row.media_type, board: splitKey(row.team).name, goal: row.goal_id && row.goal_title ? String(row.goal_title) : '', goalId: row.goal_id ? String(row.goal_id) : '', goalTeam: row.team || '', task: row.task_id ? String(row.task_title || `Task #${row.task_id}`) : '', from: subOf({ review: row, board_project: splitKey(row.team).name, server: splitKey(row.team).server }, true), ...extra }); // the newest version itself: a diff only when Compare is pressed (#11628)
+    openArtifactViewer(row.hex, { server: splitKey(row.team).server, filename: row.name, mediaType: row.media_type, fileId: row.file_id, versionLine: row.version_line, board: splitKey(row.team).name, goal: row.goal_id && row.goal_title ? String(row.goal_title) : '', goalId: row.goal_id ? String(row.goal_id) : '', goalTeam: row.team || '', task: row.task_id ? String(row.task_title || `Task #${row.task_id}`) : '', from: subOf({ review: row, board_project: splitKey(row.team).name, server: splitKey(row.team).server }, true), ...extra }); // the newest version itself: a diff only when Compare is pressed (#11628)
     markOpenedReadVisibly(row.hex, sayLive); // opening is reading it: the 'read' tag, so it stops counting everywhere (#9277); the viewer does the same for any for-review artifact, once; a failed save is said, and the item keeps counting
 }
 /** A row's action clears it from the list: the list is drawn again, and the person keeps their place (#11558). Called before the write, it notes where the page and the list are scrolled and the row beside this one (the next, or the
