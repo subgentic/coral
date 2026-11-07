@@ -18,7 +18,8 @@ const GOALS = [
     const heights = sel => ev(`[...document.querySelectorAll(${JSON.stringify(sel)})].filter(r => r.querySelector('td') && r.getClientRects().length).map(r => Math.round(r.getBoundingClientRect().height))`);
 
     let phone = false; // a phone's rows are 56 px mail rows (#9545): one line, taller than a table row
-    const one = async (label, what, sel, min, max = phone ? 56 : 48) => { const h = await heights(sel); assert.ok(h.length >= min, `${label}: ${what} has its rows (${h.length})`); assert.ok(h.every(x => x <= max), `${label}: every ${what} row is ${max === 48 || max === 56 ? 'one line' : 'at most the name and one more line'} (heights ${JSON.stringify(h)})`); };
+    // the rows are read once they are drawn (#14307: a fixed settle() was read before the Needs you list drew its rows, 0 rows, on a slow Windows runner; at a CPU throttle of 20 it failed every run): wait for the count, then measure; a count that never comes is the assertion's own message
+    const one = async (label, what, sel, min, max = phone ? 56 : 48) => { await waitFor(`[...document.querySelectorAll(${JSON.stringify(sel)})].filter(r => r.querySelector('td') && r.getClientRects().length).length >= ${min}`, `${label}: ${what} rows drawn`, 10000).catch(() => {}); const h = await heights(sel); assert.ok(h.length >= min, `${label}: ${what} has its rows (${h.length})`); assert.ok(h.every(x => x <= max), `${label}: every ${what} row is ${max === 48 || max === 56 ? 'one line' : 'at most the name and one more line'} (heights ${JSON.stringify(h)})`); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [label, w, h, mobile] of [['1280', 1280, 800, false], ['390', 390, 844, true]]) {
