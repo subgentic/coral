@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -98,16 +99,30 @@ func TestOlderCLISignatureIsRefusedWithAnUpdateHint(t *testing.T) {
 		req, err := http.NewRequest("GET", local.URL+"/api/sessions/live?limit=5", nil)
 		require.NoError(t, err)
 		req.Header.Set(cliauth.CLIAuthHeader, sig)
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := (&http.Client{Transport: &http.Transport{DisableKeepAlives: true}}).Do(req) // a new connection per request: the owner check is per connection
 		require.NoError(t, err)
 		b, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		return resp.StatusCode, string(b)
 	}
-	code, body := send(cliSignServer(t, local.URL, tok, "GET", "/api/sessions/live", "")) // the old MAC: no query
+	// signed signs path (a new hello each time) and sends the request; a request refused as another user's (the owner check missed its connection under load, #522) is signed and sent again,
+	// within cliHelloWaits. The final answer is the one asserted, and this test never expects other_user.
+	signed := func(path string) (int, string) {
+		code, body := send(cliSignServer(t, local.URL, tok, "GET", path, ""))
+		for _, wait := range cliHelloWaits {
+			if code != http.StatusForbidden || !strings.Contains(body, `"code":"other_user"`) {
+				break
+			}
+			t.Logf("signed request refused (%s); signing and sending it again in %v", strings.TrimSpace(body), wait)
+			time.Sleep(wait)
+			code, body = send(cliSignServer(t, local.URL, tok, "GET", path, ""))
+		}
+		return code, body
+	}
+	code, body := signed("/api/sessions/live") // the old MAC: no query
 	assert.Equal(t, http.StatusUnauthorized, code)
 	assert.Contains(t, body, "cli_signature_required")
 	assert.Contains(t, body, "Use the coral command that came with this Coral")
-	code, _ = send(cliSignServer(t, local.URL, tok, "GET", "/api/sessions/live?limit=5", ""))
+	code, _ = signed("/api/sessions/live?limit=5")
 	assert.Equal(t, http.StatusOK, code, "this version's signature")
 }
