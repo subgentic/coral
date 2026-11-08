@@ -56,7 +56,7 @@ const OTHER = 'cd'.repeat(32);
                         if (method === 'PUT') window.__trust.add(t[1]); if (method === 'DELETE') window.__trust.delete(t[1]);
                         return json({ id: t[1], trusted: window.__trust.has(t[1]) }); }
                     if (/\\/api\\/artifacts\\/[a-f0-9]{64}\\/(versions|comments)/.test(url)) return json(/comments/.test(url) ? { comments: [], locked: false, you: { kind: 'owner', can_comment: true, can_lock: true }, limits: {} } : (window.__versions || []));
-                    if (/\\/api\\/artifacts\\/[a-f0-9]{64}/.test(url)) return Promise.resolve(new Response(window.__body, { status: 200, headers: { 'Content-Type': 'text/html' } }));
+                    if (/\\/api\\/artifacts\\/[a-f0-9]{64}/.test(url)) return Promise.resolve(new Response(window.__bodyBytes || window.__body, { status: 200, headers: { 'Content-Type': 'text/html' } }));
                     return orig(u, o); };
             })()`);
             const open = async (hex = HEX, frame = true) => {
@@ -156,6 +156,28 @@ const OTHER = 'cd'.repeat(32);
             assert.equal(await frameText(true), null, `${w}: no host frame for a mismatched hash`);
             await shot('scripts-mismatch-' + w);
 
+            // 7b. the viewer obeys messages from its own host frame ONLY (kills: the e.source check removed): the page posts to itself what the file's host would, and nothing happens
+            await ev(`window.__body = ${JSON.stringify(HTML)}; window.__trust.add(${JSON.stringify(HEX)})`);
+            await open(); await waitFor(`!!document.querySelector('#artifact-viewer .artifact-scripts-bar')`, `${w}: on again for the forged-message checks`, 10000);
+            await ev(`window.postMessage({ type: 'coral-artifact-height', height: 3000 }, '*'); window.postMessage({ type: 'coral-artifact-navigated' }, '*'); true`);
+            await sleep(500); // sleep-ok: a negative: a forged message that was going to be obeyed has been by now
+            const forged = await ev(`(() => { const fr = document.querySelector('#artifact-viewer .artifact-linked-preview iframe'); return { frame: !!fr, minHeight: fr ? fr.style.minHeight : null, line: !!document.querySelector('#artifact-viewer .artifact-scripts-line') }; })()`);
+            assert.ok(forged.frame && forged.minHeight === '' && !forged.line, `${w}: a message from any window but the file's host is ignored: ` + JSON.stringify(forged));
+
+            // 7c. a file that navigates itself is stopped: the host reads a second load as a navigation, tells the viewer, which removes the frame and says so (kills: coral-artifact-navigated not handled; a second load not read as a navigation in the host)
+            const NAVHTML = '<p id="o">nav</p><script>setTimeout(function () { location.replace("about:blank"); }, 100);</script>';
+            const NAVHEX = require('node:crypto').createHash('sha256').update(NAVHTML).digest('hex');
+            await ev(`window.__body = ${JSON.stringify(NAVHTML)}; window.__trust.add(${JSON.stringify(NAVHEX)})`);
+            await open(NAVHEX);
+            await waitFor(`/tried to leave this page/.test((document.querySelector('#artifact-viewer .artifact-scripts-line') || {}).textContent || '') && !document.querySelector('#artifact-viewer .artifact-linked-preview iframe')`, `${w}: a file that navigates itself is stopped and the frame removed`, 15000);
+            await ev(`window.__body = ${JSON.stringify(HTML)}`);
+
+            // 8. a file whose bytes decode to more than 2 MiB (the preview allows 2 MiB of bytes; invalid bytes become 3-byte characters): no offer, no frame (kills: the 2 MiB limit off)
+            await ev(`window.__trust.clear(); window.__bodyBytes = new Uint8Array(1536 * 1024).fill(0xff)`);
+            await open(HEX, false);
+            await waitFor(`/over 2 MiB/.test((document.querySelector('#artifact-viewer .artifact-scripts-line') || {}).textContent || '')`, `${w}: the over-limit line for bytes that decode past 2 MiB`, 15000);
+            assert.ok(!(await q('.artifact-scripts-ask')) && !(await q('.artifact-scripts-bar')), `${w}: no offer and no scripts for a file past the limit`);
+            await ev(`window.__bodyBytes = null`);
             // 8. over 2 MiB (the preview's own limit, the same number): no frame and no offer
             await ev(`window.__trust.clear(); window.__body = '<p>' + 'x'.repeat(2 * 1024 * 1024 + 10) + '</p>'`);
             await open(HEX, false); await sleep(800); // sleep-ok: a negative: the over-limit file is answered by the preview's own fallback, which never draws a frame or an offer
