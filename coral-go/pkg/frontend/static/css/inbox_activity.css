@@ -3,5 +3,7 @@
 .activity-check { margin: 0; padding: var(--space-sm) var(--space-md); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-secondary); font-size: var(--fs-sm); }
 .activity-check-broken { border-color: var(--danger, var(--accent)); color: var(--text-primary); font-weight: var(--fw-strong); }
 .activity-did { font-weight: var(--fw-strong); }
-.activity-note { font-weight: var(--fw-regular); color: var(--text-secondary); }
+.activity-on { display: flex; flex-direction: column; min-width: 0; }
+.activity-detail { display: block; white-space: normal; overflow-wrap: anywhere; font-size: var(--fs-sm); line-height: var(--lh-body); color: var(--text-secondary); font-weight: var(--fw-regular); } /* the detail of a row, whole, on its own line (#14423) */
 .activity-more { align-self: flex-start; }
+.activity-about { display: block; white-space: normal; overflow-wrap: anywhere; font-size: var(--fs-sm); line-height: var(--lh-body); color: var(--text-muted); font-weight: var(--fw-regular); } /* the goal and task a row was about (#14442), under the detail: muted, whole */
