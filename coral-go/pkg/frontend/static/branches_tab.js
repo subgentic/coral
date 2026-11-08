@@ -30,8 +30,10 @@ export async function loadBranches() {
     const notYet = !!data && data.available !== false && !data.found;
     if (!notYet) waiting = { session: '', since: 0, tries: 0 };
     else if (waiting.session !== s.session_id) waiting = { session: s.session_id, since: Date.now(), tries: 0 };
-    draw(el, data, notYet && Date.now() - waiting.since > FIRST_READ_LIMIT_MS);
-    timer = setTimeout(loadBranches, notYet ? FIRST_READ_STEPS[Math.min(waiting.tries++, FIRST_READ_STEPS.length - 1)] : REFRESH_MS);
+    const overdue = notYet && Date.now() - waiting.since > FIRST_READ_LIMIT_MS;
+    draw(el, data, overdue);
+    // past the limit the folder is likely not a repository: ask once a minute, so an open tab on it does not start a pass every 15 s (Security's INFO on #531)
+    timer = setTimeout(loadBranches, notYet && !overdue ? FIRST_READ_STEPS[Math.min(waiting.tries++, FIRST_READ_STEPS.length - 1)] : REFRESH_MS);
 }
 
 function text(tag, className, value) {
