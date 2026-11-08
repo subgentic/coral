@@ -545,6 +545,22 @@ CREATE TABLE IF NOT EXISTS cloud_connection (
     last_error TEXT
 );
 
+-- This database's Dropbox sign-in (#14609, Dropbox stage 3a). One row, made the first time the server id is asked for, and kept through a
+-- disconnect: server_id belongs to the database (a restored copy keeps it). refresh_token holds a "v1:" secretbox envelope bound to
+-- account_id as AAD, never plaintext; NULL when not connected. fingerprint is SHA-256 of fp_salt, the machine id and the data folder (never
+-- the machine id itself). last_account_id is the account of the last connection, so a connect to another account is a confirmed switch.
+CREATE TABLE IF NOT EXISTS dropbox_connection (
+    id              INTEGER PRIMARY KEY CHECK (id = 1),
+    server_id       TEXT NOT NULL,
+    fp_salt         TEXT NOT NULL,
+    account_id      TEXT,
+    last_account_id TEXT,
+    refresh_token   TEXT,
+    fingerprint     TEXT,
+    state           TEXT NOT NULL DEFAULT 'disconnected',
+    connected_at    TEXT
+);
+
 -- Coral Hub enrollment in progress, and its rate limit (one row). The device code is
 -- sealed like the server token. Kept across restarts so a restart loop reuses one code
 -- instead of asking the hub for a new one each time.

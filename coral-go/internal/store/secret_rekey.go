@@ -118,6 +118,8 @@ func (s *RemoteServerStore) Rekey(ctx context.Context) error {
 		"UPDATE remote_servers SET owner_secret = '' WHERE owner_secret != ''", // the owner stamp secret (#11378) goes with them: a hub makes a new one when it sets the server up again
 		"DELETE FROM cloud_connection",
 		"DELETE FROM cloud_enrollment",
+		// The Dropbox sign-in (#14609) is discarded too; the row and its server id stay (they belong to the database).
+		"UPDATE dropbox_connection SET refresh_token = NULL, account_id = NULL, fingerprint = NULL, state = 'reconnect' WHERE refresh_token IS NOT NULL",
 	} {
 		if _, err := tx.ExecContext(ctx, q); err != nil {
 			abortKey()
