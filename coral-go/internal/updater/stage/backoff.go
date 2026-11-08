@@ -8,6 +8,7 @@ import "time"
 const (
 	KindNetwork   = "network"
 	KindVerify    = "verify"
+	KindList      = "list"       // GitHub's list of releases could not be read (too large, or not a list): not an outage of the network, so it backs off like a refusal (an hour, doubling to a day), not in minutes
 	KindRateLimit = "rate_limit" // GitHub's limit on anonymous requests (#9704): the wait is the time it says it is over, not a doubling
 )
 
