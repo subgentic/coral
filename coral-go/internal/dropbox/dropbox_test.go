@@ -44,7 +44,7 @@ func TestTheClientNeverFollowsARedirect(t *testing.T) {
 
 func TestTheAuthorizeURLAsksForPKCEAndAnOfflineToken(t *testing.T) {
 	f := NewFlows()
-	u, err := f.Start("appkey", "http://127.0.0.1:53682/dropbox/callback")
+	u, err := f.Start("appkey", "http://127.0.0.1:53682/dropbox/callback", "browser-1")
 	require.NoError(t, err)
 	p, err := url.Parse(u)
 	require.NoError(t, err)
@@ -57,7 +57,8 @@ func TestTheAuthorizeURLAsksForPKCEAndAnOfflineToken(t *testing.T) {
 	assert.Equal(t, "http://127.0.0.1:53682/dropbox/callback", q.Get("redirect_uri"))
 	state := q.Get("state")
 	require.Len(t, state, 43, "32 random bytes, base64url")
-	verifier, ok := f.Take(state)
+	verifier, redirect, ok := f.Take(state, "browser-1")
+	assert.Equal(t, "http://127.0.0.1:53682/dropbox/callback", redirect, "the redirect captured at Start")
 	require.True(t, ok)
 	sum := sha256.Sum256([]byte(verifier))
 	assert.Equal(t, base64.RawURLEncoding.EncodeToString(sum[:]), q.Get("code_challenge"), "the challenge is S256 of the verifier")
@@ -66,34 +67,34 @@ func TestTheAuthorizeURLAsksForPKCEAndAnOfflineToken(t *testing.T) {
 
 func TestAStateIsUsedOnceAndExpires(t *testing.T) {
 	f := NewFlows()
-	u, err := f.Start("k", "http://127.0.0.1:53682/dropbox/callback")
+	u, err := f.Start("k", "http://127.0.0.1:53682/dropbox/callback", "browser-1")
 	require.NoError(t, err)
 	p, _ := url.Parse(u)
 	state := p.Query().Get("state")
-	_, ok := f.Take("not-the-state")
+	_, _, ok := f.Take("not-the-state", "browser-1")
 	assert.False(t, ok)
-	_, ok = f.Take(state)
+	_, _, ok = f.Take(state, "browser-1")
 	assert.True(t, ok)
-	_, ok = f.Take(state)
+	_, _, ok = f.Take(state, "browser-1")
 	assert.False(t, ok, "single use")
 
-	u, err = f.Start("k", "http://127.0.0.1:53682/dropbox/callback")
+	u, err = f.Start("k", "http://127.0.0.1:53682/dropbox/callback", "browser-1")
 	require.NoError(t, err)
 	p, _ = url.Parse(u)
 	f.now = func() time.Time { return time.Now().Add(FlowTTL + time.Second) }
-	_, ok = f.Take(p.Query().Get("state"))
+	_, _, ok = f.Take(p.Query().Get("state"), "browser-1")
 	assert.False(t, ok, "expired after five minutes")
 }
 
 func TestOnlyOneSignInIsPendingAtATime(t *testing.T) {
 	f := NewFlows()
-	u1, _ := f.Start("k", "http://127.0.0.1:53682/dropbox/callback")
-	u2, _ := f.Start("k", "http://127.0.0.1:53682/dropbox/callback")
+	u1, _ := f.Start("k", "http://127.0.0.1:53682/dropbox/callback", "browser-1")
+	u2, _ := f.Start("k", "http://127.0.0.1:53682/dropbox/callback", "browser-1")
 	p1, _ := url.Parse(u1)
 	p2, _ := url.Parse(u2)
-	_, ok := f.Take(p1.Query().Get("state"))
+	_, _, ok := f.Take(p1.Query().Get("state"), "browser-1")
 	assert.False(t, ok, "a new sign-in replaces the pending one")
-	_, ok = f.Take(p2.Query().Get("state"))
+	_, _, ok = f.Take(p2.Query().Get("state"), "browser-1")
 	assert.True(t, ok)
 }
 
@@ -155,4 +156,29 @@ func TestErrorsNeverCarryDropboxsBody(t *testing.T) {
 	require.Error(t, err)
 	assert.False(t, strings.Contains(err.Error(), "report.md"), "only the error tag, never Dropbox's description: %v", err)
 	assert.Contains(t, err.Error(), "invalid_request")
+}
+
+func TestTheStateIsBoundToTheBrowserThatStartedTheSignIn(t *testing.T) {
+	f := NewFlows()
+	u, err := f.Start("k", "http://127.0.0.1:53682/dropbox/callback", "browser-1")
+	require.NoError(t, err)
+	p, _ := url.Parse(u)
+	state := p.Query().Get("state")
+	_, _, ok := f.Take(state, "browser-2")
+	assert.False(t, ok, "another browser (no or another flow cookie) cannot finish it")
+	_, _, ok = f.Take(state, "")
+	assert.False(t, ok)
+	_, _, ok = f.Take(state, "browser-1")
+	assert.True(t, ok, "a wrong browser does not consume the flow")
+}
+
+func TestStartAcceptsOnlyTheLoopbackCallback(t *testing.T) {
+	f := NewFlows()
+	for _, r := range []string{"http://localhost:53682/dropbox/callback", "https://127.0.0.1:53682/dropbox/callback", "http://127.0.0.1:53682/other",
+		"http://127.0.0.1/dropbox/callback", "http://127.0.0.1:53682/dropbox/callback?x=1", "http://evil.example/dropbox/callback", "http://0.0.0.0:53682/dropbox/callback"} {
+		_, err := f.Start("k", r, "browser-1")
+		assert.Error(t, err, r)
+	}
+	_, err := f.Start("k", "http://127.0.0.1:53682/dropbox/callback", "")
+	assert.Error(t, err, "a sign-in must be bound to a browser")
 }

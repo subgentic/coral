@@ -17,6 +17,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -199,14 +200,18 @@ const FlowTTL = 5 * time.Minute
 // Flows holds the one pending sign-in: the state (kept as a hash) and the PKCE verifier, in memory only. A new sign-in replaces a pending one; a
 // state is taken once, compared in constant time, and expires after FlowTTL.
 type Flows struct {
-	mu        sync.Mutex
-	stateHash [32]byte
-	verifier  string
-	redirect  string
-	created   time.Time
-	pending   bool
-	now       func() time.Time
+	mu          sync.Mutex
+	stateHash   [32]byte
+	bindingHash [32]byte // the browser that started the sign-in (a flow cookie the start route set): only it can finish
+	verifier    string
+	redirect    string
+	created     time.Time
+	pending     bool
+	now         func() time.Time
 }
+
+// callbackRe is the only redirect a sign-in may use: the one-shot listener on 127.0.0.1 (Security, #14619 note b).
+var callbackRe = regexp.MustCompile(`^http://127\.0\.0\.1:[0-9]{2,5}/dropbox/callback$`)
 
 // NewFlows makes an empty holder.
 func NewFlows() *Flows { return &Flows{now: time.Now} }
@@ -219,8 +224,15 @@ func random32() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
-// Start begins a sign-in and returns the URL to open in the person's browser. The verifier stays here; only its S256 challenge goes in the URL.
-func (f *Flows) Start(appKey, redirect string) (string, error) {
+// Start begins a sign-in bound to the browser that asked (binding: the value of the flow cookie the start route set) and returns the URL to open
+// in that browser. The verifier stays here; only its S256 challenge goes in the URL. redirect must be the loopback callback.
+func (f *Flows) Start(appKey, redirect, binding string) (string, error) {
+	if !callbackRe.MatchString(redirect) {
+		return "", errors.New("a Dropbox sign-in only returns to Coral's callback on 127.0.0.1")
+	}
+	if binding == "" {
+		return "", errors.New("a Dropbox sign-in must be bound to the browser that started it")
+	}
 	state, err := random32()
 	if err != nil {
 		return "", err
@@ -231,7 +243,7 @@ func (f *Flows) Start(appKey, redirect string) (string, error) {
 	}
 	sum := sha256.Sum256([]byte(verifier))
 	f.mu.Lock()
-	f.stateHash, f.verifier, f.redirect, f.created, f.pending = sha256.Sum256([]byte(state)), verifier, redirect, f.now(), true
+	f.stateHash, f.bindingHash, f.verifier, f.redirect, f.created, f.pending = sha256.Sum256([]byte(state)), sha256.Sum256([]byte(binding)), verifier, redirect, f.now(), true
 	f.mu.Unlock()
 	q := url.Values{
 		"client_id": {appKey}, "response_type": {"code"}, "redirect_uri": {redirect},
@@ -241,24 +253,28 @@ func (f *Flows) Start(appKey, redirect string) (string, error) {
 	return authorizeURL + "?" + q.Encode(), nil
 }
 
-// Take returns the pending sign-in's verifier when state is its state and it has not expired; it is gone afterwards either way it matched.
-func (f *Flows) Take(state string) (verifier string, ok bool) {
+// Take returns the pending sign-in's verifier and the redirect captured at Start, when state is its state, binding is the browser that started it,
+// and it has not expired. A match consumes it; a wrong state or browser does not (so a guess cannot cancel the person's sign-in).
+func (f *Flows) Take(state, binding string) (verifier, redirect string, ok bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if !f.pending {
-		return "", false
+		return "", "", false
 	}
 	if f.now().Sub(f.created) > FlowTTL {
 		f.clear()
-		return "", false
+		return "", "", false
 	}
 	h := sha256.Sum256([]byte(state))
-	if subtle.ConstantTimeCompare(h[:], f.stateHash[:]) != 1 {
-		return "", false
+	b := sha256.Sum256([]byte(binding))
+	stateOK := subtle.ConstantTimeCompare(h[:], f.stateHash[:]) == 1
+	bindOK := subtle.ConstantTimeCompare(b[:], f.bindingHash[:]) == 1
+	if !stateOK || !bindOK || binding == "" {
+		return "", "", false
 	}
-	verifier = f.verifier
+	verifier, redirect = f.verifier, f.redirect
 	f.clear()
-	return verifier, true
+	return verifier, redirect, true
 }
 
 // Redirect is the pending sign-in's redirect URI (the token exchange must repeat it), or "".
@@ -276,5 +292,5 @@ func (f *Flows) Pending() bool {
 }
 
 func (f *Flows) clear() {
-	f.pending, f.verifier, f.stateHash = false, "", [32]byte{}
+	f.pending, f.verifier, f.redirect, f.stateHash, f.bindingHash = false, "", "", [32]byte{}, [32]byte{}
 }
