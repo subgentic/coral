@@ -503,3 +503,43 @@ func TestTheLogsCarryCountsAndStateWordsOnly(t *testing.T) {
 	}
 	assert.GreaterOrEqual(t, seen, 2, "the success and the pause are both logged")
 }
+
+// Mutant: the pre-commit re-read's error is ignored (round 2, #193763).
+func TestAFailingPrivateReReadBeforeTheCommitCommitsNothing(t *testing.T) {
+	be := newBackupEnv(t)
+	be.put("a.md", "text/markdown", "a")
+	be.put("b.md", "text/markdown", "b")
+	be.dbx.onStart = func() { be.privErr = errors.New("board unreadable") } // the marks become unreadable while the sessions upload
+	be.pass()
+	assert.Empty(t, be.dbx.files, "nothing is committed")
+	assert.Zero(t, be.dbx.finishCalls, "finish_batch is never called")
+	assert.Zero(t, be.counts().BackedUp)
+}
+
+// Mutant: the default private reader answers no marks instead of an error.
+func TestTheDefaultPrivateReaderFailsClosed(t *testing.T) {
+	e := newDropboxEnv(t)
+	require.Contains(t, e.signIn(""), "Connected")
+	b := e.h.NewDropboxBackup(store.NewDropboxOutbox(e.db)) // never given SetPrivate: the wiring is missing
+	b.power = func() (bool, bool) { return false, false }
+	b.SetPrivate(nil) // a nil reader keeps the fail-closed default
+	_, _, err := storeArtifactVia(e.h.dbx.dataDir, "sess-1", "a.md", "text/markdown", "", "", "", []byte("a"))
+	require.NoError(t, err)
+	b.Pass(context.Background())
+	assert.Empty(t, e.dbx.files, "with no private reader, nothing is sent")
+	c, err := b.outbox.Counts(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, 2, c.Pending, "kept queued for when the reader is wired")
+}
+
+// Mutant: a delete leaves its queued rows (noteDropboxDelete does nothing).
+func TestADeleteCancelsTheQueuedRows(t *testing.T) {
+	be := newBackupEnv(t)
+	d := be.put("gone.md", "text/markdown", "bye")
+	require.Equal(t, 2, be.counts().Pending)
+	_, _, _, err := deleteArtifactFiles(be.h.dbx.dataDir, d)
+	require.NoError(t, err)
+	c := be.counts()
+	assert.Zero(t, c.Pending, "the rows are gone before any pass")
+	assert.Zero(t, c.Skipped)
+}
