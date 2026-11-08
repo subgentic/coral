@@ -102,3 +102,23 @@ func TestAHeldPersonMessageEndsAsNotSentWhenAPromptStaysOnTheScreen(t *testing.T
 	}
 	assert.Empty(t, r.typed(), "never typed into a prompt")
 }
+
+// #14481: a held message is released when the screen cannot be read or shows nothing yet: the look at release is forced (only a prompt that is SEEN holds), so it never waits for good on a screen
+// it cannot read. It is typed once, after the box closes.
+func TestAHeldPersonMessageIsReleasedWhenTheScreenCannotBeReadOrIsEmpty(t *testing.T) {
+	for name, screen := range map[string]struct {
+		text string
+		err  error
+	}{"an unreadable screen": {"", errors.New("no screen")}, "an empty screen": {"  \n", nil}} {
+		t.Run(name, func(t *testing.T) {
+			r, st := screenRig(t, true, "> \n")
+			r.box("permission")
+			rec := r.send("deploy")
+			require.Equal(t, http.StatusAccepted, rec.Code)
+			st.set(screen.text, screen.err)
+			r.answered()
+			r.waitTyped(1, 3*time.Second)
+			assert.Equal(t, []string{"deploy"}, r.typed(), "released: no prompt was seen")
+		})
+	}
+}
