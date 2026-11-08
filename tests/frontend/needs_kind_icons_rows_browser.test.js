@@ -72,7 +72,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         for (const r of tall) {
             if (r.kind === 'review') check(r.sameLine === true, `390 px: in a review row the sender is line one and the file name line two, under it: ${r.text}`);
             const room = r.kind === 'other' || r.kind === 'ask' ? r.line + 1 : 0.5;
-            check(r.withIcon >= r.without - 0.5 && r.withIcon - r.without < room + (r.kind === 'review' || r.kind === 'ask' ? 90 : 0) /* without the icon the row is no review/question card, so its 44 px button row at rest (#14627) is not drawn */, `390 px: a ${r.kind} row keeps its height with the icon${r.kind === 'other' || r.kind === 'ask' ? ' (a question: at most one more line)' : ''} (${r.withIcon} with, ${r.without} without): ${r.text}`);
+            check((r.kind === 'ask' || r.withIcon >= r.without - 0.5) /* a question card is one title line now (#14706), shorter than the plain row it stands for */ && r.withIcon - r.without < room + (r.kind === 'review' || r.kind === 'ask' ? 90 : 0) /* without the icon the row is no review/question card, so its 44 px button row at rest (#14627) is not drawn */, `390 px: a ${r.kind} row keeps its height with the icon${r.kind === 'other' || r.kind === 'ask' ? ' (a question: at most one more line)' : ''} (${r.withIcon} with, ${r.without} without): ${r.text}`);
         }
         const { themeJs } = require('./helpers/theme');
         for (const theme of ['dark', 'light']) {
@@ -91,7 +91,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 const shown = [...rg.getClientRects()].filter(x => x.width > 0 && x.height > 0 && x.top < r.bottom - 1 && x.bottom > contentBottom + 2 && x.top >= contentBottom - 1); return shown.length ? { text: e.textContent.slice(0, 30), lineTop: Math.round(shown[0].top), contentBottom: Math.round(contentBottom), paddingBottom: Math.round(r.bottom) } : null; }).filter(Boolean))()`);
             // and its box is exactly two lines (the Orchestrator's 13:27): not three lines, not one; it has no padding, so no part of a third line has anywhere to show
             const longBox = await ev(`(() => { const e = [...document.querySelectorAll('${T} .inbox-ask-name')].find(x => x.textContent.startsWith('Before I rename')); if (!e) return null; const cs = getComputedStyle(e), r = e.getBoundingClientRect(); return { h: Math.round(r.height * 100) / 100, line: parseFloat(cs.lineHeight) || null, padTop: parseFloat(cs.paddingTop), padBottom: parseFloat(cs.paddingBottom), lines: Math.round((r.height - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)) / (parseFloat(cs.lineHeight) || 18)) }; })()`);
-            check(!!longBox && longBox.lines >= 4, `390 px, ${theme}: a long question is said whole, wrapped on as many lines as it takes, not clamped to two (#14574): ` + JSON.stringify(longBox));
+            check(!!longBox && longBox.lines === 1, `390 px, ${theme}: a long question is one ellipsised title line on a phone card (#14706; the whole text is its title and the dialog): ` + JSON.stringify(longBox));
             check(leaks.length === 0, `390 px, ${theme}: a clamped question shows no part of a third line in its padding: ` + JSON.stringify(leaks));
             check(clashes.length === 0, `390 px, ${theme}: no two texts of a Needs you row overlap: ` + JSON.stringify(clashes));
         }

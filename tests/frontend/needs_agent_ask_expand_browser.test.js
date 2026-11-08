@@ -33,13 +33,13 @@ const SINCE = new Date(Date.now() - 120000).toISOString();
             await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr.dt-row').length === ${rows}`, `${at}the rows`, 15000);
             await new Promise(r => setTimeout(r, 800)); // sleep-ok: the rows settle
-            const rowText = () => ev(`(() => { const tr = [...document.querySelectorAll('#group-table-view tbody tr.dt-row')].find(r => /Backend Dev/.test(r.innerText)); const d = tr && tr.nextElementSibling && tr.nextElementSibling.classList.contains('dt-detail') ? tr.nextElementSibling.innerText : ''; return tr ? tr.innerText + d : null; })()`); // a wide row's opened question is the detail row under it
+            const rowText = () => ev(`(() => { const tr = [...document.querySelectorAll('#group-table-view tbody tr.dt-row')].find(r => /Backend Dev/i.test(r.innerText)); const d = tr && tr.nextElementSibling && tr.nextElementSibling.classList.contains('dt-detail') ? tr.nextElementSibling.innerText : ''; return tr ? tr.innerText + d : null; })()`); // a wide row's opened question is the detail row under it
             const buttons = () => ev(`[...document.querySelectorAll('#group-table-view .inbox-ask-expand')].map(b => ({ text: b.textContent, expanded: b.getAttribute('aria-expanded'), label: b.getAttribute('aria-label') }))`);
             const whole = () => ev(`/END-MARK/.test(document.getElementById('group-table-view').innerText)`);
             const onButton = txt => ev(`(() => { const b = document.activeElement; return !!b && b.classList.contains('inbox-ask-expand') && b.textContent === ${JSON.stringify(txt)}; })()`);
             const before = await buttons(), t0 = await rowText();
             await shot(`needs-agent-ask-${withAsk ? 'mixed' : 'agents'}-${w}-before`);
-            check(`${at}one Show all, on the cut question only (the short one has none)`, before.length === 1 && before[0].text === 'Show all' && before[0].expanded === 'false' && /Backend Dev/.test(before[0].label), JSON.stringify(before));
+            check(`${at}one Show all, on the cut question only (the short one has none)`, before.length === 1 && before[0].text === 'Show all' && before[0].expanded === 'false' && /Backend Dev/i.test(before[0].label), JSON.stringify(before));
             check(`${at}the row says the server's cut line, not the whole question yet`, /…/.test(t0) && !/END-MARK/.test(t0), JSON.stringify(t0).slice(0, 240));
             // a read that gives nothing: nothing opens, the row says so, Retry
             await ev(`window.__chatFail = true; true`); const readsBefore = await ev(`window.__reads`);
@@ -71,7 +71,7 @@ const SINCE = new Date(Date.now() - 120000).toISOString();
             await new Promise(r => setTimeout(r, 300)); // sleep-ok: focus restore settles
             check(`${at}Space closes it: Show all again, focus kept`, await onButton('Show all'));
             // Tab and Shift+Tab reach it from the row's own control
-            await ev(`(() => { const tr = [...document.querySelectorAll('#group-table-view tbody tr.dt-row')].find(r => /Backend Dev/.test(r.innerText)); const first = tr.querySelector('button.dt-primary, button.dt-mail-open, button'); first.focus(); return true; })()`);
+            await ev(`(() => { const tr = [...document.querySelectorAll('#group-table-view tbody tr.dt-row')].find(r => /Backend Dev/i.test(r.innerText)); const first = tr.querySelector('button.dt-primary, button.dt-mail-open, button'); first.focus(); return true; })()`);
             let reached = false; for (let i = 0; i < 8 && !reached; i++) { await tab(false); reached = await ev(`!!document.activeElement && document.activeElement.classList.contains('inbox-ask-expand')`); }
             check(`${at}Tab reaches Show all from the row's own control`, reached);
             await tab(true); check(`${at}Shift+Tab leaves it`, !(await ev(`!!document.activeElement && document.activeElement.classList.contains('inbox-ask-expand')`)));
@@ -82,9 +82,9 @@ const SINCE = new Date(Date.now() - 120000).toISOString();
             // the agent stops waiting and comes back with the same ask: its opened and read entries went with it (#14697), so it is closed and Show all reads again
             const readsPrune = await ev(`window.__reads`);
             await ev(`(async () => { window.__hideLong = true; const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); const m = await import((window.__coralStatic || '/static/') + 'inbox_tab.js'); state.liveSessions = ${agents}.filter(a => a.session_id !== 'long-1'); m.updateInboxTab(); return true; })()`);
-            await waitFor(`!/Backend Dev/.test(document.getElementById('group-table-view').innerText)`, `${at}the agent stopped waiting`, 8000);
+            await waitFor(`!/Backend Dev/i.test(document.getElementById('group-table-view').innerText)`, `${at}the agent stopped waiting`, 8000);
             await ev(`(async () => { window.__hideLong = false; const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); const m = await import((window.__coralStatic || '/static/') + 'inbox_tab.js'); state.liveSessions = ${agents}; m.updateInboxTab(); return true; })()`);
-            await waitFor(`/Backend Dev/.test(document.getElementById('group-table-view').innerText)`, `${at}the agent waits again`, 8000);
+            await waitFor(`/Backend Dev/i.test(document.getElementById('group-table-view').innerText)`, `${at}the agent waits again`, 8000);
             await new Promise(r => setTimeout(r, 500)); // sleep-ok: the rows settle
             const back = await buttons();
             check(`${at}an agent that stopped waiting and came back is closed again (its opened entry was dropped)`, back.length === 1 && back[0].text === 'Show all' && back[0].expanded === 'false' && !(await whole()), JSON.stringify(back));

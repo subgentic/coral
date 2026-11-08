@@ -129,11 +129,18 @@ export function buildListBar(spec, onChange, hooks = {}) {
             chev.title = spec.expandAll.expand; chev.setAttribute('aria-label', spec.expandAll.expand);
         }
     }
+    // spec.phoneChips (#14706, the approved phone mock): on a phone the list has a visible sort chip ("Oldest first") and a labelled Filter chip beside the heading, not only the icon; both are the panel's own controls (the same sort, the same panel). Wide screens do not draw them.
+    let sortChip = null;
+    if (collapsible && spec.sorts && spec.phoneChips) {
+        sortChip = make('select', 'btn list-bar-sort-chip'); sortChip.id = `${p}-sort-chip`; sortChip.setAttribute('aria-label', spec.sorts.aria);
+        for (const v of spec.sorts.values) { const o = make('option', null, (spec.sorts.labels && spec.sorts.labels[v]) || v); o.value = v; sortChip.append(o); }
+        const word = make('span', 'list-bar-toggle-label', 'Filter'); tog.append(word); tog.classList.add('list-bar-toggle-chip');
+    }
     // spec.headerSlots (#5315): the owner's title goes before the search box and its action icons after the filter icon, on this one row (setHeader). The slots are display: contents, so their children are the row's own.
     const lead = spec.headerSlots ? make('span', 'list-bar-lead') : null, tail = spec.headerSlots ? make('span', 'list-bar-tail') : null;
     // spec.more (#7686): the list's other actions behind one More icon after the filter icon and the owner's own icons.
     const more = spec.more && (typeof spec.more === 'function' || spec.more.length) && !noSearch ? buildMoreMenu(p, spec.more, spec.moreNoun || '') : null;
-    if (noSearch) searchRow.hidden = true; else searchRow.append(...(lead ? [lead] : []), wrap, count, ...(tog ? [tog] : []), ...(chev ? [chev] : []), ...(tail ? [tail] : []), ...(more ? [more] : []));
+    if (noSearch) searchRow.hidden = true; else searchRow.append(...(lead ? [lead] : []), wrap, count, ...(sortChip ? [sortChip] : []), ...(tog ? [tog] : []), ...(chev ? [chev] : []), ...(tail ? [tail] : []), ...(more ? [more] : []));
 
     const controls = make('div', 'list-bar-controls');
     const filterBtn = make('button', 'list-bar-filter-btn', 'Filters'); filterBtn.type = 'button';
@@ -225,6 +232,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
         else fld.input.addEventListener('change', () => apply({ ...f, [key]: fld.input.value }));
     }
     if (sort) sort.input.addEventListener('change', () => apply({ ...f, sort: sort.input.value }));
+    if (sortChip) sortChip.addEventListener('change', () => apply({ ...f, sort: sortChip.value }));
     const everything = () => { clearTimeout(timer); apply({ ...EMPTY, sort: f.sort }); };
     const focusSearch = () => { if (!noSearch) q.focus(); else if (inline) fields[0]?.input.focus(); else filterBtn.focus(); };
     clearAll.addEventListener('click', () => { everything(); focusSearch(); });
@@ -245,6 +253,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
                 else fld.input.value = f[key];
             }
             if (sort) sort.input.value = f.sort;
+            if (sortChip) sortChip.value = f.sort;
             const list = chips(f);
             const inRow = chipList.classList.contains('list-bar-chips-inrow'); // the row shows ONE chip (readable, 8 rem at least) and "+N" for the rest, which opens the Filters panel, where all of them are listed (#9078)
             chipList.replaceChildren(...list.map(c => { // every chip stays in the list; css shows the first in the row (the others are in the Filters panel)

@@ -52,3 +52,15 @@
 
 /* The computer's name on a phone card's meta line (#14623): a small chip beside the sender and the time. */
 .inbox-computer-chip { flex: 0 1 auto; min-width: 0; margin-inline-start: 0; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The tools of the phone Needs you, as the approved mock draws them (#14706): a visible sort chip and a labelled Filter chip beside the heading (list_bar.js, spec.phoneChips), 44 px, one line, wrapping to the next when the text is large. Wide screens draw neither. */
+.list-bar-sort-chip, .list-bar-toggle-label { display: none; }
+@media (max-width: 760px) {
+    .inbox-folder-toolbar .list-bar-sort-chip { display: inline-flex; align-items: center; flex: 0 1 auto; min-width: 0; max-width: 100%; min-height: var(--control-touch-height, 44px); padding: 0 8px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg-secondary, transparent); color: var(--text-primary); font: inherit; font-size: var(--fs-md); }
+    .inbox-folder-toolbar .list-bar-toggle-chip { width: auto; padding: 0 10px; gap: 4px; border: 1px solid var(--border); border-radius: 999px; }
+    .inbox-folder-toolbar .list-bar-toggle-chip .list-bar-toggle-label { display: inline; font-size: var(--fs-md); }
+    .inbox-folder-toolbar .list-bar-search-row { flex-wrap: wrap; row-gap: 8px; }
+    .inbox-folder-toolbar .list-bar-search-row .inbox-folder-head { flex: 1 1 100%; max-width: 100%; } /* the heading has its line, the two chips the next */
+}
+
+@media (max-width: 760px) { .inbox-needs-results .inbox-review-item.inbox-agent-first > :is(button, a, span).inbox-review-from { font-size: var(--fs-sm); font-weight: var(--fw-strong); align-self: start; text-transform: uppercase; letter-spacing: var(--ls-caps); color: var(--text-secondary); } } /* the sender: small, secondary and uppercase, as the approved mock's .who (#14706) */
