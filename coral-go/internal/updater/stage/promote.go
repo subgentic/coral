@@ -44,10 +44,11 @@ type listedRelease struct {
 		Name string `json:"name"`
 	} `json:"assets"`
 	fromFeed bool // named by the releases feed, which lists no assets: the download says whether they are there
+	fromTags bool // named by the promote-* tag lookup: no asset list either, but its 404 is NOT skipped like the feed's: above the best verified promotion it stops the pass (Security's ruling on #530)
 }
 
 func (r listedRelease) hasPromotionAssets() bool {
-	if r.fromFeed {
+	if r.fromFeed || r.fromTags {
 		return true
 	}
 	var m, b bool
@@ -315,7 +316,7 @@ func (c *checker) listPromotionTags(ctx context.Context) ([]listedRelease, error
 	}
 	out := make([]listedRelease, 0, len(tags))
 	for _, t := range tags {
-		out = append(out, listedRelease{TagName: t.tag, fromFeed: true})
+		out = append(out, listedRelease{TagName: t.tag, fromTags: true})
 	}
 	return out, nil
 }
