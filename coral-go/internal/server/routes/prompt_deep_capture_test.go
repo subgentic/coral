@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -177,4 +178,29 @@ func TestRowsOfTheFirstReadAreTheEndOfTheDeeperOneAfterTrimming(t *testing.T) {
 	assert.False(t, deepExtendsFirst("b\nc", "a\nb\nd"))
 	assert.False(t, deepExtendsFirst("a\nb\nc", "b\nc"), "a deeper read shorter than the first cannot extend it")
 	assert.False(t, deepExtendsFirst("", "a"), "nothing to compare")
+}
+
+func TestADeeperMissIsNotReadAgainAtEveryPollButIsAfterAFewSeconds(t *testing.T) {
+	rule := strings.Repeat("╌", 110)
+	pane := strings.Repeat(" more output\n", 200) + longCommand(10) + "\n" + rule + "\n This command requires approval\n\n Do you want to proceed?\n ❯ 1. Yes\n   2. No\n\n Esc to cancel\n"
+	h, lt := deepRig(pane)
+	now := time.Unix(1000, 0)
+	deepMissNow = func() time.Time { return now }
+	t.Cleanup(func() { deepMissNow = time.Now })
+	read := func() {
+		s, ok, _, err := h.readPromptScreenText(context.Background(), "a", at.Claude, "sid")
+		require.NoError(t, err)
+		require.True(t, ok)
+		assert.True(t, s.OnlyReject)
+	}
+	read()
+	read()
+	read()
+	assert.Equal(t, []int{80, deepPromptCaptureLines, 80, 80}, lt.asked, "the miss is remembered: the second and third poll do not read 460 lines again")
+	now = now.Add(deepMissTTL + time.Second)
+	read()
+	assert.Equal(t, []int{80, deepPromptCaptureLines, 80, 80, 80, deepPromptCaptureLines}, lt.asked, "after the few seconds it is read deep once more")
+	lt.pane = strings.Replace(pane, "line001", "line777", 1) // another screen is another key: read deep at once
+	read()
+	assert.Equal(t, deepPromptCaptureLines, lt.asked[len(lt.asked)-1], "a changed screen is read deep at once")
 }

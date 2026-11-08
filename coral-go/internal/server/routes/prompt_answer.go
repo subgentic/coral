@@ -717,6 +717,49 @@ const (
 	deepPromptCaptureLines = commandMaxLines + 60
 )
 
+// deepMissCache remembers, for deepMissTTL, a first-read screen (by session and text) whose deeper read still showed no opening rule: the prompt polls run every few dozen milliseconds, and a request that was never
+// shown whole must not cost a 460-line capture each time. The first screen changing (another request, a redraw) is another key, so it is read deep again at once; the entries are few (at most deepMissMax) and expire.
+type deepMissCache struct {
+	mu   sync.Mutex
+	seen map[string]time.Time
+}
+
+const deepMissMax = 256
+
+var (
+	deepMissTTL = 5 * time.Second
+	deepMissNow = time.Now
+)
+
+func deepMissKey(name, text string) string {
+	h := sha256.Sum256([]byte(name + "\x00" + text))
+	return hex.EncodeToString(h[:16])
+}
+
+func (c *deepMissCache) recent(name, text string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	seenAt, ok := c.seen[deepMissKey(name, text)]
+	return ok && deepMissNow().Sub(seenAt) < deepMissTTL
+}
+
+func (c *deepMissCache) note(name, text string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	now := deepMissNow()
+	if c.seen == nil || len(c.seen) >= deepMissMax {
+		for k, seenAt := range c.seen { // drop what expired; start over when still full
+			if now.Sub(seenAt) >= deepMissTTL {
+				delete(c.seen, k)
+			}
+		}
+		if c.seen == nil || len(c.seen) >= deepMissMax {
+			c.seen = map[string]time.Time{}
+		}
+	}
+	c.seen[deepMissKey(name, text)] = now
+}
+
 // screenRows is a screen's rows as compared: each row without its trailing spaces and carriage return, the trailing blank rows dropped.
 func screenRows(text string) []string {
 	rows := strings.Split(strings.ReplaceAll(text, "\r", ""), "\n")
@@ -774,11 +817,16 @@ func (h *SessionsHandler) readPromptScreenText(ctx context.Context, name, agentT
 		// The closing rule of a request is there and its opening rule is not: the history above the screen may hold it (#14575). tmux gives it as the pane's history; the PTY backend as the scrolled-off rows of its replay
 		// ring (CaptureOutput, vtscreen.RenderScrollback), though its first read above is only the screen's rows. Read deeper once; the same parse and the same checks judge what is found, and a request whose top is still
 		// not there stays Reject only. The deeper text replaces the first only when it shows the request whole, so every caller (the row, the card, the answer) sees the same screen.
-		if deep, derr := h.terminal.CaptureOutput(ctx, name, deepPromptCaptureLines, agentType, sessionID); derr == nil {
-			// Bound to the first read (Security's MUST on the PTY, #14575): on a PTY the first read is the live screen and the deeper one a replay of a clipped ring, which can draw an older frame or miss rows; on tmux both
-			// are one pane. The deeper text is taken only when it ENDS with every row of the first read, so it can only add what is above it (the top of the same request); anything else keeps the first read, Reject only.
-			if ds, dok := parseAgentScreen(agentType, deep); dok && !ds.commandOpenMissing && deepExtendsFirst(text, deep) && sameQuestion(s, ds) {
-				s, text = ds, deep
+		if !h.deepMiss.recent(name, text) { // a screen the deeper read already missed is not read deep again at every poll (Security's SHOULD, #14581)
+			if deep, derr := h.terminal.CaptureOutput(ctx, name, deepPromptCaptureLines, agentType, sessionID); derr == nil {
+				// Bound to the first read (Security's MUST on the PTY, #14575): on a PTY the first read is the live screen and the deeper one a replay of a clipped ring, which can draw an older frame or miss rows; on tmux both
+				// are one pane. The deeper text is taken only when it ENDS with every row of the first read, so it can only add what is above it (the top of the same request); anything else keeps the first read, Reject only.
+				ds, dok := parseAgentScreen(agentType, deep)
+				if dok && !ds.commandOpenMissing && deepExtendsFirst(text, deep) && sameQuestion(s, ds) {
+					s, text = ds, deep
+				} else if !dok || ds.commandOpenMissing {
+					h.deepMiss.note(name, text) // the top is nowhere in the deeper read: not a screen that only moved between the two reads
+				}
 			}
 		}
 	}

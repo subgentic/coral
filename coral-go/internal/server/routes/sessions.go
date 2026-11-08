@@ -142,6 +142,7 @@ type SessionsHandler struct {
 	pending   pendingTools  // tool calls started but not finished (PreToolUse hook)
 	readiness taskReadiness // one "did this finish unblock others" check at a time per task (#4602, L5)
 	hints     promptHints   // whether a prompt may be open on a session's terminal (its latest hook events), for the chat reply
+	deepMiss  deepMissCache // screens whose deeper read found no opening rule, for a few seconds (prompt_answer.go, #14581)
 	// loginScreens: whether a Claude agent with no transcript yet shows its login screen (#3830).
 	loginScreens loginScreens
 	// startupScreens: whether an agent that has sent no event yet waits on a prompt its CLI drew at launch (#4543).
