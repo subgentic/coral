@@ -98,3 +98,23 @@ func TestAMarkTakenByAnyStartStartsNothingLater(t *testing.T) {
 	assert.True(t, Take(now.Add(time.Minute)), "Coral started after the install: by Explorer, the Start Menu or Launch Coral")
 	assert.False(t, Take(now.Add(10*time.Minute)), "a later quiet install's helper start finds no mark, so the Coral the person quit stays quit")
 }
+
+// #380: the elevated installer's launch-pending mark is taken once, only while fresh (LaunchPendingMaxAge), and is its own file: it never
+// stands for the restart mark, nor the restart mark for it.
+func TestTheLaunchPendingMarkIsFreshOnceAndSeparate(t *testing.T) {
+	inTemp(t)
+	now := time.Date(2026, 10, 29, 9, 0, 0, 0, time.UTC)
+	assert.False(t, TakeLaunchPending(now), "no mark")
+
+	require.NoError(t, MarkLaunchPending(now))
+	assert.False(t, Take(now), "the restart mark is another file")
+	assert.True(t, TakeLaunchPending(now.Add(30*time.Second)), "Explorer's start, half a minute later")
+	assert.False(t, TakeLaunchPending(now.Add(31*time.Second)), "once")
+
+	require.NoError(t, MarkLaunchPending(now))
+	assert.False(t, TakeLaunchPending(now.Add(LaunchPendingMaxAge+time.Second)), "a mark older than the start it was for starts nothing")
+
+	require.NoError(t, Mark(now))
+	assert.False(t, TakeLaunchPending(now), "nor does the restart mark stand for it")
+	assert.True(t, Take(now))
+}
