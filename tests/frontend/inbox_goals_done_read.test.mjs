@@ -22,4 +22,10 @@ failDone = true;
 got = await C.listInboxGoals();
 assert.deepEqual(got.map(g => g.title), ['Open one'], 'a failed read of the finished ones leaves the open ones');
 assert.equal(C.goalsReadFailed(), true, 'and says the read failed (the caller backs off)');
+// a whole page of finished goals: there may be newer ones not listed, and the Done list says so; a short page does not
+failDone = false;
+assert.equal(C.doneGoalsCapped(), false, 'two finished goals are not a full page');
+rows['/api/goals?state=done&limit=100'] = Array.from({ length: 100 }, (_, i) => ({ id: 100 + i, board_id: 'alpha', title: 'Finished ' + i, state: 'done', updated_at: '2026-11-08T08:00:00Z' }));
+await C.listInboxGoals();
+assert.equal(C.doneGoalsCapped(), true, 'a full page of finished goals: there may be more');
 console.log('PASS inbox_goals_done_read: the Done pill has the finished goals');
