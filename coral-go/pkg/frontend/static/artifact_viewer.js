@@ -114,6 +114,7 @@ function _build() {
                     <button type="button" class="menu-item artifact-viewer-markup-item" role="menuitem" hidden>Mark up</button>
                     <button type="button" class="menu-item artifact-viewer-copyid-item" role="menuitem" title="The id that stays the same across versions" hidden>Copy file ID</button>
                     <button type="button" class="menu-item artifact-viewer-copy-id" role="menuitem" title="The id of this version only">Copy version ID</button>
+                    <button type="button" class="menu-item artifact-viewer-scripts-item" role="menuitem" hidden>Run scripts…</button>
                     <a class="menu-item artifact-viewer-newtab" role="menuitem" target="_blank" rel="noopener noreferrer" hidden>Open in new tab</a>
                     <a class="menu-item artifact-viewer-download" role="menuitem" rel="noopener noreferrer" download>Download</a>
                 </div>
@@ -133,6 +134,9 @@ function _build() {
     const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'chip artifact-viewer-sandbox'; chip.hidden = true; chip.setAttribute('aria-expanded', 'false');
     chip.textContent = 'Sandboxed'; // words only: the icon font is a subset and has no shield
     d.querySelector('.artifact-viewer-chips').append(chip);
+    const onChip = document.createElement('span'); onChip.className = 'chip artifact-viewer-scriptson'; onChip.hidden = true; onChip.textContent = 'Scripts on'; // while this version's scripts run (#14783); the bar under the header holds Turn off
+    d.querySelector('.artifact-viewer-chips').append(onChip);
+    d.querySelector('.artifact-viewer-scripts-item').addEventListener('click', () => { const body = d.querySelector('.artifact-viewer-body'); (body.querySelector('.artifact-scripts-off') || body.querySelector('.artifact-scripts-ask'))?.click(); }); // the same two buttons as the preview's own: one path, one confirmation
     chip.addEventListener('click', () => { const note = d.querySelector('.artifact-linked-notice'); if (!note) return; note.hidden = !note.hidden; chip.setAttribute('aria-expanded', String(!note.hidden)); });
     // the line under the header (who sent it, what they ask) is one cut line; a tap, Enter or Space shows all of it
     const fromEl = d.querySelector('.artifact-viewer-from'); fromEl.tabIndex = 0; fromEl.setAttribute('role', 'button'); fromEl.setAttribute('aria-expanded', 'false');
@@ -214,6 +218,14 @@ function _build() {
 }
 
 /** The sandboxed HTML preview's banner: shown the first time, then the header's Sandboxed chip says it (its tooltip is the explanation, a tap shows or hides the banner). */
+/** The "Scripts on" chip and the ⋯ menu's Run scripts… / Turn off scripts follow what the preview shows (#14783): scripts running (the bar), or offered (the button), or neither (any other file). */
+function syncScripts(d, body) {
+    const running = !!body.querySelector('.artifact-scripts-bar'), offered = !!body.querySelector('.artifact-scripts-ask');
+    d.querySelector('.artifact-viewer-scriptson').hidden = !running;
+    const item = d.querySelector('.artifact-viewer-scripts-item');
+    item.hidden = !running && !offered;
+    item.textContent = running ? 'Turn off scripts' : 'Run scripts…';
+}
 function syncSandbox(d, body) {
     const note = body.querySelector('.artifact-linked-notice'), chip = d.querySelector('.artifact-viewer-sandbox');
     chip.hidden = !note;
@@ -402,7 +414,7 @@ export function openArtifactViewer(hex, opts = {}) {
     dl.onclick = isCloud() ? (e) => { e.preventDefault(); if (dl.getAttribute('aria-disabled') === 'true') return; downloadArtifact(url, sanitizeDownloadName(opts.filename || 'artifact')).catch(err => { title.textContent = err.message; }); } : null;
     const body = d.querySelector('.artifact-viewer-body');
     const wasOpen = !d.hidden;
-    if (!d._sandboxRedraw) { d._sandboxRedraw = true; body.addEventListener('coral-preview-redrawn', () => syncSandbox(d, body)); } // scripts turned on or off (#14730) change which banner is there
+    if (!d._sandboxRedraw) { d._sandboxRedraw = true; body.addEventListener('coral-preview-redrawn', () => { syncSandbox(d, body); syncScripts(d, body); }); } // scripts turned on or off (#14730) change which banner is there
     if (typeof opts.onClose === 'function') _onClose = opts.onClose;
     else if (!wasOpen) _onClose = null;
     d.hidden = false;
@@ -471,7 +483,7 @@ export function openArtifactViewer(hex, opts = {}) {
             dl.href = target.url; dl.setAttribute('download', target.name);
             dl.onclick = isCloud() ? (e) => { e.preventDefault(); if (dl.getAttribute('aria-disabled') === 'true') return; downloadArtifact(target.url, sanitizeDownloadName(target.name)).catch(err => { title.textContent = err.message; }); } : null;
         },
-    })).then(() => { if (gen !== _gen) return; syncSandbox(d, body); d.classList.toggle('is-image', !!body.querySelector('.image-panes')); d._markUp.picture(!!body.querySelector('.image-panes')); if (!textShown) _comments.docWhole(); }, () => {}); // a picture opens taller (css), not as a strip of its own height
+    })).then(() => { if (gen !== _gen) return; syncSandbox(d, body); syncScripts(d, body); d.classList.toggle('is-image', !!body.querySelector('.image-panes')); d._markUp.picture(!!body.querySelector('.image-panes')); if (!textShown) _comments.docWhole(); }, () => {}); // a picture opens taller (css), not as a strip of its own height
     return true;
 }
 
