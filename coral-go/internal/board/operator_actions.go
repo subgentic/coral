@@ -179,6 +179,15 @@ func (s *Store) ensureOperatorActionsSchema(ctx context.Context) error {
 			return err
 		}
 	}
+	// the thread reads (#14440, Security's INFO 4) filter this record by team and goal or task, and count by task for a page of summaries: indexed, so a thread never reads the whole record
+	for _, idx := range []string{
+		`CREATE INDEX IF NOT EXISTS idx_operator_actions_team_goal ON operator_actions(team, goal_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_operator_actions_team_task ON operator_actions(team, task_id)`,
+	} {
+		if _, err := s.db.ExecContext(ctx, idx); err != nil {
+			return err
+		}
+	}
 	// this record's own id, made once and never derived from anything else (not the telemetry id): the Hub pairs it with a row's id, which is unique only within one computer's record
 	if _, err := s.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS operator_actions_record (one INTEGER PRIMARY KEY CHECK (one = 1), record_id TEXT NOT NULL)`); err != nil {
 		return err

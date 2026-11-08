@@ -136,8 +136,6 @@ GET /api/sessions/{sessionID}/resolve | token-session
 GET /api/sessions/{sessionID}/status | unbound
 GET /api/team-artifacts | token-session | operator-only
 GET /api/teams/detail/{name}/daily-knowledge | token-session
-GET /api/thread | token-session | operator-only
-GET /api/threads | token-session | operator-only
 GET /api/token-usage/summary | token-session
 GET /api/token-usage/timeseries | token-session
 GET /api/token-usage/turns | token-session | operator-only
