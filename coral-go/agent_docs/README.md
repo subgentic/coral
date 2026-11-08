@@ -47,6 +47,7 @@ Run `coral-agent docs` to list the topics, `coral-agent docs <topic>` to read on
 ### Configuration
 - [Multi-Server Hub](hub.md) — Register remote Coral servers, merged agent list, proxy and remote launch, Coral Hub tunnel refusals, versions
 - [Settings & System](settings-system.md) — App settings, status, CLI checks, network info
+- [Dropbox Backup](dropbox-backup.md) — Sign in to Dropbox from Settings > Storage and cleanup: connect, waiting for Allow, a different account, a copied data folder (Take over), Disconnect
 - [What Coral Stores](what-coral-stores.md) — What Coral keeps on this computer, for how long, whether it is cleaned of secrets, where to change it, what reaches Coral Hub
 - [Teams](teams.md) — Team lifecycle management, members, and resurrection
 - [Team Configuration](team-config.md) — Agent team configuration (agent.json schema)
