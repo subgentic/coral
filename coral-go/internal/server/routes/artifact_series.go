@@ -338,6 +338,7 @@ type seriesStamp struct {
 	ID       string
 	Version  int
 	Previous string
+	DocID    string // the document every version of the series is (#14551): version 1's document id, never the series id
 }
 
 // seriesPlan is a new version worked out under the series lock, which the caller holds until it has stored the artifact and written the index: unlock ends it.
@@ -482,7 +483,7 @@ func planNewVersion(coralDir, ref, callerBoard, newDigest string) (*seriesPlan, 
 		prev = p.rows[len(p.rows)-1].Digest
 		next = p.rows[len(p.rows)-1].N + 1
 	}
-	p.stamp = seriesStamp{ID: p.id, Version: next, Previous: prev}
+	p.stamp = seriesStamp{ID: p.id, Version: next, Previous: prev, DocID: seriesDocID(coralDir, p)}
 	p.created = time.Now().UTC().Format(time.RFC3339)
 	return p, nil
 }
@@ -527,7 +528,7 @@ func (p *seriesPlan) commit(coralDir, newDigest, session string) (versions int, 
 		for _, m := range p.rows {
 			idx.Versions = append(idx.Versions, seriesVersionRow{Digest: m.Digest, N: m.N, Session: m.Session, At: m.At})
 		}
-	} else if err := stampRecord(coralDir, p.base.session, p.rows[0].Digest, seriesStamp{ID: p.id, Version: 1}); err != nil {
+	} else if err := stampRecord(coralDir, p.base.session, p.rows[0].Digest, seriesStamp{ID: p.id, Version: 1, DocID: p.stamp.DocID}); err != nil {
 		return 0, err
 	}
 	if p.create {
@@ -545,6 +546,9 @@ func stampRecord(coralDir, session, digest string, s seriesStamp) error {
 		return fmt.Errorf("no upload record to stamp")
 	}
 	rec.SeriesID, rec.Version, rec.Previous = s.ID, s.Version, s.Previous
+	if !seriesIDRe.MatchString(rec.DocID) && seriesIDRe.MatchString(s.DocID) { // a record made before document ids: it is the series' document (#14551)
+		rec.DocID = s.DocID
+	}
 	up := uploadsDir(coralDir, session)
 	if up == "" {
 		return fmt.Errorf("no upload folder")
@@ -554,6 +558,26 @@ func stampRecord(coralDir, session, digest string, s seriesStamp) error {
 		return err
 	}
 	return writeFileAtomic(filepath.Join(up, digest+".json"), b, 0o600)
+}
+
+// seriesDocID is the document a series' versions are (#14551): version 1's document id. A new series takes the artifact it is made from; an existing one
+// reads its first version's record. A first version with no document id yet (made before document ids) gets a new one, which stampRecord or the
+// migration gives that record too, so every version of a series shares one document id. The series id itself stays derived (#14145): the two are separate.
+func seriesDocID(coralDir string, p *seriesPlan) string {
+	if p.create {
+		if seriesIDRe.MatchString(p.base.rec.DocID) {
+			return p.base.rec.DocID
+		}
+	} else if len(p.rows) > 0 {
+		if rec, ok := readUploadRecord(coralDir, p.rows[0].Session, p.rows[0].Digest); ok && seriesIDRe.MatchString(rec.DocID) {
+			return rec.DocID
+		}
+	}
+	id, err := newDocID()
+	if err != nil {
+		return ""
+	}
+	return id
 }
 
 // forgetVersion removes one version from its series' index after the artifact was deleted: the others keep their numbers (the bar says "v2 removed"), and an empty series disappears.
