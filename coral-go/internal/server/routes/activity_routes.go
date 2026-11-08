@@ -79,11 +79,8 @@ func ActivityRoutes() map[string]string {
 
 // ActivityRecorder writes the row of a listed route after its handler answered 2xx, for a person only. It wraps writes only (a GET is never an action), and a row that cannot be written is logged by the
 // store and never changes the answer: the record does not block the Operator.
-func ActivityRecorder(bs *board.Store, fileName ...func(id string) string) func(http.Handler) http.Handler {
-	var nameOf func(string) string // a file's name, as it is stored (nil: none is looked up, as before #14422)
-	if len(fileName) > 0 {
-		nameOf = fileName[0]
-	}
+func ActivityRecorder(bs *board.Store, nameOf func(id string) string) func(http.Handler) http.Handler {
+	// nameOf is a file's name as it is stored, for the title of a click on a file (#14422). It is a required parameter, so a caller that forgets it does not build; nil says on purpose that none is looked up.
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.Method {

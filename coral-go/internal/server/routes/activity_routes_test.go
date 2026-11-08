@@ -45,7 +45,7 @@ func TestEveryRecordedRouteWritesItsRowForAPersonOnly(t *testing.T) {
 					next.ServeHTTP(w, req)
 				})
 			})
-			r.Use(ActivityRecorder(bs))
+			r.Use(ActivityRecorder(bs, nil))
 			status := c.status
 			r.MethodFunc(method, pattern, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(status) })
 			path := strings.NewReplacer("{project}", "p", "{taskID}", "7", "{name}", "agent-1", "{id}", "abc", "{series_id}", "ser", "{sessionID}", "s-1", "{runID}", "9", "{goalID}", "3", "{requestID}", "4").Replace(pattern)
@@ -80,7 +80,7 @@ func TestARouteOutsideTheTableWritesNothing(t *testing.T) {
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) { next.ServeHTTP(w, asPerson(req)) })
 	})
-	r.Use(ActivityRecorder(bs))
+	r.Use(ActivityRecorder(bs, nil))
 	r.Post("/api/board/{project}/tasks/{taskID}/something-new", func(w http.ResponseWriter, _ *http.Request) {})
 	r.Get("/api/board/{project}/tasks/{taskID}", func(w http.ResponseWriter, _ *http.Request) {})
 	for _, req := range []*http.Request{httptest.NewRequest("POST", "/api/board/p/tasks/7/something-new", nil), httptest.NewRequest("GET", "/api/board/p/tasks/7", nil)} {
@@ -109,7 +109,7 @@ func TestARecordedRouteThroughTheHubIsTheOwnersRowAndAForgedStampIsNone(t *testi
 				next.ServeHTTP(w, req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerHub)))
 			})
 		})
-		r.Use(ActivityRecorder(bs))
+		r.Use(ActivityRecorder(bs, nil))
 		r.Post("/api/board/{project}/tasks/{taskID}/cancel", func(w http.ResponseWriter, _ *http.Request) {})
 		req := httptest.NewRequest("POST", "/api/board/p/tasks/7/cancel", nil)
 		for k, v := range c.hdr {

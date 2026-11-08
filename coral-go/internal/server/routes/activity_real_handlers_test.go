@@ -48,7 +48,7 @@ func TestTheOperatorsTypedAnswerThroughTheRealRouteShowsInTheActivityList(t *tes
 			next.ServeHTTP(w, asPerson(req))
 		})
 	})
-	r.Use(ActivityRecorder(bs))
+	r.Use(ActivityRecorder(bs, nil))
 	r.Post("/api/board/{project}/messages", h.PostMessage)
 	r.Get("/api/activity", h.ListActivity)
 	srv := httptest.NewServer(r)
@@ -109,7 +109,7 @@ func TestAPermissionPromptAnswerThroughTheRealRouteShowsInTheActivityList(t *tes
 		r.Use(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) { next.ServeHTTP(w, asPerson(req)) })
 		})
-		r.Use(ActivityRecorder(bs))
+		r.Use(ActivityRecorder(bs, nil))
 		r.Post("/api/sessions/live/{name}/answer-prompt", handler.AnswerPrompt)
 		r.Get("/api/activity", NewBoardHandler(bs).ListActivity)
 		srv := httptest.NewServer(r)
