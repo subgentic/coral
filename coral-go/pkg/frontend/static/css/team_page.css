@@ -496,3 +496,8 @@ dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-
     #group-table-view[data-group^="hub-inbox"] .inbox-folder-head { position: static; width: auto; height: auto; margin: 0 4px 0 0; overflow: visible; clip-path: none; max-width: none; flex: 1 1 auto; }
     #group-table-view[data-group^="hub-inbox"] .inbox-artifacts-main > .group-table-head { position: static; width: auto; height: auto; min-height: var(--control-touch-height, 44px); padding: 0 4px; margin: 0; overflow: visible; clip: auto; white-space: normal; } /* Files: the heading and count are the visible name too */
 }
+
+/* Jump to agent (#14565): the Assigned to cell is the name, the button and a quiet word for the agent's state */
+.team-task-page .task-jump { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.team-task-page .task-jump-role { color: var(--text-secondary); }
+@media (pointer: coarse), (max-width: 767px) { .team-task-page .task-jump-btn { min-height: var(--control-touch-height, 44px); } }
