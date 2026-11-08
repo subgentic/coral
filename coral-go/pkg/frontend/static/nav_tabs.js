@@ -118,6 +118,18 @@ function menuEntries(viewLabels = new Set(), phoneNav = false, chief = null) {
     const out = phoneNav ? [] : [entry('home', 'Home', { action: 'm-go-home' })]; // the floating nav's Home is one tap away
     const settingsEntry = entry('settings', 'Settings', { action: 'm-close-top-bar-settings-then-show-settings-modal' }); settingsEntry.dataset.accountStart = ''; // where the phone's account button takes the drawer (#12634)
     if (chief && chief.st) out.push(chiefNode(chief)); // Chief (#13167): its answer for the computer shown, when it has already arrived (else it joins the open menu: fillChiefLater)
+    if (isHub()) {
+        out.push(settingsEntry);
+        const account = document.getElementById('cloud-account-menu');
+        const accountLink = account && [...account.querySelectorAll('a.overflow-menu-item')].find(item => item.textContent.trim() === 'Account');
+        if (accountLink) out.push(entry('account_circle', 'Account', { onClick: () => accountLink.click() }));
+        const docs = entry('menu_book', 'Docs', { action: 'm-switch-nav-tab' }); docs.dataset.arg = 'docs'; out.push(docs);
+        out.push(entry('dns', 'Computers', { action: 'm-close-top-bar-settings-then-show-servers-modal' }));
+        out.push(entry('code', 'GitHub', { href: 'https://github.com/subgentic/coral' }));
+        const signOut = account && [...account.querySelectorAll('button.overflow-menu-item')].find(item => item.textContent.trim() === 'Sign out');
+        if (signOut) out.push(entry('lock', 'Sign out', { onClick: () => signOut.click() }));
+        return out;
+    }
     out.push(settingsEntry, entry('palette', 'Themes', { action: 'm-close-top-bar-settings-then-show-theme-configurator' }));
     if (!cloud) out.push(entry('system_update', 'Check for updates', { action: 'm-close-top-bar-settings-then-check-for-updates' }));
     if ((isHub() || cloud) && !viewLabels.has('Computers')) out.push(entry('dns', 'Computers', { action: 'm-close-top-bar-settings-then-show-servers-modal' })); // not twice: when the Servers view is one of the views above, two entries are named alike
