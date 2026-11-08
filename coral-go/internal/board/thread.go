@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/subgentic/coral/internal/clitext"
 )
 
 // A thread is the story of one goal or one task (goal #233, S3, #14440; the design note coral://artifacts/7308bfa149eb7b7b8e8566f40dc9d691851f042b3e4cc0b3e76334401209403d): the questions asked of
@@ -182,9 +184,15 @@ func (q ThreadQuery) cut(text string, n int, firstLineOnly bool) (out string, tr
 	if !ok {
 		return ThreadWithheld, false
 	}
+	// What reaches the page is clean text (Security's SHOULD on #14440): terminal control, escape sequences and the characters that reorder or hide text go (clitext.Clean); a one-line field also
+	// loses its line breaks and folds its blanks (CleanName), the 400-character excerpt keeps them.
+	red = clitext.Clean(red)
+	if firstLineOnly {
+		red = clitext.CleanName(red)
+	}
 	red = strings.TrimSpace(red)
 	if r := []rune(red); len(r) > n {
-		return string(r[:n]), true
+		return clitext.Clean(string(r[:n])), true
 	}
 	return red, false
 }
@@ -513,24 +521,24 @@ func (s *Store) threadFiles(ctx context.Context, q ThreadQuery, sc *threadScope)
 func (s *Store) threadHeader(ctx context.Context, q ThreadQuery, sc *threadScope) ThreadHeader {
 	h := ThreadHeader{Team: q.Team}
 	if sc.goal != nil {
-		h.GoalID, h.GoalTitle = sc.goal.ID, sc.goal.Title
+		h.GoalID, h.GoalTitle = sc.goal.ID, clitext.CleanName(sc.goal.Title)
 	}
 	if q.TaskID > 0 && len(sc.tasks) == 1 {
-		h.Kind, h.TaskID, h.TaskTitle = "task", sc.tasks[0].ID, sc.tasks[0].Title
-		h.Title, h.Status = sc.tasks[0].Title, sc.tasks[0].Status
+		h.Kind, h.TaskID, h.TaskTitle = "task", sc.tasks[0].ID, clitext.CleanName(sc.tasks[0].Title)
+		h.Title, h.Status = h.TaskTitle, sc.tasks[0].Status
 		if h.GoalID == 0 && sc.tasks[0].GoalID != nil {
 			h.GoalID = *sc.tasks[0].GoalID
 		}
 		if h.GoalTitle == "" && h.GoalID > 0 { // the task's own goal, read with the team in the query
 			if g, err := s.GetGoal(ctx, q.Team, h.GoalID); err == nil && g != nil {
-				h.GoalTitle = g.Title
+				h.GoalTitle = clitext.CleanName(g.Title)
 			}
 		}
 		return h
 	}
 	h.Kind = "goal"
 	if sc.goal != nil {
-		h.Title, h.Status = sc.goal.Title, sc.goal.State
+		h.Title, h.Status = clitext.CleanName(sc.goal.Title), sc.goal.State
 	}
 	return h
 }

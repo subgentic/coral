@@ -336,3 +336,53 @@ func TestTaskSummariesCarryWaitingLatestLastDecisionAndCounts(t *testing.T) {
 		assert.NotContains(t, th.Latest.Line, "Is this the right shape", "no raw text when the redaction fails")
 	}
 }
+
+// Security's SHOULD on #14440: what an agent wrote reaches the page clean. An escape sequence and a right-to-left override in a reply, in an ask's line, in a title and in the Operator's own note are
+// removed; the excerpt keeps its line breaks and a one-line field loses them.
+func TestThreadTextHasNoTerminalControlOrReorderingCharacters(t *testing.T) {
+	s, goal, task := threadFixture(t)
+	ctx := context.Background()
+	dirty := "\x1b[31mred\x1b[0m ‮evil‬ and \x1b]0;title\x07ok"
+	addReply(t, s, "team-a", "Dev", "first line "+dirty+"\nsecond line", task.ID)
+	addAsk(t, s, "team-a", dirty+"\nsecond line of the ask", goal.ID, task.ID, "Operator")
+	require.NoError(t, s.RecordActivity(ctx, opMeta, ActAnswer, "question", "1", "", "team-a"))
+	p, err := s.ThreadEntries(ctx, ThreadQuery{Team: "team-a", GoalID: goal.ID, Redact: keepAll})
+	require.NoError(t, err)
+	bad := func(s string) bool {
+		return strings.ContainsAny(s, "\x1b\x07‮‬")
+	}
+	var sawReply, sawAsk bool
+	for _, e := range p.Entries {
+		for _, f := range []string{e.Text, e.Line, e.Title, e.Note, e.Name, e.Asker, e.From} {
+			assert.False(t, bad(f), "%s: %q", e.Kind, f)
+		}
+		switch e.Kind {
+		case "reply":
+			sawReply = true
+			assert.Contains(t, e.Text, "\n", "the excerpt keeps its line breaks")
+			assert.Contains(t, e.Text, "red")
+		case "ask":
+			sawAsk = true
+			assert.NotContains(t, e.Line, "\n", "a one-line field has no line break")
+			assert.Contains(t, e.Line, "evil")
+		}
+	}
+	assert.True(t, sawReply && sawAsk)
+	// the titles carried in the header and the summaries
+	task2, err := s.CreateTask(ctx, "team-a", "Title \x1b[31mwith\x1b[0m ‮control", "", "medium", "Lead")
+	require.NoError(t, err)
+	gid := goal.ID
+	require.NoError(t, s.SetTaskGoal(ctx, "team-a", task2.ID, &gid))
+	h, err := s.ThreadEntries(ctx, ThreadQuery{Team: "team-a", TaskID: task2.ID, Redact: keepAll})
+	require.NoError(t, err)
+	assert.False(t, bad(h.Thread.Title), "%q", h.Thread.Title)
+	assert.False(t, bad(h.Thread.TaskTitle))
+	sums, err := s.ThreadSummaries(ctx, ThreadsQuery{Team: "team-a", Redact: keepAll})
+	require.NoError(t, err)
+	for _, th := range sums.Threads {
+		assert.False(t, bad(th.Title), "%q", th.Title)
+		if th.Latest != nil {
+			assert.False(t, bad(th.Latest.Line), "%q", th.Latest.Line)
+		}
+	}
+}

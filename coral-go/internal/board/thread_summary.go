@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/subgentic/coral/internal/clitext"
 )
 
 // The summaries of the list pages (#14440): one TaskSummary per task, so a page of many tasks is one read and the entries are read only when a row opens. Every query carries the board; the sources are read for
@@ -76,7 +78,7 @@ func (s *Store) threadSummariesOf(ctx context.Context, tq ThreadQuery, tasks []T
 	idx := map[int64]int{}
 	ids := make([]int64, len(tasks))
 	for i, t := range tasks {
-		out[i] = TaskSummary{TaskID: t.ID, Title: t.Title, Status: t.Status}
+		out[i] = TaskSummary{TaskID: t.ID, Title: clitext.CleanName(t.Title), Status: t.Status}
 		if t.GoalID != nil {
 			out[i].GoalID = *t.GoalID
 		}
@@ -114,7 +116,7 @@ func (s *Store) threadSummariesOf(ctx context.Context, tq ThreadQuery, tasks []T
 			titles[g.ID] = g.Title
 		}
 		for i := range out {
-			out[i].GoalTitle = titles[out[i].GoalID]
+			out[i].GoalTitle = clitext.CleanName(titles[out[i].GoalID])
 		}
 	}
 
