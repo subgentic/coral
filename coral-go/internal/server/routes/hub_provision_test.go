@@ -173,7 +173,7 @@ func (pe *provEnv) quiesce() {
 
 func (pe *provEnv) waitPhase(t *testing.T, plan, want string) map[string]any {
 	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
+	deadline := time.Now().Add(45 * time.Second) // a bound, not a wait: it returns the moment the phase is reached; a whole-package run on a loaded machine can take several times a quiet run's ~1 s (#14509)
 	for {
 		_, v := pe.do("GET", "/api/servers/provision/"+plan, nil)
 		if v["phase"] == want || time.Now().After(deadline) {
