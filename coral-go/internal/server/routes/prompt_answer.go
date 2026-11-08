@@ -719,6 +719,45 @@ const (
 	deepPromptCaptureLines = commandMaxLines + 60
 )
 
+// screenRows is a screen's rows as compared: each row without its trailing spaces and carriage return, the trailing blank rows dropped.
+func screenRows(text string) []string {
+	rows := strings.Split(strings.ReplaceAll(text, "\r", ""), "\n")
+	for i := range rows {
+		rows[i] = strings.TrimRight(rows[i], " \t")
+	}
+	for len(rows) > 0 && rows[len(rows)-1] == "" {
+		rows = rows[:len(rows)-1]
+	}
+	return rows
+}
+
+// deepExtendsFirst reports whether deep ends with every row of first (and so only adds rows above them): the proof that a deeper read is of the same screen as the first.
+func deepExtendsFirst(first, deep string) bool {
+	f, d := screenRows(first), screenRows(deep)
+	if len(f) == 0 || len(d) < len(f) {
+		return false
+	}
+	for i := range f {
+		if f[len(f)-1-i] != d[len(d)-1-i] {
+			return false
+		}
+	}
+	return true
+}
+
+// sameQuestion: the two reads give one question with the same options, in the same order.
+func sameQuestion(a, b promptScreen) bool {
+	if a.Question != b.Question || len(a.Options) != len(b.Options) {
+		return false
+	}
+	for i := range a.Options {
+		if normalizeLabel(a.Options[i].Label) != normalizeLabel(b.Options[i].Label) {
+			return false
+		}
+	}
+	return true
+}
+
 // readPromptScreenText is readPromptScreen with the screen's text, for a caller that must tell a screen with no menu on it from a
 // menu it could not parse.
 func (h *SessionsHandler) readPromptScreenText(ctx context.Context, name, agentType, sessionID string) (promptScreen, bool, string, error) {
@@ -734,13 +773,14 @@ func (h *SessionsHandler) readPromptScreenText(ctx context.Context, name, agentT
 	}
 	s, ok := parseAgentScreen(agentType, text)
 	if ok && s.commandOpenMissing && agentType == at.Claude {
-		if _, rendered := h.terminal.(ptymanager.RenderedScreenReader); !rendered { // a PTY's screen has no history to read deeper (#4543)
-			// The closing rule of a request is there and its opening rule is not: the pane's history may hold it (#14575). Read deeper once; the same parse and the same checks judge what is found, and a request whose top is
-			// still not there stays Reject only. The deeper text replaces the first only when it shows the request whole, so every caller (the row, the card, the answer) sees the same screen.
-			if deep, derr := h.terminal.CaptureOutput(ctx, name, deepPromptCaptureLines, agentType, sessionID); derr == nil {
-				if ds, dok := parseAgentScreen(agentType, deep); dok && !ds.commandOpenMissing {
-					s, text = ds, deep
-				}
+		// The closing rule of a request is there and its opening rule is not: the history above the screen may hold it (#14575). tmux gives it as the pane's history; the PTY backend as the scrolled-off rows of its replay
+		// ring (CaptureOutput, vtscreen.RenderScrollback), though its first read above is only the screen's rows. Read deeper once; the same parse and the same checks judge what is found, and a request whose top is still
+		// not there stays Reject only. The deeper text replaces the first only when it shows the request whole, so every caller (the row, the card, the answer) sees the same screen.
+		if deep, derr := h.terminal.CaptureOutput(ctx, name, deepPromptCaptureLines, agentType, sessionID); derr == nil {
+			// Bound to the first read (Security's MUST on the PTY, #14575): on a PTY the first read is the live screen and the deeper one a replay of a clipped ring, which can draw an older frame or miss rows; on tmux both
+			// are one pane. The deeper text is taken only when it ENDS with every row of the first read, so it can only add what is above it (the top of the same request); anything else keeps the first read, Reject only.
+			if ds, dok := parseAgentScreen(agentType, deep); dok && !ds.commandOpenMissing && deepExtendsFirst(text, deep) && sameQuestion(s, ds) {
+				s, text = ds, deep
 			}
 		}
 	}
