@@ -42,18 +42,25 @@ func isFolderTrustMenu(s promptScreen) bool {
 // captured screen holds MORE than one such heading: text printed before the menu (a startup hook, a program, a spoofed copy of the heading) must not choose the folder that is shown
 // and checked (Security's MUST on #14110). The caller then also pins the path to the session's own recorded folder (trustOffered).
 func folderTrustPath(screen string) string {
+	p, _ := folderTrustPathCut(screen)
+	return p
+}
+
+// folderTrustPathCut is folderTrustPath that also says whether the join stopped at the trustPathMaxLines cap with more path lines below it (#14586): such a path is a prefix, never the session's own
+// folder, and the row says the name is too long to read instead of 'not the folder this agent was started in'. cut is only ever true with a non-empty path.
+func folderTrustPathCut(screen string) (string, bool) {
 	lines := strings.Split(screen, "\n")
 	at := -1
 	for i, l := range lines {
 		if strings.TrimSpace(l) == trustFolderHeading {
 			if at >= 0 {
-				return ""
+				return "", false
 			}
 			at = i
 		}
 	}
 	if at < 0 {
-		return ""
+		return "", false
 	}
 	for j := at + 1; j < len(lines) && j <= at+3; j++ {
 		p := strings.TrimSpace(lines[j])
@@ -61,29 +68,34 @@ func folderTrustPath(screen string) string {
 			continue
 		}
 		if strings.HasPrefix(p, "Quick safety check") || strings.ContainsAny(p, "\x00\r") {
-			return ""
+			return "", false
 		}
 		// A long folder wraps at the terminal's width (an agent whose terminal is narrow: one nobody has opened yet is at the launch width): the path goes on over the next lines up to the blank line
 		// that ends it, at most trustPathMaxLines lines (a deep worktree under a narrow terminal wraps many times). The joined text is only ever COMPARED with the session's own recorded folder (trustOffered): a path that is not exactly that folder is never offered a Yes (#14560).
-		for k := j + 1; k < len(lines) && k < j+trustPathMaxLines; k++ {
+		cut := false
+		for k := j + 1; k < len(lines); k++ {
 			more := strings.TrimSpace(lines[k])
 			if more == "" {
 				break
 			}
 			if strings.HasPrefix(more, "Quick safety check") || strings.ContainsAny(more, "\x00\r") {
-				return ""
+				return "", false
+			}
+			if k >= j+trustPathMaxLines {
+				cut = true // another path line below the cap: what is joined is only the start
+				break
 			}
 			p += more
 		}
-		return p
+		return p, cut
 	}
-	return ""
+	return "", false
 }
 
 // markFolderTrust sets s.TrustFolder from the captured screen when s is the folder-trust menu; the offer itself is decided per caller (trustOffered).
 func markFolderTrust(screen string, s *promptScreen) {
 	if isFolderTrustMenu(*s) {
-		s.TrustFolder = folderTrustPath(screen)
+		s.TrustFolder, s.TrustCut = folderTrustPathCut(screen)
 	}
 }
 
@@ -121,6 +133,8 @@ func (h *SessionsHandler) trustVerdict(r *http.Request, sessionID string, s prom
 		return false, "Only the person at this computer's own dashboard can say Yes to this."
 	case s.TrustFolder == "":
 		return false, "Coral could not read which folder this is from the screen."
+	case s.TrustCut:
+		return false, "The folder name is too long to read from the screen."
 	case sessionID == "" || h.ss == nil:
 		return false, "Coral cannot tell which agent this is."
 	}
