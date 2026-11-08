@@ -240,7 +240,8 @@ function askBlockers() { // loaded once, when a row carries the field; the table
     importOnce('./inbox_blockers.js').then(m => { BL = m; refreshGroupTable('hub-inbox'); }).catch(() => {});
 }
 let answered = ''; // what an answer given here went through as, for five minutes: the row is gone and the list says so (#10720)
-document.addEventListener('coral:inbox-answered', e => { answered = e.detail.said; setTimeout(() => { answered = ''; }, 3e5); });
+const answeredRows = new Map(); // `${server}:${session_id}` -> { began, at }: a row answered here, waiting for the agent to stop waiting (#14408)
+document.addEventListener('coral:inbox-answered', e => { answered = e.detail.said; setTimeout(() => { answered = ''; }, 3e5); if (e.detail.began && e.detail.session_id) answeredRows.set(`${e.detail.server || ''}:${e.detail.session_id}`, { began: e.detail.began, at: Date.now() }); });
 const allNeeds = () => [...waitingSessions(), ...reviewRows(), ...runRows(), ...proposalRows(), ...goalDoneRows(), ...skillRows(), ...askRows(), ...recordRows(), ...welcomeRows()]; // the welcome items of a new install come last: real work first (#11443)
 const needsText = s => [s.operatorAsk ? `${s.operatorAsk.asker} ${askLine(s.operatorAsk)}` : '', s.proposal ? `${s.proposal.title} ${s.proposal.proposer}` : '', s.goalDone ? `${s.goalDone.title} ${s.waiting_summary}` : '', s.skillReview ? `${skillName(s.skillReview)} ${s.waiting_summary}` : '', s.review?.name || '', s.autorun ? `${s.autorun.name} ${s.waiting_summary}` : '', needsName(s),resolveSessionIdentity(s), sessionStateInfo(s).label, askOf(s), teamOf(s), s.goal?.title || '', s.task?.title || ''].join(' ').toLowerCase();
 let needsFilters = NF.loadFilters(), needsBar = null;
@@ -858,6 +859,11 @@ function renderInboxNav(force = false) {
     setHidden(document.querySelector('.sidebar-header[data-header="hub-inbox"] [data-group-toggle]'), true); // folders do not fold: the collapse-all button has nothing to fold
     syncLeadStrip(sections, here);
     refreshGroupTable('hub-inbox');
+    // An answered row leaves as soon as the agent stops waiting (#14408, with the server's state of #14345): that is the Answer's own result, so the table it was answered in redraws once, not held under a resting pointer
+    for (const [k, a] of answeredRows) {
+        if (Date.now() - a.at > 3e5) answeredRows.delete(k);
+        else if (!needsRows().some(s => `${sessionServer(s)}:${s.session_id}` === k)) { answeredRows.delete(k); document.dispatchEvent(new CustomEvent('coral:action-result', { detail: a.began })); }
+    }
 }
 
 // The folder strip's COUNTS are not in the signature that rebuilds a phone's table (the lead's signature below): they are written into the strip where it is (syncLeadStrip), so a count that arrives does not draw the rows again (#11692).
