@@ -24,7 +24,7 @@ import { formatLastSeen, updateNotice, RELEASES_URL, DOWNLOAD_URL, serverVersion
 import { accessChanged } from './hub_access.js';
 import { state } from './state.js';
 import { note } from './nav.js';
-import { sessionServer } from './server_base.js';
+import { serverFetch, sessionServer } from './server_base.js';
 import { needsYou } from './asked_before_restart.js';
 import { refreshPending, pendingRows, pendingCard } from './hub_pending.js';
 const { MODES, MODE_INFO, MODE_SHORT, accessChoice, effectiveMode, launchNote, effectiveNote, invalidateServerAccess, serverAccess } = await importOnce('./server_access.js');
@@ -55,10 +55,12 @@ const RELINK_BUTTON = 'Owner not confirmed';
 const relinkHelp = label => `${label || 'This computer'} can't confirm its owner yet. On that computer, ${OWNER_LABEL_STEP}.`;
 const relinkId = s => `${rowId(s.id)}-relink`;
 
+const disclosureReads = new Map();
+
 let load;
 export const serverView = {
     mount(el, refresh) {
-        load = refresh; wireMoreClose();
+        load = refresh; wireMoreClose(); disclosureReads.clear();
         if (host !== el) enrollOpen = null;
         host = el; confirming = null; renaming = null; openId = null; focusNext = null; backTo = null; loadError = ''; loaded = false;
         resetRelaunchReads();
@@ -177,7 +179,7 @@ function sortValue(s, key) {
 
 
 /** A machine's page opens in place of the list; Back (or the machine going away) returns to the list with the keyboard on that machine's row. */
-function openPage(id, inAddress) { openId = id; moreOpen = null; focusNext = 'page'; if (!inAddress) note({ view: 'servers', id }); render(); } // a click puts the machine in the address; a deep link or Back already has it
+function openPage(id, inAddress) { disclosureReads.delete(id); openId = id; moreOpen = null; focusNext = 'page'; if (!inAddress) note({ view: 'servers', id }); render(); } // a click puts the machine in the address; a deep link or Back already has it
 function closePage(inAddress) { const was = openId; if (!inAddress) note({ view: 'servers' }); openId = null; renaming = null; confirming = null; moreOpen = null; focusNext = 'row'; backTo = was; render(); }
 let backTo = null;
 
@@ -278,6 +280,27 @@ function detailCell(s, live, online, isBusy, helpId) {
         updateNote);
 }
 
+/** Information only: the connected computer authorizes the owner read and owns the words.
+ * No read, redraw or visit acknowledges the notice. A rejected/old-server response has no line. */
+function launchDisclosureLine(s) {
+    const line = h('div', { className: 'cs-launch-disclosure cs-meta' });
+    if (s.online !== true) return line;
+    if (!disclosureReads.has(s.id)) {
+        const read = serverFetch(s.id, '/api/launch-disclosure', { cache: 'no-store' })
+            .then(async r => r.ok ? r.json() : null)
+            .then(d => d && typeof d.id === 'string' && d.id.length > 0 && d.id.length <= 128 && typeof d.text === 'string' && d.text.length > 0 && d.text.length <= 12000 ? d : null)
+            .catch(() => null);
+        disclosureReads.set(s.id, read);
+    }
+    disclosureReads.get(s.id).then(d => {
+        if (!d || !line.isConnected) return;
+        line.replaceChildren(
+            h('p', { text: d.text }),
+            h('p', { text: 'Shown here for information. Acknowledge this notice in Coral on this computer. To lower its default, open Settings › Agents › Default permission mode on this computer.' }));
+    });
+    return line;
+}
+
 /** A machine's page (Goal #79, #9722): the machine's name (the rename form while renaming), its facts, the details the row used to expand to (health, what applies, the update notice, the relink help, the revoke question), and its actions in a foot bar: the relink help, Rename, and Revoke behind More. */
 function machinePage(s) {
     const live = liveOf(s), online = s.online === true, isBusy = busy.has(s.id);
@@ -297,6 +320,7 @@ function machinePage(s) {
             ...fact('Last seen', seenWords(s)), // the list column's word, online or not: one word for one fact (#9798, UI/UX)
             ...fact('Hub access', accessPicker(s, isBusy, helpId))),
         detailCell(s, live, online, isBusy, helpId),
+        launchDisclosureLine(s),
         h('div', { className: 'item-bar servers-page-bar cs-actions' }, rowActions(s, isBusy)));
     page.addEventListener('keydown', e => { if (e.key === 'Escape' && confirming === s.id) { e.preventDefault(); e.stopPropagation(); cancelRevoke(s); } });
     return page;

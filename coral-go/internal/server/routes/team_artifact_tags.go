@@ -192,15 +192,18 @@ func (h *BoardHandler) SetArtifactTags(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "could not change the tags")
 		return
 	}
+	name := h.objectSidecarName(id)        // the file's name at the click (#14422)
 	switch r.Header.Get("X-Coral-Click") { // the page says which button this was; opening a file marks it read with no header and is not a click (#13609)
 	case "read":
 		if slices.Contains(tags, "read") {
-			noteActivity(r, board.ActMarkRead, "file", id, project, "", "")
+			noteActivity(r, board.ActMarkRead, "file", id, project, name, "")
 		} else {
-			noteActivity(r, board.ActMarkUnread, "file", id, project, "", "")
+			noteActivity(r, board.ActMarkUnread, "file", id, project, name, "")
 		}
+		noteActivityTask(r, h.fileTaskOf(r.Context(), project, id)) // the row's goal and task (#14421)
 	case "tags":
-		noteActivity(r, board.ActFileTags, "file", id, project, "", strings.Join(tags, ", "))
+		noteActivity(r, board.ActFileTags, "file", id, project, name, strings.Join(tags, ", "))
+		noteActivityTask(r, h.fileTaskOf(r.Context(), project, id))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"id": id, "tags": tags})
 }

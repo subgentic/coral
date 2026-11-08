@@ -42,7 +42,7 @@ assert.deepEqual(pe.codexEnforced({ allow: ['web_access'] }), { sandbox: 'read-o
 assert.equal(pe.codexEnforced({}), null);
 assert.equal(pe.agyEnforced({ allow: ['shell', 'file_write'], deny: ['file_write'] }), 'accept-edits', 'a Deny on Agy only changes the mode');
 
-const fe = AGENT_PRESETS.find(p => p.name === 'Frontend Dev').capabilities;
+const fe = AGENT_PRESETS.find(p => p.name === 'Frontend Dev').roleLimits; // explicitly applying the original narrow role limits
 let e = pe.presetEnforcement('codex', fe, 'bypassPermissions');
 assert.match(e.text, /only a sandbox and an approval mode: a sandbox that can change files in its folder, with no network, and it asks only when the model requests it/);
 assert.match(e.text, /Deny entries and shell patterns are not enforced/);
@@ -52,7 +52,7 @@ e = pe.presetEnforcement('codex', AGENT_PRESETS.find(p => p.name === 'Lead Devel
 assert.match(e.text, /a sandbox that can change files in its folder and use the network, and it never asks/, 'Codex git_write is no sandbox-free choice (#6422): four chips are workspace-write, never');
 assert.doesNotMatch(e.text, /without a sandbox/, 'no sandbox is only an explicit choice');
 for (const t of ['agy', 'gemini', 'antigravity']) {
-    e = pe.presetEnforcement(t, AGENT_PRESETS.find(p => p.name === 'Security Reviewer').capabilities, 'default');
+    e = pe.presetEnforcement(t, AGENT_PRESETS.find(p => p.name === 'Security Reviewer').roleLimits, 'default');
     assert.match(e.text, /^Antigravity keeps only a mode: read-only planning/, t);
     assert.equal(e.denyEnforced, false, t);
 }
@@ -61,8 +61,11 @@ assert.match(e.text, /Bypass Permissions mode: nothing asks, so Allow restricts 
 assert.equal(e.denyEnforced, true);
 e = pe.presetEnforcement('claude', fe, 'default');
 assert.match(e.text, /Allow pre-approves these tools and others still run after it asks; Deny blocks/);
-e = pe.presetEnforcement('claude', AGENT_PRESETS.find(p => p.name === 'Backend Dev').capabilities, 'default');
+e = pe.presetEnforcement('claude', {allow:['shell','git_write']}, 'default');
 assert.match(e.text, /git patterns don't limit git while Shell is allowed/, 'Security F');
+e = pe.presetEnforcement('claude', {allow:['shell','git_write']}, 'auto');
+assert.match(e.text, /Auto checks git commands/);
+assert.doesNotMatch(e.text, /git patterns don't limit git/);
 assert.equal(pe.presetEnforcement('terminal', {}, 'default').text, '');
 
 // The permission mode a launch starts with when nobody picked one (#5836): Claude starts in Auto, not in a bypass of every prompt; the other CLIs keep their own default; a saved mode is
@@ -73,7 +76,7 @@ assert.equal(pe.defaultPermissionMode({}, ''), 'auto', 'no agent type named: Cla
 assert.equal(pe.defaultPermissionMode({}, undefined), 'auto');
 assert.equal(pe.defaultPermissionMode({}, 'codex'), 'auto', 'Codex uses the workspace sandbox');
 for (const other of ['agy', 'antigravity', 'gemini', 'pi']) assert.equal(pe.defaultPermissionMode({}, other), 'bypassPermissions', other + ' keeps its default');
-assert.equal(pe.defaultPermissionMode({}, 'hermes'), 'default', 'Hermes asks before a dangerous command unless --yolo: its default is the safe mode, as the server\'s is (#12169)');
+assert.equal(pe.defaultPermissionMode({}, 'hermes'), 'bypassPermissions', 'the shipped full Hermes default is yolo; saved lower modes still win');
 for (const saved of ['bypassPermissions', 'default', 'plan', 'acceptEdits', 'dontAsk', 'auto']) {
     for (const type of ['claude', 'codex', 'agy', 'pi', 'hermes']) assert.equal(pe.defaultPermissionMode({ default_permission_mode: saved }, type), saved, `a saved ${saved} stays for ${type}`);
 }
@@ -103,10 +106,10 @@ pe.syncDefaultPermissionMode(null, {}, 'claude'); // no select: nothing
 console.log(`preset_enforcement: ok (${checked} presets)`);
 
 // the network sentences only where the network is on: workspace-write that never asks
-const lead = pe.presetEnforcement('codex', AGENT_PRESETS.find(p => p.name === 'Lead Developer').capabilities, 'default');
+const lead = pe.presetEnforcement('codex', AGENT_PRESETS.find(p => p.name === 'Lead Developer').roleLimits, 'default');
 assert.equal(lead.more, pe.NETWORK_OFF_FLAG);
 assert.match(lead.text, /Leaving out Web Access does not turn the network off\./);
-const onRequest = pe.presetEnforcement('codex', AGENT_PRESETS.find(p => p.name === 'Frontend Dev').capabilities, 'default');
+const onRequest = pe.presetEnforcement('codex', AGENT_PRESETS.find(p => p.name === 'Frontend Dev').roleLimits, 'default');
 assert.equal(onRequest.more, undefined, 'on-request has no network to turn off');
 assert.doesNotMatch(onRequest.text, /use the network|Leaving out Web Access/);
 for (const mode of ['acceptEdits', 'default', 'plan']) assert.equal(pe.presetEnforcement('codex', null, mode).more, undefined, `no chips under ${mode}: nothing to turn off`);

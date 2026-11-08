@@ -61,7 +61,7 @@ func TestAHeavyRunOnTheMiniThatLosesItsSlotIsStoppedThereToo(t *testing.T) {
 	heavyRenewFloor = 50 * time.Millisecond
 	defer func() { heavyRenewFloor = prevFloor }()
 	soon := time.Now().Add(600 * time.Millisecond).UTC().Format(time.RFC3339Nano)
-	s := &heavyStub{renewStatus: 409, grants: []string{`{"granted":true,"place":0,"entry":{"id":1,"member":"mini","machine":"Mini","lease_until":"` + soon + `"}}`}}
+	s := &heavyStub{renewStatus: 409, grants: []string{`{"granted":true,"place":0,"entry":{"id":1,"member":"mini","machine":"Mini","where":"remote","lease_until":"` + soon + `"}}`}}
 	start := time.Now()
 	out, code := runHeavy(t, s, "run", "--", "sleep 60; echo should-not-print")
 	if code == 0 || strings.Contains(out, "should-not-print") || time.Since(start) > 15*time.Second {
@@ -77,9 +77,19 @@ func TestAHeavyRunOnTheMiniRunsAndReturnsTheExitCode(t *testing.T) {
 	prev := heavyTestTransport
 	heavyTestTransport = wrapperTransport(t)
 	defer func() { heavyTestTransport = prev }()
-	s := &heavyStub{grants: []string{`{"granted":true,"place":0,"entry":{"id":1,"member":"mini","machine":"Mini"}}`}}
+	s := &heavyStub{grants: []string{`{"granted":true,"place":0,"entry":{"id":1,"member":"mini","machine":"Mini","where":"remote"}}`}}
 	out, code := runHeavy(t, s, "run", "--", "echo from-the-wrapper; exit 6")
 	if code != 6 || !strings.Contains(out, "from-the-wrapper") {
 		t.Fatalf("code=%d out=%q", code, out)
+	}
+}
+
+// #14354: a pool grant that names no machine is not sent to a default one: heavyRunRemote refuses before it touches ssh or the worktree.
+func TestARemoteRunWithNoMachineIsRefusedBeforeAnySsh(t *testing.T) {
+	old := heavyTestTransport
+	heavyTestTransport = nil
+	t.Cleanup(func() { heavyTestTransport = old })
+	if code := heavyRunRemote(context.Background(), "true", time.Second, ""); code != 1 {
+		t.Fatalf("a grant with no machine: exit %d, want 1 (refused)", code)
 	}
 }

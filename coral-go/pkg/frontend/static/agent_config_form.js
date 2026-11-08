@@ -6,7 +6,7 @@ const { _acfServer, _fillModelDatalist, _getAgentModels, _getDefaultModels, _set
 const { _checkAgentCLI } = await importOnce('./cli_check.js');
 const { _classifyLoadedACFModel } = await importOnce('./acf_models.js');
 const { modelPickerHtml, loadModelPicker, wireModelPicker, syncModelPicker, thinkingPickerHtml, thinkingValue, setThinking, setThinkingActual, wireThinking } = await importOnce('./model_picker.js');
-const { _renderPresetButtons } = await importOnce('./persona_store.js');
+const { _renderPresetButtons, syncRoleLimits } = await importOnce('./persona_store.js');
 const { presetEnforcement, launchedMode } = await importOnce('./preset_enforcement.js');
 const { initSectionDialog } = await importOnce('./section_dialog.js');
 const { segmentSelect } = await importOnce('./segmented.js');
@@ -30,7 +30,7 @@ const CAPABILITY_LABELS = {
 // What a capability does beyond its name, per CLI (#4545, Security's D: for Codex, Git Write is what turns
 // off its sandbox).
 const CAPABILITY_TITLES = {
-    git_write: 'Claude: pre-approves git push (force pushes included), commit, branch, merge and rebase, so they run without a question in Default and Accept edits. In Auto, Coral adds no git rule and leaves git to the checks Auto makes itself. Codex: Git Write does not change its sandbox; with Shell it can change files in its folder, use the network and never asks.',
+    git_write: 'Claude: Git Write lets the agent push, including force pushes, without a question in Default and Accept edits; in Auto, Coral leaves git to Auto’s own checks. Switching to Auto inside the CLI keeps the launch-time rules. Codex: Git Write does not change its sandbox; with Shell it can change files in its folder, use the network and never asks.',
 };
 
 export function _togglePermissions(containerId) {
@@ -233,6 +233,7 @@ export function renderAgentConfigForm(containerId, opts = {}) {
     placeAcfCliLine(container, opts);
     wireAcfAgentType(container);
     finishAcfControls(container, opts);
+    syncRoleLimits(containerId, opts.value?.name);
 }
 
 /** The Behavior prompt: a field of settings_view (label above; the textarea keeps the class every read of the form uses). */
@@ -755,6 +756,8 @@ export function setAgentConfig(containerId, values) {
 
     if (uid) _setPermissions(`${uid}-perms`, v.capabilities || null);
     _syncEnforcement(container);
+
+    syncRoleLimits(containerId, v.name);
 
     // Re-sync Model combo and prerequisite warning after a preset/type change.
     _syncACFModelField(container);

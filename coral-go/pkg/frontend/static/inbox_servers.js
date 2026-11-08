@@ -21,6 +21,8 @@ export const serverColumns = () => multipleServers() ? [{ key: 'server', label: 
 
 /** The computers that answered 403 owner_only to the artifacts list: this person is a grantee there. Kept for the session, per computer: no later read asks them again. */
 const ownerOnly = new Set();
+/** Whether this person was told owner_only by `server` (a grantee there): what only its owner may do, they are not offered (#14396). */
+export const ownerOnlyAt = server => ownerOnly.has(server);
 const emptyArtifacts = server => ({ server, artifacts: [], teams: [], all: 0, total: 0, offset: 0, cursor: '', done: true, ownerOnly: true });
 export const isOwnerOnlyAnswer = async response => { const body = await response.clone().json().catch(() => ({})); return body.code === 'owner_only' || body.error === 'owner_only'; };
 /** True when there is at least one online computer and every one of them refused: the Hub-served Inbox then has no Artifacts folder. With one that allows it, the folder lists that computer's artifacts. */

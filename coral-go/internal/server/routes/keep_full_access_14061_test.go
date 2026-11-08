@@ -120,7 +120,7 @@ func TestSettingAndClearingItAreActivityRows(t *testing.T) {
 				next.ServeHTTP(w, req)
 			})
 		})
-		rt.Use(ActivityRecorder(r.h.bs))
+		rt.Use(ActivityRecorder(r.h.bs, nil))
 		rt.Post("/api/sessions/live/{name}/keep-full-access", r.h.KeepFullAccessOpt)
 		return func(on bool) int {
 			body, _ := json.Marshal(map[string]any{"session_id": sid(64), "agent_type": "codex", "on": on})

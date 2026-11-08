@@ -198,6 +198,17 @@ func SSHArgs(alias string) ([]string, error) {
 
 var nonSlug = regexp.MustCompile(`[^a-z0-9]+`)
 
+// AliasFor is the ssh Host alias of the remote machine a pool grant names (#14354): "coral-heavy-" and the machine's name as a slug. Nothing in the code names a machine, and nothing an agent or an
+// environment variable says changes it: the pool is defined by the Operator or an Orchestrator, and the Host block of that name (its address, user, key and pinned host key) is in the Operator's own ssh
+// config. A grant that names no machine has no alias, so no run is sent anywhere. SSHArgs checks the result.
+func AliasFor(machine string) (string, error) {
+	s := strings.Trim(nonSlug.ReplaceAllString(strings.ToLower(machine), "-"), "-")
+	if s == "" {
+		return "", fmt.Errorf("heavy: the pool grant names no machine, so there is no ssh alias to send the run to")
+	}
+	return "coral-heavy-" + s, nil
+}
+
 // Slug is an agent's name as a run folder name: lower case letters, digits and dashes.
 func Slug(name string) string {
 	s := strings.Trim(nonSlug.ReplaceAllString(strings.ToLower(name), "-"), "-")

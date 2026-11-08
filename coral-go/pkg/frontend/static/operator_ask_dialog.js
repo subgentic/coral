@@ -6,9 +6,8 @@ import { renderMarkdownStrict } from './utils.js';
 import { whenText } from './when_text.js';
 import { loadStyles } from './lazy_styles.js';
 import { showToast } from './notifications.js';
-import { decisionNeedsPerson } from './server_base.js';
 import { importOnce } from './import_once.js';
-import { askParts, askSubjects, fromAnotherComputer, buttonsOf, yesNoButtons, buttonWords, claimButton, settleButton, wakeMember, refreshOperatorAsks, replyToAsk, forgetAsk, questionContextNote } from './operator_asks.js';
+import { askParts, askSubjects, fromAnotherComputer, buttonsOffered, noteButtonsOwnerOnly, yesNoButtons, buttonWords, claimButton, settleButton, wakeMember, refreshOperatorAsks, replyToAsk, forgetAsk, questionContextNote } from './operator_asks.js';
 await loadStyles('operator_ask_dialog.css');
 
 const isReply = action => /^reply$/.test(action);
@@ -47,7 +46,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     const send = document.createElement('button'); send.type = 'button'; send.className = 'btn btn-primary inbox-ask-send'; send.textContent = 'Send reply';
     const close = document.createElement('button'); close.type = 'button'; close.className = 'btn'; close.textContent = 'Close';
     // Dismiss closes a question with no answer and nothing said to the agent, as the row's own Dismiss does (#12599): the same route and the same toast with Undo. A wait has no ask row to close, so it has no Dismiss.
-    const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'btn btn-quiet'; dismiss.textContent = 'Dismiss'; dismiss.title = 'Take it out of Needs you; nobody is told'; dismiss.hidden = a.kind !== 'ask' || fromAnotherComputer(a); // the close route is this computer's: a question from another computer is answered there
+    const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'btn btn-quiet'; dismiss.textContent = 'Dismiss'; dismiss.title = 'Take it out of Needs you; nobody is told'; dismiss.hidden = a.kind !== 'ask' || (fromAnotherComputer(a) && decisionNeedsPerson(a.server)); // the close route is served for this computer's question and, through the Hub, for the computer's owner (coral-hub batch-125): a phone's rows have no Dismiss of their own (#14419), so the dialog must
     row.append(close, ...(dismiss.hidden ? [] : [dismiss])); // Close and Dismiss stay in the footer; Send reply is on the row right under the reply box (#13148, the Operator: 'The send reply is too far away from text input')
     let tray = null;
     const finish = () => { if (tray) tray.destroy(); dlg.close(); dlg.remove(); if (onDone) onDone(); };
@@ -59,7 +58,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     const drawOffers = () => {
         offered?.remove(); offered = null; choices.length = 0;
         binary = yesNoButtons(a);
-        const offers = (fromAnotherComputer(a) && (!binary || decisionNeedsPerson(a.server))) ? [] : buttonsOf(a);
+        const offers = buttonsOffered(a);
         if (offers.length) { // what the asker offered: one tap per choice, each with what it does
             offered = document.createElement('section'); offered.className = 'inbox-ask-offers'; offered.setAttribute('aria-label', `Buttons ${markHidden(a.asker, { strict: true })} offered`);
             const head = document.createElement('p'); head.className = 'inbox-ask-offers-head'; head.textContent = offers.every(b => isReply(b.action)) ? 'Choose a reply, or write your own.' : 'Choose an action, or write a reply.';
@@ -69,7 +68,7 @@ export function openAskDialog(a, onDone, runners = {}) {
                 const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn'; const label = binary ? (b.label === 'Yes' ? 'Approve' : 'Deny') : markHidden(b.label, { strict: true }); btn.textContent = label; btn.dataset.buttonId = String(b.id);
                 const what = document.createElement('span'); what.className = 'inbox-ask-offer-what sr-only'; what.textContent = buttonWords(b);
                 btn.setAttribute('aria-label', `${label}: ${what.textContent}`); btn.title = what.textContent;
-                if (binary) { const icon = document.createElement('span'); icon.className = 'material-icons'; icon.setAttribute('aria-hidden', 'true'); icon.textContent = b.label === 'Yes' ? 'check' : 'close'; btn.replaceChildren(icon); btn.classList.add('btn-icon'); btn.setAttribute('aria-label', `${label}, sends ${b.label} with any draft text and pictures`); btn.title = btn.getAttribute('aria-label'); }
+                if (binary) { const icon = document.createElement('span'); icon.className = 'material-icons'; icon.setAttribute('aria-hidden', 'true'); icon.textContent = b.label === 'Yes' ? 'check' : 'close'; const word = document.createElement('span'); word.className = 'inbox-ask-yn-word'; word.textContent = b.label; btn.replaceChildren(icon, word); /* the icon and the reply it sends, in words (#14419: an icon alone said nothing) */ btn.setAttribute('aria-label', `${label}, sends ${b.label} with any draft text and pictures`); btn.title = btn.getAttribute('aria-label'); }
                 btn.addEventListener('click', async () => {
                     if (sending || (binary && picturesBlocked())) return;
                     sending = true; err.textContent = ''; sync();
@@ -81,7 +80,7 @@ export function openAskDialog(a, onDone, runners = {}) {
                         const navigates = ['open:new-agent', 'open:task', 'open:artifact'].includes(got.action);
                         finish(); // the dialog is modal: it goes before the page it opens
                         try {
-                            if (got.action === 'open:new-agent') { if (!window.showLaunchModal) throw new Error('The New agent dialog is not available here.'); await window.showLaunchModal(); }
+                            if (got.action === 'open:new-agent') { if (!window.showLaunchModal) throw new Error('The New agent dialog is not available here.'); await window.showLaunchModal(fromAnotherComputer(a) ? normServer(a.server) : undefined); } // the computer the question came from is the one the dialog starts on (#14396)
                             else if (got.action === 'open:task') { if (!runners.task) throw new Error('Tasks cannot be opened here.'); await runners.task(a, String(got.arg)); }
                             else if (got.action === 'open:artifact') { if (!runners.artifact) throw new Error('Files cannot be opened here.'); await runners.artifact(a, String(got.arg)); }
                             else if (got.action === 'wake') { await wakeMember(a, String(got.arg)); showToast(`Woke ${markHidden(got.arg, { strict: true })}.`); }
@@ -92,7 +91,10 @@ export function openAskDialog(a, onDone, runners = {}) {
                             if (!navigates) await settleButton(a, b, 'failed').catch(() => {}); // give a failed wake back; navigation never claims an answer
                         }
                         refreshOperatorAsks(true);
-                    } catch (e) { err.textContent = e.message || 'Not done.'; sending = false; sync(); }
+                    } catch (e) {
+                        if (e && e.code === 'owner_only') { noteButtonsOwnerOnly(a.server); err.textContent = 'Only this computer\u2019s owner can use these buttons. Write a reply instead.'; sending = false; drawOffers(); sync(); return; } // a grantee: they are taken away, the text box stays
+                        err.textContent = e.message || 'Not done.'; sending = false; sync();
+                    }
                 });
                 choices.push(btn); item.append(btn, what); list.append(item);
             }
@@ -127,7 +129,7 @@ export function openAskDialog(a, onDone, runners = {}) {
         if (sending) return;
         sending = true; err.textContent = ''; dismiss.disabled = true; sync();
         try { const m = await importOnce('./ask_ignore.js'); await m.ignoreAsk(a, markHidden(a.asker, { strict: true })); forgetAsk(a); finish(); }
-        catch (e) { err.textContent = e.message || 'Could not dismiss it.'; dismiss.disabled = false; sending = false; sync(); }
+        catch (e) { if (e && e.code === 'owner_only') { dismiss.hidden = true; err.textContent = 'Only this computer\u2019s owner can dismiss it.'; } else err.textContent = e.message || 'Could not dismiss it.'; dismiss.disabled = false; sending = false; sync(); }
     });
     dlg.addEventListener('cancel', e => { e.preventDefault(); finish(); });
     box.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !send.disabled) { e.preventDefault(); send.click(); } }); // Ctrl or Cmd+Enter sends, as the task page's reply box does (#13148)

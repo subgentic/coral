@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"net/http"
+	"path/filepath"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
@@ -78,7 +79,8 @@ func ActivityRoutes() map[string]string {
 
 // ActivityRecorder writes the row of a listed route after its handler answered 2xx, for a person only. It wraps writes only (a GET is never an action), and a row that cannot be written is logged by the
 // store and never changes the answer: the record does not block the Operator.
-func ActivityRecorder(bs *board.Store) func(http.Handler) http.Handler {
+func ActivityRecorder(bs *board.Store, nameOf func(id string) string) func(http.Handler) http.Handler {
+	// nameOf is a file's name as it is stored, for the title of a click on a file (#14422). It is a required parameter, so a caller that forgets it does not build; nil says on purpose that none is looked up.
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.Method {
@@ -104,7 +106,9 @@ func ActivityRecorder(bs *board.Store) func(http.Handler) http.Handler {
 			}
 			if pend.set { // a handler that knows more than its route does (the body, a header) said which row this click is
 				if humanInputCaller(r) {
-					_ = bs.RecordActivity(context.WithoutCancel(r.Context()), activityMetaFor(r, pend.title, pend.note), pend.action, pend.kind, pend.item, "", pend.team)
+					meta := activityMetaFor(r, pend.title, pend.note)
+					meta.TaskID = pend.task
+					_ = bs.RecordActivity(context.WithoutCancel(r.Context()), meta, pend.action, pend.kind, pend.item, "", pend.team)
 				}
 				return
 			}
@@ -121,6 +125,9 @@ func ActivityRecorder(bs *board.Store) func(http.Handler) http.Handler {
 			}
 			ctx := context.WithoutCancel(r.Context())
 			title := ""
+			if ar.Kind == "file" && nameOf != nil && item != "" { // the file's name at the time of the click: star, unstar, keep, release (delete says its own, before the file is gone) (#14422)
+				title = nameOf(item)
+			}
 			if ar.Kind == "task" && team != "" {
 				if id, err := strconv.ParseInt(item, 10, 64); err == nil && id > 0 {
 					if t, err := bs.GetTask(ctx, team, id); err == nil && t != nil {
@@ -154,11 +161,53 @@ type activityPendingKey struct{}
 type activityPending struct {
 	set                                   bool
 	action, kind, item, team, title, note string
+	task                                  int64 // the task a file's upload is linked to, when the handler knows it (#14421)
 }
 
 // noteActivity asks the recorder for a row for this request's click; the last call wins. Outside the recorder (a handler called on its own in a test) it does nothing.
 func noteActivity(r *http.Request, action, kind, item, team, title, note string) {
 	if p, _ := r.Context().Value(activityPendingKey{}).(*activityPending); p != nil {
-		*p = activityPending{true, action, kind, item, team, title, note}
+		*p = activityPending{true, action, kind, item, team, title, note, 0}
 	}
+}
+
+// noteActivityTask adds the file's task to the row noteActivity asked for (#14421): the row's goal and task are then saved with it. Call it after noteActivity; a task the team does not have is dropped by the store.
+func noteActivityTask(r *http.Request, task int64) {
+	if p, _ := r.Context().Value(activityPendingKey{}).(*activityPending); p != nil && p.set {
+		p.task = task
+	}
+}
+
+// fileTaskOf is the task a file is linked to: a task's own artifact, or the task an upload's record names (the board says whether it is the team's, as the row's thread does). 0 when it has none.
+func taskOfFile(item teamArtifact) int64 {
+	if item.TaskID > 0 {
+		return item.TaskID
+	}
+	return item.uploadTask
+}
+
+// withFileTask is the Activity meta of a file action with the file's task on it (#14421).
+func withFileTask(m board.ActivityMeta, item teamArtifact) board.ActivityMeta {
+	m.TaskID = taskOfFile(item)
+	return m
+}
+
+// fileTaskOf reads a team file's task for a handler that has not loaded the file.
+func (h *BoardHandler) fileTaskOf(ctx context.Context, project, id string) int64 {
+	if item, ok := h.teamManagedArtifact(ctx, project, id); ok {
+		return taskOfFile(item)
+	}
+	return 0
+}
+
+// StoredFileName is a stored file's name from its metadata sidecar in coralDir's object folder ("" when there is none or it cannot be read): the name a row of the Activity record keeps for a click on a file
+// (#14422). The id is a 64-digit hex name or nothing.
+func StoredFileName(coralDir, id string) string {
+	if coralDir == "" || !objectNameRe.MatchString(id) {
+		return ""
+	}
+	if m, ok := readSidecar(filepath.Join(coralDir, "artifacts", "objects", id+".json")); ok {
+		return m.Name
+	}
+	return ""
 }

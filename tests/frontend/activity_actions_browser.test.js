@@ -31,14 +31,14 @@ const BASE = require('./test_base').BASE;
             const words=await ev(`document.querySelector('#group-table-view').textContent`);
             assert.ok(!words.includes('__oneshot__'),'internal one-off name is never shown');
             assert.ok(words.includes('Check release readiness') && words.includes('Job 42'),'run display name and legacy fallback shown');
-            if(!words.includes('You answered Ada’s question: “Ship it”')) missing.push(width+': You answered Ada’s question: “Ship it”');
-            if(!words.includes('You allowed claude-ada’s permission request: “Yes, once”')) missing.push(width+': You allowed claude-ada’s permission request: “Yes, once”');
-            if(!words.includes('You completed task #12 Ship release')) missing.push(width+': You completed task #12 Ship release');
+            if(!(words.includes('Answered')&&words.includes('Ada’s question')&&words.includes('Your answer: Ship it'))) missing.push(width+': Answered | Ada’s question | Your answer: Ship it (verb, object, detail: #14423)');
+            if(!(words.includes('Allowed')&&words.includes('claude-ada’s permission request')&&words.includes('Yes, once'))) missing.push(width+': Allowed | claude-ada’s permission request | Yes, once');
+            if(!(words.includes('Completed')&&words.includes('task #12 Ship release'))) missing.push(width+': Completed | task #12 Ship release');
             if(width===1280) assert.ok(await ev(`Array.from(document.querySelectorAll('#group-table-view tbody button.dt-primary')).every(b=>(b.getAttribute('aria-label')||'').startsWith(b.textContent.trim()))`),'visible sentence starts each item button name');
             if(width===390) assert.ok(await ev(`Array.from(document.querySelectorAll('#group-table-view tbody button.dt-mail-open')).every(b=>{const summary=b.querySelector('.dt-mail-ask')?.textContent;return !summary||(b.getAttribute('aria-label')||'').split(summary).length===2;})`),'phone action sentence is announced once');
             if(width===1280) {
-                const order=await ev(`(()=>{const read=()=>Array.from(document.querySelectorAll('#group-table-view tbody td[data-key="item"]')).map(e=>e.textContent.trim()),before=read();document.querySelector('#group-table-view thead th[data-key="item"] .dt-sort').click();return {before,after:read()};})()`);
-                assert.deepEqual(order.after,[...order.before].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'})),'On sorts by its displayed sentences');
+                const order=await ev(`(()=>{const read=()=>Array.from(document.querySelectorAll('#group-table-view tbody td[data-key="item"]')).map(e=>(e.querySelector('.dt-primary, .activity-item')||e).textContent.trim()),before=read();document.querySelector('#group-table-view thead th[data-key="item"] .dt-sort').click();return {before,after:read()};})()`);
+                assert.deepEqual(order.after,[...order.before].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'})),'On sorts by its displayed object words (the detail line is not part of it, #14423)');
             }
             const filters=await ev(`(async()=>{const p=window.__coralStatic||'/static/',a=await import(p+'inbox_activity.js'),f=await import(p+'operator_activity_filters.js');return f.ACTIONS.map(action=>[action,a.filtered({...f.EMPTY,action}).length]);})()`);
             assert.ok(filters.every(([action,count])=>count===(action==='run_seen'?4:1)),'every action can be filtered individually');

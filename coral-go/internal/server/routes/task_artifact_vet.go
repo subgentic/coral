@@ -136,6 +136,12 @@ func (h *BoardHandler) objectSidecar(id string) (agentArtifactMeta, bool) {
 	return meta, true
 }
 
+// objectSidecarName is the name the object's metadata sidecar records ("" when unreadable).
+func (h *BoardHandler) objectSidecarName(id string) string {
+	m, _ := h.objectSidecar(id)
+	return m.Name
+}
+
 // objectSidecarDigest is the digest the object's metadata sidecar records ("" when unreadable).
 func (h *BoardHandler) objectSidecarDigest(id string) string {
 	meta, _ := h.objectSidecar(id)

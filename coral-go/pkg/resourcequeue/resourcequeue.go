@@ -31,9 +31,12 @@ var (
 
 // Resource is a thing with slots.
 type Resource struct {
-	Key      string        // the name: unique in one Queue ("mac-heavy"; a server-qualified id is the caller's business)
-	Slots    int           // how many may hold it at once
-	Machine  string        // where it is, for people to read; not interpreted
+	Key     string // the name: unique in one Queue ("mac-heavy"; a server-qualified id is the caller's business)
+	Slots   int    // how many may hold it at once
+	Machine string // where it is, for people to read; not interpreted
+	// Where says where a run through this resource happens (#14354): WhereHere (on the machine the queue lives on) or WhereRemote (on another one, through the Operator's ssh alias for it), set by the Operator or an
+	// Orchestrator when they define it. Empty says nothing: a heavy run on it is refused, never run here by default.
+	Where    string
 	MaxLease time.Duration // a claim is held this long unless renewed (0: DefaultLease)
 	Allowed  []string      // agents that may claim it; empty: everyone
 	Members  []string      // a pool (#13719): the resources whose slots this one hands out, in the order they are tried; a pool has no slots of its own; its Match makes the shell hook claim the pool (a grant on another machine is told to the agent, #13751)
@@ -268,6 +271,9 @@ func ValidMatch(match []string) error {
 // Define makes a resource, or changes the slots, machine, lease and allowed list of one that exists. More slots grant the waiting at once; fewer never take a slot from a holder (the holds run out).
 func (q *Queue) Define(r Resource) error {
 	pool := len(r.Members) > 0
+	if r.Where != "" && r.Where != WhereHere && r.Where != WhereRemote {
+		return ErrBadResource
+	}
 	if r.Key == "" || (!pool && r.Slots < 1) || (pool && r.Slots != 0) {
 		return ErrBadResource
 	}
@@ -290,6 +296,12 @@ func (q *Queue) Define(r Resource) error {
 	q.notify(granted)
 	return err
 }
+
+// The values of Resource.Where (#14354).
+const (
+	WhereHere   = "here"
+	WhereRemote = "remote"
+)
 
 // MaxMembers is how many resources one pool may be made of.
 const MaxMembers = 8

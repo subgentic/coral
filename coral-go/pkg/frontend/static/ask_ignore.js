@@ -11,8 +11,8 @@ const NOTE = 'Dismissed by the operator';
 async function close(a, body) {
     const r = await serverFetch(a.server, `/api/board/${encodeURIComponent(a.board)}/asks/${encodeURIComponent(a.id)}/close`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (r.ok) return;
-    let why = ''; try { const b = await r.json(); why = b.message || b.error || ''; } catch { /* not JSON */ }
-    throw new Error(why || `Could not save (HTTP ${r.status}).`);
+    let why = '', code = ''; try { const b = await r.json(); why = b.message || b.error || ''; code = b.code || b.error || ''; } catch { /* not JSON */ }
+    throw Object.assign(new Error(why || `Could not save (HTTP ${r.status}).`), { code });
 }
 
 /** Close the question quietly. `who` is the asker as it is drawn (hidden characters written out). Resolves when the route answered; rejects with its words. */

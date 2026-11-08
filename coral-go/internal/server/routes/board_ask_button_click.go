@@ -106,8 +106,8 @@ func (h *BoardHandler) ClaimAskButton(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := map[string]any{"ok": true, "id": claimed.ID, "ask_id": askID, "label": claimed.Label, "action": claimed.Action, "arg": claimed.Arg}
-	h.recordActivity(r, board.ActAnswer, "question", strconv.FormatInt(askID, 10), project, "", claimed.Label) // the option the Operator chose (text an agent wrote: cleaned, redacted and cut)
-	inboxActioned(r, tracking.InboxAsk, "", "button", time.Time{})                                             // the Inbox's numbers (#7512): the kind and the action only
+	h.recordAskActivity(r, board.ActAnswer, project, askID, claimed.Label) // the option the Operator chose (text an agent wrote: cleaned, redacted and cut)
+	inboxActioned(r, tracking.InboxAsk, "", "button", time.Time{})         // the Inbox's numbers (#7512): the kind and the action only
 	if claimed.Action != board.ActionReply {
 		writeJSON(w, http.StatusOK, out)
 		return
