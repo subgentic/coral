@@ -33,6 +33,11 @@ const TEAM = `qa-status-${Date.now() % 100000}`;
         const landed = await sample();
         assert.ok(landed.shown && landed.h === [...hs][0], 'after the read lands the line is the same height (it changed from ' + [...hs][0] + ' to ' + landed.h + '): ' + JSON.stringify(landed));
         assert.ok(landed.h >= 30, 'the line is reserved at two lines high (390 px): ' + JSON.stringify(landed));
+        // a team with no live rows whose read FAILS says 'Status unavailable', and that line is two lines high too (the Orchestrator's case): the live list stands in for a failed read, so it is emptied here
+        await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.liveSessions = []; window.__statusMode = 'fail'; document.dispatchEvent(new CustomEvent('coral:team-sleep-changed', { detail: { team: ${JSON.stringify(TEAM)} } })); return true; })`);
+        await waitFor(`/unavailable/i.test((document.getElementById('team-page-status') || {}).textContent || '')`, 'a failed read of a team with no live rows says Status unavailable', 8000);
+        const unavailable = await sample();
+        assert.ok(unavailable.shown && unavailable.h >= 30, 'the Status unavailable line is reserved at two lines too (it would shift a scrolled page by a line otherwise): ' + JSON.stringify(unavailable));
         console.log('team_status_no_flash: ok');
     } finally { await removeBoards(ev, [TEAM]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
