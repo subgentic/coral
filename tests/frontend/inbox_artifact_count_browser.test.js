@@ -35,7 +35,7 @@ const { coralReady } = require('./helpers/wait');
             const first = await asks();
             assert.equal(first, 1, 'one count read on opening: ' + first);
             const reviewReads = await ev(`window.__reviewCounts`);
-            assert.equal(reviewReads.length, 2, 'the review summary is read at startup and invalidated once when the opened list publishes');
+            assert.equal(reviewReads.length, 1, 'the tagged waiting summary is also read exactly once on opening');
             assert.deepEqual(Object.fromEntries(new URL(reviewReads[0], BASE).searchParams), {tag:'for review',waiting:'1',muted:'0',versions:'newest',limit:'1'}, 'the second stream is only the bounded review-attention summary');
             const url = await ev(`window.__counts[0]`);
             assert.match(url, /[?&]versions=newest(&|$)/, 'the badge counts files, as the list shows them (#11777): one row per file, not one per version: ' + url);

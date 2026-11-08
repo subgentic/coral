@@ -24,7 +24,7 @@ import { resolveSessionIdentity, sessionStateInfo, askWords } from './session_st
 import './safe_markdown.js'; // the shared Inbox renderer's wrapper: the lazy Inbox modules import it, and a lazy module imports only what loads at startup (import_hygiene)
 
 const INBOX_URL = '/inbox';
-document.addEventListener('coral:reviews-changed', () => { countsRefresh?.(true); updateInboxTab(); });
+document.addEventListener('coral:reviews-changed', e => { countsRefresh?.(!e.detail?.countsUnchanged); updateInboxTab(); });
 onProposalsChanged(() => updateInboxTab()); // what agents asked to add and wait for the Operator's approval is a Needs you row (#11389)
 onRunsChanged(() => updateInboxTab()); // a failed run nobody has opened is a Needs you row (#9296)
 onOperatorAsksChanged(() => updateInboxTab()); // a question an agent asked the Operator is a Needs you row (#11417)
