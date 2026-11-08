@@ -44,17 +44,14 @@ func screenRig(t *testing.T, withSignals bool, screen string) (*holdRig, *screen
 	return r, st
 }
 
-func TestAPersonMessageIsHeldWhileAPromptIsOpenOnTheScreenWhateverTheSignalsSay(t *testing.T) {
+// The Orchestrator's ruling on #14357: a FRESH send is typed as before even with a menu on the screen (a person typing may be answering it); the screen look is for RELEASING a held message only.
+func TestAFreshPersonMessageIsTypedAsBeforeEvenWithAMenuOnTheScreen(t *testing.T) {
 	for name, withSignals := range map[string]bool{"signals say idle": true, "no signals at all": false} {
 		t.Run(name, func(t *testing.T) {
-			r, st := screenRig(t, withSignals, permissionMenuScreen)
-			rec := r.send("deploy to staging")
-			assert.Equal(t, http.StatusAccepted, rec.Code, rec.Body.String())
-			time.Sleep(4 * personHoldSettle.Load())
-			assert.Empty(t, r.typed(), "nothing is typed into a prompt that is on the screen")
-			st.set("> \n", nil) // the person answered it: no prompt left
-			r.waitTyped(1, 3*time.Second)
-			assert.Equal(t, []string{"deploy to staging"}, r.typed(), "typed once, after the prompt was gone")
+			r, _ := screenRig(t, withSignals, permissionMenuScreen)
+			rec := r.send("1")
+			assert.NotEqual(t, http.StatusAccepted, rec.Code, "not held: %s", rec.Body.String())
+			assert.Equal(t, []string{"1"}, r.typed(), "typed as before: the person may be answering the menu")
 		})
 	}
 }
@@ -67,7 +64,7 @@ func TestAPersonMessageIsTypedAtOnceWhenTheScreenShowsNoPromptOrCannotBeRead(t *
 	st.set("", errors.New("no screen"))
 	rec = r.send("again")
 	assert.NotEqual(t, http.StatusAccepted, rec.Code, rec.Body.String())
-	assert.Equal(t, []string{"hello", "again"}, r.typed(), "a screen that cannot be read holds nothing: a person's send goes on unless a prompt is seen")
+	assert.Equal(t, []string{"hello", "again"}, r.typed(), "a screen that cannot be read holds nothing")
 }
 
 func TestAHeldPersonMessageWaitsAgainWhenAPromptOpensOnTheScreenBeforeItIsTyped(t *testing.T) {
@@ -82,4 +79,26 @@ func TestAHeldPersonMessageWaitsAgainWhenAPromptOpensOnTheScreenBeforeItIsTyped(
 	st.set("> \n", nil)
 	r.waitTyped(1, 3*time.Second)
 	assert.Equal(t, []string{"deploy"}, r.typed())
+}
+
+// Security's condition (a) on #14357: a held message is never typed into a prompt that stays on the screen; it ends as not sent after personHoldMax, and the person is told.
+func TestAHeldPersonMessageEndsAsNotSentWhenAPromptStaysOnTheScreen(t *testing.T) {
+	old := personHoldMax
+	personHoldMax = 300 * time.Millisecond
+	t.Cleanup(func() { personHoldMax = old })
+	r, st := screenRig(t, true, "> \n")
+	r.box("permission")
+	got := make(chan error, 1)
+	held, err := r.h.deliverPersonSend(context.Background(), r.name, "claude", r.sid, "too late", false, func(err error) { got <- err })
+	require.NoError(t, err)
+	require.NotEmpty(t, held)
+	st.set(permissionMenuScreen, nil) // another prompt opens and stays; the signals clear
+	r.answered()
+	select {
+	case err := <-got:
+		assert.Equal(t, errSendHeldExpired, err, "the person is told it was not sent")
+	case <-time.After(3 * time.Second):
+		t.Fatal("the hold has an end")
+	}
+	assert.Empty(t, r.typed(), "never typed into a prompt")
 }
