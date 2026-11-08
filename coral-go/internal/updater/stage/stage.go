@@ -72,6 +72,8 @@ type Config struct {
 	ReleasesURL, FeedURL, DownloadBase string
 	// RefsURL is where the promote-* tags are listed by name (PromoteRefs): asked when the feed names no promotion, before the releases list. "" (a test's own server without it) leaves only the list.
 	RefsURL string
+	// ReleaseByTagURL is where one release is looked up by its tag (ReleaseByTag); "" leaves a 404 of a tag-named promotion always a stop.
+	ReleaseByTagURL string
 	// Asset names the package for this platform in the sums file.
 	Asset func(version string) string
 	Now   func() time.Time
@@ -95,6 +97,7 @@ func (c *Config) defaults() {
 		c.ReleasesURL = ReleasesList
 		if c.RefsURL == "" {
 			c.RefsURL = PromoteRefs
+			c.ReleaseByTagURL = ReleaseByTag
 		}
 		if c.FeedURL == "" {
 			c.FeedURL = ReleasesFeed // GitHub's own list is asked for its feed first; a config with its own list (a test's) has no feed unless it names one
@@ -188,12 +191,13 @@ func dropStaleStage(st *verify.State, installed string) string {
 }
 
 type checker struct {
-	cfg    Config
-	dir    string
-	st     verify.State
-	now    time.Time
-	res    Result
-	newest string // the highest product release (X.Y.Z) this check saw in the feed or the API's list, "" when it saw none
+	cfg        Config
+	dir        string
+	st         verify.State
+	now        time.Time
+	res        Result
+	newest     string // the highest product release (X.Y.Z) this check saw in the feed or the API's list, "" when it saw none
+	tagLookups int    // releases looked up by tag in this check (at most one, releaseExistsForTag)
 }
 
 // recordOutcome keeps what the check found for Settings and the dashboard's notice (#9726): the result, the newest release it saw and when. A result is one of verify.CheckResults; a failure that was GitHub's rate limit
