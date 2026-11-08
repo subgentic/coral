@@ -20,10 +20,15 @@ if (!scenario) {
     // the words (no account needed)
     installDom({ mode: 'local' });
     const api = await importUi('artifact_comments_api');
-    assert.equal(api.lockedWords({ locked: true, canLock: true, lockScope: 'board', lockBoard: 'team-a' }, 'file'), 'Comments are locked on every file of team-a. You can unlock it any time.');
-    assert.equal(api.lockedWords({ locked: true, canLock: false, lockScope: 'board', lockBoard: 'team-a' }, 'file'), 'Comments are locked on every file of team-a: read only.');
+    assert.equal(api.lockedWords({ locked: true, canLock: true, lockScope: 'board', lockBoard: 'team-a' }, 'file'), 'Comments are locked on every file of team-a: read only. It is a board-wide lock, so it is changed on the computer itself, not from one file.');
+    assert.equal(api.lockedWords({ locked: true, canLock: false, lockScope: 'board', lockBoard: 'team-a' }, 'file'), 'Comments are locked on every file of team-a: read only. It is a board-wide lock, so it is changed on the computer itself, not from one file.');
     assert.equal(api.lockedWords({ locked: true, canLock: true, lockScope: 'artifact' }, 'file'), 'Comments are locked: nobody can add comments to this file. You can unlock it any time.');
     assert.equal(api.lockedWords({ locked: true, canLock: false }, 'file'), 'Comments are locked: read only.');
+    // a board-wide lock is not undone by the artifact Unlock (setLocked deletes scope artifact only): the drawer draws no Unlock for it (source pin; the drawer itself is not mounted here)
+    const { readFileSync } = await import('node:fs');
+    const drawer = readFileSync(new URL('../../coral-go/pkg/frontend/static/artifact_comments.js', import.meta.url), 'utf8');
+    assert.match(drawer, /if \(d\.canLock && !\(d\.locked && d\.lockScope === 'board'\)\)/, 'no Unlock button for a board-scoped lock');
+    assert.doesNotMatch(api.lockedWords({ locked: true, canLock: true, lockScope: 'board', lockBoard: 'team-a' }, 'file'), /unlock it any time/, 'the board-lock words never offer an unlock the button cannot do');
     const send = await importUi('artifact_comment_send');
     assert.equal(send.SEND_COMMENT_CAP, 700);
     const mk = long => send.buildSendBlock({ id: 1, board: 'team-a', agents: [], picked: new Set(), asked: new Map(), count: 1, long, results: null, busy: false, error: '', onToggle() {}, onCancel() {}, onSend() {} });

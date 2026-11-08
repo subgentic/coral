@@ -83,6 +83,6 @@ export async function sendComment(hex, server, id, agents) {
 
 /** What the drawer says of a lock (#14549): a lock that covers a whole board says so (every file of the board), one on this file says that; the owner is told they can unlock it, anyone else that it is read only. */
 export function lockedWords(d, subject) {
-    if (d.lockScope === 'board') return `Comments are locked on every file of ${d.lockBoard || 'this board'}${d.canLock ? '. You can unlock it any time.' : ': read only.'}`;
+    if (d.lockScope === 'board') return `Comments are locked on every file of ${d.lockBoard || 'this board'}: read only. It is a board-wide lock, so it is changed on the computer itself, not from one file.`;
     return d.canLock ? `Comments are locked: nobody can add comments to this ${subject}. You can unlock it any time.` : 'Comments are locked: read only.';
 }

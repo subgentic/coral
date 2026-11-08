@@ -215,7 +215,8 @@ export function attachComments(dialog, body, host, opts = {}) {
             head.append(sr);
         }
         const d = st.data;
-        if (d.canLock) { // one small lock beside the heading (#13578): closed lock = locked; the explanation is its tip, not a box
+        if (d.canLock && !(d.locked && d.lockScope === 'board')) { // a board-wide lock is not undone by the artifact Unlock (it deletes only the artifact lock): no button, the note says where (#14549)
+          // one small lock beside the heading (#13578): closed lock = locked; the explanation is its tip, not a box
             const why = d.locked ? `Comments are locked: nobody can add comments to this ${opts.words?.subject || 'file'}. Press to unlock.` : `Locking stops anyone adding comments to this ${opts.words?.subject || 'file'}. You can unlock it any time.`;
             const lock = el('button', 'btn btn-quiet btn-icon btn-xs ac-lock'); lock.type = 'button';
             lock.append(el('span', 'material-icons', d.locked ? 'lock' : 'lock_open'));
