@@ -107,7 +107,7 @@ const { JSDOM } = require('jsdom');
     // (1) Settings opened while a sign-in already waits: it keeps reading the status, without a new Connect.
     m.stopDropboxPoll();
     await status({ app_key_set: true, connected: false, state: 'disconnected', signin_pending: true });
-    assert.ok(m.dropboxPolling(), 'a pending sign-in is followed when Settings opens');
+    assert.strictEqual($('settings-dropbox').dataset.polling, '1', 'a pending sign-in is followed when Settings opens');
     assert.match($('settings-dropbox-status').textContent, /Waiting for you to click Allow/);
     // (2) It expires (no longer pending, not connected): the person is told, with Connect to try again.
     await status({ app_key_set: true, connected: false, state: 'disconnected' });

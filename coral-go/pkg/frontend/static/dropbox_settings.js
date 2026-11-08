@@ -112,19 +112,23 @@ export async function loadDropbox() {
     return st;
 }
 
-// dropboxPolling says whether the status is being read again while a sign-in waits (for tests).
-export function dropboxPolling() {
-    return pollTimer !== null;
+
+// polling marks the block while the status is read again for a waiting sign-in (data-polling).
+function polling(on) {
+    const el = $('settings-dropbox');
+    if (el) el.dataset.polling = on ? '1' : '0';
 }
 
 export function stopDropboxPoll() {
     if (pollTimer) clearTimeout(pollTimer);
     pollTimer = null;
+    polling(false);
 }
 
 // poll reads the status every two seconds while a sign-in waits, and stops when it ends or after five minutes.
 function poll() {
     stopDropboxPoll();
+    polling(true);
     pollTimer = setTimeout(async () => {
         const st = await loadDropbox();
         if (st && (st.signin_pending || (!st.connected && !st.switch_pending && Date.now() < pollUntil)) && Date.now() < pollUntil) poll();
