@@ -44,12 +44,24 @@ const { coralReady } = require('./helpers/wait');
             check(`${at}review cards with a version pill are there and the pill is inside the card`, r.cards.filter(c => c.pill).length >= 2 && r.cards.every(c => c.pillInside), JSON.stringify(r.cards.map(c => c.pill)));
             check(`${at}the asker keeps a readable width (at least 56 px)`, r.cards.every(c => c.fromW === null || c.fromW >= 56), JSON.stringify(r.cards.map(c => c.fromW)));
             check(`${at}nothing is wider than the screen`, r.wide <= 0, String(r.wide));
-            // a cut chip says its whole name when tapped (the hover title is no help on a phone, #14705) and the card does not open; a chip that fits leaves the tap to the card
-            const tap = await ev(`(() => { const chips = [...document.querySelectorAll('#group-table-view tbody tr.dt-row .inbox-computer-chip, #group-table-view tbody tr.dt-row .dt-mail-computer')]; const cut = chips.find(c => c.scrollWidth > c.clientWidth + 1); if (!cut) return { none: true, chips: chips.length }; document.querySelectorAll('.toast').forEach(t => t.remove()); cut.scrollIntoView({ block: 'center', behavior: 'instant' }); const full = cut.textContent.trim(); cut.click(); return { full, chips: chips.length }; })()`);
-            if (tap.none) check(`${at}(no chip is cut at this size: nothing to tap)`, true, String(tap.chips));
+            // the whole computer name reaches a finger, a keyboard and a screen reader (#14705): a CUT chip is a button (role, focusable, named) that says its whole name in a toast on a real tap, Enter and Space, and the card's own button names the computer too
+            const info = await ev(`(() => { const chips = [...document.querySelectorAll('#group-table-view tbody tr.dt-row .inbox-computer-chip')]; const cut = chips.find(c => c.scrollWidth > c.clientWidth + 1); const tr = (cut || chips[0] || {}).closest ? (cut || chips[0]).closest('tr') : null; const from = tr && tr.querySelector('.inbox-review-from'); const full = (cut || chips[0] || {}).textContent; return { chips: chips.length, haveCut: !!cut, full: full && full.trim(), role: cut && cut.getAttribute('role'), tabindex: cut && cut.tabIndex, label: cut && cut.getAttribute('aria-label'), fromLabel: from && from.getAttribute('aria-label') }; })()`);
+            check(`${at}a card chip is a named, focusable button and the card's button names the computer`, info.chips >= 2 && !!info.full && (!info.haveCut || (info.role === 'button' && info.tabindex === 0 && info.label === 'Computer: ' + info.full)) && (info.fromLabel || '').includes('on ' + info.full), JSON.stringify(info));
+            if (!info.haveCut) check(`${at}(no chip is cut at this size: nothing to tap)`, true, String(info.chips));
             else {
-                await waitFor(`!![...document.querySelectorAll('.toast')].find(t => t.textContent.includes(${JSON.stringify(tap.full)}))`, `${at}the cut chip's tap says its whole name`, 4000);
-                check(`${at}tapping a cut chip says its whole name in a toast and opens no dialog`, await ev(`!document.querySelector('dialog[open]')`), tap.full);
+                const point = () => ev(`(() => { const c = [...document.querySelectorAll('#group-table-view tbody tr.dt-row .inbox-computer-chip')].find(x => x.scrollWidth > x.clientWidth + 1); c.scrollIntoView({ block: 'center', behavior: 'instant' }); const b = c.getBoundingClientRect(); return { x: Math.round((b.left + b.right) / 2), y: Math.round((b.top + b.bottom) / 2) }; })()`);
+                const toasted = () => ev(`[...document.querySelectorAll('.toast')].some(t => t.textContent.includes(${JSON.stringify(info.full)}))`);
+                const clear = () => ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); true`);
+                await clear(); let pt = await point();
+                await client.Input.dispatchTouchEvent({ type: 'touchStart', touchPoints: [{ x: pt.x, y: pt.y }] }); await client.Input.dispatchTouchEvent({ type: 'touchEnd', touchPoints: [] });
+                await waitFor(`[...document.querySelectorAll('.toast')].some(t => t.textContent.includes(${JSON.stringify(info.full)}))`, `${at}a real tap on the cut chip says its whole name`, 4000);
+                check(`${at}a real tap on a cut chip says its whole name in a toast and opens no dialog`, await ev(`!document.querySelector('dialog[open]')`), info.full);
+                for (const [key, code, vk, text] of [['Enter', 'Enter', 13, '\r'], [' ', 'Space', 32, ' ']]) {
+                    await clear(); await ev(`(() => { const c = [...document.querySelectorAll('#group-table-view tbody tr.dt-row .inbox-computer-chip')].find(x => x.scrollWidth > x.clientWidth + 1); c.focus(); return document.activeElement === c; })()`);
+                    await client.Input.dispatchKeyEvent({ type: 'keyDown', key, code, windowsVirtualKeyCode: vk, text }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key, code, windowsVirtualKeyCode: vk });
+                    await waitFor(`[...document.querySelectorAll('.toast')].some(t => t.textContent.includes(${JSON.stringify(info.full)}))`, `${at}${key === ' ' ? 'Space' : 'Enter'} on the cut chip says its whole name`, 4000);
+                    check(`${at}${key === ' ' ? 'Space' : 'Enter'} on the focused chip says its whole name and opens no dialog`, await ev(`!document.querySelector('dialog[open]')`), info.full);
+                }
             }
         }
     } finally { await client.close(); }
