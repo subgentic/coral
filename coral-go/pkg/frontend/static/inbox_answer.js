@@ -93,6 +93,16 @@ async function readAsk(s) {
     return picks.length >= 1 && picks.length <= MAX_CHOICES ? { ask: String(po.ask_id || ''), picks, onlyReject, held, question: stepClean(po.question).slice(0, 120), target, targetNote } : { ...none, target, targetNote };
 }
 
+/** The agent's whole question for a row's Show all (#14637): what the chat card says, as one clean line, up to 4096 characters; '' when the read is refused or the agent asks nothing now. Read on the click only. */
+export async function readWholeQuestion(s) {
+    const params = new URLSearchParams({ after: '0', limit: '1', session_id: s.session_id, agent_type: s.agent_type || '' });
+    const resp = await serverFetch(sessionServer(s), `/api/sessions/live/${encodeURIComponent(s.name)}/chat?${params}`);
+    if (!resp.ok) return '';
+    const reply = await resp.json().catch(() => null) || {};
+    const q = stepClean(reply.prompt_options && reply.prompt_options.question);
+    return q.length > 4096 ? `${q.slice(0, 4096)}\u2026` : q;
+}
+
 const askKey = s => `${sessionServer(s)}:${s.session_id}:${s.waiting_since || ''}`;
 
 async function answer(s, o, ask, cell, step = '', trustFolder = '') { // step: the whole review text the row was drawn for ('' for a step with no review)
