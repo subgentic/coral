@@ -75,6 +75,20 @@ const GOALS = [
             await pick('done'); await settle(600);
             check(`${label}: the Done pill reads the finished goals and lists them (#14601)`, JSON.stringify(await titles()) === JSON.stringify(['Close the old board']), JSON.stringify(await titles()));
             await pick('all'); await settle(600);
+
+            // #14663 (QA Reviewer 2): a page opened with Done SAVED as the filter reads the finished goals first; the other pills' counts must still come from the open goals (one open read first, then Done's own)
+            await pick('done'); await settle(600);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+            await coralReady('startup', 'liveList', 'settings');
+            await ev(`(() => { const R = window.fetch; window.fetch = (u, o) => /\\/api\\/goals(\\?|$)/.test(String(u)) ? Promise.resolve(new Response(JSON.stringify({ goals: ${JSON.stringify(GOALS)}.filter(g => (g.state === 'done') === /[?&]state=done/.test(String(u))) }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : R(u, o); return true; })()`);
+            await ev(`window.switchNavTab('hub-inbox'); true`);
+            await waitFor(`document.querySelectorAll('.view-list-item').length > 3 || !!document.querySelector('.view-list select')`, 'the folders again', 10000);
+            if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); if (s) { s.value = 'goals'; s.dispatchEvent(new Event('change', { bubbles: true })); } return true; })()`);
+            else await ev(`document.querySelector('.view-list-item[data-key="goals"]').click(); true`);
+            await waitFor(`/Close the old board/.test(document.body.innerText)`, `${label}: the saved Done pill lists the finished goal`, 10000); await settle(600);
+            const saved = await ev(`(() => { const s = document.querySelector('.inbox-folder-toolbar .team-tb-select'); const sel = s && s.getClientRects().length ? [...s.options].map(o => o.textContent.trim()) : null; return (sel || [...document.querySelectorAll('.team-tb-pills .goals-chip')].map(b => b.textContent.trim())).join('|'); })()`);
+            check(`${label}: after a reload with Done saved, the other pills still count the open goals (#14663)`, /All 4/.test(saved) && /Active 2/.test(saved) && /Blocked 1/.test(saved) && /Proposed 1/.test(saved) && /Done 1/.test(saved), saved);
+            await pick('all'); await settle(600);
         }
     } finally { await client.close(); }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }
