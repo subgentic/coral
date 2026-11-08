@@ -229,6 +229,7 @@ export async function loadDropbox() {
         if (!pollTimer) { pollUntil = Date.now() + POLL_FOR_MS; poll(); }
         wasPending = true;
     } else {
+        if (wasPending && (st.connected || st.switch_pending)) note(''); // the sign-in finished: its "open it here" link is stale (#14736)
         if (wasPending && !st.connected && !st.switch_pending) {
             note('The Dropbox sign-in timed out or was cancelled. Connect again to try once more.'); // MUST 2: say it, with Connect shown by render
         }
@@ -287,10 +288,10 @@ export async function connectDropbox() {
     const tab = window.open(url, '_blank', 'noopener');
     setStatus('Waiting for you to click Allow in Dropbox…');
     wasPending = true;
-    if (!tab) {
-        // The browser blocked the new tab (MUST 3): the same page as a link the person opens.
-        note('Your browser blocked the Dropbox tab. Open it here:', url, true, 'Open Dropbox to sign in');
-    }
+    // With noopener, window.open answers null even when the tab opened, so the page cannot tell a blocked tab (#14736, UI Reviewer's SHOULD on
+    // #14609): the same page is always offered as a link, in words that are true either way.
+    void tab;
+    note("If the Dropbox tab didn't open, open it here:", url, true, 'Open Dropbox to sign in');
     pollUntil = Date.now() + POLL_FOR_MS;
     poll();
 }

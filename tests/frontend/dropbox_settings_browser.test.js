@@ -63,6 +63,19 @@ const { coralReady } = require('./helpers/wait');
             check(`${tag}: Disconnect is shown and nothing covers it`, disc.ok, JSON.stringify(disc));
             check(`${tag}: no sideways scroll`, await ev(`document.documentElement.scrollWidth <= innerWidth + 1`));
             await shot(`dropbox-settings-connected-${w}`);
+            console.log(`${tag}: the layout (#14736, the Operator's shot)`);
+            const lay = await ev(`(() => { const box = r => ({ t: Math.round(r.top), b: Math.round(r.bottom), l: Math.round(r.left), r: Math.round(r.right), h: Math.round(r.height), w: Math.round(r.width) });
+                const pairs = [...document.querySelectorAll('#settings-dropbox-types label')].map(l => { const i = l.querySelector('input'), t = box(l.getBoundingClientRect()), c = box(i.getBoundingClientRect()); return { h: t.h, gap: t.r - c.r, sameLine: Math.abs((c.t + c.b) / 2 - (t.t + t.b) / 2) < 8, boxFirst: c.l <= t.l + 2 }; });
+                const tops = new Set([...document.querySelectorAll('#settings-dropbox-types label')].map(l => Math.round(l.getBoundingClientRect().top)));
+                const fs = getComputedStyle(document.querySelector('#settings-dropbox .settings-dropbox-filters'));
+                const age = document.getElementById('settings-dropbox-age').getBoundingClientRect(), ageLabel = document.querySelector('label[for="settings-dropbox-age"]').getBoundingClientRect();
+                const pane = document.getElementById('settings-dropbox').getBoundingClientRect();
+                return { pairs, rows: tops.size, border: fs.borderTopWidth, ageW: Math.round(age.width), ageInPane: age.left >= pane.left - 1 && age.right <= pane.right + 1, ageBesideLabel: age.top < ageLabel.bottom + 2 }; })()`);
+            check(`${tag}: each type's box comes first and sits on the same line as its name, close to it`, lay.pairs.length === 10 && lay.pairs.every(p => p.sameLine && p.boxFirst && p.h < 40), JSON.stringify(lay.pairs.slice(0, 3)));
+            check(`${tag}: the ten types fit in a compact grid (at most ${w > 600 ? 2 : 5} rows)`, lay.rows <= (w > 600 ? 2 : 5), String(lay.rows));
+            check(`${tag}: no box drawn round the sections`, lay.border === '0px', lay.border);
+            check(`${tag}: the age field is a small box in the page${w > 600 ? ', on the line of its label' : ''}`, lay.ageW < 140 && lay.ageInPane && (w <= 600 || lay.ageBesideLabel), JSON.stringify(lay));
+            await shot(`dropbox-settings-layout-${w}`);
             await ev(`window.hideSettingsModal && window.hideSettingsModal(); true`);
         }
     } finally { await client.close(); }

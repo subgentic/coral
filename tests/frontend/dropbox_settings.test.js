@@ -134,9 +134,17 @@ const { JSDOM } = require('jsdom');
     assert.strictEqual(link.getAttribute('href'), 'https://www.dropbox.com/oauth2/authorize?y=2');
     assert.strictEqual(link.getAttribute('target'), '_blank');
     assert.match(link.getAttribute('rel') || '', /noopener/);
-    assert.match($('settings-dropbox-note').textContent, /blocked/);
+    assert.match($('settings-dropbox-note').textContent, /If the Dropbox tab didn't open, open it here:/);
     m.stopDropboxPoll();
     popupBlocked = false;
+    // With noopener a browser answers null even when the tab opened (#14736): the words are true either way, never "blocked".
+    await m.connectDropbox();
+    assert.doesNotMatch($('settings-dropbox-note').textContent, /blocked/);
+    assert.ok($('settings-dropbox-note').querySelector('a'), 'the link is there in both cases');
+    // Once the sign-in finishes, the link is gone (the Operator saw it stay under "Connected").
+    await status({ app_key_set: true, connected: true, state: 'connected', account_id: 'dbid:AAA' });
+    assert.strictEqual($('settings-dropbox-note').textContent, '', 'no stale sign-in link once connected');
+    m.stopDropboxPoll();
 
     // Stage 4c (#14693): the backup's counts, its filters and a full Dropbox.
     const connected = { app_key_set: true, connected: true, state: 'connected', account_id: 'dbid:AAA',
