@@ -3,6 +3,7 @@
 //   agent_ui.js         (none since #5090: a panel on a local Coral goes through panel_sandbox.js's host frame, as on the hub)
 //   artifact_preview.js the Linked preview: an external https address in a locked sandbox (no scripts, forms, popups or navigation)
 //   panel_sandbox.js    the constant address of the panel host page
+//   artifact_scripts.js the constant address of the trusted-HTML host page (#14730, design v3 read and approved by Security)
 //   view_sandbox.js     the constant address of the custom-view host page
 //   inbox_tab.js        the constant '/inbox'
 //   artifacts_tab.js    the constant '/artifacts'
@@ -14,7 +15,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const STATIC = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'coral-go', 'pkg', 'frontend', 'static');
-const ALLOWED = { 'artifact_preview.js': 1, 'panel_sandbox.js': 1, 'view_sandbox.js': 1, 'inbox_tab.js': 1, 'artifacts_tab.js': 1, 'inbox_sidebar.js': 1 };
+const ALLOWED = { 'artifact_preview.js': 1, 'artifact_scripts.js': 1, 'panel_sandbox.js': 1, 'view_sandbox.js': 1, 'inbox_tab.js': 1, 'artifacts_tab.js': 1, 'inbox_sidebar.js': 1 };
 const found = {};
 for (const f of fs.readdirSync(STATIC).filter(n => n.endsWith('.js'))) {
     const src = fs.readFileSync(path.join(STATIC, f), 'utf8');

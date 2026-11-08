@@ -402,6 +402,7 @@ export function openArtifactViewer(hex, opts = {}) {
     dl.onclick = isCloud() ? (e) => { e.preventDefault(); if (dl.getAttribute('aria-disabled') === 'true') return; downloadArtifact(url, sanitizeDownloadName(opts.filename || 'artifact')).catch(err => { title.textContent = err.message; }); } : null;
     const body = d.querySelector('.artifact-viewer-body');
     const wasOpen = !d.hidden;
+    if (!d._sandboxRedraw) { d._sandboxRedraw = true; body.addEventListener('coral-preview-redrawn', () => syncSandbox(d, body)); } // scripts turned on or off (#14730) change which banner is there
     if (typeof opts.onClose === 'function') _onClose = opts.onClose;
     else if (!wasOpen) _onClose = null;
     d.hidden = false;
@@ -440,7 +441,7 @@ export function openArtifactViewer(hex, opts = {}) {
     readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) { _details.add(readersBlock(hex, opts.server, _details)); if (opts.sourceNamed) _details.add(privateBlock(hex, opts.server, _details)); } }).catch(() => {});
     if (!opts.switched) d.querySelector('.artifact-viewer-close').focus(); // a version chosen from the bar keeps the keyboard on the bar
     let textShown = false; // the strict text view drew it: comments can point into it. Anything else (a frame, a picture, a PDF, a table, a video, a download) takes whole-document comments (#11444).
-    Promise.resolve(renderArtifact(body, `coral://artifacts/${hex}`, { server: opts.server, board: opts.board, sourceNamed: opts.sourceNamed, filename: opts.filename, mediaType: opts.mediaType }, {
+    Promise.resolve(renderArtifact(body, `coral://artifacts/${hex}`, { server: opts.server, board: opts.board, sourceNamed: opts.sourceNamed, filename: opts.filename, mediaType: opts.mediaType, scripts: true }, {
         signal: _abort.signal,
         isStale: () => gen !== _gen || d.hidden,
         opened: () => { if (opts.sourceNamed && gen === _gen && !d.hidden) importOnce('./inbox_reviews.js').then(m => m.recordOpenedVersion(hex, { server: opts.server, board: opts.board })).catch(() => {}); },
