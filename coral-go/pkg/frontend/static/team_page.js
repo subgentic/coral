@@ -278,7 +278,7 @@ async function readCounts() {
     S.counts.needs ??= '…';
     importOnce('./inbox_sidebar.js').then(m => m.refreshTeamNeedsCount(team)).then(count => {
         if (seq !== S.countSeq || team !== S.team) return;
-        S.counts.needs = count.complete ? count.value : count.value ? `${count.value}+` : '…'; drawCounts();
+        S.counts.needs = count.ownerOnly ? '' : count.complete ? count.value : count.value ? `${count.value}+` : '…'; drawCounts();
     }).catch(() => { if (seq === S.countSeq && team === S.team) { S.counts.needs = '…'; drawCounts(); } });
     const knowledge = S.knowledgeFor === team ? null : (S.knowledgeFor = team, teamFetch(team, n => `/api/teams/detail/${encodeURIComponent(n)}/knowledge`).then(async r => { const data = await r.json(); return r.ok ? data : null; }).catch(() => null)); // the Knowledge tab's count once per team, with the others (the notes are read again when the tab opens)
     const [goals, tasks, avail, kn] = await Promise.allSettled([
@@ -302,7 +302,7 @@ async function readCounts() {
 function syncNeedsCount() {
     if (!S.team || !currentTeamPage()) return;
     const team = S.team;
-    importOnce('./inbox_sidebar.js').then(m => { if (S.team !== team) return; const count = m.teamNeedsCount(team); S.counts.needs = count.complete ? count.value : count.value ? `${count.value}+` : '…'; drawCounts(); });
+    importOnce('./inbox_sidebar.js').then(m => { if (S.team !== team) return; const count = m.teamNeedsCount(team); S.counts.needs = count.ownerOnly ? '' : count.complete ? count.value : count.value ? `${count.value}+` : '…'; drawCounts(); });
 }
 document.addEventListener('coral:needs-updated', () => { if (S.team && currentTeamPage()) drawStatus(S.statusData); syncNeedsCount(); });
 document.addEventListener('coral:team-needs-count', e => { if (e.detail?.team === S.team) syncNeedsCount(); });

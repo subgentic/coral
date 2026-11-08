@@ -1063,7 +1063,7 @@ export function teamNeedsCount(team) {
     const review = teamReviewTotals.get(team);
     const source = splitKey(team).server;
     const incomplete = readGaps().some(gap => gap.source === source);
-    return { value: nonReview + (review?.value || 0), complete: !!review?.complete && !incomplete };
+    return { value: nonReview + (review?.value || 0), complete: !!review?.complete && !incomplete, ownerOnly: !!review?.ownerOnly };
 }
 export function refreshTeamNeedsCount(team, force = false) {
     const previous = teamReviewTotals.get(team);
@@ -1076,7 +1076,7 @@ export function refreshTeamNeedsCount(team, force = false) {
     entry.pending = (async () => {
         try {
             const response = await serverFetch(source.server, `/api/team-artifacts?${query}`, { signal: AbortSignal.timeout(5000) }), body = await response.json();
-            if (response.status === 403 && (body.code === 'owner_only' || body.error === 'owner_only')) { entry.value = 0; entry.complete = true; }
+            if (response.status === 403 && (body.code === 'owner_only' || body.error === 'owner_only')) { entry.value = 0; entry.complete = true; entry.ownerOnly = true; }
             else if (response.ok && Number.isSafeInteger(body.total) && body.total >= 0 && !body.partial && !body.truncated && !body.failed_boards?.length) { entry.value = body.total; entry.complete = true; }
         } catch { /* no unread source is certified as zero */ }
         finally { entry.pending = null; }
@@ -1095,7 +1095,7 @@ export function showTeamNeeds(host, team, { onCount = () => {} } = {}) {
     const profile = needsProfiles.get(team) || { filters: NF.clean({ ...NF.EMPTY }), bar: null, order: null, query: '', state: DT.tableState(), table: null };
     activeNeedsTeam = team;
     needsFilters = profile.filters; needsBar = profile.bar; needsOrder = profile.order; queries.needs = profile.query; needsState = profile.state; needsTable = profile.table;
-    const toolbarHost = DT.el('div', 'gt-toolbar'), body = DT.el('div', 'team-needs-body');
+    const toolbarHost = DT.el('div', 'team-needs-toolbar'), body = DT.el('div', 'team-needs-body');
     host.replaceChildren(toolbarHost, body);
     let disposed = false, drawing = false, signature = '';
     const redraw = () => {
@@ -1104,7 +1104,8 @@ export function showTeamNeeds(host, team, { onCount = () => {} } = {}) {
         try {
             const spec = needsListSpec(), toolbar = inboxNeedsToolbar();
             const count = teamNeedsCount(team);
-            onCount(count.complete ? count.value : count.value ? `${count.value}+` : '…');
+            onCount(count.ownerOnly ? '' : count.complete ? count.value : count.value ? `${count.value}+` : '…');
+            if (count.ownerOnly) { toolbarHost.replaceChildren(); body.replaceChildren(DT.el('p', 'goals-note', "Only this computer's owner sees this.")); signature = ''; return; }
             if (spec.signature === signature && host.contains(toolbar.node)) return;
             signature = spec.signature;
             if (!toolbarHost.contains(toolbar.node)) toolbarHost.replaceChildren(toolbar.node);
