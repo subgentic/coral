@@ -25,11 +25,18 @@ var bypassFlags = []string{"--dangerously-skip-permissions", "--yolo=true", "--a
 // flags, allowed tools or settings it asks for, on a single launch and a team launch; the
 // Operator's launch keeps them.
 func TestAgentCannotLaunchALessRestrictedAgent(t *testing.T) {
+	bypass := "bypassPermissions"
 	for _, tc := range []struct {
-		name     string
-		asAgent  bool
-		wantKept bool
-	}{{"operator", false, true}, {"agent", true, false}} {
+		name       string
+		asAgent    bool
+		callerMode *string // the launching agent's stored mode (nil: the row records none, rank 0)
+		wantStart  bool
+		wantKept   bool // the Operator's flags are kept as asked
+	}{
+		{"operator", false, nil, true, true},
+		{"agent whose row records no mode", true, nil, false, false},
+		{"agent in bypass", true, &bypass, true, false},
+	} {
 		for _, team := range []bool{false, true} {
 			cfg := &config.Config{LogDir: t.TempDir()}
 			db, err := storetest.Open(t, filepath.Join(t.TempDir(), "test.db"))
@@ -39,7 +46,7 @@ func TestAgentCannotLaunchALessRestrictedAgent(t *testing.T) {
 			terminal := newMockTerminal()
 			h := NewSessionsHandler(db, cfg, nil, terminal, nil)
 			work := t.TempDir() // an agent starts agents in its team's folder (#13891)
-			require.NoError(t, store.NewSessionStore(db).RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: "sid-a", AgentType: "claude", AgentName: "a", WorkingDir: work}))
+			require.NoError(t, store.NewSessionStore(db).RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: "sid-a", AgentType: "claude", AgentName: "a", WorkingDir: work, PermissionMode: tc.callerMode}))
 			body := map[string]any{"working_dir": work, "agent_type": "claude", "flags": bypassFlags}
 			path, handle := "/api/sessions/launch", h.Launch
 			if team {
@@ -54,32 +61,45 @@ func TestAgentCannotLaunchALessRestrictedAgent(t *testing.T) {
 			}
 			rec := httptest.NewRecorder()
 			handle(rec, req)
-			require.Equal(t, http.StatusOK, rec.Code, "%s team=%v: %s", tc.name, team, rec.Body.String())
 			cmds := strings.Join(terminal.sentCommands(), "\n")
+			if !tc.wantStart {
+				// refused above the caller's rank (#14336): nothing starts, and the member (or the launch) says why
+				assert.Contains(t, rec.Body.String(), agentLaunchAboveCallerCode, "%s team=%v: %s", tc.name, team, rec.Body.String())
+				assert.Empty(t, cmds, "%s team=%v: nothing started", tc.name, team)
+				continue
+			}
+			require.Equal(t, http.StatusOK, rec.Code, "%s team=%v: %s", tc.name, team, rec.Body.String())
 			require.NotEmpty(t, cmds)
-			for _, f := range []string{"--yolo", "--allowedTools", "Bash(*)", "/tmp/x.json", "--verbose"} {
+			for _, f := range []string{"--allowedTools", "Bash(*)", "/tmp/x.json", "--verbose"} {
 				assert.Equal(t, tc.wantKept, strings.Contains(cmds, f), "%s team=%v: %s", tc.name, team, f)
 			}
-			if !tc.wantKept {
-				assert.NotContains(t, cmds, "--dangerously-skip-permissions", "%s team=%v", tc.name, team)
-			}
+			// a bypass caller may start a bypass member; the flags outside the allowlist are still dropped
+			assert.True(t, strings.Contains(cmds, "bypassPermissions") || strings.Contains(cmds, "--dangerously-skip-permissions"), "%s team=%v: %s", tc.name, team, cmds)
 		}
 	}
 }
 
-// The limits themselves: every flag but --model, allow rules, tools and hooks go; deny rules,
-// which only narrow, stay.
+// The limits themselves, now the cap's (#14336): an agent's launch keeps --model and its deny rules; flags beyond it are dropped; allow rules, tools and hooks the caller does not have are refused.
 func TestLimitAgentLaunch(t *testing.T) {
-	flags, caps, tools, hooks := limitAgentLaunch("test",
-		[]string{"--sandbox", "danger-full-access", "-s=x", "--approval-mode=yolo", "-y", "--add-dir", "/", "--mcp-config", "m.json", "--permission-mode=bypassPermissions", "--model", "opus", "--verbose"},
-		&agent.Capabilities{Allow: []string{"Bash(*)"}, Deny: []string{"Bash(rm *)"}},
-		[]string{"Bash"}, map[string]interface{}{"PreToolUse": "x"})
-	assert.Equal(t, []string{"--model", "opus"}, flags)
-	require.NotNil(t, caps)
-	assert.Empty(t, caps.Allow)
-	assert.Equal(t, []string{"Bash(rm *)"}, caps.Deny)
-	assert.Nil(t, tools)
-	assert.Nil(t, hooks)
+	grant, refusal := capAgentLaunchFor(callerAuthority{}, agentLaunchAsk{AgentType: "claude", Flags: []string{"--model", "opus", "--verbose", "--add-dir", "/"},
+		Caps: &agent.Capabilities{Deny: []string{"Bash(rm *)"}}})
+	require.Nil(t, refusal)
+	assert.Equal(t, []string{"--model", "opus"}, grant.Flags)
+	require.NotNil(t, grant.Caps)
+	assert.Equal(t, []string{"Bash(rm *)"}, grant.Caps.Deny)
+	assert.Empty(t, grant.Caps.Allow)
+	for name, ask := range map[string]agentLaunchAsk{
+		"an allow rule":   {AgentType: "claude", Caps: &agent.Capabilities{Allow: []string{"Bash(*)"}}},
+		"an allowed tool": {AgentType: "claude", Tools: []string{"Bash"}},
+		"a hook":          {AgentType: "claude", Hooks: map[string]interface{}{"PreToolUse": "x"}},
+		"a bypass flag":   {AgentType: "claude", Flags: []string{"--permission-mode=bypassPermissions"}},
+		"a sandbox flag":  {AgentType: "codex", Flags: []string{"--sandbox", "danger-full-access", "-s=x"}},
+		"a yolo flag":     {AgentType: "gemini", Flags: []string{"--approval-mode=yolo", "-y"}},
+	} {
+		_, refusal := capAgentLaunchFor(callerAuthority{}, ask)
+		require.NotNil(t, refusal, name)
+		assert.Equal(t, agentLaunchAboveCallerCode, refusal.Code, name)
+	}
 }
 
 // #4032 round 2: the agent's flags are an allowlist, so the spellings Security found past the
@@ -127,7 +147,8 @@ func TestAgentLaunchOfASavedTemplateKeepsItsChoices(t *testing.T) {
 		name     string
 		member   map[string]any
 		wantKept bool
-	}{{"the saved entry", member, true}, {"one extra tool", extraTool, false}, {"one extra flag", extraFlag, false}} {
+		refused  bool // beyond the caller's own tools (#14336): the member is not started
+	}{{"the saved entry", member, true, false}, {"one extra tool", extraTool, false, true}, {"one extra flag", extraFlag, false, false}} {
 		cfg := &config.Config{LogDir: t.TempDir()}
 		db, err := storetest.Open(t, filepath.Join(t.TempDir(), "test.db"))
 		require.NoError(t, err)
@@ -136,13 +157,19 @@ func TestAgentLaunchOfASavedTemplateKeepsItsChoices(t *testing.T) {
 		require.NoError(t, store.NewSessionStore(db).SetSetting(context.Background(), "saved_team_templates", saved))
 		terminal := newMockTerminal()
 		h := NewSessionsHandler(db, cfg, nil, terminal, nil)
-		work := t.TempDir() // an agent starts agents in its team's folder (#13891)
-		require.NoError(t, store.NewSessionStore(db).RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: "sid-a", AgentType: "claude", AgentName: "a", WorkingDir: work}))
+		work := t.TempDir()                                              // an agent starts agents in its team's folder (#13891)
+		callerCaps := `{"allow":["Bash(make *)"],"deny":["Bash(rm *)"]}` // the launching agent holds the saved entry's allow rule: a member's allow list is a subset of its own (#14336)
+		require.NoError(t, store.NewSessionStore(db).RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: "sid-a", AgentType: "claude", AgentName: "a", WorkingDir: work, Capabilities: &callerCaps}))
 		b, _ := json.Marshal(map[string]any{"board_name": "t", "working_dir": work, "agents": []map[string]any{tc.member}})
 		req := httptest.NewRequest(http.MethodPost, "/api/sessions/launch-team", bytes.NewReader(b))
 		req = req.WithContext(context.WithValue(req.Context(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: "sid-a", SessionName: "claude-a"}))
 		rec := httptest.NewRecorder()
 		h.LaunchTeam(rec, req)
+		if tc.refused {
+			assert.Contains(t, rec.Body.String(), agentLaunchAboveCallerCode, tc.name)
+			assert.Empty(t, terminal.sentCommands(), "%s: nothing started", tc.name)
+			continue
+		}
 		require.Equal(t, http.StatusOK, rec.Code, "%s: %s", tc.name, rec.Body.String())
 		cmds := strings.Join(terminal.sentCommands(), "\n")
 		require.NotEmpty(t, cmds)

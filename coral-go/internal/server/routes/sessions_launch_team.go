@@ -49,6 +49,8 @@ type launchTeamAgent struct {
 	// ReviewsOnly and ReviewAreas (#8957): the member takes review tasks only, and which areas it reviews (empty: every area). Applied when the member subscribes to the team's board.
 	ReviewsOnly bool     `json:"reviews_only"`
 	ReviewAreas []string `json:"review_areas"`
+	// grantedMode is the mode the cap gave this member when an agent launched the team (#14336): never read from the request.
+	grantedMode string `json:"-"`
 }
 
 // launchTeamRequest is a team launch's body.
@@ -161,6 +163,12 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 	// Through the Coral Hub, a team with any member that skips permission prompts needs the owner's local switch, checked
 	// before anything is written or started (#126 F4). A member that is exactly one of the owner's saved templates may keep
 	// its allow rules, tools and hooks; its flags are checked all the same.
+	if dialogLaunch(r) { // a launch from the dashboard's own dialog waits for the notice when any member would start in the new default (#14353)
+		settings, _ := h.ss.GetSettings(r.Context())
+		if h.refuseUnseenDisclosure(w, r, teamUsesNewDefault(body, settings)) {
+			return
+		}
+	}
 	if cloud.Tunneled(r) {
 		settings, err := h.ss.GetSettings(r.Context())
 		if err != nil {
@@ -263,8 +271,13 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 	// member's choices are limited, except a member that is exactly an entry of a team template
 	// the Operator saved (saved_team_templates, which an agent's token can't write).
 	fromAgent := agentCaller(r)
+	teamFlagsAsked := body.Flags // what the team's flags asked for: the cap reads their mode for every member that has no flags of its own
 	if fromAgent {
 		body.Flags = keepAgentLaunchFlags(body.Flags)
+	}
+	var authority callerAuthority
+	if fromAgent {
+		authority = h.callerAuthorityOf(ctx, r) // read once, from the launching agent's stored row (#14336)
 	}
 	// A team the Operator launches starts with its Orchestrator holding the grant, on (#13891). Only when the Operator made the call and the team is new: an agent's launch-team, a relaunch of a team
 	// that has a board, and a board that already has a grant row never get one.
@@ -282,27 +295,25 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 			memberType = agentDef.AgentType
 		}
 		savedMember := fromAgent && inSavedTeamTemplate(userSettings, agentDef, memberType)
-		if fromAgent && !savedMember && agentLaunchUnsupervised(memberType) {
-			// An agent does not start a member of a type that never asks (#5901), unless it is exactly one of the owner's saved entries: not started, a setup problem (the category "" makes
-			// an all-refused team a 422), as the Hub's refusal of a member is.
-			launched = append(launched, map[string]any{"name": agentDef.Name, "error": agentLaunchUnsupervisedMessage(memberType), "code": agentLaunchUnsupervisedCode})
-			categories = append(categories, "")
-			continue
-		}
-		if fromAgent && !savedMember {
-			agentDef.Flags, agentDef.Capabilities, agentDef.Tools, agentDef.Hooks = limitAgentLaunch("launch-team", agentDef.Flags, agentDef.Capabilities, agentDef.Tools, agentDef.Hooks)
-		}
-		if fromAgent && !savedMember {
-			// The Operator's saved default is not an agent's to use when it skips the prompts (Security's #7576 finding): not started, a setup problem (the category "" makes an all-refused team a 422).
-			if mode, inherits := agentLaunchInheritsSkippingDefault(memberType, agentDef.Flags, userSettings); inherits {
-				if h.orchestratorLaunchAsksFirst(r, memberType) {
-					agentDef.PermissionMode = "default" // an Orchestrator's member starts ask-first, never less restricted than itself (#11713)
-				} else {
-					launched = append(launched, map[string]any{"name": agentDef.Name, "error": agentLaunchInheritsSkippingDefaultMessage(memberType, mode), "code": agentLaunchNeedsModeCode})
-					categories = append(categories, "")
-					continue
-				}
+		if fromAgent {
+			// An agent never starts an agent that can do more without asking than itself, and a member that names nothing gets the new default capped by the launching agent (#14336, the one rule that
+			// replaced #4032, #5901, #7576, #11713 and #7552), except that a member exactly an entry of a template the Operator saved keeps its own flags, capabilities, tools and hooks. Refused: not
+			// started, a setup problem (the category "" makes an all-refused team a 422), as the Hub's refusal of a member is.
+			askedFlags := agentDef.Flags
+			if len(askedFlags) == 0 {
+				askedFlags = teamFlagsAsked
 			}
+			grant, refusal := capAgentLaunchFor(authority, agentLaunchAsk{
+				AgentType: memberType, Flags: askedFlags, PermissionMode: agentDef.PermissionMode, Caps: agentDef.Capabilities, Tools: agentDef.Tools, Hooks: agentDef.Hooks,
+				OnBoard: body.BoardName != "" || body.BoardID != "", SavedTemplate: savedMember, DefaultMode: defaultModeFor(memberType, userSettings),
+			})
+			if refusal != nil {
+				launched = append(launched, map[string]any{"name": agentDef.Name, "error": refusal.Message, "code": refusal.Code})
+				categories = append(categories, "")
+				continue
+			}
+			agentDef.Flags, agentDef.Capabilities, agentDef.Tools, agentDef.Hooks = grant.Flags, grant.Caps, grant.Tools, grant.Hooks
+			agentDef.grantedMode = grant.Mode
 		}
 		if code, msg, stopped := h.hubMemberStopped(ctx, r, body, agentDef); stopped {
 			// Not started, and a setup problem (the category "" makes an all-refused team a 422), never a server fault (#5839).
@@ -318,9 +329,9 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 			categories = append(categories, "")
 			continue
 		}
-		// A member that names no mode, flags or capabilities starts in the CLI's normal confirm mode, the "Default" the team form shows (#6415, Codex Test's #6412): the server no longer
-		// widens an empty member to Auto (#5836 still applies to a single launch). What the person chose (flags, capabilities, a saved default) is used as before.
-		entry, category := h.launchTeamMember(ctx, body, agentDef, userSettings, workingDir, worktreePath, teamID, false, !fromAgent && memberAt == seatAt)
+		// A member that names no mode starts in the new default of its type (#14336: Auto for Claude and Codex, Bypass for Hermes and opencode), or the Operator's saved default, as a single launch does;
+		// for an agent's launch it is the default CAPPED by the launching agent (above). A member whose form says Default sends it, and starts in Default (#10362, the form's own pick).
+		entry, category := h.launchTeamMember(ctx, body, agentDef, userSettings, workingDir, worktreePath, teamID, !fromAgent && !teamIsRelaunch(body) && autoDefaultAllowed(ctx, r, h.ss), !fromAgent && memberAt == seatAt)
 		_, memberFailed := entry["error"]
 		sidMade, _ := entry["session_id"].(string)
 		h.endAgentLaunch(ctx, h.accountingBoard(r, body.BoardName, body.BoardServer), lifeID, !memberFailed, launcherWords(h.orchActorOf(r))+" started "+orchName(agentDef.Name), sidMade)
@@ -366,6 +377,7 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := map[string]any{"ok": true, "board": body.BoardName, "board_id": body.BoardName, "board_label": h.boardLabel(body.BoardName), "agents": launched}
+	h.addLaunchNotice(ctx, resp)
 	if teamID > 0 {
 		resp["team_id"] = teamID
 	}
@@ -460,6 +472,33 @@ func teamAsksToSkip(body launchTeamRequest, settings map[string]string) bool {
 	return false
 }
 
+// teamUsesNewDefault is whether any member of the team would start in the new default (a member that names no mode, flags or saved default, on a team that is not a relaunch).
+func teamUsesNewDefault(body launchTeamRequest, settings map[string]string) bool {
+	for _, def := range body.Agents {
+		agentType, flags := body.AgentType, def.Flags
+		if def.AgentType != "" {
+			agentType = def.AgentType
+		}
+		if len(flags) == 0 {
+			flags = body.Flags
+		}
+		if memberDefaultSkips(body, def, settings, agentType, flags) {
+			return true
+		}
+		// the form writes its shipped Auto as the CLI's own flags: judged by what they say, unless the member names Default, the owner saved a default, or it is a relaunch (#14353)
+		if !teamIsRelaunch(body) && def.PermissionMode != "default" && savedDefaultMode(settings) == "" && effectiveLaunchSkips(agentType, flags) {
+			return true
+		}
+	}
+	return false
+}
+
+// teamIsRelaunch is a launch on a board that already exists, named by its id (#3536): the new default is for NEW teams, so a member of a relaunch that names no mode keeps what it had, the CLI's own
+// confirm mode (a saved template stores no mode), and the Hub gate does not count the new default for it (#14336, build item 3). An explicit mode, flags or capabilities are what they say.
+func teamIsRelaunch(body launchTeamRequest) bool {
+	return body.BoardID != "" && !body.NewBoard
+}
+
 // memberAsksToSkip is teamAsksToSkip for one member.
 func memberAsksToSkip(body launchTeamRequest, def launchTeamAgent, settings map[string]string) bool {
 	agentType, flags := body.AgentType, def.Flags
@@ -472,7 +511,25 @@ func memberAsksToSkip(body launchTeamRequest, def launchTeamAgent, settings map[
 	if agent.SkipsPermissionPrompts(agentType, flags) {
 		return true
 	}
+	if memberDefaultSkips(body, def, settings, agentType, flags) {
+		return true
+	}
 	return hubWidens(def.Capabilities, def.Tools, def.Hooks) && !inSavedTeamTemplate(settings, def, agentType)
+}
+
+// memberDefaultSkips reports whether a member that NAMES NO MODE would start in a mode that skips the prompts because of the new default (#14336, Security's MUST 2 on #14333): Auto for Claude and Codex,
+// Bypass for Hermes and opencode. A Coral Hub launch of such a member is held to the same switch as a single launch: with the owner's "Coral Hub can turn on auto-accept" off the member is refused with
+// hub_auto_accept_disabled, never started in Default and never in Auto. A member that names a mode (its own flags, the team's, or an explicit Default) is judged by what it names; the Operator's own
+// saved default is the owner's choice and is not counted, as before.
+func memberDefaultSkips(body launchTeamRequest, def launchTeamAgent, settings map[string]string, agentType string, flags []string) bool {
+	if teamIsRelaunch(body) || def.PermissionMode == "default" || savedDefaultMode(settings) != "" { // only "default" names a mode (the launch honours no other value)
+		return false
+	}
+	if carried, _ := agent.SplitPermissionFlags(flags); len(carried) > 0 || agent.PermissionModeFromFlags(flags) != "" {
+		return false
+	}
+	mode := agent.DefaultLaunchPermissionMode(agentType)
+	return agent.SkipsPermissionPrompts(agentType, agent.PermissionFlagsForAgent(agentType, mode)) || mode == "bypassPermissions" || mode == "auto"
 }
 
 // hubMemberStopped is the check of one member of a team launch that came through Coral Hub, made when it is its turn (#5839): the owner may have turned
@@ -719,7 +776,7 @@ func (h *SessionsHandler) launchTeamMember(ctx context.Context, body launchTeamR
 		Model: effectiveModel, Thinking: effectiveThinking, Capabilities: def.Capabilities, Tools: def.Tools, Hooks: def.Hooks,
 		// The member's flags carry the mode as the expanded flags of its type (--sandbox workspace-write -a never for Codex's auto), which PermissionModeFromFlags does not read
 		// back (it never widens one type's flags into a mode), so the mode stored for it was the default and a team reset relaunched it with no permission flags (#5251).
-		PermissionMode: explicitDefaultMemberMode(def.PermissionMode, memberPermMode, agentFlags),
+		PermissionMode: memberLaunchMode(def, memberPermMode, agentFlags),
 		AutoByDefault:  autoByDefault,
 	})
 	if err != nil {
@@ -760,7 +817,7 @@ func (h *SessionsHandler) launchTeamMember(ctx context.Context, body launchTeamR
 			}
 		}
 	}
-	entry := map[string]any{"name": launchedName(result, def.Name), "session_id": sessionID, "session_name": result["session_name"]}
+	entry := map[string]any{"name": launchedName(result, def.Name), "session_id": sessionID, "session_name": result["session_name"], "permission_mode": result["permission_mode"]}
 	if worktreePath != "" {
 		entry["worktree_path"] = worktreePath
 	}
@@ -820,4 +877,12 @@ func memberSkills(agents []launchTeamAgent) [][]string {
 		out[i] = a.Skills
 	}
 	return out
+}
+
+// memberLaunchMode is the mode a team member is launched with: the one the cap granted when an agent launched the team, else the explicit one explicitDefaultMemberMode works out.
+func memberLaunchMode(def launchTeamAgent, fromTeamFlags string, memberFlags []string) string {
+	if def.grantedMode != "" {
+		return def.grantedMode
+	}
+	return explicitDefaultMemberMode(def.PermissionMode, fromTeamFlags, memberFlags)
 }

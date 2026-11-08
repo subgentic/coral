@@ -5,8 +5,9 @@
 import { state } from './state.js';
 import { showToast } from './utils.js';
 import { setHidden, setText } from './dom_write.js';
-import { serverFetch, currentServer, identityKey, keyLabel, isCloud, isLocalServer } from './server_base.js';
+import { serverFetch, currentServer, identityKey, keyLabel, isCloud, isLocalServer, sessionServer, normServer } from './server_base.js';
 import { importOnce } from './import_once.js';
+import { keepInfo, keepEventMatches } from './codex_mode.js';
 
 /** The lines the Info tab shows for an agent's MCP servers (#9769): one per server, "name: transport, scope"; [] when the CLI is not one Coral reads, and one line saying none when it reads it and finds none. */
 export function mcpLines(result) {
@@ -27,7 +28,7 @@ const FIELD_IDS = ['info-agent-name', 'info-agent-type', 'info-tmux-session', 'i
 function clearFields() {
     for (const id of FIELD_IDS) { const el = $(id); if (el) el.textContent = ''; }
     $('info-board')?.replaceChildren();
-    for (const id of ['info-prompt-label', 'info-prompt', 'info-board-label', 'info-board', 'info-attach-note']) setHidden($(id), true);
+    for (const id of ['info-prompt-label', 'info-prompt', 'info-board-label', 'info-board', 'info-attach-note', 'info-keep-label', 'info-keep', 'info-keep-off']) setHidden($(id), true);
     setHidden($('info-tab-grid'), true);
 }
 function clearRows() {
@@ -45,6 +46,19 @@ async function loadMcp(name, sid, server, current) {
     $(val).replaceChildren(...lines.map(l => Object.assign(document.createElement('div'), { textContent: l })));
     setHidden($(label), false); setHidden($(val), false);
 }
+
+/** The Operator's "keep Full access when this agent restarts" (#14061): a Codex agent's row says it, and the one-click Off is here. The row is the list's (the Operator's: an agent or a Hub viewer never gets the key, so nothing shows). */
+function fillKeep(s, server) {
+    const row = s && state.liveSessions.find(x => x.session_id === s.session_id && sessionServer(x) === server);
+    const k = keepInfo(row);
+    for (const id of ['info-keep-label', 'info-keep']) setHidden($(id), !k);
+    const btn = $('info-keep-off');
+    setHidden(btn, !k || !k.button);
+    if (!k) return;
+    setText($('info-keep-text'), k.text);
+    if (k.button) { setText(btn, k.button.label); btn.setAttribute('aria-label', k.button.aria); btn.dataset.mode = k.button.mode; btn.dataset.name = s.name; btn.dataset.agentType = s.agent_type || ''; btn.dataset.sessionId = s.session_id || ''; }
+}
+document.addEventListener('coral:keep-full-access-changed', e => { const s = state.currentSession; if ($('agentic-panel-info')?.classList.contains('active') && s && s.type === 'live' && keepEventMatches(e.detail, s.session_id, normServer(currentServer()))) fillKeep(s, currentServer()); }); // listener-ok: one for the page's life, like the agent-selected one below
 
 function fillFields(info, server) {
     const set = (id, v) => { $(id).textContent = v; };
@@ -87,7 +101,7 @@ export async function showInfoTab() {
         const info = await resp.json();
         if (!current()) return;
         if (info.error) { showToast(info.error, true); say(info.error); return; }
-        say(''); fillFields(info, server); showGrid();
+        say(''); fillFields(info, server); fillKeep(s, server); showGrid();
     } catch (e) {
         if (!current()) return;
         showToast('Failed to load session info', true); say('Could not load this agent\'s info.');

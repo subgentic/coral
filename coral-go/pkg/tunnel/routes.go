@@ -246,6 +246,8 @@ var routeTable = cat(
 		"/api/sessions/live/{name}/notices/resume",
 	)),
 	owner(OwnerRefuse, rules(http.MethodGet, TierView,
+		// The first-launch notice (#14353, #14414): the text and whether this computer's owner has read it, for the Computers page. Read only, no query. Acknowledging and clearing it are not listed (never): that is the person at the computer's own dashboard.
+		"/api/launch-disclosure",
 		"/api/artifacts/{hex64}",
 		// Which artifact a shortened link in an old message means (#9841): link, repeatable, the owner's alone like the reads around it.
 		"/api/artifacts/resolve",
@@ -316,6 +318,7 @@ var routeTable = cat(
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/sessions/live/{name}/dismiss-wait")),
 	// The Operator's per-agent auto-sleep switch (#12111) is the OWNER's alone through the hub: it changes Coral's own record and types and kills nothing, so Interact.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/sessions/live/{name}/auto-sleep")),
+	owner(OwnerRefuse, rules(http.MethodPost, TierLaunch, "/api/sessions/live/{name}/keep-full-access")),                                                   // the Operator's alone, and Launch like every route that widens what an agent may do (#14061, Security)
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/operator-artifacts", "/api/board/{project}/operator-artifacts/message")), // a file the Operator shares with an agent (#11376)
 	// The Markdown editor (#13757): the owner's alone through the hub. What a file allows is a view of the owner's artifacts; the save writes a new version, Interact.
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/board/{project}/artifacts/{digest}/edit")),

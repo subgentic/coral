@@ -15,7 +15,7 @@ export const ACTION_LABEL = {
     task_park: 'Parked or released a task', task_reply: 'Replied on a task', prompt_answer: "Answered an agent's prompt", prompt_allow: 'Allowed what an agent asked', prompt_reject: 'Refused what an agent asked', wait_dismiss: 'Dismissed a waiting agent', wait_send: 'Sent held words to an agent',
     mark_unread: 'Marked unread', file_tags: 'Changed the tags of a file', file_star: 'Starred a file', file_unstar: 'Unstarred a file', file_keep: 'Kept a file', file_release: 'Released a file', file_delete: 'Deleted a file', file_share: 'Shared a file with an agent', file_edit: 'Saved a new version of a file', file_edit_send: 'Sent an edit of a file to agents',
     saved_add: 'Saved a message', saved_update: 'Changed a saved message', saved_remove: 'Removed a saved message', chat_flag: 'Starred or archived a chat', chat_send: 'Sent words to an agent', run_seen: 'Opened or dismissed a failed run',
-    agents_record: 'Recorded for all agents', goal_create: 'Created a goal', goal_edit: 'Changed a goal', goal_driver: 'Changed the driver of a goal', goal_move: 'Moved a goal to another team', goal_request_accept: 'Accepted a goal request',
+    agents_record: 'Recorded for all agents', keep_full_access: 'Changed Full access on restart', goal_create: 'Created a goal', goal_edit: 'Changed a goal', goal_driver: 'Changed the driver of a goal', goal_move: 'Moved a goal to another team', goal_request_accept: 'Accepted a goal request',
     goal_request_decline: 'Declined a goal request', inbox_hide: 'Dismissed a row in Needs you',
     hub_update_check: 'Coral Hub checked for an update', hub_update_relaunch: 'Coral Hub relaunched into an update',
 };

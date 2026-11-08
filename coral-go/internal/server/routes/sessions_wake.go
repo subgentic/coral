@@ -202,6 +202,7 @@ func (h *SessionsHandler) prepareWake(ctx context.Context, ls *store.LiveSession
 		CoralHost:       h.cfg.AgentHost(),
 		CoralPort:       h.cfg.Port,
 		RunTag:          h.runTagFor(ctx, ls.SessionID, "", ""),
+		KeepFullAccess:  h.keepFullAccessForRelaunch(ctx, ls.AgentType, ls.SessionID, "wake", ls.Capabilities, nil), // the Operator's choice (#14061)
 	}
 
 	// A Claude agent whose conversation is gone starts a new one under the same session id (#12714): looked for here, before the launch, and the CLI's own "No conversation found" line is only a backstop. "Gone" needs both that

@@ -153,7 +153,7 @@ func TestLaunchAndWakeRefuseABrokenConfiguredCLIPath(t *testing.T) {
 	require.NoError(t, err)
 	launch := string(launchBody)
 	teamBody := func(hub bool) string { // a board per call: a second launch of the same name joins the first
-		b, err := json.Marshal(map[string]any{"board_name": fmt.Sprintf("t-%v", hub), "working_dir": t.TempDir(), "agent_type": "claude", "agents": []map[string]string{{"name": "A"}}})
+		b, err := json.Marshal(map[string]any{"board_name": fmt.Sprintf("t-%v", hub), "working_dir": t.TempDir(), "agent_type": "claude", "agents": []map[string]string{{"name": "A", "permission_mode": "default"}}}) // asking first: the new default skips prompts, which a Hub launch has its own gate for (#14336)
 		require.NoError(t, err)
 		return string(b)
 	}

@@ -25,7 +25,7 @@ import (
 )
 
 // sensitiveKeys are settings that should never be returned to the frontend.
-var sensitiveKeys = map[string]bool{}
+var sensitiveKeys = map[string]bool{launchDisclosureAckSetting: true} // the first-launch acknowledgement is the owner's alone (#14353): not listed to any caller of GET /api/settings
 
 // GetSettings returns all user settings, filtering out sensitive keys.
 // GET /api/settings

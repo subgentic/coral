@@ -101,7 +101,19 @@ func extractFirstText(content any) string {
 	return ""
 }
 
+// keepFullAccess is params as the Operator's "keep Full access" choice (#14061, #14085) has them: Bypass, no permission flag of the person's or the preset's beside it, and no allow or deny
+// rules from the capabilities (the settings builder checks KeepFullAccess too). A launch without the choice is returned as it was.
+func keepFullAccess(params LaunchParams) LaunchParams {
+	if !params.KeepFullAccess {
+		return params
+	}
+	_, params.Flags = SplitPermissionFlags(params.Flags)
+	params.PermissionMode = "bypassPermissions"
+	return params
+}
+
 func (a *ClaudeAgent) LaunchCommand(params LaunchParams) (string, error) {
+	params = keepFullAccess(params)
 	files := &launchFiles{}
 	bin := resolveBinary(params.CLIPath, "claude")
 	parts := []string{bin}
@@ -163,7 +175,7 @@ func claudeSettingsFile(files *launchFiles, params LaunchParams, effectiveID str
 	}
 
 	// Inject permissions from capabilities
-	if perms := TranslateToClaudePermissionsForMode(params.Capabilities, claudeLaunchMode(params, interactive)); perms != nil {
+	if perms := TranslateToClaudePermissionsForMode(params.Capabilities, claudeLaunchMode(params, interactive)); perms != nil && !params.KeepFullAccess {
 		permMap := map[string]any{}
 		if len(perms.Allow) > 0 {
 			permMap["allow"] = perms.Allow

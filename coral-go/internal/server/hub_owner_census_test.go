@@ -24,10 +24,11 @@ import (
 
 // hubStampNotNeeded: Activity routes that are deliberately not stamped, with why.
 var hubStampNotNeeded = map[string]string{
-	"POST /api/board/{project}/goal-images": "a picture is bigger than the stamp's 64 KB body cap and would never be stamped; it stays local-only until a bounded design exists (Security, #13694)",
-	"POST /api/system/update/check-hub":     "the Hub owner's update check: it changes the computer itself (its own owner route)",
-	"POST /api/system/update/relaunch":      "the Hub owner's relaunch: it changes the computer itself (its own owner route)",
-	"PUT /api/settings":                     "this computer's settings (the Dismiss of a banner is local to its dashboard)",
+	"POST /api/board/{project}/goal-images":           "a picture is bigger than the stamp's 64 KB body cap and would never be stamped; it stays local-only until a bounded design exists (Security, #13694)",
+	"POST /api/system/update/check-hub":               "the Hub owner's update check: it changes the computer itself (its own owner route)",
+	"POST /api/system/update/relaunch":                "the Hub owner's relaunch: it changes the computer itself (its own owner route)",
+	"PUT /api/settings":                               "this computer's settings (the Dismiss of a banner is local to its dashboard)",
+	"POST /api/sessions/live/{name}/keep-full-access": "the Hub owner's set or clear is allowed (owner-refuse, Launch) but not stamped, so it writes no Activity row on the remote: the stamp list is Security's to widen (#13694 tiers, a count pin); the person at this computer's own click does write one (#14061)",
 }
 
 // neverStamped is what a stamp must never be made for: it changes code or settings on the computer, or its body is bigger than a stamp covers. Every entry must still be a real route (the test fails a

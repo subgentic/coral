@@ -172,6 +172,7 @@ export async function _fillThemeSelect(s) {
 
 // The defaults for a new agent: render engine, agent type, permission mode and working directory.
 export function _fillDefaults(s) {
+    importOnce('./launch_disclosure.js').then(m => m.refreshLaunchDisclosure()).catch(() => {});
     // Default Render Engine
     const currentEngine = s.default_renderer || "xterm";
     const options = getEngineNames()

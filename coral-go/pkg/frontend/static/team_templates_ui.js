@@ -2,6 +2,7 @@
 import { importOnce } from './import_once.js';
 import { showToast } from './utils.js';
 const { _getSavedTeamTemplates, _upsertSavedTeamTemplates } = await importOnce('./persona_store.js');
+const { SHIPPED_CAPABILITIES } = await importOnce('./agent_presets.js');
 const { getAgentConfig } = await importOnce('./agent_config_form.js');
 
 const BUILTIN_TEAM_TEMPLATES = [
@@ -65,6 +66,11 @@ function _syncTemplateMenu() {
     const saved = _getSavedTeamTemplates().some(t => t.name === sel.value);
     item.disabled = !saved;
     item.title = saved ? 'Download this template as a .json file: its members (roles, instructions, models, flags)' : 'Pick one of your saved templates to export it';
+}
+
+// Only shipped templates change; saved team choices remain as stored.
+for (const template of BUILTIN_TEAM_TEMPLATES) for (const member of template.agents) {
+    member.capabilities = { allow: [...SHIPPED_CAPABILITIES], deny: [] };
 }
 
 function _allTemplates() { return [...BUILTIN_TEAM_TEMPLATES, ..._getSavedTeamTemplates()]; }

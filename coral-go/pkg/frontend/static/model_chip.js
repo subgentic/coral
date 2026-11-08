@@ -4,12 +4,13 @@
  * type the CLI's own command (POST /api/sessions/live/{name}/model); the chip then says "Switching…" until the transcript confirms, and
  * says why when it does not (model_switch). A CLI with no live switch shows "Apply with restart": the Restart dialog opens with the
  * choice filled in. Typing in the composer is never held up by any of it. */
-import { serverFetch } from './server_base.js';
+import { serverFetch, normServer } from './server_base.js';
 import { escapeHtml, escapeAttr, showToast } from './utils.js';
 import { importOnce } from './import_once.js';
 import { familyOf, addCustomModel, probeCanAdd, peekCanAdd } from './custom_model_add.js';
 import { modelLabel, readModelsCache, writeModelsCache, clearModelsCache, levelName } from './model_labels.js';
 import { setText, setHidden, setTitle, setData, setAttr } from './dom_write.js';
+import { modeChip, keepChip, keepEventMatches } from './codex_mode.js';
 import { menuMove } from './menu_keys.js';
 
 /** The agent types whose CLI takes /model and /effort in a running session (the server's liveSwitchTypes). */
@@ -117,11 +118,29 @@ export function updateModelChip(session, server) {
         setAttr(chip, 'aria-label', labels[k]);    // the name holds what the chip shows (label in name), not a fixed phrase that hides it
     }
     setText(p.note, v.note); // the live region stays in the page, empty and out of the way (css), so a note that appears is announced
+    const mode = modeChip(s), modeWrap = $('codex-mode-wrap'), modeEl = $('codex-mode-chip'); // a Codex agent's live mode (#14051): read-only, said in plain text
+    if (modeWrap && modeEl) {
+        setHidden(modeWrap, !mode);
+        if (mode) { setText($('codex-mode-key'), mode.key); setText($('codex-mode-text'), mode.text); setTitle(modeEl, mode.title); setData(modeEl, 'warn', mode.warn ? 'on' : ''); setAttr(modeEl, 'aria-label', `${mode.key.trim()} ${mode.text}${mode.warn ? (s.agent_type === 'agy' ? ', less than was chosen' : ', a restart would narrow it') : ''}`); }
+    }
+    const keep = keepChip(s), keepWrap = $('codex-keep-wrap'), keepEl = $('codex-keep-chip'), keepOff = $('codex-keep-off'); // the Operator's Full access across restarts (#14061), with its one-click Off
+    if (keepWrap && keepEl && keepOff) {
+        setHidden(keepWrap, !keep);
+        if (keep) { setText($('codex-keep-text'), keep.text); setTitle(keepEl, keep.title); setData(keepEl, 'warn', keep.warn ? 'on' : ''); setText(keepOff, keep.button.label); setAttr(keepOff, 'aria-label', keep.button.aria); setData(keepOff, 'mode', keep.button.mode); setData(keepOff, 'name', s.name); setData(keepOff, 'agentType', s.agent_type); setData(keepOff, 'sessionId', s.session_id); }
+    }
     const st = v.model.state === 'failed' || v.thinking.state === 'failed' ? 'failed' : (v.thinking.state === 'requested' ? 'requested' : '');
     setData(p.note, 'state', st);
     if (_open) _renderMenu(_open);
     if (_optionsOpen()) _renderOptions();
 }
+
+/** The Operator turned "keep Full access on restart" on or off (agent_actions.js): the chip on screen and the phone's Options row follow, from the same list row, without waiting for the next list read (#14061). */
+document.addEventListener('coral:keep-full-access-changed', e => { // listener-ok: one for the page's life, like the chip's own wiring
+    const d = e.detail || {};
+    if (!_cur || !keepEventMatches(d, _cur.session.session_id, normServer(_cur.server))) return; // the same session id on another computer is not this agent
+    _cur.session = { ..._cur.session, keep_full_access: d.on === true };
+    updateModelChip(_cur.session, _cur.server);
+});
 
 // ── The menu ─────────────────────────────────────────────────────────────
 
@@ -246,7 +265,11 @@ function _renderOptions() {
     if (!menu || !s) return;
     const v = chipView(s, _cur.server);
     const row = (kind, word, text) => `<button type="button" role="menuitem" class="model-chip-item" data-options-open="${escapeAttr(kind)}"><span class="model-chip-item-label">${escapeHtml(word + ': ' + text)}</span></button>`;
-    const html = row('model', 'Model', v.model.text) + (p.thinking.wrap && !p.thinking.wrap.hidden ? row('thinking', 'Thinking', v.thinking.text) : '');
+    const mode = modeChip(s); // a phone shows no chips, only this sheet: a Codex agent's live mode is a plain line in it (#14051), not a button
+    const modeLine = mode ? `<div class="options-sheet-mode-note" role="note"${mode.warn ? ' data-warn="on"' : ''} title="${escapeAttr(mode.title)}">${escapeHtml(mode.key + mode.text)}</div>` : '';
+    const keep = keepChip(s); // the Operator's Full access across restarts (#14061): its one-click Off is a row of the sheet on a phone
+    const keepRow = keep ? `<button type="button" role="menuitem" class="model-chip-item" data-on-click="agent-keep-full-access" data-mode="${escapeAttr(keep.button.mode)}" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(s.session_id)}" title="${escapeAttr(keep.title)}"><span class="model-chip-item-label">${escapeHtml(keep.text + ': ' + (keep.button.mode === 'off' ? 'turn off' : 'use Full access'))}</span></button>` : '';
+    const html = row('model', 'Model', v.model.text) + (p.thinking.wrap && !p.thinking.wrap.hidden ? row('thinking', 'Thinking', v.thinking.text) : '') + modeLine + keepRow;
     if (menu.dataset.sig === html) return;
     menu.dataset.sig = html;
     menu.innerHTML = html;

@@ -424,6 +424,9 @@ func DefaultLaunchPermissionMode(agentType string) string {
 	if agentType == at.Opencode {
 		return "bypassPermissions" // opencode's own defaults ask nothing inside its folder: a launch that names no mode starts as it always did, and "default" is the ask-first mode (#11395)
 	}
+	if agentType == at.Hermes {
+		return "bypassPermissions" // the Operator's decision (#14333): every agent we ship starts with all permissions on; for Hermes that is --yolo, with no sandbox of any kind. It had an ask-first default on purpose (#12169)
+	}
 	return "default"
 }
 

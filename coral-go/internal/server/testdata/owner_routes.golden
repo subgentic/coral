@@ -32,6 +32,7 @@ GET /api/board/{project}/tasks/{taskID}/artifact-content view owner-only
 GET /api/chief view owner-only
 GET /api/custom-models view owner-only
 GET /api/goals view owner-sees
+GET /api/launch-disclosure view owner-only
 GET /api/needs-you view owner-only
 GET /api/operator-asks view owner-only
 GET /api/proposals view owner-only
@@ -77,6 +78,7 @@ POST /api/hub-auto-accept launch owner-only-hub
 POST /api/saved interact owner-only
 POST /api/sessions/live/{name}/auto-sleep interact owner-only
 POST /api/sessions/live/{name}/dismiss-wait interact owner-only
+POST /api/sessions/live/{name}/keep-full-access launch owner-only
 POST /api/sessions/live/{name}/notices/pause interact owner-only
 POST /api/sessions/live/{name}/notices/resume interact owner-only
 POST /api/sessions/record-agents interact owner-only

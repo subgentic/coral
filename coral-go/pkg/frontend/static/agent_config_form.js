@@ -6,12 +6,13 @@ const { _acfServer, _fillModelDatalist, _getAgentModels, _getDefaultModels, _set
 const { _checkAgentCLI } = await importOnce('./cli_check.js');
 const { _classifyLoadedACFModel } = await importOnce('./acf_models.js');
 const { modelPickerHtml, loadModelPicker, wireModelPicker, syncModelPicker, thinkingPickerHtml, thinkingValue, setThinking, setThinkingActual, wireThinking } = await importOnce('./model_picker.js');
-const { _renderPresetButtons } = await importOnce('./persona_store.js');
+const { _renderPresetButtons, syncRoleLimits } = await importOnce('./persona_store.js');
 const { presetEnforcement, launchedMode } = await importOnce('./preset_enforcement.js');
 const { initSectionDialog } = await importOnce('./section_dialog.js');
 const { segmentSelect } = await importOnce('./segmented.js');
 const { launchFlags } = await importOnce('./launch_flags.js');
 import { escapeHtml, escapeAttr } from './utils.js';
+import { restartHint } from './codex_mode.js';
 import { mountSettingsView } from './settings_view.js';
 const _mk0 = "<details class=\"acf-tools-details\"><summary title=\"Which tools this agent may use without asking, and which it may not.\">Tool permissions <span class=\"acf-perms-summary settings-hint\"></span></summary>";
 const _mk1 = "<label title=\"Extra command-line options passed to the agent's CLI, for example --verbose.\">Flags <span class=\"launch-optional\">optional</span>"; // the persona page's Behavior prompt is a field of it (a startup module)
@@ -29,7 +30,7 @@ const CAPABILITY_LABELS = {
 // What a capability does beyond its name, per CLI (#4545, Security's D: for Codex, Git Write is what turns
 // off its sandbox).
 const CAPABILITY_TITLES = {
-    git_write: 'Claude: pre-approves git push (force pushes included), commit, branch, merge and rebase, so they run without a question in Default and Accept edits. In Auto, Coral adds no git rule and leaves git to the checks Auto makes itself. Codex: Git Write does not change its sandbox; with Shell it can change files in its folder, use the network and never asks.',
+    git_write: 'Claude: Git Write lets the agent push, including force pushes, without a question in Default and Accept edits; in Auto, Coral leaves git to Auto’s own checks. Switching to Auto inside the CLI keeps the launch-time rules. Codex: Git Write does not change its sandbox; with Shell it can change files in its folder, use the network and never asks.',
 };
 
 export function _togglePermissions(containerId) {
@@ -121,11 +122,20 @@ function _syncEnforcement(container) {
         || defaultPermissionMode(_settingsFor(_acfServer(container)), agentType);
     const caps = _getPermissions(`${uid}-perms`) || {};
     const e = presetEnforcement(agentType, caps, permMode);
-    // Codex and Antigravity keep only a sandbox and an approval mode: an explicit Mode is applied and the capabilities may only narrow it; with no Mode the capabilities decide (#6425). Say so beside the Mode.
+    // The Operator's "Use Full access for this agent" (#14085): the checkbox is there only in a form that offers it (launch, restart) and only for the three CLIs that have it (the server refuses anyone else and says so)
+    const useFull = container.querySelector('.acf-use-full-access');
+    if (useFull) useFull.hidden = !['claude', 'codex', 'agy'].includes(agentType);
+    const offered = !!useFull && !useFull.hidden;
+    const fullOn = offered && !!useFull.querySelector('.acf-use-full-access-input')?.checked;
+    // Codex and Antigravity keep only a sandbox and an approval mode: an explicit Mode is applied and the capabilities may only narrow it; with no Mode the capabilities decide (#6425). Say so beside the Mode,
+    // and say what the Full access box does: it is pointed to only where it is, and once ticked the note says Full access, not the narrowing it overrides.
     const override = container.querySelector('.acf-mode-override');
     if (override) {
         const lm = launchedMode(agentType, permMode, caps);
-        override.textContent = !lm.narrowed ? '' : permMode === 'default' ? `No Mode chosen, so the capabilities decide: ${lm.text}.` : `The capabilities narrow this Mode: ${lm.text}.`;
+        override.textContent = !lm.narrowed ? ''
+            : fullOn ? 'Use Full access is ticked: this agent runs with Full access whatever its capabilities say.'
+            : permMode === 'default' ? `No Mode chosen, so the capabilities decide: ${lm.text}.${offered ? ' Tick Use Full access for this agent, below, to override that.' : ''}`
+            : `The capabilities narrow this Mode: ${lm.text}.${offered ? ' Tick Use Full access for this agent, below, to override that.' : ''}`;
         override.hidden = !override.textContent;
     }
     // The form's own line, and any line elsewhere that mirrors it (the Launch dialog shows it under the
@@ -223,6 +233,7 @@ export function renderAgentConfigForm(containerId, opts = {}) {
     placeAcfCliLine(container, opts);
     wireAcfAgentType(container);
     finishAcfControls(container, opts);
+    syncRoleLimits(containerId, opts.value?.name);
 }
 
 /** The Behavior prompt: a field of settings_view (label above; the textarea keeps the class every read of the form uses). */
@@ -292,6 +303,7 @@ function acfAutoPermissionsHtml(container, opts, { showAutoPermissions, agentTyp
         const modeWords = { default: 'Default', plan: 'Plan', acceptEdits: 'Accept edits', auto: 'Auto', bypassPermissions: 'Bypass permissions', dontAsk: "Don't ask" };
         const live = typeof v.liveMode === 'string' && modeWords[v.liveMode] && v.liveMode !== permModeVal ? v.liveMode : ''; // the agent runs in one mode and a restart uses another (the stored one): say so (#12481)
         const liveNote = live ? `<span class="settings-hint acf-mode-live" role="status">Running in ${escapeHtml(modeWords[live])} now; restarting uses ${escapeHtml(modeWords[permModeVal] || permModeVal)} unless you pick.</span>` : '';
+        const codexNote = v.codexNarrows ? `<span class="settings-hint acf-mode-live acf-codex-narrows" role="status">${escapeHtml(restartHint(v.codexNarrows))}</span>` : ''; // a Codex agent that runs wider than a restart will start it (#14051): said, never changed
         const permModeDesc = permissionDescription(v.agentType, permModeVal); // per CLI: Auto has safety checks on Claude only (#10000)
         autoPermissionsHTML = `
             <label>Permission mode
@@ -306,7 +318,11 @@ function acfAutoPermissionsHtml(container, opts, { showAutoPermissions, agentTyp
                 <span class="settings-hint perm-mode-desc">${escapeHtml(permModeDesc)}</span>
                 <span class="settings-hint acf-mode-override" role="status" hidden></span>
                 ${liveNote}
-            </label>`;
+                ${codexNote}
+            </label>
+            ${opts.offerUseFullAccess ? `<label class="acf-use-full-access" hidden><input type="checkbox" class="acf-use-full-access-input"> Use Full access for this agent
+                <span class="settings-hint">It runs with Full access whatever its role's capabilities say, and every time it restarts. Only you can set it.</span>
+            </label>` : ''}`;
     }
     return autoPermissionsHTML;
 }
@@ -441,6 +457,7 @@ function initAcfPermissions(container, uid, { caps, v }) {
     trackPermissionPick(container.querySelector('.acf-permission-mode')); // a mode picked here is the person's, whatever the agent type does next (#5836)
     container.querySelector('.acf-permission-mode')?.addEventListener('change', () => _syncEnforcement(container));
     container.querySelector('.perms-shell-input')?.addEventListener('input', () => _syncEnforcement(container));
+    container.querySelector('.acf-use-full-access-input')?.addEventListener('change', () => _syncEnforcement(container)); // the note follows the box (#14085)
 }
 
 function initAcfPresets(containerId, uid, opts, { showPreset }) {
@@ -683,6 +700,7 @@ export function getAgentConfig(containerId) {
         flags,
         permissionMode: permMode, // what the form's select says: a launch on Default asks nothing about skipping prompts (#7620)
         capabilities: uid ? _getPermissions(`${uid}-perms`) : null,
+        useFullAccess: !!container.querySelector('.acf-use-full-access:not([hidden]) .acf-use-full-access-input')?.checked, // the Operator's choice, sent as keep_full_access (#14085)
     };
 }
 window.getAgentConfig = getAgentConfig;
@@ -738,6 +756,8 @@ export function setAgentConfig(containerId, values) {
 
     if (uid) _setPermissions(`${uid}-perms`, v.capabilities || null);
     _syncEnforcement(container);
+
+    syncRoleLimits(containerId, v.name);
 
     // Re-sync Model combo and prerequisite warning after a preset/type change.
     _syncACFModelField(container);

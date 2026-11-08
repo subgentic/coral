@@ -2,6 +2,7 @@
 1	agent_config_form.js	agentHTML
 1	agent_config_form.js	autoPermissionsHTML
 1	agent_config_form.js	body
+1	agent_config_form.js	codexNote
 1	agent_config_form.js	flagsInput
 1	agent_config_form.js	liveNote
 1	agent_config_form.js	modelPickerHtml()
@@ -343,10 +344,11 @@
 1	session_header_updates.js	_whereBack
 2	session_rows.js	!instructionsOffered(s, isCloud()) ? '' : `<button class="menu-item overflow-menu-item" data-on-click="agent-i
 1	session_rows.js	MORE_DOTS_SVG
-19	session_rows.js	SVGO.o0
+20	session_rows.js	SVGO.o0
 8	session_rows.js	SVGO.o1
 4	session_rows.js	SVGO.o2
 2	session_rows.js	SVGO.o4
+1	session_rows.js	['codex', 'claude', 'agy'].includes(s.agent_type) && typeof s.keep_full_access === 'boolean' ? (() => { const 
 2	session_rows.js	_archiveItem
 2	session_rows.js	_mk0
 2	session_rows.js	_mk1

@@ -96,7 +96,7 @@ func TestTheOwnerDecisionHasOneImplementation(t *testing.T) {
 // The set of owner routes is pinned here, so that a route cannot leave the table (and stop being stamped and refused) without this test saying so: a change to it is a reviewed act.
 func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 	want := map[string]string{
-		"GET /api/artifacts": "owner-only", "GET /api/artifacts/resolve": "owner-only", "GET /api/artifacts/{hex64}": "owner-only", "GET /api/artifacts/{hex64}/meta": "owner-only", "GET /api/artifacts/{hex64}/thumbnail": "owner-only", "GET /api/artifacts/{hex64}/comments": "owner-only", "GET /api/artifacts/{hex64}/readers": "owner-only",
+		"GET /api/launch-disclosure": "owner-only", "GET /api/artifacts": "owner-only", "GET /api/artifacts/resolve": "owner-only", "GET /api/artifacts/{hex64}": "owner-only", "GET /api/artifacts/{hex64}/meta": "owner-only", "GET /api/artifacts/{hex64}/thumbnail": "owner-only", "GET /api/artifacts/{hex64}/comments": "owner-only", "GET /api/artifacts/{hex64}/readers": "owner-only",
 		"DELETE /api/artifacts/{hex64}": "owner-only", "PUT /api/artifacts/{hex64}/star": "owner-only", "DELETE /api/artifacts/{hex64}/star": "owner-only", "POST /api/artifacts/{hex64}/opened": "owner-only", // the star (#9819) and the opened version (#13910)
 		"GET /api/board/{project}/proposals":               "owner-only",
 		"GET /api/proposals":                               "owner-only",
@@ -147,6 +147,7 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"POST /api/board/{project}/asks/{messageID}/close":                     "owner-only", // Ignore and Undo in the owner's Needs you table on the Hub (#13446)
 		"POST /api/sessions/live/{name}/dismiss-wait":                          "owner-only",
 		"POST /api/sessions/live/{name}/auto-sleep":                            "owner-only", // an agent's auto-sleep switch (#12111)
+		"POST /api/sessions/live/{name}/keep-full-access":                      "owner-only", // a Codex agent's Full access across restarts (#14061)
 		"GET /api/board/{project}/artifacts/{digest}/edit":                     "owner-only",
 		"GET /api/board/{project}/artifacts/{digest}/edit/send":                "owner-only",
 		"POST /api/board/{project}/artifacts/{digest}/edit/send":               "owner-only",
