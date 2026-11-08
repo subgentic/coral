@@ -954,10 +954,10 @@ func TestAgy_PermissionModeTranslation(t *testing.T) {
 			notWant: []string{"--permission-mode"},
 		},
 		{
+			// #14741: auto is agy's own --mode auto (only for an agy whose --help lists it: tested in agy_auto_mode_test.go), never the skip flag it used to be translated to.
 			name:    "flag equals auto",
 			params:  LaunchParams{Flags: []string{"--permission-mode=auto"}},
-			want:    []string{"--dangerously-skip-permissions"},
-			notWant: []string{"--permission-mode"},
+			notWant: []string{"--permission-mode", "--dangerously-skip-permissions"},
 		},
 		{
 			name:    "plan",

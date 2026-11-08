@@ -24,13 +24,15 @@ func agyModeLabel(word string) string {
 		return "Bypass permissions"
 	case "accept-edits":
 		return "Accept edits"
+	case "auto":
+		return "Auto"
 	case "plan":
 		return "Plan (read-only)"
 	}
 	return "Asks first"
 }
 
-var agyModeRank = map[string]int{"default": 0, "plan": 1, "accept-edits": 2, "skip": 3}
+var agyModeRank = map[string]int{"default": 0, "plan": 1, "accept-edits": 2, "auto": 3, "skip": 4}
 
 // permissionEffective is the row key's value for a stored agent, from the launch builders' own steps: nil when there is nothing to say. Codex says it only when the launch would give less than
 // what was chosen (the live chip of #14051 has the rest); agy always says what it was started with; Claude's capabilities add allow and deny rules and never lower a chosen mode, so it has none.

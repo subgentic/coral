@@ -2,7 +2,7 @@ package agent
 
 import "strings"
 
-// AgyLaunchMode is the one mode an agy launch with these stored settings starts in, as one of "skip" (nothing asks), "accept-edits", "plan" or "default" (asks first). It takes the same steps
+// AgyLaunchMode is the one mode an agy launch with these stored settings starts in, as one of "skip" (nothing asks), "auto", "accept-edits", "plan" or "default" (asks first). It takes the same steps
 // the launch builder takes (the Operator's keep-Full-access choice first, then the capabilities narrowing an explicit mode, then the stored flags, then the mode), and
 // TestAgyLaunchModeAgreesWithTheLaunchBuilder keeps the two together (#14085). With nil capabilities it is the mode the person chose, before any narrowing.
 func AgyLaunchMode(flags []string, caps *Capabilities, mode string, keepFullAccess bool) string {
@@ -46,6 +46,8 @@ func agyModeWord(rank int) string {
 		return "skip"
 	case agyRankAcceptEdits:
 		return "accept-edits"
+	case agyRankAuto:
+		return "auto"
 	case agyRankPlan:
 		return "plan"
 	}
@@ -63,6 +65,8 @@ func agyModeWordOfMode(mode string) string {
 	switch mode {
 	case "accept-edits":
 		return "accept-edits"
+	case "auto":
+		return "auto"
 	case "plan":
 		return "plan"
 	}
