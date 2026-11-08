@@ -49,12 +49,12 @@ func TestARowKeepsWhoAskedAndAnOldRowStillVerifies(t *testing.T) {
 func TestTheAskerIsCleanedAndCut(t *testing.T) {
 	s := activityStore(t)
 	m := opMeta
-	m.Title, m.Asker = "q", "Head‮ of​ Security "+string(make([]rune, 0))+"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+	m.Title, m.Asker = "q", "Head\u202e of\u200b Security "+string(make([]rune, 0))+"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 	require.NoError(t, s.RecordActivity(context.Background(), m, ActIgnore, "question", "1", "", "p"))
 	rows, _, err := s.ActivityPage(context.Background(), ActivityFilter{Limit: 5})
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	assert.NotContains(t, rows[0].Asker, "‮")
-	assert.NotContains(t, rows[0].Asker, "​")
+	assert.NotContains(t, rows[0].Asker, "\u202e")
+	assert.NotContains(t, rows[0].Asker, "\u200b")
 	assert.LessOrEqual(t, len([]rune(rows[0].Asker)), activityAskerCap+1)
 }
