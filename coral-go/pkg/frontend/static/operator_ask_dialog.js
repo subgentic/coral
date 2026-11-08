@@ -47,7 +47,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     const send = document.createElement('button'); send.type = 'button'; send.className = 'btn btn-primary inbox-ask-send'; send.textContent = 'Send reply';
     const close = document.createElement('button'); close.type = 'button'; close.className = 'btn'; close.textContent = 'Close';
     // Dismiss closes a question with no answer and nothing said to the agent, as the row's own Dismiss does (#12599): the same route and the same toast with Undo. A wait has no ask row to close, so it has no Dismiss.
-    const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'btn btn-quiet'; dismiss.textContent = 'Dismiss'; dismiss.title = 'Take it out of Needs you; nobody is told'; dismiss.hidden = a.kind !== 'ask' || fromAnotherComputer(a); // the close route is this computer's: a question from another computer is answered there
+    const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'btn btn-quiet'; dismiss.textContent = 'Dismiss'; dismiss.title = 'Take it out of Needs you; nobody is told'; dismiss.hidden = a.kind !== 'ask' || (fromAnotherComputer(a) && decisionNeedsPerson(a.server)); // the close route is served for this computer's question and, through the Hub, for the computer's owner (coral-hub batch-125): a phone's rows have no Dismiss of their own (#14419), so the dialog must
     row.append(close, ...(dismiss.hidden ? [] : [dismiss])); // Close and Dismiss stay in the footer; Send reply is on the row right under the reply box (#13148, the Operator: 'The send reply is too far away from text input')
     let tray = null;
     const finish = () => { if (tray) tray.destroy(); dlg.close(); dlg.remove(); if (onDone) onDone(); };
@@ -69,7 +69,7 @@ export function openAskDialog(a, onDone, runners = {}) {
                 const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn'; const label = binary ? (b.label === 'Yes' ? 'Approve' : 'Deny') : markHidden(b.label, { strict: true }); btn.textContent = label; btn.dataset.buttonId = String(b.id);
                 const what = document.createElement('span'); what.className = 'inbox-ask-offer-what sr-only'; what.textContent = buttonWords(b);
                 btn.setAttribute('aria-label', `${label}: ${what.textContent}`); btn.title = what.textContent;
-                if (binary) { const icon = document.createElement('span'); icon.className = 'material-icons'; icon.setAttribute('aria-hidden', 'true'); icon.textContent = b.label === 'Yes' ? 'check' : 'close'; btn.replaceChildren(icon); btn.classList.add('btn-icon'); btn.setAttribute('aria-label', `${label}, sends ${b.label} with any draft text and pictures`); btn.title = btn.getAttribute('aria-label'); }
+                if (binary) { const icon = document.createElement('span'); icon.className = 'material-icons'; icon.setAttribute('aria-hidden', 'true'); icon.textContent = b.label === 'Yes' ? 'check' : 'close'; const word = document.createElement('span'); word.className = 'inbox-ask-yn-word'; word.textContent = b.label; btn.replaceChildren(icon, word); /* the icon and the reply it sends, in words (#14419: an icon alone said nothing) */ btn.setAttribute('aria-label', `${label}, sends ${b.label} with any draft text and pictures`); btn.title = btn.getAttribute('aria-label'); }
                 btn.addEventListener('click', async () => {
                     if (sending || (binary && picturesBlocked())) return;
                     sending = true; err.textContent = ''; sync();
@@ -127,7 +127,7 @@ export function openAskDialog(a, onDone, runners = {}) {
         if (sending) return;
         sending = true; err.textContent = ''; dismiss.disabled = true; sync();
         try { const m = await importOnce('./ask_ignore.js'); await m.ignoreAsk(a, markHidden(a.asker, { strict: true })); forgetAsk(a); finish(); }
-        catch (e) { err.textContent = e.message || 'Could not dismiss it.'; dismiss.disabled = false; sending = false; sync(); }
+        catch (e) { if (e && e.code === 'owner_only') { dismiss.hidden = true; err.textContent = 'Only this computer\u2019s owner can dismiss it.'; } else err.textContent = e.message || 'Could not dismiss it.'; dismiss.disabled = false; sending = false; sync(); }
     });
     dlg.addEventListener('cancel', e => { e.preventDefault(); finish(); });
     box.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !send.disabled) { e.preventDefault(); send.click(); } }); // Ctrl or Cmd+Enter sends, as the task page's reply box does (#13148)
