@@ -26,7 +26,7 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
-        await seed(ev, TEAM); await stub(); await liveWaiting(ev, true); await openTeam(ev, waitFor, TEAM); // the status says Backend Dev needs input: its live row agrees, or the header says "Checking attention status" (42b847cc3, #14437) await settle(700);
+        await seed(ev, TEAM); await stub(); await liveWaiting(ev, true); await openTeam(ev, waitFor, TEAM); await settle(700); // the status says Backend Dev needs input: its live row agrees, or the header says "Checking attention status" (42b847cc3, #14437);
         await S.run('a waiting agent is "needs attention", not "All well"', async () => {
             assert.equal(await status(), '1 needs attention', `got ${JSON.stringify(await status())}`);
         });
