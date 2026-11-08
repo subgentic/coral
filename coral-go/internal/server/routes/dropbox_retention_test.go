@@ -431,3 +431,40 @@ func TestAdjacentPairsAtTheCeilingAreNeverSplit(t *testing.T) {
 	}
 	assert.Equal(t, 2, be.audits()[0].Held, "the third pair waits whole")
 }
+
+// QA Reviewer 2's last two gaps on #14703.
+
+// Mutant: the Go /v1/ check is dropped. SQLite's LIKE ignores ASCII case, so '/V1/...' passes the query's filter and only the exact prefix
+// check in planRetention keeps it.
+func TestNothingOutsideV1IsDeletedWhateverItsCase(t *testing.T) {
+	be, ds := newRetentionEnv(t, 4)
+	be.age(10, ds...)
+	ctx := context.Background()
+	for _, d := range ds {
+		_, err := be.db.ExecContext(ctx, "UPDATE dropbox_outbox SET path = '/V1/' || substr(path, 5) WHERE digest = ?", d)
+		require.NoError(t, err)
+	}
+	be.retain(1)
+	assert.Empty(t, be.dbx.deleteCalls, "a path that is not exactly under /v1/ is never deleted")
+	assert.Equal(t, 8, be.audits()[0].Held, "held, and counted")
+}
+
+// Mutant: pairs are grouped without the document, so two documents with the same bytes (same digest, both version 1) merge into one group.
+func TestPairsNeverCrossDocuments(t *testing.T) {
+	be := newBackupEnv(t)
+	be.b.retainPoll, be.b.retainWait = time.Millisecond, 50*time.Millisecond
+	d := be.put("a.md", "text/markdown", "the same bytes")
+	d2, _, err := storeArtifactVia(be.h.dbx.dataDir, "sess-2", "b.md", "text/markdown", "", "", "", []byte("the same bytes")) // another document, the same bytes
+	require.NoError(t, err)
+	require.Equal(t, d, d2)
+	be.pass()
+	require.Len(t, be.dbx.files, 4, "two documents: two version files and two sidecars")
+	be.age(10, d)
+	be.retain(1) // a ledger of 4: a ceiling of 2, one whole pair
+	require.Len(t, be.dbx.deleteCalls, 1, "one document's pair fits")
+	call := be.dbx.deleteCalls[0]
+	require.Len(t, call, 2)
+	doc := func(p string) string { return strings.Split(p, "/")[3] }
+	assert.Equal(t, doc(call[0]), doc(call[1]), "both files of one document, never one from each")
+	assert.Equal(t, 2, be.audits()[0].Held, "the other document's pair waits whole")
+}
