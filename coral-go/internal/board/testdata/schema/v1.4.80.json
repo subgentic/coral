@@ -728,7 +728,7 @@
     },
     {
       "name": "operator_actions",
-      "sql": "CREATE TABLE operator_actions (\n\t\tid        INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\tat        TEXT NOT NULL,\n\t\tactor     TEXT NOT NULL,\n\t\taction    TEXT NOT NULL,\n\t\titem_kind TEXT NOT NULL,\n\t\titem_id   TEXT NOT NULL,\n\t\tversion   TEXT NOT NULL DEFAULT '',\n\t\tteam      TEXT NOT NULL,\n\t\tsource    TEXT NOT NULL,\n\t\thint      TEXT NOT NULL DEFAULT '',\n\t\tsurface   TEXT NOT NULL DEFAULT '',\n\t\ttitle     TEXT NOT NULL DEFAULT '',\n\t\tnote      TEXT NOT NULL DEFAULT '',\n\t\tprev_hash TEXT NOT NULL,\n\t\thash      TEXT NOT NULL\n\t)",
+      "sql": "CREATE TABLE operator_actions (\n\t\tid        INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\tat        TEXT NOT NULL,\n\t\tactor     TEXT NOT NULL,\n\t\taction    TEXT NOT NULL,\n\t\titem_kind TEXT NOT NULL,\n\t\titem_id   TEXT NOT NULL,\n\t\tversion   TEXT NOT NULL DEFAULT '',\n\t\tteam      TEXT NOT NULL,\n\t\tsource    TEXT NOT NULL,\n\t\thint      TEXT NOT NULL DEFAULT '',\n\t\tsurface   TEXT NOT NULL DEFAULT '',\n\t\ttitle     TEXT NOT NULL DEFAULT '',\n\t\tnote      TEXT NOT NULL DEFAULT '',\n\t\tprev_hash TEXT NOT NULL,\n\t\thash      TEXT NOT NULL\n\t, goal_id INTEGER, task_id INTEGER)",
       "tbl_name": "operator_actions",
       "type": "table"
     },
@@ -6662,6 +6662,24 @@
           "notnull": 1,
           "pk": 0,
           "type": "TEXT"
+        },
+        {
+          "cid": 15,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "goal_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 16,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "task_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
         }
       ],
       "indexes": [
