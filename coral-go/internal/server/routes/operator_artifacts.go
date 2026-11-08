@@ -291,6 +291,7 @@ func (h *BoardHandler) UploadOperatorArtifact(w http.ResponseWriter, r *http.Req
 	h.bs.NoteArtifactsChanged(project)
 	rememberOperatorShare(project, sessionID, hexID, name, time.Now())
 	slog.Info("[operator share] stored", "surface", "local", "board", project, "digest", hexID) // who and which, never a name or a byte of the file
+	noteActivity(r, board.ActFileShare, "file", hexID, project, meta.Name, "")                  // the Activity row names the file and its id: the route has no {id}, so the table's row alone said neither (#14478)
 	writeJSON(w, http.StatusCreated, map[string]any{"uri": "coral://artifacts/" + hexID, "id": hexID, "name": meta.Name, "media_type": meta.MediaType, "size": meta.Size, "digest": meta.Digest})
 }
 
