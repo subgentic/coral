@@ -1,8 +1,10 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -29,6 +31,9 @@ type fakeDropbox struct {
 	badCode     bool   // the token endpoint answers invalid_grant to the next code
 	revokeFails bool
 	revoked     int
+	sameRefresh bool   // Dropbox answers a reconnect of the same account with the refresh token it gave before
+	issued      int    // codes exchanged, so each sign-in gets its own refresh token by default
+	onRevoke    func() // called when a revoke arrives, before it is answered (to check what is stored at that moment)
 	srv         *httptest.Server
 }
 
@@ -46,11 +51,21 @@ func newFakeDropbox(t *testing.T) *fakeDropbox {
 					w.Write([]byte(`{"error":"invalid_grant"}`))
 					return
 				}
-				json.NewEncoder(w).Encode(map[string]any{"access_token": "a-" + f.account, "refresh_token": "refresh-secret-" + f.account, "account_id": f.account, "expires_in": 14400})
+				f.issued++
+				refresh := fmt.Sprintf("refresh-secret-%s-%d", f.account, f.issued)
+				if f.sameRefresh {
+					refresh = "refresh-secret-" + f.account
+				}
+				json.NewEncoder(w).Encode(map[string]any{"access_token": "a-" + f.account, "refresh_token": refresh, "account_id": f.account, "expires_in": 14400})
 				return
 			}
 			json.NewEncoder(w).Encode(map[string]any{"access_token": "a1", "expires_in": 14400})
 		case "/2/auth/token/revoke":
+			if f.onRevoke != nil {
+				f.mu.Unlock()
+				f.onRevoke()
+				f.mu.Lock()
+			}
 			if f.revokeFails {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
@@ -285,4 +300,28 @@ func TestANewSignInRevokesTheOneItReplaces(t *testing.T) {
 	e.dbx.account = "dbid:BBB"
 	assert.Contains(t, e.signIn(""), "Connected", "a failed revoke never blocks the new sign-in")
 	assert.Equal(t, "dbid:BBB", e.status()["account_id"])
+}
+
+// The old sign-in is revoked only after the new one is saved (Security's SHOULD b on #14640): at the moment Dropbox gets the revoke, the store
+// already holds the new token, so a failure between the two steps never leaves Coral with neither.
+func TestTheOldSignInIsRevokedOnlyAfterTheNewOneIsSaved(t *testing.T) {
+	e := newDropboxEnv(t)
+	require.Contains(t, e.signIn(""), "Connected")
+	first, err := e.h.dbx.store.RefreshToken(context.Background())
+	require.NoError(t, err)
+	var atRevoke string
+	e.dbx.onRevoke = func() { atRevoke, _ = e.h.dbx.store.RefreshToken(context.Background()) }
+	require.Contains(t, e.signIn(""), "Connected")
+	require.NotEmpty(t, atRevoke, "a revoke was sent")
+	assert.NotEqual(t, first, atRevoke, "the new sign-in was already saved when the old one was revoked")
+}
+
+// A reconnect that gets back the same refresh token revokes nothing (Security's SHOULD a on #14640): revoking it would end the new sign-in too.
+func TestAReconnectWithTheSameTokenRevokesNothing(t *testing.T) {
+	e := newDropboxEnv(t)
+	e.dbx.sameRefresh = true
+	require.Contains(t, e.signIn(""), "Connected")
+	require.Contains(t, e.signIn(""), "Connected")
+	assert.Equal(t, 0, e.dbx.revoked, "the same token is not revoked")
+	assert.Equal(t, true, e.status()["connected"])
 }
