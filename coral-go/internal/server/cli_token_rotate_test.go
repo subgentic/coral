@@ -35,19 +35,27 @@ func TestResetPasswordRotatesTheCLIToken(t *testing.T) {
 
 	old, err := cloud.ReadCLIToken(cfg.CoralDir())
 	require.NoError(t, err)
-	status := func(tok string) (int, error) {
-		resp, err := cliDo(t, cloud.CLIClient{Base: local.URL, Token: tok}, ctx, http.MethodGet, "/api/sessions/live", nil, nil, 5*time.Second)
+	// status signs one request with tok. retry sends a refused hello again (cliDo) for a token that should sign; the old token's expected refusal is asked once, with no retry.
+	status := func(tok string, retry bool) (int, error) {
+		cli := cloud.CLIClient{Base: local.URL, Token: tok}
+		var resp *http.Response
+		var err error
+		if retry {
+			resp, err = cliDo(t, cli, ctx, http.MethodGet, "/api/sessions/live", nil, nil, 5*time.Second)
+		} else {
+			resp, err = cli.Do(ctx, http.MethodGet, "/api/sessions/live", nil, nil, 5*time.Second)
+		}
 		if err != nil {
 			return 0, err
 		}
 		resp.Body.Close()
 		return resp.StatusCode, nil
 	}
-	code, err := status(old)
+	code, err := status(old, true)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, code, "the token signs before the reset")
 
-	resp, err := cloud.CLIClient{Base: local.URL, Token: old}.Do(ctx, http.MethodPost, "/api/auth/password/reset", []byte(`{"password":"a new one"}`), nil, 30*time.Second)
+	resp, err := cliDo(t, cloud.CLIClient{Base: local.URL, Token: old}, ctx, http.MethodPost, "/api/auth/password/reset", []byte(`{"password":"a new one"}`), nil, 30*time.Second)
 	require.NoError(t, err)
 	resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -55,9 +63,9 @@ func TestResetPasswordRotatesTheCLIToken(t *testing.T) {
 	fresh, err := cloud.ReadCLIToken(cfg.CoralDir())
 	require.NoError(t, err)
 	assert.NotEqual(t, old, fresh, "a new token was written")
-	_, err = status(old)
+	_, err = status(old, false)
 	assert.ErrorIs(t, err, cliauth.ErrNotCoral, "the old token no longer signs")
-	code, err = status(fresh)
+	code, err = status(fresh, true)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, code, "the new token signs")
 
