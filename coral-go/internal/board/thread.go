@@ -197,9 +197,13 @@ func (q ThreadQuery) cut(text string, n int, firstLineOnly bool) (out string, tr
 	return red, false
 }
 
+// threadTimeLayout is the one text form of a time in a thread: UTC, a fixed six fractional digits, "Z". Fixed width, so the text of two times sorts as the times do (RFC3339Nano drops trailing zeros: ".1Z" would
+// sort after ".12Z", and "…00Z" after "…00.5Z"); thread_summary.go compares these strings. The census (store TestEveryRFC3339NanoWriterIsListed) asks writers to avoid RFC3339Nano for that reason (#14726).
+const threadTimeLayout = "2006-01-02T15:04:05.000000Z"
+
 func utc(s string) string {
 	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
-		return t.UTC().Format(time.RFC3339Nano)
+		return t.UTC().Format(threadTimeLayout)
 	}
 	return s
 }
