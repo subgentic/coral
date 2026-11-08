@@ -191,7 +191,7 @@ function confirmRateLimit(s, o, ask, cell, rl) {
     if (never) q.append('This stops the reminder for good.');
     else { const m = document.createElement('code'); m.className = 'inbox-trust-path'; m.textContent = rl.model; q.append('Switch this agent to ', m, '? It changes the model the agent runs with.'); }
     const go = document.createElement('button'); go.type = 'button'; go.className = 'btn btn-small inbox-answer inbox-trust-go'; go.textContent = never ? 'Never show again' : `Switch to ${rl.model}`;
-    go.dataset.session = s.session_id; go.dataset.n = String(Number(o.n)); go.setAttribute('aria-label', never ? `Stop the rate-limit reminder for ${who}` : `Switch ${who} to ${rl.model}`);
+    go.dataset.session = s.session_id; go.dataset.n = String(Number(o.n)); go.setAttribute('aria-label', never ? `Never show again: stops the rate-limit reminder for ${who}` : `Switch to ${rl.model}: ${who}`); // starts with the words on the button, so "click Never show again" finds it (WCAG 2.5.3, UI Accessibility on #14774)
     const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'btn btn-small inbox-trust-cancel'; cancel.textContent = 'Cancel';
     go.addEventListener('click', e => { e.stopPropagation(); answer(s, o, ask, cell, '', '', rl.model); });
     cancel.addEventListener('click', e => { e.stopPropagation(); fill(s, cell).then(() => cell.querySelector('.inbox-answer')?.focus({ preventScroll: true })); });
