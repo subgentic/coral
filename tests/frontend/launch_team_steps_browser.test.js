@@ -56,7 +56,8 @@ const { coralReady } = require('./helpers/wait');
         await ev(`{ const n = document.getElementById('team-board-name'); n.value = 'crew-1'; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = '/work/repo'; d.dispatchEvent(new Event('input', { bubbles: true })); } true`);
         await click('#launch-team-next'); assert.equal(await step(), 'members');
         await pick('Coding Team');
-        await ev(`window.showTeamAgentModal(); true`);
+        // Explicit Default is distinct from the shipped Auto default (#14532).
+        await ev(`{ const mode = document.getElementById('team-permission-mode'); mode.value = 'default'; mode.dispatchEvent(new Event('change', { bubbles: true })); } window.showTeamAgentModal(); true`);
         assert.equal(await ev(`document.querySelector('#launch-agent-acf .acf-permission-mode').value`), 'default', 'the new member starts at the default Mode');
         await ev(`{ const n = document.getElementById('launch-agent-name-input'); n.value = 'Scribe'; n.dispatchEvent(new Event('input', { bubbles: true })); window.saveTeamAgentFromModal(); } true`);
         assert.match(await summary('Scribe'), /default mode$/, 'and its row says so');

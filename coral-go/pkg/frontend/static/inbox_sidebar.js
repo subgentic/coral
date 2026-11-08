@@ -1540,6 +1540,7 @@ export async function openInboxGroup(name) {
     if (name === 'goals') restoreGoalList();
     const opener = itemOpeners.get(name), table = $('group-table-view');
     if (opener && table) { itemOpeners.delete(name); putBack(table, opener); } // spent once used (#12319)
+    else if (table) table.scrollTop = 0; // A fresh folder starts at its top, not the previous folder's offset (#14532).
 }
 
 /** The list a person came back to is drawn (and redrawn) after the route, so its rows may not be there yet and a draw can put the scroll back to the top: for about a second keep its place and the row's focus where they were, until

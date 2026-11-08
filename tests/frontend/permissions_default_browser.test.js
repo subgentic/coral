@@ -8,6 +8,7 @@ const { guardSettings } = require('./helpers/settings_guard');
 (async()=>{
  const guard=await guardSettings();
  const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();
+ const snapshot=async(label,width)=>{if(!process.env.CORAL_SCREENSHOT_DIR)return;const fs=require('node:fs');fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true});for(const size of [16,32]){await ev(`document.documentElement.style.fontSize='${size}px';true`);await ev(require('./helpers/wait').framesJs(3));fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/${width}-${size}-${label}.png`,Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}await ev(`document.documentElement.style.fontSize='';true`);};
  const full=['agent_spawn','file_read','file_write','shell','web_access'];
  try{
   await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
@@ -29,6 +30,16 @@ const { guardSettings } = require('./helpers/settings_guard');
 
    await ev(`import((window.__coralStatic||'/static/')+'launch_disclosure.js').then(m=>m.refreshLaunchDisclosure())`);
    await waitFor(`!!document.getElementById('launch-disclosure-banner')`,'real unseen server record shows the banner');
+   assert.deepEqual(await ev(`(()=>{const b=document.getElementById('launch-disclosure-banner'),s=b.querySelector('summary'),a=b.querySelector('button');return {expanded:s.getAttribute('aria-expanded'),controls:!!document.getElementById(s.getAttribute('aria-controls')),ackVisible:a.checkVisibility(),bounded:b.getBoundingClientRect().height<=innerHeight/4+1}})()`),{expanded:'false',controls:true,ackVisible:false,bounded:true},'closed notice exposes its state, hides acknowledgement and leaves the app room');
+   await snapshot('closed',width);
+   await ev(`document.querySelector('#launch-disclosure-banner button').click();true`);
+   assert.equal(await ev(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json()).then(d=>d.seen)`),false,'a closed notice cannot acknowledge even through a synthetic button click');
+   await ev(`document.querySelector('#launch-disclosure-banner summary').focus();true`);
+   await client.Input.dispatchKeyEvent({type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r'});
+   await client.Input.dispatchKeyEvent({type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+   await waitFor(`document.querySelector('#launch-disclosure-banner summary').getAttribute('aria-expanded')==='true'`,'keyboard opens the full disclosure',5000,`({focus:document.activeElement?.outerHTML,open:document.querySelector('#launch-disclosure-banner details')?.open,inert:!!document.querySelector('#launch-disclosure-banner')?.closest('[inert]')})`);
+   assert.equal(await ev(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json()).then(d=>d.seen)`),false,'expansion never acknowledges');
+   await snapshot('open',width);
    await ev(`[...document.querySelectorAll('#launch-disclosure-banner button')].find(b=>b.textContent==="I've read this").click();true`);
    await waitFor(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json()).then(d=>d.seen===true)`,'owner acknowledgement persisted on the real server');
    await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev,'startup','settings');await installTeam(ev);await stubModels(ev);
@@ -76,7 +87,7 @@ const { guardSettings } = require('./helpers/settings_guard');
    assert.equal(await ev(`document.getElementById('team-permission-mode').value`),'default','explicit Default survives provider change');
    assert.deepEqual(await ev(`import((window.__coralStatic||'/static/')+'preset_enforcement.js').then(m=>[m.defaultPermissionMode({default_permission_mode:'default'},'hermes'),m.defaultPermissionMode({},'hermes')])`),['default','bypassPermissions'],'stored lower Hermes choice wins over new shipped yolo default');
    await ev(`(async()=>{const S=window.__coralStatic||'/static/';(await import(S+'launch_core.js')).hideLaunchModal();const real=window.fetch;window.__disclosure={id:'full-permissions-1',text:'Full tool permissions <b>are not role limits</b>. Change the default in Settings.',seen:false};window.__launchAudit={launch:[],ack:[],failAck:false};window.fetch=(input,options={})=>{const path=new URL(String(input),location.href).pathname;const json=(data,status=200)=>Promise.resolve(Response.json(data,{status}));if(path==='/api/launch-disclosure')return json(window.__disclosure);if(path==='/api/launch-disclosure/ack'){window.__launchAudit.ack.push(JSON.parse(options.body));if(window.__launchAudit.failAck)return json({error:'owner_only'},403);window.__disclosure.seen=true;return json({id:window.__disclosure.id,seen:true});}if(path==='/api/sessions/launch'||path==='/api/sessions/launch-team'){window.__launchAudit.launch.push({path,body:JSON.parse(options.body)});return window.__disclosure.seen?json({session_id:'new-agent',name:'new-agent',permission_mode:'auto'}):json({code:'launch_disclosure_required',disclosure:window.__disclosure},409);}return real(input,options)};await(await import(S+'launch_disclosure.js')).refreshLaunchDisclosure();return true;})()`);
-   await waitFor(`document.getElementById('launch-disclosure-banner')?.textContent.includes('Full tool permissions')`,'unseen disclosure stays in dashboard banner');
+   await waitFor(`document.getElementById('launch-disclosure-banner')?.textContent.includes('New agents start with full permissions')`,'unseen disclosure stays in dashboard banner');
    assert.equal(await ev(`!!document.querySelector('#launch-disclosure-banner b')`),false,'server text is text, never markup');
    await ev(`window.showSettingsModal('agents').then(()=>true)`);
    await waitFor(`!!document.getElementById('settings-permission-mode')`,'settings default exists');

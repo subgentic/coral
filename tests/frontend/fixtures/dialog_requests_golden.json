@@ -10,7 +10,8 @@
       "allow": [
         "file_read"
       ]
-    }
+    },
+    "useFullAccess": false
   },
   "restart_unchanged": {
     "agent_type": "claude",
@@ -39,7 +40,8 @@
         "shell:git *",
         "shell:npm *"
       ]
-    }
+    },
+    "useFullAccess": false
   },
   "restart_changed": {
     "agent_type": "codex",
@@ -83,7 +85,8 @@
     "prompt": "",
     "flags": "--permission-mode auto",
     "permissionMode": "auto",
-    "capabilities": null
+    "capabilities": null,
+    "useFullAccess": false
   },
   "agent_minimal": {
     "working_dir": "/work/repo",
@@ -107,7 +110,8 @@
         "shell",
         "shell:git *"
       ]
-    }
+    },
+    "useFullAccess": false
   },
   "agent_full": {
     "working_dir": "/work/other",
@@ -149,7 +153,8 @@
     "prompt": "Write the code.\nCarefully.",
     "flags": "--sandbox workspace-write -a never",
     "permissionMode": "auto",
-    "capabilities": null
+    "capabilities": null,
+    "useFullAccess": false
   },
   "team_full": {
     "board_name": "alpha-team",
