@@ -10,16 +10,13 @@ import (
 	"github.com/subgentic/coral/internal/agent"
 )
 
-// The first-launch disclosure (#14353, Security's MUST 3 on #14333): agents start with full permissions, and the person is told once, in words the server owns, before a launch from the dashboard's own
+// The first-launch disclosure (#14353, Security's MUST 3 on #14333): agents default to Auto, and a different mode may skip prompts; the person is told once, in words the server owns, before a launch from the dashboard's own
 // dialog uses that default. The text and its id live here; the acknowledgement is an operator-only record of the id and when (never a browser flag, never set by an agent route or by any launch).
 const (
 	// LaunchDisclosureID versions the words: a change of the text is a new id, and an old acknowledgement then no longer counts.
-	LaunchDisclosureID = "full-permissions-3"
-	// LaunchDisclosureText is the measured behaviour in plain words (Auto still judges a force push or a delete outside the project; Codex stays in its sandbox).
-	LaunchDisclosureText = "Agents you start here begin with full permissions. They run as you, with every file you can reach: they can read and change files, run commands and use the web without asking you first. " +
-		"Claude's own safety checks still apply to destructive commands such as a force push or a delete outside the project, and Codex stays inside its project folder. " +
-		"Hermes, OpenCode and Pi agents run with no such checks at all, and so does any agent you start in Bypass or with Full access (Codex then leaves its folder too). " +
-		"To start one with fewer permissions, pick a lower permission mode when you launch it, or set a default permission mode in Settings."
+	LaunchDisclosureID = "full-permissions-4"
+	// LaunchDisclosureText names the default and points to the controls for choosing a different mode.
+	LaunchDisclosureText = "Agents default to auto mode. Choose a different permission mode when you launch an agent or set a default in Settings."
 	// PermissionLoweringText is where to lower it, carried in every launch answer.
 	PermissionLoweringText = "To lower it: pass a lower permission mode when you launch (a CLI permission flag, or permission_mode default), or set a default permission mode in Settings."
 	// launchDisclosureAckSetting holds {"id","at"}. It is hidden from GET /api/settings and cannot be written through PUT /api/settings (the registry does not know it).

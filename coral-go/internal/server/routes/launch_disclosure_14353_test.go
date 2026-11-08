@@ -86,7 +86,8 @@ func TestTheLaunchNoticeIsReadAndAcknowledgedOnlyByTheOwner(t *testing.T) {
 	assert.Equal(t, LaunchDisclosureID, v["id"])
 	assert.Equal(t, LaunchDisclosureText, v["text"])
 	assert.Equal(t, false, v["seen"])
-	assert.Contains(t, v["text"], "run as you, with every file you can reach")
+	assert.Contains(t, v["text"], "Agents default to auto mode.")
+	assert.Contains(t, v["text"], "when you launch an agent")
 	assert.NotContains(t, v["text"], "data folder", "no claim that Coral fences its data folder")
 
 	// an agent's token can neither read, acknowledge nor clear it; nothing is stored
@@ -214,10 +215,12 @@ func TestADialogLaunchThatWritesItsShippedModeAsFlagsStillWaitsForTheNotice(t *t
 	assert.Equal(t, http.StatusOK, code, "the owner saved a default of their own: nothing is shipped to them unannounced: %v", out)
 }
 
-// Security's condition B on #14333: the notice names Hermes Bypass and the Bypass and Full access exception for the checks and Codex's folder.
-func TestTheLaunchNoticeNamesHermesBypassAndTheBypassException(t *testing.T) {
-	assert.Contains(t, LaunchDisclosureText, "Hermes, OpenCode and Pi agents run with no such checks at all, and so does any agent you start in Bypass or with Full access (Codex then leaves its folder too).")
-	assert.Equal(t, "full-permissions-3", LaunchDisclosureID, "new words, new id: an older acknowledgement no longer counts")
+// The Operator's chosen copy is short and points to where a different mode is chosen.
+func TestTheLaunchNoticeNamesAutoDefaultAndModeChoice(t *testing.T) {
+	assert.Contains(t, LaunchDisclosureText, "Agents default to auto mode.")
+	assert.Contains(t, LaunchDisclosureText, "when you launch an agent")
+	assert.Contains(t, LaunchDisclosureText, "set a default in Settings")
+	assert.Equal(t, "full-permissions-4", LaunchDisclosureID, "new words, new id: an older acknowledgement no longer counts")
 }
 
 // Security's SHOULD on #14353: only "default" names a mode. Any other non-empty permission_mode is dropped by the launch, so it counts as none in each of the three places that decide the gate.
