@@ -178,7 +178,14 @@ function rowMore(actions, label) {
         });
         menu.append(b);
     }
-    toggle.addEventListener('click', async e => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(toggle); });
+    toggle.addEventListener('click', async e => {
+        e.stopPropagation();
+        // The menu module loads on the first tap, and a redraw that lands meanwhile replaces this button with a new one (late data redraws the list): the tap opens the menu of the button that is there now, found by its row's key, and not of a detached one (#14757; the same class as #14631, which keeps an open menu across a redraw).
+        const key = toggle.closest('tr[data-key]')?.dataset.key;
+        const menus = await importOnce('./menu_button.js');
+        const live = toggle.isConnected ? toggle : key ? [...document.querySelectorAll('#group-table-view tr[data-key]')].find(r => r.dataset.key === key)?.querySelector('.dt-mail-more-toggle') : null;
+        if (live) menus.toggleMenu(live);
+    });
     wrap.append(toggle, menu);
     return wrap;
 }
