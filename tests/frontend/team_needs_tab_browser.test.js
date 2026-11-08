@@ -28,6 +28,11 @@ const BASE = require('./test_base').BASE;
             await waitFor(`document.querySelector('#team-panel-needs')?.textContent.includes('Team waiting agent')`,'shared list contains the local waiting agent');
             assert.equal(await ev(`document.querySelector('#team-panel-needs').textContent.includes('Other computer agent')`),false,'same team name on another computer is excluded');
             assert.equal(await ev(`document.documentElement.scrollWidth <= innerWidth`), true, width + ': no horizontal overflow');
+            await ev(`(()=>{const button=[...document.querySelectorAll('#team-panel-needs button')].find(b=>/Filters/.test(b.getAttribute('aria-label')||b.textContent));button.click();return true})()`);
+            await waitFor(`!!document.querySelector('#inbox-needs-team')?.getClientRects().length`,'team filter is visible');
+            assert.match(await ev(`document.querySelector('#inbox-needs-team option[value=""]').textContent`),/^This team: /,'fixed scope is explicit instead of Any team');
+            await ev(`(()=>{const done=[...document.querySelectorAll('#team-panel-needs button')].find(b=>b.textContent.trim()==='Done');const toggle=[...document.querySelectorAll('#team-panel-needs button')].find(b=>/Filters/.test(b.getAttribute('aria-label')||b.textContent));(done||toggle).click();return true})()`);
+
             await ev(`(()=>{const input=document.querySelector('#team-panel-needs input[type=search]');input.value='no matching agent';input.dispatchEvent(new Event('input',{bubbles:true}));return true})()`);
             await waitFor(`![...document.querySelectorAll('#team-panel-needs tbody tr[data-key]')].some(row=>row.textContent.includes('Team waiting agent'))`,'team search filters its rows');
             assert.equal(await ev(`document.querySelector('#team-tab-needs .team-tab-count').textContent`),'1','search does not narrow unfiltered tab badge');

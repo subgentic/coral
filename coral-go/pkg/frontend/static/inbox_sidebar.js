@@ -275,7 +275,7 @@ function inboxNeedsToolbar() {
             idp: 'inbox-needs', noun: 'agent', searchLabel: 'Search needs you',
             sorts: { values: NF.SORTS, labels: NF.SORT_LABEL, aria: 'Sort by how long they have waited' },
             fields: [
-                { type: 'select', key: 'team', id: 'inbox-needs-team', label: 'Team', values: [], labels: {}, any: 'Any team' },
+                { type: 'select', key: 'team', id: 'inbox-needs-team', label: 'Team', values: [], labels: {}, any: activeNeedsTeam ? `This team: ${keyLabel(activeNeedsTeam)}` : 'Any team' },
                 { type: 'select', key: 'agent', id: 'inbox-needs-agent', label: 'Agent', values: [], labels: {}, any: 'Any agent' },
                 { type: 'select', key: 'goal', id: 'inbox-needs-goal', label: 'Goal', values: [], labels: {}, any: 'Any goal' },
                 { type: 'select', key: 'longer', id: 'inbox-needs-longer', label: 'Waiting longer than', values: NF.LONGER, labels: NF.LONGER_LABEL, any: 'Any time' },
