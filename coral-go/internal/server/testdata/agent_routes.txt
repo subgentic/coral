@@ -11,6 +11,7 @@ a DELETE /api/agent/ui/{id}
 b DELETE /api/artifacts/series/{series_id}
 b DELETE /api/artifacts/{id}
 b DELETE /api/board/{project}/cross-team-links
+b DELETE /api/launch-disclosure/ack
 b DELETE /api/shared-images/{id}
 b DELETE /api/artifacts/{id}/comments/lock
 b DELETE /api/artifacts/{id}/comments/{cid}
@@ -144,6 +145,7 @@ b GET /api/goal-links
 b GET /api/goals
 b GET /api/goals/metrics
 c GET /api/health
+b GET /api/launch-disclosure
 b GET /api/operator-asks
 b GET /api/history-import
 b GET /api/needs-you
@@ -381,6 +383,7 @@ b POST /api/folder-tags/{folderName}
 b POST /api/history-import
 b POST /api/hub-auto-accept
 b POST /api/indexer/refresh
+b POST /api/launch-disclosure/ack
 a POST /api/notifications
 b POST /api/pinned-folders
 b POST /api/saved
