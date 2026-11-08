@@ -256,6 +256,7 @@ func relayArtifactSeed(t *testing.T, seed int64, shortIdle bool, add func(string
 			return hooksStarted.Load() == hooksEnded.Load() && (hs == nil || hs.artifactInflight.Load() == 0)
 		})
 		endedBefore := hooksEnded.Load()
+		startedBefore := hooksStarted.Load()
 		b := body() // the same body for both calls
 		var resp RelayResponse
 		var err error
@@ -272,6 +273,17 @@ func relayArtifactSeed(t *testing.T, seed int64, shortIdle bool, add func(string
 			waitHub(func() bool { return hooksEnded.Load() > endedBefore })
 		} else {
 			time.Sleep(20 * time.Millisecond) // no frame reaches the hub (range, capability off, cancelled): nothing to wait for
+			if clientAborts && client == cs && n >= 1 && n <= RelayMaxArtifact && !cancelled {
+				// A call the CLIENT ended (a body too short or too long, or blocked) returns the moment it sees its own error, while the hub's
+				// handler for that stream may not have taken its in-flight slot yet: under -race and load it did so after the next call began,
+				// and one of the two was answered 429 rate_limited (seeds 37, 78, 122, 150, 155, 198, 201; #14564). Wait for the hub to have
+				// started the hook (the next iteration's wait then holds until it has ended and released the slot). A hook that never starts
+				// (the reset reached the hub before its header was read) costs this bound and nothing else.
+				deadline := time.Now().Add(3 * time.Second)
+				for hooksStarted.Load() == startedBefore && time.Now().Before(deadline) {
+					time.Sleep(2 * time.Millisecond)
+				}
+			}
 		}
 		mu.Lock()
 		hub := got
