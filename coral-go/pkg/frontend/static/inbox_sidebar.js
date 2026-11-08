@@ -192,7 +192,7 @@ const addComputerChip = (s, tr) => {
     const label = pagingServerLabel(serverOf(s)); if (!label) return;
     let tags = item.querySelector(':scope > .inbox-review-tags');
     if (!tags) { tags = DT.el('span', 'inbox-review-tags'); const from = item.querySelector(':scope > .inbox-review-from'); if (from) from.after(tags); else item.prepend(tags); }
-    const chip = DT.el('span', 'inbox-computer-chip', label); chip.title = `On ${label}`; tags.append(chip);
+    const chip = DT.el('span', 'chip chip-tag inbox-computer-chip', label); chip.title = `On ${label}`; tags.append(chip);
 };
 const introNode = text => DT.el('span', 'inbox-review-from', text);
 const fromNode = s => {
