@@ -563,7 +563,8 @@ CREATE TABLE IF NOT EXISTS dropbox_connection (
     max_age_days    INTEGER NOT NULL DEFAULT 0, -- only artifacts newer than this many days; 0 is no limit
     retention_days      INTEGER NOT NULL DEFAULT 0, -- stage 4b (#14703): delete the Dropbox copies older than this many days; 0 is off (the default)
     retention_since     TEXT,                       -- when the Operator confirmed it
-    retention_last_pass TEXT                        -- the last retention pass (a local clock earlier than this refuses a pass)
+    retention_last_pass TEXT,                       -- the last retention pass (a local clock earlier than this refuses a pass)
+    list_cursor         TEXT                        -- stage 5a (#14714): the listing cursor of /v1 for the account connected now; cleared by any new sign-in
 );
 
 -- Dropbox stage 4's outbox (#14655): one row per file to back up (an artifact version or its item_data sidecar), by its Dropbox path (ids only,
@@ -592,6 +593,28 @@ CREATE TABLE IF NOT EXISTS dropbox_outbox (
 );
 CREATE INDEX IF NOT EXISTS idx_dropbox_outbox_due ON dropbox_outbox(state, next_try_at, artifact_at);
 
+-- Dropbox stage 5a (#14714): edits made in Dropbox, held for the Operator. The edited bytes are an object (digest) with NO upload record until a
+-- decision, so nothing that lists, searches, links, grants or serves uploads can show them. One pending row a document (a newer edit replaces it).
+-- path is the ledger's own path (a Coral-made string), never anything from a listing. state: pending, deciding (a decision being written: retention
+-- still holds it), promoted, separate.
+CREATE TABLE IF NOT EXISTS dropbox_edits (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id  TEXT NOT NULL,
+    doc_id      TEXT NOT NULL,
+    version     INTEGER NOT NULL,
+    orig_digest TEXT NOT NULL,
+    path        TEXT NOT NULL,
+    digest      TEXT NOT NULL,
+    media_type  TEXT NOT NULL,
+    size        INTEGER NOT NULL,
+    rev         TEXT NOT NULL,
+    state       TEXT NOT NULL DEFAULT 'pending',
+    seen_at     TEXT NOT NULL,
+    decided_at  TEXT,
+    result      TEXT NOT NULL DEFAULT ''
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_dropbox_edits_open ON dropbox_edits(doc_id) WHERE state IN ('pending', 'deciding');
+
 -- Dropbox stage 4b's audit (#14703): each retention setting change (who, old and new days, the dry-run count the page showed) and each retention
 -- pass (counts and bytes). Never a name, path, digest or token. The newest 500 rows are kept.
 CREATE TABLE IF NOT EXISTS dropbox_audit (
@@ -604,7 +627,7 @@ CREATE TABLE IF NOT EXISTS dropbox_audit (
     count    INTEGER NOT NULL DEFAULT 0, -- a setting: the dry-run count shown; a pass: files deleted
     bytes    INTEGER NOT NULL DEFAULT 0,
     held     INTEGER NOT NULL DEFAULT 0, -- a pass: due files left for later by the ceiling
-    reason   TEXT NOT NULL DEFAULT ''    -- a pass that deleted nothing: the reason word (clock_behind, clock_skew, ...)
+    reason   TEXT NOT NULL DEFAULT ''    -- a pass that deleted nothing: the reason word (clock_behind, clock_skew, ...); an edit decision: promoted or separate
 );
 CREATE INDEX IF NOT EXISTS idx_dropbox_outbox_digest ON dropbox_outbox(digest);
 

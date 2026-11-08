@@ -23,6 +23,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 
@@ -76,7 +77,12 @@ type DropboxBackup struct {
 	retainPoll  time.Duration                                           // how often a running delete job is read (a second)
 	retainWait  time.Duration                                           // how long a pass waits for its delete job (30 s); later passes read it
 	lastRetain  time.Time                                               // the last retention pass of this process
-	keepDoc     func(ctx context.Context, doc string, version int) bool // an offload marker or a pending edit keeps the pair (stages 5 and 6; none yet)
+	keepDoc     func(ctx context.Context, doc string, version int) bool // a pending edit keeps the pair (stage 5a); offload markers join in stage 6
+
+	// Stage 5a, edits made in Dropbox (#14714).
+	edits        *store.DropboxEdits
+	editBounds   editBounds
+	editsWaiting atomic.Int64 // edits the last listing pass left in Dropbox because of a bound
 
 	passMu sync.Mutex
 	kick   chan struct{} // an upload asks for a pass soon
@@ -92,7 +98,7 @@ func (h *CloudHandler) NewDropboxBackup(ob *store.DropboxOutbox) *DropboxBackup 
 	_ = secrets.Init()
 	b := &DropboxBackup{d: h.dbx, outbox: ob, coralDir: h.dbx.dataDir, power: osPower, now: time.Now, parallel: dropboxParallel, kick: make(chan struct{}, 1),
 		retainEvery: time.Hour, retainPoll: time.Second, retainWait: 30 * time.Second,
-		keepDoc: func(context.Context, string, int) bool { return false }, // no offload markers or pending edits exist before stages 5 and 6
+		edits: store.NewDropboxEdits(ob.DB()), editBounds: defaultEditBounds,
 		private: func(context.Context, []string) (map[string]bool, error) {
 			return nil, errors.New("no private marks to read")
 		}, // fail closed until SetPrivate
@@ -126,6 +132,12 @@ func (h *CloudHandler) NewDropboxBackup(ob *store.DropboxOutbox) *DropboxBackup 
 		}
 		return time.Duration(days) * 24 * time.Hour
 	}
+	// Retention keeps a document with an edit held for the Operator, or one being decided (Security's MUST on #14703, in the same commit as the
+	// code that holds edits); an unreadable table keeps it too (fail closed). Stage 6 adds offload markers.
+	b.keepDoc = func(ctx context.Context, doc string, _ int) bool {
+		open, err := b.edits.IsOpen(ctx, doc)
+		return err != nil || open
+	}
 	h.dbx.outbox = ob
 	h.dbx.backup = b
 	dropboxBackupsMu.Lock()
@@ -146,6 +158,7 @@ func (b *DropboxBackup) Run(ctx context.Context, every time.Duration) {
 	b.Backfill(ctx)
 	b.Pass(ctx)
 	b.Retain(ctx)
+	b.Notice(ctx)
 	t := time.NewTicker(every)
 	defer t.Stop()
 	for {
@@ -157,6 +170,7 @@ func (b *DropboxBackup) Run(ctx context.Context, every time.Duration) {
 		}
 		b.Pass(ctx)
 		b.Retain(ctx) // stage 4b: at most once an hour, only when the Operator turned it on
+		b.Notice(ctx) // stage 5a: edits made in Dropbox
 	}
 }
 

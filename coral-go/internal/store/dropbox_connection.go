@@ -151,7 +151,7 @@ func (s *DropboxStore) Save(ctx context.Context, accountID, refreshToken, finger
 	}
 	// Every new sign-in starts with retention off (Security's answer 2 on #14703): the Operator turns it on again through the dry run.
 	_, err = s.db.ExecContext(ctx, `UPDATE dropbox_connection SET account_id = ?, last_account_id = ?, refresh_token = ?, fingerprint = ?, state = ?, connected_at = ?,
-		retention_days = 0, retention_since = NULL WHERE id = 1`,
+		retention_days = 0, retention_since = NULL, list_cursor = NULL WHERE id = 1`,
 		accountID, accountID, env, fingerprint, DropboxStateConnected, nowUTC())
 	return err
 }
@@ -216,7 +216,7 @@ func (s *DropboxStore) SetState(ctx context.Context, state string) error {
 
 // Disconnect forgets the token, the account and the fingerprint; the server id and the last account stay.
 func (s *DropboxStore) Disconnect(ctx context.Context) error {
-	_, err := s.db.ExecContext(ctx, "UPDATE dropbox_connection SET refresh_token = NULL, account_id = NULL, fingerprint = NULL, state = ?, connected_at = NULL, retention_days = 0, retention_since = NULL WHERE id = 1", DropboxStateDisconnected)
+	_, err := s.db.ExecContext(ctx, "UPDATE dropbox_connection SET refresh_token = NULL, account_id = NULL, fingerprint = NULL, state = ?, connected_at = NULL, retention_days = 0, retention_since = NULL, list_cursor = NULL WHERE id = 1", DropboxStateDisconnected)
 	return err
 }
 
@@ -274,12 +274,13 @@ type DropboxAudit struct {
 const (
 	DropboxAuditSetting = "setting"
 	DropboxAuditPass    = "pass"
+	DropboxAuditEdit    = "edit" // stage 5a: the Operator's decision on an edit made in Dropbox (reason: promoted or separate)
 	dropboxAuditKeep    = 500
 )
 
 // AddAudit writes one audit row and keeps the newest 500.
 func (s *DropboxStore) AddAudit(ctx context.Context, a DropboxAudit) error {
-	if a.Kind != DropboxAuditSetting && a.Kind != DropboxAuditPass {
+	if a.Kind != DropboxAuditSetting && a.Kind != DropboxAuditPass && a.Kind != DropboxAuditEdit {
 		return errors.New("not a Dropbox audit kind")
 	}
 	if a.At == "" {
@@ -327,5 +328,26 @@ func (s *DropboxStore) SetFilters(ctx context.Context, types []string, maxAgeDay
 		return err
 	}
 	_, err := s.db.ExecContext(ctx, "UPDATE dropbox_connection SET filter_types = ?, max_age_days = ? WHERE id = 1", strings.Join(types, ","), maxAgeDays)
+	return err
+}
+
+// ListCursor is stage 5a's listing cursor (” when there is none: list from the start).
+func (s *DropboxStore) ListCursor(ctx context.Context) (string, error) {
+	if err := s.ensureRow(ctx); err != nil {
+		return "", err
+	}
+	var c sql.NullString
+	err := s.db.GetContext(ctx, &c, "SELECT list_cursor FROM dropbox_connection WHERE id = 1")
+	return c.String, err
+}
+
+// SetListCursor stores the cursor (” clears it), only while account is still the one connected: a sign-in that changed the account meanwhile
+// keeps its own empty cursor.
+func (s *DropboxStore) SetListCursor(ctx context.Context, account, cursor string) error {
+	var c any
+	if cursor != "" {
+		c = cursor
+	}
+	_, err := s.db.ExecContext(ctx, "UPDATE dropbox_connection SET list_cursor = ? WHERE id = 1 AND account_id = ?", c, account)
 	return err
 }

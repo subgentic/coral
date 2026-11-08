@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -240,4 +241,75 @@ func TestSpaceUsageAtReadsDropboxsClock(t *testing.T) {
 	assert.EqualValues(t, 1, used)
 	assert.EqualValues(t, 2, alloc)
 	assert.True(t, at.Equal(when), "%v", at)
+}
+
+// #14714, Dropbox stage 5a: the listing and the capped download.
+
+func TestListFolderPagesAndAReset(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var a map[string]any
+		json.NewDecoder(r.Body).Decode(&a)
+		switch r.URL.Path {
+		case "/2/files/list_folder":
+			assert.Equal(t, "/v1", a["path"])
+			assert.Equal(t, true, a["recursive"])
+			assert.Equal(t, true, a["include_deleted"], "a deleted version file is seen")
+			w.Write([]byte(`{"entries":[{".tag":"file","path_lower":"/v1/a","rev":"r2","size":3,"content_hash":"h"},{".tag":"deleted","path_lower":"/v1/b"}],"cursor":"c1","has_more":true}`))
+		case "/2/files/list_folder/continue":
+			if a["cursor"] == "old" {
+				w.WriteHeader(http.StatusConflict)
+				w.Write([]byte(`{"error_summary":"reset/.."}`))
+				return
+			}
+			w.Write([]byte(`{"entries":[],"cursor":"c2","has_more":false}`))
+		}
+	}))
+	defer srv.Close()
+	c := newTestClient(t, srv)
+	p, err := c.ListFolder(context.Background(), "acc", "/v1")
+	require.NoError(t, err)
+	assert.Equal(t, []ListEntry{{Tag: "file", PathLower: "/v1/a", Rev: "r2", Size: 3, ContentHash: "h"}, {Tag: "deleted", PathLower: "/v1/b"}}, p.Entries)
+	assert.True(t, p.HasMore)
+	p, err = c.ListFolderContinue(context.Background(), "acc", "c1")
+	require.NoError(t, err)
+	assert.Equal(t, "c2", p.Cursor)
+	_, err = c.ListFolderContinue(context.Background(), "acc", "old")
+	assert.ErrorIs(t, err, ErrCursorReset)
+}
+
+func TestDownloadAsksForTheRevAndIsCappedByWhatIsRead(t *testing.T) {
+	body := strings.Repeat("x", 100)
+	declared := int64(100)
+	chunked := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/2/files/download", r.URL.Path)
+		assert.JSONEq(t, `{"path":"rev:015abc"}`, r.Header.Get("Dropbox-API-Arg"), "exactly the listed rev")
+		w.Header().Set("Dropbox-API-Result", fmt.Sprintf(`{"rev":"015abc","size":%d,"content_hash":"h"}`, declared))
+		if chunked {
+			w.(http.Flusher).Flush() // no Content-Length: the size is unknown until read
+		}
+		w.Write([]byte(body))
+	}))
+	defer srv.Close()
+	c := newTestClient(t, srv)
+	var buf bytes.Buffer
+	d, n, err := c.Download(context.Background(), "acc", "015abc", 100, &buf)
+	require.NoError(t, err)
+	assert.Equal(t, Downloaded{Rev: "015abc", Size: 100, ContentHash: "h"}, d)
+	assert.EqualValues(t, 100, n)
+
+	buf.Reset()
+	declared = 1000
+	_, n, err = c.Download(context.Background(), "acc", "015abc", 100, &buf)
+	assert.ErrorIs(t, err, ErrTooBig, "a declared size over the cap is refused")
+	assert.Zero(t, n, "before any byte is read")
+
+	buf.Reset()
+	declared, chunked, body = 10, true, strings.Repeat("y", 500) // Dropbox's size says 10; the stream carries 500 with no length
+	_, n, err = c.Download(context.Background(), "acc", "015abc", 100, &buf)
+	assert.ErrorIs(t, err, ErrTooBig, "a lying or absent length is cut at the cap plus one")
+	assert.EqualValues(t, 101, n)
+
+	_, _, err = c.Download(context.Background(), "acc", "", 100, &buf)
+	assert.Error(t, err, "never without the rev")
 }

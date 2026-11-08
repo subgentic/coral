@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -53,6 +54,65 @@ type fakeDropbox struct {
 	jobs        map[string][]string // job id -> "path|parent_rev" of each entry
 	deleteCalls [][]string          // the paths of each delete_batch call
 	checkCalls  int
+	// Stage 5a's listing and download side.
+	changes    []map[string]any  // entries list_folder/continue answers after a cursor (an edit, a touch, a delete)
+	revBytes   map[string][]byte // bytes of each rev an edit made
+	pageSize   int               // entries a page (0: all)
+	resetNext  bool              // the next continue answers reset
+	downloads  []string          // revs downloaded
+	lieSize    int64             // download answers this size in Dropbox-API-Result while sending the real bytes
+	extraBytes []byte            // download appends these to the body (a stream longer than declared)
+	listCalls  int
+}
+
+// edit replaces path's bytes as a person would in Dropbox (a new rev, a new content hash).
+func (f *fakeDropbox) edit(path string, b []byte) string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.revs == nil {
+		f.revs = map[string]string{}
+	}
+	if f.revBytes == nil {
+		f.revBytes = map[string][]byte{}
+	}
+	rev := fmt.Sprintf("e%d", len(f.revBytes)+1)
+	f.files[path], f.revs[path], f.revBytes[rev] = b, rev, b
+	f.changes = append(f.changes, map[string]any{".tag": "file", "path_lower": path, "rev": rev, "size": len(b), "content_hash": dropbox.ContentHash(b)})
+	return rev
+}
+
+// touch gives path a new rev with the same bytes.
+func (f *fakeDropbox) touch(path string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.revs == nil {
+		f.revs = map[string]string{}
+	}
+	b := f.files[path]
+	rev := fmt.Sprintf("t%d", len(f.changes)+1)
+	f.revs[path] = rev
+	f.changes = append(f.changes, map[string]any{".tag": "file", "path_lower": path, "rev": rev, "size": len(b), "content_hash": dropbox.ContentHash(b)})
+}
+
+// remove deletes path in Dropbox, as a person would.
+func (f *fakeDropbox) remove(path string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.files, path)
+	f.changes = append(f.changes, map[string]any{".tag": "deleted", "path_lower": path})
+}
+
+// listPage answers entries[from:] a page at a time with cursor "c<next>".
+func (f *fakeDropbox) listPage(entries []map[string]any, from int) map[string]any {
+	end := len(entries)
+	if f.pageSize > 0 && from+f.pageSize < end {
+		end = from + f.pageSize
+	}
+	page := entries[from:end]
+	if page == nil {
+		page = []map[string]any{}
+	}
+	return map[string]any{"entries": page, "cursor": fmt.Sprintf("c%d", end), "has_more": end < len(entries)}
 }
 
 // applyDeletes deletes each "path|parent_rev" whose rev still matches, as Dropbox does: a missing path is not_found, another rev is refused.
@@ -161,6 +221,74 @@ func newFakeDropbox(t *testing.T) *fakeDropbox {
 				return
 			}
 			json.NewEncoder(w).Encode(map[string]any{".tag": "file", "id": "id:" + a["path"], "rev": "r1", "content_hash": dropbox.ContentHash(b)})
+		case "/2/files/list_folder":
+			f.listCalls++
+			// A full listing: every file stored, with the changes made so far counted as seen (the cursor points after them).
+			var all []map[string]any
+			for p, b := range f.files {
+				rev := "r1"
+				if v, ok := f.revs[p]; ok {
+					rev = v
+				}
+				all = append(all, map[string]any{".tag": "file", "path_lower": p, "rev": rev, "size": len(b), "content_hash": dropbox.ContentHash(b)})
+			}
+			sort.Slice(all, func(i, j int) bool { return all[i]["path_lower"].(string) < all[j]["path_lower"].(string) })
+			out := f.listPage(all, 0)
+			if !out["has_more"].(bool) {
+				out["cursor"] = fmt.Sprintf("c%d", len(f.changes))
+			} else {
+				out["cursor"] = fmt.Sprintf("L%d", len(out["entries"].([]map[string]any)))
+			}
+			json.NewEncoder(w).Encode(out)
+		case "/2/files/list_folder/continue":
+			f.listCalls++
+			var a map[string]string
+			json.NewDecoder(r.Body).Decode(&a)
+			if f.resetNext {
+				f.resetNext = false
+				w.WriteHeader(http.StatusConflict)
+				w.Write([]byte(`{"error_summary":"reset/.."}`))
+				return
+			}
+			var from int
+			if _, err := fmt.Sscanf(a["cursor"], "L%d", &from); err == nil { // the rest of a full listing
+				var all []map[string]any
+				for p, b := range f.files {
+					all = append(all, map[string]any{".tag": "file", "path_lower": p, "rev": "r1", "size": len(b), "content_hash": dropbox.ContentHash(b)})
+				}
+				sort.Slice(all, func(i, j int) bool { return all[i]["path_lower"].(string) < all[j]["path_lower"].(string) })
+				out := f.listPage(all, from)
+				if out["has_more"].(bool) {
+					out["cursor"] = fmt.Sprintf("L%d", from+len(out["entries"].([]map[string]any)))
+				} else {
+					out["cursor"] = fmt.Sprintf("c%d", len(f.changes))
+				}
+				json.NewEncoder(w).Encode(out)
+				return
+			}
+			fmt.Sscanf(a["cursor"], "c%d", &from)
+			json.NewEncoder(w).Encode(f.listPage(f.changes, from))
+		case "/2/files/download":
+			var a map[string]string
+			json.Unmarshal([]byte(r.Header.Get("Dropbox-API-Arg")), &a)
+			rev := strings.TrimPrefix(a["path"], "rev:")
+			f.downloads = append(f.downloads, rev) // every attempt, answered or not
+			b, ok := f.revBytes[rev]
+			if !ok {
+				w.WriteHeader(http.StatusConflict)
+				w.Write([]byte(`{"error_summary":"path/not_found/"}`))
+				return
+			}
+			size := int64(len(b))
+			if f.lieSize > 0 {
+				size = f.lieSize
+			}
+			w.Header().Set("Dropbox-API-Result", fmt.Sprintf(`{"rev":%q,"size":%d,"content_hash":%q}`, rev, size, dropbox.ContentHash(b)))
+			if len(f.extraBytes) > 0 {
+				w.(http.Flusher).Flush()
+			}
+			w.Write(b)
+			w.Write(f.extraBytes)
 		case "/2/files/delete_batch":
 			var a struct {
 				Entries []struct {

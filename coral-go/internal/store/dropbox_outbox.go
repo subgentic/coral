@@ -272,6 +272,47 @@ func (o *DropboxOutbox) Done(ctx context.Context, path string) (DropboxOutboxDon
 	return d, err
 }
 
+// PathRow is a ledger row found by its path, for stage 5a's listing (#14714): by the outbox's unique path index (Security's SHOULD H).
+type PathRow struct {
+	ID          int64  `db:"id"`
+	Kind        string `db:"kind"`
+	Digest      string `db:"digest"`
+	DocID       string `db:"doc_id"`
+	Version     int    `db:"version"`
+	Path        string `db:"path"`
+	State       string `db:"state"`
+	AccountID   string `db:"account_id"`
+	Rev         string `db:"rev"`
+	ContentHash string `db:"content_hash"`
+}
+
+// ByPath returns the row at path (sql.ErrNoRows when there is none).
+func (o *DropboxOutbox) ByPath(ctx context.Context, path string) (PathRow, error) {
+	var r PathRow
+	err := o.db.GetContext(ctx, &r, `SELECT id, kind, digest, doc_id, version, path, state, COALESCE(account_id, '') AS account_id, COALESCE(rev, '') AS rev,
+		COALESCE(content_hash, '') AS content_hash FROM dropbox_outbox WHERE path = ?`, path)
+	return r, err
+}
+
+// SeeRev records a new rev of a file whose bytes did not change (a touch: the same content hash), so it is not seen as an edit again.
+func (o *DropboxOutbox) SeeRev(ctx context.Context, id int64, rev string) error {
+	_, err := o.db.ExecContext(ctx, "UPDATE dropbox_outbox SET rev = ? WHERE id = ? AND state IN (?, ?)", rev, id, DropboxOutboxDoneS, DropboxOutboxEdited)
+	return err
+}
+
+// Requeue queues a done row again: its file is gone from Dropbox while the local copy is here (v33 §8). Only a done row moves: never one that is
+// deleting (retention's job), retained_out, gone or edited. The row then goes through the private re-read, the filters and retention's window like
+// any upload (Security's SHOULD I).
+func (o *DropboxOutbox) Requeue(ctx context.Context, id int64) (bool, error) {
+	res, err := o.db.ExecContext(ctx, "UPDATE dropbox_outbox SET state = ?, next_try_at = '', attempts = 0, file_id = NULL, rev = NULL, content_hash = NULL WHERE id = ? AND state = ?",
+		DropboxOutboxQueued, id, DropboxOutboxDoneS)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n == 1, err
+}
+
 // CancelDigest removes the queued rows of an artifact the person deleted (Security's change b), and reports how many. Rows already done stay.
 func (o *DropboxOutbox) CancelDigest(ctx context.Context, digest string) (int, error) {
 	res, err := o.db.ExecContext(ctx, "DELETE FROM dropbox_outbox WHERE digest = ? AND state = ?", digest, DropboxOutboxQueued)

@@ -77,6 +77,11 @@ func (c *Client) doHeader(req *http.Request, access string, out any) (http.Heade
 		}
 		return hdr, nil
 	}
+	return hdr, respError(resp, data)
+}
+
+// respError turns a refused answer into an error that carries Dropbox's tag only (never a token or a body).
+func respError(resp *http.Response, data []byte) error {
 	var e apiError
 	_ = json.Unmarshal(data, &e)
 	tag := strings.SplitN(e.Summary, "/", 2)[0]
@@ -86,16 +91,16 @@ func (c *Client) doHeader(req *http.Request, access string, out any) (http.Heade
 		if n, err := strconv.Atoi(strings.TrimSpace(resp.Header.Get("Retry-After"))); err == nil && n > 0 && n <= 3600 {
 			after = time.Duration(n) * time.Second
 		}
-		return hdr, &RateLimited{After: after}
+		return &RateLimited{After: after}
 	case resp.StatusCode == http.StatusUnauthorized && tag == "expired_access_token":
-		return hdr, ErrAccessExpired
+		return ErrAccessExpired
 	case resp.StatusCode == http.StatusConflict && strings.Contains(e.Summary, "not_found"):
-		return hdr, ErrNotFound
+		return ErrNotFound
 	}
 	if !validTag(tag) {
 		tag = "unknown"
 	}
-	return hdr, fmt.Errorf("Dropbox: %d %s", resp.StatusCode, tag)
+	return fmt.Errorf("Dropbox: %d %s", resp.StatusCode, tag)
 }
 
 func (c *Client) rpc(ctx context.Context, access, endpoint string, arg, out any) error {
@@ -394,4 +399,93 @@ func (a deleteJobAnswer) outcomes(n int) ([]DeleteOutcome, error) {
 		}
 	}
 	return res, nil
+}
+
+// Stage 5a (#14714): the listing that notices edits, and the download of exactly the listed rev.
+
+// ListEntry is one entry of a folder listing: a file (with its rev, size and content hash) or a deleted path.
+type ListEntry struct {
+	Tag         string `json:".tag"` // file, folder or deleted
+	PathLower   string `json:"path_lower"`
+	Rev         string `json:"rev"`
+	Size        int64  `json:"size"`
+	ContentHash string `json:"content_hash"`
+}
+
+// ListPage is one page of a listing. Pages are handled one at a time (Security's SHOULD H on #14714): never built into one list.
+type ListPage struct {
+	Entries []ListEntry `json:"entries"`
+	Cursor  string      `json:"cursor"`
+	HasMore bool        `json:"has_more"`
+}
+
+// ErrCursorReset is Dropbox saying the stored cursor is no longer valid: list again from the start.
+var ErrCursorReset = errors.New("Dropbox reset the listing cursor")
+
+// ListFolder starts a recursive listing of path.
+func (c *Client) ListFolder(ctx context.Context, access, path string) (ListPage, error) {
+	var p ListPage
+	err := c.rpc(ctx, access, "files/list_folder", map[string]any{"path": path, "recursive": true, "include_deleted": true, "limit": 2000}, &p)
+	return p, err
+}
+
+// ListFolderContinue reads the next page after cursor (the changes since it, once a listing is complete).
+func (c *Client) ListFolderContinue(ctx context.Context, access, cursor string) (ListPage, error) {
+	var p ListPage
+	err := c.rpc(ctx, access, "files/list_folder/continue", map[string]string{"cursor": cursor}, &p)
+	if err != nil && strings.Contains(err.Error(), " reset") {
+		return p, ErrCursorReset
+	}
+	return p, err
+}
+
+// ErrTooBig is a file over the caller's cap: refused from its declared size, or cut off while reading.
+var ErrTooBig = errors.New("Dropbox file over the size cap")
+
+// Downloaded is what Dropbox said about the file it sent.
+type Downloaded struct {
+	Rev         string `json:"rev"`
+	Size        int64  `json:"size"`
+	ContentHash string `json:"content_hash"`
+}
+
+// Download writes exactly the file's rev (rev:<rev>) to w, at most max bytes: a declared size over max is refused before any read, and the read is
+// cut at max plus one byte whatever Content-Length says (Security's MUST C on #14714). It returns Dropbox's own account of the file and the bytes
+// written.
+func (c *Client) Download(ctx context.Context, access, rev string, max int64, w io.Writer) (Downloaded, int64, error) {
+	var d Downloaded
+	if rev == "" {
+		return d, 0, errors.New("a download needs the rev")
+	}
+	arg, _ := json.Marshal(map[string]string{"path": "rev:" + rev})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.content+"/2/files/download", http.NoBody)
+	if err != nil {
+		return d, 0, err
+	}
+	req.Header.Set("Dropbox-API-Arg", string(arg))
+	req.Header.Set("Authorization", "Bearer "+access)
+	req.Header.Set("User-Agent", c.userAgent)
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return d, 0, fmt.Errorf("could not reach Dropbox: %w", stripURL(err))
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		data, _ := io.ReadAll(io.LimitReader(resp.Body, maxBody))
+		return d, 0, respError(resp, data)
+	}
+	if err := json.Unmarshal([]byte(resp.Header.Get("Dropbox-API-Result")), &d); err != nil {
+		return d, 0, errors.New("Dropbox: a download answer Coral does not understand")
+	}
+	if d.Size > max || resp.ContentLength > max {
+		return d, 0, ErrTooBig
+	}
+	n, err := io.Copy(w, io.LimitReader(resp.Body, max+1))
+	if err != nil {
+		return d, n, fmt.Errorf("Dropbox: the download stopped: %w", stripURL(err))
+	}
+	if n > max {
+		return d, n, ErrTooBig
+	}
+	return d, n, nil
 }

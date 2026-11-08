@@ -162,3 +162,46 @@ func TestRetentionsLedgerReadIsNarrow(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, c.RetainedOut)
 }
+
+// #14714, Dropbox stage 5a: the listing's ledger lookups. Mutants: Requeue moves a row that is not done; SeeRev changes a row in another state.
+func TestTheListingsLedgerLookups(t *testing.T) {
+	db := openTestDB(t)
+	ob := NewDropboxOutbox(db)
+	ctx := context.Background()
+	id := map[string]int64{}
+	for _, p := range []string{"/v1/a/done", "/v1/a/deleting", "/v1/a/retained", "/v1/a/queued"} {
+		ok, err := ob.Enqueue(ctx, outboxRow(p, "d-"+p, ts(time.Now())))
+		require.NoError(t, err)
+		require.True(t, ok)
+		var n int64
+		require.NoError(t, db.GetContext(ctx, &n, "SELECT id FROM dropbox_outbox WHERE path = ?", p))
+		id[p] = n
+	}
+	for _, p := range []string{"/v1/a/done", "/v1/a/deleting", "/v1/a/retained"} {
+		require.NoError(t, ob.MarkDoneBy(ctx, id[p], "dbid:A", 3, "id", "r1", "h1"))
+	}
+	require.NoError(t, ob.MarkDeleting(ctx, []int64{id["/v1/a/deleting"]}, "job"))
+	require.NoError(t, ob.MarkRetention(ctx, id["/v1/a/retained"], DropboxOutboxRetainedOut))
+
+	r, err := ob.ByPath(ctx, "/v1/a/done")
+	require.NoError(t, err)
+	assert.Equal(t, PathRow{ID: id["/v1/a/done"], Kind: DropboxKindVersion, Digest: "d-/v1/a/done", DocID: "0123456789abcdef0123456789abcdef", Version: 1, Path: "/v1/a/done", State: DropboxOutboxDoneS, AccountID: "dbid:A", Rev: "r1", ContentHash: "h1"}, r)
+	_, err = ob.ByPath(ctx, "/v1/a/none")
+	assert.Error(t, err)
+
+	require.NoError(t, ob.SeeRev(ctx, id["/v1/a/done"], "r2"))
+	r, _ = ob.ByPath(ctx, "/v1/a/done")
+	assert.Equal(t, "r2", r.Rev, "a touch: the new rev is recorded")
+	require.NoError(t, ob.SeeRev(ctx, id["/v1/a/retained"], "r9"))
+	r, _ = ob.ByPath(ctx, "/v1/a/retained")
+	assert.Equal(t, "r1", r.Rev, "not for a row retention removed")
+
+	for p, want := range map[string]bool{"/v1/a/done": true, "/v1/a/deleting": false, "/v1/a/retained": false, "/v1/a/queued": false} {
+		ok, err := ob.Requeue(ctx, id[p])
+		require.NoError(t, err)
+		assert.Equal(t, want, ok, p)
+	}
+	r, _ = ob.ByPath(ctx, "/v1/a/done")
+	assert.Equal(t, DropboxOutboxQueued, r.State)
+	assert.Empty(t, r.Rev, "sent again as a new file")
+}

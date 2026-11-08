@@ -80,6 +80,12 @@ function renderBackup(st, keepControls = false) {
     const plural = (k) => `${k} ${k === 1 ? 'day' : 'days'}`;
     text += chosenTypes.length ? ` Backing up ${chosenTypes.map(t => '.' + t).join(', ')}` : ' Backing up every type';
     text += days > 0 ? ` from the last ${plural(days)}${byRetention ? ', the retention window' : ''}.` : '.';
+    // Stage 5a (#14714): edits made in Dropbox are held, never applied here until the Operator decides.
+    const ed = st.edits || {};
+    const heldEdits = Number(ed.open || 0);
+    const waitingEdits = Number(ed.waiting || 0);
+    if (heldEdits) text += ` ${heldEdits} ${heldEdits === 1 ? 'file was' : 'files were'} edited in Dropbox: Coral holds the ${heldEdits === 1 ? 'edit' : 'edits'} for you and has not changed ${heldEdits === 1 ? 'it' : 'them'} here.`;
+    if (waitingEdits) text += ` ${waitingEdits} more ${waitingEdits === 1 ? 'edit waits' : 'edits wait'} in Dropbox until you decide some.`;
     if (keep > 0) {
         text += ` Keeping files in Dropbox for ${plural(keep)}.`;
         if (st.retention.waiting_for_files) text += ' Retention starts once at least 2 artifacts are backed up.';

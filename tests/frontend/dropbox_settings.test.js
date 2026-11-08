@@ -266,6 +266,12 @@ const { JSDOM } = require('jsdom');
     assert.match(await refused(500, { error: 'boom' }), /Couldn't read the Dropbox connection/);
     assert.match(await refused(404, { error: 'not found' }), /Couldn't read the Dropbox connection/, 'a 404 with no code is not the build');
 
+    // Edits made in Dropbox (#14714): held, never applied here.
+    await status({ ...connected, edits: { open: 2, waiting: 5 } });
+    assert.match($('settings-dropbox-counts').textContent, /2 files were edited in Dropbox: Coral holds the edits for you and has not changed them here\. 5 more edits wait in Dropbox until you decide some\./);
+    await status({ ...connected, edits: { open: 0, waiting: 0 } });
+    assert.doesNotMatch($('settings-dropbox-counts').textContent, /edited in Dropbox/);
+
     // Retention (#14703): the counts, the window and the dry run before Turn on.
     await status({ ...connected, backup: { backed_up: 4, retained_out: 3, gone: 1, edited: 2 }, filters: { types: [], max_age_days: 0 }, retention: { days: 0 } });
     const line = () => $('settings-dropbox-counts').textContent;

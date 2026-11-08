@@ -136,6 +136,11 @@ func (h *CloudHandler) DropboxStatus(w http.ResponseWriter, r *http.Request) {
 		}
 		out["retention"] = ret
 	}
+	if d.backup != nil && d.backup.edits != nil {
+		if n, _, err := d.backup.edits.Stats(r.Context()); err == nil {
+			out["edits"] = map[string]any{"open": n, "waiting": d.backup.editsWaitingNow()} // counts only (stage 5a)
+		}
+	}
 	writeJSON(w, http.StatusOK, out)
 }
 
