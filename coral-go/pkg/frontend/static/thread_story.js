@@ -4,6 +4,7 @@
 import { importOnce } from './import_once.js';
 import { serverFetch, splitKey } from './server_base.js';
 import { loadStyles } from './lazy_styles.js';
+import { markHidden } from './visible_marks.js';
 const DT = await importOnce('./data_table.js');
 const { activityParts } = await importOnce('./operator_activity_words.js');
 await loadStyles('thread_story.css');
@@ -11,6 +12,8 @@ await loadStyles('thread_story.css');
 const PAGE = 10, FRESH_MS = 20000;
 const cache = new Map(); // `${team}#${task}` -> { at, entries (newest first), more, cursor, failed }
 const drawers = new Map(); // `${team}#${task}` -> the draw of the story node on screen now: the table is drawn again (a redraw makes a new node), and a read that was in flight answers into that one, not a node that is gone
+/** Words an agent or the Operator wrote: every hidden character is written out (<U+202E>), never drawn, so nothing in a reply, an ask, a file name or a decision reorders or hides the row (Security's rule for Activity and Needs you, #14444). */
+const safe = x => markHidden(x == null ? '' : String(x), { strict: true });
 const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
 const kindWord = r => ({ file: 'a file', question: 'a question', goal: 'a goal', task: 'a task' }[r.item_kind] || 'an item');
 const EVENT_WORDS = { created: 'Task created', assigned: 'Task assigned', done: 'Task done', cancelled: 'Task cancelled' };
@@ -36,27 +39,27 @@ async function read(team, task, after) {
 export function entryNode(e) {
     const kind = Object.hasOwn(EV_CLASS, e.kind) && e.kind !== 'other' ? e.kind : 'other';
     const n = el('li', `thread-ev ${EV_CLASS[kind]}`);
-    const head = (who, extra) => { const h = el('div', 'thread-head'); h.append(el('span', 'thread-who', who || 'Someone'), el('span', 'thread-when', ''), ...(extra ? [extra] : [])); h.querySelector('.thread-when').replaceWith(DT.timeCell(e.at)); h.querySelector('.dt-time').classList.add('thread-when'); return h; };
+    const head = (who, extra) => { const h = el('div', 'thread-head'); h.append(el('span', 'thread-who', safe(who) || 'Someone'), el('span', 'thread-when', ''), ...(extra ? [extra] : [])); h.querySelector('.thread-when').replaceWith(DT.timeCell(e.at)); h.querySelector('.dt-time').classList.add('thread-when'); return h; };
     if (e.kind === 'task_event' || e.kind === 'goal_event') {
-        n.append(el('span', 'thread-endline', (e.kind === 'task_event' ? EVENT_WORDS : GOAL_WORDS)[e.event] || `${e.kind === 'task_event' ? 'Task' : 'Goal'} ${e.event || 'changed'}`), ' ', DT.timeCell(e.at));
+        n.append(el('span', 'thread-endline', (e.kind === 'task_event' ? EVENT_WORDS : GOAL_WORDS)[e.event] || `${e.kind === 'task_event' ? 'Task' : 'Goal'} ${safe(e.event) || 'changed'}`), ' ', DT.timeCell(e.at));
         return n;
     }
     if (e.kind === 'ask') {
-        n.append(head(e.asker, e.state === 'open' ? el('span', 'chip chip-tag thread-chip', STATE_WORDS.open) : null), el('div', 'thread-text', e.line || 'asked a question'));
-        if (e.state && e.state !== 'open') n.append(el('div', 'thread-sub', STATE_WORDS[e.state] || e.state));
+        n.append(head(e.asker, e.state === 'open' ? el('span', 'chip chip-tag thread-chip', STATE_WORDS.open) : null), el('div', 'thread-text', safe(e.line) || 'asked a question'));
+        if (e.state && e.state !== 'open') n.append(el('div', 'thread-sub', STATE_WORDS[e.state] || safe(e.state)));
     } else if (e.kind === 'file') {
-        const chip = el('span', 'thread-file', e.name || 'a file');
+        const chip = el('span', 'thread-file', safe(e.name) || 'a file');
         n.append(head(e.by), chip);
-        if (e.state) n.append(' ', el('span', 'thread-sub', e.state));
+        if (e.state) n.append(' ', el('span', 'thread-sub', safe(e.state)));
     } else if (e.kind === K_REPLY) {
-        n.append(head(e.from), el('div', 'thread-text', `${e.text || ''}${e.truncated ? '…' : ''}`));
+        n.append(head(e.from), el('div', 'thread-text', `${safe(e.text)}${e.truncated ? '…' : ''}`));
     } else if (e.kind === 'decision') {
         const p = activityParts({ ...e, action: e.action, item_kind: e.item_kind }, r => r.title || kindWord(r));
         n.append(head('You'), el('span', 'chip chip-tag thread-decision', p.did));
-        if (p.on) n.append(' ', el('span', 'thread-on', p.on));
-        if (p.detail) n.append(el('div', 'thread-quote', p.detail));
+        if (p.on) n.append(' ', el('span', 'thread-on', safe(p.on)));
+        if (p.detail) n.append(el('div', 'thread-quote', safe(p.detail)));
     } else {
-        n.append(head(e.actor || e.from || e.by), el('div', 'thread-text', e.line || e.text || e.kind || ''));
+        n.append(head(e.actor || e.from || e.by), el('div', 'thread-text', safe(e.line || e.text || e.kind)));
     }
     return n;
 }

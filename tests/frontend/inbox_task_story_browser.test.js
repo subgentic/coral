@@ -33,8 +33,8 @@ const BASE = require('./test_base').BASE;
 
             // the thread read is answered by the page
             await ev(`(() => { const prev = window.fetch.bind(window), at = n => new Date(Date.now() - n * 60000).toISOString(); window.__threadCalls = []; window.__threadFail = false;
-                const E = [ { kind: 'task_event', id: 'e1', event: 'created', at: at(120) }, { kind: 'ask', id: 'a1', asker: 'Developer', line: 'Which docs format do you want?', state: 'open', at: at(100) },
-                    { kind: 'file', id: 'f1', name: 'Docs draft.md', by: 'Developer', state: 'in review', at: at(90) }, { kind: 'reply', id: 'r1', from: 'Developer', text: 'I wrote a first draft, tell me what is missing', at: at(80) },
+                const E = [ { kind: 'task_event', id: 'e1', event: 'created', at: at(120) }, { kind: 'ask', id: 'a1', asker: 'Developer', line: 'Which docs format do you want?\\u202eevil', state: 'open', at: at(100) },
+                    { kind: 'file', id: 'f1', name: 'Docs\\u200bdraft.md', by: 'Developer', state: 'in review', at: at(90) }, { kind: 'reply', id: 'r1', from: 'Developer', text: 'I wrote a first draft\\u202e, tell me what is missing\\u200b', at: at(80) },
                     { kind: 'decision', id: 'd1', action: 'changes', actor: 'operator', item_kind: 'file', title: 'Docs draft.md', note: 'Add a section for the phone', at: at(70) },
                     { kind: 'reply', id: 'r2', from: 'Developer', text: 'Added the phone section', at: at(60) }, { kind: 'file', id: 'f2', name: 'Docs draft v2.md', by: 'Developer', state: 'in review', at: at(50) },
                     { kind: 'decision', id: 'd2', action: 'approve', actor: 'operator', item_kind: 'file', title: 'Docs draft v2.md', note: '', at: at(40) }, { kind: 'reply', id: 'r3', from: 'Developer', text: 'Merged', at: at(30) },
@@ -75,6 +75,10 @@ const BASE = require('./test_base').BASE;
             check(story.earlier && story.earlier.h >= (mobile ? 44 : 30), `${at}'Show earlier' is there (44 px on a phone): ` + JSON.stringify(story.earlier));
             check(story.scroll <= 0, `${at}no sideways scroll with the story on`);
             check((await ev(`window.__threadCalls`)).some(s => /task=12/.test(s) && /order=desc/.test(s) && /limit=10/.test(s) && !/after=/.test(s)), `${at}one read for the newest ten: ` + JSON.stringify(await ev(`window.__threadCalls`)));
+            check(/Docs<U\+200B>draft\.md/.test(story.items.join(' ')) && /first draft<U\+202E>, tell me what is missing<U\+200B>/.test(story.items.join(' ')), `${at}hidden characters in a file name and a reply are written out, not drawn: ` + JSON.stringify(story.items.slice(0, 4)));
+            check(await ev(`(() => { const t = document.querySelector('.thread-story').textContent; return !/[\\u202e\\u200b]/.test(t); })()`), `${at}no bidi override or zero-width character is left in the story's text`);
+            check(await ev(`(() => { const lis = [...document.querySelectorAll('.thread-list li')]; return lis.every((li, i) => i === 0 || li.getBoundingClientRect().top >= lis[i - 1].getBoundingClientRect().top); })()`), `${at}the rows stay in order down the page`);
+            check(await ev(`(() => { const b = document.querySelector('.dt-group-story[aria-pressed="false"]'), on = document.querySelector('.dt-group-story[aria-pressed="true"]'); return !!b && !!on && getComputedStyle(b).backgroundColor !== getComputedStyle(on).borderColor && getComputedStyle(on).borderColor !== getComputedStyle(b).borderColor; })()`), `${at}Story is quiet when off and takes the accent only while on`);
             await snap('open');
             // Show earlier pages back: the two oldest join the top, and the button goes
             const eb = await ev(`(() => { const b = document.querySelector('.thread-earlier'); b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
@@ -82,6 +86,7 @@ const BASE = require('./test_base').BASE;
             await waitFor(`document.querySelectorAll('.thread-list li').length === 12`, `${at}Show earlier reads the page before`, 8000).catch(async e => { throw new Error(e.message + ' | ' + await ev(`JSON.stringify({ calls: window.__threadCalls, li: document.querySelectorAll('.thread-list li').length, earlier: (() => { const b = document.querySelector('.thread-earlier'); return b && [b.hidden, b.disabled, JSON.stringify(b.getBoundingClientRect()), (() => { const x = document.elementFromPoint(b.getBoundingClientRect().left + 5, b.getBoundingClientRect().top + 5); return x && (x.tagName + '.' + x.className + ' | ' + (x.parentElement && x.parentElement.className)); })()]; })() })`)); });
             const all = await ev(`({ first: document.querySelector('.thread-list li').textContent.replace(/\\s+/g, ' '), last: [...document.querySelectorAll('.thread-list li')].pop().textContent.replace(/\\s+/g, ' '), hidden: document.querySelector('.thread-earlier').hidden })`);
             check(/Task created/.test(all.first) && /Task done/.test(all.last) && all.hidden, `${at}twelve entries, oldest first, no more to show: ` + JSON.stringify(all));
+            check(await ev(`(() => { const t = [...document.querySelectorAll('.thread-list li')].map(li => li.textContent).join(' '); return /Which docs format do you want\\?<U\\+202E>evil/.test(t) && !/\\u202e/.test(t); })()`), `${at}a hidden character in an ask line (on the earlier page) is written out too`);
             check((await ev(`window.__threadCalls`)).some(s => /after=c1/.test(s)), `${at}it asked after the cursor the read gave`);
             await snap('earlier');
             // the heading button and the Story control are two controls: the items shut without touching the story, and Story shuts the story alone

@@ -699,7 +699,8 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 /* the heading stays one sticky cell on one row: inside it a bar holds the heading's button, which takes the rest of the width, and the Story control beside it (#14444) */
 .dt-group-pair { display: flex; align-items: center; gap: 8px; width: 100%; padding-inline-end: var(--table-pad-x, 12px); box-sizing: border-box; }
 .dt-group-pair .dt-group-toggle { flex: 1 1 auto; width: auto; min-width: 0; }
-.dt-group-story { flex: none; min-height: 44px; min-width: 44px; }
+.dt-group-story { flex: none; min-height: 44px; min-width: 44px; border: 1px solid var(--border); } /* quiet when off (a heading's side control must be quieter than Answer or Approve); the accent only while the story is on (#14444) */
+.dt-group-story[aria-pressed="true"] { border-color: var(--accent); }
 @media (max-width: 767px) { .dt-group-pair .dt-group-toggle { flex-wrap: wrap; position: relative; padding-inline-start: calc(var(--table-pad-x, 12px) + 28px); } .dt-group-pair .dt-group-toggle .dt-group-words { flex: 1 1 9rem; min-width: 9rem; } .dt-group-pair .dt-group-toggle::before { position: absolute; inset-inline-start: var(--table-pad-x, 12px); top: 14px; } } /* a phone: the title keeps a readable line and the chip drops under it; the chevron is out of the flow; the Story control stays at the right of the same heading */
 .dt-story-row > td { padding: 0; }
 .inbox-needs-results .dt-group-toggle { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 6px var(--table-pad-x, 12px) 6px calc(var(--table-pad-x, 12px) + 16px); border: 0; background: none; color: var(--text-primary); font: inherit; text-align: start; cursor: pointer; white-space: pre-line; }
