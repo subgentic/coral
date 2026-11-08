@@ -146,7 +146,7 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 	// The routes are named once, by tunnel.ForwardsIdempotencyKey, which is also what the connector and the hub proxy forward the header by.
 	r.Use(routes.NewIdempotency().Middleware)
 	// The Operator's clicks that are recorded by their route (#13609): after the handler answered 2xx, for a person only.
-	r.Use(routes.ActivityRecorder(s.boardStore))
+	r.Use(routes.ActivityRecorder(s.boardStore, func(id string) string { return routes.StoredFileName(s.cfg.CoralDir(), id) })) // a file click names the file (#14422)
 }
 
 // registerAuth: the health check and the sign-in routes.

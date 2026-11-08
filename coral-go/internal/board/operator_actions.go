@@ -30,6 +30,8 @@ const (
 	ActivityNoteCap = 200
 	// activityTextCap bounds an item's title (text an agent wrote).
 	activityTextCap = 120
+	// activityAskerCap bounds the asker's name on an ask's row.
+	activityAskerCap = 80
 	// ActivityMaxLimit is the most rows one read returns (a larger limit is cut to it); the answer says whether more exist.
 	ActivityMaxLimit = 200
 	// activityTimeFormat is a row's time: UTC with milliseconds, fixed width, so it sorts as text and a merge of several computers' records can order by (time, id).
@@ -113,6 +115,7 @@ type ActivityMeta struct {
 	// TaskID is the task a file's upload says it is linked to, which only the handler knows (the board store does not hold uploads): kept on a file row only when the team has that task, and its goal comes
 	// from the task (#14421). Any other kind of row ignores it.
 	TaskID int64
+	Asker  string // on a row about an ask: who asked (cleaned and cut here); the Title is the ask's line (#14422)
 }
 
 type activityKey struct{}
@@ -144,8 +147,10 @@ type OperatorAction struct {
 	Note     string `db:"note" json:"note,omitempty"`
 	// GoalID and TaskID are the goal and task the row was about, saved when it was written (#14421): nil for a row with none, and for every row from before they existed (never guessed afterwards). Both are
 	// inside the row's hash when either is set; a row with neither hashes as it always did.
-	GoalID   *int64 `db:"goal_id" json:"goal_id,omitempty"`
-	TaskID   *int64 `db:"task_id" json:"task_id,omitempty"`
+	GoalID *int64 `db:"goal_id" json:"goal_id,omitempty"`
+	TaskID *int64 `db:"task_id" json:"task_id,omitempty"`
+	// Asker is who asked, on a row about an ask: the row's Title is then the ask's own line, and this keeps the asker readable beside it (#14422). Empty on every other row and on every row made before it.
+	Asker    string `db:"asker" json:"asker,omitempty"`
 	PrevHash string `db:"prev_hash" json:"-"`
 	Hash     string `db:"hash" json:"-"`
 }
@@ -178,6 +183,10 @@ func (s *Store) ensureOperatorActionsSchema(ctx context.Context) error {
 		if _, err := s.db.ExecContext(ctx, `ALTER TABLE operator_actions ADD COLUMN `+col+` INTEGER`); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return err
 		}
+	}
+	// who asked, on a row about an ask (#14422): added to a record that has none; an old row keeps '' and its hash (the field joins the hash only when it has text)
+	if _, err := s.db.ExecContext(ctx, `ALTER TABLE operator_actions ADD COLUMN asker TEXT NOT NULL DEFAULT ''`); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+		return err
 	}
 	// this record's own id, made once and never derived from anything else (not the telemetry id): the Hub pairs it with a row's id, which is unique only within one computer's record
 	if _, err := s.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS operator_actions_record (one INTEGER PRIMARY KEY CHECK (one = 1), record_id TEXT NOT NULL)`); err != nil {
@@ -229,7 +238,11 @@ func activityText(s string, n int) string {
 // activityHash chains a row: the SHA-256 of the previous hash and of every field of this row, each length-prefixed so no two rows hash alike by moving a character between fields.
 func activityHash(prev string, a OperatorAction) string {
 	h := sha256.New()
-	for _, f := range []string{prev, a.At, a.Actor, a.Action, a.ItemKind, a.ItemID, a.Version, a.Team, a.Source, a.Hint, a.Surface, a.Title, a.Note} {
+	fields := []string{prev, a.At, a.Actor, a.Action, a.ItemKind, a.ItemID, a.Version, a.Team, a.Source, a.Hint, a.Surface, a.Title, a.Note}
+	if a.Asker != "" { // a row made before the field (or one with no asker) hashes as it always did, so the record's chain still verifies (#14422)
+		fields = append(fields, "asker", a.Asker)
+	}
+	for _, f := range fields {
 		fmt.Fprintf(h, "%d:%s|", len(f), f)
 	}
 	if a.GoalID != nil || a.TaskID != nil { // a row with a thread hashes it too; one with none hashes exactly as before the columns, so no old row's hash changes (#14421)
@@ -272,7 +285,7 @@ func appendActivity(ctx context.Context, q activityExec, now time.Time, m Activi
 	surface := ValidSurface(m.Surface)
 	goal, task := resolveThread(ctx, q, m, kind, item, team)
 	a := OperatorAction{At: now.UTC().Format(activityTimeFormat), Actor: m.Actor, Action: action, ItemKind: kind, ItemID: item, Version: version, Team: team, Source: source, Hint: hint, Surface: surface,
-		Title: activityText(m.Title, activityTextCap), Note: activityText(m.Note, ActivityNoteCap), GoalID: goal, TaskID: task, PrevHash: head.LastHash}
+		Title: activityText(m.Title, activityTextCap), Note: activityText(m.Note, ActivityNoteCap), GoalID: goal, TaskID: task, Asker: activityText(m.Asker, activityAskerCap), PrevHash: head.LastHash}
 	if a.Actor == "" {
 		a.Actor = "local"
 	}
@@ -286,8 +299,8 @@ func appendActivity(ctx context.Context, q activityExec, now time.Time, m Activi
 		_, _ = q.ExecContext(ctx, `RELEASE activity_row`)
 		return err
 	}
-	res, err := q.ExecContext(ctx, `INSERT INTO operator_actions (at, actor, action, item_kind, item_id, version, team, source, hint, surface, title, note, goal_id, task_id, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		a.At, a.Actor, a.Action, a.ItemKind, a.ItemID, a.Version, a.Team, a.Source, a.Hint, a.Surface, a.Title, a.Note, a.GoalID, a.TaskID, a.PrevHash, a.Hash)
+	res, err := q.ExecContext(ctx, `INSERT INTO operator_actions (at, actor, action, item_kind, item_id, version, team, source, hint, surface, title, note, asker, goal_id, task_id, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		a.At, a.Actor, a.Action, a.ItemKind, a.ItemID, a.Version, a.Team, a.Source, a.Hint, a.Surface, a.Title, a.Note, a.Asker, a.GoalID, a.TaskID, a.PrevHash, a.Hash)
 	if err != nil {
 		return fail(err)
 	}
@@ -407,7 +420,7 @@ const ActivityCheckNote = "Edits made outside Coral are shown unless the whole r
 // removed are not checked: the trim moved the anchor.
 func (s *Store) VerifyActivity(ctx context.Context) (ActivityCheck, error) {
 	rows := []OperatorAction{}
-	if err := s.db.SelectContext(ctx, &rows, `SELECT id, at, actor, action, item_kind, item_id, version, team, source, hint, surface, title, note, goal_id, task_id, prev_hash, hash FROM operator_actions ORDER BY id`); err != nil {
+	if err := s.db.SelectContext(ctx, &rows, `SELECT id, at, actor, action, item_kind, item_id, version, team, source, hint, surface, title, note, asker, goal_id, task_id, prev_hash, hash FROM operator_actions ORDER BY id`); err != nil {
 		return ActivityCheck{}, err
 	}
 	var head struct {
@@ -476,7 +489,7 @@ func (s *Store) ListActivity(ctx context.Context, f ActivityFilter) ([]OperatorA
 // ActivityPage is ListActivity and whether more rows exist past the page (it reads one more than the limit). The limit is at most ActivityMaxLimit and 50 when not given; the order is (time, id) newest
 // first, and a cursor (BeforeAt with BeforeID) pages by that pair.
 func (s *Store) ActivityPage(ctx context.Context, f ActivityFilter) ([]OperatorAction, bool, error) {
-	q := `SELECT id, at, actor, action, item_kind, item_id, version, team, source, hint, surface, title, note, goal_id, task_id FROM operator_actions WHERE 1 = 1`
+	q := `SELECT id, at, actor, action, item_kind, item_id, version, team, source, hint, surface, title, note, asker, goal_id, task_id FROM operator_actions WHERE 1 = 1`
 	var args []any
 	if f.Team != "" {
 		q += ` AND team = ?`
