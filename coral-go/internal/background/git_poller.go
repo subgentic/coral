@@ -193,11 +193,19 @@ func (p *GitPoller) Run(ctx context.Context) error {
 	wait, _ := p.nextWait()
 	timer := time.NewTimer(wait)
 	defer timer.Stop()
+	var kicks <-chan struct{} // nil without a Branches collector: never ready
+	if p.branches != nil {
+		kicks = p.branches.Kicks()
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
+		case <-kicks:
+			if _, enabled := p.nextWait(); enabled {
+				p.branchesPass(ctx) // in this loop, so never beside a full pass
+			}
 		case <-timer.C:
 			if _, enabled := p.nextWait(); enabled {
 				if err := p.PollOnce(ctx); err != nil {
@@ -208,6 +216,22 @@ func (p *GitPoller) Run(ctx context.Context) error {
 			timer.Reset(next)
 		}
 	}
+}
+
+// branchesPass reads only the Branches tab's repositories, when a tab asked for one that has no picture yet (branches.Collector.Kicks): the same agents and git
+// roots as a full pass, and the collector's own limits (only the wanted repositories, each at most once a minute, within its pass budget).
+func (p *GitPoller) branchesPass(ctx context.Context) {
+	agents, err := p.discoverAgents(ctx)
+	if err != nil {
+		p.logger.Debug("branches pass: discover agents", "error", err)
+		return
+	}
+	dirToAgents := p.groupByGitRoot(ctx, agents)
+	roots := make([]string, 0, len(dirToAgents))
+	for root := range dirToAgents {
+		roots = append(roots, root)
+	}
+	p.branches.Observe(ctx, roots)
 }
 
 // PollOnce performs a single git polling pass for all live agents.

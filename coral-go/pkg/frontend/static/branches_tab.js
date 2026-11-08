@@ -5,7 +5,9 @@ import { serverFetch, serverForSession } from './server_base.js';
 import { emptyState } from './dom_write.js';
 
 const REFRESH_MS = 60000; // the snapshot is read again at most once a minute on the server
-const FIRST_READ_MS = 15000; // a repository is first read on the server's next pass after the tab asks
+const FIRST_READ_STEPS = [2000, 4000, 8000, 15000]; // a repository is first read when the tab asks (the server starts a pass then): look again soon, then less often
+const FIRST_READ_LIMIT_MS = 60000; // past this with nothing read, the tab says so instead of 'reading'
+let waiting = { session: '', since: 0, tries: 0 }; // how long the open agent's repository has been asked for without an answer
 let generation = 0;
 let timer = null;
 const panel = () => document.getElementById('agentic-panel-branches');
@@ -25,8 +27,11 @@ export async function loadBranches() {
         if (resp.ok) data = await resp.json();
     } catch { /* drawn as unavailable below */ }
     if (mine !== generation || state.currentSession?.session_id !== s.session_id) return; // another agent was chosen meanwhile
-    draw(el, data);
-    timer = setTimeout(loadBranches, data && data.available !== false && !data.found ? FIRST_READ_MS : REFRESH_MS); // a repository is read once its tab asks: look again soon
+    const notYet = !!data && data.available !== false && !data.found;
+    if (!notYet) waiting = { session: '', since: 0, tries: 0 };
+    else if (waiting.session !== s.session_id) waiting = { session: s.session_id, since: Date.now(), tries: 0 };
+    draw(el, data, notYet && Date.now() - waiting.since > FIRST_READ_LIMIT_MS);
+    timer = setTimeout(loadBranches, notYet ? FIRST_READ_STEPS[Math.min(waiting.tries++, FIRST_READ_STEPS.length - 1)] : REFRESH_MS);
 }
 
 function text(tag, className, value) {
@@ -50,9 +55,14 @@ function numbers(w) {
     return `${where} · ${changes(w)}`;
 }
 
-function draw(el, data) {
+function draw(el, data, overdue = false) {
     if (!data || data.available === false) { emptyState(el, 'Branches are not available from this computer.'); return; }
-    if (!data.found) { emptyState(el, "Reading this agent's repository. If nothing shows, its folder is not in a git repository Coral reads."); return; }
+    if (!data.found) {
+        emptyState(el, overdue
+            ? "Coral has not read a repository for this agent's folder. Its folder may not be in a git repository, or git took too long and the read is paused for a few minutes."
+            : "Reading this agent's repository: the first read takes a few seconds.");
+        return;
+    }
     if (data.unreadable) { emptyState(el, 'Coral could not read this repository.'); return; }
     const head = text('p', 'branches-note', data.base ? `Counted against ${data.base}.` : 'No base branch found: counts are not shown.');
     const list = document.createElement('ul');
