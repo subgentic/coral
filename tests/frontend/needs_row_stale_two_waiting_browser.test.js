@@ -27,7 +27,7 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`(window.__qaState && window.__qaState.liveSessions || []).length === 2`, `${w}: the two agents`, 8000);
             await ev(`window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, ...window.__m.entry(window.__m.agents[s.session_id]) })); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.updateInboxTab()); true`);
             await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '2'`, `${w}: two waiting`, 8000);
-            await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
+            await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`); // as the real entries do (app_actions, phone_drawer, goal_view, saved): the Inbox tab is shown first, which mounts its hooks (#14447)
             await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' && document.querySelectorAll('#group-table-view .inbox-answer').length === 4`, `${w}: both rows' two choices`, 12000);
             await new Promise(r => setTimeout(r, 600)); // sleep-ok: the buttons are armed (the table has settled) before a press
             const rowOf = name => `[...document.querySelectorAll('#group-table-view tbody tr')].find(tr => tr.textContent.includes('${name}'))`; // the rows of the agents named qa and qb (neither name is part of the other)
