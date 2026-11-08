@@ -70,8 +70,8 @@ func (s *heavyStub) saw(suffix string) bool {
 	return false
 }
 
-const macGrant = `{"granted":true,"place":0,"entry":{"id":1,"member":"mac-heavy","machine":"Mac"}}`
-const miniGrant = `{"granted":true,"place":0,"entry":{"id":1,"member":"mini","machine":"Mini"}}`
+const macGrant = `{"granted":true,"place":0,"entry":{"id":1,"member":"mac-heavy","machine":"Mac","where":"here"}}`
+const miniGrant = `{"granted":true,"place":0,"entry":{"id":1,"member":"mini","machine":"Mini","where":"remote"}}`
 
 func runHeavy(t *testing.T, s *heavyStub, args ...string) (out string, code int) {
 	t.Helper()
@@ -142,11 +142,11 @@ func TestHeavyRunWaitsInLineAndThenRuns(t *testing.T) {
 	}
 }
 
-func TestHeavyRunGrantedTheMiniRefusesACommandThatIsForTheMacOnlyAndGivesTheSlotBack(t *testing.T) {
+func TestHeavyRunGrantedARemoteMachineRefusesACommandThatIsForThisMachineOnlyAndGivesTheSlotBack(t *testing.T) {
 	for _, cmd := range []string{"cat ~/.coral/sessions.db", "curl http://127.0.0.1:8420/api/health", "go test ./... --coral-dir ~/.coral"} {
 		s := &heavyStub{grants: []string{miniGrant}}
 		out, code := runHeavy(t, s, "run", "--", cmd)
-		if code != 2 || !strings.Contains(out, "Mac only") {
+		if code != 2 || !strings.Contains(out, "this machine only") {
 			t.Fatalf("%q: code=%d out=%q", cmd, code, out)
 		}
 		if !s.saw("/heavy/release") {
@@ -155,7 +155,7 @@ func TestHeavyRunGrantedTheMiniRefusesACommandThatIsForTheMacOnlyAndGivesTheSlot
 	}
 }
 
-func TestHeavyRunNeedsACommandAndHeavyWhereDecidesByMachine(t *testing.T) {
+func TestHeavyRunNeedsACommand(t *testing.T) {
 	s := &heavyStub{grants: []string{macGrant}}
 	if _, code := runHeavy(t, s, "run"); code != 1 {
 		t.Fatalf("no command: exit 1, got %d", code)
@@ -163,14 +163,29 @@ func TestHeavyRunNeedsACommandAndHeavyWhereDecidesByMachine(t *testing.T) {
 	if s.saw("/claim") {
 		t.Fatal("nothing is claimed without a command")
 	}
-	for member, machine := range map[string]string{"mini": "", "x": "Mini", "other": "mini", "y": "MINI"} {
-		if !heavyOnMini(member, machine) {
-			t.Errorf("%q %q is the mini", member, machine)
-		}
+}
+
+// #14354: where a run happens is what the granted resource's definition says, never a name in the code: a grant whose resource says here runs in this folder whatever the member or machine is called
+// (a member named mini that says here is local), and one that says nothing is refused with the command that fixes it, the slot given back and the command never run (epoch-go once ran on the Mac).
+func TestHeavyRunDecidesByWhatTheResourceSaysAndRefusesWhenItSaysNothing(t *testing.T) {
+	local := `{"granted":true,"place":0,"entry":{"id":1,"member":"mini","machine":"mini","where":"here"}}`
+	s := &heavyStub{grants: []string{local}}
+	out, code := runHeavy(t, s, "run", "--", "echo ran-here")
+	if code != 0 || !strings.Contains(out, "ran-here") {
+		t.Fatalf("a resource that says here runs here, whatever its member is called: code=%d out=%q", code, out)
 	}
-	for _, c := range [][2]string{{"mac-heavy", "Mac"}, {"mac-heavy", ""}, {"", ""}, {"minibar", "Mac"}} {
-		if heavyOnMini(c[0], c[1]) {
-			t.Errorf("%q %q is not the mini", c[0], c[1])
+	for name, grant := range map[string]string{
+		"nothing said":                `{"granted":true,"place":0,"entry":{"id":1,"member":"mac-heavy","machine":"Mac"}}`,
+		"a plain resource, said none": `{"granted":true,"place":0,"entry":{"id":1,"machine":"epoch"}}`,
+		"an unknown value":            `{"granted":true,"place":0,"entry":{"id":1,"member":"x","machine":"x","where":"elsewhere"}}`,
+	} {
+		s := &heavyStub{grants: []string{grant}}
+		out, code := runHeavy(t, s, "run", "--", "echo must-not-run")
+		if code != 2 || strings.Contains(out, "must-not-run\n") || !strings.Contains(out, "does not say where it runs") || !strings.Contains(out, "--here") || !strings.Contains(out, "--remote") {
+			t.Fatalf("%s: code=%d out=%q", name, code, out)
+		}
+		if !s.saw("/heavy/release") {
+			t.Fatalf("%s: the slot is given back: %v", name, s.reqs)
 		}
 	}
 }
@@ -193,7 +208,7 @@ func TestAHeavyRunLongerThanItsLeaseRenewsTheSlotWhileItRuns(t *testing.T) {
 	heavyRenewFloor = 50 * time.Millisecond
 	defer func() { heavyRenewFloor = prevFloor }()
 	soon := time.Now().Add(900 * time.Millisecond).UTC().Format(time.RFC3339Nano)
-	s := &heavyStub{grants: []string{`{"granted":true,"place":0,"entry":{"id":1,"member":"mac-heavy","machine":"Mac","lease_until":"` + soon + `"}}`}}
+	s := &heavyStub{grants: []string{`{"granted":true,"place":0,"entry":{"id":1,"member":"mac-heavy","machine":"Mac","where":"here","lease_until":"` + soon + `"}}`}}
 	out, code := runHeavy(t, s, "run", "--", "sleep 2; echo finished")
 	if code != 0 || !strings.Contains(out, "finished") {
 		t.Fatalf("code=%d out=%q", code, out)
@@ -208,7 +223,7 @@ func TestAHeavyRunThatLosesItsSlotIsStoppedAndSaysSo(t *testing.T) {
 	heavyRenewFloor = 50 * time.Millisecond
 	defer func() { heavyRenewFloor = prevFloor }()
 	soon := time.Now().Add(600 * time.Millisecond).UTC().Format(time.RFC3339Nano)
-	s := &heavyStub{renewStatus: 409, grants: []string{`{"granted":true,"place":0,"entry":{"id":1,"member":"mac-heavy","machine":"Mac","lease_until":"` + soon + `"}}`}}
+	s := &heavyStub{renewStatus: 409, grants: []string{`{"granted":true,"place":0,"entry":{"id":1,"member":"mac-heavy","machine":"Mac","where":"here","lease_until":"` + soon + `"}}`}}
 	start := time.Now()
 	out, code := runHeavy(t, s, "run", "--", "sleep 30; echo should-not-print")
 	if code == 0 || strings.Contains(out, "should-not-print") || time.Since(start) > 10*time.Second {
@@ -272,13 +287,13 @@ func TestAHeavyRunWhoseClaimIsSilentAsksTheResourceItsMachine(t *testing.T) {
 	heavyTestTransport = wrapperTransport(t)
 	defer func() { heavyTestTransport = prev }()
 	// an older server: the claim names no machine for a plain resource; the resource itself says mini
-	s := &heavyStub{grants: []string{`{"granted":true,"place":0,"entry":{"id":1}}`}, statusBody: `{"name":"mini","machine":"mini"}`}
+	s := &heavyStub{grants: []string{`{"granted":true,"place":0,"entry":{"id":1}}`}, statusBody: `{"name":"mini","machine":"mini","where":"remote"}`}
 	out, code := runHeavy(t, s, "run", "--pool", "mini", "--", "echo hi-from-the-mini-path")
 	if code != 0 || !strings.Contains(out, "running on mini (over ssh)") {
 		t.Fatalf("it runs on the mini, over ssh, saying so: code=%d out=%q", code, out)
 	}
 	// and a plain resource whose own machine is the Mac runs here
-	s = &heavyStub{grants: []string{`{"granted":true,"place":0,"entry":{"id":1}}`}, statusBody: `{"name":"mac-heavy","machine":"mac"}`}
+	s = &heavyStub{grants: []string{`{"granted":true,"place":0,"entry":{"id":1}}`}, statusBody: `{"name":"mac-heavy","machine":"mac","where":"here"}`}
 	out, code = runHeavy(t, s, "run", "--pool", "mac-heavy", "--", "echo hi-from-here")
 	if code != 0 || !strings.Contains(out, "hi-from-here") || !strings.Contains(out, "(on this Mac)") {
 		t.Fatalf("a Mac resource runs here and says so: code=%d out=%q", code, out)

@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// #13820: on Windows `coral-board heavy run` says at once that it is for the Mac and the mini, claims nothing and starts nothing; elsewhere it is not refused.
+// #13820: on Windows `coral-board heavy run` says at once that it is for a Mac or Linux machine and its remote machines, claims nothing and starts nothing; elsewhere it is not refused.
 func TestHeavyRunOnWindowsSaysSoAndStartsNothing(t *testing.T) {
 	why := heavyUnsupportedHere()
 	if runtime.GOOS != "windows" {

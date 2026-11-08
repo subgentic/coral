@@ -112,14 +112,14 @@ func TestFileListRefusesAWorktreeOverTheCapsAndSaysHowBigItIs(t *testing.T) {
 }
 
 func TestSSHArgumentsAreFixedAndTheDestinationIsTheOperatorsAliasAfterDoubleDash(t *testing.T) {
-	args, err := SSHArgs("coral-heavy-mini")
+	args, err := SSHArgs("coral-heavy-box")
 	require.NoError(t, err)
 	joined := strings.Join(args, " ")
 	for _, want := range []string{"-T", "-a", "-x", "ControlMaster=no", "ControlPath=none", "BatchMode=yes", "StrictHostKeyChecking=yes", "ClearAllForwardings=yes", "ForwardAgent=no", "ForwardX11=no", "SendEnv=-*", "ServerAliveInterval=15"} {
 		assert.Contains(t, joined, want)
 	}
 	require.GreaterOrEqual(t, len(args), 2)
-	assert.Equal(t, []string{"--", "coral-heavy-mini"}, args[len(args)-2:], "the destination comes last, after --")
+	assert.Equal(t, []string{"--", "coral-heavy-box"}, args[len(args)-2:], "the destination comes last, after --")
 	for _, bad := range []string{"", "-oProxyCommand=touch /tmp/x", "-x", "a b", "a;b", "host:22", "user@host", "Mini", strings.Repeat("a", 60)} {
 		_, err := SSHArgs(bad)
 		assert.Error(t, err, "%q", bad)

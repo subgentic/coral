@@ -43,7 +43,7 @@ func failingTransport() Transport {
 		outR, outW := io.Pipe()
 		errR, errW := io.Pipe()
 		go func() {
-			errW.Write([]byte("ssh: Could not resolve hostname coral-heavy-mini\n"))
+			errW.Write([]byte("ssh: Could not resolve hostname coral-heavy-box\n"))
 			outW.Close()
 			errW.Close()
 		}()

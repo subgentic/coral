@@ -13,5 +13,5 @@ func heavyOwnGroup(c *exec.Cmd) {
 	c.Cancel = func() error { return syscall.Kill(-c.Process.Pid, syscall.SIGKILL) }
 }
 
-// heavyUnsupportedHere: the heavy pool is the Mac and the mini, and a run can be stopped here (its command's whole process group is killed), so nothing is refused.
+// heavyUnsupportedHere: the heavy pool is this machine and a remote one, and a run can be stopped here (its command's whole process group is killed), so nothing is refused.
 func heavyUnsupportedHere() string { return "" }
