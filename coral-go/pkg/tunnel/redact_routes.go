@@ -15,6 +15,7 @@ import (
 var redactExempt = map[string]string{
 	"GET /api/artifacts/{hex64}": "byte-exact download: the id is the SHA-256 of the bytes, so any change breaks the link and its check",
 	"GET /api/health":            "fixed fields (status, version): no free text",
+	"GET /api/launch-disclosure": "the server's own fixed notice text, its id and a seen flag: no free text from a person or an agent",
 }
 
 // redactLater: View routes not redacted yet, each with when; the docs say so. Empty since

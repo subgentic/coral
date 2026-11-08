@@ -1,10 +1,10 @@
 package main
 
 import (
-	"io"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
