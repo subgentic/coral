@@ -28,8 +28,8 @@ import (
 func TestMain(m *testing.M) {
 	cleanupTemp := testtemp.Use() // a private temp, home and data folder for this package (#356)
 	listenerPIDs = func(string, int) ([]uint32, error) { return nil, nil }
-	connectionOwnerPID = func(string, int) (uint32, bool, error) { return 0, false, nil } // and nothing accepts a connection there either
-	AllowTestServerListener = true                                                        // the tests' own servers
+	connectionOwnerPID = func(string, int, time.Duration) (uint32, bool, error) { return 0, false, nil } // and nothing accepts a connection there either
+	AllowTestServerListener = true                                                                       // the tests' own servers
 	testtemp.Exit(cleanupTemp, m.Run())
 }
 

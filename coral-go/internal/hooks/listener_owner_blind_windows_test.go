@@ -34,11 +34,19 @@ func blindRig(t *testing.T, rows func(clientPort int) []connRow, owner func(uint
 		}
 	}()
 	resetListenerCheck(t, func(string, int) ([]uint32, error) { return nil, nil }, owner) // the listener table shows nothing
-	prevConn, prevRows, prevWin, prevGap := connectionOwnerPID, tcpConns, connReadWindow, connReadGap
+	prevConn, prevRows, prevWin, prevRetry, prevGap := connectionOwnerPID, tcpConns, connReadWindow, connRetryWindow, connReadGap
 	connectionOwnerPID = connectionOwner
-	connReadWindow, connReadGap = 600*time.Millisecond, 50*time.Millisecond
+	connReadWindow, connRetryWindow, connReadGap = 600*time.Millisecond, 300*time.Millisecond, 50*time.Millisecond
 	client := 0
 	tcpConns = func(uint32) ([]connRow, error) {
+		// the newest connection's client port: a retry dials a fresh connection (until its port arrives, the table shows the last)
+		for drained := false; !drained; {
+			select {
+			case client = <-clients:
+			default:
+				drained = true
+			}
+		}
 		if client == 0 {
 			select {
 			case client = <-clients:
@@ -48,7 +56,7 @@ func blindRig(t *testing.T, rows func(clientPort int) []connRow, owner func(uint
 		return rows(client), nil
 	}
 	t.Cleanup(func() {
-		connectionOwnerPID, tcpConns, connReadWindow, connReadGap = prevConn, prevRows, prevWin, prevGap
+		connectionOwnerPID, tcpConns, connReadWindow, connRetryWindow, connReadGap = prevConn, prevRows, prevWin, prevRetry, prevGap
 	})
 	return "127.0.0.1", port
 }
@@ -119,4 +127,35 @@ func mySID(t *testing.T) *windows.SID {
 	u, err := windows.GetCurrentProcessToken().GetTokenUser()
 	require.NoError(t, err)
 	return u.User.Sid
+}
+
+// The table misses the first connection's row for its whole window but shows the second one's: the one retry on a fresh connection finds it, and the owner is checked as usual (this process passes).
+func TestARowMissedOnTheFirstConnectionIsFoundOnTheRetry(t *testing.T) {
+	var port int
+	first := 0
+	host, p := blindRig(t, func(client int) []connRow {
+		if first == 0 {
+			first = client
+		}
+		if client == first {
+			return nil // the first connection's row never shows
+		}
+		return []connRow{serverEnd(port, client, uint32(os.Getpid()))}
+	}, func(uint32) (*windows.SID, string, error) { return nil, "", errors.New("unused") })
+	port = p
+	start := time.Now()
+	assert.NoError(t, checkListener(host, port), "found on the second connection")
+	assert.GreaterOrEqual(t, time.Since(start), connReadWindow, "the first window ran out first")
+}
+
+// A row that never shows on either connection refuses after the two windows, and no sooner.
+func TestARowMissedOnEveryTryRefusesAfterBothWindows(t *testing.T) {
+	host, port := blindRig(t, func(int) []connRow { return nil }, func(uint32) (*windows.SID, string, error) { return nil, "", errors.New("unused") })
+	start := time.Now()
+	err := checkListener(host, port)
+	var fe *ForeignListenerError
+	require.ErrorAs(t, err, &fe, "refused: %v", err)
+	took := time.Since(start)
+	assert.GreaterOrEqual(t, took, connReadWindow+connRetryWindow, "both windows ran")
+	assert.Less(t, took, connReadWindow+connRetryWindow+2*time.Second, "and that is the bound")
 }

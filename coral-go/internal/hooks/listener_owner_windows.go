@@ -59,7 +59,12 @@ func checkListener(host string, port int) error {
 	// The listener table can miss a listener that is there (it showed a new one's row about three times in twenty), so a missing row is not "nothing is there", and rows that pass are not the whole
 	// answer either: a program on 127.0.0.1:<port> takes the connections even when Coral holds 0.0.0.0:<port>, and the table may have missed its row. So the tool connects every time (about a
 	// millisecond), and the owner of the server end of that connection is checked like a listener's. Where nothing accepts the connection and no listener row shows, there is nothing there.
-	pid, connected, cerr := connectionOwnerPID(host, port)
+	pid, connected, cerr := connectionOwnerPID(host, port, connReadWindow)
+	if connected && errors.Is(cerr, errNoConnRow) {
+		// The table missed this one connection's row for the whole window (about one call in twenty here): one fresh connection gets a shorter second window, and then it refuses. A row naming
+		// another process, two rows or a read error refuse at once, with no second try.
+		pid, connected, cerr = connectionOwnerPID(host, port, connRetryWindow)
+	}
 	if !connected && len(pids) == 0 {
 		return nil
 	}
@@ -375,16 +380,21 @@ type connRow struct {
 	pid          uint32
 }
 
-// connReadWindow and connReadGap bound the re-reading of the table for the connection's row: a handful of reads in about two seconds.
+// errNoConnRow: the table never showed the row of the connection's server end within the window.
+var errNoConnRow = errors.New("the system's table never showed who owns the connection")
+
+// connReadWindow and connReadGap bound the re-reading of the table for the connection's row: a handful of reads in about two seconds; when the row never showed, checkListener makes one more
+// connection with connRetryWindow, so about three seconds at most.
 var (
-	connReadWindow = 2 * time.Second
-	connReadGap    = 200 * time.Millisecond
-	tcpConns       = tcpConnections // the table of all connections; a test replaces it
+	connReadWindow  = 2 * time.Second
+	connRetryWindow = time.Second
+	connReadGap     = 200 * time.Millisecond
+	tcpConns        = tcpConnections // the table of all connections; a test replaces it
 )
 
 // connectionOwner connects to host:port now and reads the table for the row of the server end of that connection (local end host:port, remote end our own client port, established). connected is false when
 // nothing accepted the connection. A row that never appears, or two, is an error: the owner is not known.
-func connectionOwner(host string, port int) (pid uint32, connected bool, err error) {
+func connectionOwner(host string, port int, window time.Duration) (pid uint32, connected bool, err error) {
 	h := strings.Trim(host, "[]")
 	if strings.EqualFold(h, "localhost") {
 		h = "127.0.0.1"
@@ -406,7 +416,7 @@ func connectionOwner(host string, port int) (pid uint32, connected bool, err err
 	if ip4 := ip.To4(); ip4 != nil {
 		ip, af = ip4, afInet
 	}
-	deadline := time.Now().Add(connReadWindow)
+	deadline := time.Now().Add(window)
 	for {
 		rows, rerr := tcpConns(af)
 		if rerr != nil {
@@ -425,7 +435,7 @@ func connectionOwner(host string, port int) (pid uint32, connected bool, err err
 			return 0, true, errors.New("the table shows two owners for the connection")
 		}
 		if time.Now().After(deadline) {
-			return 0, true, errors.New("the system's table never showed who owns the connection")
+			return 0, true, errNoConnRow
 		}
 		time.Sleep(connReadGap)
 	}
