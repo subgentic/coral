@@ -59,6 +59,8 @@ func TestTheOperatorsTypedAnswerToAQuestionIsARow(t *testing.T) {
 	assert.Equal(t, board.ActAnswer, rows[0].Action)
 	assert.Equal(t, "question", rows[0].ItemKind)
 	assert.Equal(t, itoa(q.ID), rows[0].ItemID)
+	assert.Equal(t, "@Operator which design do we ship?", rows[0].Title, "the ask's own line (#14422; it was the asker)")
+	assert.Equal(t, "Lead", rows[0].Asker)
 	assert.Contains(t, rows[0].Note, "the second one")
 }
 
@@ -117,6 +119,10 @@ func TestTheReadButtonsAndTheTagEditorAreRowsAndAnOpenIsNot(t *testing.T) {
 	assert.Equal(t, "internal, final", rows[0]["note"])
 	assert.Equal(t, board.ActMarkRead, rows[1]["action"])
 	assert.Equal(t, board.ActMarkUnread, rows[2]["action"])
+	for _, row := range rows {
+		assert.NotEmpty(t, row["title"], "the file's name at the click (#14422)")
+		assert.Equal(t, StoredFileName(e.coralDir, id), row["title"])
+	}
 	assert.Equal(t, id, rows[2]["item_id"])
 	assert.Equal(t, "file", rows[2]["item_kind"])
 
