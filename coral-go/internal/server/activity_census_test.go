@@ -223,6 +223,7 @@ var activityNotAnInboxAction = map[string]string{
 	"POST /api/system/api-key/regenerate":                                  "this computer's settings and controls, not an Inbox action",
 	"POST /api/system/auto-wake/dismiss":                                   "this computer's settings and controls, not an Inbox action",
 	"POST /api/system/data-folder/adopt":                                   "this computer's settings and controls, not an Inbox action",
+	"POST /api/system/security-notice/ack":                                 "this computer's settings and controls, not an Inbox action",
 	"POST /api/system/login-token":                                         "this computer's settings and controls, not an Inbox action",
 	"POST /api/system/restart":                                             "this computer's settings and controls, not an Inbox action",
 	"POST /api/system/telemetry/acknowledge":                               "this computer's settings and controls, not an Inbox action",
