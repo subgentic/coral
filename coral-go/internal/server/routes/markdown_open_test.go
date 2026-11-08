@@ -70,7 +70,9 @@ func TestRenderMarkdownSafeIsLinear(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			start := time.Now()
 			out := renderMarkdownSafe(src)
-			require.Less(t, time.Since(start), 2*time.Second, "rendering %d bytes of %s must not be slow", len(src), name)
+			if !raceEnabled { // a time budget means nothing under the race detector (10 to 20 times slower, #14280): the shape still renders and stays safe there, and the normal run keeps the budget (#14668)
+				require.Less(t, time.Since(start), 2*time.Second, "rendering %d bytes of %s must not be slow", len(src), name)
+			}
 			require.NotContains(t, out, "<script")
 		})
 	}

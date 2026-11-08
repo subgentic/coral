@@ -596,6 +596,9 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-mail-cell:has(> .inbox-answers) { flex-wrap: wrap; }
 .dt-mail-cell > .inbox-answers { flex: 1 1 100%; padding: 0 12px 8px 56px; } /* under the mail line, in line with its text */
 .dt-mail-cell > .inbox-answers:empty { display: none; }
+.dt-mail-cell:has(> .dt-mail-extra) { flex-wrap: wrap; }
+.dt-mail-cell > .dt-mail-extra { flex: 1 1 100%; min-width: 0; padding: 0 12px 8px 56px; } /* under the mail line, in line with its text (#14637) */
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .dt-mail-cell > .dt-mail-extra { padding-left: 0; padding-right: 0; } }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .inbox-answers .inbox-dismiss, .inbox-answers:not(:has(.inbox-answer)) { display: none; } } /* a phone's Needs you row stays one line: the Dismiss is on the agent's card there (#11352) */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .dt-mail-cell > .inbox-answers { padding-left: 0; padding-right: 0; } } /* a phone's choices have no indent (#10874) */ /* no choices read (yet): no padded empty line under the row, which made it 64 px, not the one line of 56 */
 
@@ -644,6 +647,8 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-mail-kind > .dt-mail-open { grid-column: 2; grid-row: 1; }
 .dt-mail-kind > :is(.dt-mail-more, .dt-mail-more-gap) { grid-column: 3; grid-row: 1; }
 .dt-mail-kind > .inbox-answers { grid-column: 1 / -1; grid-row: 2; padding-left: 0; }
+.dt-mail-kind > .dt-mail-extra { grid-column: 2 / -1; grid-row: 2; padding: 0 12px 8px 0; }
+.dt-mail-kind > .dt-mail-extra ~ .inbox-answers { grid-row: 3; }
 .material-icons.inbox-kind-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 2rem; height: 2rem; margin: 0; border-radius: var(--radius-lg); font-size: var(--needs-icon-size); line-height: 1; color: var(--needs-icon-indigo-fg); background: var(--needs-icon-indigo-bg); }
 .inbox-kind-icon[data-kind="review"] { color: var(--needs-icon-green-fg); background: var(--needs-icon-green-bg); }
 .inbox-kind-icon[data-kind="proposal"], .inbox-kind-icon[data-kind="goal_done"] { color: var(--needs-icon-purple-fg); background: var(--needs-icon-purple-bg); }

@@ -39,6 +39,9 @@ const (
 // messageFTSChunk is the messages indexed per statement while building: the writer is free between them. A variable so a test can lower it.
 var messageFTSChunk = 5000
 
+// messageFTSAfterChunk is called after each chunk is indexed (nil in the product): a test posts messages from it, so they land between chunks on every run, not by luck of timing (#14679).
+var messageFTSAfterChunk func()
+
 // messageFTSMaxCandidates: a needle the index offers this many messages for matches most of the board, and the index is slower than the
 // LIKE scan there (a trigram lookup of a common word, measured in the benchmark): the search is answered without it. A variable for a test.
 var messageFTSMaxCandidates = 2000
@@ -253,8 +256,14 @@ func (s *Store) buildMessageSearchIndex(ctx context.Context) error {
 			return fmt.Errorf("%s: %w", firstWords(q), err)
 		}
 	}
+	// The chunks run up to the newest message there is NOW, not for as long as posts keep arriving (#14668): a board whose posts outrun the chunks (a slow machine, the race detector, a flood) would otherwise
+	// be chased without end. What is posted after that point is indexed by the last step's transaction below, which takes every id above the chunks, and by the triggers after it.
+	var target int64
+	if err := s.db.GetContext(ctx, &target, `SELECT COALESCE(MAX(id), 0) FROM board_messages`); err != nil {
+		return err
+	}
 	var last int64
-	for {
+	for last < target {
 		var hi int64
 		err := s.db.GetContext(ctx, &hi, `SELECT COALESCE(MAX(id), 0) FROM (SELECT id FROM board_messages WHERE id > ? ORDER BY id LIMIT ?)`, last, messageFTSChunk)
 		if err != nil {
@@ -267,6 +276,9 @@ func (s *Store) buildMessageSearchIndex(ctx context.Context) error {
 			return err
 		}
 		last = hi
+		if f := messageFTSAfterChunk; f != nil {
+			f()
+		}
 		select {
 		case <-ctx.Done():
 			return ctx.Err()

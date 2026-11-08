@@ -16,6 +16,10 @@ import (
 func TestRunNowRecordsTheJobsRunAndKeepsTheSchedule(t *testing.T) {
 	ctx := context.Background()
 	s, ss, job := jobWithRuns(t) // a daily 09:00 job, no runs
+	// The job runs in its folder itself (no_worktree), not in a worktree of it: its folder here is /tmp, not a git repository, so a worktree run FAILS at once, the failed run stops being "running", and the second RunNow
+	// below then starts another (7 of 20 under -race, #14668: the run's failure and the test's second call raced). With no worktree the run reaches the launch, which waits for the test.
+	_, err := ss.UpdateScheduledJob(ctx, job.ID, map[string]interface{}{"no_worktree": 1})
+	require.NoError(t, err)
 	var mu sync.Mutex
 	var launched []int64
 	// The launch waits for the test: "a job that is running is not run twice" is only a fact while the first run is still running. A launch that returned at once let a loaded run (two cores, -race) end the first

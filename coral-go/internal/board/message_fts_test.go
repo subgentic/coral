@@ -164,24 +164,19 @@ func TestMessageSearchIndexBuildsWhileMessagesArePosted(t *testing.T) {
 	ctx := context.Background()
 	old := messageFTSChunkForTest(50) // many chunks, so the posts land between them
 	defer old()
-	var wg sync.WaitGroup
-	stop := make(chan struct{})
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for i := 0; ; i++ {
-			select {
-			case <-stop:
-				return
-			default:
-			}
-			_, _ = s.PostMessage(ctx, "proj", "dev", fmt.Sprintf("late arrival number %d progress", i), nil)
-			time.Sleep(time.Millisecond)
+	// Two messages are posted after EVERY chunk (a hook, #14679), so posts land during the build on every run: the ones above the last chunk are the tail the last step must index.
+	posts := 0
+	messageFTSAfterChunk = func() {
+		for k := 0; k < 2; k++ {
+			_, err := s.PostMessage(ctx, "proj", "dev", fmt.Sprintf("late arrival number %d progress", posts), nil)
+			require.NoError(t, err)
+			posts++
 		}
-	}()
+	}
+	defer func() { messageFTSAfterChunk = nil }()
 	require.NoError(t, s.BuildMessageSearchIndex(ctx))
-	close(stop)
-	wg.Wait()
+	messageFTSAfterChunk = nil
+	require.Equal(t, 16, posts, "eight chunks of 50 over 400 messages, two posts after each")
 	_, err := s.db.ExecContext(ctx, `INSERT INTO `+messageFTSTable+`(`+messageFTSTable+`, rank) VALUES ('integrity-check', 1)`)
 	require.NoError(t, err, "every message, the ones posted during the build too, is indexed once")
 	a, b := queryBoth(t, s, MessageQueryParams{Q: []string{"late arrival"}, Limit: []string{"200"}})
@@ -672,4 +667,34 @@ func buildAfterOpenBuild(t *testing.T, s *Store, ctx context.Context) {
 	t.Helper()
 	require.Eventually(t, func() bool { return s.MessageSearchIndexState() != "building" }, 30*time.Second, 2*time.Millisecond, "the build the open started is over")
 	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+}
+
+// #14668, #14679: a build ends even when posts arrive faster than the chunks are indexed. It used to chase the table's end until posts stopped (the race shard held 86 minutes on a table grown to 673,000 rows). Chunks
+// of one message with ten posts after each outrun the builder by far; the build now stops chasing at the newest message it saw when it began, and the last step indexes the rest. The hook cancels the build after
+// 1,000 chunks, so the old loop FAILS fast instead of running on.
+func TestMessageSearchIndexBuildEndsWhenPostsOutrunIt(t *testing.T) {
+	s := ftsStoreWithMessages(t, ftsTexts, 200)
+	base, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	old := messageFTSChunkForTest(1)
+	defer old()
+	chunks := 0
+	messageFTSAfterChunk = func() {
+		chunks++
+		if chunks > 1000 {
+			cancel() // the build is chasing the posts: stop it, and the test says so
+			return
+		}
+		for k := 0; k < 10; k++ {
+			_, _ = s.PostMessage(context.Background(), "proj", "dev", fmt.Sprintf("flood %d progress", chunks*10+k), nil)
+		}
+	}
+	defer func() { messageFTSAfterChunk = nil }()
+	require.NoError(t, s.BuildMessageSearchIndex(base), "the build ends on its own (it was chasing the posts past 1,000 chunks)")
+	messageFTSAfterChunk = nil
+	require.LessOrEqual(t, chunks, 200, "one chunk per message there was when it began")
+	ctx := context.Background()
+	_, err := s.db.ExecContext(ctx, `INSERT INTO `+messageFTSTable+`(`+messageFTSTable+`, rank) VALUES ('integrity-check', 1)`)
+	require.NoError(t, err, "every message, the flood too, is indexed once")
+	require.Equal(t, "ready", s.MessageSearchIndexState())
 }
