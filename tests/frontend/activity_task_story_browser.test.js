@@ -7,15 +7,15 @@ const BASE=require('./test_base').BASE;
  const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();
  try{
   await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
-  await Page.addScriptToEvaluateOnNewDocument({source:`localStorage.removeItem('coral-inbox-group-review-goal');localStorage.removeItem('coral-inbox-task-open');localStorage.removeItem('coral-inbox-activity-filters');`});
+  await Page.addScriptToEvaluateOnNewDocument({source:`localStorage.removeItem('coral-inbox-group-review-goal');localStorage.removeItem('coral-inbox-group-mode');localStorage.removeItem('coral-inbox-task-open');localStorage.removeItem('coral-inbox-activity-filters');`});
   for(const width of [1280,390]){
    await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
    await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev,'startup','settings');
    await ev(`(()=>{const base={team:'alpha',actor:'operator',source:'local',goal_id:1,goal_title:'Ship <b>the release</b>',task_id:11,task_title:'Write the plan',item_kind:'question',asker:'Reviewer'};window.__activityRows=['approve','changes','deny','answer','dismiss'].map((action,i)=>({...base,id:10+i,action,title:'Object '+action,note:action==='answer'?'@Reviewer Yes, keep @Designer informed.':'My words for '+action,item_id:String(i+1),at:new Date(Date.now()-i*60000).toISOString()}));window.__activityRows.push({...base,id:30,team:'beta',title:'Different team',action:'approve',note:'Beta words',item_id:'30',at:new Date().toISOString()},{...base,id:31,task_id:null,title:'Goal-level object',action:'answer',note:'Goal words',item_id:'31',at:new Date().toISOString()},{...base,id:32,goal_id:null,task_id:null,title:'Legacy object',action:'dismiss',note:'Legacy words',item_id:'32',at:new Date().toISOString()});const real=window.fetch;window.fetch=(u,o)=>new URL(String(u),location.href).pathname==='/api/activity'?Promise.resolve(Response.json({actions:window.__activityRows,check:{intact:true,rows:8}})):real(u,o);window.switchNavTab('hub-inbox');return import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.openInboxGroup('activity'))})()`);
    await waitFor(`document.querySelectorAll('.activity-folder tr.dt-row').length===8`,'ungrouped Activity rows');
    await ev(`document.getElementById('inbox-activity-toggle').click();true`);
-   await waitFor(`document.querySelector('.inbox-activity-group-toggle input')?.getClientRects().length>0`,'Activity Group by goal option');
-   await ev(`document.querySelector('.inbox-activity-group-toggle input').click();document.getElementById('inbox-activity-toggle').click();true`);
+   await waitFor(`document.querySelector('.inbox-activity-group-toggle select')?.getClientRects().length>0`,'Activity Group by goal option');
+   await ev(`(()=>{const s=document.querySelector('.inbox-activity-group-toggle select');s.value='task';s.dispatchEvent(new Event('change',{bubbles:true}))})();document.getElementById('inbox-activity-toggle').click();true`);
    await waitFor(`document.querySelectorAll('.activity-folder .dt-group-task').length===2`,'source-qualified task headings');
    await ev(`(() => { const prev = window.fetch.bind(window), at = n => new Date(Date.now() - n * 60000).toISOString(); window.__threadCalls = []; const E = [
        { kind: 'task_event', id: 'e1', event: 'created', at: at(90) }, { kind: 'ask', id: 'a1', asker: 'Reviewer', line: 'Which plan do you prefer?', state: 'answered', at: at(80) },

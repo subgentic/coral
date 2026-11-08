@@ -63,12 +63,12 @@ export const filtered = f => AF.ordered(rows.filter(r => AF.matches(r, f, teamOf
 export const total = () => rows.length;
 
 /** The page's table spec for the sidebar's group table. `open` has { file(row), goal(row), question(row) }: how a row's item opens (the sidebar knows the routes). */
-export function spec(f, open, { grouped = false, tasks, taskSignature = '' } = {}) {
+export function spec(f, open, { grouped = false, byTask = true, tasks, taskSignature = '' } = {}) {
     const list = filtered(f);
-    const parts = r => { const p = partsOf(r); return grouped && r.goal_id && r.task_id ? { ...p, about: '' } : p; };
+    const parts = r => { const p = partsOf(r); return grouped && byTask && r.goal_id && r.task_id ? { ...p, about: '' } : p; };
     const decision = r => { const label = AF.DECISION_LABEL[AF.decisionOf(r)]; if (!label) return DT.el('span', 'activity-did', parts(r).did); const chip = DT.tag(parts(r).did); chip.classList.add('activity-decision'); return chip; };
     const summary = r => { const p = parts(r); return [p.did, p.detail, p.about ? markHidden(p.about, { strict: true }) : ''].filter(Boolean).join(' · '); };
-    const groupFor = grouped ? Threads.activityGroupLookup(list, teamLabel, parts, tasks) : null;
+    const groupFor = grouped ? Threads.activityGroupLookup(list, teamLabel, parts, tasks, byTask) : null;
     const opens = r => (r.item_kind === 'job_run' && !!jobRunParts(r.item_id)) || (r.item_kind === 'file' && /^[a-f0-9]{64}$/i.test(r.version || r.item_id || '')) || (r.item_kind === 'agent' && r.item_id && r.action !== 'agents_record') || (['goal', 'question', 'task', 'message', 'workflow_run'].includes(r.item_kind) && /^\d+$/.test(r.item_id)) || (r.item_kind === 'chat' && !!r.item_id);
     return { title: 'Activity', noun: ['action', 'actions'], rows: list,
         empty: { line: !loaded || loading ? 'Reading the record…' : failed ? (denied ? 'Only the account this computer is linked to can see the Activity record.' : 'The record could not be read.') : AF.isFiltered(f) ? 'No action matches the search and filters.' : 'Nothing yet.',
