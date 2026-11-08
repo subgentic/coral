@@ -1,7 +1,7 @@
 /* The Operator's review of an artifact a team tagged "for review" (#136584, #136588), in the artifact viewer: Approve (the row leaves Needs you, the uploading agent is told) and Request changes (a comment
  * on the whole document, sent to the uploader through the comments' own Send to agent, and the file remains visible, uncounted, while it is the agent's turn; its next version returns for review). The state is read from the team's artifact list (its tags and,
  * once decided, the time); the buttons show only for a pending one; through Coral Hub the owner has both: the change-request send is the owner's too (#11354). */
-import { boardFetch, identityKey, decisionNeedsPerson, isCloud, serverFetch, splitKey } from './server_base.js';
+import { boardFetch, identityKey, decisionNeedsPerson, isCloud, commentWritesOn, serverFetch, splitKey } from './server_base.js';
 import { showToast, announceNotice } from './notifications.js';
 import { markHidden } from './visible_marks.js';
 import { importOnce } from './import_once.js';
@@ -289,7 +289,9 @@ export function attachReview(d, { reload }) {
             }
             kept = out?.text_kept === true; older = decided && !Object.hasOwn(out || {}, 'text_kept');
             if (older) legacyDecision = fileKey(was);
-            if (!out?.text_kept) {
+            // Through the Hub with its comment writes closed (the account's comment_writes is not true, #14549), a comment and a send can only come back not_found: the decision already sent with the words is the whole request (#14797).
+            const hubNoComments = isCloud() && !commentWritesOn() && decided && !images.length;
+            if (!out?.text_kept && !hubNoComments) {
                 // Pictures retain their existing comment route. An older computer
                 // already applied the decision but ignored text: do not decide twice.
                 if (!who) throw new Error('No agent is recorded for this artifact, so there is nobody to ask: use a comment.');
@@ -311,7 +313,7 @@ export function attachReview(d, { reload }) {
             const recipient = shown(out.to || who || 'The agent');
             const reason = { no_uploader: 'no agent is recorded for this artifact', board_paused: 'the board is paused', rate_limited: 'the sending limit was reached', not_owner: 'only the owner can send this', redaction_unavailable: 'the words could not be checked', failed: 'delivery failed' }[out.reason] || String(out.reason || 'delivery was not confirmed').replaceAll('_', ' ');
             const notice = out.delivered ? `${recipient} was asked.` : out.reason === 'already_sent' ? `${recipient} was already told.` : `${recipient} was not told: ${reason}.`;
-            showToast(`Changes requested. ${!out.delivered && kept ? 'Your words are in the thread. ' : ''}${notice}`);
+            showToast(hubNoComments && !out.text_kept ? 'Changes requested. Your words were not added to the thread: this Hub does not carry comments yet, so the agent was not told.' : `Changes requested. ${!out.delivered && kept ? 'Your words are in the thread. ' : ''}${notice}`);
             text.value = ''; tray.clear(); done = true; openForm(false); show({ ...was, state: 'changes' }); changes.focus({ preventScroll: true }); reload();
         } catch (err) {
             if (!current()) return;
