@@ -4,7 +4,7 @@ import { setReviewCacheReader } from './ask_filter.js';
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
 import { sourcesKey } from './board_fetch.js';
 import { inboxSources, serverLabel, isOwnerOnlyAnswer } from './inbox_servers.js';
-import { boardFetch, nextArtifactPage, splitKey, serverFetch, identityKey, noteBoardLabels, normServer } from './server_base.js';
+import { boardFetch, nextArtifactPage, splitKey, serverFetch, identityKey, noteBoardLabels, normServer, isCloud } from './server_base.js';
 import { SORT_PARAM } from './filter_model.js';
 import { fetchSkewed } from './query_skew.js';
 import { hideAsksWhen } from './ask_filter.js';
@@ -273,6 +273,7 @@ export async function reviewOfTeam(team, digest, { anyState = false } = {}) {
 /** Expand a capped legacy collapse only when deciding it; ordinary Inbox reads stay bounded.
  * The reviewed row fixes the source, uploader/name group and upper version boundary. */
 export async function legacyEarlierVersions(row) {
+    if (isCloud()) throw new Error("Earlier versions aren't available through Coral Hub.");
     const source = splitKey(row.team), query = new URLSearchParams({ team: source.name, tag: 'for review', versions: 'all', q: row.name || '' });
     if (row.produced_by) query.set('by', row.produced_by);
     const older = new Map(), seen = new Set();

@@ -397,6 +397,7 @@ node artifact_opened_version.test.mjs
 node artifact_pinned_cleanup.test.mjs
 
 node inbox_review_legacy_versions.test.mjs
+node inbox_review_legacy_versions_hub.test.mjs
 node codex_mode.test.mjs
 node resume_ended.test.mjs
 node version_skew_reads.test.mjs
