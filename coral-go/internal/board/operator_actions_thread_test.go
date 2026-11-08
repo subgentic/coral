@@ -32,6 +32,12 @@ func threadFixture(t *testing.T) (s *Store, goal *Goal, task *Task) {
 	return s, goal, task
 }
 
+// recordAsk makes the message a question the board knows (RecordAskSubject keeps a subject only for a message recorded as an ask).
+func recordAsk(t *testing.T, s *Store, team string, id int64) {
+	t.Helper()
+	require.NoError(t, s.RecordAsk(context.Background(), team, &Message{ID: id, SubscriberID: "Lead", CreatedAt: time.Now().UTC().Format(time.RFC3339)}, []string{"Operator"}))
+}
+
 func lastRow(t *testing.T, s *Store) OperatorAction {
 	t.Helper()
 	rows, err := s.ListActivity(context.Background(), ActivityFilter{})
@@ -50,6 +56,7 @@ func idOf(p *int64) int64 {
 func TestAnAskRowCarriesTheGoalAndTaskOfTheAsksSubject(t *testing.T) {
 	s, goal, task := threadFixture(t)
 	ctx := context.Background()
+	recordAsk(t, s, "team-a", 77)
 	require.NoError(t, s.RecordAskSubject(ctx, "team-a", 77, goal.ID, task.ID))
 	require.NoError(t, s.RecordActivity(ctx, opMeta, ActAnswer, "question", "77", "", "team-a"))
 	r := lastRow(t, s)
@@ -57,11 +64,13 @@ func TestAnAskRowCarriesTheGoalAndTaskOfTheAsksSubject(t *testing.T) {
 	assert.Equal(t, task.ID, idOf(r.TaskID), "the ask's task")
 
 	// an ask with a task and no goal of its own takes the task's goal; one with a goal only has no task
+	recordAsk(t, s, "team-a", 78)
 	require.NoError(t, s.RecordAskSubject(ctx, "team-a", 78, 0, task.ID))
 	require.NoError(t, s.RecordActivity(ctx, opMeta, ActAnswer, "question", "78", "", "team-a"))
 	r = lastRow(t, s)
 	assert.Equal(t, goal.ID, idOf(r.GoalID), "the goal of the task the ask is about")
 	assert.Equal(t, task.ID, idOf(r.TaskID))
+	recordAsk(t, s, "team-a", 79)
 	require.NoError(t, s.RecordAskSubject(ctx, "team-a", 79, goal.ID, 0))
 	require.NoError(t, s.RecordActivity(ctx, opMeta, ActAnswer, "question", "79", "", "team-a"))
 	r = lastRow(t, s)
@@ -176,6 +185,7 @@ func TestPromptWaitAndPlainMessageRowsHaveNoThread(t *testing.T) {
 func TestAnAnswerAnApprovalAndACompletionOfOneGoalShareItsId(t *testing.T) {
 	s, goal, task := threadFixture(t)
 	ctx := context.Background()
+	recordAsk(t, s, "team-a", 5)
 	require.NoError(t, s.RecordAskSubject(ctx, "team-a", 5, goal.ID, task.ID))
 	require.NoError(t, s.RecordActivity(ctx, opMeta, ActAnswer, "question", "5", "", "team-a"))
 	hex := hexN(6)

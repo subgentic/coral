@@ -36,6 +36,7 @@ func TestTheRecordCarriesAndFiltersByTheGoalAndTaskOfEachRow(t *testing.T) {
 	meta := board.ActivityMeta{Actor: "local", Source: "local"}
 
 	// 1) the goal's ask, answered
+	require.NoError(t, e.h.bs.RecordAsk(ctx, "alpha", &board.Message{ID: 41, SubscriberID: "Alice", CreatedAt: "2026-11-07T12:00:00Z"}, []string{"Operator"}))
 	require.NoError(t, e.h.bs.RecordAskSubject(ctx, "alpha", 41, gid, tid))
 	require.NoError(t, e.h.bs.RecordActivity(ctx, meta, board.ActAnswer, "question", "41", "", "alpha"))
 	// 2) its file, approved through the real handler: the handler names the file's task
