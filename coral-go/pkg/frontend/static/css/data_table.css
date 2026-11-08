@@ -588,7 +588,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .inbox-answers .inbox-answer { max-width: 100%; height: auto; min-height: 32px; white-space: normal; text-align: left; overflow-wrap: anywhere; } /* a long choice wraps its words inside its column, never clipped at the cell's edge (#11728) */
 .inbox-answered { color: var(--text-secondary); }
 .inbox-only-reject { color: var(--text-secondary); font-size: .85em; flex: 1 1 100%; } /* a request that can only be rejected (#11399): said in words, on its own line under the No */
-@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .inbox-answers .inbox-answer { flex: 1 1 auto; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); } }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .inbox-answers .inbox-answer { flex: 1 1 auto; display: block; white-space: normal; overflow: hidden; overflow-wrap: break-word; text-align: start; height: auto; min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); } } /* a phone: a choice wraps at its words (all of it, up to the 500-character preview), the button grows with it (#14574: an inbox-only person has to read option 1; was one line with an ellipsis, #13688) */
 .dt-mail-cell:has(> .inbox-answers) { flex-wrap: wrap; }
 .dt-mail-cell > .inbox-answers { flex: 1 1 100%; padding: 0 12px 8px 56px; } /* under the mail line, in line with its text */
 .dt-mail-cell > .inbox-answers:empty { display: none; }
@@ -694,3 +694,4 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .inbox-remove-wait-help { flex-basis: 100%; min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; font-size: var(--fs-sm); }
 .inbox-answers:has(.inbox-remove-wait-help) { width: 280px; white-space: normal; }
 .dt-mail-menu .menu-item-with-help { display: block; white-space: normal; text-align: left; min-height: var(--control-touch-height, 44px); }
+@media (max-width: 760px) { .inbox-needs-results td:has(> .inbox-review-star-anchor) .dt-subtitle { margin-inline-end: 52px; } } /* a phone's review card is as tall as its text (#14574): the star's 44 px target sits beside the summary, so the summary stops short of it */

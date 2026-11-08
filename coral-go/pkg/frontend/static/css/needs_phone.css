@@ -38,7 +38,15 @@
 @media (max-width: 760px) {
     /* The sender and time keep the whole first line. The 44 px star sits beside
      * the description, with its own space, and never wraps the table's cells. */
-    .inbox-needs-results .inbox-review-star-anchor.inbox-agent-first.inbox-review-item { padding-inline-end: 0; min-height: calc(1lh + 46px); grid-template-columns: minmax(0, 1fr) max-content max-content; }
+    .inbox-needs-results .inbox-review-star-anchor.inbox-agent-first.inbox-review-item { padding-inline-end: 0; min-height: calc(1lh + 2px); grid-template-columns: minmax(0, 1fr) max-content max-content; }
     .inbox-needs-results .inbox-review-item.inbox-review-star-anchor > .inbox-review-name:not(.inbox-ask-name) { box-sizing: border-box; width: calc(100% - 52px); max-width: calc(100% - 52px); margin-inline-end: 52px; padding-inline-end: 0; }
     .inbox-needs-results .inbox-review-star-anchor > .inbox-review-star { top: calc(1lh + 2px); }
+}
+
+/* A question is read where it stands (#14574, Beta run 3): the row's name is the whole question (up to the preview's 500 characters), so it wraps, on a wide row and on a phone, and nothing clamps it to a line or two. Last in this sheet: it outranks the phone's two-line and one-line clamps above. */
+.inbox-needs-results .inbox-review-item.inbox-agent-first > .inbox-review-name.inbox-ask-name,
+.inbox-needs-results .inbox-review-item > .inbox-review-name.inbox-ask-name { display: block; min-width: 0; max-width: 100%; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; -webkit-line-clamp: unset; line-clamp: none; }
+@media (min-width: 768px) { /* a wide row: the asker on the first line, the question under it across the column, not squeezed beside the name */
+    .inbox-needs-results .inbox-review-item.inbox-agent-first:has(> .inbox-ask-name) { flex-wrap: wrap; }
+    .inbox-needs-results .inbox-review-item.inbox-agent-first > .inbox-review-name.inbox-ask-name { flex: 1 1 100%; order: 5; }
 }

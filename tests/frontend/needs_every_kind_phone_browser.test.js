@@ -62,7 +62,7 @@ const { guardSettings } = require('./helpers/settings_guard');
                 check(r.words.length === 0, `${w} px: a ${r.kind} row draws no kind words: ` + JSON.stringify(r.words));
                 const wait = r.lines.find(l => l.c === 'inbox-review-wait'); if (wait) check(Math.abs(wait.t - first.t) <= 6 && wait.l > first.l, `${w} px: the time is at the right of line one in a ${r.kind} row (Layout A): ` + JSON.stringify(r.lines.map(l => [l.c, l.t, l.l])));
                 check(r.iconTop !== null && r.iconTop >= 4 && r.iconTop <= 16 && r.iconLeft >= 8 && r.iconLeft <= 20, `${w} px: a ${r.kind} row's icon is in the one spot, top left: ` + JSON.stringify([r.iconTop, r.iconLeft]));
-                check(r.nLines >= 2 && r.nLines <= 3 && r.inside, `${w} px: a ${r.kind} row is two or three rendered lines (${r.nLines}), all inside the row: ` + JSON.stringify(r.lines.map(l => [l.c, l.t, l.h])));
+                check(r.nLines >= 2 && (r.kind === 'ask' || r.nLines <= 3) && r.inside, `${w} px: a ${r.kind} row is two or three rendered lines (a question to the Operator is said whole, however many, #14574) (${r.nLines}), all inside the row: ` + JSON.stringify(r.lines.map(l => [l.c, l.t, l.h])));
                 check(!r.blank, `${w} px: a ${r.kind} row is as tall as its text, no blank space under it: h=${r.h} blank=${r.blank}`);
                 if (['ask', 'review', 'proposal'].includes(r.kind)) {
                     check(first && first.c === 'from' && second && second.c === 'name', `${w} px: a ${r.kind} row has the agent's name on line one and the ask on line two: ` + JSON.stringify(r.lines));
