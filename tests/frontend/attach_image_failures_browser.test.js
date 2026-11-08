@@ -47,7 +47,7 @@ async function httpJson(method, p, body, headers = {}) {
             if (strip) Object.defineProperty(strip, 'innerHTML', { configurable: true, get() { return proto.get.call(this); }, set(v) { if (window.__breakStrip) throw new Error('strip cannot be drawn'); proto.set.call(this, v); } });
             return true; })()`);
         await ev(`window.selectLiveSession(${JSON.stringify(name)}, 'claude', ${JSON.stringify(sid)}, 'local'); true`);
-        await waitFor(`!!window.T && T.state.currentSession && T.state.currentSession.session_id === ${JSON.stringify(sid)}`, 'the agent is open', { timeout: 15000 });
+        await waitFor(`!!window.T && T.state.currentSession && T.state.currentSession.session_id === ${JSON.stringify(sid)}`, 'the agent is open', 15000);
         await settle(800);
         const reset = async mode => { await ev(`(() => { window.__mode = ${JSON.stringify(mode)}; window.__breakStrip = false; document.querySelectorAll('.toast, #toast-container > *').forEach(e => e.remove()); window.__rec.toasts = []; window.__rec.errors = []; delete window.__origCreate; const i = document.getElementById('command-input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); T.state.currentSession && (window.__sid = T.state.currentSession.session_id); return true; })()`); };
         const attach = async () => {
