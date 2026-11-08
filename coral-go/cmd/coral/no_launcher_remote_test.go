@@ -52,8 +52,7 @@ func TestNoLauncherTurnsRemoteAccessOn(t *testing.T) {
 		}
 		scanned++
 		s := string(b)
-		// In Go, a launcher's argument is the literal "--remote"; the flag in a comment or a log line is prose.
-		if (ext == ".go" && strings.Contains(s, `"--remote"`)) || (ext != ".go" && flagRe.MatchString(s)) {
+		if passesRemoteFlag(rel, ext, s, flagRe) {
 			t.Errorf("%s passes --remote: a launcher must not turn remote access on", rel)
 		}
 		if ext == ".go" && optRe.MatchString(s) {
@@ -66,5 +65,41 @@ func TestNoLauncherTurnsRemoteAccessOn(t *testing.T) {
 	}
 	if scanned < 50 {
 		t.Fatalf("scanned only %d files: the walk is not reaching the tree", scanned)
+	}
+}
+
+// otherRemoteFlags are the files where "--remote" is ANOTHER program's flag, not the server's remote-access switch (#14810): coral-board's flag table (flagcheck.go) lists its own 'resource define --remote'
+// (#14354: the resource's runs happen on another machine over ssh; it opens no port and starts no Coral). The exemption is the literal in a 'Bools: []string{...}' flag list of that file and nothing else in it: an
+// argument handed to a program, a command line or a start of Coral in the same file is still a launcher passing --remote.
+var otherRemoteFlags = map[string]bool{filepath.Join("coral-go", "cmd", "coral-board", "flagcheck.go"): true}
+
+var flagTableList = regexp.MustCompile(`Bools:\s*\[\]string\{[^}]*\}`)
+
+// passesRemoteFlag is whether the file (rel, its extension, its text) passes the server's --remote: in Go the literal "--remote" as an argument (the flag in a comment or a log line is prose), in other files the flag as a word.
+func passesRemoteFlag(rel, ext, s string, flagRe *regexp.Regexp) bool {
+	if ext == ".go" && otherRemoteFlags[rel] {
+		s = flagTableList.ReplaceAllString(s, "")
+	}
+	return (ext == ".go" && strings.Contains(s, `"--remote"`)) || (ext != ".go" && flagRe.MatchString(s))
+}
+
+func TestOtherProgramsRemoteFlagIsToldApartFromTheServers(t *testing.T) {
+	flagRe := regexp.MustCompile(`(^|[\s"'\x60,\[])--remote([\s"'\x60=,\]]|$)`)
+	table := filepath.Join("coral-go", "cmd", "coral-board", "flagcheck.go")
+	spec := `spec = clihelp.FlagSpec{Bools: []string{"--json", "--wait", "--here", "--remote"}, Values: []string{"--timeout"}}`
+	if passesRemoteFlag(table, ".go", spec, flagRe) {
+		t.Error("coral-board's own flag table is not a launcher")
+	}
+	if !passesRemoteFlag(table, ".go", spec+"\nexec.Command(coral, \"--remote\")", flagRe) {
+		t.Error("an argument that starts Coral with --remote in the same file is still caught")
+	}
+	if !passesRemoteFlag(table, ".go", `args := []string{"serve", "--remote"}`, flagRe) {
+		t.Error("a list of arguments that is not a flag table is still caught")
+	}
+	if !passesRemoteFlag(filepath.Join("coral-go", "cmd", "coral-tray", "main.go"), ".go", spec, flagRe) {
+		t.Error("another file with the same flag table is not exempt: the exemption is this file alone")
+	}
+	if !passesRemoteFlag(table, ".sh", "coral --remote", flagRe) {
+		t.Error("a script that passes --remote is caught whatever its folder")
 	}
 }
