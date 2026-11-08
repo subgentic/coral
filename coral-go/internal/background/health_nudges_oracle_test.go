@@ -62,7 +62,7 @@ func TestRunProjectAgreesWithBefore4599(t *testing.T) {
 	for kind, floor := range map[string]int{
 		"claim nudge": 15, "status nudge": 15, "claim escalation": 5, "status escalation": 5,
 		"mention renudge": 10, "held notice": 10, "claim held back by a wait": 10, "failed delivery": 10, "budget line": 5,
-		"parked task": 10, "snoozed reminder": 10,
+		"parked task": 10, "snoozed reminder": 10, "expired wait": 10, "expired wait swept": 10,
 	} {
 		require.GreaterOrEqual(t, healthKinds[kind], floor, "the %s rule went (almost) unexercised", kind)
 	}
@@ -167,6 +167,7 @@ func runHealthOracle(t *testing.T, seed int64) {
 	held := map[string]time.Time{}
 	var taskIDs []int64
 	for step := 0; step < 24; step++ {
+		expiredSet := false
 		offset += time.Duration(2+rng.Intn(9)) * time.Minute
 		now := base.Add(offset)
 		hs := healthOn()
@@ -287,6 +288,18 @@ func runHealthOracle(t *testing.T, seed int64) {
 
 		// The same bytes on both sides.
 		require.NoError(t, bs.Close())
+		// An expiring wait is still compared old against new (#14470): the waits above last hours so none expires on its own while the test runs (#14395), so on every fifth step the oldest active wait's
+		// expiry is set to a fixed moment in the past, in the database both sides copy: both sweep it as expired, whatever the real time of each run. No rng draw, so every seed is the same run.
+		if step%5 == 4 {
+			db, err := sql.Open("sqlite", pathA)
+			require.NoError(t, err)
+			res, err := db.Exec(`UPDATE board_waits SET expires_at = '2000-01-01T00:00:00Z' WHERE id = (SELECT MIN(id) FROM board_waits WHERE status = 'active')`)
+			require.NoError(t, err)
+			n, _ := res.RowsAffected()
+			healthAdd("expired wait", int(n))
+			expiredSet = n > 0
+			require.NoError(t, db.Close())
+		}
 		copyHealthBoard(t, pathA, pathB)
 		var sent [2][]string
 		var failed [2]int
@@ -328,6 +341,10 @@ func runHealthOracle(t *testing.T, seed int64) {
 		require.Equal(t, failed[0], failed[1], "step %d: the failed deliveries", step)
 		before := dumpHealthBoard(t, pathA)
 		require.Equal(t, before, dumpHealthBoard(t, pathB), "step %d: the databases after the run", step)
+		if step%5 == 4 && expiredSet {
+			require.Contains(t, strings.Join(dumpHealthBoard(t, pathB), "\n"), "board_waits id=", "step %d: the waits are in the dump", step)
+			healthAdd("expired wait swept", strings.Count(strings.Join(dumpHealthBoard(t, pathB), "\n"), "status=expired"))
+		}
 		for _, k := range sent[1] {
 			for kind, key := range map[string]string{"claim nudge": "|health-claim:", "status nudge": "|health-status:", "mention renudge": "|health-mention:"} {
 				if strings.Contains(k, key) {
