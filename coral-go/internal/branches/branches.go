@@ -33,6 +33,7 @@ const (
 	refreshEvery   = time.Minute      // a repository is read again at most this often
 	askedFor       = 10 * time.Minute // a repository is read only while its tab was read this recently (Security's SHOULD 2 on #272)
 	timedOutPause  = 5 * time.Minute  // a repository whose git timed out is left alone this long
+	kickGap        = 10 * time.Second // a tab that asks for a repository not read yet starts a pass at most this often (Kicks)
 	maxBranchRunes = 80
 )
 
@@ -86,13 +87,15 @@ type Collector struct {
 	counts  map[string]counts // by base tip + branch tip
 	paused  map[string]time.Time
 	asked   map[string]time.Time // canonical agent folders whose tab was read, and when
+	kick    chan struct{}        // a tab asked for a repository that has no picture yet (Kicks)
+	kicked  time.Time            // the last kick, for kickGap
 	now     func() time.Time
 	run     func(ctx context.Context, dir string, args ...string) ([]byte, error)
 }
 
 // New is an empty collector that runs git through gitutil.
 func New() *Collector {
-	return &Collector{repos: map[string]*Repo{}, rootKey: map[string]string{}, counts: map[string]counts{}, paused: map[string]time.Time{}, asked: map[string]time.Time{}, now: time.Now, run: readGit}
+	return &Collector{repos: map[string]*Repo{}, rootKey: map[string]string{}, counts: map[string]counts{}, paused: map[string]time.Time{}, asked: map[string]time.Time{}, kick: make(chan struct{}, 1), now: time.Now, run: readGit}
 }
 
 // errNotRead is a git call this package does not make.
@@ -491,11 +494,29 @@ func (c *Collector) For(dir string) (Repo, int, bool) {
 		}
 	}
 	if bestRepo == nil {
+		c.kickLocked() // nothing read for this folder yet: the poller reads it now rather than at its next pass (up to two minutes away)
 		return Repo{}, -1, false
 	}
 	cp := *bestRepo
 	cp.Worktrees = append([]Worktree(nil), bestRepo.Worktrees...)
 	return cp, best, true
+}
+
+// Kicks fires when a tab asked for a folder the collector has no picture of: the git poller runs a Branches pass then (only Observe reads, and only what is wanted), so the
+// first answer comes in seconds, not at the poller's next pass. A kick is sent at most once per kickGap, and one waiting kick is enough (the channel holds one).
+func (c *Collector) Kicks() <-chan struct{} { return c.kick }
+
+// kickLocked sends a kick unless one was sent within kickGap; c.mu is held.
+func (c *Collector) kickLocked() {
+	now := c.now()
+	if !c.kicked.IsZero() && now.Sub(c.kicked) < kickGap {
+		return
+	}
+	select {
+	case c.kick <- struct{}{}:
+		c.kicked = now
+	default:
+	}
 }
 
 // Holds says worktree i of repo holds dir (another agent's folder), for the tab's agent chips.
