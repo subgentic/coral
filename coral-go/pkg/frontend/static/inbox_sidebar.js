@@ -453,9 +453,9 @@ export function reviewActions(row, inSaved = false) { // inSaved (#11641, #11799
 function openRun(run) { markSeen(run); go(runRoute(run)); }
 /** What a button an agent put on a question may open (#11643): the page runs these only after the server claimed the button and named its stored action. */
 const askRunners = {
-    task: (a, id) => openItemRoute('tasks', a.board, id, `${a.board}#${id}`),
-    goal: (a, id) => go({ ...folderRoute, id: a.board, item: id }),
-    artifact: async (a, hex) => { const { openArtifactViewer } = await importOnce('./artifact_viewer.js'); openArtifactViewer(hex, { server: splitKey(a.board).server, board: splitKey(a.board).name, filename: `File from ${markHidden(a.asker, { strict: true })}` }); },
+    task: (a, id) => { const team = boardTeamKey(a.server, a.board); openItemRoute('tasks', team, id, `${team}#${id}`); }, // the question's own computer (#14396): a bare team name is this one's
+    goal: (a, id) => go({ ...folderRoute, id: boardTeamKey(a.server, a.board), item: id }),
+    artifact: async (a, hex) => { const { openArtifactViewer } = await importOnce('./artifact_viewer.js'); openArtifactViewer(hex, { server: splitKey(boardTeamKey(a.server, a.board)).server, board: splitKey(boardTeamKey(a.server, a.board)).name, filename: `File from ${markHidden(a.asker, { strict: true })}` }); },
 };
 /** A question to the Operator: Answer opens it whole with the reply box (#11417). */
 function askActions(a) {
