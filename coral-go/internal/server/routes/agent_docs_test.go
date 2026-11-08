@@ -283,7 +283,23 @@ func TestHowDoIAnswersContinueAFileAndThePermissionModes(t *testing.T) {
 		assert.Contains(t, text, cli, "Auto says where the CLIs differ")
 	}
 	assert.Contains(t, text, "**Resume in**", "the Resume dialog's mode row is named")
-	assert.GreaterOrEqual(t, strings.Count(text, "On **Antigravity**, **Gemini**, **Pi** and **opencode** it means what Auto means there"), 2, "Bypass permissions and Don't ask say what they mean on the CLIs with no checks")
+	// Bypass permissions and Don't ask say what they mean on the CLIs that differ (the words changed with #14741: agy has its own Auto, so Bypass is the skip flag and Don't ask is Plan there).
+	for _, lead := range []string{"- **Bypass permissions:**", "- **Don't ask:**"} {
+		line := ""
+		for _, l := range strings.Split(text, "\n") {
+			if strings.HasPrefix(l, lead) {
+				line = l
+			}
+		}
+		require.NotEmpty(t, line, lead)
+		named := 0
+		for _, cli := range []string{"**Antigravity**", "**Gemini**", "**Pi**", "**opencode**"} {
+			if strings.Contains(line, cli) {
+				named++
+			}
+		}
+		assert.GreaterOrEqual(t, named, 2, lead+" names at least two of the CLIs it means something different on")
+	}
 	static := filepath.Join("..", "..", "..", "pkg", "frontend")
 	read := func(rel ...string) string {
 		b, err := os.ReadFile(filepath.Join(append([]string{static}, rel...)...))
