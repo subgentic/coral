@@ -25,7 +25,7 @@ const {coralReady}=require('./helpers/wait');
    }
   }
   // Native data paths use explicit inventory ownership, browser filtering and source identities.
-  await Page.addScriptToEvaluateOnNewDocument({source:`(()=>{const real=window.fetch;window.fetch=(u,o)=>new URL(String(u),location.href).pathname==='/api/account'?Promise.resolve(Response.json({tasks_native:true,saved_native:true,inbox_reply:true,saved_expand:true})):real(u,o)})()`});
+  await Page.addScriptToEvaluateOnNewDocument({source:`(()=>{localStorage.setItem('coral-saved-filters',JSON.stringify({team:'@previous/board',kind:'board',sort:'oldest'}));const real=window.fetch;window.fetch=(u,o)=>new URL(String(u),location.href).pathname==='/api/account'?Promise.resolve(Response.json({tasks_native:true,saved_native:true,inbox_reply:true,saved_expand:true})):real(u,o)})()`});
   for(const width of [1280,390,320]){
    await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width!==1280});
    await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await coralReady(ev,'startup','settings');
@@ -57,6 +57,9 @@ const {coralReady}=require('./helpers/wait');
    await waitFor(`document.querySelector('.ibx-reply-status')?.textContent==='Reply refused'`,'authoritative reply refusal is shown');
    assert.equal(await ev(`window.__personalCalls.filter(c=>c.path.endsWith('/reply')).length`),1,'a refused reply is never automatically resent');
    await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.openInboxGroup('saved'))`);
+   const initialSavedFilters=await ev(`import((window.__coralStatic||'/static/')+'saved.js').then(m=>m.savedFiltersNow())`);
+   assert.equal(initialSavedFilters.team,'',width+' Hub Saved ignores the unscoped previous-account Team filter');
+   assert.equal(initialSavedFilters.sort,'newest',width+' Hub Saved ignores the unscoped previous-account sort');
    await waitFor(`import((window.__coralStatic||'/static/')+'saved.js').then(m=>m.savedView().shown.length===2)`,'owned saved sources loaded');
    const before=await ev('window.__personalCalls.length');
    const savedCheck=await ev(`import((window.__coralStatic||'/static/')+'saved.js').then(async m=>{await m.setSavedQuery('private snippet m1');const view=m.savedView(),it=view.shown[0];return {sources:view.shown.map(i=>i.server),capped:view.capped,notice:view.notice,done:await m.savedSetDone(it,true),remove:await m.savedRemove(it)}})`);
@@ -72,6 +75,24 @@ const {coralReady}=require('./helpers/wait');
    assert.ok(calls.every(c=>['m1','m2'].includes(c.server)),'no grantee, unknown or offline personal reads');
    assert.ok(calls.filter(c=>c.path==='/api/saved').every(c=>c.query==='?limit=200'),'only the fixed bounded Saved query is sent');
    assert.ok(calls.every(c=>!c.query.includes('private')&&!c.query.includes('snippet')),'filter canaries never enter GET queries');
+   await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.openInboxGroup('tasks'))`);
+   await waitFor(`document.querySelector('#group-table-view').textContent.includes('Operator m1')`,'owned tasks return for account-change check');
+   await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.setInboxSearch('private task search'))`);
+   await ev(`import((window.__coralStatic||'/static/')+'saved.js').then(async m=>{await m.setSavedFilters({team:'@m1/alpha',kind:'board',sort:'oldest'});await m.setSavedQuery('private saved search')})`);
+   assert.equal(await ev(`localStorage.getItem('coral-saved-filters')`),JSON.stringify({team:'@previous/board',kind:'board',sort:'oldest'}),width+' Hub Saved never reads or writes the shared local filter key');
+   await ev(`import((window.__coralStatic||'/static/')+'local_store.js').then(m=>m.forgetAccountMemory())`);
+   await ev(`import((window.__coralStatic||'/static/')+'state.js').then(({state})=>{state.servers=[];return true})`);
+   const forgotten=await ev(`Promise.all([import((window.__coralStatic||'/static/')+'saved.js'),import((window.__coralStatic||'/static/')+'inbox_sidebar.js')]).then(([s,i])=>({saved:s.savedView(),filters:s.savedFiltersNow(),counts:i.folderSections?.(),search:document.querySelector('#inbox-search')?.value,shared:localStorage.getItem('coral-saved-filters')}))`);
+   assert.equal(forgotten.saved.query,'',width+' account change clears Saved query');
+   assert.equal(forgotten.filters.team,'',width+' account change clears Saved Team filter');
+   assert.equal(forgotten.filters.kind,'',width+' account change clears Saved kind filter');
+   assert.equal(forgotten.filters.sort,'newest',width+' account change restores Saved default sort');
+   assert.deepEqual(forgotten.saved.shown,[],width+' account change clears Saved rows');
+   assert.equal(forgotten.search,'',width+' account change clears the visible Saved search');
+   assert.equal(forgotten.shared,JSON.stringify({team:'@previous/board',kind:'board',sort:'oldest'}),width+' Hub filters do not change shared local storage');
+   await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.openInboxGroup('tasks'))`);
+   assert.equal(await ev(`document.querySelector('#inbox-search')?.value`),'',width+' reopening Tasks uses an empty search after account change');
+   assert.equal(await ev(`document.querySelector('#group-table-view').textContent.includes('Operator m1')`),false,width+' reopened Tasks contain no previous-account rows');
   }
  }finally{await client.close();}
 })().catch(error=>{console.error(error);process.exitCode=1});

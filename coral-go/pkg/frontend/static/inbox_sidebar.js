@@ -151,7 +151,6 @@ const GROUPS = nativeInbox() ? [{ key: 'needs', label: 'Needs you', ...(nativeNe
 const GROUP_KEY = 'coral.inbox.tab'; // the group last on screen, kept in this browser
 let tasks = [];
 let taskPending = null;
-onAccountForgotten(() => { tasks = []; });
 /** A folder's name and its search words: the groups above, or a chat folder (its title comes from the chat folders' own list). */
 const groupMeta = key => GROUPS.find(g => g.key === key) || (CH.CHAT_KEY.test(key) && CH.chatFolder(key) ? { key, label: CH.chatFolder(key).title, search: CH.searchWords(key), short: 'Search' } : null);
 const DEFAULT_GROUP = nativeInbox() ? 'chats' : 'needs';
@@ -607,6 +606,17 @@ const taskMatches = t => serverMatches(t, taskFilters) && (!queries.tasks || tas
     && (!taskFilters.priority || t.priority === taskFilters.priority)
     && (!taskFilters.from || Date.parse(t.updated_at || t.created_at) >= new Date(taskFilters.from + 'T00:00:00').getTime());
 const taskRows = () => tasks.filter(t => (!isCloud() || personalInboxAllowed(t.server)) && taskMatches(t) && (taskState === 'all' || stateOf(t) === taskState)).sort((a, b) => (RANK[a.priority] ?? 3) - (RANK[b.priority] ?? 3));
+onAccountForgotten(() => {
+    tasks = [];
+    taskFilters = { ...TF.EMPTY };
+    taskState = 'all';
+    queries.tasks = '';
+    queries.saved = '';
+    inboxTasksState.selected.clear();
+    const input = $('inbox-search');
+    if (input && (group === 'tasks' || group === 'saved')) input.value = '';
+    if (!$('inbox-local')?.hidden) renderInboxNav(true);
+});
 function inboxTaskToolbar() {
     if (!taskBar) {
         taskBar = TV.tasksToolbar('mine', next => {

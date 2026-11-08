@@ -29,13 +29,16 @@ let down = []; // the registered servers that did not answer the last read: {id,
 let multi = false; // more than one server answered: each item names its server
 const checks = new Map(); // item (uid) -> { state: 'live' | 'ended' | 'board' | 'gone' | 'noopen', why }
 // The search and filters (#4778): the server matches (q, kind, conv, order), so a search covers every saved message, not just the ones shown.
-let filters = loadSavedFilters();
-const setFilters = next => { filters = next; saveSavedFilters(filters); };
+// Native Hub Saved is account-owned state. Keep its filters only in memory so a shared browser
+// never carries one account's team/search choices into the next account.
+const accountScopedSaved = () => isCloud() && nativeSaved();
+let filters = accountScopedSaved() ? { ...cleanSaved({}) } : loadSavedFilters();
+const setFilters = next => { filters = next; if (!accountScopedSaved()) saveSavedFilters(filters); };
 let bar = null;
 let totals = { open: 0, done: 0 };
 let loadSeq = 0; // the read in flight that was asked for last: an answer that comes after a newer ask is dropped, so a slow read of an old filter never overwrites the list of the newer one (#7945)
 let scope = ALL; // where the panel was opened from (#4792): the agent or the team on screen, or everything; the server matches it, and the counts are its own
-onAccountForgotten(() => { ++loadSeq; items = []; sourceItems = []; down = []; capped = false; checks.clear(); convTitles.clear(); totals = { open: 0, done: 0 }; });
+onAccountForgotten(() => { ++loadSeq; items = []; sourceItems = []; down = []; capped = false; checks.clear(); convTitles.clear(); totals = { open: 0, done: 0 }; if (accountScopedSaved()) { filters = { ...cleanSaved({}) }; tab = 'open'; } });
 const convTitles = new Map(); // conversation reference -> its title, from every list read: the Conversation filter's options (they must outlast a filter that leaves one)
 /** An item's identity across servers: ids are each server's own. */
 const uid = it => `${it.server}:${it.id}`;
