@@ -251,6 +251,7 @@ func parsePromptScreenRaw(capture string) (promptScreen, bool) {
 	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
 		lines = lines[:len(lines)-1]
 	}
+	steadyClaudeTimer(lines) // Claude's own countdown line is steady text here (#14581)
 	// The option list ends within a few lines of the bottom (a footer such
 	// as "Enter to select · Esc to cancel" may follow it).
 	end := -1
@@ -537,6 +538,29 @@ func promptContext(lines []string, questionAt int) string {
 // commandMaxLines bounds the walk up from the question for a permission prompt's command block.
 const commandMaxLines = 400
 
+// claudeTimerRe is Claude Code's own auto-block timer line in its permission dialog ("⚠ Claude Code will automatically block this request in 1:19, to avoid holding up an unattended session"). It counts down on the
+// terminal; read as part of the request it froze on the card at the second it was read and made the ask's identity (AskID) change every second, so the person's own answer was refused as 'another ask is open' (#14581, Beta
+// run 3). Here the time is replaced by fixed words, in the one place every reader of a screen goes through (the card, the row, the answer, auto-accept); the terminal still shows the real countdown. It is Claude's WHOLE line, and
+// is looked for only BELOW the last dashed rule (Claude's own lines under the request, then the question): the command block above it is never touched, so a command that contains the phrase is shown as it is (Security's SHOULD).
+var claudeTimerRe = regexp.MustCompile(`^(\s*[⚠│|]?\s*Claude Code will automatically block this request )in \d{1,2}:\d{2}(, to avoid holding up an unattended session\s*)$`)
+
+// steadyClaudeTimer replaces the time in Claude's auto-block line, below the last dashed rule only.
+func steadyClaudeTimer(lines []string) {
+	last := -1
+	for i := len(lines) - 1; i >= 0 && i >= len(lines)-40; i-- {
+		if dashedRuleRe.MatchString(lines[i]) {
+			last = i
+			break
+		}
+	}
+	if last < 0 {
+		return
+	}
+	for i := last + 1; i < len(lines); i++ {
+		lines[i] = claudeTimerRe.ReplaceAllString(lines[i], "${1}after a timer of its own${2}")
+	}
+}
+
 var dashedRuleRe = regexp.MustCompile(`^\s*[╌┄]{8,}\s*$`)
 
 // promptCommand is the whole request Claude draws between its two dashed rules just above a permission question (a Bash command, an edit's diff), so a card and a row can show all of it and not the last three lines
@@ -721,6 +745,49 @@ const (
 	deepPromptCaptureLines = commandMaxLines + 60
 )
 
+// deepMissCache remembers, for deepMissTTL, a first-read screen (by session and text) whose deeper read still showed no opening rule: the prompt polls run every few dozen milliseconds, and a request that was never
+// shown whole must not cost a 460-line capture each time. The first screen changing (another request, a redraw) is another key, so it is read deep again at once; the entries are few (at most deepMissMax) and expire.
+type deepMissCache struct {
+	mu   sync.Mutex
+	seen map[string]time.Time
+}
+
+const deepMissMax = 256
+
+var (
+	deepMissTTL = 5 * time.Second
+	deepMissNow = time.Now
+)
+
+func deepMissKey(name, text string) string {
+	h := sha256.Sum256([]byte(name + "\x00" + text))
+	return hex.EncodeToString(h[:16])
+}
+
+func (c *deepMissCache) recent(name, text string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	seenAt, ok := c.seen[deepMissKey(name, text)]
+	return ok && deepMissNow().Sub(seenAt) < deepMissTTL
+}
+
+func (c *deepMissCache) note(name, text string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	now := deepMissNow()
+	if c.seen == nil || len(c.seen) >= deepMissMax {
+		for k, seenAt := range c.seen { // drop what expired; start over when still full
+			if now.Sub(seenAt) >= deepMissTTL {
+				delete(c.seen, k)
+			}
+		}
+		if c.seen == nil || len(c.seen) >= deepMissMax {
+			c.seen = map[string]time.Time{}
+		}
+	}
+	c.seen[deepMissKey(name, text)] = now
+}
+
 // screenRows is a screen's rows as compared: each row without its trailing spaces and carriage return, the trailing blank rows dropped.
 func screenRows(text string) []string {
 	rows := strings.Split(strings.ReplaceAll(text, "\r", ""), "\n")
@@ -778,11 +845,16 @@ func (h *SessionsHandler) readPromptScreenText(ctx context.Context, name, agentT
 		// The closing rule of a request is there and its opening rule is not: the history above the screen may hold it (#14575). tmux gives it as the pane's history; the PTY backend as the scrolled-off rows of its replay
 		// ring (CaptureOutput, vtscreen.RenderScrollback), though its first read above is only the screen's rows. Read deeper once; the same parse and the same checks judge what is found, and a request whose top is still
 		// not there stays Reject only. The deeper text replaces the first only when it shows the request whole, so every caller (the row, the card, the answer) sees the same screen.
-		if deep, derr := h.terminal.CaptureOutput(ctx, name, deepPromptCaptureLines, agentType, sessionID); derr == nil {
-			// Bound to the first read (Security's MUST on the PTY, #14575): on a PTY the first read is the live screen and the deeper one a replay of a clipped ring, which can draw an older frame or miss rows; on tmux both
-			// are one pane. The deeper text is taken only when it ENDS with every row of the first read, so it can only add what is above it (the top of the same request); anything else keeps the first read, Reject only.
-			if ds, dok := parseAgentScreen(agentType, deep); dok && !ds.commandOpenMissing && deepExtendsFirst(text, deep) && sameQuestion(s, ds) {
-				s, text = ds, deep
+		if !h.deepMiss.recent(name, text) { // a screen the deeper read already missed is not read deep again at every poll (Security's SHOULD, #14581)
+			if deep, derr := h.terminal.CaptureOutput(ctx, name, deepPromptCaptureLines, agentType, sessionID); derr == nil {
+				// Bound to the first read (Security's MUST on the PTY, #14575): on a PTY the first read is the live screen and the deeper one a replay of a clipped ring, which can draw an older frame or miss rows; on tmux both
+				// are one pane. The deeper text is taken only when it ENDS with every row of the first read, so it can only add what is above it (the top of the same request); anything else keeps the first read, Reject only.
+				ds, dok := parseAgentScreen(agentType, deep)
+				if dok && !ds.commandOpenMissing && deepExtendsFirst(text, deep) && sameQuestion(s, ds) {
+					s, text = ds, deep
+				} else {
+					h.deepMiss.note(name, text) // no top in the deeper read, or it is not the same screen: not read deep again for a few seconds (Security's SHOULD)
+				}
 			}
 		}
 	}
