@@ -123,6 +123,31 @@ const { settle, coralReady } = require('./helpers/wait');
         r = await row();
         assert.ok(r.tops.length === 1 && !r.clipped, 'wide counts: icons alone, one line, nothing clipped: ' + JSON.stringify(r));
         ok('a count that widens the tabs takes the words off: one line, nothing clipped');
+        // coral-hub's UI review of the Branches tab: after a pick from More the focus is on a visible target, the opened panel (named for its tab), never body or the menu
+        // item that went with the menu; Tab and Shift-Tab then move between visible controls. At 1280 and at 390 (phone).
+        const seen = () => ev(`(() => { const a = document.activeElement; if (!a || a === document.body) return { id: 'body' }; const r = a.getBoundingClientRect();
+            return { id: a.id || a.tagName.toLowerCase(), role: a.getAttribute('role') || '', label: a.getAttribute('aria-label') || '', visible: r.width > 0 && r.height > 0 && getComputedStyle(a).visibility !== 'hidden' }; })()`);
+        for (const [w, mobile] of [[1280, false], [390, true]]) {
+            console.log(`${w}: the focus after a pick from More`);
+            await load(w, mobile);
+            await ev(`document.getElementById('agentic-tab-more').focus(); true`);
+            await key('ArrowDown');
+            await waitFor(`!document.getElementById('agentic-more-menu').hidden`, 'the menu opens', 4000);
+            for (let i = 0; i < 6 && !(await ev(`document.activeElement && document.activeElement.dataset.tab === 'branches'`)); i++) await key('ArrowDown');
+            await key('Enter');
+            await waitFor(`document.getElementById('agentic-panel-branches').classList.contains('active')`, 'Enter opens Branches', 4000);
+            const after = await seen();
+            assert.deepEqual([after.id, after.label, after.visible], ['agentic-panel-branches', 'Branches', true], `${w}: the focus is on the Branches panel, named and visible: ` + JSON.stringify(after));
+            await key('Tab');
+            const next = await seen();
+            assert.ok(next.id !== 'body' && next.visible, `${w}: Tab from the panel goes to a visible control: ` + JSON.stringify(next));
+            await ev(`document.getElementById('agentic-panel-branches').focus(); true`);
+            await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers: 8 });
+            await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers: 8 });
+            const prev = await seen();
+            assert.ok(prev.id !== 'body' && prev.visible, `${w}: Shift-Tab from the panel goes to a visible control: ` + JSON.stringify(prev));
+            ok(`${w}: picking Branches puts the focus on its panel; Tab goes to ${next.id}, Shift-Tab to ${prev.id}`);
+        }
         console.log('PASS dock tabs');
     } catch (e) { console.error(e && e.stack || e); process.exitCode = 1; }
     try { await client.close(); } catch (_) {}
