@@ -45,7 +45,7 @@ const trustMenu = po => {
     if (String(no.label || '').trim().toLowerCase() !== TRUST_NO || said(yes) !== TRUST_YES || !/^yes,/i.test(String(yes.label || '').trim())) return null;
     if (!Number.isInteger(Number(no.n)) || !Number.isInteger(Number(yes.n))) return null;
     const folder = typeof po.trust_folder === 'string' ? po.trust_folder : '';
-    return { no, yes, folder: po.trust_offer === true && folder && stepClean(folder) === folder ? folder : '' }; // a folder with a hidden or control character is never offered
+    return { no, yes, why: stepClean(po.trust_why).slice(0, 160), folder: po.trust_offer === true && folder && stepClean(folder) === folder ? folder : '' }; // a folder with a hidden or control character is never offered
 };
 
 // Claude's "Claude wants to use your browser" menu (#14151): the server reads it by structure (browser_menu: the title, then exactly these three rows in this order, one marked, no numbers, no footer). The row takes ONE of
@@ -79,7 +79,7 @@ async function readAsk(s) {
     const browser = browserMenu(po);
     if (browser) return { ask: String(po.ask_id || ''), picks: [browser.notNow], onlyReject, browser: true, question: '' }; // only Not now is a button; Install and Don't ask again are left to Open, and the row says so
     const trust = trustMenu(po);
-    if (trust) return trust.folder ? { ask: String(po.ask_id || ''), picks: [trust.no, trust.yes], onlyReject, trust: { folder: trust.folder, yes: trust.yes } } : { ask: String(po.ask_id || ''), picks: [trust.no], onlyReject, held: true }; // No only, and the row says the rest is left to Open
+    if (trust) return trust.folder ? { ask: String(po.ask_id || ''), picks: [trust.no, trust.yes], onlyReject, trust: { folder: trust.folder, yes: trust.yes } } : { ask: String(po.ask_id || ''), picks: [trust.no], onlyReject, held: true, trustWhy: trust.why }; // No only, and the row says the rest is left to Open
     if (po.unnumbered) return none; // an unnumbered menu that is neither the folder-trust nor the browser menu above: no button on a row (the arrows and Enter go into whatever is on that screen; #14151, UI Reviewer), the row says the rest is Open agent's
     const permission = (po.options || []).some(o => PERMISSION_WORDS.test(String(o.label || ''))); // a permission card: only a plain Yes or No is a button; a question's own choices (Red, Blue) are
     const picks = (po.options || []).filter(o => (o.action || 'select') === 'select' && o.label && Number.isInteger(Number(o.n)) && plainlyOneTime(String(o.label), permission) && (!onlyReject || REJECT_FORM.test(wholeLabel(String(o.label)))));
@@ -185,7 +185,7 @@ const stillArming = b => !!b._armEntry && Date.now() < b._armEntry.at;
 function fill(s, cell, withDismiss = true) {
     const key = askKey(s);
     if (!read.has(key)) read.set(key, readAsk(s).catch(() => ({ ask: '', picks: [], onlyReject: false })));
-    return read.get(key).then(({ ask, picks, onlyReject, held, step, stepFull, question, later, lines, trust, browser, target, targetNote }) => {
+    return read.get(key).then(({ ask, picks, onlyReject, held, trustWhy, step, stepFull, question, later, lines, trust, browser, target, targetNote }) => {
         cell._cmdObserver?.disconnect(); cell._cmdObserver = null; // the earlier block's observer goes with the block (#14173)
         cell.replaceChildren();
         const said = norm => String(norm || '').replace(/[?\s]+$/, '');
@@ -239,7 +239,7 @@ function fill(s, cell, withDismiss = true) {
             cell.append(b);
         }
         gate?.apply();
-        if (held) { const more = document.createElement('span'); more.className = 'inbox-only-reject'; more.textContent = 'More choices: open the agent.'; cell.append(more); } // some of the question's choices are left to Open: said, so these do not read as all of them
+        if (held) { const more = document.createElement('span'); more.className = 'inbox-only-reject'; more.textContent = trustWhy ? `No Yes here: ${trustWhy} Open the agent to answer.` : 'More choices: open the agent.'; cell.append(more); } // some of the question's choices are left to Open: said, so these do not read as all of them
         if (onlyReject) { // said in words, set as text: the full request is under Open
             const note = document.createElement('span');
             note.className = 'inbox-only-reject';

@@ -85,6 +85,8 @@ type promptScreen struct {
 	// only to the person's own dashboard and for a folder Coral may trust (#14110, prompt_trust.go).
 	TrustFolder string `json:"trust_folder,omitempty"`
 	TrustOffer  bool   `json:"trust_offer,omitempty"`
+	// TrustWhy: the plain reason there is no Yes on the folder-trust menu when none is offered (#14572); "" when the offer is made or the menu is another.
+	TrustWhy string `json:"trust_why,omitempty"`
 	// BrowserMenu: Claude's "Claude wants to use your browser" menu, read by structure (prompt_browser.go, #14151): a row may take its "Not now" only.
 	BrowserMenu bool `json:"browser_menu,omitempty"`
 	// Multi: every option has a box (a multi-select question, #5232): a digit toggles the box and nothing is
