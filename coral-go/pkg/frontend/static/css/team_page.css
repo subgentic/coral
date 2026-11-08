@@ -5,8 +5,8 @@
 .team-page-title { margin: 0; font-size: var(--fs-2xl); font-weight: var(--fw-title); line-height: var(--lh-label); overflow-wrap: anywhere; min-width: 0; }
 .team-page-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
 .team-page-machine { font-weight: var(--fw-regular); font-size: var(--fs-lg); color: var(--text-secondary); }
-.team-page-status { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-secondary); }
-.team-page-status:empty { display: none; }
+.team-page-status { flex: 1 1 12rem; min-width: 0; display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-secondary); }
+.team-page-status:empty { display: none; } /* flex 12rem (#14659): a long line ("Waiting for first signal. A signal is an agent's first message.") wraps inside its own box instead of onto a row of its own, so the title is on the same row, at the same top, whatever the read says */
 .team-page-health { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; padding: 4px 0; min-height: 32px; font: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--link-text, var(--accent)); cursor: pointer; text-align: left; }
 .team-page-health[hidden] { display: none; }
 .team-page-health:hover { text-decoration: underline; }
