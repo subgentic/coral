@@ -23,13 +23,15 @@ const { removeBoards } = require('./helpers/board_cleanup');
                     if(window.__probeMode==='hold') return new Promise(resolve=>{window.__trustProbeRelease=()=>resolve(Response.json({checked:true,files:{'.claude/settings.json':false,'.claude/settings.local.json':false,'.mcp.json':false,'.codex/config.toml':false}}));});
                     return json(body);
                 }
-                if (p.pathname === '/api/filesystem/list') { window.__listed = (window.__listed || 0) + 1; return p.searchParams.get('path') === '/home/p/Coral/exists' && !window.__hideExists ? json({ entries: [] }) : json({ error: 'not found' }, 404); }
+                if (p.pathname === '/api/filesystem/list') { window.__listed = (window.__listed || 0) + 1; const q = p.searchParams.get('path') || ''; return ((q === '/home/p/Coral/exists' && !window.__hideExists) || q.startsWith('/home/p/Code/')) ? json({ entries: [] }) : json({ error: 'not found' }, 404); } // the folders the cases call existing (Code/...) are found: Next checks the folder first and goes on only when it is found (#14437, acfb782ec)
                 if (p.pathname === '/api/board/projects') return json([]);
                 return real(u, o); };
             await window.showLaunchModal(); window.hideLaunchModal(); })(); true`);
+        const named = () => ev(`{ const n = document.getElementById('team-board-name'); const want = 'trust-' + (window.__teamLaunches.length + 1); if (n.value !== want) { n.value = want; n.dispatchEvent(new Event('input', { bubbles: true })); } } true`);
         const open = async () => {
             await ev(`window.showLaunchModal(); window._selectLaunchType('team'); true`);
             await waitFor(`!!document.getElementById('launch-step-team') && getComputedStyle(document.getElementById('launch-step-team')).display !== 'none' && document.querySelectorAll('#team-template-select option').length > 1`, 'the team step');
+            await named(); // the team's name first: a folder Coral suggested follows the name (acfb782ec), so the name set after the folder would replace it (#14437)
         };
         const setDir = async (value, suggested) => {
             const before = await ev(`window.__listed || 0`);
@@ -40,7 +42,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         const rowHidden = id => ev(`(document.getElementById(${JSON.stringify(id)}) || document.getElementById('launch-team-trust-line'))?.closest('.sv-row')?.hidden`);
         const visible = id => ev(`{ const r = document.getElementById(${JSON.stringify(id)})?.closest('.sv-row'); !!r && !r.hidden }`);
         const go = async () => {
-            await ev(`{ const n = document.getElementById('team-board-name'); n.value = 'trust-' + (window.__teamLaunches.length + 1); n.dispatchEvent(new Event('input', { bubbles: true })); } true`);
+            await named();
             await ev(`document.querySelector('#launch-team-next').click(); true`);
             await ev(`document.querySelector('#launch-team-next').click(); true`);
             const before = await ev(`window.__teamLaunches.length`);

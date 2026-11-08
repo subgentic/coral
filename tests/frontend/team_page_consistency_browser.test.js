@@ -2,7 +2,7 @@
 // moments as one: while the rollup is fresh and the task rows are the last read, the page says "Updating…" in its reserved slot and its task column is aria-busy, and both are gone when the rows arrive. The board's goals, tasks and status are stubbed in the page. 1280 px, isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { install: installTP, seed, openTeam, scenarios } = require('./helpers/team_page');
+const { install: installTP, seed, openTeam, scenarios, liveWaiting } = require('./helpers/team_page');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
 const TEAM = `qa-consist-${Date.now() % 100000}`;
@@ -26,7 +26,7 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
-        await seed(ev, TEAM); await stub(); await openTeam(ev, waitFor, TEAM); await settle(700);
+        await seed(ev, TEAM); await stub(); await liveWaiting(ev, true); await openTeam(ev, waitFor, TEAM); // the status says Backend Dev needs input: its live row agrees, or the header says "Checking attention status" (42b847cc3, #14437) await settle(700);
         await S.run('a waiting agent is "needs attention", not "All well"', async () => {
             assert.equal(await status(), '1 needs attention', `got ${JSON.stringify(await status())}`);
         });
@@ -39,7 +39,7 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
             await ev(`document.getElementById('team-tab-goals').click(); true`); await settle(300);
         });
         await S.run('with nobody waiting, offline or queued the status is "All well"', async () => {
-            await ev(`window.__avail = 'available'; true`);
+            await ev(`window.__avail = 'available'; true`); await liveWaiting(ev, false); // nobody waits, in the status and in the live row (#14437)
             await ev(`window.dispatchEvent(new Event('focus')); import((window.__coralStatic || '/static/') + 'team_page.js').then(m => m.goTab('goals', {})); true`);
             await waitFor(`document.getElementById('team-page-status').textContent.trim() === '1 needs attention' || true`, 'a pass', 500).catch(() => {});
             await ev(`document.dispatchEvent(new Event('visibilitychange')); true`);
