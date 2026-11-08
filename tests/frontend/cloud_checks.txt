@@ -403,3 +403,5 @@ node inbox_review_legacy_versions.test.mjs
 node codex_mode.test.mjs
 node resume_ended.test.mjs
 node version_skew_reads.test.mjs
+
+node remove_wait_remote_policy.test.mjs
