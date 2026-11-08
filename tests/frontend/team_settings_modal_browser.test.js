@@ -31,7 +31,7 @@ const TEAM = `qa-tsm-${Date.now() % 100000}`;
             await openTeam(ev, waitFor, TEAM); await settle(800);
 
             const tabs = await ev(`window.__tp.allTabs().map(t => window.__tp.tabLabel(t))`);
-            check(`${label}: the team page has no Settings tab (Goals, Agents, Tasks, Artifacts, Knowledge, Board)`, JSON.stringify(tabs) === JSON.stringify(['Goals', 'Agents', 'Tasks', 'Artifacts', 'Knowledge', 'Board']), JSON.stringify(tabs));
+            check(`${label}: the team page has no Settings tab (Goals, Needs you, Agents, Tasks, Artifacts, Knowledge, Board)`, JSON.stringify(tabs) === JSON.stringify(['Goals', 'Needs you', 'Agents', 'Tasks', 'Artifacts', 'Knowledge', 'Board']), JSON.stringify(tabs));
             const btn = await ev(`(() => { const b = document.getElementById('team-page-settings'), a = document.getElementById('team-page-add-agent'), m = document.getElementById('team-page-more'); const vis = e => !!e && e.getClientRects().length > 0; return { settings: vis(b), add: vis(a), more: vis(m), order: vis(b) && vis(a) && vis(m) ? [a, b, m].map(e => Math.round(e.getBoundingClientRect().left)) : null }; })()`);
             if (!mobile) check(`${label}: a Settings button sits beside Add agent and More (Add agent, Settings, More, left to right)`, btn.settings && btn.add && btn.more && btn.order[0] < btn.order[1] && btn.order[1] < btn.order[2], JSON.stringify(btn));
             else check(`${label}: a phone's header has the one More button, and Settings is its menu item`, !btn.settings && btn.more, JSON.stringify(btn));
