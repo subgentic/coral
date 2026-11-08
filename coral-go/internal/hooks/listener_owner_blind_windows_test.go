@@ -71,7 +71,7 @@ func TestAListenerRowTheTableMissesDoesNotMeanNothingIsThere(t *testing.T) {
 }
 
 func TestTheOwnerOfTheAcceptedConnectionIsCheckedLikeAListener(t *testing.T) {
-	stranger := func(uint32) (*windows.SID, string, error) { return nil, `C:	ools\stranger.exe`, nil }
+	stranger := func(uint32) (*windows.SID, string, error) { return mySID(t), `C:\tools\stranger.exe`, nil } // this account, so the image is what is refused
 	var port int
 	// a row naming another pid whose image is not Coral's: refused, with the image's wording
 	host, p := blindRig(t, func(client int) []connRow { return []connRow{serverEnd(port, client, 4321)} }, stranger)
@@ -96,4 +96,27 @@ func TestTheAcceptedConnectionOfThisVeryProcessPassesAndTwoRowsRefuse(t *testing
 	}, func(uint32) (*windows.SID, string, error) { return nil, "", errors.New("unused") })
 	port2 = p2
 	require.Error(t, checkListener(host2, port2), "two owners for one connection: refused")
+}
+
+// The table shows a listener row that passes (this very process, in a test), but the connection made to the port is accepted by another program: the check refuses. A program on 127.0.0.1:<port>
+// takes the connections while Coral holds 0.0.0.0:<port>, and the table can miss its listener row.
+func TestListenerRowsThatPassDoNotHideAnotherProgramThatAcceptsTheConnection(t *testing.T) {
+	stranger := func(uint32) (*windows.SID, string, error) { return mySID(t), `C:\tools\stranger.exe`, nil } // this account, so the image is what is refused
+	var port int
+	host, p := blindRig(t, func(client int) []connRow { return []connRow{serverEnd(port, client, 4321)} }, stranger)
+	port = p
+	listenerPIDs = func(string, int) ([]uint32, error) { return []uint32{uint32(os.Getpid())}, nil } // the row the table shows is this process's, which passes in tests
+	err := checkListener(host, port)
+	var fe *ForeignListenerError
+	require.ErrorAs(t, err, &fe, "%v", err)
+	assert.Equal(t, uint32(4321), fe.PID, "the connection's owner is the one refused")
+	assert.Contains(t, fe.Why, "stranger.exe")
+}
+
+// mySID is this process's own account, for an owner stub whose account passes.
+func mySID(t *testing.T) *windows.SID {
+	t.Helper()
+	u, err := windows.GetCurrentProcessToken().GetTokenUser()
+	require.NoError(t, err)
+	return u.User.Sid
 }

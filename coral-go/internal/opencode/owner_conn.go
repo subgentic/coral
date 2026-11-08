@@ -77,3 +77,14 @@ func serverEndPIDs(out []byte, port, clientPort int) []int {
 	}
 	return pids
 }
+
+// ownerIsChildBeforePassword is the check made just before the real password is sent: the listener rows must all be the child's (listenerIsChild), and on Windows the owner of the server end of a
+// connection made now must be the child as well. The table can show the child's listener row and miss another one in the same read, and a program on 127.0.0.1:<port> takes the connections even when
+// the child holds 0.0.0.0:<port>, so on Windows rows that are all the child's are not enough by themselves.
+func ownerIsChildBeforePassword(ctx context.Context, port, child int) (bool, error) {
+	owned, err := listenerIsChild(ctx, port, child)
+	if err != nil || !owned || runtime.GOOS != "windows" {
+		return owned, err
+	}
+	return connectionOwnerIsChild(ctx, port, child)
+}

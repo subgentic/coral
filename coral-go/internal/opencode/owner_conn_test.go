@@ -38,6 +38,14 @@ func connOwnerRig(t *testing.T, rows func(port, clientPort int) string) (port in
 	t.Cleanup(func() { netstatTable, isDescendantOf, connReadWindow, connReadGap = oldTable, oldDesc, oldWin, oldGap })
 	var client int
 	netstatTable = func(ctx context.Context) ([]byte, error) {
+		// the newest connection's client port: each check dials its own connection, so a second check in one test has a new one (until it arrives, the table shows the last)
+		for drained := false; !drained; {
+			select {
+			case client = <-clientPorts:
+			default:
+				drained = true
+			}
+		}
 		if client == 0 {
 			select {
 			case client = <-clientPorts:
@@ -96,4 +104,32 @@ func TestWithNoListenerRowTheConnectionDecides(t *testing.T) {
 	owned, err = listenerIsChild(context.Background(), port, child+1)
 	require.NoError(t, err)
 	assert.False(t, owned)
+}
+
+// The table shows the child's listener row, and only that one, but the connection made to the port is accepted by another process (a program on 127.0.0.1:<port> takes the connections while the child
+// holds 0.0.0.0:<port>, and the table missed the other listener's row): the check before the password refuses.
+func TestListenerRowsThatAreAllTheChildsDoNotPassWhenTheConnectionIsAnothersBeforeThePassword(t *testing.T) {
+	const child, stranger = 4242, 7777
+	port, _ := connOwnerRig(t, func(port, client int) string {
+		return fmt.Sprintf("  TCP    0.0.0.0:%d    0.0.0.0:0    LISTENING    %d\n  TCP    127.0.0.1:%d    127.0.0.1:%d    ESTABLISHED    %d\n", port, child, port, client, stranger)
+	})
+	isDescendantOf = func(_ context.Context, pid, c int) bool { return pid == c }
+	owned, err := listenerIsChild(context.Background(), port, child)
+	require.NoError(t, err)
+	assert.True(t, owned, "the rows the table shows are all the child's")
+	owned, err = ownerIsChildBeforePassword(context.Background(), port, child)
+	require.NoError(t, err)
+	assert.False(t, owned, "but the connection is another process's: no password")
+}
+
+// And when the connection is the child's too, the check before the password passes.
+func TestListenerRowsAndTheConnectionBothTheChildsPassBeforeThePassword(t *testing.T) {
+	const child = 4242
+	port, _ := connOwnerRig(t, func(port, client int) string {
+		return fmt.Sprintf("  TCP    0.0.0.0:%d    0.0.0.0:0    LISTENING    %d\n  TCP    127.0.0.1:%d    127.0.0.1:%d    ESTABLISHED    %d\n", port, child, port, client, child)
+	})
+	isDescendantOf = func(_ context.Context, pid, c int) bool { return pid == c }
+	owned, err := ownerIsChildBeforePassword(context.Background(), port, child)
+	require.NoError(t, err)
+	assert.True(t, owned)
 }

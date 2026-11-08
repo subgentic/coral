@@ -418,8 +418,8 @@ func startOn(ctx context.Context, cfg Config, version Version, dir string, port 
 			if !owned {
 				return fail(errors.New("opencode: the listener on this port is not the server that was started"))
 			}
-			// Once more just before the password goes: who owns the port is read again, so the answer is not older than the send.
-			owned, oerr = listenerIsChild(ctx, port, s.cmd.Process.Pid)
+			// Once more just before the password goes: who owns the port is read again, so the answer is not older than the send, and on Windows the owner of a connection made now must be the child too.
+			owned, oerr = ownerIsChildBeforePassword(ctx, port, s.cmd.Process.Pid)
 			if oerr != nil {
 				return fail(fmt.Errorf("opencode: could not tell who listens on the server's port, so the password is not sent: %w", oerr))
 			}

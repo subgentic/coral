@@ -56,17 +56,18 @@ func checkListener(host string, port int) error {
 	if err != nil {
 		return fmt.Errorf("coral: can't list what listens on port %d to check it is Coral: %w", port, err)
 	}
-	if len(pids) == 0 {
-		// The listener table can miss a listener that is there (it showed a new one's row about three times in twenty): a missing row is not "nothing is there". Where the connection is accepted anyway, the
-		// owner of its server end is checked like a listener's; where it is not, there is nothing and the connection fails by itself.
-		pid, connected, cerr := connectionOwnerPID(host, port)
-		if !connected {
-			return nil
-		}
+	// The listener table can miss a listener that is there (it showed a new one's row about three times in twenty), so a missing row is not "nothing is there", and rows that pass are not the whole
+	// answer either: a program on 127.0.0.1:<port> takes the connections even when Coral holds 0.0.0.0:<port>, and the table may have missed its row. So the tool connects every time (about a
+	// millisecond), and the owner of the server end of that connection is checked like a listener's. Where nothing accepts the connection and no listener row shows, there is nothing there.
+	pid, connected, cerr := connectionOwnerPID(host, port)
+	if !connected && len(pids) == 0 {
+		return nil
+	}
+	if connected {
 		if cerr != nil {
 			return &ForeignListenerError{Port: port, Why: fmt.Sprintf("Coral couldn't check who runs the program on that port: %v. Check what is listening on port %d, or start Coral.", cerr, port)}
 		}
-		pids = []uint32{pid}
+		pids = append(pids, pid)
 	}
 	self := uint32(os.Getpid())
 	for _, pid := range pids {
