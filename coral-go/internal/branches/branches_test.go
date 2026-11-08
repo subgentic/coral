@@ -110,7 +110,7 @@ func TestAWorktreeBeyondTheCapIsCountedNotDropped(t *testing.T) {
 // Security's MUST 2: a branch name that cleaning would change is not shown as a look-alike.
 func TestABranchNameWithAHiddenCharacterIsNotShown(t *testing.T) {
 	trees := parseWorktrees([]byte("worktree /r\x00HEAD 0123456789012345678901234567890123456789\x00branch refs/heads/main\x00\x00" +
-		"worktree /r/w\x00HEAD 0123456789012345678901234567890123456789\x00branch refs/heads/ma‮in\x00\x00" +
+		"worktree /r/w\x00HEAD 0123456789012345678901234567890123456789\x00branch refs/heads/ma\u202ein\x00\x00" +
 		"worktree /r/b\x00bare\x00\x00"))
 	require.Len(t, trees, 2, "a bare entry is not a worktree")
 	assert.Equal(t, "main", trees[0].Branch)
