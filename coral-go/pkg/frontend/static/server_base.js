@@ -466,6 +466,7 @@ export function decisionNeedsPerson(server) {
 // Explicit account booleans override the existing boot choices independently.
 // Missing/malformed fields and failed reads retain boot behavior for older Hubs.
 // Startup bounds this shared cached read; the Hub still authorizes every write.
+let _tasksNative = false, _savedNative = false, _inboxReply = false, _savedExpand = false;
 let _needsNative = null, _goalPreview = null, _commentWrites = null, _commentSend = null, _accountFlagsInit = null;
 export function initCloudAccountFlags() {
     if (!isCloud()) return Promise.resolve();
@@ -477,6 +478,10 @@ export function initCloudAccountFlags() {
                 new Promise(resolve => { timer = setTimeout(() => resolve(null), 4000); }),
             ]);
             _needsNative = typeof account?.needs_native === 'boolean' ? account.needs_native : null;
+            _tasksNative = account?.tasks_native === true;
+            _savedNative = account?.saved_native === true;
+            _inboxReply = account?.inbox_reply === true;
+            _savedExpand = account?.saved_expand === true;
             _goalPreview = typeof account?.goal_preview === 'boolean' ? account.goal_preview : null;
             _commentWrites = typeof account?.comment_writes === 'boolean' ? account.comment_writes : null; // the Hub routes comment writes to the computer (#14549); absent: not offered, as before
             _commentSend = typeof account?.comment_send === 'boolean' ? account.comment_send : null; // the Hub routes the lock and the send to an agent (#14549)
@@ -508,6 +513,12 @@ export function goalPreviewOn() {
 export function nativeInbox() {
     return isCloud() && bootConfig().inbox === 'native';
 }
+
+/** Independent account-only migrations: missing or malformed flags always keep Hub frames. */
+export const nativeTasks = () => nativeInbox() && _tasksNative;
+export const nativeSaved = () => nativeInbox() && _savedNative;
+export const inboxReplyOn = () => !isCloud() || _inboxReply;
+export const savedExpandOn = () => !isCloud() || _savedExpand;
 
 /** Native Needs you requires native Inbox; an account boolean wins, otherwise boot decides. */
 export function nativeNeeds() {

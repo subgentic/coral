@@ -26,7 +26,7 @@ import { go, note, backIs, currentRoute } from './nav.js';
 import { unreadReviewCount, reviewAttentionCount } from './ask_filter.js'; // the files waiting: the full read's once it has run, else what the computers counted (#13172)
 
 import { build, keyRoute, parse as parseRoute, inboxFolderPath, BOARDS_FOLDER, BOARDS_SUB } from './routes.js';
-import { serverFetch, sessionServer, normServer, boardTeamKey, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox, nativeNeeds, decisionNeedsPerson, LOCAL_SERVER, serverUrl, isCloud } from './server_base.js';
+import { serverFetch, sessionServer, normServer, boardTeamKey, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox, nativeNeeds, nativeTasks, nativeSaved, decisionNeedsPerson, LOCAL_SERVER, serverUrl, isCloud } from './server_base.js';
 import { teamLabel, serverLabel } from './server_status.js';
 import { showView, showToast, OPERATOR_ID, versionLineOf } from './utils.js';
 import { registerActions, textOf } from './actions.js';
@@ -138,8 +138,8 @@ const $ = id => document.getElementById(id);
 /** The Hub-served dashboard's own Inbox (Goal #100, nativeInbox()): Needs you, Tasks and Saved are the Hub's own pages, drawn in the centre in a frame at the constant addresses below (the addresses coral-hub gave on the board, Oct 27);
  *  the chat folders are native, and so are Goals (GET /api/goals, a View route of every online computer) and Artifacts (GET /api/team-artifacts: a View route the Hub answers owner_only for a grantee, who then has no Artifacts folder, #11071). */
 const HUB_FRAMES = { needs: '/inbox/hub/needs', tasks: '/inbox/hub/tasks', saved: '/inbox/hub/saved' };
-const hubFrame = key => (nativeInbox() && HUB_FRAMES[key] && !(key === 'needs' && nativeNeeds()) ? HUB_FRAMES[key] : ''); // a Hub page's address, or '' when the folder is Coral's own (Needs you with the Hub's `needs: 'native'`, #13446)
-const GROUPS = nativeInbox() ? [{ key: 'needs', label: 'Needs you', ...(nativeNeeds() ? {} : { frame: HUB_FRAMES.needs }) }, { key: 'tasks', label: 'Tasks', frame: HUB_FRAMES.tasks }, { key: 'goals', label: 'Goals' }, { key: 'artifacts', label: 'Artifacts' }, { key: 'saved', label: 'Saved', frame: HUB_FRAMES.saved }].map(g => ({ ...g, search: g.frame ? 'Search the Inbox' : g.key === 'needs' ? 'Search needs you' : g.key === 'goals' ? 'Search goals' : 'Search artifacts', short: 'Search' })) : [
+const hubFrame = key => (nativeInbox() && HUB_FRAMES[key] && !((key === 'needs' && nativeNeeds()) || (key === 'tasks' && nativeTasks()) || (key === 'saved' && nativeSaved())) ? HUB_FRAMES[key] : ''); // a Hub page's address, or '' when the folder is Coral's own (Needs you with the Hub's `needs: 'native'`, #13446)
+const GROUPS = nativeInbox() ? [{ key: 'needs', label: 'Needs you', ...(nativeNeeds() ? {} : { frame: HUB_FRAMES.needs }) }, { key: 'tasks', label: 'Tasks', ...(nativeTasks() ? {} : { frame: HUB_FRAMES.tasks }) }, { key: 'goals', label: 'Goals' }, { key: 'artifacts', label: 'Artifacts' }, { key: 'saved', label: 'Saved', ...(nativeSaved() ? {} : { frame: HUB_FRAMES.saved }) }].map(g => ({ ...g, search: g.frame ? 'Search the Inbox' : g.key === 'needs' ? 'Search needs you' : g.key === 'goals' ? 'Search goals' : g.key === 'tasks' ? 'Search tasks' : g.key === 'saved' ? 'Search saved messages' : 'Search artifacts', short: 'Search' })) : [
     { key: 'needs', label: 'Needs you', search: 'Search needs you', short: 'Search' },
     { key: 'tasks', label: 'Tasks', search: 'Search tasks', short: 'Search' },
     { key: 'goals', label: 'Goals', search: 'Search goals', short: 'Search' }, // the open goals of every team the person runs (GET /api/goals): the team page's goal row plus a Team column (#7776)
@@ -1012,7 +1012,7 @@ function savedListSpec(where = '') {
                 { key: 'saved', label: 'Saved', tone: 'tertiary', align: 'end', line: 1, tiny: true, cell: f => f.saved },
                 ...(rows.some(f => f.state && f.state.toLowerCase() !== v.tab) ? [{ key: 'state', label: 'State', line: 0, cell: f => (f.state ? DT.tag(f.state) : '') }] : []), // the Open and Done filter already says it: a State column that repeats it on every row is drawn only when a row's state is something else (gone)
                 { key: 'action', label: 'Action', hideLabel: true, line: 1, tiny: true, cell: f => {
-                    if (f.gone) return '';
+                    if (f.gone || isCloud()) return '';
                     const b = DT.el('button', 'btn btn-small dt-quiet dt-hover-action', f.done ? 'Reopen' : 'Done'); b.type = 'button'; b.setAttribute('aria-label', `${f.done ? 'Reopen, move back to Open' : 'Mark done'}: ${f.which}`); // drawn on the row's hover and keyboard focus (css); always on a touch screen
                     b.addEventListener('click', async () => { const it = saved.findSavedItem(f.id); if (!it) return; const done = !it.done_at; if (await saved.savedSetDone(it, done)) sayLive(done ? 'Marked done' : 'Moved back to Open'); });
                     return b; } },
@@ -1037,8 +1037,8 @@ async function openDockSavedSheet(id, opener) {
     const cannotOpen = f.gone || f.noopen;
     const actions = [];
     if (!cannotOpen) actions.push({ label: f.open.text, primary: true, ariaLabel: f.open.name, run: () => saved.savedOpen(it) });
-    if (!f.gone) actions.push({ label: f.done ? 'Reopen' : 'Done', ariaLabel: `${f.done ? 'Reopen, move back to Open' : 'Mark done'}: ${f.which}`, run: async () => { const now = saved.findSavedItem(id); if (!now) return; const done = !now.done_at; if (await saved.savedSetDone(now, done)) { sayLive(done ? 'Marked done' : 'Moved back to Open'); back(); } } }); // a phone's rows have no Done button: it is in the item (#9786)
-    actions.push({ label: 'Remove from saved', ariaLabel: `Remove from saved: ${f.which}`, run: async () => { if (await saved.savedRemove(it)) { sayLive('Removed from saved'); back(); } } });
+    if (!f.gone && !isCloud()) actions.push({ label: f.done ? 'Reopen' : 'Done', ariaLabel: `${f.done ? 'Reopen, move back to Open' : 'Mark done'}: ${f.which}`, run: async () => { const now = saved.findSavedItem(id); if (!now) return; const done = !now.done_at; if (await saved.savedSetDone(now, done)) { sayLive(done ? 'Marked done' : 'Moved back to Open'); back(); } } }); // a phone's rows have no Done button: it is in the item (#9786)
+    if (!isCloud()) actions.push({ label: 'Remove from saved', ariaLabel: `Remove from saved: ${f.which}`, run: async () => { if (await saved.savedRemove(it)) { sayLive('Removed from saved'); back(); } } });
     dockSheetId = id;
     openDetailPane({
         key: `saved:${id}`, title: f.title, sub: [f.said ? `Said ${f.said}` : '', `Saved ${f.saved}`, f.state, f.serverName].filter(Boolean).join(' · '),
@@ -1483,7 +1483,7 @@ function openSavedPage(id) {
     });
     wrap.addEventListener('focusout', e => { if (openMore && openMore.wrap === wrap && !wrap.contains(e.relatedTarget)) closeMore(false); }); // Tab out of the menu closes it
     rm.addEventListener('click', async () => { closeMore(false); if (await saved.savedRemove(it)) { sayLive('Removed from saved'); closePage(true); } });
-    menu.append(rm); wrap.append(toggle, menu); bar.append(wrap);
+    menu.append(rm); wrap.append(toggle, menu); if (!isCloud()) bar.append(wrap);
     const open = el('button', 'btn btn-small btn-primary', f.open.text);
     open.type = 'button'; open.setAttribute('aria-label', f.open.name);
     if (f.gone || f.noopen) { open.disabled = true; open.title = f.why; } else open.addEventListener('click', () => saved.savedOpen(it));

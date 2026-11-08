@@ -7,7 +7,7 @@ import { openTask, taskHref } from './task_navigation.js';
 import { cleanArtifactName } from './artifact_names.js';
 import { onAccountForgotten } from './local_store.js';
 import { loadSafeMarkdown } from './vendor_loader.js';
-import { keyLabel, splitKey, pathId, serverFetch, boardFetch, identityKey, noteBoardLabels, isCloud } from './server_base.js';
+import { keyLabel, splitKey, pathId, serverFetch, boardFetch, identityKey, noteBoardLabels, isCloud, savedExpandOn } from './server_base.js';
 import { setInboxCount } from './inbox_tab.js'; // the count on the Tasks tab
 const { mountInbox, clearInboxDrafts, INBOX_CONTRACT } = await importOnce('./inbox_panel.js'); // the component (shared with the hub); this file is the one that is Coral's
 
@@ -124,4 +124,4 @@ function coralInbox() {
 export function refreshTasks() { const i = coralInbox(); if (i) i.refresh(); }
 
 /** The "Read the whole message" control for a saved item, or null. */
-export function savedExpandFor(item, which, mode) { const i = coralInbox(); return i ? i.savedExpand(item, which, mode) : null; }
+export function savedExpandFor(item, which, mode) { if (!savedExpandOn()) return null; const i = coralInbox(); return i ? i.savedExpand(item, which, mode) : null; }
