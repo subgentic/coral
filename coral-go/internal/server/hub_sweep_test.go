@@ -137,7 +137,7 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 	routes.SetHubOwnerLabel(func(context.Context) (string, error) { return sweepOwner, nil })
 	t.Cleanup(func() { routes.SetHubOwnerLabel(nil) })
 	owner := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: sweepOwner}
-	ownerOnly := map[string]bool{"/api/thread": true, "/api/threads": true, "/api/launch-disclosure": true, "/api/artifacts": true, "/api/artifacts/resolve": true, "/api/artifacts/{id}": true, "/api/artifacts/{id}/meta": true, "/api/artifacts/{id}/thumbnail": true, "/api/artifacts/{id}/comments": true, "/api/artifacts/{id}/readers": true,
+	ownerOnly := map[string]bool{"/api/artifacts/{id}/trust-preview": true, "/api/thread": true, "/api/threads": true, "/api/launch-disclosure": true, "/api/artifacts": true, "/api/artifacts/resolve": true, "/api/artifacts/{id}": true, "/api/artifacts/{id}/meta": true, "/api/artifacts/{id}/thumbnail": true, "/api/artifacts/{id}/comments": true, "/api/artifacts/{id}/readers": true,
 		"/api/board/{project}/artifacts": true, "/api/board/{project}/cross-team/settings": true, "/api/session-artifacts": true, "/api/team-artifacts": true, "/api/board/{project}/tasks/{taskID}/artifact-content": true,
 		"/api/saved": true, "/api/saved/{id}/message": true, // saved for later is the owner's alone since #5753
 		"/api/artifacts/{id}/versions": true, "/api/artifacts/series/{series_id}": true, "/api/artifacts/series/{series_id}/versions": true, // the owner's version list and series reads (#11354)
@@ -185,6 +185,9 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		}
 		if f[1] == "/api/artifacts/{id}/readers" { // who can read that artifact (#5577)
 			path = "/api/artifacts/" + artifactHex + "/readers"
+		}
+		if f[1] == "/api/artifacts/{id}/trust-preview" { // the owner's trust record of that artifact (#14730)
+			path = "/api/artifacts/" + artifactHex + "/trust-preview"
 		}
 		if f[1] == "/api/artifacts/{id}/versions" { // the version list of that artifact (#11354)
 			path = "/api/artifacts/" + artifactHex + "/versions"

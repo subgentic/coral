@@ -191,7 +191,7 @@ func TestAllowedIsTheListedDecisionsAndNothingElse(t *testing.T) {
 			t.Errorf("%v allowed", bad)
 		}
 	}
-	if n := len(Routes()); n != 61 { // 61 since generation 6 (#13910, the opened version of a file); 60 since generation 5 (#13834, the done-state of a goal)
+	if n := len(Routes()); n != 63 { // 63 since generation 7 (#14730, the owner turns scripts on and off for one version of an HTML file); 61 since generation 6 (#13910, the opened version of a file); 60 since generation 5 (#13834, the done-state of a goal)
 		t.Errorf("the allowlist has %d routes: a new one needs a reason and a review (Security's tiers, #13694)", n)
 	}
 	first := 0
