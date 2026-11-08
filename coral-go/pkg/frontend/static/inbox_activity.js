@@ -5,7 +5,7 @@
 import { importOnce } from './import_once.js';
 import { requestJson } from './request_json.js';
 import { teamLabel } from './server_status.js';
-const { activityWords, jobRunParts } = await importOnce('./operator_activity_words.js');
+const { activityParts, jobRunParts } = await importOnce('./operator_activity_words.js');
 import { loadStyles } from './lazy_styles.js';
 const DT = await importOnce('./data_table.js');
 const AF = await importOnce('./operator_activity_filters.js'); // lazy, as the sidebar loads it: its failure is retried
@@ -17,8 +17,8 @@ let rows = [], check = null, loaded = false, loading = null, more = false, faile
 const state = DT.tableState();
 let onChange = () => {};
 
-/** The words of what was done. */
-export const actionWord = activityWords;
+/** The row as the one rule says it (#14423): verb, object, detail. */
+export const partsOf = r => activityParts(r, itemWords);
 const KIND_WORD = { file: 'a file', question: 'a question', goal: 'a goal', proposal: 'a proposal', message: 'a message', task: 'a task', agent: 'an agent', chat: 'a chat', run: 'a run', workflow_run: 'a workflow run', job_run: 'an automation run', setting: 'a row in Needs you', goal_request: 'a goal request' };
 /** What it was done to: the item's title when the record kept one (words an agent wrote), else the kind. */
 export const itemWords = r => r.item_kind === 'job_run' ? (r.title && r.title !== '__oneshot__' ? r.title : jobRunParts(r.item_id) ? `Job ${jobRunParts(r.item_id).jobId}` : 'an automation run') : r.title || (r.item_kind === 'agent' && r.item_id ? r.item_id : r.item_kind === 'task' && r.item_id ? `Task #${r.item_id}` : KIND_WORD[r.item_kind]) || 'an item';
@@ -60,7 +60,6 @@ export const total = () => rows.length;
 /** The page's table spec for the sidebar's group table. `open` has { file(row), goal(row), question(row) }: how a row's item opens (the sidebar knows the routes). */
 export function spec(f, open) {
     const list = filtered(f);
-    const displayWords = r => /^(task_|prompt_|wait_)/.test(r.action) || r.action === 'answer' ? actionWord(r) : itemWords(r);
     const opens = r => (r.item_kind === 'job_run' && !!jobRunParts(r.item_id)) || (r.item_kind === 'file' && /^[a-f0-9]{64}$/i.test(r.version || r.item_id || '')) || (r.item_kind === 'agent' && r.item_id && r.action !== 'agents_record') || (['goal', 'question', 'task', 'message', 'workflow_run'].includes(r.item_kind) && /^\d+$/.test(r.item_id)) || (r.item_kind === 'chat' && !!r.item_id);
     return { title: 'Activity', noun: ['action', 'actions'], rows: list,
         empty: { line: !loaded || loading ? 'Reading the record…' : failed ? (denied ? 'Only the account this computer is linked to can see the Activity record.' : 'The record could not be read.') : AF.isFiltered(f) ? 'No action matches the search and filters.' : 'Nothing yet.',
@@ -70,12 +69,12 @@ export function spec(f, open) {
             const wrap = DT.el('div', 'activity-folder');
             const words = checkWords(check);
             if (words) { const n = DT.el('p', `activity-check${check && !check.intact ? ' activity-check-broken' : ''}`, words); n.setAttribute('role', check && !check.intact ? 'alert' : 'status'); wrap.append(n); }
-            const t = DT.dataTable({ label: `Activity, ${list.length}`, rows: list, rowKey: r => r.id, state, decorate: (r, tr) => { if (opens(r)) return; const button = tr.querySelector('button.dt-mail-open'); if (button) { const text = DT.el('span', button.className.replace('dt-primary', '')); text.append(...button.childNodes); button.replaceWith(text); } }, rowName: r => `${itemWords(r)} ${actionWord(r)}`, oneLine: true, resize: true, sortBar: false,
+            const t = DT.dataTable({ label: `Activity, ${list.length}`, rows: list, rowKey: r => r.id, state, decorate: (r, tr) => { if (opens(r)) return; const button = tr.querySelector('button.dt-mail-open'); if (button) { const text = DT.el('span', button.className.replace('dt-primary', '')); text.append(...button.childNodes); button.replaceWith(text); } }, wrapMail: true, rowName: r => { const p = partsOf(r); return `${p.on} ${p.did}${p.detail ? ` \u00b7 ${p.detail}` : ''}`; }, oneLine: true, resize: true, sortBar: false,
                 open: r => { if (!opens(r)) return; if (r.item_kind === 'file' && /^[a-f0-9]{64}$/i.test(r.version || r.item_id || '')) open.file(r); else if (r.item_kind === 'goal') open.goal(r); else if (r.item_kind === 'question' && opens(r)) open.question(r); else if (r.item_kind === 'task' && opens(r)) open.task(r); else if (r.item_kind === 'agent' && opens(r)) open.agent(r); else if (r.item_kind === 'message' && opens(r)) open.message(r); else if (r.item_kind === 'chat' && opens(r)) open.chat(r); else if (r.item_kind === 'workflow_run' && opens(r)) open.workflow(r); else if (r.item_kind === 'job_run' && opens(r)) open.job(r, jobRunParts(r.item_id)); },
-                mail: r => ({ lead: { icon: 'checklist', square: true, name: actionWord(r) }, title: itemWords(r), team: teamOf(r), snippet: '', ask: actionWord(r), time: DT.timeCell(r.at).textContent }),
+                mail: r => { const p = partsOf(r); return { lead: { icon: 'checklist', square: true, name: p.did }, title: p.on, team: teamOf(r), snippet: '', ask: p.detail ? `${p.did} \u00b7 ${p.detail}` : p.did, time: DT.timeCell(r.at).textContent }; },
                 columns: [ // narrowing drops From (62 rem), then Team (52), then When (36), then You did (16): the data table's own thresholds, so the On column (the item) never shrinks (the table rules' R2)
-                    { key: 'action', label: 'You did', sort: true, sortValue: actionWord, line: 2, width: '12rem', dropAt: 16, cell: r => { const w = DT.el('span', 'activity-did', AF.ACTION_LABEL[r.action] || r.action); if (r.note && displayWords(r) === itemWords(r)) w.append(DT.el('span', 'activity-note', ` “${r.note}”`)); return w; } },
-                    { key: 'item', label: 'On', primary: true, width: 'grow', sort: true, sortValue: displayWords, line: 1, cell: r => { const text = displayWords(r), el = opens(r) ? DT.primaryButton(text, `${text}. Open ${itemWords(r)}`) : DT.el('span', 'activity-item', text); DT.tipIf(el, text, () => el.scrollWidth > el.clientWidth); return el; } },
+                    { key: 'action', label: 'You did', sort: true, sortValue: r => partsOf(r).did, line: 2, width: '12rem', dropAt: 16, cell: r => DT.el('span', 'activity-did', partsOf(r).did) },
+                    { key: 'item', label: 'On', primary: true, width: 'grow', sort: true, sortValue: r => partsOf(r).on, line: 1, cell: r => { const p = partsOf(r), el = opens(r) ? DT.primaryButton(p.on, `${p.on}. Open ${itemWords(r)}`) : DT.el('span', 'activity-item', p.on); DT.tipIf(el, p.on, () => el.scrollWidth > el.clientWidth); if (!p.detail) return el; const cell = DT.el('span', 'activity-on'); cell.append(el, DT.el('span', 'activity-detail', p.detail)); return cell; } }, // the detail is its own line under the object, whole (never cut)
                     { key: 'team', label: 'Team', sort: true, sortValue: teamOf, line: 2, width: '9rem', dropAt: 52, cell: teamOf },
                     { key: 'from', label: 'From', sort: true, sortValue: fromWords, line: 2, tone: 'tertiary', width: '11rem', dropAt: 62, cell: fromWords },
                     { key: 'when', label: 'When', sort: 'date', sortValue: r => r.at, firstDir: 'desc', line: 0, tone: 'tertiary', align: 'end', width: '7rem', dropAt: 36, cell: r => DT.timeCell(r.at) },
