@@ -53,22 +53,29 @@ type apiError struct {
 }
 
 func (c *Client) do(req *http.Request, access string, out any) error {
+	_, err := c.doHeader(req, access, out)
+	return err
+}
+
+// doHeader is do, also returning the answer's headers (for Dropbox's Date: stage 4b's clock check).
+func (c *Client) doHeader(req *http.Request, access string, out any) (http.Header, error) {
 	req.Header.Set("Authorization", "Bearer "+access)
 	req.Header.Set("User-Agent", c.userAgent)
 	resp, err := c.hc.Do(req)
 	if err != nil {
-		return fmt.Errorf("could not reach Dropbox: %w", stripURL(err))
+		return nil, fmt.Errorf("could not reach Dropbox: %w", stripURL(err))
 	}
 	defer resp.Body.Close()
+	hdr := resp.Header
 	data, _ := io.ReadAll(io.LimitReader(resp.Body, maxBody))
 	if resp.StatusCode == http.StatusOK {
 		if out == nil {
-			return nil
+			return hdr, nil
 		}
 		if err := json.Unmarshal(data, out); err != nil {
-			return errors.New("Dropbox: an answer Coral does not understand")
+			return hdr, errors.New("Dropbox: an answer Coral does not understand")
 		}
-		return nil
+		return hdr, nil
 	}
 	var e apiError
 	_ = json.Unmarshal(data, &e)
@@ -79,16 +86,16 @@ func (c *Client) do(req *http.Request, access string, out any) error {
 		if n, err := strconv.Atoi(strings.TrimSpace(resp.Header.Get("Retry-After"))); err == nil && n > 0 && n <= 3600 {
 			after = time.Duration(n) * time.Second
 		}
-		return &RateLimited{After: after}
+		return hdr, &RateLimited{After: after}
 	case resp.StatusCode == http.StatusUnauthorized && tag == "expired_access_token":
-		return ErrAccessExpired
+		return hdr, ErrAccessExpired
 	case resp.StatusCode == http.StatusConflict && strings.Contains(e.Summary, "not_found"):
-		return ErrNotFound
+		return hdr, ErrNotFound
 	}
 	if !validTag(tag) {
 		tag = "unknown"
 	}
-	return fmt.Errorf("Dropbox: %d %s", resp.StatusCode, tag)
+	return hdr, fmt.Errorf("Dropbox: %d %s", resp.StatusCode, tag)
 }
 
 func (c *Client) rpc(ctx context.Context, access, endpoint string, arg, out any) error {
@@ -258,14 +265,133 @@ func (c *Client) Metadata(ctx context.Context, access, path string) (Meta, error
 
 // SpaceUsage reads how much of the account is used and how much it has (bytes).
 func (c *Client) SpaceUsage(ctx context.Context, access string) (used, allocated int64, err error) {
+	used, allocated, _, err = c.SpaceUsageAt(ctx, access)
+	return used, allocated, err
+}
+
+// SpaceUsageAt is SpaceUsage with Dropbox's own time, from the answer's Date header (zero when there is none): stage 4b's clock check.
+func (c *Client) SpaceUsageAt(ctx context.Context, access string) (used, allocated int64, at time.Time, err error) {
 	var out struct {
 		Used       int64 `json:"used"`
 		Allocation struct {
 			Allocated int64 `json:"allocated"`
 		} `json:"allocation"`
 	}
-	if err := c.rpc(ctx, access, "users/get_space_usage", nil, &out); err != nil {
-		return 0, 0, err
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.api+"/2/users/get_space_usage", http.NoBody)
+	if err != nil {
+		return 0, 0, time.Time{}, err
 	}
-	return out.Used, out.Allocation.Allocated, nil
+	hdr, err := c.doHeader(req, access, &out)
+	if err != nil {
+		return 0, 0, time.Time{}, err
+	}
+	if d, perr := http.ParseTime(hdr.Get("Date")); perr == nil {
+		at = d
+	}
+	return out.Used, out.Allocation.Allocated, at, nil
+}
+
+// Delete is one file for DeleteBatch: its path, and the rev it must still have (parent_rev), so a file changed in Dropbox since Coral stored it is
+// refused by Dropbox itself (stage 4b, Security's answer 1 on #14703: by path, never by id).
+type Delete struct {
+	Path string
+	Rev  string
+}
+
+// DeleteOutcome is how one delete of a batch ended.
+type DeleteOutcome int
+
+// Delete outcomes.
+const (
+	DeleteOK       DeleteOutcome = iota + 1
+	DeleteNotFound               // nothing at that path any more (moved, renamed or removed in Dropbox): left alone
+	DeleteRetry                  // too many writes, or Dropbox's own trouble: try again later
+	DeleteRefused                // anything else, a rev that no longer matches included: the file is kept and never retried
+)
+
+// DeleteBatch starts deleting files and returns the async job's id when Dropbox answers later, or the outcomes in order when it answered at once.
+func (c *Client) DeleteBatch(ctx context.Context, access string, dels []Delete) (job string, res []DeleteOutcome, err error) {
+	type entry struct {
+		Path      string `json:"path"`
+		ParentRev string `json:"parent_rev"`
+	}
+	arg := struct {
+		Entries []entry `json:"entries"`
+	}{}
+	for _, d := range dels {
+		if d.Rev == "" {
+			return "", nil, errors.New("a delete needs the rev Coral stored")
+		}
+		arg.Entries = append(arg.Entries, entry{Path: d.Path, ParentRev: d.Rev})
+	}
+	var out deleteJobAnswer
+	if err := c.rpc(ctx, access, "files/delete_batch", arg, &out); err != nil {
+		return "", nil, err
+	}
+	if out.Tag == "async_job_id" {
+		if out.JobID == "" {
+			return "", nil, errors.New("Dropbox: no delete job id")
+		}
+		return out.JobID, nil, nil
+	}
+	res, err = out.outcomes(len(dels))
+	return "", res, err
+}
+
+// ErrJobUnknown is a delete job Dropbox no longer knows (too old, or not this account's).
+var ErrJobUnknown = errors.New("Dropbox does not know that delete job")
+
+// DeleteBatchCheck reads a delete job once: done false while it is still running, else the outcomes in the order of the batch (n files).
+func (c *Client) DeleteBatchCheck(ctx context.Context, access, job string, n int) (done bool, res []DeleteOutcome, err error) {
+	var out deleteJobAnswer
+	if err := c.rpc(ctx, access, "files/delete_batch/check", map[string]string{"async_job_id": job}, &out); err != nil {
+		if strings.Contains(err.Error(), "invalid_async_job_id") || errors.Is(err, ErrNotFound) {
+			return false, nil, ErrJobUnknown
+		}
+		return false, nil, err
+	}
+	switch out.Tag {
+	case "in_progress":
+		return false, nil, nil
+	case "complete":
+		res, err = out.outcomes(n)
+		return true, res, err
+	default: // failed: the whole job, nothing deleted that Coral can count on; every file is tried again later
+		res = make([]DeleteOutcome, n)
+		for i := range res {
+			res[i] = DeleteRetry
+		}
+		return true, res, nil
+	}
+}
+
+type deleteJobAnswer struct {
+	Tag     string            `json:".tag"`
+	JobID   string            `json:"async_job_id"`
+	Entries []json.RawMessage `json:"entries"`
+}
+
+func (a deleteJobAnswer) outcomes(n int) ([]DeleteOutcome, error) {
+	if a.Tag != "complete" || len(a.Entries) != n {
+		return nil, errors.New("Dropbox: the delete answer does not match the batch")
+	}
+	res := make([]DeleteOutcome, n)
+	for i, raw := range a.Entries {
+		var e struct {
+			Tag     string          `json:".tag"`
+			Failure json.RawMessage `json:"failure"`
+		}
+		_ = json.Unmarshal(raw, &e)
+		switch {
+		case e.Tag == "success":
+			res[i] = DeleteOK
+		case bytes.Contains(e.Failure, []byte(`"too_many_write_operations"`)) || bytes.Contains(e.Failure, []byte(`"internal_error"`)) || bytes.Contains(e.Failure, []byte(`"too_many_files"`)):
+			res[i] = DeleteRetry
+		case bytes.Contains(e.Failure, []byte(`"path_lookup"`)) && bytes.Contains(e.Failure, []byte(`"not_found"`)):
+			res[i] = DeleteNotFound
+		default:
+			res[i] = DeleteRefused // a rev that no longer matches, or anything Coral does not know: keep the file
+		}
+	}
+	return res, nil
 }

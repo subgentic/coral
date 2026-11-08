@@ -585,3 +585,4 @@ b POST /api/dropbox/switch
 b POST /api/dropbox/takeover
 b PUT /api/dropbox/filters
 b POST /api/dropbox/check
+b PUT /api/dropbox/retention

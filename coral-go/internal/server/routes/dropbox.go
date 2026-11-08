@@ -126,6 +126,16 @@ func (h *CloudHandler) DropboxStatus(w http.ResponseWriter, r *http.Request) {
 			out["backup"] = counts // counts and the last sync only: no names or paths
 		}
 	}
+	if days, _, err := d.store.Retention(r.Context()); err == nil {
+		ret := map[string]any{"days": days}
+		if c, err := d.store.Get(r.Context()); err == nil && days > 0 && d.outbox != nil && c.AccountID != "" {
+			if n, err := d.outbox.LedgerSize(r.Context(), c.AccountID); err == nil && n < 4 {
+				// Half the ledger, in whole pairs (a version and its sidecar): retention starts once at least 2 artifacts are backed up (Security's point 7).
+				ret["waiting_for_files"] = true
+			}
+		}
+		out["retention"] = ret
+	}
 	writeJSON(w, http.StatusOK, out)
 }
 
@@ -379,4 +389,65 @@ func (h *CloudHandler) DropboxCheckAgain(w http.ResponseWriter, r *http.Request)
 	}
 	h.dbx.backup.Nudge()
 	writeJSON(w, http.StatusAccepted, map[string]any{"checking": true})
+}
+
+// DropboxSetRetention answers PUT /api/dropbox/retention (stage 4b, #14703): the Operator's "Keep in Dropbox for N days", on this computer only.
+// {days: 0} turns it off. Without confirm it is a dry run: what the next pass would delete at that N, nothing saved. With confirm it is saved, and
+// the audit row records the dry-run count and bytes the page showed (seen_count, seen_bytes: recorded only, never trusted).
+func (h *CloudHandler) DropboxSetRetention(w http.ResponseWriter, r *http.Request) {
+	if h.refuseCloud(w, r, allowDashboard) || !requireJSON(w, r) {
+		return
+	}
+	d := h.dbx
+	if d == nil || d.backup == nil {
+		writeError(w, http.StatusNotFound, "not_available", "Dropbox backup is not available in this build")
+		return
+	}
+	var in struct {
+		Days      int   `json:"days"`
+		Confirm   bool  `json:"confirm"`
+		SeenCount int   `json:"seen_count"`
+		SeenBytes int64 `json:"seen_bytes"`
+	}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<10))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&in); err != nil {
+		errBadRequest(w, "retention is {\"days\": n, \"confirm\": true|false}")
+		return
+	}
+	if in.Days < 0 || in.Days > 3650 {
+		errBadRequest(w, "days is 0 (off) to 3650")
+		return
+	}
+	ctx := r.Context()
+	old, _, err := d.store.Retention(ctx)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "", "could not read the retention setting")
+		return
+	}
+	if in.Days > 0 && !in.Confirm {
+		count, bytes, held, ledger, err := d.backup.RetentionPreview(ctx, in.Days)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "", "could not count what retention would delete")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"dry_run": true, "days": in.Days, "due": count, "bytes": bytes, "held": held, "ledger": ledger})
+		return
+	}
+	if in.Days > 0 {
+		if c, err := d.store.Get(ctx); err != nil || !c.Connected {
+			writeError(w, http.StatusConflict, "not_connected", "Connect Dropbox first")
+			return
+		}
+	}
+	if err := d.store.SetRetention(ctx, in.Days); err != nil {
+		writeError(w, http.StatusInternalServerError, "", "could not save the retention setting")
+		return
+	}
+	a := store.DropboxAudit{Kind: store.DropboxAuditSetting, Who: "operator", OldDays: old, NewDays: in.Days}
+	if in.Days > 0 {
+		a.Count, a.Bytes = max(in.SeenCount, 0), max(in.SeenBytes, 0)
+	}
+	_ = d.store.AddAudit(ctx, a)
+	writeJSON(w, http.StatusOK, map[string]any{"days": in.Days})
 }

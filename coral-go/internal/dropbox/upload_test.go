@@ -145,3 +145,87 @@ func TestAnExpiredAccessTokenIsToldApart(t *testing.T) {
 	assert.ErrorIs(t, err, ErrAccessExpired)
 	assert.False(t, strings.Contains(err.Error(), "tok-7f3a9c"), "the error never carries the token")
 }
+
+// #14703, Dropbox stage 4b: retention's calls.
+
+func TestDeleteBatchSendsPathAndParentRevAndReadsEachOutcome(t *testing.T) {
+	var got map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/2/files/delete_batch", r.URL.Path)
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&got))
+		w.Write([]byte(`{".tag":"complete","entries":[
+			{".tag":"success","metadata":{".tag":"file"}},
+			{".tag":"failure","failure":{".tag":"path_lookup","path_lookup":{".tag":"not_found"}}},
+			{".tag":"failure","failure":{".tag":"too_many_write_operations"}},
+			{".tag":"failure","failure":{".tag":"path_write","path_write":{".tag":"conflict","conflict":{".tag":"file"}}}},
+			{".tag":"failure","failure":{".tag":"something_new"}}]}`))
+	}))
+	defer srv.Close()
+	job, res, err := newTestClient(t, srv).DeleteBatch(context.Background(), "acc", []Delete{
+		{Path: "/v1/a", Rev: "r1"}, {Path: "/v1/b", Rev: "r1"}, {Path: "/v1/c", Rev: "r1"}, {Path: "/v1/d", Rev: "r1"}, {Path: "/v1/e", Rev: "r1"},
+	})
+	require.NoError(t, err)
+	assert.Empty(t, job)
+	assert.Equal(t, []DeleteOutcome{DeleteOK, DeleteNotFound, DeleteRetry, DeleteRefused, DeleteRefused}, res, "anything unknown keeps the file")
+	e := got["entries"].([]any)[0].(map[string]any)
+	assert.Equal(t, "/v1/a", e["path"], "by path, never by id")
+	assert.Equal(t, "r1", e["parent_rev"])
+
+	_, _, err = newTestClient(t, srv).DeleteBatch(context.Background(), "acc", []Delete{{Path: "/v1/a"}})
+	assert.Error(t, err, "a delete without the stored rev is never sent")
+}
+
+func TestDeleteBatchAsyncJobAndItsCheck(t *testing.T) {
+	polls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/2/files/delete_batch":
+			w.Write([]byte(`{".tag":"async_job_id","async_job_id":"j1"}`))
+		case "/2/files/delete_batch/check":
+			var a map[string]string
+			json.NewDecoder(r.Body).Decode(&a)
+			if a["async_job_id"] != "j1" {
+				w.WriteHeader(http.StatusConflict)
+				w.Write([]byte(`{"error_summary":"invalid_async_job_id/"}`))
+				return
+			}
+			polls++
+			if polls == 1 {
+				w.Write([]byte(`{".tag":"in_progress"}`))
+				return
+			}
+			w.Write([]byte(`{".tag":"complete","entries":[{".tag":"success","metadata":{}}]}`))
+		}
+	}))
+	defer srv.Close()
+	c := newTestClient(t, srv)
+	job, res, err := c.DeleteBatch(context.Background(), "acc", []Delete{{Path: "/v1/a", Rev: "r1"}})
+	require.NoError(t, err)
+	assert.Equal(t, "j1", job)
+	assert.Nil(t, res)
+	done, _, err := c.DeleteBatchCheck(context.Background(), "acc", "j1", 1)
+	require.NoError(t, err)
+	assert.False(t, done)
+	done, res, err = c.DeleteBatchCheck(context.Background(), "acc", "j1", 1)
+	require.NoError(t, err)
+	assert.True(t, done)
+	assert.Equal(t, []DeleteOutcome{DeleteOK}, res)
+	_, _, err = c.DeleteBatchCheck(context.Background(), "acc", "gone", 1)
+	assert.ErrorIs(t, err, ErrJobUnknown)
+	_, _, err = c.DeleteBatchCheck(context.Background(), "acc", "j1", 2)
+	assert.Error(t, err, "an answer that does not match the batch is not applied")
+}
+
+func TestSpaceUsageAtReadsDropboxsClock(t *testing.T) {
+	when := time.Date(2026, 11, 8, 16, 0, 0, 0, time.UTC)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Date", when.Format(http.TimeFormat))
+		w.Write([]byte(`{"used":1,"allocation":{"allocated":2}}`))
+	}))
+	defer srv.Close()
+	used, alloc, at, err := newTestClient(t, srv).SpaceUsageAt(context.Background(), "acc")
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, used)
+	assert.EqualValues(t, 2, alloc)
+	assert.True(t, at.Equal(when), "%v", at)
+}

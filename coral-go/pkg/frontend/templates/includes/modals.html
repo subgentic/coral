@@ -676,6 +676,16 @@
                                         <span class="settings-hint">days (0 for every age)</span>
                                         <button type="button" class="btn btn-small" id="settings-dropbox-filters-save">Save</button>
                                     </fieldset>
+                                    <fieldset class="settings-dropbox-filters">
+                                        <legend>Keep in Dropbox</legend>
+                                        <label for="settings-dropbox-retention-days">Keep files in Dropbox for</label>
+                                        <input type="number" id="settings-dropbox-retention-days" min="0" max="3650" step="1" inputmode="numeric" class="settings-input settings-input-small">
+                                        <span class="settings-hint">days (0 keeps them until you remove them)</span>
+                                        <button type="button" class="btn btn-small" id="settings-dropbox-retention-save">Save</button>
+                                        <button type="button" class="btn btn-small" id="settings-dropbox-retention-on" hidden>Turn on</button>
+                                        <button type="button" class="btn btn-small" id="settings-dropbox-retention-cancel" hidden>Cancel</button>
+                                        <p class="settings-hint">Older files are deleted from Dropbox for every Coral that uses this backup. Copies on this computer are not touched. Dropbox may keep deleted files for a while in its own deleted files and version history, where they can still be read.</p>
+                                    </fieldset>
                                 </div>
                             </section>
                             <div id="settings-worktrees-live">

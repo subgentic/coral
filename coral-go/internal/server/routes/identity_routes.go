@@ -159,6 +159,7 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/dropbox/switch":        "switch the Dropbox account",
 	"POST /api/dropbox/takeover":      "take over the Dropbox backup",
 	"PUT /api/dropbox/filters":        "choose what the Dropbox backup sends",
+	"PUT /api/dropbox/retention":      "choose how long Dropbox keeps backed-up files",
 	"POST /api/dropbox/check":         "ask the Dropbox backup to check for space again",
 	"POST /api/cloud/redeem":          "redeem a Coral Hub credential",
 	"POST /api/cloud/rekey":           "replace the secret key and discard what it sealed", // #3698

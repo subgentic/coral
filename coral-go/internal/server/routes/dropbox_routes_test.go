@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,6 +45,36 @@ type fakeDropbox struct {
 	rateLimitOnce int  // the next upload session start answers 429 with this Retry-After (seconds), once
 	badHash       bool // finish_batch answers success with a content_hash that is not the bytes'
 	srv           *httptest.Server
+	// Stage 4b's delete side.
+	revs        map[string]string   // a path's rev when it is not r1 (an edit in Dropbox)
+	dateOffset  time.Duration       // Dropbox's clock, ahead of this one by this much
+	noDate      bool                // answer get_space_usage with no Date header
+	asyncPolls  int                 // delete_batch answers with a job that is in progress for this many checks
+	jobs        map[string][]string // job id -> "path|parent_rev" of each entry
+	deleteCalls [][]string          // the paths of each delete_batch call
+	checkCalls  int
+}
+
+// applyDeletes deletes each "path|parent_rev" whose rev still matches, as Dropbox does: a missing path is not_found, another rev is refused.
+func (f *fakeDropbox) applyDeletes(keyed []string) []any {
+	var out []any
+	for _, k := range keyed {
+		path, rev, _ := strings.Cut(k, "|")
+		cur := "r1"
+		if r, ok := f.revs[path]; ok {
+			cur = r
+		}
+		switch _, there := f.files[path]; {
+		case !there:
+			out = append(out, map[string]any{".tag": "failure", "failure": map[string]any{".tag": "path_lookup", "path_lookup": map[string]any{".tag": "not_found"}}})
+		case rev != cur:
+			out = append(out, map[string]any{".tag": "failure", "failure": map[string]any{".tag": "path_write", "path_write": map[string]any{".tag": "conflict", "conflict": map[string]any{".tag": "file"}}}})
+		default:
+			delete(f.files, path)
+			out = append(out, map[string]any{".tag": "success", "metadata": map[string]any{".tag": "file", "path_lower": path}})
+		}
+	}
+	return out
 }
 
 func newFakeDropbox(t *testing.T) *fakeDropbox {
@@ -130,7 +161,53 @@ func newFakeDropbox(t *testing.T) *fakeDropbox {
 				return
 			}
 			json.NewEncoder(w).Encode(map[string]any{".tag": "file", "id": "id:" + a["path"], "rev": "r1", "content_hash": dropbox.ContentHash(b)})
+		case "/2/files/delete_batch":
+			var a struct {
+				Entries []struct {
+					Path      string `json:"path"`
+					ParentRev string `json:"parent_rev"`
+				} `json:"entries"`
+			}
+			json.NewDecoder(r.Body).Decode(&a)
+			var paths, keyed []string
+			for _, e := range a.Entries {
+				paths = append(paths, e.Path)
+				keyed = append(keyed, e.Path+"|"+e.ParentRev)
+			}
+			f.deleteCalls = append(f.deleteCalls, paths)
+			if f.asyncPolls > 0 {
+				if f.jobs == nil {
+					f.jobs = map[string][]string{}
+				}
+				id := fmt.Sprintf("job-%d", len(f.deleteCalls))
+				f.jobs[id] = keyed
+				json.NewEncoder(w).Encode(map[string]any{".tag": "async_job_id", "async_job_id": id})
+				return
+			}
+			json.NewEncoder(w).Encode(map[string]any{".tag": "complete", "entries": f.applyDeletes(keyed)})
+		case "/2/files/delete_batch/check":
+			f.checkCalls++
+			var a map[string]string
+			json.NewDecoder(r.Body).Decode(&a)
+			keyed, ok := f.jobs[a["async_job_id"]]
+			if !ok {
+				w.WriteHeader(http.StatusConflict)
+				w.Write([]byte(`{"error_summary":"invalid_async_job_id/"}`))
+				return
+			}
+			if f.asyncPolls > 0 {
+				f.asyncPolls--
+				json.NewEncoder(w).Encode(map[string]any{".tag": "in_progress"})
+				return
+			}
+			delete(f.jobs, a["async_job_id"])
+			json.NewEncoder(w).Encode(map[string]any{".tag": "complete", "entries": f.applyDeletes(keyed)})
 		case "/2/users/get_space_usage":
+			if f.noDate {
+				w.Header()["Date"] = nil // net/http adds a Date unless it is set to nil
+			} else {
+				w.Header().Set("Date", time.Now().Add(f.dateOffset).UTC().Format(http.TimeFormat))
+			}
 			json.NewEncoder(w).Encode(map[string]any{"used": f.used, "allocation": map[string]any{"allocated": f.alloc}})
 		case "/2/auth/token/revoke":
 			if f.onRevoke != nil {
@@ -157,6 +234,7 @@ type dropboxEnv struct {
 	machine string
 	host    string // the Host the dashboard was opened at
 	db      *store.DB
+	body    string // the next call's JSON body ('{}' when empty)
 }
 
 func newDropboxEnv(t *testing.T) *dropboxEnv {
@@ -178,7 +256,11 @@ func newDropboxEnv(t *testing.T) *dropboxEnv {
 
 func (e *dropboxEnv) call(method, path string, dashboard bool, hdr map[string]string) *httptest.ResponseRecorder {
 	e.t.Helper()
-	req := httptest.NewRequest(method, path, strings.NewReader(`{}`))
+	body := `{}`
+	if e.body != "" {
+		body, e.body = e.body, ""
+	}
+	req := httptest.NewRequest(method, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	for k, v := range hdr {
 		req.Header.Set(k, v)
@@ -201,6 +283,8 @@ func (e *dropboxEnv) call(method, path string, dashboard bool, hdr map[string]st
 		e.h.DropboxTakeOver(rec, req)
 	case "/api/dropbox/check":
 		e.h.DropboxCheckAgain(rec, req)
+	case "/api/dropbox/retention":
+		e.h.DropboxSetRetention(rec, req)
 	}
 	return rec
 }

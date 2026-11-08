@@ -103,6 +103,41 @@ func TestARekeyDiscardsTheDropboxTokenAndKeepsTheServerID(t *testing.T) {
 	c, err := ds.Get(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, DropboxStateReconnect, c.State, "the settings page asks to connect again")
+	days, _, err := ds.Retention(ctx)
+	require.NoError(t, err)
+	assert.Zero(t, days)
+}
+
+// Stage 4b (#14703): a re-key turns retention off with the token (it is set before the re-key in this test).
+func TestARekeyTurnsRetentionOff(t *testing.T) {
+	rs, db, dir, _ := newRemoteStore(t)
+	ds := NewDropboxStore(db, rs)
+	ctx := context.Background()
+	require.NoError(t, ds.Save(ctx, "dbid:AAA", fakeRefresh, "fp"))
+	require.NoError(t, ds.SetRetention(ctx, 9))
+	require.NoError(t, os.Chmod(secretbox.KeyFilePath(dir), 0o644))
+	require.NoError(t, rs.Rekey(ctx))
+	days, _, err := ds.Retention(ctx)
+	require.NoError(t, err)
+	assert.Zero(t, days)
+}
+
+// Stage 4b (#14703): the audit keeps the newest 500 rows and accepts only its two kinds; the setting is 0 to 3650.
+func TestTheDropboxAuditIsBoundedAndTheSettingChecked(t *testing.T) {
+	ds, _, _ := dropboxStore(t)
+	ctx := context.Background()
+	for i := 0; i < 510; i++ {
+		require.NoError(t, ds.AddAudit(ctx, DropboxAudit{Kind: DropboxAuditPass, Count: i}))
+	}
+	all, err := ds.Audits(ctx, 1000)
+	require.NoError(t, err)
+	assert.Len(t, all, 500)
+	assert.Equal(t, 509, all[0].Count, "newest first")
+	assert.Equal(t, 10, all[499].Count, "the oldest ten dropped")
+	assert.Error(t, ds.AddAudit(ctx, DropboxAudit{Kind: "name"}))
+	assert.Error(t, ds.SetRetention(ctx, -1))
+	assert.Error(t, ds.SetRetention(ctx, 3651))
+	require.NoError(t, ds.SetRetention(ctx, 3650))
 }
 
 func TestAKeyRotationKeepsTheDropboxTokenReadableAndTheFingerprintTrue(t *testing.T) {

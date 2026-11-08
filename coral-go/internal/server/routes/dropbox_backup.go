@@ -71,6 +71,13 @@ type DropboxBackup struct {
 	now      func() time.Time
 	parallel int
 
+	// Stage 4b, retention (#14703).
+	retainEvery time.Duration                                           // at most one retention pass this often (an hour)
+	retainPoll  time.Duration                                           // how often a running delete job is read (a second)
+	retainWait  time.Duration                                           // how long a pass waits for its delete job (30 s); later passes read it
+	lastRetain  time.Time                                               // the last retention pass of this process
+	keepDoc     func(ctx context.Context, doc string, version int) bool // an offload marker or a pending edit keeps the pair (stages 5 and 6; none yet)
+
 	passMu sync.Mutex
 	kick   chan struct{} // an upload asks for a pass soon
 }
@@ -84,6 +91,8 @@ var (
 func (h *CloudHandler) NewDropboxBackup(ob *store.DropboxOutbox) *DropboxBackup {
 	_ = secrets.Init()
 	b := &DropboxBackup{d: h.dbx, outbox: ob, coralDir: h.dbx.dataDir, power: osPower, now: time.Now, parallel: dropboxParallel, kick: make(chan struct{}, 1),
+		retainEvery: time.Hour, retainPoll: time.Second, retainWait: 30 * time.Second,
+		keepDoc: func(context.Context, string, int) bool { return false }, // no offload markers or pending edits exist before stages 5 and 6
 		private: func(context.Context, []string) (map[string]bool, error) {
 			return nil, errors.New("no private marks to read")
 		}, // fail closed until SetPrivate
@@ -105,7 +114,14 @@ func (h *CloudHandler) NewDropboxBackup(ob *store.DropboxOutbox) *DropboxBackup 
 	}
 	b.maxAge = func() time.Duration {
 		_, days, err := b.d.store.Filters(context.Background())
-		if err != nil || days <= 0 {
+		if err != nil {
+			return 0
+		}
+		// While retention is on, nothing older than its window is sent: it would only be deleted again (Security's point 3 on #14703).
+		if keep, _, rerr := b.d.store.Retention(context.Background()); rerr == nil && keep > 0 && (days <= 0 || keep < days) {
+			days = keep
+		}
+		if days <= 0 {
 			return 0
 		}
 		return time.Duration(days) * 24 * time.Hour
@@ -129,6 +145,7 @@ func (b *DropboxBackup) SetPrivate(f func(ctx context.Context, ids []string) (ma
 func (b *DropboxBackup) Run(ctx context.Context, every time.Duration) {
 	b.Backfill(ctx)
 	b.Pass(ctx)
+	b.Retain(ctx)
 	t := time.NewTicker(every)
 	defer t.Stop()
 	for {
@@ -139,6 +156,7 @@ func (b *DropboxBackup) Run(ctx context.Context, every time.Duration) {
 		case <-b.kick:
 		}
 		b.Pass(ctx)
+		b.Retain(ctx) // stage 4b: at most once an hour, only when the Operator turned it on
 	}
 }
 
@@ -483,6 +501,10 @@ func (b *DropboxBackup) send(ctx context.Context, cl *dropbox.Client, access str
 	if len(commits) == 0 {
 		return true
 	}
+	account := ""
+	if c, err := b.d.store.Get(ctx); err == nil {
+		account = c.AccountID // the account each file is stored in (stage 4b: retention reads only the current account's rows)
+	}
 	res, err := cl.FinishBatch(ctx, access, commits)
 	if err != nil {
 		for _, s := range sent {
@@ -500,13 +522,13 @@ func (b *DropboxBackup) send(ctx context.Context, cl *dropbox.Client, access str
 				_ = b.outbox.MarkParked(ctx, s.row.ID, store.DropboxOutboxFailed)
 				continue
 			}
-			_ = b.outbox.MarkDone(ctx, s.row.ID, r.FileID, r.Rev, r.ContentHash)
+			_ = b.outbox.MarkDoneBy(ctx, s.row.ID, account, int64(len(s.data)), r.FileID, r.Rev, r.ContentHash)
 			done++
 		case dropbox.CommitConflict:
 			// One metadata check: the same bytes already there are done; anything else is parked, never overwritten and never retried in a loop.
 			m, err := cl.Metadata(ctx, access, s.row.Path)
 			if err == nil && m.ContentHash == s.hash {
-				_ = b.outbox.MarkDone(ctx, s.row.ID, m.FileID, m.Rev, m.ContentHash)
+				_ = b.outbox.MarkDoneBy(ctx, s.row.ID, account, int64(len(s.data)), m.FileID, m.Rev, m.ContentHash)
 				done++
 			} else {
 				_ = b.outbox.MarkParked(ctx, s.row.ID, store.DropboxOutboxConflict)

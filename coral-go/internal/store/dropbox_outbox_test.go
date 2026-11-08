@@ -113,3 +113,52 @@ func TestADeleteCancelsQueuedRowsButKeepsWhatIsBackedUp(t *testing.T) {
 	require.Len(t, rows, 1)
 	assert.Equal(t, "/y/v1", rows[0].Path)
 }
+
+// #14703, Dropbox stage 4b: retention's ledger read takes only done rows of the account, under /v1/, with a stored rev, older than the cut.
+// Mutants: each filter of the query dropped in turn.
+func TestRetentionsLedgerReadIsNarrow(t *testing.T) {
+	db := openTestDB(t)
+	ob := NewDropboxOutbox(db)
+	ctx := context.Background()
+	old := ts(time.Now().Add(-10 * 24 * time.Hour))
+	young := ts(time.Now())
+	mk := func(path, at, account, rev string, done bool) {
+		ok, err := ob.Enqueue(ctx, outboxRow(path, "d-"+path, at))
+		require.NoError(t, err)
+		require.True(t, ok)
+		if done {
+			var id int64
+			require.NoError(t, db.GetContext(ctx, &id, "SELECT id FROM dropbox_outbox WHERE path = ?", path))
+			require.NoError(t, ob.MarkDoneBy(ctx, id, account, 3, "id:"+path, rev, "h"))
+		}
+	}
+	mk("/v1/aaa/due", old, "dbid:A", "r1", true)
+	mk("/elsewhere/old", old, "dbid:A", "r1", true)
+	mk("/v1/aaa/other-account", old, "dbid:B", "r1", true)
+	mk("/v1/aaa/no-rev", old, "dbid:A", "", true)
+	mk("/v1/aaa/young", young, "dbid:A", "r1", true)
+	mk("/v1/aaa/queued", old, "dbid:A", "r1", false)
+	rows, err := ob.DueForRetention(ctx, "dbid:A", time.Now().Add(-7*24*time.Hour), 100)
+	require.NoError(t, err)
+	var paths []string
+	for _, r := range rows {
+		paths = append(paths, r.Path)
+	}
+	assert.Equal(t, []string{"/v1/aaa/due"}, paths)
+	n, err := ob.LedgerSize(ctx, "dbid:A")
+	require.NoError(t, err)
+	assert.Equal(t, 4, n, "the account's done rows")
+
+	// A row in a running job is never put in a second one, and only a done or deleting row takes a retention outcome.
+	require.NoError(t, ob.MarkDeleting(ctx, []int64{rows[0].ID}, "job-1"))
+	require.NoError(t, ob.MarkDeleting(ctx, []int64{rows[0].ID}, "job-2"))
+	jobs, err := ob.Deleting(ctx, "dbid:A")
+	require.NoError(t, err)
+	require.Len(t, jobs["job-1"], 1)
+	assert.Empty(t, jobs["job-2"])
+	require.NoError(t, ob.MarkRetention(ctx, rows[0].ID, DropboxOutboxRetainedOut))
+	assert.Error(t, ob.MarkRetention(ctx, rows[0].ID, DropboxOutboxQueued))
+	c, err := ob.Counts(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 1, c.RetainedOut)
+}

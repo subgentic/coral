@@ -23,6 +23,12 @@ const (
 	DropboxOutboxSkipped  = "skipped"
 	DropboxOutboxFailed   = "failed"
 	DropboxOutboxPrivate  = "private" // the artifact is marked private: parked, never sent (Security's SHOULD 4 on #14691)
+
+	// Stage 4b, retention (#14703). The local copy is never touched in any of them.
+	DropboxOutboxDeleting    = "deleting"     // a retention delete job is running for the row (delete_job): never put in a second job
+	DropboxOutboxRetainedOut = "retained_out" // retention deleted the Dropbox copy
+	DropboxOutboxGone        = "gone"         // no longer at its place in Dropbox (moved, renamed or removed there): left alone, never "removed by Coral"
+	DropboxOutboxEdited      = "edited"       // Dropbox refused the delete (the rev changed: edited there): kept, never retried; stage 5's
 )
 
 // DropboxOutboxRow is one file to back up.
@@ -54,6 +60,10 @@ type DropboxOutboxCounts struct {
 	Failed   int    `json:"failed"`
 	Private  int    `json:"private"`
 	LastSync string `json:"last_sync"`
+	// Stage 4b (#14703).
+	RetainedOut int `json:"retained_out"`
+	Gone        int `json:"gone"`
+	Edited      int `json:"edited"`
 }
 
 // DropboxOutbox is the table.
@@ -99,8 +109,100 @@ func (o *DropboxOutbox) MarkRetry(ctx context.Context, id int64, at time.Time) e
 
 // MarkDone records what Dropbox stored.
 func (o *DropboxOutbox) MarkDone(ctx context.Context, id int64, fileID, rev, contentHash string) error {
-	_, err := o.db.ExecContext(ctx, "UPDATE dropbox_outbox SET state = ?, file_id = ?, rev = ?, content_hash = ?, done_at = ? WHERE id = ?",
-		DropboxOutboxDoneS, fileID, rev, contentHash, nowUTC(), id)
+	return o.MarkDoneBy(ctx, id, "", 0, fileID, rev, contentHash)
+}
+
+// MarkDoneBy records what Dropbox stored, in which account, and its size (stage 4b: retention reads only the current account's rows).
+func (o *DropboxOutbox) MarkDoneBy(ctx context.Context, id int64, accountID string, size int64, fileID, rev, contentHash string) error {
+	var acct any
+	if accountID != "" {
+		acct = accountID
+	}
+	_, err := o.db.ExecContext(ctx, "UPDATE dropbox_outbox SET state = ?, file_id = ?, rev = ?, content_hash = ?, done_at = ?, account_id = ?, size = ? WHERE id = ?",
+		DropboxOutboxDoneS, fileID, rev, contentHash, nowUTC(), acct, size, id)
+	return err
+}
+
+// StampAccount gives the done rows stored before stage 4b (no account) the account connected now, and reports how many. Only one account has been
+// connected before this stage on any database, so they are its files (the stage 4b delta v2, point 2).
+func (o *DropboxOutbox) StampAccount(ctx context.Context, accountID string) (int, error) {
+	if accountID == "" {
+		return 0, errors.New("no account to stamp")
+	}
+	res, err := o.db.ExecContext(ctx, "UPDATE dropbox_outbox SET account_id = ? WHERE state = ? AND (account_id IS NULL OR account_id = '')", accountID, DropboxOutboxDoneS)
+	if err != nil {
+		return 0, err
+	}
+	n, err := res.RowsAffected()
+	return int(n), err
+}
+
+// LedgerRow is one file retention may delete: a done row of the current account, with what Dropbox said when Coral stored it.
+type LedgerRow struct {
+	ID         int64  `db:"id"`
+	Kind       string `db:"kind"`
+	Digest     string `db:"digest"`
+	DocID      string `db:"doc_id"`
+	Version    int    `db:"version"`
+	Path       string `db:"path"`
+	ArtifactAt string `db:"artifact_at"`
+	Rev        string `db:"rev"`
+	Size       int64  `db:"size"`
+	DeleteJob  string `db:"delete_job"`
+}
+
+// LedgerSize counts the current account's done rows (retention's ceiling is half of them).
+func (o *DropboxOutbox) LedgerSize(ctx context.Context, accountID string) (int, error) {
+	var n int
+	err := o.db.GetContext(ctx, &n, "SELECT COUNT(*) FROM dropbox_outbox WHERE state = ? AND account_id = ?", DropboxOutboxDoneS, accountID)
+	return n, err
+}
+
+// DueForRetention returns the current account's done rows whose artifact is older than before, oldest first, at most limit. Only paths under /v1/
+// with a stored rev: anything else is never deleted.
+func (o *DropboxOutbox) DueForRetention(ctx context.Context, accountID string, before time.Time, limit int) ([]LedgerRow, error) {
+	var rows []LedgerRow
+	err := o.db.SelectContext(ctx, &rows, `SELECT id, kind, digest, doc_id, version, path, artifact_at, COALESCE(rev, '') AS rev, size, COALESCE(delete_job, '') AS delete_job
+		FROM dropbox_outbox WHERE state = ? AND account_id = ? AND artifact_at <> '' AND artifact_at < ? AND path LIKE '/v1/%' AND COALESCE(rev, '') <> ''
+		ORDER BY artifact_at, doc_id, version, kind LIMIT ?`, DropboxOutboxDoneS, accountID, ts(before), limit)
+	return rows, err
+}
+
+// Deleting returns the rows of the current account in a running retention job, by job.
+func (o *DropboxOutbox) Deleting(ctx context.Context, accountID string) (map[string][]LedgerRow, error) {
+	var rows []LedgerRow
+	if err := o.db.SelectContext(ctx, &rows, `SELECT id, kind, digest, doc_id, version, path, artifact_at, COALESCE(rev, '') AS rev, size, COALESCE(delete_job, '') AS delete_job
+		FROM dropbox_outbox WHERE state = ? AND account_id = ? ORDER BY id`, DropboxOutboxDeleting, accountID); err != nil {
+		return nil, err
+	}
+	out := map[string][]LedgerRow{}
+	for _, r := range rows {
+		out[r.DeleteJob] = append(out[r.DeleteJob], r)
+	}
+	return out, nil
+}
+
+// MarkDeleting puts done rows in a running delete job. Only rows still done move, so a row is never in two jobs.
+func (o *DropboxOutbox) MarkDeleting(ctx context.Context, ids []int64, job string) error {
+	if job == "" {
+		return errors.New("a delete job needs an id")
+	}
+	for _, id := range ids {
+		if _, err := o.db.ExecContext(ctx, "UPDATE dropbox_outbox SET state = ?, delete_job = ? WHERE id = ? AND state = ?", DropboxOutboxDeleting, job, id, DropboxOutboxDoneS); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// MarkRetention records how a retention delete ended for a row: retained_out, gone or edited; or done again (to be tried later).
+func (o *DropboxOutbox) MarkRetention(ctx context.Context, id int64, state string) error {
+	switch state {
+	case DropboxOutboxRetainedOut, DropboxOutboxGone, DropboxOutboxEdited, DropboxOutboxDoneS:
+	default:
+		return errors.New("not a retention outcome")
+	}
+	_, err := o.db.ExecContext(ctx, "UPDATE dropbox_outbox SET state = ?, delete_job = NULL WHERE id = ? AND state IN (?, ?)", state, id, DropboxOutboxDoneS, DropboxOutboxDeleting)
 	return err
 }
 
@@ -139,6 +241,14 @@ func (o *DropboxOutbox) Counts(ctx context.Context) (DropboxOutboxCounts, error)
 			c.Failed = r.N
 		case DropboxOutboxPrivate:
 			c.Private = r.N
+		case DropboxOutboxRetainedOut:
+			c.RetainedOut = r.N
+		case DropboxOutboxGone:
+			c.Gone = r.N
+		case DropboxOutboxEdited:
+			c.Edited = r.N
+		case DropboxOutboxDeleting:
+			c.BackedUp += r.N // still in Dropbox until the job says otherwise
 		}
 	}
 	var last sql.NullString

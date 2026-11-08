@@ -21,6 +21,10 @@ const { JSDOM } = require('jsdom');
           <div id="settings-dropbox-types"></div>
           <input id="settings-dropbox-age" type="number">
           <button id="settings-dropbox-filters-save"></button>
+          <input id="settings-dropbox-retention-days" type="number">
+          <button id="settings-dropbox-retention-save"></button>
+          <button id="settings-dropbox-retention-on" hidden></button>
+          <button id="settings-dropbox-retention-cancel" hidden></button>
         </div>
       </section></body>`, { url: 'http://127.0.0.1:8420/' });
     for (const k of ['window', 'document']) Object.defineProperty(globalThis, k, { value: dom.window[k], configurable: true, writable: true });
@@ -253,6 +257,59 @@ const { JSDOM } = require('jsdom');
     assert.ok(!shown('settings-dropbox-connect'));
     assert.match(await refused(500, { error: 'boom' }), /Couldn't read the Dropbox connection/);
     assert.match(await refused(404, { error: 'not found' }), /Couldn't read the Dropbox connection/, 'a 404 with no code is not the build');
+
+    // Retention (#14703): the counts, the window and the dry run before Turn on.
+    await status({ ...connected, backup: { backed_up: 4, retained_out: 3, gone: 1, edited: 2 }, filters: { types: [], max_age_days: 0 }, retention: { days: 0 } });
+    const line = () => $('settings-dropbox-counts').textContent;
+    assert.match(line(), /3 removed from Dropbox by retention \(still on this computer\)/);
+    assert.match(line(), /1 no longer at its place in Dropbox/, 'never "removed by Coral"');
+    assert.match(line(), /2 edited in Dropbox, kept there/);
+    assert.doesNotMatch(line(), /Keeping files in Dropbox/, 'off: no retention sentence');
+    assert.strictEqual($('settings-dropbox-retention-days').value, '0');
+    await status({ ...connected, filters: { types: [], max_age_days: 10 }, retention: { days: 3, waiting_for_files: true } });
+    assert.match(line(), /from the last 3 days, the retention window\./, 'the smaller window is the one uploads use');
+    assert.match(line(), /Keeping files in Dropbox for 3 days\. Retention starts once at least 2 artifacts are backed up\./);
+    assert.strictEqual($('settings-dropbox-retention-days').value, '3');
+
+    await status({ ...connected, retention: { days: 0 } });
+    const retentionCalls = () => calls.filter(c => c.url === '/api/dropbox/retention').map(c => JSON.parse(c.body));
+    const before = retentionCalls().length;
+    answers['/api/dropbox/retention'] = { status: 200, body: { dry_run: true, days: 7, due: 4, bytes: 2048, held: 6 } };
+    $('settings-dropbox-retention-days').value = '7';
+    await m.saveRetention();
+    assert.deepStrictEqual(retentionCalls().slice(before), [{ days: 7 }], 'first a dry run, nothing confirmed');
+    assert.match($('settings-dropbox-note').textContent, /4 files \(2 KB\) would be deleted from Dropbox now, and 6 more on later passes\. Turn on, or Cancel\./);
+    assert.ok(shown('settings-dropbox-retention-on') && shown('settings-dropbox-retention-cancel'));
+    // Cancel: nothing saved, the field back to what is saved.
+    $('settings-dropbox-retention-cancel').click();
+    assert.ok(!shown('settings-dropbox-retention-on'));
+    assert.match($('settings-dropbox-note').textContent, /Nothing changed/);
+    assert.strictEqual($('settings-dropbox-retention-days').value, '0');
+    assert.strictEqual(retentionCalls().length, before + 1);
+    // Turn on: saved with the count the person saw.
+    $('settings-dropbox-retention-days').value = '7';
+    await m.saveRetention();
+    answers['/api/dropbox/retention'] = { status: 200, body: { days: 7 } };
+    await m.confirmRetention();
+    assert.deepStrictEqual(retentionCalls().pop(), { days: 7, confirm: true, seen_count: 4, seen_bytes: 2048 });
+    assert.ok(!shown('settings-dropbox-retention-on'));
+    assert.match($('settings-dropbox-note').textContent, /Retention is on/);
+    // Off: no dry run.
+    $('settings-dropbox-retention-days').value = '0';
+    await m.saveRetention();
+    assert.deepStrictEqual(retentionCalls().pop(), { days: 0 });
+    assert.match($('settings-dropbox-note').textContent, /Retention is off/);
+    // A refused read while the count waits takes Turn on away.
+    answers['/api/dropbox/retention'] = { status: 200, body: { dry_run: true, days: 2, due: 0, bytes: 0, held: 0 } };
+    await status({ ...connected, retention: { days: 0 } });
+    $('settings-dropbox-retention-days').value = '2';
+    await m.saveRetention();
+    assert.match($('settings-dropbox-note').textContent, /Nothing would be deleted from Dropbox now/);
+    answers['/api/dropbox/status'] = { status: 403, body: { error: 'x', code: 'other_user' } };
+    await m.loadDropbox();
+    assert.ok(!shown('settings-dropbox-retention-on') && !shown('settings-dropbox-retention-cancel'));
+    await m.confirmRetention();
+    assert.strictEqual(retentionCalls().pop().confirm, undefined, 'the stale count can no longer be confirmed');
 
     // Nothing from the server is put into the page as HTML.
     await status({ app_key_set: true, connected: true, state: 'connected', account_id: '<img src=x onerror=alert(1)>' });

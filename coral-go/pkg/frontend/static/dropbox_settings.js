@@ -64,13 +64,26 @@ function renderBackup(st, keepControls = false) {
     if (n('skipped')) parts.push(`${n('skipped')} skipped`);
     if (n('failed')) parts.push(`${n('failed')} failed`);
     if (n('private')) parts.push(`${n('private')} private, kept off Dropbox`);
+    // Stage 4b, retention (#14703). A file not at its place is never said to be removed by Coral (Security's answer 1).
+    if (n('retained_out')) parts.push(`${n('retained_out')} removed from Dropbox by retention (still on this computer)`);
+    if (n('gone')) parts.push(`${n('gone')} no longer at ${n('gone') === 1 ? 'its place' : 'their places'} in Dropbox`);
+    if (n('edited')) parts.push(`${n('edited')} edited in Dropbox, kept there`);
     let text = parts.join(', ') + '.';
     const at = Date.parse(b.last_sync || '');
     if (!Number.isNaN(at)) text += ` Last backed up ${new Date(at).toLocaleString()}.`;
     const chosenTypes = (st.filters && st.filters.types) || [];
-    const days = Number((st.filters && st.filters.max_age_days) || 0);
+    const filterDays = Number((st.filters && st.filters.max_age_days) || 0);
+    const keep = Number((st.retention && st.retention.days) || 0);
+    // While retention is on, nothing older than its window is sent (Security's point 3 on #14703): the summary says the smaller window.
+    const byRetention = keep > 0 && (filterDays === 0 || keep < filterDays);
+    const days = byRetention ? keep : filterDays;
+    const plural = (k) => `${k} ${k === 1 ? 'day' : 'days'}`;
     text += chosenTypes.length ? ` Backing up ${chosenTypes.map(t => '.' + t).join(', ')}` : ' Backing up every type';
-    text += days > 0 ? ` from the last ${days} ${days === 1 ? 'day' : 'days'}.` : '.';
+    text += days > 0 ? ` from the last ${plural(days)}${byRetention ? ', the retention window' : ''}.` : '.';
+    if (keep > 0) {
+        text += ` Keeping files in Dropbox for ${plural(keep)}.`;
+        if (st.retention.waiting_for_files) text += ' Retention starts once at least 2 artifacts are backed up.';
+    }
     const counts = $('settings-dropbox-counts');
     if (counts) counts.textContent = text;
     const box = $('settings-dropbox-types');
@@ -89,9 +102,10 @@ function renderBackup(st, keepControls = false) {
     if (box) for (const input of box.querySelectorAll('input[type=checkbox]')) input.checked = chosen.has(input.value);
     const age = $('settings-dropbox-age');
     if (age) age.value = String((st.filters && st.filters.max_age_days) || 0);
+    const ret = $('settings-dropbox-retention-days');
+    if (ret && !pendingRetention) ret.value = String(keep);
 }
 
-// saveDropboxFilters sends the ticked types and the age limit.
 // filterKey is what the boxes and the age say now, to tell an edit made while a save was on its way.
 function filterKey() {
     const box = $('settings-dropbox-types');
@@ -99,6 +113,7 @@ function filterKey() {
     return JSON.stringify([types, ($('settings-dropbox-age') || {}).value || '0']);
 }
 
+// saveDropboxFilters sends the ticked types and the age limit.
 export async function saveDropboxFilters() {
     note('');
     const box = $('settings-dropbox-types');
@@ -122,6 +137,8 @@ let lastStatus = null; // the last status shown, so a saved filter updates the s
 // hideAll takes every button and the backup part (with its counts) off the screen: a refused or failed read shows none of a stale state (UI Reviewer's MUST 2 on #14693).
 function hideAll() {
     for (const id of ['settings-dropbox-connect', 'settings-dropbox-disconnect', 'settings-dropbox-switch', 'settings-dropbox-takeover', 'settings-dropbox-recheck']) show(id, false);
+    pendingRetention = null;
+    showRetentionConfirm(false);
     renderBackup(null);
     const counts = $('settings-dropbox-counts');
     if (counts) counts.textContent = '';
@@ -314,6 +331,62 @@ async function checkAgain() {
     setTimeout(() => { loadDropbox(); }, 4000);
 }
 
+// Retention (stage 4b, #14703): "Keep in Dropbox for N days". Turning it on, or changing N, first asks what the next pass would delete and shows
+// that count; only Turn on saves it, with the count the person saw. 0 turns it off with no question.
+const RETENTION = '/api/dropbox/retention';
+let pendingRetention = null; // {days, due, bytes} while the count waits for Turn on or Cancel
+
+function showRetentionConfirm(on) {
+    show('settings-dropbox-retention-on', on);
+    show('settings-dropbox-retention-cancel', on);
+}
+
+function sizeText(bytes) {
+    const mb = Number(bytes || 0) / (1024 * 1024);
+    return mb >= 1 ? `${mb.toFixed(1)} MB` : `${Math.max(1, Math.round(Number(bytes || 0) / 1024))} KB`;
+}
+
+export async function saveRetention() {
+    note('');
+    const days = parseInt(($('settings-dropbox-retention-days') || {}).value || '0', 10);
+    if (!Number.isFinite(days) || days < 0 || days > 3650) { note('Keep in Dropbox is 0 (off) to 3650 days.'); return; }
+    let res;
+    if (days === 0) {
+        try { res = await post(RETENTION, 'PUT', JSON.stringify({ days: 0 })); } catch { res = { ok: false, body: {} }; }
+        if (!res.ok) { note(String(res.body.error || "Couldn't save. Try again.")); return; }
+        note('Retention is off. Nothing more is deleted from Dropbox.');
+        await loadDropbox();
+        return;
+    }
+    try { res = await post(RETENTION, 'PUT', JSON.stringify({ days })); } catch { res = { ok: false, body: {} }; }
+    if (!res.ok || !res.body.dry_run) { note(String(res.body.error || "Couldn't count what would be deleted. Try again.")); return; }
+    const due = Number(res.body.due || 0);
+    pendingRetention = { days, due, bytes: Number(res.body.bytes || 0) };
+    const what = due ? `${due} ${due === 1 ? 'file' : 'files'} (${sizeText(res.body.bytes)}) would be deleted from Dropbox now` : 'Nothing would be deleted from Dropbox now';
+    const later = Number(res.body.held || 0) ? `, and ${res.body.held} more on later passes` : '';
+    note(`${what}${later}. Turn on, or Cancel.`);
+    showRetentionConfirm(true);
+}
+
+export async function confirmRetention() {
+    const p = pendingRetention;
+    if (!p) return;
+    let res;
+    try { res = await post(RETENTION, 'PUT', JSON.stringify({ days: p.days, confirm: true, seen_count: p.due, seen_bytes: p.bytes })); } catch { res = { ok: false, body: {} }; }
+    pendingRetention = null;
+    showRetentionConfirm(false);
+    if (!res.ok) { note(String(res.body.error || "Couldn't save. Try again.")); return; }
+    note(`Retention is on: files older than ${p.days} ${p.days === 1 ? 'day' : 'days'} are deleted from Dropbox, at most 100 an hour.`);
+    await loadDropbox();
+}
+
+function cancelRetention() {
+    pendingRetention = null;
+    showRetentionConfirm(false);
+    note('Nothing changed.');
+    if (lastStatus) renderBackup(lastStatus);
+}
+
 function wire() {
     if (wired) return;
     const on = (id, fn) => { const el = $(id); if (el) el.addEventListener('click', () => { fn(); }); };
@@ -323,5 +396,8 @@ function wire() {
     on('settings-dropbox-takeover', takeOver);
     on('settings-dropbox-filters-save', saveDropboxFilters);
     on('settings-dropbox-recheck', checkAgain);
+    on('settings-dropbox-retention-save', saveRetention);
+    on('settings-dropbox-retention-on', confirmRetention);
+    on('settings-dropbox-retention-cancel', cancelRetention);
     wired = true;
 }

@@ -528,6 +528,7 @@ PUT /api/cloud/max-mode never
 PUT /api/cloud/redact-tokens never
 PUT /api/custom-models launch
 PUT /api/dropbox/filters never
+PUT /api/dropbox/retention never
 PUT /api/resources/{name} never
 PUT /api/scheduled/jobs/{jobID} never
 PUT /api/sessions/history/{sessionID}/notes never

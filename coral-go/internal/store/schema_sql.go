@@ -560,7 +560,10 @@ CREATE TABLE IF NOT EXISTS dropbox_connection (
     state           TEXT NOT NULL DEFAULT 'disconnected',
     connected_at    TEXT,
     filter_types    TEXT NOT NULL DEFAULT '',  -- stage 4 (#14655): the chosen extensions, comma-separated; '' is every type
-    max_age_days    INTEGER NOT NULL DEFAULT 0 -- only artifacts newer than this many days; 0 is no limit
+    max_age_days    INTEGER NOT NULL DEFAULT 0, -- only artifacts newer than this many days; 0 is no limit
+    retention_days      INTEGER NOT NULL DEFAULT 0, -- stage 4b (#14703): delete the Dropbox copies older than this many days; 0 is off (the default)
+    retention_since     TEXT,                       -- when the Operator confirmed it
+    retention_last_pass TEXT                        -- the last retention pass (a local clock earlier than this refuses a pass)
 );
 
 -- Dropbox stage 4's outbox (#14655): one row per file to back up (an artifact version or its item_data sidecar), by its Dropbox path (ids only,
@@ -582,9 +585,27 @@ CREATE TABLE IF NOT EXISTS dropbox_outbox (
     content_hash TEXT,
     secret_flag  INTEGER NOT NULL DEFAULT 0,
     created_at   TEXT NOT NULL,
-    done_at      TEXT
+    done_at      TEXT,
+    account_id   TEXT,                      -- stage 4b (#14703): the Dropbox account the file was stored in (retention reads only the current one's)
+    size         INTEGER NOT NULL DEFAULT 0, -- its bytes, for retention's dry-run count
+    delete_job   TEXT                       -- a retention delete job still running for this row (state deleting)
 );
 CREATE INDEX IF NOT EXISTS idx_dropbox_outbox_due ON dropbox_outbox(state, next_try_at, artifact_at);
+
+-- Dropbox stage 4b's audit (#14703): each retention setting change (who, old and new days, the dry-run count the page showed) and each retention
+-- pass (counts and bytes). Never a name, path, digest or token. The newest 500 rows are kept.
+CREATE TABLE IF NOT EXISTS dropbox_audit (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    at       TEXT NOT NULL,
+    kind     TEXT NOT NULL,              -- setting or pass
+    who      TEXT NOT NULL DEFAULT '',   -- operator (the person at this computer) for a setting; '' for a pass
+    old_days INTEGER NOT NULL DEFAULT 0,
+    new_days INTEGER NOT NULL DEFAULT 0,
+    count    INTEGER NOT NULL DEFAULT 0, -- a setting: the dry-run count shown; a pass: files deleted
+    bytes    INTEGER NOT NULL DEFAULT 0,
+    held     INTEGER NOT NULL DEFAULT 0, -- a pass: due files left for later by the ceiling
+    reason   TEXT NOT NULL DEFAULT ''    -- a pass that deleted nothing: the reason word (clock_behind, clock_skew, ...)
+);
 CREATE INDEX IF NOT EXISTS idx_dropbox_outbox_digest ON dropbox_outbox(digest);
 
 -- Coral Hub enrollment in progress, and its rate limit (one row). The device code is

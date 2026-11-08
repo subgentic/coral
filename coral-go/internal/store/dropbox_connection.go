@@ -149,7 +149,9 @@ func (s *DropboxStore) Save(ctx context.Context, accountID, refreshToken, finger
 	if err != nil {
 		return err
 	}
-	_, err = s.db.ExecContext(ctx, `UPDATE dropbox_connection SET account_id = ?, last_account_id = ?, refresh_token = ?, fingerprint = ?, state = ?, connected_at = ? WHERE id = 1`,
+	// Every new sign-in starts with retention off (Security's answer 2 on #14703): the Operator turns it on again through the dry run.
+	_, err = s.db.ExecContext(ctx, `UPDATE dropbox_connection SET account_id = ?, last_account_id = ?, refresh_token = ?, fingerprint = ?, state = ?, connected_at = ?,
+		retention_days = 0, retention_since = NULL WHERE id = 1`,
 		accountID, accountID, env, fingerprint, DropboxStateConnected, nowUTC())
 	return err
 }
@@ -214,8 +216,88 @@ func (s *DropboxStore) SetState(ctx context.Context, state string) error {
 
 // Disconnect forgets the token, the account and the fingerprint; the server id and the last account stay.
 func (s *DropboxStore) Disconnect(ctx context.Context) error {
-	_, err := s.db.ExecContext(ctx, "UPDATE dropbox_connection SET refresh_token = NULL, account_id = NULL, fingerprint = NULL, state = ?, connected_at = NULL WHERE id = 1", DropboxStateDisconnected)
+	_, err := s.db.ExecContext(ctx, "UPDATE dropbox_connection SET refresh_token = NULL, account_id = NULL, fingerprint = NULL, state = ?, connected_at = NULL, retention_days = 0, retention_since = NULL WHERE id = 1", DropboxStateDisconnected)
 	return err
+}
+
+// Retention is stage 4b's setting (#14703): delete the Dropbox copies older than days (0 is off), and when the last pass ran (” never).
+func (s *DropboxStore) Retention(ctx context.Context) (days int, lastPass string, err error) {
+	if err := s.ensureRow(ctx); err != nil {
+		return 0, "", err
+	}
+	var r struct {
+		Days int            `db:"retention_days"`
+		Last sql.NullString `db:"retention_last_pass"`
+	}
+	if err := s.db.GetContext(ctx, &r, "SELECT retention_days, retention_last_pass FROM dropbox_connection WHERE id = 1"); err != nil {
+		return 0, "", err
+	}
+	return r.Days, r.Last.String, nil
+}
+
+// SetRetention records the setting; the caller has checked it (0 to 3650) and that it is the Operator's.
+func (s *DropboxStore) SetRetention(ctx context.Context, days int) error {
+	if days < 0 || days > 3650 {
+		return errors.New("retention is 0 (off) to 3650 days")
+	}
+	if err := s.ensureRow(ctx); err != nil {
+		return err
+	}
+	var since any
+	if days > 0 {
+		since = nowUTC()
+	}
+	_, err := s.db.ExecContext(ctx, "UPDATE dropbox_connection SET retention_days = ?, retention_since = ? WHERE id = 1", days, since)
+	return err
+}
+
+// SetRetentionPass records when a retention pass ran (RFC 3339, UTC).
+func (s *DropboxStore) SetRetentionPass(ctx context.Context, at string) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE dropbox_connection SET retention_last_pass = ? WHERE id = 1", at)
+	return err
+}
+
+// DropboxAudit is one row of stage 4b's audit: a setting change or a retention pass. No names, paths, digests or tokens.
+type DropboxAudit struct {
+	At      string `db:"at" json:"at"`
+	Kind    string `db:"kind" json:"kind"`
+	Who     string `db:"who" json:"who"`
+	OldDays int    `db:"old_days" json:"old_days"`
+	NewDays int    `db:"new_days" json:"new_days"`
+	Count   int    `db:"count" json:"count"`
+	Bytes   int64  `db:"bytes" json:"bytes"`
+	Held    int    `db:"held" json:"held"`
+	Reason  string `db:"reason" json:"reason"`
+}
+
+// Audit kinds.
+const (
+	DropboxAuditSetting = "setting"
+	DropboxAuditPass    = "pass"
+	dropboxAuditKeep    = 500
+)
+
+// AddAudit writes one audit row and keeps the newest 500.
+func (s *DropboxStore) AddAudit(ctx context.Context, a DropboxAudit) error {
+	if a.Kind != DropboxAuditSetting && a.Kind != DropboxAuditPass {
+		return errors.New("not a Dropbox audit kind")
+	}
+	if a.At == "" {
+		a.At = nowUTC()
+	}
+	if _, err := s.db.ExecContext(ctx, `INSERT INTO dropbox_audit (at, kind, who, old_days, new_days, count, bytes, held, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		a.At, a.Kind, a.Who, a.OldDays, a.NewDays, a.Count, a.Bytes, a.Held, a.Reason); err != nil {
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, "DELETE FROM dropbox_audit WHERE id <= (SELECT MAX(id) FROM dropbox_audit) - ?", dropboxAuditKeep)
+	return err
+}
+
+// Audits returns the newest audit rows first, at most limit.
+func (s *DropboxStore) Audits(ctx context.Context, limit int) ([]DropboxAudit, error) {
+	var out []DropboxAudit
+	err := s.db.SelectContext(ctx, &out, "SELECT at, kind, who, old_days, new_days, count, bytes, held, reason FROM dropbox_audit ORDER BY id DESC LIMIT ?", limit)
+	return out, err
 }
 
 // Filters are the backup's choices (stage 4, #14655): the extensions to back up (none is every type) and the most days old an artifact may be
