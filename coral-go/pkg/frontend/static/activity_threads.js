@@ -1,6 +1,8 @@
 /* Activity's source-qualified goal/task partitions. The table descriptor is U1's;
  * a decided thread has no unread state and starts shut unless the person opened it. */
 import { markHidden } from './visible_marks.js';
+import { importOnce } from './import_once.js';
+const { storyNode } = await importOnce('./thread_story.js'); // the story under a task (#14444)
 const teamKey = r => String(r.team || '').startsWith('@') || !r.server || r.server === 'local' ? String(r.team || '') : `@${r.server}/${r.team || ''}`;
 const goalKey = r => r.goal_id ? JSON.stringify([teamKey(r), String(r.goal_id)]) : 'no-goal';
 const taskKey = r => r.goal_id && r.task_id ? JSON.stringify([teamKey(r), String(r.goal_id), 'task', String(r.task_id)]) : '';
@@ -34,7 +36,7 @@ export function activityGroupLookup(rows, sourceLabel, partsOf, tasks) {
     for (const [key,{row,count,latest}] of groups) {
         if (!taskKey(row)) { entries.set(key,{key,label:goalLabel(key)}); continue; }
         const open = tasks.open(key,false);
-        entries.set(key,{key,level:'task',label:`Task #${row.task_id}${row.task_title ? ' · '+safe(row.task_title) : ''}\n${count} shown · newest: ${cut(partsOf(latest).on)}`,open,onToggle:()=>tasks.toggle(key,!open),parent:{key:goalKey(row),label:goalLabel(goalKey(row))}});
+        entries.set(key,{key,level:'task',label:`Task #${row.task_id}${row.task_title ? ' · '+safe(row.task_title) : ''}\n${count} shown · newest: ${cut(partsOf(latest).on)}`,open,onToggle:()=>tasks.toggle(key,!open),...(tasks.toggleStory?{onStory:()=>tasks.toggleStory(`a:${key}`,!tasks.storyOpen(`a:${key}`)),storyOpen:tasks.storyOpen(`a:${key}`),story:()=>storyNode(teamKey(row),row.task_id)}:{}),parent:{key:goalKey(row),label:goalLabel(goalKey(row))}});
     }
     return row => entries.get(taskKey(row)||goalKey(row));
 }
