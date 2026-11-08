@@ -19,11 +19,13 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/subgentic/coral/internal/dropbox"
+	"github.com/subgentic/coral/internal/secfile"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -55,7 +57,14 @@ func (b *DropboxBackup) Notice(ctx context.Context) {
 	}
 	b.passMu.Lock()
 	defer b.passMu.Unlock()
-	b.sweepHeld(ctx) // whatever the readiness: held files no open edit names go
+	// Whatever the readiness: the open edits of an account no longer connected go (a Disconnect, another account, a Rekey: Security's condition
+	// c), then every held file no open edit names.
+	keep := ""
+	if c, err := b.d.store.Get(ctx); err == nil && c.Connected {
+		keep = c.AccountID
+	}
+	_, _ = b.edits.DropOtherAccounts(ctx, keep)
+	b.sweepHeld(ctx)
 	if b.d == nil || b.d.appKey() == "" || b.d.looksLikeCopy(ctx) {
 		return
 	}
@@ -243,15 +252,42 @@ func (b *DropboxBackup) heldDir() string {
 // heldPath is a held edit's file, named by its digest (64 hex, from the hash computed on arrival).
 func (b *DropboxBackup) heldPath(digest string) string { return filepath.Join(b.heldDir(), digest) }
 
-// dropHeld removes a held file no open edit names any more (a newer edit replaced it, or it was decided).
+var heldNameRe = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+// dropHeld removes a held file no open edit names any more (a newer edit replaced it, or it was decided): only an exact 64-hex name that is a
+// regular file (never a link or a folder someone put there).
 func (b *DropboxBackup) dropHeld(ctx context.Context, digest string) {
-	if len(digest) != 64 {
+	if !heldNameRe.MatchString(digest) {
 		return
 	}
-	if held, err := b.edits.Holds(ctx, digest); err == nil && !held {
+	if held, err := b.edits.Holds(ctx, digest); err != nil || held {
+		return
+	}
+	if st, err := os.Lstat(b.heldPath(digest)); err == nil && st.Mode().IsRegular() {
 		_ = os.Remove(b.heldPath(digest))
 	}
 }
+
+// openHeld opens a held file for a decision without following a link, as a regular file, and checks its bytes still hash to the digest and its
+// size (Security's conditions a and b on #14714): a file changed on disk is not stored; the edit goes back to pending.
+func (b *DropboxBackup) openHeld(e store.DropboxEdit) error {
+	f, err := secfile.OpenNoFollow(b.heldPath(e.Digest), os.O_RDONLY, 0)
+	if err != nil {
+		return errHeldChanged
+	}
+	defer f.Close()
+	st, err := f.Stat()
+	if err != nil || !st.Mode().IsRegular() || st.Size() != e.Size {
+		return errHeldChanged
+	}
+	h := sha256.New()
+	if _, err := io.Copy(h, io.LimitReader(f, dropboxEditMaxSize+1)); err != nil || hex.EncodeToString(h.Sum(nil)) != e.Digest {
+		return errHeldChanged
+	}
+	return nil
+}
+
+var errHeldChanged = errors.New("the held edit changed on disk")
 
 // sweepHeld removes what no open edit names: a temp file left over an hour by a stopped fetch, or a held file whose edit was decided or replaced.
 func (b *DropboxBackup) sweepHeld(ctx context.Context) {
@@ -262,12 +298,12 @@ func (b *DropboxBackup) sweepHeld(ctx context.Context) {
 	for _, de := range ents {
 		name := de.Name()
 		if strings.HasPrefix(name, artifactUploadTempP) {
-			if info, err := de.Info(); err == nil && time.Since(info.ModTime()) > time.Hour {
+			if info, err := de.Info(); err == nil && info.Mode().IsRegular() && time.Since(info.ModTime()) > time.Hour {
 				_ = os.Remove(filepath.Join(b.heldDir(), name))
 			}
 			continue
 		}
-		b.dropHeld(ctx, name)
+		b.dropHeld(ctx, name) // only an exact 64-hex regular file
 	}
 }
 

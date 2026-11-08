@@ -229,3 +229,83 @@ func TestPromoteOfAFileOfNoTeamSaysKeepItSeparate(t *testing.T) {
 	assert.True(t, still, "pending again")
 	assert.Equal(t, http.StatusOK, be.decide(open[0].DocID, "separate", true).Code, "and Keep separate works")
 }
+
+// Security's conditions a to c on #14714 (21:21).
+
+// Mutant: a decision takes an edit of an account that is not the one connected.
+func TestADecisionRefusesAnotherAccountsEdit(t *testing.T) {
+	be, _, e := heldEdit(t)
+	_, err := be.db.ExecContext(context.Background(), "UPDATE dropbox_edits SET account_id = 'dbid:OLD' WHERE id = ?", e.ID)
+	require.NoError(t, err)
+	rec := be.decide(e.DocID, "promote", true)
+	assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), "other_account")
+	assert.False(t, be.hasRecord(e.Digest), "nothing stored")
+}
+
+// Mutant: a Disconnect (or another account, or a Rekey) leaves the edits and their bytes.
+func TestDisconnectDropsTheEditsAndTheirFiles(t *testing.T) {
+	be, _, e := heldEdit(t)
+	require.NoError(t, be.h.dbx.store.Disconnect(context.Background()))
+	be.notice()
+	assert.Empty(t, be.open(), "the edits of an account no longer connected are dropped")
+	_, err := os.Stat(be.b.heldPath(e.Digest))
+	assert.True(t, os.IsNotExist(err), "and their held bytes")
+}
+
+// Mutants: the held bytes are not hashed again at the decision; a changed file stays stuck pending.
+func TestAChangedHeldFileIsNotStoredAndIsFetchedAgain(t *testing.T) {
+	be, _, e := heldEdit(t)
+	require.NoError(t, os.WriteFile(be.b.heldPath(e.Digest), []byte("# doc 0, edited in Dropbox\nX"), 0o600)) // changed on this computer
+	rec := be.decide(e.DocID, "promote", true)
+	assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), "held_changed")
+	assert.False(t, be.hasRecord(e.Digest), "the changed bytes are never stored")
+	n := len(be.dbx.downloads)
+	be.notice()
+	assert.Len(t, be.dbx.downloads, n+1, "fetched again from Dropbox")
+	open := be.open()
+	require.Len(t, open, 1)
+	assert.Equal(t, e.Digest, open[0].Digest, "with the bytes Dropbox has")
+	assert.Equal(t, http.StatusOK, be.decide(e.DocID, "promote", true).Code, "and it can be decided")
+}
+
+// Mutant: the held file is opened through a link.
+func TestALinkedHeldFileIsRefused(t *testing.T) {
+	be, _, e := heldEdit(t)
+	b, err := os.ReadFile(be.b.heldPath(e.Digest))
+	require.NoError(t, err)
+	elsewhere := filepath.Join(t.TempDir(), "same-bytes")
+	require.NoError(t, os.WriteFile(elsewhere, b, 0o600))
+	require.NoError(t, os.Remove(be.b.heldPath(e.Digest)))
+	if err := os.Symlink(elsewhere, be.b.heldPath(e.Digest)); err != nil {
+		t.Skipf("no symlinks: %v", err)
+	}
+	rec := be.decide(e.DocID, "separate", true)
+	assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+	assert.False(t, be.hasRecord(e.Digest))
+}
+
+// Mutant: the sweep removes anything in the held folder.
+func TestTheSweepRemovesOnlyExactHexRegularFiles(t *testing.T) {
+	be, _, _ := heldEdit(t)
+	dir := be.b.heldDir()
+	keep := map[string]func(string) error{
+		"notes.txt":              func(p string) error { return os.WriteFile(p, []byte("x"), 0o600) },
+		strings.Repeat("cd", 32): func(p string) error { return os.Mkdir(p, 0o700) },
+	}
+	for name, mk := range keep {
+		require.NoError(t, mk(filepath.Join(dir, name)))
+	}
+	link := strings.Repeat("ef", 32)
+	symlinked := os.Symlink(filepath.Join(dir, "notes.txt"), filepath.Join(dir, link)) == nil
+	be.notice()
+	for name := range keep {
+		_, err := os.Lstat(filepath.Join(dir, name))
+		assert.NoError(t, err, "%s stays: not an exact 64-hex regular file", name)
+	}
+	if symlinked {
+		_, err := os.Lstat(filepath.Join(dir, link))
+		assert.NoError(t, err, "a link is never removed through")
+	}
+}

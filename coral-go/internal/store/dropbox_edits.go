@@ -135,6 +135,21 @@ func (e *DropboxEdits) Holds(ctx context.Context, digest string) (bool, error) {
 	return n > 0, err
 }
 
+// DropOtherAccounts deletes the pending edits of every account but keep (” drops them all: not connected) and returns their digests, so the
+// held files go too (Security's condition c on #14714: Disconnect, a sign-in with another account and Rekey drop that account's edits). An edit
+// being decided is left to finish or come back to pending, and is dropped on the next pass.
+func (e *DropboxEdits) DropOtherAccounts(ctx context.Context, keep string) ([]string, error) {
+	var ds []string
+	if err := e.db.SelectContext(ctx, &ds, "SELECT digest FROM dropbox_edits WHERE state = ? AND account_id <> ?", DropboxEditPending, keep); err != nil {
+		return nil, err
+	}
+	if len(ds) == 0 {
+		return nil, nil
+	}
+	_, err := e.db.ExecContext(ctx, "DELETE FROM dropbox_edits WHERE state = ? AND account_id <> ?", DropboxEditPending, keep)
+	return ds, err
+}
+
 // Begin moves a document's pending edit to deciding, once: a second click, or the other button at the same time, gets ErrNotPending.
 func (e *DropboxEdits) Begin(ctx context.Context, doc string) (DropboxEdit, error) {
 	res, err := e.db.ExecContext(ctx, "UPDATE dropbox_edits SET state = ? WHERE doc_id = ? AND state = ?", DropboxEditDeciding, doc, DropboxEditPending)
@@ -154,6 +169,12 @@ func (e *DropboxEdits) Finish(ctx context.Context, id int64, state, result strin
 		return errors.New("not a decision")
 	}
 	_, err := e.db.ExecContext(ctx, "UPDATE dropbox_edits SET state = ?, result = ?, decided_at = ? WHERE id = ? AND state = ?", state, result, nowUTC(), id, DropboxEditDeciding)
+	return err
+}
+
+// Forget removes an open edit (its held bytes changed on disk): the listing fetches it again from Dropbox.
+func (e *DropboxEdits) Forget(ctx context.Context, id int64) error {
+	_, err := e.db.ExecContext(ctx, "DELETE FROM dropbox_edits WHERE id = ? AND state IN (?, ?)", id, DropboxEditPending, DropboxEditDeciding)
 	return err
 }
 

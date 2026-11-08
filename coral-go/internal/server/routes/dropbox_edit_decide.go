@@ -143,6 +143,21 @@ func (h *CloudHandler) decideEdit(w http.ResponseWriter, r *http.Request, promot
 		writeError(w, http.StatusInternalServerError, "", "could not read the edit")
 		return
 	}
+	// An edit of an account no longer connected is not decided here (Security's condition c); it is dropped on the next pass.
+	if c, cerr := d.store.Get(ctx); cerr != nil || !c.Connected || c.AccountID != e.AccountID {
+		_ = b.edits.Abandon(context.WithoutCancel(ctx), e.ID)
+		writeError(w, http.StatusConflict, "other_account", "This edit was made in a Dropbox account that is not the one connected now")
+		return
+	}
+	// The held bytes are read again, without following a link, and must still be the digest (conditions a and b).
+	if err := b.openHeld(e); err != nil {
+		bg := context.WithoutCancel(ctx)
+		_ = b.edits.Forget(bg, e.ID)                   // not this edit's bytes any more: it is forgotten,
+		b.dropHeld(bg, e.Digest)                       // its file goes (a regular file only),
+		_ = d.store.SetListCursor(bg, e.AccountID, "") // and the next listing reads Dropbox again from the start, so it is fetched again
+		writeError(w, http.StatusConflict, "held_changed", "The held edit changed on this computer: Coral will fetch it again from Dropbox")
+		return
+	}
 	state, result, out := store.DropboxEditSeparate, "", map[string]any{}
 	if promote {
 		state = store.DropboxEditPromoted
@@ -175,6 +190,7 @@ func (h *CloudHandler) decideEdit(w http.ResponseWriter, r *http.Request, promot
 	}
 	_ = d.store.AddAudit(ctx, store.DropboxAudit{Kind: store.DropboxAuditEdit, Who: "operator", Reason: state}) // no names, ids or bytes
 	b.dropHeld(ctx, e.Digest)                                                                                   // in the store now (or the same bytes were already): the held copy goes
+	b.sweepHeld(ctx)                                                                                            // and anything else no open edit names
 	noteArtifactsChanged()
 	out["decision"] = state
 	writeJSON(w, http.StatusOK, out)
