@@ -997,3 +997,9 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 #launch-disclosure-banner > details { min-width: 0; width: 100%; overflow-wrap: anywhere; }
 #launch-disclosure-banner summary { min-height: 44px; }
 #launch-disclosure-body > p { margin-bottom: 8px; }
+/* A short touch-screen agent view gives the conversation its rows back. This
+   folds only the collapsed notice; leaving the agent view or rotating back
+   restores it. Reading an expanded notice and the launch gate are unchanged. */
+@media (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    body.live-session-active #launch-disclosure-banner:not(:has(details[open])) { display: none; }
+}
