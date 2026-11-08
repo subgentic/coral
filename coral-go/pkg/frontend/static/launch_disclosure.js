@@ -38,9 +38,18 @@ export async function refreshLaunchDisclosure() {
         previous?.remove();
         const banner = document.createElement('div'); banner.id = 'launch-disclosure-banner'; banner.dataset.disclosureId = disclosure.id; banner.className = 'notice notice-info notice-bar'; banner.setAttribute('role', 'note');
         const text = document.createElement('span'); text.className = 'alerts-offer-text'; text.textContent = disclosure.text;
-        const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-small'; button.textContent = "I've read this";
-        button.addEventListener('click', async () => { button.disabled = true; try { await acknowledge('local', disclosure); } catch (error) { button.disabled = false; showToast(error.message, true); } });
-        banner.append(text, button);
+        const actions = document.createElement('div'); actions.className = 'launch-disclosure-actions';
+        const read = document.createElement('button'); read.type = 'button'; read.className = 'btn btn-small'; read.textContent = "I've read this";
+        const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'btn btn-small launch-disclosure-dismiss'; dismiss.textContent = 'Dismiss'; dismiss.setAttribute('aria-label', 'Dismiss, I have read this');
+        const acknowledgeFromBanner = async () => {
+            actions.querySelectorAll('button').forEach(button => { button.disabled = true; });
+            try { await acknowledge('local', disclosure); }
+            catch (error) { actions.querySelectorAll('button').forEach(button => { button.disabled = false; }); showToast(error.message, true); }
+        };
+        read.addEventListener('click', acknowledgeFromBanner);
+        dismiss.addEventListener('click', acknowledgeFromBanner);
+        actions.append(read, dismiss);
+        banner.append(text, actions);
         const after = document.getElementById('local-auth-banner') || document.querySelector('header.top-bar');
         if (after) after.after(banner); else document.body.prepend(banner);
         announceNotice(disclosure.text);

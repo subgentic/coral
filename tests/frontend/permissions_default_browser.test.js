@@ -1,5 +1,6 @@
 // Shipped role defaults, one-click narrow role limits, and explicit team choices.
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
 const { install: installTeam, openNewTeam, stubModels, T, N } = require('./helpers/new_team');
@@ -9,6 +10,7 @@ const { guardSettings } = require('./helpers/settings_guard');
  const guard=await guardSettings();
  const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();
  const full=['agent_spawn','file_read','file_write','shell','web_access'];
+ const disclosureWords=[], dismissChecks=[];
  try{
   await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
   for(const width of [1280,390]){
@@ -16,9 +18,7 @@ const { guardSettings } = require('./helpers/settings_guard');
    await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev,'startup','settings');await installTeam(ev);await stubModels(ev);
    const actual=await ev(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(async r=>({status:r.status,body:await r.json()}))`);
    assert.equal(actual.status,200,'real integrated owner disclosure route is readable');
-   assert.equal(actual.body.id,'full-permissions-3','pin the final security-reviewed disclosure version');
-   assert.match(actual.body.text,/run as you, with every file you can reach/,'real server text states the operating-system authority');
-   assert.match(actual.body.text,/Hermes/,'real server disclosure names Hermes Bypass');
+   disclosureWords.push({id:actual.body.id,text:actual.body.text,width});
    await ev(`fetch('/api/launch-disclosure/ack',{method:'DELETE'}).then(r=>r.ok)`);
    await ev(`fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({default_permission_mode:''})}).then(r=>r.ok)`);
    if(process.env.CORAL_TEST_STRICT) for(const path of ['/api/sessions/launch','/api/sessions/launch-team']){
@@ -29,7 +29,16 @@ const { guardSettings } = require('./helpers/settings_guard');
 
    await ev(`import((window.__coralStatic||'/static/')+'launch_disclosure.js').then(m=>m.refreshLaunchDisclosure())`);
    await waitFor(`!!document.getElementById('launch-disclosure-banner')`,'real unseen server record shows the banner');
-   await ev(`[...document.querySelectorAll('#launch-disclosure-banner button')].find(b=>b.textContent==="I've read this").click();true`);
+   if(process.env.CORAL_SCREENSHOT_DIR){fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true});fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/launch-disclosure-${width}.png`,Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}
+   dismissChecks.push(await ev(`(()=>{const banner=document.getElementById('launch-disclosure-banner'),button=[...banner.querySelectorAll('button')].find(b=>b.textContent.trim()==='Dismiss');if(!button)return{width:${width},visible:false};const a=button.getBoundingClientRect(),b=banner.getBoundingClientRect(),t=banner.querySelector('.alerts-offer-text').getBoundingClientRect();return{width:${width},visible:a.width>0&&a.height>0,label:button.getAttribute('aria-label'),inside:a.left>=b.left&&a.right<=b.right&&a.top>=b.top&&a.bottom<=b.bottom,nonOverlap:a.right<=t.left||a.left>=t.right||a.bottom<=t.top||a.top>=t.bottom,hitWidth:a.width,hitHeight:a.height}})()`));
+   const hasDismiss=await ev(`!![...document.querySelectorAll('#launch-disclosure-banner button')].find(b=>b.textContent.trim()==='Dismiss')`);
+   if(hasDismiss){
+    await ev(`(()=>{window.__bannerAck={calls:0,fail:true,real:window.fetch};window.fetch=(input,options={})=>{const path=new URL(String(input),location.href).pathname;if(path==='/api/launch-disclosure/ack'){window.__bannerAck.calls++;if(window.__bannerAck.fail)return Promise.resolve(Response.json({error:'owner_only'},{status:403}));}return window.__bannerAck.real(input,options)};[...document.querySelectorAll('#launch-disclosure-banner button')].find(b=>b.textContent.trim()==='Dismiss').click();return true})()`);
+    await waitFor(`window.__bannerAck.calls===1`,'dismiss sends the owner acknowledgement');
+    await waitFor(`!([...document.querySelectorAll('#launch-disclosure-banner button')].find(b=>b.textContent.trim()==='Dismiss')?.disabled)`,'failed acknowledgement restores the dismiss action');
+    assert.equal(await ev(`!!document.getElementById('launch-disclosure-banner')`),true,'failed acknowledgement keeps the banner visible');
+    await ev(`window.__bannerAck.fail=false;[...document.querySelectorAll('#launch-disclosure-banner button')].find(b=>b.textContent.trim()==='Dismiss').click();true`);
+   }else await ev(`[...document.querySelectorAll('#launch-disclosure-banner button')].find(b=>b.textContent==="I've read this").click();true`);
    await waitFor(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json()).then(d=>d.seen===true)`,'owner acknowledgement persisted on the real server');
    await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev,'startup','settings');await installTeam(ev);await stubModels(ev);
    await ev(`import((window.__coralStatic||'/static/')+'launch_disclosure.js').then(m=>m.refreshLaunchDisclosure())`);
@@ -98,6 +107,10 @@ const { guardSettings } = require('./helpers/settings_guard');
    assert.equal(await ev(`!!document.getElementById('launch-disclosure-banner')`),false,'acknowledged server state removes banner');
 
   }
+  assert.deepEqual(disclosureWords.map(x=>x.id),['full-permissions-4','full-permissions-4'],'copy changes version the owner acknowledgement at desktop and phone');
+  for(const {text,width} of disclosureWords){assert.equal(text,'Agents default to auto mode. Choose a different permission mode when you launch an agent or set a default in Settings.',width+': the Operator-chosen short wording keeps its mode-setting pointer');}
+  assert.deepEqual(dismissChecks.map(x=>x.visible),[true,true],'Dismiss is visible without expanding at desktop and phone');
+  for(const x of dismissChecks){assert.equal(x.label,'Dismiss, I have read this',x.width+': explicit accessible action name');assert.ok(x.inside&&x.nonOverlap&&x.hitWidth>=44&&x.hitHeight>=44,x.width+': dismiss has a full-size in-banner hit target clear of the disclosure text');}
   console.log('PASS shipped full presets, visible role limits and explicit team Default at desktop/phone');
  }finally{try{await guard.restore()}finally{await client.close()}}
 })().catch(e=>{console.error(e);process.exitCode=1});
