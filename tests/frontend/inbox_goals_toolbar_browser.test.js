@@ -34,20 +34,20 @@ const GOALS = [
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady('startup', 'liveList', 'settings');
             await ev(`try { localStorage.removeItem('coral-inbox-goals-filters'); } catch {} true`);
-            await ev(`(() => { const R = window.fetch; window.fetch = (u, o) => /\\/api\\/goals(\\?|$)/.test(String(u)) ? Promise.resolve(new Response(JSON.stringify({ goals: ${JSON.stringify(GOALS)} }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : R(u, o); return true; })()`);
+            await ev(`(() => { const R = window.fetch; window.fetch = (u, o) => /\\/api\\/goals(\\?|$)/.test(String(u)) ? Promise.resolve(new Response(JSON.stringify({ goals: ${JSON.stringify(GOALS)}.filter(g => (g.state === 'done') === /[?&]state=done/.test(String(u))) }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : R(u, o); return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`document.querySelectorAll('.view-list-item').length > 3 || !!document.querySelector('.view-list select')`, 'the folders', 10000);
-            await waitFor(`(rows => /Goals5/.test(rows.join('|')) && ['All chats', 'Board history', 'With notes', 'Starred', 'Active now', 'Archived'].every(n => rows.some(r => r.startsWith(n) && /\\d/.test(r.slice(n.length)))))(${FOLDER_ROWS})`, 'every chat folder shows its count (the first snapshot is taken after they arrive: Windows CI showed them blank before and 0 after)', 15000);
+            await waitFor(`(rows => /Goals4/.test(rows.join('|')) && ['All chats', 'Board history', 'With notes', 'Starred', 'Active now', 'Archived'].every(n => rows.some(r => r.startsWith(n) && /\\d/.test(r.slice(n.length)))))(${FOLDER_ROWS})`, 'every chat folder shows its count (the first snapshot is taken after they arrive: Windows CI showed them blank before and 0 after)', 15000);
             const before = await folders();
             if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); if (s) { s.value = 'goals'; s.dispatchEvent(new Event('change', { bubbles: true })); } return true; })()`);
             else await ev(`document.querySelector('.view-list-item[data-key="goals"]').click(); true`);
-            await waitFor(`document.querySelectorAll('button.dt-primary').length >= 5`, 'five goals', 10000); await settle(300);
+            await waitFor(`document.querySelectorAll('button.dt-primary').length >= 4`, 'four open goals', 10000); await settle(300);
 
             check(`${label}: ${label === '390' ? 'opening the folder does not put the keyboard on the search box: a phone starts at the first row or the heading (#9985)' : "opening the folder puts the focus on the page's search box, not on the heading"}`, await ev(`(() => { const a = document.activeElement; const inSearch = !!a && a.matches('input[type=search]') && !!a.closest('.inbox-folder-toolbar'); return ${label === '390' ? '!a || !/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)' : 'inSearch'}; })()`), await ev(`document.activeElement && (document.activeElement.id || document.activeElement.className || document.activeElement.tagName)`));
             const g = await geometry();
             check(`${label}: the Goals page has a search box named "Search goals" and the Filters icon in the same row, to its right`, g && g.qName === 'Search goals' && (mobile ? g.searchW === 0 : g.sameRow && g.right) && /Filters/.test(g.toggleName), JSON.stringify(g));
             if (mobile) check(`${label}: the pills are not in the row (one select in the Filters sheet since #8700), the page's box is not drawn (the top pill is the search, #13591), nothing is wider than the screen`, g && !g.select && !g.pills && g.searchW === 0 && g.over <= 0, JSON.stringify(g));
-            else check(`${label}: the state pills are in the row (All, Active, Blocked, Proposed, Done) with their counts`, g && g.pills && (await ev(`[...document.querySelectorAll('.team-tb-pills .goals-chip')].map(b => b.textContent.trim()).join('|')`)) === 'All 5|Active 2|Blocked 1|Proposed 1|Done 1');
+            else check(`${label}: the state pills are in the row (All, Active, Blocked, Proposed, Done) with their counts`, g && g.pills && (await ev(`[...document.querySelectorAll('.team-tb-pills .goals-chip')].map(b => b.textContent.trim()).join('|')`)) === 'All 4|Active 2|Blocked 1|Proposed 1|Done');
 
             await pick('blocked'); await settle(300);
             check(`${label}: the Blocked pill shows only the blocked goal`, JSON.stringify(await titles()) === JSON.stringify(['Cut the cold start']), JSON.stringify(await titles()));
@@ -59,10 +59,10 @@ const GOALS = [
             check(`${label}: no label of the Filters panel wraps (each sits above its box)`, await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-menu .list-bar-field-label')].filter(e => e.getClientRects().length).every(e => e.getBoundingClientRect().height < 22 && e.getBoundingClientRect().width >= 110)`));
             await setField('inbox-goals-team', 'team-b'); await settle(400);
             const chipText = () => ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-chip-text')].map(e => e.textContent).join('|')`);
-            check(`${label}: a Team filter shows only that team's goals, as a chip "Team: team-b"`, JSON.stringify(await titles()) === JSON.stringify(['Close the old board', 'Plan the migration', 'Write the guide']) && (await chipText()) === 'Team: team-b', JSON.stringify([await titles(), await chipText()]));
+            check(`${label}: a Team filter shows only that team's goals, as a chip "Team: team-b"`, JSON.stringify(await titles()) === JSON.stringify(['Plan the migration', 'Write the guide']) && (await chipText()) === 'Team: team-b', JSON.stringify([await titles(), await chipText()]));
             check(`${label}: the icon says one filter is on`, /1 on/.test(await ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle').getAttribute('aria-label')`)));
             await setField('inbox-goals-driver', 'Orchestrator'); await settle(400);
-            check(`${label}: Team and Driver together narrow further`, JSON.stringify(await titles()) === JSON.stringify(['Close the old board', 'Plan the migration']), JSON.stringify(await titles()));
+            check(`${label}: Team and Driver together narrow further`, JSON.stringify(await titles()) === JSON.stringify(['Plan the migration']), JSON.stringify(await titles()));
             check(`${label}: the filters are kept in the browser for the folder`, /team-b/.test(await ev(`localStorage.getItem('coral-inbox-goals-filters') || ''`)));
             check(`${label}: the folder list (the sidebar) is as it was`, (await folders()) === before, before + ' vs ' + (await folders()));
 
@@ -71,7 +71,10 @@ const GOALS = [
             await waitFor(`[...document.querySelectorAll('button.dt-primary')].filter(b => b.getClientRects().length).length === 1`, 'the search narrows', 6000);
             check(`${label}: the search narrows inside the filters`, JSON.stringify(await titles()) === JSON.stringify(['Plan the migration']), JSON.stringify(await titles()));
             await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-chip-all')].forEach(b => b.click()); true`); await settle(500);
-            check(`${label}: Clear all gives every goal back`, (await titles()).length === 5, JSON.stringify(await titles()));
+            check(`${label}: Clear all gives every goal back`, (await titles()).length === 4, JSON.stringify(await titles()));
+            await pick('done'); await settle(600);
+            check(`${label}: the Done pill reads the finished goals and lists them (#14601)`, JSON.stringify(await titles()) === JSON.stringify(['Close the old board']), JSON.stringify(await titles()));
+            await pick('all'); await settle(600);
         }
     } finally { await client.close(); }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }

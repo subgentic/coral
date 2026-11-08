@@ -637,6 +637,7 @@ async function refreshTasks() {
 }
 
 // ── Goals ────────────────────────────────────────────────────────────────
+let doneKnown = false; // the finished goals are read only while the Done pill is picked: its count is not known before that (#14641)
 let goals = []; // the open goals of every team (GET /api/goals): id, board_id, title, outcome, state, rollup, updated_at
 const goalKey = g => `${g.board_id}#${g.id}`;
 /** The phone's bulk action on selected goals of any team: Close as Done or Dropped with a reason, one request per goal on its own team (#12230). */
@@ -690,8 +691,8 @@ function inboxGoalsToolbar() {
         filters: goalFilters,
         options: { team: { values: teams, labels: Object.fromEntries(teams.map(t => [t, goalTeam({ board_id: t })])) }, driver: { values: drivers } },
         pills: { label: 'Show goals that are', current: goalFilters.state || 'all',
-            items: [{ key: 'all', label: 'All', count: rows.filter(g => String(g.state || '').toLowerCase() !== 'done').length }, ...GF.STATES.map((key, i) => ({ key, label: GF.STATE_LABEL[key], count: counts[i] }))],
-            onPick: key => { goalFilters = { ...goalFilters, state: key === 'all' ? '' : key }; GF.saveFilters(goalFilters); renderInboxNav(true); } },
+            items: [{ key: 'all', label: 'All', count: rows.filter(g => String(g.state || '').toLowerCase() !== 'done').length }, ...GF.STATES.map((key, i) => ({ key, label: GF.STATE_LABEL[key], count: key === 'done' && !doneKnown ? undefined : counts[i] }))],
+            onPick: key => { const was = goalFilters.state === 'done'; goalFilters = { ...goalFilters, state: key === 'all' ? '' : key }; GF.saveFilters(goalFilters); renderInboxNav(true); if (was !== (goalFilters.state === 'done')) refreshGoals(); /* the Done pill reads the finished goals, the others the open ones (one read each) */ } },
         action: newGoalAction(),
     });
     return { node, signature: JSON.stringify([goalFilters, teams, drivers, counts, rows.length]) };
@@ -741,7 +742,10 @@ function refreshGoals(force = true) {
 async function readGoals() {
     let ok = true;
     try {
-        goals = await listInboxGoals(); ok = !goalsReadFailed();
+        const finished = goalFilters.state === 'done', read = await listInboxGoals(finished); ok = !goalsReadFailed();
+        if (ok && finished) doneKnown = true;
+        if (ok) { const isDone = g => String(g.state || '').toLowerCase() === 'done'; goals = finished ? [...goals.filter(g => !isDone(g)), ...read] : [...read, ...goals.filter(isDone)]; } // one read per gap: the other kind stays as the last read left it
+        else if (!goals.length) goals = [];
     } catch { goals = []; ok = false; }
     if (!isCloud()) try { // Local hidden state lives in this computer's settings; Hub goals carry per-computer done_state.
         const r = await fetch('/api/settings');
