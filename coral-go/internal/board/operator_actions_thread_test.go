@@ -257,6 +257,10 @@ func TestADatabaseFromBeforeTheColumnsGetsThemAndItsRowsHaveNoThread(t *testing.
 	s := activityStore(t)
 	ctx := context.Background()
 	require.NoError(t, s.RecordActivity(ctx, opMeta, ActMessage, "message", "1", "", "team-a"))
+	for _, idx := range []string{"idx_operator_actions_team_goal", "idx_operator_actions_team_task"} { // SQLite will not drop an indexed column: the old database had no such index (#14440 adds them)
+		_, err := s.db.ExecContext(ctx, `DROP INDEX IF EXISTS `+idx)
+		require.NoError(t, err)
+	}
 	_, err := s.db.ExecContext(ctx, `ALTER TABLE operator_actions DROP COLUMN goal_id`)
 	require.NoError(t, err)
 	_, err = s.db.ExecContext(ctx, `ALTER TABLE operator_actions DROP COLUMN task_id`)

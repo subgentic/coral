@@ -18,15 +18,17 @@ const LONG = 'Not now: the build is red, the release notes are not written and I
                 window.__rows = [
                     { id: 9, action: 'dismiss', item_kind: 'question', item_id: '5', title: '', note: 'Dismissed by the operator', at: at(6), ...base },
                     { id: 8, action: 'answer', item_kind: 'question', item_id: '6', title: 'Orchestrator', note: '@Orchestrator 1 is fine for now', at: at(6), ...base },
-                    { id: 7, action: 'answer', item_kind: 'question', item_id: '7', title: 'Which of the two designs should ship in v2.0.61?', asker: 'Orchestrator', note: '@Orchestrator Option 2', at: at(7), ...base },
+                    { id: 7, action: 'answer', item_kind: 'question', item_id: '7', title: '@Operator Which of the two designs should ship in v2.0.61?', asker: 'Orchestrator', note: '@Orchestrator Option 2', at: at(7), ...base },
                     { id: 6, action: 'answer', item_kind: 'question', item_id: '8', title: '', note: 'Yes', at: at(7), team: 'coral-go-team', actor: 'operator', source: 'local', version: '', hint: '', surface: '' },
                     { id: 5, action: 'dismiss', item_kind: 'question', item_id: '9', title: 'Ship it?', note: ${JSON.stringify(LONG)}, at: at(9), ...base },
                     { id: 4, action: 'file_unstar', item_kind: 'file', item_id: 'a'.repeat(64), version: 'a'.repeat(64), title: 'release-plan.md', note: '', at: at(40), ...base },
                     { id: 3, action: 'file_star', item_kind: 'file', item_id: 'b'.repeat(64), version: 'b'.repeat(64), title: '', note: '', at: at(41), ...base },
+                    { id: 2, action:'file_tags',item_kind:'file',item_id:'c'.repeat(64),title:'tagged-plan.md',note:'',at:at(42),...base },
+                    { id: 1, action:'file_share',item_kind:'file',item_id:'d'.repeat(64),title:'shared-plan.md',note:'',at:at(43),...base },
                 ];
-                const real = window.fetch; window.fetch = (u, o) => new URL(String(u), location.origin).pathname === '/api/activity' ? Promise.resolve(new Response(JSON.stringify({ actions: window.__rows, check: { intact: true, rows: 7 } }), { headers: { 'Content-Type': 'application/json' } })) : real(u, o);
+                const real = window.fetch; window.fetch = (u, o) => new URL(String(u), location.origin).pathname === '/api/activity' ? Promise.resolve(new Response(JSON.stringify({ actions: window.__rows, check: { intact: true, rows: 9 } }), { headers: { 'Content-Type': 'application/json' } })) : real(u, o);
                 localStorage.removeItem('coral-inbox-activity-filters'); window.switchNavTab('hub-inbox'); return import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.openInboxGroup('activity')).then(() => true); })()`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 7`, `${width}: the seven rows`, 15000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 9`, `${width}: the nine rows`, 15000);
             await new Promise(r => setTimeout(r, 400)); // sleep-ok: the columns settle
             if (process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/activity-rule-${width}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
             const text = await ev(`document.querySelector('#group-table-view').textContent.replace(/\\s+/g, ' ')`);
@@ -41,9 +43,9 @@ const LONG = 'Not now: the build is red, the release notes are not written and I
             assert.ok(text.includes(LONG), `${width}: a long note is whole, not cut`);
             if (width === 1280) {
                 const cols = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(tr => ({ did: (tr.querySelector('td[data-key="action"]') || {}).textContent, on: (tr.querySelector('td[data-key="item"] .dt-primary, td[data-key="item"] .activity-item') || {}).textContent, detail: (tr.querySelector('.activity-detail') || {}).textContent || '', cut: tr.querySelector('.activity-detail') ? tr.querySelector('.activity-detail').scrollWidth > tr.querySelector('.activity-detail').clientWidth + 1 : false }))`);
-                assert.deepEqual(cols.map(c => c.did), ['Dismissed', 'Answered', 'Answered', 'Answered', 'Dismissed', 'Unstarred', 'Starred'], `${width}: YOU DID is the verb alone: ${JSON.stringify(cols.map(c => c.did))}`);
-                assert.deepEqual(cols.map(c => c.on), ['a question', 'Orchestrator’s question', 'Which of the two designs should ship in v2.0.61?', 'a question', 'Ship it?', 'release-plan.md', 'a file'], `${width}: ON is the object alone: ${JSON.stringify(cols.map(c => c.on))}`);
-                assert.deepEqual(cols.map(c => c.detail), ['', 'Your answer: 1 is fine for now', 'from Orchestrator · Your answer: Option 2', 'Your answer: Yes', LONG, '', ''], `${width}: the detail is on its own line: ${JSON.stringify(cols.map(c => c.detail))}`);
+                assert.deepEqual(cols.map(c => c.did), ['Dismissed', 'Answered', 'Answered', 'Answered', 'Dismissed', 'Unstarred', 'Starred', 'Changed the tags', 'Shared'], `${width}: YOU DID is the verb alone: ${JSON.stringify(cols.map(c => c.did))}`);
+                assert.deepEqual(cols.map(c => c.on), ['a question', 'Orchestrator’s question', 'Which of the two designs should ship in v2.0.61?', 'a question', 'Ship it?', 'release-plan.md', 'a file', 'tagged-plan.md', 'shared-plan.md'], `${width}: ON is the object alone: ${JSON.stringify(cols.map(c => c.on))}`);
+                assert.deepEqual(cols.map(c => c.detail), ['', 'Your answer: 1 is fine for now', 'from Orchestrator · Your answer: Option 2', 'Your answer: Yes', LONG, '', '', '', ''], `${width}: the detail is on its own line: ${JSON.stringify(cols.map(c => c.detail))}`);
                 assert.ok(cols.every(c => !c.cut), `${width}: no detail is cut`);
             } else {
                 const wrap = await ev(`[...document.querySelectorAll('#group-table-view tbody .dt-mail-ask, #group-table-view tbody .dt-mail-title')].map(e => ({ t: e.textContent.slice(0, 30), cut: e.scrollWidth > e.clientWidth + 1 || getComputedStyle(e).textOverflow === 'ellipsis' }))`);
