@@ -79,6 +79,7 @@ const SCEN = [
                     else if (p === '/api/themes') pr = A.themes === 500 ? json({}, 500) : json({ themes: A.themes ? [{ name: 'Mine' }, { name: 'Other' }] : [] });
                     else if (p === '/api/agent-models') pr = A.models === 500 ? json({}, 500) : json({ claude: ['opus', 'sonnet'], codex: ['gpt'], agy: ['gem'], pi: ['p1'] });
                     else if (p === '/api/system/api-key') pr = A.key === 401 ? json({}, 401) : json({ key: typeof A.key === 'string' ? A.key : '' });
+                    else if (p === '/api/system/terminal-backend' && (o.method || 'GET').toUpperCase() === 'GET') pr = json({ saved: '', running: 'pty', forced: false, choice: ${process.platform !== 'win32'}, next: 'pty', restart_required: false, can_restart: false, running_agents: 0, leftover_tmux_agents: 0, default_notice: false }); // pinned: the real answer's choice is true only where the server finds tmux, so the Terminal backend control read "" on a machine without it (#14528)
                     else if (p === '/api/system/status') pr = A.status === 500 ? json({}, 500) : json({ version: '9.9.9' });
                     else pr = real(u, o);
                     window.__inflight++;
