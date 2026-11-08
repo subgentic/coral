@@ -27,6 +27,8 @@ func TestMain(m *testing.M) {
 	os.Setenv("CORAL_BOARD_SEARCH_INDEX", "off")
 	// Every test that launches Codex shares one Codex home: the first-start gap (#6364) is for the test that sets it.
 	codexFirstStartGap = 0
+	// The document-id migration (#14551) runs in place in tests: a background writer must not outlive a test's temp folder.
+	docIDMigrationStart = func(dir string) { migrateDocIDs(dir) }
 	// CI sets CORAL_TELEMETRY_DISABLED=1 for every job (the telemetry census requires it), and with it set the analytics tests
 	// (launch, lifecycle, prerequisite) see no events: they check what is sent, to a local sink. The tracking package's TestMain
 	// does the same; the tests that check the variable set it themselves (#4997).

@@ -61,6 +61,9 @@ type agentUploadRecord struct {
 	// TaskID is the task of the uploader's board this upload is linked to (#7739): the agent's one task in progress at the upload, or the one it named. Absent on a person's upload and on one made
 	// with no task. It is checked against the board when the list is made (a task that is not on the team's board is not shown).
 	TaskID int64 `json:"task_id,omitempty"`
+	// DocID is the document this upload is (#14551, Dropbox stage 1): 32 random hex, never a digest, made at the first upload and kept by every re-upload of the same bytes by the same
+	// session. A version's document id is its series id. Two uploads of the same bytes are two documents, though they share one object.
+	DocID string `json:"doc_id,omitempty"`
 }
 
 // sourcePaste marks an upload record made from an image pasted or attached in the dashboard.
@@ -76,6 +79,7 @@ func (h *SessionsHandler) RegisterAgentArtifacts(r chi.Router) {
 	st.maxBytes = h.artifactStoreMaxBytes
 	st.receivedMaxBytes = h.receivedArtifactsMaxBytes
 	st.mu.Unlock()
+	docIDMigrationStart(h.cfg.CoralDir()) // in the background: startup never waits for it (#14551)
 	r.Post("/api/agent/artifacts", h.uploadAgentArtifact)
 	r.Get("/api/artifacts", h.listAllArtifacts)                           // the machine-wide list, the owner's (#5575)
 	r.Get("/api/artifacts/resolve", h.resolveArtifactRefs)                // #9841: which artifact a shortened link in an old message means
@@ -563,6 +567,8 @@ func storeArtifactFileAs(coralDir, sessionID, name, mediaType, tmpPath, hexID st
 			if stamp != nil { // a version of a series: the record says which (#6357)
 				ur.SeriesID, ur.Version, ur.Previous = stamp.ID, stamp.Version, stamp.Previous
 			}
+			prev, _ := readUploadRecord(coralDir, sessionID, hexID) // a re-upload keeps its document id; a version's is its series id (#14551)
+			ur.DocID = docIDFor(docIDOf(prev), stamp)
 			recPath := filepath.Join(up, hexID+".json")
 			switch {
 			case taskID > 0:

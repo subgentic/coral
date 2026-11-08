@@ -279,6 +279,8 @@ type crossTeamArtifactRecord struct {
 	// first source stays in the fields above, write-once), so the board can see that more than one
 	// Coral sent it (#4449).
 	Also []crossTeamAlso `json:"also,omitempty"`
+	// DocID: a received row is a document of its own (#14551): 32 random hex, set when the row is first written. Absent on a "shared" row, which records a send of an upload.
+	DocID string `json:"doc_id,omitempty"`
 }
 
 // crossTeamAlso is one later receipt of a file a board already had.
@@ -318,6 +320,11 @@ func (h *BoardHandler) writeCrossTeamRecord(kind string, rec crossTeamArtifactRe
 	}()
 	if !objectNameRe.MatchString(rec.ID) { // an id read from a file or a message is a 64-digit hex name before it is joined onto a folder (#5305)
 		return errors.New("not an artifact id")
+	}
+	if kind == "received" && !seriesIDRe.MatchString(rec.DocID) { // a received file is a document of its own (#14551)
+		if id, err := newDocID(); err == nil {
+			rec.DocID = id
+		}
 	}
 	dir := h.boardRecordDir(kind, rec.Board)
 	if dir == "" {

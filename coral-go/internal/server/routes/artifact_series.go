@@ -381,9 +381,13 @@ func planNewVersion(coralDir, ref, callerBoard, newDigest string) (*seriesPlan, 
 		}
 	}
 	if p.id == "" {
-		id, err := newSeriesID()
-		if err != nil {
-			return nil, err
+		// A new series is the document its first version already is (#14551): it takes that record's document id, unless an index already has that id. Otherwise a new id.
+		id := p.base.rec.DocID
+		if !seriesIDRe.MatchString(id) || seriesIDInUse(coralDir, id) {
+			var err error
+			if id, err = newSeriesID(); err != nil {
+				return nil, err
+			}
 		}
 		p.id, p.create = id, true
 	}
@@ -490,6 +494,9 @@ func stampRecord(coralDir, session, digest string, s seriesStamp) error {
 		return fmt.Errorf("no upload record to stamp")
 	}
 	rec.SeriesID, rec.Version, rec.Previous = s.ID, s.Version, s.Previous
+	if !seriesIDRe.MatchString(rec.DocID) { // a record made before document ids: its document is now its series (#14551)
+		rec.DocID = s.ID
+	}
 	up := uploadsDir(coralDir, session)
 	if up == "" {
 		return fmt.Errorf("no upload folder")
@@ -499,6 +506,16 @@ func stampRecord(coralDir, session, digest string, s seriesStamp) error {
 		return err
 	}
 	return writeFileAtomic(filepath.Join(up, digest+".json"), b, 0o600)
+}
+
+// seriesIDInUse says an index for id already exists (a series id can't be reused for another document).
+func seriesIDInUse(coralDir, id string) bool {
+	p := seriesPath(coralDir, id)
+	if p == "" {
+		return true
+	}
+	_, err := os.Lstat(p)
+	return err == nil
 }
 
 // forgetVersion removes one version from its series' index after the artifact was deleted: the others keep their numbers (the bar says "v2 removed"), and an empty series disappears.

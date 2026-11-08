@@ -237,7 +237,7 @@ func runExternalMessageOracle(t *testing.T, seed int64, counts map[string]int) {
 			for _, kind := range []string{"shared", "received"} {
 				for _, b := range []string{"alpha", "beta"} {
 					j, _ := json.Marshal(s.h.crossTeamRecords(kind, b))
-					fmt.Fprintf(&rb, "%s/%s %s;", kind, b, oracleStamp.ReplaceAllString(string(j), "<t>"))
+					fmt.Fprintf(&rb, "%s/%s %s;", kind, b, oracleDocID.ReplaceAllString(oracleStamp.ReplaceAllString(string(j), "<t>"), `"doc_id":"<d>"`))
 				}
 			}
 			results[i] = result{rec.Code, oracleStamp.ReplaceAllString(oracleCrossTeamID.ReplaceAllString(rec.Body.String(), ""), "<t>"), msgs, rb.String(), append([]string(nil), *s.notified...)}
