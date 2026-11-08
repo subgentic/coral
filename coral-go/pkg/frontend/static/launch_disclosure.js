@@ -5,7 +5,7 @@ import { showToast } from './utils.js';
 import { showConfirmModal } from './confirm_dialog.js';
 import { announceNotice } from './notifications.js';
 let readGeneration = 0;
-const headline = 'New agents start with full permissions: they can run commands and change files without asking you';
+const headline = 'Agents default to auto mode.';
 function disclosureSection(id, title, disclosure) {
     const section = document.createElement('details'); section.className = 'disclosure';
     const summary = document.createElement('summary');
