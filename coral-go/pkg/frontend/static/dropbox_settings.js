@@ -93,6 +93,12 @@ export async function loadDropbox() {
     try {
         const r = await fetch(STATUS, { cache: 'no-store' });
         if (r.ok) st = await r.json();
+        else if (r.status === 403 || r.status === 404) {
+            // Through Coral Hub every Dropbox route is refused (never in the tunnel table): say where it is done instead.
+            for (const id of ['settings-dropbox-connect', 'settings-dropbox-disconnect', 'settings-dropbox-switch', 'settings-dropbox-takeover']) show(id, false);
+            setStatus('Dropbox backup is set up on the computer itself, not through Coral Hub.');
+            return null;
+        }
     } catch { /* shown below */ }
     if (!st) {
         setStatus("Couldn't read the Dropbox connection.");

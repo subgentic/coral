@@ -127,6 +127,12 @@ const { JSDOM } = require('jsdom');
     m.stopDropboxPoll();
     popupBlocked = false;
 
+    // Through Coral Hub the routes are refused: the block says where Dropbox is set up, with no buttons (hub census: explains).
+    answers['/api/dropbox/status'] = { status: 403, body: { error: 'forbidden' } };
+    await m.loadDropbox();
+    assert.match($('settings-dropbox-status').textContent, /set up on the computer itself, not through Coral Hub/);
+    assert.ok(!shown('settings-dropbox-connect') && !shown('settings-dropbox-disconnect'));
+
     // Nothing from the server is put into the page as HTML.
     await status({ app_key_set: true, connected: true, state: 'connected', account_id: '<img src=x onerror=alert(1)>' });
     assert.strictEqual(document.querySelector('#settings-dropbox img'), null);
