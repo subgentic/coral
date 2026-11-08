@@ -108,7 +108,7 @@ function renderBackup(st, keepControls = false) {
     if (box) for (const input of box.querySelectorAll('input[type=checkbox]')) input.checked = chosen.has(input.value);
     const age = $('settings-dropbox-age');
     if (age) age.value = String((st.filters && st.filters.max_age_days) || 0);
-    const ret = $('settings-dropbox-retention-days');
+    const ret = $('settings-dropbox-keep-for');
     if (ret && !pendingRetention) ret.value = String(keep);
 }
 
@@ -356,7 +356,7 @@ function sizeText(bytes) {
 
 // retentionDays reads the field: a whole number 0 to 3650, or null (1.9, -1, letters, an empty field and anything else send nothing; UI Reviewer's MUST 2 on #14703).
 function retentionDays() {
-    const raw = String(($('settings-dropbox-retention-days') || {}).value || '').trim();
+    const raw = String(($('settings-dropbox-keep-for') || {}).value || '').trim();
     if (!/^[0-9]{1,4}$/.test(raw)) return null;
     const days = Number(raw);
     return days <= 3650 ? days : null;
@@ -407,7 +407,7 @@ export async function confirmRetention() {
     if (!p || p.seq !== retentionSeq || retentionDays() !== p.days) { dropRetentionPreview(); return; }
     pendingRetention = null;
     showRetentionConfirm(false);
-    focusEl('settings-dropbox-retention-days');
+    focusEl('settings-dropbox-keep-for');
     let res;
     try { res = await post(RETENTION, 'PUT', JSON.stringify({ days: p.days, confirm: true, seen_count: p.due, seen_bytes: p.bytes })); } catch { res = { ok: false, body: {} }; }
     if (!res.ok) { note(String(res.body.error || "Couldn't save. Try again.")); return; }
@@ -419,7 +419,7 @@ function cancelRetention() {
     dropRetentionPreview();
     note('Nothing changed.');
     if (lastStatus) renderBackup(lastStatus);
-    focusEl('settings-dropbox-retention-days'); // the buttons that had focus are gone (UI Reviewer's SHOULD on #14703)
+    focusEl('settings-dropbox-keep-for'); // the buttons that had focus are gone (UI Reviewer's SHOULD on #14703)
 }
 
 function focusEl(id) {
@@ -439,7 +439,7 @@ function wire() {
     on('settings-dropbox-retention-save', saveRetention);
     on('settings-dropbox-retention-on', confirmRetention);
     on('settings-dropbox-retention-cancel', cancelRetention);
-    const field = $('settings-dropbox-retention-days');
+    const field = $('settings-dropbox-keep-for');
     if (field) field.addEventListener('input', dropRetentionPreview); // a changed field takes the shown count and Turn on away
     wired = true;
 }

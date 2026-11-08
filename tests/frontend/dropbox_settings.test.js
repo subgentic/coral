@@ -21,7 +21,7 @@ const { JSDOM } = require('jsdom');
           <div id="settings-dropbox-types"></div>
           <input id="settings-dropbox-age" type="number">
           <button id="settings-dropbox-filters-save"></button>
-          <input id="settings-dropbox-retention-days" type="number">
+          <input id="settings-dropbox-keep-for" type="number">
           <button id="settings-dropbox-retention-save"></button>
           <button id="settings-dropbox-retention-on" hidden></button>
           <button id="settings-dropbox-retention-cancel" hidden></button>
@@ -279,17 +279,17 @@ const { JSDOM } = require('jsdom');
     assert.match(line(), /1 no longer at its place in Dropbox/, 'never "removed by Coral"');
     assert.match(line(), /2 edited in Dropbox, kept there/);
     assert.doesNotMatch(line(), /Keeping files in Dropbox/, 'off: no retention sentence');
-    assert.strictEqual($('settings-dropbox-retention-days').value, '0');
+    assert.strictEqual($('settings-dropbox-keep-for').value, '0');
     await status({ ...connected, filters: { types: [], max_age_days: 10 }, retention: { days: 3, waiting_for_files: true } });
     assert.match(line(), /from the last 3 days, the retention window\./, 'the smaller window is the one uploads use');
     assert.match(line(), /Keeping files in Dropbox for 3 days\. Retention starts once at least 2 artifacts are backed up\./);
-    assert.strictEqual($('settings-dropbox-retention-days').value, '3');
+    assert.strictEqual($('settings-dropbox-keep-for').value, '3');
 
     await status({ ...connected, retention: { days: 0 } });
     const retentionCalls = () => calls.filter(c => c.url === '/api/dropbox/retention').map(c => JSON.parse(c.body));
     const before = retentionCalls().length;
     answers['/api/dropbox/retention'] = { status: 200, body: { dry_run: true, days: 7, due: 4, bytes: 2048, held: 6 } };
-    $('settings-dropbox-retention-days').value = '7';
+    $('settings-dropbox-keep-for').value = '7';
     await m.saveRetention();
     assert.deepStrictEqual(retentionCalls().slice(before), [{ days: 7 }], 'first a dry run, nothing confirmed');
     assert.match($('settings-dropbox-note').textContent, /Keeping files for 7 days: 4 files \(2 KB\) would be deleted from Dropbox now, and 6 more on later passes\. Turn on, or Cancel\./, 'the count names the days it is for');
@@ -298,11 +298,11 @@ const { JSDOM } = require('jsdom');
     $('settings-dropbox-retention-cancel').click();
     assert.ok(!shown('settings-dropbox-retention-on'));
     assert.match($('settings-dropbox-note').textContent, /Nothing changed/);
-    assert.strictEqual($('settings-dropbox-retention-days').value, '0');
-    assert.strictEqual(document.activeElement, $('settings-dropbox-retention-days'), 'focus goes back to the field when the buttons go (SHOULD)');
+    assert.strictEqual($('settings-dropbox-keep-for').value, '0');
+    assert.strictEqual(document.activeElement, $('settings-dropbox-keep-for'), 'focus goes back to the field when the buttons go (SHOULD)');
     assert.strictEqual(retentionCalls().length, before + 1);
     // Turn on: saved with the count the person saw.
-    $('settings-dropbox-retention-days').value = '7';
+    $('settings-dropbox-keep-for').value = '7';
     await m.saveRetention();
     answers['/api/dropbox/retention'] = { status: 200, body: { days: 7 } };
     await m.confirmRetention();
@@ -310,14 +310,14 @@ const { JSDOM } = require('jsdom');
     assert.ok(!shown('settings-dropbox-retention-on'));
     assert.match($('settings-dropbox-note').textContent, /Retention is on/);
     // Off: no dry run.
-    $('settings-dropbox-retention-days').value = '0';
+    $('settings-dropbox-keep-for').value = '0';
     await m.saveRetention();
     assert.deepStrictEqual(retentionCalls().pop(), { days: 0 });
     assert.match($('settings-dropbox-note').textContent, /Retention is off/);
     // A refused read while the count waits takes Turn on away.
     answers['/api/dropbox/retention'] = { status: 200, body: { dry_run: true, days: 2, due: 0, bytes: 0, held: 0 } };
     await status({ ...connected, retention: { days: 0 } });
-    $('settings-dropbox-retention-days').value = '2';
+    $('settings-dropbox-keep-for').value = '2';
     await m.saveRetention();
     assert.match($('settings-dropbox-note').textContent, /Keeping files for 2 days: nothing would be deleted from Dropbox now/);
     answers['/api/dropbox/status'] = { status: 403, body: { error: 'x', code: 'other_user' } };
@@ -331,7 +331,7 @@ const { JSDOM } = require('jsdom');
     answers['/api/dropbox/retention'] = { status: 200, body: { dry_run: true, days: 1, due: 9, bytes: 1, held: 0 } };
     for (const bad of ['1.9', '-1', 'abc', '', '4000', '1e3', '7.0', '0x10', '3651']) {
         const n0 = retentionCalls().length;
-        $('settings-dropbox-retention-days').value = bad;
+        $('settings-dropbox-keep-for').value = bad;
         await m.saveRetention();
         assert.strictEqual(retentionCalls().length, n0, `nothing sent for ${JSON.stringify(bad)}`);
         assert.ok(!shown('settings-dropbox-retention-on'));
@@ -341,18 +341,18 @@ const { JSDOM } = require('jsdom');
     // (1) The confirm is bound to the days the field shows. Edited after the count (with or without an input event): Turn on goes, and a
     // confirm sends nothing.
     answers['/api/dropbox/retention'] = { status: 200, body: { dry_run: true, days: 7, due: 4, bytes: 10, held: 0 } };
-    $('settings-dropbox-retention-days').value = '7';
+    $('settings-dropbox-keep-for').value = '7';
     await m.saveRetention();
     assert.ok(shown('settings-dropbox-retention-on'));
-    $('settings-dropbox-retention-days').value = '30';
-    $('settings-dropbox-retention-days').dispatchEvent(new dom.window.Event('input'));
+    $('settings-dropbox-keep-for').value = '30';
+    $('settings-dropbox-keep-for').dispatchEvent(new dom.window.Event('input'));
     assert.ok(!shown('settings-dropbox-retention-on'), 'a changed field takes Turn on away');
     let n1 = retentionCalls().length;
     await m.confirmRetention();
     assert.strictEqual(retentionCalls().length, n1, 'nothing confirmed for the old count');
-    $('settings-dropbox-retention-days').value = '7';
+    $('settings-dropbox-keep-for').value = '7';
     await m.saveRetention();
-    $('settings-dropbox-retention-days').value = '30'; // no input event (a script, an autofill)
+    $('settings-dropbox-keep-for').value = '30'; // no input event (a script, an autofill)
     n1 = retentionCalls().length;
     await m.confirmRetention();
     assert.strictEqual(retentionCalls().length, n1, 'the field no longer says 7: nothing confirmed');
@@ -360,7 +360,7 @@ const { JSDOM } = require('jsdom');
 
     // A dry-run answer for other days than were asked (a stale or mixed-up reply) is not shown as a count to confirm.
     answers['/api/dropbox/retention'] = { status: 200, body: { dry_run: true, days: 1, due: 99, bytes: 1, held: 0 } };
-    $('settings-dropbox-retention-days').value = '7';
+    $('settings-dropbox-keep-for').value = '7';
     await m.saveRetention();
     assert.ok(!shown('settings-dropbox-retention-on'), 'a count for 1 day never offers Turn on for 7');
 
@@ -373,10 +373,10 @@ const { JSDOM } = require('jsdom');
         const days = JSON.parse(opts.body).days;
         return new Promise(res => waiting.push({ days, go: () => res({ ok: true, status: 200, json: async () => ({ dry_run: true, days, due: days, bytes: days * 1024, held: 0 }) }) }));
     };
-    $('settings-dropbox-retention-days').value = '7';
+    $('settings-dropbox-keep-for').value = '7';
     const first = m.saveRetention();
-    $('settings-dropbox-retention-days').value = '30';
-    $('settings-dropbox-retention-days').dispatchEvent(new dom.window.Event('input'));
+    $('settings-dropbox-keep-for').value = '30';
+    $('settings-dropbox-keep-for').dispatchEvent(new dom.window.Event('input'));
     const second = m.saveRetention();
     await new Promise(r => setTimeout(r, 0));
     assert.deepStrictEqual(waiting.map(w => w.days), [7, 30]);
