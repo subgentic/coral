@@ -96,7 +96,7 @@ func TestADeeperReadStillJudgesTheRequestByTheSameLimits(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, ok)
 	assert.True(t, s.OnlyReject, "found whole but over the byte limit: still Reject only")
-	hidden := strings.Replace(longCommand(95), "line010", "line‮010", 1)
+	hidden := strings.Replace(longCommand(95), "line010", "line\u202e010", 1)
 	h2, _ := deepRig(claudeBashScreen(hidden))
 	s2, ok2, _, err2 := h2.readPromptScreenText(context.Background(), "a", at.Claude, "sid")
 	require.NoError(t, err2)
