@@ -272,23 +272,31 @@ func (d *plainFolder) remove(name string) error {
 // file with the mark's name, if any, is removed as itself, and the mark is created new in that folder, so if something takes the name again
 // in between the create fails rather than write through it (Security on #335).
 func Mark(now time.Time) error {
+	return markFile(fileName, now)
+}
+
+// markFile writes now into the file name in the mark's folder, with Mark's rules: the folder opened once as a plain folder, the file created new relative to it,
+// no link followed.
+func markFile(name string, now time.Time) error {
 	dir, err := folder()
 	if err != nil {
 		return err
 	}
-	return markIn(dir, now)
+	return markIn(dir, name, now)
 }
 
 // MarkFor is Mark in the named product's folder (see productDir).
-func MarkFor(product string, now time.Time) error {
+func MarkFor(product string, now time.Time) error { return markFileFor(product, fileName, now) }
+
+func markFileFor(product, name string, now time.Time) error {
 	dir, err := productDir(product)
 	if err != nil {
 		return err
 	}
-	return markIn(dir, now)
+	return markIn(dir, name, now)
 }
 
-func markIn(dir string, now time.Time) error {
+func markIn(dir, name string, now time.Time) error {
 	if err := makeFolder(dir); err != nil {
 		return err
 	}
@@ -298,14 +306,14 @@ func markIn(dir string, now time.Time) error {
 	}
 	defer d.Close()
 	afterFolderOpen()
-	if err := d.remove(fileName); err != nil {
+	if err := d.remove(name); err != nil {
 		return err
 	}
-	h, err := d.openChild(fileName, windows.FILE_WRITE_DATA|windows.FILE_READ_ATTRIBUTES, windows.FILE_CREATE, windows.FILE_NON_DIRECTORY_FILE)
+	h, err := d.openChild(name, windows.FILE_WRITE_DATA|windows.FILE_READ_ATTRIBUTES, windows.FILE_CREATE, windows.FILE_NON_DIRECTORY_FILE)
 	if err != nil {
 		return err
 	}
-	f := os.NewFile(uintptr(h), fileName)
+	f := os.NewFile(uintptr(h), name)
 	_, err = f.WriteString(now.UTC().Format(time.RFC3339) + "\n")
 	if cerr := f.Close(); err == nil {
 		err = cerr
@@ -395,11 +403,16 @@ const maxMarkBytes = 256
 // unreadable or stale mark is false; the file goes in every case, so it starts Coral once at most. A folder that is not a plain folder is not
 // touched, and starts nothing; a link with the mark's name is removed as itself and starts nothing.
 func Take(now time.Time) bool {
+	return takeFile(fileName, now, MaxAge)
+}
+
+// takeFile is Take for the file name and the age maxAge.
+func takeFile(name string, now time.Time, maxAge time.Duration) bool {
 	dir, err := folder()
 	if err != nil {
 		return false
 	}
-	return takeIn(dir, now)
+	return takeIn(dir, name, now, maxAge)
 }
 
 // TakeFor is Take in the named product's folder.
@@ -408,19 +421,19 @@ func TakeFor(product string, now time.Time) bool {
 	if err != nil {
 		return false
 	}
-	return takeIn(dir, now)
+	return takeIn(dir, fileName, now, MaxAge)
 }
 
-func takeIn(dir string, now time.Time) bool {
+func takeIn(dir, name string, now time.Time, maxAge time.Duration) bool {
 	d, err := openPlainFolder(dir)
 	if err != nil {
 		return false
 	}
 	defer d.Close()
-	h, err := d.openChild(fileName, windows.FILE_READ_DATA|windows.DELETE|windows.FILE_READ_ATTRIBUTES, windows.FILE_OPEN, windows.FILE_NON_DIRECTORY_FILE)
+	h, err := d.openChild(name, windows.FILE_READ_DATA|windows.DELETE|windows.FILE_READ_ATTRIBUTES, windows.FILE_OPEN, windows.FILE_NON_DIRECTORY_FILE)
 	if err != nil {
 		if !notFound(err) {
-			_ = d.remove(fileName) // a directory or a link with the name: gone as itself, and nothing starts
+			_ = d.remove(name) // a directory or a link with the name: gone as itself, and nothing starts
 		}
 		return false
 	}
@@ -428,7 +441,7 @@ func takeIn(dir string, now time.Time) bool {
 	isLink := windows.GetFileInformationByHandle(h, &info) != nil || info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0
 	var b []byte
 	var rerr error
-	f := os.NewFile(uintptr(h), fileName)
+	f := os.NewFile(uintptr(h), name)
 	if !isLink {
 		b, rerr = io.ReadAll(io.LimitReader(f, maxMarkBytes))
 	}
@@ -442,5 +455,28 @@ func takeIn(dir string, now time.Time) bool {
 		return false
 	}
 	age := now.Sub(at)
-	return age >= -time.Minute && age <= MaxAge
+	return age >= -time.Minute && age <= maxAge
+}
+
+// LaunchPendingMaxAge is the longest between the installer's Finish button starting Coral through Explorer and Coral's start (task #380).
+const LaunchPendingMaxAge = 2 * time.Minute
+
+const launchPendingName = "launch-pending"
+
+// MarkLaunchPending records that the installer's Finish button, in an ELEVATED installer, is starting Coral through Explorer now, so that
+// Coral starts unelevated (task #380). A coral-tray that finds a fresh mark and is itself elevated was not started the way the installer
+// meant (Explorer's unelevated start did not happen), and starts nothing. The same rules as Mark: the folder opened once as a plain folder, no link followed.
+func MarkLaunchPending(now time.Time) error {
+	return markFile(launchPendingName, now)
+}
+
+// MarkLaunchPendingFor is MarkLaunchPending in the named product's folder (the installer's helper, which is told its product).
+func MarkLaunchPendingFor(product string, now time.Time) error {
+	return markFileFor(product, launchPendingName, now)
+}
+
+// TakeLaunchPending removes the launch-pending mark and reports whether it was there and fresh (written within LaunchPendingMaxAge before
+// now). Every start of Coral takes it, so a mark is used once at most and never outlives the start it was for.
+func TakeLaunchPending(now time.Time) bool {
+	return takeFile(launchPendingName, now, LaunchPendingMaxAge)
 }
