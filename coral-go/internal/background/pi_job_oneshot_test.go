@@ -68,11 +68,11 @@ func TestAOneShotJobIsNotAlsoTypedItsPrompt(t *testing.T) {
 		defer cancel()
 		_ = fn(ctx, store.ScheduledJob{AgentType: agentType, Name: "job", RepoPath: t.TempDir(), Prompt: "summarize the open tasks"}, 1)
 		rt.mu.Lock()
-		defer rt.mu.Unlock()
 		if len(rt.commands) > 0 {
 			command = rt.commands[0]
 		}
-		return len(rt.sent), command
+		rt.mu.Unlock()
+		return rt.sentCount(), command // the inputs are guarded by the embedded runtime's mutex, not by rt.mu (#14281)
 	}
 	typed, cmd := run(at.Pi)
 	assert.Zero(t, typed, "nothing is typed into a one-shot Pi")

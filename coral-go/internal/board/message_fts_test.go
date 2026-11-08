@@ -439,18 +439,20 @@ func TestMessageSearchIndexIsCheckedAfterOpen(t *testing.T) {
 	}
 	require.NoError(t, s.Close())
 
-	defer func(d time.Duration) { messageIndexCheckDelay = d }(messageIndexCheckDelay)
-	messageIndexCheckDelay = 10 * time.Millisecond
-	defer func(q, p time.Duration) { messageIndexQuiet, messageIndexQuietPoll = q, p }(messageIndexQuiet, messageIndexQuietPoll)
-	messageIndexQuiet, messageIndexQuietPoll = 10*time.Millisecond, 10*time.Millisecond // this test reads the board every 50 ms while it waits: a quiet gap is 10 ms
+	defer func(d time.Duration) { setMessageIndexTuning(func() { messageIndexCheckDelay = d }) }(messageIndexCheckDelay)
+	setMessageIndexTuning(func() { messageIndexCheckDelay = 10 * time.Millisecond })
+	defer func(q, p time.Duration) {
+		setMessageIndexTuning(func() { messageIndexQuiet, messageIndexQuietPoll = q, p })
+	}(messageIndexQuiet, messageIndexQuietPoll)
+	setMessageIndexTuning(func() { messageIndexQuiet, messageIndexQuietPoll = 10*time.Millisecond, 10*time.Millisecond }) // this test reads the board every 50 ms while it waits: a quiet gap is 10 ms
 	// The check is held at its hook until the test lets it go, so "it has not run yet" is a fact and not a race with a clock: on a loaded run the first query used to come more than the delay after the open, and the
 	// check had run (the flake of a full ./internal/board run, #13310).
 	release := make(chan struct{})
 	var releaseOnce sync.Once
 	letGo := func() { releaseOnce.Do(func() { close(release) }) }
 	defer letGo()
-	defer func() { messageIndexCheckHook = func() {} }()
-	messageIndexCheckHook = func() { <-release }
+	defer func() { setMessageIndexTuning(func() { messageIndexCheckHook = func() {} }) }()
+	setMessageIndexTuning(func() { messageIndexCheckHook = func() { <-release } })
 	s, err = NewStoreWithKey(path, "")
 	require.NoError(t, err)
 	defer s.Close()
@@ -557,12 +559,16 @@ func TestTheIndexCheckWaitsForAQuietBoard(t *testing.T) {
 	require.NoError(t, s.Close())
 
 	defer func(d, q, p, m time.Duration) {
-		messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = d, q, p, m
-		messageIndexCheckHook = func() {}
+		setMessageIndexTuning(func() {
+			messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = d, q, p, m
+			messageIndexCheckHook = func() {}
+		})
 	}(messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax)
-	messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = time.Millisecond, 250*time.Millisecond, 20*time.Millisecond, time.Hour
+	setMessageIndexTuning(func() {
+		messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = time.Millisecond, 250*time.Millisecond, 20*time.Millisecond, time.Hour
+	})
 	var ran atomic.Int64
-	messageIndexCheckHook = func() { ran.Add(1) }
+	setMessageIndexTuning(func() { messageIndexCheckHook = func() { ran.Add(1) } })
 	s, err = NewStoreWithKey(path, "")
 	require.NoError(t, err)
 	defer s.Close()
@@ -594,12 +600,16 @@ func TestTheIndexCheckRunsAfterTheLongestWaitOnABoardThatIsNeverQuiet(t *testing
 	buildAfterOpenBuild(t, s, ctx)
 	require.NoError(t, s.Close())
 	defer func(d, q, p, m time.Duration) {
-		messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = d, q, p, m
-		messageIndexCheckHook = func() {}
+		setMessageIndexTuning(func() {
+			messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = d, q, p, m
+			messageIndexCheckHook = func() {}
+		})
 	}(messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax)
-	messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = time.Millisecond, time.Hour, 10*time.Millisecond, 300*time.Millisecond
+	setMessageIndexTuning(func() {
+		messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = time.Millisecond, time.Hour, 10*time.Millisecond, 300*time.Millisecond
+	})
 	var ran atomic.Int64
-	messageIndexCheckHook = func() { ran.Add(1) }
+	setMessageIndexTuning(func() { messageIndexCheckHook = func() { ran.Add(1) } })
 	s, err = NewStoreWithKey(path, "")
 	require.NoError(t, err)
 	defer s.Close()
@@ -612,8 +622,8 @@ func TestTheIndexCheckNeverRunsOnAStoreClosedDuringTheQuietWait(t *testing.T) {
 	s := &Store{}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	defer func(q time.Duration) { messageIndexQuiet = q }(messageIndexQuiet)
-	messageIndexQuiet = 0 // quiet already: the case that ran the check
+	defer func(q time.Duration) { setMessageIndexTuning(func() { messageIndexQuiet = q }) }(messageIndexQuiet)
+	setMessageIndexTuning(func() { messageIndexQuiet = 0 }) // quiet already: the case that ran the check
 	require.False(t, s.waitForQuietBoard(ctx), "a cancelled wait stops")
 
 	// the whole path: the store is closed while the check waits; the hook is never called
@@ -631,15 +641,19 @@ func TestTheIndexCheckNeverRunsOnAStoreClosedDuringTheQuietWait(t *testing.T) {
 	buildAfterOpenBuild(t, st, bg) // the open starts a build of its own: wait for it, then build (#13389)
 	require.NoError(t, st.Close())
 	defer func(d, q, p, m time.Duration) {
-		messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = d, q, p, m
-		messageIndexCheckHook = func() {}
+		setMessageIndexTuning(func() {
+			messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = d, q, p, m
+			messageIndexCheckHook = func() {}
+		})
 	}(messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax)
-	messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = 5*time.Millisecond, time.Hour, 20*time.Millisecond, time.Hour
+	setMessageIndexTuning(func() {
+		messageIndexCheckDelay, messageIndexQuiet, messageIndexQuietPoll, messageIndexQuietWaitMax = 5*time.Millisecond, time.Hour, 20*time.Millisecond, time.Hour
+	})
 	var ran atomic.Int64
-	messageIndexCheckHook = func() { ran.Add(1) }
+	setMessageIndexTuning(func() { messageIndexCheckHook = func() { ran.Add(1) } })
 	st, err = NewStoreWithKey(path, "")
 	require.NoError(t, err)
-	messageIndexQuiet = 0 // from now the board counts as quiet at every look
+	setMessageIndexTuning(func() { messageIndexQuiet = 0 }) // from now the board counts as quiet at every look
 	require.NoError(t, st.Close())
 	time.Sleep(300 * time.Millisecond) // sleep-ok: nothing should happen; wait out several looks to show no run follows the close
 	require.EqualValues(t, 0, ran.Load(), "closed during the wait: no check")
@@ -647,6 +661,13 @@ func TestTheIndexCheckNeverRunsOnAStoreClosedDuringTheQuietWait(t *testing.T) {
 
 // A store opened with the index on and none built starts a build of its own in the background (applyMessageSearchIndexSetting): a test's own BuildMessageSearchIndex made while that one runs drops
 // and creates the same tables under it ("table already exists", "no such table: board_message_fts_meta"), which a slow machine (Windows) shows (#13389). Wait for the open's build to be over first.
+// setMessageIndexTuning changes the check's timings or hook under the lock the product reads them with (#14281).
+func setMessageIndexTuning(f func()) {
+	messageIndexTuningMu.Lock()
+	defer messageIndexTuningMu.Unlock()
+	f()
+}
+
 func buildAfterOpenBuild(t *testing.T, s *Store, ctx context.Context) {
 	t.Helper()
 	require.Eventually(t, func() bool { return s.MessageSearchIndexState() != "building" }, 30*time.Second, 2*time.Millisecond, "the build the open started is over")

@@ -66,7 +66,7 @@ func TestRunPassAgreesWithBefore4599(t *testing.T) {
 	// Each seed has its own notifiers (each delivers through its own recorder: n.deliverNudge), boards and random source, so the 150
 	// seeds run in parallel (#4982: 58 s of the package on epoch), inside one group so the floors are read after every seed has finished.
 	t.Run("seeds", func(t *testing.T) {
-		for seed := int64(1); seed <= 150; seed++ {
+		for seed := int64(1); seed <= int64(oracleSeeds(150)); seed++ {
 			t.Run(fmt.Sprint(seed), func(t *testing.T) {
 				t.Parallel()
 				runNotifierOracle(t, seed)
@@ -74,6 +74,9 @@ func TestRunPassAgreesWithBefore4599(t *testing.T) {
 		}
 	})
 	t.Logf("compared: %d nudge attempts, %d resends after a failure, %d health nudges, %d mentions", oracleTotals.nudges, oracleTotals.resends, oracleTotals.health, oracleTotals.mentions)
+	if raceEnabled {
+		return // few seeds under -race: the coverage floors are for the plain run (#14281)
+	}
 	require.Greater(t, oracleTotals.nudges, 900) // 1000 before a member in mode all was nudged only for what a plain read returns (#7757): the volume fell by about 2%, and 900 is still a run that nudged a lot
 	require.Greater(t, oracleTotals.resends, 10)
 	require.Greater(t, oracleTotals.health, 50)
