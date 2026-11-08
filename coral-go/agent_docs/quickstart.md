@@ -301,6 +301,15 @@ curl -H "Authorization: Bearer $(coral api-key)" -s -X POST "http://127.0.0.1:84
   -d "{\"keys\":[\"Enter\"],\"agent_type\":\"claude\",\"session_id\":\"$SID\"}"
 ```
 
+Claude's folder-trust question may also appear as a row in **Inbox > Needs you**, with the folder
+named. Coral offers **Yes, I trust this folder** there only when it reads the same question and
+folder from the terminal and may trust that folder, and only on your own dashboard (not through Coral
+Hub). It does not offer it, and the row says why in plain words, for your home folder, a folder that
+holds it, a top folder, a hidden folder, a shared folder or one other people on this computer can
+write into, and a folder directly under your home folder: *Coral doesn't trust a folder directly under
+your home folder from here, because it would cover every project there. Try a project folder one
+level deeper.* Answer those in **Terminal**, or launch the agent in a folder one level deeper.
+
 The CLI may remember your answer for that repository. Coral does not answer these
 startup trust or hook-review questions for you.
 

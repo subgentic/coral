@@ -40,6 +40,12 @@ curl -H "Authorization: Bearer $(coral api-key)" -s -X POST "http://localhost:$P
   -H "Content-Type: application/json" -d "{\"keys\":[\"Enter\"],\"agent_type\":\"claude\",\"session_id\":\"$SID\"}"
 ```
 
+If Claude is the agent, the same question can be answered from **Inbox > Needs you** on your own
+dashboard (the row names the folder and offers **Yes, I trust this folder**), unless Coral may not trust
+that folder: your home folder, a folder that holds it, a top or hidden folder, a shared folder, and a
+folder directly under your home folder. For those the row says why and the answer is the terminal's
+(or a project folder one level deeper).
+
 Trust is remembered per repository. Launching a team of four agents into a fresh repo
 blocks all four at once.
 
