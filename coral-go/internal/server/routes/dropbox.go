@@ -13,6 +13,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -272,6 +273,33 @@ func (h *CloudHandler) DropboxDisconnect(w http.ResponseWriter, r *http.Request)
 	if d == nil {
 		writeError(w, http.StatusNotFound, "not_available", "Dropbox backup is not available in this build")
 		return
+	}
+	// Stage 6a (#14814): {"delete_backup": true, "typed": [...]} deletes the backup in Dropbox first, after its typed confirm; the sign-in is
+	// revoked and forgotten only when that delete finished (Security's 2b). Without it, Disconnect is as it was.
+	var in struct {
+		DeleteBackup bool     `json:"delete_backup"`
+		Typed        []string `json:"typed"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
+	if err := decodeJSONStrict(r, &in); err != nil && !errors.Is(err, io.EOF) {
+		errBadRequest(w, `send {} or {"delete_backup": true, "typed": [...]}`)
+		return
+	}
+	if in.DeleteBackup {
+		if d.backup == nil {
+			writeError(w, http.StatusNotFound, "not_available", "Dropbox backup is not available in this build")
+			return
+		}
+		if code, refusal, err := d.backup.deleteBackup(r.Context(), in.Typed); code != http.StatusOK || err != nil {
+			if refusal == nil {
+				refusal = map[string]any{"error": "could not delete the Dropbox backup; you are still connected"}
+			}
+			if code == http.StatusOK {
+				code = http.StatusInternalServerError
+			}
+			writeJSON(w, code, refusal)
+			return
+		}
 	}
 	revoked := false
 	if old := d.storedRefresh(r.Context()); old != "" {

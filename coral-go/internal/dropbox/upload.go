@@ -489,3 +489,56 @@ func (c *Client) Download(ctx context.Context, access, rev string, max int64, w 
 	}
 	return d, n, nil
 }
+
+// Stage 6a (#14814): explicit removal.
+
+// DeleteFolder starts deleting a whole folder (the backup's /v1, after the Operator's typed confirm): delete_batch with one entry and no
+// parent_rev, which Dropbox runs as a job for a big folder. It returns the job's id, or the outcome when Dropbox answered at once.
+func (c *Client) DeleteFolder(ctx context.Context, access, path string) (job string, res []DeleteOutcome, err error) {
+	if path == "" || path == "/" {
+		return "", nil, errors.New("never the whole app folder")
+	}
+	arg := map[string]any{"entries": []map[string]string{{"path": path}}}
+	var out deleteJobAnswer
+	if err := c.rpc(ctx, access, "files/delete_batch", arg, &out); err != nil {
+		return "", nil, err
+	}
+	if out.Tag == "async_job_id" {
+		if out.JobID == "" {
+			return "", nil, errors.New("Dropbox: no delete job id")
+		}
+		return out.JobID, nil, nil
+	}
+	res, err = out.outcomes(1)
+	return "", res, err
+}
+
+// ListNames lists the names directly in folder (one level; for the offload markers of a digest). ErrNotFound means the folder is not there;
+// any other error is returned as it is, so the caller fails closed (Security's 2a on #14814).
+func (c *Client) ListNames(ctx context.Context, access, folder string) ([]string, error) {
+	var names []string
+	var p struct {
+		Entries []struct {
+			Name string `json:"name"`
+		} `json:"entries"`
+		Cursor  string `json:"cursor"`
+		HasMore bool   `json:"has_more"`
+	}
+	if err := c.rpc(ctx, access, "files/list_folder", map[string]any{"path": folder, "recursive": false, "limit": 2000}, &p); err != nil {
+		return nil, err
+	}
+	for i := 0; ; i++ {
+		for _, e := range p.Entries {
+			names = append(names, e.Name)
+		}
+		if !p.HasMore || i > 100 {
+			break
+		}
+		cur := p.Cursor
+		p.Entries, p.HasMore = nil, false
+		if err := c.rpc(ctx, access, "files/list_folder/continue", map[string]string{"cursor": cur}, &p); err != nil {
+			return nil, err
+		}
+	}
+	return names, nil
+}

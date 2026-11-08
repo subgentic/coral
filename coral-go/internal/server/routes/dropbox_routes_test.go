@@ -63,7 +63,8 @@ type fakeDropbox struct {
 	lieSize       int64             // download answers this size in Dropbox-API-Result while sending the real bytes
 	extraBytes    []byte            // download appends these to the body (a stream longer than declared)
 	listCalls     int
-	failDownloads int // the next downloads answer 500 (Dropbox's own trouble)
+	failDownloads int  // the next downloads answer 500 (Dropbox's own trouble)
+	markersFail   bool // stage 6a: a marker listing answers 500
 }
 
 // edit replaces path's bytes as a person would in Dropbox (a new rev, a new content hash).
@@ -121,6 +122,21 @@ func (f *fakeDropbox) applyDeletes(keyed []string) []any {
 	var out []any
 	for _, k := range keyed {
 		path, rev, _ := strings.Cut(k, "|")
+		if rev == "" { // stage 6a: a folder, deleted whole (no parent_rev)
+			n := 0
+			for p := range f.files {
+				if p == path || strings.HasPrefix(p, path+"/") {
+					delete(f.files, p)
+					n++
+				}
+			}
+			if n == 0 {
+				out = append(out, map[string]any{".tag": "failure", "failure": map[string]any{".tag": "path_lookup", "path_lookup": map[string]any{".tag": "not_found"}}})
+			} else {
+				out = append(out, map[string]any{".tag": "success", "metadata": map[string]any{".tag": "folder", "path_lower": path}})
+			}
+			continue
+		}
 		cur := "r1"
 		if r, ok := f.revs[path]; ok {
 			cur = r
@@ -221,9 +237,35 @@ func newFakeDropbox(t *testing.T) *fakeDropbox {
 				w.Write([]byte(`{"error_summary":"path/not_found/"}`))
 				return
 			}
-			json.NewEncoder(w).Encode(map[string]any{".tag": "file", "id": "id:" + a["path"], "rev": "r1", "content_hash": dropbox.ContentHash(b)})
+			rev := "r1"
+			if v, ok := f.revs[a["path"]]; ok {
+				rev = v // the rev an edit made
+			}
+			json.NewEncoder(w).Encode(map[string]any{".tag": "file", "id": "id:" + a["path"], "rev": rev, "content_hash": dropbox.ContentHash(b)})
 		case "/2/files/list_folder":
 			f.listCalls++
+			var la map[string]any
+			_ = json.NewDecoder(r.Body).Decode(&la)
+			if lp, _ := la["path"].(string); strings.HasPrefix(lp, "/v1/offloaded/") { // stage 6a: one marker folder, by name
+				if f.markersFail {
+					w.WriteHeader(http.StatusInternalServerError)
+					w.Write([]byte(`{"error_summary":"internal_error/"}`))
+					return
+				}
+				var ents []map[string]any
+				for p := range f.files {
+					if strings.HasPrefix(p, lp+"/") && !strings.Contains(strings.TrimPrefix(p, lp+"/"), "/") {
+						ents = append(ents, map[string]any{".tag": "file", "name": strings.TrimPrefix(p, lp+"/"), "path_lower": p})
+					}
+				}
+				if len(ents) == 0 {
+					w.WriteHeader(http.StatusConflict)
+					w.Write([]byte(`{"error_summary":"path/not_found/"}`))
+					return
+				}
+				json.NewEncoder(w).Encode(map[string]any{"entries": ents, "cursor": "m", "has_more": false})
+				return
+			}
 			// A full listing: every file stored, with the changes made so far counted as seen (the cursor points after them).
 			var all []map[string]any
 			for p, b := range f.files {

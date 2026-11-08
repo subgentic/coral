@@ -274,13 +274,14 @@ type DropboxAudit struct {
 const (
 	DropboxAuditSetting = "setting"
 	DropboxAuditPass    = "pass"
-	DropboxAuditEdit    = "edit" // stage 5a: the Operator's decision on an edit made in Dropbox (reason: promoted or separate)
+	DropboxAuditEdit    = "edit"    // stage 5a: the Operator's decision on an edit made in Dropbox (reason: promoted or separate)
+	DropboxAuditRemoval = "removal" // stage 6a: an explicit removal (reason: removed, private or delete_all; count: files)
 	dropboxAuditKeep    = 500
 )
 
 // AddAudit writes one audit row and keeps the newest 500.
 func (s *DropboxStore) AddAudit(ctx context.Context, a DropboxAudit) error {
-	if a.Kind != DropboxAuditSetting && a.Kind != DropboxAuditPass && a.Kind != DropboxAuditEdit {
+	if a.Kind != DropboxAuditSetting && a.Kind != DropboxAuditPass && a.Kind != DropboxAuditEdit && a.Kind != DropboxAuditRemoval {
 		return errors.New("not a Dropbox audit kind")
 	}
 	if a.At == "" {

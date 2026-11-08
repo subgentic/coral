@@ -29,6 +29,7 @@ const (
 	DropboxOutboxRetainedOut = "retained_out" // retention deleted the Dropbox copy
 	DropboxOutboxGone        = "gone"         // no longer at its place in Dropbox (moved, renamed or removed there): left alone, never "removed by Coral"
 	DropboxOutboxEdited      = "edited"       // Dropbox refused the delete (the rev changed: edited there): kept, never retried; stage 5's
+	DropboxOutboxRemoved     = "removed"      // stage 6a: the Operator removed it from Dropbox; never sent again, not even by a later upload of the same bytes
 )
 
 // DropboxOutboxRow is one file to back up.
@@ -64,6 +65,7 @@ type DropboxOutboxCounts struct {
 	RetainedOut int `json:"retained_out"`
 	Gone        int `json:"gone"`
 	Edited      int `json:"edited"`
+	Removed     int `json:"removed"` // stage 6a
 }
 
 // DropboxOutbox is the table.
@@ -247,6 +249,8 @@ func (o *DropboxOutbox) Counts(ctx context.Context) (DropboxOutboxCounts, error)
 			c.Gone = r.N
 		case DropboxOutboxEdited:
 			c.Edited = r.N
+		case DropboxOutboxRemoved:
+			c.Removed = r.N
 		case DropboxOutboxDeleting:
 			c.BackedUp += r.N // still in Dropbox until the job says otherwise
 		}
@@ -311,6 +315,46 @@ func (o *DropboxOutbox) Requeue(ctx context.Context, id int64) (bool, error) {
 	}
 	n, err := res.RowsAffected()
 	return n == 1, err
+}
+
+// LedgerOfDigest is what the account has in Dropbox of an artifact (stage 6a's removal): its done and edited rows, every document and version
+// with those bytes, versions and sidecars both, by path.
+func (o *DropboxOutbox) LedgerOfDigest(ctx context.Context, accountID, digest string) ([]PathRow, error) {
+	var rows []PathRow
+	err := o.db.SelectContext(ctx, &rows, `SELECT id, kind, digest, doc_id, version, path, state, COALESCE(account_id, '') AS account_id, COALESCE(rev, '') AS rev,
+		COALESCE(content_hash, '') AS content_hash FROM dropbox_outbox WHERE digest = ? AND account_id = ? AND state IN (?, ?) AND path LIKE '/v1/%' ORDER BY id`,
+		digest, accountID, DropboxOutboxDoneS, DropboxOutboxEdited)
+	return rows, err
+}
+
+// MarkRemoved records that the Operator removed a row's file from Dropbox: only a done or edited row moves (never one a retention job holds).
+func (o *DropboxOutbox) MarkRemoved(ctx context.Context, id int64) error {
+	_, err := o.db.ExecContext(ctx, "UPDATE dropbox_outbox SET state = ? WHERE id = ? AND state IN (?, ?)", DropboxOutboxRemoved, id, DropboxOutboxDoneS, DropboxOutboxEdited)
+	return err
+}
+
+// RemoveQueued marks the queued rows of a digest removed (nothing still waiting is sent after the Operator removed the artifact), and reports how many.
+func (o *DropboxOutbox) RemoveQueued(ctx context.Context, digest string) (int, error) {
+	res, err := o.db.ExecContext(ctx, "UPDATE dropbox_outbox SET state = ? WHERE digest = ? AND state = ?", DropboxOutboxRemoved, digest, DropboxOutboxQueued)
+	if err != nil {
+		return 0, err
+	}
+	n, err := res.RowsAffected()
+	return int(n), err
+}
+
+// WasRemoved reports whether the Operator removed this digest from Dropbox: a later upload of the same bytes is not sent (Security's 2d on #14814).
+func (o *DropboxOutbox) WasRemoved(ctx context.Context, digest string) (bool, error) {
+	var n int
+	err := o.db.GetContext(ctx, &n, "SELECT COUNT(*) FROM dropbox_outbox WHERE digest = ? AND state = ?", digest, DropboxOutboxRemoved)
+	return n > 0, err
+}
+
+// ClearAll forgets the whole ledger (Disconnect, then Delete the Dropbox backup too: the backup is gone, and a later sign-in starts afresh, backing
+// everything up again; the per-artifact "removed" rule is for one artifact the Operator took out of a backup that goes on).
+func (o *DropboxOutbox) ClearAll(ctx context.Context) error {
+	_, err := o.db.ExecContext(ctx, "DELETE FROM dropbox_outbox")
+	return err
 }
 
 // CancelDigest removes the queued rows of an artifact the person deleted (Security's change b), and reports how many. Rows already done stay.

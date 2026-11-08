@@ -84,6 +84,8 @@ type DropboxBackup struct {
 	editBounds   editBounds
 	editsWaiting atomic.Int64 // edits the last listing pass left in Dropbox because of a bound
 
+	markPrivate func(ctx context.Context, digest string) error // stage 6a: the board's private mark (SetMarkPrivate); nil: Mark private is not offered
+
 	passMu sync.Mutex
 	kick   chan struct{} // an upload asks for a pass soon
 }
@@ -211,6 +213,9 @@ func (b *DropboxBackup) enqueue(ctx context.Context, digest string, rec agentUpl
 	doc := docIDOf(rec)
 	if !seriesIDRe.MatchString(doc) || !objectNameRe.MatchString(digest) {
 		return nil // no document id yet: the migration gives it one, and the backfill queues it then
+	}
+	if removed, err := b.outbox.WasRemoved(ctx, digest); err != nil || removed {
+		return err // the Operator removed these bytes from Dropbox: a later upload of them is not sent (Security's 2d on #14814)
 	}
 	version := rec.Version
 	if version < 1 {
