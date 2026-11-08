@@ -653,6 +653,18 @@
                             <div id="settings-message-search-status" class="settings-hint" role="status">Loading&hellip;</div>
                             <div id="settings-chat-import-status" class="settings-hint" hidden></div>
                             <button class="btn btn-small" type="button" id="settings-chat-import" hidden></button>
+                            <section id="settings-dropbox" class="settings-dropbox" aria-labelledby="settings-dropbox-title">
+                                <!-- Dropbox backup (#14609): the Operator's, on this computer's dashboard only; dropbox_settings.js fills it -->
+                                <h5 id="settings-dropbox-title">Dropbox backup</h5>
+                                <div id="settings-dropbox-status" class="settings-hint" role="status" aria-live="polite">Loading&hellip;</div>
+                                <div class="settings-dropbox-actions">
+                                    <button type="button" class="btn btn-small" id="settings-dropbox-connect" hidden>Connect Dropbox&hellip;</button>
+                                    <button type="button" class="btn btn-small" id="settings-dropbox-switch" hidden>Switch to the new account</button>
+                                    <button type="button" class="btn btn-small" id="settings-dropbox-takeover" hidden>Take over</button>
+                                    <button type="button" class="btn btn-small" id="settings-dropbox-disconnect" hidden>Disconnect</button>
+                                </div>
+                                <div id="settings-dropbox-note" class="settings-hint" role="status"></div>
+                            </section>
                             <div id="settings-worktrees-live">
                                 <div id="wt-status" class="settings-hint" role="status"></div>
                                 <p id="wt-empty" class="settings-hint" hidden></p>
