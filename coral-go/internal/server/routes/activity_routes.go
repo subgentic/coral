@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"net/http"
+	"path/filepath"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
@@ -78,7 +79,11 @@ func ActivityRoutes() map[string]string {
 
 // ActivityRecorder writes the row of a listed route after its handler answered 2xx, for a person only. It wraps writes only (a GET is never an action), and a row that cannot be written is logged by the
 // store and never changes the answer: the record does not block the Operator.
-func ActivityRecorder(bs *board.Store) func(http.Handler) http.Handler {
+func ActivityRecorder(bs *board.Store, fileName ...func(id string) string) func(http.Handler) http.Handler {
+	var nameOf func(string) string // a file's name, as it is stored (nil: none is looked up, as before #14422)
+	if len(fileName) > 0 {
+		nameOf = fileName[0]
+	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.Method {
@@ -123,6 +128,9 @@ func ActivityRecorder(bs *board.Store) func(http.Handler) http.Handler {
 			}
 			ctx := context.WithoutCancel(r.Context())
 			title := ""
+			if ar.Kind == "file" && nameOf != nil && item != "" { // the file's name at the time of the click: star, unstar, keep, release (delete says its own, before the file is gone) (#14422)
+				title = nameOf(item)
+			}
 			if ar.Kind == "task" && team != "" {
 				if id, err := strconv.ParseInt(item, 10, 64); err == nil && id > 0 {
 					if t, err := bs.GetTask(ctx, team, id); err == nil && t != nil {
@@ -193,4 +201,16 @@ func (h *BoardHandler) fileTaskOf(ctx context.Context, project, id string) int64
 		return taskOfFile(item)
 	}
 	return 0
+}
+
+// StoredFileName is a stored file's name from its metadata sidecar in coralDir's object folder ("" when there is none or it cannot be read): the name a row of the Activity record keeps for a click on a file
+// (#14422). The id is a 64-digit hex name or nothing.
+func StoredFileName(coralDir, id string) string {
+	if coralDir == "" || !objectNameRe.MatchString(id) {
+		return ""
+	}
+	if m, ok := readSidecar(filepath.Join(coralDir, "artifacts", "objects", id+".json")); ok {
+		return m.Name
+	}
+	return ""
 }

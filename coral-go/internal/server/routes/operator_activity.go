@@ -197,6 +197,35 @@ var activityActions = map[string]bool{
 
 // recordActivity adds the row of an Operator action that is not a write in the board database's own transaction (best effort: a crash between the action and its row can lose one row, and a row that cannot
 // be written is logged and never blocks the action). Only the Operator's own actions are recorded: callers check who acted before they call.
+// askActivityMeta is the row's meta for an action on an ask (#14422): the ask's own line as the title (secrets out, cut, as the Needs you row shows it) and who asked beside it, so the Activity page can
+// say 'Dismissed "Ship batch-120 tonight?" from Head of Security' and not 'a question'. A message that cannot be read leaves both empty, as every row was before.
+func (h *BoardHandler) askActivityMeta(r *http.Request, ctx context.Context, project string, askID int64, note string) board.ActivityMeta {
+	m := activityMetaFor(r, "", note)
+	if msg, err := h.bs.GetMessageByID(ctx, project, askID); err == nil && msg != nil {
+		m.Title, m.Asker = needsYouLine(msg.Content), needsYouLine(msg.SubscriberID)
+	}
+	return m
+}
+
+// recordAskActivity writes the row of the Operator's action on an ask (an answer by button, an ignore, an undo of one) with the ask's line and asker, and tells Chief as recordActivity does.
+func (h *BoardHandler) recordAskActivity(r *http.Request, action, project string, askID int64, note string) {
+	if h.bs == nil {
+		return
+	}
+	ctx := context.WithoutCancel(r.Context())
+	_ = h.bs.RecordActivity(ctx, h.askActivityMeta(r, ctx, project, askID, note), action, "question", strconv.FormatInt(askID, 10), "", project)
+	h.tellChief(ctx, action, "question", project, "", "") // the Operator's decision on a team Chief fronts (#12171), as before
+}
+
+// recordAskWords is recordWords for the Operator's typed answer to an ask: the same person-only rule, the words as the note, and the ask's line and asker as the title and asker (#14422).
+func (h *BoardHandler) recordAskWords(r *http.Request, action, project string, askID int64, words string) {
+	if h.bs == nil || !humanInputCaller(r) {
+		return
+	}
+	ctx := context.WithoutCancel(r.Context())
+	_ = h.bs.RecordActivity(ctx, h.askActivityMeta(r, ctx, project, askID, words), action, "question", strconv.FormatInt(askID, 10), "", project)
+}
+
 func (h *BoardHandler) recordActivity(r *http.Request, action, kind, item, team, title, note string) {
 	if h.bs == nil {
 		return
