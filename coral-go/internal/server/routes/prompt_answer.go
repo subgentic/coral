@@ -732,13 +732,12 @@ func (h *SessionsHandler) readPromptScreenText(ctx context.Context, name, agentT
 	}
 	s, ok := parseAgentScreen(agentType, text)
 	if ok && s.commandOpenMissing && agentType == at.Claude {
-		if _, rendered := h.terminal.(ptymanager.RenderedScreenReader); !rendered { // a PTY's screen has no history to read deeper (#4543)
-			// The closing rule of a request is there and its opening rule is not: the pane's history may hold it (#14575). Read deeper once; the same parse and the same checks judge what is found, and a request whose top is
-			// still not there stays Reject only. The deeper text replaces the first only when it shows the request whole, so every caller (the row, the card, the answer) sees the same screen.
-			if deep, derr := h.terminal.CaptureOutput(ctx, name, deepPromptCaptureLines, agentType, sessionID); derr == nil {
-				if ds, dok := parseAgentScreen(agentType, deep); dok && !ds.commandOpenMissing {
-					s, text = ds, deep
-				}
+		// The closing rule of a request is there and its opening rule is not: the history above the screen may hold it (#14575). tmux gives it as the pane's history; the PTY backend as the scrolled-off rows of its replay
+		// ring (CaptureOutput, vtscreen.RenderScrollback), though its first read above is only the screen's rows. Read deeper once; the same parse and the same checks judge what is found, and a request whose top is still
+		// not there stays Reject only. The deeper text replaces the first only when it shows the request whole, so every caller (the row, the card, the answer) sees the same screen.
+		if deep, derr := h.terminal.CaptureOutput(ctx, name, deepPromptCaptureLines, agentType, sessionID); derr == nil {
+			if ds, dok := parseAgentScreen(agentType, deep); dok && !ds.commandOpenMissing {
+				s, text = ds, deep
 			}
 		}
 	}

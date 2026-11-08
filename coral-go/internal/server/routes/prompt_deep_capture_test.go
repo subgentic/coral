@@ -32,6 +32,17 @@ func (l *linesTerminal) CaptureOutput(_ context.Context, _ string, lines int, _,
 	return strings.Join(all, "\n"), nil
 }
 
+// screenAndScrollbackTerminal is a terminal whose prompt read is the screen as drawn (the PTY backend: RenderedScreen, 50 rows) while CaptureOutput(lines) gives the rows that scrolled off above it too, as vtscreen.RenderScrollback does.
+type screenAndScrollbackTerminal struct{ *linesTerminal }
+
+func (p *screenAndScrollbackTerminal) RenderedScreen(_ context.Context, _, _, _ string) (string, error) {
+	all := strings.Split(p.pane, "\n")
+	if len(all) > 50 {
+		all = all[len(all)-50:]
+	}
+	return strings.Join(all, "\n"), nil
+}
+
 func deepRig(pane string) (*SessionsHandler, *linesTerminal) {
 	lt := &linesTerminal{mockSessionTerminal: newMockTerminal(), pane: pane}
 	return &SessionsHandler{terminal: lt}, lt
@@ -97,4 +108,15 @@ func TestADeeperReadIsForClaudeOnly(t *testing.T) {
 	_, _, _, err := h.readPromptScreenText(context.Background(), "a", at.Codex, "sid")
 	require.NoError(t, err)
 	assert.Equal(t, []int{80}, lt.asked, "another agent's program can print rules of its own: no deeper read, no request read from it")
+}
+
+func TestARequestOnAPTYScreenWhoseTopScrolledOffIsReadWhole(t *testing.T) {
+	lt := &linesTerminal{mockSessionTerminal: newMockTerminal(), pane: strings.Repeat("older output\n", 30) + claudeBashScreen(longCommand(95))}
+	h := &SessionsHandler{terminal: &screenAndScrollbackTerminal{lt}}
+	s, ok, _, err := h.readPromptScreenText(context.Background(), "a", at.Claude, "sid")
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.False(t, s.OnlyReject, "the PTY's screen shows 50 rows; the request's top scrolled off above them and is in its scrollback: %s", s.Note)
+	assert.Contains(t, s.Target, "line001")
+	assert.Equal(t, []int{deepPromptCaptureLines}, lt.asked, "the screen read is the first; CaptureOutput is asked once, deep")
 }
