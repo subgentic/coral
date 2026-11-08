@@ -23,6 +23,11 @@ export const DECISION_LABEL = { approve: 'Approved', changes: 'Asked for changes
 export const DECISIONS = Object.keys(DECISION_LABEL);
 export const decisionOf = row => ({ ignore: 'dismiss', wait_dismiss: 'dismiss', inbox_hide: 'dismiss', prompt_answer: 'answer', prompt_allow: 'approve', prompt_reject: 'deny', skill_approve: 'approve', skill_reject: 'deny' }[row.action] || (DECISIONS.includes(row.action) ? row.action : ''));
 
+export const NO_GOAL = 'No goal';
+/** The agent a row is about, when the record says (#14445): who asked, for an ask (an older answer kept the asker as its title), or the agent named by a prompt, wait or chat row; '' for a row about no agent. */
+export const agentOf = row => String(row.asker || ((row.item_kind === 'agent' || /^(prompt_|wait_)/.test(row.action || '') || (row.action === 'answer' && row.item_kind === 'question')) ? (row.title || (row.item_kind === 'agent' ? row.item_id : '')) : '') || '').trim();
+/** The goal a row served: its title (the server looks it up now), else its number, else the words for none; a row from before the record kept goals has none. */
+export const goalOf = row => (row.goal_title ? String(row.goal_title).trim() : Number(row.goal_id) > 0 ? `Goal #${Number(row.goal_id)}` : NO_GOAL);
 export const ACTIONS = Object.keys(ACTION_LABEL);
 export const SORTS = ['newest', 'oldest'];
 export const SORT_LABEL = { newest: 'Newest first', oldest: 'Oldest first' };
@@ -35,6 +40,8 @@ const teamChip = v => `Team: ${teamNames.get(v) || v}`;
 const model = defineFilters({
     q: { type: 'text', max: 200, chip: v => `Search: ${v}` },
     team: { type: 'custom', empty: '', clean: v => text(v, 200), filtered: v => !!v, chip: teamChip, clear: f => ({ ...f, team: '' }) },
+    agent: { type: 'text', max: 80, chip: v => `Agent: ${v}` },
+    goal: { type: 'text', max: 200, chip: v => `Goal: ${v}` }, // the goal a row served, or "No goal", as Needs you says it (#14445)
     decision: { type: 'choice', values: DECISIONS, chip: v => `Decision: ${DECISION_LABEL[v]}` },
     action: { type: 'choice', values: ACTIONS, chip: v => `Action: ${ACTION_LABEL[v]}` },
     from: { type: 'day', chip: v => `Since ${v}` },
@@ -58,6 +65,8 @@ export function matches(r, f, teamOf = x => x.team || '') {
         if (!hay.includes(c.q.toLowerCase())) return false;
     }
     if (c.decision && decisionOf(r) !== c.decision) return false;
+    if (c.agent && agentOf(r) !== c.agent) return false;
+    if (c.goal && goalOf(r) !== c.goal) return false;
     if (c.action && r.action !== c.action) return false;
     if (c.team && r.team !== c.team) return false;
     if (c.from && stamp(r) < Date.parse(localMidnight(c.from))) return false;

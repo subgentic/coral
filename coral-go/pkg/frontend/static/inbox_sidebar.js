@@ -690,6 +690,8 @@ function inboxActivityToolbar() {
             sorts: { values: AF.SORTS, labels: AF.SORT_LABEL, aria: 'Sort activity' },
             fields: [
                 { type: 'select', key: 'team', id: 'inbox-activity-team', label: 'Team', values: [], labels: {}, any: 'Any team' },
+                { type: 'select', key: 'agent', id: 'inbox-activity-agent', label: 'Agent', values: [], labels: {}, any: 'Any agent' },
+                { type: 'select', key: 'goal', id: 'inbox-activity-goal', label: 'Goal', values: [], labels: {}, any: 'Any goal' },
                 { type: 'select', key: 'decision', id: 'inbox-activity-decision', label: 'Decision', values: AF.DECISIONS, labels: AF.DECISION_LABEL, any: 'Any decision' },
                 { type: 'select', key: 'action', id: 'inbox-activity-action', label: 'Action', values: AF.ACTIONS, labels: AF.ACTION_LABEL, any: 'Any action' },
                 { type: 'date', key: 'from', id: 'inbox-activity-from', label: 'Since' },
@@ -703,7 +705,7 @@ function inboxActivityToolbar() {
     }
     const teams = AC.teams();
     AF.setTeamNames(new Map(teams.map(t => [t, teamLabel(t)])));
-    const node = activityBar.draw({ filters: activityFilters, options: { team: { values: teams, labels: Object.fromEntries(teams.map(t => [t, teamLabel(t)])) } } });
+    const node = activityBar.draw({ filters: activityFilters, options: { team: { values: teams, labels: Object.fromEntries(teams.map(t => [t, teamLabel(t)])) }, agent: { values: AC.agents(), labels: {} }, goal: { values: AC.goals(), labels: {} } } });
     activityBar.bar.showField('server', false);
     const menu = node.querySelector('.list-bar-menu');
     if (menu && !menu.querySelector('.inbox-activity-group-toggle')) {

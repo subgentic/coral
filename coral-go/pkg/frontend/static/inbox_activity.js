@@ -55,6 +55,9 @@ export function refresh(done, { next = false } = {}) {
 
 /** Team ids that appear in the record, with the names the page shows them by. */
 export const teams = () => [...new Set(rows.map(r => r.team))].sort((a, b) => teamLabel(a).localeCompare(teamLabel(b)));
+/** The agents and the goals the record names, for the Filters panel's lists (#14445): the agents by name, the goals by title with No goal last when any row has none. */
+export const agents = () => [...new Set(rows.map(AF.agentOf).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+export const goals = () => { const all = [...new Set(rows.map(AF.goalOf))]; return [...all.filter(g => g !== AF.NO_GOAL).sort((a, b) => a.localeCompare(b)), ...all.filter(g => g === AF.NO_GOAL)]; };
 export const teamOf = r => teamLabel(r.team);
 export const filtered = f => AF.ordered(rows.filter(r => AF.matches(r, f, teamOf)), f);
 export const total = () => rows.length;
