@@ -15,6 +15,12 @@ const { JSDOM } = require('jsdom');
         <button id="settings-dropbox-switch" hidden></button>
         <button id="settings-dropbox-takeover" hidden></button>
         <div id="settings-dropbox-note"></div>
+        <div id="settings-dropbox-backup" hidden>
+          <div id="settings-dropbox-counts"></div>
+          <div id="settings-dropbox-types"></div>
+          <input id="settings-dropbox-age" type="number">
+          <button id="settings-dropbox-filters-save"></button>
+        </div>
       </section></body>`, { url: 'http://127.0.0.1:8420/' });
     for (const k of ['window', 'document']) Object.defineProperty(globalThis, k, { value: dom.window[k], configurable: true, writable: true });
 
@@ -126,6 +132,55 @@ const { JSDOM } = require('jsdom');
     assert.match($('settings-dropbox-note').textContent, /blocked/);
     m.stopDropboxPoll();
     popupBlocked = false;
+
+    // Stage 4c (#14693): the backup's counts, its filters and a full Dropbox.
+    const connected = { app_key_set: true, connected: true, state: 'connected', account_id: 'dbid:AAA',
+        backup: { backed_up: 12, pending: 3, conflict: 1, skipped: 0, failed: 0, last_sync: '2026-11-08T12:00:00Z' },
+        filters: { types: ['md', 'png'], max_age_days: 1 } };
+    await status(connected);
+    assert.ok(shown('settings-dropbox-backup'), 'the backup part shows once connected');
+    const counts = $('settings-dropbox-counts').textContent;
+    assert.match(counts, /12 files backed up/);
+    assert.match(counts, /3 waiting/);
+    assert.match(counts, /1 conflict/);
+    assert.ok(!/skipped|failed/.test(counts), 'zero counts are left out');
+    const boxes = [...$('settings-dropbox-types').querySelectorAll('input[type=checkbox]')];
+    assert.ok(boxes.length >= 10, 'one box per type of the closed list');
+    assert.deepStrictEqual(boxes.filter(b => b.checked).map(b => b.value).sort(), ['md', 'png']);
+    assert.strictEqual($('settings-dropbox-age').value, '1');
+
+    // Save: a JSON PUT of the ticked types and the age.
+    boxes.find(b => b.value === 'pdf').checked = true;
+    $('settings-dropbox-age').value = '7';
+    answers['/api/dropbox/filters'] = { status: 200, body: { types: ['md', 'pdf', 'png'], max_age_days: 7 } };
+    await m.saveDropboxFilters();
+    const put = calls.filter(c => c.url === '/api/dropbox/filters').pop();
+    assert.strictEqual(put.method, 'PUT');
+    const sent = JSON.parse(put.body);
+    assert.deepStrictEqual({ ...sent, types: [...sent.types].sort() }, { types: ['md', 'pdf', 'png'], max_age_days: 7 }, 'the ticked types (any order) and the age');
+    assert.match($('settings-dropbox-note').textContent, /Saved/);
+    assert.match($('settings-dropbox-note').textContent, /never deletes/i, 'narrowing is said to keep what is already in Dropbox');
+
+    // A refused save shows the server's sentence.
+    answers['/api/dropbox/filters'] = { status: 400, body: { error: 'max_age_days is 0 (no limit) to 3650' } };
+    $('settings-dropbox-age').value = '99999';
+    await m.saveDropboxFilters();
+    assert.match($('settings-dropbox-note').textContent, /0 \(no limit\) to 3650/);
+
+    // No filter: every type and every age.
+    await status({ ...connected, filters: { types: [], max_age_days: 0 } });
+    assert.ok([...$('settings-dropbox-types').querySelectorAll('input')].every(b => !b.checked));
+    assert.match($('settings-dropbox-backup').textContent, /every type/i);
+
+    // A full Dropbox: the backup has paused, nothing deleted, one next step.
+    await status({ ...connected, state: 'quota_full' });
+    assert.match($('settings-dropbox-status').textContent, /Your Dropbox is full, so the backup has paused\. Nothing has been deleted/);
+    const more = $('settings-dropbox-note').querySelector('a');
+    assert.ok(more && /dropbox\.com/.test(more.getAttribute('href')), 'Get more Dropbox space');
+
+    // Not connected: the backup part is hidden.
+    await status({ app_key_set: true, connected: false, state: 'disconnected' });
+    assert.ok(!shown('settings-dropbox-backup'));
 
     // A refused status read says why, by the server's error code (Security's SHOULD on 2ed958673), never with buttons.
     const refused = async (status, body) => { answers['/api/dropbox/status'] = { status, body }; await m.loadDropbox(); return $('settings-dropbox-status').textContent; };

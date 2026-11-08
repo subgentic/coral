@@ -39,16 +39,72 @@ function note(text, link, newTab = false, linkText = '') {
     }
 }
 
-async function post(url) {
-    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', cache: 'no-store' });
+async function post(url, method = 'POST', payload = '{}') {
+    const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: payload, cache: 'no-store' });
     let body = {};
     try { body = await r.json(); } catch { /* no body */ }
     return { ok: r.ok, status: r.status, body: body || {} };
 }
 
+// The types Dropbox backup knows (the server's closed extension map, #14655), written with their dot: one bare type name is also an icon name, and the
+// icon-subset scan counts every whole string that equals one (icon_names.mjs).
+const TYPES = ['.md', '.txt', '.json', '.csv', '.png', '.jpg', '.gif', '.webp', '.pdf', '.mp4'].map(t => t.slice(1));
+
+// renderBackup shows the backup's counts and its filters (stage 4c, #14693) once connected.
+function renderBackup(st) {
+    const on = !!(st && st.connected && !st.looks_like_copy);
+    show('settings-dropbox-backup', on);
+    if (!on) return;
+    const b = st.backup || {};
+    const parts = [];
+    const n = (k) => Number(b[k] || 0);
+    parts.push(`${n('backed_up')} files backed up`);
+    if (n('pending')) parts.push(`${n('pending')} waiting`);
+    if (n('conflict')) parts.push(`${n('conflict')} ${n('conflict') === 1 ? 'conflict' : 'conflicts'} (already in Dropbox with other content, left as they are)`);
+    if (n('skipped')) parts.push(`${n('skipped')} skipped`);
+    if (n('failed')) parts.push(`${n('failed')} failed`);
+    let text = parts.join(', ') + '.';
+    const at = Date.parse(b.last_sync || '');
+    if (!Number.isNaN(at)) text += ` Last backed up ${new Date(at).toLocaleString()}.`;
+    const chosenTypes = (st.filters && st.filters.types) || [];
+    const days = Number((st.filters && st.filters.max_age_days) || 0);
+    text += chosenTypes.length ? ` Backing up ${chosenTypes.map(t => '.' + t).join(', ')}` : ' Backing up every type';
+    text += days > 0 ? ` from the last ${days} ${days === 1 ? 'day' : 'days'}.` : '.';
+    const counts = $('settings-dropbox-counts');
+    if (counts) counts.textContent = text;
+    const box = $('settings-dropbox-types');
+    if (box && !box.childElementCount) {
+        for (const t of TYPES) {
+            const label = document.createElement('label');
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.value = t;
+            label.append(input, document.createTextNode(` .${t}`));
+            box.append(label, document.createTextNode(' '));
+        }
+    }
+    const chosen = new Set((st.filters && st.filters.types) || []);
+    if (box) for (const input of box.querySelectorAll('input[type=checkbox]')) input.checked = chosen.has(input.value);
+    const age = $('settings-dropbox-age');
+    if (age) age.value = String((st.filters && st.filters.max_age_days) || 0);
+}
+
+// saveDropboxFilters sends the ticked types and the age limit.
+export async function saveDropboxFilters() {
+    note('');
+    const box = $('settings-dropbox-types');
+    const types = box ? [...box.querySelectorAll('input[type=checkbox]')].filter(i => i.checked).map(i => i.value) : [];
+    const days = parseInt(($('settings-dropbox-age') || {}).value || '0', 10);
+    let res;
+    try { res = await post('/api/dropbox/filters', 'PUT', JSON.stringify({ types, max_age_days: Number.isFinite(days) ? days : 0 })); } catch { note("Couldn't reach Coral. Try again."); return; }
+    if (!res.ok) { note(String(res.body.error || "Couldn't save. Try again.")); return; }
+    note('Saved. Narrowing what is backed up never deletes what is already in Dropbox.');
+}
+
 // render shows one state. st is the status answer.
 function render(st) {
     for (const id of ['settings-dropbox-connect', 'settings-dropbox-disconnect', 'settings-dropbox-switch', 'settings-dropbox-takeover']) show(id, false);
+    renderBackup(st);
     if (!st || !st.app_key_set) {
         setStatus("Dropbox backup isn't available in this build.");
         return;
@@ -64,6 +120,12 @@ function render(st) {
     if (st.connected && st.looks_like_copy) {
         setStatus('This Coral looks like a copy of one that backs up to Dropbox (a copied or restored data folder), so the backup is paused here. If this is now the computer you use, Take over: Coral records this computer as the one that backs up. If the original is still in use, leave it paused.');
         show('settings-dropbox-takeover', true);
+        return;
+    }
+    if (st.connected && st.state === 'quota_full') {
+        setStatus('Your Dropbox is full, so the backup has paused. Nothing has been deleted.');
+        note('Free up space in Dropbox, or get more:', 'https://www.dropbox.com/plans', true, 'Get more Dropbox space');
+        show('settings-dropbox-disconnect', true);
         return;
     }
     if (st.connected) {
@@ -219,5 +281,6 @@ function wire() {
     on('settings-dropbox-disconnect', disconnectDropbox);
     on('settings-dropbox-switch', confirmSwitch);
     on('settings-dropbox-takeover', takeOver);
+    on('settings-dropbox-filters-save', saveDropboxFilters);
     wired = true;
 }

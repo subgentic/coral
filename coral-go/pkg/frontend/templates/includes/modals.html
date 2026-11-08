@@ -664,6 +664,18 @@
                                     <button type="button" class="btn btn-small" id="settings-dropbox-disconnect" hidden>Disconnect</button>
                                 </div>
                                 <div id="settings-dropbox-note" class="settings-hint" role="status"></div>
+                                <div id="settings-dropbox-backup" class="settings-dropbox-backup" hidden>
+                                    <div id="settings-dropbox-counts" class="settings-hint"></div>
+                                    <fieldset class="settings-dropbox-filters">
+                                        <legend>What to back up</legend>
+                                        <div id="settings-dropbox-types" class="settings-dropbox-types"></div>
+                                        <p class="settings-hint">No box ticked backs up every type.</p>
+                                        <label for="settings-dropbox-age">Only artifacts from the last</label>
+                                        <input type="number" id="settings-dropbox-age" min="0" max="3650" step="1" inputmode="numeric" class="settings-input settings-input-small">
+                                        <span class="settings-hint">days (0 for every age)</span>
+                                        <button type="button" class="btn btn-small" id="settings-dropbox-filters-save">Save</button>
+                                    </fieldset>
+                                </div>
                             </section>
                             <div id="settings-worktrees-live">
                                 <div id="wt-status" class="settings-hint" role="status"></div>
