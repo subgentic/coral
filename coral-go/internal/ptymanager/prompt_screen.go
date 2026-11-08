@@ -30,7 +30,9 @@ var (
 	// Questions that only appear while a prompt is open.
 	promptQuestionRe = regexp.MustCompile(`(?i)^\s*(do you want to\b|would you like to\b|do you trust the files\b|allow\b.*\?\s*$)`)
 	// Footers drawn under an open menu or approval prompt.
-	promptFooterRe = regexp.MustCompile(`(?i)(enter to (select|confirm|submit)|esc to (cancel|go back|reject|interrupt and reject)|↑/↓ to (navigate|select)|press enter to (confirm|continue))`)
+	// The footers a menu or question draws only while it is open: Claude's, Codex's.
+	decisiveFooterRe = regexp.MustCompile(`(?i)(enter to (select|confirm|submit)|↑/↓ to (navigate|select)|press enter to (confirm|continue))`)
+	promptFooterRe   = regexp.MustCompile(`(?i)(enter to (select|confirm|submit)|esc to (cancel|go back|reject|interrupt and reject)|↑/↓ to (navigate|select)|press enter to (confirm|continue))`)
 )
 
 // markedOptionRe: a line starting with a selection marker and text ("❯ No, exit",
@@ -173,6 +175,20 @@ func codexWorkingMatching(screen string, workingRe *regexp.Regexp) (line string,
 	return "", false
 }
 
+// checkBoxRe is a row with a check box, ticked or not, numbered or not: "1. [ ] Settings", "5. [✓] Other", "[x] Docs". Only a multi-select question draws them at the start of a row (a markdown task list starts with "- ").
+var checkBoxRe = regexp.MustCompile(`^\s*([❯›>]\s*)?(\d{1,2}[.)]\s+)?\[[ xX✓✔]\]\s*\S`)
+
+// checkBoxRows counts the numbered check-box rows of lines.
+func checkBoxRows(lines []string) int {
+	n := 0
+	for _, l := range lines {
+		if checkBoxRe.MatchString(l) {
+			n++
+		}
+	}
+	return n
+}
+
 // isPromptHold reports whether a hold's reason (PromptOnScreen's, or the agent's
 // state) is a request from the agent to the user: a selection menu, a prompt
 // question, or a state of needs input. A footer alone ("esc to cancel", which agy
@@ -220,8 +236,18 @@ func PromptOnScreen(screen string) (bool, string) {
 	if options >= 2 && selected {
 		return true, "selection menu"
 	}
+	// A numbered row with a check box is a multi-select question, whichever row the cursor is on and however few rows the window holds (#14717): the question can be taller than the window, so its marked
+	// row, and all but one of its rows, may be above it. lines is only what is BELOW the last input box, so a checklist in an agent's reply (above its box) is never counted here.
+	if checkBoxRows(lines) >= 1 {
+		return true, "selection menu (check boxes)"
+	}
 	for _, line := range lines {
 		t := strings.TrimSpace(line)
+		// Claude's menu and question footers ("Enter to select", "↑/↓ to navigate", "press Enter to confirm") are drawn only while one is open: a hold whatever rows the window shows (#14717: a question taller
+		// than the window can show the footer and one row, or only the footer). Antigravity's "esc to cancel" is also drawn while it works, so it stays a footer alone (below).
+		if decisiveFooterRe.MatchString(t) {
+			return true, "selection menu (its footer: " + t + ")"
+		}
 		if promptFooterRe.MatchString(t) {
 			if busyOnScreen(all) {
 				// Antigravity draws "esc to cancel" under its input box while it works
