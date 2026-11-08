@@ -39,8 +39,16 @@ async function inboxRows(path, field) {
 }
 
 /** Open goals from this Coral and its registered machines, preserving team identity. */
-export const goalsReadFailed = () => !!inboxRows.failed;
-export function listInboxGoals() { return inboxRows('/api/goals?limit=100', 'goals'); }
+let goalsFailed = false;
+export const goalsReadFailed = () => goalsFailed;
+/** The open goals, and the goals finished (state done) so the Goals folder's Done pill has something to show (#14601: the default read is the open ones only, so Done said 0 after a goal finished). Two reads, so the finished ones never crowd an open goal out of the page. */
+export async function listInboxGoals() {
+    const open = await inboxRows('/api/goals?limit=100', 'goals'), openFailed = !!inboxRows.failed;
+    let done = [], doneFailed = false;
+    try { done = await inboxRows('/api/goals?state=done&limit=100', 'goals'); doneFailed = !!inboxRows.failed; } catch { doneFailed = true; }
+    goalsFailed = openFailed || doneFailed;
+    return [...open, ...done.filter(d => !open.some(o => o.board_id === d.board_id && o.id === d.id))];
+}
 
 const ARTIFACT_LINK_RE = /coral:\/\/artifacts\/([0-9a-f]{64})(?![0-9a-f])/g;
 const ARTIFACT_LOOKUPS_MAX = 20;

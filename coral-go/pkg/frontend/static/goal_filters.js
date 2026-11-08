@@ -35,13 +35,14 @@ export const saveFilters = f => kept.save('inbox-goals', { ...f, q: '' }, browse
 const stamp = g => Date.parse(g.updated_at || g.updatedAt || '') || 0;
 
 /** Whether a goal passes the filters. `teamOf(g)` is the words the Team column shows (the search covers them). The pill's state is a filter here too. */
-export function matches(g, f, teamOf = x => x.board_id || '') {
+export function matches(g, f, teamOf = x => x.board_id || '', opts = {}) {
     const c = clean(f);
     if (c.q) {
         const hay = [g.title, g.outcome, teamOf(g), g.state, g.driver].join(' ').toLowerCase();
         if (!hay.includes(c.q.toLowerCase())) return false;
     }
     if (c.state && String(g.state || '').toLowerCase() !== c.state) return false;
+    if (!c.state && !opts.withDone && String(g.state || '').toLowerCase() === 'done') return false; // a finished goal is under the Done pill, not in All (#14601)
     if (c.team && g.board_id !== c.team) return false;
     if (c.driver && g.driver !== c.driver) return false;
     if (c.from && stamp(g) < Date.parse(localMidnight(c.from))) return false;

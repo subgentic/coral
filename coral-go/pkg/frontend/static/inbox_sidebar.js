@@ -666,13 +666,13 @@ function inboxGoalsToolbar() {
     const teams = [...new Set(goals.map(g => g.board_id))].sort((a, b) => goalTeam({ board_id: a }).localeCompare(goalTeam({ board_id: b })));
     const drivers = [...new Set(goals.map(g => g.driver).filter(Boolean))].sort();
     GF.setTeamNames(new Map(teams.map(t => [t, goalTeam({ board_id: t })])));
-    const rows = goals.filter(g => GF.matches(g, { ...goalFilters, state: '' }, goalTeam));
+    const rows = goals.filter(g => GF.matches(g, { ...goalFilters, state: '' }, goalTeam, { withDone: true })); // every state, finished goals too: the pills count them
     const counts = GF.STATES.map(key => rows.filter(g => String(g.state || '').toLowerCase() === key).length);
     const node = goalBar.draw({
         filters: goalFilters,
         options: { team: { values: teams, labels: Object.fromEntries(teams.map(t => [t, goalTeam({ board_id: t })])) }, driver: { values: drivers } },
         pills: { label: 'Show goals that are', current: goalFilters.state || 'all',
-            items: [{ key: 'all', label: 'All', count: rows.length }, ...GF.STATES.map((key, i) => ({ key, label: GF.STATE_LABEL[key], count: counts[i] }))],
+            items: [{ key: 'all', label: 'All', count: rows.filter(g => String(g.state || '').toLowerCase() !== 'done').length }, ...GF.STATES.map((key, i) => ({ key, label: GF.STATE_LABEL[key], count: counts[i] }))],
             onPick: key => { goalFilters = { ...goalFilters, state: key === 'all' ? '' : key }; GF.saveFilters(goalFilters); renderInboxNav(true); } },
         action: newGoalAction(),
     });
@@ -771,7 +771,7 @@ const savedCounts = () => saved.savedView().totals;
 /** The number beside a folder. Needs you counts what the Inbox badge counts (an alarm: an agent, a review, a run, a proposal, a question); the welcome items are listed but are not alarms, so they are not in either (#11622). */
 /** The goals agents proposed that wait for the Operator (a row in Needs you): the Goals folder counts them, it said 0 while one waited (#11894). */
 const goalProposals = () => pendingProposals().filter(p => p.kind === 'goal');
-const countOf = key => key === 'needs' ? waitingSessions().length + unreadReviewCount() + failedUnread().length + pendingProposals().length + goalDoneRows().filter(needsUnread).length + skillCount() + operatorAsks().length + recordRows().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length + goalProposals().length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? `${countSavedReviews().complete ? '' : 'at least '}${savedCounts().open + countSavedReviews().value}` : undefined;
+const countOf = key => key === 'needs' ? waitingSessions().length + unreadReviewCount() + failedUnread().length + pendingProposals().length + goalDoneRows().filter(needsUnread).length + skillCount() + operatorAsks().length + recordRows().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.filter(g => String(g.state || '').toLowerCase() !== 'done').length + goalProposals().length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? `${countSavedReviews().complete ? '' : 'at least '}${savedCounts().open + countSavedReviews().value}` : undefined;
 /** The folders of the Inbox (#7785, the mailbox mock): one view list, a name and a count each. Needs you, Tasks and Saved open their table in the centre; */
 const FOLDER_ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved: 'saved-bookmark', artifacts: 'inventory_2', activity: 'checklist',
     chats: 'chat_bubble_outline', [BOARDS_FOLDER]: 'forum', 'chats-notes': 'edit_note', 'chats-starred': 'star', 'chats-active': 'bolt', 'chats-archived': 'folder' }; // UI/UX's existing subset choices (#8866); tagged folders keep their colour dot

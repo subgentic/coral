@@ -83,7 +83,7 @@ func TestTrustVerdictSaysWhyThereIsNoYes(t *testing.T) {
 	require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: "00000000-0000-0000-0000-00000000b573", AgentType: "claude", AgentName: "homey", WorkingDir: home}))
 	ok, why = h.trustVerdict(dash(), "00000000-0000-0000-0000-00000000b573", menu(home))
 	assert.False(t, ok)
-	assert.Contains(t, why, "does not trust this kind of folder")
+	assert.Contains(t, why, "home folder")
 	// a menu that is not the folder-trust menu has nothing to say
 	ok, why = h.trustVerdict(dash(), sid, promptScreen{})
 	assert.False(t, ok)
