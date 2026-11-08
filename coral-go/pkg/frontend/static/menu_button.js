@@ -12,9 +12,10 @@ const items = menu => [...menu.querySelectorAll('[role="menuitem"]:not([disabled
 
 export function closeMenus({ restoreFocus = false } = {}) {
     if (!current) return;
-    const { toggle, menu, restore, observer } = current;
+    const { toggle, menu, restore, observer, stopTrackingFocus } = current;
     current = null;
     observer?.disconnect();
+    stopTrackingFocus?.();
     restore?.();
     menu.hidden = true;
     menu.classList.remove('team-menu-up');
@@ -52,6 +53,29 @@ function place(toggle, menu) {
     keepMenuOnScreen(menu, toggle);
 }
 
+// A refresh may replace a row and all its action closures. Reopen only on the
+// same row in the same folder, using the newly rendered menu and current data.
+function restoreRowMenu(previous, anchor) {
+    if (current !== previous) return;
+    const active = document.activeElement;
+    const restoreFocus = active === document.body || !active?.isConnected || previous.menu.contains(active) || active === previous.toggle;
+    const scope = anchor?.scope;
+    const row = scope?.isConnected && scope.dataset.group === anchor.group
+        ? [...scope.querySelectorAll('tr[data-key]')].find(r => r.dataset.key === anchor.key) : null;
+    const toggle = row && [...row.querySelectorAll('[aria-haspopup="menu"][aria-controls]')].find(t =>
+        t.className === anchor.toggleClass && t.getAttribute('aria-label') === anchor.label);
+    const focus = previous.focus;
+    closeMenus();
+    if (!toggle || toggle.disabled || !toggle.getClientRects().length) return;
+    const menu = document.getElementById(toggle.getAttribute('aria-controls'));
+    if (!menu || !items(menu).length) return;
+    openMenu(toggle, { focusFirst: false });
+    if (restoreFocus) {
+        const action = focus?.action && items(menu).find(b => (b.getAttribute('aria-label') || b.textContent.trim()) === focus.action);
+        (action || (focus?.toggle ? toggle : items(menu)[0]))?.focus({ preventScroll: true });
+    }
+}
+
 export function openMenu(toggle, { focusFirst = true } = {}) {
     const menu = document.getElementById(toggle.getAttribute('aria-controls') || '');
     if (!menu || !toggle.isConnected) return;
@@ -59,9 +83,19 @@ export function openMenu(toggle, { focusFirst = true } = {}) {
     menu.hidden = false;
     toggle.setAttribute('aria-expanded', 'true');
     current = { toggle, menu, scrolled: scrollPositions(toggle) };
+    const previous = current;
+    const trackFocus = () => {
+        const active = document.activeElement;
+        previous.focus = active === toggle ? { toggle: true } : { action: items(menu).includes(active) ? (active.getAttribute('aria-label') || active.textContent.trim()) : null };
+    };
+    menu.addEventListener('focusin', trackFocus); toggle.addEventListener('focusin', trackFocus);
+    current.stopTrackingFocus = () => { menu.removeEventListener('focusin', trackFocus); toggle.removeEventListener('focusin', trackFocus); };
+    trackFocus();
     if (menu.classList.contains('dt-mail-menu') || toggle.closest('.dt-box')) {
         current.restore = liftTableMenu(toggle, menu);
-        current.observer = new MutationObserver(() => { if (!toggle.isConnected || !menu.isConnected) closeMenus(); });
+        const row = toggle.closest('tr[data-key]'), scope = toggle.closest('#group-table-view');
+        const anchor = row && scope ? { scope, group: scope.dataset.group, key: row.dataset.key, toggleClass: toggle.className, label: toggle.getAttribute('aria-label') } : null;
+        current.observer = new MutationObserver(() => { if (!toggle.isConnected || !menu.isConnected) restoreRowMenu(previous, anchor); });
         current.observer.observe(document.body, { childList: true, subtree: true });
     } else place(toggle, menu);
     if (focusFirst) items(menu)[0]?.focus({ preventScroll: true }); // the placed menu is already on screen: taking focus must not scroll the dialog (that scroll would close the menu, #12909)
