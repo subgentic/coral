@@ -22,7 +22,7 @@ const { closeDetailPane } = await importOnce('./detail_pane.js'); // a lazy modu
 const { el } = await importOnce('./team_table.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
 
-const PHONE_MORE = ['knowledge', 'branches', 'messages']; // (the last three of TEAM_TABS: the row is its first four, Goals, Agents, Tasks, Artifacts, in the operator's order, #8791) // the tabs a phone puts behind its More menu (CSS hides their tabs under 761 px)
+const PHONE_MORE = ['knowledge', 'messages', 'branches']; // (the last three of TEAM_TABS: the row is its first four, Goals, Agents, Tasks, Artifacts, in the operator's order, #8791) // the tabs a phone puts behind its More menu (CSS hides their tabs under 761 px)
 const LABEL = { goals: 'Goals', messages: 'Board', tasks: 'Tasks', agents: 'Agents', artifacts: 'Artifacts', knowledge: 'Knowledge', branches: 'Branches' };
 const S = { team: '', tab: 'goals', item: null, counts: {}, built: false, countSeq: 0, navSeq: 0, noGoal: false }; // noGoal: the next Tasks tab opens filtered to the tasks that serve no goal (the Goals table's last row, #7717)
 const $ = (id) => document.getElementById(id);
