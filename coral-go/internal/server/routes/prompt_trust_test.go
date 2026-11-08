@@ -291,7 +291,7 @@ func TestFolderTrustPathJoinsAPathTheTerminalWrapped(t *testing.T) {
 	assert.Equal(t, "", folderTrustPath(" Accessing workspace:\n Quick safety check: Is this a project you created or one you trust?\n"))
 	assert.Equal(t, "", folderTrustPath(" Accessing workspace:\n /a/path\n Quick safety check: Is this a project\n"+" more\n"), "no blank line between the path and the question: the question line is not a path")
 	// the folder joined is not the session's own folder unless it is exactly that folder
-	assert.False(t, sameFolder(folderTrustPath(screen(long[:60], long[60:])+" extra"), long))
+	assert.False(t, sameFolder(folderTrustPath(screen(long[:60], long[60:]+" extra")), long))
 }
 
 // Security's SHOULD 3 on #14560: a deep worktree under a narrow terminal wraps many times. Joined from up to trustPathMaxLines (8) lines: 5 and 8 lines are read whole; a 9-line wrap is a prefix, which is
