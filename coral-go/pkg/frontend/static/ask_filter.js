@@ -11,15 +11,17 @@ export const unreadReviewItems = () => read();
 export const refreshReviews = () => refresh();
 /** Exact server attention totals are distinct from the loaded page's unread rows. */
 export function reviewAttentionCount() {
+    const metadata = summary(), n = metadata?.attentionTotal;
+    // A complete loaded window applies the current mute/read/comment policy. The
+    // startup counter can predate it; recount in memory instead of fetching it twice.
+    if (Number.isSafeInteger(n) && n >= 0) return { value: n, complete: true };
     const server = countMetadata(), authoritative = counted();
     if (Number.isSafeInteger(authoritative) && authoritative >= 0 && (!server || server.complete)) return { value: authoritative, complete: true };
-    const metadata = summary(), n = metadata?.attentionTotal;
     if (server && !server.complete) {
         const fallback = server.sources.filter(s => s.total === null).reduce((total, s) => total + (metadata?.loadedBySource?.[s.server] || 0), 0);
         return { value: server.knownTotal + fallback, complete: false };
     }
-    return Number.isSafeInteger(n) && n >= 0 ? { value: n, complete: true }
-        : { value: read().length, complete: metadata === null && !counterAttached };
+    return { value: read().length, complete: metadata === null && !counterAttached };
 }
 export function setReviewCacheReader(reader, refresher, summarizer = () => null) { read = reader; refresh = refresher; summary = summarizer; }
 

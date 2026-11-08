@@ -4,7 +4,7 @@ import { setReviewCacheReader } from './ask_filter.js';
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
 import { sourcesKey } from './board_fetch.js';
 import { inboxSources, serverLabel, isOwnerOnlyAnswer } from './inbox_servers.js';
-import { boardFetch, nextArtifactPage, splitKey, serverFetch, identityKey, noteBoardLabels, normServer } from './server_base.js';
+import { boardFetch, nextArtifactPage, splitKey, serverFetch, identityKey, noteBoardLabels, normServer, isCloud } from './server_base.js';
 import { SORT_PARAM } from './filter_model.js';
 import { fetchSkewed } from './query_skew.js';
 import { hideAsksWhen } from './ask_filter.js';
@@ -12,7 +12,13 @@ import { importOnce } from './import_once.js';
 const { createReviewPages } = await importOnce('./review_pages.js');
 const { needsReviewAttention, hasNewVersion, waitingOnAgent } = await importOnce('./inbox_review_state.js');
 
-let items = [], saved = [], muted = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => { if (typeof document !== 'undefined') document.dispatchEvent(new Event('coral:reviews-changed')); };
+let items = [], saved = [], muted = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = (detail = null) => { if (typeof document !== 'undefined') document.dispatchEvent(new CustomEvent('coral:reviews-changed', { detail })); };
+let savedActivated = false;
+export function activateSavedReviews() {
+    if (savedActivated) return pending || Promise.resolve();
+    savedActivated = true;
+    return pending ? pending.then(() => refreshReviews(true)) : refreshReviews(true);
+}
 let activated = false, refreshAgain = false, freshnessDirty = false;
 onArtifactsRev(() => {
     if (!activated) return;
@@ -361,6 +367,7 @@ export function reviewPageSummary() {
         hasMore: sources.some(s => s.has_more), partial: !ready || sources.some(s => s.truncated),
         failed: sources.filter(s => s.error).map(s => s.server) };
 }
+let pagesPublished = false;
 function publishPages() {
     const next = [], nextSaved = [], nextMuted = [], failed = [];
     for (const source of reviewPager.snapshot()) {
@@ -377,7 +384,8 @@ function publishPages() {
         for (const a of source.artifacts) if (a.tags?.includes('saved') && a.tags.includes('for review') && a.available) nextSaved.push(a);
     }
     items = next.sort(byAge); saved = nextSaved.sort(byAge); muted = nextMuted.sort(byAge); errors = failed;
-    changed();
+    changed({ countsUnchanged: !pagesPublished }); // initial page publication is not an edit: the independent startup summary is already reading
+    pagesPublished = true;
 }
 async function appendReviews(pager, server) {
     if (!activated) return;
@@ -421,7 +429,7 @@ export function refreshReviews(force = false, { reuse = false } = {}) {
     syncPageSources();
     const unchanged = !force && !freshnessDirty && finishedRev === revision ? unchangedComputer : null;
     freshnessDirty = false;
-    pending = Promise.all([reviewPager.refresh({ unchanged }), savedPager.refresh({ unchanged }), refreshActiveQuery(unchanged)]).then(([reviews, saved]) => {
+    pending = Promise.all([reviewPager.refresh({ unchanged }), (!isCloud() || savedActivated ? savedPager.refresh({ unchanged }) : Promise.resolve([])), refreshActiveQuery(unchanged)]).then(([reviews, saved]) => {
         if (started !== revision) return;
         if (!sourceSetChanged && [...reviews, ...saved].every(result => result === false)) return;
         publishPages();

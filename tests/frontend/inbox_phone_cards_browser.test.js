@@ -1,6 +1,6 @@
 // The phone's Needs you is one card per item in the agent chat's look (#14144, the Operator: "the Inbox on the phone is a bit jumbled, probably trying to put too much on. Follow the agent chat look."; the mock they approved):
 // each file or question is a card with the chat's own card colour, 1 px border and 12 px radius with the small top-left corner, 12 px apart; the glyph clears the sender's name; the description is ONE line; the sort
-// controls are two compact chips (the word "Sort by" stays for a screen reader); the count equals the cards drawn; the footer notice is after the last card, never over it; nothing runs off the screen. 390 and 430 px,
+// controls are two compact chips (the word "Sort by" stays for a screen reader); the count is unread attention while read cards remain visible; the footer notice is after the last card, never over it; nothing runs off the screen. 390 and 430 px,
 // dark and light, and 200% text. The review rows are stubbed through the owner list; the Inbox and its fold are real.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -17,7 +17,7 @@ const { coralReady } = require('./helpers/wait');
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, theme, font] of [[390, 'dark', 16], [430, 'dark', 16], [390, 'light', 16], [390, 'dark', 32], [320, 'dark', 16], [360, 'dark', 16]]) {
-            const at = `${w} ${theme} ${font}px: `;
+            const at = `${w} ${theme} ${font}px: `; let opened = false;
             await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(INBOX_WORLD);
@@ -25,11 +25,12 @@ const { coralReady } = require('./helpers/wait');
             await ev(`(() => { const real = window.fetch, now = Date.now(), hex = n => n.toString(16).padStart(64, '0');
                 const rows = [{ id: hex(1), name: 'Desktop film with local voice over (Samantha, v3).mp4', media_type: 'text/html', size: 900, created_at: new Date(now - 10 * 3600e3).toISOString(), available: true, tags: ['for review'], produced_by: 'Developer experience', review_question: 'v3: fuller captions over the whole film, same words spoken. Good? A longer second sentence that must not make the card taller.', version: 3, earlier_digests: [hex(8), hex(9)] },
                     { id: hex(2), name: 'release-plan.md', media_type: 'text/markdown', size: 1200, created_at: new Date(now - 20 * 3600e3).toISOString(), available: true, tags: ['for review'], produced_by: 'Orchestrator', review_question: 'On v2.0.57, do the main pages look consistent on a phone?' }];
-                window.fetch = (u, o = {}) => { if (/\\/api\\/board\\/team-a\\/artifacts\\/[0-9a-f]{64}\\/tags/.test(String(u)) && (o.method || 'GET').toUpperCase() === 'PUT') return Promise.resolve(new Response(JSON.stringify({ tags: ['for review', 'read'] }), { status: 200, headers: { 'Content-Type': 'application/json' } })); const page = window.__reviewFixturePage(u, location.origin, { 'team-a': rows }); if (page) return Promise.resolve(new Response(JSON.stringify(page), { status: 200, headers: { 'Content-Type': 'application/json' } })); return real(u, o); }; return true; })()`);
+                window.fetch = (u, o = {}) => { if (/\\/api\\/board\\/team-a\\/artifacts\\/[0-9a-f]{64}\\/tags/.test(String(u)) && (o.method || 'GET').toUpperCase() === 'PUT') { const id = new URL(String(u), location.href).pathname.split('/').at(-2), tags = JSON.parse(o.body).tags; const item = rows.find(a => a.id === id); if (item) item.tags = tags; return Promise.resolve(new Response(JSON.stringify({ tags }), { status: 200, headers: { 'Content-Type': 'application/json' } })); } const page = window.__reviewFixturePage(u, location.origin, { 'team-a': rows }); if (page) return Promise.resolve(new Response(JSON.stringify(page), { status: 200, headers: { 'Content-Type': 'application/json' } })); return real(u, o); }; return true; })()`);
             await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr.dt-row').length === 2`, `${at}two cards`, 15000);
             await waitFor(`!!document.querySelector('#group-table-view .dt-box.dt-folded')`, `${at}folded to phone rows`, 5000);
+            await waitFor(`document.getElementById('nav-tab-hub-inbox-badge')?.textContent === '2'`, `${at}two unread cards count before either is opened`);
             await new Promise(r => setTimeout(r, 800)); // sleep-ok: the fold settles after the first paint
             const m = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view tbody tr.dt-row')], rc = e => e.getBoundingClientRect();
                 const probe = Object.assign(document.createElement('div'), { className: 'chat-bubble assistant' }); document.body.append(probe); const pc = getComputedStyle(probe); const chat = { bg: pc.backgroundColor, border: pc.borderTopColor, radius: pc.borderTopRightRadius, tl: pc.borderTopLeftRadius }; probe.remove();
@@ -78,9 +79,12 @@ const { coralReady } = require('./helpers/wait');
                 const said = await ev(`(document.getElementById('artifact-viewer').innerText || '').replace(/\\s+/g, ' ')`);
                 check(said.includes('A longer second sentence that must not make the card taller.'), `${at}the file's header carries the whole question the card cut: ` + JSON.stringify(said.slice(0, 300)));
                 await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close')?.click(); true`);
+                opened = true;
+                await waitFor(`document.getElementById('nav-tab-hub-inbox-badge')?.textContent === '1'`, `${at}opening marks one card read and drops unread attention`);
+                check(await ev(`document.querySelectorAll('#group-table-view tbody tr.dt-row').length === 2 && document.querySelectorAll('#group-table-view tbody tr.dt-row.dt-read').length === 1`), `${at}the read card remains visible alongside the unread card`);
             }
             const badge = await ev(`document.getElementById('nav-tab-hub-inbox-badge')?.textContent`);
-            check(badge === '2', `${at}the count is the number of cards (2): ` + badge);
+            check(badge === (opened ? '1' : '2'), `${at}the badge counts unread cards (${opened ? 1 : 2}), while both cards remain listed: ` + badge);
         }
     } finally { await client.close(); }
     if (failures.length) { console.error('FAIL\n  ' + failures.join('\n  ')); process.exit(1); }
