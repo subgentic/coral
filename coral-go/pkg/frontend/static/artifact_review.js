@@ -25,6 +25,7 @@ export async function reviewStateOf(team, hex) {
 
 const timeWords = at => { const t = Date.parse(at); return Number.isNaN(t) ? '' : new Date(t).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }); };
 
+const CHANGE_WORDS_MAX = 500; // runes of the words sent with Request changes
 async function decide(team, row, decision, reason, note, quiet = false, words = '') {
     const r = await boardFetch(team, `/artifacts/${encodeURIComponent(row.id)}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, ...(reason ? { reason } : {}), ...(note ? { note } : {}), ...(quiet ? { quiet: true } : {}), ...(words ? { text: words } : {}) }) });
     const body = await r.json().catch(() => ({}));
@@ -274,6 +275,7 @@ export function attachReview(d, { reload }) {
         if (sending || inProgress) return;
         const body = text.value.trim();
         if (!body || !cur) { error.textContent = 'Say what should change.'; return; }
+        if ([...body].length > CHANGE_WORDS_MAX) { error.textContent = `Keep it to ${CHANGE_WORDS_MAX} characters: it is ${[...body].length}. Your words are still here.`; return; } // the Hub takes 1 to 500 characters of text for Request changes (coral-hub, #14797); the computer's own cap is 8 KB. Never cut a person's words: say so
         const was = cur, g = gen, current = () => g === gen && cur?.team === was.team && cur?.hex === was.hex;
         clearProgress(); sending = true; syncSend(); text.readOnly = true; error.textContent = '';
         let recorded = false, kept = false, older = false;

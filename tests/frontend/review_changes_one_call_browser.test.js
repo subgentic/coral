@@ -12,7 +12,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
     const failures = [];
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const mode of ['one', 'older', 'older-comment-refused', 'older-comment-lost', 'older-send-refused', 'older-send-lost', 'older-send-lost-file', 'older-send-lost-words', 'pictures', 'in-progress', 'not-delivered', 'already-sent', 'hub', 'held-close', 'held-switch', 'text-not-kept', 'unsupported-images', 'other-refusal', 'cloud', 'cloud-older']) {
+        for (const mode of ['one', 'older', 'older-comment-refused', 'older-comment-lost', 'older-send-refused', 'older-send-lost', 'older-send-lost-file', 'older-send-lost-words', 'pictures', 'in-progress', 'not-delivered', 'already-sent', 'hub', 'held-close', 'held-switch', 'text-not-kept', 'unsupported-images', 'other-refusal', 'cloud', 'cloud-older', 'too-long']) {
             try {
                 if (mode === 'cloud' || mode === 'cloud-older') await setupHubWorld({ client, Page, Emulation, width: 1280, height: 900, mobile: false, inbox: true, hubFeed: true });
                 await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
@@ -61,7 +61,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                     await ev(`(() => { const b=Uint8Array.from(atob('${PNG}'),c=>c.charCodeAt(0)),dt=new DataTransfer();dt.items.add(new File([b],'example.png',{type:'image/png'})); const input=document.querySelector('#one-call-review .ac-picker input');input.files=dt.files;input.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
                     await waitFor(`!!document.querySelector('#one-call-review .ac-thumb-ready')`, 'picture upload finishes');
                 }
-                await ev(`document.querySelector('#one-call-review textarea').value='Keep these exact words.'; document.querySelector('#one-call-review form').requestSubmit(); true`);
+                await ev(`document.querySelector('#one-call-review textarea').value=${JSON.stringify(mode === 'too-long' ? 'é'.repeat(501) : 'Keep these exact words.')}; document.querySelector('#one-call-review form').requestSubmit(); true`);
                 if (mode === 'held-close' || mode === 'held-switch') {
                     await waitFor(`typeof window.__releaseDecision === 'function'`, 'the old response is held');
                     if (mode === 'held-close') await ev(`window.__control.close(); true`);
@@ -114,6 +114,10 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                         assert.equal(sends.length,2,mode+': retry sends only the existing comment');
                         assert.equal(sends[0].path,sends[1].path,mode+': both sends address the same comment');
                     }
+                } else if (mode === 'too-long') {
+                    await waitFor(`/Keep it to 500 characters: it is 501/.test(document.querySelector('#one-call-review .artifact-review-error').textContent)`, 'the 501-character words are refused in the form, before sending');
+                    assert.equal(await ev(`window.__writes.length`),0,'501 characters (not bytes) are never sent: the Hub takes 1 to 500 (#14797)');
+                    assert.equal(await ev(`document.querySelector('#one-call-review textarea').value.length`),501,'the words are kept, never cut');
                 } else if (mode === 'text-not-kept' || mode === 'other-refusal') {
                     await waitFor(`!!document.querySelector('#one-call-review .artifact-review-error').textContent`, 'the refusal stays in the form');
                     const error = await ev(`document.querySelector('#one-call-review .artifact-review-error').textContent`);
