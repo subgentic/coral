@@ -28,6 +28,9 @@ assert.equal(personalInboxAllowed('owned', true), false, 'unknown mode cannot re
 assert.equal(personalInboxSources().length, 5, 'malformed routing sources are dropped');
 assert.match(personalInboxNotice('Saved'), /Only this computer's owner/);
 assert.match(personalInboxNotice('Saved'), /Ownership is not known/);
+const { nativeSavedSourceAllowed } = await import('../../coral-go/pkg/frontend/static/server_status.js');
+for (const version of [undefined, '2.0.61', '2.0.62-rc.1']) { state.servers[0].coral_version = version; assert.equal(nativeSavedSourceAllowed('owned'), false, 'Saved withholds an unknown or older version'); }
+for (const version of ['2.0.62', '2.0.63']) { state.servers[0].coral_version = version; assert.equal(nativeSavedSourceAllowed('owned'), true); }
 state.servers = [];
 assert.match(personalInboxNotice('Saved'), /Waiting for computer ownership/);
 console.log('personal_inbox_policy: strict ownership, mode and source boundaries pass');

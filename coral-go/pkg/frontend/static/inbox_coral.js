@@ -1,5 +1,6 @@
 /* Coral's side of the shared Inbox (#5754): the adapter that gives inbox_panel.js its tasks, task text, reply and saved-message read from this Coral's own routes, and the one mounted panel
  * (the Inbox tab's "Tasks for you" and the "Read the whole message" control of a Saved for later item). The component itself is inbox_panel.js; Coral Hub mounts the same file with its own adapter. */
+import { nativeSavedSourceAllowed } from './server_status.js';
 import { state } from './state.js';
 import { importOnce } from './import_once.js';
 import { makeLinkPolicy } from './safe_markdown.js';
@@ -118,9 +119,9 @@ export const coralInboxAdapter = {
     canReply(task) { return !isCloud() || (inboxReplyOn() && personalInboxAllowed(splitKey(task?.project).server, true) && ['pending', 'in_progress', 'blocked', 'draft'].includes(task?.status) && !task?.parked_reason && !task?.parked_until) ? { ok: true } : { ok: false, reason: 'Reply requires an owned computer in Interact or Launch mode and an available task.' }; }, // the Operator of this computer; a Coral Hub viewer's adapter says why not
     async readSavedMessage(item) {
         // GET /api/saved/{id}/message (Backend, #5753): the redacted, capped text of the stored item's source; reason says why there is none (gone, not_reachable, too_long)
-        if (isCloud() && (!savedExpandOn() || !personalInboxAllowed(item.server))) throw new Error('This saved message is not available.');
+        if (isCloud() && (!savedExpandOn() || !nativeSavedSourceAllowed(item.server))) throw new Error('This saved message is not available.');
         const d = await json(await serverFetch(item.server, `/api/saved/${pathId(item.id)}/message`));
-        if (isCloud() && !personalInboxAllowed(item.server)) throw new Error('This saved message is no longer available.');
+        if (isCloud() && !nativeSavedSourceAllowed(item.server)) throw new Error('This saved message is no longer available.');
         return { text: typeof d.text === 'string' ? d.text : '', partial: !!d.partial, reason: typeof d.reason === 'string' ? d.reason : '' };
     },
     taskHref(task) { return taskHref(task.project, task.id); },

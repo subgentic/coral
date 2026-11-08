@@ -7,7 +7,7 @@
 
 import { state } from './state.js';
 import { MORE_DOTS_SVG } from './html_escape.js';
-import { LOCAL_SERVER, normServer, isHub, keyLabel, splitKey } from './server_base.js';
+import { LOCAL_SERVER, normServer, isHub, keyLabel, splitKey, isCloud, personalInboxAllowed } from './server_base.js';
 import { launchBlockReason } from './launch_server.js';
 import { OUTCOME_UNKNOWN_LINE, isOutcomeUnknown } from './outcome_unknown.js';
 /** What the list of remote computers says on a Coral that is not a hub (its route answers 404): the Computers page shows nothing for it, not a red error (#11400). */
@@ -426,4 +426,13 @@ export function compareVersions(a, b) {
         else if (p !== q) return p < q ? -1 : 1;
     }
     return x.pre.length === y.pre.length ? 0 : (x.pre.length < y.pre.length ? -1 : 1);
+}
+
+/** Native Saved uses the exact-file contract shipped with its 2.0.62 rollout.
+ * Unknown versions and prereleases below that release do not opt in. */
+export function nativeSavedSourceAllowed(server) {
+    if (!isCloud()) return true;
+    const source = (state.servers || []).find(s => s.id === server);
+    const order = compareVersions(shortVersion(serverVersion(source)), '2.0.62');
+    return personalInboxAllowed(server) && (order === 0 || order === 1);
 }

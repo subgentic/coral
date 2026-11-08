@@ -1000,7 +1000,7 @@ function savedListSpec(where = '') {
     const dock = where === 'dock-tab';
     const multi = rows.some(f => f.serverName);
     const empty = v.loading ? 'Loading saved items' : v.error ? v.error : v.filtered ? 'No saved messages match this search.' : v.notice || v.scoped || (v.tab === 'done' ? 'Nothing is marked done.' : 'Nothing is saved for later.');
-    const files = dock ? [] : savedFiles(); // the saved review files, listed above the messages (#11641)
+    const files = dock ? [] : savedFiles().filter(a => !v.query || [a.name, a.produced_by].join(' ').toLowerCase().includes(v.query.toLowerCase())); // the saved review files, listed above the messages (#11641)
     const spec = { title: 'Saved', count: dock ? rows.length : `${countSavedReviews().complete && savedKnown() ? '' : 'at least '}${rows.length + countSavedReviews().value}`, noun: ['item', 'items'], headless: dock, chipsLabel: 'Show',
         chips: !dock ? [] : [{ action: 'inbox-saved-chip', data: { tab: 'open' }, label: 'Open', count: v.totals.open, pressed: v.tab === 'open' }, { action: 'inbox-saved-chip', data: { tab: 'done' }, label: 'Done', count: v.totals.done, pressed: v.tab === 'done' }],
         empty: { line: empty, hint: v.loading || v.error || v.filtered || v.tab === 'done' ? '' : 'Save a message from a chat or a board with its bookmark.' },
@@ -1413,7 +1413,7 @@ function setGroup(key, { auto = false } = {}) {
 let personalSourceKey = '';
 document.addEventListener('coral:servers-updated', () => {
     if (!isCloud()) return;
-    const key = JSON.stringify(personalInboxSources().map(s => [s.id, s.owner, s.status, s.effective_mode]));
+    const key = JSON.stringify(personalInboxSources().map(s => [s.id, s.owner, s.status, s.effective_mode, s.coral_version, s.version]));
     if (key === personalSourceKey) return;
     personalSourceKey = key;
     tasks = tasks.filter(t => personalInboxAllowed(t.server));

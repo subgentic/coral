@@ -2,9 +2,10 @@ import { artifactRevision, artifactsUnchanged, onArtifactsRev } from './artifact
 import { setReviewCacheReader } from './ask_filter.js';
 /* Review artifacts use the same owner-protected team list and tags routes as Artifacts.
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
+import { nativeSavedSourceAllowed } from './server_status.js';
 import { sourcesKey } from './board_fetch.js';
 import { inboxSources, serverLabel, isOwnerOnlyAnswer } from './inbox_servers.js';
-import { boardFetch, nextArtifactPage, splitKey, serverFetch, identityKey, noteBoardLabels, normServer, isCloud, nativeSaved, personalInboxAllowed } from './server_base.js';
+import { boardFetch, nextArtifactPage, splitKey, serverFetch, identityKey, noteBoardLabels, normServer, isCloud, nativeSaved } from './server_base.js';
 import { SORT_PARAM } from './filter_model.js';
 import { fetchSkewed } from './query_skew.js';
 import { hideAsksWhen } from './ask_filter.js';
@@ -97,9 +98,10 @@ hideAsksWhen(a => { const key = askReviewKey(a); return !!key && (linkedReviews.
 let savedFor = null, savedRev = -1, savedView = [];
 /** The saved files, one row per file like Needs you (#11937): the newest version, with the older saved ones as `earlier`. */
 export const savedFiles = () => {
-    if (savedFor === saved && savedRev === revision) return savedView;
+    const permitted = rows => isCloud() && nativeSaved() ? rows.filter(row => nativeSavedSourceAllowed(splitKey(row.team).server)) : rows;
+    if (savedFor === saved && savedRev === revision) return permitted(savedView);
     savedView = collapseVersions(saved); savedFor = saved; savedRev = revision;
-    return savedView;
+    return permitted(savedView);
 };
 export const isRead = a => !!(a.tags && a.tags.includes('read')) && !(a.new_comments > 0) && !hasNewVersion(a); // a read file whose Operator-started thread has agent replies not yet opened is unread again, counted once as itself (#12026)
 export const unreadReviewItems = () => reviewItems().filter(needsReviewAttention);
@@ -268,6 +270,7 @@ export async function reviewOfTeam(team, digest, { anyState = false } = {}) {
     const hex = String(digest || '').toLowerCase();
     if (!/^[a-f0-9]{64}$/.test(hex)) throw new Error('The review file has no valid digest.');
     const source = splitKey(team);
+    if (anyState && isCloud() && nativeSaved() && !nativeSavedSourceAllowed(source.server)) throw new Error('Saved file lookup requires an owned, online computer running Coral 2.0.62 or newer.');
     const params = new URLSearchParams({ team: source.name, digest: hex, ...(!anyState ? { tag: 'for review' } : {}) });
     const query = params.toString();
     const data = await readComputerPage(source.server, { query, cursor: '', limit: 50, revisionBound: !anyState }); // viewer state can overlap its own mark-read write
@@ -331,14 +334,14 @@ const reviewPager = createReviewPages({ read: readComputerPage, key: pageKey });
 const savedPager = createReviewPages({ read: readComputerPage, key: pageKey });
 function syncPageSources() {
     const servers = inboxSources();
-    if (!pagesReady) { reviewPager.reset(servers, reviewQuery); savedPager.reset(isCloud() && nativeSaved() ? servers.filter(server => personalInboxAllowed(server)) : servers, savedQuery); pagesReady = true; }
-    else { reviewPager.setSources(servers); savedPager.setSources(isCloud() && nativeSaved() ? servers.filter(server => personalInboxAllowed(server)) : servers); }
+    if (!pagesReady) { reviewPager.reset(servers, reviewQuery); savedPager.reset(isCloud() && nativeSaved() ? servers.filter(server => nativeSavedSourceAllowed(server)) : servers, savedQuery); pagesReady = true; }
+    else { reviewPager.setSources(servers); savedPager.setSources(isCloud() && nativeSaved() ? servers.filter(server => nativeSavedSourceAllowed(server)) : servers); }
 }
 export const reviewPages = () => reviewPager.status();
 export const savedReviewPages = () => savedPager.status();
 /** Saved is an intersection: the saved query's for-review tag count covers off-page review files. */
 export function countSavedReviews() {
-    const pages = savedReviewPages(), unknown = new Set();
+    const pages = savedReviewPages().filter(page => !isCloud() || !nativeSaved() || nativeSavedSourceAllowed(page.server)), unknown = new Set();
     let value = 0, complete = pages.length > 0;
     for (const page of pages) {
         if (page.ownerOnly) continue;

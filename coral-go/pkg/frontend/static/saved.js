@@ -6,7 +6,7 @@ import { serverMatches } from './inbox_servers.js';
  * it, the board message was deleted) is marked Gone on its item, which keeps its snippet and can only be removed. */
 import { onAccountForgotten } from './local_store.js';
 import { isPhoneLayout } from './phone_layout.js';
-import { teamLabel } from './server_status.js';
+import { teamLabel, nativeSavedSourceAllowed } from './server_status.js';
 import { whenText } from './when_text.js';
 import { state } from './state.js';
 import { showToast } from './utils.js';
@@ -35,7 +35,7 @@ let bar = null;
 let totals = { open: 0, done: 0 };
 let loadSeq = 0; // the read in flight that was asked for last: an answer that comes after a newer ask is dropped, so a slow read of an old filter never overwrites the list of the newer one (#7945)
 let scope = ALL; // where the panel was opened from (#4792): the agent or the team on screen, or everything; the server matches it, and the counts are its own
-onAccountForgotten(() => { ++loadSeq; items = []; sourceItems = []; checks.clear(); convTitles.clear(); totals = { open: 0, done: 0 }; });
+onAccountForgotten(() => { ++loadSeq; items = []; sourceItems = []; down = []; capped = false; checks.clear(); convTitles.clear(); totals = { open: 0, done: 0 }; });
 const convTitles = new Map(); // conversation reference -> its title, from every list read: the Conversation filter's options (they must outlast a filter that leaves one)
 /** An item's identity across servers: ids are each server's own. */
 const uid = it => `${it.server}:${it.id}`;
@@ -60,14 +60,14 @@ function ago(iso) {
 }
 
 function browserItems() {
-    items = sourceItems.filter(i => personalInboxAllowed(i.server) && savedKeeps(i, filters) && serverMatches(i, filters)
+    items = sourceItems.filter(i => nativeSavedSourceAllowed(i.server) && savedKeeps(i, filters) && serverMatches(i, filters)
         && (!filters.kind || i.kind === filters.kind) && (!filters.conv || i.ref === filters.conv)
         && (!filters.q || [i.title, i.snippet].some(t => String(t || '').toLowerCase().includes(filters.q.toLowerCase()))))
         .sort((a, b) => (filters.sort === 'oldest' ? -1 : 1) * (b.saved_at || '').localeCompare(a.saved_at || ''));
 }
 async function loadCloud(mine) {
     if (!nativeSaved()) return;
-    const sources = personalInboxSources().filter(s => personalInboxAllowed(s.id));
+    const sources = personalInboxSources().filter(s => nativeSavedSourceAllowed(s.id));
     const results = await Promise.all(sources.map(async s => {
         try {
             const r = await serverFetch(s.id, '/api/saved?limit=200');
@@ -78,7 +78,7 @@ async function loadCloud(mine) {
         } catch { return { server: s.id, label: s.label, failed: true }; }
     }));
     if (mine !== loadSeq) return;
-    const answered = results.filter(r => !r.failed && personalInboxAllowed(r.server));
+    const answered = results.filter(r => !r.failed && nativeSavedSourceAllowed(r.server));
     down = results.filter(r => r.failed).map(r => ({ id: r.server, label: r.label, ownerOnly: r.ownerOnly }));
     sourceItems = answered.flatMap(a => a.d.items.slice(0, 200).filter(validSavedItem).map(i => ({ ...i, server: a.server })));
     capped = answered.some(a => a.d.items.length >= 200 || a.d.has_more || a.d.truncated);
@@ -389,7 +389,7 @@ export function onSavedRender(fn) { renderListeners.add(fn); }
 /** What the Inbox shows: the tab's items (Open or Done), both totals, the servers that did not answer, and whether a search or filter is on. */
 export function savedView() {
     if (isCloud()) browserItems();
-    return { notice: personalInboxNotice('saved items'), capped: isCloud() && capped, browserOnly: isCloud(), loading: !_drawn && !_readError, error: _readError, scoped: scope.kind === 'all' ? '' : scopeEmpty(scope, tab), tab, totals: { ...totals }, shown: items.filter(i => (tab === 'done') === !!i.done_at), down: [...down], filtered: savedFiltered(filters), query: filters.q || '' };
+    return { notice: [personalInboxNotice('saved items'), ...(isCloud() ? personalInboxSources().filter(s => personalInboxAllowed(s.id) && !nativeSavedSourceAllowed(s.id)).map(s => `Saved on ${s.label || s.id} requires Coral 2.0.62 or newer; its version is older or unknown.`) : [])].filter(Boolean).join(' '), capped: isCloud() && capped, browserOnly: isCloud(), loading: !_drawn && !_readError, error: _readError, scoped: scope.kind === 'all' ? '' : scopeEmpty(scope, tab), tab, totals: { ...totals }, shown: items.filter(i => (tab === 'done') === !!i.done_at), down: [...down], filtered: savedFiltered(filters), query: filters.q || '' };
 }
 /** One item's facts for a row or a page: its words, and what it can do. */
 export function savedItemFacts(it) {
@@ -419,7 +419,8 @@ export function loadSaved() {
 }
 export function savedInventoryChanged() {
     if (!isCloud()) return;
-    ++loadSeq; pendingLoad = null; sourceItems = sourceItems.filter(i => personalInboxAllowed(i.server));
+    ++loadSeq; pendingLoad = null; sourceItems = sourceItems.filter(i => nativeSavedSourceAllowed(i.server));
+    totals = { open: sourceItems.filter(i => !i.done_at).length, done: sourceItems.filter(i => !!i.done_at).length };
     browserItems();
     if (_drawn) render();
 }
