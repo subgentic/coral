@@ -65,6 +65,29 @@ func TestOutsideRootIsAcceptedWhenItIsMadeOwnerOnlyAndProtected(t *testing.T) {
 	}
 }
 
+// A root whose path holds an 8.3 short name (GitHub's Windows runners set TEMP to C:\Users\RUNNER~1\...) is not refused as a link: a short name is the same folder. On a drive
+// with short names turned off there is no short form to give, and the test says so.
+func TestOutsideRootUnderAShortNameIsAccepted(t *testing.T) {
+	base := rootBase(t)
+	in, err := windows.UTF16PtrFromString(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	buf := make([]uint16, windows.MAX_LONG_PATH)
+	n, err := windows.GetShortPathName(in, &buf[0], uint32(len(buf)))
+	short := windows.UTF16ToString(buf[:n])
+	if err != nil || n == 0 || strings.EqualFold(short, base) {
+		t.Skipf("this drive gives %q no 8.3 short form (short names off), so there is nothing to check here", base)
+	}
+	root := filepath.Join(short, rootName)
+	if reason := checkOutsideRoot(root); reason != "" {
+		t.Fatalf("a root under the short path %q: %q", short, reason)
+	}
+	if got := longPath(root); !strings.EqualFold(got, filepath.Join(base, rootName)) {
+		t.Errorf("longPath(%q) = %q, want the long form %q", root, got, filepath.Join(base, rootName))
+	}
+}
+
 func TestOutsideRootWithAnAuthenticatedUsersEntryIsRefused(t *testing.T) {
 	root := filepath.Join(rootBase(t), rootName)
 	makeWith(t, root, "D:P(A;OICI;GA;;;"+me(t).String()+")(A;OICI;GA;;;AU)")

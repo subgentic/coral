@@ -72,14 +72,30 @@ func checkOutsideRoot(clean string) string {
 	if reason := checkRootFolder(clean, me); reason != "" {
 		return reason
 	}
+	// EvalSymlinks gives every element its long name, so an 8.3 short name in the path (GitHub's Windows runners set TEMP to C:\Users\RUNNER~1\...) is compared in its long form too:
+	// a short name is not a link. The root exists by now, so GetLongPathName can read every element.
 	real, err := filepath.EvalSymlinks(clean)
-	if err != nil || !strings.EqualFold(real, clean) {
+	if err != nil || !strings.EqualFold(real, longPath(clean)) {
 		return "a link or junction is in its path"
 	}
 	if reason := protectedpath.Refusal(real); reason != "" {
 		return reason
 	}
 	return ""
+}
+
+// longPath is p with each 8.3 short name replaced by its long name (GetLongPathName), or p itself when that cannot be read.
+func longPath(p string) string {
+	in, err := windows.UTF16PtrFromString(p)
+	if err != nil {
+		return p
+	}
+	buf := make([]uint16, windows.MAX_LONG_PATH)
+	n, err := windows.GetLongPathName(in, &buf[0], uint32(len(buf)))
+	if err != nil || n == 0 || int(n) > len(buf) {
+		return p
+	}
+	return windows.UTF16ToString(buf[:n])
 }
 
 func isLetter(b byte) bool { return b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z' }
