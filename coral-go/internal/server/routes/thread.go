@@ -119,12 +119,8 @@ func (h *BoardHandler) Threads(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := r.URL.Query()
-	team, goal, task, limit, ok := threadParams(w, q, threadsKeys)
+	team, goal, _, limit, ok := threadParams(w, q, threadsKeys) // task is not one of the summaries' keys: threadParams refuses it as unknown already
 	if !ok {
-		return
-	}
-	if task != 0 {
-		errBadRequest(w, "unknown query key: task")
 		return
 	}
 	state := q.Get("state")
