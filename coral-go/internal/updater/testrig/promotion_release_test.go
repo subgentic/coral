@@ -156,3 +156,56 @@ func TestARehearsalWithAHigherSequenceDoesNotHideTheRealPromotion(t *testing.T) 
 	assert.Equal(t, "1.4.131", res.Version)
 	// before the guard the rehearsal (sequence 9) was picked and then refused by the rules: the result was a refusal and nothing was staged
 }
+
+// A revocation published seconds ago can be listed before the download host serves its files. Its 404 stops the pass (the network back-off), so the older promotion it revokes is
+// not staged in the meantime; once its files are served, the revocation is the one taken (Security's #337).
+func TestANewerPromotionThatIsNotServedYetDoesNotLetAnOlderOneWin(t *testing.T) {
+	r := newRig(t)
+	r.publish(Spec{Version: "1.4.131", Sequence: 5})
+	r.publish(Spec{Version: "1.4.132", Sequence: 6})
+	r.publish(Spec{Version: "1.4.131", Sequence: 8, Revoked: []string{"1.4.132"}}) // the revocation of 1.4.132
+	newest := PromotionTag("v1.4.131", 8) + "/" + stage.ManifestFile
+	r.gh.Status[newest] = 404
+	res := r.check()
+	assert.Equal(t, stage.ResultFailed, res.Result, "%+v", res)
+	assert.Equal(t, "manifest", res.FailedStage, "a network failure, not a refusal")
+	assert.NotEmpty(t, res.NextAttempt, "backed off like any download that failed")
+	r.nothingStaged()
+	assert.Zero(t, r.gh.Hits[FakeRepo+"/releases/download/"+PromotionTag("v1.4.132", 6)+"/"+stage.ManifestFile], "the pass stopped at the newest promotion, before the one it revokes")
+
+	delete(r.gh.Status, newest)
+	r.cfg.Now = func() time.Time { return time.Now().Add(time.Hour) }
+	res = r.check()
+	require.Equal(t, stage.ResultStaged, res.Result, "%+v", res)
+	assert.Equal(t, "1.4.131", res.Version, "the revocation (sequence 8) is the newest promotion, and 1.4.132 is revoked")
+	st, err := verify.LoadState(r.cfg.DataDir + "/" + stage.UpdatesDir)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"1.4.132"}, st.Revoked)
+}
+
+// A promotion the feed names has no asset list: the download says whether its files are there. A promote-* release the feed names whose files answer 404 is junk, skipped like a
+// release without them, and must not stop every check: the older promotion that verifies is staged (a 404 stops the pass only for a release whose list shows the files, above).
+func TestAFeedNamedPromotionWithNoFilesIsSkippedNotAStopForEveryCheck(t *testing.T) {
+	r := newRig(t)
+	r.gh.FeedWithPromotions = true // the real feed names none; a feed that did names this one
+	r.publish(Spec{Version: "1.4.131", Sequence: 5})
+	r.publish(Spec{Version: "1.4.132", Sequence: 6})
+	r.gh.Status[PromotionTag("v1.4.132", 6)+"/"+stage.ManifestFile] = 404 // named, and its files are not there
+	res := r.check()
+	require.Equal(t, stage.ResultStaged, res.Result, "%+v", res)
+	assert.Equal(t, "1.4.131", res.Version, "the older promotion, which verifies, is taken")
+	assert.Empty(t, res.NextAttempt, "no back-off: nothing failed")
+}
+
+// An older promotion that is listed and whose files answer 404 cannot beat the newer one that has already verified, so it must not throw it away: the newest verified promotion is staged
+// (coral-hub's Security on #151). The 404 of a release ABOVE the best verified one still stops the pass (the test above).
+func TestAnOlderListedPromotionThatAnswers404DoesNotDiscardANewerVerifiedOne(t *testing.T) {
+	r := newRig(t)
+	r.publish(Spec{Version: "1.4.130", Sequence: 5})
+	r.publish(Spec{Version: "1.4.131", Sequence: 8})
+	r.gh.Status[PromotionTag("v1.4.130", 5)+"/"+stage.ManifestFile] = 404 // the older one's files are gone
+	res := r.check()
+	require.Equal(t, stage.ResultStaged, res.Result, "%+v", res)
+	assert.Equal(t, "1.4.131", res.Version, "the newest verified promotion is taken")
+	assert.Empty(t, res.NextAttempt, "no back-off: nothing the pass needed failed")
+}

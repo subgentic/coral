@@ -116,18 +116,28 @@ func (c *checker) findPromotion(ctx context.Context, onlyTag string) (p *promoti
 			bundle, berr = c.cfg.Fetcher.Get(ctx, base+ManifestBundleFile, verify.MaxBundleBytes)
 		}
 		if merr != nil || berr != nil {
-			if notFound(merr) || notFound(berr) {
-				junk++ // listed with the assets and not there (being published, or gone): not a candidate, and not a refusal: nothing was promoted yet
+			// A release named by the feed, which lists no assets, whose files answer 404 is a promote-* release without them: junk, not a promotion, and it must not stop every check.
+			if r.fromFeed && (notFound(merr) || notFound(berr)) {
+				junk++
 				continue
 			}
+			// An older listed release whose files answer 404 cannot beat a promotion that has already verified, so it must not throw that one away: it is counted and skipped. Only a release
+			// above the best verified sequence (or any, while nothing verified yet) stops the pass below (coral-hub's Security on #151).
+			if p != nil && seq <= p.m.Sequence && (notFound(merr) || notFound(berr)) {
+				junk++
+				continue
+			}
+			// A file the list says the release has (the API's list shows its assets) and that answers 404 is not junk: it is a promotion published seconds ago that the download host
+			// doesn't serve yet. Skipping it would let an older promotion win this pass, so a revocation could lose to the promotion it revokes; it stops the pass like any other fetch
+			// error, and the network back-off tries again (Security's #337).
 			if errors.Is(merr, verify.ErrTooLarge) || errors.Is(berr, verify.ErrTooLarge) {
 				skip(version, &verify.Failure{Stage: verify.StageManifestDocument, Reason: "a file of the promotion release is larger than the limit"}) // junk, not an outage: it must not hide the releases behind it
 				continue
 			}
 			if merr != nil {
-				return nil, junk, merr
+				return nil, junk, fmt.Errorf("%s of %s: %w", ManifestFile, r.TagName, merr)
 			}
-			return nil, junk, berr
+			return nil, junk, fmt.Errorf("%s of %s: %w", ManifestBundleFile, r.TagName, berr)
 		}
 		m, verr := verify.PromotionManifest(c.cfg.Verifier, c.cfg.Pins, manifest, bundle)
 		if verr != nil {

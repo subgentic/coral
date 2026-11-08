@@ -62,12 +62,12 @@ func TestPickShell(t *testing.T) {
 // #384: the test suites' server starts PowerShell without the person's profile; a real launch, and any other shell, are left as they are.
 func TestTheTestServersPowerShellSkipsTheProfile(t *testing.T) {
 	ps := `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`
-	assert.Equal(t, []string{ps, "-NoProfile"}, withoutProfileForTests([]string{ps}, true))
-	assert.Equal(t, []string{`C:\pwsh\pwsh.exe`, "-NoProfile"}, withoutProfileForTests([]string{`C:\pwsh\pwsh.exe`}, true))
-	assert.Equal(t, []string{ps}, withoutProfileForTests([]string{ps}, false), "a real launch keeps the profile")
-	assert.Equal(t, []string{"/bin/bash"}, withoutProfileForTests([]string{"/bin/bash"}, true), "not a PowerShell: unchanged")
-	assert.Empty(t, withoutProfileForTests(nil, true))
+	assert.Equal(t, []string{ps, "-NoProfile"}, withoutProfileUnderTestHooks([]string{ps}, true))
+	assert.Equal(t, []string{`C:\pwsh\pwsh.exe`, "-NoProfile"}, withoutProfileUnderTestHooks([]string{`C:\pwsh\pwsh.exe`}, true))
+	assert.Equal(t, []string{ps}, withoutProfileUnderTestHooks([]string{ps}, false), "a real launch keeps the profile")
+	assert.Equal(t, []string{"/bin/bash"}, withoutProfileUnderTestHooks([]string{"/bin/bash"}, true), "not a PowerShell: unchanged")
+	assert.Empty(t, withoutProfileUnderTestHooks(nil, true))
 	in := []string{ps}
-	_ = withoutProfileForTests(in, true)
+	_ = withoutProfileUnderTestHooks(in, true)
 	assert.Equal(t, []string{ps}, in, "the slice it was given is not changed")
 }

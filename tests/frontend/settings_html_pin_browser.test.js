@@ -10,6 +10,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
 const { osNeutralCli } = require('./helpers/os_neutral_cli');
+const { KNOWN_MODELS } = require('./helpers/known_models'); // the built-in model list every time, whatever an earlier suite on this server left (#553)
 const GOLDEN = path.join(__dirname, 'settings_html_pin.golden.json');
 
 (async () => {
@@ -18,7 +19,7 @@ const GOLDEN = path.join(__dirname, 'settings_html_pin.golden.json');
     const S = `(window.__coralStatic || '/static/')`;
     const got = {};
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: KNOWN_MODELS });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev, 'startup', 'liveList', 'settings');

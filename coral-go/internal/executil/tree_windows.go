@@ -138,12 +138,28 @@ func exited(pid uint32) bool {
 	return ev != uint32(windows.WAIT_TIMEOUT)
 }
 
-// killRoot ends the process Go started after its tree: a shim whose only child was just ended may already be ending by itself, and Windows answers "access denied" to that, which is the
-// outcome that was wanted (os.ErrProcessDone, which Go ignores).
+// killRoot ends the process Go started after its tree: a shim whose only child was just ended ends by itself, and while it is ending Windows answers "access denied" to the kill although the process
+// handle is not signalled yet (the exit takes a few milliseconds to finish). That answer is the outcome that was wanted (os.ErrProcessDone, which Go ignores) once the process is gone, so it is waited for,
+// for at most rootExitWait; a process that is still running after that returns the error.
 func killRoot(cmd interface{ Kill() error }, pid uint32) error {
 	err := cmd.Kill()
-	if err != nil && exited(pid) {
-		return os.ErrProcessDone
+	if err == nil {
+		return nil
 	}
-	return err
+	deadline := time.Now().Add(rootExitWait)
+	for {
+		if processExited(pid) {
+			return os.ErrProcessDone
+		}
+		if !time.Now().Before(deadline) {
+			return err
+		}
+		time.Sleep(rootExitGap)
+	}
 }
+
+var (
+	processExited = exited // a test replaces it
+	rootExitWait  = 2 * time.Second
+	rootExitGap   = 5 * time.Millisecond
+)

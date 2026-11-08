@@ -9,13 +9,14 @@ const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
+const { KNOWN_MODELS } = require('./helpers/known_models'); // the built-in model list every time, whatever an earlier suite on this server left (#553)
 const GOLDEN = path.join(__dirname, 'fixtures', 'dialog_requests_golden.json');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const out = {};
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: KNOWN_MODELS });
         await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
         await coralReady(ev, 'startup', 'liveList', 'settings');
