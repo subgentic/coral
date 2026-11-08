@@ -59,10 +59,15 @@ const BASE = require('./test_base').BASE;
             await snap('open');
 
             // the heading is a button: a real click shuts the task's items, a second opens them
-            const head = n => ev(`(() => { const b = [...document.querySelectorAll('.dt-group-task .dt-group-toggle')].find(x => x.textContent.includes('Task #${n}')); b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, h: Math.round(r.height), w: Math.round(r.width), vw: innerWidth, expanded: b.getAttribute('aria-expanded'), hit: document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === b || b.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)) }; })()`);
+            // the heading's place, measured once the layout has stopped moving (the table draws again a moment after a toggle): the same box on three reads running, so a press lands where it was measured
+            const head = n => ev(`new Promise(resolve => { const find = () => [...document.querySelectorAll('.dt-group-task .dt-group-toggle')].find(x => x.textContent.includes('Task #${n}')); find().scrollIntoView({ block: 'center', behavior: 'instant' }); let last = '', same = 0, frames = 0;
+                const step = () => { const b = find(), r = b.getBoundingClientRect(), key = [r.left, r.top, r.width, r.height].map(v => Math.round(v)).join(','); same = key === last ? same + 1 : 0; last = key; frames++;
+                    if (same >= 3 || frames > 90) { const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); resolve({ x: r.left + r.width / 2, y: r.top + r.height / 2, h: Math.round(r.height), w: Math.round(r.width), vw: innerWidth, expanded: b.getAttribute('aria-expanded'), hit: !!hit && (hit === b || b.contains(hit)) }); } else setTimeout(step, 40); /* sleep-ok: a timed poll of the layout, not an animation frame: a hidden page (the Mac) never runs frames */ };
+                setTimeout(step, 40); })`);
             const tap = async p => { if (mobile) await client.Input.synthesizeTapGesture({ x: p.x, y: p.y, gestureSourceType: 'touch' }); else { await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: p.x, y: p.y }); await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: p.x, y: p.y, button: 'left', clickCount: 1 }); await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: p.x, y: p.y, button: 'left', clickCount: 1 }); } };
-            // a real tap on the heading, then wait for it to take: a tap that lands while the table is redrawing is made again (a loaded machine redraws late), at most three times
-            const toggleTo = async state => { for (let i = 0; i < 3; i++) { const q = await head(11); await tap(q); const ok = await waitFor(`[...document.querySelectorAll('.dt-group-toggle')].find(x => x.textContent.includes('Task #11')).getAttribute('aria-expanded') === '${state}'`, `${at}the heading is ${state === 'true' ? 'open' : 'shut'} after the tap`, 4000).then(() => true, () => false); if (ok) return true; } return false; };
+            // ONE real tap on the heading, no retry (#14483): it must take the first time
+            const toggleTo = async state => { const q = await head(11); await tap(q); return waitFor(`[...document.querySelectorAll('.dt-group-toggle')].find(x => x.textContent.includes('Task #11')).getAttribute('aria-expanded') === '${state}'`, `${at}the heading is ${state === 'true' ? 'open' : 'shut'} after one tap`, 5000).then(() => true, () => false); };
+
             let p = await head(11);
             check(p.expanded === 'true' && p.h >= 44 && p.hit && p.w <= p.vw, `${at}the task heading is an open, 44 px, on-screen button: ` + JSON.stringify(p));
             check(await toggleTo('false'), `${at}a real tap shuts the task`);
@@ -72,6 +77,14 @@ const BASE = require('./test_base').BASE;
             check(await ev(`JSON.parse(localStorage.getItem('coral-inbox-task-open') || '{}')`).then(v => Object.values(v).includes(false)), `${at}the choice is kept in this browser`);
             await snap('shut');
             check(await toggleTo('true'), `${at}a second tap opens it again`);
+            // the keyboard still works (a click with no pointer): Enter on the focused heading shuts it, Space opens it
+            const key = async (k, code) => { await client.Input.dispatchKeyEvent({ type: 'keyDown', key: k, code, windowsVirtualKeyCode: k === 'Enter' ? 13 : 32, text: k === 'Enter' ? '\r' : ' ' }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: k, code, windowsVirtualKeyCode: k === 'Enter' ? 13 : 32 }); };
+            await head(11); await ev(`[...document.querySelectorAll('.dt-group-toggle')].find(x => x.textContent.includes('Task #11')).focus(); true`);
+            await key('Enter', 'Enter');
+            check(await waitFor(`[...document.querySelectorAll('.dt-group-toggle')].find(x => x.textContent.includes('Task #11')).getAttribute('aria-expanded') === 'false'`, `${at}Enter shuts the focused heading`, 4000).then(() => true, () => false), `${at}the keyboard still shuts a task (Enter)`);
+            await ev(`[...document.querySelectorAll('.dt-group-toggle')].find(x => x.textContent.includes('Task #11')).focus(); true`);
+            await key(' ', 'Space');
+            check(await waitFor(`[...document.querySelectorAll('.dt-group-toggle')].find(x => x.textContent.includes('Task #11')).getAttribute('aria-expanded') === 'true'`, `${at}Space opens the focused heading`, 4000).then(() => true, () => false), `${at}and Space opens it again`);
             rows = await shape();
             check(rows.some(r => r.startsWith('row:') && /Story one/.test(r)) && rows.some(r => r.startsWith('row:') && /Waiting dev/.test(r)), `${at}open again: the items are back, the waiting agent too: ` + JSON.stringify(rows));
             check(await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`) <= 0, `${at}no sideways scroll`);
