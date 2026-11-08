@@ -60,7 +60,7 @@ func (h *BoardHandler) MarkArtifactForReview(w http.ResponseWriter, r *http.Requ
 	}
 	question, _ := board.CleanReviewQuestion(body.Question) // empty once cleaned: none, and an earlier one is kept
 	// The row of the send is written in the same transaction as the send (Security's SHOULD on #13231): a row that cannot be written undoes the send.
-	sendCtx := board.WithActivity(context.WithoutCancel(ctx), activityMetaFor(r, item.Name, question))
+	sendCtx := board.WithActivity(context.WithoutCancel(ctx), withFileTask(activityMetaFor(r, item.Name, question), item))
 	if throughAHub(r) { // a decided file is final through a hub (#13494): sending it again starts a new round, which stays a local act
 		sendCtx = board.WithOneDecision(sendCtx)
 	}
@@ -127,7 +127,7 @@ func (h *BoardHandler) UnmarkArtifactForReview(w http.ResponseWriter, r *http.Re
 			h.writeReviewAnswer(w, r, project, id, was)
 			return
 		}
-		err = h.bs.TakeArtifactOutOfReview(board.WithActivity(context.WithoutCancel(ctx), activityMetaFor(r, h.artifactNameOf(ctx, project, id), "")), project, id, was, withoutTag(was, tagForReview))
+		err = h.bs.TakeArtifactOutOfReview(board.WithActivity(context.WithoutCancel(ctx), h.fileActivityMeta(ctx, r, project, id)), project, id, was, withoutTag(was, tagForReview))
 		if err == nil {
 			break
 		}
@@ -144,12 +144,13 @@ func (h *BoardHandler) UnmarkArtifactForReview(w http.ResponseWriter, r *http.Re
 	h.writeReviewAnswer(w, r, project, id, all[id])
 }
 
-// artifactNameOf is the file's name as the team lists it, for a record; "" when it cannot be found.
-func (h *BoardHandler) artifactNameOf(ctx context.Context, project, id string) string {
+// fileActivityMeta is the Activity meta of an action on a team file this handler has not loaded: the file's name as the team lists it for the title, and its task (#14421); no title or task when the file
+// cannot be found.
+func (h *BoardHandler) fileActivityMeta(ctx context.Context, r *http.Request, project, id string) board.ActivityMeta {
 	if item, ok := h.teamManagedArtifact(ctx, project, id); ok {
-		return item.Name
+		return withFileTask(activityMetaFor(r, item.Name, ""), item)
 	}
-	return ""
+	return activityMetaFor(r, "", "")
 }
 
 // writeReviewAnswer answers with the file's tags and the question it carries now.
