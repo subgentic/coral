@@ -20,28 +20,32 @@ import (
 	"github.com/subgentic/coral/internal/mediatype"
 )
 
-const artifactUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task] [--tag WORD]... [--question TEXT] [--kind done|release|decided]
-       coral-agent artifact download <coral://artifacts/digest> [--output FILE] [--force]
+const artifactUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <file id>[@version]] [--rename] [--task N | --no-task] [--tag WORD]... [--question TEXT] [--kind done|release|decided]
+       coral-agent artifact download <coral://artifacts/digest | file id | file id@version> [--output FILE] [--force]
        coral-agent artifact reply <coral://artifacts/digest | coral://goals/team/number | coral://diffs/team/session/hash> <comment-id> <text | ->
        coral-agent artifact comments <coral://artifacts/digest | coral://goals/team/number | coral://diffs/team/session/hash>
 Run coral-agent artifact upload --help, artifact download --help, artifact reply --help or artifact comments --help for one of them.`
 
-const artifactUploadUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task] [--tag WORD]... [--question TEXT] [--kind done|release|decided]
+const artifactUploadUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <file id>[@version]] [--rename] [--task N | --no-task] [--tag WORD]... [--question TEXT] [--kind done|release|decided]
 
 An upload is linked to the task you have in progress (the reply says task_id, and this prints
 "Linked to task #N"); the task's page and the team's Artifacts tab then list it. --task N links it to
 another task of yours instead; --no-task links it to none. A task that is not yours is refused and
 nothing is stored.
 
---new-version-of adds the file as a new version of an artifact this agent's board uploaded (its
-coral://artifacts/<digest> link): the reply carries
-series_id, version and versions. Same bytes as the newest version add nothing (exit 0); same
-bytes as an older version are refused (non-zero), so nobody takes it for the newest.
-Name the version you EDITED: fetch the newest version first, edit it,
-and pass ITS link to --new-version-of. If a newer version exists (a person's save in the editor, or
-another agent's upload), nothing is stored and Coral answers 409 with the newest link and the
-download line to run: fetch it, redo your change on it, upload again. A series link names no version,
-so it is refused too. A first upload that is a version of nothing needs no --new-version-of.
+Every file has a stable file id (32 hex) and every version a number (1, 2, 3...). The reply carries
+file_id, version, versions and version_line ("version N of <name> (file <id>)", also printed on
+stderr). --new-version-of <file id> adds the upload as a new version of that file; <file id>@<n>
+names the version you EDITED, and a coral://artifacts/<digest> link of a version still works (its reply
+says which file id to use). Same bytes as the newest version add nothing (exit 0); same bytes as an
+older version are refused (non-zero), so nobody takes it for the newest.
+Fetch the newest version first, edit it, and pass the file id (or <file id>@<n> of the version you
+edited). A bare file id is accepted when the newest version is your own; if someone else (a person's save in the
+editor, or another agent) saved a newer one, nothing is stored and Coral answers 409 with the newest link and the
+download line to run: fetch it, redo your change on it, upload again.
+A new version keeps its file's name: an upload under a different name is refused (400 name_differs, naming
+both) unless you pass --rename (the file then has the new name), or upload it without --new-version-of
+as a file of its own. A first upload that is a version of nothing needs neither.
 
 --tag puts a word on the file in your team's Artifacts tab (repeat it, at most 5 in all; lowercase letters, digits, spaces and
 hyphens, 24 characters at most): tag a file "for review" when a person must look at it, decide, or approve it, and logs and
@@ -132,7 +136,7 @@ func cmdArtifact(args []string) {
 		fmt.Fprintln(os.Stderr, artifactUsageText)
 		clierr.Exit1()
 	}
-	opts, err := splitOptions(args[1:], []string{"name", "media-type", "new-version-of", "task", "tag", "question", "kind"}, []string{"no-task"})
+	opts, err := splitOptions(args[1:], []string{"name", "media-type", "new-version-of", "task", "tag", "question", "kind"}, []string{"no-task", "rename"})
 	if err != nil || len(opts.Positional) != 1 {
 		if err == nil {
 			err = fmt.Errorf("upload needs exactly one file")
@@ -161,7 +165,7 @@ func cmdArtifact(args []string) {
 	}
 	name = mediatype.EnsureExtension(name, file)
 	mediaType := mediatype.Resolve(opts.Values["media-type"], file, name)
-	if err := uploadArtifactKind(serverURL, file, name, mediaType, resolveSessionID(), opts.Values["new-version-of"], task, opts.All["tag"], opts.Values["question"], opts.Values["kind"], os.Stdout, os.Stderr); err != nil {
+	if err := uploadArtifactFull(serverURL, file, name, mediaType, resolveSessionID(), opts.Values["new-version-of"], task, opts.All["tag"], opts.Values["question"], opts.Values["kind"], opts.Bools["rename"], os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		clierr.Exit1()
 	}
@@ -182,6 +186,11 @@ func uploadArtifactTags(serverURL, file, name, mediaType, sid, newVersionOf, tas
 
 // uploadArtifactKind is uploadArtifactTags with the kind of a file for review (#12144), sent as the kind parameter; the server checks the fact for it.
 func uploadArtifactKind(serverURL, file, name, mediaType, sid, newVersionOf, task string, tags []string, question, kind string, stdout, stderr io.Writer) error {
+	return uploadArtifactFull(serverURL, file, name, mediaType, sid, newVersionOf, task, tags, question, kind, false, stdout, stderr)
+}
+
+// uploadArtifactFull is uploadArtifactKind with rename (#14145): the upload may give a new version of a file another name.
+func uploadArtifactFull(serverURL, file, name, mediaType, sid, newVersionOf, task string, tags []string, question, kind string, rename bool, stdout, stderr io.Writer) error {
 	if err := refuseSignInLinkIn("an artifact name, tag or question", append([]string{name, question}, tags...)...); err != nil {
 		return err
 	}
@@ -200,6 +209,9 @@ func uploadArtifactKind(serverURL, file, name, mediaType, sid, newVersionOf, tas
 	if newVersionOf != "" { // exactly a 64-hex artifact link or a 32-hex series link: the server refuses anything else before any lookup (#6357)
 		req.Header.Set("X-Artifact-New-Version-Of", newVersionOf)
 	}
+	if rename {
+		req.Header.Set("X-Artifact-Rename", "1")
+	}
 	if mediaType != "" {
 		req.Header.Set("X-Artifact-Media-Type", mediaType)
 	}
@@ -216,6 +228,7 @@ func uploadArtifactKind(serverURL, file, name, mediaType, sid, newVersionOf, tas
 	body, _ := clitext.ReadReply(resp.Body, rawOutput)
 	var reply struct {
 		URI      string `json:"uri"`
+		Line     string `json:"version_line"`
 		TaskID   int64  `json:"task_id"`
 		Error    string `json:"error"`
 		Code     string `json:"code"`
@@ -251,6 +264,9 @@ func uploadArtifactKind(serverURL, file, name, mediaType, sid, newVersionOf, tas
 		fmt.Fprintln(stderr, "Note: Coral removed this image's metadata (camera, location) before storing it, so its id is the SHA-256 of the stored bytes, not of your file.")
 	}
 	fmt.Fprintln(stdout, string(body))
+	if reply.Line != "" { // the same words the dashboard uses for a file and its version (#14145)
+		fmt.Fprintln(stderr, reply.Line)
+	}
 	if reply.TaskID > 0 { // the reply (stdout) is the JSON a script reads; the line for a person is on stderr (#7739)
 		fmt.Fprintf(stderr, "Linked to task #%d\n", reply.TaskID)
 	}

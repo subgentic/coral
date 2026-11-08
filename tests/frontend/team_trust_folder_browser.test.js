@@ -16,6 +16,13 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const real = window.fetch; const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
             window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href), m = o.method || 'GET';
                 if (p.pathname === '/api/sessions/launch-team' && m === 'POST') { window.__teamLaunches.push(JSON.parse(o.body)); return json({ agents: [{ name: 'A', session_id: 's' }], ...(window.__trustAnswer ? { trust_folder: window.__trustAnswer } : {}) }); }
+                if (p.pathname === '/api/filesystem/trust-probe') {
+                    window.__probePath = p.searchParams.get('path');
+                    const body = window.__probeMode === 'clean' ? { checked:true, files:{'.claude/settings.json':false,'.claude/settings.local.json':false,'.mcp.json':false,'.codex/config.toml':false} }
+                        : window.__probeMode === 'config' ? { checked:true, files:{'.claude/settings.json':true,'.claude/settings.local.json':false,'.mcp.json':false,'.codex/config.toml':false} } : {checked:false};
+                    if(window.__probeMode==='hold') return new Promise(resolve=>{window.__trustProbeRelease=()=>resolve(Response.json({checked:true,files:{'.claude/settings.json':false,'.claude/settings.local.json':false,'.mcp.json':false,'.codex/config.toml':false}}));});
+                    return json(body);
+                }
                 if (p.pathname === '/api/filesystem/list') { window.__listed = (window.__listed || 0) + 1; return p.searchParams.get('path') === '/home/p/Coral/exists' && !window.__hideExists ? json({ entries: [] }) : json({ error: 'not found' }, 404); }
                 if (p.pathname === '/api/board/projects') return json([]);
                 return real(u, o); };
@@ -152,6 +159,61 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await go();
         await waitFor(`[...document.querySelectorAll('.toast-message')].some(t => /Trust this folder was not applied for claude: the agent's settings file is a link/.test(t.textContent))`, 'a real failure for one agent type is still said in a toast');
         await ev(`window.__trustAnswer = null; window.hideLaunchModal(); true`);
-    } finally { await removeBoards(ev, Array.from({ length: 13 }, (_, i) => 'trust-' + (i + 1))); await client.close(); }
+        console.log('A person-chosen checked folder defaults on, with an opt-out and a path-bound wire tick');
+        const choose = async (folder, mode) => {
+            await open();
+            await ev(`(()=>{window.__probeMode=${JSON.stringify(mode)};window.__probePath='';const d=document.getElementById('launch-team-dir');delete d.dataset.suggested;d.value='';d.focus();return true;})()`);
+            await client.Input.insertText({text:folder});
+            await waitFor(`window.__probePath===${JSON.stringify(folder)}`,'one debounced project-config check');
+        };
+        await choose('/home/p/Code/clean','clean');
+        await waitFor(`document.getElementById('launch-team-trust').checked`,'clean chosen folder defaults on');
+        assert.match(await ev(`document.getElementById('launch-team-trust').closest('.sv-row').textContent`), /Untick/);
+        sent = await go(); assert.equal(sent.trust_folder,true,'default tick reaches the existing server contract');
+        await ev(`window.hideLaunchModal();true`);
+        await choose('/home/p/Code/clean','clean');
+        await waitFor(`document.getElementById('launch-team-trust').checked`,'default ready before opt-out');
+        await ev(`document.getElementById('launch-team-trust').click();true`);
+        sent = await go(); assert.equal(sent.trust_folder,undefined,'unticking omits the opt-in wire field');
+        await ev(`window.hideLaunchModal();true`);
+        await choose('/home/p/Code/config','config');
+        await waitFor(`/this folder has its own settings/i.test(document.getElementById('launch-team-trust').closest('.sv-row').textContent)`,'project configuration is named');
+        assert.equal(await ev(`document.getElementById('launch-team-trust').checked`),false,'existing project settings require an explicit tick');
+        assert.match(await ev(`document.getElementById('launch-team-trust').closest('.sv-row').textContent`), /\.claude\/settings\.json/);
+        await ev(`window.hideLaunchModal();true`);
+        await choose('/home/p/Code/unchecked','unchecked');
+        await waitFor(`/could not be checked/.test(document.getElementById('launch-team-trust').closest('.sv-row').textContent)`,'failed check is explained');
+        assert.equal(await ev(`document.getElementById('launch-team-trust').checked`),false,'unchecked stays off');
+        await ev(`window.hideLaunchModal();true`);
+        await choose('/home/p/Code/slow','hold');
+        await waitFor(`!!window.__trustProbeRelease`,'old-folder probe held');
+        await setDir('/home/p/Code/other-after-probe',false);
+        await ev(`window.__trustProbeRelease();true`);
+        await waitFor(`document.getElementById('launch-team-dir').value==='/home/p/Code/other-after-probe'`,'changed folder remains');
+        assert.equal(await ev(`document.getElementById('launch-team-trust').checked`),false,'late safe-folder reply cannot trust a different folder');
+        await ev(`window.hideLaunchModal();true`);
+
+
+        console.log('A scripted or remembered folder never receives the default trust tick');
+        await open();
+        await ev(`window.__probeMode='clean';window.__probePath='';true`);
+        await setDir('/home/p/Code/scripted',false);
+        await ev(`new Promise(resolve=>setTimeout(resolve,650))`); // sleep-ok: negative authorization assertion must outlast the 400 ms trust-default debounce
+        assert.equal(await ev(`document.getElementById('launch-team-trust').checked`),false,'an untrusted input event without trustChosen cannot auto-tick trust');
+        assert.equal(await ev(`window.__probePath`),'','a scripted folder never even requests default-trust advice');
+        sent = await go(); assert.equal(sent.trust_folder,undefined,'scripted input sends no trust opt-in');
+        await ev(`window.hideLaunchModal();true`);
+        await ev(`import((window.__coralStatic||'/static/')+'state.js').then(({state})=>{window.__oldTrustDefault=state.settings.default_working_dir;state.settings.default_working_dir='/home/p/Code/remembered';window.__probeMode='clean';window.__probePath='';})`);
+        await open();
+        await waitFor(`document.getElementById('launch-team-dir').value==='/home/p/Code/remembered'`,'remembered Settings folder is restored');
+        // Restored inputs can dispatch an untrusted event to update their hints.
+        await ev(`document.getElementById('launch-team-dir').dispatchEvent(new Event('input',{bubbles:true}));true`);
+        await ev(`new Promise(resolve=>setTimeout(resolve,650))`); // sleep-ok: the remembered-folder refusal must survive the deferred default check
+        assert.equal(await ev(`document.getElementById('launch-team-trust').checked`),false,'a remembered default remains off until the person explicitly ticks it');
+        assert.equal(await ev(`window.__probePath`),'','a remembered folder is not treated as a new folder choice');
+        sent = await go(); assert.equal(sent.trust_folder,undefined,'remembered folder sends no trust opt-in');
+        await ev(`import((window.__coralStatic||'/static/')+'state.js').then(({state})=>{if(window.__oldTrustDefault===undefined)delete state.settings.default_working_dir;else state.settings.default_working_dir=window.__oldTrustDefault;window.hideLaunchModal();})`);
+
+    } finally { await removeBoards(ev, Array.from({ length: 20 }, (_, i) => 'trust-' + (i + 1))); await client.close(); }
     console.log('team_trust_folder_browser: ok');
 })().catch(e => { console.error(e); process.exit(1); });

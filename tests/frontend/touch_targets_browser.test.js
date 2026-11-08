@@ -99,9 +99,12 @@ const UNDERSIZED = `(() => {
         console.log('PASS phone 390 coarse: no control under 44px, no overflow');
 
         // #4976: the Agent Team dialog's member cards (move up and down, edit, remove) and its Back arrow.
+        await require('./helpers/new_team').stubFolders(ev); // the made-up wizard folders exist (Next checks the folder, acfb782ec)
         await ev(`window.showLaunchModal(); window._selectLaunchType('team'); true`);
         await waitFor(`!!document.getElementById('team-template-select') && getComputedStyle(document.getElementById('launch-step-team')).display !== 'none'`, 'the team step');
-        await ev(`{ const n = document.getElementById('team-board-name'); n.value = 'crew-x'; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = '/work/x'; d.dispatchEvent(new Event('input', { bubbles: true })); } document.getElementById('launch-team-next').click(); true`); // the members are on the second step (#7407)
+        await ev(`{ const n = document.getElementById('team-board-name'); n.value = 'crew-x'; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = '/work/repo'; d.dispatchEvent(new Event('input', { bubbles: true })); } document.getElementById('launch-team-next').click(); true`); // the members are on the second step (#7407)
+        // Next checks the folder first and goes on only when it is found (#14318, acfb782ec): the stubbed '/work/repo' is the made-up folder the wizard suites use; wait for the members step before reading its rows
+        await waitFor(`document.getElementById('launch-step-team').dataset.stage === 'members'`, 'the folder is checked and the members step shows', 6000);
         await ev(`window._addTeamAgent('Amy', 'First.'); window._addTeamAgent('Bo', 'Second.'); true`); // the dialog starts with no members (#5989)
         await waitFor(`!!document.querySelector('#team-agents-list .team-agent-row')`, 'the team dialog with its member rows');
         const teamSmall = await ev(UNDERSIZED);

@@ -51,13 +51,19 @@ export function askBadge(m) {
 
 /** A board chat message a Coral Hub user sent through the Hub (#3377). origin is set by the
  *  server on tunnel chat posts, never taken from a client and never inferred from the name. */
+/** Who a message is from, as a row and a reply say it: a post the Hub made as the Operator is from the Operator (never from the Hub user's id, #14292); else the job title, the sender name, 'Unknown'. */
+export function boardSenderName(m) {
+    if (m && m.origin === 'hub_operator') return 'Operator';
+    return (m && (m.job_title || m.sender_name)) || 'Unknown';
+}
+
 export function hubUserBadge(m) {
     // The Operator, acting through Coral Hub (#3404): which Hub user did it is recorded by the
     // server from the validated header (hub_user), never taken from the name.
     if (m && m.origin === 'hub_operator') {
         const who = /^hub-user-[0-9a-f]{8}$/.test(String(m.hub_user || '')) ? m.hub_user : 'unknown Hub user';
         const title = `Posted as the Operator by ${who} through Coral Hub, not by you at this computer.`;
-        return `<span class="chip chip-tag mb-external-badge mb-hub-user-badge is-operator" title="${escapeAttr(title)}">Operator via Coral Hub · ${escapeHtml(who)}</span>`;
+        return `<span class="chip chip-tag mb-external-badge mb-hub-user-badge is-operator" title="${escapeAttr(title)}">Operator via Coral Hub</span>`;
     }
     // A Coral Hub that doesn't say which of its users sent it (an older hub): sent as the
     // reserved 'Coral Hub', origin hub_user_unknown. Never shown as a known user.

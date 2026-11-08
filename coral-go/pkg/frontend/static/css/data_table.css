@@ -431,6 +431,8 @@
 .dt-mail-live { flex: none; align-self: center; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--success); }
 .dt-mail-snippet { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--table-tertiary-color); }
 .dt-mail-ask { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); color: var(--table-secondary-color); }
+.dt-box.dt-wrap-mail .dt-mail-title { max-width: 100%; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; } /* wrapMail: the title and the second line are whole (#14423) */
+.dt-box.dt-wrap-mail .dt-mail-ask { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 .dt-mail-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .dt-mail-time { font-size: var(--fs-base); color: var(--table-tertiary-color); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .dt-mail-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
@@ -667,3 +669,36 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .inbox-needs-results .dt-group-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .inbox-needs-results .dt-group-words { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .inbox-needs-results .dt-group-chip { flex: none; border: 1px solid var(--warning); color: var(--warning-text, var(--warning)); background: none; }
+/* #14144 (the Operator approved the mock): a phone's Needs you is one card per item in the agent chat's own look (chat.css .chat-bubble.assistant: the chat's card colour, 1 px border, 12 px radius with the small
+   top-left corner, 12 px 16 px padding), 12 px apart, one short line of description, and the sort controls are two chips in one slim row ("Sort by" is read by a screen reader, not drawn). */
+@media (max-width: 760px) {
+    .inbox-needs-results .dt-box.dt-folded tbody { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 12px 12px 0; }
+    #group-table-view[data-group="hub-inbox:needs"] .dt-box.dt-folded tbody tr.dt-row > td, #group-table-view[data-group="hub-inbox:needs"] .dt-box.dt-folded tbody tr.dt-row:hover > td { background: none; } /* the unread tint and the hover paint the cells; the card's colour is the row's */
+    :root #group-table-view[data-group="hub-inbox:needs"] .dt-box.dt-folded tbody tr.dt-row.dt-row { background: var(--chat-assistant-bg, var(--bg-tertiary)); border: 1px solid var(--border); border-radius: var(--radius-xl); border-top-left-radius: 2px; padding: 12px 16px; min-width: 0; }
+    :root #group-table-view[data-group="hub-inbox:needs"] .dt-box.dt-folded tbody tr.dt-row.dt-row.dt-read { background: var(--bg-secondary); } /* a read card is quieter than an unread one (the card keeps the unread signal the old row's tint gave: needs_read_state) */
+    .inbox-needs-results .dt-box.dt-folded tbody tr.dt-row:last-child { border-bottom: 1px solid var(--border); }
+    .inbox-needs-results .dt-box.dt-folded tbody tr.dt-row { position: relative; }
+    .inbox-needs-results .dt-box.dt-folded tbody tr.dt-row > td:has(> .inbox-kind-column) { padding-inline-start: calc(2rem + 12px); } /* the card's padding holds the glyph: the text starts after it (the glyph is 2 rem wide, so it grows with the text size) */
+    .inbox-needs-results .dt-box.dt-folded tbody tr.dt-row > td > .inbox-kind-column { left: 0; top: 0; }
+    #group-table-view[data-group="hub-inbox:needs"] { --space-2xl: 12px; } /* ONE left edge, 12 px, for the title, the search, the grouping box, the chips, the cards and the notice under them (the Operator: the search bar is offset): the page's own 24 px gutter is the card's 12 px too */
+    .inbox-needs-results .dt-box.dt-folded tbody tr.dt-row .inbox-file-question { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* a file's review question is ONE line on a phone card (the Operator's approved mock, 'too much on each row'); the whole question is one tap away, in the file's header; the desktop keeps two lines */
+    #group-table-view[data-group="hub-inbox:needs"] .inbox-group-review-toggle { margin-inline: 0; }
+    body:has(#group-table-view[data-group="hub-inbox:needs"]) .phone-inbox-bar .phone-bar-title .phone-bar-search { padding: 12px max(12px, env(safe-area-inset-right, 0px)) 12px max(12px, env(safe-area-inset-left, 0px)); } /* the Needs you search starts its text on the same 12 px edge (the other folders keep their bar) */
+    #group-table-view[data-group="hub-inbox:needs"] .inbox-alerts-link .btn { margin-inline-start: 0; padding-inline-start: 0; } /* the button's text, not a 20 px indent, starts the line */
+    .inbox-needs-results .dt-box.dt-folded .dt-sortbar { border-bottom: 0; padding: 10px 12px 0; gap: 8px; }
+    .inbox-needs-results .dt-box.dt-folded .dt-sortbar-label { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    .inbox-needs-results .dt-box.dt-folded .dt-sortbar select, .inbox-needs-results .dt-box.dt-folded .dt-sortbar .btn { border-radius: 999px; background: var(--bg-tertiary); }
+}
+
+/* Reserve the old file-icon space before previews load; the fallback never changes row geometry. */
+.artifact-thumbnail { display: inline-grid; place-items: center; width: var(--artifact-thumbnail-size, 16px); height: var(--artifact-thumbnail-size, 16px); flex: none; overflow: hidden; vertical-align: middle; }
+.artifact-thumbnail > .explorer-file-icon { max-width: 100%; max-height: 100%; }
+.inbox-kind-icon.inbox-artifact-thumbnail::before { content: none; }
+.artifact-thumbnail.dt-mail-avatar { border-radius: var(--radius-sm); }
+
+.artifact-thumbnail-image { display: block; width: 100%; height: 100%; object-fit: contain; }
+
+/* A destructive-to-attention action explains its effect before a click or tap. */
+.inbox-remove-wait-help { flex-basis: 100%; min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; font-size: var(--fs-sm); }
+.inbox-answers:has(.inbox-remove-wait-help) { width: 280px; white-space: normal; }
+.dt-mail-menu .menu-item-with-help { display: block; white-space: normal; text-align: left; min-height: var(--control-touch-height, 44px); }

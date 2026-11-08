@@ -95,6 +95,7 @@ func ownerLabelRecordedWith(r *http.Request, label func(context.Context) (string
 // ownerRefusals are the words a non-owner gets (403, code owner_only) on each route the table marks owner-only, by "METHOD pattern". The decision is the table's and one helper's
 // (refuseNonOwner); only the sentence belongs to the route.
 var ownerRefusals = map[string]string{
+	tunnel.OwnerRouteKey("GET", "/api/artifacts/{hex64}/thumbnail"):                                 textArtifactsOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/artifacts/{hex64}"):                                           textArtifactsOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/artifacts"):                                                   textArtifactsOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/artifacts/resolve"):                                           textArtifactsOwnerOnly,

@@ -84,21 +84,24 @@ func TestAnotherAgentsNewerVersionIsNotBuriedEither(t *testing.T) {
 	assert.Equal(t, before, len(seriesMembersFor(rig, v1)), "nothing stored")
 }
 
-func TestASeriesLinkNamesNoVersionAndIsRefusedAsANewVersion(t *testing.T) {
+func TestASeriesLinkNamesNoVersionSoItIsABaseOnlyForTheOneWhoSavedTheNewest(t *testing.T) {
 	rig, _ := ownerRig(t)
 	v1 := rig.uploadText("a1", "plan.txt", "plan, first draft")
 	code, out := rig.uploadVersion("a1", "plan.txt", "plan, second", "coral://artifacts/"+v1)
 	require.Equal(t, http.StatusCreated, code, out)
 	sid, _ := out["series_id"].(string)
 	v2 := rig.digestOf(out)
-	for _, who := range []string{"a1", "a2"} {
-		code, out = rig.uploadVersion(who, "plan.txt", "plan, by the series link of "+who, "coral://artifacts/series/"+sid)
-		assert.Equal(t, http.StatusConflict, code, "%s: %v", who, out)
-		assert.Equal(t, "stale_base", out["code"])
-		assert.Contains(t, out["error"], "A series link names no version")
-		assert.Contains(t, out["error"], "--new-version-of coral://artifacts/"+v2)
-	}
+	// another agent: a bare id names no version, so it cannot be the base (#13792); it is told the file id and version to use (#14145)
+	code, out = rig.uploadVersion("a2", "plan.txt", "plan, by the file id of a2", "coral://artifacts/series/"+sid)
+	assert.Equal(t, http.StatusConflict, code, "%v", out)
+	assert.Equal(t, "stale_base", out["code"])
+	assert.Contains(t, out["error"], "a bare file id names no version")
+	assert.Contains(t, out["error"], "--new-version-of <file id>@2")
+	assert.Contains(t, out["error"], "coral-agent artifact download coral://artifacts/"+v2)
 	assert.Len(t, seriesMembersFor(rig, v1), 2)
+	// the agent that saved the newest is the one who can name the file alone
+	code, out = rig.uploadVersion("a1", "plan.txt", "plan, third by a1", "coral://artifacts/series/"+sid)
+	assert.Equal(t, http.StatusCreated, code, "%v", out)
 	// a first upload that is a version of nothing stays allowed
 	assert.NotEmpty(t, rig.uploadText("a1", "other.txt", "a different file"))
 }

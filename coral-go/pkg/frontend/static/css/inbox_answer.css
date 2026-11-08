@@ -2,3 +2,23 @@
 .inbox-answer-step { color: var(--text-secondary); font-size: .85em; flex: 1 1 100%; }
 .inbox-answer-step-line + .inbox-answer-step-line::before { content: ' \00b7 '; } /* a wide row runs the pairs on one line, separated by a dot; a phone puts each on its own line (below) */
 @media (max-width: 768px) { .inbox-answer-step-line { display: block; } .inbox-answer-step-line + .inbox-answer-step-line::before { content: none; } } /* which question these choices are for, or what Submit will send (#11981) */
+
+/* The folder-trust row (#14110): the folder as plain text and what Yes does, on their own full line; a long path breaks anywhere and never widens the row. */
+.inbox-trust-note { color: var(--text-secondary); font-size: .85em; flex: 1 1 100%; min-width: 0; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; word-break: break-word; } /* the table's cells do not wrap: this one does, so the whole folder and what Yes does are read before a button is pressed (the real row showed both cut at the edge) */
+.inbox-trust-path { font-family: var(--font-mono, ui-monospace, monospace); color: var(--text-primary); white-space: normal; overflow-wrap: anywhere; word-break: break-all; }
+.inbox-trust-confirm { color: var(--text-primary); }
+@media (max-width: 768px) { .inbox-trust-go, .inbox-trust-cancel { min-height: 44px; } .inbox-answers > .inbox-trust-note { padding-inline: 20px; box-sizing: border-box; } } /* the note lines up with the buttons under it */
+
+/* The command a permission row wants to run (#14173): all of it, wrapped, in a code block of at most 3 lines (4 on a phone); a Yes shows only while the block is not clipped. */
+.inbox-cmd-block { --cmd-lines: 3; flex: 1 1 100%; min-width: 0; max-width: 100%; box-sizing: border-box; margin: 0; padding: 4px 8px; font-family: var(--font-mono, ui-monospace, monospace); font-size: var(--fs-sm); line-height: var(--lh-body); color: var(--text-primary); background: var(--bg-secondary); border-radius: var(--radius-sm); white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; max-height: calc(var(--cmd-lines) * 1lh + 8px); overflow: hidden; }
+.inbox-cmd-block.is-open { max-height: min(14em, 40dvh); overflow-y: auto; } /* Show all: the whole command in a capped box that scrolls inside */
+.inbox-cmd-more { align-self: flex-start; }
+.inbox-cmd-note { flex: 1 1 100%; min-width: 0; overflow-wrap: anywhere; color: var(--text-secondary); font-size: .85em; }
+.inbox-yes-note { flex: 1 1 100%; }
+@media (max-width: 768px) { .inbox-cmd-block { --cmd-lines: 4; } .inbox-answers > .inbox-cmd-block, .inbox-answers > .inbox-cmd-note, .inbox-answers > .inbox-yes-note { margin-inline: 20px; max-width: calc(100% - 40px); } }
+
+/* The line that says new items wait while a pointer holds the Needs you rows still (#14173): under the table, stuck to the bottom of the view, so it never moves a row. */
+.group-table-held { position: sticky; bottom: 0; margin: 0; padding: 6px 12px; background: var(--bg-secondary); border-top: 1px solid var(--border); text-align: center; }
+
+/* A Yes that has just been drawn waits 400 ms for a click (#14302): it shows it is not ready yet. */
+.inbox-answer.inbox-arming { opacity: .6; cursor: progress; }

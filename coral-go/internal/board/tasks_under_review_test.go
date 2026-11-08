@@ -36,7 +36,7 @@ func TestTasksUnderReviewAgreesWithTheOldQueryOnRandomBoards(t *testing.T) {
 	workflows := []string{"", `{}`, `{"completion_review": {"candidate": "x"}}`, `{"completion_review": null}`, `{"other": {"completion_review": 1}}`, `{"completion_review": 0}`, `{"completion_review": ""}`, `not json at all`}
 	ctx := context.Background()
 	nonEmpty, withReview, withPendingReview := 0, 0, 0
-	for seed := int64(1); seed <= 60; seed++ {
+	for seed := int64(1); seed <= int64(oracleSeeds(60)); seed++ {
 		rng := rand.New(rand.NewSource(seed))
 		s := testStore(t)
 		boards := []string{"alpha", "beta", "gamma"}
@@ -75,6 +75,9 @@ func TestTasksUnderReviewAgreesWithTheOldQueryOnRandomBoards(t *testing.T) {
 		require.NoError(t, s.db.GetContext(ctx, &np, `SELECT COUNT(*) FROM board_tasks WHERE status = 'review_pending'`))
 		withReview += n
 		withPendingReview += np
+	}
+	if raceEnabled {
+		return // few seeds under -race: the coverage floors are for the plain run (#14281)
 	}
 	assert.Greater(t, nonEmpty, 100, "the boards are not all empty answers")
 	assert.Greater(t, withReview, 50, "in_progress tasks with a completion review were compared")

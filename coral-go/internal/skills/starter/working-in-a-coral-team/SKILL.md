@@ -68,7 +68,7 @@ Tag a file "for review" only when a person must look at it, decide or approve it
 coral-agent artifact upload plan.md --tag "for review" --question "Approve this plan for the new import dialog?"
 ```
 
-Logs, patches, notes and screenshots for another agent are not for review: upload them with no tag. A changed file is a new version of the same one, `--new-version-of <the link of the NEWEST version, downloaded and edited>`, never `plan-v2.md`. If a person or another agent saved a newer version meanwhile, the upload is refused with the newest link: download it, redo your change on it, upload again.
+Logs, patches, notes and screenshots for another agent are not for review: upload them with no tag. A changed file is a new version of the same one, `--new-version-of <file id>@<the version you downloaded and edited>` (the upload prints the file id and `version N of <name>`; a different name is refused unless `--rename`), never `plan-v2.md`. If a person or another agent saved a newer version meanwhile, the upload is refused with the newest link: download it, redo your change on it, upload again.
 
 ## Asking and waiting
 

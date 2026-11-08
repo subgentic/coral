@@ -1,25 +1,45 @@
-/* Activity summaries use recorded fields only; old rows without sender/choice details stay explicit about what is known. */
+/* Activity rows use recorded fields only; old rows without sender/choice details stay explicit about what is known. A row is a verb (YOU DID), an object (ON) and a detail on its own line (#14423). */
 import { importOnce } from './import_once.js';
 const { ACTION_LABEL } = await importOnce('./operator_activity_filters.js');
-const TASK_VERB = { task_create: 'created', task_complete: 'completed', task_cancel: 'cancelled', task_publish: 'published', task_edit: 'changed', task_remind: 'sent a reminder about', task_park: 'parked or released', task_reply: 'replied on' };
-export function activityWords(row) {
-    const quote = row.note ? `: “${row.note}”` : '';
-    if (row.action === 'answer' && row.item_kind === 'question') return `You answered ${row.title ? `${row.title}’s question` : 'a question'}${quote}`;
-    if (row.action === 'prompt_allow') return `You allowed ${row.title || row.item_id || 'an agent'}’s permission request${quote}`;
-    if (row.action === 'prompt_reject') return `You refused ${row.title || row.item_id || 'an agent'}’s permission request${quote}`;
-    if (row.action === 'prompt_answer') return `You answered ${row.title || row.item_id || 'an agent'}’s permission prompt${quote}`;
-    if (TASK_VERB[row.action]) return `You ${TASK_VERB[row.action]} task #${row.item_id}${row.title ? ` ${row.title}` : ''}${quote}`;
-    if (row.action === 'file_edit_send') return `You sent your edit of ${row.title || 'a file'} to agents${quote}`;
-    if (row.action === 'file_edit') return `You saved a new version of ${row.title || 'a file'}${quote}`;
-    if (row.action === 'wait_dismiss') return `You dismissed ${row.title || row.item_id || 'an agent'}’s waiting card`;
-    if (row.action === 'wait_send') return `You sent held words to ${row.title || row.item_id || 'an agent'}`;
-    return `${ACTION_LABEL[row.action] || row.action}${quote}`;
-}
-
 /** New job-run records carry the parent job and run id; older bare ids have no safe parent. */
 export function jobRunParts(value) {
     const match = /^([1-9]\d*):([1-9]\d*)$/.exec(String(value || ''));
     if (!match) return null;
     const jobId = Number(match[1]), runId = Number(match[2]);
     return Number.isSafeInteger(jobId) && Number.isSafeInteger(runId) ? { jobId, runId } : null;
+}
+
+// ── One rule for a row (#14423, the Operator): the VERB is in YOU DID, the OBJECT in ON, and the detail on its own line under the object. ──
+const FIXED_DISMISS_NOTE = 'Dismissed by the operator'; // what a dismissed ask is recorded with: the verb already says it, so it is not repeated as a detail
+const KIND_OBJECT = ['a file', 'a question', 'a goal', 'a proposal', 'a message', 'a task', 'an agent', 'a chat', 'a run', 'a workflow run', 'an automation run', 'a row in Needs you', 'a goal request'];
+const TASK_DID = { task_create: 'Created', task_complete: 'Completed', task_cancel: 'Cancelled', task_publish: 'Published', task_edit: 'Changed', task_remind: 'Sent a reminder about', task_park: 'Parked or released', task_reply: 'Replied on' };
+/** An answer sent from Needs you starts with the @mention of the agent that asked: it is shown without it, the asker being named on its own. ONLY the recorded asker's mention is removed (its name may be several words, '@Head of Security'), never the first @token of whatever was typed: an answer that starts with another mention keeps it (#14461). With no asker known the note is shown as it is. */
+export const cleanAnswer = (note, asker) => {
+    const t = String(note || '').trim(), name = String(asker || '').trim();
+    if (!name) return t;
+    const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), m = new RegExp(`^@${esc.replace(/\s+/g, '\\s+')}(?![\\w-])[\\s,:]*`, 'i').exec(t);
+    const rest = m ? t.slice(m[0].length).trim() : t;
+    return rest || t;
+};
+/** @returns {{ did: string, on: string, detail: string }} the verb for YOU DID, the object for ON (what the record kept, else the kind), and the detail for its own line. `itemWords(row)` is the row's own object words (inbox_activity.js). */
+export function activityParts(row, itemWords) {
+    const obj = itemWords(row), who = row.title || row.item_id || 'an agent', note = String(row.note || '').trim();
+    const mk = (did, on, detail = '') => ({ did, on, detail: detail === FIXED_DISMISS_NOTE ? '' : detail });
+    if (row.action === 'answer' && row.item_kind === 'question') { // a NEW row: the title is the ask's line and `asker` is who asked; an older row keeps the asker in the title
+        const answer = note ? `Your answer: ${cleanAnswer(note, row.asker || row.title)}` : '';
+        if (row.asker) return mk('Answered', row.title || 'a question', [`from ${row.asker}`, answer].filter(Boolean).join(' · '));
+        return mk('Answered', row.title ? `${row.title}’s question` : 'a question', answer);
+    }
+    if (row.action === 'prompt_allow') return mk('Allowed', `${who}’s permission request`, note);
+    if (row.action === 'prompt_reject') return mk('Refused', `${who}’s permission request`, note);
+    if (row.action === 'prompt_answer') return mk('Answered', `${who}’s permission prompt`, note);
+    if (TASK_DID[row.action]) return mk(TASK_DID[row.action], `task #${row.item_id}${row.title ? ` ${row.title}` : ''}`, note);
+    if (row.action === 'file_edit_send') return mk('Sent your edit', `${row.title || 'a file'}`, [note, 'to agents'].filter(Boolean).join(' · '));
+    if (row.action === 'file_edit') return mk('Saved a new version', `${row.title || 'a file'}`, note);
+    if (row.action === 'wait_dismiss') return mk('Dismissed', `${who}’s waiting card`);
+    if (row.action === 'wait_send') return mk('Sent held words to', who);
+    let did = ACTION_LABEL[row.action] || row.action;
+    const kind = KIND_OBJECT.find(k => did.endsWith(` ${k}`));
+    if (kind && obj !== undefined) { const bare = did.slice(0, -(kind.length + 1)); if (!/\b(?:of|to|for|the)$/.test(bare)) did = bare; } // "Starred a file" is Starred | the file
+    return mk(did, obj, note);
 }

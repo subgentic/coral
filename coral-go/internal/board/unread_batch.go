@@ -49,6 +49,11 @@ func (s *Store) UnreadForSessions(ctx context.Context, sessionNames []string) (m
 		switch receiveModeOf(sub) {
 		case "none":
 		case "mentions":
+			if isOrchestrator(sub.SubscriberID, sub.JobTitle, sub.CanPeek) { // counted one by one: the review notice that names an orchestrator is unread for it too (#14104)
+				n, err := s.CheckUnread(ctx, sub.Project, sub.SubscriberID)
+				out[sub.SessionName] = SessionUnread{Sub: sub, Unread: n, Err: err}
+				continue
+			}
 			byProject[sub.Project] = append(byProject[sub.Project], sub)
 		default: // "all" and groups: as CheckUnread does
 			n, err := s.CheckUnread(ctx, sub.Project, sub.SubscriberID)

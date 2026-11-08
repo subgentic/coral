@@ -49,7 +49,7 @@ const stamp = r => Date.parse(r.at || '') || 0;
 export function matches(r, f, teamOf = x => x.team || '') {
     const c = clean(f);
     if (c.q) {
-        const hay = [r.title, r.note, teamOf(r), ACTION_LABEL[r.action] || r.action, r.item_kind].join(' ').toLowerCase();
+        const hay = [r.title, r.note, r.asker, teamOf(r), ACTION_LABEL[r.action] || r.action, r.item_kind].join(' ').toLowerCase();
         if (!hay.includes(c.q.toLowerCase())) return false;
     }
     if (c.action && r.action !== c.action) return false;

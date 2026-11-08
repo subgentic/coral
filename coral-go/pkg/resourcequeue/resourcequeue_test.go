@@ -386,3 +386,70 @@ func TestLeavingAHoldIsReleasingItAndLeavingNothingIsAnError(t *testing.T) {
 	assert.Equal(t, []string{"b"}, names(st.Holders), "a slot given back at once, as Release does")
 	assert.ErrorIs(t, q.Leave("mac", "nobody", time.Minute), ErrNotHolder)
 }
+
+// #14170: a `claim --wait` that was stopped leaves its place, and the slot that came to it was held by nobody (twice on 2026-11-07). A waiting entry nobody has asked about for WaitStale is not waited on.
+func TestAWaitingEntryNobodyAsksAboutAnyMoreIsSkippedAndItsSlotGoesToThoseStillWaiting(t *testing.T) {
+	q, c := fixture(t, Config{WaitStale: WaitStale})
+	claim(t, q, "mac", "holder", 0)
+	pc := func(agent string) {
+		_, err := q.Claim("mac", Claimant{Agent: agent, Polls: true})
+		require.NoError(t, err)
+	}
+	pc("stopped")
+	pc("polling")
+	for i := 0; i < 20; i++ { // the waiting CLI asks every few seconds; the stopped one asks no more
+		c.add(3 * time.Second)
+		pc("polling")
+	}
+	c.add(2 * time.Second)
+	require.NoError(t, q.Release("mac", "holder"))
+	st, _ := q.Status("mac")
+	assert.Equal(t, []string{"polling"}, names(st.Holders), "the slot goes to the one still waiting, not to the stopped command")
+	assert.Equal(t, []string{"stopped"}, names(st.Queue))
+	_, err := q.Reap()
+	require.NoError(t, err)
+	_, err = q.Claim("mac", Claimant{Agent: "stopped", Polls: true})
+	require.NoError(t, err)
+	r := claim(t, q, "mac", "stopped", 0) // run again: the place is its own once more
+	assert.False(t, r.Granted, "its slot is taken now, but it is in line again")
+	c.add(DefaultAwayGrace + time.Minute)
+	_, err = q.Reap()
+	require.NoError(t, err)
+	c.add(WaitStale + time.Second) // and if it stops again, it is dropped after the grace
+	_, err = q.Reap()
+	require.NoError(t, err)
+	c.add(DefaultAwayGrace + time.Minute)
+	_, err = q.Reap()
+	require.NoError(t, err)
+	st, _ = q.Status("mac")
+	assert.Empty(t, st.Queue, "an abandoned place does not stay in line for ever")
+}
+
+func TestAnEntryThatKeepsAskingIsNeverTakenForAbandoned(t *testing.T) {
+	q, c := fixture(t, Config{WaitStale: WaitStale})
+	claim(t, q, "mac", "holder", 0)
+	for i := 0; i < 101; i++ {
+		_, err := q.Claim("mac", Claimant{Agent: "waiting", Polls: true})
+		require.NoError(t, err)
+		c.add(3 * time.Second)
+		_, err = q.Reap()
+		require.NoError(t, err)
+	}
+	_, err := q.Reap()
+	require.NoError(t, err)
+	require.NoError(t, q.Release("mac", "holder"))
+	st, _ := q.Status("mac")
+	assert.Equal(t, []string{"waiting"}, names(st.Holders))
+}
+
+// A place the hook made for a refused command is not judged by polling: the agent retries when it likes (the hook's message says "run the same command again later").
+func TestAPlaceTheHookMadeIsNotTakenForAbandonedForNotAsking(t *testing.T) {
+	q, c := fixture(t, Config{WaitStale: WaitStale})
+	claim(t, q, "mac", "holder", 0)
+	_, err := q.Claim("mac", Claimant{Agent: "hooked", Via: "hook"}) // a place that does not poll
+	require.NoError(t, err)
+	c.add(5 * time.Minute)
+	require.NoError(t, q.Release("mac", "holder"))
+	st, _ := q.Status("mac")
+	assert.Equal(t, []string{"hooked"}, names(st.Holders), "the hook's place waited five minutes and still gets the slot")
+}

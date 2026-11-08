@@ -833,7 +833,7 @@ func (s *Server) serveChief(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Referrer-Policy", "same-origin")
 	w.Header().Set("Cache-Control", "no-store")
 	if sessionID == "" || s.indexTmpl == nil {
-		w.Write([]byte(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Chief</title></head><body style="font-family:system-ui,sans-serif;padding:24px"><p>Chief is not set up on this computer.</p></body></html>`))
+		w.Write([]byte(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Chief</title></head><body style="font-family:system-ui,sans-serif;padding:24px"><a href="/" style="display:inline-flex;align-items:center;min-height:44px;min-width:44px">Back to Coral</a><p>Chief is not set up on this computer.</p></body></html>`))
 		return
 	}
 	data := templateData{CoralRoot: s.cfg.CoralRoot, EntryMode: "agent", TargetSessionID: sessionID, Chief: true, StaticBase: s.staticBase(), ModulePreloads: frontend.StartupModules(), BootJSON: testHooksBoot()}

@@ -70,6 +70,40 @@ func claudeLineTime(line []byte) time.Time {
 	return t
 }
 
+// claudeLineMainAssistantTime is the time of an assistant entry of the main thread, or the zero time for any other line (#14345): a subagent's entry (isSidechain true), a user entry (a tool result's carrier)
+// and Claude Code's own "<synthetic>" assistant entries are not the agent's model going on. An entry with no isSidechain field (an older Claude Code) is the main thread's.
+func claudeLineMainAssistantTime(line []byte) time.Time {
+	if !bytes.Contains(line, assistantType) {
+		return time.Time{}
+	}
+	var rec struct {
+		Type        string `json:"type"`
+		IsSidechain bool   `json:"isSidechain"`
+		Timestamp   string `json:"timestamp"`
+		Message     struct {
+			Model string `json:"model"`
+		} `json:"message"`
+	}
+	if json.Unmarshal(line, &rec) != nil || rec.Type != "assistant" || rec.IsSidechain || rec.Message.Model == "" || strings.HasPrefix(rec.Message.Model, "<") {
+		return time.Time{}
+	}
+	t, _ := time.Parse(time.RFC3339Nano, rec.Timestamp)
+	return t
+}
+
+// TranscriptAssistantAt is when the newest main-thread assistant entry of a Claude session was written (zero when none was read): what a turn read found, and it reads nothing itself (#14345).
+func (r *SessionReader) TranscriptAssistantAt(sessionID string) time.Time {
+	r.mu.Lock()
+	c := r.cache[sessionID]
+	r.mu.Unlock()
+	if c == nil {
+		return time.Time{}
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.claudeState.assistantAt
+}
+
 // TranscriptTurnAt is when the assistant entry that TranscriptModel and TranscriptThinking come from was written (zero when none was read, or for a Codex session): a setting made after it is newer
 // than what it recorded (#6225). Like them it reads nothing itself.
 func (r *SessionReader) TranscriptTurnAt(sessionID string) time.Time {

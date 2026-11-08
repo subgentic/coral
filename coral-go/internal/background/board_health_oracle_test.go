@@ -50,7 +50,7 @@ func TestComposeCheckAgreesWithBefore4599(t *testing.T) {
 	// Each seed has its own boards, databases and random source: the seeds run in parallel (#4982: 132 s of the package on epoch),
 	// inside one group so the floors are read after every seed has finished.
 	t.Run("seeds", func(t *testing.T) {
-		for seed := int64(1); seed <= 24; seed++ {
+		for seed := int64(1); seed <= int64(oracleSeeds(24)); seed++ {
 			t.Run(fmt.Sprint(seed), func(t *testing.T) {
 				t.Parallel()
 				runCheckOracle(t, seed)
@@ -58,6 +58,9 @@ func TestComposeCheckAgreesWithBefore4599(t *testing.T) {
 		}
 	})
 	t.Logf("compared, per phrase: %v", checkSeen)
+	if raceEnabled {
+		return // few seeds under -race: the coverage floors are for the plain run (#14281)
+	}
 	for phrase, floor := range checkPhrases {
 		require.GreaterOrEqual(t, checkSeen[phrase], floor, "%q went (almost) unprinted", phrase)
 	}
