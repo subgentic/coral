@@ -12,6 +12,7 @@ const recordTiming=row=>{timings.push(row);if(process.env.CORAL_LAUNCH_TIMING_RE
  const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();
  const snapshot=async(label,width)=>{if(!process.env.CORAL_SCREENSHOT_DIR)return;const fs=require('node:fs');fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true});for(const size of [16,32]){await ev(`document.documentElement.style.fontSize='${size}px';true`);await ev(require('./helpers/wait').framesJs(3));fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/${width}-${size}-${label}.png`,Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}await ev(`document.documentElement.style.fontSize='';true`);};
  const full=['agent_spawn','file_read','file_write','shell','web_access'];
+ const dismissChecks=[];
  try{
   await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
   for(const width of [1280,390]){
@@ -19,9 +20,8 @@ const recordTiming=row=>{timings.push(row);if(process.env.CORAL_LAUNCH_TIMING_RE
    await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev,'startup','settings');await installTeam(ev);await stubModels(ev);
    const actual=await ev(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(async r=>({status:r.status,body:await r.json()}))`);
    assert.equal(actual.status,200,'real integrated owner disclosure route is readable');
-   assert.equal(actual.body.id,'full-permissions-3','pin the final security-reviewed disclosure version');
-   assert.match(actual.body.text,/run as you, with every file you can reach/,'real server text states the operating-system authority');
-   assert.match(actual.body.text,/Hermes/,'real server disclosure names Hermes Bypass');
+   assert.equal(actual.body.id,'full-permissions-4','pin the final security-reviewed disclosure version');
+   assert.equal(actual.body.text,'Agents default to auto mode. Choose a different permission mode when you launch an agent or set a default in Settings.','real server keeps the Operator-approved wording');
    await ev(`fetch('/api/launch-disclosure/ack',{method:'DELETE'}).then(r=>r.ok)`);
    await ev(`fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({default_permission_mode:''})}).then(r=>r.ok)`);
    if(process.env.CORAL_TEST_STRICT) for(const path of ['/api/sessions/launch','/api/sessions/launch-team']){
@@ -34,9 +34,21 @@ const recordTiming=row=>{timings.push(row);if(process.env.CORAL_LAUNCH_TIMING_RE
 
    await ev(`import((window.__coralStatic||'/static/')+'launch_disclosure.js').then(m=>m.refreshLaunchDisclosure())`);
    await waitFor(`!!document.getElementById('launch-disclosure-banner')`,'real unseen server record shows the banner');
-   assert.deepEqual(await ev(`(()=>{const b=document.getElementById('launch-disclosure-banner'),s=b.querySelector('summary'),a=b.querySelector('button');return {expanded:s.getAttribute('aria-expanded'),controls:!!document.getElementById(s.getAttribute('aria-controls')),ackVisible:a.checkVisibility(),bounded:b.getBoundingClientRect().height<=innerHeight/4+1}})()`),{expanded:'false',controls:true,ackVisible:false,bounded:true},'closed notice exposes its state, hides acknowledgement and leaves the app room');
+   assert.deepEqual(await ev(`(()=>{const b=document.getElementById('launch-disclosure-banner'),s=b.querySelector('summary'),read=[...b.querySelectorAll('button')].find(x=>x.textContent.trim()==="I've read this"),dismiss=b.querySelector('.launch-disclosure-dismiss');return {expanded:s.getAttribute('aria-expanded'),summary:s.querySelector('.launch-disclosure-summary-text')?.textContent,controls:!!document.getElementById(s.getAttribute('aria-controls')),readHidden:!read.checkVisibility(),dismissVisible:dismiss.checkVisibility(),bounded:b.getBoundingClientRect().height<=innerHeight/4+1}})()`),{expanded:'false',summary:'Agents default to auto mode.',controls:true,readHidden:true,dismissVisible:true,bounded:true},'collapsed summary uses the Operator-approved default-auto wording, keeps the acknowledgement inside its body, and exposes Dismiss');
+   await waitFor(`document.getElementById('notice-live')?.textContent.trim()==='Agents default to auto mode.'`,'screen-reader announcement matches the collapsed summary',10000);
    await snapshot('closed',width);
-   await ev(`document.querySelector('#launch-disclosure-banner button').click();true`);
+   dismissChecks.push(await ev(`(()=>{const b=document.getElementById('launch-disclosure-banner'),s=b.querySelector('summary'),d=b.querySelector('.launch-disclosure-dismiss'),text=s.querySelector('.launch-disclosure-summary-text'),r=d.getBoundingClientRect(),br=b.getBoundingClientRect(),tr=text.getBoundingClientRect();return {width:${width},label:d.getAttribute('aria-label'),height:r.height,widthPx:r.width,inside:r.left>=br.left&&r.right<=br.right&&r.top>=br.top&&r.bottom<=br.bottom,clear:r.right<=tr.left||r.left>=tr.right||r.bottom<=tr.top||r.top>=tr.bottom,collapsed:!b.querySelector('details').open}})()`));
+   await ev(`(()=>{const real=window.fetch;window.__dismissProbe={real,calls:0,fail:true};window.fetch=(input,options={})=>{if(new URL(String(input),location.href).pathname==='/api/launch-disclosure/ack'){window.__dismissProbe.calls++;if(window.__dismissProbe.fail)return Promise.resolve(Response.json({error:'owner_only'},{status:403}));}return real(input,options)};document.querySelector('#launch-disclosure-banner .launch-disclosure-dismiss').click();return true})()`);
+   await waitFor(`window.__dismissProbe.calls===1`,'collapsed Dismiss submits the owner acknowledgement');
+   await waitFor(`!document.querySelector('#launch-disclosure-banner .launch-disclosure-dismiss')?.disabled`,'failed Dismiss write restores the action');
+   await ev(require('./helpers/wait').framesJs(2));
+   assert.deepEqual(await ev(`(()=>{const b=document.getElementById('launch-disclosure-banner');return {visible:!!b,collapsed:!b.querySelector('details').open,seen:window.__dismissProbe.calls>0,dismissDisabled:b.querySelector('.launch-disclosure-dismiss').disabled,error:document.querySelector('#toast-host .toast.error .toast-message')?.textContent.includes('Could not record that you have read this')}})()`),{visible:true,collapsed:true,seen:true,dismissDisabled:false,error:true},`${width}: refused acknowledgement leaves the notice collapsed, visible, and reports the error`);
+   await ev(`window.__dismissProbe.fail=false;document.querySelector('#launch-disclosure-banner .launch-disclosure-dismiss').click();true`);
+   await waitFor(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json()).then(d=>d.seen===true)`,'collapsed Dismiss acknowledgement persisted on the real server');
+   await ev(`window.fetch=window.__dismissProbe.real;fetch('/api/launch-disclosure/ack',{method:'DELETE'}).then(r=>r.ok)`);
+   await ev(`import((window.__coralStatic||'/static/')+'launch_disclosure.js').then(m=>m.refreshLaunchDisclosure())`);
+   await waitFor(`!!document.getElementById('launch-disclosure-banner')`,'dismiss test resets the unseen notice for keyboard checks');
+   await ev(`(()=>{[...document.querySelectorAll('#launch-disclosure-banner button')].find(b=>b.textContent.trim()==="I've read this").click();return true})()`);
    assert.equal(await ev(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json()).then(d=>d.seen)`),false,'a closed notice cannot acknowledge even through a synthetic button click');
    await ev(`document.querySelector('#launch-disclosure-banner summary').focus();true`);
    await client.Input.dispatchKeyEvent({type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r'});
@@ -47,8 +59,11 @@ const recordTiming=row=>{timings.push(row);if(process.env.CORAL_LAUNCH_TIMING_RE
    if(width===390)await ev(`document.documentElement.style.fontSize='32px';true`);
    await client.Input.dispatchKeyEvent({type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
    await client.Input.dispatchKeyEvent({type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
-   await waitFor(`document.activeElement===document.querySelector('#launch-disclosure-banner button')`,'Tab reaches acknowledgement');
-   const ackPoint=()=>ev(`(()=>{const b=document.getElementById('launch-disclosure-banner').getBoundingClientRect(),a=document.querySelector('#launch-disclosure-banner button'),r=a.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;return {x,y,inside:r.top>=b.top&&r.bottom<=b.bottom&&y>=0&&y<innerHeight&&a.contains(document.elementFromPoint(x,y))}})()`);
+   await waitFor(`document.activeElement===document.querySelector('#launch-disclosure-banner .launch-disclosure-dismiss')`,'Tab reaches collapsed-row Dismiss');
+   await client.Input.dispatchKeyEvent({type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+   await client.Input.dispatchKeyEvent({type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+   await waitFor(`document.activeElement===[...document.querySelectorAll('#launch-disclosure-banner button')].find(b=>b.textContent.trim()==="I've read this")`,'Tab reaches the expanded acknowledgement');
+   const ackPoint=()=>ev(`(()=>{const b=document.getElementById('launch-disclosure-banner').getBoundingClientRect(),a=[...document.querySelectorAll('#launch-disclosure-banner button')].find(x=>x.textContent.trim()==="I've read this"),r=a.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;return {x,y,inside:r.top>=b.top&&r.bottom<=b.bottom&&y>=0&&y<innerHeight&&a.contains(document.elementFromPoint(x,y))}})()`);
    assert.equal((await ackPoint()).inside,true,`${width}: Tab scrolls the acknowledgement into the bounded notice, including 200% text on phone`);
    await client.Input.dispatchKeyEvent({type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r'});
    await client.Input.dispatchKeyEvent({type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
@@ -131,8 +146,8 @@ const recordTiming=row=>{timings.push(row);if(process.env.CORAL_LAUNCH_TIMING_RE
    await ev(`(()=>{const e=document.getElementById('team-permission-mode');e.value='default';e.dispatchEvent(new Event('change',{bubbles:true}));const t=document.getElementById('team-agent-type');t.value='codex';t.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
    assert.equal(await ev(`document.getElementById('team-permission-mode').value`),'default','explicit Default survives provider change');
    assert.deepEqual(await ev(`import((window.__coralStatic||'/static/')+'preset_enforcement.js').then(m=>[m.defaultPermissionMode({default_permission_mode:'default'},'hermes'),m.defaultPermissionMode({},'hermes')])`),['default','bypassPermissions'],'stored lower Hermes choice wins over new shipped yolo default');
-   await ev(`(async()=>{const S=window.__coralStatic||'/static/';(await import(S+'launch_core.js')).hideLaunchModal();const real=window.fetch;window.__disclosure={id:'full-permissions-1',text:'Full tool permissions <b>are not role limits</b>. Change the default in Settings.',seen:false};window.__launchAudit={launch:[],ack:[],failAck:false};window.fetch=(input,options={})=>{const path=new URL(String(input),location.href).pathname;const json=(data,status=200)=>Promise.resolve(Response.json(data,{status}));if(path==='/api/launch-disclosure')return json(window.__disclosure);if(path==='/api/launch-disclosure/ack'){window.__launchAudit.ack.push(JSON.parse(options.body));if(window.__launchAudit.failAck)return json({error:'owner_only'},403);window.__disclosure.seen=true;return json({id:window.__disclosure.id,seen:true});}if(path==='/api/sessions/launch'||path==='/api/sessions/launch-team'){window.__launchAudit.launch.push({path,body:JSON.parse(options.body)});return window.__disclosure.seen?json({session_id:'new-agent',name:'new-agent',permission_mode:'auto'}):json({code:'launch_disclosure_required',disclosure:window.__disclosure},409);}return real(input,options)};await(await import(S+'launch_disclosure.js')).refreshLaunchDisclosure();return true;})()`);
-   await waitFor(`document.getElementById('launch-disclosure-banner')?.textContent.includes('New agents start with full permissions')`,'unseen disclosure stays in dashboard banner');
+   await ev(`(async()=>{const S=window.__coralStatic||'/static/';(await import(S+'launch_core.js')).hideLaunchModal();const real=window.fetch;window.__disclosure={id:'full-permissions-1',text:'Agents default to auto mode. <b>Change the default in Settings.</b>',seen:false};window.__launchAudit={launch:[],ack:[],failAck:false};window.fetch=(input,options={})=>{const path=new URL(String(input),location.href).pathname;const json=(data,status=200)=>Promise.resolve(Response.json(data,{status}));if(path==='/api/launch-disclosure')return json(window.__disclosure);if(path==='/api/launch-disclosure/ack'){window.__launchAudit.ack.push(JSON.parse(options.body));if(window.__launchAudit.failAck)return json({error:'owner_only'},403);window.__disclosure.seen=true;return json({id:window.__disclosure.id,seen:true});}if(path==='/api/sessions/launch'||path==='/api/sessions/launch-team'){window.__launchAudit.launch.push({path,body:JSON.parse(options.body)});return window.__disclosure.seen?json({session_id:'new-agent',name:'new-agent',permission_mode:'auto'}):json({code:'launch_disclosure_required',disclosure:window.__disclosure},409);}return real(input,options)};await(await import(S+'launch_disclosure.js')).refreshLaunchDisclosure();return true;})()`);
+   await waitFor(`document.getElementById('launch-disclosure-banner')?.querySelector('.launch-disclosure-summary-text')?.textContent==='Agents default to auto mode.'`,'unseen disclosure summary uses the approved default-auto wording');
    assert.equal(await ev(`!!document.querySelector('#launch-disclosure-banner b')`),false,'server text is text, never markup');
    await ev(`window.showSettingsModal('agents').then(()=>true)`);
    await waitFor(`!!document.getElementById('settings-permission-mode')`,'settings default exists');
@@ -154,6 +169,7 @@ const recordTiming=row=>{timings.push(row);if(process.env.CORAL_LAUNCH_TIMING_RE
    assert.equal(await ev(`!!document.getElementById('launch-disclosure-banner')`),false,'acknowledged server state removes banner');
 
   }
+  for(const x of dismissChecks){assert.equal(x.label,'Dismiss, I have read this',`${x.width}: Dismiss has an explicit accessible name`);assert.ok(x.inside&&x.clear&&x.widthPx>=44&&x.height>=44&&x.collapsed,`${x.width}: collapsed summary Dismiss is a non-overlapping 44 px target: ${JSON.stringify(x)}`);}
   console.log('PASS shipped full presets, visible role limits and explicit team Default at desktop/phone');
  }finally{try{await guard.restore()}finally{await client.close()}}
 })().catch(e=>{console.error(e);process.exitCode=1});
