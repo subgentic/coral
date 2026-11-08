@@ -45,6 +45,7 @@ Run `coral-agent docs` to list the topics, `coral-agent docs <topic>` to read on
 - [Saved messages](saved-messages.md) — The Operator's bookmarks on chat and board messages (`/api/saved`), the stable message key, jump back to a message
 
 ### Configuration
+- [Getting Started](getting-started.md) — Install Coral, find your way around the Inbox, start a first agent and a team, and a short tour of what else is in the app
 - [Multi-Server Hub](hub.md) — Register remote Coral servers, merged agent list, proxy and remote launch, Coral Hub tunnel refusals, versions
 - [Settings & System](settings-system.md) — App settings, status, CLI checks, network info
 - [What Coral Stores](what-coral-stores.md) — What Coral keeps on this computer, for how long, whether it is cleaned of secrets, where to change it, what reaches Coral Hub
