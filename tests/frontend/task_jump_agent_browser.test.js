@@ -26,14 +26,13 @@ const { coralReady } = require('./helpers/wait');
         const mk = async (title, assigned) => { const r = await api('POST', `/api/board/${B}/tasks`, { title, body: 'Details for ' + title, assigned_to: assigned, created_by: 'orch', priority: 'medium' }); assert.ok(r.status < 300, JSON.stringify(r)); return r.body.id || r.body.task.id; };
         await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'orch', job_title: 'Orchestrator', session_name: 'orch-s' }); // only an orchestrator makes shared tasks
         for (const id of ['jta-dev', 'jta-sleepy', 'jta-qa']) await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: id, session_name: id + '-s' });
-        const run = await mk('Build the jump', 'jta-dev'), sleepy = await mk('Sleeping builder', 'jta-sleepy'), gone = await mk('Builder that ended', 'jta-gone'), rev = await mk('Under review', 'jta-dev'), nobody = await mk('Nobody yet', '');
-        assert.ok([run, sleepy, gone, rev].every(Number.isInteger), 'the tasks were made: ' + JSON.stringify([run, sleepy, gone, rev]));
+        const run = await mk('Build the jump', 'jta-dev'), sleepy = await mk('Sleeping builder', 'jta-sleepy'), gone = await mk('Builder that ended', 'jta-gone'), rev = await mk('Under review', 'jta-dev'), rev2 = await mk('Reviewer gone', 'jta-dev'), nobody = await mk('Nobody yet', '');
+        assert.ok([run, sleepy, gone, rev, rev2].every(Number.isInteger), 'the tasks were made: ' + JSON.stringify([run, sleepy, gone, rev, rev2]));
         const add = (name, o) => ev(`window.__m.add(${JSON.stringify(name)}, 'B', 1, ${JSON.stringify({ board_project: B, board_is_orchestrator: false, board_subscriber_id: name, ...o })}); true`);
         await add('jta-dev', { sleeping: false }); await add('jta-sleepy', { sleeping: true }); await add('jta-qa', { sleeping: false });
         await waitFor(`['jta-dev', 'jta-sleepy', 'jta-qa'].every(n => (window.__qaState.liveSessions || []).some(s => s.name === n))`, 'the agents', 8000);
         // the task read of a task in review, as the server sends it (the reviewers of the round); the page reads the task through fetch
-        await ev(`(() => { const real = window.fetch; window.fetch = async (u, o) => { const r = await real(u, o); if (!new RegExp('/api/board/${B}/tasks/${rev}$').test(String(u))) return r; const j = await r.json(); return new Response(JSON.stringify({ ...j, status: 'review_pending', review_requested: true, reviewers: [{ name: 'jta-qa' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } }); }; return true; })()`);
-
+        await ev(`(() => { const real = window.fetch, who = { ${rev}: 'jta-qa', ${rev2}: 'jta-nobody' }; window.fetch = async (u, o) => { const r = await real(u, o); const m = new RegExp('/api/board/${B}/tasks/(\\\\d+)$').exec(String(u)); if (!m || !who[m[1]]) return r; const j = await r.json(); const author = (window.__qaState.liveSessions || []).find(s => s.name === 'jta-dev'); return new Response(JSON.stringify({ ...j, status: 'review_pending', review_requested: true, reviewers: [{ name: who[m[1]] }], session_id: author && author.session_id }), { status: 200, headers: { 'Content-Type': 'application/json' } }); }; return true; })()`);
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             const tag = `${w} px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
@@ -72,6 +71,11 @@ const { coralReady } = require('./helpers/wait');
             check(`${tag}: a task in review jumps to the reviewer, named`, !!r && r.label === 'Jump to agent: jta-qa, the reviewer' && /Reviewer: jta-qa/.test(r.cell), JSON.stringify(r));
             await ev(`document.querySelector('#team-panel-item .task-jump-btn').click(); true`); await waitFor(`window.__qaState.currentSession && window.__qaState.currentSession.name === 'jta-qa'`, `${tag}: the reviewer's page`, 8000);
             check(`${tag}: a tap opens the reviewer, not the author`, (await landed()).name === 'jta-qa');
+            await open(rev2); const gr = await jump();
+            check(`${tag}: a reviewer that is not running is still the target, named`, !!gr && gr.label.startsWith('Jump to agent: jta-nobody, the reviewer') && /Not running/.test(gr.cell), JSON.stringify(gr));
+            const authorId = await ev(`(window.__qaState.liveSessions || []).find(s => s.name === 'jta-dev').session_id`);
+            await ev(`document.querySelector('#team-panel-item .task-jump-btn').click(); true`); await waitFor(`window.__qaState.currentSession && window.__qaState.currentSession.name === 'jta-nobody'`, `${tag}: the absent reviewer's page`, 8000);
+            check(`${tag}: it opens the reviewer by name and never the author's session (the task carries the author's session id)`, await ev(`(() => { const s = window.__qaState.currentSession; return s.name === 'jta-nobody' && s.session_id !== ${JSON.stringify(authorId)}; })()`), JSON.stringify(await landed()));
         }
     } finally { await api('DELETE', `/api/board/${B}`).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

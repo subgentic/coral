@@ -55,9 +55,17 @@ test('task assignee link uses its team and never falls back to an unrelated stan
     state.liveSessions = [{ ...rows[0], board_project: '' }, rows[1], rows[2]];
     renderTaskPage(host, task, { project: '@m1/dev', onBack() {} });
     host.querySelector('dl.facts dd .task-jump-btn').click(); // Jump to agent always shows and always jumps (#14565): with no agent of this team running it opens the assignee on this team's computer, never the unrelated standalone agent
-    assert.equal(selected[2], undefined, 'no session of the unrelated agents is selected');
+    assert.equal(selected[2], '', 'no session of the unrelated agents is selected');
     assert.equal(selected[3], 'm1', 'it opens on the team\'s computer');
     assert.equal(selected[0], 'Lead Developer');
+    // a task in review whose reviewer is not running: the author's session (the task's own hint) must not open under the reviewer's name (#14565)
+    state.liveSessions = [rows[3]];
+    renderTaskPage(host, { ...task, session_id: 'm1-dev', review_requested: true, reviewers: [{ name: 'Gone Reviewer' }] }, { project: '@m1/dev', onBack() {} });
+    host.querySelector('dl.facts dd .task-jump-btn').click();
+    assert.deepEqual([selected[0], selected[2], selected[3]], ['Gone Reviewer', '', 'm1'], 'a reviewer with no live row opens by name, with no session id (not the author\'s m1-dev)');
+    renderTaskPage(host, { ...task, session_id: 'foreign-stale', assigned_to: 'Gone Assignee' }, { project: '@m1/dev', onBack() {} });
+    host.querySelector('dl.facts dd .task-jump-btn').click();
+    assert.deepEqual([selected[0], selected[2], selected[3]], ['Gone Assignee', '', 'm1'], 'an unmatched assignee never reuses a stale or foreign session hint');
     host.remove();
 });
 test('remote comment Sent to names retain their panel computer', async () => {
