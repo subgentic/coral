@@ -4,7 +4,8 @@
 import { importOnce } from './import_once.js';
 const { agentLink } = await importOnce('./agent_link.js');
 import { showToast } from './utils.js';
-import { decisionNeedsPerson, boardTeamKey, normServer } from './server_base.js';
+import { decisionNeedsPerson, boardTeamKey, normServer, splitKey, isLocalServer } from './server_base.js';
+import { state } from './state.js';
 import { loadStyles } from './lazy_styles.js';
 const { markHidden } = await importOnce('./visible_marks.js'); // lazy: its failure is retried
 const { proposalItems, pendingProposals, onProposalsChanged, refreshProposals, dismissExpired, decide } = await importOnce('./proposals_state.js'); // lazy: its failure is retried
@@ -64,13 +65,22 @@ export function proposalActions(p) {
     return box;
 }
 
+/** The team a proposal is for, in words (#14780): the team's own name when the list has it; else the name on this computer; on another computer 'a team on <its name>'. Never the board's id ('@<computer-id>/docs-team'). */
+function proposalTeamWords(p) {
+    if (p.board_label) return markedText(p.board_label);
+    const { server, name } = splitKey(p.board_id);
+    if (isLocalServer(server)) return markedText(name);
+    const known = (state.servers || []).find(s => s && s.id === server);
+    return `a team on ${markedText((known && (known.label || known.name)) || 'another computer')}`;
+}
+
 /** The dialog of a proposal: its words, who proposed it and for which team, and the three decisions. mode: 'view' | 'edit' | 'reject' (which part is open first). */
 export function openProposalDialog(p, mode = 'view') {
     document.getElementById('proposal-dialog')?.remove();
     const facts = proposalFacts(p), pay = p.payload && typeof p.payload === 'object' ? p.payload : {};
     const d = el('dialog', 'modal-content dlg-form proposal-dialog'); d.id = 'proposal-dialog'; d.setAttribute('aria-labelledby', 'proposal-dialog-title');
     const h = el('h2', null, `${kindWord(p) === 'goal' ? 'A goal' : 'A task'} waiting for your approval`); h.id = 'proposal-dialog-title';
-    const who = el('p', 'proposal-who'); who.append(agentLink(p.proposer, { board: boardTeamKey(p.server, p.board_id) }), ` proposed it for ${p.board_label ? markedText(p.board_label) : p.board_id}.${p.goal_proposal_id ? ' It is for a goal that is also waiting: approve that goal first.' : ''}`); // the proposer's name opens its chat (#12182)
+    const who = el('p', 'proposal-who'); who.append(agentLink(p.proposer, { board: boardTeamKey(p.server, p.board_id) }), ` proposed it for ${proposalTeamWords(p)}.${p.goal_proposal_id ? ' It is for a goal that is also waiting: approve that goal first.' : ''}`); // the proposer's name opens its chat (#12182)
     const inputs = []; // [field, the raw words]: a field shows the words marked until Edit opens them, then the raw words
     let editing = mode === 'edit';
     const field = (label, value, tall) => { const l = el('label', 'proposal-field'); l.append(el('span', null, label)); const i = el(tall ? 'textarea' : 'input', 'field'); if (tall) i.rows = 4; i.value = editing ? value : markedBlock(value); i.readOnly = !editing; inputs.push([i, value]); l.append(i); return [l, i]; }; // the words are read first: they are changed only after Edit and approve
