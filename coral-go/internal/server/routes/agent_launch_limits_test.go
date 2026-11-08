@@ -89,7 +89,7 @@ func TestLimitAgentLaunch(t *testing.T) {
 	assert.Equal(t, []string{"Bash(rm *)"}, grant.Caps.Deny)
 	assert.Empty(t, grant.Caps.Allow)
 	for name, ask := range map[string]agentLaunchAsk{
-		"an allow rule":  {AgentType: "claude", Caps: &agent.Capabilities{Allow: []string{"Bash(*)"}}},
+		"an allow rule":   {AgentType: "claude", Caps: &agent.Capabilities{Allow: []string{"Bash(*)"}}},
 		"an allowed tool": {AgentType: "claude", Tools: []string{"Bash"}},
 		"a hook":          {AgentType: "claude", Hooks: map[string]interface{}{"PreToolUse": "x"}},
 		"a bypass flag":   {AgentType: "claude", Flags: []string{"--permission-mode=bypassPermissions"}},
@@ -157,7 +157,7 @@ func TestAgentLaunchOfASavedTemplateKeepsItsChoices(t *testing.T) {
 		require.NoError(t, store.NewSessionStore(db).SetSetting(context.Background(), "saved_team_templates", saved))
 		terminal := newMockTerminal()
 		h := NewSessionsHandler(db, cfg, nil, terminal, nil)
-		work := t.TempDir() // an agent starts agents in its team's folder (#13891)
+		work := t.TempDir()                                              // an agent starts agents in its team's folder (#13891)
 		callerCaps := `{"allow":["Bash(make *)"],"deny":["Bash(rm *)"]}` // the launching agent holds the saved entry's allow rule: a member's allow list is a subset of its own (#14336)
 		require.NoError(t, store.NewSessionStore(db).RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: "sid-a", AgentType: "claude", AgentName: "a", WorkingDir: work, Capabilities: &callerCaps}))
 		b, _ := json.Marshal(map[string]any{"board_name": "t", "working_dir": work, "agents": []map[string]any{tc.member}})

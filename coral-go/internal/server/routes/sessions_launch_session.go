@@ -257,9 +257,9 @@ func (h *SessionsHandler) launchSession(ctx context.Context, spec launchSpec) (_
 	return map[string]any{
 		"ok": true, "session_id": sessionID, "session_name": sessionName,
 		"agent_type": agentType, "working_dir": absDir,
-		"display_name": displayName, // numbered when the role was taken on the board (#3543)
+		"display_name":    displayName,                         // numbered when the role was taken on the board (#3543)
 		"permission_mode": effectivePermissionMode(launchMode), // the mode the agent started in (#14353)
-		"log_file":     logFile, "launch_path": backend,
+		"log_file":        logFile, "launch_path": backend,
 		// launch_path names the launch path (the stored label, live sessions' launch_path) and reads as "pty" even for a tmux session: it means "through the
 		// TerminalBackend". terminal names what the session actually runs on. It was called "backend" until #6146, which read as the terminal.
 		"terminal": terminalKind(h.backend),

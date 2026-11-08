@@ -165,4 +165,3 @@ func (h *SessionsHandler) addLaunchNotice(ctx context.Context, answer map[string
 		}
 	}
 }
-

@@ -197,6 +197,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodPost && ((strings.HasPrefix(p, "/api/board/") && strings.HasSuffix(p, "/done-state")) || p == "/api/sessions/record-agents") {
 				continue
 			}
+			// The first-launch notice (#14353, #14414) is read through the hub by the owner alone: the old list never had it.
+			if m == http.MethodGet && p == "/api/launch-disclosure" {
+				continue
+			}
 			// The Operator's opened version of a series (#13910) is the owner's alone: the old list never had it.
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/artifacts/") && strings.HasSuffix(p, "/opened") {
 				continue
