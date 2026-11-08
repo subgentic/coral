@@ -38,6 +38,9 @@ func TestCoralMasksTheKeysTheLibraryMisses(t *testing.T) {
 		{"openai, sk-svcacct-", "sk-svcacct-" + fake(60, urlSafe, 6)},
 		{"aws access key id", "AKIA" + fake(16, upperNum, 7)},
 		{"aws temporary key id", "ASIA" + fake(16, upperNum, 8)},
+		// Dropbox access tokens with no "dropbox" beside them (#14609): betterleaks' rules need the word within about 20 characters.
+		{"dropbox short-lived", "sl." + fake(135, urlSafe+"=", 30)},
+		{"dropbox sl.u.", "sl.u." + fake(200, urlSafe, 31)},
 	}
 	frames := []struct{ name, format string }{
 		{"bare", "%s"},
@@ -84,6 +87,9 @@ func TestCoralsKeyRulesLeaveOrdinaryTextAlone(t *testing.T) {
 		"sk-learn-release-notes-2024-final",
 		"see sk-2024-planning-notes-final-revision-v3 for details",
 		"AKIA is the prefix of an AWS key ID",
+		"sl. is the prefix of a Dropbox token",
+		"the file is sl.txt, see sl.example.com for details",
+		"sl." + fake(40, urlSafe, 32),    // too short for a token
 		"AKIA" + "IOSFODNN7" + "EXAMPLE", // Amazon's documentation key
 		"AKIAlowercase0123456789",
 		"BAKIA" + fake(16, upperNum, 11),

@@ -14,6 +14,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"sync"
@@ -134,6 +135,16 @@ func (h *CloudHandler) DropboxConnect(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "no_app_key", "This build has no Dropbox app key")
 		return
 	}
+	// The flow cookie is the host's the dashboard was opened at, and the browser returns it only to that host: the callback is on 127.0.0.1, so the
+	// dashboard must be too (Security's note 4 on #14638).
+	host, port, err := net.SplitHostPort(r.Host)
+	if err != nil || host != "127.0.0.1" {
+		if port == "" {
+			port = "8420"
+		}
+		writeError(w, http.StatusConflict, "open_on_127", "Open Coral at http://127.0.0.1:"+port+" to connect Dropbox")
+		return
+	}
 	binding, err := randomBinding()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "", "could not start the sign-in")
@@ -176,6 +187,9 @@ func (d *dropboxRoutes) finish(res dropbox.CallbackResult) string {
 	if err != nil {
 		return didNotFinish
 	}
+	if c.Connected && c.LastAccountID == tok.AccountID {
+		d.revokeStored(ctx) // the sign-in this one replaces is ended at Dropbox first, best effort (Security's note 5 on #14638)
+	}
 	if c.LastAccountID != "" && c.LastAccountID != tok.AccountID {
 		d.mu.Lock()
 		d.pending = &dropboxSwitch{account: tok.AccountID, refresh: tok.Refresh, fingerprint: fp, until: time.Now().Add(dropboxSwitchTTL)}
@@ -206,11 +220,12 @@ func (h *CloudHandler) DropboxConfirmSwitch(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusConflict, "no_switch_pending", "No switch to another Dropbox account is waiting")
 		return
 	}
+	oldRevoked := d.revokeStored(r.Context()) // the old account's sign-in, if one is stored, is ended at Dropbox first, best effort
 	if err := d.store.Save(r.Context(), p.account, p.refresh, p.fingerprint); err != nil {
 		writeError(w, http.StatusInternalServerError, "", "could not save the Dropbox connection")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"connected": true, "account_id": p.account})
+	writeJSON(w, http.StatusOK, map[string]any{"connected": true, "account_id": p.account, "old_revoked": oldRevoked})
 }
 
 // DropboxDisconnect answers POST /api/dropbox/disconnect: revokes at Dropbox first, then forgets the sign-in here whatever the revoke did (Security's
@@ -224,17 +239,7 @@ func (h *CloudHandler) DropboxDisconnect(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusNotFound, "not_available", "Dropbox backup is not available in this build")
 		return
 	}
-	revoked := false
-	if refresh, err := d.store.RefreshToken(r.Context()); err == nil {
-		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
-		cl := d.client(d.appKey())
-		if access, err := cl.Refresh(ctx, refresh); err == nil {
-			revoked = cl.Revoke(ctx, access) == nil
-		} else if errors.Is(err, dropbox.ErrInvalidGrant) {
-			revoked = true // Dropbox already refuses it
-		}
-		cancel()
-	}
+	revoked := d.revokeStored(r.Context())
 	d.mu.Lock()
 	d.pending = nil
 	d.mu.Unlock()
@@ -264,4 +269,24 @@ func (h *CloudHandler) DropboxTakeOver(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"looks_like_copy": false})
+}
+
+// revokeStored ends the stored sign-in at Dropbox, if there is one, and reports whether Dropbox no longer accepts it (revoked now, or refused
+// already). It never fails a caller: a revoke that cannot be done is reported as false.
+func (d *dropboxRoutes) revokeStored(ctx context.Context) bool {
+	refresh, err := d.store.RefreshToken(ctx)
+	if err != nil {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	cl := d.client(d.appKey())
+	access, err := cl.Refresh(ctx, refresh)
+	if errors.Is(err, dropbox.ErrInvalidGrant) {
+		return true // Dropbox already refuses it
+	}
+	if err != nil {
+		return false
+	}
+	return cl.Revoke(ctx, access) == nil
 }

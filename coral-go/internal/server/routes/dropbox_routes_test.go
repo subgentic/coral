@@ -68,6 +68,7 @@ type dropboxEnv struct {
 	h       *CloudHandler
 	dbx     *fakeDropbox
 	machine string
+	host    string // the Host the dashboard was opened at
 }
 
 func newDropboxEnv(t *testing.T) *dropboxEnv {
@@ -79,7 +80,7 @@ func newDropboxEnv(t *testing.T) *dropboxEnv {
 	h := NewCloudHandler(store.NewSessionStore(db), dir)
 	h.SetPeerCheck(func(*http.Request) (bool, bool) { return true, true })
 	h.SetDropbox(store.NewDropboxStore(db, store.NewRemoteServerStore(db, dir)), dir)
-	e := &dropboxEnv{t: t, h: h, dbx: newFakeDropbox(t), machine: "machine-1"}
+	e := &dropboxEnv{t: t, h: h, dbx: newFakeDropbox(t), machine: "machine-1", host: "127.0.0.1:8420"}
 	h.dbx.appKey = func() string { return "appkey" }
 	h.dbx.client = func(k string) *dropbox.Client { return dropbox.NewClientAt(k, e.dbx.srv.URL) }
 	h.dbx.machineID = func() (string, error) { return e.machine, nil }
@@ -96,6 +97,7 @@ func (e *dropboxEnv) call(method, path string, dashboard bool, hdr map[string]st
 	}
 	if dashboard {
 		dashboardRequest(req)
+		req.Host = e.host
 	}
 	rec := httptest.NewRecorder()
 	switch path {
@@ -249,4 +251,38 @@ func TestAnUnreadableMachineIDStillWorks(t *testing.T) {
 	e := newDropboxEnv(t)
 	e.h.dbx.machineID = func() (string, error) { return "", errors.New("no id") }
 	assert.Contains(t, e.signIn(""), "Connected", "the copy check falls back to the data folder")
+}
+
+// The flow cookie is set by the host the dashboard was opened at and the browser sends it only to that host: opened at localhost, it would never
+// reach the 127.0.0.1 callback and the sign-in could not finish (Security's note 4 on #14638).
+func TestConnectNeedsCoralOpenAt127(t *testing.T) {
+	e := newDropboxEnv(t)
+	e.host = "localhost:8420"
+	rec := e.call(http.MethodPost, "/api/dropbox/connect", true, nil)
+	assert.Equal(t, http.StatusConflict, rec.Code)
+	assert.Contains(t, rec.Body.String(), "open_on_127")
+	assert.Contains(t, rec.Body.String(), "http://127.0.0.1:8420")
+	assert.False(t, e.h.dbx.flows.Pending(), "no sign-in was started")
+}
+
+// A sign-in that replaces a stored one revokes the old token at Dropbox first, best effort (Security's note 5 on #14638).
+func TestANewSignInRevokesTheOneItReplaces(t *testing.T) {
+	e := newDropboxEnv(t)
+	require.Contains(t, e.signIn(""), "Connected")
+	assert.Equal(t, 0, e.dbx.revoked)
+	require.Contains(t, e.signIn(""), "Connected", "the same account again")
+	assert.Equal(t, 1, e.dbx.revoked, "the replaced sign-in was revoked")
+
+	e.dbx.account = "dbid:BBB"
+	require.Contains(t, e.signIn(""), "different Dropbox account")
+	assert.Equal(t, 1, e.dbx.revoked, "nothing is revoked before the confirm")
+	rec := e.call(http.MethodPost, "/api/dropbox/switch", true, nil)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), `"old_revoked":true`)
+	assert.Equal(t, 2, e.dbx.revoked, "the switch revoked the old account's sign-in")
+
+	e.dbx.revokeFails = true
+	e.dbx.account = "dbid:BBB"
+	assert.Contains(t, e.signIn(""), "Connected", "a failed revoke never blocks the new sign-in")
+	assert.Equal(t, "dbid:BBB", e.status()["account_id"])
 }
