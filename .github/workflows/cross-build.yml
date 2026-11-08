@@ -82,10 +82,9 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
-        with:
-          go-version-file: coral-go/go.mod
-          cache: false
+      # Go from go.dev, checksum-pinned (the same action release.yml's macOS jobs use): actions/setup-go's own download of the macOS Intel archive
+      # has answered 403 here (v2.0.60's gate, three heads) and its archive was unavailable to the macOS runners before (2026-10-15).
+      - uses: ./.github/actions/setup-go-macos
       - name: Go cache paths
         id: gopaths
         run: |
@@ -128,10 +127,9 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
-        with:
-          go-version-file: coral-go/go.mod
-          cache: false
+      # Go from go.dev, checksum-pinned (the same action release.yml's macOS jobs use): actions/setup-go's own download of the macOS Intel archive
+      # has answered 403 here (v2.0.60's gate, three heads) and its archive was unavailable to the macOS runners before (2026-10-15).
+      - uses: ./.github/actions/setup-go-macos
       - name: go test ./internal/peercred (the real kernel table)
         working-directory: coral-go
         run: go test -count=1 -v ./internal/peercred/...
