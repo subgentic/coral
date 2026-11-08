@@ -247,6 +247,9 @@ func parsePromptScreenRaw(capture string) (promptScreen, bool) {
 	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
 		lines = lines[:len(lines)-1]
 	}
+	for i, l := range lines {
+		lines[i] = claudeTimerRe.ReplaceAllString(l, "${1}after a timer of its own") // Claude's own countdown line is steady text here (#14581)
+	}
 	// The option list ends within a few lines of the bottom (a footer such
 	// as "Enter to select · Esc to cancel" may follow it).
 	end := -1
@@ -532,6 +535,11 @@ func promptContext(lines []string, questionAt int) string {
 
 // commandMaxLines bounds the walk up from the question for a permission prompt's command block.
 const commandMaxLines = 400
+
+// claudeTimerRe is Claude Code's own auto-block timer inside its permission dialog ("Claude Code will automatically block this request in 1:19, to avoid holding up an unattended session"). It counts down on the terminal; read as
+// the request's text it froze on the card at the second it was read and made the ask's identity (AskID) change every second, so the person's own answer was refused as 'another ask is open' (#14581, Beta run 3). Here the
+// time is replaced by fixed words, in the one place every reader of a screen goes through (the card, the row, the answer, auto-accept); the terminal still shows the real countdown.
+var claudeTimerRe = regexp.MustCompile(`(will automatically block this request )in \d{1,2}:\d{2}`)
 
 var dashedRuleRe = regexp.MustCompile(`^\s*[╌┄]{8,}\s*$`)
 
