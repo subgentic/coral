@@ -1,0 +1,62 @@
+# Native Hub Tasks and Saved — v2.0.62 plan (#14664)
+
+Replace the Tasks and Saved frames independently, behind account gates. Reuse Coral's tables and protected per-computer readers; keep both Hub pages available for old shells and disabled accounts. This is a plan, with no runtime or API change.
+
+## Evidence and limits
+
+Read Coral trial `0556437c0` and the local Hub checkout at `24f03e4181038c3c06dcf1b011127b09a42fb2df`. Hub inspection was read-only. “Present” below means source support in these snapshots, not a successful production round trip or deployment confirmation. Before enabling either flag, the Hub owner must confirm its deployed route table and connector minimum.
+
+Upstream read: coral://artifacts/6b7167ea16e5c8d9a48be54b1df486cd3d890cb0ea9e5f0fa0ded9a12f43ec80. It describes the earlier .58/.59 state; the route checks below supplement it. The #14524 load branch is still under review, so its deferred-loading behavior is a prerequisite to integrate, not a landed fact of this base.
+
+Coral's `inbox_sidebar.js` chooses `hubFrameTable` before native table rendering. Tasks and Saved remain unconditional entries in `HUB_FRAMES`/`GROUPS`; only Needs you has a native exception. Merely deleting the frame URLs would leave missing pages and would not start the readers.
+
+## Routes and source identity
+
+Every computer request below goes through `/api/remote/{server}/api/...` on the Hub. The Hub account/inventory requests are the only bare Hub-origin reads. A row identity includes computer, board and item id; keep the raw board name separate from its qualified routing key. Same-numbered tasks/bookmarks and same-digest files on different computers must never collide.
+
+| View / operation | Route and query/body | Source support today; migration work |
+|---|---|---|
+| Shared inventory and gates | `GET /api/account`, `GET /api/servers` or the existing live inventory | Existing. Share the bounded cached account read and computer inventory; no new account request per folder. No local fallback while inventory is empty. |
+| Tasks list | `GET /api/board/tasks` with bounded `limit`, selected `fields`, `status`, `assigned_to`, `sort=updated_at`, `order=desc`; `cursor` where supported | Coral tunnel View route/query keys exist. Hub frame already uses the protected proxy. Reuse `inbox_coral.js:inboxRows/listTasks`, with explicit partial/truncated state and a bounded projection. Preserve the Hub task population described below. |
+| Task detail / conversation | `GET /api/board/{board}/tasks/{id}`; `GET .../messages/all?task_id={id}&limit=...` | Existing View routes on the machine; Hub frame reads the thread already. Request only on expansion; use safe ids and source-qualified `boardFetch`. |
+| Task reply | `POST .../tasks/{id}/reply`, JSON `{content, reply_to?}` | Existing Interact route; Hub `internal/proxy/inboxreply.go` adds owner-only handling, a 20/minute per-account limit and audit-before-forward. Do not copy the native adapter's unconditional `canReply: true`. Require existing `inbox_reply` UI capability plus owner/effective Interact and server permission; refusals remain authoritative. |
+| Task-linked goal / file | Existing team goal page and file viewer; `GET /api/artifacts/{hex}/meta` for link qualification, then existing protected file reads | Existing route groundwork; reuse source-aware navigation and safe Markdown policy. Metadata checks are on demand, capped at the existing 20 distinct ids per render, never per list row at startup. |
+| Saved messages list | `GET /api/saved?state=open|done&limit=200`, with supported `q`, `kind`, `conv`, `sort`, `team`, `agent`, `author` filters | Hub frame already proxies the owner's list. Machine route is View + owner-only; Hub `ownerstamp.go` explicitly lists it. Fix `saved.js:load`: all-scope cloud reads only online owned computers, not required `read(LOCAL_SERVER)`. Do not silently truncate: say when only the first bounded window is shown. No invented offset/cursor parameter; add backend pagination only as a separate agreed extension if required. |
+| Saved whole message | `GET /api/saved/{id}/message` | Existing owner-only View route, explicitly stamped by Hub. Prefer this capped/redacted stored-source route over reconstructing live/history or board URLs from bookmark text. Preserve `partial` and `reason` (`gone`, `not_reachable`, `too_long`). Respect existing `saved_expand` capability. |
+| Saved bookmark create/change/delete | `POST /api/saved`; `PATCH /api/saved/{id}` with `{done}`; `DELETE /api/saved/{id}` | Machine and Hub owner-stamp source entries exist; writes require Interact. Current Hub Saved page is read-only. Initial native rollout should remain read-only for bookmark mutations; enabling local buttons is a separate capability/parity decision, not a consequence of `saved_native`. All bookmark actions retain source. |
+| Saved review files | `GET /api/team-artifacts?tag=saved&versions=newest&limit=50`, protected cursor paging | Existing owner-protected cross-team route/query handling in Hub `artifactquery.go` and machine tunnel. Reuse `inbox_reviews` Saved pager; activate only when the native view or explicit Saved-file lookup opens. No board-by-board artifact scan. |
+| Saved file deep link / viewer | Protected team/digest lookup on `GET /api/team-artifacts` (with `team`, `digest`, optional `tag`), then existing metadata/bytes/viewer routes | Reuse the established review-link lookup and same-source fallback when a saved file is no longer for review. Refusal or failure must not fall back to another computer or Hub-origin bytes. Validate these exact query shapes against the deployed connector pin. |
+| File keep/unkeep/read/decide | Existing protected tag/decision routes, including `PUT /api/board/{board}/artifacts/{digest}/tags` where authorized | Do not broaden access as part of retiring frames. Preserve existing owner stamps, per-file capabilities and tag-merge behavior. A read-only first Saved slice can open files without offering newly enabled mutations. |
+
+Machine evidence: `pkg/tunnel/routes.go` and `routes_query.go`; `internal/server/routes/saved.go`; `pkg/frontend/static/inbox_coral.js`, `saved.js`, `saved_marks.js`, `inbox_reviews.js`, `inbox_link.js`. Hub evidence: `internal/accountui/assets/needs-you-tasks.js`, `saved.js`; `internal/proxy/ownerstamp.go`, `artifactquery.go`, `inboxreply.go`, `proxy.go`; `internal/accountapi/api.go`.
+
+## Behavior that needs preserving
+
+The current Hub Tasks page includes Operator-assigned **or review-pending** work and parked work; its source projection includes `assigned_to`, `parked_reason`, `parked_until`. Coral's current native adapter filters `assigned_to=Operator` and omits those parked fields. Reusing that query unchanged would lose part of the Hub list. Recommend retaining the Hub population in v2.0.62: read a bounded status window once per computer, project those fields, then apply the same Operator/review/parked predicate. If server-side OR filtering is needed at scale, design that query explicitly; do not scan every board or silently reinterpret statuses. Review-pending and parked rows keep their existing reply restrictions.
+
+Saved is personal, not a team-shared rollup. Owners may read their own connected computers; a grant must not expose someone else's bookmarks. Classify `owner_only` separately from offline/failed sources, and show the owner-only explanation rather than “nothing saved.” Keep per-source counts unknown on failures; one failed source does not discard successful rows. Never include bookmark text in telemetry, URLs, page titles or notifications. Collapse/dispose expanded message text when leaving its view, and clear account-scoped caches/drafts on sign-out or account change.
+
+`Saved.load` already qualifies rows by server, but its local read is mandatory in all-scope and must change. `saved_marks.js` explicitly skips cloud button sync, view detection and count events (lines105/142/196 in the inspected snapshot). Replace those blanket skips with the native capability and source-aware owner checks. Do not activate chat bookmark creation or local-scope readers merely because a frame is disabled. Fix the historical byte-read fallback that uses `LOCAL_SERVER` for a remote saved chat; the stored-source message endpoint avoids this ambiguity.
+
+## Account gates and activation
+
+Propose independent account booleans `tasks_native` and `saved_native`, default absent/off. Add them to the Hub's account response behind separate account rollout gates, and read them through Coral's existing `initCloudAccountFlags` cached, bounded startup promise. In the inspected Hub checkout these two flags are not present; they are required new Hub work. The shell already has the `needs_native` reader pattern; do not assume that field is present in this older inspected Hub snapshot.
+
+For cloud mode, native selection requires `nativeInbox()` and strict `true` for the corresponding new boolean. Explicit false, missing/malformed fields or account failure leave the frame. Local behavior stays native. Freeze the choice for the page's startup, as current account initialization does; do not swap an open frame/table when a late answer arrives. The booleans select UI only and authorize nothing.
+
+Both `hubFrame(key)` and `GROUPS` must use the same predicate. Update `showInbox`, folder selection, toolbar/search, count, phone drawer and disposal together. Start Tasks only when its native folder opens, and Saved only when its native folder opens or an explicit protected Saved-file lookup needs the cache. An already-selected folder/deep link must still activate its readers. Keep the existing six-request per-computer limiter; task/history/goal/Saved work must not compete with Needs you's first paint. No eager Saved count/message expansion or background board fan-out.
+
+## What the Hub must add before enabling
+
+1. The two account flags, shared shell-version/connector compatibility gates, default-off cohort controls and rollback to frames. Keep frame endpoints until old clients have aged out.
+2. A verified deployment matrix for each read/query listed above and existing write capabilities (`inbox_reply`, `saved_expand`). Check the pinned route table and closed queries rather than infer support from a release number alone.
+3. Owner/effective-tier information or existing permission result sufficient for native reply/read-only controls. Fail closed when unknown; server authorization still decides every request. Do not reuse the local adapter's unconditional reply permission.
+4. Hub-side contract tests for the exact native queries and absent/false/true flags. No new broad proxy route is demonstrated necessary for the first read-only slice: most needed routes already exist in inspected source. Any unsupported query shape or bookmark mutation requires a separate reviewed delta, not a wider wildcard allowlist.
+
+## Delivery and validation
+
+First land the shared flag contract with both frames still selected by default. Next enable native Tasks for an internal cohort after population/reply parity tests; independently enable read-only native Saved with source-aware lists, files and capped expansion. Treat bookmark writes as a later explicit capability. Keep the old pages for rollback. Do not use an API refusal as a silent automatic switch to a frame: report it; a rollout flag selects the implementation for the page.
+
+Failing-first browser coverage at1280/390/320 must cover each flag independently, disabled/missing/failed account reads, slow/empty inventory, two computers with colliding board/task/bookmark ids, an offline/owner-only source, late responses after navigation, Tasks review/parked population, View versus owner Interact, reply403/429/unknown outcome without duplicate automatic send, Saved opened as the initial folder, direct file links, partial/capped messages, and successful source-local recovery. Assert no bare Hub `/api/saved`, no per-board artifact scan and no Tasks/Saved work before Needs you paint. Use request lists plus measured dispatch waves, not total counts alone. Run native/frame route census, settings/markup pins if changed, `test:cloud` and relevant frontend Go checks during implementation.
+
+Recommended internal decisions for the implementation task: preserve the current Hub Tasks population; make first native Saved read-only; use the two independent strict account booleans above. These are proposals for Orchestrator/Hub review, not deployed changes or a request for Operator action.
