@@ -7,7 +7,7 @@ A build of Coral that has no Dropbox app key shows *Dropbox backup isn't availab
 ## Connect
 
 1. Open Coral at `http://127.0.0.1:<port>` (for example `http://127.0.0.1:8420`), not at `localhost` or the computer's name. The sign-in comes back to `127.0.0.1` only. If you press **Connect Dropbox…** anywhere else, Coral says *Open Coral at http://127.0.0.1:<port> to connect Dropbox:* with a link to that address.
-2. Press **Connect Dropbox…**. Dropbox's own page opens in a new tab. If your browser blocks the tab, Coral says *Your browser blocked the Dropbox tab. Open it here:* and shows an **Open Dropbox to sign in** link.
+2. Press **Connect Dropbox…**. Dropbox's own page opens in a new tab. If the tab does not open, Coral says *If the Dropbox tab didn't open, open it here:* and shows an **Open Dropbox to sign in** link.
 3. Coral says *Waiting for you to click Allow in Dropbox…* and reads its own status every two seconds. Click **Allow** in Dropbox, in the same browser. The Dropbox tab says *Connected. You can close this tab.* and Settings says *Connected to Dropbox (<your account id>).* It shows the account's id, not its email address.
 
 Coral waits five minutes. If you do not click Allow in that time, or you cancel, Settings says *The Dropbox sign-in timed out or was cancelled. Connect again to try once more.* and offers **Connect Dropbox…** again. A second sign-in started while one is waiting is refused with *Another Dropbox sign-in is already waiting. Finish it, or wait five minutes and try again.* If the browser tab says *Dropbox sign-in didn't finish. Go back to Coral and try again.*, nothing was saved: try again, in the browser you pressed Connect in.
@@ -36,4 +36,4 @@ If this data folder was copied or restored onto another computer or into another
 - *Couldn't read the Dropbox connection.* means Settings could not read the status; reopen Settings.
 - A program on this computer that already uses port 53682 on `127.0.0.1` also shows as *Another Dropbox sign-in is already waiting.* Close it, or wait and try again.
 
-<!-- Maintainers: not for merge until Dropbox ships (#14684). Written against dropbox-14609-signin 77923d71b (the sign-in at 1d482cbb9, the Hub census fix 2ed958673 and the per-code wording); re-check each quoted sentence against the revision that ships. -->
+<!-- Maintainers: not for merge until Dropbox ships (#14684). Written against dropbox-14609-signin 77923d71b (the sign-in at 1d482cbb9, the Hub census fix 2ed958673 and the per-code wording); re-check each quoted sentence against the revision that ships. The "If the Dropbox tab didn't open" sentence is from dropbox-14703-retention da8d7419b (#14736); that branch also has controls this page does not cover yet (Check again, counts, filters, retention). -->
