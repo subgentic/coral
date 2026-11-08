@@ -72,7 +72,8 @@ function restoreRowMenu(previous, anchor) {
     openMenu(toggle, { focusFirst: false });
     if (restoreFocus) {
         const action = focus?.action && items(menu).find(b => (b.getAttribute('aria-label') || b.textContent.trim()) === focus.action);
-        (action || (focus?.toggle ? toggle : items(menu)[0]))?.focus({ preventScroll: true });
+        // A vanished action must not turn the next Enter into a different command.
+        (action || toggle).focus({ preventScroll: true });
     }
 }
 
