@@ -1360,7 +1360,7 @@ function setGroup(key, { auto = false } = {}) {
     if (!groupMeta(key)) key = 'needs';
     const was = group;
     group = key;
-    if (key === 'saved' && was !== key) saved.loadSaved();
+    if (key === 'saved' && !hubFrame(key)) { saved.loadSaved(); activateSavedReviews(); }
     if (key === 'activity' && was !== 'activity') AC.refresh(() => renderInboxNav(true)); // the record is read when its folder is picked (#12070)
     if (!auto) { _autoFrom = ''; browserLocal.set(GROUP_KEY, key); } // a folder the person chose is the remembered one; Needs you opened for them (auto) is not (#10212)
     const input = $('inbox-search'), g = groupMeta(key);

@@ -65,7 +65,7 @@ const HEX = 'a'.repeat(64), DECIDED = 'b'.repeat(64), REVIEW_ONLY = 'c'.repeat(6
             assert.deepEqual(cold.slice(0,2).map(r=>[r.server,r.team,r.digest,r.tag]),[['m2','same',HEX,'for review'],['m2','same',HEX,null]],'cold fallback stays on the same protected computer/board/digest');
             assert.ok(cold.every(r=>r.server==='m2'&&r.team==='same'&&r.digest===HEX),'viewer review-state reads keep the same protected source scope');
             await ev(`document.querySelector('.artifact-viewer-close').click();true`);
-            await ev(`import(${S}+'inbox_reviews.js').then(m=>m.refreshReviews(true))`);
+            await ev(`import(${S}+'inbox_reviews.js').then(m=>m.activateSavedReviews())`); // Saved is now lazy; wait for its explicit activation before asserting cached rows
             assert.equal(await ev(`import(${S}+'inbox_reviews.js').then(m=>m.savedFiles().length)`),2,'both computers have a source-qualified Saved row');
             await ev(`window.__savedLink.forbidLookup=true;window.__savedLink.lookups=[];true`);
             for(const [server,title] of [['m2','Desktop saved.md'],['m1','Laptop saved.md']]){

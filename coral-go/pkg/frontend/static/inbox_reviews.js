@@ -14,7 +14,11 @@ const { needsReviewAttention, hasNewVersion, waitingOnAgent } = await importOnce
 
 let items = [], saved = [], muted = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => { if (typeof document !== 'undefined') document.dispatchEvent(new Event('coral:reviews-changed')); };
 let savedActivated = false;
-export function activateSavedReviews() { if (savedActivated) return; savedActivated = true; if (pending) pending.then(() => refreshReviews(true)); else refreshReviews(true); }
+export function activateSavedReviews() {
+    if (savedActivated) return pending || Promise.resolve();
+    savedActivated = true;
+    return pending ? pending.then(() => refreshReviews(true)) : refreshReviews(true);
+}
 let activated = false, refreshAgain = false, freshnessDirty = false;
 onArtifactsRev(() => {
     if (!activated) return;
@@ -410,10 +414,15 @@ async function refreshActiveQuery(unchanged = null) {
     });
     return mine.promise;
 }
+let forcedRefresh = null;
 export function refreshReviews(force = false, { reuse = false } = {}) {
     if (force) activated = true;
     if (!activated) return null;
-    if (pending) return force && pendingStarted !== revision ? pending.then(() => refreshReviews(true)) : pending;
+    if (pending) {
+        if (!force) return pending;
+        if (!forcedRefresh) forcedRefresh = pending.then(() => { forcedRefresh = null; return refreshReviews(true); });
+        return forcedRefresh; // coalesce a newer explicit refresh; do not certify an older in-flight snapshot
+    }
     const sources = sourcesKey();
     if (force && reuse && finishedAt && Date.now() - finishedAt < 30000 && finishedRev === revision && sources === lastSources) return Promise.resolve();
     if (!force && Date.now() - lastRead < 30000 && sources === lastSources) return null;
