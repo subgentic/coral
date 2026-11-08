@@ -1,5 +1,181 @@
 # Release Notes
 
+## v2.0.60 — A permission request shown whole, a Needs you of one card per item, and a question you settled in the terminal that clears
+
+### Changes
+
+#### What you will notice first
+
+- **The phone's Needs you is one card per item**, in the agent chat's look: one left edge, a file's review question on one line with an ellipsis, a read card quieter than an unread one (#14144, #14204).
+- **A permission request is shown whole, and when its Yes button appears has changed.** The command is drawn in full in a code block with Claude's own line under it; a long command needs Show all before Yes shows, and a fresh Yes waits 400 ms before it takes a click, and stays armed while its ask is on the list. A request dialog with more than 12 lines is Reject-only (#14173, #14271, #14302).
+- **A question you settled in the terminal clears from Coral.** A question card leaves when the agent has gone on, from the live row, Needs you and the gate, and a prompt still on the terminal keeps its card (#14340, #14345).
+- **Remove from Needs you:** a dismissed wait whose evidence never comes can be removed; Dismiss marks it ignored, never resolved (#14203, #14266).
+- **A comment sent to an agent says when the agent read it** ("Read by the agent", with the time) (#14129, #14130).
+- **Each file has a version line** under the viewer's header, with Copy file ID in the ⋯ menu; an older computer's list shows only what that computer knows (#14178, #14361, #14369).
+- **Needs you rows held under a resting pointer** wait at most 2 s for a row that needs you and 10 s for any other, and a row you just acted on is not held (#14373).
+- **Wake it in the Ask dialog never starts a second copy of a running agent; on another computer it wakes or resumes there.** A Wake from the agent panel wakes the chat open on that agent, and Wake Team names the agents Kill All ended (#14420, #14323, #14208).
+- **A question that no longer applies clears itself, "Goal looks done" is no longer wrong when tasks move, and "N columns hidden" can show** (#14174).
+- **Image files show lazy thumbnails in the artifact lists, behind the owner gate** (#14147).
+- **The health check is on by default for new teams** (#14091, #14255); a team that stored no setting stays off after the upgrade.
+- **Team settings** says Close while nothing is changed and Cancel once something is (#14293).
+- **A Hub user's post** keeps its own name ("Operator via Coral Hub" for the Hub's Operator) (#14292).
+- **The team page's status line keeps its height while the first availability read arrives**, so the page no longer jumps under the pointer (#14569).
+- **Windows: a timed-out CLI probe ends the whole process tree**, not only `cmd.exe`, and a kill checks the process's creation time (#349, #158).
+
+#### Fixed
+
+- **A v2.0.59 dashboard viewing a computer still on v2.0.58** retries a refused read without the newer query keys, so that computer's review files and Starred files list again (#14317).
+- **In Auto mode Coral no longer pre-approves git pushes; a force push is judged by Auto again, and scheduled jobs and workflow steps no longer carry those git rules.** The git write rules fail closed: only a written Default, Plan, Accept edits or Don't ask mode emits them (#14350).
+- **Bidirectional text controls** in comments, author names and Hub user names are shown and isolated, not applied (#14113, #14241).
+- **The update-relaunch status** no longer races when two requests arrive together (#14280); **a Codex chat** merges only the copies of one message (#14102).
+- **An older Claude Code** entry with no `isSidechain` field closes the question, and only a main-thread assistant entry closes one (#14345, #14387).
+- **The team page's title stays put on a desktop** whatever the status line says: the long "Waiting for first signal" line no longer wraps onto a header row of its own (#14659).
+- **Windows: a kill waits for a root process that is ending by itself** before it reports a refused termination, so a shim that exits on its own is not an error (`internal/executil`, #14660).
+- **Updater: an older listed release that answers 404 is skipped once a newer promotion has verified;** a 404 on a release above the best verified one, or before any verifies, still stops the pass and backs off (Windows PR #151).
+
+#### Through Coral Hub
+
+- **One route was added and reaches the tunnel, owner only:** `GET /api/artifacts/{id}/thumbnail`.
+- **Three routes changed from view to view with an owner-sees redaction:** `GET /api/board/{project}/goals`, `GET /api/board/{project}/goals/{goalID}` and `GET /api/goals`.
+- **One route was added that the Hub never reaches:** `GET /api/filesystem/trust-probe`.
+
+#### Known issues
+
+- **Check for updates in Coral 2.0.60 and earlier may miss newer releases.** Download the installer for your system from the [Coral releases page on GitHub](https://github.com/subgentic/coral/releases) and install it over this one. The fix is planned for v2.0.61.
+- **Two Windows browser-test flakes, not product bugs:** `settings_html_pin` and `model_picker` each passed only on a retry in a gate run, because a model list left by another CLI path stayed cached. The test side is fixed (Windows PR #321: the pinned suites start from the built-in list); the product-side cache fix is #322, in Batch F.
+- Carried from v2.0.59: macOS may ask once more after tmux restarts (#12836); Windows in-app update does not work from 2.0.0 through 2.0.6; a Coral of 2.0.5 or earlier on macOS cannot update in-app; OpenCode on Windows is not fully tested; Hermes agents are experimental.
+- A computer still on v2.0.58 behind a Hub: reads work through the fallback above; update it to v2.0.60 for the full set.
+
+#### For developers and releases
+
+- **go-race full is green and sharded** (routes, board, store, rest; the final head's run: routes 88 of 120 minutes, all four shards green). #14281's fixes and #14280 are in, and the three red shards of the first v2.0.60 run are fixed in the tests: the markdown linearity budget is not asserted under `-race`, the Run-now test's job runs in its folder, and the FTS index-build test posts a bounded 300 messages instead of for as long as the build runs (#14668).
+- **Why updates can be missed (#14535):** the list of releases the updater reads (`releases?per_page=30`) is 1,073,297 bytes against the 1,048,576 it accepts (measured 2026-11-08), and the v2.0.59 promotion release sits at position 66 of the list (page 3), because a promotion sorts by the date of the `promote` branch tip (2026-10-24), not by when it was published. The fix (a higher cap, promotions found by name, paging) is Windows PR #317 for v2.0.61.
+- **`verify-release` reads `RELEASE_NOTES.md` with the raw media type**, because the contents API returns nothing over 1 MiB.
+- **Windows tests:** Batches A and B (test-only PRs, plus #151 above, a rename behind the `CORAL_TEST_HOOKS` gate and a settable clock allowance in #179) are in; the CDP runner's local default is at most 8 shards, and the Windows cdp job's limit is 75 minutes.
+- **cross-build:** its macOS Intel job passed on one rerun after `actions/setup-go` answered 403 downloading Go (infrastructure, not code); a change to use our checksum-pinned `setup-go-macos` there is approved and lands after this release. It passed on the last two gated heads.
+- Many test-only fixes after the v2.0.59 gate: the suites wait for what they measure instead of a fixed time, several suites run seeds in parallel, and the Windows team-dialog suites type a folder that exists on Windows (#14596).
+- `heavy run` never runs on this Mac under a claim for another machine (#14262).
+- The static tree budget is raised to 6,038,528 bytes for this batch (standing OK).
+
+Not in this release (v2.0.61 with the permissions set, per Security's ancestry check; do not write them as shipped): Keep Full access and the Hub owner-switch gate (#14061, #14085, #14162, #14193), the new permissions default and the agent-launch cap (#14336), the first-launch notice (#14353, #14337, #14414), the person-message look (#14357), Activity thread ids and names (#14421, #14422), the heavy-run rewrite and the removal of machine nicknames (#14354, #14410). Windows Batch C (the Branches tab and test infrastructure) is not in this release either.
+
+#### For Coral Hub
+
+### Tunnel routes, v2.0.59 to 1b82feb83
+
+Added, reachable through the tunnel (1)
+
+- `GET /api/artifacts/{id}/thumbnail`: view, owner-only
+
+Changed (3)
+
+- `GET /api/board/{project}/goals`: view to view owner-sees
+- `GET /api/board/{project}/goals/{goalID}`: view to view owner-sees
+- `GET /api/goals`: view to view owner-sees
+
+Added, never reachable (the Hub has nothing to do) (1)
+
+- `GET /api/filesystem/trust-probe`: never
+
+### Board settings keys (BoardSettings, HealthSettings included), v2.0.59 to 1b82feb83
+
+No key was added, removed or changed.
+
+### What Coral Hub compiles in or embeds, v2.0.59 to 1b82feb83
+
+`pkg/hubproxy`: 0 files of Go code changed (+0, -0)
+
+- test files, not compiled by the Hub: 1 file (+121, -70)
+
+`pkg/tunnel`: 1 file of Go code changed (+5, -4)
+
+- `coral-go/pkg/tunnel/routes.go`: +5, -4
+- test files, not compiled by the Hub: 3 files (+219, -152)
+- other files (data, docs), not compiled by the Hub: 1 file (+1, -0)
+
+`pkg/frontend`: 61 files the Hub embeds changed (+1178, -271)
+
+- `coral-go/pkg/frontend/static/agent_actions.js`: +5, -0
+- `coral-go/pkg/frontend/static/agent_config_form.js`: +1, -1
+- `coral-go/pkg/frontend/static/analytics_efficiency.js`: +6, -1
+- `coral-go/pkg/frontend/static/artifact_comment_ask.js`: +23, -7
+- `coral-go/pkg/frontend/static/artifact_comment_send.js`: +3, -0
+- `coral-go/pkg/frontend/static/artifact_comments.js`: +14, -11
+- `coral-go/pkg/frontend/static/artifact_comments_api.js`: +1, -1
+- `coral-go/pkg/frontend/static/artifact_review.js`: +34, -13
+- `coral-go/pkg/frontend/static/artifact_table.js`: +3, -3
+- `coral-go/pkg/frontend/static/artifact_thumbnail.js`: +83, -0
+- `coral-go/pkg/frontend/static/artifact_versions.js`: +8, -2
+- `coral-go/pkg/frontend/static/artifact_video_comments.js`: +4, -1
+- `coral-go/pkg/frontend/static/artifact_viewer.js`: +43, -1
+- `coral-go/pkg/frontend/static/ask_ignore.js`: +2, -1
+- `coral-go/pkg/frontend/static/asked_before_restart.js`: +3, -2
+- `coral-go/pkg/frontend/static/bidi_marks.js`: +43, -0
+- `coral-go/pkg/frontend/static/board_chat.js`: +5, -5
+- `coral-go/pkg/frontend/static/board_message_text.js`: +7, -1
+- `coral-go/pkg/frontend/static/board_window.js`: +6, -6
+- `coral-go/pkg/frontend/static/browser.js`: +2, -1
+- `coral-go/pkg/frontend/static/chat_prompt_empty.js`: +2, -1
+- `coral-go/pkg/frontend/static/css/artifact-comments.css`: +4, -0
+- `coral-go/pkg/frontend/static/css/artifact_viewer_header.css`: +3, -0
+- `coral-go/pkg/frontend/static/css/data_table.css`: +34, -0
+- `coral-go/pkg/frontend/static/css/inbox_answer.css`: +20, -0
+- `coral-go/pkg/frontend/static/css/operator_ask_dialog.css`: +5, -1
+- `coral-go/pkg/frontend/static/css/popout.css`: +5, -0
+- `coral-go/pkg/frontend/static/css/team_page.css`: +3, -2
+- `coral-go/pkg/frontend/static/data_table.js`: +10, -3
+- `coral-go/pkg/frontend/static/dismiss_wait.js`: +31, -4
+- `coral-go/pkg/frontend/static/file_explorer.js`: +2, -115
+- `coral-go/pkg/frontend/static/file_icons.js`: +119, -0
+- `coral-go/pkg/frontend/static/goal_done.js`: +19, -6
+- `coral-go/pkg/frontend/static/goal_view.js`: +1, -0
+- `coral-go/pkg/frontend/static/goals_adapter.js`: +1, -0
+- `coral-go/pkg/frontend/static/inbox_answer.js`: +142, -8
+- `coral-go/pkg/frontend/static/inbox_link.js`: +13, -5
+- `coral-go/pkg/frontend/static/inbox_reviews.js`: +9, -6
+- `coral-go/pkg/frontend/static/inbox_servers.js`: +5, -4
+- `coral-go/pkg/frontend/static/inbox_sidebar.js`: +15, -13
+- `coral-go/pkg/frontend/static/inbox_tab.js`: +1, -0
+- `coral-go/pkg/frontend/static/message_refs.js`: +43, -0
+- `coral-go/pkg/frontend/static/needs_filters.js`: +4, -0
+- `coral-go/pkg/frontend/static/needs_input_card.js`: +22, -0
+- `coral-go/pkg/frontend/static/operator_ask_dialog.js`: +4, -3
+- `coral-go/pkg/frontend/static/operator_asks.js`: +34, -2
+- `coral-go/pkg/frontend/static/popout.js`: +19, -0
+- `coral-go/pkg/frontend/static/query_skew.js`: +57, -0
+- `coral-go/pkg/frontend/static/resume_ended.js`: +65, -0
+- `coral-go/pkg/frontend/static/review_counts.js`: +7, -1
+- `coral-go/pkg/frontend/static/settings_view.js`: +1, -0
+- `coral-go/pkg/frontend/static/sidebar_groups.js`: +32, -1
+- `coral-go/pkg/frontend/static/team_actions.js`: +30, -2
+- `coral-go/pkg/frontend/static/team_artifacts_page.js`: +7, -4
+- `coral-go/pkg/frontend/static/team_dialogs.js`: +34, -17
+- `coral-go/pkg/frontend/static/team_form.js`: +41, -5
+- `coral-go/pkg/frontend/static/team_health_settings.js`: +1, -1
+- `coral-go/pkg/frontend/static/team_launch_settings.js`: +1, -1
+- `coral-go/pkg/frontend/static/team_page.js`: +13, -8
+- `coral-go/pkg/frontend/static/utils.js`: +22, -1
+- `coral-go/pkg/frontend/templates/includes/views/live_session.html`: +1, -0
+- test files, not compiled by the Hub: 1 file (+2, -1)
+
+`agent_docs`: 5 files the Hub embeds changed (+7, -5)
+
+- `coral-go/agent_docs/artifacts.md`: +1, -1
+- `coral-go/agent_docs/board.md`: +1, -1
+- `coral-go/agent_docs/team-config.md`: +2, -0
+- `coral-go/agent_docs/teams.md`: +1, -1
+- `coral-go/agent_docs/using-the-dashboard.md`: +2, -2
+
+Unchanged: `pkg/hubowner`, `pkg/redact`.
+
+### Coral packages compiled into the Hub through its imports, v2.0.59 to 1b82feb83
+
+`internal/secrets`: 0 files of Go code changed (+0, -0), imported by `internal/logsafe`
+
+- test files, not compiled by the Hub: 9 files (+55, -0)
+
+Unchanged: `internal/fsreplace`, `internal/httputil`, `internal/logsafe`, `internal/safego`, `internal/secfile`, `pkg/redact/betterleaks`.
+
 ## v2.0.59 — Request changes in one call, a Goals page with groups and pins, and a Needs you that reads less
 
 ### Changes
