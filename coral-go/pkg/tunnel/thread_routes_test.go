@@ -26,3 +26,24 @@ func TestTheThreadReadsAreOwnerOnlyViewRoutesWithTheirOwnKeys(t *testing.T) {
 	assert.Equal(t, TierNever, Classify(http.MethodGet, "/api/thread", "team=alpha&task=3&state=waiting"))
 	assert.Equal(t, TierNever, Classify(http.MethodGet, "/api/threads", "team=alpha&task=3"))
 }
+
+// #14472 (QA review of #14440): the keys are EXACTLY the note's. A key the read does not take, however plausible, is never; a mutant that adds one to the list passed the test above, which only tried "surprise".
+func TestTheThreadReadsTakeExactlyTheKeysOfTheNoteAndNoOther(t *testing.T) {
+	for path, keys := range map[string][]string{
+		"/api/thread":  {"after", "goal", "limit", "order", "task", "team"},
+		"/api/threads": {"after", "goal", "limit", "state", "team"},
+	} {
+		for _, k := range keys {
+			assert.Equal(t, TierView, Classify(http.MethodGet, path, k+"=1"), path+": the key "+k+" is taken")
+		}
+		for _, k := range []string{"debug", "raw", "redact", "fields", "include", "as", "actor", "token", "session_id", "hub_user", "operator", "text", "q", "sort", "since", "before", "before_at", "full", "verbose", "format"} {
+			ok := false
+			for _, own := range keys {
+				ok = ok || own == k
+			}
+			if !ok {
+				assert.Equal(t, TierNever, Classify(http.MethodGet, path, "team=alpha&"+k+"=1"), path+": the key "+k+" is not taken")
+			}
+		}
+	}
+}
