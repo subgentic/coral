@@ -35,6 +35,15 @@ async function read(team, task, after) {
     } catch { return { failed: true }; }
 }
 
+/** The Operator's decisions put with the ask they answer (#14445, U5): a decision entry carries `ask_id`, the ask entry's `message_id`; when that ask is on the page, the decision is drawn INSIDE the ask's entry, so the ask and how it was decided
+ *  read as one block, and is not drawn again on its own. A decision whose ask is not on this page (an older page, another task's) stays on its own, and says what it answered. Oldest first in, oldest first out. */
+export function pairEntries(oldestFirst) {
+    const asks = new Map(), mine = new Map();
+    for (const e of oldestFirst) if (e.kind === 'ask' && e.message_id) asks.set(String(e.message_id), e);
+    for (const e of oldestFirst) if (e.kind === 'decision' && e.ask_id && asks.has(String(e.ask_id))) { const k = String(e.ask_id); if (!mine.has(k)) mine.set(k, []); mine.get(k).push(e); }
+    return oldestFirst.filter(e => !(e.kind === 'decision' && e.ask_id && asks.has(String(e.ask_id)))).map(e => (e.kind === 'ask' && mine.has(String(e.message_id)) ? { ...e, decisions: mine.get(String(e.message_id)) } : e));
+}
+
 /** One entry of the story as a node: who and when on the first line, then its words. */
 export function entryNode(e) {
     const kind = Object.hasOwn(EV_CLASS, e.kind) && e.kind !== 'other' ? e.kind : 'other';
@@ -47,6 +56,16 @@ export function entryNode(e) {
     if (e.kind === 'ask') {
         n.append(head(e.asker, e.state === 'open' ? el('span', 'chip chip-tag thread-chip', STATE_WORDS.open) : null), el('div', 'thread-text', safe(e.line) || 'asked a question'));
         if (e.state && e.state !== 'open') n.append(el('div', 'thread-sub', STATE_WORDS[e.state] || safe(e.state)));
+        if (Array.isArray(e.decisions) && e.decisions.length) { // how it was decided, in the ask's own block (the ask_id join)
+            n.classList.add('thread-paired');
+            for (const d of e.decisions) {
+                const p = activityParts({ ...d, action: d.action, item_kind: d.item_kind }, r => r.title || kindWord(r)), box = el('div', 'thread-decided');
+                box.append(el('span', 'thread-decided-by', 'You decided'), ' ', el('span', 'chip chip-tag thread-decision', p.did), ' ', DT.timeCell(d.at));
+                const words = String(d.note || '').trim() ? p.detail.replace(/^from [^·]*·\s*/, '') : '';
+                if (words) box.append(el('div', 'thread-quote', safe(words)));
+                n.append(box);
+            }
+        }
     } else if (e.kind === 'file') {
         const chip = el('span', 'thread-file', safe(e.name) || 'a file');
         n.append(head(e.by), chip);
@@ -73,7 +92,7 @@ export function storyNode(team, task) {
     const earlier = el('button', 'btn btn-small thread-earlier', 'Show earlier'); earlier.type = 'button'; earlier.hidden = true;
     box.append(earlier, list, status);
     const draw = st => {
-        list.replaceChildren(...[...st.entries].reverse().map(entryNode)); // newest first from the read, oldest first on the page
+        list.replaceChildren(...pairEntries([...st.entries].reverse()).map(entryNode)); // newest first from the read, oldest first on the page, each decision inside the ask it answered
         earlier.hidden = !st.more; earlier.disabled = false;
         status.hidden = st.entries.length > 0 || !!st.failed;
         if (!st.entries.length && !st.failed) status.textContent = 'Nothing has been said about this task yet.';

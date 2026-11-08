@@ -16,3 +16,7 @@
 .thread-status { margin: 0; color: var(--text-secondary); font-size: var(--fs-sm); }
 .thread-earlier { align-self: flex-start; min-height: 32px; }
 @media (max-width: 767px) { .thread-story { padding-inline-start: var(--table-pad-x, 12px); } .thread-earlier { min-height: 44px; } }
+.thread-paired { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-sm); background: var(--bg-secondary, transparent); } /* an ask with how it was decided, one block (#14445) */
+.thread-decided { margin-top: var(--space-sm); padding-top: var(--space-sm); border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-sm); }
+.thread-decided-by { font-weight: var(--fw-medium); }
+.thread-decided .thread-quote { flex: 1 1 100%; }
