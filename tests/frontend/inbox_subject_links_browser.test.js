@@ -20,7 +20,7 @@ const {coralReady}=require('./helpers/wait');const BASE=require('./test_base').B
   await waitFor(`typeof window.__releaseGoalCountRead==='function'`,'deferred Goals count read');
   await ev(`window.__subjectGoalAnchor=document.querySelector('.inbox-ask-subject-links a[data-subject-kind="goal"]');window.__releaseGoalCountRead();true`);
   await waitFor(`window.__goalCountReadDone===true`,'deferred Goals count completion');
-  await ev(`new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
+  await ev(require('./helpers/wait').framesJs(2));
   assert.equal(await ev(`window.__subjectGoalAnchor===document.querySelector('.inbox-ask-subject-links a[data-subject-kind="goal"]')`),true,'deferred counts preserve the same Goal link node');
  };
  try{
