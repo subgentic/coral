@@ -13,8 +13,6 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-
-	"github.com/subgentic/coral/internal/store"
 )
 
 // artifactRefRe finds an artifact id in any text: coral://artifacts/<hex>, /api/artifacts/<hex>
@@ -251,15 +249,6 @@ func (h *SessionsHandler) protectedArtifacts(ctx context.Context) (map[string]bo
 	for id := range seriesMemberSet(h.cfg.CoralDir()) {
 		kept[id] = true
 	}
-	// An edit made in Dropbox, held for the Operator, has no upload record until it is decided (Dropbox stage 5a, #14714): its bytes are kept
-	// here, or the prune would take them as an orphan. An unreadable table stops the prune (fail closed).
-	held, err := store.NewDropboxEdits(h.db).Digests(ctx)
-	if err != nil {
-		return nil, err
-	}
-	for id := range held {
-		kept[id] = true
-	}
 	return kept, nil
 }
 
@@ -268,10 +257,8 @@ func (h *SessionsHandler) isProtected(ctx context.Context, id string) (bool, err
 	if kept, err := h.isKept(ctx, id); err != nil || kept {
 		return kept, err
 	}
-	if _, _, inSeries := digestSeries(h.cfg.CoralDir(), id); inSeries {
-		return true, nil
-	}
-	return store.NewDropboxEdits(h.db).Holds(ctx, id) // a Dropbox edit held for the Operator (#14714)
+	_, _, inSeries := digestSeries(h.cfg.CoralDir(), id)
+	return inSeries, nil
 }
 
 func (h *SessionsHandler) isKept(ctx context.Context, id string) (bool, error) {

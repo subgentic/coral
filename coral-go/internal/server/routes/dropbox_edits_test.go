@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -78,7 +77,7 @@ func TestAnEditIsHeldWithNoRecordAndTheOriginalUntouched(t *testing.T) {
 	assert.Equal(t, store.DropboxEditPending, e.State)
 	assert.Equal(t, ds[0], e.OrigDigest)
 	assert.Equal(t, "text/markdown", e.MediaType, "text stays text")
-	b, err := os.ReadFile(be.objectPath(e.Digest))
+	b, err := os.ReadFile(be.b.heldPath(e.Digest))
 	require.NoError(t, err)
 	assert.Equal(t, "# doc 0, edited in Dropbox\n", string(b))
 	assert.False(t, be.hasRecord(e.Digest), "no upload record: invisible to every list, search, link, grant, agent and Hub route")
@@ -88,7 +87,7 @@ func TestAnEditIsHeldWithNoRecordAndTheOriginalUntouched(t *testing.T) {
 	assert.True(t, be.hasRecord(ds[0]))
 	st, _ := be.status()["edits"].(map[string]any)
 	assert.EqualValues(t, 1, st["open"])
-	matches, _ := filepath.Glob(filepath.Join(be.h.dbx.dataDir, "artifacts", "objects", artifactUploadTempP+"*"))
+	matches, _ := filepath.Glob(filepath.Join(be.b.heldDir(), artifactUploadTempP+"*"))
 	assert.Empty(t, matches, "no temp file left")
 }
 
@@ -191,7 +190,7 @@ func TestAnEditIsCappedByWhatIsRead(t *testing.T) {
 	be.dbx.extraBytes = []byte(strings.Repeat("y", 100)) // the stream carries 105 bytes for a declared 5
 	be.notice()
 	assert.Empty(t, be.open(), "the bytes are not the listed file")
-	matches, _ := filepath.Glob(filepath.Join(be.h.dbx.dataDir, "artifacts", "objects", artifactUploadTempP+"*"))
+	matches, _ := filepath.Glob(filepath.Join(be.b.heldDir(), artifactUploadTempP+"*"))
 	assert.Empty(t, matches, "the temp file is removed on failure")
 
 	be.dbx.lieSize, be.dbx.extraBytes = 0, nil
@@ -229,7 +228,7 @@ func TestRepeatedEditsCollapseAndAResetFetchesNothingKnown(t *testing.T) {
 	be.notice()
 	open := be.open()
 	require.Len(t, open, 1)
-	b, _ := os.ReadFile(be.objectPath(open[0].Digest))
+	b, _ := os.ReadFile(be.b.heldPath(open[0].Digest))
 	assert.Equal(t, "second edit", string(b), "the newest")
 	n := len(be.dbx.downloads)
 	be.dbx.resetNext = true
@@ -254,22 +253,30 @@ func TestRetentionKeepsADocumentWithAnOpenEdit(t *testing.T) {
 	assert.Equal(t, 2, be.counts().RetainedOut, "the other old document goes")
 }
 
-// Mutant: the prune does not count held edits as protected.
-func TestThePruneKeepsAHeldEdit(t *testing.T) {
+// The 5a fix after Security's SHOULD 8 test. Mutant: the held bytes go into the artifact store (where a digest serves them and a list shows them).
+func TestAHeldEditLivesOutsideTheStore(t *testing.T) {
 	be, ds := newDropboxEditEnv(t, 1)
 	be.dbx.edit(be.versionFile(ds[0]), []byte("edited bytes"))
 	be.notice()
 	open := be.open()
 	require.Len(t, open, 1)
-	cfg := &config.Config{}
-	cfg.UseCoralDir(be.h.dbx.dataDir)
-	sh := &SessionsHandler{db: be.db, cfg: cfg}
-	kept, err := sh.protectedArtifacts(context.Background())
-	require.NoError(t, err)
-	assert.True(t, kept[open[0].Digest], "the held bytes are protected")
-	ok, err := sh.isProtected(context.Background(), open[0].Digest)
-	require.NoError(t, err)
-	assert.True(t, ok, "and the re-check under the lock agrees")
+	_, err := os.Stat(be.objectPath(open[0].Digest))
+	assert.True(t, os.IsNotExist(err), "nothing in artifacts/objects before the decision")
+	info, err := os.Stat(be.b.heldPath(open[0].Digest))
+	require.NoError(t, err, "held beside the store")
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	// A newer edit replaces the held bytes; the old file goes.
+	old := open[0].Digest
+	be.dbx.edit(be.versionFile(ds[0]), []byte("edited again"))
+	be.notice()
+	_, err = os.Stat(be.b.heldPath(old))
+	assert.True(t, os.IsNotExist(err), "the replaced edit's bytes are gone")
+	// A stray file no open edit names is swept.
+	stray := strings.Repeat("ab", 32)
+	require.NoError(t, os.WriteFile(be.b.heldPath(stray), []byte("x"), 0o600))
+	be.notice()
+	_, err = os.Stat(be.b.heldPath(stray))
+	assert.True(t, os.IsNotExist(err), "swept")
 }
 
 // Security's SHOULD 7 on 085c4511b. Mutant: a passing fetch error is counted as skipped and the cursor moves on (the edit is missed).
@@ -282,6 +289,6 @@ func TestAFetchThatFailsOnceIsTriedAgain(t *testing.T) {
 	be.notice()
 	open := be.open()
 	require.Len(t, open, 1, "the next pass fetches it")
-	b, _ := os.ReadFile(be.objectPath(open[0].Digest))
+	b, _ := os.ReadFile(be.b.heldPath(open[0].Digest))
 	assert.Equal(t, "edited while Dropbox had trouble", string(b))
 }

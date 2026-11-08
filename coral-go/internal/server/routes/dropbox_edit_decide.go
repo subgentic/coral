@@ -56,8 +56,8 @@ func (b *DropboxBackup) promoteEdit(e store.DropboxEdit) (int, error) {
 	if name == "" {
 		name = orig.rec.Name
 	}
-	// The object is already in the store (held): storeArtifactFileAs writes only the record, under the newest version's session.
-	if _, _, err := storeArtifactFileAs(b.coralDir, latest.Session, name, e.MediaType, "", e.Digest, e.Size, &plan.stamp, 0, func(rec *agentUploadRecord) {
+	// The held bytes move into the store now (storeArtifactFileAs: fits(), the digest lock), with their record, under the newest version's session.
+	if _, _, err := storeArtifactFileAs(b.coralDir, latest.Session, name, e.MediaType, b.heldPath(e.Digest), e.Digest, e.Size, &plan.stamp, 0, func(rec *agentUploadRecord) {
 		rec.Board, rec.OwnerKind, rec.OwnerID = orig.rec.Board, base.OwnerKind, base.OwnerID
 		rec.Uploader, rec.Role = dropboxEditUploader, ""
 		rec.UploadedBy, rec.Source, rec.PromotedBy = "owner", sourceDropboxEdit, "operator"
@@ -77,7 +77,7 @@ func (b *DropboxBackup) separateEdit(e store.DropboxEdit) (string, error) {
 	if !ok {
 		return "", errNoOriginal
 	}
-	if _, _, err := storeArtifactFileAs(b.coralDir, orig.session, separateName(orig.rec.Name), e.MediaType, "", e.Digest, e.Size, nil, 0, func(rec *agentUploadRecord) {
+	if _, _, err := storeArtifactFileAs(b.coralDir, orig.session, separateName(orig.rec.Name), e.MediaType, b.heldPath(e.Digest), e.Digest, e.Size, nil, 0, func(rec *agentUploadRecord) {
 		rec.Board, rec.OwnerKind, rec.OwnerID = orig.rec.Board, orig.rec.OwnerKind, orig.rec.OwnerID
 		rec.Uploader, rec.Role = dropboxEditUploader, ""
 		rec.UploadedBy, rec.Source = "owner", sourceDropboxEdit
@@ -174,6 +174,7 @@ func (h *CloudHandler) decideEdit(w http.ResponseWriter, r *http.Request, promot
 		return
 	}
 	_ = d.store.AddAudit(ctx, store.DropboxAudit{Kind: store.DropboxAuditEdit, Who: "operator", Reason: state}) // no names, ids or bytes
+	b.dropHeld(ctx, e.Digest)                                                                                   // in the store now (or the same bytes were already): the held copy goes
 	noteArtifactsChanged()
 	out["decision"] = state
 	writeJSON(w, http.StatusOK, out)

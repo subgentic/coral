@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/subgentic/coral/internal/dropbox"
@@ -54,6 +55,7 @@ func (b *DropboxBackup) Notice(ctx context.Context) {
 	}
 	b.passMu.Lock()
 	defer b.passMu.Unlock()
+	b.sweepHeld(ctx) // whatever the readiness: held files no open edit names go
 	if b.d == nil || b.d.appKey() == "" || b.d.looksLikeCopy(ctx) {
 		return
 	}
@@ -174,19 +176,26 @@ func (b *DropboxBackup) noticeEntry(ctx context.Context, cl *dropbox.Client, acc
 	p.bytes += size
 	if digest == row.Digest {
 		_ = b.outbox.SeeRev(ctx, row.ID, e.Rev) // the same bytes as Coral's own (a revert): nothing pending
+		b.dropHeld(ctx, digest)
 		p.touched++
 		return
 	}
+	prev, _ := b.edits.Get(ctx, row.DocID)
 	if err := b.edits.Hold(ctx, store.DropboxEdit{AccountID: account, DocID: row.DocID, Version: row.Version, OrigDigest: row.Digest, Path: row.Path,
 		Digest: digest, MediaType: mt, Size: size, Rev: e.Rev}); err == nil {
 		p.held++
+		if prev.Digest != "" && prev.Digest != digest {
+			b.dropHeld(ctx, prev.Digest) // the older edit of this document is replaced: its bytes go
+		}
+	} else {
+		b.dropHeld(ctx, digest) // not held (a decision is being written): the fetched bytes go
 	}
 }
 
 // fetchEdit downloads exactly the listed rev into an exclusive 0600 temp file in the store's own folder, capped by what is read (Security's MUST C),
 // checks the rev and size against the listing (MUST B), types it by its bytes (MUST D), and stores it as an object with no upload record.
 func (b *DropboxBackup) fetchEdit(ctx context.Context, cl *dropbox.Client, access string, e dropbox.ListEntry, row store.PathRow) (string, int64, string, error) {
-	dir := filepath.Join(b.coralDir, "artifacts", "objects")
+	dir := b.heldDir()
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", 0, "", err
 	}
@@ -214,10 +223,52 @@ func (b *DropboxBackup) fetchEdit(ctx context.Context, cl *dropbox.Client, acces
 		return "", 0, "", errNoOriginal
 	}
 	mt := typeByBytes(orig.rec.MediaType, head.buf)
-	if _, _, err := storeArtifactFileAs(b.coralDir, "", cleanValue(orig.rec.Name), mt, tmpPath, digest, n, nil, 0, nil); err != nil {
+	// Held OUTSIDE the artifact store (the 5a fix after Security's SHOULD 8 test): no artifact route reads this folder and no list scans it, so
+	// nothing, an agent with the digest or the Operator's own list, sees the bytes before the decision moves them into the store.
+	final := b.heldPath(digest)
+	if _, err := os.Lstat(final); err == nil {
+		return digest, n, mt, nil // the same bytes are held already
+	}
+	if err := os.Rename(tmpPath, final); err != nil {
 		return "", 0, "", err
 	}
 	return digest, n, mt, nil
+}
+
+// heldDir is where held edits wait: artifacts/dropbox-held, beside the store and never part of it.
+func (b *DropboxBackup) heldDir() string {
+	return filepath.Join(b.coralDir, "artifacts", "dropbox-held")
+}
+
+// heldPath is a held edit's file, named by its digest (64 hex, from the hash computed on arrival).
+func (b *DropboxBackup) heldPath(digest string) string { return filepath.Join(b.heldDir(), digest) }
+
+// dropHeld removes a held file no open edit names any more (a newer edit replaced it, or it was decided).
+func (b *DropboxBackup) dropHeld(ctx context.Context, digest string) {
+	if len(digest) != 64 {
+		return
+	}
+	if held, err := b.edits.Holds(ctx, digest); err == nil && !held {
+		_ = os.Remove(b.heldPath(digest))
+	}
+}
+
+// sweepHeld removes what no open edit names: a temp file left over an hour by a stopped fetch, or a held file whose edit was decided or replaced.
+func (b *DropboxBackup) sweepHeld(ctx context.Context) {
+	ents, err := os.ReadDir(b.heldDir())
+	if err != nil {
+		return
+	}
+	for _, de := range ents {
+		name := de.Name()
+		if strings.HasPrefix(name, artifactUploadTempP) {
+			if info, err := de.Info(); err == nil && time.Since(info.ModTime()) > time.Hour {
+				_ = os.Remove(filepath.Join(b.heldDir(), name))
+			}
+			continue
+		}
+		b.dropHeld(ctx, name)
+	}
 }
 
 var (

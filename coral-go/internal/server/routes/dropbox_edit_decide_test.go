@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -103,6 +104,10 @@ func TestPromoteMakesTheNextVersionByTheUnknownWriter(t *testing.T) {
 		}
 	}
 	assert.True(t, found, "the new version is backed up as v2")
+	_, err := os.Stat(be.objectPath(e.Digest))
+	assert.NoError(t, err, "the bytes are in the store now")
+	_, err = os.Stat(be.b.heldPath(e.Digest))
+	assert.True(t, os.IsNotExist(err), "and the held copy is gone")
 }
 
 // Security's SHOULD E. Mutant: Promote loosens the series' own-uploader rule.
