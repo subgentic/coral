@@ -228,7 +228,7 @@ function fill(s, cell, withDismiss = true) {
         }
         for (const o of picks) {
             const b = document.createElement('button');
-            b.type = 'button'; b.className = 'btn btn-small inbox-answer'; b.textContent = o.label;
+            b.type = 'button'; b.className = 'btn btn-small inbox-answer'; b.textContent = o.label.length > 500 ? `${o.label.slice(0, 499).trimEnd()}\u2026` : o.label; b.title = o.label; // the whole label is the title and the name; only after 500 characters is the words cut (#14574)
             b.dataset.session = s.session_id; b.dataset.n = String(Number(o.n)); // what finds this choice again after a redraw keeps the keyboard on it (sidebar_groups.js)
             b.setAttribute('aria-label', `Answer ${o.label} for ${resolveSessionIdentity(s)}`);
             const isYes = gateOpt => !REJECT_FORM.test(wholeLabel(String(gateOpt.label)));
