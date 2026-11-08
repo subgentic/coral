@@ -39,7 +39,9 @@ func newDiscRig(t *testing.T) *discRig {
 }
 
 func withKind(kind string) func(*http.Request) *http.Request {
-	return func(r *http.Request) *http.Request { return r.WithContext(context.WithValue(r.Context(), callerKindKey{}, kind)) }
+	return func(r *http.Request) *http.Request {
+		return r.WithContext(context.WithValue(r.Context(), callerKindKey{}, kind))
+	}
 }
 
 func asAgentToken(r *http.Request) *http.Request {
@@ -238,4 +240,33 @@ func TestOnlyDefaultCountsAsNamingAModeForTheNoticeGate(t *testing.T) {
 		assert.True(t, launchDefaultSkips(typ, nil, "", none), typ)
 	}
 	assert.True(t, launchDefaultSkips(at.Agy, []string{"--dangerously-skip-permissions"}, "", none), "agy yolo as flags")
+}
+
+// QA Reviewer 2's SHOULD on #14353: a Coral Hub sign-in that is not the owner of this computer's link is refused on all three routes and records nothing; the owner's own is not.
+func TestAHubSignInThatIsNotTheOwnerCannotReadAcknowledgeOrClearTheNotice(t *testing.T) {
+	resetOwnerState(t)
+	withLabel(t, ownerLabel, nil)
+	d := newDiscRig(t)
+	hub := func(headers map[string]string) func(*http.Request) *http.Request {
+		return func(r *http.Request) *http.Request {
+			for k, v := range headers {
+				r.Header.Set(k, v)
+			}
+			actor, ok := actorFor(r, callerHub)
+			require.True(t, ok)
+			r = withActor(r, actor)
+			return r.WithContext(context.WithValue(r.Context(), callerKindKey{}, callerHub))
+		}
+	}
+	grantee := hub(granteeHeaders())
+	for name, hd := range map[string]http.HandlerFunc{"read": d.rig.h.GetLaunchDisclosure, "ack": d.rig.h.AckLaunchDisclosure, "clear": d.rig.h.ClearLaunchDisclosure} {
+		code, out := d.call(hd, "POST", "/api/launch-disclosure/ack", map[string]string{"id": LaunchDisclosureID}, grantee)
+		assert.Equal(t, http.StatusForbidden, code, "%s: %v", name, out)
+	}
+	_, v := d.call(d.rig.h.GetLaunchDisclosure, "GET", "/x", nil, nil)
+	assert.Equal(t, false, v["seen"], "a non-owner recorded nothing")
+	owner := hub(ownerHeaders(ownerLabel))
+	code, v := d.call(d.rig.h.AckLaunchDisclosure, "POST", "/api/launch-disclosure/ack", map[string]string{"id": LaunchDisclosureID}, owner)
+	require.Equal(t, http.StatusOK, code, "%v", v)
+	assert.Equal(t, true, v["seen"], "the Hub owner may acknowledge it")
 }
