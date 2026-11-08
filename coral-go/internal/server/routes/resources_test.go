@@ -335,3 +335,31 @@ func TestAWaitThatTimedOutKeepsItsPlaceAndAPlainReleaseDropsIt(t *testing.T) {
 	_, c = g.do("token:Dev C", "POST", "/api/resources/mac-heavy/claim", map[string]any{})
 	assert.EqualValues(t, 2, c["place"], "a plain release leaves the line: the claim again joins behind")
 }
+
+// #14262: a claim of a PLAIN slot resource (not a pool's member) says which machine it is on, in the reply: `heavy run` reads it to decide between the mini over ssh and this Mac, and a reply with no machine
+// made it run a mini claim on the Mac. A pool's grant still names its member's machine.
+func TestAClaimOfAPlainSlotResourceNamesItsOwnMachine(t *testing.T) {
+	g := newResRig(t)
+	g.subscribe("alpha", "Dev", "Developer", false)
+	g.subscribe("alpha", "The Orchestrator", "Orchestrator", true)
+	for name, machine := range map[string]string{"mini": "mini", "mac-heavy": "mac"} {
+		code, _ := g.do("token:The Orchestrator", "PUT", "/api/resources/"+name, map[string]any{"slots": 1, "machine": machine})
+		require.Equal(t, 200, code)
+	}
+	for name, machine := range map[string]string{"mini": "mini", "mac-heavy": "mac"} {
+		code, out := g.do("token:Dev", "POST", "/api/resources/"+name+"/claim", map[string]any{})
+		require.Equal(t, 200, code, "%v", out)
+		entry := out["entry"].(map[string]any)
+		assert.Equal(t, machine, entry["machine"], "the grant of %s says where it is", name)
+		code, _ = g.do("token:Dev", "POST", "/api/resources/"+name+"/release", map[string]any{})
+		require.Equal(t, 200, code)
+	}
+	// a pool's grant: the member's machine, as before
+	code, _ := g.do("token:The Orchestrator", "PUT", "/api/resources/heavy", map[string]any{"members": []string{"mini", "mac-heavy"}})
+	require.Equal(t, 200, code)
+	code, out := g.do("token:Dev", "POST", "/api/resources/heavy/claim", map[string]any{})
+	require.Equal(t, 200, code, "%v", out)
+	entry := out["entry"].(map[string]any)
+	assert.NotEmpty(t, entry["member"])
+	assert.NotEmpty(t, entry["machine"], "a pool's grant names its member's machine")
+}

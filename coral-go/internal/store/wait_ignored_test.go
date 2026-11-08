@@ -35,3 +35,35 @@ func TestHidingARequestRemovesTheRowsOfAgentsThatAreGone(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{"awake": "k-awake-2", "asleep": "k-asleep"}, keys, "a stopped agent's row and one with no live session are gone; a sleeping agent's stays")
 }
+
+// #14266: a removal needs the request to be ignored first, is kept for that request only, and a new request is neither ignored nor removed.
+func TestAWaitIsRemovedOnlyAfterItWasIgnoredAndOnlyForThatRequest(t *testing.T) {
+	ctx := context.Background()
+	s := newCommentStore(t)
+	ok, err := s.SetWaitRemoved(ctx, "sess-1", "req-a")
+	require.NoError(t, err)
+	assert.False(t, ok, "nothing was ignored: nothing to remove")
+
+	require.NoError(t, s.SetWaitIgnored(ctx, "sess-1", "req-a"))
+	removed, err := s.WaitRemovedKeys(ctx)
+	require.NoError(t, err)
+	assert.Empty(t, removed, "ignored is not removed")
+	ok, err = s.SetWaitRemoved(ctx, "sess-1", "req-b")
+	require.NoError(t, err)
+	assert.False(t, ok, "another request than the ignored one cannot be removed")
+	ok, err = s.SetWaitRemoved(ctx, "sess-1", "req-a")
+	require.NoError(t, err)
+	assert.True(t, ok)
+	removed, _ = s.WaitRemovedKeys(ctx)
+	assert.Equal(t, map[string]string{"sess-1": "req-a"}, removed)
+
+	require.NoError(t, s.SetWaitIgnored(ctx, "sess-1", "req-a"))
+	removed, _ = s.WaitRemovedKeys(ctx)
+	assert.Equal(t, map[string]string{"sess-1": "req-a"}, removed, "an ignore of the same request keeps the removal")
+
+	require.NoError(t, s.SetWaitIgnored(ctx, "sess-1", "req-c"))
+	removed, _ = s.WaitRemovedKeys(ctx)
+	assert.Empty(t, removed, "the next request is not removed")
+	ignored, _ := s.WaitIgnoredKeys(ctx)
+	assert.Equal(t, "req-c", ignored["sess-1"])
+}

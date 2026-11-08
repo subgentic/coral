@@ -7,7 +7,7 @@ import { nameSaveButton, aboutRow, BOARD_SAVE_BUTTON } from './saved_marks.js';
 import { renderTaskQueueRun, groupTaskQueueRuns } from './board_system_lines.js';
 const { threadItems, hasThreads, answersLoaded } = await importOnce('./board_threads.js'); // a part of the board page's group: loaded with it
 import { authorLabel } from './board_author.js';
-import { getAgentColor, isOperatorId, OPERATOR_ID, escapeAttr, boardMessageColorStyle, escapeHtml, externalMessageBadge, replyWithHtml, hubUserBadge, askBadge, renderBoardMessageBody } from './utils.js';
+import { getAgentColor, isOperatorId, OPERATOR_ID, escapeAttr, boardMessageColorStyle, escapeHtml, externalMessageBadge, replyWithHtml, hubUserBadge, boardSenderName, askBadge, renderBoardMessageBody } from './utils.js';
 let boardLeadName = () => ''; importOnce('./board_members.js').then(m => { boardLeadName = m.boardLeadName; }).catch(() => {}); // not awaited: board_members.js loads the board's own modules, and this one is among them
 const { isSelectMode, isSelected } = await importOnce('./board_export.js'); // a part of the board page's group: loaded with it
 import { rowParts, toggleRow, revealRow, sameDay, dayDividerHtml, refreshReplies } from './board_table.js';
@@ -155,10 +155,10 @@ function nameBoardButtons(root) {
 function renderBoardItem(item, prev) {
     if (item.kind === 'queue') return renderTaskQueueRun(item, formatTime);
     const m = item.m;
-    const color = getAgentColor(m.job_title || 'Unknown');
-    const agent = m.job_title || 'Unknown';
+    const color = getAgentColor(boardSenderName(m));
+    const agent = boardSenderName(m);
     const prevMsg = prev && prev.kind === 'msg' ? prev.m : null;
-    const prevAgent = prevMsg ? (prevMsg.job_title || 'Unknown') : null;
+    const prevAgent = prevMsg ? (boardSenderName(prevMsg)) : null;
     const sameAsPrev = agent === prevAgent;
     const spacing = sameAsPrev && !item.nested ? 'mb-message-grouped' : 'mb-message-first';
     const isLeader = /orchestrator/i.test(agent) || isOperatorId(m.subscriber_id);
@@ -168,7 +168,7 @@ function renderBoardItem(item, prev) {
     const moreLabel = `Actions for the message from ${agent}, ${formatTime(m.created_at)}${snippet ? `: ${snippet}` : ''}`; // each one names its own message (three at one minute are three names)
     const deleteLabel = `Delete the message from ${agent}, ${formatTime(m.created_at)}`; // names the message: an icon alone has no name
     const parent = m.reply_to ? bs._allMessages[indexOfId(bs._allMessages, m.reply_to)] : null;
-    const parts = rowParts(m, { agent, timeHtml: messageTimeHtml(m.created_at), moreLabel, replyName: m.reply_to ? (parent ? (parent.job_title || 'Unknown') : 'an earlier message') : '', self: OPERATOR_ID.toLowerCase() }); // the table's head, actions and flags (board_table.js)
+    const parts = rowParts(m, { agent, timeHtml: messageTimeHtml(m.created_at), moreLabel, replyName: m.reply_to ? (parent ? (boardSenderName(parent)) : 'an earlier message') : '', self: OPERATOR_ID.toLowerCase() }); // the table's head, actions and flags (board_table.js)
     const checkbox = isSelectMode() ? `<input type="checkbox" class="check mb-select-checkbox" data-msg-id="${Number(m.id)}" ${isSelected(m.id) ? 'checked' : ''} data-on-click="mb-msg-select">` : '';
     return `
         <div class="mb-message ${spacing}${alignClass}${selectedClass}${parts.classes}${item.nested ? ' mb-thread-reply' : ''}"${parts.attrs} role="listitem" data-message-id="${escapeAttr(String(m.id))}"${m.reply_to ? ` data-reply-to="${Number(m.reply_to)}"` : ''}${messageAttachmentAttrs(m)} style="${boardMessageColorStyle(color)}">
@@ -237,7 +237,7 @@ function prependEarlier(container, count) {
     tmp.innerHTML = fresh.map((item, i) => renderBoardItem(item, i > 0 ? fresh[i - 1] : null)).join('');
     const added = [...tmp.content.children];
     const prev = fresh[fresh.length - 1];
-    const grouped = !!prev && prev.kind === 'msg' && (prev.m.job_title || 'Unknown') === (tail.m.job_title || 'Unknown');
+    const grouped = !!prev && prev.kind === 'msg' && boardSenderName(prev.m) === boardSenderName(tail.m);
     first.className = first.className.replace(/mb-message-(first|grouped)/, grouped ? 'mb-message-grouped' : 'mb-message-first'); // in place: the same class order as a whole render
     const lead = first.previousElementSibling && first.previousElementSibling.classList.contains('mb-day') ? first.previousElementSibling : first; // the day line above the first row stays above the new rows
     lead.before(tmp.content);

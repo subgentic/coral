@@ -74,8 +74,8 @@ type launchTeamRequest struct {
 	// Skills are approved skills every member is told about (#12023): ids from the Skills Store.
 	Skills             []string `json:"skills"`
 	TeamKnowledgeIndex string   `json:"team_knowledge_index"`
-	// HealthMonitor true turns the team's health check on (#4962). The check is off for a new team; false or absent leaves the team's
-	// setting as it is, so a relaunch never turns off a check the operator turned on.
+	// HealthMonitor true turns the team's health check on; false turns it OFF for a team that has no stored setting yet (a new team: the person unticked the box, and the default is on since #14091); absent, or false for a team
+	// that already has a setting, leaves the team's setting as it is, so a relaunch never turns off a check the operator turned on.
 	HealthMonitor *bool `json:"health_monitor"`
 	// TrustFolder is the person's tick on an existing folder: "Trust this folder: its settings and tools can run" (#11889). A folder this launch makes is trusted without it; only the person's dashboard is heard.
 	TrustFolder bool `json:"trust_folder"`
@@ -560,9 +560,9 @@ func (h *SessionsHandler) restoreTeamTemplate(ctx context.Context, body *launchT
 			log.Printf("[launch-team] restored working mode %q for team %s", wm.Mode, body.BoardName)
 		}
 	}
-	if body.HealthMonitor != nil && *body.HealthMonitor && h.bs != nil {
-		if err := h.bs.SetHealthOn(ctx, body.BoardName, true); err != nil {
-			log.Printf("[launch-team] failed to turn on the health check for team %s: %v", body.BoardName, err)
+	if body.HealthMonitor != nil && h.bs != nil && (*body.HealthMonitor || !h.bs.HealthSettingStored(ctx, body.BoardName)) {
+		if err := h.bs.SetHealthOn(ctx, body.BoardName, *body.HealthMonitor); err != nil {
+			log.Printf("[launch-team] failed to set the health check for team %s: %v", body.BoardName, err)
 		}
 	}
 	if len(body.WorkflowPresets) > 0 && h.bs != nil {

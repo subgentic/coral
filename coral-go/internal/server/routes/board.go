@@ -129,6 +129,8 @@ type BoardHandler struct {
 	memberRest func(ctx context.Context, project, member string) string
 	// sessionAsleep reports whether a live session is asleep, ended or archived: an approval's message waits for it (SetSessionAsleepLookup). Nil: not known.
 	sessionAsleep func(ctx context.Context, sessionID string) bool
+	// commentReadStamp is told which messages a member's coral-board read returned, to stamp the comments they delivered (#14130, SetCommentReadStamp). Nil: none.
+	commentReadStamp func(ctx context.Context, project, readerSession string, messageIDs []int64)
 	// needsYouAgents lists the agents waiting on the Operator for GET /api/needs-you (SetNeedsYouAgents). Nil: none.
 	needsYouAgents func(r *http.Request) ([]NeedsYouItem, error)
 	// needsYouSkills lists the skills waiting for approval for GET /api/needs-you (SetNeedsYouSkills). Nil: none.

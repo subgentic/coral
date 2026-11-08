@@ -93,4 +93,33 @@ func TestAnAllTeamsRowOfALabelledBoardCarriesItsSeriesFacts(t *testing.T) {
 	oa, _ := own["artifacts"].([]any)
 	require.NotEmpty(t, oa, own)
 	assert.EqualValues(t, 3, oa[0].(map[string]any)["version"])
+
+}
+
+// #14145: every row carries the file's stable id and the one version line, in a series or not, and the same line the upload and the viewer use; a different team's identical bytes are a different file.
+func TestTeamArtifactRowsCarryTheFileIdAndTheVersionLine(t *testing.T) {
+	rig, _ := ownerRig(t)
+	_, d := seriesOf(t, rig) // three versions of plan.txt
+	solo := rig.uploadText("a1", "solo.txt", "no second version")
+	h := &BoardHandler{coralDir: rig.coralDir}
+	rows := []teamArtifact{{ID: d[0], Name: "plan.txt"}, {ID: d[2], Name: "plan.txt"}, {ID: solo, Name: "solo.txt"}, {ID: "task-link-without-a-stored-object"}}
+	h.attachSeriesVersions(rows, "team-a")
+	sid, _, ok := digestSeriesOnBoard(rig.coralDir, d[0], "team-a")
+	require.True(t, ok)
+	assert.Equal(t, sid, rows[0].FileID)
+	assert.Equal(t, "version 1 of plan.txt (file "+sid+")", rows[0].VersionLine)
+	assert.Equal(t, sid, rows[1].FileID, "every version of a file has its id")
+	assert.Equal(t, "version 3 of plan.txt (file "+sid+")", rows[1].VersionLine)
+	assert.Equal(t, virtualFileID("team-a", solo), rows[2].FileID, "a file never versioned: its derived id, version 1")
+	assert.Equal(t, "version 1 of solo.txt (file "+virtualFileID("team-a", solo)+")", rows[2].VersionLine)
+	assert.NotEqual(t, virtualFileID("team-b", solo), rows[2].FileID, "another team's identical bytes are another file")
+	// the id the row shows is the id the first version of it keeps
+	code, out := rig.uploadVersion("a1", "solo.txt", "second", "coral://artifacts/"+solo)
+	require.Equal(t, 201, code, out)
+	assert.Equal(t, rows[2].FileID, out["file_id"], "the id shown before it was versioned is the id it keeps")
+	// a store with no series still gives the derived id
+	empty := &BoardHandler{coralDir: t.TempDir()}
+	none := []teamArtifact{{ID: solo, Name: "solo.txt"}}
+	empty.attachSeriesVersions(none, "team-a")
+	assert.Equal(t, virtualFileID("team-a", solo), none[0].FileID)
 }

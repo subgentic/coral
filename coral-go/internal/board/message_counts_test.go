@@ -46,7 +46,7 @@ func sameProjects(t *testing.T, s *Store, why string) {
 func TestListProjectsAgreesWithTheOldQueryThroughPostsDeletesMovesAndProjectDeletes(t *testing.T) {
 	ctx := context.Background()
 	compared, withMessages, emptyAfterDelete := 0, 0, 0
-	for seed := int64(1); seed <= 25; seed++ {
+	for seed := int64(1); seed <= int64(oracleSeeds(25)); seed++ {
 		rng := rand.New(rand.NewSource(seed))
 		s := testStore(t)
 		boards := []string{"alpha", "beta", "gamma", "delta"}
@@ -105,6 +105,9 @@ func TestListProjectsAgreesWithTheOldQueryThroughPostsDeletesMovesAndProjectDele
 				withMessages++
 			}
 		}
+	}
+	if raceEnabled {
+		return // few seeds under -race: the coverage floors are for the plain run (#14281)
 	}
 	assert.Greater(t, compared, 250)
 	assert.Greater(t, withMessages, 40, "boards with messages were compared")

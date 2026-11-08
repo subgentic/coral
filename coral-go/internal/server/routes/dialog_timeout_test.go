@@ -393,7 +393,7 @@ func TestOnlyTheOperatorSetsTheDialogTimeout(t *testing.T) {
 	require.Equal(t, http.StatusOK, put(on, dashboard))
 	got := h.bs.GetHealthSettings(ctx, "team")
 	assert.Equal(t, board.HealthDialogTimeout{On: true, AfterMin: 12}, got.DialogTimeout)
-	assert.False(t, got.On, "the rest of the health setup is as it was: the patch names only the timeout")
+	assert.True(t, got.On, "the rest of the health setup is as it was (the default, on since #14091): the patch names only the timeout")
 }
 
 // closingOpencode is the fake opencode server whose reply takes the request off its list, as the real one does.

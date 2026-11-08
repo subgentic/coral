@@ -86,7 +86,7 @@ func (h *BoardHandler) goalDoneItems(ctx context.Context, project string, hidden
 		}
 		for _, g := range page.Goals {
 			r := g.Rollup
-			if g.State != board.GoalActive || r.Total == 0 || r.Done != r.Total || !goalDoneQuietOver(g, h.goalDoneClock()(), quiet) {
+			if g.State != board.GoalActive || r.Total == 0 || r.Done != r.Total || g.MovedOpen > 0 || !goalDoneQuietOver(g, h.goalDoneClock()(), quiet) {
 				continue
 			}
 			if hidden[goalDoneKey(project, g.ID, r.Total)] || hidden[project+"|"+strconv.FormatInt(g.ID, 10)+"|*"] {
@@ -95,7 +95,7 @@ func (h *BoardHandler) goalDoneItems(ctx context.Context, project string, hidden
 			if read[goalDoneReadKey(project, g.ID, r.Total, g.UpdatedAt)] && news[goalSubject(project, g.ID)] == 0 { // a read goal counts again while agents have replied in the Operator's thread on it and they have not opened it (#12073)
 				continue // opened at this total and last change: read, not counted (a task done since has a new total, a goal reopened or edited a new last change, and the item is back)
 			}
-			items = append(items, NeedsYouItem{Kind: "goal_done", Line: needsYouLine("Goal #" + strconv.FormatInt(g.ID, 10) + " looks done: " + g.Title), Team: project, ID: "goal_done:" + project + ":" + strconv.FormatInt(g.ID, 10), At: needsYouTime(g.UpdatedAt), NewComments: news[goalSubject(project, g.ID)]})
+			items = append(items, NeedsYouItem{Kind: "goal_done", Line: needsYouLine("Goal #" + strconv.FormatInt(g.ID, 10) + " looks done: " + g.Title), Team: project, ID: "goal_done:" + project + ":" + strconv.FormatInt(g.ID, 10), At: needsYouTime(goalDoneArrival(g, quiet)), NewComments: news[goalSubject(project, g.ID)]})
 		}
 		if page.NextCursor == "" {
 			return items, nil
@@ -148,4 +148,14 @@ func listSet(ctx context.Context, fn func(ctx context.Context) []string) map[str
 		set[e] = true
 	}
 	return set
+}
+
+// The inbox wait starts when the quiet period ends, not at goal creation or an old task completion.
+func goalDoneArrival(g board.Goal, quiet time.Duration) string {
+	if g.LooksDoneAt != nil {
+		if at, err := time.Parse(time.RFC3339, *g.LooksDoneAt); err == nil {
+			return at.Add(quiet).UTC().Format(time.RFC3339)
+		}
+	}
+	return g.UpdatedAt
 }

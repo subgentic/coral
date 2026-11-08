@@ -123,7 +123,7 @@ func normalizedLabel(s string) string { return normalizeLabel(s) }
 // classifyApproval reads the prompt at the bottom of a capture and decides
 // whether it is an approve-once tool approval for the agent type.
 func classifyApproval(agentType, capture string) approvalDecision {
-	screen, ok := parsePromptScreen(capture)
+	screen, ok := parsePromptScreenFor(agentType, capture)
 	if !ok {
 		return approvalDecision{}
 	}

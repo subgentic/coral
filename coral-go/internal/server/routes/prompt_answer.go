@@ -81,6 +81,12 @@ type promptScreen struct {
 	// Unnumbered: the options carry no numbers (Claude Code's folder-trust and API-key menus at launch,
 	// #4543); n is an option's place in the list, and it is answered with the arrow keys and Enter.
 	Unnumbered bool `json:"unnumbered,omitempty"`
+	// TrustFolder and TrustOffer: Claude's folder-trust menu names its folder (read from the screen, never from the agent's words) and a row may offer Yes for it
+	// only to the person's own dashboard and for a folder Coral may trust (#14110, prompt_trust.go).
+	TrustFolder string `json:"trust_folder,omitempty"`
+	TrustOffer  bool   `json:"trust_offer,omitempty"`
+	// BrowserMenu: Claude's "Claude wants to use your browser" menu, read by structure (prompt_browser.go, #14151): a row may take its "Not now" only.
+	BrowserMenu bool `json:"browser_menu,omitempty"`
 	// Multi: every option has a box (a multi-select question, #5232): a digit toggles the box and nothing is
 	// answered until Submit is taken. Submit is the row under the options (nil when it is not on screen).
 	Multi  bool          `json:"multi,omitempty"`
@@ -88,6 +94,12 @@ type promptScreen struct {
 	// The few lines above the question (a permission prompt's command): with the question and the labels,
 	// what tells this prompt from the next one the agent opens (samePrompt).
 	context string
+	// command: the whole request a permission prompt draws between its two dashed rules (a long command, an edit's diff), read from the screen up to commandMaxLines (#14173); "" when the screen draws no such block.
+	command string
+	// commandOpenMissing: the dashed rule that closes the request is just above the question but the one that opens it was not found within commandMaxLines: the request cannot be shown whole, so only Reject is offered (#14173, Security).
+	commandOpenMissing bool
+	// TargetNote: Claude's own line under the request ("Contains brace with quote character", "This command requires approval"), plain text, shown beneath the command (#14173).
+	TargetNote string `json:"target_note,omitempty"`
 	// Target is the lines above the question (a permission prompt's command) as permreview shows them: whole up to its limit, hidden characters written out. OnlyReject and Note: the request holds a character
 	// that hides what it does, or is longer than a card shows, so only Reject is offered and an Allow answer is refused (#11399). A cut the CLI itself makes on its screen cannot be known.
 	Target     string `json:"target,omitempty"`
@@ -152,20 +164,34 @@ func indentOf(s string) int {
 // Its text (title, question, option labels, review lines, the Submit label) comes out clean (cleanPromptScreen): what an agent's
 // screen can carry is shown on the card, matched by auto-accept and kept in the session state.
 func parsePromptScreen(capture string) (promptScreen, bool) {
+	return parsePromptScreenFor(at.Claude, capture)
+}
+
+// parsePromptScreenFor is parsePromptScreen for a session of agentType: the request block between Claude's two dashed rules is read ONLY for a Claude session (#14173, Security): another agent's program can print
+// dashed rules and a question of its own, and that must not become the "request" a person is shown or the part of it that is judged.
+func parsePromptScreenFor(agentType, capture string) (promptScreen, bool) {
 	s, ok := parsePromptScreenRaw(capture)
 	if !ok {
 		return s, false
 	}
+	if agentType != at.Claude {
+		s.command, s.TargetNote, s.commandOpenMissing = "", "", false
+	}
 	// Judged on the raw text, before cleanPromptScreen drops what hides: the terminal still holds it.
-	rv := permreview.Merge(permreview.Of(s.context), permreview.Of(s.Question), permreview.Of(s.Title))
+	rv := permreview.Merge(permreview.Of(s.context), permreview.Of(s.command), permreview.Of(s.Question), permreview.Of(s.Title))
 	target := permreview.Of(s.context).Shown
+	if s.command != "" {
+		target = permreview.Of(s.command).Shown // the whole block between the rules, not its last three lines (#14173)
+	}
 	s = cleanPromptScreen(s)
 	s.AskID = askID(s)
-	if s.context != "" {
+	if s.context != "" || s.command != "" {
 		s.Target = target
 	}
 	if !rv.Allowed() {
 		s.OnlyReject, s.Note = true, rv.Note()
+	} else if s.commandOpenMissing {
+		s.OnlyReject, s.Note = true, "The top of this request is not on the screen, so it cannot be read whole. It can only be rejected here: read it in the terminal."
 	}
 	return s, true
 }
@@ -173,7 +199,7 @@ func parsePromptScreen(capture string) (promptScreen, bool) {
 // askID is the digest AskID carries.
 func askID(s promptScreen) string {
 	h := sha256.New()
-	for _, part := range []string{s.Title, s.Question, s.context} {
+	for _, part := range []string{s.Title, s.Question, s.context, s.command} {
 		h.Write([]byte(part))
 		h.Write([]byte{0})
 	}
@@ -191,6 +217,7 @@ func askID(s promptScreen) string {
 func cleanPromptScreen(s promptScreen) promptScreen {
 	s.Title = clitext.CleanName(s.Title)
 	s.Question = clitext.CleanName(s.Question)
+	s.TargetNote = clitext.CleanName(s.TargetNote)
 	opts := make([]promptOption, len(s.Options))
 	for i, o := range s.Options {
 		o.Label = clitext.CleanName(o.Label)
@@ -353,7 +380,7 @@ func parsePromptScreenRaw(capture string) (promptScreen, bool) {
 			}
 		}
 	}
-	return promptScreen{Title: title, Question: question, Options: opts, Review: parseReview(lines, questionAt), Multi: multi, Submit: submit, boxes: boxes, context: promptContext(lines, questionAt)}, true
+	return promptScreen{Title: title, Question: question, Options: opts, Review: parseReview(lines, questionAt), Multi: multi, Submit: submit, boxes: boxes, context: promptContext(lines, questionAt)}.withCommand(lines, questionAt), true
 }
 
 var (
@@ -469,7 +496,7 @@ func parseUnnumberedMenu(lines []string) (promptScreen, bool) {
 	if questionAt < 0 {
 		questionAt = first
 	}
-	return promptScreen{Question: question, Options: opts, Unnumbered: true, context: promptContext(lines, questionAt)}, true
+	return promptScreen{Question: question, Options: opts, Unnumbered: true, context: promptContext(lines, questionAt)}.withCommand(lines, questionAt), true
 }
 
 // paragraphAt is the paragraph (non-blank lines between blank lines and rules) holding lines[i], joined, and
@@ -503,9 +530,119 @@ func promptContext(lines []string, questionAt int) string {
 	return strings.Join(above, "\n")
 }
 
+// commandMaxLines bounds the walk up from the question for a permission prompt's command block.
+const commandMaxLines = 400
+
+var dashedRuleRe = regexp.MustCompile(`^\s*[╌┄]{8,}\s*$`)
+
+// promptCommand is the whole request Claude draws between its two dashed rules just above a permission question (a Bash command, an edit's diff), so a card and a row can show all of it and not the last three lines
+// promptContext keeps for telling one ask from the next (#14173, the Beta Tester: a long command showed only its last 2 lines). It is "" unless the nearest non-blank line above the question is a dashed rule and
+// the rule that opens the block is within commandMaxLines: any other screen keeps the old three lines. Each line keeps its own indentation, one leading space (the dialog's margin) dropped.
+func promptCommand(lines []string, questionAt int) (cmd, note string, missing bool) {
+	i, seen := questionAt-1, 0
+	var desc []string
+	for ; i >= 0; i-- { // Claude's own line or two under the request sit between the closing rule and the question (every real Bash prompt has one)
+		t := strings.TrimSpace(lines[i])
+		if t == "" {
+			continue
+		}
+		if dashedRuleRe.MatchString(lines[i]) {
+			break
+		}
+		if seen++; seen > descriptionLines {
+			// More text than a request's description under the closing rule: when a real Claude dialog (its header, then dashed rules) is above it, the request was never shown whole: Reject only (#14271, Security's extra on #14173)
+			if tailUnderRealDialog(lines, i) {
+				return "", "", true
+			}
+			return "", "", false
+		}
+		desc = append([]string{t}, desc...)
+	}
+	if i < 0 {
+		return "", "", false
+	}
+	end := i
+	for j := end - 1; j >= 0 && j >= end-commandMaxLines; j-- {
+		if dashedRuleRe.MatchString(lines[j]) {
+			if !requestDialogHeader(lines, j) {
+				return "", "", true // two rules and no Claude dialog header above them: not shown whole, so Reject only; never the old three lines with an Allow (#14173, Security)
+			}
+			block := make([]string, 0, end-j-1)
+			for _, l := range lines[j+1 : end] {
+				block = append(block, strings.TrimRight(strings.TrimPrefix(l, " "), " \t\r"))
+			}
+			return strings.Trim(strings.Join(block, "\n"), "\n"), strings.Join(desc, " "), false
+		}
+	}
+	return "", "", true // a closing rule with no opening rule in reach: the request is not shown whole
+}
+
+// headerScanLines: how many non-blank lines above the opening rule are searched for the dialog's header; the agent's own description under the header can run to many lines, and must not push it out of reach.
+const headerScanLines = 24
+
+// descriptionLines: how many lines of Claude's own (and an agent's) text may sit between the closing dashed rule and the question.
+const descriptionLines = 12
+
+var (
+	solidRuleRe        = regexp.MustCompile(`^\s*─{8,}\s*$`)
+	dialogHeaderLineRe = regexp.MustCompile(`(?i)\b(?:command|files?)\s*$`)
+)
+
+// requestDialogHeader says whether the dashed rule at open is the one that opens Claude's request dialog: within a few lines above it, a solid rule and under it the dialog's header ("Bash command", "Edit file", "Create
+// file"). Without that header the rules and the question are text something else printed (#14173, Security's SHOULD).
+func requestDialogHeader(lines []string, open int) bool {
+	seen := 0
+	for k := open - 1; k >= 0 && seen < headerScanLines; k-- {
+		if strings.TrimSpace(lines[k]) == "" {
+			continue
+		}
+		seen++
+		if solidRuleRe.MatchString(lines[k]) {
+			for h := k + 1; h < open; h++ {
+				if t := strings.TrimSpace(lines[h]); t != "" {
+					return dialogHeaderLineRe.MatchString(t)
+				}
+			}
+			return false
+		}
+	}
+	return false
+}
+
+// tailUnderRealDialog says whether, looking up from line from (a line of a long tail of text under a rule), a closing dashed rule is within tailScanLines non-blank lines, an opening dashed rule above it, and Claude's dialog
+// header above that: the shape of a real request whose own description was made long.
+func tailUnderRealDialog(lines []string, from int) bool {
+	seen := 0
+	for i := from; i >= 0 && seen < tailScanLines; i-- {
+		if strings.TrimSpace(lines[i]) == "" {
+			continue
+		}
+		seen++
+		if !dashedRuleRe.MatchString(lines[i]) {
+			continue
+		}
+		for j := i - 1; j >= 0 && j >= i-commandMaxLines; j-- {
+			if dashedRuleRe.MatchString(lines[j]) {
+				return requestDialogHeader(lines, j)
+			}
+		}
+		return false
+	}
+	return false
+}
+
+// tailScanLines: how far above the question the closing rule of a request with a very long description is looked for.
+const tailScanLines = 200
+
+// withCommand sets the request block, Claude's line under it and the missing-opening-rule flag from the screen above the question.
+func (s promptScreen) withCommand(lines []string, questionAt int) promptScreen {
+	s.command, s.TargetNote, s.commandOpenMissing = promptCommand(lines, questionAt)
+	return s
+}
+
 // samePrompt reports whether two reads show the same prompt, wherever its selection is.
 func samePrompt(a, b promptScreen) bool {
-	if a.Question != b.Question || a.context != b.context || len(a.Options) != len(b.Options) {
+	if a.Question != b.Question || a.context != b.context || a.command != b.command || len(a.Options) != len(b.Options) {
 		return false
 	}
 	for i := range a.Options {
@@ -586,14 +723,35 @@ func (h *SessionsHandler) readPromptScreenText(ctx context.Context, name, agentT
 	if err != nil {
 		return promptScreen{}, false, "", err
 	}
-	s, ok := parsePromptScreen(text)
+	s, ok := parseAgentScreen(agentType, text)
 	if ok {
-		markApprovalKinds(agentType, text, &s)
 		if agentType == at.Hermes && s.Kind == promptKindApproval {
 			applyHermesCommand(&s, h.hermesStoredCommand(ctx, sessionID)) // the screen drops a hidden character; Hermes's stored call has it (#12170)
 		}
 	}
 	return s, ok, text, nil
+}
+
+// parseAgentScreen reads the prompt on an agent's screen the way a row, a card and an answer all must: the generic parse, plus the two Claude-only menus that a row may answer (the folder-trust menu, #14110,
+// and Claude's browser menu, #14151). Those two are read ONLY when the session's stored agent type is Claude: three lines shaped like either menu printed by a Codex, agy, Gemini or terminal agent's own program
+// are not a prompt of Claude's, and an arrow key and Enter into that program would answer whatever it is waiting for (Security's MUST on #14151). Every caller that reads a screen for an offer or an answer comes here, so the
+// gate holds at offer time and again at answer time.
+func parseAgentScreen(agentType, text string) (promptScreen, bool) {
+	s, ok := parsePromptScreenFor(agentType, text)
+	if !ok && agentType == at.Claude {
+		lines := strings.Split(strings.ReplaceAll(text, "\r", ""), "\n")
+		for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
+			lines = lines[:len(lines)-1]
+		}
+		s, ok = parseBrowserPromptMenu(lines)
+	}
+	if ok {
+		markApprovalKinds(agentType, text, &s)
+		if agentType == at.Claude {
+			markFolderTrust(text, &s)
+		}
+	}
+	return s, ok
 }
 
 // menuStillDrawn says whether text still shows the menu `before`: at least two of its option labels (or all, for a short
@@ -628,13 +786,14 @@ func normalizeLabel(s string) string {
 func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	var body struct {
-		SessionID string `json:"session_id"`
-		AgentType string `json:"agent_type"`
-		N         int    `json:"n"`
-		Label     string `json:"label"`
-		Text      string `json:"text"`   // the typed answer, for a "text" option
-		Submit    bool   `json:"submit"` // take the Submit row of a multi-select question (#5232); no n or label
-		AskID     string `json:"ask_id"` // the ask the caller drew (a screen's ask_id): another ask now open is refused (#10400); empty: not checked
+		SessionID   string `json:"session_id"`
+		AgentType   string `json:"agent_type"`
+		N           int    `json:"n"`
+		Label       string `json:"label"`
+		Text        string `json:"text"`         // the typed answer, for a "text" option
+		Submit      bool   `json:"submit"`       // take the Submit row of a multi-select question (#5232); no n or label
+		AskID       string `json:"ask_id"`       // the ask the caller drew (a screen's ask_id): another ask now open is refused (#10400); empty: not checked
+		TrustFolder string `json:"trust_folder"` // a row's Yes for the folder-trust menu names the folder it drew: the screen must still name it, and Coral may trust it (#14110); empty: the chat's own answer
 	}
 	if err := decodeJSON(r, &body); err != nil || !body.Submit && (body.N < 1 || body.N > 9 || strings.TrimSpace(body.Label) == "") {
 		errBadRequest(w, "n (1-9) and label are required")
@@ -691,6 +850,10 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 	opt := screen.Options[body.N-1]
 	if normalizeLabel(opt.Label) != normalizeLabel(body.Label) {
 		errConflict(w, "The prompt changed. Answer it in the terminal.")
+		return
+	}
+	if body.TrustFolder != "" && isTrustYes(screen, opt) && (screen.TrustFolder != body.TrustFolder || !h.trustOffered(r, body.SessionID, screen)) { // a row's lasting Yes: only for the folder it showed, a folder Coral may trust, from the person's own dashboard (#14110)
+		writeError(w, http.StatusConflict, "trust_changed", "The folder to trust changed or cannot be trusted from here. Answer it in the agent's own chat.")
 		return
 	}
 	if note := h.onlyRejectNote(body.SessionID, screen); note != "" && !optionIsReject(opt) { // a request that cannot be shown whole or hides something is never allowed from here (#11399)
@@ -759,7 +922,11 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 	case optionIsReject(opt):
 		row = board.ActPromptReject
 	}
-	noteActivity(r, row, "agent", name, "", "", opt.Label)
+	note := opt.Label
+	if body.TrustFolder != "" && isTrustYes(screen, opt) {
+		note = opt.Label + ": " + screen.TrustFolder // the grant can be found later: who, which agent, which folder (#14110)
+	}
+	noteActivity(r, row, "agent", name, "", "", note)
 	h.kickWS()                     // every screen showing the card takes the answer now
 	h.forgetDialog(body.SessionID) // the prompt was answered: it is not a dialog the agent is stuck at (#11437); the next pass reads the screen again
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "answered": opt.Label, "at": at})

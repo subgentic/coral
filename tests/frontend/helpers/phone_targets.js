@@ -76,6 +76,13 @@ const ICON_ALIGN = `(() => {
 const ALLOW = [];
 
 // Reviewed exceptions for same-named controls in one scene: [scene pattern, role pattern, name pattern, why]. A list of rows whose buttons all say "Delete" or "Open" is fixed by naming each by its row (aria-label with the row's title), not listed here.
+// Reviewed exceptions for the icon-label check: [scene pattern, the finding's text pattern, why].
+const ALLOW_ICON = [
+    // #14436: since 42b847cc3 the phone team bar says 'Status unavailable' when the board's status could not be read (it was empty, and hidden, before). That line is the team's status, not the Back button's label:
+    // the button is 44 px tall and spans both header rows (team_page.css, the 600 px block), so its centre is half a row from the second one by design, and the check took the status as its sibling label.
+    ['hub: board', 'button#team-page-bar-back\\.team-bar-back "Back to Agents".*span#team-page-status', 'a header-spanning Back button is not a control that follows a label, and the status line under the title is not its label (#14436)'],
+];
+const allowedIcon = (scene, finding) => ALLOW_ICON.some(([s, f]) => new RegExp(s).test(scene) && new RegExp(f).test(finding));
 const ALLOW_DUPS = [];
 const allowedDup = (scene, d) => ALLOW_DUPS.some(([s, r, n]) => new RegExp(s).test(scene) && new RegExp(r).test(d.role) && new RegExp(n, 'i').test(d.name));
 
@@ -231,7 +238,7 @@ async function scene(ev, results, name, setup, { min = 3, expect, contrastOnly =
     const ia = await ev(ICON_ALIGN); // before the 200% pass: that pass puts the root font back and the (i) is still shrinking (a transition) for a moment, 45 to 48 px, when it ends
     const sc = await scaleOf(ev, name);
     { const line = `icon census: ${name}: ${ia.n} icon-only controls checked, ${ia.labelled} against a label on their row, ${ia.infos} (i)`; console.log(line); if (process.env.ICON_CENSUS_LOG) require('node:fs').appendFileSync(process.env.ICON_CENSUS_LOG, line + '\n'); } // how much each scene checked: a scene that checks nothing is visible here
-    results.push({ name, iconBad: ia.bad, iconN: ia.n, contrast: cr.fails, contrastChecked: cr.checked, n: m.n, min, small: m.small.filter(c => !allowed(name, c)), dups: (m.dups || []).filter(d => !allowedDup(name, d)), unnamed: (m.unnamed || []).filter(u => !allowedUnnamed(name, u)), scale: sc });
+    results.push({ name, iconBad: ia.bad.filter(b => !allowedIcon(name, b)), iconN: ia.n, contrast: cr.fails, contrastChecked: cr.checked, n: m.n, min, small: m.small.filter(c => !allowed(name, c)), dups: (m.dups || []).filter(d => !allowedDup(name, d)), unnamed: (m.unnamed || []).filter(u => !allowedUnnamed(name, u)), scale: sc });
 }
 
 /** The problems in the results: a scene that failed to open, one with too few controls to be the real screen, and every control under 44 px. */

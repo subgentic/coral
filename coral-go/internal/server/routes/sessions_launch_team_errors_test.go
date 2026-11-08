@@ -241,3 +241,19 @@ func TestAConfiguredCLIPathThatCantBeRunIsASetupProblem(t *testing.T) {
 	assert.NotEqual(t, tracking.FailProviderUnrunnable, classifyLaunchError(errors.New("something else broke")))
 	assert.True(t, allConfigurationFailures([]string{classifyLaunchError(brokenCLIPathError{})}))
 }
+
+// A missing folder must not reserve the new team's label, even across retries (#14154).
+func TestTeamLaunchMissingFolderDoesNotReserveName(t *testing.T) {
+	server, h, _, ss := setupSessionsTestServerWithConfig(t, config.Load(t.TempDir()))
+	stubCLIPaths(t, ss)
+	missing := filepath.Join(t.TempDir(), "missing-folder")
+	for i := 0; i < 2; i++ {
+		status, out := postTeam(t, server.URL, map[string]any{"board_name": "retry-folder", "working_dir": missing, "agent_type": "claude", "agents": []map[string]any{{"name": "A", "prompt": "x"}}})
+		require.NotEqual(t, http.StatusConflict, status, "retry must not offer Join for an empty failed launch: %v", out)
+		require.GreaterOrEqual(t, status, 400, "%v", out)
+		require.Contains(t, fmt.Sprint(out["error"]), "directory not found", "the failure must be the folder, not CLI setup")
+		labelled, err := h.bs.BoardsLabelled(context.Background(), "retry-folder")
+		require.NoError(t, err)
+		require.Empty(t, labelled, "failed folder launch left a board: %v", out)
+	}
+}

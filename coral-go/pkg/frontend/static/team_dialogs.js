@@ -6,7 +6,7 @@ import { scrollBehavior } from './motion.js';
 import { showToast, escapeHtml, escapeAttr, boardNameProblem, OPERATOR_ID } from './utils.js';
 import { loadLiveSessions } from './api.js';
 import { recordRecentDir, getRecentDirs, pruneMissingRecents } from './browser.js';
-import { teamForm, showTeamWorktree, showTeamWorkers, syncSuggestionExists, dropStaleTrustTick, trustTicked } from './team_form.js';
+import { teamForm, showTeamWorktree, showTeamWorkers, syncSuggestionExists, trustTicked, resetFolderTrust, scheduleFolderTrust } from './team_form.js';
 import { agentNameForm, agentStatus } from './agent_form.js';
 import { cliPathButton } from './prerequisites.js';
 import { serverFetch, boardFetch, identityKey, LOCAL_SERVER, isHub } from './server_base.js';
@@ -163,7 +163,9 @@ function _syncTeamGate() {
 document.addEventListener('team-step-shown', _syncTeamGate);
 document.addEventListener('cli-blocks-launch', e => { if (e.target.closest?.('#launch-step-team')) _syncTeamGate(); }); // a CLI check that answers while step 3 shows
 document.addEventListener('team-page-open', e => { const page = e.target.closest && e.target.closest('.team-page'); if (page && page.dataset.page) showTeamStep(page.dataset.page); });
-document.addEventListener('input', e => { if (e.target && (e.target.id === 'team-board-name' || e.target.id === 'launch-team-dir')) _syncTeamGate(); if (e.target && e.target.id === 'launch-team-dir') { dropStaleTrustTick(); teamForm()?.refresh(); syncSuggestionExists(); } }); // the folder decides which trust row shows (#11889)
+document.addEventListener('change', e => { if (e.target?.id === 'launch-team-dir') scheduleFolderTrust(e); });
+let _teamFolderGeneration = 0;
+document.addEventListener('input', e => { if (e.target && ['team-board-name', 'launch-team-dir'].includes(e.target.id)) _teamFolderGeneration++; if (e.target?.id === 'team-board-name' && _effectiveServer(launch.server) === LOCAL_SERVER) offerSuggestion(document.getElementById('launch-team-dir'), document.getElementById('launch-team-dir-suggest'), e.target.value.trim() || 'first-team', { afterCoralMade: true }); if (e.target && (e.target.id === 'team-board-name' || e.target.id === 'launch-team-dir')) _syncTeamGate(); if (e.target && e.target.id === 'launch-team-dir') { scheduleFolderTrust(e); teamForm()?.refresh(); syncSuggestionExists(); } }); // the folder decides which trust row shows (#11889)
 
 // Remove keeps the row aside for Undo (one removal back); a new removal, a template or a closed dialog makes the last one final.
 let _removedTeamAgent = null;
@@ -198,11 +200,13 @@ function _undoTeamAgentRemoval() {
 }
 
 // Next needs what this step needs; on a step that is not met, it says so where the person looks (the field, or the line that says what is missing) and does not go on.
-function teamStepMove(dir) {
+async function teamStepMove(dir) {
     const step = currentTeamStep();
     const i = TEAM_STEPS.indexOf(step);
     if (dir > 0 && step === 'team') {
         if (!teamForm().validate({ focus: true }).ok) { _teamStepPressed = true; _syncTeamGate(); return; } // the first field that is wrong takes the focus and says what is missing
+        const generation = ++_teamFolderGeneration;
+        if (!await _checkNewTeamFolder({ validate: true }) || generation !== _teamFolderGeneration || currentTeamStep() !== 'team') return;
     }
     if (dir > 0 && step === 'members' && !hasOrchestrator()) { _membersPressed = true; document.getElementById('team-add-orchestrator')?.focus(); _syncTeamGate(); return; } // the button that fixes it takes the focus, and the one red line says what is missing
     const to = TEAM_STEPS[Math.min(TEAM_STEPS.length - 1, Math.max(0, i + dir))];
@@ -318,27 +322,38 @@ function _applyACFPresetFor(containerId, name) {
 
 // Default team: first 3 presets
 
-/** A folder the person typed or browsed to that does not exist yet, inside one that does (#12833): step 1 SAYS Coral creates it when the team is launched, and the launch asks for exactly that (create_new_folder). A folder that exists, a
- *  name Coral would not make, a parent that is missing, another computer's folder and Coral's own suggestion (which has its own line) get no line and no request: the launch checks them as before. */
+/** Step 1 checks the chosen folder before Next advances. A missing local folder can be made at Launch only when its parent is accessible and does not list it. Suggested folders use their existing create_dir path; remote folders are checked without requesting creation. */
 const NEW_FOLDER_NAME = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}$/;
-async function _checkNewTeamFolder() {
+async function _checkNewTeamFolder({ validate = false } = {}) {
     const input = document.getElementById('launch-team-dir'), line = document.getElementById('launch-team-dir-new');
-    if (!input || !line) return;
+    if (!input || !line) return false;
     const dir = input.value.trim(), server = _effectiveServer(launch.server);
     const clear = () => { delete input.dataset.createNew; if (!line.hidden) line.hidden = true; };
+    if (!dir) { clear(); return false; }
+    if (usesSuggestion(input)) { clear(); return true; } // the server makes only its own safe suggestion
     const m = /^(.*[\\/])([^\\/]+)[\\/]*$/.exec(dir);
-    if (!dir || !m || usesSuggestion(input) || server !== LOCAL_SERVER || input.dataset.dirServer || !NEW_FOLDER_NAME.test(m[2]) || /(^|[\\/])\.\.([\\/]|$)/.test(dir)) { clear(); return; }
-    const parent = m[1].length > 1 ? m[1].replace(/[\\/]+$/, '') : m[1];
-    let exists = true, parentOk = false;
+    const canCreate = !!m && server === LOCAL_SERVER && !input.dataset.dirServer && NEW_FOLDER_NAME.test(m[2]) && !/(^|[\\/])\.\.([\\/]|$)/.test(dir);
+    const parent = m && (m[1].length > 1 ? m[1].replace(/[\\/]+$/, '') : m[1]);
+    const stillCurrent = () => input.value.trim() === dir && server === _effectiveServer(launch.server);
+    const refuse = words => { if (!stillCurrent()) return false; clear(); if (validate) markFieldInvalid(input, words); return false; };
     try {
-        exists = (await serverFetch(server, `/api/filesystem/list?path=${encodeURIComponent(dir)}`)).ok;
-        if (!exists) parentOk = (await serverFetch(server, `/api/filesystem/list?path=${encodeURIComponent(parent)}`)).ok;
-    } catch { clear(); return; }
-    if (input.value.trim() !== dir) return; // the field changed while it was asked
-    if (exists || !parentOk) { clear(); return; }
+        const response = await serverFetch(server, `/api/filesystem/list?path=${encodeURIComponent(dir)}`);
+        if (!stillCurrent()) return false;
+        if (response.ok) { const data = await response.json(); if (!stillCurrent()) return false; if (data.error) return refuse('The folder cannot be read. Choose an accessible folder.'); clear(); return true; }
+        if (![403, 404].includes(response.status)) return refuse('The folder could not be checked. Check the computer and try again.');
+        if (!canCreate) return refuse('Folder not found. Choose an existing folder or a new folder inside one that exists.');
+        const parentResponse = await serverFetch(server, `/api/filesystem/list?path=${encodeURIComponent(parent)}`);
+        if (!stillCurrent()) return false;
+        if (!parentResponse.ok) return refuse('The parent folder could not be found or checked. Choose an existing parent folder.');
+        const parentData = await parentResponse.json();
+        if (!stillCurrent()) return false;
+        if (parentData.error || !Array.isArray(parentData.entries)) return refuse('The parent folder cannot be read. Choose an accessible parent folder.');
+        if (parentData.entries.includes(m[2])) return refuse('This folder exists but cannot be read. Choose an accessible folder.');
+    } catch { return refuse('The folder could not be checked. Check the computer and try again.'); }
     input.dataset.createNew = dir;
     line.textContent = `${m[2]} does not exist yet. Coral creates it inside ${parent} when you launch the team.`;
     line.hidden = false;
+    return true;
 }
 
 /** Worktree option is offered when the working directory is a git repo ON THE TARGET SERVER. */
@@ -388,7 +403,7 @@ function _renderTeamDirRecents() {
     const box = document.getElementById('launch-team-dir-recents');
     if (!box) return;
     const dirs = getRecentDirs(_effectiveServer(launch.server)).slice(0, 3);
-    if (!box._pruned) { box._pruned = true; pruneMissingRecents(_effectiveServer(launch.server)).then(changed => { box._pruned = false; if (!changed) return; _renderTeamDirRecents(); const f = document.getElementById('launch-team-dir'); if (f && !f.value && !_settingsFor(_effectiveServer(launch.server)).default_working_dir) offerSuggestion(f, document.getElementById('launch-team-dir-suggest'), 'first-team', { afterCoralMade: true }); }).catch(() => { box._pruned = false; }); } // folders that are gone are dropped once per opening (#11336)
+    if (!box._pruned) { box._pruned = true; pruneMissingRecents(_effectiveServer(launch.server)).then(changed => { box._pruned = false; if (!changed) return; _renderTeamDirRecents(); const f = document.getElementById('launch-team-dir'); if (f && !f.value && !_settingsFor(_effectiveServer(launch.server)).default_working_dir) offerSuggestion(f, document.getElementById('launch-team-dir-suggest'), document.getElementById('team-board-name')?.value.trim() || 'first-team', { afterCoralMade: true }); }).catch(() => { box._pruned = false; }); } // folders that are gone are dropped once per opening (#11336)
     box.replaceChildren(...(dirs.length ? [Object.assign(document.createElement('span'), { className: 'launch-recent-label', textContent: 'Recent:' })] : []), ...dirs.map(d => {
         const b = document.createElement('button');
         b.type = 'button'; b.className = 'btn btn-small launch-dir-recent'; b.title = d; b.dataset.dir = d; b.dataset.team = '1'; b.setAttribute('data-on-click', 'launch-dir-recent');
@@ -403,6 +418,7 @@ async function _initTeamForm() {
     if (banner) banner.style.display = 'none';
 
     // Reset form
+    _teamFolderGeneration++;
     document.getElementById("team-board-name").value = "";
     const addr = document.getElementById("team-board-server");
     if (addr) { addr.value = ""; addr.disabled = true; } // the machine's own entry reveals it (launch_dialog.js _syncTeamAddress)
@@ -424,6 +440,7 @@ async function _initTeamForm() {
     showTeamStep('team');
     _applyTeamDefaultMode();
 
+    resetFolderTrust();
     // Pre-fill working dir from the target server's settings
     const s = _settingsFor(_effectiveServer(launch.server));
     const dirInput = document.getElementById("launch-team-dir");
@@ -798,7 +815,7 @@ async function launchTeam() {
     else if (document.getElementById('launch-team-dir')?.dataset.createNew === workingDir) payload.create_new_folder = true; // a new folder the person chose, which step 1 said Coral makes (#12833)
     if (!isHub() && trustTicked()) payload.trust_folder = true; // the person ticked: trust this existing folder for the agents (#11889)
     if (settings.working_mode) payload.working_mode = settings.working_mode; // the working mode, its guidance and the Additional instructions (#7407)
-    if (settings.health_monitor) payload.health_monitor = true;
+    if (settings.health_monitor === false) payload.health_monitor = false; // unticked on a new team (#14091); on is the default and is not sent
     if (useWorktree) {
         payload.worktree = true;
         if (baseBranch) payload.base_branch = baseBranch;

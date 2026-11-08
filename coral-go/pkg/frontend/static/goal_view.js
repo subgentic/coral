@@ -196,6 +196,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         copyBtn.title = 'Copies a line to paste to an agent: it runs coral-board goal brief for this goal';
         if (!phone) line.append(copyBtn); // on a phone it is in the header's More menu (#13119)
         main.append(line);
+        if (g.movedOpen) main.append(el('p', 'goals-note', `${g.movedOpen} moved task${g.movedOpen === 1 ? ' is' : 's are'} unfinished or cannot be checked here. Check “Done when” before closing this goal.`));
         const waitNote = el('p', 'goals-note goal-reviews-waiting'); waitNote.hidden = true; main.append(waitNote); // files for review on this goal that were never answered (Beta #11837 G): said while any wait, whatever the goal's state
         paintWaiting(g, waitNote);
         if (g.outcome || g.doneWhen || g.images.length) {

@@ -8,6 +8,10 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
+// A folder that exists: since acfb782ec Next checks the folder before it advances, and a path whose parent is missing stays on step 1 (#14436).
+const TEAM_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ui-audit-batch2-'));
+process.on('exit', () => { try { fs.rmSync(TEAM_DIR, { recursive: true, force: true }); } catch { /* gone */ } });
 const { coralReady } = require('./helpers/wait');
 
 (async () => {
@@ -27,7 +31,7 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(await ev(`document.activeElement.id`), 'team-board-name', 'the keyboard starts in the name');
         assert.deepEqual(await ev(`(document.getElementById('team-board-name').getAttribute('aria-describedby') || '').split(' ').map(id => (document.getElementById(id) || {}).textContent)`), ["A team is a group of agents working on one board. Letters, digits, - and _.", ''], 'the name is described by its help, then the notice under it');
         assert.ok(await ev(vis('#team-board-name')) && await ev(vis('#launch-team-dir')), 'the name and the folder are on the first step');
-        await ev(`{ const n = document.getElementById('team-board-name'); n.value = 'crew-x'; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = '/work/x'; d.dispatchEvent(new Event('input', { bubbles: true })); } document.getElementById('launch-team-next').click(); true`);
+        await ev(`{ const n = document.getElementById('team-board-name'); n.value = 'crew-x'; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = ${JSON.stringify(TEAM_DIR)}; d.dispatchEvent(new Event('input', { bubbles: true })); } document.getElementById('launch-team-next').click(); true`);
         await waitFor(vis('#team-template-select'), 'the template picker on the second step');
         assert.equal(await ev(`document.getElementById('team-template-more').getAttribute('aria-expanded')`), 'false', 'the template tools start closed');
         assert.equal(await ev(vis('#team-template-menu')), false, 'the template actions are behind the More menu');

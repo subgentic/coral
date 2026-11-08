@@ -307,3 +307,47 @@ func TestAGoalLooksDoneToTheOperatorOnlyAfterFifteenQuietMinutes(t *testing.T) {
 	assert.Equal(t, 30*time.Minute, GoalDoneQuietFrom(map[string]string{"goal_done_quiet_minutes": "30"}))
 	assert.Equal(t, 15*time.Minute, GoalDoneQuietFrom(map[string]string{}), "unset: 15")
 }
+
+func TestMovedTasksDoNotCreateAnOldGoalDoneItem(t *testing.T) {
+	h, bs := operatorAsksRig(t)
+	ctx := context.Background()
+	h.goalDoneNow = quietPassed
+	from, err := bs.CreateGoal(ctx, "team", board.GoalInput{Title: "Ship the app", DoneWhen: "Acceptance checks pass", CreatedBy: "Lead"})
+	require.NoError(t, err)
+	to, err := bs.CreateGoal(ctx, "team", board.GoalInput{Title: "Finish checks", CreatedBy: "Lead"})
+	require.NoError(t, err)
+	makeTask := func() *board.Task {
+		tk, err := bs.CreateTaskWithOpts(ctx, "team", "work", "", "medium", "Lead", &board.CreateTaskOpts{GoalID: &from.ID})
+		require.NoError(t, err)
+		return tk
+	}
+	finish := func(tk *board.Task) {
+		_, err := bs.ClaimTask(ctx, "team", "Dev", tk.ID)
+		require.NoError(t, err)
+		_, err = bs.CompleteTask(ctx, "team", tk.ID, "Dev", nil)
+		require.NoError(t, err)
+	}
+	a, b := makeTask(), makeTask()
+	finish(a)
+	require.NoError(t, bs.SetTaskGoal(ctx, "team", b.ID, &to.ID))
+	items, err := h.goalDoneItems(ctx, "team", nil, nil, nil)
+	require.NoError(t, err)
+	require.Empty(t, items, "one attached task done must not hide the unfinished task moved to another goal")
+	finish(b)
+	items, err = h.goalDoneItems(ctx, "team", nil, nil, nil)
+	require.NoError(t, err)
+	var item *NeedsYouItem
+	for i := range items {
+		if items[i].ID == fmt.Sprintf("goal_done:team:%d", from.ID) {
+			item = &items[i]
+		}
+	}
+	require.NotNil(t, item, "the goal becomes a candidate once its moved work actually finishes")
+	g, err := bs.GetGoal(ctx, "team", from.ID)
+	require.NoError(t, err)
+	require.NotNil(t, g.LooksDoneAt)
+	completed, err := time.Parse(time.RFC3339, *g.LooksDoneAt)
+	require.NoError(t, err)
+	assert.Equal(t, completed.Add(goalDoneQuiet).UTC().Format(time.RFC3339), item.At, "waiting starts at arrival after the quiet period, not goal creation")
+	assert.Equal(t, "Acceptance checks pass", g.DoneWhen, "the person's acceptance criteria are retained for review, not inferred")
+}

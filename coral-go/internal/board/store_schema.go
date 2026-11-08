@@ -41,6 +41,9 @@ func (s *Store) ensureSchema(ctx context.Context) error {
 	if err := s.migrateHealthDefaultOff(ctx); err != nil {
 		return err
 	}
+	if err := s.migrateHealthDefaultOn(ctx); err != nil {
+		return err
+	}
 	if err := s.ensureHubOperatorActionsSchema(ctx); err != nil {
 		return err
 	}

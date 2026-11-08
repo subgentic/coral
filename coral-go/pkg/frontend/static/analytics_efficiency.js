@@ -131,7 +131,12 @@ function draw(key) {
     if (!s.data) { view.append(el('p', 'goals-note', 'Loading…')); return; }
     const d = s.data, min = num(d.min_sample) || 10, groups = d.groups.filter(g => num(g.value) != null && num(g.n) != null && g.n > 0), empty = d.groups.filter(g => !groups.includes(g)); // a group with no commits or tasks (n 0) is listed in the table, with no bar
     const isFewG = g => g.low_sample === true || g.n < min; // the endpoint says it (low_sample); older answers: under the minimum
-    if (!groups.length) { view.append(el('p', 'goals-note', `No ${cfg.units} ${RANGE_WORDS[range] || 'in this time range'}: ${range === '30d' ? 'nothing to compare yet' : 'pick a longer range above'}.`)); return; }
+    if (!groups.length) {
+        const used = d.usage && num(d.usage.sessions) > 0; // sessions spent tokens in the range: Coral cannot tell that no commit was made, only that none was recorded (#14095)
+        if (cfg.metric === 'tokens_per_commit' && used) view.append(el('p', 'goals-note', `No ${cfg.units} recorded from these sessions ${RANGE_WORDS[range] || 'in this time range'}. Coral counts commits made in each session’s own folder and in the worktrees it made; commits made anywhere else are not counted.`));
+        else view.append(el('p', 'goals-note', `No ${cfg.units} ${RANGE_WORDS[range] || 'in this time range'}: ${range === '30d' ? 'nothing to compare yet' : 'pick a longer range above'}.`));
+        return;
+    }
     if (s.group === 'task') { drawTaskList(view, cfg, d, groups); return; }
     const ranked = groups.filter(g => !isFewG(g)).sort((a, b) => a.value - b.value), few = groups.filter(isFewG).sort((a, b) => a.value - b.value), order = [...ranked, ...few];
     const total = num(d.total && d.total.n) != null ? d.total.n : groups.reduce((n, g) => n + g.n, 0);

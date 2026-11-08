@@ -371,8 +371,13 @@ func TestTheOwnersListCarriesEachThreadsAsksAndNobodyElsesDoes(t *testing.T) {
 		m := a.(map[string]any)
 		byAgent[m["agent"].(string)] = m
 	}
+	devRead, qaRead := byAgent["Dev"]["read_at"], byAgent["QA"]["read_at"]
+	delete(byAgent["Dev"], "read_at")
+	delete(byAgent["QA"], "read_at")
 	assert.Equal(t, map[string]any{"agent": "Dev", "open": true, "replies": float64(1), "seen": true, "nudged": false}, byAgent["Dev"], "a reply is seen")
 	assert.Equal(t, map[string]any{"agent": "QA", "open": true, "replies": float64(0), "seen": false, "nudged": false}, byAgent["QA"])
+	assert.NotEmpty(t, devRead, "a reply is a read: read_at is the seen stamp (#14130)")
+	assert.Equal(t, "", qaRead, "read_at is the empty string while the agent has not read it, never absent on the owner's list (#14130)")
 	assert.Empty(t, asks(cmtAsOwner, other), "a thread nobody was asked into has none")
 	// the reply (a comment of Dev's) carries none either
 	code, list := rig.do("GET", cp(cmtDoc), cmtAsOwner, nil)
@@ -464,4 +469,71 @@ func TestTheSendMessageNamesTheExactReplyCommand(t *testing.T) {
 	last := msgs[len(msgs)-1].Content
 	assert.LessOrEqual(t, len(last), 2048)
 	assert.Contains(t, last, fmt.Sprintf("coral://artifacts/%s %d", cmtDoc, long.ID))
+}
+
+// #14130: the owner's thread says when the asked agent read the comment. The message that delivered it is linked to the agent's session; coral-board read of it by THAT agent stamps the ask (read_at), a read by
+// another member (an orchestrator reads everything) stamps nothing, and a read of an unrelated message stamps nothing.
+func TestTheAskedAgentsBoardReadOfTheDeliveringMessageStampsReadAt(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	rig.agent(2, "QA", false)
+	cid := rig.ownerComment("please look")
+	_, out := rig.send(cid, "Dev", "QA")
+	require.Equal(t, 200, rig.mustCode(out))
+
+	readAt := func() map[string]string {
+		code, list := rig.do("GET", cp(cmtDoc), cmtAsOwner, nil)
+		require.Equal(t, 200, code, fmt.Sprint(list))
+		got := map[string]string{}
+		for _, c := range list["comments"].([]any) {
+			if m := c.(map[string]any); m["id"] == float64(cid) {
+				for _, a := range m["asks"].([]any) {
+					k := a.(map[string]any)
+					r, present := k["read_at"]
+					require.True(t, present, "read_at is on every ask of the owner's list")
+					got[k["agent"].(string)] = r.(string)
+				}
+			}
+		}
+		return got
+	}
+	assert.Equal(t, map[string]string{"Dev": "", "QA": ""}, readAt(), "sent, not read")
+
+	var devMsg, qaMsg board.Message
+	for _, m := range rig.operatorMessages() {
+		switch {
+		case strings.Contains(m.Content, "@Dev"):
+			devMsg = m
+		case strings.Contains(m.Content, "@QA"):
+			qaMsg = m
+		}
+	}
+	require.NotZero(t, devMsg.ID)
+	require.NotZero(t, qaMsg.ID)
+	other, err := rig.h.bs.PostMessage(context.Background(), "team-a", "QA", "an unrelated message", nil)
+	require.NoError(t, err)
+
+	bh := NewBoardHandler(rig.h.bs)
+	ctx := context.Background()
+	bh.noteCommentReads(ctx, "team-a", naming.SubscriberID("Dev", "claude"), []board.Message{qaMsg, *other}) // Dev's read returns QA's message and an unrelated one
+	assert.Equal(t, map[string]string{"Dev": "", "QA": ""}, readAt(), "no hook set: nothing happens, and nothing crashes")
+
+	bh.SetCommentReadStamp(rig.h.StampCommentReads)
+	bh.noteCommentReads(ctx, "team-a", naming.SubscriberID("Dev", "claude"), []board.Message{qaMsg, *other})
+	assert.Equal(t, map[string]string{"Dev": "", "QA": ""}, readAt(), "Dev read QA's message and an unrelated one: neither ask is stamped")
+	bh.noteCommentReads(ctx, "team-a", naming.SubscriberID("QA", "claude"), []board.Message{devMsg})
+	assert.Equal(t, map[string]string{"Dev": "", "QA": ""}, readAt(), "QA read Dev's message: Dev's ask is not stamped")
+	bh.noteCommentReads(ctx, "team-b", naming.SubscriberID("Dev", "claude"), []board.Message{devMsg})
+	assert.Equal(t, map[string]string{"Dev": "", "QA": ""}, readAt(), "a read on another board stamps nothing")
+
+	bh.noteCommentReads(ctx, "team-a", naming.SubscriberID("Dev", "claude"), []board.Message{devMsg})
+	got := readAt()
+	assert.NotEmpty(t, got["Dev"], "Dev read the message that delivered the comment to it")
+	_, perr := time.Parse(time.RFC3339Nano, got["Dev"])
+	assert.NoError(t, perr, "an RFC 3339 time: %q", got["Dev"])
+	assert.Equal(t, "", got["QA"], "QA's ask is its own")
+	first := got["Dev"]
+	time.Sleep(15 * time.Millisecond)
+	bh.noteCommentReads(ctx, "team-a", naming.SubscriberID("Dev", "claude"), []board.Message{devMsg})
+	assert.Equal(t, first, readAt()["Dev"], "the first read stays")
 }

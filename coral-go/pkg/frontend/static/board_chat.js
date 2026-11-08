@@ -5,7 +5,7 @@ const { agentLinkHtml } = await importOnce('./agent_link.js'); // an agent's nam
 /* Moved out of render.js as it was (#3795): no behaviour change. */
 import { formatHourMinute } from './format.js';
 import { morphHtml } from './dom_morph.js';
-import { OPERATOR_ID, isOperatorId, escapeHtml, showToast, escapeAttr, getAgentColor, askBadge, externalMessageBadge, replyWithHtml, hubUserBadge, renderBoardMessageBody, setBoardMentionNames, highlightMentionsIn, boardMessageColorStyle } from './utils.js';
+import { OPERATOR_ID, isOperatorId, escapeHtml, showToast, escapeAttr, getAgentColor, askBadge, externalMessageBadge, replyWithHtml, hubUserBadge, boardSenderName, renderBoardMessageBody, setBoardMentionNames, highlightMentionsIn, boardMessageColorStyle } from './utils.js';
 import { splitKey, keyLabel, boardFetch } from './server_base.js';
 import { groupTaskQueueRuns, renderTaskQueueRun } from './board_system_lines.js';
 const { threadItems } = await importOnce('./board_threads.js'); // a part of the board page's group
@@ -368,10 +368,10 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
         const day = item.nested ? '' : dayLineBefore(item.kind === 'queue' ? item.msgs[0].created_at : item.m.created_at, i > 0 ? lastWhen(items[i - 1]) : null);
         if (item.kind === 'queue') return day + renderTaskQueueRun(item, _formatTime);
         const m = item.m;
-        const agent = m.job_title || m.sender_name || 'Unknown';
+        const agent = boardSenderName(m);
         const color = getAgentColor(agent);
         const prev = i > 0 && items[i - 1].kind === 'msg' ? items[i - 1].m : null;
-        const prevAgent = prev ? (prev.job_title || prev.sender_name || 'Unknown') : null;
+        const prevAgent = prev ? (boardSenderName(prev)) : null;
         const sameAsPrev = agent === prevAgent;
         const spacing = sameAsPrev && !item.nested ? 'mb-message-grouped' : 'mb-message-first';
         const isLeader = /orchestrator/i.test(agent) || isOperatorId(m.subscriber_id || m.session_id);
@@ -380,7 +380,7 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
         const selectedClass = _boardChatSelectMode && _boardChatSelectedIds.has(m.id) ? ' mb-message-selected' : '';
         const checkbox = _boardChatSelectMode ? `<input type="checkbox" class="check mb-select-checkbox" data-msg-id="${Number(m.id)}" ${_boardChatSelectedIds.has(m.id) ? 'checked' : ''} data-on-click="board-chat-msg-select">` : '';
         const parent = m.reply_to ? messages.find(x => x.id === m.reply_to) : null;
-        const parts = rowParts(m, { agent, timeHtml: messageTimeHtml(m.created_at), moreLabel: '', replyName: m.reply_to ? (parent ? (parent.job_title || parent.sender_name || 'Unknown') : 'an earlier message') : '', more: false, idp: 'dbd' });
+        const parts = rowParts(m, { agent, timeHtml: messageTimeHtml(m.created_at), moreLabel: '', replyName: m.reply_to ? (parent ? (boardSenderName(parent)) : 'an earlier message') : '', more: false, idp: 'dbd' });
         return day + `<div class="mb-message ${spacing}${alignClass}${selectedClass}${parts.classes}${item.nested ? ' mb-thread-reply' : ''}"${parts.attrs} data-message-id="${Number(m.id)}"${m.reply_to ? ` data-reply-to="${Number(m.reply_to)}"` : ''}${messageAttachmentAttrs(m)} style="${boardMessageColorStyle(color)}">
             ${parts.toggle}
             <div class="mb-message-header">
@@ -489,7 +489,7 @@ export async function _exportBoardChatSelected() {
     let md = `# ${project} — Exported Chat\n\n`;
     md += `**Exported**: ${now} · **Messages**: ${selected.length}\n\n---\n\n`;
     for (const m of selected) {
-        const agent = m.job_title || m.sender_name || 'Unknown';
+        const agent = boardSenderName(m);
         const time = _formatTime(m.created_at);
         md += `### ${agent} — ${time}\n${m.content}\n\n`;
     }

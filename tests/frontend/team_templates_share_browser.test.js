@@ -18,7 +18,7 @@ const { coralReady } = require('./helpers/wait');
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await require('./helpers/new_team').stubFolders(ev); // the made-up wizard folder exists: Next checks it first (#14437, acfb782ec)
         await coralReady(ev, 'startup', 'liveList', 'settings');
         const vis = sel => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); return !!e && e.checkVisibility({ checkVisibilityCSS: true, contentVisibilityAuto: true }); })()`;
 
@@ -28,7 +28,7 @@ const { coralReady } = require('./helpers/wait');
         console.log('1. the template menu');
         await ev(`(async () => { await window.showLaunchModal(); window._selectLaunchType('team'); return true; })()`);
         await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none'`, 'the team step');
-        await ev(`{ const n = document.getElementById('team-board-name'); n.value = 'share-crew'; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = '/work/x'; d.dispatchEvent(new Event('input', { bubbles: true })); } document.getElementById('launch-team-next').click(); true`);
+        await ev(`{ const n = document.getElementById('team-board-name'); n.value = 'share-crew'; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = '/work/repo'; d.dispatchEvent(new Event('input', { bubbles: true })); } document.getElementById('launch-team-next').click(); true`);
         await waitFor(vis('#team-template-select'), 'the template picker');
         // a saved template of the person's own, and the download captured
         await ev(`(async () => {
