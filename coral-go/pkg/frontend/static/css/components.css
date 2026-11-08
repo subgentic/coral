@@ -1974,6 +1974,11 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 }
 /* What cannot be undone is a last group of its own: more room above its divider, so a thumb that reaches for Move Down or Set Color is not one slip from Kill (#10282, Mobile tester). */
 .overflow-menu-divider-danger { margin-top: 14px; padding-top: 2px; }
+/* A team's destructive actions are distinct targets, including disabled Hub items. */
+.group-kebab > .sidebar-kebab-menu > .overflow-menu-danger + .overflow-menu-danger {
+    margin-top: 12px;
+    border-top: 1px solid var(--border);
+}
 
 .overflow-menu-version { padding: 4px 14px 6px; font-size: var(--fs-sm); color: var(--text-muted); user-select: text; }
 #coral-version-row[hidden] { display: none; }
