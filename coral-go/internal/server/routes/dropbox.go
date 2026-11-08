@@ -12,7 +12,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net"
@@ -349,9 +348,8 @@ func (h *CloudHandler) DropboxSetFilters(w http.ResponseWriter, r *http.Request)
 		Types      []string `json:"types"`
 		MaxAgeDays int      `json:"max_age_days"`
 	}
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&in); err != nil {
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
+	if err := decodeJSONStrict(r, &in); err != nil {
 		errBadRequest(w, "a filter is {\"types\": [...], \"max_age_days\": n}")
 		return
 	}
@@ -414,9 +412,8 @@ func (h *CloudHandler) DropboxSetRetention(w http.ResponseWriter, r *http.Reques
 		SeenCount int   `json:"seen_count"`
 		SeenBytes int64 `json:"seen_bytes"`
 	}
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<10))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&in); err != nil {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<10)
+	if err := decodeJSONStrict(r, &in); err != nil {
 		errBadRequest(w, "retention is {\"days\": n, \"confirm\": true|false}")
 		return
 	}

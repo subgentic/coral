@@ -70,6 +70,9 @@ var reviewedFileOpens = map[string]string{
 	"uploads.go:UploadFile:WriteFile":                                     "a random hex prefix + filepath.Base of the name, an extension allowlist",
 	"workflow.go:stepFileType:Open":                                       "a workflow step file: Clean + prefix check, realPath + within, sensitivePath",
 	"shared_images.go:readUploadRecord:ReadFile":                          "uploads/<uploadsDir(session): a safe id>/<64 lower-case hex>.json, a record the server wrote (#5284)",
+	"dropbox_backup.go:DropboxBackup.readObject:OpenNoFollow":             "artifacts/objects/<64-hex digest of an outbox row the server wrote>: opened once without following a link, a regular file, capped, and its SHA-256 checked against the digest (#14655, #14691)",
+	"dropbox_backup.go:osPower:ReadFile":                                  "fixed files under /sys/class/power_supply (the OS's own battery state, Linux): no name from a request or a listing",
+	"dropbox_edits.go:DropboxBackup.openHeld:OpenNoFollow":                "artifacts/dropbox-held/<64-hex digest of an open edit>: opened without following a link, a regular file of the edit's size, its SHA-256 checked (#14714, Security's conditions a and b)",
 	"artifacts_list_all.go:listAllArtifactRows:ReadFile":                  "the machine-wide list (#5575): objects/<64 lower-case hex>.json sidecars (size-bounded) and artifacts/received/<32-hex board>/<64-hex>.json rows the server wrote; every name is checked against objectNameRe and boardDirName",
 }
 

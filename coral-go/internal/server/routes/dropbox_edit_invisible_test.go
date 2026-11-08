@@ -41,11 +41,15 @@ func TestAHeldEditIsInvisibleToEveryReadRoute(t *testing.T) {
 		for _, route := range []string{"/api/artifacts", "/api/artifacts?q=plan", "/api/artifacts?q=secret"} {
 			_, out := rig.getAs(s, route)
 			assert.False(t, strings.Contains(out, d), "%s %s lists the held edit", s, route)
+			assert.NotContains(t, out, string(body), "%s %s: never the held bytes", s, route)
+			assert.NotContains(t, out, "secret-ish", "%s %s: nor any of their words", s, route)
 		}
 	}
 	for _, route := range []string{"/api/artifacts", "/api/artifacts?q=plan", "/api/artifacts?q=secret"} {
 		_, out := rig.getAs("", route)
 		assert.False(t, strings.Contains(out, d), "the dashboard's %s lists the held edit", route)
+		assert.NotContains(t, out, string(body), "the dashboard's %s: never the held bytes", route)
+		assert.NotContains(t, out, "secret-ish", "the dashboard's %s: nor any of their words", route)
 	}
 	for _, route := range []string{"/api/artifacts/" + d, "/api/artifacts/" + d + "/meta", "/api/artifacts/" + d + "/versions"} {
 		code, out := rig.getAs("", route)

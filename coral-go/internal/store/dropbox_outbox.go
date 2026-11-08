@@ -164,7 +164,7 @@ func (o *DropboxOutbox) DueForRetention(ctx context.Context, accountID string, b
 	var rows []LedgerRow
 	err := o.db.SelectContext(ctx, &rows, `SELECT id, kind, digest, doc_id, version, path, artifact_at, COALESCE(rev, '') AS rev, size, COALESCE(delete_job, '') AS delete_job
 		FROM dropbox_outbox WHERE state = ? AND account_id = ? AND artifact_at <> '' AND artifact_at < ? AND path LIKE '/v1/%' AND COALESCE(rev, '') <> ''
-		ORDER BY artifact_at, doc_id, version, kind LIMIT ?`, DropboxOutboxDoneS, accountID, ts(before), limit)
+		ORDER BY artifact_at, doc_id, version, kind, id LIMIT ?`, DropboxOutboxDoneS, accountID, ts(before), limit)
 	return rows, err
 }
 
