@@ -705,3 +705,9 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 
 /* Activity uses the same nested goal/task headings as Needs you (#14443). */
 .activity-folder .dt-group th { position: static; white-space: pre-line; text-transform: none; letter-spacing: normal; font-size: var(--fs-sm); line-height: var(--lh-body); overflow-wrap: anywhere; }
+/* the heading stays one sticky cell on one row: inside it a bar holds the heading's button, which takes the rest of the width, and the Story control beside it (#14444) */
+.dt-group-pair { display: flex; align-items: center; gap: 8px; width: 100%; padding-inline-end: var(--table-pad-x, 12px); box-sizing: border-box; }
+.dt-group-pair .dt-group-toggle { flex: 1 1 auto; width: auto; min-width: 0; }
+.dt-group-story { flex: none; min-height: 44px; min-width: 44px; }
+@media (max-width: 767px) { .dt-group-pair .dt-group-toggle { flex-wrap: wrap; position: relative; padding-inline-start: calc(var(--table-pad-x, 12px) + 28px); } .dt-group-pair .dt-group-toggle .dt-group-words { flex: 1 1 9rem; min-width: 9rem; } .dt-group-pair .dt-group-toggle::before { position: absolute; inset-inline-start: var(--table-pad-x, 12px); top: 14px; } } /* a phone: the title keeps a readable line and the chip drops under it; the chevron is out of the flow; the Story control stays at the right of the same heading */
+.dt-story-row > td { padding: 0; }

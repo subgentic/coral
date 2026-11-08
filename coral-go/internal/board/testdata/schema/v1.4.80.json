@@ -235,6 +235,18 @@
       "type": "index"
     },
     {
+      "name": "idx_operator_actions_team_goal",
+      "sql": "CREATE INDEX idx_operator_actions_team_goal ON operator_actions(team, goal_id)",
+      "tbl_name": "operator_actions",
+      "type": "index"
+    },
+    {
+      "name": "idx_operator_actions_team_task",
+      "sql": "CREATE INDEX idx_operator_actions_team_task ON operator_actions(team, task_id)",
+      "tbl_name": "operator_actions",
+      "type": "index"
+    },
+    {
       "name": "idx_operator_touch_team_at",
       "sql": "CREATE INDEX idx_operator_touch_team_at ON operator_touch(team, at)",
       "tbl_name": "operator_touch",
@@ -6874,6 +6886,72 @@
             }
           ],
           "name": "idx_operator_actions_team",
+          "origin": "c",
+          "partial": 0,
+          "seq": 2,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 7,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "team",
+              "seqno": 0
+            },
+            {
+              "cid": 15,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "goal_id",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "idx_operator_actions_team_goal",
+          "origin": "c",
+          "partial": 0,
+          "seq": 1,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 7,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "team",
+              "seqno": 0
+            },
+            {
+              "cid": 16,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "task_id",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "idx_operator_actions_team_task",
           "origin": "c",
           "partial": 0,
           "seq": 0,

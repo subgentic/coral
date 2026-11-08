@@ -56,6 +56,7 @@ var notAStarter = map[string]string{
 	// The installed-Coral guard (#5293, #234): it lists the machine's processes with powershell and compares the lists; neither file runs a Coral.
 	"tests/frontend/installed_tray_guard.mjs":      "lists the coral-tray.exe processes under Program Files before and after a run and compares them; it starts no Coral",
 	"tests/frontend/installed_tray_guard.test.mjs": "feeds the guard's functions made-up process lists; it starts nothing",
+	"tests/frontend/local_shards.test.mjs":         "checks the CDP runner's shard default with plain numbers and reads run_cdp_suites.mjs as text; it starts nothing",
 	// The CDP runner's old-folder sweep (helpers/run_folders.mjs): the tests build made-up coral-cdp-* folders in a temporary directory and call the sweep on them; the word run_cdp_suites is in their comments and names only.
 	"tests/frontend/run_folders.test.mjs":    "calls the sweep helper on made-up run folders in a temporary directory; it starts no Coral",
 	"tests/frontend/run_folders_qa.test.mjs": "the sweep helper's QA probes (symlinks, old binaries) on made-up folders; it starts no Coral",
