@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -22,6 +23,61 @@ import (
 	"github.com/subgentic/coral/pkg/hubproxy"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
+
+// retryWhileUnattributable repeats a request from this test process to its own listener while the answer is 403 other_user, for at most unattributableWait. That answer is the connection's owner not
+// found in the operating system's socket table: under heavy load (Windows) the row for a connection made a moment ago is not there yet ("peercred: no socket row"), and the test process, which IS the
+// user Coral runs as, is refused for a lookup miss. Only that one answer is retried, only for the test's own legitimate calls: any other status, and any 403 with another code, returns at once, and
+// nothing here touches the refusal of a real other user, which the cloud tests check on their own. (#14462)
+const unattributableWait = 10 * time.Second
+
+func retryWhileUnattributable(do func() (int, map[string]any, string)) (int, map[string]any, string) {
+	return retryWhileUnattributableFor(unattributableWait, do)
+}
+
+func retryWhileUnattributableFor(wait time.Duration, do func() (int, map[string]any, string)) (int, map[string]any, string) {
+	deadline := time.Now().Add(wait)
+	for {
+		code, out, body := do()
+		if code != http.StatusForbidden || out["code"] != "other_user" || time.Now().After(deadline) {
+			return code, out, body
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// The helper retries only the lookup-miss answer: it goes on past other_user until a success, returns at once on any other answer (a different 403 included), and gives up with the last other_user
+// answer after its time (so a caller that really is another user still sees the refusal).
+func TestTheUnattributableRetryOnlyRetriesOtherUserAndGivesUp(t *testing.T) {
+	other := map[string]any{"code": "other_user"}
+	calls := 0
+	code, _, _ := retryWhileUnattributableFor(time.Second, func() (int, map[string]any, string) {
+		calls++
+		if calls < 3 {
+			return http.StatusForbidden, other, "x"
+		}
+		return http.StatusOK, nil, "ok"
+	})
+	assert.Equal(t, http.StatusOK, code)
+	assert.Equal(t, 3, calls, "retried past the lookup miss")
+
+	calls = 0
+	code, out, _ := retryWhileUnattributableFor(time.Second, func() (int, map[string]any, string) {
+		calls++
+		return http.StatusForbidden, map[string]any{"code": "hub_identity_required"}, "x"
+	})
+	assert.Equal(t, http.StatusForbidden, code)
+	assert.Equal(t, "hub_identity_required", out["code"])
+	assert.Equal(t, 1, calls, "any other refusal is returned at once")
+
+	calls = 0
+	code, out, _ = retryWhileUnattributableFor(50*time.Millisecond, func() (int, map[string]any, string) {
+		calls++
+		return http.StatusForbidden, other, "x"
+	})
+	assert.Equal(t, http.StatusForbidden, code, "a real other user is still refused, after the wait")
+	assert.Equal(t, "other_user", out["code"])
+	assert.Greater(t, calls, 1)
+}
 
 // #3428 end to end (QA bug bash, round 2): the real hub proxy, a real tunnel and the connector's
 // LocalHandler in front of the real router. What a Coral Hub user can and cannot be, on a board
@@ -189,7 +245,9 @@ func TestHubIdentityEdgesEndToEnd(t *testing.T) {
 	}
 	check("operator-by-default on")
 	setDisabled := func(d bool) {
-		code, _, b := onComputer("PUT", "/api/system/hub-operator", map[string]any{"disabled": d})
+		code, _, b := retryWhileUnattributable(func() (int, map[string]any, string) {
+			return onComputer("PUT", "/api/system/hub-operator", map[string]any{"disabled": d})
+		})
 		require.Equal(t, http.StatusOK, code, b)
 	}
 	setDisabled(true)
