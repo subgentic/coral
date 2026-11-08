@@ -31,7 +31,7 @@
  const HEX_RE = /^[0-9a-f]{64}$/i;
 // The team page's tabs, in order (#7453). /team/<name> with no tab is the first.
 export const SKILL_FOLDERS = ['imported', 'agent-created', 'coral-skills']; // the Skills sidebar's folders besides All (#12997)
-export const TEAM_TABS = ['goals', 'agents', 'tasks', 'artifacts', 'knowledge', 'branches', 'messages']; // the strip's order, left to right and by the arrow keys (the operator's, #8791): Goals, Agents, Tasks, Artifacts, Knowledge, Board; team settings are a popout (#8853), not a tab
+export const TEAM_TABS = ['goals', 'agents', 'tasks', 'artifacts', 'knowledge', 'messages', 'branches']; // the strip's order, left to right and by the arrow keys (the operator's, #8791): Goals, Agents, Tasks, Artifacts, Knowledge, Board, and Branches last (Board stays sixth, after Knowledge); team settings are a popout (#8853), not a tab
 const TEAM_ITEM_TABS = ['goals', 'tasks', 'messages']; // the tabs with an item: /team/<name>/goals/<id>, /team/<name>/tasks/<id> (pages), /team/<name>/messages/<id> (the Board tab scrolled to that message, #7921)
 // An agent's own tabs (live_session.html #agentic-tab-<id>); the team-scoped ones belong to /team.
 export const AGENT_SUBTABS = ['board', 'tasks', 'notes', 'files', 'browse', 'artifacts', 'activity', 'info', 'agent-ui', 'branches'];
