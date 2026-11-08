@@ -29,12 +29,16 @@ async function httpJson(method, p, body, headers = {}) {
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await coralReady();
         // record the upload request, the toasts and console.error; modes break one step at a time
-        await ev(`(() => { const real = window.fetch; window.__rec = { toasts: [], errors: [] }; window.__mode = 'ok';
+        // __uploadsHandled counts uploads the page has finished with: a timer queued when the request fails, or when the page reads the answer's text, runs only after the page's own follow-up (attach, draw,
+        // toast) has run. A step waits for it: a quiet page is not a finished upload (nothing moves while the request is out), and a step measured before the answer was read found nothing attached.
+        await ev(`(() => { const real = window.fetch; window.__rec = { toasts: [], errors: [] }; window.__mode = 'ok'; window.__uploadsHandled = 0;
+            const handled = () => setTimeout(() => { window.__uploadsHandled++; }, 0);
             window.fetch = async (u, o = {}) => { const url = String(u && u.url || u), m = (o.method || 'GET').toUpperCase();
                 if (url.endsWith('/api/upload') && m === 'POST') {
-                    if (window.__mode === 'throw') throw new TypeError('network down');
+                    if (window.__mode === 'throw') { handled(); throw new TypeError('network down'); }
                     const r = await real(u, o);
                     if (window.__mode === 'strip') window.__breakStrip = true;
+                    r.text = async function () { try { return await Response.prototype.text.call(this); } finally { handled(); } };
                     return r; }
                 return real(u, o); };
             const ce = console.error; console.error = (...a) => { window.__rec.errors.push(a.map(x => String(x && x.message || x)).join(' ')); ce.apply(console, a); };
@@ -47,8 +51,10 @@ async function httpJson(method, p, body, headers = {}) {
         await settle(800);
         const reset = async mode => { await ev(`(() => { window.__mode = ${JSON.stringify(mode)}; window.__breakStrip = false; document.querySelectorAll('.toast, #toast-container > *').forEach(e => e.remove()); window.__rec.toasts = []; window.__rec.errors = []; delete window.__origCreate; const i = document.getElementById('command-input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); T.state.currentSession && (window.__sid = T.state.currentSession.session_id); return true; })()`); };
         const attach = async () => {
+            const before = await ev(`window.__uploadsHandled`);
             await ev(`(() => { const i = document.getElementById('attach-image-input'); i.addEventListener('click', e => e.preventDefault(), { once: true }); document.querySelector('.attach-image-btn').click(); return true; })()`);
             await ev(`(async () => { const c = document.createElement('canvas'); c.width = 300; c.height = 200; const x = c.getContext('2d'); x.fillStyle = '#39c'; x.fillRect(0, 0, 300, 200); const b = await new Promise(r => c.toBlob(r, 'image/png')); const f = new File([b], 'image.png', { type: 'image/png' }); const dt = new DataTransfer(); dt.items.add(f); const input = document.getElementById('attach-image-input'); input.files = dt.files; input.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+            await waitFor(`window.__uploadsHandled > ${before}`, 'the page to finish with the upload', 15000);
             await settle(1500);
             return ev(`({ toasts: window.__rec.toasts.filter(t => !/Agents loading|Sign-in|tmux/.test(t)), errors: window.__rec.errors, chips: document.querySelectorAll('#image-attachments .image-attachment').length, pending: T.state.currentSession && (document.querySelectorAll('#image-attachments .image-attachment').length), input: document.getElementById('command-input').value })`);
         };
