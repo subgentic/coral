@@ -101,3 +101,33 @@ func TestALongNumberedMenuWithItsMarkedRowAboveTheWindowIsAMenu(t *testing.T) {
 	assert.Empty(t, a.sent())
 	ForgetSession(n)
 }
+
+// Security's MUST on 227f924e0: a question taller than the window whose visible tail is the footer plus at most one row (the Operator's exact case: just the free-text row) or the footer alone is still a question.
+func TestAMenuFooterHoldsWhateverRowsTheWindowShows(t *testing.T) {
+	for name, screen := range map[string]string{
+		"the footer alone":                      "\n  Enter to select · ↑/↓ to navigate · Esc to cancel\n",
+		"the footer and the free-text row":      "  5. [ ] Type something.\n     Next\n────────────────────────────\n  6. Chat about this\n\n  Enter to select · ↑/↓ to navigate · Esc to cancel\n",
+		"the footer and one plain numbered row": "  6. Chat about this\n\n  Enter to select · ↑/↓ to navigate · Esc to cancel\n",
+		"the free-text row alone (a check box)": "  5. [ ] Type something.\n     Next\n",
+		"Codex's confirm footer and no rows":    "\n  press enter to confirm or esc to go back\n",
+		"a navigate footer without 'Enter'":     "\n  ↑/↓ to select · Esc to exit\n",
+	} {
+		open, why := PromptOnScreen(screen)
+		assert.True(t, open, name)
+		assert.False(t, strings.HasPrefix(why, footerWhy) || strings.HasPrefix(why, busyWhy), "%s: a footer alone: %q", name, why)
+		a := &fakeAgent{screen: screen}
+		n := "claude-t-footer-only"
+		assert.Equal(t, Skipped, deliver(t, a, n, "You have 1 unread message"), name)
+		assert.Empty(t, a.sent(), name)
+		assert.Zero(t, a.enters, name)
+		ForgetSession(n)
+	}
+}
+
+// Antigravity draws "esc to cancel" under its input box while it runs a command: that is a footer alone, not a menu, and the text still goes (it is busy, not asking).
+func TestAnEscOnlyFooterIsStillNotAMenu(t *testing.T) {
+	open, why := PromptOnScreen("  esc to cancel\n")
+	assert.True(t, open)
+	assert.True(t, strings.HasPrefix(why, footerWhy) || strings.HasPrefix(why, busyWhy), "%q", why)
+	assert.False(t, isPromptHold(why), "an esc-only footer holds no send as a question: %q", why)
+}
