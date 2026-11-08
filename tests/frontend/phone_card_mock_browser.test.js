@@ -38,7 +38,7 @@ const { coralReady } = require('./helpers/wait');
             check(await ev(`(() => { const t = document.querySelector('#group-table-view tbody tr.dt-row .inbox-review-tags .inbox-review-version'); if (!t) return false; const cs = getComputedStyle(t); return parseFloat(cs.borderTopLeftRadius) >= 8 && cs.borderTopWidth === '1px'; })()`), `${at}the version has a pill's border and radius`);
             check(!g.star || (g.star.b - g.star.t >= 43.5 && g.star.r - g.star.l >= 43.5 && g.star.events !== 'none' && g.star.t >= g.approve.t - 4 && g.star.r <= g.card.r - 8), `${at}a starred card's star is a 44 px button at the end of the button row (the dots are at the top right): ` + JSON.stringify(g.star));
             check(g.timeText && !/v3/.test(g.timeText), `${at}the time line says the time only: ` + g.timeText);
-            await shot('phone-card-mock-' + w);
+            await shot('phone-card-mock-' + w + '-' + theme + '-' + font);
 
         }
     } finally { await client.close(); }
