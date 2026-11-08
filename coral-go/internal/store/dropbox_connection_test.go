@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"strings"
 	"testing"
@@ -157,4 +158,17 @@ func TestSetStateAcceptsOnlyTheKnownStates(t *testing.T) {
 	c, err := ds.Get(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, DropboxStateReconnect, c.State, "a refused state changes nothing")
+}
+
+func TestADisconnectLeavesNoAccountAndNoSealedToken(t *testing.T) {
+	ds, _, db := dropboxStore(t)
+	ctx := context.Background()
+	require.NoError(t, ds.Save(ctx, "dbid:AAA", fakeRefresh, "fp"))
+	require.NoError(t, ds.Disconnect(ctx))
+	c, err := ds.Get(ctx)
+	require.NoError(t, err)
+	assert.Empty(t, c.AccountID)
+	var raw sql.NullString
+	require.NoError(t, db.GetContext(ctx, &raw, "SELECT refresh_token FROM dropbox_connection WHERE id = 1"))
+	assert.False(t, raw.Valid, "the sealed token column is NULL, not just unreadable")
 }

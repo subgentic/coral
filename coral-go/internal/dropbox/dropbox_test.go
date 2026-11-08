@@ -182,3 +182,38 @@ func TestStartAcceptsOnlyTheLoopbackCallback(t *testing.T) {
 	_, err := f.Start("k", "http://127.0.0.1:53682/dropbox/callback", "")
 	assert.Error(t, err, "a sign-in must be bound to a browser")
 }
+
+func TestAnErrorTagThatIsFreeTextNeverReachesTheError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"error":"could not read /Users/me/secret/report.md","error_description":"x"}`))
+	}))
+	defer srv.Close()
+	_, err := newTestClient(t, srv).Exchange(context.Background(), "c", "v", "r")
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "report.md")
+	assert.NotContains(t, err.Error(), "/Users")
+	assert.Contains(t, err.Error(), "unknown", "a tag that is not a tag is replaced")
+}
+
+func TestTheTokenFormNamesTheApp(t *testing.T) {
+	var form url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		form = r.PostForm
+		w.Write([]byte(`{"access_token":"a","refresh_token":"r","account_id":"dbid:A"}`))
+	}))
+	defer srv.Close()
+	_, err := newTestClient(t, srv).Refresh(context.Background(), "r")
+	require.NoError(t, err)
+	assert.Equal(t, "appkey", form.Get("client_id"), "a public client names its app")
+	assert.Equal(t, "refresh_token", form.Get("grant_type"))
+}
+
+func TestARevokeThatFailsIsAnError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusInternalServerError) }))
+	defer srv.Close()
+	err := newTestClient(t, srv).Revoke(context.Background(), "a")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "500")
+}
