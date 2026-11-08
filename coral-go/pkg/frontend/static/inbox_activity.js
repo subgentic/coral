@@ -9,6 +9,7 @@ const { activityParts, aboutWords, jobRunParts } = await importOnce('./operator_
 import { markHidden } from './visible_marks.js';
 import { loadStyles } from './lazy_styles.js';
 const DT = await importOnce('./data_table.js');
+const Threads = await importOnce('./activity_threads.js');
 const AF = await importOnce('./operator_activity_filters.js'); // lazy, as the sidebar loads it: its failure is retried
 await loadStyles('inbox_activity.css'); // the folder's rules load with the folder, not at start (page_weight)
 
@@ -54,28 +55,35 @@ export function refresh(done, { next = false } = {}) {
 
 /** Team ids that appear in the record, with the names the page shows them by. */
 export const teams = () => [...new Set(rows.map(r => r.team))].sort((a, b) => teamLabel(a).localeCompare(teamLabel(b)));
+/** The agents and the goals the record names, for the Filters panel's lists (#14445): the agents by name, the goals by title with No goal last when any row has none. */
+export const agents = () => [...new Set(rows.map(AF.agentOf).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+export const goals = () => { const all = [...new Set(rows.map(AF.goalOf))]; return [...all.filter(g => g !== AF.NO_GOAL).sort((a, b) => a.localeCompare(b)), ...all.filter(g => g === AF.NO_GOAL)]; };
 export const teamOf = r => teamLabel(r.team);
 export const filtered = f => AF.ordered(rows.filter(r => AF.matches(r, f, teamOf)), f);
 export const total = () => rows.length;
 
 /** The page's table spec for the sidebar's group table. `open` has { file(row), goal(row), question(row) }: how a row's item opens (the sidebar knows the routes). */
-export function spec(f, open) {
+export function spec(f, open, { grouped = false, tasks, taskSignature = '' } = {}) {
     const list = filtered(f);
+    const parts = r => { const p = partsOf(r); return grouped && r.goal_id && r.task_id ? { ...p, about: '' } : p; };
+    const decision = r => { const label = AF.DECISION_LABEL[AF.decisionOf(r)]; if (!label) return DT.el('span', 'activity-did', parts(r).did); const chip = DT.tag(parts(r).did); chip.classList.add('activity-decision'); return chip; };
+    const summary = r => { const p = parts(r); return [p.did, p.detail, p.about ? markHidden(p.about, { strict: true }) : ''].filter(Boolean).join(' · '); };
+    const groupFor = grouped ? Threads.activityGroupLookup(list, teamLabel, parts, tasks) : null;
     const opens = r => (r.item_kind === 'job_run' && !!jobRunParts(r.item_id)) || (r.item_kind === 'file' && /^[a-f0-9]{64}$/i.test(r.version || r.item_id || '')) || (r.item_kind === 'agent' && r.item_id && r.action !== 'agents_record') || (['goal', 'question', 'task', 'message', 'workflow_run'].includes(r.item_kind) && /^\d+$/.test(r.item_id)) || (r.item_kind === 'chat' && !!r.item_id);
     return { title: 'Activity', noun: ['action', 'actions'], rows: list,
         empty: { line: !loaded || loading ? 'Reading the record…' : failed ? (denied ? 'Only the account this computer is linked to can see the Activity record.' : 'The record could not be read.') : AF.isFiltered(f) ? 'No action matches the search and filters.' : 'Nothing yet.',
             hint: loaded && !failed && !AF.isFiltered(f) ? 'Each time you approve, ask for changes, deny, ignore or answer something in Needs you, a line is added here.' : undefined },
-        signature: JSON.stringify([list.map(r => r.id), check, loaded, failed, denied, more]),
+        signature: JSON.stringify([list.map(r => r.id), check, loaded, failed, denied, more, grouped, grouped ? taskSignature : '']),
         node: () => {
             const wrap = DT.el('div', 'activity-folder');
             const words = checkWords(check);
             if (words) { const n = DT.el('p', `activity-check${check && !check.intact ? ' activity-check-broken' : ''}`, words); n.setAttribute('role', check && !check.intact ? 'alert' : 'status'); wrap.append(n); }
-            const t = DT.dataTable({ label: `Activity, ${list.length}`, rows: list, rowKey: r => r.id, state, decorate: (r, tr) => { if (opens(r)) return; const button = tr.querySelector('button.dt-mail-open'); if (button) { const text = DT.el('span', button.className.replace('dt-primary', '')); text.append(...button.childNodes); button.replaceWith(text); } }, wrapMail: true, rowName: r => { const p = partsOf(r); return `${p.on} ${p.did}${p.detail ? ` \u00b7 ${p.detail}` : ''}`; }, oneLine: true, resize: true, sortBar: false,
+            const t = DT.dataTable({ label: `Activity, ${list.length}`, rows: list, ...(grouped ? { orderRows: Threads.arrangeActivityRows, groupSorted: true, groupBy: groupFor } : {}), rowKey: r => r.id, state, decorate: (r, tr) => { const ask = tr.querySelector('.dt-mail-ask'); if (ask) { const p = parts(r); ask.replaceChildren(decision(r)); if (p.detail) ask.append(' · ', p.detail); if (p.about) ask.append(' · ', markHidden(p.about, { strict: true })); } if (opens(r)) return; const button = tr.querySelector('button.dt-mail-open'); if (button) { const text = DT.el('span', button.className.replace('dt-primary', '')); text.append(...button.childNodes); button.replaceWith(text); } }, wrapMail: true, rowName: r => { const p = parts(r); return `${p.on} ${summary(r)}`; }, oneLine: true, resize: true, sortBar: false,
                 open: r => { if (!opens(r)) return; if (r.item_kind === 'file' && /^[a-f0-9]{64}$/i.test(r.version || r.item_id || '')) open.file(r); else if (r.item_kind === 'goal') open.goal(r); else if (r.item_kind === 'question' && opens(r)) open.question(r); else if (r.item_kind === 'task' && opens(r)) open.task(r); else if (r.item_kind === 'agent' && opens(r)) open.agent(r); else if (r.item_kind === 'message' && opens(r)) open.message(r); else if (r.item_kind === 'chat' && opens(r)) open.chat(r); else if (r.item_kind === 'workflow_run' && opens(r)) open.workflow(r); else if (r.item_kind === 'job_run' && opens(r)) open.job(r, jobRunParts(r.item_id)); },
-                mail: r => { const p = partsOf(r); return { lead: { icon: 'checklist', square: true, name: p.did }, title: p.on, team: teamOf(r), snippet: '', ask: [p.did, p.detail, p.about ? markHidden(p.about, { strict: true }) : ''].filter(Boolean).join(' \u00b7 '), time: DT.timeCell(r.at).textContent }; },
+                mail: r => { const p = parts(r); return { lead: { icon: 'checklist', square: true, name: p.did }, title: p.on, team: teamOf(r), snippet: '', ask: summary(r), time: DT.timeCell(r.at).textContent }; },
                 columns: [ // narrowing drops From (62 rem), then Team (52), then When (36), then You did (16): the data table's own thresholds, so the On column (the item) never shrinks (the table rules' R2)
-                    { key: 'action', label: 'You did', sort: true, sortValue: r => partsOf(r).did, line: 2, width: '12rem', dropAt: 16, cell: r => DT.el('span', 'activity-did', partsOf(r).did) },
-                    { key: 'item', label: 'On', primary: true, width: 'grow', sort: true, sortValue: r => partsOf(r).on, line: 1, cell: r => { const p = partsOf(r), el = opens(r) ? DT.primaryButton(p.on, `${p.on}. Open ${itemWords(r)}`) : DT.el('span', 'activity-item', p.on); DT.tipIf(el, p.on, () => el.scrollWidth > el.clientWidth); if (!p.detail && !p.about) return el; const cell = DT.el('span', 'activity-on'); cell.append(el); if (p.detail) cell.append(DT.el('span', 'activity-detail', p.detail)); if (p.about) cell.append(DT.el('span', 'activity-about', markHidden(p.about, { strict: true }))); return cell; } }, // the detail is its own line under the object, whole (never cut)
+                    { key: 'action', label: 'You did', sort: true, sortValue: r => parts(r).did, line: 2, width: '12rem', dropAt: 16, cell: decision },
+                    { key: 'item', label: 'On', primary: true, width: 'grow', sort: true, sortValue: r => parts(r).on, line: 1, cell: r => { const p = parts(r), el = opens(r) ? DT.primaryButton(p.on, `${p.on}. ${p.about ? `${markHidden(p.about, { strict: true })}. ` : ''}Open ${itemWords(r)}`) : DT.el('span', 'activity-item', p.on); DT.tipIf(el, p.on, () => el.scrollWidth > el.clientWidth); if (!p.detail && !p.about) return el; const cell = DT.el('span', 'activity-on'); cell.append(el); if (p.detail) cell.append(DT.el('span', 'activity-detail', p.detail)); if (p.about) cell.append(DT.el('span', 'activity-about', markHidden(p.about, { strict: true }))); return cell; } }, // the detail is its own line under the object, whole (never cut)
                     { key: 'team', label: 'Team', sort: true, sortValue: teamOf, line: 2, width: '9rem', dropAt: 52, cell: teamOf },
                     { key: 'from', label: 'From', sort: true, sortValue: fromWords, line: 2, tone: 'tertiary', width: '11rem', dropAt: 62, cell: fromWords },
                     { key: 'when', label: 'When', sort: 'date', sortValue: r => r.at, firstDir: 'desc', line: 0, tone: 'tertiary', align: 'end', width: '7rem', dropAt: 36, cell: r => DT.timeCell(r.at) },

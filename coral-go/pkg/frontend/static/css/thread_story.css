@@ -1,0 +1,22 @@
+/* The story under a task in Needs you and Activity (#14444, option A): who and when, a file as a chip, a decision as a chip with its quote, the end of the task as a line. */
+.thread-story { display: flex; flex-direction: column; gap: var(--space-sm); padding: var(--space-sm) var(--table-pad-x, 12px) var(--space-md) calc(var(--table-pad-x, 12px) + 28px); min-width: 0; }
+.thread-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-sm); border-inline-start: 2px solid var(--border); padding-inline-start: var(--space-md); }
+.thread-ev { min-width: 0; font-size: var(--fs-md); line-height: var(--lh-body); color: var(--text-primary); overflow-wrap: anywhere; }
+.thread-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-sm); }
+.thread-who { font-weight: var(--fw-medium); }
+.thread-when { color: var(--text-secondary); font-size: var(--fs-sm); }
+.thread-text { color: var(--text-primary); }
+.thread-sub { color: var(--text-secondary); font-size: var(--fs-sm); }
+.thread-file { display: inline-block; max-width: 100%; padding: 2px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-tertiary); overflow-wrap: anywhere; }
+.thread-decision { border: 1px solid var(--accent); }
+.thread-chip { border: 1px solid var(--warning); color: var(--warning-text, var(--warning)); background: none; }
+.thread-quote { margin-top: 2px; padding-inline-start: var(--space-sm); border-inline-start: 2px solid var(--border); color: var(--text-secondary); }
+.thread-endline { font-weight: var(--fw-medium); color: var(--text-secondary); }
+.ev-task_event, .ev-goal_event { color: var(--text-secondary); font-size: var(--fs-sm); }
+.thread-status { margin: 0; color: var(--text-secondary); font-size: var(--fs-sm); }
+.thread-earlier { align-self: flex-start; min-height: 32px; }
+@media (max-width: 767px) { .thread-story { padding-inline-start: var(--table-pad-x, 12px); } .thread-earlier { min-height: 44px; } }
+.thread-paired { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-sm); background: var(--bg-secondary, transparent); } /* an ask with how it was decided, one block (#14445) */
+.thread-decided { margin-top: var(--space-sm); padding-top: var(--space-sm); border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-sm); }
+.thread-decided-by { font-weight: var(--fw-medium); }
+.thread-decided .thread-quote { flex: 1 1 100%; }
