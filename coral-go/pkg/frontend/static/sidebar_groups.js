@@ -252,7 +252,10 @@ let hoverOver = false, hoverHeldSince = null;
 // The action's handler dispatches 'coral:action-result' AFTER the server accepted it and the list it changed has been read again (an event, so no module imports the table). The table then makes ONE redraw, not held, scoped to the table on screen:
 // the token lives only for that call. No click, menu or refused action does it, and there is no time window: a later arrival is held as before.
 let actedRefresh = false;
-if (typeof document !== 'undefined') document.addEventListener('coral:action-result', () => { if (!open) return; const kind = open.kind; actedRefresh = true; try { refreshGroupTable(kind); } finally { actedRefresh = false; } });
+if (typeof document !== 'undefined') {
+    document.addEventListener('coral:action-start', e => { if (e.detail && open) e.detail.table = open; }); // the table on screen when the action began
+    document.addEventListener('coral:action-result', e => { const t = e.detail && e.detail.table; if (!t || t !== open) return; actedRefresh = true; try { refreshGroupTable(t.kind); } finally { actedRefresh = false; } }); // only that table, still on screen
+}
 let holdCap = HOVER_HOLD_MS, drawnUrgent = '';
 const hovering = () => hoverOver && hoverHeldSince !== null ? Date.now() - hoverHeldSince < holdCap : hoverOver;
 function showHeldNote() {

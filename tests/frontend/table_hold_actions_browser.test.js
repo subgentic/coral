@@ -70,6 +70,18 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const t0 = Date.now();
             await waitFor(`document.querySelectorAll('.saved-files tbody tr').length === 2 && ![...document.querySelectorAll('.saved-files tbody tr')].some(r => /plan-1\\.md/.test(r.textContent))`, at + 'the dismissed row leaves after the slow success', 10000);
             check(Date.now() - t0 < 2500, at + 'it left within 2.5 s of the answer (took ' + (Date.now() - t0) + ' ms), though the pointer rests and the answer came after 6.5 s');
+            // 4) the person goes ELSEWHERE while a Dismiss is slow, and comes back to a fresh Saved: the late success is for the table it began in, not this one
+            await ev(`window.__replied = 0; window.__delay = 6500; true`);
+            await rest(); await mark();
+            await ev(`document.querySelector('.saved-files button[aria-label^="Dismiss: plan-"]').click(); true`);
+            await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the other table is drawn
+            await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('saved')).then(() => true)`);
+            await waitFor(`!!document.querySelector('.saved-files') && document.querySelectorAll('.saved-files tbody tr').length >= 2`, at + 'Saved is drawn again (a new table)', 10000);
+            await rest(); await mark(); await arrive(4); // a new row arrives in the NEW table, held under the resting pointer
+            const before = await rows();
+            await waitFor(`!!window.__replied`, at + 'the slow answer of the first table came', 12000);
+            await new Promise(r => setTimeout(r, 1200)); // sleep-ok: a redraw the late answer wrongly asked for would have happened by now
+            check(await rows() === before && await kept() === before && await heldNote(), at + 'the late answer of the table the person left did not release this one: rows ' + before + ' -> ' + await rows() + ', kept ' + await kept() + ', note ' + await heldNote());
             await removeBoards(ev, [team]).catch(() => {});
         }
     } finally { await client.close(); }

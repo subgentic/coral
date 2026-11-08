@@ -104,9 +104,10 @@ export async function markGoalDoneUnread(team, g) {
 
 /** Hides a goal's item: mode 'not-yet' (until a task is added) or 'ignore'. Resolves to a function that puts it back. */
 export async function hideGoalDone(team, g, mode) {
+    const h = { table: null }; document.dispatchEvent(new CustomEvent('coral:action-start', { detail: h })); // the table on screen when it began (#14373)
     const entry = mode === 'ignore' ? starOf(team, g) : keyOf(team, g);
     await post(team, g, mode);
     keep(SETTING, [...hiddenList().filter(e => e !== entry), entry]);
-    document.dispatchEvent(new Event('coral:action-result')); // the hidden list is saved: the table's one redraw for this action is not held under a resting pointer (#14373)
+    document.dispatchEvent(new CustomEvent('coral:action-result', { detail: h })); // the hidden list is saved: that table's one redraw for this action is not held under a resting pointer (#14373)
     return async () => { await post(team, g, 'show'); keep(SETTING, withoutGoal(hiddenList(), team, g)); };
 }

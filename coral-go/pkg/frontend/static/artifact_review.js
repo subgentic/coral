@@ -79,7 +79,10 @@ export async function approveRow(team, row, note = '') { // note (#11888): one s
 }
 
 const shown = name => markHidden(name, { strict: true }); // the uploader's file name is an agent's text: hidden characters are written out wherever it is drawn or spoken (Security's SHOULD, #11552)
-const settled = row => importOnce('./inbox_reviews.js').then(m => { m.settleReview(row); return m.refreshReviews(true); }).catch(() => {}).then(() => { document.dispatchEvent(new Event('coral:action-result')); }); // once the refresh has landed: the table's one redraw for this action is not held (#14373)
+// An action of the person's names the table it started in and, when the server has accepted it and the list is read again, asks that table (only) for one redraw that is not held under a resting pointer (#14373): the table on screen at the START is captured, so a slow answer that arrives after the person went elsewhere releases nothing there.
+const begin = () => { const h = { table: null }; document.dispatchEvent(new CustomEvent('coral:action-start', { detail: h })); return h; };
+const finish = h => document.dispatchEvent(new CustomEvent('coral:action-result', { detail: h }));
+const settled = (row, h) => importOnce('./inbox_reviews.js').then(m => { m.settleReview(row); return m.refreshReviews(true); }).catch(() => {}).then(() => finish(h));
 const fromWords = out => (out.delivered && out.asleep ? `${out.to} is asleep: it will see this when it wakes.` : out.delivered ? `${out.to} was told.` : out.reason === 'no_uploader' ? 'No agent is recorded for it, so nobody was told.' : '');
 
 /** Deny a review row (#11552): a final no, the agent is told it was declined, with the reason if there is one. Resolves the server's answer. */
@@ -92,19 +95,19 @@ async function onEarlier(row, run) {
     return { done, failed };
 }
 
-export async function denyRow(team, row, reason) {
+export async function denyRow(team, row, reason) { const h = begin();
     const out = await decide(team, row, 'deny', reason);
     const m = await importOnce('./inbox_reviews.js').catch(() => null);
     if (m) out.earlier = await settleEarlierVersions(m, row).catch(() => ({ settled: 0, failed: 1 })); // the older versions leave Needs you with it, quietly: the agent is told once, about the newest
-    settled(row); return out;
+    settled(row, h); return out;
 }
 /** Dismiss a review row: out of Needs you with no verdict and nobody told; the file stays where it is. Unignore puts it back as it was. */
-export async function ignoreRow(team, row) { const out = await decide(team, row, 'ignore'); out.earlier = await onEarlier(row, e => decide(e.team, e, 'ignore')); settled(row); return out; }
-export async function unignoreRow(team, row) { const out = await decide(team, row, 'unignore'); importOnce('./inbox_reviews.js').then(m => { m.reviewsChangedOnServer(); return m.refreshReviews(true); }).catch(() => {}).then(() => { document.dispatchEvent(new Event('coral:action-result')); }); return out; }
+export async function ignoreRow(team, row) { const h = begin(); const out = await decide(team, row, 'ignore'); out.earlier = await onEarlier(row, e => decide(e.team, e, 'ignore')); settled(row, h); return out; }
+export async function unignoreRow(team, row) { const h = begin(); const out = await decide(team, row, 'unignore'); importOnce('./inbox_reviews.js').then(m => { m.reviewsChangedOnServer(); return m.refreshReviews(true); }).catch(() => {}).then(() => finish(h)); return out; }
 
 /** Save for later (#11641): out of Needs you and its counts, kept in Saved with its decisions; nobody is told. Move to Needs you (unsave) puts it back as it was. */
-export async function saveRow(team, row) { const out = await decide(team, row, 'save'); out.earlier = await onEarlier(row, e => decide(e.team, e, 'save')); settled(row); return out; }
-export async function unsaveRow(team, row) { const out = await decide(team, row, 'unsave'); out.earlier = await onEarlier(row, e => decide(e.team, e, 'unsave')); importOnce('./inbox_reviews.js').then(m => { m.reviewsChangedOnServer(); return m.refreshReviews(true); }).catch(() => {}).then(() => { document.dispatchEvent(new Event('coral:action-result')); }); return out; }
+export async function saveRow(team, row) { const h = begin(); const out = await decide(team, row, 'save'); out.earlier = await onEarlier(row, e => decide(e.team, e, 'save')); settled(row, h); return out; }
+export async function unsaveRow(team, row) { const h = begin(); const out = await decide(team, row, 'unsave'); out.earlier = await onEarlier(row, e => decide(e.team, e, 'unsave')); importOnce('./inbox_reviews.js').then(m => { m.reviewsChangedOnServer(); return m.refreshReviews(true); }).catch(() => {}).then(() => finish(h)); return out; }
 export function saySaved(team, row) {
     showToast(`Saved for later: ${shown(row.name)}`, false, undefined, { action: { label: 'Undo', onClick: () => unsaveRow(team, row).then(() => announceNotice(`${shown(row.name)} is back in Needs you.`)).catch(e => showToast(e.message)) } });
     announceNotice(`Saved for later: ${shown(row.name)}. Undo is in the notice.`);

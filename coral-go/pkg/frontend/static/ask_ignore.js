@@ -17,8 +17,9 @@ async function close(a, body) {
 
 /** Close the question quietly. `who` is the asker as it is drawn (hidden characters written out). Resolves when the route answered; rejects with its words. */
 export async function ignoreAsk(a, who) {
+    const h = { table: null }; document.dispatchEvent(new CustomEvent('coral:action-start', { detail: h })); // the table on screen when the Dismiss began: only it gets the one unheld redraw (#14373)
     await close(a, { note: NOTE });
-    Promise.resolve(refreshOperatorAsks(true)).catch(() => {}).then(() => { document.dispatchEvent(new Event('coral:action-result')); }); // the list has been read again: its one redraw for this action is not held under a resting pointer (#14373)
+    Promise.resolve(refreshOperatorAsks(true)).catch(() => {}).then(() => { document.dispatchEvent(new CustomEvent('coral:action-result', { detail: h })); }); // the list has been read again: its one redraw for this action is not held under a resting pointer (#14373)
     const flat = markHidden(String(a.text || ''), { strict: true }).replace(/\s+/g, ' ').trim(), what = flat ? `"${flat.length > 48 ? flat.slice(0, 47).trimEnd() + '\u2026' : flat}" from ${who}` : `the question of ${who}`; // which one, since nine ignores said the same line nine times (#12112)
     showToast(`Dismissed ${what}`, false, undefined, { action: { label: 'Undo', onClick: () => close(a, { undo: true }).then(() => { refreshOperatorAsks(true); announceNotice(`The question of ${who} is back in Needs you.`); }).catch(e => showToast(e.message, true)) } });
     announceNotice(`Dismissed ${what}. Undo is in the notice.`);
