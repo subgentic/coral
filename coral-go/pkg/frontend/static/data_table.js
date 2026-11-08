@@ -23,6 +23,17 @@ import { browserLocal } from './safe_storage.js';
 import { loadStyles } from './lazy_styles.js';
 
 let lastTap = { key: '', at: -1e9 }; // the last group-heading tap the pointer path handled (every table draws again after a toggle, so this outlives the table that heard it)
+
+// ── A group heading that opens and shuts its rows (a task's, #14441/#14483) ──
+// Toggled from the DOCUMENT, not from a handler on the button or on one table: the page draws its table again while a finger is down (a poll, a read landing), and the new table (a new tbody and a new button) is what the finger is lifted over; the
+// browser then sends the click to the two elements' common parent, so no handler on either ever hears it. The press and the lift are matched by the group's KEY (data-group-key), and the toggle that is current for that key (registered at every draw, by whichever
+// table drew last) runs. The press state lives here, outside every table, so it outlives the table that saw the press.
+const groupToggles = new Map(); let pressedGroup = null;
+const toggleOf = e => { const b = e.target && e.target.closest && e.target.closest('.dt-group-toggle'); return b && b.dataset.groupKey ? b : null; };
+document.addEventListener('pointerdown', e => { const b = toggleOf(e); pressedGroup = b ? { key: b.dataset.groupKey, x: e.clientX, y: e.clientY } : null; }, true);
+document.addEventListener('pointercancel', () => { pressedGroup = null; }, true);
+document.addEventListener('pointerup', e => { const d = pressedGroup; pressedGroup = null; const b = toggleOf(e); if (!d || !b || b.dataset.groupKey !== d.key || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 12) return; const run = groupToggles.get(d.key); if (run) { lastTap = { key: d.key, at: e.timeStamp }; run(); } }, true);
+document.addEventListener('click', e => { const b = toggleOf(e); if (!b) return; if (e.detail > 0 && lastTap.key === b.dataset.groupKey && e.timeStamp - lastTap.at < 600) return; /* the pointer path already did this tap */ const run = groupToggles.get(b.dataset.groupKey); if (run) run(); }, true); // a keyboard press (detail 0), or a click the pointer path did not see
 export const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const button = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 
@@ -211,13 +222,6 @@ export function dataTable(cfg) {
     const table = el('table', 'dt-table'); table.setAttribute('aria-label', cfg.label); table.setAttribute('role', 'table');
     if (cfg.layout === 'fixed' || cfg.oneLine) table.style.tableLayout = 'fixed'; // grouped lists share column widths even when their contents differ
     const thead = el('thead'); thead.setAttribute('role', 'rowgroup'); const tbody = el('tbody'); tbody.setAttribute('role', 'rowgroup');
-    // A group heading that opens and shuts its rows (a task's, #14441/#14483) is toggled from here, not from a handler on the button: the table is drawn again while a finger is down (a poll, a read landing), the button is a new element when it
-    // is lifted, and the browser then sends the click to their common parent, so a handler on the button never heard it. The press and the lift are matched by the group's KEY, and the toggle that is current for that key (set at every draw) runs.
-    const groupToggles = new Map(); let pressed = null;
-    const toggleOf = e => { const b = e.target && e.target.closest && e.target.closest('.dt-group-toggle'); return b && b.dataset.groupKey ? b : null; };
-    tbody.addEventListener('pointerdown', e => { const b = toggleOf(e); pressed = b ? { key: b.dataset.groupKey, x: e.clientX, y: e.clientY } : null; });
-    tbody.addEventListener('pointerup', e => { const b = toggleOf(e), d = pressed; pressed = null; if (!b || !d || b.dataset.groupKey !== d.key || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 12) return; const run = groupToggles.get(d.key); if (run) { lastTap = { key: d.key, at: e.timeStamp }; run(); } });
-    tbody.addEventListener('click', e => { const b = toggleOf(e); if (!b) return; if (e.detail > 0 && lastTap.key === b.dataset.groupKey && e.timeStamp - lastTap.at < 600) return; /* the pointer path already did this tap: it drew the table again, so this click is on the NEW table and the guard is module-wide */ const run = groupToggles.get(b.dataset.groupKey); if (run) run(); }); // a keyboard press (detail 0), or a click the pointer path did not see
     const colgroup = el('colgroup');
     table.append(colgroup, thead, tbody);
     // the columns left out to fit the panel are never silently gone (#11943): a quiet control says how many, lists them and brings one back (it then keeps its place and the others give way by the same rules)

@@ -70,7 +70,32 @@ const BASE = require('./test_base').BASE;
             // the same tap with the table drawn again between the press and the lift: the heading is a NEW element when the finger is lifted (a poll, a read landing), and the browser sends the click to their common parent
             const press = async q => { if (mobile) await client.Input.dispatchTouchEvent({ type: 'touchStart', touchPoints: [{ x: q.x, y: q.y }] }); else { await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: q.x, y: q.y }); await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: q.x, y: q.y, button: 'left', clickCount: 1 }); } };
             const lift = async q => { if (mobile) await client.Input.dispatchTouchEvent({ type: 'touchEnd', touchPoints: [] }); else await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: q.x, y: q.y, button: 'left', clickCount: 1 }); };
-            const tapWithRedraw = async state => { const q = await head(11); await press(q); await ev(`(() => { const tr = [...document.querySelectorAll('.dt-group-task')].find(x => x.textContent.includes('Task #11')); tr.replaceWith(tr.cloneNode(true)); return true; })()`); await lift(q); return waitFor(`[...document.querySelectorAll('.dt-group-toggle')].find(x => x.textContent.includes('Task #11')).getAttribute('aria-expanded') === '${state}'`, `${at}the heading is ${state === 'true' ? 'open' : 'shut'} after a tap with a redraw in the middle`, 5000).then(() => true, () => false); };
+            // (a) the real Needs you refresh: while the finger is down a read lands; the redraw is held and drawn right after the lift, so the whole table (the heading button with it) is a new element when the click that follows the lift is sent
+            const tapWithRedraw = async state => { const q = await head(11); await press(q);
+                await ev(`(async () => { window.__oldBody = document.querySelector('#group-table-view tbody'); window.__oldBtn = [...document.querySelectorAll('.dt-group-toggle')].find(x => x.textContent.includes('Task #11')); window.__asks = window.__asks.concat([{ board: '${team}', kind: 'ask', id: 100 + window.__asks.length, asker: 'Developer', text: 'A new question while you press ' + window.__asks.length, cut: false, at: new Date().toISOString(), buttons: [] }]); const m = await import((window.__coralStatic || '/static/') + 'operator_asks.js'); await m.refreshOperatorAsks(true); await m.refreshOperatorAsks(true); return true; })()`);
+                await ev(`new Promise(r => setTimeout(r, 700))`); /* sleep-ok: the read has landed; the page holds the redraw while the finger is down (sidebar_groups, #12636) and draws it right after the lift */
+                await lift(q);
+                check(await waitFor(`!window.__oldBtn.isConnected && [...document.querySelectorAll('#group-table-view tbody tr')].some(tr => /A new question while you press/.test(tr.textContent))`, `${at}the table is drawn again right after the lift`, 8000).then(() => true, () => false), `${at}the heading button was replaced by the redraw that came with the lift (the new question drawn)`);
+                const took = await waitFor(`[...document.querySelectorAll('.dt-group-toggle')].find(x => x.textContent.includes('Task #11')).getAttribute('aria-expanded') === '${state}'`, `${at}the heading is ${state === 'true' ? 'open' : 'shut'} after a tap whose redraw comes between the lift and the click`, 5000).then(() => true, () => false);
+                await ev(`new Promise(r => setTimeout(r, 900))`); /* sleep-ok: a double toggle would show up late, from the click that follows */
+                check(await ev(`[...document.querySelectorAll('.dt-group-toggle')].find(x => x.textContent.includes('Task #11')).getAttribute('aria-expanded') === '${state}'`), `${at}and it stays ${state === 'true' ? 'open' : 'shut'}: one tap, one toggle`);
+                return took; };
+            // (b) a whole NEW table (a new tbody) replaces the old one between the press and the lift (a team page mounting, a view redrawn from scratch): drawn here with the data table itself, over the page, so the replacement is exact
+            const tapWithTableSwap = async () => { await ev(`(async () => { const DT = await import((window.__coralStatic || '/static/') + 'data_table.js'); window.__swapHits = [];
+                    const make = who => DT.dataTable({ label: 'swap', columns: [{ key: 'n', label: 'N', cell: r => String(r.n) }], rows: [{ n: 1 }], rowKey: r => r.n, groupSorted: true, groupBy: () => ({ key: 'swap#1', label: 'Task #9 · swap \\u00b7 1 shown', level: 'task', open: true, onToggle: () => window.__swapHits.push(who) }) });
+                    const host = document.createElement('div'); host.id = 'swap-host'; host.className = 'inbox-needs-results'; host.style.cssText = 'position: fixed; top: 80px; left: 12px; width: 320px; z-index: 99999; background: #000;'; document.body.append(host); window.__swapMake = make; host.append(make('A').el); return true; })()`);
+                /* the second table is built and laid out out of sight first (the same width), so the swap changes the element and not the layout */
+                await ev(`(() => { const off = document.createElement('div'); off.id = 'swap-off'; off.className = 'inbox-needs-results'; off.style.cssText = 'position: fixed; top: 80px; left: -9999px; width: 320px;'; document.body.append(off); window.__swapB = window.__swapMake('B'); off.append(window.__swapB.el); return true; })()`);
+                await ev(`new Promise(r => setTimeout(r, 700))`); /* sleep-ok: the table lays its columns out */
+                const r = await ev(`(() => { const b = document.querySelector('#swap-host .dt-group-toggle'), r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+                check(await ev(`(() => { const e = document.elementFromPoint(${r.x}, ${r.y}); return !!(e && e.closest('.dt-group-toggle')); })()`), `${at}the swap table's heading is under the press point`);
+                await press(r);
+                await ev(`(() => { const host = document.getElementById('swap-host'); host.replaceChildren(window.__swapB.el); return true; })()`);
+                await lift(r);
+                await ev(`new Promise(r => setTimeout(r, 900))`); /* sleep-ok: a second toggle would arrive late, from the click */
+                const hits = await ev(`window.__swapHits`);
+                await ev(`document.getElementById('swap-host').remove(); document.getElementById('swap-off').remove(); true`);
+                return hits; };
             let p = await head(11);
             check(p.expanded === 'true' && p.h >= 44 && p.hit && p.w <= p.vw, `${at}the task heading is an open, 44 px, on-screen button: ` + JSON.stringify(p));
             check(await toggleTo('false'), `${at}a real tap shuts the task`);
@@ -80,7 +105,8 @@ const BASE = require('./test_base').BASE;
             check(await ev(`JSON.parse(localStorage.getItem('coral-inbox-task-open') || '{}')`).then(v => Object.values(v).includes(false)), `${at}the choice is kept in this browser`);
             await snap('shut');
             check(await toggleTo('true'), `${at}a second tap opens it again`);
-            check(await tapWithRedraw('false'), `${at}a tap with the heading replaced between press and lift still shuts the task`);
+            { const hits = await tapWithTableSwap(); check(hits.length === 1 && hits[0] === 'B', `${at}a new table swapped in between press and lift: the toggle that is current for the group runs once: ` + JSON.stringify(hits)); }
+            check(await tapWithRedraw('false'), `${at}a tap with the whole table replaced between the lift and the click still shuts the task`);
             check(await tapWithRedraw('true'), `${at}and another opens it again`);
             // the keyboard still works (a click with no pointer): Enter on the focused heading shuts it, Space opens it
             const key = async (k, code) => { await client.Input.dispatchKeyEvent({ type: 'keyDown', key: k, code, windowsVirtualKeyCode: k === 'Enter' ? 13 : 32, text: k === 'Enter' ? '\r' : ' ' }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: k, code, windowsVirtualKeyCode: k === 'Enter' ? 13 : 32 }); };
