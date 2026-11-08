@@ -111,6 +111,7 @@ func (h *CloudHandler) NewDropboxBackup(ob *store.DropboxOutbox) *DropboxBackup 
 		return time.Duration(days) * 24 * time.Hour
 	}
 	h.dbx.outbox = ob
+	h.dbx.backup = b
 	dropboxBackupsMu.Lock()
 	dropboxBackups[filepath.Clean(b.coralDir)] = b
 	dropboxBackupsMu.Unlock()
@@ -306,6 +307,9 @@ type dropboxSend struct {
 func (b *DropboxBackup) Pass(ctx context.Context) {
 	b.passMu.Lock()
 	defer b.passMu.Unlock()
+	if c, err := b.d.store.Get(ctx); err == nil && c.Connected && c.State == store.DropboxStateQuotaFull && !b.spaceFreed(ctx) {
+		return // still full: nothing is sent until the person frees space (Security's SHOULD 2 on #14693)
+	}
 	if !b.ready(ctx) {
 		return
 	}
@@ -524,6 +528,39 @@ func (b *DropboxBackup) send(ctx context.Context, cl *dropbox.Client, access str
 		slog.Info("[dropbox] backed up", "files", done)
 	}
 	return goOn
+}
+
+// spaceFreed asks Dropbox for the account's space while the backup is paused as full, and below the 90% line sets the state back to connected.
+func (b *DropboxBackup) spaceFreed(ctx context.Context) bool {
+	if b.d.appKey() == "" || b.d.looksLikeCopy(ctx) {
+		return false
+	}
+	refresh, err := b.d.store.RefreshToken(ctx)
+	if err != nil {
+		return false
+	}
+	cl := b.d.client(b.d.appKey())
+	access, err := cl.Refresh(ctx, refresh)
+	if err != nil {
+		return false
+	}
+	used, alloc, err := cl.SpaceUsage(ctx, access)
+	if err != nil || alloc <= 0 || used*10 >= alloc*9 {
+		return false
+	}
+	if err := b.d.store.SetState(ctx, store.DropboxStateConnected); err != nil {
+		return false
+	}
+	slog.Info("[dropbox] Dropbox has space again: the backup carries on")
+	return true
+}
+
+// Nudge asks for a pass soon (the Operator's Check again).
+func (b *DropboxBackup) Nudge() {
+	select {
+	case b.kick <- struct{}{}:
+	default:
+	}
 }
 
 // backoff is the wait before a retry: doubling from a minute, capped at an hour.

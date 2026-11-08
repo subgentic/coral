@@ -20,6 +20,7 @@ const { JSDOM } = require('jsdom');
           <div id="settings-dropbox-types"></div>
           <input id="settings-dropbox-age" type="number">
           <button id="settings-dropbox-filters-save"></button>
+          <button id="settings-dropbox-recheck" hidden></button>
         </div>
       </section></body>`, { url: 'http://127.0.0.1:8420/' });
     for (const k of ['window', 'document']) Object.defineProperty(globalThis, k, { value: dom.window[k], configurable: true, writable: true });
@@ -144,6 +145,9 @@ const { JSDOM } = require('jsdom');
     assert.match(counts, /3 waiting/);
     assert.match(counts, /1 conflict/);
     assert.ok(!/skipped|failed/.test(counts), 'zero counts are left out');
+    await status({ ...connected, backup: { ...connected.backup, private: 2 } });
+    assert.match($('settings-dropbox-counts').textContent, /2 private, kept off Dropbox/, 'private items are counted when there are any');
+    await status(connected);
     const boxes = [...$('settings-dropbox-types').querySelectorAll('input[type=checkbox]')];
     assert.ok(boxes.length >= 10, 'one box per type of the closed list');
     assert.deepStrictEqual(boxes.filter(b => b.checked).map(b => b.value).sort(), ['md', 'png']);
@@ -177,6 +181,17 @@ const { JSDOM } = require('jsdom');
     assert.match($('settings-dropbox-status').textContent, /Your Dropbox is full, so the backup has paused\. Nothing has been deleted/);
     const more = $('settings-dropbox-note').querySelector('a');
     assert.ok(more && /dropbox\.com/.test(more.getAttribute('href')), 'Get more Dropbox space');
+    // Check again: one next step after freeing space, which reads the status again (the worker resumes on its next pass).
+    assert.ok(shown('settings-dropbox-recheck'), 'a Check again button');
+    answers['/api/dropbox/check'] = { status: 404, body: { code: 'not_available' } };
+    $('settings-dropbox-recheck').click();
+    await new Promise(r => setTimeout(r, 0));
+    assert.ok(calls.some(c => c.url === '/api/dropbox/check' && c.method === 'POST'), 'Check again asks the worker for a pass');
+    assert.match($('settings-dropbox-note').textContent, /Couldn't check/, 'a refused check says so');
+    answers['/api/dropbox/check'] = { status: 200, body: { checking: true } };
+    $('settings-dropbox-recheck').click();
+    await new Promise(r => setTimeout(r, 0));
+    assert.match($('settings-dropbox-status').textContent, /Checking your Dropbox space/);
 
     // Not connected: the backup part is hidden.
     await status({ app_key_set: true, connected: false, state: 'disconnected' });

@@ -296,6 +296,21 @@ func TestPrivateRowsAreParkedNotRetried(t *testing.T) {
 	assert.Empty(t, rows, "never handed out again")
 }
 
+// A full Dropbox pauses the backup; once the person frees space, the next pass sees it and carries on (Security's SHOULD 2 on #14693).
+func TestTheBackupResumesWhenSpaceIsFreed(t *testing.T) {
+	be := newBackupEnv(t)
+	be.put("a.md", "text/markdown", "a")
+	require.NoError(t, be.h.dbx.store.SetState(context.Background(), store.DropboxStateQuotaFull))
+	be.dbx.used, be.dbx.alloc = 95, 100
+	be.pass()
+	assert.Empty(t, be.dbx.files, "still full: nothing sent")
+	assert.Equal(t, "quota_full", be.status()["state"])
+	be.dbx.used = 10 // the person freed space
+	be.pass()
+	assert.Equal(t, "connected", be.status()["state"], "the state goes back to connected")
+	assert.Len(t, be.dbx.files, 2, "and the backup carries on")
+}
+
 // QA Reviewer 2's test gaps on stage 4 (#14655), Security-shaped first. Each one fails against the mutant named in its comment.
 
 func (be *backupEnv) counts() store.DropboxOutboxCounts {
@@ -542,4 +557,21 @@ func TestADeleteCancelsTheQueuedRows(t *testing.T) {
 	c := be.counts()
 	assert.Zero(t, c.Pending, "the rows are gone before any pass")
 	assert.Zero(t, c.Skipped)
+}
+
+// Check again (#14693): the Operator's button asks the worker for a pass now; only from this computer's dashboard.
+func TestCheckAgainAsksForAPass(t *testing.T) {
+	be := newBackupEnv(t)
+	for len(be.b.kick) > 0 {
+		<-be.b.kick
+	}
+	assert.NotEqual(t, http.StatusAccepted, be.call(http.MethodPost, "/api/dropbox/check", false, nil).Code, "not from outside the dashboard")
+	assert.Empty(t, be.b.kick)
+	rec := be.call(http.MethodPost, "/api/dropbox/check", true, nil)
+	require.Equal(t, http.StatusAccepted, rec.Code, rec.Body.String())
+	assert.Len(t, be.b.kick, 1, "a pass is asked for")
+	assert.Equal(t, http.StatusAccepted, be.call(http.MethodPost, "/api/dropbox/check", true, nil).Code, "a second press does not block")
+
+	e := newDropboxEnv(t) // no worker in this build
+	assert.Equal(t, http.StatusNotFound, e.call(http.MethodPost, "/api/dropbox/check", true, nil).Code)
 }

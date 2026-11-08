@@ -47,6 +47,7 @@ type dropboxRoutes struct {
 	pending *dropboxSwitch // a sign-in to another account, waiting for the Operator's confirm
 
 	outbox *store.DropboxOutbox // the backup's queue (stage 4), set by NewDropboxBackup; nil before
+	backup *DropboxBackup       // the worker, for Check again; nil before NewDropboxBackup
 }
 
 type dropboxSwitch struct {
@@ -365,4 +366,17 @@ func (h *CloudHandler) DropboxSetFilters(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"types": types, "max_age_days": in.MaxAgeDays})
+}
+
+// DropboxCheckAgain answers POST /api/dropbox/check: the Operator's Check again (after freeing space in Dropbox) asks the worker for a pass now.
+func (h *CloudHandler) DropboxCheckAgain(w http.ResponseWriter, r *http.Request) {
+	if h.refuseCloud(w, r, allowDashboard) || !requireJSON(w, r) {
+		return
+	}
+	if h.dbx == nil || h.dbx.backup == nil {
+		writeError(w, http.StatusNotFound, "not_available", "Dropbox backup is not available in this build")
+		return
+	}
+	h.dbx.backup.Nudge()
+	writeJSON(w, http.StatusAccepted, map[string]any{"checking": true})
 }

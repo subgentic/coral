@@ -395,6 +395,7 @@ POST /api/cloud/guide-revoked never
 POST /api/cloud/owner-label/arm never
 POST /api/cloud/redeem never
 POST /api/cloud/rekey never
+POST /api/dropbox/check never
 POST /api/dropbox/connect never
 POST /api/dropbox/disconnect never
 POST /api/dropbox/switch never

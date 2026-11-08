@@ -199,6 +199,8 @@ func (e *dropboxEnv) call(method, path string, dashboard bool, hdr map[string]st
 		e.h.DropboxConfirmSwitch(rec, req)
 	case "/api/dropbox/takeover":
 		e.h.DropboxTakeOver(rec, req)
+	case "/api/dropbox/check":
+		e.h.DropboxCheckAgain(rec, req)
 	}
 	return rec
 }

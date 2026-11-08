@@ -518,6 +518,7 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Post("/api/dropbox/switch", s.cloudHandler.DropboxConfirmSwitch)
 	r.Post("/api/dropbox/takeover", s.cloudHandler.DropboxTakeOver)
 	r.Put("/api/dropbox/filters", s.cloudHandler.DropboxSetFilters) // stage 4 (#14655): what to back up
+	r.Post("/api/dropbox/check", s.cloudHandler.DropboxCheckAgain)  // stage 4c (#14693): Check again after freeing space
 	// The Dropbox backup worker (#14655): one background loop; a pass every five minutes or soon after an upload, only while connected.
 	dbxBackup := s.cloudHandler.NewDropboxBackup(store.NewDropboxOutbox(s.db))
 	if s.boardStore != nil {

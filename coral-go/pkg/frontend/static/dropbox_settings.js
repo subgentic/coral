@@ -63,6 +63,7 @@ function renderBackup(st) {
     if (n('conflict')) parts.push(`${n('conflict')} ${n('conflict') === 1 ? 'conflict' : 'conflicts'} (already in Dropbox with other content, left as they are)`);
     if (n('skipped')) parts.push(`${n('skipped')} skipped`);
     if (n('failed')) parts.push(`${n('failed')} failed`);
+    if (n('private')) parts.push(`${n('private')} private, kept off Dropbox`);
     let text = parts.join(', ') + '.';
     const at = Date.parse(b.last_sync || '');
     if (!Number.isNaN(at)) text += ` Last backed up ${new Date(at).toLocaleString()}.`;
@@ -103,7 +104,7 @@ export async function saveDropboxFilters() {
 
 // render shows one state. st is the status answer.
 function render(st) {
-    for (const id of ['settings-dropbox-connect', 'settings-dropbox-disconnect', 'settings-dropbox-switch', 'settings-dropbox-takeover']) show(id, false);
+    for (const id of ['settings-dropbox-connect', 'settings-dropbox-disconnect', 'settings-dropbox-switch', 'settings-dropbox-takeover', 'settings-dropbox-recheck']) show(id, false);
     renderBackup(st);
     if (!st || !st.app_key_set) {
         setStatus("Dropbox backup isn't available in this build.");
@@ -124,7 +125,8 @@ function render(st) {
     }
     if (st.connected && st.state === 'quota_full') {
         setStatus('Your Dropbox is full, so the backup has paused. Nothing has been deleted.');
-        note('Free up space in Dropbox, or get more:', 'https://www.dropbox.com/plans', true, 'Get more Dropbox space');
+        note('Free up space in Dropbox, or get more, then Check again:', 'https://www.dropbox.com/plans', true, 'Get more Dropbox space');
+        show('settings-dropbox-recheck', true);
         show('settings-dropbox-disconnect', true);
         return;
     }
@@ -274,6 +276,16 @@ async function takeOver() {
     await loadDropbox();
 }
 
+// checkAgain asks the worker for a pass now (after the person freed space) and reads the status again a few seconds later.
+async function checkAgain() {
+    note('');
+    let r;
+    try { r = await post('/api/dropbox/check'); } catch { r = { ok: false }; }
+    if (!r.ok) { note("Couldn't check. Try again."); return; }
+    setStatus('Checking your Dropbox space…');
+    setTimeout(() => { loadDropbox(); }, 4000);
+}
+
 function wire() {
     if (wired) return;
     const on = (id, fn) => { const el = $(id); if (el) el.addEventListener('click', () => { fn(); }); };
@@ -282,5 +294,6 @@ function wire() {
     on('settings-dropbox-switch', confirmSwitch);
     on('settings-dropbox-takeover', takeOver);
     on('settings-dropbox-filters-save', saveDropboxFilters);
+    on('settings-dropbox-recheck', checkAgain);
     wired = true;
 }
