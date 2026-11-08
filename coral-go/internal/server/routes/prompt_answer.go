@@ -710,6 +710,13 @@ func (h *SessionsHandler) readPromptScreen(ctx context.Context, name, agentType,
 	return s, ok, err
 }
 
+// promptCaptureLines is how much of the pane a prompt is first read from; deepPromptCaptureLines is the read made again when that one shows the closing rule of a request but not the opening rule (#14575): the parser
+// walks up commandMaxLines for it, the header and Claude's own lines add a few dozen more, so the window is what the walk can use. It is not a second set of rules: the same parse and the same checks judge what it finds.
+const (
+	promptCaptureLines     = 80
+	deepPromptCaptureLines = commandMaxLines + 60
+)
+
 // readPromptScreenText is readPromptScreen with the screen's text, for a caller that must tell a screen with no menu on it from a
 // menu it could not parse.
 func (h *SessionsHandler) readPromptScreenText(ctx context.Context, name, agentType, sessionID string) (promptScreen, bool, string, error) {
@@ -718,12 +725,23 @@ func (h *SessionsHandler) readPromptScreenText(ctx context.Context, name, agentT
 	if rs, ok := h.terminal.(ptymanager.RenderedScreenReader); ok {
 		text, err = rs.RenderedScreen(ctx, name, agentType, sessionID) // the PTY's output is not the screen as drawn (#4543)
 	} else {
-		text, err = h.terminal.CaptureOutput(ctx, name, 80, agentType, sessionID)
+		text, err = h.terminal.CaptureOutput(ctx, name, promptCaptureLines, agentType, sessionID)
 	}
 	if err != nil {
 		return promptScreen{}, false, "", err
 	}
 	s, ok := parseAgentScreen(agentType, text)
+	if ok && s.commandOpenMissing && agentType == at.Claude {
+		if _, rendered := h.terminal.(ptymanager.RenderedScreenReader); !rendered { // a PTY's screen has no history to read deeper (#4543)
+			// The closing rule of a request is there and its opening rule is not: the pane's history may hold it (#14575). Read deeper once; the same parse and the same checks judge what is found, and a request whose top is
+			// still not there stays Reject only. The deeper text replaces the first only when it shows the request whole, so every caller (the row, the card, the answer) sees the same screen.
+			if deep, derr := h.terminal.CaptureOutput(ctx, name, deepPromptCaptureLines, agentType, sessionID); derr == nil {
+				if ds, dok := parseAgentScreen(agentType, deep); dok && !ds.commandOpenMissing {
+					s, text = ds, deep
+				}
+			}
+		}
+	}
 	if ok {
 		if agentType == at.Hermes && s.Kind == promptKindApproval {
 			applyHermesCommand(&s, h.hermesStoredCommand(ctx, sessionID)) // the screen drops a hidden character; Hermes's stored call has it (#12170)
