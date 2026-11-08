@@ -692,3 +692,11 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .inbox-remove-wait-help { flex-basis: 100%; min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; font-size: var(--fs-sm); }
 .inbox-answers:has(.inbox-remove-wait-help) { width: 280px; white-space: normal; }
 .dt-mail-menu .menu-item-with-help { display: block; white-space: normal; text-align: left; min-height: var(--control-touch-height, 44px); }
+/* A task's heading inside its goal in Needs you (#14441): one button that opens and shuts the task's items; a chevron, the title and counts, a chip while something waits on the Operator. 44 px high, the whole width. */
+.inbox-needs-results .dt-group-task th { padding: 0; }
+.inbox-needs-results .dt-group-toggle { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 6px var(--table-pad-x, 12px) 6px calc(var(--table-pad-x, 12px) + 16px); border: 0; background: none; color: var(--text-primary); font: inherit; text-align: start; cursor: pointer; white-space: pre-line; }
+.inbox-needs-results .dt-group-toggle::before { content: "\25B8"; flex: none; width: 1.25em; font-size: var(--fs-base); color: var(--text-secondary); }
+.inbox-needs-results .dt-group-toggle[aria-expanded="true"]::before { content: "\25BE"; }
+.inbox-needs-results .dt-group-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.inbox-needs-results .dt-group-words { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.inbox-needs-results .dt-group-chip { flex: none; border: 1px solid var(--warning); color: var(--warning-text, var(--warning)); background: none; }
