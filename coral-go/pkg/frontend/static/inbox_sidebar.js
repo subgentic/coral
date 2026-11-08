@@ -1362,18 +1362,21 @@ let _mounted = false;
 let _wasShown = false; // the Inbox tab is on screen: cleared when another tab is (below), so the next show is a reopen
 let _asked = false; // a folder was named for the next show (rememberGroup): the reopen rule does not move it to Needs you
 let _autoFrom = ''; // the folder that was open before Needs you was opened for the person (#10205): it is the remembered one, and comes back when nothing waits again
+/** Mounts the Inbox's listeners and hooks, once. showInbox does it, and so does openInboxGroup: a caller that opens a folder without showing the tab first would otherwise get a table no live update redraws (#14452). */
+function mountInbox() {
+    if (_mounted) return;
+    _mounted = true;
+    new MutationObserver(() => { if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') { _wasShown = false; needsOrder = null; needsState.shown = null; if (needsFilters.kind) { needsFilters = { ...needsFilters, kind: '' }; NF.saveFilters(needsFilters); } } }).observe(document.body, { attributes: true, attributeFilter: ['data-nav-tab'] });
+    $('inbox-view').addEventListener('click', () => quietFocus($('inbox-view')), true);
+    if (nativeInbox()) $('inbox-search')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); if (e.repeat) return; /* a held Enter is one search */ filterInbox(e.target.value); } }); // a chat search runs when it is asked for, not on each key (coral-hub's rate condition)
+    onInboxHooks({ goals: liveGoals, needs: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); }, counts: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); } });
+    saved.onSavedRender(() => { if (!$('inbox-local')?.hidden) renderInboxNav(true); });
+    saved.mountInboxSavedBar($('inbox-saved-bar'));
+}
 /** Called by switchNavTab('hub-inbox') (where the dashboard builds its own Inbox): the lists are read again and the group last on screen opens as a table (a phone shows the list). */
 export async function showInbox({ folder = '', quiet = false } = {}) {
     let auto = false; // Needs you was chosen for the person: it is not stored as the remembered folder
-    if (!_mounted) {
-        _mounted = true;
-        new MutationObserver(() => { if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') { _wasShown = false; needsOrder = null; needsState.shown = null; if (needsFilters.kind) { needsFilters = { ...needsFilters, kind: '' }; NF.saveFilters(needsFilters); } } }).observe(document.body, { attributes: true, attributeFilter: ['data-nav-tab'] });
-        $('inbox-view').addEventListener('click', () => quietFocus($('inbox-view')), true);
-        if (nativeInbox()) $('inbox-search')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); if (e.repeat) return; /* a held Enter is one search */ filterInbox(e.target.value); } }); // a chat search runs when it is asked for, not on each key (coral-hub's rate condition)
-        onInboxHooks({ goals: liveGoals, needs: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); }, counts: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); } });
-        saved.onSavedRender(() => { if (!$('inbox-local')?.hidden) renderInboxNav(true); });
-        saved.mountInboxSavedBar($('inbox-saved-bar'));
-    }
+    mountInbox();
     $('inbox-local').hidden = false;
     if (folder && groupMeta(folder)) { closePage(false); page = null; $('inbox-page') && ($('inbox-page').hidden = true); group = folder; } // a link to a folder: the folder, not the page that was open
     else if (_asked) _autoFrom = ''; // the folder the person asked for stays
@@ -1422,6 +1425,7 @@ export function rememberGroup(name) { if (groupMeta(name)) { group = name; _aske
 /** A group wanted on screen from elsewhere (the Saved button of the top bar): its table opens. */
 export async function openInboxGroup(name) {
     if (!groupMeta(name)) name = DEFAULT_GROUP;
+    mountInbox(); // a caller that did not show the tab first still gets the live hooks (#14452)
     $('inbox-local') && ($('inbox-local').hidden = false);
     closePage(false);
     page = null;
