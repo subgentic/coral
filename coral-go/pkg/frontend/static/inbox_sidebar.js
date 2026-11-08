@@ -892,6 +892,7 @@ function wireSaveDrop(list) {
         importOnce('./artifact_review.js').then(async ({ saveRow, saySaved }) => { await saveRow(row.team, row); saySaved(row.team, row); sayLive(`Saved ${markHidden(row.name, { strict: true })} for later.`); }).catch(error => sayLive(error.message)); });
 }
 function renderInboxNav(force = false) {
+    syncReviewPagingControls();
     teamNeedsMount?.redraw();
     const list = $('inbox-nav-list');
     if (!list) return;
@@ -939,7 +940,21 @@ function renderFolderCounts() {
 
 /** Paging controls live outside the rows; each button follows only its computer's cursor. */
 function reviewPagingSignature() {
-    return [reviewPages(), savedReviewPages()].map(pages => pages.map(p => [p.server, p.loading, p.error, p.has_more, p.next_cursor, p.loadedCount, p.total, p.truncated]));
+    return [reviewPages(), savedReviewPages()].map(pages => pages.map(p => [p.server, p.error, p.has_more, p.next_cursor, p.loadedCount, p.total, p.truncated]));
+}
+function syncReviewPagingControls() {
+    const pages = new Map();
+    for (const [stream, items] of [['review', reviewPages()], ['saved', savedReviewPages()]]) {
+        for (const page of items) pages.set(JSON.stringify([stream, page.server]), page);
+    }
+    for (const button of $('group-table-view')?.querySelectorAll('[data-review-more]') || []) {
+        const page = pages.get(JSON.stringify([button.dataset.reviewStream, button.dataset.reviewMore]));
+        if (!page) continue;
+        const action = page.error ? 'Retry' : 'Show more';
+        button.disabled = !!page.loading;
+        if (button.textContent !== (page.loading ? 'Loading…' : action)) button.textContent = page.loading ? 'Loading…' : action;
+        button.setAttribute('aria-label', `${action} ${button.dataset.reviewStream === 'saved' ? 'saved files' : 'review files'} from ${pagingServerLabel(page.server)}`);
+    }
 }
 function appendReviewPaging(host, savedPage = false) {
     for (const page of (savedPage ? savedReviewPages() : reviewPages())) {
