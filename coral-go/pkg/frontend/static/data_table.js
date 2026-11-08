@@ -147,7 +147,7 @@ export const compareBy = (col) => { // exported for its unit test (data_table_co
 };
 
 /** The phone's mail row (#9545, UI/UX's spec): a 44 px leading target holding a 32 px avatar, the title and the first words of what it says on one line, the time at the right, and under the line (Needs you only) the ask.
- *  A caller opts in with `mail(row) -> { actions?: [{ label, title?, off?, confirm?, onArm?, run(button) }] (a ⋯ button at the row's right opens them, #137104), lead: { text, name?, square?, icon? }, kindIcon? (a node drawn in the full-height leading column), title, snippet?, state?, ask?, askTag?, time?, unread?, mark?, data?, tip?, team?, teamAlways?, nameTeam?, snippetTip?, computer? }` (nameTeam: the team is in the button's name but not drawn on the line, so Needs you is one line, #9986) (state: the word the row shows for what it is in (a task's Queued, In review), said in the button's name after the title, so a screen reader hears <name>, <state> (#9747)) (team: after the title in tertiary, always when teamAlways, else only for a title two rows share) (data: attributes for the open button, as `{ taskId: 5 }` is data-task-id="5"); on a phone the row is this cell alone (the columns are the desktop's), and its button is the row's open control.
+ *  A caller opts in with `mail(row) -> { actions?: [{ label, title?, off?, confirm?, onArm?, run(button) }] (a ⋯ button at the row's right opens them, #137104), lead: { text, name?, square?, icon? }, kindIcon? (a node drawn in the full-height leading column), title, snippet?, state?, ask?, askTag?, time?, unread?, mark?, data?, tip?, team?, teamAlways?, nameTeam?, snippetTip?, computer?, extra? (a node under the line, before the choices) }` (nameTeam: the team is in the button's name but not drawn on the line, so Needs you is one line, #9986) (state: the word the row shows for what it is in (a task's Queued, In review), said in the button's name after the title, so a screen reader hears <name>, <state> (#9747)) (team: after the title in tertiary, always when teamAlways, else only for a title two rows share) (data: attributes for the open button, as `{ taskId: 5 }` is data-task-id="5"); on a phone the row is this cell alone (the columns are the desktop's), and its button is the row's open control.
  *  `unread` makes the title 600 (a read one is 500) and draws an accent dot under the time that is named "Unread" for a screen reader: a list says it only where a read state exists (Needs you; chats, boards and tasks through inbox_read.js, #9687). `mark: 'attention'` is the amber dot under the time and outranks the unread dot (one dot a row). A desktop table takes `unread(row)` for the same look as a `dt-unread` row. Text is set with textContent only. */
 const MAIL_QUERY = '(max-width: 767px)';
 let rowMenus = 0;
@@ -212,9 +212,15 @@ const mailCell = (m, label, open, pick, showTeam = false, gap = false) => { // o
     td.append(lead, body);
     if (m.actions && m.actions.length) td.append(rowMore(m.actions, label)); // a row's ⋯ menu, after the row's button and before its choices
     else if (gap) { const g = el('span', 'dt-mail-more-gap'); g.setAttribute('aria-hidden', 'true'); td.append(g); }
+    if (m.extra) { const x = el('span', 'dt-mail-extra'); x.append(m.extra); td.append(x); } // words and a control under the line (an agent's whole question and its Show all, #14637), before the choices
     if (m.answers) td.append(m.answers); // a Needs you row's choices, under the line (#10400)
     return td;
 };
+
+/** A full-width row under `tr` with `node` in it (#14637): the table's own detail row for one row's words (an agent's whole question, opened). Called from a surface's decorate, so it is drawn again with its row. */
+export function addDetailRow(tr, node, cls = '') {
+    const dr = el('tr', 'dt-detail'), td = el('td', `dt-detail-cell${cls ? ` ${cls}` : ''}`); dr.setAttribute('role', 'row'); td.setAttribute('role', 'cell'); td.colSpan = tr.cells.length; td.append(node); dr.append(td); tr.after(dr); return dr;
+}
 
 // Menu controls belong to table instances, including multiple tables on one page.
 let hiddenSeq = 0;
