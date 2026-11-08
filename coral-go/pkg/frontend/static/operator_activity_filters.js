@@ -19,6 +19,10 @@ export const ACTION_LABEL = {
     goal_request_decline: 'Declined a goal request', inbox_hide: 'Dismissed a row in Needs you',
     hub_update_check: 'Coral Hub checked for an update', hub_update_relaunch: 'Coral Hub relaunched into an update',
 };
+export const DECISION_LABEL = { approve: 'Approved', changes: 'Asked for changes', deny: 'Denied', answer: 'Answered', dismiss: 'Dismissed' };
+export const DECISIONS = Object.keys(DECISION_LABEL);
+export const decisionOf = row => ({ ignore: 'dismiss', wait_dismiss: 'dismiss', inbox_hide: 'dismiss', prompt_answer: 'answer', prompt_allow: 'approve', prompt_reject: 'deny', skill_approve: 'approve', skill_reject: 'deny' }[row.action] || (DECISIONS.includes(row.action) ? row.action : ''));
+
 export const ACTIONS = Object.keys(ACTION_LABEL);
 export const SORTS = ['newest', 'oldest'];
 export const SORT_LABEL = { newest: 'Newest first', oldest: 'Oldest first' };
@@ -31,6 +35,7 @@ const teamChip = v => `Team: ${teamNames.get(v) || v}`;
 const model = defineFilters({
     q: { type: 'text', max: 200, chip: v => `Search: ${v}` },
     team: { type: 'custom', empty: '', clean: v => text(v, 200), filtered: v => !!v, chip: teamChip, clear: f => ({ ...f, team: '' }) },
+    decision: { type: 'choice', values: DECISIONS, chip: v => `Decision: ${DECISION_LABEL[v]}` },
     action: { type: 'choice', values: ACTIONS, chip: v => `Action: ${ACTION_LABEL[v]}` },
     from: { type: 'day', chip: v => `Since ${v}` },
     sort: { type: 'order', values: SORTS, default: 'newest' },
@@ -49,9 +54,10 @@ const stamp = r => Date.parse(r.at || '') || 0;
 export function matches(r, f, teamOf = x => x.team || '') {
     const c = clean(f);
     if (c.q) {
-        const hay = [r.title, r.note, r.asker, teamOf(r), ACTION_LABEL[r.action] || r.action, r.item_kind].join(' ').toLowerCase();
+        const hay = [r.title, r.note, r.asker, r.goal_title, r.task_title, DECISION_LABEL[decisionOf(r)], teamOf(r), ACTION_LABEL[r.action] || r.action, r.item_kind].join(' ').toLowerCase();
         if (!hay.includes(c.q.toLowerCase())) return false;
     }
+    if (c.decision && decisionOf(r) !== c.decision) return false;
     if (c.action && r.action !== c.action) return false;
     if (c.team && r.team !== c.team) return false;
     if (c.from && stamp(r) < Date.parse(localMidnight(c.from))) return false;
