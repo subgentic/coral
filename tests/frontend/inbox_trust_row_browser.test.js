@@ -47,11 +47,22 @@ const MENU = (extra = {}) => ({ question: 'Quick safety check: Is this a project
 
             const rowButtons = () => ev(`[...document.querySelectorAll('#group-table-view .inbox-answers button:not(.inbox-dismiss)')].map(b => b.textContent)`);
             // a real click on a button of the row: scrolled into view, the point on it is the button itself, never something over it
-            const click = async text => {
+            const clickOnce = async text => {
                 await waitFor(`!document.querySelector('#group-table-view .inbox-answers button.inbox-arming')`, `${at}a freshly drawn Yes is armed after 400 ms (#14302)`, 3000).catch(() => {});
                 const p = await ev(`(() => { const b = [...document.querySelectorAll('#group-table-view .inbox-answers button')].find(x => x.textContent === ${JSON.stringify(text)}); if (!b) return null; b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2, hit = document.elementFromPoint(x, y); return { x, y, ok: !!hit && (hit === b || b.contains(hit)), w: Math.round(r.width), h: Math.round(r.height), right: Math.round(r.right) }; })()`);
                 if (!p) return null;
                 await Input.dispatchMouseEvent({ type: 'mousePressed', x: p.x, y: p.y, button: 'left', clickCount: 1 }); await Input.dispatchMouseEvent({ type: 'mouseReleased', x: p.x, y: p.y, button: 'left', clickCount: 1 });
+                return p;
+            };
+            // a toast from the step before (a phone's 'Answered' note sits over the row's bottom edge) covers a button for a few seconds: press only when the point on the button is the button itself (#14586)
+            const click = async text => {
+                let p = null;
+                for (const end = Date.now() + 9000; Date.now() < end;) {
+                    const hit = await ev(`(() => { const b = [...document.querySelectorAll('#group-table-view .inbox-answers button')].find(x => x.textContent === ${JSON.stringify(text)}); if (!b) return null; b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(), e = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return !!e && (e === b || b.contains(e)); })()`);
+                    if (hit !== false) break; // null: no such button (clickOnce says so); true: nothing covers it
+                    await new Promise(r => setTimeout(r, 250)); // sleep-ok: waiting for the toast over the button to go
+                }
+                p = await clickOnce(text);
                 return p;
             };
             // a new ask in the row: the agent stops waiting (the row goes) and waits again on this menu

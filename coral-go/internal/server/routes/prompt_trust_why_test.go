@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -87,4 +88,64 @@ func TestTrustVerdictSaysWhyThereIsNoYes(t *testing.T) {
 	ok, why = h.trustVerdict(dash(), sid, promptScreen{})
 	assert.False(t, ok)
 	assert.Empty(t, why)
+}
+
+// #14586 (Security's SHOULD 3 on #14572): a path wrapped over more lines than Coral joins says so ("too long to read"), not "not the folder this agent was started in"; a path that ends at the cap exactly
+// is read whole; the answer never carries the flag.
+func TestTrustVerdictSaysTheFolderNameIsTooLongWhenTheJoinStoppedAtTheCap(t *testing.T) {
+	const sid = "00000000-0000-0000-0000-00000000b586"
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	deep := filepath.Join(home, "work", strings.Repeat("a-deep-folder-name-", 9), "member")
+	require.NoError(t, os.MkdirAll(deep, 0o755))
+	_, h, _, ss := setupSessionsTestServer(t)
+	require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "member", WorkingDir: deep}))
+	dash := func() *http.Request {
+		r := httptest.NewRequest(http.MethodGet, "/chat", nil)
+		return r.WithContext(context.WithValue(r.Context(), callerKindKey{}, callerDashCookie))
+	}
+	wrapAt := func(n int) string { // the screen with the folder wrapped every n characters
+		var parts []string
+		for rest := deep; rest != ""; {
+			m := n
+			if m > len(rest) {
+				m = len(rest)
+			}
+			parts = append(parts, rest[:m])
+			rest = rest[m:]
+		}
+		return strings.Replace(trustScreen(t, deep), "\n "+deep+"\n", "\n "+strings.Join(parts, "\n ")+"\n", 1)
+	}
+	lines := func(n int) int { return (len(deep) + n - 1) / n }
+	narrow, exact := 0, 0
+	for n := 5; n < len(deep); n++ { // the widest wrap that is nine lines, the widest that is eight
+		if lines(n) == trustPathMaxLines+1 {
+			narrow = n
+		}
+		if lines(n) == trustPathMaxLines {
+			exact = n
+		}
+	}
+	require.NotZero(t, narrow)
+	require.NotZero(t, exact)
+
+	s, ok := parseAgentScreen("claude", wrapAt(narrow))
+	require.True(t, ok)
+	assert.True(t, s.TrustCut)
+	ok, why := h.trustVerdict(dash(), sid, s)
+	assert.False(t, ok)
+	assert.Contains(t, why, "too long to read from the screen")
+	assert.NotContains(t, why, "not the one this agent was started in")
+
+	s, ok = parseAgentScreen("claude", wrapAt(exact))
+	require.True(t, ok)
+	assert.False(t, s.TrustCut, "a path that ends exactly at the cap is read whole")
+	assert.Equal(t, deep, s.TrustFolder)
+	ok, why = h.trustVerdict(dash(), sid, s)
+	assert.True(t, ok, why)
+
+	b, err := json.Marshal(promptScreen{TrustCut: true})
+	require.NoError(t, err)
+	assert.NotContains(t, string(b), "TrustCut")
+	assert.NotContains(t, string(b), "trust_cut")
 }
