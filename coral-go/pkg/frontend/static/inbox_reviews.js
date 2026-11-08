@@ -274,7 +274,13 @@ export async function reviewOfTeam(team, digest, { anyState = false } = {}) {
  * The reviewed row fixes the source, uploader/name group and upper version boundary. */
 export async function legacyEarlierVersions(row) {
     const source = splitKey(row.team), query = new URLSearchParams({ team: source.name, tag: 'for review', versions: 'all', q: row.name || '' });
-    if (row.produced_by) query.set('by', row.produced_by);
+    const name = String(row.name || ''), uploader = String(row.produced_by || '');
+    if (new TextEncoder().encode(name).length > 200) throw new Error('The file name exceeds Coral Hub’s 200-byte search limit; earlier versions could not be checked.');
+    const hasUnsupportedSpaceOrControl = value => [...value].some(ch => ch !== ' ' && /[\p{Cc}\p{White_Space}]/u.test(ch));
+    if (hasUnsupportedSpaceOrControl(name) || hasUnsupportedSpaceOrControl(uploader) || uploader.includes(',') || source.name.includes(',')) {
+        throw new Error('The file name, uploader, or team contains characters Coral Hub cannot safely search; earlier versions could not be checked.');
+    }
+    if (uploader) query.set('by', uploader);
     const older = new Map(), seen = new Set();
     let cursor = '';
     do {
