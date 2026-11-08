@@ -461,6 +461,7 @@ export function reviewActions(row, inSaved = false) { // inSaved (#11641, #11799
         if (inSaved) menu.push({ label: 'Move to Needs you', title: 'Put it back in Needs you as it was', run: unsave });
         else if (!bookmark) menu.push({ label: 'Save for later', title: 'Keep it in Saved, out of Needs you; nobody is told', run: save });
     }
+    if (isPhoneLayout() && row.starred) menu.push({ label: 'Remove the star', title: 'Take the star off this file', run: b => { b.closest('tr')?.querySelector('.inbox-review-star')?.click(); } }); // the phone card's star is a quiet mark at its top line (#14683, the approved mock has the dots there); taking it off is here
     menu.push({ label: 'Copy version ID', title: 'The id of this version only', run: b => { const hex = row.id; return importOnce('./artifact_clipboard.js').then(m => m.copyArtifactId(hex)).catch(error => failed(b, error)); } });
     if (isRead(row) && !inSaved) { box.classList.add('inbox-review-actions-read'); menu.push({ label: 'Mark unread', title: 'Count it in Needs you again', run: unread }); }
     if (menu.length) { const more = moreMenu(menu, file); more.setAttribute('data-slot', 'dots'); box.append(more); }

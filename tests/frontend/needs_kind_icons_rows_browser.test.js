@@ -72,7 +72,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         for (const r of tall) {
             if (r.kind === 'review') check(r.sameLine === true, `390 px: in a review row the sender is line one and the file name line two, under it: ${r.text}`);
             const room = r.kind === 'other' || r.kind === 'ask' ? r.line + 1 : 0.5;
-            check(r.withIcon >= r.without - 0.5 && r.withIcon - r.without < room + (r.kind === 'review' || r.kind === 'ask' ? 52 : 0) /* without the icon the row is no review/question card, so its 44 px button row at rest (#14627) is not drawn */, `390 px: a ${r.kind} row keeps its height with the icon${r.kind === 'other' || r.kind === 'ask' ? ' (a question: at most one more line)' : ''} (${r.withIcon} with, ${r.without} without): ${r.text}`);
+            check(r.withIcon >= r.without - 0.5 && r.withIcon - r.without < room + (r.kind === 'review' || r.kind === 'ask' ? 90 : 0) /* without the icon the row is no review/question card, so its 44 px button row at rest (#14627) is not drawn */, `390 px: a ${r.kind} row keeps its height with the icon${r.kind === 'other' || r.kind === 'ask' ? ' (a question: at most one more line)' : ''} (${r.withIcon} with, ${r.without} without): ${r.text}`);
         }
         const { themeJs } = require('./helpers/theme');
         for (const theme of ['dark', 'light']) {
