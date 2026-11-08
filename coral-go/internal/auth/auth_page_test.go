@@ -222,7 +222,7 @@ func TestAuthPageSaysWhyAPasswordIsNeededAndOffersNoSkip(t *testing.T) {
 	for _, skip := range []string{"do not need one", "You do not need", "opens without", "without one", "continue without", "skip", "Only you use this computer"} {
 		assert.NotContains(t, strings.ToLower(create), strings.ToLower(skip), "the create screen suggests no way around the password: "+skip)
 	}
-	assert.Contains(t, create, "It keeps other people and other devices out of Coral in a web browser. Your password manager can save it.", "the note under the form says why too")
+	assert.Contains(t, create, "Your password manager can save it. Forgot it later? Run coral reset-password in a terminal on this computer.", "the note under the form keeps the password-manager and reset help (#14731)")
 	// the sign-in and forgot-password panel (a computer with a password) says why, and not that the app opens without one
 	signin := AuthPage(PageState{PasswordSet: true, Local: true, Strict: true})
 	assert.NotContains(t, strings.ToLower(signin), "opens without a password", "the forgot-password note no longer says the app opens without one")
@@ -277,4 +277,40 @@ func TestCreatePasswordPageLeadsWithTheFormAndFoldsTheOtherWays(t *testing.T) {
 		assert.Contains(t, page, "<summary>Other ways to sign in</summary>", name)
 		assert.Contains(t, page, "coral open", "%s: the way in stays on the page", name)
 	}
+}
+
+// #14731 (the Operator: the Create a password page has "a lot going on"): one clear path. The reason a password is asked for is said ONCE (it was three times), there is ONE primary button, and the
+// same-computer open, the Hub link and the API key are under one folded "Other ways in" (nothing the page offered is gone). The strength bar has no two-line reserve under it.
+func TestCreatePasswordPageIsOneClearPath(t *testing.T) {
+	for name, s := range map[string]PageState{
+		"local":          {Local: true, LocalOpen: true},
+		"local-hub":      {Local: true, LocalOpen: true, HubSignin: "unpaired"},
+		"local-no-open":  {Local: true},
+		"remote":         {},
+		"locked":         {Local: true, LocalOpen: true, Locked: true},
+		"strict-local":   {Local: true, LocalOpen: true, Strict: true},
+		"hub-ready-open": {Local: true, LocalOpen: true, HubSignin: "ready", HubURL: "https://app.coralhub.dev"},
+	} {
+		page := AuthPage(s)
+		start := strings.Index(page, `<section id="panel-create"`)
+		end := strings.Index(page[start:], "</section>") + start
+		create := page[start:end]
+		assert.Equal(t, 1, strings.Count(create, "keeps other people"), "%s: the reason is said once", name)
+		assert.Equal(t, 1, strings.Count(create, "btn btn-primary"), "%s: one primary button on the create panel", name)
+		assert.Contains(t, create, `<summary>Other ways in</summary>`, name)
+		ways := create[strings.Index(create, `id="other-ways"`):]
+		assert.Contains(t, ways, `id="show-key"`, "%s: the API key is under Other ways in", name)
+		assert.NotContains(t, create[:strings.Index(create, `id="other-ways"`)], `id="show-key"`, "%s: and nowhere above it", name)
+		if s.LocalOpen {
+			assert.Contains(t, ways, `id="local-open"`, "%s: Open Coral on this computer is under Other ways in", name)
+			assert.NotContains(t, create[:strings.Index(create, `id="other-ways"`)], `id="local-open"`, "%s: and not above it", name)
+			assert.NotContains(t, create, `btn btn-primary wide" id="local-open"`, "%s: it is not a second primary button", name)
+		}
+		if s.HubSignin == "unpaired" {
+			assert.Contains(t, ways, `id="hub-link-open"`, "%s: the Hub link is under Other ways in", name)
+		}
+		assert.Contains(t, create, "coral reset-password", "%s: the reset help stays", name)
+	}
+	// the sign-in page keeps its primary same-computer button: this is the create page's change only
+	assert.Contains(t, AuthPage(PageState{PasswordSet: true, Local: true, LocalOpen: true}), `btn btn-primary wide" id="local-open"`)
 }
