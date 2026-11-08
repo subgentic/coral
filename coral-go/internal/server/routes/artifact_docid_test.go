@@ -196,3 +196,42 @@ func TestTheMigrationNeverFollowsALinkedRecord(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, body, string(b), "a file outside the store, reached through a link, is never written")
 }
+
+// #14620 (QA on #14612): the migration reads every upload record BEFORE it stamps any, so a series whose version 1 has no document id and whose version 2 has one gives version 1 that one, whichever the walk
+// reaches first. Many series, with the two versions in different session folders (either order) or the same one (either digest order), so no single directory order hides the pre-scan: without it, a version 1
+// the walk reaches before version 2 would be stamped with a document id of its own and the series would be two documents.
+func TestTheMigrationGivesAVersionOneTheDocumentIDItsLaterVersionAlreadyHas(t *testing.T) {
+	coralDir := t.TempDir()
+	digest := func(s string) string { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }
+	hex32 := func(s string) string { return digest(s)[:32] }
+	put := func(session, d, body string) string {
+		p := filepath.Join(coralDir, "artifacts", "uploads", session, d+".json")
+		require.NoError(t, os.MkdirAll(filepath.Dir(p), 0o700))
+		require.NoError(t, os.WriteFile(p, []byte(body), 0o600))
+		return p
+	}
+	type pair struct{ v1, v2, doc string }
+	var pairs []pair
+	for i := 0; i < 30; i++ {
+		name := "series-" + strings.Repeat("x", i%4) + string(rune('a'+i%26)) + "-" + digest(string(rune(i)))[:6]
+		sid, doc := hex32("sid "+name), hex32("doc "+name)
+		d1, d2 := digest(name+" v1"), digest(name+" v2")
+		s1, s2 := "s-a", "s-z" // version 1 is walked first
+		switch i % 3 {
+		case 1:
+			s1, s2 = "s-z", "s-a" // version 2 is walked first
+		case 2:
+			s1, s2 = "s-m", "s-m" // the same folder: the digests' order decides
+		}
+		put(s1, d1, `{"name":"p.txt","size":3,"digest":"sha256:`+d1+`","created_at":"2026-10-01T00:00:00Z","series_id":"`+sid+`","version":1}`)
+		put(s2, d2, `{"name":"p.txt","size":3,"digest":"sha256:`+d2+`","created_at":"2026-10-02T00:00:00Z","series_id":"`+sid+`","version":2,"previous":"`+d1+`","doc_id":"`+doc+`"}`)
+		pairs = append(pairs, pair{v1: filepath.Join("artifacts", "uploads", s1, d1+".json"), v2: filepath.Join("artifacts", "uploads", s2, d2+".json"), doc: doc})
+	}
+	res := migrateDocIDs(coralDir)
+	assert.Equal(t, 0, res.Failed)
+	assert.Equal(t, len(pairs), res.Stamped, "only the version 1 of each series was missing its id")
+	for _, p := range pairs {
+		assert.Equal(t, p.doc, readJSONMap(t, filepath.Join(coralDir, p.v1))["doc_id"], "version 1 takes the id its later version has: %s", p.v1)
+		assert.Equal(t, p.doc, readJSONMap(t, filepath.Join(coralDir, p.v2))["doc_id"], "version 2 keeps it")
+	}
+}
