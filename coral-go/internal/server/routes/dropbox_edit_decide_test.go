@@ -309,3 +309,26 @@ func TestTheSweepRemovesOnlyExactHexRegularFiles(t *testing.T) {
 		assert.NoError(t, err, "a link is never removed through")
 	}
 }
+
+// QA's survivor on 78d58ac6b (#195889, item 4). Mutant: the hash compare is dropped (only the size is checked).
+func TestASameSizeSwapOfTheHeldBytesIsRefused(t *testing.T) {
+	be, _, e := heldEdit(t)
+	b, err := os.ReadFile(be.b.heldPath(e.Digest))
+	require.NoError(t, err)
+	swapped := []byte(strings.Repeat("Z", len(b))) // the same length, other bytes
+	require.NoError(t, os.WriteFile(be.b.heldPath(e.Digest), swapped, 0o600))
+	rec := be.decide(e.DocID, "separate", true)
+	assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), "held_changed")
+	assert.False(t, be.hasRecord(e.Digest))
+}
+
+// QA's survivor on 78d58ac6b (item 5). Mutant: no sweep after a decision (a stray held file stays until the next listing pass).
+func TestADecisionSweepsTheHeldFolder(t *testing.T) {
+	be, _, e := heldEdit(t)
+	stray := strings.Repeat("9a", 32)
+	require.NoError(t, os.WriteFile(be.b.heldPath(stray), []byte("left over"), 0o600))
+	require.Equal(t, http.StatusOK, be.decide(e.DocID, "promote", true).Code)
+	_, err := os.Stat(be.b.heldPath(stray))
+	assert.True(t, os.IsNotExist(err), "the decision's own sweep removed it, before any pass")
+}

@@ -59,6 +59,9 @@ func (b *DropboxBackup) Notice(ctx context.Context) {
 	defer b.passMu.Unlock()
 	// Whatever the readiness: the open edits of an account no longer connected go (a Disconnect, another account, a Rekey: Security's condition
 	// c), then every held file no open edit names.
+	if b.d == nil {
+		return
+	}
 	keep := ""
 	if c, err := b.d.store.Get(ctx); err == nil && c.Connected {
 		keep = c.AccountID
