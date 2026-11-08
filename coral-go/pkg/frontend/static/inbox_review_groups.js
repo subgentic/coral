@@ -11,6 +11,7 @@ function aboutOf(row) {
     const r = row.review, a = row.operatorAsk;
     if (r) return { team: r.team, goalId: Number(r.goal_id) || 0, goalTitle: r.goal_title, taskId: Number(r.task_id) || 0, taskTitle: r.task_title };
     if (a) return { team: boardTeamKey(a.server, a.board), goalId: Number(a.goal_id) || 0, goalTitle: a.goal_title, taskId: Number(a.task_id) || 0, taskTitle: a.task_title };
+    if (row.goal && row.goal.id && row.board_project) return { team: boardTeamKey(row.server, row.board_project), goalId: Number(row.goal.id) || 0, goalTitle: row.goal.title, taskId: Number(row.task && row.task.id) || 0, taskTitle: row.task && row.task.title }; // an agent waiting on a prompt or for input: the goal and task it works on (#14441)
     return null;
 }
 const goalKey = row => { const x = aboutOf(row); return x && x.goalId ? JSON.stringify([x.team, String(x.goalId)]) : 'no-goal'; };
@@ -39,7 +40,7 @@ const cut = (text, n) => { const t = String(text || '').replace(/\s+/g, ' ').tri
  * and it has no story. The Story control is the heading's second one (#14444): the story is history, so it is shut until asked for and sits above the items when on. */
 export function reviewGroupLookup(rows, grouped, isRead, sourceLabel, tasks = null) {
     const keyOf = r => { if (pinned(r)) return 'pinned'; if (r.review && waitingOnAgent(r.review)) return 'waiting-agent'; if (!grouped) return null; const x = aboutOf(r); if (!x || !x.goalId) return r.review ? 'no-goal' : 'other-items'; return taskKey(r) || goalKey(r); };
-    const unreadOf = r => (r.review ? !isRead(r.review) : !!r.operatorAsk);
+    const unreadOf = r => (r.review ? !isRead(r.review) : true); // a waiting agent or a question is waiting by being in the list
     const groups = new Map(), goals = new Map();
     for (const row of rows) {
         const key = keyOf(row);
@@ -61,7 +62,7 @@ export function reviewGroupLookup(rows, grouped, isRead, sourceLabel, tasks = nu
         else if (key === 'waiting-agent') entry = { key, label: `Waiting on agent \u00b7 ${count}` };
         else if (key === 'no-goal') entry = { key, label: `No goal \u00b7 ${count}` };
         else if (taskKey(row) === key) {
-            const x = aboutOf(row), title = markHidden(String(x.taskTitle || ''), { strict: true }), line = cut(latest.review ? latest.review.name : latest.waiting_summary, 70);
+            const x = aboutOf(row), title = markHidden(String(x.taskTitle || ''), { strict: true }), line = markHidden(cut(latest.review ? latest.review.name : latest.waiting_summary, 70), { strict: true }); // words an agent wrote: hidden characters written out, like the titles
             const open = tasks ? tasks.open(key, unread > 0) : true;
             entry = { key, label: `Task #${x.taskId}${title ? ` \u00b7 ${title}` : ''}\n${count}${line ? ` \u00b7 newest: ${line}` : ''}`, chip: unread > 0 ? 'Waiting on you' : '', level: 'task', open, ...(tasks ? { onToggle: () => tasks.toggle(key, !open) } : {}), ...(tasks && tasks.toggleStory && x.team && x.taskId ? { onStory: () => tasks.toggleStory(key, !tasks.storyOpen(key)), storyOpen: tasks.storyOpen(key), story: () => storyNode(x.team, x.taskId) } : {}), parent: { key: goalKey(row), label: goalLabel(goalKey(row)) } };
         } else entry = { key, label: goalLabel(key) };
