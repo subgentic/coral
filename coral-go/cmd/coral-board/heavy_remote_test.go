@@ -83,3 +83,23 @@ func TestAHeavyRunOnTheMiniRunsAndReturnsTheExitCode(t *testing.T) {
 		t.Fatalf("code=%d out=%q", code, out)
 	}
 }
+
+// Moved here from heavy_test.go (#14595): it runs the real wrapper through wrapperTransport and inTempRepo, which need /bin/sh and are not built on Windows, so on Windows the test file did not compile.
+func TestAHeavyRunWhoseClaimIsSilentAsksTheResourceItsMachine(t *testing.T) {
+	inTempRepo(t)
+	prev := heavyTestTransport
+	heavyTestTransport = wrapperTransport(t)
+	defer func() { heavyTestTransport = prev }()
+	// an older server: the claim names no machine for a plain resource; the resource itself says mini
+	s := &heavyStub{grants: []string{`{"granted":true,"place":0,"entry":{"id":1}}`}, statusBody: `{"name":"mini","machine":"mini"}`}
+	out, code := runHeavy(t, s, "run", "--pool", "mini", "--", "echo hi-from-the-mini-path")
+	if code != 0 || !strings.Contains(out, "running on mini (over ssh)") {
+		t.Fatalf("it runs on the mini, over ssh, saying so: code=%d out=%q", code, out)
+	}
+	// and a plain resource whose own machine is the Mac runs here
+	s = &heavyStub{grants: []string{`{"granted":true,"place":0,"entry":{"id":1}}`}, statusBody: `{"name":"mac-heavy","machine":"mac"}`}
+	out, code = runHeavy(t, s, "run", "--pool", "mac-heavy", "--", "echo hi-from-here")
+	if code != 0 || !strings.Contains(out, "hi-from-here") || !strings.Contains(out, "(on this Mac)") {
+		t.Fatalf("a Mac resource runs here and says so: code=%d out=%q", code, out)
+	}
+}
