@@ -99,7 +99,7 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 				continue
 			}
 			// The owner's switch of one agent's auto-sleep (#12111) is new: the old list never had it.
-			if m == http.MethodPost && strings.HasPrefix(p, "/api/sessions/live/") && strings.HasSuffix(p, "/auto-sleep") {
+			if m == http.MethodPost && strings.HasPrefix(p, "/api/sessions/live/") && (strings.HasSuffix(p, "/auto-sleep") || strings.HasSuffix(p, "/keep-full-access")) { // the second is the owner's Full access across restarts (#14061)
 				continue
 			}
 			// The owner's read of one team's cross-team state (#5636) is new: the old list never had it.
@@ -203,6 +203,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			}
 			// The done-state of a goal-looks-done row (#13834) and the bulk Record for all agents (#13834) are the owner's alone: the old list never had them.
 			if m == http.MethodPost && ((strings.HasPrefix(p, "/api/board/") && strings.HasSuffix(p, "/done-state")) || p == "/api/sessions/record-agents") {
+				continue
+			}
+			// The first-launch notice (#14353, #14414) is read through the hub by the owner alone: the old list never had it.
+			if m == http.MethodGet && p == "/api/launch-disclosure" {
 				continue
 			}
 			// The Operator's opened version of a series (#13910) is the owner's alone: the old list never had it.

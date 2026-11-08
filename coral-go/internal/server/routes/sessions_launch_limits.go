@@ -4,12 +4,10 @@ package routes
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"strings"
 
 	"github.com/subgentic/coral/internal/agent"
-	"github.com/subgentic/coral/internal/board"
 	setreg "github.com/subgentic/coral/internal/settings"
 )
 
@@ -17,36 +15,6 @@ import (
 func agentCaller(r *http.Request) bool {
 	_, ok := VerifiedSession(r.Context())
 	return ok
-}
-
-// limitAgentLaunch is what an agent may ask for when it starts another agent (#4032, Security's
-// #4031 finding 1): users govern agents through their CLI's permissions, so an agent must not
-// start one with fewer. Only the flags in agentLaunchFlags are kept (an allowlist, so a spelling
-// nobody listed is removed too); allowed tools, capability "allow" rules and custom hooks
-// (commands the agent's CLI would run itself) are removed. Deny rules, which only narrow, stay.
-// The Operator (the dashboard, the command line, the API key) keeps every choice.
-func limitAgentLaunch(route string, flags []string, caps *agent.Capabilities, tools []string, hooks map[string]interface{}) ([]string, *agent.Capabilities, []string, map[string]interface{}) {
-	clean := keepAgentLaunchFlags(flags)
-	var dropped []string
-	if len(clean) != len(flags) {
-		dropped = append(dropped, "flags")
-	}
-	if caps != nil && len(caps.Allow) > 0 {
-		dropped = append(dropped, "capability allow rules")
-		caps = &agent.Capabilities{Deny: caps.Deny}
-	}
-	if len(tools) > 0 {
-		dropped = append(dropped, "allowed tools")
-		tools = nil
-	}
-	if len(hooks) > 0 {
-		dropped = append(dropped, "hooks")
-		hooks = nil
-	}
-	if len(dropped) > 0 {
-		log.Printf("[%s] an agent's launch asked for %s: removed (only the Operator can start a less-restricted agent)", route, strings.Join(dropped, ", "))
-	}
-	return clean, caps, tools, hooks
 }
 
 // agentLaunchFlags are the only flags an agent's launch keeps (value: the flag takes the next
@@ -179,13 +147,6 @@ func stripAgentPermissionFlags(flags []string) []string {
 // agentLaunchUnsupervisedCode is the code of the refusal of an agent starting a type that never asks (#5901, Security's ruling on #4032).
 const agentLaunchUnsupervisedCode = "agent_launch_unsupervised"
 
-// agentLaunchUnsupervised says whether an agent may not start agentType because it never asks before running tools: the type skips the prompts with no flags at all
-// (agent.SkipsPermissionPrompts, which is Pi today, so a future CLI without prompts is covered the same way). An agent never starts an agent that asks for less than itself
-// (#4032), and the only things it may choose are the model flags; such a type has no mode that asks to fall back to, so it would be a way round the stripped permission flags.
-func agentLaunchUnsupervised(agentType string) bool {
-	return agent.SkipsPermissionPrompts(agentType, nil)
-}
-
 func agentLaunchUnsupervisedMessage(agentType string) string {
 	return "an agent cannot start a " + agentType + " agent: " + agentType + " does not ask before running tools; ask the Operator to start it"
 }
@@ -193,58 +154,4 @@ func agentLaunchUnsupervisedMessage(agentType string) string {
 // agentLaunchNeedsModeCode is the code of the refusal of an agent starting a Codex that names no permission mode on a board (#7552, Security's decision on #7527's caveat).
 const agentLaunchNeedsModeCode = "agent_launch_needs_mode"
 
-// agentLaunchNeedsMode says whether an agent's launch of agentType must be refused for want of a permission mode: a Codex on a board, with no mode in its flags and no saved
-// default_permission_mode. The Operator's launch with no mode is Auto (AutoByDefault); an agent's is not (it never starts a less-restricted agent, #4032, nor one that skips prompts,
-// #5901), so it would start bare Codex, which asks first, and a Codex that asks first cannot reach Coral from its sandbox: a worker that cannot post. An explicit mode, and a saved default (the
-// person's choice for every launch), are used as before; Claude and the other types are unchanged.
-func agentLaunchNeedsMode(agentType string, flags []string, onBoard bool, userSettings map[string]string) bool {
-	if agentType != "codex" || !onBoard {
-		return false
-	}
-	if carried, _ := agent.SplitPermissionFlags(flags); len(carried) > 0 || agent.PermissionModeFromFlags(flags) != "" {
-		return false
-	}
-	return setreg.Enum(userSettings, "default_permission_mode") == ""
-}
-
 const agentLaunchNeedsModeMessage = "an agent's Codex launch with no permission mode asks first, and a Codex that asks first cannot reach Coral from its sandbox: ask the Operator to start it (the Operator's launch gets Auto)"
-
-// agentLaunchInheritsSkippingDefault says whether an agent's launch of agentType would start in the Operator's saved default permission mode and that mode skips the prompts
-// (Auto, Don't ask, Bypass Permissions, and for Claude also Plan and Accept edits: SkipsPermissionPrompts reads the mode as the --permission-mode flag Coral translates per type).
-// launchSession takes the mode from the flags, else the saved default (#6423); limitAgentLaunch holds an agent to its flags and never saw that default applied later, so a saved Auto
-// reached an agent's Codex as "-a never" with the whole network (Security's #7576 finding). The flags an agent keeps are --model only, so when it names no mode the saved default is
-// the mode. An unsaved default is not a way round: AutoByDefault is false for an agent. (Pi never reaches here: agentLaunchUnsupervised refused it.)
-func agentLaunchInheritsSkippingDefault(agentType string, flags []string, userSettings map[string]string) (mode string, inherits bool) {
-	if carried, _ := agent.SplitPermissionFlags(flags); len(carried) > 0 || agent.PermissionModeFromFlags(flags) != "" {
-		return "", false // a mode in the flags is what limitAgentLaunch already held it to
-	}
-	saved := setreg.Enum(userSettings, "default_permission_mode")
-	if saved == "" || !agent.ValidPermissionMode(saved) {
-		return "", false
-	}
-	return saved, agent.SkipsPermissionPrompts(agentType, []string{"--permission-mode", saved})
-}
-
-// agentLaunchInheritsSkippingDefaultMessage is the refusal's words: the Operator's saved default is not an agent's to use.
-func agentLaunchInheritsSkippingDefaultMessage(agentType, mode string) string {
-	return "an agent cannot start a " + agentType + " agent in the Operator's saved default permission mode (" + mode + "): it skips the permission prompts, and an agent never starts a less-restricted agent; ask the Operator to start it"
-}
-
-// orchestratorLaunchAsksFirst says an agent's launch of agentType, which would have inherited a saved default that skips the prompts, may go on in the ask-first mode instead of being refused (#11713): the caller is the
-// active Orchestrator of the board its session is subscribed to (the person's helper, who launches agents for them), and the type can ask first and still reach Coral (a Codex that asks first cannot, so its refusal stands).
-// The launch is then never less restricted than the Orchestrator itself, and the Operator raises it later. Any other agent is refused as before.
-func (h *SessionsHandler) orchestratorLaunchAsksFirst(r *http.Request, agentType string) bool {
-	if agentType == "codex" || h.bs == nil {
-		return false
-	}
-	owner, ok := VerifiedSession(r.Context())
-	if !ok || owner == nil {
-		return false
-	}
-	sub, err := h.bs.GetSubscriptionBySessionName(r.Context(), owner.SessionName)
-	if err != nil || sub == nil || sub.IsActive == 0 {
-		return false
-	}
-	orch, err := h.bs.TeamOrchestrator(r.Context(), sub.Project)
-	return err == nil && board.SameIdentity(orch, sub.SubscriberID)
-}

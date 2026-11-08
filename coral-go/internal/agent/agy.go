@@ -324,8 +324,10 @@ func (a *AgyAgent) LaunchCommand(params LaunchParams) (string, error) {
 		parts = append(parts, "--conversation", params.ResumeSessionID)
 	}
 
-	// Permission flags from capabilities
-	if perms := TranslateToAgyPermissions(params.Capabilities); perms != nil {
+	// The Operator's "keep Full access" choice (#14061, #14085) is every relaunch's switch, after the capabilities and whatever the mode or the stored flags say.
+	if params.KeepFullAccess {
+		parts = append(parts, "--dangerously-skip-permissions")
+	} else if perms := TranslateToAgyPermissions(params.Capabilities); perms != nil { // permission flags from capabilities
 		// An explicit mode (the member's own, else the team's) is applied and the capabilities only narrow it (#6425).
 		if rank, ok := agyRankForMode(params.PermissionMode); ok {
 			perms = narrowAgyPermissions(perms, rank)
@@ -345,7 +347,7 @@ func (a *AgyAgent) LaunchCommand(params LaunchParams) (string, error) {
 	claudeOnlyFlags := map[string]bool{
 		"--settings": true, "--session-id": true,
 	}
-	permissionApplied := params.Capabilities != nil && !params.Capabilities.IsEmpty()
+	permissionApplied := params.KeepFullAccess || (params.Capabilities != nil && !params.Capabilities.IsEmpty())
 	for i := 0; i < len(params.Flags); i++ {
 		flag := params.Flags[i]
 		// The former Gemini spelling of the mode (--approval-mode X, --approval-mode=X): agy has --mode, so a recognised value is translated, both tokens consumed (dropping only the

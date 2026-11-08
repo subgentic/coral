@@ -80,3 +80,29 @@ export function _renderPresetButtons(containerId, kind, opts = {}) {
 export function _findPersona(name) {
     return AGENT_PRESETS.find(p => p.name === name) || _getSavedPersonas().find(p => p.name === name);
 }
+
+/** The role is advice, while tool limits are an explicit choice in every agent form. */
+export function syncRoleLimits(containerId, name) {
+    const container = document.getElementById(containerId); if (!container) return;
+    let box = container.querySelector('[data-role-limit-note]');
+    if (!box) {
+        box = document.createElement('div'); box.dataset.roleLimitNote = '1';
+        const note = document.createElement('p'); note.className = 'settings-hint';
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-small'; button.textContent = "Apply the role's limits";
+        const status = document.createElement('p'); status.className = 'settings-hint'; status.dataset.roleLimitStatus = '1'; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); status.setAttribute('aria-atomic', 'true');
+        box.append(note, button, status);
+        (container.querySelector('[data-section="persona"], .acf-persona-page') || container).append(box);
+        button.addEventListener('click', async () => {
+            const preset = AGENT_PRESETS.find(p => p.name === box.dataset.rolePreset);
+            if (!preset?.roleLimits) return;
+            const form = await importOnce('./agent_config_form.js'), current = form.getAgentConfig(containerId);
+            form.setAgentConfig(containerId, { ...current, name: current.name || preset.name, capabilities: structuredClone(preset.roleLimits) });
+            const labels = { file_read: 'read files', file_write: 'write files', shell: 'run commands', web_access: 'web access', git_write: 'Git writes', agent_spawn: 'start agents', notebook: 'notebooks' };
+            status.textContent = 'Role limits applied: ' + preset.roleLimits.allow.map(tool => labels[tool] || (tool.startsWith('shell:') ? 'command ' + tool.slice(6) : tool)).join(', ') + '.';
+        });
+    }
+    const preset = AGENT_PRESETS.find(p => p.name === name);
+    box.querySelector('[data-role-limit-status]').textContent = '';
+    box.dataset.rolePreset = preset?.name || ''; box.hidden = !preset?.roleLimits;
+    box.querySelector('p').textContent = preset?.roleNote || (preset?.roleLimits ? 'This role is a prompt, not a permission. Apply the role’s limits to use its saved tool choices; check the tool list and permission mode below.' : '');
+}

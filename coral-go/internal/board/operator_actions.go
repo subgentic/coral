@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -29,6 +30,8 @@ const (
 	ActivityNoteCap = 200
 	// activityTextCap bounds an item's title (text an agent wrote).
 	activityTextCap = 120
+	// activityAskerCap bounds the asker's name on an ask's row.
+	activityAskerCap = 80
 	// ActivityMaxLimit is the most rows one read returns (a larger limit is cut to it); the answer says whether more exist.
 	ActivityMaxLimit = 200
 	// activityTimeFormat is a row's time: UTC with milliseconds, fixed width, so it sorts as text and a merge of several computers' records can order by (time, id).
@@ -92,6 +95,7 @@ const (
 	ActChatSend       = "chat_send" // the chat composer's Send to an agent
 	ActRunSeen        = "run_seen"  // a failed run opened or dismissed
 	ActAgentsRecord   = "agents_record"
+	ActKeepFullAccess = "keep_full_access" // the Operator turned "keep Full access when this agent restarts" on or off for a Codex agent; the note says which (#14061)
 	ActGoalCreate     = "goal_create"
 	ActGoalEdit       = "goal_edit" // a goal's words, or Reopen
 	ActGoalDriver     = "goal_driver"
@@ -109,6 +113,10 @@ type ActivityMeta struct {
 	Surface string // "inbox", "chat" or "": which part of the page the action was taken in, as the page said (a closed list; anything else is nothing)
 	Note    string // already cleaned, redacted and cut by the caller ("" when the redactor refused)
 	Title   string // the item's title as text (cleaned and cut here)
+	// TaskID is the task a file's upload says it is linked to, which only the handler knows (the board store does not hold uploads): kept on a file row only when the team has that task, and its goal comes
+	// from the task (#14421). Any other kind of row ignores it.
+	TaskID int64
+	Asker  string // on a row about an ask: who asked (cleaned and cut here); the Title is the ask's line (#14422)
 }
 
 type activityKey struct{}
@@ -138,6 +146,12 @@ type OperatorAction struct {
 	Surface  string `db:"surface" json:"surface,omitempty"` // what the page said it was (inbox or chat), like Hint: a page-reported word from a closed list, never text
 	Title    string `db:"title" json:"title,omitempty"`
 	Note     string `db:"note" json:"note,omitempty"`
+	// GoalID and TaskID are the goal and task the row was about, saved when it was written (#14421): nil for a row with none, and for every row from before they existed (never guessed afterwards). Both are
+	// inside the row's hash when either is set; a row with neither hashes as it always did.
+	GoalID *int64 `db:"goal_id" json:"goal_id,omitempty"`
+	TaskID *int64 `db:"task_id" json:"task_id,omitempty"`
+	// Asker is who asked, on a row about an ask: the row's Title is then the ask's own line, and this keeps the asker readable beside it (#14422). Empty on every other row and on every row made before it.
+	Asker    string `db:"asker" json:"asker,omitempty"`
 	PrevHash string `db:"prev_hash" json:"-"`
 	Hash     string `db:"hash" json:"-"`
 }
@@ -163,6 +177,16 @@ func (s *Store) ensureOperatorActionsSchema(ctx context.Context) error {
 		return err
 	}
 	if _, err := s.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_operator_actions_team ON operator_actions(team, id)`); err != nil {
+		return err
+	}
+	// the goal and task of a row (#14421): nullable, so an old row stays empty. No index: the record is cut at ActivityMaxRows (50,000) and a filter by goal or task reads it whole.
+	for _, col := range []string{"goal_id", "task_id"} {
+		if _, err := s.db.ExecContext(ctx, `ALTER TABLE operator_actions ADD COLUMN `+col+` INTEGER`); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			return err
+		}
+	}
+	// who asked, on a row about an ask (#14422): added to a record that has none; an old row keeps '' and its hash (the field joins the hash only when it has text)
+	if _, err := s.db.ExecContext(ctx, `ALTER TABLE operator_actions ADD COLUMN asker TEXT NOT NULL DEFAULT ''`); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 		return err
 	}
 	// this record's own id, made once and never derived from anything else (not the telemetry id): the Hub pairs it with a row's id, which is unique only within one computer's record
@@ -215,10 +239,26 @@ func activityText(s string, n int) string {
 // activityHash chains a row: the SHA-256 of the previous hash and of every field of this row, each length-prefixed so no two rows hash alike by moving a character between fields.
 func activityHash(prev string, a OperatorAction) string {
 	h := sha256.New()
-	for _, f := range []string{prev, a.At, a.Actor, a.Action, a.ItemKind, a.ItemID, a.Version, a.Team, a.Source, a.Hint, a.Surface, a.Title, a.Note} {
+	fields := []string{prev, a.At, a.Actor, a.Action, a.ItemKind, a.ItemID, a.Version, a.Team, a.Source, a.Hint, a.Surface, a.Title, a.Note}
+	if a.Asker != "" { // a row made before the field (or one with no asker) hashes as it always did, so the record's chain still verifies (#14422)
+		fields = append(fields, "asker", a.Asker)
+	}
+	for _, f := range fields {
 		fmt.Fprintf(h, "%d:%s|", len(f), f)
 	}
+	if a.GoalID != nil || a.TaskID != nil { // a row with a thread hashes it too; one with none hashes exactly as before the columns, so no old row's hash changes (#14421)
+		for _, f := range []string{threadIDText(a.GoalID), threadIDText(a.TaskID)} {
+			fmt.Fprintf(h, "%d:%s|", len(f), f)
+		}
+	}
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+func threadIDText(p *int64) string {
+	if p == nil {
+		return ""
+	}
+	return strconv.FormatInt(*p, 10)
 }
 
 type activityExec interface {
@@ -244,8 +284,9 @@ func appendActivity(ctx context.Context, q activityExec, now time.Time, m Activi
 		hint = "phone"
 	}
 	surface := ValidSurface(m.Surface)
+	goal, task := resolveThread(ctx, q, m, kind, item, team)
 	a := OperatorAction{At: now.UTC().Format(activityTimeFormat), Actor: m.Actor, Action: action, ItemKind: kind, ItemID: item, Version: version, Team: team, Source: source, Hint: hint, Surface: surface,
-		Title: activityText(m.Title, activityTextCap), Note: activityText(m.Note, ActivityNoteCap), PrevHash: head.LastHash}
+		Title: activityText(m.Title, activityTextCap), Note: activityText(m.Note, ActivityNoteCap), GoalID: goal, TaskID: task, Asker: activityText(m.Asker, activityAskerCap), PrevHash: head.LastHash}
 	if a.Actor == "" {
 		a.Actor = "local"
 	}
@@ -259,8 +300,8 @@ func appendActivity(ctx context.Context, q activityExec, now time.Time, m Activi
 		_, _ = q.ExecContext(ctx, `RELEASE activity_row`)
 		return err
 	}
-	res, err := q.ExecContext(ctx, `INSERT INTO operator_actions (at, actor, action, item_kind, item_id, version, team, source, hint, surface, title, note, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		a.At, a.Actor, a.Action, a.ItemKind, a.ItemID, a.Version, a.Team, a.Source, a.Hint, a.Surface, a.Title, a.Note, a.PrevHash, a.Hash)
+	res, err := q.ExecContext(ctx, `INSERT INTO operator_actions (at, actor, action, item_kind, item_id, version, team, source, hint, surface, title, note, asker, goal_id, task_id, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		a.At, a.Actor, a.Action, a.ItemKind, a.ItemID, a.Version, a.Team, a.Source, a.Hint, a.Surface, a.Title, a.Note, a.Asker, a.GoalID, a.TaskID, a.PrevHash, a.Hash)
 	if err != nil {
 		return fail(err)
 	}
@@ -274,6 +315,61 @@ func appendActivity(ctx context.Context, q activityExec, now time.Time, m Activi
 	}
 	_, err = q.ExecContext(ctx, `RELEASE activity_row`)
 	return err
+}
+
+// resolveThread is the goal and task a row is about, found in the same transaction the row is written in (#14421), or nil for each when there is none or this team does not have it. Only the kinds that
+// have a thread say one: an ask (its subject, board_ask_subjects), a task action (the task, and its goal), a goal action (the goal) and a file (the task its handler named, and that task's goal). A prompt, a
+// wait and a plain team message have none, and a task or goal id is kept only when it is this team's own: ids are never carried across teams or guessed.
+func resolveThread(ctx context.Context, q activityExec, m ActivityMeta, kind, item, team string) (goal, task *int64) {
+	if team == "" {
+		return nil, nil
+	}
+	var goalID, taskID int64
+	switch kind {
+	case "question":
+		if id, err := strconv.ParseInt(item, 10, 64); err == nil && id > 0 {
+			var sj struct {
+				GoalID int64 `db:"goal_id"`
+				TaskID int64 `db:"task_id"`
+			}
+			if err := q.GetContext(ctx, &sj, `SELECT goal_id, task_id FROM board_ask_subjects WHERE message_id = ? AND project = ?`, id, team); err == nil {
+				goalID, taskID = sj.GoalID, sj.TaskID
+			}
+		}
+	case "task":
+		if id, err := strconv.ParseInt(item, 10, 64); err == nil && id > 0 {
+			taskID = id
+		}
+	case "goal":
+		if id, err := strconv.ParseInt(item, 10, 64); err == nil && id > 0 {
+			goalID = id
+		}
+	case "file":
+		taskID = m.TaskID
+	default:
+		return nil, nil
+	}
+	if taskID > 0 { // the team must have the task; a goal the row did not name is the task's
+		var g sql.NullInt64
+		if err := q.GetContext(ctx, &g, `SELECT goal_id FROM board_tasks WHERE id = ? AND board_id = ?`, taskID, team); err != nil {
+			taskID = 0
+		} else if goalID == 0 && g.Valid {
+			goalID = g.Int64
+		}
+	}
+	if goalID > 0 { // and the goal
+		var one int64
+		if err := q.GetContext(ctx, &one, `SELECT id FROM board_goals WHERE id = ? AND board_id = ?`, goalID, team); err != nil {
+			goalID = 0
+		}
+	}
+	if goalID > 0 {
+		goal = &goalID
+	}
+	if taskID > 0 {
+		task = &taskID
+	}
+	return goal, task
 }
 
 // recordInTx writes the row for ctx's action in tx when the context says the Operator acted. A failure to write it is the transaction's failure only for a board write the row must match; the caller decides.
@@ -325,7 +421,7 @@ const ActivityCheckNote = "Edits made outside Coral are shown unless the whole r
 // removed are not checked: the trim moved the anchor.
 func (s *Store) VerifyActivity(ctx context.Context) (ActivityCheck, error) {
 	rows := []OperatorAction{}
-	if err := s.db.SelectContext(ctx, &rows, `SELECT id, at, actor, action, item_kind, item_id, version, team, source, hint, surface, title, note, prev_hash, hash FROM operator_actions ORDER BY id`); err != nil {
+	if err := s.db.SelectContext(ctx, &rows, `SELECT id, at, actor, action, item_kind, item_id, version, team, source, hint, surface, title, note, asker, goal_id, task_id, prev_hash, hash FROM operator_actions ORDER BY id`); err != nil {
 		return ActivityCheck{}, err
 	}
 	var head struct {
@@ -374,6 +470,8 @@ type ActivityFilter struct {
 	BeforeID     int64  // rows older than this id (the next page)
 	BeforeAt     string // with BeforeID: rows older than this (time, id), the cursor a merge of several computers' records pages by
 	Limit        int
+	GoalID       int64 // only the rows about this goal (0: any); a row from before the columns has none and is never matched (#14421)
+	TaskID       int64 // only the rows about this task (0: any)
 }
 
 // ActivityRecordID is this computer's record's own id (see operator_actions_record).
@@ -392,7 +490,7 @@ func (s *Store) ListActivity(ctx context.Context, f ActivityFilter) ([]OperatorA
 // ActivityPage is ListActivity and whether more rows exist past the page (it reads one more than the limit). The limit is at most ActivityMaxLimit and 50 when not given; the order is (time, id) newest
 // first, and a cursor (BeforeAt with BeforeID) pages by that pair.
 func (s *Store) ActivityPage(ctx context.Context, f ActivityFilter) ([]OperatorAction, bool, error) {
-	q := `SELECT id, at, actor, action, item_kind, item_id, version, team, source, hint, surface, title, note FROM operator_actions WHERE 1 = 1`
+	q := `SELECT id, at, actor, action, item_kind, item_id, version, team, source, hint, surface, title, note, asker, goal_id, task_id FROM operator_actions WHERE 1 = 1`
 	var args []any
 	if f.Team != "" {
 		q += ` AND team = ?`
@@ -405,6 +503,14 @@ func (s *Store) ActivityPage(ctx context.Context, f ActivityFilter) ([]OperatorA
 	if f.Actor != "" {
 		q += ` AND actor = ?`
 		args = append(args, f.Actor)
+	}
+	if f.GoalID > 0 {
+		q += ` AND goal_id = ?`
+		args = append(args, f.GoalID)
+	}
+	if f.TaskID > 0 {
+		q += ` AND task_id = ?`
+		args = append(args, f.TaskID)
 	}
 	switch {
 	case f.BeforeID > 0 && f.BeforeAt != "":

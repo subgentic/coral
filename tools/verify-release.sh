@@ -176,7 +176,8 @@ if [ -n "$meta" ]; then
     dlsec="$(awk 'NR==1{next} /^---$/{exit} {print}' <<<"$body")"
     body="$(awk 'st==0 && NR==1 && $0=="### Download"{st=1; next} st==1{ if ($0=="---") st=2; next } st==2{ st=3; if ($0=="") next } {print}' <<<"$body")"
   fi
-  notes="$(gh api "repos/$REPO/contents/RELEASE_NOTES.md?ref=$TAG" -q .content 2>/dev/null | base64 -d 2>/dev/null)"
+  # The raw media type, not .content: the contents API returns an empty body for a file over 1 MiB, and RELEASE_NOTES.md passed that at v2.0.59 (1,051,205 bytes).
+  notes="$(gh api -H "Accept: application/vnd.github.raw" "repos/$REPO/contents/RELEASE_NOTES.md?ref=$TAG" 2>/dev/null)"
   if [ -z "$notes" ]; then
     fail notes "RELEASE_NOTES.md at $TAG" "could not be read"
   else

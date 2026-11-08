@@ -175,7 +175,7 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 	if throughAHub(r) { // a hub caller (the tunnel, or the self-hosted hub: its stamp or its API key) never changes a decision already made on the file (#13494); this computer's own dashboard still may
 		r = r.WithContext(board.WithOneDecision(r.Context()))
 	}
-	r = r.WithContext(board.WithActivity(r.Context(), activityMetaFor(r, item.Name, note))) // the Activity record: the decision and its row are one transaction (#12069)
+	r = r.WithContext(board.WithActivity(r.Context(), withFileTask(activityMetaFor(r, item.Name, note), item))) // the Activity record: the decision and its row are one transaction (#12069); the row carries the file's task (#14421)
 	change, tags, err := h.bs.DecideArtifactReview(r.Context(), project, id, state, time.Now())
 	switch {
 	case errors.Is(err, board.ErrAlreadyDecided):
@@ -320,7 +320,7 @@ func (h *BoardHandler) ignoreArtifact(w http.ResponseWriter, r *http.Request, pr
 		errNotFound(w, "this team has no such artifact")
 		return
 	}
-	r = r.WithContext(board.WithActivity(r.Context(), activityMetaFor(r, item.Name, "")))
+	r = r.WithContext(board.WithActivity(r.Context(), withFileTask(activityMetaFor(r, item.Name, ""), item)))
 	change, tags, err := h.bs.IgnoreArtifactReview(r.Context(), project, id, ignore)
 	switch {
 	case err == board.ErrNotForReview:
@@ -343,7 +343,7 @@ func (h *BoardHandler) saveArtifact(w http.ResponseWriter, r *http.Request, proj
 		errNotFound(w, "this team has no such artifact")
 		return
 	}
-	r = r.WithContext(board.WithActivity(r.Context(), activityMetaFor(r, item.Name, "")))
+	r = r.WithContext(board.WithActivity(r.Context(), withFileTask(activityMetaFor(r, item.Name, ""), item)))
 	change, tags, err := h.bs.SaveArtifactReview(r.Context(), project, id, save)
 	switch {
 	case err == board.ErrNotForReview:
@@ -401,7 +401,7 @@ func (h *BoardHandler) settleSupersededArtifact(w http.ResponseWriter, r *http.R
 			}
 		}
 	}
-	r = r.WithContext(board.WithActivity(r.Context(), activityMetaFor(r, item.Name, "Automatic settlement of an older version")))
+	r = r.WithContext(board.WithActivity(r.Context(), withFileTask(activityMetaFor(r, item.Name, "Automatic settlement of an older version"), item)))
 	changed, err := h.bs.SettleOlderArtifactReview(r.Context(), project, id, newer, time.Now())
 	if errors.Is(err, board.ErrNotOlderReview) {
 		commentRefuse(w, http.StatusConflict, "not_older_version", "Only an older version with a newer review or an approved/denied version in the same team and series can be settled automatically")

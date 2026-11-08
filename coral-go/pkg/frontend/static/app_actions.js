@@ -6,7 +6,7 @@ import { state } from './state.js';
 import { loadLiveSessions } from './api.js';
 import { restartSession, restartStage, hideRestartModal, confirmRestart, editGoal, refreshGoal } from './controls.js';
 import { selectLiveSession, selectHistorySession, editAndResubmit, renameAgent, editInstructions, setAgentIcon, toggleChatFlag } from './sessions.js';
-import { RESET_LOG_NOTE, toggleGroupCollapse, killGroup, killBoard, toggleTeamSleep, toggleAgentSleep, sleepTerminalGone, toggleAgentArchive, toggleArchivedSection, shareAgentTeam, saveTeamFromSidebar, killSessionDirect, showInfoDirect, attachDirect, restartDirect, restartSameDirect, showConfirmModal, hideConfirmModal, showPromptModal, hidePromptModal, showAlertModal, hideAlertModal, copyFolderPath, moveGroupUp, moveGroupDown, toggleGroupByTeam, expandSleepingGroup, setBoardAccentColor, moveSessionUp, moveSessionDown, showTeamTokenUsage, distillTeamKnowledge, filterLiveAgents, syncDisplayMenu, agentSearchKey, toggleShowServer, toggleGroupByServer, toggleRowLine, groupHeaderKey, teamHeaderKey } from './render.js';
+import { RESET_LOG_NOTE, toggleGroupCollapse, killGroup, killBoard, toggleTeamSleep, toggleAgentSleep, setKeepFullAccess, sleepTerminalGone, toggleAgentArchive, toggleArchivedSection, shareAgentTeam, saveTeamFromSidebar, killSessionDirect, showInfoDirect, attachDirect, restartDirect, restartSameDirect, showConfirmModal, hideConfirmModal, showPromptModal, hidePromptModal, showAlertModal, hideAlertModal, copyFolderPath, moveGroupUp, moveGroupDown, toggleGroupByTeam, expandSleepingGroup, setBoardAccentColor, moveSessionUp, moveSessionDown, showTeamTokenUsage, distillTeamKnowledge, filterLiveAgents, syncDisplayMenu, agentSearchKey, toggleShowServer, toggleGroupByServer, toggleRowLine, groupHeaderKey, teamHeaderKey } from './render.js';
 import { whatStaysReset } from './agent_words.js';
 import { toggleBrowser, browserNavigateTo, browserNavigateUp, browserSelectRecent, browserUse } from './browser.js';
 import { toggleAgenticPanel, toggleSidebarRail, focusSidebarSearch } from './sidebar.js';
@@ -25,6 +25,7 @@ import { showFolderTagDropdown, addFolderTag, removeFolderTag, createAndAddFolde
 import { pinFolder, unpinFolder, showOpenFolderModal, hideOpenFolderModal, submitOpenFolder } from './pinned_folders.js';
 import { checkForUpdates, dismissUpdateToast } from './update_check.js';
 import { teamFetch, keyLabel, nativeInbox, inTeam } from './server_base.js';
+import { keepResetNote } from './codex_mode.js';
 import { showServersModal } from './servers.js';
 import { toggleAllGroups } from './group_collapse.js';
 import { toggleAllGroupFolds } from './sidebar_groups.js';
@@ -367,7 +368,7 @@ Object.assign(window, {
 });
 
 function resetTeam(boardName) {
-    showConfirmModal('Reset team', `Reset all agents in "${keyLabel(boardName)}"? Each one stops and starts again from its first instructions, in a new chat. ${whatStaysReset((state.liveSessions || []).filter(s => inTeam(s, boardName)))} ${RESET_LOG_NOTE}`, async () => {
+    showConfirmModal('Reset team', `Reset all agents in "${keyLabel(boardName)}"? Each one stops and starts again from its first instructions, in a new chat. ${whatStaysReset((state.liveSessions || []).filter(s => inTeam(s, boardName)))}${keepResetNote((state.liveSessions || []).filter(s => inTeam(s, boardName) && s.keep_full_access === true).length)} ${RESET_LOG_NOTE}`, async () => {
         try {
             const resp = await teamFetch(boardName, n => `/api/sessions/live/team/${encodeURIComponent(n)}/reset`, { method: 'POST' });
             if (resp.ok) {
@@ -454,7 +455,7 @@ Object.assign(window, {
     toggleGroupCollapse, groupHeaderKey, teamHeaderKey, killGroup, moveGroupUp, moveGroupDown,
     copyFolderPath, killBoard, setBoardAccentColor, resetTeam,
     moveSessionUp, moveSessionDown,
-    toggleTeamSleep, toggleAgentSleep, sleepTerminalGone, toggleAgentArchive, toggleArchivedSection,
+    toggleTeamSleep, toggleAgentSleep, setKeepFullAccess, sleepTerminalGone, toggleAgentArchive, toggleArchivedSection,
     exitTeamPage, openTeamPage,
     showTeamAvailabilityWorkspace, showTeamWorkingModeWorkspace, showTeamLinkDialog,
     shareAgentTeam, saveTeamFromSidebar, showTeamTokenUsage, distillTeamKnowledge,

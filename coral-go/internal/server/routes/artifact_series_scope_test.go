@@ -137,7 +137,11 @@ func TestDeletingSharedBytesSaysTheyWereInOtherTeamsToo(t *testing.T) {
 	k.h.deleteArtifactCore(rec2, req2)
 	require.Equal(t, http.StatusOK, rec2.Code)
 	assert.NotContains(t, rec2.Body.String(), "also_in_teams")
-	assert.False(t, pend2.set)
+	// #14422: the row of a delete names the file (read before it is gone), so a one-team delete asks for a row too, with the name and no 'also held' words
+	assert.True(t, pend2.set, "the Activity row is asked for, with the file's name")
+	assert.Equal(t, board.ActFileDelete, pend2.action)
+	assert.NotEmpty(t, pend2.title, "the file's name at the time")
+	assert.Empty(t, pend2.note, "no words about other teams: only this one held the bytes")
 }
 
 func TestTeamsHoldingCountsEachTeamOnce(t *testing.T) {

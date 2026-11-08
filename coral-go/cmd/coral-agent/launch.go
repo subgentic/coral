@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -104,5 +105,22 @@ func cmdLaunch(args []string) {
 	}
 	fmt.Printf("Launched %s in %s\n", label, absDir)
 	fmt.Printf("  Session: %s\n", sessionName)
+	printLaunchNotice(os.Stdout, result)
 	fmt.Printf("  Open Coral to work with it: %s\n", hooks.RedactedURL(serverURL))
+}
+
+// printLaunchNotice says what the server answered about permissions (#14353, Security's MUST 3): the mode the agent started in, where to lower it, and, until the owner has read it in the
+// dashboard, the first-launch notice. A server that answers none of these (an older one) prints nothing.
+func printLaunchNotice(w io.Writer, result map[string]any) {
+	if mode, _ := result["permission_mode"].(string); mode != "" {
+		fmt.Fprintf(w, "  Permission mode: %s\n", mode)
+	}
+	if lower, _ := result["permission_lowering"].(string); lower != "" {
+		fmt.Fprintf(w, "  %s\n", lower)
+	}
+	if d, ok := result["launch_disclosure"].(map[string]any); ok {
+		if text, _ := d["text"].(string); text != "" {
+			fmt.Fprintf(w, "  Notice: %s\n", text)
+		}
+	}
 }

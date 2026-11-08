@@ -146,7 +146,7 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 	// The routes are named once, by tunnel.ForwardsIdempotencyKey, which is also what the connector and the hub proxy forward the header by.
 	r.Use(routes.NewIdempotency().Middleware)
 	// The Operator's clicks that are recorded by their route (#13609): after the handler answered 2xx, for a person only.
-	r.Use(routes.ActivityRecorder(s.boardStore))
+	r.Use(routes.ActivityRecorder(s.boardStore, func(id string) string { return routes.StoredFileName(s.cfg.CoralDir(), id) })) // a file click names the file (#14422)
 }
 
 // registerAuth: the health check and the sign-in routes.
@@ -488,6 +488,10 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.Post("/api/sessions/live/{name}/answer-prompt", sessHandler.AnswerPrompt)
 	r.Post("/api/sessions/live/{name}/dismiss-wait", sessHandler.DismissWait)
 	r.Post("/api/sessions/live/{name}/auto-sleep", sessHandler.AutoSleepOpt)
+	r.Post("/api/sessions/live/{name}/keep-full-access", sessHandler.KeepFullAccessOpt)
+	r.Get("/api/launch-disclosure", sessHandler.GetLaunchDisclosure)          // #14353: the first-launch notice, owner only
+	r.Post("/api/launch-disclosure/ack", sessHandler.AckLaunchDisclosure)     // the owner has read it
+	r.Delete("/api/launch-disclosure/ack", sessHandler.ClearLaunchDisclosure) // only the owner takes that back
 	r.Get("/api/sessions/live/{name}/events/counts", sessHandler.EventCounts)
 	r.Delete("/api/sessions/live/{name}/events", sessHandler.ClearEvents)
 	r.Post("/api/sessions/live/{name}/token-usage", sessHandler.RecordTokenUsage)

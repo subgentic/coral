@@ -18,12 +18,13 @@ It is a **record for the Operator, not a tamper-proof audit trail**: a program t
 
 ## Request
 
-`GET /api/activity?team=&action=&before=&before_at=&limit=`
+`GET /api/activity?team=&action=&goal=&task=&before=&before_at=&limit=`
 
 | parameter | meaning |
 |---|---|
 | `team` | one team's bare board name (letters, digits, `_`, `.`, `-`; at most 64); another value is `400` |
 | `action` | one of `approve`, `changes`, `deny`, `ignore`, `supersede`, `unignore`, `save`, `unsave`, `undone`, `answer`, `dismiss`, `goal_close`, `proposal`, `mark_read`, `goal_review`, `send_review`, `unsend_review`, `hub_update_check`, `hub_update_relaunch`, `message`, `task_create`, `task_complete`, `task_cancel`, `task_publish`, `task_edit`, `task_remind`, `task_park`, `task_reply`, `prompt_answer`, `prompt_allow`, `prompt_reject` (a permission prompt answered Yes or No: the note is the option's own label, the title is empty), `wait_dismiss`, `wait_send` (#13609), and from slice 2 `mark_unread`, `file_tags`, `file_star`, `file_unstar`, `file_keep`, `file_release`, `file_delete`, `file_share`, `file_edit`, `file_edit_send`, `saved_add`, `saved_update`, `saved_remove`, `chat_flag`, `chat_send`, `run_seen`, `agents_record`, `goal_create`, `goal_edit`, `goal_driver`, `goal_move`, `goal_request_accept`, `goal_request_decline`, `inbox_hide`; another value is `400` |
+| `goal`, `task` | only the rows about that goal or task (a positive whole number; anything else is `400`). They combine with the other filters. A row written before the computer saved a goal and task on each row has neither and is never matched |
 | `before`, `before_at` | the cursor: rows older than the pair (`before_at`, `before`), both taken from the previous answer's `next_before` and `next_before_at`. `before_at` alone is `400`; `before` alone pages by id (the id grows with time on one computer) |
 | `limit` | rows per page; default 50, **at most 200** (more is cut to 200); `0`, a negative number or a non-number is `400` |
 
@@ -33,7 +34,8 @@ It is a **record for the Operator, not a tamper-proof audit trail**: a program t
 {
   "actions": [ { "id": 41, "at": "2026-11-02T05:41:12.304Z", "actor": "local", "action": "approve",
                  "item_kind": "file", "item_id": "<64 hex>", "version": "<64 hex>", "team": "coral-go-team",
-                 "source": "local", "hint": "phone", "title": "plan.md", "note": "" } ],
+                 "source": "local", "hint": "phone", "title": "plan.md", "note": "",
+                 "goal_id": 12, "task_id": 340, "goal_title": "Ship the importer", "task_title": "Write the importer" } ],
   "more": true,
   "record_id": "<32 hex>",
   "limit_max": 200,
@@ -64,8 +66,12 @@ It is a **record for the Operator, not a tamper-proof audit trail**: a program t
   - `action`: as in the table above.
   - `item_kind`: `file`, `question`, `goal`, `proposal`, `message`, `task` (a task, #13609), `chat`, `workflow_run` or `job_run` (a failed run's `run_seen`: a workflow run's `item_id` is the run's number; a `job_run`'s is `jobID:runID`, two numbers and a colon, with the job's name as the title (#13626); an older `job_run`-less row of kind `run` has the run's number alone and cannot be linked), `setting`, `goal_request` or `agent` (an agent's session name, #13609). `item_id`: the item's id (a file's digest, a goal's or proposal's number, a question's message number). `version`: for a file, the digest of the exact version acted on (the same as `item_id` today; a file is addressed by its digest), else absent. The item is named by id and kind plus `title`, a **short label** (at most 120 characters): words an agent wrote, so show it as text and never build a link from it.
   - `team`: the board's bare name on that computer.
+  - `goal_id`, `task_id`: the goal and task the row was about, saved when the row was written, so they are what they were then; both absent when the row has none, and **always absent on a row from before the computer saved them (never guessed afterwards)**. An ask carries its subject's; a task action its task and that task's goal; a goal action its goal; a file's decision, tags, read mark and edit carry the task the file is linked to and that task's goal. Prompt answers, waits and plain team messages have none, and so do the file stars, keeps, releases and deletes the page sends without a team. A goal or task id is only ever one this team has. These ids are inside the row's hash when present (a row with none hashes as it always did).
+  - **Keying a thread (for the Hub):** a goal or task number is only meaningful on one team of one computer: two computers, and two teams on one computer, each have a goal 12 and a task 340 of their own. Key a thread by (computer's `record_id`, `team`, number), never by the bare number, or two different threads merge into one.
+  - `goal_title`, `task_title`: those goal's and task's titles **as they are now** (looked up when the page is read, as the Needs you rows do; cleaned and cut), absent when the row has no goal or task, or when it has since been deleted. Never kept with the row.
   - `source`: `local` or `hub`, decided by the computer from the request's own provenance. `hint`: `phone`, or absent; it is only what the page said about itself, so show it as "reported by the page". `surface`: `inbox`, `chat` or absent, the part of the page the action was taken in, as the page said (a closed list of two words; anything else is stored as nothing, and it is part of the row's chain hash); show it as "reported by the page" too.
   - `note`: the Operator's own one-line reason or chosen option, redacted for secrets and cut to 200 characters; absent when none (or when the redactor refused). **No comment body, file content, answer text, picture or secret is ever in a row.**
+  - `title` and `asker` (#14422): the item's name when the action was taken, kept as text and cut to 120 characters: a file's name for a click on a file, a task's or goal's title, and for a row about an ask (a button answer, a typed answer, ignore and its undo) the **first 120 characters of the ask's own line, redacted for secrets**, with `asker` (who asked, cut to 80) beside it. Absent on a row made before the names were kept, and never guessed for one.
 - `more`: whether rows exist past this page. `next_before` and `next_before_at` are the last row's pair (absent on an empty page).
 - `record_id`: this computer's record's own random id, made once with the table and never derived from another id. Rows from different computers are told apart by it.
 - `limit_max`: the largest `limit` the computer honours.

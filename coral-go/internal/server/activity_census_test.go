@@ -19,6 +19,7 @@ import (
 
 // activityByHandler: the handler writes the row itself (in the store transaction of the decision, after the post, or by asking the recorder), for a person only.
 var activityByHandler = map[string]string{
+	"POST /api/sessions/live/{name}/keep-full-access":                     "the Operator turned keep-Full-access-on-restart on or off for a Codex agent (keep_full_access, #14061): the handler asks the recorder for the row, the note says on or off",
 	"DELETE /api/board/{project}/artifacts/{id}/review":                   "take out of review (unsend_review)",
 	"POST /api/artifacts/{id}/opened":                                     "the version of a series the Operator opened (#13910): the Operator's own reading state, kept so a row can say New version; it is not a decision, so no Activity row",
 	"POST /api/board/{project}/artifacts/{id}/review":                     "a file's review: approve, changes, deny, ignore, unignore, save, unsave, supersede (board.DecideArtifactReview and friends)",
@@ -60,6 +61,8 @@ var activityCommentsOut = map[string]string{
 
 // activityNotAnInboxAction: a route a person (or an agent) can reach that is not an action in the Inbox, with why.
 var activityNotAnInboxAction = map[string]string{
+	"POST /api/launch-disclosure/ack":                                      "the owner's one-time acknowledgement of the first-launch notice (#14353): not an action in the Inbox; it records only the notice id and the time",
+	"DELETE /api/launch-disclosure/ack":                                    "the owner takes that acknowledgement back (#14353): not an action in the Inbox",
 	"DELETE /api/agent/ui/{id}":                                            "an agent's own call: no person's click",
 	"DELETE /api/auth/sessions/{id}":                                       "sign-in and sessions",
 	"DELETE /api/board/remotes":                                            "computers on the board",

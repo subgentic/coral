@@ -37,11 +37,14 @@ type restartRequest struct {
 	// PermissionMode is the mode the person picked in the restart dialog: it wins over the stored mode and the stored permission flags (#12481; before, the pick travelled only as a flag in extra_flags, which is
 	// stripped, so Default to Bypass gave no flag and Bypass to Default kept the stored one). nil or "" is a restart that asks for nothing (Restart same settings): the stored mode stands.
 	PermissionMode *string `json:"permission_mode"`
+	// KeepFullAccess: the form's "Use Full access for this agent" (#14085): this restart is Full access whatever the capabilities say, and so is every one after it. The Operator's alone.
+	KeepFullAccess bool `json:"keep_full_access"`
 }
 
 // restartPlan is a restart worked out before anything is touched: the agent, where it runs, its new identity and
 // the settings it starts with.
 type restartPlan struct {
+	keepSource   string // where the request came from (store.KeepSourceLocal or Hub): the source of a choice this restart stores (#14193)
 	req          restartRequest
 	agentType    string
 	stored       *store.LiveSession // the session being restarted (nil: unknown to the store)
@@ -97,8 +100,15 @@ func (h *SessionsHandler) Restart(w http.ResponseWriter, r *http.Request) {
 		fail(w)
 		return
 	}
+	plan.keepSource = keepSourceOf(r)
+	if req.KeepFullAccess {
+		if status, msg := h.keepFullAccessRequestRefusal(r, plan.agentType); status != 0 {
+			writeError(w, status, "", msg)
+			return
+		}
+	}
 	// Through the Coral Hub, extra flags or capabilities that skip permission prompts need the owner's local switch (#126 F4).
-	if refuseHubSkip(w, r, h.ss, hubAsksToSkip(plan.agentType, strings.Fields(req.ExtraFlags), req.Capabilities, nil, nil)) {
+	if refuseHubSkip(w, r, h.ss, hubAsksToSkip(plan.agentType, strings.Fields(req.ExtraFlags), req.Capabilities, nil, nil) || req.KeepFullAccess) { // #14193
 		return
 	}
 	plan.restartSettings()
@@ -110,6 +120,9 @@ func (h *SessionsHandler) Restart(w http.ResponseWriter, r *http.Request) {
 	if fail != nil {
 		fail(w)
 		return
+	}
+	if req.KeepFullAccess && plan.stored != nil { // built without a refusal: the choice is the agent's from now on, and ReplaceLiveSession carries it to the new session (same capabilities)
+		h.storeKeepFullAccess(ctx, r, plan.stored.SessionID, name, "restart")
 	}
 	ctx, cancel := lifecycleCtx(ctx) // from here the restart touches the terminals: it runs to its end whatever the request does
 	defer cancel()
@@ -444,10 +457,17 @@ func (h *SessionsHandler) restartCommand(ctx context.Context, p *restartPlan) (s
 		refuse, _ := cliPathRefusal(ctx, cerr)
 		return "", refuse
 	}
+	keepFull := false
+	if p.req.KeepFullAccess { // the form asked for it: this restart is Full access and the choice is stored below, once the command is built (#14085)
+		keepFull = true
+	} else if p.stored != nil && !p.pickedMode { // a mode picked in the restart dialog is the person asking for something else: it ends the choice (below)
+		keepFull = h.keepFullAccessForRelaunch(ctx, p.agentType, p.stored.SessionID, "restart", p.stored.Capabilities, p.capsJSON)
+	}
 	cmd, err := h.launchCommand(ctx, agent.GetAgent(p.agentType), agent.LaunchParams{
-		SessionID:    p.newSessionID,
-		SessionName:  p.newSessionName,
-		ProtocolPath: h.protocolPath(), EmbeddedProtocol: true,
+		KeepFullAccess: keepFull,
+		SessionID:      p.newSessionID,
+		SessionName:    p.newSessionName,
+		ProtocolPath:   h.protocolPath(), EmbeddedProtocol: true,
 		Flags:           p.flags,
 		WorkingDir:      p.workdir,
 		CLIPath:         cliPath, // Settings > CLI paths (#3205)
@@ -467,6 +487,9 @@ func (h *SessionsHandler) restartCommand(ctx context.Context, p *restartPlan) (s
 	})
 	if err != nil {
 		return "", func(w http.ResponseWriter) { errInternalServer(w, fmt.Sprintf("launch command failed: %v", err)) }
+	}
+	if !p.req.KeepFullAccess && p.stored != nil && p.pickedMode && keepFullAccessType(p.agentType) {
+		h.clearKeepFullAccess(ctx, p.stored.SessionID, "the restart picked a permission mode")
 	}
 	return cmd, nil
 }
@@ -663,6 +686,11 @@ func (h *SessionsHandler) restartRecord(ctx context.Context, p *restartPlan) {
 			return ptr.NonEmpty(p.permMode) // the mode it restarted in is recorded, so the next restart knows it (#10297)
 		}(),
 	})
+	if p.req.KeepFullAccess { // the form's choice goes to the NEW session even when the same restart edited the capabilities (which ends an earlier choice): the person just made it (#14085)
+		if _, err := h.ss.SetKeepFullAccessFrom(ctx, p.newSessionID, true, p.keepSource); err != nil {
+			log.Printf("[keep-full-access] could not store the choice on the restarted session %s: %v", p.newSessionID, err)
+		}
+	}
 	h.removeReplacedHermesHome(p.stored, p.board, p.req.SessionID) // the agent has a new session id, so a home of its own: the old one is no longer anyone's
 	if p.chiefMode != "" {
 		h.ss.SetSetting(ctx, "chief_session", p.newSessionID) // Chief is still the recorded agent after its restart: the next restart finds it

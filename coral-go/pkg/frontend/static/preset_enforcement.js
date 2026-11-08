@@ -108,7 +108,7 @@ export function presetEnforcement(agentType, caps, permMode) {
         let text = 'Claude: Allow pre-approves these tools and others still run after it asks; Deny blocks.';
         if (permMode === 'bypassPermissions') text = BYPASS_NOTE;
         const quiet = text === BYPASS_NOTE; // the plain Bypass line is the default case: it is said on Permissions only, not again under the persona (#5595)
-        if (allow.has('shell') && allow.has('git_write')) text += " Git Write's git patterns don't limit git while Shell is allowed.";
+        if (allow.has('shell') && allow.has('git_write')) text += permMode === 'auto' ? ' In Auto, Coral emits no git preapprovals; Auto checks git commands.' : " Git Write's git patterns don't limit git while Shell is allowed.";
         return { text, denyEnforced: true, patternsEnforced: true, quiet };
     }
     if (family === 'codex') {
@@ -144,7 +144,7 @@ export function presetEnforcement(agentType, caps, permMode) {
 export function defaultPermissionMode(settings, agentType) {
     const saved = settings && settings.default_permission_mode;
     if (saved) return saved;
-    if (agentType === 'hermes') return 'default'; // Hermes asks before a dangerous command unless --yolo: the safe mode is its default, as the server's is (DefaultLaunchPermissionMode, #12169)
+    if (agentType === 'hermes') return 'bypassPermissions'; // The shipped full default is --yolo; a saved lower mode above always wins.
     return !agentType || agentType === 'claude' || agentType === 'codex' ? 'auto' : 'bypassPermissions';
 }
 

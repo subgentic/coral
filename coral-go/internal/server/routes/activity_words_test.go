@@ -59,6 +59,8 @@ func TestTheOperatorsTypedAnswerToAQuestionIsARow(t *testing.T) {
 	assert.Equal(t, board.ActAnswer, rows[0].Action)
 	assert.Equal(t, "question", rows[0].ItemKind)
 	assert.Equal(t, itoa(q.ID), rows[0].ItemID)
+	assert.Equal(t, "@Operator which design do we ship?", rows[0].Title, "the ask's own line (#14422; it was the asker)")
+	assert.Equal(t, "Lead", rows[0].Asker)
 	assert.Contains(t, rows[0].Note, "the second one")
 }
 
@@ -89,7 +91,7 @@ func TestTheReadButtonsAndTheTagEditorAreRowsAndAnOpenIsNot(t *testing.T) {
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) { next.ServeHTTP(w, asPerson(req)) })
 	})
-	r.Use(ActivityRecorder(e.h.bs))
+	r.Use(ActivityRecorder(e.h.bs, nil))
 	r.Put("/api/board/{project}/artifacts/{id}/tags", e.h.SetArtifactTags)
 	r.Get("/api/activity", e.h.ListActivity)
 	srv := httptest.NewServer(r)
@@ -117,6 +119,10 @@ func TestTheReadButtonsAndTheTagEditorAreRowsAndAnOpenIsNot(t *testing.T) {
 	assert.Equal(t, "internal, final", rows[0]["note"])
 	assert.Equal(t, board.ActMarkRead, rows[1]["action"])
 	assert.Equal(t, board.ActMarkUnread, rows[2]["action"])
+	for _, row := range rows {
+		assert.NotEmpty(t, row["title"], "the file's name at the click (#14422)")
+		assert.Equal(t, StoredFileName(e.coralDir, id), row["title"])
+	}
 	assert.Equal(t, id, rows[2]["item_id"])
 	assert.Equal(t, "file", rows[2]["item_kind"])
 
@@ -127,7 +133,7 @@ func TestTheReadButtonsAndTheTagEditorAreRowsAndAnOpenIsNot(t *testing.T) {
 			next.ServeHTTP(w, req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerAgentNoToken)))
 		})
 	})
-	ar.Use(ActivityRecorder(e.h.bs))
+	ar.Use(ActivityRecorder(e.h.bs, nil))
 	ar.Put("/api/board/{project}/artifacts/{id}/tags", e.h.SetArtifactTags)
 	asrv := httptest.NewServer(ar)
 	t.Cleanup(asrv.Close)

@@ -56,7 +56,38 @@ func activityActor(id callerIdentity) string {
 	return "hub:unknown"
 }
 
-// GET /api/activity?team=&action=&before=&limit= : the record, newest first, a page at a time, and whether its chain is whole (checked on the first page). Read only; the Operator's alone, at this computer or through
+// activityRowView is a row of the record as the read answers it: the row, and the titles of its goal and task as they are now, looked up live as Needs you does (#14421). A row with no goal or task has no
+// titles; a goal or task deleted since has none either.
+type activityRowView struct {
+	board.OperatorAction
+	GoalTitle string `json:"goal_title,omitempty"`
+	TaskTitle string `json:"task_title,omitempty"`
+}
+
+func (h *BoardHandler) activityRows(ctx context.Context, rows []board.OperatorAction) []activityRowView {
+	out := make([]activityRowView, len(rows))
+	links := map[string]*askSubjectLinks{}
+	for i, r := range rows {
+		out[i].OperatorAction = r
+		if (r.GoalID == nil && r.TaskID == nil) || r.Team == "" {
+			continue
+		}
+		l := links[r.Team]
+		if l == nil {
+			l = &askSubjectLinks{h: h, project: r.Team, goals: map[int64]string{}, tasks: map[int64]string{}}
+			links[r.Team] = l
+		}
+		if r.GoalID != nil {
+			out[i].GoalTitle = needsYouLine(l.goalTitle(ctx, *r.GoalID))
+		}
+		if r.TaskID != nil {
+			out[i].TaskTitle = needsYouLine(l.taskTitle(ctx, *r.TaskID))
+		}
+	}
+	return out
+}
+
+// GET /api/activity?team=&action=&goal=&task=&before=&limit= : the record, newest first, a page at a time, and whether its chain is whole (checked on the first page). Read only; the Operator's alone, at this computer or through
 // Coral Hub as the Hub OWNER (#12070: the tunnel's table lists it as an owner route; nobody else gets it).
 func (h *BoardHandler) ListActivity(w http.ResponseWriter, r *http.Request) {
 	if !operatorOnly(w, r) { // at this computer, the person; through Coral Hub, the account this computer is linked to and nobody else (refuseNonOwner): a guest, a grantee or a viewer is refused owner_only
@@ -80,6 +111,20 @@ func (h *BoardHandler) ListActivity(w http.ResponseWriter, r *http.Request) {
 		if id := hubOwnerRequest(r); id.team {
 			scoped = activityActor(id)
 			f.Actor = scoped
+		}
+	}
+	for _, k := range []string{"goal", "task"} { // only the rows about this goal or task (#14421); a row from before they were saved has neither and is never matched
+		if v := q.Get(k); v != "" {
+			n, err := strconv.ParseInt(v, 10, 64)
+			if err != nil || n <= 0 {
+				errBadRequest(w, "invalid "+k)
+				return
+			}
+			if k == "goal" {
+				f.GoalID = n
+			} else {
+				f.TaskID = n
+			}
 		}
 	}
 	if v := q.Get("before"); v != "" {
@@ -115,7 +160,7 @@ func (h *BoardHandler) ListActivity(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "could not read the record")
 		return
 	}
-	out := map[string]any{"actions": rows, "more": more, "record_id": recordID, "limit_max": board.ActivityMaxLimit}
+	out := map[string]any{"actions": h.activityRows(r.Context(), rows), "more": more, "record_id": recordID, "limit_max": board.ActivityMaxLimit}
 	if f.BeforeID == 0 {
 		chk, err := h.bs.VerifyActivity(r.Context())
 		if err != nil {
@@ -145,13 +190,42 @@ var activityActions = map[string]bool{
 	board.ActTaskCreate: true, board.ActTaskComplete: true, board.ActTaskCancel: true, board.ActTaskPublish: true, board.ActTaskEdit: true, board.ActTaskRemind: true, board.ActTaskPark: true, board.ActTaskReply: true,
 	board.ActPromptAnswer: true, board.ActPromptAllow: true, board.ActPromptReject: true, board.ActWaitDismiss: true, board.ActWaitSend: true, board.ActMessage: true,
 	board.ActMarkUnread: true, board.ActFileTags: true, board.ActFileStar: true, board.ActFileUnstar: true, board.ActFileKeep: true, board.ActFileRelease: true, board.ActFileDelete: true, board.ActFileShare: true, board.ActFileEdit: true, board.ActFileEditSend: true,
-	board.ActSavedAdd: true, board.ActSavedUpdate: true, board.ActSavedRemove: true, board.ActChatFlag: true, board.ActChatSend: true, board.ActRunSeen: true, board.ActAgentsRecord: true,
+	board.ActSavedAdd: true, board.ActSavedUpdate: true, board.ActSavedRemove: true, board.ActChatFlag: true, board.ActChatSend: true, board.ActRunSeen: true, board.ActAgentsRecord: true, board.ActKeepFullAccess: true,
 	board.ActGoalCreate: true, board.ActGoalEdit: true, board.ActGoalDriver: true, board.ActGoalMove: true, board.ActGoalRequestAdd: true, board.ActGoalRequestNo: true, board.ActInboxHide: true,
 	board.ActSkillApprove: true, board.ActSkillReject: true, board.ActSkillRemove: true, board.ActSkillImport: true, board.ActSkillScriptsAck: true, board.ActSkillSecretAck: true,
 }
 
 // recordActivity adds the row of an Operator action that is not a write in the board database's own transaction (best effort: a crash between the action and its row can lose one row, and a row that cannot
 // be written is logged and never blocks the action). Only the Operator's own actions are recorded: callers check who acted before they call.
+// askActivityMeta is the row's meta for an action on an ask (#14422): the ask's own line as the title (secrets out, cut, as the Needs you row shows it) and who asked beside it, so the Activity page can
+// say 'Dismissed "Ship batch-120 tonight?" from Head of Security' and not 'a question'. A message that cannot be read leaves both empty, as every row was before.
+func (h *BoardHandler) askActivityMeta(r *http.Request, ctx context.Context, project string, askID int64, note string) board.ActivityMeta {
+	m := activityMetaFor(r, "", note)
+	if msg, err := h.bs.GetMessageByID(ctx, project, askID); err == nil && msg != nil {
+		m.Title, m.Asker = needsYouLine(msg.Content), needsYouLine(msg.SubscriberID)
+	}
+	return m
+}
+
+// recordAskActivity writes the row of the Operator's action on an ask (an answer by button, an ignore, an undo of one) with the ask's line and asker, and tells Chief as recordActivity does.
+func (h *BoardHandler) recordAskActivity(r *http.Request, action, project string, askID int64, note string) {
+	if h.bs == nil {
+		return
+	}
+	ctx := context.WithoutCancel(r.Context())
+	_ = h.bs.RecordActivity(ctx, h.askActivityMeta(r, ctx, project, askID, note), action, "question", strconv.FormatInt(askID, 10), "", project)
+	h.tellChief(ctx, action, "question", project, "", "") // the Operator's decision on a team Chief fronts (#12171), as before
+}
+
+// recordAskWords is recordWords for the Operator's typed answer to an ask: the same person-only rule, the words as the note, and the ask's line and asker as the title and asker (#14422).
+func (h *BoardHandler) recordAskWords(r *http.Request, action, project string, askID int64, words string) {
+	if h.bs == nil || !humanInputCaller(r) {
+		return
+	}
+	ctx := context.WithoutCancel(r.Context())
+	_ = h.bs.RecordActivity(ctx, h.askActivityMeta(r, ctx, project, askID, words), action, "question", strconv.FormatInt(askID, 10), "", project)
+}
+
 func (h *BoardHandler) recordActivity(r *http.Request, action, kind, item, team, title, note string) {
 	if h.bs == nil {
 		return

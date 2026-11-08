@@ -13,7 +13,7 @@ import { serverFetch, boardFetch, identityKey, LOCAL_SERVER, isHub } from './ser
 const { launch } = await importOnce('./launch_state.js');
 const { goalWrite } = await importOnce('./goal_write.js');
 const { _acfServer, _effectiveServer, _settingsFor } = await importOnce('./launch_models.js');
-const { trackPermissionPick, _getPermissionFlagsForAgentMode, _normalizePermFlagsForAgent, _updatePermModeDescription, _hasPermFlag } = await importOnce('./permission_flags.js');
+const { defaultPermissionMode, trackPermissionPick, _getPermissionFlagsForAgentMode, _normalizePermFlagsForAgent, _updatePermModeDescription, _hasPermFlag } = await importOnce('./permission_flags.js');
 const { _findPersona, _getSavedTeamTemplates, _upsertSavedTeamTemplates } = await importOnce('./persona_store.js');
 const { getAgentConfig, renderAgentConfigForm, setAgentConfig, resetProviderChoices } = await importOnce('./agent_config_form.js');
 const { markFieldInvalid, _launchBlocked, _launchOn, _onServerSuffix, _refreshAfterLaunch, _resetDirInputs, _showLaunchStep, hideLaunchModal, showTeamLaunchFailures } = await importOnce('./launch_core.js');
@@ -65,7 +65,7 @@ function _updateTeamAgentSummary(row) {
     const acf = acfId ? document.getElementById(acfId) : null;
     const ownMode = acf?.querySelector('.acf-permission-mode')?.value || 'default';
     const teamMode = document.getElementById('team-permission-mode')?.value || 'default';
-    const mode = ownMode !== 'default' ? ownMode : teamMode;
+    const mode = ownMode !== 'default' ? ownMode : (row.dataset.permissionExplicit === '1' ? 'default' : teamMode);
     const lm = launchedMode(type, mode, config.capabilities);
     parts.push([lm.narrowed ? lm.text : `${_modeLabel(mode)} mode`.replace(/^Default mode$/, 'default mode'), mode !== 'default' || !!lm.narrowed, !!lm.warn]);
     const line = row.querySelector('.team-agent-summary');
@@ -234,7 +234,7 @@ function _defaultTeamAgentModalConfig() {
 function showTeamAgentModal(row = null, { role = '' } = {}) {
     const acfValue = row?.dataset.acfId ? getAgentConfig(row.dataset.acfId) : { ..._defaultTeamAgentModalConfig(), name: role };
     // A member with no Mode of its own launches with the saved default Mode: the dialog shows that Mode (saving it unchanged keeps the member following it, see saveTeamAgentFromModal).
-    if (row && !/--permission-mode|--mode|--sandbox|--full-auto|--dangerously/.test(acfValue.flags || '')) acfValue.flags = [acfValue.flags, _teamModeFlags(acfValue.agentType)].filter(Boolean).join(' ');
+    if (row && row.dataset.permissionExplicit !== '1' && !/--permission-mode|--mode|--sandbox|--full-auto|--dangerously/.test(acfValue.flags || '')) acfValue.flags = [acfValue.flags, _teamModeFlags(acfValue.agentType)].filter(Boolean).join(' ');
     const dialog = document.getElementById('launch-modal');
     if (dialog && getComputedStyle(dialog).display === 'none') { dialog.style.display = 'flex'; launch.mode = 'team'; _showLaunchStep('team'); } // display-ok: the member is a step of the Launch dialog, which is open when a person is in the team form; opened as it is when something else asks (the team form is kept, not reset)
     launch.member = { row, returnTo: currentTeamStep(), value: acfValue };
@@ -288,6 +288,8 @@ function saveTeamAgentFromModal() {
     if (opener?.dataset.acfId) {
         opener.dataset.followsTeamType = followsType ? '1' : '';
         setAgentConfig(opener.dataset.acfId, config);
+        opener.dataset.permissionExplicit = modalMode === 'default' || modalMode !== document.getElementById('team-permission-mode')?.value ? '1' : '';
+        if (!opener.dataset.permissionExplicit) delete document.getElementById(opener.dataset.acfId)?.querySelector('.acf-permission-mode')?.dataset.pickedByPerson;
     } else {
         _addTeamAgent(config.name, config.prompt, config.capabilities, followsType ? '' : config.agentType, config.model, config.flags, { reveal: true });
     }
@@ -389,12 +391,12 @@ async function _loadExistingTeamBoards() {
     _validateTeamName();
 }
 
-// The team form starts at the CLI's own confirm mode (Default), not Auto: the person's saved default wins, and a mode they pick stays (#6397).
+// New teams follow the shipped per-type default; a stored mode or a person's explicit Default still wins.
 function _applyTeamDefaultMode() {
     const el = document.getElementById('team-permission-mode');
     if (!el) return;
     trackPermissionPick(el);
-    if (!el.dataset.pickedByPerson) el.value = _settingsFor(_effectiveServer(launch.server)).default_permission_mode || 'default';
+    if (!el.dataset.pickedByPerson) el.value = defaultPermissionMode(_settingsFor(_effectiveServer(launch.server)), document.getElementById('team-agent-type')?.value || 'claude');
     _updatePermModeDescription(el);
 }
 
@@ -520,7 +522,8 @@ function _loadTeamTemplate(name) {
     for (const agent of tmpl.agents) {
         const agentName = agent.name || agent.role || '';
         const agentPrompt = agent.prompt || agent.description || '';
-        _addTeamAgent(agentName, agentPrompt, agent.capabilities, agent.agent_type, agent.model, agent.flags);
+        const row = _addTeamAgent(agentName, agentPrompt, agent.capabilities, agent.agent_type, agent.model, agent.flags);
+        if (!tmpl.builtin) row.dataset.permissionExplicit = '1'; // existing saved templates retain their confirm-mode meaning
     }
     if (tmpl.flags) {
         const tfEl = document.getElementById("team-flags");
@@ -786,7 +789,8 @@ async function launchTeam() {
         if (config.thinking) agent.thinking = config.thinking; // #4969
         if (config.flags) agent.flags = config.flags.split(/\s+/).filter(Boolean);
         // A member whose mode is Default says so (#10362): its form sends no flag for Default, the same request as "nothing chosen", which starts in the saved default or Auto.
-        if (config.permissionMode === 'default' && !(config.flags && _hasPermFlag(config.flags))) agent.permission_mode = 'default';
+        const modeWasPicked = row.dataset.permissionExplicit === '1' || document.getElementById(acfId)?.querySelector('.acf-permission-mode')?.dataset.pickedByPerson === '1';
+        if (config.permissionMode === 'default' && (modeWasPicked || teamPermMode === 'default') && !(config.flags && _hasPermFlag(config.flags))) agent.permission_mode = 'default';
         agents.push(agent);
     }
 

@@ -324,9 +324,19 @@ func (a *CodexAgent) LaunchCommand(params LaunchParams) (string, error) {
 	// Note: Codex's sandbox may strip env vars from child processes.
 	// coral-board handles this via board_state file fallback (reads job_title
 	// from ~/.coral/board_state_{session}.json when CORAL_SUBSCRIBER_ID is unavailable).
-	parts, bypassSandbox, permissionApplied := codexCapabilityFlags(parts, params.Capabilities, params.PermissionMode)
+	userFlags := params.Flags
+	var bypassSandbox, permissionApplied bool
+	if params.KeepFullAccess {
+		// The Operator's choice for this agent (#14061): the bypass switch and no other sandbox or approval setting (Codex takes each once), whatever the capabilities and the stored flags say. Only the
+		// stored flags that are not permissions are kept.
+		_, userFlags = SplitPermissionFlags(params.Flags)
+		parts = append(parts, "--dangerously-bypass-approvals-and-sandbox")
+		bypassSandbox, permissionApplied = true, true
+	} else {
+		parts, bypassSandbox, permissionApplied = codexCapabilityFlags(parts, params.Capabilities, params.PermissionMode)
+	}
 	presetApplied := permissionApplied
-	parts, bypassSandbox, permissionApplied = codexUserFlags(parts, params.Flags, bypassSandbox, permissionApplied)
+	parts, bypassSandbox, permissionApplied = codexUserFlags(parts, userFlags, bypassSandbox, permissionApplied)
 	if !permissionApplied {
 		parts, _, _ = appendCodexPermissionMode(parts, bypassSandbox, params.PermissionMode)
 	}

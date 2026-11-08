@@ -97,8 +97,8 @@ Capabilities are translated to each CLI's own permissions at launch, and that is
 
 | agent_type | What is enforced |
 |------------|------------------|
-| `claude` | `allow` becomes pre-approvals and `deny` becomes deny rules in Claude Code's settings (`file_read` -> `Read`, `Glob`, `Grep`; `shell:npm *` -> `Bash(npm *)`). A tool that isn't allowed still runs after Claude asks, and in Bypass Permissions mode (the dashboard's default) nothing asks, so `allow` restricts nothing; only `deny` blocks. `git_write`'s git patterns don't limit git while `shell` is allowed, and they match command prefixes only. |
-| `codex` | Only a sandbox (`read-only`, `workspace-write`, or none) and whether it asks (`on-request`: the model decides, and sandboxed commands run without asking; `never`). Shell patterns and `deny` entries aren't enforced; a `deny` entry only changes the mode. `shell`, `file_read`, `file_write` and `git_write` together run Codex without a sandbox. |
+| `claude` | `allow` becomes pre-approvals and `deny` becomes deny rules in Claude Code's settings (`file_read` -> `Read`, `Glob`, `Grep`; `shell:npm *` -> `Bash(npm *)`). A tool that isn't allowed still runs after Claude asks, and in Bypass Permissions mode nothing asks, so `allow` restricts nothing; only `deny` blocks. The shipped Claude mode is Auto, whose checks remain active. In Auto Coral emits no `Bash(git ...)` preapprovals. `git_write`'s git patterns don't limit git while `shell` is allowed, and they match command prefixes only. |
+| `codex` | Only a sandbox (`read-only`, `workspace-write`, or none) and whether it asks (`on-request`: the model decides, and sandboxed commands run without asking; `never`). Shell patterns and `deny` entries aren't enforced; a `deny` entry only changes the mode. Full capabilities keep Codex in its workspace-write sandbox; only explicit Bypass or Keep Full access leaves it. |
 | `agy`, `gemini` | `agy 1.4.7 --help` offers `--mode accept-edits\|auto\|plan`, `--dangerously-skip-permissions`, and `--sandbox` (it has no `--approval-mode` flag; `internal/agent/agy.go` translates legacy `--approval-mode default\|plan\|auto_edit\|yolo` flags and never passes `--approval-mode` to `agy`). Coral's capability translation (`TranslateToAgyPermissions` in `internal/agent/permissions.go`, `internal/agent/agy.go`) maps capabilities to `--mode plan`, `--mode accept-edits`, or `--dangerously-skip-permissions` (and passes `--sandbox` when `AgyPermissions.Sandbox` is set). Shell patterns and `deny` entries aren't enforced; a `deny` entry only changes the mode, and with `shell` it gives `--mode accept-edits`, which approves edits without asking. (`gemini` launches the `agy` binary.) |
 
 A permission mode the person set (the member's own, else the team's; "Default" is none) is always applied, and for Codex and Antigravity capabilities can only narrow it: Plan with Shell, Read, Write and Git Write stays read-only, and a read-only capability set stays read-only under Bypass Permissions. With no mode set, the capabilities decide. Capabilities never mean "no sandbox": Shell, Read, Write and Git Write with no `deny` is `workspace-write` and never asks; a Codex agent runs without a sandbox only in the Bypass Permissions mode or with a bypass flag typed.
@@ -107,24 +107,24 @@ A permission mode the person set (the member's own, else the team's; "Default" i
 
 **What a resume keeps (#14172).** A Resume (from All chats, or the Restart button on a question for an agent that was ended) starts the earlier chat again in its own folder with the permission mode it ran in, under its own name and team. It does not bring back the role's capabilities or Allow rules: those belong to the agent's stored settings, which Restart and Wake keep and a Resume of a chat does not have. An agent resumed this way asks again for what its role had pre-approved, so the person sets the mode (and, for Claude, what is allowed) as they would for a new agent.
 
-The dashboard's built-in presets get these flags (from `agent_presets.js`, pinned by `internal/agent/testdata/preset_enforcement.golden`):
+The dashboard's built-in presets start with read, write, shell, web and agent-spawn tools, with `git_write` off. Roles describe a prompt, not a permission: Every shipped preset offers **Apply the role's limits** to restore its role-specific tool choices; inspect the resulting tool list and permission mode. Saved personas and team templates retain their stored choices. Saved template members are not checked against the launching agent’s permission rank. **Keep Full access** allows an agent to give a child Bypass permissions; choose it only when that delegation is intended. These are the capability-derived flags (from `agent_presets.js`, pinned by `internal/agent/testdata/preset_enforcement.golden`); an explicit lower mode still wins:
 
 | Preset | Codex | Antigravity |
 |--------|-------|-------------|
-| Lead Developer | `--sandbox workspace-write -a never` | `--dangerously-skip-permissions` |
-| QA Engineer | `--sandbox workspace-write -a never` | `--dangerously-skip-permissions` |
+| Lead Developer | `--sandbox workspace-write -a never --search` | `--dangerously-skip-permissions` |
+| QA Engineer | `--sandbox workspace-write -a never --search` | `--dangerously-skip-permissions` |
 | Orchestrator | `--sandbox workspace-write -a never --search` | `--dangerously-skip-permissions` |
-| Frontend Dev | `--sandbox workspace-write -a on-request --search` | `--mode accept-edits` |
-| Backend Dev | `--sandbox workspace-write -a never` | `--dangerously-skip-permissions` |
-| DevOps Engineer | `--sandbox workspace-write -a never` | `--dangerously-skip-permissions` |
-| Security Reviewer | `--sandbox read-only -a on-request --search` | `--mode plan` |
-| Technical Writer | `--sandbox workspace-write -a on-request` | `--mode accept-edits` |
-| Content Writer | `--sandbox workspace-write -a on-request --search` | `--mode accept-edits` |
-| SEO Strategist | `--sandbox read-only -a on-request --search` | `--mode plan` |
-| Design Director | `--sandbox workspace-write -a on-request --search` | `--mode accept-edits` |
-| Research Analyst | `--sandbox read-only -a on-request --search` | `--mode plan` |
-| Writer & Editor | `--sandbox workspace-write -a on-request` | `--mode accept-edits` |
-| Scheduler & Planner | `--sandbox workspace-write -a on-request` | `--mode accept-edits` |
+| Frontend Dev | `--sandbox workspace-write -a never --search` | `--dangerously-skip-permissions` |
+| Backend Dev | `--sandbox workspace-write -a never --search` | `--dangerously-skip-permissions` |
+| DevOps Engineer | `--sandbox workspace-write -a never --search` | `--dangerously-skip-permissions` |
+| Security Reviewer | `--sandbox workspace-write -a never --search` | `--dangerously-skip-permissions` |
+| Technical Writer | `--sandbox workspace-write -a never --search` | `--dangerously-skip-permissions` |
+| Content Writer | `--sandbox workspace-write -a never --search` | `--dangerously-skip-permissions` |
+| SEO Strategist | `--sandbox workspace-write -a never --search` | `--dangerously-skip-permissions` |
+| Design Director | `--sandbox workspace-write -a never --search` | `--dangerously-skip-permissions` |
+| Research Analyst | `--sandbox workspace-write -a never --search` | `--dangerously-skip-permissions` |
+| Writer & Editor | `--sandbox workspace-write -a never --search` | `--dangerously-skip-permissions` |
+| Scheduler & Planner | `--sandbox workspace-write -a never --search` | `--dangerously-skip-permissions` |
 
 ## Hooks
 

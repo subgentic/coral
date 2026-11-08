@@ -37,6 +37,7 @@ func TestLaunchInTheHomeFolderAsksTheDashboardOnce(t *testing.T) {
 	home := homeFolderOf(t)
 	_, h, term, ss := setupSessionsTestServer(t)
 	stubCLIPaths(t, ss)
+	ackLaunchDisclosure(t, ss) // a dashboard launch with the new default waits for the notice (#14353); these tests are about the folder
 	launch := func(dir string, extra map[string]any, wrap func(*http.Request) *http.Request) *httptest.ResponseRecorder {
 		body := map[string]any{"agent_type": "claude", "working_dir": dir, "home_folder_ask": true}
 		for k, v := range extra {
@@ -71,6 +72,7 @@ func TestTeamLaunchInTheHomeFolderAsksTheDashboardOnce(t *testing.T) {
 	home := homeFolderOf(t)
 	_, h, term, ss := setupSessionsTestServer(t)
 	stubCLIPaths(t, ss)
+	ackLaunchDisclosure(t, ss) // a dashboard launch with the new default waits for the notice (#14353); these tests are about the folder
 	start := func(extra map[string]any) *httptest.ResponseRecorder {
 		body := map[string]any{"board_name": "homeask", "new_board": true, "working_dir": home, "home_folder_ask": true, "agent_type": "claude", "agents": []map[string]any{{"name": "a"}}}
 		for k, v := range extra {
@@ -152,6 +154,7 @@ func TestAnOlderPageIsNeverAskedAboutTheHomeFolder(t *testing.T) {
 	home := homeFolderOf(t)
 	_, h, term, ss := setupSessionsTestServer(t)
 	stubCLIPaths(t, ss)
+	ackLaunchDisclosure(t, ss)                                                        // a dashboard launch with the new default waits for the notice (#14353); these tests are about the folder
 	b, _ := json.Marshal(map[string]any{"agent_type": "claude", "working_dir": home}) // no home_folder_ask
 	rec := httptest.NewRecorder()
 	h.Launch(rec, asDashCookie13425(httptest.NewRequest(http.MethodPost, "/api/sessions/launch", bytes.NewReader(b))))

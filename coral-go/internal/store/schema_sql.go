@@ -35,6 +35,14 @@ CREATE TABLE IF NOT EXISTS agent_ui_events (
 );
 CREATE INDEX IF NOT EXISTS idx_agent_ui_events ON agent_ui_events(session_id,panel_id,id);
 
+-- The Operator's "Keep Full access when this agent restarts" choice for a Codex agent (#14061): a row is the choice being on. A table of its own, as auto_sleep_state is: a live_sessions row that is
+-- registered again does not lose it, and only the Operator's route writes it.
+CREATE TABLE IF NOT EXISTS keep_full_access (
+	session_id TEXT PRIMARY KEY,
+	set_at     INTEGER NOT NULL,
+	source     TEXT NOT NULL DEFAULT 'local' -- 'local' (the dashboard, the command line, the API key) or 'hub' (the Hub owner, through the tunnel): a choice the hub made ends with the hub's switch, as a hub-enabled auto-accept does (#14193)
+);
+
 CREATE TABLE IF NOT EXISTS auto_sleep_state (
 	session_id TEXT PRIMARY KEY,
 	off        INTEGER NOT NULL DEFAULT 0,

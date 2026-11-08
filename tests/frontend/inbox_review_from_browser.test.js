@@ -40,7 +40,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             check(b.sub === 'Frontend<U+202E> Dev<U+200B>', at + 'a file with no task says who sent it too, what hides or reorders the name written out, not drawn: ' + JSON.stringify(b.sub));
             check(c.sub === 'sender unknown', at + 'a file with no uploader on record says so: ' + JSON.stringify(c.sub));
             check(a.visible && b.visible && c.visible, at + 'the line is on screen on every row, once');
-            check(!a.text.includes(t1) && !c.text.includes(t2), at + 'the team is not on the row (it is in the opened file, below, #11719)');
+            check(a.text.includes(t1) && c.text.includes(t2), at + 'review rows carry their Team cell (#14142)');
             check(!(await ev(`document.documentElement.scrollWidth > innerWidth + 1`)), at + 'no sideways scroll');
             await shot(`inbox-review-from-${w}`);
             // the opened item says the same in its header

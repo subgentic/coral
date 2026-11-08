@@ -3,7 +3,6 @@ package routes
 import (
 	"errors"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -90,7 +89,7 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 			errInternalServer(w, "could not open the question again")
 			return
 		}
-		h.recordActivity(r, board.ActUnignore, "question", strconv.FormatInt(id, 10), project, "", "")
+		h.recordAskActivity(r, board.ActUnignore, project, id, "")
 		if hubOwner != nil {
 			recordHubOwnerAction(r.Context(), h.bs, *hubOwner, r.Method, r.URL.Path, project, http.StatusOK)
 		}
@@ -106,7 +105,7 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if strings.EqualFold(actor, "Operator") && humanInputCaller(r) { // the Operator's own Ignore, not an agent closing its own question
-		h.recordActivity(r, board.ActIgnore, "question", strconv.FormatInt(id, 10), project, "", note)
+		h.recordAskActivity(r, board.ActIgnore, project, id, note)
 		inboxActioned(r, tracking.InboxAsk, "", "dismiss", time.Time{}) // the Inbox's numbers (#7512)
 	}
 	if hubOwner != nil {
