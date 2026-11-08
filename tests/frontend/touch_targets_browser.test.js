@@ -269,9 +269,9 @@ const UNDERSIZED = `(() => {
             await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
             await Emulation.setDeviceMetricsOverride({ width: 700, height: 844, deviceScaleFactor: 1, mobile: true });
             await ev(`document.querySelector('.cloud-account-btn').click()`);
-            await waitFor(`[...document.querySelectorAll('#cloud-account-menu .overflow-menu-item')].filter(e => e.getBoundingClientRect().height).length >= 4`, 'the account dropdown', { soft: true });
+            await waitFor(`[...document.querySelectorAll('#cloud-account-menu .overflow-menu-item')].filter(e => e.getBoundingClientRect().height).length >= 7`, 'the account dropdown', { soft: true });
             const accountRows = await menuRows('#cloud-account-menu .overflow-menu-item');
-            assert.equal(accountRows.length, 4, 'the account dropdown shows Servers, Account, Saved for later and Sign out: ' + JSON.stringify(accountRows));
+            assert.equal(accountRows.length, 7, 'the account dropdown shows Settings, Account, Docs, Computers, GitHub, Saved for later (an older Hub) and Sign out (#14764): ' + JSON.stringify(accountRows));
             for (const [w, h] of accountRows) assert.ok(w >= 44 && h >= 44, `account dropdown row ${w}x${h} under 44px`);
             const accountSmall = await ev(`(() => { const m = document.getElementById('cloud-account-menu'); const out = []; for (const el of m.querySelectorAll('button, a[href]')) { const r = el.getBoundingClientRect(); if (r.width && r.height && (r.width < 44 || r.height < 44)) out.push(Math.round(r.width) + 'x' + Math.round(r.height) + ' ' + el.textContent.trim()); } return out; })()`);
             assert.deepEqual(accountSmall, [], 'account dropdown: every control is at least 44x44');

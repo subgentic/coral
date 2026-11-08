@@ -1,4 +1,4 @@
-// Coral Hub's account menu (#4596, coral-go#1): email, Servers, Account (the hub's /account), Saved for later (the hub's /saved), Sign out. Plain same-tab links on the hub's own origin;
+// Coral Hub's account menu (#4596, coral-go#1): email, Settings, Account (the hub's /account), Docs, Computers, GitHub, Saved for later (the hub's /saved, an older Hub), Sign out (#14764). Plain same-tab links on the hub's own origin;
 // the button says whether the menu is open (aria-expanded); a local Coral has no account menu and so neither entry. Served as the hub would serve it (boot flag mode "cloud", as in
 // hub_nav_browser).
 //
@@ -48,9 +48,9 @@ const BASE = require('./test_base').BASE;
         await ev(`document.querySelector('.cloud-account-btn').click(); true`);
         assert.equal(await ev(`document.querySelector('.cloud-account-btn').getAttribute('aria-expanded')`), 'true');
         await waitFor(`!document.querySelector('#cloud-account-menu a[href="/saved"]')`,'account-only Hub nav loaded');
-        assert.deepEqual(await ev(`[...document.querySelectorAll('#cloud-account-menu > *')].map(e => e.textContent)`), ['tester@example.com', 'Computers', 'Account', 'Sign out']);
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#cloud-account-menu > *')].map(e => e.textContent)`), ['tester@example.com', 'Settings', 'Account', 'Docs', 'Computers', 'GitHub', 'Sign out'], 'the six in the Operator\'s order (#14764), for an account-only Hub');
         const links = await ev(`[...document.querySelectorAll('#cloud-account-menu a')].map(a => ({ text: a.textContent, href: a.getAttribute('href'), role: a.getAttribute('role'), cls: a.className, target: a.getAttribute('target'), resolved: new URL(a.href).origin === location.origin }))`);
-        assert.deepEqual(links, [{ text: 'Account', href: '/account', role: 'menuitem', cls: 'menu-item overflow-menu-item', target: null, resolved: true }]);
+        assert.deepEqual(links, [{ text: 'Account', href: '/account', role: 'menuitem', cls: 'menu-item overflow-menu-item', target: null, resolved: true }, { text: 'GitHub', href: 'https://github.com/subgentic/coral', role: 'menuitem', cls: 'menu-item overflow-menu-item', target: null, resolved: false }, { text: 'Saved for later', href: '/saved', role: 'menuitem', cls: 'menu-item overflow-menu-item', target: null, resolved: true }]);
         if (process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/hub-account-menu.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
         await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); true`);
         assert.equal(await ev(`document.querySelector('.cloud-account-btn').getAttribute('aria-expanded')`), 'false');
