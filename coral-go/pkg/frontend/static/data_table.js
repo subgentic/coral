@@ -34,10 +34,24 @@ const groupActions = new Map(); let pressedGroup = null; // `${groupKey}|${toggl
 const TAP_DISTANCE = 12;
 const controlOf = e => { const b = e.target && e.target.closest && e.target.closest('[data-group-control]'); return b && b.dataset.groupKey ? b : null; };
 const controlId = b => `${b.dataset.groupKey}|${b.dataset.groupControl}`;
-document.addEventListener('pointerdown', e => { const b = controlOf(e); pressedGroup = b ? { id: controlId(b), x: e.clientX, y: e.clientY } : null; }, true);
-document.addEventListener('pointercancel', () => { pressedGroup = null; }, true);
-document.addEventListener('pointerup', e => { const d = pressedGroup; pressedGroup = null; const b = controlOf(e); if (!d || !b || controlId(b) !== d.id || Math.hypot(e.clientX - d.x, e.clientY - d.y) > TAP_DISTANCE) return; const run = groupActions.get(d.id); if (run) { lastTap = { id: d.id, at: e.timeStamp }; run(); } }, true);
-document.addEventListener('click', e => { const b = controlOf(e); if (!b) return; const id = controlId(b); if (e.detail > 0 && lastTap.id === id && e.timeStamp - lastTap.at < 600) return; /* the pointer path already did this tap */ const run = groupActions.get(id); if (run) run(); }, true); // a keyboard press (detail 0), or a click the pointer path did not see
+// Only the primary button (a left click, a touch, a pen tip) is a tap: a right or middle click did not press the button before and must not now (the browser sends those as contextmenu / auxclick, never click).
+const primary = e => e.button === 0 && e.isPrimary !== false;
+let rejectedAt = -1e9; // the last press that turned out NOT to be a tap (a drag past the distance, or a lift over another control): the click the browser may still send for it is not a toggle either
+document.addEventListener('pointerdown', e => { if (!primary(e)) { pressedGroup = null; return; } const b = controlOf(e); pressedGroup = b ? { id: controlId(b), x: e.clientX, y: e.clientY } : null; }, true);
+document.addEventListener('pointercancel', () => { if (pressedGroup) rejectedAt = performance.now(); pressedGroup = null; }, true);
+document.addEventListener('pointerup', e => {
+    const d = pressedGroup; pressedGroup = null;
+    if (!d || !primary(e)) return;
+    const b = controlOf(e), tap = !!b && controlId(b) === d.id && Math.hypot(e.clientX - d.x, e.clientY - d.y) <= TAP_DISTANCE;
+    if (!tap) { rejectedAt = e.timeStamp; return; } // a drag or a lift elsewhere: nothing toggles, and a click that follows is swallowed below
+    const run = groupActions.get(d.id); if (run) { lastTap = { id: d.id, at: e.timeStamp }; run(); }
+}, true);
+document.addEventListener('click', e => {
+    const b = controlOf(e); if (!b) return;
+    if (e.detail > 0 && Math.abs(e.timeStamp - rejectedAt) < 600) { e.stopImmediatePropagation(); e.preventDefault(); return; } // the click of a gesture the pointer path refused (a drag released over the same button)
+    const id = controlId(b); if (e.detail > 0 && lastTap.id === id && e.timeStamp - lastTap.at < 600) return; // the pointer path already did this tap
+    const run = groupActions.get(id); if (run) run();
+}, true); // a keyboard press (detail 0), or a click the pointer path did not see
 export const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const button = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 

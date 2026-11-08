@@ -72,6 +72,7 @@ const BASE = require('./test_base').BASE;
                 const q = await place(n, which); const before = await state(n, which);
                 await press(q);
                 if (replace === 'rows') await ev(`(() => { const tr = ${heading(n)}; tr.replaceWith(tr.cloneNode(true)); return true; })()`); // the heading row is a new element (no listeners)
+                if (replace === 'inbox') await ev(`import((window.__coralStatic || '/static/') + 'sidebar_groups.js').then(m => { m.openGroupTable('hub-inbox', 'needs'); return true; })`); // the Inbox itself draws its table again (a real product path: the table is replaced, not cloned)
                 if (replace === 'table') await ev(`(() => { const w = document.querySelector('.inbox-needs-results'); w.replaceWith(w.cloneNode(true)); return true; })()`); // the WHOLE table is a new element, as a real refresh makes it
                 await lift(q);
                 return waitFor(`(() => { const tr = ${heading(n)}; const v = ${which === 'story' ? `tr.querySelector('.dt-group-story').getAttribute('aria-pressed')` : `tr.querySelector('.dt-group-toggle').getAttribute('aria-expanded')`}; return v !== ${JSON.stringify(before)}; })()`, `${at}one tap on the ${which} control (${replace || 'no redraw'}) changes it`, 6000).then(() => true, () => false);
@@ -82,7 +83,7 @@ const BASE = require('./test_base').BASE;
             check(await oneTap(11, 'story', ''), `${at}one tap turns the story on`);
             check(await oneTap(11, 'story', ''), `${at}one tap turns it off`);
             // 2) the heading row replaced between the press and the lift (the UI/UX case), then the WHOLE table (UI Reviewer's)
-            for (const replace of ['rows', 'table']) {
+            for (const replace of ['rows', 'table', 'inbox']) {
                 check(await oneTap(11, 'toggle', replace), `${at}a tap with the ${replace} replaced between press and lift still shuts the items`);
                 check(await oneTap(11, 'toggle', replace), `${at}and another opens them again (${replace})`);
                 check(await oneTap(11, 'story', replace), `${at}a tap on Story with the ${replace} replaced still turns the story on (${replace})`);
@@ -104,6 +105,18 @@ const BASE = require('./test_base').BASE;
                 if (!mobile) await unchanged(`a drag of 40 px from Task #11's ${which} control before the lift (the table swapped between)`, async () => { const a = await place(11, which); await press(a); await swapTable(); const far = { x: a.x + 40, y: a.y }; await moveTo(far); await lift(far); });
             }
             // (the id match in the pointer path is not separately observable: two controls are always more than the 12 px tap distance apart, so the distance guard already refuses a lift over another one; the mutant that drops only the id match is equivalent)
+            // 2c) UI Reviewer's MUST: only the PRIMARY button taps (a right or middle click did not press the button before), and a gesture the pointer path refuses also loses the click the browser sends for it
+            if (!mobile) {
+                for (const which of ['toggle', 'story']) for (const button of ['right', 'middle']) {
+                    await unchanged(`a ${button} click on Task #11's ${which} control`, async () => { const a = await place(11, which); await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: a.x, y: a.y }); await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: a.x, y: a.y, button, buttons: button === 'right' ? 2 : 4, clickCount: 1 }); await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: a.x, y: a.y, button, buttons: 0, clickCount: 1 }); });
+                }
+                // a drag that stays on the SAME wide control and is released over it (no redraw at all): the browser sends a click for it, and nothing toggles
+                await unchanged(`a 40 px drag released over the same heading button (no redraw)`, async () => { const a = await place(11, 'toggle'); await press(a); const far = { x: a.x + 40, y: a.y }; await moveTo(far); await lift(far); });
+            } else {
+                await unchanged(`a touch that is cancelled (no redraw)`, async () => { const a = await place(11, 'toggle'); await press(a); await client.Input.dispatchTouchEvent({ type: 'touchCancel', touchPoints: [] }); });
+            }
+            check(await oneTap(11, 'toggle', ''), `${at}and a plain tap still works after the refused gestures`);
+            check(await oneTap(11, 'toggle', ''), `${at}and again (back to open)`);
             // 3) the keyboard still works: Enter on the focused heading shuts it, Space opens it, and Enter on Story turns it on (a click with no pointer)
             const key = async (k, code) => { await client.Input.dispatchKeyEvent({ type: 'keyDown', key: k, code, windowsVirtualKeyCode: k === 'Enter' ? 13 : 32, text: k === 'Enter' ? '\r' : ' ' }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: k, code, windowsVirtualKeyCode: k === 'Enter' ? 13 : 32 }); };
             await ev(`${heading(11)}.querySelector('.dt-group-toggle').focus(); true`); await key('Enter', 'Enter');
