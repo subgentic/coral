@@ -25,10 +25,18 @@ const { removeBoards } = require('./helpers/board_cleanup');
     else if(width===390){await client.Input.dispatchTouchEvent({type:'touchStart',touchPoints:[{x:point.x,y:point.y,id:1}]});await client.Input.dispatchTouchEvent({type:'touchEnd',touchPoints:[]});}
     else{await client.Input.dispatchMouseEvent({type:'mousePressed',x:point.x,y:point.y,button:'left',clickCount:1});await client.Input.dispatchMouseEvent({type:'mouseReleased',x:point.x,y:point.y,button:'left',clickCount:1});}
    };
+   let phoneRedraws=0;
    const remove=async(keyboard=false)=>{
     let button;
     if(width===1280){await waitFor(`!!document.querySelector('.inbox-remove-wait')`,'desktop Remove action');button=`document.querySelector('.inbox-remove-wait')`;}
-    else{await activate(`document.querySelector('#group-table-view tr[data-key="local:retained-agent-id"] [aria-label*="More"]')`);await waitFor(`document.querySelector('[role=menuitem][aria-label="Remove from Needs you"]')?.getClientRects().length>0`,'phone Remove menu item');button=`document.querySelector('[role=menuitem][aria-label="Remove from Needs you"]')`;}
+    else{
+     // A person taps More on a phone and late data redraws the list: the menu must still open, and one that is open must stay open, with no second tap (#14757). The first Remove of a page taps and redraws in the same task (the open comes after the menu module loads, so the redraw lands first); the second opens the menu and then redraws it. Both redraws change waiting_since and put it back, through updateInboxTab, so the later stale-row steps are not disturbed.
+     const more=`document.querySelector('#group-table-view tr[data-key="local:retained-agent-id"] [aria-label*="More"]')`;
+     const redraw=`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>{const set=v=>{window.T.state.liveSessions=window.T.state.liveSessions.map(r=>r.session_id==='retained-agent-id'?{...r,waiting_since:v(r.waiting_since)}:r);window.__retained=window.T.state.liveSessions.find(r=>r.session_id==='retained-agent-id');m.updateInboxTab();};const w0=window.__retained.waiting_since;set(()=>new Date(Date.parse(w0)-1000).toISOString());set(()=>w0);return true;})`;
+     const shape=phoneRedraws++;
+     if(shape===0){const replaced=await ev(`(()=>{const t=${more};window.__moreNode=t;t.click();return ${redraw}.then(()=>!t.isConnected);})()`);assert.equal(replaced,true,'the tap and the redraw in one task replaced the More button');}
+     else{await activate(more);await waitFor(`document.querySelector('[role=menuitem][aria-label="Remove from Needs you"]')?.getClientRects().length>0`,'phone Remove menu item before the redraw');if(shape===1){await ev(`window.__moreNode=${more};${redraw}.then(()=>!window.__moreNode.isConnected)`).then(replaced=>assert.equal(replaced,true,'the redraw replaced the More button of the open menu'));}}
+     await waitFor(`document.querySelector('[role=menuitem][aria-label="Remove from Needs you"]')?.getClientRects().length>0`,'phone Remove menu item (open, and still open after a redraw, with no second tap)');button=`document.querySelector('[role=menuitem][aria-label="Remove from Needs you"]')`;}
     const help=await ev(`(()=>{const e=${width===1280?"document.querySelector('.inbox-remove-wait-help')":"document.querySelector('[role=menuitem][aria-label=\"Remove from Needs you\"] .menu-item-state')"};if(!e)return null;const r=e.getBoundingClientRect(),c=getComputedStyle(e);return{text:e.textContent,visible:r.width>0&&r.height>0&&c.visibility!=='hidden'&&c.display!=='none',inside:r.left>=0&&r.right<=innerWidth+1};})()`);
     assert.ok(help&&help.visible&&help.inside,'visible Remove explanation before activation: '+JSON.stringify(help));
     assert.equal(help.text,'Hides this request from Needs you. Nothing is sent to the agent.');

@@ -79,7 +79,7 @@ const AGENTS = [
             const clickCurrent = (expression, why) => waitFor(`(() => { const e = (${expression}); if (!e?.isConnected || !e.getClientRects().length) return false; e.click(); return true; })()`, at + why, 4000);
             // a tap opens the menu: Dismiss first, on the screen, focused; the row itself did not open
             const url0 = await ev(`location.href`);
-            // A redraw can replace the row between the tap and the menu opening (the open is after an awaited import), and the menu of a row that is gone is closed: the person taps again. So does the test, up to five times; once (390 dark) a redraw is forced in the same task as the first tap, so this path is always exercised (#14630).
+            // A redraw can replace the row between the tap and the menu opening (the open is after an awaited import), and the tap opens the menu of the button that is in the row now (data_table.js, #14757): nobody taps again. Once (390 dark) a redraw is forced in the same task as the first tap and the same tap must open the menu (taps === 1); the loop only guards a run where it did not (#14630).
             const forced = w === 390 && theme === 'dark';
             const opens = `!!(${probe}) && !(${probe}).parentElement.querySelector('.menu').hidden`;
             let opened = false, replaced = null, taps = 0, lastDiagnostic = null;
@@ -100,7 +100,7 @@ const AGENTS = [
                 });
             }
             if (!opened) throw new Error(lastDiagnostic);
-            if (forced) check(at + 'a redraw right after the tap replaced the button, and a second tap opened the menu', replaced === true && taps === 2, JSON.stringify({ replaced, taps }));
+            if (forced) check(at + 'a redraw right after the tap replaced the button, and the same tap still opened the menu (no second tap)', replaced === true && taps === 1, JSON.stringify({ replaced, taps }));
             const menu = await ev(`(() => { const t = (${probe}), m = t.parentElement.querySelector('.menu'), r = m.getBoundingClientRect(), items = [...m.querySelectorAll('[role=menuitem]')]; return { expanded: t.getAttribute('aria-expanded'), items: items.map(i => i.textContent), focus: document.activeElement === items[0], role: m.getAttribute('role'), left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), bottom: Math.round(r.bottom), vw: innerWidth, vh: innerHeight, itemH: Math.round(items[0].getBoundingClientRect().height), url: location.href }; })()`);
             check(at + 'the menu opens: Dismiss is its first action, focused, a 44 px row', menu.expanded === 'true' && menu.items[0] === 'Dismiss' && menu.focus && menu.role === 'menu' && menu.itemH >= 44, JSON.stringify(menu));
             check(at + 'the menu is whole on the screen (not cut by the list)', menu.left >= 0 && menu.right <= menu.vw && menu.top >= 0 && menu.bottom <= menu.vh, JSON.stringify(menu));
