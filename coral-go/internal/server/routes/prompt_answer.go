@@ -247,9 +247,7 @@ func parsePromptScreenRaw(capture string) (promptScreen, bool) {
 	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
 		lines = lines[:len(lines)-1]
 	}
-	for i, l := range lines {
-		lines[i] = claudeTimerRe.ReplaceAllString(l, "${1}after a timer of its own") // Claude's own countdown line is steady text here (#14581)
-	}
+	steadyClaudeTimer(lines) // Claude's own countdown line is steady text here (#14581)
 	// The option list ends within a few lines of the bottom (a footer such
 	// as "Enter to select · Esc to cancel" may follow it).
 	end := -1
@@ -536,10 +534,28 @@ func promptContext(lines []string, questionAt int) string {
 // commandMaxLines bounds the walk up from the question for a permission prompt's command block.
 const commandMaxLines = 400
 
-// claudeTimerRe is Claude Code's own auto-block timer inside its permission dialog ("Claude Code will automatically block this request in 1:19, to avoid holding up an unattended session"). It counts down on the terminal; read as
-// the request's text it froze on the card at the second it was read and made the ask's identity (AskID) change every second, so the person's own answer was refused as 'another ask is open' (#14581, Beta run 3). Here the
-// time is replaced by fixed words, in the one place every reader of a screen goes through (the card, the row, the answer, auto-accept); the terminal still shows the real countdown.
-var claudeTimerRe = regexp.MustCompile(`(will automatically block this request )in \d{1,2}:\d{2}`)
+// claudeTimerRe is Claude Code's own auto-block timer line in its permission dialog ("⚠ Claude Code will automatically block this request in 1:19, to avoid holding up an unattended session"). It counts down on the
+// terminal; read as part of the request it froze on the card at the second it was read and made the ask's identity (AskID) change every second, so the person's own answer was refused as 'another ask is open' (#14581, Beta
+// run 3). Here the time is replaced by fixed words, in the one place every reader of a screen goes through (the card, the row, the answer, auto-accept); the terminal still shows the real countdown. It is Claude's WHOLE line, and
+// is looked for only BELOW the last dashed rule (Claude's own lines under the request, then the question): the command block above it is never touched, so a command that contains the phrase is shown as it is (Security's SHOULD).
+var claudeTimerRe = regexp.MustCompile(`^(\s*[⚠│|]?\s*Claude Code will automatically block this request )in \d{1,2}:\d{2}(, to avoid holding up an unattended session\s*)$`)
+
+// steadyClaudeTimer replaces the time in Claude's auto-block line, below the last dashed rule only.
+func steadyClaudeTimer(lines []string) {
+	last := -1
+	for i := len(lines) - 1; i >= 0 && i >= len(lines)-40; i-- {
+		if dashedRuleRe.MatchString(lines[i]) {
+			last = i
+			break
+		}
+	}
+	if last < 0 {
+		return
+	}
+	for i := last + 1; i < len(lines); i++ {
+		lines[i] = claudeTimerRe.ReplaceAllString(lines[i], "${1}after a timer of its own${2}")
+	}
+}
 
 var dashedRuleRe = regexp.MustCompile(`^\s*[╌┄]{8,}\s*$`)
 
@@ -832,8 +848,8 @@ func (h *SessionsHandler) readPromptScreenText(ctx context.Context, name, agentT
 				ds, dok := parseAgentScreen(agentType, deep)
 				if dok && !ds.commandOpenMissing && deepExtendsFirst(text, deep) && sameQuestion(s, ds) {
 					s, text = ds, deep
-				} else if !dok || ds.commandOpenMissing {
-					h.deepMiss.note(name, text) // the top is nowhere in the deeper read: not a screen that only moved between the two reads
+				} else {
+					h.deepMiss.note(name, text) // no top in the deeper read, or it is not the same screen: not read deep again for a few seconds (Security's SHOULD)
 				}
 			}
 		}

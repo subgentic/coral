@@ -204,3 +204,23 @@ func TestADeeperMissIsNotReadAgainAtEveryPollButIsAfterAFewSeconds(t *testing.T)
 	read()
 	assert.Equal(t, deepPromptCaptureLines, lt.asked[len(lt.asked)-1], "a changed screen is read deep at once")
 }
+
+func TestABindingFailureIsNotReadDeepAgainForAFewSeconds(t *testing.T) {
+	live := strings.Repeat("older output\n", 30) + claudeBashScreen(longCommand(95))
+	stale := strings.Replace(live, "2. No", "2. No, and tell Claude what to do instead", 1)
+	lt := &divergingTerminal{linesTerminal: &linesTerminal{mockSessionTerminal: newMockTerminal()}, live: live, deep: stale}
+	h := &SessionsHandler{terminal: lt}
+	now := time.Unix(5000, 0)
+	deepMissNow = func() time.Time { return now }
+	t.Cleanup(func() { deepMissNow = time.Now })
+	for i := 0; i < 3; i++ {
+		s, ok, _, err := h.readPromptScreenText(context.Background(), "a", at.Claude, "sid")
+		require.NoError(t, err)
+		require.True(t, ok)
+		assert.True(t, s.OnlyReject)
+	}
+	assert.Equal(t, []int{80, deepPromptCaptureLines, 80, 80}, lt.asked, "a deeper read that was not the same screen is not read again at every poll")
+	now = now.Add(deepMissTTL + time.Second)
+	_, _, _, _ = h.readPromptScreenText(context.Background(), "a", at.Claude, "sid")
+	assert.Equal(t, deepPromptCaptureLines, lt.asked[len(lt.asked)-1], "after the few seconds it is tried again")
+}
