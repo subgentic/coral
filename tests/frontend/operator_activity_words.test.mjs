@@ -44,3 +44,9 @@ assert.deepEqual(activityParts({action:'answer',item_kind:'question',title:'Whic
 assert.deepEqual(activityParts({action:'answer',item_kind:'question',title:'Which?',asker:'Orchestrator',note:'@Lead yes'}, words).detail, 'from Orchestrator · Your answer: @Lead yes', 'an unrelated mention stays in the detail');
 for (const value of ACTIONS) { const p = activityParts({action:value,item_kind:'task',item_id:'12',title:'Title'}, words); assert.ok(p.did && p.on, value); }
 console.log('operator_activity_words: verb, object and detail for each row');
+
+// #14477: ask titles strip only the leading Operator addressee; named file objects carry the noun.
+assert.equal(activityParts({action:'answer',item_kind:'question',title:'@Operator, Ship now?',asker:'Lead'},words).on,'Ship now?');
+assert.equal(activityParts({action:'answer',item_kind:'question',title:'Ask @Operator about release',asker:'Lead'},words).on,'Ask @Operator about release');
+assert.deepEqual(activityParts({action:'file_tags',item_kind:'file',title:'plan.md'},words),{did:'Changed the tags',on:'plan.md',detail:''});
+assert.deepEqual(activityParts({action:'file_share',item_kind:'file',title:'plan.md'},words),{did:'Shared',on:'plan.md',detail:''});
