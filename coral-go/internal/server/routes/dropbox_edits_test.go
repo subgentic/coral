@@ -271,3 +271,17 @@ func TestThePruneKeepsAHeldEdit(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, ok, "and the re-check under the lock agrees")
 }
+
+// Security's SHOULD 7 on 085c4511b. Mutant: a passing fetch error is counted as skipped and the cursor moves on (the edit is missed).
+func TestAFetchThatFailsOnceIsTriedAgain(t *testing.T) {
+	be, ds := newDropboxEditEnv(t, 2)
+	be.dbx.edit(be.versionFile(ds[0]), []byte("edited while Dropbox had trouble"))
+	be.dbx.failDownloads = 1
+	be.notice()
+	assert.Empty(t, be.open(), "nothing held: the download failed")
+	be.notice()
+	open := be.open()
+	require.Len(t, open, 1, "the next pass fetches it")
+	b, _ := os.ReadFile(be.objectPath(open[0].Digest))
+	assert.Equal(t, "edited while Dropbox had trouble", string(b))
+}

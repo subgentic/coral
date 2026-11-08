@@ -18,6 +18,7 @@ const { JSDOM } = require('jsdom');
         <div id="settings-dropbox-note"></div>
         <div id="settings-dropbox-backup" hidden>
           <div id="settings-dropbox-counts"></div>
+          <ul id="settings-dropbox-edits" hidden></ul>
           <div id="settings-dropbox-types"></div>
           <input id="settings-dropbox-age" type="number">
           <button id="settings-dropbox-filters-save"></button>
@@ -271,6 +272,37 @@ const { JSDOM } = require('jsdom');
     assert.match($('settings-dropbox-counts').textContent, /2 files were edited in Dropbox: Coral holds the edits for you and has not changed them here\. 5 more edits wait in Dropbox until you decide some\./);
     await status({ ...connected, edits: { open: 0, waiting: 0 } });
     assert.doesNotMatch($('settings-dropbox-counts').textContent, /edited in Dropbox/);
+
+    // The held edits (#14714 piece 2): Coral's name, size and type, the unseen note, Dropbox's own view, and the two decisions.
+    const doc = 'a'.repeat(32);
+    await status({ ...connected, edits: { open: 1, waiting: 0, items: [{ doc_id: doc, name: '<img src=x onerror=alert(1)>report.md', size: 2048, media_type: 'text/markdown', next_version: 3, dropbox_url: 'https://www.dropbox.com/home/Apps/coralhub/v1/aaa/' + doc + '/v1-12345678.md' }] } });
+    const list = $('settings-dropbox-edits');
+    assert.ok(!list.hidden);
+    assert.strictEqual(list.querySelectorAll('li').length, 1);
+    assert.strictEqual(list.querySelector('img'), null, 'a name is text, never markup');
+    assert.match(list.textContent, /<img src=x onerror=alert\(1\)>report\.md was edited in Dropbox \(2 KB, text\/markdown\)\./);
+    assert.match(list.textContent, /Coral has not shown you what changed\./);
+    const look = list.querySelector('a');
+    assert.strictEqual(look.getAttribute('target'), '_blank');
+    assert.strictEqual(look.getAttribute('rel'), 'noopener noreferrer');
+    assert.ok(look.getAttribute('href').startsWith('https://www.dropbox.com/'));
+    const [useBtn, keepBtn] = list.querySelectorAll('button');
+    assert.strictEqual(useBtn.textContent, 'Use it as version 3', 'names the version it will make');
+    assert.strictEqual(keepBtn.textContent, 'Keep it separate');
+    answers['/api/dropbox/edits/' + doc + '/promote'] = { status: 200, body: { decision: 'promoted', version: 3 } };
+    useBtn.click();
+    await new Promise(r => setTimeout(r, 0));
+    assert.ok(calls.some(c => c.url === '/api/dropbox/edits/' + doc + '/promote' && c.method === 'POST'));
+    assert.match($('settings-dropbox-note').textContent, /the edit is version 3 now/);
+    answers['/api/dropbox/edits/' + doc + '/separate'] = { status: 409, body: { code: 'not_pending' } };
+    await m.decideEdit(doc, 'separate', 'report.md');
+    assert.match($('settings-dropbox-note').textContent, /already decided/);
+    const sentBefore = calls.length;
+    await m.decideEdit('../x', 'promote', 'x');
+    await m.decideEdit(doc, 'delete', 'x');
+    assert.strictEqual(calls.length, sentBefore, 'nothing sent for a bad id or action');
+    await status({ ...connected, edits: { open: 0, waiting: 0, items: [] } });
+    assert.ok($('settings-dropbox-edits').hidden, 'none held: the list is hidden');
 
     // Retention (#14703): the counts, the window and the dry run before Turn on.
     await status({ ...connected, backup: { backed_up: 4, retained_out: 3, gone: 1, edited: 2 }, filters: { types: [], max_age_days: 0 }, retention: { days: 0 } });

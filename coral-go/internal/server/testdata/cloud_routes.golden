@@ -398,6 +398,8 @@ POST /api/cloud/rekey never
 POST /api/dropbox/check never
 POST /api/dropbox/connect never
 POST /api/dropbox/disconnect never
+POST /api/dropbox/edits/{doc}/promote never
+POST /api/dropbox/edits/{doc}/separate never
 POST /api/dropbox/switch never
 POST /api/dropbox/takeover never
 POST /api/folder-tags/{folderName} never

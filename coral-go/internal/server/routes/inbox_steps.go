@@ -30,7 +30,7 @@ func inboxTime(s string) time.Time {
 // needsYouKindToInbox maps the needs-you kinds to the Inbox telemetry's.
 var needsYouKindToInbox = map[string]string{
 	"agent": tracking.InboxAgentWait, "question": tracking.InboxAsk, "wait": tracking.InboxWait, "proposal": tracking.InboxProposal,
-	"review": tracking.InboxReview, "goal_done": tracking.InboxGoalDone, "skill": tracking.InboxSkill,
+	"review": tracking.InboxReview, "goal_done": tracking.InboxGoalDone, "skill": tracking.InboxSkill, "dropbox_edit": tracking.InboxOther,
 }
 
 // InboxOpenedCounts is what is waiting for the person who opened the Inbox, by kind, as the server sees it (needs-you): counts only.

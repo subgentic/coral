@@ -103,6 +103,7 @@ function renderBackup(st, keepControls = false) {
             box.append(label, document.createTextNode(' '));
         }
     }
+    renderEdits(ed.items || []);
     if (keepControls) return;
     const chosen = new Set((st.filters && st.filters.types) || []);
     if (box) for (const input of box.querySelectorAll('input[type=checkbox]')) input.checked = chosen.has(input.value);
@@ -110,6 +111,60 @@ function renderBackup(st, keepControls = false) {
     if (age) age.value = String((st.filters && st.filters.max_age_days) || 0);
     const ret = $('settings-dropbox-keep-for');
     if (ret && !pendingRetention) ret.value = String(keep);
+}
+
+// renderEdits draws the edits made in Dropbox that wait for the Operator (stage 5a, #14714): Coral's own name for the file, the edit's size and
+// type, a note that Coral has not shown what changed, the file in Dropbox's own web view (a new tab, noopener noreferrer, built by the server from
+// its own path), and the two decisions. All text is textContent.
+function renderEdits(items) {
+    const list = $('settings-dropbox-edits');
+    if (!list) return;
+    list.textContent = '';
+    list.hidden = !items.length;
+    for (const it of items) {
+        const li = document.createElement('li');
+        li.className = 'settings-dropbox-edit';
+        const head = document.createElement('div');
+        const name = document.createElement('strong');
+        name.textContent = String(it.name || 'A file');
+        head.append(name, document.createTextNode(` was edited in Dropbox (${sizeText(it.size)}, ${String(it.media_type || 'unknown type')}).`));
+        const why = document.createElement('div');
+        why.className = 'settings-hint';
+        why.append(document.createTextNode('Coral has not shown you what changed. '));
+        const url = String(it.dropbox_url || '');
+        if (url.startsWith('https://www.dropbox.com/')) {
+            const a = document.createElement('a');
+            a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+            a.textContent = 'Open it in Dropbox to look first';
+            why.append(a, document.createTextNode('.'));
+        }
+        const acts = document.createElement('div');
+        acts.className = 'dropbox-inline';
+        const doc = String(it.doc_id || '');
+        const use = document.createElement('button');
+        use.type = 'button'; use.className = 'btn btn-small';
+        use.textContent = `Use it as version ${Number(it.next_version) || 2}`;
+        use.addEventListener('click', () => decideEdit(doc, 'promote', String(it.name || 'the file')));
+        const keep = document.createElement('button');
+        keep.type = 'button'; keep.className = 'btn btn-small';
+        keep.textContent = 'Keep it separate';
+        keep.addEventListener('click', () => decideEdit(doc, 'separate', String(it.name || 'the file')));
+        acts.append(use, keep);
+        li.append(head, why, acts);
+        list.append(li);
+    }
+}
+
+// decideEdit sends the Operator's decision; a second one (another click, the other button) is refused by the server and said so.
+export async function decideEdit(doc, action, name) {
+    if (!/^[0-9a-f]{32}$/.test(doc) || (action !== 'promote' && action !== 'separate')) return;
+    let res;
+    try { res = await post(`/api/dropbox/edits/${doc}/${action}`); } catch { res = { ok: false, status: 0, body: {} }; }
+    if (res.status === 409) note(`${name}: this edit was already decided.`);
+    else if (!res.ok) { note(String(res.body.error || "Couldn't record that. Try again.")); return; }
+    else if (action === 'promote') note(`${name}: the edit is version ${Number(res.body.version) || ''} now.`);
+    else note(`${name}: the edit is kept as its own file.`);
+    await loadDropbox();
 }
 
 // filterKey is what the boxes and the age say now, to tell an edit made while a save was on its way.

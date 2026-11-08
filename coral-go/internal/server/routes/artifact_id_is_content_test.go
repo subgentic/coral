@@ -96,7 +96,9 @@ func TestOnlyTheReviewedFilesWriteIntoTheObjectsFolder(t *testing.T) {
 		}
 	}
 	sort.Strings(got)
-	want := []string{"artifact_comment_images.go", "artifacts.go", "artifacts_store.go", "board_artifact_edit.go", "cross_team_pending.go", "operator_artifacts.go"}
+	// dropbox_edits.go (#14714): an edit made in Dropbox is read into an exclusive 0600 temp file in the objects folder, hashed while it is read, and
+	// handed to storeArtifactFileAs under its digest, never under a name from Dropbox (Security's MUSTs C and D on the 5a delta).
+	want := []string{"artifact_comment_images.go", "artifacts.go", "artifacts_store.go", "board_artifact_edit.go", "cross_team_pending.go", "dropbox_edits.go", "operator_artifacts.go"}
 	assert.Equal(t, want, got, "the files of this package that name the objects folder and write a file changed: review how the new one names and writes an object")
 }
 

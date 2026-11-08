@@ -153,18 +153,20 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/cloud/connect/cancel":                 "cancel connecting to Coral Hub",
 	"POST /api/cloud/disconnect":                     "disconnect from Coral Hub",
 	// Dropbox sign-in (#14609): the Operator's, from this computer's dashboard.
-	"GET /api/dropbox/status":         "read the Dropbox connection",
-	"POST /api/dropbox/connect":       "connect Dropbox",
-	"POST /api/dropbox/disconnect":    "disconnect Dropbox",
-	"POST /api/dropbox/switch":        "switch the Dropbox account",
-	"POST /api/dropbox/takeover":      "take over the Dropbox backup",
-	"PUT /api/dropbox/filters":        "choose what the Dropbox backup sends",
-	"PUT /api/dropbox/retention":      "choose how long Dropbox keeps backed-up files",
-	"POST /api/dropbox/check":         "ask the Dropbox backup to check for space again",
-	"POST /api/cloud/redeem":          "redeem a Coral Hub credential",
-	"POST /api/cloud/rekey":           "replace the secret key and discard what it sealed", // #3698
-	"GET /api/cloud/owner-label":      "see whether Coral Hub's owner is recorded on this computer",
-	"POST /api/cloud/owner-label/arm": "confirm who owns this computer on Coral Hub",
+	"GET /api/dropbox/status":                "read the Dropbox connection",
+	"POST /api/dropbox/connect":              "connect Dropbox",
+	"POST /api/dropbox/disconnect":           "disconnect Dropbox",
+	"POST /api/dropbox/switch":               "switch the Dropbox account",
+	"POST /api/dropbox/takeover":             "take over the Dropbox backup",
+	"PUT /api/dropbox/filters":               "choose what the Dropbox backup sends",
+	"POST /api/dropbox/edits/{doc}/promote":  "use an edit made in Dropbox as the next version",
+	"POST /api/dropbox/edits/{doc}/separate": "keep an edit made in Dropbox as its own file",
+	"PUT /api/dropbox/retention":             "choose how long Dropbox keeps backed-up files",
+	"POST /api/dropbox/check":                "ask the Dropbox backup to check for space again",
+	"POST /api/cloud/redeem":                 "redeem a Coral Hub credential",
+	"POST /api/cloud/rekey":                  "replace the secret key and discard what it sealed", // #3698
+	"GET /api/cloud/owner-label":             "see whether Coral Hub's owner is recorded on this computer",
+	"POST /api/cloud/owner-label/arm":        "confirm who owns this computer on Coral Hub",
 	// #3553: the Operator removes an artifact (also refused to anyone but a person, in every mode).
 	"DELETE /api/artifacts/{id}": "delete an artifact",
 	// #5575: the machine-wide list of every artifact (the owner's, here or through Coral Hub): never an agent's.

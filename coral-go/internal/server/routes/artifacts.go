@@ -64,6 +64,9 @@ type agentUploadRecord struct {
 	// DocID is the document this upload is (#14551, Dropbox stage 1): 32 random hex, never a digest, made at the first upload and kept by every re-upload of the same bytes by the same
 	// session. A version's document id is its series id. Two uploads of the same bytes are two documents, though they share one object.
 	DocID string `json:"doc_id,omitempty"`
+	// PromotedBy is "operator" on a version that was an edit made in Dropbox and that the Operator chose to use (Dropbox stage 5a, #14714): the
+	// explicit exception to the series' own-uploader rule is this one decision, recorded, never a loosening of the rule.
+	PromotedBy string `json:"promoted_by,omitempty"`
 }
 
 // sourcePaste marks an upload record made from an image pasted or attached in the dashboard.

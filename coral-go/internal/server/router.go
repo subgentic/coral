@@ -517,9 +517,11 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Post("/api/dropbox/disconnect", s.cloudHandler.DropboxDisconnect)
 	r.Post("/api/dropbox/switch", s.cloudHandler.DropboxConfirmSwitch)
 	r.Post("/api/dropbox/takeover", s.cloudHandler.DropboxTakeOver)
-	r.Put("/api/dropbox/filters", s.cloudHandler.DropboxSetFilters)     // stage 4 (#14655): what to back up
-	r.Post("/api/dropbox/check", s.cloudHandler.DropboxCheckAgain)      // stage 4c (#14693): Check again after freeing space
-	r.Put("/api/dropbox/retention", s.cloudHandler.DropboxSetRetention) // stage 4b (#14703): Keep in Dropbox for N days
+	r.Put("/api/dropbox/filters", s.cloudHandler.DropboxSetFilters)                 // stage 4 (#14655): what to back up
+	r.Post("/api/dropbox/check", s.cloudHandler.DropboxCheckAgain)                  // stage 4c (#14693): Check again after freeing space
+	r.Put("/api/dropbox/retention", s.cloudHandler.DropboxSetRetention)             // stage 4b (#14703): Keep in Dropbox for N days
+	r.Post("/api/dropbox/edits/{doc}/promote", s.cloudHandler.DropboxPromoteEdit)   // stage 5a (#14714): use an edit made in Dropbox as the next version
+	r.Post("/api/dropbox/edits/{doc}/separate", s.cloudHandler.DropboxSeparateEdit) // stage 5a: keep it as its own artifact
 	// The Dropbox backup worker (#14655): one background loop; a pass every five minutes or soon after an upload, only while connected.
 	dbxBackup := s.cloudHandler.NewDropboxBackup(store.NewDropboxOutbox(s.db))
 	if s.boardStore != nil {

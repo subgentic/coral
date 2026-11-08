@@ -586,3 +586,5 @@ b POST /api/dropbox/takeover
 b PUT /api/dropbox/filters
 b POST /api/dropbox/check
 b PUT /api/dropbox/retention
+b POST /api/dropbox/edits/{doc}/promote
+b POST /api/dropbox/edits/{doc}/separate

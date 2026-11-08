@@ -55,14 +55,15 @@ type fakeDropbox struct {
 	deleteCalls [][]string          // the paths of each delete_batch call
 	checkCalls  int
 	// Stage 5a's listing and download side.
-	changes    []map[string]any  // entries list_folder/continue answers after a cursor (an edit, a touch, a delete)
-	revBytes   map[string][]byte // bytes of each rev an edit made
-	pageSize   int               // entries a page (0: all)
-	resetNext  bool              // the next continue answers reset
-	downloads  []string          // revs downloaded
-	lieSize    int64             // download answers this size in Dropbox-API-Result while sending the real bytes
-	extraBytes []byte            // download appends these to the body (a stream longer than declared)
-	listCalls  int
+	changes       []map[string]any  // entries list_folder/continue answers after a cursor (an edit, a touch, a delete)
+	revBytes      map[string][]byte // bytes of each rev an edit made
+	pageSize      int               // entries a page (0: all)
+	resetNext     bool              // the next continue answers reset
+	downloads     []string          // revs downloaded
+	lieSize       int64             // download answers this size in Dropbox-API-Result while sending the real bytes
+	extraBytes    []byte            // download appends these to the body (a stream longer than declared)
+	listCalls     int
+	failDownloads int // the next downloads answer 500 (Dropbox's own trouble)
 }
 
 // edit replaces path's bytes as a person would in Dropbox (a new rev, a new content hash).
@@ -273,6 +274,12 @@ func newFakeDropbox(t *testing.T) *fakeDropbox {
 			json.Unmarshal([]byte(r.Header.Get("Dropbox-API-Arg")), &a)
 			rev := strings.TrimPrefix(a["path"], "rev:")
 			f.downloads = append(f.downloads, rev) // every attempt, answered or not
+			if f.failDownloads > 0 {
+				f.failDownloads--
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(`{"error_summary":"internal_error/"}`))
+				return
+			}
 			b, ok := f.revBytes[rev]
 			if !ok {
 				w.WriteHeader(http.StatusConflict)

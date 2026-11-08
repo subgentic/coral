@@ -160,8 +160,15 @@ func (b *DropboxBackup) noticeEntry(ctx context.Context, cl *dropbox.Client, acc
 	}
 	p.fetched++
 	digest, size, mt, err := b.fetchEdit(ctx, cl, access, e, row)
+	if errors.Is(err, dropbox.ErrTooBig) || errors.Is(err, errNotTheListedFile) || errors.Is(err, errNoOriginal) {
+		p.skipped++ // this file will not do as listed: looked at again only when it changes
+		return
+	}
 	if err != nil {
-		p.skipped++
+		// A passing trouble (the network, a rate limit, a full store, a failed write): like a bound, the pass stops here and the cursor stays, so
+		// the edit is looked at again next pass, never missed (Security's SHOULD 7 on 085c4511b).
+		p.waiting++
+		p.stop = true
 		return
 	}
 	p.bytes += size
@@ -199,12 +206,12 @@ func (b *DropboxBackup) fetchEdit(ctx context.Context, cl *dropbox.Client, acces
 		return "", 0, "", err
 	}
 	if got.Rev != e.Rev || n != e.Size || got.Size != e.Size {
-		return "", 0, "", errors.New("the download is not the listed file")
+		return "", 0, "", errNotTheListedFile
 	}
 	digest := hex.EncodeToString(h.Sum(nil))
 	orig, _, ok := b.record(row.Digest, row.DocID)
 	if !ok {
-		return "", 0, "", errors.New("no record of the original")
+		return "", 0, "", errNoOriginal
 	}
 	mt := typeByBytes(orig.rec.MediaType, head.buf)
 	if _, _, err := storeArtifactFileAs(b.coralDir, "", cleanValue(orig.rec.Name), mt, tmpPath, digest, n, nil, 0, nil); err != nil {
@@ -212,6 +219,11 @@ func (b *DropboxBackup) fetchEdit(ctx context.Context, cl *dropbox.Client, acces
 	}
 	return digest, n, mt, nil
 }
+
+var (
+	errNotTheListedFile = errors.New("the download is not the listed file")
+	errNoOriginal       = errors.New("no record of the original")
+)
 
 // headWriter keeps the first max bytes written through it.
 type headWriter struct {
