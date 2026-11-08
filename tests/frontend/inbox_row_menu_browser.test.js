@@ -60,7 +60,9 @@ const AGENTS = [
             // a tap opens the menu: Dismiss first, on the screen, focused; the row itself did not open
             const url0 = await ev(`location.href`);
             await clickCurrent(`(() => { const toggle = (${probe}); window.__rowMenuClicked = toggle; return toggle; })()`, 'tap the current row menu');
-            await waitFor(`!!(${probe}) && !(${probe}).parentElement.querySelector('.menu').hidden`, at + 'the menu opens', 4000).catch(async error => {
+            // A live-session update can redraw the row right after the tap: a NEW button and a closed menu replace the one the tap landed on (the CI runners did this now and then, 42467381330). Forced here so it happens every time.
+            await ev(`import((window.__coralStatic||'/static/')+'state.js').then(async ({ state }) => { const m = await import((window.__coralStatic||'/static/')+'inbox_tab.js'); const live = JSON.parse(JSON.stringify(state.liveSessions)); live.forEach(x => { x.waiting_since = new Date(Date.parse(x.waiting_since) - 1000).toISOString(); }); state.liveSessions = live; m.updateInboxTab(); return true; })`);
+await waitFor(`(() => { const t = (${probe}); if (!t?.isConnected) return false; if (!t.parentElement.querySelector('.menu').hidden) return true; if (t.getClientRects().length) t.click(); return false; })()`, at + 'the menu opens (the tap is repeated on the current button while the menu is closed: a redraw can replace the button the first tap landed on)', 4000).catch(async error => {
                 const diagnostic = await ev(`(() => {
                     const original = window.__rowMenuClicked, current = (${probe}), menu = current?.parentElement.querySelector('.menu');
                     return { originalConnected: original?.isConnected ?? false, currentConnected: current?.isConnected ?? false,
