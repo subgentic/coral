@@ -1,6 +1,7 @@
 // New team, step 3's side list (#10719, Desktop #10714 moment 5): "Start none", "Workflow none", "Health check off", "Messaging off" said their state and not what each is. Each tab now has a short plain tip as its tooltip, and
 // for a screen reader as its description after the state; the visible words do not grow (the tab reads as before). At 1280 px (a phone picks the section from a select).
 const assert = require('node:assert/strict');
+const { teamDir } = require('./helpers/team_dir');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
@@ -16,7 +17,7 @@ const { coralReady } = require('./helpers/wait');
             await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`window.showLaunchModal(); true`); await waitFor(`document.querySelector('#launch-modal .modal-content') && document.querySelector('#launch-modal .modal-content').getClientRects().length > 0`, `${w}: the launch dialog`, 8000);
             await ev(`window._selectLaunchType('team'); true`); await waitFor(`document.getElementById('launch-step-team').dataset.stage === 'team'`, `${w}: step 1`, 8000);
-            await ev(`{ const n = document.getElementById('team-board-name'); n.value = 'tips-run'; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = '/tmp/tips-run'; d.dispatchEvent(new Event('input', { bubbles: true })); document.getElementById('launch-team-next').click(); } true`);
+            await ev(`{ const n = document.getElementById('team-board-name'); n.value = 'tips-run'; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = ${JSON.stringify(teamDir('tips-run'))}; d.dispatchEvent(new Event('input', { bubbles: true })); document.getElementById('launch-team-next').click(); } true`);
             await waitFor(`document.getElementById('launch-step-team').dataset.stage === 'members'`, `${w}: step 2`, 8000);
             await ev(`document.getElementById('launch-team-next').click(); true`);
             await waitFor(`document.getElementById('launch-step-team').dataset.stage === 'start' && document.querySelectorAll('#team-start-host .settings-tab .menu-item-state').length >= 4`, `${w}: step 3 with its side list`, 10000);
