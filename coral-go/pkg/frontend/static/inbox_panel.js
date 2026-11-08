@@ -280,11 +280,13 @@ export function mountInbox(host, adapter, options) {
         ta.addEventListener('input', () => { if (ta.value) _drafts.set(key, ta.value); else _drafts.delete(key); sync(); grow(); });
         ta.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); form.requestSubmit(); } });
         sync();
-        Promise.resolve().then(() => adapter.canReply()).then(can => {
-            if (can && can.ok === false) {
-                form.replaceChildren(el('p', 'ibx-note', can.reason || 'You can read this task here but not reply to it.'));
+        form.hidden = true; // Permission must be known before offering the reply box.
+        Promise.resolve().then(() => adapter.canReply(task)).then(can => {
+            form.hidden = false;
+            if (!can || can.ok !== true) {
+                form.replaceChildren(el('p', 'ibx-note', can?.reason || 'You can read this task here but not reply to it.'));
             }
-        }).catch(() => { /* an adapter that cannot say leaves the box; the server is the gate */ });
+        }).catch(() => { form.hidden = false; form.replaceChildren(el('p', 'ibx-note', 'Reply permission could not be checked.')); });
         form.addEventListener('submit', async e => {
             e.preventDefault();
             const content = ta.value.trim();

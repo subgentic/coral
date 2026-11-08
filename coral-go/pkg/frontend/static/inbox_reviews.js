@@ -4,7 +4,7 @@ import { setReviewCacheReader } from './ask_filter.js';
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
 import { sourcesKey } from './board_fetch.js';
 import { inboxSources, serverLabel, isOwnerOnlyAnswer } from './inbox_servers.js';
-import { boardFetch, nextArtifactPage, splitKey, serverFetch, identityKey, noteBoardLabels, normServer, isCloud } from './server_base.js';
+import { boardFetch, nextArtifactPage, splitKey, serverFetch, identityKey, noteBoardLabels, normServer, isCloud, nativeSaved, personalInboxAllowed } from './server_base.js';
 import { SORT_PARAM } from './filter_model.js';
 import { fetchSkewed } from './query_skew.js';
 import { hideAsksWhen } from './ask_filter.js';
@@ -331,8 +331,8 @@ const reviewPager = createReviewPages({ read: readComputerPage, key: pageKey });
 const savedPager = createReviewPages({ read: readComputerPage, key: pageKey });
 function syncPageSources() {
     const servers = inboxSources();
-    if (!pagesReady) { reviewPager.reset(servers, reviewQuery); savedPager.reset(servers, savedQuery); pagesReady = true; }
-    else { reviewPager.setSources(servers); savedPager.setSources(servers); }
+    if (!pagesReady) { reviewPager.reset(servers, reviewQuery); savedPager.reset(isCloud() && nativeSaved() ? servers.filter(server => personalInboxAllowed(server)) : servers, savedQuery); pagesReady = true; }
+    else { reviewPager.setSources(servers); savedPager.setSources(isCloud() && nativeSaved() ? servers.filter(server => personalInboxAllowed(server)) : servers); }
 }
 export const reviewPages = () => reviewPager.status();
 export const savedReviewPages = () => savedPager.status();

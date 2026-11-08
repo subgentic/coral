@@ -224,6 +224,7 @@ node review_attention_count.test.mjs
 node inbox_reviews_query.test.mjs
 node review_counts.test.mjs
 node review_counts_cloud.test.mjs
+node personal_inbox_policy.test.mjs
 node artifact_review_words.test.mjs
 node inbox_reviews_cloud.test.mjs
 node task_list_data.test.mjs

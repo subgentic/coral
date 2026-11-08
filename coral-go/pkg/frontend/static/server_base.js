@@ -197,6 +197,27 @@ export function serverForSession(name, sessionId) {
 // folder showed up as its raw key, "@<uuid>/folder", instead of the folder name.
 const SERVER_ID_RE = /^(?:[a-z0-9-]{1,32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 
+/** Personal Hub rollups require an explicit ownership assertion from inventory.
+ * An access tier or a connector's owner-stamp support never substitutes for it. */
+export function personalInboxSources() {
+    return (state.servers || []).filter(s => s && typeof s.id === 'string' && s.id !== LOCAL_SERVER && SERVER_ID_RE.test(s.id));
+}
+export function personalInboxAllowed(server, write = false) {
+    if (!isCloud()) return true;
+    const source = personalInboxSources().find(s => s.id === server);
+    return source?.owner === true && source.status === 'online'
+        && (!write || ['interact', 'launch'].includes(source.effective_mode));
+}
+export function personalInboxNotice(noun) {
+    if (!isCloud()) return '';
+    const sources = personalInboxSources();
+    if (!sources.length) return 'Waiting for computer ownership information.';
+    return sources.filter(s => !personalInboxAllowed(s.id)).map(s =>
+        s.owner === false ? `Only this computer's owner sees ${noun} on ${s.label || s.id}.`
+        : s.owner !== true ? `Ownership is not known for ${s.label || s.id}; ${noun} are not shown.`
+        : `${s.label || s.id} is offline; its ${noun} are not shown.`).join(' ');
+}
+
 /** Unpack a key made by identityKey(): {server, name}. */
 export function splitKey(key) {
     const k = String(key ?? '');
