@@ -148,6 +148,7 @@ export const RUNS_WHILE_OPEN = 'only while Coral is running on this computer. A 
 const EXIT_NOTES = {
     ended_while_coral_was_down: "Coral was stopped when this run's agent ended, so it could not see the result.",
     interrupted_by_restart: 'Coral restarted before this run launched its agent.',
+    timeout_waiting_for_answer: "Stopped waiting for your answer: the agent was at a prompt when the run's time ran out.",
 };
 export function exitNote(run) { const r = run && run.exit_reason; return (r && EXIT_NOTES[r]) || ''; }
 const unseen = run => !!run && run.status === 'completed' && run.exit_reason === 'ended_while_coral_was_down';

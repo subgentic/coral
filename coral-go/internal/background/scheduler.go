@@ -116,6 +116,7 @@ type JobScheduler struct {
 	store          *store.ScheduleStore
 	sessionStore   *store.SessionStore
 	lastEventType  func(ctx context.Context, sessionID string) (last string, stopFailed bool) // the type of the agent's last event (stop, tool_use...), "" for none, and whether a stop was a failed turn (an API error); nil: not known (#6898)
+	agentWaiting   func(ctx context.Context, sessionID string) bool                           // whether the agent is waiting at a prompt of its own (permission, question, plan) right now: a run that runs out of time then says it stopped waiting for an answer (#14772)
 	hasEvents      func(ctx context.Context, sessionID string) bool                           // whether the agent's CLI reported anything (its hook events); nil: a run is never judged by it (#6842)
 	runtime        AgentRuntime
 	maxConcurrent  int
@@ -591,6 +592,10 @@ func (s *JobScheduler) launchAndWatch(runID int64, job store.ScheduledJob, rc ru
 		return
 	}
 	status, exitReason := runOutcome(launchErr, watchCtx.Err())
+	if status == "killed" && exitReason == "timeout" && s.waitedAtTimeout(ctx, runID) { // not just 'timeout': the person is told it stopped waiting for THEM (#14772)
+		exitReason = timeoutWaitingCode
+		s.store.UpdateScheduledRun(ctx, runID, map[string]interface{}{"error_msg": timeoutWaitingMsg, "error_code": timeoutWaitingCode})
+	}
 	if neverStarted.Load() && status == "failed" { // the backstop ended the run: its own sentence and code, not "context canceled" (#6978)
 		exitReason = agentNeverStartedCode // the code in exit_reason, the sentence in error_msg, on every path (the startup settle's shape, #7016)
 		s.store.UpdateScheduledRun(ctx, runID, map[string]interface{}{"error_msg": agentNeverStartedMsg, "error_code": agentNeverStartedCode})
@@ -609,6 +614,17 @@ func (s *JobScheduler) launchAndWatch(runID int64, job store.ScheduledJob, rc ru
 		s.cleanupWorktree(rc.repoPath, wt.worktreeDir, wt.runBranch, wt.baseBranch)
 	}
 }
+
+// SetAgentWaiting tells the scheduler how to ask whether an agent is waiting at a prompt (the startup passes the hook-event state, AgentWaitingFromEvents).
+func (s *JobScheduler) SetAgentWaiting(fn func(ctx context.Context, sessionID string) bool) {
+	s.agentWaiting = fn
+}
+
+// timeoutWaitingCode is the exit reason of a run that ran out of its time while its agent waited at a prompt, and timeoutWaitingMsg the one fixed sentence in its history: never built from the prompt's own words.
+const (
+	timeoutWaitingCode = "timeout_waiting_for_answer"
+	timeoutWaitingMsg  = "Stopped waiting for your answer: the agent was at a prompt when the run's time ran out."
+)
 
 // SetEventCheck tells the scheduler how to ask whether an agent's CLI reported anything (a stored hook event), the signal that it started (the startup passes the task store's read).
 func (s *JobScheduler) SetEventCheck(fn func(ctx context.Context, sessionID string) bool) {
@@ -753,6 +769,18 @@ func (s *JobScheduler) afterLaunch(ctx context.Context, runID int64, job store.S
 	if rc.tag != "" {
 		s.tagSession(ctx, *run.SessionID, rc.tag)
 	}
+}
+
+// waitedAtTimeout is whether the run's agent was waiting at a prompt as its time ran out. A run with no session, no check wired or a read that fails is not judged: it stays a plain timeout.
+func (s *JobScheduler) waitedAtTimeout(ctx context.Context, runID int64) bool {
+	if s.agentWaiting == nil {
+		return false
+	}
+	run, err := s.store.GetScheduledRun(ctx, runID)
+	if err != nil || run == nil || run.SessionID == nil || *run.SessionID == "" {
+		return false
+	}
+	return s.agentWaiting(ctx, *run.SessionID)
 }
 
 // runOutcome is a run's final status and reason: completed when the agent is done, failed with the launch's error,

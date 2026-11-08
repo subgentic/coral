@@ -75,6 +75,15 @@ func hookSignal(ts *store.TaskStore) func(ctx context.Context, sessionID string)
 	}
 }
 
+// AgentWaitingFromEvents reads, from an agent's stored hook events, whether it is waiting at a prompt of its own right now (the scheduler's SetAgentWaiting).
+func AgentWaitingFromEvents(ts *store.TaskStore) func(ctx context.Context, sessionID string) bool {
+	signal := hookSignal(ts)
+	return func(ctx context.Context, sessionID string) bool {
+		sig, known := signal(ctx, sessionID)
+		return known && sig.NeedsInput
+	}
+}
+
 // NewHealthNudges returns the rules with the design's defaults.
 func NewHealthNudges(bs *board.Store, ts *store.TaskStore, rt AgentRuntime, discover func(context.Context) ([]AgentInfo, error)) *HealthNudges {
 	h := &HealthNudges{

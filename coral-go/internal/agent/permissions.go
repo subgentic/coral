@@ -368,13 +368,13 @@ func PermissionFlagsForAgent(agentType, mode string) []string {
 		return []string{"--permission-mode", mode}
 	case at.Agy, "antigravity", "gemini":
 		switch mode {
-		case "plan":
+		case "plan", "dontAsk": // agy has no mode that allows only what was approved ahead of time: Don't ask is Plan (read-only), as the launch types it (#14772)
 			return []string{"--mode", "plan"}
 		case "acceptEdits":
 			return []string{"--mode", "accept-edits"}
 		case "bypassPermissions":
 			return []string{"--dangerously-skip-permissions"}
-		default:
+		default: // "auto" is agy's own --mode auto only for an agy whose --help lists it, which a mode name alone cannot know: the launch builder adds it (AgySupportsAutoMode)
 			return nil
 		}
 	case at.Hermes:

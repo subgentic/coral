@@ -36,9 +36,10 @@ const SANDBOXED_ASKS = 'Sandboxed, asks first: can change files in its folder, n
 /** Only a workspace-write sandbox that never asks has the network on: the flag that turns it off. */
 export const NETWORK_OFF_FLAG = '-c sandbox_workspace_write.network_access=false';
 const CODEX_SANDBOX_RANK = { 'read-only': 1, 'workspace-write': 2, none: 3 };
-const AGY_MODE_RANK = { plan: 1, dontAsk: 1, acceptEdits: 2, auto: 3, bypassPermissions: 3 };
-const AGY_CAPS_RANK = { default: 0, plan: 1, 'accept-edits': 2, 'skip-permissions': 3 };
-const AGY_RANK_TEXT = ['Asks first', 'Plan', 'Accepts edits', 'Skips permission prompts'];
+// auto is agy's own --mode auto, between accept edits and nothing asking (#14772: it ranked with Bypass before); the capabilities never make an auto (agyEnforced), so only the modes have rank 3
+const AGY_MODE_RANK = { plan: 1, dontAsk: 1, acceptEdits: 2, auto: 3, bypassPermissions: 4 };
+const AGY_CAPS_RANK = { default: 0, plan: 1, 'accept-edits': 2, 'skip-permissions': 4 };
+const AGY_RANK_TEXT = ['Asks first', 'Plan', 'Accepts edits', 'Auto', 'Skips permission prompts'];
 export function launchedMode(agentType, mode, caps) {
     const family = _agentFamily(agentType);
     const hasCaps = !!(caps?.allow?.length || caps?.deny?.length);
@@ -55,9 +56,9 @@ export function launchedMode(agentType, mode, caps) {
     }
     if (family === 'agy') {
         const mr = AGY_MODE_RANK[mode], cr = AGY_CAPS_RANK[agyEnforced(caps)];
-        if (mr === undefined) return hasCaps && cr > 0 ? { narrowed: true, text: AGY_RANK_TEXT[cr], ...(cr === 3 ? { warn: true } : {}) } : { narrowed: false };
+        if (mr === undefined) return hasCaps && cr > 0 ? { narrowed: true, text: AGY_RANK_TEXT[cr], ...(cr === 4 ? { warn: true } : {}) } : { narrowed: false };
         if (hasCaps && cr < mr) return { narrowed: true, text: AGY_RANK_TEXT[cr] };
-        return mr === 3 ? { narrowed: false, warn: true } : { narrowed: false };
+        return mr === 4 ? { narrowed: false, warn: true } : { narrowed: false };
     }
     return { narrowed: false };
 }

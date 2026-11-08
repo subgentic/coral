@@ -68,7 +68,7 @@ func modeRank(agentType, mode string) int {
 			return rankEdits
 		case "auto":
 			return rankJudged // agy's own --mode auto (#14741); an agy that does not list it launches asking, which is lower than this, never higher
-		default: // "dontAsk" has no flag for agy: it asks
+		default: // "dontAsk" is Plan for agy (--mode plan, read-only: #14772), which asks for everything
 			return rankAsks
 		}
 	}
@@ -155,7 +155,7 @@ func effectiveRank(agentType, mode string, caps *agent.Capabilities, keepFull bo
 	if cr, ok := capsRank(agentType, caps); ok {
 		switch mode {
 		case "", "default", "auto", "dontAsk":
-			if mode == "" || mode == "default" || (isAgyType(agentType) && mode == "dontAsk") {
+			if mode == "" || mode == "default" {
 				r = cr // no mode named: the capabilities are the rank (agy's yolo from full capabilities). An agy launch that NAMES auto is narrowed by them, never widened (#14741: auto never becomes Bypass)
 			} else if cr < r {
 				r = cr
