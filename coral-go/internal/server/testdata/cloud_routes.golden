@@ -20,6 +20,7 @@ DELETE /api/board/{project}/tasks/{taskID}/reminder interact
 DELETE /api/board/{project}/waits never
 DELETE /api/chief/checks/{checkID} never
 DELETE /api/folder-tags/{folderName}/{tagID} never
+DELETE /api/launch-disclosure/ack never
 DELETE /api/pinned-folders launch
 DELETE /api/resources/entries/{id} never
 DELETE /api/resources/{name} never
@@ -143,6 +144,7 @@ GET /api/goals view
 GET /api/goals/metrics view
 GET /api/health view
 GET /api/history-import never
+GET /api/launch-disclosure never
 GET /api/needs-you view
 GET /api/operator-asks view
 GET /api/pinned-folders view
@@ -394,6 +396,7 @@ POST /api/folder-tags/{folderName} never
 POST /api/history-import never
 POST /api/hub-auto-accept launch
 POST /api/indexer/refresh never
+POST /api/launch-disclosure/ack never
 POST /api/notifications never
 POST /api/pinned-folders launch
 POST /api/resources/entries/{id}/move never

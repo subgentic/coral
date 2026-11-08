@@ -61,6 +61,8 @@ var activityCommentsOut = map[string]string{
 
 // activityNotAnInboxAction: a route a person (or an agent) can reach that is not an action in the Inbox, with why.
 var activityNotAnInboxAction = map[string]string{
+	"POST /api/launch-disclosure/ack":   "the owner's one-time acknowledgement of the first-launch notice (#14353): not an action in the Inbox; it records only the notice id and the time",
+	"DELETE /api/launch-disclosure/ack": "the owner takes that acknowledgement back (#14353): not an action in the Inbox",
 	"DELETE /api/agent/ui/{id}":                                            "an agent's own call: no person's click",
 	"DELETE /api/auth/sessions/{id}":                                       "sign-in and sessions",
 	"DELETE /api/board/remotes":                                            "computers on the board",
