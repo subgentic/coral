@@ -33,12 +33,12 @@ const BUTTONS = [
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
             await ev(`(() => { const original = window.fetch.bind(window), json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
                 window.__calls = []; window.__launch = []; window.__viewer = [];
-                const ask = (id, board) => ({ board, kind: 'ask', id, asker: 'Backend Dev', text: 'Ship tonight or wait?', cut: false, at: new Date().toISOString(), buttons: ${JSON.stringify(BUTTONS)} });
+                const ask = (id, board, ageMs) => ({ board, kind: 'ask', id, asker: 'Backend Dev', text: 'Ship tonight or wait?', cut: false, at: new Date(Date.now() - ageMs).toISOString(), buttons: ${JSON.stringify(BUTTONS)} }); // the other computer's question (m2) is the newer one, so the list puts it FIRST every time: the rows' order must never decide which one a step opens (it used to follow whichever computer answered first, and a step that opened m2's got its 403 and a dialog that rightly stayed open)
                 window.fetch = (url, opts = {}) => {
                     const u = new URL(String(url), location.href), m = (opts.method || 'GET').toUpperCase(), mm = u.pathname.match(/^\\/api\\/remote\\/(m1|m2)(\\/api\\/.*)$/);
                     if (!mm) return original(url, opts);
                     const server = mm[1], path = mm[2];
-                    if (path === '/api/operator-asks') return json(server === 'm1' ? [ask(7, 'team-x')] : [ask(8, 'team-y')]);
+                    if (path === '/api/operator-asks') return json(server === 'm1' ? [ask(7, 'team-x', 120000)] : [ask(8, 'team-y', 60000)]);
                     const claim = path.match(/^\\/api\\/board\\/([^/]+)\\/asks\\/(\\d+)\\/buttons\\/(\\d+)\\/(claim|settle)$/);
                     if (claim) {
                         window.__calls.push({ server, path: u.pathname, search: u.search, method: m, body: opts.body === undefined ? '' : String(opts.body), verb: claim[4], button: Number(claim[3]) });
@@ -56,7 +56,10 @@ const BUTTONS = [
             await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             const openAnswer = async who => {
                 await waitFor(`[...document.querySelectorAll('button')].some(b => /^Answer the question of Backend Dev/.test(b.getAttribute('aria-label') || '') && b.getClientRects().length)`, `${at}the question's Answer button`, 15000);
-                await ev(`(() => { const all = [...document.querySelectorAll('button')].filter(b => /^Answer the question of Backend Dev/.test(b.getAttribute('aria-label') || '') && b.getClientRects().length); all[${who}].click(); return true; })()`);
+                // the row of the wanted computer's question (m1 asked in team-x, m2 in team-y), found by its team, not by its place in the list
+                const team = who === 0 ? 'team-x' : 'team-y';
+                await waitFor(`[...document.querySelectorAll('button')].some(b => /^Answer the question of Backend Dev/.test(b.getAttribute('aria-label') || '') && b.getClientRects().length && (b.closest('tr, li, [role=row]')?.textContent || '').includes('${team}'))`, `${at}the Answer button of the question in ${team}`, 15000);
+                await ev(`(() => { const b = [...document.querySelectorAll('button')].find(b => /^Answer the question of Backend Dev/.test(b.getAttribute('aria-label') || '') && b.getClientRects().length && (b.closest('tr, li, [role=row]')?.textContent || '').includes('${team}')); b.click(); return true; })()`);
                 await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open]')`, `${at}the dialog opens`, 8000);
             };
             const offers = () => ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); return { buttons: [...d.querySelectorAll('.inbox-ask-offer button')].map(b => b.textContent.trim()), box: !!d.querySelector('.inbox-ask-box'), hint: (d.querySelector('.inbox-ask-offers-hint') || {}).textContent || '', error: d.querySelector('.inbox-ask-error').textContent }; })()`);
