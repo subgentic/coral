@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -20,8 +21,15 @@ const (
 	// ReleasesList is the newest releases of the repository, newest first (one page).
 	ReleasesList = "https://api.github.com/repos/" + verify.Repo + "/releases?per_page=30"
 
-	// maxListBytes caps the list's size: 30 releases are well under it, and a larger answer is refused, not truncated.
-	maxListBytes = 1 << 20
+	// PromoteRefs is the repository's tags that start with promote-: a short list of names (about 450 bytes each), whatever the release notes weigh and whatever order the releases are listed in. A
+	// promotion release is tagged on the promote branch's commit, so the releases list orders it by that commit's date, and it sinks out of the first page as newer releases come (page 3 by now).
+	PromoteRefs = "https://api.github.com/repos/" + verify.Repo + "/git/matching-refs/tags/promote-"
+
+	// maxListBytes caps the releases list's size, a memory bound and not a trust bound: the list carries each release's notes (about 40 KB a release today, 1.05 MiB for the 30 of one page, which
+	// is what stopped every check at the old 1 MiB), and GitHub allows a note of 125,000 characters. A larger answer is refused, not truncated.
+	maxListBytes = 8 << 20
+	// maxRefsBytes caps the tag list: about two thousand promotions fit, and a promotion is made by hand.
+	maxRefsBytes = 1 << 20
 	// maxPromoteCandidates is how many promotion releases one pass looks at, newest first: junk by anyone with write access costs this many small downloads, no more.
 	maxPromoteCandidates = 10
 )
@@ -61,6 +69,9 @@ type promotion struct {
 	bundle   []byte
 	m        *verify.Manifest
 }
+
+// errListUnreadable says GitHub's list of releases was answered but cannot be used (larger than the limit, or not a list): it is not "the network", and waiting five minutes will not change it.
+var errListUnreadable = errors.New("the list of releases cannot be read")
 
 // errNoPromotion says there is no promotion release listed (for the tag asked for): nothing was promoted.
 var errNoPromotion = errors.New("no promotion")
@@ -226,16 +237,31 @@ func (c *checker) releaseList(ctx context.Context, onlyTag string) ([]listedRele
 					return list, nil
 				}
 			}
-			// no promotion among the feed's newest releases: the API's list goes further back (30)
+			// no promotion among the feed's newest releases: the promotion tags are asked for by name
+		}
+	}
+	if c.cfg.RefsURL != "" {
+		list, err := c.listPromotionTags(ctx)
+		var se *verify.StatusError
+		switch {
+		case errors.As(err, &se) && se.RateLimited:
+			return nil, err
+		case err == nil:
+			return list, nil // the tags are the whole answer, an empty one too: a promotion release has a tag, and the list is not asked
+		default:
+			log.Printf("[update] the promotion tags could not be read (%s): asking the list of releases", reasonOf(err))
 		}
 	}
 	raw, err := c.cfg.Fetcher.Get(ctx, c.cfg.ReleasesURL, maxListBytes)
+	if errors.Is(err, verify.ErrTooLarge) {
+		return nil, fmt.Errorf("%w: %w", errListUnreadable, err)
+	}
 	if err != nil {
 		return nil, err
 	}
 	var list []listedRelease
 	if json.Unmarshal(raw, &list) != nil {
-		return nil, errors.New("the list of releases is not a list")
+		return nil, fmt.Errorf("%w: it is not a list", errListUnreadable)
 	}
 	if len(list) > 100 {
 		list = list[:100] // a page is 30: anything more is not read
@@ -254,4 +280,53 @@ func (c *checker) noteNewest(list []listedRelease) {
 			c.newest = v
 		}
 	}
+}
+
+// listPromotionTags asks for the repository's promote-* tags and returns the newest maxPromoteCandidates of them by the sequence in the name, as candidates the way the feed names them: the tag, assets
+// assumed (the download says whether they are there; the manifest's own tag and sequence and its signature decide, as for any candidate). A name that is not promote-<tag>-<sequence> is not one.
+func (c *checker) listPromotionTags(ctx context.Context) ([]listedRelease, error) {
+	raw, err := c.cfg.Fetcher.Get(ctx, c.cfg.RefsURL, maxRefsBytes)
+	if err != nil {
+		return nil, err
+	}
+	var refs []struct {
+		Ref string `json:"ref"`
+	}
+	if json.Unmarshal(raw, &refs) != nil {
+		return nil, errors.New("the promotion tags are not a list")
+	}
+	type tagSeq struct {
+		tag string
+		seq int64
+	}
+	var tags []tagSeq
+	for _, r := range refs {
+		tag := strings.TrimPrefix(r.Ref, "refs/tags/")
+		sm := promoteTagRe.FindStringSubmatch(tag)
+		if sm == nil {
+			continue
+		}
+		seq, _ := strconv.ParseInt(sm[2], 10, 64)
+		tags = append(tags, tagSeq{tag, seq})
+	}
+	sort.Slice(tags, func(i, j int) bool { return tags[i].seq > tags[j].seq })
+	if len(tags) > maxPromoteCandidates {
+		tags = tags[:maxPromoteCandidates]
+	}
+	out := make([]listedRelease, 0, len(tags))
+	for _, t := range tags {
+		out = append(out, listedRelease{TagName: t.tag, fromFeed: true})
+	}
+	return out, nil
+}
+
+var urlQueryRe = regexp.MustCompile(`\?[^\s"')]*`)
+
+// reasonOf is an error as a log line may carry it: the query of any URL in it dropped (nothing the updater asks for carries a token, and nothing may start to), and at most 200 characters.
+func reasonOf(err error) string {
+	s := urlQueryRe.ReplaceAllString(err.Error(), "?...")
+	if len(s) > 200 {
+		s = s[:200] + "..."
+	}
+	return s
 }
