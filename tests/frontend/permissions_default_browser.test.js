@@ -44,8 +44,34 @@ const recordTiming=row=>{timings.push(row);if(process.env.CORAL_LAUNCH_TIMING_RE
    await waitFor(`document.querySelector('#launch-disclosure-banner summary').getAttribute('aria-expanded')==='true'`,'keyboard opens the full disclosure',5000,`({focus:document.activeElement?.outerHTML,open:document.querySelector('#launch-disclosure-banner details')?.open,inert:!!document.querySelector('#launch-disclosure-banner')?.closest('[inert]')})`);
    assert.equal(await ev(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json()).then(d=>d.seen)`),false,'expansion never acknowledges');
    await snapshot('open',width);
-   await ev(`[...document.querySelectorAll('#launch-disclosure-banner button')].find(b=>b.textContent==="I've read this").click();true`);
-   await waitFor(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json()).then(d=>d.seen===true)`,'owner acknowledgement persisted on the real server');
+   if(width===390)await ev(`document.documentElement.style.fontSize='32px';true`);
+   await client.Input.dispatchKeyEvent({type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+   await client.Input.dispatchKeyEvent({type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+   await waitFor(`document.activeElement===document.querySelector('#launch-disclosure-banner button')`,'Tab reaches acknowledgement');
+   const ackPoint=()=>ev(`(()=>{const b=document.getElementById('launch-disclosure-banner').getBoundingClientRect(),a=document.querySelector('#launch-disclosure-banner button'),r=a.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;return {x,y,inside:r.top>=b.top&&r.bottom<=b.bottom&&y>=0&&y<innerHeight&&a.contains(document.elementFromPoint(x,y))}})()`);
+   assert.equal((await ackPoint()).inside,true,`${width}: Tab scrolls the acknowledgement into the bounded notice, including 200% text on phone`);
+   await client.Input.dispatchKeyEvent({type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r'});
+   await client.Input.dispatchKeyEvent({type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+   await waitFor(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json()).then(d=>d.seen===true)`,'keyboard acknowledgement persisted on the real server');
+   if(width===390){
+    await Emulation.setTouchEmulationEnabled({enabled:true});
+    await ev(`fetch('/api/launch-disclosure/ack',{method:'DELETE'}).then(r=>r.ok)`);
+    await ev(`import((window.__coralStatic||'/static/')+'launch_disclosure.js').then(m=>m.refreshLaunchDisclosure())`);
+    const point=await ev(`(()=>{const r=document.getElementById('launch-disclosure-banner').getBoundingClientRect();return{x:r.left+30,y:r.top+20}})()`);
+    await client.Input.synthesizeTapGesture({...point,gestureSourceType:'touch'});
+    await waitFor(`document.querySelector('#launch-disclosure-banner summary').getAttribute('aria-expanded')==='true'`,'touch opens notice at 390/200%');
+    let ack=await ackPoint();
+    for(let i=0;i<16&&!ack.inside;i++){
+     const origin=await ev(`(()=>{const r=document.getElementById('launch-disclosure-banner').getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height*0.8}})()`);
+     await client.Input.synthesizeScrollGesture({...origin,yDistance:-160,speed:800,gestureSourceType:'touch'});
+     ack=await ackPoint();
+    }
+    assert.equal(ack.inside,true,'touch scrolling reaches the real acknowledgement at 390/200%');
+    assert.equal(await ev(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json()).then(d=>d.seen)`),false,'touch expansion and scrolling do not acknowledge');
+    await client.Input.synthesizeTapGesture({x:ack.x,y:ack.y,gestureSourceType:'touch'});
+    await waitFor(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json()).then(d=>d.seen===true)`,'real touch acknowledgement persisted');
+    await ev(`document.documentElement.style.fontSize='';true`);
+   }
    await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev,'startup','settings');await installTeam(ev);await stubModels(ev);
    await ev(`import((window.__coralStatic||'/static/')+'launch_disclosure.js').then(m=>m.refreshLaunchDisclosure())`);
    assert.equal(await ev(`!!document.getElementById('launch-disclosure-banner')`),false,'real acknowledgement survives full reload');
