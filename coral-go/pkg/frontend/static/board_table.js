@@ -227,17 +227,40 @@ function fillReplies(row) {
     title.textContent = `Replies (${kids.length})`;
     holder.append(title);
     for (const kid of kids) {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'mb-row-reply';
-        b.setAttribute('data-on-click', 'mb-jump-msg');
-        b.dataset.msgId = kid.dataset.messageId;
-        const who = kid.querySelector('.mb-row-who'), time = kid.querySelector('.mb-row-toggle time'), snip = kid.querySelector('.mb-row-snippet');
+        const item = document.createElement('div');
+        item.className = 'mb-row-reply';
+        const who = kid.querySelector('.mb-row-who'), time = kid.querySelector('.mb-row-toggle time');
+        const header = document.createElement('div'); header.className = 'mb-row-reply-header';
         const name = document.createElement('b'); name.textContent = who ? who.textContent : '';
         const when = document.createElement('span'); when.className = 'mb-row-reply-time'; when.textContent = time ? time.textContent : '';
-        const words = document.createElement('span'); words.className = 'mb-row-reply-words'; words.textContent = snip ? snip.textContent : '';
-        b.append(name, when, words);
-        holder.append(b);
+        const jump = document.createElement('button');
+        jump.type = 'button'; jump.className = 'mb-row-reply-open'; jump.textContent = 'Open reply';
+        jump.setAttribute('data-on-click', 'mb-jump-msg'); jump.dataset.msgId = kid.dataset.messageId;
+        jump.setAttribute('aria-label', `Open reply by ${who ? who.textContent : 'sender'}`);
+        header.append(name, when, jump);
+        const words = document.createElement('div'); words.className = 'mb-row-reply-words';
+        const sourceBody = kid.querySelector('.mb-message-body');
+        if (sourceBody) {
+            for (const child of sourceBody.childNodes) words.append(child.cloneNode(true));
+            // The body clone is displayed beside the actual reply; duplicate IDs would break its references.
+            words.removeAttribute('id');
+            for (const el of words.querySelectorAll('[id]')) el.removeAttribute('id');
+        }
+        item.append(header, words);
+        if ((words.textContent || '').trim().length > 220) {
+            words.classList.add('is-clamped');
+            const more = document.createElement('button');
+            more.type = 'button'; more.className = 'mb-row-reply-more'; more.textContent = 'Show more';
+            more.setAttribute('aria-expanded', 'false');
+            more.addEventListener('click', () => {
+                const expanded = item.classList.toggle('is-expanded');
+                words.classList.toggle('is-clamped', !expanded);
+                more.textContent = expanded ? 'Show less' : 'Show more';
+                more.setAttribute('aria-expanded', String(expanded));
+            });
+            item.append(more);
+        }
+        holder.append(item);
     }
 }
 
