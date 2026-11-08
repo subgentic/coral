@@ -48,7 +48,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             if (mobile) check(m.long.sub && m.long.sub.startsWith('Is the rollout order right') && m.long.subH <= m.long.lh + 4, at + `a phone card's long question is cut at ONE line with an ellipsis (#14144: the Operator's approved mock, coral://artifacts/ccdb36ffad7b116b3d6a59f1271f28b421c423186b3d9d1a981ba61998e0a2b7; the whole question is one tap away, pinned in inbox_phone_cards): ${JSON.stringify([m.long.sub, m.long.clamp, m.long.subH, m.long.lh])}`);
             else check(m.long.sub && m.long.sub.startsWith('Is the rollout order right') && String(m.long.clamp) === '2' && m.long.subH <= m.long.lh * 2 + 4 && m.long.subH > m.long.lh * 1.5, at + `the long question is cut at two lines: ${JSON.stringify([m.long.sub, m.long.clamp, m.long.subH, m.long.lh])}`);
             check(m.short.sub === 'Ship it?' && m.none.sub === 'For review', at + `a short question shows whole and a file with none says "For review": ${JSON.stringify([m.short.sub, m.none.sub])}`);
-            check(!new RegExp(team).test(m.long.text) && !/No goal/.test(m.long.text), at + 'the team and the goal are not on the row: ' + m.long.text.slice(0, 200));
+            check(new RegExp(team).test(m.long.text) && !/No goal/.test(m.long.text), at + 'the Team cell is present and no empty goal is added (#14142): ' + m.long.text.slice(0, 200));
             await removeBoards(ev, [team]).catch(() => {});
         }
     } finally { await ev(`localStorage.removeItem('coral-inbox-needs-filters'); true`).catch(() => {}); await client.close(); }
