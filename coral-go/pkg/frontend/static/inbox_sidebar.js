@@ -386,7 +386,15 @@ function moreMenu(items, label) {
         b.addEventListener('click', async e => { e.stopPropagation(); (await importOnce('./menu_button.js')).closeMenus({ restoreFocus: !isPhoneLayout() || wrap.contains(document.activeElement) }); it.run(b); }); // a phone row's dots are out of sight (#11671): focus goes back to them only for the keyboard that was in the menu
         menu.append(b);
     }
-    toggle.addEventListener('click', async e => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(toggle); });
+    toggle.addEventListener('click', async e => {
+        e.stopPropagation();
+        const rowKey = toggle.closest('tr')?.dataset.key;
+        const menus = await importOnce('./menu_button.js');
+        // Loading the menu module can overlap an inbox refresh. A redraw replaces the row, so open the
+        // current button for this row instead of toggling a detached control.
+        const live = toggle.isConnected ? toggle : rowKey ? document.querySelector(`#group-table-view tr[data-key="${CSS.escape(rowKey)}"] .inbox-row-more-toggle`) : null;
+        if (live) menus.toggleMenu(live);
+    });
     wrap.append(toggle, menu); return wrap;
 }
 
