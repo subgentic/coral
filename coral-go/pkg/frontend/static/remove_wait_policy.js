@@ -1,8 +1,8 @@
-/* Hub removal remains off until batch-127 is explicitly DEPLOYED. Owner metadata
- * must come from the Hub's live HTTP/WS server rows, never inferred from access. */
+/* Hub removal is on since coral-hub's batch-128 was DEPLOYED (owner:true on the live HTTP/WS server rows and /api/servers, and the Hub half of remove:true on dismiss-wait) and Security read it (#14634).
+ * Owner metadata must come from the Hub's live HTTP/WS server rows, never inferred from access; the computer (v2.0.60 and later) still decides what may be removed. */
 import { compareVersions, serverVersion, shortVersion } from './server_status.js';
 
-export const HUB_REMOVE_WAIT_DEPLOYED = false;
+export const HUB_REMOVE_WAIT_DEPLOYED = true;
 export function remoteRemoveWaitAllowed(serverId, servers, { cloud, deployed = HUB_REMOVE_WAIT_DEPLOYED } = {}) {
     if (cloud !== true || deployed !== true || !serverId || serverId === 'local' || !Array.isArray(servers)) return false;
     const server = servers.find(row => row?.id === serverId);
