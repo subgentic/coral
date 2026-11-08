@@ -362,3 +362,72 @@ func TestEveryNewSignInStartsWithRetentionOff(t *testing.T) {
 	days, _, _ = be.h.dbx.store.Retention(ctx)
 	assert.Zero(t, days)
 }
+
+// QA Reviewer 2's gaps on #14703 (17:30), the copy check first. Each test names its mutant.
+
+// Mutant: Retain does not check looksLikeCopy.
+func TestRetentionDeletesNothingFromACopiedDataFolder(t *testing.T) {
+	be, ds := newRetentionEnv(t, 4)
+	be.age(10, ds...)
+	be.machine = "machine-2" // this data folder now runs on another machine: it looks like a copy
+	be.retain(1)
+	assert.Empty(t, be.dbx.deleteCalls)
+	assert.Len(t, be.dbx.files, 8)
+}
+
+// Mutants: only "ahead" is checked; a zero Dropbox time passes.
+func TestADropboxClockFarBehindDeletesNothing(t *testing.T) {
+	be, ds := newRetentionEnv(t, 4)
+	be.age(10, ds...)
+	be.dbx.dateOffset = -25 * time.Hour
+	be.retain(1)
+	assert.Empty(t, be.dbx.deleteCalls, "Dropbox's clock a day behind ours")
+	assert.Equal(t, "clock_skew", be.audits()[0].Reason)
+	be.dbx.dateOffset = 0
+	be.b.now = func() time.Time { return time.Time{}.Add(48 * time.Hour) } // a local clock near zero: a day off a real Dropbox time
+	be.retain(1)
+	assert.Empty(t, be.dbx.deleteCalls)
+}
+
+// Mutant: Retain ignores the battery.
+func TestOnBatteryRetentionDeletesNothing(t *testing.T) {
+	be, ds := newRetentionEnv(t, 4)
+	be.age(10, ds...)
+	be.b.power = func() (bool, bool) { return true, false }
+	be.retain(1)
+	assert.Empty(t, be.dbx.deleteCalls)
+	be.b.power = func() (bool, bool) { return false, true }
+	be.retain(1)
+	assert.Empty(t, be.dbx.deleteCalls, "nor on a metered network")
+}
+
+// Mutant: the route saves retention while Dropbox is not connected.
+func TestRetentionCannotBeTurnedOnWhileNotConnected(t *testing.T) {
+	be := newBackupEnv(t)
+	ctx := context.Background()
+	require.NoError(t, be.h.dbx.store.Disconnect(ctx))
+	be.body = `{"days": 7, "confirm": true}`
+	rec := be.call(http.MethodPut, "/api/dropbox/retention", true, nil)
+	assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), "not_connected")
+	days, _, _ := be.h.dbx.store.Retention(ctx)
+	assert.Zero(t, days)
+	be.body = `{"days": 3651, "confirm": true}`
+	assert.Equal(t, http.StatusBadRequest, be.call(http.MethodPut, "/api/dropbox/retention", true, nil).Code, "over 3650 days")
+	be.body = `{"days": 0}`
+	assert.Equal(t, http.StatusOK, be.call(http.MethodPut, "/api/dropbox/retention", true, nil).Code, "turning it off needs no connection")
+}
+
+// Mutant: the pair grouping takes single rows, so a pair is split at the ceiling.
+func TestAdjacentPairsAtTheCeilingAreNeverSplit(t *testing.T) {
+	be, ds := newRetentionEnv(t, 5) // 10 files: a ceiling of 5, which fits two whole pairs and half of a third
+	be.age(10, ds[0], ds[1], ds[2])
+	be.retain(1)
+	require.Len(t, be.dbx.deleteCalls, 1)
+	assert.Len(t, be.dbx.deleteCalls[0], 4, "two whole pairs, never 5 files")
+	for _, d := range ds {
+		n := be.inDropbox(d)
+		assert.True(t, n == 0 || n == 2, "a pair is deleted whole or kept whole (%s has %d)", d[:8], n)
+	}
+	assert.Equal(t, 2, be.audits()[0].Held, "the third pair waits whole")
+}

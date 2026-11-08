@@ -171,8 +171,20 @@ func TestDeleteBatchSendsPathAndParentRevAndReadsEachOutcome(t *testing.T) {
 	assert.Equal(t, "/v1/a", e["path"], "by path, never by id")
 	assert.Equal(t, "r1", e["parent_rev"])
 
-	_, _, err = newTestClient(t, srv).DeleteBatch(context.Background(), "acc", []Delete{{Path: "/v1/a"}})
-	assert.Error(t, err, "a delete without the stored rev is never sent")
+}
+
+// QA Reviewer 2's gap on #14703. Mutant: DeleteBatch sends an entry with no parent_rev.
+func TestADeleteWithNoStoredRevIsNeverSent(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.Write([]byte(`{".tag":"complete","entries":[{".tag":"success","metadata":{}},{".tag":"success","metadata":{}}]}`))
+	}))
+	defer srv.Close()
+	_, res, err := newTestClient(t, srv).DeleteBatch(context.Background(), "acc", []Delete{{Path: "/v1/a", Rev: "r1"}, {Path: "/v1/b"}})
+	assert.Error(t, err)
+	assert.Nil(t, res)
+	assert.Zero(t, calls, "nothing reaches Dropbox when any entry lacks the rev Coral stored")
 }
 
 func TestDeleteBatchAsyncJobAndItsCheck(t *testing.T) {
