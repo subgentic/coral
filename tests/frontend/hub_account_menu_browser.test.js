@@ -50,7 +50,7 @@ const BASE = require('./test_base').BASE;
         await waitFor(`!document.querySelector('#cloud-account-menu a[href="/saved"]')`,'account-only Hub nav loaded');
         assert.deepEqual(await ev(`[...document.querySelectorAll('#cloud-account-menu > *')].map(e => e.textContent)`), ['tester@example.com', 'Settings', 'Account', 'Docs', 'Computers', 'GitHub', 'Sign out'], 'the six in the Operator\'s order (#14764), for an account-only Hub');
         const links = await ev(`[...document.querySelectorAll('#cloud-account-menu a')].map(a => ({ text: a.textContent, href: a.getAttribute('href'), role: a.getAttribute('role'), cls: a.className, target: a.getAttribute('target'), resolved: new URL(a.href).origin === location.origin }))`);
-        assert.deepEqual(links, [{ text: 'Account', href: '/account', role: 'menuitem', cls: 'menu-item overflow-menu-item', target: null, resolved: true }, { text: 'GitHub', href: 'https://github.com/subgentic/coral', role: 'menuitem', cls: 'menu-item overflow-menu-item', target: null, resolved: false }, { text: 'Saved for later', href: '/saved', role: 'menuitem', cls: 'menu-item overflow-menu-item', target: null, resolved: true }]);
+        assert.deepEqual(links, [{ text: 'Account', href: '/account', role: 'menuitem', cls: 'menu-item overflow-menu-item', target: null, resolved: true }, { text: 'GitHub', href: 'https://github.com/subgentic/coral', role: 'menuitem', cls: 'menu-item overflow-menu-item', target: null, resolved: false }]);
         if (process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/hub-account-menu.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
         await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); true`);
         assert.equal(await ev(`document.querySelector('.cloud-account-btn').getAttribute('aria-expanded')`), 'false');
@@ -65,8 +65,9 @@ const BASE = require('./test_base').BASE;
             await waitFor(`!!document.querySelector('#cloud-account-menu a[href="/account"]')&&!document.querySelector('#cloud-account-menu a[href="/saved"]')`,'account-only navigation');
             const button=width===390?'#top-phone-bar [data-account]':'#test-hub-account-menu';
             if(width===1280) await ev(`(()=>{const b=document.createElement('button');b.id='test-hub-account-menu';b.setAttribute('data-on-click','m-top-menu');b.setAttribute('data-hamburger','');b.setAttribute('aria-controls','nav-more-menu');b.textContent='Hub account menu';document.body.append(b);return true})()`);
-            await waitFor(`document.querySelector(${JSON.stringify(button)})?.getClientRects().length>0`,'visible shared account/menu button');
-            await ev(`document.querySelector(${JSON.stringify(button)}).click();true`);
+            const visibleButton=`[...document.querySelectorAll(${JSON.stringify(width===390?'[data-account]':'#test-hub-account-menu')})].find(b=>b.getClientRects().length>0)`; // on a phone the agent home hides the top bar (and its #top-phone-bar): the visible [data-account] is the home's own account button
+            await waitFor(`!!(${visibleButton})`,'visible shared account/menu button');
+            await ev(`(${visibleButton}).click();true`);
             await waitFor(`!document.getElementById('nav-more-menu').hidden`,'shared account menu open');
             const section=await ev(`(()=>{const start=document.querySelector('#nav-more-menu [data-account-start]'),entries=[];for(let e=start;e;e=e.nextElementSibling)if(e.matches('[role=menuitem]'))entries.push({label:e.lastElementChild.textContent.trim(),icon:e.firstElementChild.textContent,href:e.getAttribute('href'),target:e.getAttribute('target')});return entries})()`);
             accountSections.push({width,section});
