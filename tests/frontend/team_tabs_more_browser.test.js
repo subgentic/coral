@@ -31,16 +31,16 @@ const TEAM = `qa-tabs-more-${Date.now() % 100000}`;
             check(`${label}: all seven tabs, no More tab`, ['goals', 'agents', 'tasks', 'artifacts', 'knowledge', 'messages', 'branches'].every(t => s.tabs.includes(t)) && !s.more, JSON.stringify(s));
             if (!mobile) continue;
             check(`${label}: each tab is 44 px, the page does not scroll sideways, the strip has its fade`, s.h.every(x => x >= 44) && s.page && (!s.scrolls || s.fade), JSON.stringify(s));
-            // the last tab: Right wraps to the first, a tap opens Board and the strip shows it
+            // a tap on Board (sixth) opens it and the strip shows it; the last tab is Branches: Right from it wraps to the first, Left from the first wraps to it
             await ev(`document.querySelector('#team-tabs [data-tab="messages"]').click(); true`); await settle(500);
             s = await state();
             check(`${label}: a tap on Board opens it and the strip shows the open tab`, s.selected === 'messages' && s.selIn, JSON.stringify(s));
-            await ev(`document.querySelector('#team-tabs [data-tab="messages"]').focus(); true`); await key('ArrowRight', 39);
+            await ev(`document.querySelector('#team-tabs [data-tab="branches"]').focus(); true`); await key('ArrowRight', 39);
             s = await state();
-            check(`${label}: Right from the last tab (Board) wraps to Goals`, s.focus === 'goals' || s.selected === 'goals', JSON.stringify(s));
+            check(`${label}: Right from the last tab (Branches) wraps to Goals`, s.focus === 'goals' || s.selected === 'goals', JSON.stringify(s));
             await key('ArrowLeft', 37);
             s = await state();
-            check(`${label}: Left from the first tab (Goals) wraps to Board`, s.focus === 'messages' || s.selected === 'messages', JSON.stringify(s));
+            check(`${label}: Left from the first tab (Goals) wraps to Branches`, s.focus === 'branches' || s.selected === 'branches', JSON.stringify(s));
         }
     } finally { await removeBoards(ev, [TEAM]); await client.close(); }
     const failed = results.filter(r => !r).length;
