@@ -95,8 +95,23 @@ setInterval(() => {}, 1 << 30);
     const setValue = (id, v) => ev(`(() => { const d = document.getElementById(${JSON.stringify(id)}); d.value = ${JSON.stringify(v)}; d.dispatchEvent(new Event('input', { bubbles: true })); d.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
     const gotText = async s => { try { return fs.readFileSync(s.got, 'utf8'); } catch { return ''; } };
     const gotContains = async (s, text, ms = 30000) => { const until = Date.now() + ms; let t = ''; while (Date.now() < until) { t = await gotText(s); if (t.includes(text)) return t; await sleep(100); } return t; };
-    // Whatever stands between Launch and the launch itself (the permission question) is answered the way a first-timer would: the recommended button.
+    // A fresh install must explicitly read and acknowledge the current server notice before its first launch (the launch is blocked until the person presses Continue launch; setup does not bypass the gate, #14758),
+    // and then whatever else stands between Launch and the launch itself (the permission question) is answered the way a first-timer would: the recommended button.
+    let noticeAcknowledged = false; // the first launch of a fresh install asks; every later launch must not
     const answerQuestions = async () => {
+        const disclosure = await ev(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json())`);
+        if (noticeAcknowledged) {
+            assert.equal(disclosure.seen, true, 'the notice stays acknowledged for the next launch');
+            assert.equal(await ev(`document.getElementById('confirm-modal')?.getClientRects().length>0`), false, 'the notice is not asked again');
+        } else {
+        assert.equal(disclosure.seen, false, 'a fresh install has not acknowledged the launch notice');
+        await waitFor(`document.getElementById('confirm-modal')?.getClientRects().length>0 && document.getElementById('confirm-modal-message')?.textContent===${JSON.stringify(disclosure.text)}`, 'the full server launch notice before launching', { timeout: 10000 });
+        assert.equal(await ev(`fetch('/api/sessions/live').then(r=>r.json()).then(l=>(Array.isArray(l)?l:l.sessions||[]).length)`), 0, 'nothing launches before the notice is acknowledged');
+        assert.equal(await ev(`document.getElementById('confirm-modal-yes').textContent.trim()`), 'Continue launch');
+        await ev(`document.getElementById('confirm-modal-yes').click();true`);
+        await waitFor(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json()).then(d=>d.seen===true)`, 'the explicit acknowledgement persisted');
+        noticeAcknowledged = true;
+        }
         for (let i = 0; i < 40; i++) {
             if (await ev(`(() => { const b = document.querySelector('body > .modal:not([id]) [data-action="enable"]'); if (b) { b.click(); return true; } return false; })()`)) return true;
             await sleep(50);
@@ -256,6 +271,7 @@ setInterval(() => {}, 1 << 30);
     try {
         await Promise.all([Page.enable(), Runtime.enable()]);
         for (const [tag, vp] of [['desktop', [1280, 900, false]], ['phone', [390, 844, true]]]) {
+            noticeAcknowledged = false; // each walk is a fresh install on its own server
             try { await walk(tag, vp); } catch (e) { failures.push(`${tag}: ${String((e && e.message) || e).split('\n')[0]}`); console.log('   ✗ ' + failures[failures.length - 1]); }
             for (const s of servers.splice(0)) await s.stop().catch(() => {});
             try { await terminalSkipWalk(tag, vp); } catch (e) { failures.push(`${tag} (terminal skip): ${String((e && e.message) || e).split('\n')[0]}`); console.log('   ✗ ' + failures[failures.length - 1]); }
