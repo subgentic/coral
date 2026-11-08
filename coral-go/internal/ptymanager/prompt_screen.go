@@ -173,6 +173,20 @@ func codexWorkingMatching(screen string, workingRe *regexp.Regexp) (line string,
 	return "", false
 }
 
+// checkBoxRe is a numbered row with a check box: "1. [ ] Settings", "5. [✓] Other". Only a multi-select question draws them.
+var checkBoxRe = regexp.MustCompile(`^\s*([❯›>]\s*)?\d{1,2}[.)]\s+\[[ xX✓✔]\]`)
+
+// checkBoxRows counts the numbered check-box rows of lines.
+func checkBoxRows(lines []string) int {
+	n := 0
+	for _, l := range lines {
+		if checkBoxRe.MatchString(l) {
+			n++
+		}
+	}
+	return n
+}
+
 // isPromptHold reports whether a hold's reason (PromptOnScreen's, or the agent's
 // state) is a request from the agent to the user: a selection menu, a prompt
 // question, or a state of needs input. A footer alone ("esc to cancel", which agy
@@ -220,9 +234,17 @@ func PromptOnScreen(screen string) (bool, string) {
 	if options >= 2 && selected {
 		return true, "selection menu"
 	}
+	// A numbered list whose rows have check boxes is a multi-select question, whichever row the cursor is on (#14717): the question can be taller than the window, so its marked row may be above it.
+	if options >= 2 && checkBoxRows(lines) >= 1 {
+		return true, "selection menu (check boxes)"
+	}
 	for _, line := range lines {
 		t := strings.TrimSpace(line)
 		if promptFooterRe.MatchString(t) {
+			// Numbered options under a menu's own footer are the menu, with its marked row above the window (#14717): a question, not a footer alone.
+			if options >= 2 {
+				return true, "selection menu (its marked row is above the screen)"
+			}
 			if busyOnScreen(all) {
 				// Antigravity draws "esc to cancel" under its input box while it works
 				// (#3472): still held, the safe side, but it is busy, not asking.
