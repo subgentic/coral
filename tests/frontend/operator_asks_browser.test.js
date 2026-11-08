@@ -41,7 +41,7 @@ const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed th
             const leadRow = await ev(`(() => { const r = [...document.querySelectorAll('#group-table-view tbody tr')].find(x => x.textContent.includes('Lead')); const n = r.querySelector('.inbox-review-name'), sub = r.querySelector('.cell-subtitle, [class*="subtitle"]'), from = r.querySelector('.inbox-review-from'); return { name: n ? n.textContent : '', sub: sub ? sub.textContent : '', from: from ? from.textContent.replace(/ \u00b7$/, '') : '' }; })()`);
             assert.ok(leadRow.name.startsWith('Which of the two'), at + "the row's name is the question's first line: " + JSON.stringify(leadRow));
             assert.equal(leadRow.from, 'Lead', at + 'the asker leads the top line');
-            assert.equal((leadRow.name.replace(/…$/, '') + ' ' + leadRow.sub).replace(/\s+/g, ' ').trim(), LONG.replace(/\u202e/g, '<U+202E>'), at + 'the subtitle continues the preview to preserve the complete question without repeating it (#12649)');
+            { const said = leadRow.name.replace(/…$/, '').replace(/\s+/g, ' ').trim(), whole = LONG.replace(/\u202e/g, '<U+202E>').replace(/\s+/g, ' ').trim(); assert.ok(whole.startsWith(said) && said.length >= Math.min(whole.length, 450) && !leadRow.sub.includes(said.slice(0, 40)), at + 'the row\'s name is the whole question (the preview\'s 500 characters), and the line under it does not say it again (#12649, #14574): ' + leadRow.sub.slice(0, 80)); }
             await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '2'`, at + 'the badge counts both', 6000);
 
             // opens whole

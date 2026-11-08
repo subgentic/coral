@@ -37,10 +37,13 @@ export function askLine(a) {
     const one = plainMarkdown(previewText(a)).replace(/\s+/g, ' ').trim();
     return one.length > LINE_MAX ? `${one.slice(0, LINE_MAX - 1).trimEnd()}…` : one;
 }
+/** A question as a row says it (#14574, Beta run 3): all of the preview (the first PREVIEW_IN characters, Markdown marks dropped, white space collapsed) so the row wraps it and an inbox-only person reads it where it stands; a question longer than the preview ends in an ellipsis, and Answer opens it whole. */
+export function askFull(a) {
+    const one = plainMarkdown(previewText(a)).replace(/\s+/g, ' ').trim();
+    return String((a && a.text) == null ? '' : a.text).length > PREVIEW_IN ? `${one.trimEnd()}\u2026` : one;
+}
 /** The whole question, hidden characters written out, line breaks kept. */
 export const askWhole = a => markHidden(a && a.text, { strict: true });
-/** The whole question as plain text (a row's second line): the same words, line breaks kept, without the Markdown marks. */
-export const askPlain = a => plainMarkdown(previewText(a));
 /** A stable id of one question among the rows. */
 export const askKey = a => `operator-ask:${a.server && !isLocalServer(a.server) ? `${a.server}/` : ''}${a.board}:${a.kind}:${a.id}`; // two computers can each have a team of one name and a question of one number
 
