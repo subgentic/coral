@@ -51,7 +51,7 @@ async function post(url, method = 'POST', payload = '{}') {
 const TYPES = ['.md', '.txt', '.json', '.csv', '.png', '.jpg', '.gif', '.webp', '.pdf', '.mp4'].map(t => t.slice(1));
 
 // renderBackup shows the backup's counts and its filters (stage 4c, #14693) once connected.
-function renderBackup(st) {
+function renderBackup(st, keepControls = false) {
     const on = !!(st && st.connected && !st.looks_like_copy);
     show('settings-dropbox-backup', on);
     if (!on) return;
@@ -84,6 +84,7 @@ function renderBackup(st) {
             box.append(label, document.createTextNode(' '));
         }
     }
+    if (keepControls) return;
     const chosen = new Set((st.filters && st.filters.types) || []);
     if (box) for (const input of box.querySelectorAll('input[type=checkbox]')) input.checked = chosen.has(input.value);
     const age = $('settings-dropbox-age');
@@ -91,20 +92,46 @@ function renderBackup(st) {
 }
 
 // saveDropboxFilters sends the ticked types and the age limit.
+// filterKey is what the boxes and the age say now, to tell an edit made while a save was on its way.
+function filterKey() {
+    const box = $('settings-dropbox-types');
+    const types = box ? [...box.querySelectorAll('input[type=checkbox]')].filter(i => i.checked).map(i => i.value).sort() : [];
+    return JSON.stringify([types, ($('settings-dropbox-age') || {}).value || '0']);
+}
+
 export async function saveDropboxFilters() {
     note('');
     const box = $('settings-dropbox-types');
     const types = box ? [...box.querySelectorAll('input[type=checkbox]')].filter(i => i.checked).map(i => i.value) : [];
     const days = parseInt(($('settings-dropbox-age') || {}).value || '0', 10);
+    const sentKey = filterKey();
     let res;
     try { res = await post('/api/dropbox/filters', 'PUT', JSON.stringify({ types, max_age_days: Number.isFinite(days) ? days : 0 })); } catch { note("Couldn't reach Coral. Try again."); return; }
     if (!res.ok) { note(String(res.body.error || "Couldn't save. Try again.")); return; }
+    // The summary follows what was saved (UI Reviewer's MUST 1 on #14693), from the answer itself. The boxes and the age follow it too, unless
+    // the person changed them while the save was on its way: newer edits are kept for the next Save.
+    if (lastStatus) {
+        lastStatus = { ...lastStatus, filters: { types: res.body.types || [], max_age_days: Number(res.body.max_age_days || 0) } };
+        renderBackup(lastStatus, filterKey() !== sentKey);
+    }
     note('Saved. Narrowing what is backed up never deletes what is already in Dropbox.');
+}
+
+let lastStatus = null; // the last status shown, so a saved filter updates the summary without another read
+
+// hideAll takes every button and the backup part (with its counts) off the screen: a refused or failed read shows none of a stale state (UI Reviewer's MUST 2 on #14693).
+function hideAll() {
+    for (const id of ['settings-dropbox-connect', 'settings-dropbox-disconnect', 'settings-dropbox-switch', 'settings-dropbox-takeover', 'settings-dropbox-recheck']) show(id, false);
+    renderBackup(null);
+    const counts = $('settings-dropbox-counts');
+    if (counts) counts.textContent = '';
+    lastStatus = null;
 }
 
 // render shows one state. st is the status answer.
 function render(st) {
-    for (const id of ['settings-dropbox-connect', 'settings-dropbox-disconnect', 'settings-dropbox-switch', 'settings-dropbox-takeover', 'settings-dropbox-recheck']) show(id, false);
+    hideAll();
+    lastStatus = st;
     renderBackup(st);
     if (!st || !st.app_key_set) {
         setStatus("Dropbox backup isn't available in this build.");
@@ -161,7 +188,7 @@ export async function loadDropbox() {
             // A refusal says why, read from the error code ({"error": sentence, "code": code}); never with buttons.
             let code = '';
             try { code = String((await r.json()).code || ''); } catch { /* no body */ }
-            for (const id of ['settings-dropbox-connect', 'settings-dropbox-disconnect', 'settings-dropbox-switch', 'settings-dropbox-takeover']) show(id, false);
+            hideAll();
             if (code === 'not_available') {
                 setStatus("Dropbox backup isn't available in this build.");
             } else if (code === 'local_dashboard_required' || code === 'other_user' || (r.status === 403 && !code)) {
@@ -174,6 +201,7 @@ export async function loadDropbox() {
         }
     } catch { /* shown below */ }
     if (!st) {
+        hideAll();
         setStatus("Couldn't read the Dropbox connection.");
         return null;
     }

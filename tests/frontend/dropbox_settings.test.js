@@ -14,13 +14,13 @@ const { JSDOM } = require('jsdom');
         <button id="settings-dropbox-disconnect" hidden></button>
         <button id="settings-dropbox-switch" hidden></button>
         <button id="settings-dropbox-takeover" hidden></button>
+        <button id="settings-dropbox-recheck" hidden></button>
         <div id="settings-dropbox-note"></div>
         <div id="settings-dropbox-backup" hidden>
           <div id="settings-dropbox-counts"></div>
           <div id="settings-dropbox-types"></div>
           <input id="settings-dropbox-age" type="number">
           <button id="settings-dropbox-filters-save"></button>
-          <button id="settings-dropbox-recheck" hidden></button>
         </div>
       </section></body>`, { url: 'http://127.0.0.1:8420/' });
     for (const k of ['window', 'document']) Object.defineProperty(globalThis, k, { value: dom.window[k], configurable: true, writable: true });
@@ -164,6 +164,28 @@ const { JSDOM } = require('jsdom');
     assert.deepStrictEqual({ ...sent, types: [...sent.types].sort() }, { types: ['md', 'pdf', 'png'], max_age_days: 7 }, 'the ticked types (any order) and the age');
     assert.match($('settings-dropbox-note').textContent, /Saved/);
     assert.match($('settings-dropbox-note').textContent, /never deletes/i, 'narrowing is said to keep what is already in Dropbox');
+    // UI Reviewer's MUST 1 on #14693: the summary and the controls follow the saved answer, with no reload.
+    assert.match($('settings-dropbox-counts').textContent, /Backing up \.md, \.pdf, \.png from the last 7 days\./);
+    answers['/api/dropbox/filters'] = { status: 200, body: { types: ['md'], max_age_days: 0 } }; // the server's answer, not what was ticked
+    await m.saveDropboxFilters();
+    assert.match($('settings-dropbox-counts').textContent, /Backing up \.md\./);
+    assert.deepStrictEqual([...$('settings-dropbox-types').querySelectorAll('input:checked')].map(b => b.value), ['md'], 'the boxes follow the answer');
+    assert.strictEqual($('settings-dropbox-age').value, '0');
+    // An edit made while the save is on its way is kept (the summary still follows the answer).
+    let release;
+    const realFetch0 = globalThis.fetch;
+    globalThis.fetch = (url, opts) => url === '/api/dropbox/filters'
+        ? new Promise(res => { release = () => res({ ok: true, status: 200, json: async () => ({ types: ['md'], max_age_days: 0 }) }); })
+        : realFetch0(url, opts);
+    const saving = m.saveDropboxFilters();
+    $('settings-dropbox-types').querySelector('input[value=png]').checked = true; // ticked after Save was pressed
+    $('settings-dropbox-age').value = '3';
+    release();
+    await saving;
+    globalThis.fetch = realFetch0;
+    assert.match($('settings-dropbox-counts').textContent, /Backing up \.md\./, 'the summary says what was saved');
+    assert.deepStrictEqual([...$('settings-dropbox-types').querySelectorAll('input:checked')].map(b => b.value).sort(), ['md', 'png'], 'the newer tick is kept');
+    assert.strictEqual($('settings-dropbox-age').value, '3', 'the newer age is kept');
 
     // A refused save shows the server's sentence.
     answers['/api/dropbox/filters'] = { status: 400, body: { error: 'max_age_days is 0 (no limit) to 3650' } };
@@ -192,6 +214,28 @@ const { JSDOM } = require('jsdom');
     $('settings-dropbox-recheck').click();
     await new Promise(r => setTimeout(r, 0));
     assert.match($('settings-dropbox-status').textContent, /Checking your Dropbox space/);
+
+    // UI Reviewer's MUST 2 on #14693: connected, then a refused or failed read hides the backup controls, the stale counts and every button.
+    const stale = () => {
+        assert.ok(!shown('settings-dropbox-backup'), 'the backup part, with the types, the age and Save, is hidden');
+        assert.ok($('settings-dropbox-filters-save').closest('#settings-dropbox-backup'), 'Save lives in the backup part');
+        assert.strictEqual($('settings-dropbox-counts').textContent, '', 'no stale counts');
+        for (const id of ['settings-dropbox-disconnect', 'settings-dropbox-recheck', 'settings-dropbox-connect']) assert.ok(!shown(id), id);
+    };
+    for (const [code, body] of [[403, { error: 'x', code: 'local_dashboard_required' }], [404, { error: 'x', code: 'not_available' }], [500, {}]]) {
+        await status({ ...connected, state: 'quota_full', backup: { backed_up: 3 } });
+        assert.ok(shown('settings-dropbox-backup') && shown('settings-dropbox-recheck'));
+        answers['/api/dropbox/status'] = { status: code, body };
+        await m.loadDropbox();
+        stale();
+    }
+    await status({ ...connected, backup: { backed_up: 3 } });
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async () => { throw new TypeError('network down'); };
+    await m.loadDropbox();
+    globalThis.fetch = realFetch;
+    stale();
+    assert.match($('settings-dropbox-status').textContent, /Couldn't read the Dropbox connection/);
 
     // Not connected: the backup part is hidden.
     await status({ app_key_set: true, connected: false, state: 'disconnected' });
