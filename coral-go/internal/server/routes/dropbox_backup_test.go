@@ -262,3 +262,33 @@ func TestTheBackgroundLoopBacksUpAfterAnUpload(t *testing.T) {
 		return len(be.dbx.files) == 2
 	}, 5*time.Second, 50*time.Millisecond)
 }
+
+// A private mark set after the files were read is read again right before the commit (Security's SHOULD 3 on #14691): the marked artifact is not
+// committed, and the rest of the batch is.
+func TestAMarkSetMidPassStopsTheCommitOfThatArtifact(t *testing.T) {
+	be := newBackupEnv(t)
+	d := be.put("now-private.md", "text/markdown", "secret plan")
+	be.put("public.md", "text/markdown", "fine")
+	be.dbx.onStart = func() { be.private[d] = true } // marked while the sessions upload
+	be.pass()
+	for p, b := range be.dbx.files {
+		assert.NotEqual(t, "secret plan", string(b), "the artifact marked mid-pass was committed at %s", p)
+		assert.False(t, strings.Contains(p, "/v1-"+d[:8]), "nor its sidecar: %s", p)
+	}
+	assert.Len(t, be.dbx.files, 2, "the other artifact and its sidecar are")
+}
+
+// A private artifact's rows are parked as private, not retried every pass (Security's SHOULD 4 on #14691), and counted.
+func TestPrivateRowsAreParkedNotRetried(t *testing.T) {
+	be := newBackupEnv(t)
+	d := be.put("p.md", "text/markdown", "p")
+	be.private[d] = true
+	be.pass()
+	c, err := be.b.outbox.Counts(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, 2, c.Private, "the file and its sidecar")
+	assert.Equal(t, 0, c.Pending)
+	rows, err := be.b.outbox.Next(context.Background(), be.b.now().Add(48*time.Hour), 10)
+	require.NoError(t, err)
+	assert.Empty(t, rows, "never handed out again")
+}

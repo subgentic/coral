@@ -23,11 +23,11 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 	"unicode"
 
 	"github.com/subgentic/coral/internal/dropbox"
+	"github.com/subgentic/coral/internal/secfile"
 	"github.com/subgentic/coral/internal/secrets"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -233,7 +233,7 @@ func (b *DropboxBackup) record(digest, doc string) (seriesRecord, int, bool) {
 
 // readObject reads artifacts/objects/<digest> without following a link, as a regular file, capped, and checks its SHA-256 equals the digest.
 func (b *DropboxBackup) readObject(digest string) ([]byte, error) {
-	f, err := os.OpenFile(filepath.Join(b.coralDir, "artifacts", "objects", digest), os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	f, err := secfile.OpenNoFollow(filepath.Join(b.coralDir, "artifacts", "objects", digest), os.O_RDONLY, 0) // every platform: never through a link (#14691)
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +363,7 @@ func (b *DropboxBackup) Pass(ctx context.Context) {
 	}
 	for _, row := range rows {
 		if private[row.Digest] {
-			_ = b.outbox.MarkRetry(ctx, row.ID, now.Add(time.Hour))
+			_ = b.outbox.MarkParked(ctx, row.ID, store.DropboxOutboxPrivate) // parked, not retried every pass
 			continue
 		}
 		r, uploads, found := b.record(row.Digest, row.DocID)
@@ -448,9 +448,27 @@ func (b *DropboxBackup) send(ctx context.Context, cl *dropbox.Client, access str
 	if !b.ready(ctx) {
 		return false // a take over, a reconnect or a copy happened mid-pass: nothing is committed (Security's change a)
 	}
+	// The private marks are read again for this batch right before its commit (Security's SHOULD 3 on #14691): a mark set while the files were read
+	// or uploaded keeps that artifact out; marks that cannot be read commit nothing.
+	ids := map[string]bool{}
+	for _, s := range batch {
+		ids[s.row.Digest] = true
+	}
+	list := make([]string, 0, len(ids))
+	for d := range ids {
+		list = append(list, d)
+	}
+	marked, err := b.private(ctx, list)
+	if err != nil {
+		return false
+	}
 	var commits []dropbox.Commit
 	var sent []dropboxSend
 	for _, s := range batch {
+		if marked[s.row.Digest] {
+			_ = b.outbox.MarkParked(ctx, s.row.ID, store.DropboxOutboxPrivate)
+			continue
+		}
 		if s.sess == "" {
 			_ = b.outbox.MarkRetry(ctx, s.row.ID, now.Add(backoff(s.row.Attempts)))
 			continue

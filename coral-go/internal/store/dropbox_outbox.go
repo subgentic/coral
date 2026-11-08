@@ -22,6 +22,7 @@ const (
 	DropboxOutboxConflict = "conflict"
 	DropboxOutboxSkipped  = "skipped"
 	DropboxOutboxFailed   = "failed"
+	DropboxOutboxPrivate  = "private" // the artifact is marked private: parked, never sent (Security's SHOULD 4 on #14691)
 )
 
 // DropboxOutboxRow is one file to back up.
@@ -51,6 +52,7 @@ type DropboxOutboxCounts struct {
 	Conflict int    `json:"conflict"`
 	Skipped  int    `json:"skipped"`
 	Failed   int    `json:"failed"`
+	Private  int    `json:"private"`
 	LastSync string `json:"last_sync"`
 }
 
@@ -105,7 +107,7 @@ func (o *DropboxOutbox) MarkDone(ctx context.Context, id int64, fileID, rev, con
 // MarkParked parks a row as conflict, skipped or failed: it is not handed out again.
 func (o *DropboxOutbox) MarkParked(ctx context.Context, id int64, state string) error {
 	switch state {
-	case DropboxOutboxConflict, DropboxOutboxSkipped, DropboxOutboxFailed:
+	case DropboxOutboxConflict, DropboxOutboxSkipped, DropboxOutboxFailed, DropboxOutboxPrivate:
 	default:
 		return errors.New("not a parked outbox state")
 	}
@@ -135,6 +137,8 @@ func (o *DropboxOutbox) Counts(ctx context.Context) (DropboxOutboxCounts, error)
 			c.Skipped = r.N
 		case DropboxOutboxFailed:
 			c.Failed = r.N
+		case DropboxOutboxPrivate:
+			c.Private = r.N
 		}
 	}
 	var last sql.NullString
