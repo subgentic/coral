@@ -12,6 +12,7 @@
 const assert = require('node:assert/strict');
 const CDP = require('chrome-remote-interface');
 const BASE = require('./test_base').BASE;
+const { removeBoards } = require('./helpers/board_cleanup');
 
 (async () => {
     const client = await CDP({ port: Number(process.env.CDP_PORT || 9222) });
@@ -39,7 +40,7 @@ const BASE = require('./test_base').BASE;
                 lookalike: u.hubUserBadge({ id: 2, subscriber_id: 'hub-user-0a1b2c3d', content: 'hi' }),
                 otherOrigin: u.hubUserBadge({ id: 3, subscriber_id: 'x', origin: 'something-else' }),
                 op: (() => { const b = document.createElement('div'); b.innerHTML = u.hubUserBadge({ id: 5, subscriber_id: 'Operator', origin: 'hub_operator', hub_user: 'hub-user-0a1b2c3d' });
-                    const e = b.querySelector('.mb-hub-user-badge'); return e ? { text: e.textContent, op: e.classList.contains('is-operator') } : null; })(),
+                    const e = b.querySelector('.mb-hub-user-badge'); return e ? { text: e.textContent, op: e.classList.contains('is-operator'), title: e.title } : null; })(),
                 opForged: u.hubUserBadge({ id: 6, subscriber_id: 'Operator', origin: 'hub_operator', hub_user: '<img src=x>' }),
                 opText: u.boardMessageDisplayText({ origin: 'hub_operator', content: '[Operator via Coral Hub, hub-user-0a1b2c3d] please review #12' }),
                 localText: u.boardMessageDisplayText({ content: '[Operator via Coral Hub, hub-user-0a1b2c3d] typed by a local agent' }),
@@ -53,7 +54,8 @@ const BASE = require('./test_base').BASE;
         assert.match(badges.title, /hub-user-0a1b2c3d/, 'the title names the Hub user');
         assert.equal(badges.lookalike, '', 'a hub-user-… name without the server-set origin gets no badge');
         assert.equal(badges.otherOrigin, '');
-        assert.deepEqual(badges.op, { text: 'Operator via Coral Hub · hub-user-0a1b2c3d', op: true }, 'the Hub acting as the Operator (#3404)');
+        assert.deepEqual({ text: badges.op.text, op: badges.op.op }, { text: 'Operator via Coral Hub', op: true }, 'the Hub acting as the Operator (#3404): no id in the visible chip (#14292)');
+        assert.match(badges.op.title, /hub-user-0a1b2c3d/, 'the Hub user id stays in the hover title (#14292)');
         assert.ok(!/<img/.test(badges.opForged) && /unknown Hub user/.test(badges.opForged), 'a malformed hub_user is never shown as one');
         assert.equal(badges.opText, 'please review #12', 'the server prefix becomes the badge');
         assert.match(badges.localText, /^\[Operator via Coral Hub/, 'the same text from anyone else is shown as written');
@@ -71,7 +73,8 @@ const BASE = require('./test_base').BASE;
                 { id: 1, project: 'gamma', subscriber_id: 'hub-user-0a1b2c3d', job_title: 'hub-user-0a1b2c3d', origin: 'hub_user', content: 'from the hub', created_at: '2026-10-14T08:00:01Z' },
                 { id: 2, project: 'gamma', subscriber_id: 'hub-user-99999999', job_title: 'hub-user-99999999', content: 'looks like one', created_at: '2026-10-14T08:00:02Z' },
                 { id: 3, project: 'gamma', subscriber_id: 'Lead Developer', job_title: 'Lead Developer', content: 'an agent', created_at: '2026-10-14T08:00:03Z' },
-                { id: 4, project: 'gamma', subscriber_id: 'Operator', job_title: 'Operator', origin: 'hub_operator', hub_user: 'hub-user-0a1b2c3d', content: '[Operator via Coral Hub, hub-user-0a1b2c3d] ship it', created_at: '2026-10-14T08:00:04Z' },
+                { id: 4, project: 'gamma', subscriber_id: 'hub-user-0a1b2c3d', job_title: 'hub-user-0a1b2c3d', origin: 'hub_operator', hub_user: 'hub-user-0a1b2c3d', content: '[Operator via Coral Hub, hub-user-0a1b2c3d] ship it', created_at: '2026-10-14T08:00:04Z' },
+                { id: 5, project: 'gamma', subscriber_id: 'Member', job_title: 'Member', origin: 'hub_operator', hub_user: 'hub-user-0a1b2c3d', content: '[Operator via Coral Hub, hub-user-0a1b2c3d] and me', created_at: '2026-10-14T08:00:05Z' },
             ];
             window.fetch = async (url, opts) => {
                 const u = String(url);
@@ -95,14 +98,47 @@ const BASE = require('./test_base').BASE;
             (await import(${S}+'render.js')).showBoardChatTab('gamma'); // the board chat of an agent on the team (its Board tab)
             return true;
         })()`);
-        await waitFor(`document.querySelectorAll('#board-panel-msgs .mb-message').length === 4`, 'the team chat');
+        await waitFor(`document.querySelectorAll('#board-panel-msgs .mb-message').length === 5`, 'the team chat');
         const chat = await ev(`[...document.querySelectorAll('#board-panel-msgs .mb-message')].map(m => ({ body: m.querySelector('.mb-message-body').textContent.trim(), badge: !!m.querySelector('.mb-hub-user-badge') }))`);
         assert.deepEqual(chat, [
             { body: 'from the hub', badge: true },
             { body: 'looks like one', badge: false },
             { body: 'an agent', badge: false },
             { body: 'ship it', badge: true },
+            { body: 'and me', badge: true },
         ], 'the Operator via Coral Hub post: its badge, and the prefix not shown twice');
+        // The chip as the page renders it at the two widths (the table row keeps its header copy hidden by CSS, so this reads the rendered text and title, not the paint).
+        for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
+            await waitFor(`document.querySelectorAll('#board-panel-msgs .mb-message').length === 5`, `${w}: the team chat`);
+            const chip = await ev(`(() => { const c = document.querySelector('#board-panel-msgs .mb-hub-user-badge.is-operator'); return c ? { text: c.textContent.trim(), title: c.title } : null; })()`);
+            assert.ok(chip, `${w}: the Operator via Coral Hub chip is rendered`);
+            assert.equal(chip.text, 'Operator via Coral Hub', `${w}: the chip shows no Hub user id (#14292)`);
+            assert.match(chip.title, /hub-user-0a1b2c3d/, `${w}: the id is in the hover title`);
+            // A real click on Reply, in the team chat and then on the board page: the box reads '@Operator ' for every Hub-as-Operator post, also one whose Hub user is named 'Member' (#14292)
+            const REPLIES = (rows, input, who = '.is-operator') => `(() => { const out = []; for (const row of document.querySelectorAll(${JSON.stringify(rows)})) { if (!row.querySelector(${JSON.stringify(who)})) continue;
+                const t = row.querySelector(':scope > .mb-row-toggle'); if (t && t.getAttribute('aria-expanded') !== 'true') t.click();
+                const b = row.querySelector('[data-on-click="mb-msg-reply"]'); const box = document.getElementById(${JSON.stringify(input)}); if (!b || !box) { out.push({ missing: !b ? 'reply' : 'box' }); continue; }
+                box.value = ''; b.click(); out.push({ who: b.dataset.sender, label: b.getAttribute('aria-label'), box: box.value, name: (row.querySelector('.mb-row-who') || {}).textContent }); } return out; })()`;
+            const chat = await ev(REPLIES('#board-panel-msgs .mb-message', 'board-panel-input'));
+            assert.equal(chat.length, 2, `${w}: both Hub-as-Operator posts in the team chat have Reply: ` + JSON.stringify(chat));
+            for (const r of chat) { assert.equal(r.box, '@Operator ', `${w}: the team chat's box reads @Operator: ` + JSON.stringify(r)); assert.ok(!/hub-user-|Member/.test(String(r.label)), `${w}: the Reply label names no id: ` + r.label); }
+            // an ordinary Hub user (origin hub_user, not the Operator) keeps its own name, in the row and in Reply, and is never shown as Operator
+            const HU = '.mb-hub-user-badge:not(.is-operator):not(.is-unknown)';
+            const hub = await ev(REPLIES('#board-panel-msgs .mb-message', 'board-panel-input', HU));
+            assert.equal(hub.length, 1, `${w}: the one ordinary Hub user's post in the team chat has Reply: ` + JSON.stringify(hub));
+            assert.deepEqual([hub[0].who, hub[0].box, hub[0].name], ['hub-user-0a1b2c3d', '@hub-user-0a1b2c3d ', 'hub-user-0a1b2c3d'], `${w}: it keeps its own name in the row and the box: ` + JSON.stringify(hub[0]));
+            assert.ok(!/Operator/.test(String(hub[0].label)) && hub[0].who !== 'Operator', `${w}: and is never shown as Operator`);
+            await ev(`(async () => { const m = await import(${S}+'message_board.js'); m.showBoardInPage('gamma', document.getElementById('mb-board').parentElement); return true; })()`);
+            await waitFor(`document.querySelectorAll('#mb-board .mb-message').length === 5`, `${w}: the board page's rows`);
+            const page = await ev(REPLIES('#mb-board .mb-message', 'mb-post-input'));
+            assert.equal(page.length, 2, `${w}: both posts on the board page have Reply: ` + JSON.stringify(page));
+            for (const r of page) assert.equal(r.box, '@Operator ', `${w}: the board page's box reads @Operator: ` + JSON.stringify(r));
+            const pageHub = await ev(REPLIES('#mb-board .mb-message', 'mb-post-input', HU));
+            assert.equal(pageHub.length, 1, `${w}: the ordinary Hub user's post on the board page has Reply: ` + JSON.stringify(pageHub));
+            assert.deepEqual([pageHub[0].who, pageHub[0].box], ['hub-user-0a1b2c3d', '@hub-user-0a1b2c3d '], `${w}: on the board page it keeps its own name too: ` + JSON.stringify(pageHub[0]));
+        }
+        await Emulation.setDeviceMetricsOverride({ width: 1400, height: 900, deviceScaleFactor: 1, mobile: false });
         console.log("   ✓ team chat: the badge on the Hub user's message only");
 
         console.log("2. Settings: \"Let Coral Hub act as the Operator\" (on by default; the stored setting is still the opt-out \"disabled\", #3404, #6579)");
@@ -186,6 +222,7 @@ const BASE = require('./test_base').BASE;
         console.log('   ✓ hidden where the answer is read-only (through the hub) or 404');
         console.log('PASS hub_user_ui_browser');
     } finally {
+        await removeBoards(ev, ['gamma']).catch(() => {}); // the board page check made it
         await client.close();
     }
 })().catch(e => { console.error(e); process.exit(1); });

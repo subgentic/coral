@@ -96,7 +96,7 @@ func TestTheOwnerDecisionHasOneImplementation(t *testing.T) {
 // The set of owner routes is pinned here, so that a route cannot leave the table (and stop being stamped and refused) without this test saying so: a change to it is a reviewed act.
 func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 	want := map[string]string{
-		"GET /api/artifacts": "owner-only", "GET /api/artifacts/resolve": "owner-only", "GET /api/artifacts/{hex64}": "owner-only", "GET /api/artifacts/{hex64}/meta": "owner-only", "GET /api/artifacts/{hex64}/comments": "owner-only", "GET /api/artifacts/{hex64}/readers": "owner-only",
+		"GET /api/artifacts": "owner-only", "GET /api/artifacts/resolve": "owner-only", "GET /api/artifacts/{hex64}": "owner-only", "GET /api/artifacts/{hex64}/meta": "owner-only", "GET /api/artifacts/{hex64}/thumbnail": "owner-only", "GET /api/artifacts/{hex64}/comments": "owner-only", "GET /api/artifacts/{hex64}/readers": "owner-only",
 		"DELETE /api/artifacts/{hex64}": "owner-only", "PUT /api/artifacts/{hex64}/star": "owner-only", "DELETE /api/artifacts/{hex64}/star": "owner-only", "POST /api/artifacts/{hex64}/opened": "owner-only", // the star (#9819) and the opened version (#13910)
 		"GET /api/board/{project}/proposals":               "owner-only",
 		"GET /api/proposals":                               "owner-only",
@@ -118,17 +118,18 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"GET /api/analytics/activity":                   "owner-only", // the activity counts of the Analytics tabs (#11225)
 		"POST /api/sessions/live/{name}/notices/pause":  "owner-only", // pausing Coral's notices to an agent (#11387)
 		"POST /api/sessions/live/{name}/notices/resume": "owner-only",
-		"GET /api/operator-asks":                        "owner-only", // the questions agents asked the Operator, for Needs you (#11417)
-		"GET /api/needs-you":                            "owner-only", // what is waiting for the Operator, for the Hub's phone push (#11596)
-		"GET /api/activity":                             "owner-only", // the record of what the Operator did in Needs you, read only (#12070)
-		"GET /api/board/{project}/orchestrator-grant":   "owner-only", // the grant to a board's orchestrator (#11432)
-		"PUT /api/board/{project}/orchestrator-grant":   "owner-only",
-		"GET /api/board/{project}/lifecycle-log":        "owner-only",
-		"GET /api/chief":                                "owner-only", // the recorded Chief, for the Hub's own Chief page (#11470)
-		"GET /api/artifacts/{hex64}/private":            "owner-only", // the manager's private mark (#11457)
-		"PUT /api/artifacts/{hex64}/private":            "owner-only",
-		"GET /api/board/{project}/guide-roster":         "owner-only", // which name goes with which guide (#11457)
-		"PUT /api/board/{project}/guide-roster":         "owner-only",
+		"GET /api/operator-asks":                        "owner-only",                                   // the questions agents asked the Operator, for Needs you (#11417)
+		"GET /api/needs-you":                            "owner-only",                                   // what is waiting for the Operator, for the Hub's phone push (#11596)
+		"GET /api/activity":                             "owner-only",                                   // the record of what the Operator did in Needs you, read only (#12070)
+		"GET /api/thread":                               "owner-only", "GET /api/threads": "owner-only", // the story of a goal or task, and the summaries of a page of them (#14440)
+		"GET /api/board/{project}/orchestrator-grant": "owner-only", // the grant to a board's orchestrator (#11432)
+		"PUT /api/board/{project}/orchestrator-grant": "owner-only",
+		"GET /api/board/{project}/lifecycle-log":      "owner-only",
+		"GET /api/chief":                              "owner-only", // the recorded Chief, for the Hub's own Chief page (#11470)
+		"GET /api/artifacts/{hex64}/private":          "owner-only", // the manager's private mark (#11457)
+		"PUT /api/artifacts/{hex64}/private":          "owner-only",
+		"GET /api/board/{project}/guide-roster":       "owner-only", // which name goes with which guide (#11457)
+		"PUT /api/board/{project}/guide-roster":       "owner-only",
 		// A comment (or reply), a resolve and a reopen through the Hub are the owner's alone (#7052).
 		"POST /api/artifacts/{hex64}/comments":              "owner-only",
 		"POST /api/artifacts/{hex64}/comments/{id}/resolve": "owner-only",
@@ -155,8 +156,11 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"POST /api/board/{project}/operator-artifacts/message":                 "owner-only",
 		"POST /api/board/{project}/messages":                                   "owner-sees", "POST /api/board/{project}/subscribe": "owner-sees", "POST /api/board/{project}/tasks": "owner-sees", "POST /api/board/{project}/goals": "owner-sees", // they can start a new board (#11627)
 		"POST /api/board/{project}/working-mode/presets": "owner-sees", "PUT /api/board/{project}/working-mode": "owner-sees",
-		"GET /api/sessions/live":            "owner-sees", // the live list: everyone gets it, the stamped owner also gets waits_on_this (#12377)
-		"GET /api/board/{project}/settings": "owner-sees", "GET /api/system/update": "owner-update",
+		"GET /api/sessions/live":              "owner-sees", // the live list: everyone gets it, the stamped owner also gets waits_on_this (#12377)
+		"GET /api/goals":                      "owner-sees", // the goals reads (#14047): everyone gets the goals, the stamped owner also gets each one's done-state
+		"GET /api/board/{project}/goals":      "owner-sees",
+		"GET /api/board/{project}/goals/{id}": "owner-sees",
+		"GET /api/board/{project}/settings":   "owner-sees", "GET /api/system/update": "owner-update",
 		"POST /api/system/update/relaunch": "owner-only", "POST /api/system/update/check-hub": "owner-only", // the Hub updates a computer only as its stamped owner, behind the person's switch (#13258)
 	}
 	got := map[string]string{}

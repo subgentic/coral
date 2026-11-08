@@ -12,6 +12,7 @@
  * visible text, tooltips or document.title. */
 
 import { importOnce } from './import_once.js';
+import { platform } from './platform/detect.js';
 import { isSignedOut } from './overload.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { state } from './state.js';
@@ -134,6 +135,24 @@ export function applyPopoutBodyClass() {
 export async function initPopout() {
     if (!isPopout()) return;
     applyPopoutBodyClass();
+    if (document.body.dataset.chief === 'true') {
+        document.addEventListener('keydown', e => {
+            if (!platform.isNative || e.defaultPrevented || e.repeat || e.isComposing) return;
+            const focus = document.activeElement;
+            const editing = [focus, ...e.composedPath()].some(el => el instanceof HTMLElement && (
+                (el.matches('textarea, input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"])') && el.value.length > 0)
+                || (el.isContentEditable && el.textContent.length > 0)
+            ));
+            // The focused editor or popup gets its own Escape before page navigation (#14165).
+            if (editing || [...document.querySelectorAll('dialog[open], [aria-modal="true"], [role="menu"], [role="listbox"], :popover-open')].some(el => el.getClientRects().length > 0)) return;
+            const escape = e.key === 'Escape' && !e.metaKey && !e.altKey && !e.ctrlKey && !e.shiftKey;
+            const back = e.key === '[' && e.metaKey && !e.altKey && !e.ctrlKey && !e.shiftKey;
+            if (!escape && !back) return;
+            e.preventDefault(); e.stopPropagation();
+            location.assign('/');
+        }, true);
+    }
+
     // The workspace is the whole page: show it before anything resolves so
     // loading / not-found / ended states render inside the real shell.
     showView('live-session-view');

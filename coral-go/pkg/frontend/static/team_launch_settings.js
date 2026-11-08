@@ -133,7 +133,7 @@ export function readTeamLaunchSettings() {
     if (flags.goals_need_approval) board.goals_need_approval = true;
     if (flags.tasks_need_approval) board.tasks_need_approval = true;
     const h = valuesToHealth(v, HEALTH_DEFAULTS);
-    if (h.on) out.health_monitor = true;
+    if (!h.on) out.health_monitor = false; // on is what a new team has (#14091): nothing to send; unticked says so, and the server keeps a stored choice
     if (JSON.stringify(h) !== JSON.stringify(HEALTH_DEFAULTS)) board.health = h;
     if (!v.cross_team_messaging) board.cross_team_messaging = false;
     if (!v.cross_team_artifacts) board.cross_team_artifacts = false;

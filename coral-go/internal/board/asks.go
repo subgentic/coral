@@ -60,6 +60,12 @@ func (s *Store) ensureAsksSchema(ctx context.Context) error {
 			goal_id    INTEGER NOT NULL DEFAULT 0,
 			task_id    INTEGER NOT NULL DEFAULT 0
 		)`,
+		`CREATE TABLE IF NOT EXISTS board_ask_task_snapshots (
+            message_id INTEGER PRIMARY KEY,
+            project TEXT NOT NULL,
+            task_id INTEGER NOT NULL,
+            assignee TEXT NOT NULL
+        )`,
 		`CREATE TABLE IF NOT EXISTS board_ask_closed (
 			message_id INTEGER PRIMARY KEY,
 			project    TEXT NOT NULL,
@@ -159,8 +165,9 @@ func (s *Store) RecordAsk(ctx context.Context, project string, msg *Message, ask
 
 // AskSubject is the goal and the task a question is about (#12164): 0 for none.
 type AskSubject struct {
-	GoalID int64
-	TaskID int64
+	GoalID           int64
+	TaskID           int64
+	MayNoLongerApply string
 }
 
 // RecordAskSubject keeps the goal and the task a question (a message recorded with RecordAsk) is about. The caller has checked that both are of the board; nothing is kept for a message that is not a question of
@@ -169,9 +176,29 @@ func (s *Store) RecordAskSubject(ctx context.Context, project string, messageID,
 	if goalID <= 0 && taskID <= 0 {
 		return nil
 	}
-	_, err := s.db.ExecContext(ctx, `INSERT OR REPLACE INTO board_ask_subjects (message_id, project, goal_id, task_id)
-		SELECT message_id, project, ?, ? FROM board_asks WHERE message_id = ? AND project = ?`, max(goalID, 0), max(taskID, 0), messageID, project)
-	return err
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err = tx.ExecContext(ctx, `INSERT OR REPLACE INTO board_ask_subjects (message_id, project, goal_id, task_id)
+        SELECT message_id, project, ?, ? FROM board_asks WHERE message_id = ? AND project = ?`, max(goalID, 0), max(taskID, 0), messageID, project); err != nil {
+		return err
+	}
+	// Only the explicitly linked task on this board, and only when the question exists.
+	// Keep the first assignee snapshot for that link; a repeated recording must not erase a reassignment.
+	if taskID > 0 {
+		_, err = tx.ExecContext(ctx, `INSERT INTO board_ask_task_snapshots (message_id, project, task_id, assignee)
+            SELECT a.message_id, a.project, t.id, COALESCE(t.assigned_to,'') FROM board_ask_subjects a
+            JOIN board_tasks t ON t.board_id = a.project AND t.id = a.task_id
+            WHERE a.project = ? AND a.message_id = ? AND a.task_id = ?
+            ON CONFLICT(message_id) DO UPDATE SET task_id=excluded.task_id, assignee=excluded.assignee
+            WHERE board_ask_task_snapshots.project=excluded.project AND board_ask_task_snapshots.task_id<>excluded.task_id`, project, messageID, taskID)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // ClaimedTaskOf is the one task member has claimed and is working on (in progress) on the board, and the goal it belongs to (0 for none): the default subject of a question the member asks (#12164). ok is false when
@@ -209,15 +236,23 @@ func (s *Store) AskSubjectsOf(ctx context.Context, project string, ids []int64) 
 		args = append(args, id)
 	}
 	var rows []struct {
-		MessageID int64 `db:"message_id"`
-		GoalID    int64 `db:"goal_id"`
-		TaskID    int64 `db:"task_id"`
+		MessageID        int64  `db:"message_id"`
+		GoalID           int64  `db:"goal_id"`
+		TaskID           int64  `db:"task_id"`
+		MayNoLongerApply string `db:"may_no_longer_apply"`
 	}
-	if err := s.reader().SelectContext(ctx, &rows, `SELECT message_id, goal_id, task_id FROM board_ask_subjects WHERE project = ? AND message_id IN (`+in+`)`, args...); err != nil {
+	if err := s.reader().SelectContext(ctx, &rows, `SELECT a.message_id, a.goal_id, a.task_id,
+        CASE WHEN t.status IN ('completed','skipped','cancelled') THEN 'task_completed'
+        WHEN t.id IS NOT NULL AND snap.message_id IS NOT NULL AND LOWER(TRIM(snap.assignee))<>LOWER(TRIM(COALESCE(t.assigned_to,''))) THEN 'task_reassigned'
+        ELSE '' END AS may_no_longer_apply
+        FROM board_ask_subjects a
+        LEFT JOIN board_tasks t ON t.board_id=a.project AND t.id=a.task_id
+        LEFT JOIN board_ask_task_snapshots snap ON snap.project=a.project AND snap.message_id=a.message_id AND snap.task_id=a.task_id
+        WHERE a.project = ? AND a.message_id IN (`+in+`)`, args...); err != nil {
 		return nil, err
 	}
 	for _, r := range rows {
-		out[r.MessageID] = AskSubject{GoalID: r.GoalID, TaskID: r.TaskID}
+		out[r.MessageID] = AskSubject{GoalID: r.GoalID, TaskID: r.TaskID, MayNoLongerApply: r.MayNoLongerApply}
 	}
 	return out, nil
 }

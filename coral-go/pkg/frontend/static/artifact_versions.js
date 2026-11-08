@@ -1,7 +1,10 @@
+import { importOnce } from './import_once.js';
+const { artifactThumbnail, thumbnailPath } = await importOnce('./artifact_thumbnail.js');
 /* Versions of an artifact in the viewer (#6357, #6472 layout A): a bar under the title for an artifact that is one of several versions of a series: Previous and Next, "v3 of 3" opening the list of
  * every version (a listbox, newest first), and "Compare with v2". Compare draws the text's lines that were added and removed since the version before (Changes) or the two versions side by side. All
  * text is set with textContent. The server's list is GET /api/artifacts/{digest}/versions (an artifact in no series is a 404: no bar). A switch and a compare are said once in a polite line. */
 import { serverUrl, artifactPath } from './server_base.js';
+import { fetchSkewed, VERSIONS_KEYS } from './query_skew.js';
 import { el } from './dom_el.js';
 import { pollEvery } from './overload.js';
 
@@ -84,7 +87,9 @@ export function attachVersions(dialog, hooks) {
     async function load(hex, server, board = '') {
         try {
             // The version bar asks for its own team's series: bytes two teams hold are two series, and the route will not guess between them (#13999, #14015). A direct link with no team asks without one.
-            const r = await fetch(serverUrl(`/api/artifacts/${hex}/versions${board ? `?board=${encodeURIComponent(board)}` : ''}`, server));
+            // A computer on an older release refuses ?board= (its versions route takes no query): there is no bar then. Asked again without the team, its answer would be that computer's guess at a series, and a hidden bar is honest where a guess is not (#14317, Security's INFO 4).
+            const { response: r, dropped } = await fetchSkewed(server, `/api/artifacts/${hex}/versions`, board ? { board } : {}, { kind: 'versions', keys: VERSIONS_KEYS, retry: false });
+            if (dropped.length) return { rows: null, ambiguous: false };
             if (r.status === 409) { const d = await r.json().catch(() => ({})); return { rows: null, ambiguous: !!(d && d.code === 'ambiguous_series') }; } // no bar, a quiet note
             if (!r.ok) return { rows: null, ambiguous: false };
             const d = await r.json();
@@ -123,6 +128,7 @@ export function attachVersions(dialog, hooks) {
         bar.hidden = !st.rows || i < 0;
         note.hidden = !st.ambiguous || !bar.hidden; note.textContent = note.hidden ? '' : 'Held by more than one team: open it from a team to see its versions.';
         hooks.version?.(bar.hidden ? 0 : st.rows[i].version);
+        hooks.line?.(bar.hidden ? null : st.rows[i]); // the file id and line of the version SHOWN, from the server's list (#14178): a switch or a save never keeps another version's
         dialog.classList.toggle('av-has-versions', !bar.hidden);
         if (bar.hidden) return;
         const rows = st.rows, row = rows[i], total = rows.length, latest = i === total - 1;
@@ -153,7 +159,7 @@ export function attachVersions(dialog, hooks) {
             // the shown version is the list's one Tab stop; the arrow keys move between the rest (a roving tabindex)
             const li = el('li', 'av-option'); li.setAttribute('role', 'option'); li.id = `av-opt-${r.version}`; li.tabIndex = r.digest === st.hex ? 0 : -1; li.dataset.version = String(r.version);
             li.setAttribute('aria-selected', String(r.digest === st.hex)); li.title = w.full;
-            li.append(el('span', 'av-vname', `v${r.version}${r.is_latest ? ' (latest)' : ''}`), el('span', 'av-who', [w.label, r.role || r.uploader].filter(Boolean).join(' · ')), el('span', 'av-size', sizeOf(r.size || 0)));
+            li.append(artifactThumbnail(r, { url: thumbnailPath(r) ? serverUrl(thumbnailPath(r), st.server) : '' }), el('span', 'av-vname', `v${r.version}${r.is_latest ? ' (latest)' : ''}`), el('span', 'av-who', [w.label, r.role || r.uploader].filter(Boolean).join(' · ')), el('span', 'av-size', sizeOf(r.size || 0)));
             li.addEventListener('click', () => choose(r));
             li.addEventListener('focus', () => { for (const o of options()) o.tabIndex = o === li ? 0 : -1; });
             list.append(li);

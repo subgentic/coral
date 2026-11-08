@@ -79,6 +79,9 @@ type GitPoller struct {
 
 	// identityHash makes the stored pseudonym of a git email address (store.IdentityHasher); nil stores none, and commits are then matched to sessions by name only.
 	identityHash store.IdentityHasher
+
+	// scanned is, for each session's own worktree, how many lines of its HEAD reflog were read (#14095). PollOnce runs on the poller's own goroutine only.
+	scanned map[string]int
 }
 
 // SetLandingWatch gives the poller the landing alert to feed.
@@ -224,6 +227,8 @@ func (p *GitPoller) PollOnce(ctx context.Context) error {
 	for workdir, dirAgents := range dirToAgents {
 		p.pollDir(ctx, workdir, dirAgents, seen)
 	}
+
+	p.scanOwnWorktrees(ctx, agents) // the commits an agent makes in the worktrees it made (#14095)
 
 	if p.landing != nil {
 		p.landing.Observe(ctx, dirToAgents)

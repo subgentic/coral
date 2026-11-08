@@ -64,6 +64,13 @@ type efficiencyAnswer struct {
 	Average     efficiencyAverage  `json:"average"`
 	Groups      []efficiency.Group `json:"groups"`
 	Unmeasured  []string           `json:"unmeasured"`
+	// Usage is what the sessions did in the window whatever the commits say (#14095): with usage and no commit the page says the commits were not recorded from these sessions, not that none were made.
+	Usage efficiencyUsage `json:"usage"`
+}
+
+type efficiencyUsage struct {
+	Sessions int   `json:"sessions"`
+	Tokens   int64 `json:"tokens"`
 }
 
 // Efficiency answers the read.
@@ -140,6 +147,15 @@ func (h *EfficiencyHandler) Efficiency(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, err.Error())
 		return
 	}
+	usage := efficiencyUsage{}
+	seenUsage := map[string]bool{}
+	for _, u := range in.Usage {
+		usage.Tokens += u.Tokens
+		if u.Session != "" && !seenUsage[u.Session] {
+			seenUsage[u.Session] = true
+			usage.Sessions++
+		}
+	}
 	prevIn, err := h.input(ctx, since.Add(-efficiencyUsual), since, team, shared, dim != efficiency.Thinking)
 	if err != nil {
 		fail(err)
@@ -152,7 +168,7 @@ func (h *EfficiencyHandler) Efficiency(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, efficiencyAnswer{
 		Metric: metric, GroupBy: dim, Range: rng, GeneratedAt: now.Format(time.RFC3339), MinSample: efficiency.MinSample,
-		Total: cur.Total, Average: efficiencyAverage{Value: cur.Median, Usual: prev.Median}, Groups: groups, Unmeasured: cur.Unmeasured,
+		Total: cur.Total, Average: efficiencyAverage{Value: cur.Median, Usual: prev.Median}, Groups: groups, Unmeasured: cur.Unmeasured, Usage: usage,
 	})
 }
 

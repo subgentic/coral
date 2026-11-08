@@ -30,6 +30,8 @@ func isAgentTool(r *http.Request) bool {
 // every mode since #3929 (only with strict local auth before); the Operator can (the dashboard,
 // an API key, the signed command line). Each agent call is recorded in the identity report.
 var operatorOnlyRoutes = map[string]string{
+	"GET /api/filesystem/trust-probe":      "check project configuration names before choosing folder trust",
+	"GET /api/artifacts/{id}/thumbnail":    "read an artifact thumbnail",
 	"GET /api/chief/checks":                "read scheduled checks",
 	"POST /api/chief/checks":               "create scheduled checks",
 	"GET /api/chief/checks/{checkID}":      "read a scheduled check",
@@ -56,6 +58,8 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/operator-asks":                            "read the questions agents asked the Operator (their text)",
 	"GET /api/needs-you":                                "read what is waiting for the Operator (one cleaned line each)",
 	"GET /api/activity":                                 "read the Activity record of what the Operator did in Needs you (#12069)",
+	"GET /api/thread":                                   "read the story of one goal or task: its questions, files, replies and the Operator's decisions (#14440)",
+	"GET /api/threads":                                  "read one summary per task for the list pages (#14440)",
 	"GET /api/analytics/inbox-vs-chat":                  "read how much the Operator did in the Inbox and how much in a chat (counts only, #12158)",
 	"GET /api/analytics/resource-queue":                 "read how much the resource queue is used and whether it helps coordination (numbers only, #13671)",
 	"GET /api/chief":                                    "read which agent the Operator recorded as Chief (#11470)",

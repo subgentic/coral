@@ -10,6 +10,7 @@
  *   decorate(row, tr, detailTr) and decorateHead(th, column): called each time the rows (or the header) are drawn, for the hooks a surface keeps on them.
  *   cell types: chip(word, cls), avatar(name), avatars(people, label), personButton(name, label), tag(text), timeCell(stamp), link(text, run), primaryButton(text, label)
  *   oneLine: true: keep one row, hide columns with dropAt 62/52/36/28/16 (rem) as the container narrows; never fold. resize: true opts into shared desktop resizing and remembered widths.
+ *   wrapMail: true: a phone's mail row wraps its title and second line instead of cutting them (the words are the record itself: Activity, #14423).
  *   wrapNames: true (with oneLine): in a narrow table the name wraps at its words, to two or three lines, rather than ending in an ellipsis mid-word (the Automations lists).
  *   compact: true: a folded column row is two compact lines (60 px; the name on one line): the Tasks lists and the dock's Artifacts ask for it (#8496); other folded tables keep two-line names and descriptions.
  *   state: tableState(), kept by the caller across redraws: the sort, and the selection (a set of row keys, kept while the rows are filtered or paged, cleared when selectable.contextKey changes).
@@ -22,18 +23,21 @@ import { whenText, shortWhen } from './when_text.js';
 import { browserLocal } from './safe_storage.js';
 import { loadStyles } from './lazy_styles.js';
 
-let lastTap = { key: '', at: -1e9 }; // the last group-heading tap the pointer path handled (every table draws again after a toggle, so this outlives the table that heard it)
+let lastTap = { id: '', at: -1e9 }; // the last group-heading tap the pointer path handled (every table draws again after a toggle, so this outlives the table that heard it)
 
-// ── A group heading that opens and shuts its rows (a task's, #14441/#14483) ──
-// Toggled from the DOCUMENT, not from a handler on the button or on one table: the page draws its table again while a finger is down (a poll, a read landing), and the new table (a new tbody and a new button) is what the finger is lifted over; the
-// browser then sends the click to the two elements' common parent, so no handler on either ever hears it. The press and the lift are matched by the group's KEY (data-group-key), and the toggle that is current for that key (registered at every draw, by whichever
-// table drew last) runs. The press state lives here, outside every table, so it outlives the table that saw the press.
-const groupToggles = new Map(); let pressedGroup = null;
-const toggleOf = e => { const b = e.target && e.target.closest && e.target.closest('.dt-group-toggle'); return b && b.dataset.groupKey ? b : null; };
-document.addEventListener('pointerdown', e => { const b = toggleOf(e); pressedGroup = b ? { key: b.dataset.groupKey, x: e.clientX, y: e.clientY } : null; }, true);
+// ── A group heading's controls: the button that opens and shuts its rows (a task's, #14441/#14483) and its Story control (#14444) ──
+// Taken from the DOCUMENT, not from a handler on the button or on one table: the page draws its table again while a finger is down (a poll, a read landing), and the new table (a new tbody and a new button) is what the finger is lifted over; the
+// browser then sends the click to the two elements' common parent, so no handler on either ever hears it. The press and the lift are matched by the control's id (the group's key and which control it is: data-group-key, data-group-control),
+// and the action that is current for that id (registered at every draw, by whichever table drew last) runs. The press state lives here, outside every table, so it outlives the table that saw the press. A lift over another group, or
+// after a drag past the tap distance, is not a tap; a click that follows a tap this path already took is not a second one; a keyboard press (a click with no pointer) is taken by the click path.
+const groupActions = new Map(); let pressedGroup = null; // `${groupKey}|${toggle|story}` -> the action of the control as it was last drawn
+const TAP_DISTANCE = 12;
+const controlOf = e => { const b = e.target && e.target.closest && e.target.closest('[data-group-control]'); return b && b.dataset.groupKey ? b : null; };
+const controlId = b => `${b.dataset.groupKey}|${b.dataset.groupControl}`;
+document.addEventListener('pointerdown', e => { const b = controlOf(e); pressedGroup = b ? { id: controlId(b), x: e.clientX, y: e.clientY } : null; }, true);
 document.addEventListener('pointercancel', () => { pressedGroup = null; }, true);
-document.addEventListener('pointerup', e => { const d = pressedGroup; pressedGroup = null; const b = toggleOf(e); if (!d || !b || b.dataset.groupKey !== d.key || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 12) return; const run = groupToggles.get(d.key); if (run) { lastTap = { key: d.key, at: e.timeStamp }; run(); } }, true);
-document.addEventListener('click', e => { const b = toggleOf(e); if (!b) return; if (e.detail > 0 && lastTap.key === b.dataset.groupKey && e.timeStamp - lastTap.at < 600) return; /* the pointer path already did this tap */ const run = groupToggles.get(b.dataset.groupKey); if (run) run(); }, true); // a keyboard press (detail 0), or a click the pointer path did not see
+document.addEventListener('pointerup', e => { const d = pressedGroup; pressedGroup = null; const b = controlOf(e); if (!d || !b || controlId(b) !== d.id || Math.hypot(e.clientX - d.x, e.clientY - d.y) > TAP_DISTANCE) return; const run = groupActions.get(d.id); if (run) { lastTap = { id: d.id, at: e.timeStamp }; run(); } }, true);
+document.addEventListener('click', e => { const b = controlOf(e); if (!b) return; const id = controlId(b); if (e.detail > 0 && lastTap.id === id && e.timeStamp - lastTap.at < 600) return; /* the pointer path already did this tap */ const run = groupActions.get(id); if (run) run(); }, true); // a keyboard press (detail 0), or a click the pointer path did not see
 export const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const button = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 
@@ -143,6 +147,11 @@ function rowMore(actions, label) {
     const menu = el('div', 'menu dt-mail-menu'); menu.id = `${id}-menu`; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', `Actions for ${label}`);
     for (const a of actions) {
         const b = el('button', 'menu-item', a.label); b.type = 'button'; b.setAttribute('role', 'menuitem'); if (a.title) b.title = a.title;
+        if (a.help) {
+            b.classList.add('menu-item-with-help'); b.setAttribute('aria-label', a.label);
+            const help = el('span', 'menu-item-state', a.help); help.id = `${id}-help-${menu.children.length}`;
+            b.setAttribute('aria-describedby', help.id); b.append(help);
+        }
         if (a.off) { b.disabled = true; b.setAttribute('aria-disabled', 'true'); } // an action that is off right now stays in the menu, said off (the first in a line cannot move up)
         b.addEventListener('click', async e => {
             e.stopPropagation();
@@ -163,7 +172,8 @@ const mailCell = (m, label, open, pick, showTeam = false, gap = false) => { // o
     const td = el('td', 'dt-mail-cell'); td.setAttribute('role', 'cell');
     const lead = el(pick ? 'button' : 'span', 'dt-mail-lead');
     if (pick) { lead.type = 'button'; lead.setAttribute('role', 'checkbox'); lead.setAttribute('aria-label', `Select ${label}`); lead.setAttribute('aria-checked', 'false'); lead.addEventListener('click', pick); } else lead.setAttribute('aria-hidden', 'true'); // a list that can be selected: the avatar is its checkbox (a tap, no gesture), as the desktop's is
-    const l = m.lead || {}, shape = l.icon ? el('span', 'dt-mail-avatar material-icons', l.icon) : el('span', 'dt-mail-avatar', [...String(l.text || m.title || '?')][0].toUpperCase());
+    const l = m.lead || {}, shape = l.node || (l.icon ? el('span', 'dt-mail-avatar material-icons', l.icon) : el('span', 'dt-mail-avatar', [...String(l.text || m.title || '?')][0].toUpperCase()));
+    shape.classList.add('dt-mail-avatar');
     if (l.square) shape.classList.add('dt-mail-square');
     shape.style.background = `var(--avatar-${(hash(String(l.name || m.title || '').toLowerCase()) % 8) + 1})`;
     const tick = el('span', 'dt-mail-avatar dt-mail-tick material-icons', 'check'); tick.setAttribute('aria-hidden', 'true'); // the avatar of a selected row
@@ -192,6 +202,8 @@ const mailCell = (m, label, open, pick, showTeam = false, gap = false) => { // o
     return td;
 };
 
+// Menu controls belong to table instances, including multiple tables on one page.
+let hiddenSeq = 0;
 export function dataTable(cfg) {
     if (cfg.oneLine) cfg = { ...cfg, fold: 'none', layout: 'fixed', resize: cfg.resize === true };
     const st = cfg.state || tableState();
@@ -202,6 +214,7 @@ export function dataTable(cfg) {
     const hasContent = cfg.columns.some(c => c.width === 'content');
     const box = el('div', `dt-box${cfg.compact ? ' dt-compact' : ''}${foldAt === 'fit' ? ' dt-fit' : ''}${hasContent ? ' dt-has-content' : ''}${cfg.bare ? ' dt-bare' : ''}${cfg.scroll ? ' dt-scroll' : ''} ${foldKind === 'labeled' ? 'dt-fold-labeled' : foldKind === 'always' ? 'dt-fold-column' : foldKind === 'none' ? 'dt-fold-none' : 'dt-fold-column'}`);
     if (cfg.oneLine) box.classList.add('dt-one-line');
+    if (cfg.wrapMail) box.classList.add('dt-wrap-mail'); // a phone's mail row says its title and its second line whole (they wrap) instead of ending in an ellipsis (Activity, #14423)
     if (cfg.oneLine && cfg.wrapNames) box.classList.add('dt-wrap-names'); // a narrow list wraps a long name at its words (hyphens too) instead of cutting it mid-word with an ellipsis (#10275)
     const mailQuery = cfg.mail && typeof window.matchMedia === 'function' ? window.matchMedia(MAIL_QUERY) : null, mailOn = () => !!mailQuery && mailQuery.matches; // a phone's rows are mail rows
     box.classList.toggle('dt-mail-on', mailOn());
@@ -225,9 +238,8 @@ export function dataTable(cfg) {
     const colgroup = el('colgroup');
     table.append(colgroup, thead, tbody);
     // the columns left out to fit the panel are never silently gone (#11943): a quiet control says how many, lists them and brings one back (it then keeps its place and the others give way by the same rules)
-    let hiddenSeq = 0;
     const hiddenBar = el('div', 'cols-hidden-bar'); hiddenBar.hidden = true;
-    const hiddenId = `dt-cols-hidden-${++hiddenSeq}`; // a counter, not a random suffix: the markup is the same on every draw (task_list_golden)
+    const hiddenId = `dt-cols-hidden-${++hiddenSeq}`; // unique even while several tables or an old and new draw coexist
     const hiddenMenu = el('div', 'menu cols-hidden-menu'); hiddenMenu.id = `${hiddenId}-menu`; hiddenMenu.hidden = true; hiddenMenu.setAttribute('role', 'menu'); hiddenMenu.setAttribute('aria-label', 'Hidden columns');
     const hiddenBtn = button('btn btn-quiet btn-small cols-hidden-btn', '', async (e) => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(hiddenBtn); });
     hiddenBtn.id = hiddenId; hiddenBtn.setAttribute('aria-haspopup', 'menu'); hiddenBtn.setAttribute('aria-expanded', 'false'); hiddenBtn.setAttribute('aria-controls', hiddenMenu.id);
@@ -551,8 +563,9 @@ export function dataTable(cfg) {
         const cols = columns.length + (sel ? 1 : 0);
         let lastGroup = null, lastParent = null;
         const groupHead = g => { const gr = el('tr', g.level === 'task' ? 'dt-group dt-group-task' : 'dt-group'); gr.setAttribute('role', 'row'); const gh = el('th', null); gh.colSpan = cols; gh.scope = 'rowgroup'; gh.setAttribute('role', 'rowheader'); // a group with onToggle (a task's items, #14441) is one button that opens and shuts them
-            if (g.onToggle) { const b = el('button', 'dt-group-toggle'); b.type = 'button'; b.setAttribute('aria-expanded', String(g.open !== false)); const words = el('span', 'dt-group-words', g.label); b.append(words); if (g.chip) b.append(el('span', 'chip chip-tag dt-group-chip', g.chip)); b.dataset.groupKey = g.key; groupToggles.set(g.key, g.onToggle); gh.append(b); } else gh.textContent = g.label;
-            gr.append(gh); tbody.append(gr); };
+            if (g.onToggle) { const b = el('button', 'dt-group-toggle'); b.type = 'button'; b.setAttribute('aria-expanded', String(g.open !== false)); const words = el('span', 'dt-group-words', g.label); b.append(words); if (g.chip) b.append(el('span', 'chip chip-tag dt-group-chip', g.chip)); b.dataset.groupKey = g.key; b.dataset.groupControl = 'toggle'; groupActions.set(`${g.key}|toggle`, g.onToggle); if (!g.onStory) gh.append(b); else { const sb = el('button', 'btn btn-small btn-quiet dt-group-story', 'Story'); sb.type = 'button'; sb.setAttribute('aria-pressed', String(!!g.storyOpen)); sb.setAttribute('aria-label', `Story of ${String(g.label).split('\n')[0]}`); sb.dataset.groupKey = g.key; sb.dataset.groupControl = 'story'; groupActions.set(`${g.key}|story`, g.onStory); const bar = el('div', 'dt-group-pair'); bar.append(b, sb); gh.append(bar); } } else gh.textContent = g.label; // a heading with onStory has a second control, its own: the story of the task (#14444)
+            gr.append(gh); tbody.append(gr);
+            if (g.story && g.storyOpen) { const sr = el('tr', 'dt-story-row'); sr.setAttribute('role', 'row'); const sc = el('td', null); sc.colSpan = cols; sc.setAttribute('role', 'cell'); sc.append(g.story()); sr.append(sc); tbody.append(sr); } }; // the story is a second row under the heading, above the items, only while it is on
         const mails = mailOn() ? list.map(r => cfg.mail(r)) : null, gap = !!mails && mails.some(m => m.actions && m.actions.length); // a list with a ⋯ on any row reserves its 44 px on every row, so the times line up (#137104)
         list.forEach((r, i) => {
             if (cfg.groupBy && (!st.sort || cfg.groupSorted)) { // the rows come in the caller's order: a divider where their group changes (a day), none once the person has sorted

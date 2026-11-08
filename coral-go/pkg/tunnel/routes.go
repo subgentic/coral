@@ -204,9 +204,7 @@ var routeTable = cat(
 		"/api/board/{project}/tasks/{id}",
 		"/api/board/{project}/tasks/{id}/cost",
 		"/api/board/{project}/tasks/{id}/history",
-		// A board's goals and each one's rollup (#7087): read like its tasks, redacted like them.
-		"/api/board/{project}/goals",
-		"/api/board/{project}/goals/{id}",
+		// A board's goals and each one's rollup (#7087): read like its tasks, redacted like them; see the OwnerSees block below for their done-state (#14047).
 		"/api/board/{project}/status",
 		"/api/board/{project}/working-mode",
 		"/api/board/{project}/working-mode/presets",
@@ -222,7 +220,6 @@ var routeTable = cat(
 		"/api/token-usage", "/api/token-usage/summary", "/api/token-usage/timeseries",
 		"/api/token-usage/by-team", "/api/token-usage/by-branch", "/api/token-usage/session/{id}/turns", "/api/token-usage/turns",
 		"/api/goals/metrics", "/api/call-metrics/summary",
-		"/api/goals", // every board's goals in one call (#7260): the Operator's, redacted like the per-board read
 		"/api/tags", "/api/folder-tags", "/api/folder-tags/{name}", "/api/pinned-folders",
 		// The Operator's saved messages (#4510): his own bookmarks, snippets redacted when saved.
 		"/api/scheduled/jobs", "/api/scheduled/jobs/{id}", "/api/scheduled/jobs/{id}/runs", "/api/scheduled/runs/recent", "/api/automations/runs", // Recent runs as pages (#13183): the same View-tier read as /api/scheduled/runs/recent, a page at a time (the connector redacts its reply like the old one: View routes are redacted by default)
@@ -256,6 +253,7 @@ var routeTable = cat(
 		"/api/artifacts",
 		// The same artifact without its bytes (#5465, coral-hub): id, size, the media type a download is served as and the stored name, 404 exactly as the content read is, never cached.
 		"/api/artifacts/{hex64}/meta",
+		"/api/artifacts/{hex64}/thumbnail",
 		// Who can read an artifact (#5577): the owners that hold it and the teams whose agents read it. No query.
 		"/api/artifacts/{hex64}/readers",
 		// The comments on an artifact (#5176): reads here; the owner's writes are the block below. Editing, deleting, sending a thread to an agent, the lock and an agent's reply are unlisted (never) from here.
@@ -355,6 +353,9 @@ var routeTable = cat(
 	// The live session list (#12377, coral-hub's question): everyone who may view still gets the list, and the stamped owner also gets what is the owner's alone on its rows (waits_on_this, #11455: task titles of every board).
 	// Without the marker the connector never stamped this route, so the machine could not tell the owner from a viewer and the field never reached a Hub dashboard. The handler decides per field; nothing is refused here.
 	owner(OwnerSees, rules(http.MethodGet, TierView, "/api/sessions/live")),
+	// The goals reads (#7087, #7260, #14047): every viewer still gets the goals, redacted like the task reads, and nobody is refused; the stamped owner also gets each goal's done-state (what the Operator did to its "looks done"
+	// row: hidden or read), their own attention. Without the marker the connector never stamped these routes, so a Hub page could not show a Dismiss, Not yet or read after a reload. The handler decides per field.
+	owner(OwnerSees, rules(http.MethodGet, TierView, "/api/goals", "/api/board/{project}/goals", "/api/board/{project}/goals/{id}")),
 	// The routes that can start a NEW board (#11627, Security's #11636): the owner marker is stamped so the machine can tell the owner from a guest, a grantee or a guide, and refuses everyone else a name no board has (403 owner_only,
 	// refuseNewBoardName). The handler decides, so a guest still posts, subscribes and writes on a board that exists. Interact, as before.
 	owner(OwnerSees,
@@ -520,7 +521,7 @@ var routeTable = cat(
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/needs-you")),
 	// The Activity record (#12069, #12070): what the Operator did in Needs you, read only, the OWNER's alone through the hub (a guest, a grantee or a viewer is refused owner_only). The check of its chain runs on the machine; the
 	// rows hold no comment text, only the Operator's own cut and redacted note and the titles agents gave their items.
-	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/activity")),
+	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/activity", "/api/thread", "/api/threads")), // #14440: the story of a goal or task, and the summaries of a page of them
 	// The Operator's grant to a board's orchestrator and the log of what agents did to the board's agents (#11432) are the OWNER's alone through the hub (an authentic stamp, the owner marker): the switch lets an agent wake,
 	// sleep and start agents. The orchestrator's own wake and sleep routes are not here: they are agent-only and local, so the hub never reaches them.
 	owner(OwnerRefuse, rules(http.MethodGet, TierLaunch, "/api/board/{project}/orchestrator-grant", "/api/board/{project}/lifecycle-log", "/api/board/{project}/guide-roster")),

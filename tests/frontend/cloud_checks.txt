@@ -19,6 +19,7 @@ node import_hygiene.test.js
 node vendor_manifest.mjs
 node run_folders.test.mjs
 node run_folders_qa.test.mjs
+node local_shards.test.mjs
 node sandbox_profile.test.mjs
 node when_text.test.mjs
 node artifact_tag_rules_unit.test.mjs
@@ -158,6 +159,7 @@ node overload.test.mjs
 node team_availability_polling.test.mjs
 node team_folder_pick.test.mjs
 node account_nav.test.mjs
+node message_refs.test.mjs
 node topbar_contract.test.mjs
 node team_artifacts_copy_link.test.mjs
 node shared_images.test.mjs
@@ -396,3 +398,5 @@ node artifact_opened_version.test.mjs
 node artifact_pinned_cleanup.test.mjs
 
 node inbox_review_legacy_versions.test.mjs
+node resume_ended.test.mjs
+node version_skew_reads.test.mjs

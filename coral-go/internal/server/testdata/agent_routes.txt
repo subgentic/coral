@@ -73,6 +73,7 @@ a GET /api/artifacts/{id}
 a GET /api/artifacts/{id}/comments
 a GET /api/artifacts/{id}/meta
 b GET /api/artifacts/{id}/private
+b GET /api/artifacts/{id}/thumbnail
 a GET /api/artifacts/{id}/versions
 b GET /api/artifacts/{id}/readers
 b GET /api/auth/hub-origins
@@ -135,6 +136,7 @@ b GET /api/cloud/owner-label
 c GET /api/cloud/status
 b GET /api/custom-models
 c GET /api/filesystem/is-git
+b GET /api/filesystem/trust-probe
 c GET /api/filesystem/list
 c GET /api/folder-tags
 c GET /api/folder-tags/{folderName}
@@ -550,7 +552,6 @@ b GET /api/skills/{id}
 b POST /api/skills/{id}/approve
 b POST /api/skills/{id}/reject
 b DELETE /api/skills/{id}
-
 # #13253: Chief check CRUD is the person's; only a pinned receiving session can report a trigger.
 b GET /api/chief/checks
 b POST /api/chief/checks
@@ -572,3 +573,5 @@ a POST /api/resources/{name}/renew
 a PUT /api/resources/{name}
 b PUT /api/teams/detail/{name}/daily-knowledge
 b PUT /api/teams/detail/{name}/daily-knowledge/auto-apply
+b GET /api/thread
+b GET /api/threads

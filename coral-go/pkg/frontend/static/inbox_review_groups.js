@@ -4,6 +4,7 @@ import { markHidden } from './visible_marks.js';
 import { importOnce } from './import_once.js';
 import { boardTeamKey } from './server_base.js';
 const { waitingOnAgent } = await importOnce('./inbox_review_state.js');
+const { storyNode } = await importOnce('./thread_story.js'); // the story under a task (#14444)
 
 /** What a row is about, whichever kind it is: a file for review carries its goal and task, a question to the Operator its own (the asker's declared or claimed ones, #14441). null for any other row. */
 function aboutOf(row) {
@@ -35,7 +36,8 @@ export function arrangeReviewRows(rows, grouped) {
 }
 const cut = (text, n) => { const t = String(text || '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1).trimEnd()}\u2026` : t; };
 /** One heading per contiguous group, including single documents. A task's items sit under a heading of their own, inside their goal's: its title, number, a Waiting on you chip while anything in it is unread, the count and its newest line; the heading opens and
- * shuts the items (#14441). Counts describe the filtered rows shown, never the whole goal or computer. `tasks` is { open(key, hasUnread) -> bool, toggle(key, open) }; without it a task's items are always shown. */
+ * shuts the items (#14441). Counts describe the filtered rows shown, never the whole goal or computer. `tasks` is { open(key, hasUnread) -> bool, toggle(key, open), storyOpen(key) -> bool, toggleStory(key, on) }; without it a task's items are always shown
+ * and it has no story. The Story control is the heading's second one (#14444): the story is history, so it is shut until asked for and sits above the items when on. */
 export function reviewGroupLookup(rows, grouped, isRead, sourceLabel, tasks = null) {
     const keyOf = r => { if (pinned(r)) return 'pinned'; if (r.review && waitingOnAgent(r.review)) return 'waiting-agent'; if (!grouped) return null; const x = aboutOf(r); if (!x || !x.goalId) return r.review ? 'no-goal' : 'other-items'; return taskKey(r) || goalKey(r); };
     const unreadOf = r => (r.review ? !isRead(r.review) : true); // a waiting agent or a question is waiting by being in the list
@@ -62,7 +64,7 @@ export function reviewGroupLookup(rows, grouped, isRead, sourceLabel, tasks = nu
         else if (taskKey(row) === key) {
             const x = aboutOf(row), title = markHidden(String(x.taskTitle || ''), { strict: true }), line = markHidden(cut(latest.review ? latest.review.name : latest.waiting_summary, 70), { strict: true }); // words an agent wrote: hidden characters written out, like the titles
             const open = tasks ? tasks.open(key, unread > 0) : true;
-            entry = { key, label: `Task #${x.taskId}${title ? ` \u00b7 ${title}` : ''}\n${count}${line ? ` \u00b7 newest: ${line}` : ''}`, chip: unread > 0 ? 'Waiting on you' : '', level: 'task', open, ...(tasks ? { onToggle: () => tasks.toggle(key, !open) } : {}), parent: { key: goalKey(row), label: goalLabel(goalKey(row)) } };
+            entry = { key, label: `Task #${x.taskId}${title ? ` \u00b7 ${title}` : ''}\n${count}${line ? ` \u00b7 newest: ${line}` : ''}`, chip: unread > 0 ? 'Waiting on you' : '', level: 'task', open, ...(tasks ? { onToggle: () => tasks.toggle(key, !open) } : {}), ...(tasks && tasks.toggleStory && x.team && x.taskId ? { onStory: () => tasks.toggleStory(key, !tasks.storyOpen(key)), storyOpen: tasks.storyOpen(key), story: () => storyNode(x.team, x.taskId) } : {}), parent: { key: goalKey(row), label: goalLabel(goalKey(row)) } };
         } else entry = { key, label: goalLabel(key) };
         labels.set(key, entry);
     }

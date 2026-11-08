@@ -1,6 +1,8 @@
 // A stubbed server for the artifact viewer's versions (#6480): three versions of release-plan.md, the version list, and the comments of the newest with a carried, an ambiguous and a gone one.
 // Shared by artifact_versions_browser and the censuses' version scenes. STUB is page code to run with ev(): it replaces window.fetch.
 const H1 = '1'.repeat(64), H2 = '2'.repeat(64), H3 = '3'.repeat(64);
+const FILE = 'a1b2c3d4e5f60718293a4b5c6d7e8f90'; // the stubbed file's id (#14145): each version's row says its own line, as the server's list does
+const lineOf = n => `version ${n} of release-plan.md (file ${FILE})`;
 const T = {
     [H1]: ['# Release plan', '', 'Ship on Thursday.', 'The first step is the folder.', 'Terms stay as they are.'].join('\n'),
     [H2]: ['# Release plan', '', 'Ship the Servers page on Friday, with the team behind it.', 'The first step is the folder, then the details.', 'Revoke sits beside Rename on every row.', 'Terms stay as they are.'].join('\n'),
@@ -10,7 +12,7 @@ const T = {
 const STUB = `(() => {
     const real = window.fetch; window.__posts = []; const T = ${JSON.stringify(T)};
     const at = n => new Date(Date.now() - n * 3600000).toISOString();
-    const rows = [['${H1}', 1, 30], ['${H2}', 2, 3], ['${H3}', 3, 1]].map(([d, v, h]) => ({ digest: d, version: v, versions: 3, is_latest: v === 3, name: 'release-plan.md', size: 9000 + v * 1500, media_type: 'text/markdown', at: at(h), uploader: 'frontend-dev', role: 'Frontend Dev' }));
+    const rows = [['${H1}', 1, 30], ['${H2}', 2, 3], ['${H3}', 3, 1]].map(([d, v, h]) => ({ digest: d, version: v, versions: 3, is_latest: v === 3, name: 'release-plan.md', file_id: '${FILE}', version_line: 'version ' + v + ' of release-plan.md (file ${FILE})', size: 9000 + v * 1500, media_type: 'text/markdown', at: at(h), uploader: 'frontend-dev', role: 'Frontend Dev' }));
     const json = (o, status) => Promise.resolve(new Response(JSON.stringify(o), { status: status || 200, headers: { 'Content-Type': 'application/json' } }));
     const who = n => (n === 'Operator' ? { kind: 'owner', issuer: 'local', subject: n, name: n } : { kind: 'agent', issuer: 'local', subject: n, name: n });
     const c = (id, art, ver, from, carried, quote, body, extra) => ({ id, artifact_id: art, parent_id: null, anchor: { quote }, body, author: who(extra && extra.by || 'Operator'), created_at: at(2), mine: true, can: { reply: true, edit: true, delete: true, resolve: true }, version: ver, ...(from ? { from_version: from, carried } : {}), ...(extra || {}) });
@@ -35,4 +37,4 @@ const STUB = `(() => {
     };
     return true; })()`;
 
-module.exports = { H1, H2, H3, T, STUB };
+module.exports = { H1, H2, H3, T, STUB, FILE, lineOf };

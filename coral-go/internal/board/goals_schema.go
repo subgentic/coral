@@ -24,6 +24,16 @@ func (s *Store) ensureGoalsSchema(ctx context.Context) error {
 			closed_at     TEXT,
 			closed_reason TEXT NOT NULL DEFAULT ''
 		)`,
+		// Preserve a task's departure before its new goal can hide unfinished work from the old goal.
+		`CREATE TABLE IF NOT EXISTS board_goal_task_moves (
+            board_id TEXT NOT NULL,
+            goal_id INTEGER NOT NULL,
+            task_id INTEGER NOT NULL,
+            moved_at TEXT NOT NULL DEFAULT '',
+            arrived_at TEXT NOT NULL DEFAULT '',
+            PRIMARY KEY(board_id, goal_id, task_id)
+        )`,
+
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_board_goals_uid ON board_goals(goal_uid)`,
 		`CREATE INDEX IF NOT EXISTS idx_board_goals_board ON board_goals(board_id, state, id)`,
 		// A goal's uid is set at creation and never changes: a reference that outlives re-enrolling and board re-keys is made of it.
@@ -77,7 +87,27 @@ func (s *Store) ensureGoalsSchema(ctx context.Context) error {
 	const goalChanged = `OLD.title IS NOT NEW.title OR OLD.outcome IS NOT NEW.outcome OR OLD.done_when IS NOT NEW.done_when OR OLD.state IS NOT NEW.state OR OLD.blocked_on IS NOT NEW.blocked_on OR OLD.driver IS NOT NEW.driver
 			OR OLD.closed_at IS NOT NEW.closed_at OR OLD.closed_reason IS NOT NEW.closed_reason`
 	const wasClosed, nowClosed = `OLD.state IN ('done', 'dropped')`, `NEW.state IN ('done', 'dropped')`
+	// A moved task still affects its former goals' completion hint. Publish their refresh events in
+	// the same counter change as the task's current goal; no cross-board status is followed.
+	departedEvent := func(board, task, current, kind string) string {
+		return fmt.Sprintf(` INSERT INTO board_goal_events(board_id,goal_id,kind,seq,at)
+            SELECT m.board_id,m.goal_id,'%s',meta.seq,strftime('%%Y-%%m-%%dT%%H:%%M:%%SZ','now')
+            FROM board_goal_task_moves m JOIN board_goal_meta meta ON meta.board_id=m.board_id
+            JOIN board_goals g ON g.board_id=m.board_id AND g.id=m.goal_id
+            WHERE m.board_id=%s AND m.task_id=%s AND m.goal_id IS NOT %s;`, kind, board, task, current)
+	}
+
 	for _, stmt := range []string{
+		`CREATE TRIGGER IF NOT EXISTS board_goal_record_task_move AFTER UPDATE OF goal_id, board_id ON board_tasks
+            WHEN OLD.goal_id IS NOT NEW.goal_id OR OLD.board_id IS NOT NEW.board_id
+            BEGIN
+                INSERT INTO board_goal_task_moves(board_id,goal_id,task_id,moved_at)
+                SELECT OLD.board_id,OLD.goal_id,OLD.id,strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE OLD.goal_id IS NOT NULL AND OLD.goal_id > 0
+                ON CONFLICT(board_id,goal_id,task_id) DO UPDATE SET moved_at=excluded.moved_at;
+                INSERT INTO board_goal_task_moves(board_id,goal_id,task_id,arrived_at)
+                SELECT NEW.board_id,NEW.goal_id,NEW.id,strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE NEW.goal_id IS NOT NULL AND NEW.goal_id > 0
+                ON CONFLICT(board_id,goal_id,task_id) DO UPDATE SET arrived_at=excluded.arrived_at;
+            END`,
 		// The rollup's grouped count reads (board_id, goal_id, status) and nothing else of the task, so the index holds status and the count is index-only (#9584: 1.6 to 0.36 ms for a page of 40 goals). It is the older
 		// (board_id, goal_id) index with a column more, so that one is dropped: the same write cost, the same lookups.
 		`CREATE INDEX IF NOT EXISTS idx_board_tasks_goal_status ON board_tasks(board_id, goal_id, status) WHERE goal_id IS NOT NULL`,
@@ -107,13 +137,20 @@ func (s *Store) ensureGoalsSchema(ctx context.Context) error {
 		// a task's status changed, in the same goal: task_state; the goal changed (linked, unlinked or moved): one counter move, an event for the goal it left and one for the goal it joined
 		`DROP TRIGGER IF EXISTS board_tasks_goal_seq_update`,
 		`DROP TRIGGER IF EXISTS board_tasks_goal_seq_state`,
-		`CREATE TRIGGER board_tasks_goal_seq_state AFTER UPDATE OF status ON board_tasks WHEN OLD.goal_id IS NEW.goal_id AND NEW.goal_id IS NOT NULL AND OLD.status IS NOT NEW.status
-			BEGIN ` + moved("NEW.board_id") + event("NEW.board_id", "NEW.goal_id", "task_state", "1") + ` END`,
+		`CREATE TRIGGER board_tasks_goal_seq_state AFTER UPDATE OF status, completed_at ON board_tasks
+            WHEN OLD.goal_id IS NEW.goal_id AND (OLD.status IS NOT NEW.status OR OLD.completed_at IS NOT NEW.completed_at)
+            AND (NEW.goal_id IS NOT NULL OR EXISTS(SELECT 1 FROM board_goal_task_moves m WHERE m.board_id=NEW.board_id AND m.task_id=NEW.id))
+            BEGIN ` + moved("NEW.board_id") + event("NEW.board_id", "NEW.goal_id", "task_state", "NEW.goal_id IS NOT NULL") + departedEvent("NEW.board_id", "NEW.id", "NEW.goal_id", "task_state") + ` END`,
+		`CREATE TRIGGER IF NOT EXISTS board_goal_departed_board_refresh AFTER UPDATE OF board_id ON board_tasks
+            WHEN OLD.board_id IS NOT NEW.board_id AND (OLD.goal_id IS NOT NULL OR EXISTS(SELECT 1 FROM board_goal_task_moves m WHERE m.board_id=OLD.board_id AND m.task_id=OLD.id))
+            BEGIN ` + moved("OLD.board_id") + event("OLD.board_id", "OLD.goal_id", "task_unlinked", "OLD.goal_id IS NOT NULL") + departedEvent("OLD.board_id", "OLD.id", "OLD.goal_id", "task_unlinked") + ` END`,
 		`DROP TRIGGER IF EXISTS board_tasks_goal_seq_move`,
 		`CREATE TRIGGER board_tasks_goal_seq_move AFTER UPDATE OF goal_id ON board_tasks WHEN OLD.goal_id IS NOT NEW.goal_id
-			BEGIN ` + moved("NEW.board_id") + event("NEW.board_id", "OLD.goal_id", "task_unlinked", "OLD.goal_id IS NOT NULL") + event("NEW.board_id", "NEW.goal_id", "task_linked", "NEW.goal_id IS NOT NULL") + ` END`,
+			BEGIN ` + moved("NEW.board_id") + event("NEW.board_id", "OLD.goal_id", "task_unlinked", "OLD.goal_id IS NOT NULL AND OLD.board_id IS NEW.board_id") + event("NEW.board_id", "NEW.goal_id", "task_linked", "NEW.goal_id IS NOT NULL") + ` END`,
 		`DROP TRIGGER IF EXISTS board_tasks_goal_seq_delete`,
-		`CREATE TRIGGER board_tasks_goal_seq_delete AFTER DELETE ON board_tasks WHEN OLD.goal_id IS NOT NULL BEGIN ` + moved("OLD.board_id") + event("OLD.board_id", "OLD.goal_id", "task_unlinked", "1") + ` END`,
+		`CREATE TRIGGER board_tasks_goal_seq_delete AFTER DELETE ON board_tasks
+            WHEN OLD.goal_id IS NOT NULL OR EXISTS(SELECT 1 FROM board_goal_task_moves m WHERE m.board_id=OLD.board_id AND m.task_id=OLD.id)
+            BEGIN ` + moved("OLD.board_id") + event("OLD.board_id", "OLD.goal_id", "task_unlinked", "OLD.goal_id IS NOT NULL") + departedEvent("OLD.board_id", "OLD.id", "OLD.goal_id", "task_unlinked") + ` END`,
 	} {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil {
 			return err

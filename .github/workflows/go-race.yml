@@ -4,8 +4,9 @@ name: go-race
 #  - per push to ci/** (a release batch): the small, high-risk packages that handle credentials, the network and processes, each
 #    in its own job and under about 6 minutes on epoch: internal/auth, internal/cloud, pkg/tunnel, internal/ptymanager,
 #    internal/startup and internal/hooks (the agent hooks' tool input, #8478);
-#  - nightly (and by dispatch): every package with -race, internal/server/routes alone with a long timeout, and everything else
-#    in one job. The scheduled run is on the default branch.
+#  - nightly (and by dispatch): every package with -race, internal/server/routes, internal/board and internal/store each alone
+#    with a long timeout (board takes about 46 minutes under -race on a CI runner, #14281), and everything else in one job.
+#    The scheduled run is on the default branch.
 #
 # Trust, as go-tests.yml: no pull_request trigger (a fork's code never runs here), no secrets, read-only contents, actions pinned
 # by SHA, nothing cached. CORAL_TELEMETRY_DISABLED=1 like every CI workflow (the telemetry census); the packages whose tests check
@@ -74,10 +75,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [routes, rest]
+        shard: [routes, board, store, rest]
     env:
       CORAL_TELEMETRY_DISABLED: "1"
-      ROUTES_PKG: internal/server/routes
+      ALONE_PKGS: "internal/server/routes internal/board internal/store" # each is a shard of its own; the rest is every other package
     defaults:
       run:
         shell: bash
@@ -103,10 +104,17 @@ jobs:
           mkdir -p "$TMPDIR"
           root=$(go list -m)
           all=(); while IFS= read -r p; do all+=("${p#"$root"/}"); done < <(go list ./...)
-          printf '%s\n' "${all[@]}" | grep -qxF "$ROUTES_PKG" || { echo "::error::package $ROUTES_PKG no longer exists: update go-race.yml"; exit 1; }
+          for a in $ALONE_PKGS; do
+            printf '%s\n' "${all[@]}" | grep -qxF "$a" || { echo "::error::package $a no longer exists: update go-race.yml"; exit 1; }
+          done
+          case "$SHARD" in routes) mine=internal/server/routes ;; board) mine=internal/board ;; store) mine=internal/store ;; *) mine= ;; esac
           pkgs=()
           for p in "${all[@]}"; do
-            if [ "$SHARD" = routes ]; then [ "$p" = "$ROUTES_PKG" ] || continue; else [ "$p" != "$ROUTES_PKG" ] || continue; fi
+            if [ -n "$mine" ]; then
+              [ "$p" = "$mine" ] || continue
+            else
+              case " $ALONE_PKGS " in *" $p "*) continue ;; esac
+            fi
             pkgs+=("./$p")
           done
           echo "go test -race, shard $SHARD: ${#pkgs[@]} of ${#all[@]} packages"

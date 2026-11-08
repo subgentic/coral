@@ -235,6 +235,18 @@
       "type": "index"
     },
     {
+      "name": "idx_operator_actions_team_goal",
+      "sql": "CREATE INDEX idx_operator_actions_team_goal ON operator_actions(team, goal_id)",
+      "tbl_name": "operator_actions",
+      "type": "index"
+    },
+    {
+      "name": "idx_operator_actions_team_task",
+      "sql": "CREATE INDEX idx_operator_actions_team_task ON operator_actions(team, task_id)",
+      "tbl_name": "operator_actions",
+      "type": "index"
+    },
+    {
       "name": "idx_operator_touch_team_at",
       "sql": "CREATE INDEX idx_operator_touch_team_at ON operator_touch(team, at)",
       "tbl_name": "operator_touch",
@@ -310,6 +322,12 @@
       "name": "sqlite_autoindex_board_goal_meta_1",
       "sql": null,
       "tbl_name": "board_goal_meta",
+      "type": "index"
+    },
+    {
+      "name": "sqlite_autoindex_board_goal_task_moves_1",
+      "sql": null,
+      "tbl_name": "board_goal_task_moves",
       "type": "index"
     },
     {
@@ -493,6 +511,12 @@
       "type": "table"
     },
     {
+      "name": "board_ask_task_snapshots",
+      "sql": "CREATE TABLE board_ask_task_snapshots (\n            message_id INTEGER PRIMARY KEY,\n            project TEXT NOT NULL,\n            task_id INTEGER NOT NULL,\n            assignee TEXT NOT NULL\n        )",
+      "tbl_name": "board_ask_task_snapshots",
+      "type": "table"
+    },
+    {
       "name": "board_asks",
       "sql": "CREATE TABLE board_asks (\n\t\t\tmessage_id INTEGER PRIMARY KEY,\n\t\t\tproject    TEXT NOT NULL,\n\t\t\tasker      TEXT NOT NULL,\n\t\t\tasked      TEXT NOT NULL,\n\t\t\tcreated_at TEXT NOT NULL\n\t\t)",
       "tbl_name": "board_asks",
@@ -538,6 +562,12 @@
       "name": "board_goal_requests_out",
       "sql": "CREATE TABLE board_goal_requests_out (\n\t\t\tid          INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tboard_id    TEXT NOT NULL,\n\t\t\tgoal_id     INTEGER NOT NULL,\n\t\t\trequest_id  TEXT NOT NULL,\n\t\t\tto_server   TEXT NOT NULL DEFAULT '',\n\t\t\tto_board    TEXT NOT NULL,\n\t\t\tstatus      TEXT NOT NULL DEFAULT 'requested' CHECK (status IN ('requested', 'accepted', 'declined', 'expired')),\n\t\t\treason      TEXT NOT NULL DEFAULT '',\n\t\t\tcreated_by  TEXT NOT NULL DEFAULT '',\n\t\t\tcreated_at  TEXT NOT NULL,\n\t\t\tanswered_at TEXT\n\t\t)",
       "tbl_name": "board_goal_requests_out",
+      "type": "table"
+    },
+    {
+      "name": "board_goal_task_moves",
+      "sql": "CREATE TABLE board_goal_task_moves (\n            board_id TEXT NOT NULL,\n            goal_id INTEGER NOT NULL,\n            task_id INTEGER NOT NULL,\n            moved_at TEXT NOT NULL DEFAULT '',\n            arrived_at TEXT NOT NULL DEFAULT '',\n            PRIMARY KEY(board_id, goal_id, task_id)\n        )",
+      "tbl_name": "board_goal_task_moves",
       "type": "table"
     },
     {
@@ -728,7 +758,7 @@
     },
     {
       "name": "operator_actions",
-      "sql": "CREATE TABLE operator_actions (\n\t\tid        INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\tat        TEXT NOT NULL,\n\t\tactor     TEXT NOT NULL,\n\t\taction    TEXT NOT NULL,\n\t\titem_kind TEXT NOT NULL,\n\t\titem_id   TEXT NOT NULL,\n\t\tversion   TEXT NOT NULL DEFAULT '',\n\t\tteam      TEXT NOT NULL,\n\t\tsource    TEXT NOT NULL,\n\t\thint      TEXT NOT NULL DEFAULT '',\n\t\tsurface   TEXT NOT NULL DEFAULT '',\n\t\ttitle     TEXT NOT NULL DEFAULT '',\n\t\tnote      TEXT NOT NULL DEFAULT '',\n\t\tprev_hash TEXT NOT NULL,\n\t\thash      TEXT NOT NULL\n\t)",
+      "sql": "CREATE TABLE operator_actions (\n\t\tid        INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\tat        TEXT NOT NULL,\n\t\tactor     TEXT NOT NULL,\n\t\taction    TEXT NOT NULL,\n\t\titem_kind TEXT NOT NULL,\n\t\titem_id   TEXT NOT NULL,\n\t\tversion   TEXT NOT NULL DEFAULT '',\n\t\tteam      TEXT NOT NULL,\n\t\tsource    TEXT NOT NULL,\n\t\thint      TEXT NOT NULL DEFAULT '',\n\t\tsurface   TEXT NOT NULL DEFAULT '',\n\t\ttitle     TEXT NOT NULL DEFAULT '',\n\t\tnote      TEXT NOT NULL DEFAULT '',\n\t\tprev_hash TEXT NOT NULL,\n\t\thash      TEXT NOT NULL\n\t, goal_id INTEGER, task_id INTEGER)",
       "tbl_name": "operator_actions",
       "type": "table"
     },
@@ -791,6 +821,18 @@
       "sql": "CREATE TABLE task_workflows (\n\t task_id INTEGER PRIMARY KEY REFERENCES board_tasks(id), data TEXT NOT NULL, has_artifacts INTEGER NOT NULL DEFAULT 0, eff_state INTEGER NOT NULL DEFAULT 0, eff_review_of INTEGER NOT NULL DEFAULT 0, eff_author TEXT NOT NULL DEFAULT '', eff_submitted TEXT NOT NULL DEFAULT '', eff_rejected INTEGER NOT NULL DEFAULT 0, lst_state INTEGER NOT NULL DEFAULT 0, lst_outcome TEXT NOT NULL DEFAULT '', lst_author TEXT NOT NULL DEFAULT '', lst_review_requested INTEGER NOT NULL DEFAULT 0, lst_reviewers TEXT NOT NULL DEFAULT '[]', lst_review_areas TEXT NOT NULL DEFAULT '[]', lst_in_pool INTEGER NOT NULL DEFAULT 0, lst_wanted INTEGER NOT NULL DEFAULT 0, lst_artifacts INTEGER NOT NULL DEFAULT 0, lst_art_refs TEXT NOT NULL DEFAULT '', lst_parent INTEGER NOT NULL DEFAULT 0)",
       "tbl_name": "task_workflows",
       "type": "table"
+    },
+    {
+      "name": "board_goal_departed_board_refresh",
+      "sql": "CREATE TRIGGER board_goal_departed_board_refresh AFTER UPDATE OF board_id ON board_tasks\n            WHEN OLD.board_id IS NOT NEW.board_id AND (OLD.goal_id IS NOT NULL OR EXISTS(SELECT 1 FROM board_goal_task_moves m WHERE m.board_id=OLD.board_id AND m.task_id=OLD.id))\n            BEGIN INSERT INTO board_goal_meta (board_id, seq, updated_at) VALUES (OLD.board_id, 1, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))\n\t\tON CONFLICT(board_id) DO UPDATE SET seq = seq + 1, updated_at = excluded.updated_at; INSERT INTO board_goal_events (board_id, goal_id, kind, seq, at) SELECT OLD.board_id, OLD.goal_id, 'task_unlinked', seq, strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM board_goal_meta WHERE board_id = OLD.board_id AND (OLD.goal_id IS NOT NULL); INSERT INTO board_goal_events(board_id,goal_id,kind,seq,at)\n            SELECT m.board_id,m.goal_id,'task_unlinked',meta.seq,strftime('%Y-%m-%dT%H:%M:%SZ','now')\n            FROM board_goal_task_moves m JOIN board_goal_meta meta ON meta.board_id=m.board_id\n            JOIN board_goals g ON g.board_id=m.board_id AND g.id=m.goal_id\n            WHERE m.board_id=OLD.board_id AND m.task_id=OLD.id AND m.goal_id IS NOT OLD.goal_id; END",
+      "tbl_name": "board_tasks",
+      "type": "trigger"
+    },
+    {
+      "name": "board_goal_record_task_move",
+      "sql": "CREATE TRIGGER board_goal_record_task_move AFTER UPDATE OF goal_id, board_id ON board_tasks\n            WHEN OLD.goal_id IS NOT NEW.goal_id OR OLD.board_id IS NOT NEW.board_id\n            BEGIN\n                INSERT INTO board_goal_task_moves(board_id,goal_id,task_id,moved_at)\n                SELECT OLD.board_id,OLD.goal_id,OLD.id,strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE OLD.goal_id IS NOT NULL AND OLD.goal_id \u003e 0\n                ON CONFLICT(board_id,goal_id,task_id) DO UPDATE SET moved_at=excluded.moved_at;\n                INSERT INTO board_goal_task_moves(board_id,goal_id,task_id,arrived_at)\n                SELECT NEW.board_id,NEW.goal_id,NEW.id,strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE NEW.goal_id IS NOT NULL AND NEW.goal_id \u003e 0\n                ON CONFLICT(board_id,goal_id,task_id) DO UPDATE SET arrived_at=excluded.arrived_at;\n            END",
+      "tbl_name": "board_tasks",
+      "type": "trigger"
     },
     {
       "name": "board_goal_requests_out_seq_insert",
@@ -860,7 +902,7 @@
     },
     {
       "name": "board_tasks_goal_seq_delete",
-      "sql": "CREATE TRIGGER board_tasks_goal_seq_delete AFTER DELETE ON board_tasks WHEN OLD.goal_id IS NOT NULL BEGIN INSERT INTO board_goal_meta (board_id, seq, updated_at) VALUES (OLD.board_id, 1, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))\n\t\tON CONFLICT(board_id) DO UPDATE SET seq = seq + 1, updated_at = excluded.updated_at; INSERT INTO board_goal_events (board_id, goal_id, kind, seq, at) SELECT OLD.board_id, OLD.goal_id, 'task_unlinked', seq, strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM board_goal_meta WHERE board_id = OLD.board_id AND (1); END",
+      "sql": "CREATE TRIGGER board_tasks_goal_seq_delete AFTER DELETE ON board_tasks\n            WHEN OLD.goal_id IS NOT NULL OR EXISTS(SELECT 1 FROM board_goal_task_moves m WHERE m.board_id=OLD.board_id AND m.task_id=OLD.id)\n            BEGIN INSERT INTO board_goal_meta (board_id, seq, updated_at) VALUES (OLD.board_id, 1, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))\n\t\tON CONFLICT(board_id) DO UPDATE SET seq = seq + 1, updated_at = excluded.updated_at; INSERT INTO board_goal_events (board_id, goal_id, kind, seq, at) SELECT OLD.board_id, OLD.goal_id, 'task_unlinked', seq, strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM board_goal_meta WHERE board_id = OLD.board_id AND (OLD.goal_id IS NOT NULL); INSERT INTO board_goal_events(board_id,goal_id,kind,seq,at)\n            SELECT m.board_id,m.goal_id,'task_unlinked',meta.seq,strftime('%Y-%m-%dT%H:%M:%SZ','now')\n            FROM board_goal_task_moves m JOIN board_goal_meta meta ON meta.board_id=m.board_id\n            JOIN board_goals g ON g.board_id=m.board_id AND g.id=m.goal_id\n            WHERE m.board_id=OLD.board_id AND m.task_id=OLD.id AND m.goal_id IS NOT OLD.goal_id; END",
       "tbl_name": "board_tasks",
       "type": "trigger"
     },
@@ -872,13 +914,13 @@
     },
     {
       "name": "board_tasks_goal_seq_move",
-      "sql": "CREATE TRIGGER board_tasks_goal_seq_move AFTER UPDATE OF goal_id ON board_tasks WHEN OLD.goal_id IS NOT NEW.goal_id\n\t\t\tBEGIN INSERT INTO board_goal_meta (board_id, seq, updated_at) VALUES (NEW.board_id, 1, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))\n\t\tON CONFLICT(board_id) DO UPDATE SET seq = seq + 1, updated_at = excluded.updated_at; INSERT INTO board_goal_events (board_id, goal_id, kind, seq, at) SELECT NEW.board_id, OLD.goal_id, 'task_unlinked', seq, strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM board_goal_meta WHERE board_id = NEW.board_id AND (OLD.goal_id IS NOT NULL); INSERT INTO board_goal_events (board_id, goal_id, kind, seq, at) SELECT NEW.board_id, NEW.goal_id, 'task_linked', seq, strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM board_goal_meta WHERE board_id = NEW.board_id AND (NEW.goal_id IS NOT NULL); END",
+      "sql": "CREATE TRIGGER board_tasks_goal_seq_move AFTER UPDATE OF goal_id ON board_tasks WHEN OLD.goal_id IS NOT NEW.goal_id\n\t\t\tBEGIN INSERT INTO board_goal_meta (board_id, seq, updated_at) VALUES (NEW.board_id, 1, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))\n\t\tON CONFLICT(board_id) DO UPDATE SET seq = seq + 1, updated_at = excluded.updated_at; INSERT INTO board_goal_events (board_id, goal_id, kind, seq, at) SELECT NEW.board_id, OLD.goal_id, 'task_unlinked', seq, strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM board_goal_meta WHERE board_id = NEW.board_id AND (OLD.goal_id IS NOT NULL AND OLD.board_id IS NEW.board_id); INSERT INTO board_goal_events (board_id, goal_id, kind, seq, at) SELECT NEW.board_id, NEW.goal_id, 'task_linked', seq, strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM board_goal_meta WHERE board_id = NEW.board_id AND (NEW.goal_id IS NOT NULL); END",
       "tbl_name": "board_tasks",
       "type": "trigger"
     },
     {
       "name": "board_tasks_goal_seq_state",
-      "sql": "CREATE TRIGGER board_tasks_goal_seq_state AFTER UPDATE OF status ON board_tasks WHEN OLD.goal_id IS NEW.goal_id AND NEW.goal_id IS NOT NULL AND OLD.status IS NOT NEW.status\n\t\t\tBEGIN INSERT INTO board_goal_meta (board_id, seq, updated_at) VALUES (NEW.board_id, 1, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))\n\t\tON CONFLICT(board_id) DO UPDATE SET seq = seq + 1, updated_at = excluded.updated_at; INSERT INTO board_goal_events (board_id, goal_id, kind, seq, at) SELECT NEW.board_id, NEW.goal_id, 'task_state', seq, strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM board_goal_meta WHERE board_id = NEW.board_id AND (1); END",
+      "sql": "CREATE TRIGGER board_tasks_goal_seq_state AFTER UPDATE OF status, completed_at ON board_tasks\n            WHEN OLD.goal_id IS NEW.goal_id AND (OLD.status IS NOT NEW.status OR OLD.completed_at IS NOT NEW.completed_at)\n            AND (NEW.goal_id IS NOT NULL OR EXISTS(SELECT 1 FROM board_goal_task_moves m WHERE m.board_id=NEW.board_id AND m.task_id=NEW.id))\n            BEGIN INSERT INTO board_goal_meta (board_id, seq, updated_at) VALUES (NEW.board_id, 1, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))\n\t\tON CONFLICT(board_id) DO UPDATE SET seq = seq + 1, updated_at = excluded.updated_at; INSERT INTO board_goal_events (board_id, goal_id, kind, seq, at) SELECT NEW.board_id, NEW.goal_id, 'task_state', seq, strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM board_goal_meta WHERE board_id = NEW.board_id AND (NEW.goal_id IS NOT NULL); INSERT INTO board_goal_events(board_id,goal_id,kind,seq,at)\n            SELECT m.board_id,m.goal_id,'task_state',meta.seq,strftime('%Y-%m-%dT%H:%M:%SZ','now')\n            FROM board_goal_task_moves m JOIN board_goal_meta meta ON meta.board_id=m.board_id\n            JOIN board_goals g ON g.board_id=m.board_id AND g.id=m.goal_id\n            WHERE m.board_id=NEW.board_id AND m.task_id=NEW.id AND m.goal_id IS NOT NEW.goal_id; END",
       "tbl_name": "board_tasks",
       "type": "trigger"
     },
@@ -1688,6 +1730,47 @@
           "notnull": 1,
           "pk": 0,
           "type": "INTEGER"
+        }
+      ],
+      "indexes": []
+    },
+    "board_ask_task_snapshots": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "message_id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "task_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "assignee",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
         }
       ],
       "indexes": []
@@ -2635,6 +2718,98 @@
           "origin": "c",
           "partial": 0,
           "seq": 1,
+          "unique": 1
+        }
+      ]
+    },
+    "board_goal_task_moves": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "board_id",
+          "notnull": 1,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "goal_id",
+          "notnull": 1,
+          "pk": 2,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "task_id",
+          "notnull": 1,
+          "pk": 3,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 3,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "moved_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "arrived_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "goal_id",
+              "seqno": 1
+            },
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "task_id",
+              "seqno": 2
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 3
+            }
+          ],
+          "name": "sqlite_autoindex_board_goal_task_moves_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
           "unique": 1
         }
       ]
@@ -6662,6 +6837,24 @@
           "notnull": 1,
           "pk": 0,
           "type": "TEXT"
+        },
+        {
+          "cid": 15,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "goal_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 16,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "task_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
         }
       ],
       "indexes": [
@@ -6693,6 +6886,72 @@
             }
           ],
           "name": "idx_operator_actions_team",
+          "origin": "c",
+          "partial": 0,
+          "seq": 2,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 7,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "team",
+              "seqno": 0
+            },
+            {
+              "cid": 15,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "goal_id",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "idx_operator_actions_team_goal",
+          "origin": "c",
+          "partial": 0,
+          "seq": 1,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 7,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "team",
+              "seqno": 0
+            },
+            {
+              "cid": 16,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "task_id",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "idx_operator_actions_team_task",
           "origin": "c",
           "partial": 0,
           "seq": 0,

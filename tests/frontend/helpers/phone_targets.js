@@ -1,6 +1,7 @@
 'use strict';
 const { installAudit, setTheme } = require('./contrast');
 const { TOUCH_AFTER } = require('./touch_area');
+const { sceneReady } = require('./scene_ready');
 // The phone touch-target census (#6130): at 390 px with touch, every visible control on a scene is at least 44 x 44 px. measure() is an expression for ev(): the controls (buttons, links, inputs, selects,
 // summaries, role=button/tab/menuitem/switch) under 44 px in either direction, and how many controls the scene has at all (so a scene that never rendered cannot pass by being empty). A checkbox or radio
 // counts as its label. A link inside running text is inline and exempt (WCAG 2.2 target size, inline exception); everything else under 44 px fails, unless it is on the reviewed ALLOW list below.
@@ -219,13 +220,13 @@ async function tap(ev, selector) {
     if (r !== 'ok') throw new Error(`${selector}: ${r}`);
 }
 
-/** Record one scene: its controls and the ones under 44 px (minus the allow list). `expect` is an expression that must be true once the scene is open (its own content is showing), checked before anything is measured. */
-async function scene(ev, results, name, setup, { min = 3, expect, contrastOnly = false } = {}) {
+/** Record one scene: its controls and the ones under 44 px (minus the allow list). `expect` is an expression that must be true once the scene is open (its own content is showing); the scene is
+ *  measured once it is ready (scene_ready.js: its fetches done, nothing aria-busy, nothing moving), and a scene not ready in time fails unless `knownSlow` says why it may be measured as it is (#416). */
+async function scene(ev, results, name, setup, { min = 3, expect, contrastOnly = false, knownSlow } = {}) {
     try {
         await setup();
-        if (expect) { await new Promise(r => setTimeout(r, 400)); if (!(await ev(expect))) throw new Error(`the scene is not showing (${expect.slice(0, 80)})`); } // sleep-ok: the scene's own transition settles
+        await sceneReady(ev, name, { expect, knownSlow });
     } catch (e) { results.push({ name, error: String(e && e.message || e).slice(0, 200) }); return; }
-    await new Promise(r => setTimeout(r, 600)); // sleep-ok: the scene's own transitions settle
     const m = contrastOnly ? { n: min, small: [], dups: [], unnamed: [] } : await ev(MEASURE); // contrastOnly (the desktop pass): only the colours are looked at
     const cr = await contrastOf(ev, name);
     const ia = await ev(ICON_ALIGN); // before the 200% pass: that pass puts the root font back and the (i) is still shrinking (a transition) for a moment, 45 to 48 px, when it ends

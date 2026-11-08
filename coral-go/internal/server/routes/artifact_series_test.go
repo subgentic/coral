@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -155,7 +156,7 @@ func TestBytesInAnotherTeamsSeriesAreTheCallersOwnAndTheOtherTeamsSeriesIsUntouc
 	sid, _ := seriesOf(t, rig) // team-a's series holds "plan, second draft"
 	before := len(seriesMembers(rig.coralDir, sid))
 	own := rig.uploadText("b1", "b.txt", "bob's own artifact")
-	code, out := rig.uploadVersion("b1", "b2.txt", "plan, second draft", "coral://artifacts/"+own)
+	code, out := rig.uploadVersion("b1", "b.txt", "plan, second draft", "coral://artifacts/"+own) // the same name: a new version keeps its file's name (#14145), and what this test protects is the series isolation, not a rename
 	assert.Equal(t, http.StatusCreated, code, "team-b's version is team-b's: it learns nothing of team-a's series: %v", out)
 	assert.NotEqual(t, sid, out["series_id"], "a series of team-b's own")
 	assert.EqualValues(t, 2, out["version"])
@@ -252,7 +253,10 @@ func TestTheVersionListHasFixedFieldsAndOnlyWhatTheCallerMayRead(t *testing.T) {
 			assert.Equal(t, "plan.txt", row["name"])
 			assert.Equal(t, "text/plain", row["media_type"])
 			assert.NotEmpty(t, row["at"])
-			assert.ElementsMatch(t, []string{"digest", "version", "versions", "is_latest", "name", "size", "media_type", "at", "uploader", "role"}, keysOf(row), "fixed fields: no series id, no path")
+			// #14145: each version says the file's id and its own line, for the viewer's bar; the id is the series' own (the artifact info already says it to any reader of a version), never another series' and no path
+			assert.Equal(t, sid, row["file_id"], route)
+			assert.Equal(t, "version "+strconv.Itoa(i+1)+" of plan.txt (file "+sid+")", row["version_line"], route)
+			assert.ElementsMatch(t, []string{"digest", "version", "versions", "is_latest", "name", "size", "media_type", "at", "uploader", "role", "file_id", "version_line"}, keysOf(row), "fixed fields: no path")
 		}
 		status, _ = rig.getAs("b1", route)
 		assert.Equal(t, 404, status, "another team's agent: the same 404 as no such series: "+route)

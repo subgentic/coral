@@ -94,6 +94,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodGet && p == "/api/sessions/live" {
 				continue
 			}
+			// The goals reads are OwnerSees routes since #14047 (the owner's goals carry their done-state): the old list never had them.
+			if m == http.MethodGet && (p == "/api/goals" || (strings.HasPrefix(p, "/api/board/") && strings.Contains(p, "/goals"))) {
+				continue
+			}
 			// The owner's switch of one agent's auto-sleep (#12111) is new: the old list never had it.
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/sessions/live/") && strings.HasSuffix(p, "/auto-sleep") {
 				continue
@@ -108,6 +112,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			}
 			// Resolving a shortened artifact link (#9841) is the owner's alone through the hub: the old list never had it.
 			if m == http.MethodGet && p == "/api/artifacts/resolve" {
+				continue
+			}
+			// Protected thumbnail reads are new in #14147, not in the historical list.
+			if m == http.MethodGet && strings.HasPrefix(p, "/api/artifacts/") && strings.HasSuffix(p, "/thumbnail") {
 				continue
 			}
 			// Starring an artifact (#9819) is the owner's alone through the hub: the old list never had it.
@@ -195,6 +203,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			}
 			// The done-state of a goal-looks-done row (#13834) and the bulk Record for all agents (#13834) are the owner's alone: the old list never had them.
 			if m == http.MethodPost && ((strings.HasPrefix(p, "/api/board/") && strings.HasSuffix(p, "/done-state")) || p == "/api/sessions/record-agents") {
+				continue
+			}
+			// The thread reads (#14440) are the owner's alone through the hub: the old list never had them.
+			if m == http.MethodGet && (p == "/api/thread" || p == "/api/threads") {
 				continue
 			}
 			// The Operator's opened version of a series (#13910) is the owner's alone: the old list never had it.
