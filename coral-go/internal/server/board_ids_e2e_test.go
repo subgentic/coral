@@ -184,7 +184,7 @@ func TestBoardIDsStrictAgentChecks(t *testing.T) {
 
 	cliTok, err := cliauth.ReadToken(dir)
 	require.NoError(t, err)
-	resp, err := cliauth.CLIClient{Base: ts.URL, Token: cliTok}.Do(ctx, "POST", "/api/sessions/launch", []byte(launch), nil, 0)
+	resp, err := cliDo(t, cliauth.CLIClient{Base: ts.URL, Token: cliTok}, ctx, "POST", "/api/sessions/launch", []byte(launch), nil, 0)
 	require.NoError(t, err)
 	var opOut map[string]any
 	_ = json.NewDecoder(resp.Body).Decode(&opOut)

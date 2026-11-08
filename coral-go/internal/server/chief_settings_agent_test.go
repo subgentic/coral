@@ -26,7 +26,7 @@ func TestAnAgentTokenCannotWriteTheChiefSettings(t *testing.T) {
 	cli := cliauth.CLIClient{Base: ts.URL, Token: cliTok}
 	put := func(asAgent bool, body string) int {
 		if !asAgent {
-			resp, err := cli.Do(ctx, "PUT", "/api/settings", []byte(body), nil, 0)
+			resp, err := cliDo(t, cli, ctx, "PUT", "/api/settings", []byte(body), nil, 0)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 			io.Copy(io.Discard, resp.Body)

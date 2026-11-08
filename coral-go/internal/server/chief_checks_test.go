@@ -19,7 +19,7 @@ func TestChiefChecksOwnerSurfaceExistsWithoutConnectorCredentials(t *testing.T) 
 	token, err := cliauth.ReadToken(dir)
 	require.NoError(t, err)
 	cli := cliauth.CLIClient{Base: ts.URL, Token: token}
-	resp, err := cli.Do(context.Background(), "GET", "/api/chief/checks", nil, nil, 0)
+	resp, err := cliDo(t, cli, context.Background(), "GET", "/api/chief/checks", nil, nil, 0)
 	require.NoError(t, err)
 	defer resp.Body.Close()
 	require.Equal(t, 200, resp.StatusCode)
@@ -74,7 +74,7 @@ func (e *checksEnv) call(t *testing.T, method, path string, body any, agent bool
 		if key != "" {
 			headers.Set("Idempotency-Key", key)
 		}
-		resp, err = e.cli.Do(context.Background(), method, path, data, headers, 0)
+		resp, err = cliDo(t, e.cli, context.Background(), method, path, data, headers, 0)
 	}
 	require.NoError(t, err)
 	defer resp.Body.Close()

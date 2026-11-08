@@ -36,7 +36,7 @@ func TestResetPasswordRotatesTheCLIToken(t *testing.T) {
 	old, err := cloud.ReadCLIToken(cfg.CoralDir())
 	require.NoError(t, err)
 	status := func(tok string) (int, error) {
-		resp, err := cloud.CLIClient{Base: local.URL, Token: tok}.Do(ctx, http.MethodGet, "/api/sessions/live", nil, nil, 5*time.Second)
+		resp, err := cliDo(t, cloud.CLIClient{Base: local.URL, Token: tok}, ctx, http.MethodGet, "/api/sessions/live", nil, nil, 5*time.Second)
 		if err != nil {
 			return 0, err
 		}

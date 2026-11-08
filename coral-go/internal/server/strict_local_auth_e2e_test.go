@@ -102,7 +102,7 @@ func TestStrictLocalAuthEndToEnd(t *testing.T) {
 	// coral open: the signed request mints a link (the command-line token from the data folder).
 	tok, err := cliauth.ReadToken(dir)
 	require.NoError(t, err)
-	resp, err := cliauth.CLIClient{Base: ts.URL, Token: tok}.Do(context.Background(), http.MethodPost, "/api/system/login-token", []byte("{}"), nil, 0)
+	resp, err := cliDo(t, cliauth.CLIClient{Base: ts.URL, Token: tok}, context.Background(), http.MethodPost, "/api/system/login-token", []byte("{}"), nil, 0)
 	require.NoError(t, err)
 	var link struct {
 		Path string `json:"path"`
@@ -133,7 +133,7 @@ func TestStrictLocalAuthEndToEnd(t *testing.T) {
 	assert.Equal(t, "strict", rep["mode"])
 
 	// A person's command-line tool: every request signed, the local Operator.
-	cli := &http.Client{Transport: cliauth.Transport{Base: http.DefaultTransport, Token: tok}}
+	cli := cliHTTPClient(t, tok, "")
 	code, _, _ = get(cli, "/api/sessions/live", nil)
 	assert.Equal(t, http.StatusOK, code)
 	post := func(c *http.Client, path, body string, hdr http.Header) (int, []byte) {
@@ -243,7 +243,7 @@ func TestStrictLocalAuthOffByDefault(t *testing.T) {
 	}
 	tok, err := cliauth.ReadToken(dir)
 	require.NoError(t, err)
-	code, _ := status(&http.Client{Transport: cliauth.Transport{Base: http.DefaultTransport, Token: tok, Dir: dir}}, nil)
+	code, _ := status(cliHTTPClient(t, tok, dir), nil)
 	assert.Equal(t, http.StatusOK, code, "a signed command-line request")
 	callers := srv.identity.Report()["callers"].(map[string]int64)
 	assert.Positive(t, callers["local_other"], "the unsigned caller is reported")

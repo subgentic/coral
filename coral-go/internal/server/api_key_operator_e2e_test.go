@@ -79,7 +79,7 @@ func TestAPIKeyRoutesNeedAVerifiedOperatorWithStrictOff(t *testing.T) {
 	})
 	assert.Equal(t, http.StatusOK, code, "the dashboard cookie: %s", body)
 	assert.Contains(t, body, key)
-	resp2, err := cli.Do(ctx, "GET", "/api/system/api-key", nil, nil, 0)
+	resp2, err := cliDo(t, cli, ctx, "GET", "/api/system/api-key", nil, nil, 0)
 	require.NoError(t, err)
 	defer resp2.Body.Close()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode, "the signed command line")
