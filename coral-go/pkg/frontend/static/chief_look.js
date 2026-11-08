@@ -2,7 +2,7 @@
  * the chief_name, chief_avatar, chief_avatar_letter and chief_fronts settings and gives them cleaned through GET /api/chief. This module draws the avatar, reads the look and puts it on the /chief page: the header's
  * name and avatar, the page title, and (by the --chief-color and --chief-letter variables chief.css reads) the avatar beside each of Chief's chat bubbles. Everything is set as text, never as HTML. Lazy: only /chief
  * and Settings > Chief load it. */
-import { serverFetch, contextServer, isCloud } from './server_base.js';
+import { serverFetch, contextServer, isCloud, isLocalServer } from './server_base.js';
 import { showToast } from './utils.js';
 import { importOnce } from './import_once.js';
 import { loadStyles } from './lazy_styles.js';
@@ -38,6 +38,7 @@ const cached = new Map();
 /** What the machine says about Chief, once per page load; null when it cannot be read (the page then keeps the agent's own name). */
 export function readChief(force = false) {
     const server = contextServer();
+    if (isCloud() && isLocalServer(server)) return Promise.resolve(null); // through the Hub with no computer shown, a bare /api/chief is the Hub's own (a 404): not asked (#14743)
     if (!cached.has(server) || force) cached.set(server, serverFetch(server, '/api/chief', { credentials: 'same-origin', cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(j => (j && j.enabled ? lookOf(j) : null)).catch(() => null));
     return cached.get(server);
 }

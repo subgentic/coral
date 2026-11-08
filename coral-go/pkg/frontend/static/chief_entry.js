@@ -4,7 +4,7 @@
  *   'setup'     none is set up on this computer: "Set up Chief", which opens Settings > Chief;
  *   'hub-setup' none is set up and the page is the Hub's: "Set up Chief" says, in a line, that Chief is set up on the computer itself (Settings is not the Hub's);
  *   null        the machine refuses (not the owner), or cannot be read: nothing is shown. */
-import { serverFetch, contextServer, isCloud } from './server_base.js';
+import { serverFetch, contextServer, isCloud, isLocalServer } from './server_base.js';
 import { importOnce } from './import_once.js';
 const { lookOf, avatarNode } = await importOnce('./chief_look.js'); // lazy: its failure is retried
 
@@ -12,6 +12,7 @@ const cache = new Map(), known = new Map(); // per computer: the asked answer, a
 /** The entry's state for the computer shown now, once per page load per computer (force: ask again). */
 export function chiefState(force = false) {
     const server = contextServer();
+    if (isCloud() && isLocalServer(server)) { known.set(server, null); return Promise.resolve(null); } // through the Hub with no computer shown: a bare /api/chief is the Hub's own (a 404); no Chief entry, no request, as the skills read does (#14743)
     if (!cache.has(server) || force) {
         cache.set(server, serverFetch(server, '/api/chief', { credentials: 'same-origin', cache: 'no-store' })
             .then(r => (r.ok ? r.json() : null))
