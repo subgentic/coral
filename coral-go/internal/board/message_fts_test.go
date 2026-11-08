@@ -169,7 +169,9 @@ func TestMessageSearchIndexBuildsWhileMessagesArePosted(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for i := 0; ; i++ {
+		// A bounded number of posts (#14668): the poster used to post for as long as the build ran, and under -race (10 to 20 times slower) it outran the builder, which chased a table that grew
+		// to 673,000 rows and held the package for 86 minutes. 300 posts land between the 8 or so chunks as before.
+		for i := 0; i < 300; i++ {
 			select {
 			case <-stop:
 				return
