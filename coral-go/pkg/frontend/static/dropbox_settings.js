@@ -10,6 +10,7 @@ const $ = (id) => document.getElementById(id);
 let pollTimer = null;
 let pollUntil = 0;
 let wired = false;
+let wasPending = false; // a sign-in was waiting at the last read: if it is gone and nothing connected, it timed out
 
 function show(id, on) {
     const el = $(id);
@@ -21,9 +22,9 @@ function setStatus(text) {
     if (el) el.textContent = text;
 }
 
-// note shows a sentence under the buttons; link (optional) is a URL the sentence ends with, shown as a link. The note is a live region that is always
-// rendered (empty when there is nothing to say), so a screen reader reads each new sentence.
-function note(text, link) {
+// note shows a sentence under the buttons; link (optional) is a URL the sentence ends with, shown as a link (in a new tab when newTab). The note is a
+// live region that is always rendered (empty when there is nothing to say), so a screen reader reads each new sentence.
+function note(text, link, newTab = false, linkText = '') {
     const el = $('settings-dropbox-note');
     if (!el) return;
     el.textContent = '';
@@ -32,7 +33,8 @@ function note(text, link) {
     if (link) {
         const a = document.createElement('a');
         a.href = link;
-        a.textContent = link;
+        a.textContent = linkText || link;
+        if (newTab) { a.target = '_blank'; a.rel = 'noopener noreferrer'; }
         el.append(document.createTextNode(' '), a);
     }
 }
@@ -97,7 +99,22 @@ export async function loadDropbox() {
         return null;
     }
     render(st);
+    if (st.signin_pending) {
+        // A sign-in already waits (Settings opened again, or reloaded): keep reading the status (UI Reviewer's MUST 1 on #14654).
+        if (!pollTimer) { pollUntil = Date.now() + POLL_FOR_MS; poll(); }
+        wasPending = true;
+    } else {
+        if (wasPending && !st.connected && !st.switch_pending) {
+            note('The Dropbox sign-in timed out or was cancelled. Connect again to try once more.'); // MUST 2: say it, with Connect shown by render
+        }
+        wasPending = false;
+    }
     return st;
+}
+
+// dropboxPolling says whether the status is being read again while a sign-in waits (for tests).
+export function dropboxPolling() {
+    return pollTimer !== null;
 }
 
 export function stopDropboxPoll() {
@@ -138,8 +155,13 @@ export async function connectDropbox() {
     }
     const url = String(res.body.authorize_url || '');
     if (!url.startsWith('https://www.dropbox.com/')) { note("Dropbox sign-in didn't start. Try again."); return; }
-    window.open(url, '_blank', 'noopener');
+    const tab = window.open(url, '_blank', 'noopener');
     setStatus('Waiting for you to click Allow in Dropbox…');
+    wasPending = true;
+    if (!tab) {
+        // The browser blocked the new tab (MUST 3): the same page as a link the person opens.
+        note('Your browser blocked the Dropbox tab. Open it here:', url, true, 'Open Dropbox to sign in');
+    }
     pollUntil = Date.now() + POLL_FOR_MS;
     poll();
 }

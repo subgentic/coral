@@ -26,7 +26,8 @@ const { JSDOM } = require('jsdom');
         return { ok: a.status === 200, status: a.status, json: async () => a.body };
     };
     let opened = null;
-    dom.window.open = (u) => { opened = u; return null; };
+    let popupBlocked = false;
+    dom.window.open = (u) => { opened = u; return popupBlocked ? null : {}; };
     const m = await import(pathToFileURL(path.join(dir, 'dropbox_settings.js')).href);
     const $ = (id) => document.getElementById(id);
     const shown = (id) => !$(id).hidden;
@@ -101,6 +102,30 @@ const { JSDOM } = require('jsdom');
     answers['/api/dropbox/disconnect'] = { status: 200, body: { connected: false, revoked: true } };
     await m.disconnectDropbox();
     assert.ok(!/Connected apps/.test($('settings-dropbox-note').textContent), 'a revoked sign-in needs no Connected apps note');
+
+    // UI Reviewer's MUSTs on #14654.
+    // (1) Settings opened while a sign-in already waits: it keeps reading the status, without a new Connect.
+    m.stopDropboxPoll();
+    await status({ app_key_set: true, connected: false, state: 'disconnected', signin_pending: true });
+    assert.ok(m.dropboxPolling(), 'a pending sign-in is followed when Settings opens');
+    assert.match($('settings-dropbox-status').textContent, /Waiting for you to click Allow/);
+    // (2) It expires (no longer pending, not connected): the person is told, with Connect to try again.
+    await status({ app_key_set: true, connected: false, state: 'disconnected' });
+    assert.match($('settings-dropbox-note').textContent, /timed out/);
+    assert.ok(shown('settings-dropbox-connect'), 'a retry');
+    m.stopDropboxPoll();
+    // (3) The browser blocks the new tab: a visible link opens Dropbox instead.
+    popupBlocked = true;
+    answers['/api/dropbox/connect'] = { status: 200, body: { authorize_url: 'https://www.dropbox.com/oauth2/authorize?y=2' } };
+    await m.connectDropbox();
+    const link = $('settings-dropbox-note').querySelector('a');
+    assert.ok(link, 'a link to open Dropbox');
+    assert.strictEqual(link.getAttribute('href'), 'https://www.dropbox.com/oauth2/authorize?y=2');
+    assert.strictEqual(link.getAttribute('target'), '_blank');
+    assert.match(link.getAttribute('rel') || '', /noopener/);
+    assert.match($('settings-dropbox-note').textContent, /blocked/);
+    m.stopDropboxPoll();
+    popupBlocked = false;
 
     // Nothing from the server is put into the page as HTML.
     await status({ app_key_set: true, connected: true, state: 'connected', account_id: '<img src=x onerror=alert(1)>' });
