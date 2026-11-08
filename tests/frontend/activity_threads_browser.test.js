@@ -21,7 +21,7 @@ const BASE=require('./test_base').BASE;
    assert.equal(await ev(`!!document.querySelector('.activity-folder .dt-group b')`),false,'goal text never becomes HTML');
    const headings=await ev(`[...document.querySelectorAll('.activity-folder .dt-group')].map(e=>e.textContent)`);
    assert.equal(headings.filter(t=>t.startsWith('Goal #1')).length,2,'same goal number in two teams never merges');
-   assert.ok(headings.some(t=>t.startsWith('No goal')),'old rows remain No goal');
+   assert.ok(headings.some(t=>t.startsWith('Not linked to a goal')),'rows without a recorded goal are honestly labelled');
    const tap=async(index)=>{await ev(framesJs());const p=await ev(`(()=>{const b=document.querySelectorAll('.activity-folder .dt-group-toggle')[${index}];b.scrollIntoView({block:'center'});const r=b.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2,h:r.height,hit:b.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}})()`);assert.ok(p.h>=44&&p.hit,'on-screen task target '+JSON.stringify(p));if(width===390)await client.Input.synthesizeTapGesture({x:p.x,y:p.y,gestureSourceType:'touch'});else{await client.Input.dispatchMouseEvent({type:'mousePressed',x:p.x,y:p.y,button:'left',clickCount:1});await client.Input.dispatchMouseEvent({type:'mouseReleased',x:p.x,y:p.y,button:'left',clickCount:1});}};
    await tap(0);await waitFor(`document.querySelectorAll('.activity-folder tr.dt-row').length>2`,'first task opens');
    assert.ok((await ev(`[...document.querySelectorAll('.activity-folder .dt-group-toggle')].map(b=>b.getAttribute('aria-expanded'))`)).includes('false'),'other team stays shut');

@@ -29,7 +29,7 @@ export function activityGroupLookup(rows, sourceLabel, partsOf, tasks) {
         const group = groups.get(key); group.count++;
         if (Date.parse(row.at) > Date.parse(group.latest.at)) group.latest = row;
     }
-    const goalLabel = key => { const {row,count}=goals.get(key); return `${row.goal_id ? `Goal #${row.goal_id}${row.goal_title ? ' · ' + safe(row.goal_title) : ''}\n${sourceLabel(teamKey(row))} · ` : 'No goal · '}${count} shown`; };
+    const goalLabel = key => { const {row,count}=goals.get(key); return `${row.goal_id ? `Goal #${row.goal_id}${row.goal_title ? ' · ' + safe(row.goal_title) : ''}\n${sourceLabel(teamKey(row))} · ` : 'Not linked to a goal · '}${count} shown`; };
     const entries = new Map();
     for (const [key,{row,count,latest}] of groups) {
         if (!taskKey(row)) { entries.set(key,{key,label:goalLabel(key)}); continue; }
