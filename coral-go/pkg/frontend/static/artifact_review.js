@@ -50,7 +50,10 @@ async function decisionEarlier(m, row) {
 
 async function settleEarlierVersions(m, row) {
     let settled = 0, failed = 0;
-    for (const e of await decisionEarlier(m, row)) {
+    let earlier;
+    try { earlier = await decisionEarlier(m, row); }
+    catch (e) { return { settled: 0, failed: 1, ...(e?.message ? { reason: e.message } : {}) }; }
+    for (const e of earlier) {
         try {
             const current = await m.currentTags(e);
             if (current !== null) {
@@ -74,7 +77,7 @@ export async function approveRow(team, row, note = '') { // note (#11888): one s
     const out = await decide(team, row, 'approve', undefined, String(note || '').replace(/\s+/g, ' ').trim());
     document.dispatchEvent(new CustomEvent('coral:review-approved', { detail: { team, id: row.id, at: out.review?.at || new Date().toISOString() } })); // an open viewer of this file says Approved at once, whoever approved it (the Inbox row, the viewer, a note)
     const m = await importOnce('./inbox_reviews.js').catch(() => null);
-    if (m) { out.earlier = await settleEarlierVersions(m, row).catch(() => ({ settled: 0, failed: 1 })); m.settleReview(row); m.refreshReviews(true).catch(() => {}); } // the versions before the approved one are settled with it (#11533)
+    if (m) { out.earlier = await settleEarlierVersions(m, row).catch(e => ({ settled: 0, failed: 1, ...(e?.message ? { reason: e.message } : {}) })); m.settleReview(row); m.refreshReviews(true).catch(() => {}); } // the versions before the approved one are settled with it (#11533)
     return out;
 }
 
@@ -84,6 +87,12 @@ const begin = () => { const h = { table: null }; document.dispatchEvent(new Cust
 const finish = h => document.dispatchEvent(new CustomEvent('coral:action-result', { detail: h }));
 const settled = (row, h) => importOnce('./inbox_reviews.js').then(m => { m.settleReview(row); return m.refreshReviews(true); }).catch(() => {}).then(() => finish(h));
 const fromWords = out => (out.delivered && out.asleep ? `${out.to} is asleep: it will see this when it wakes.` : out.delivered ? `${out.to} was told.` : out.reason === 'no_uploader' ? 'No agent is recorded for it, so nobody was told.' : '');
+const earlierFailure = out => {
+    const info = out?.earlier;
+    if (!info?.failed) return '';
+    if (info.reason === "Earlier versions aren't available through Coral Hub.") return " Earlier versions aren't available through Coral Hub; they may remain in Needs you.";
+    return ` ${info.failed} earlier version${info.failed === 1 ? '' : 's'} could not be cleared; ${info.failed === 1 ? 'it may remain' : 'they may remain'} in Needs you.`;
+};
 
 /** Deny a review row (#11552): a final no, the agent is told it was declined, with the reason if there is one. Resolves the server's answer. */
 /** What a row action does to the file's other versions (#11937): a row stands for the whole file (the newest, with the older ones as "earlier versions"), so the action goes to every version, not only the newest: otherwise the version
@@ -91,14 +100,14 @@ const fromWords = out => (out.delivered && out.asleep ? `${out.to} is asleep: it
 async function onEarlier(row, run) {
     const m = await importOnce('./inbox_reviews.js').catch(() => null);
     let done = 0, failed = 0;
-    if (m) { let earlier; try { earlier = await decisionEarlier(m, row); } catch { return { done: 0, failed: 1 }; } for (const e of earlier) { try { if (await m.currentTags(e) !== null) await run(e); done++; } catch { failed++; } } }
+    if (m) { let earlier; try { earlier = await decisionEarlier(m, row); } catch (e) { return { done: 0, failed: 1, ...(e?.message ? { reason: e.message } : {}) }; } for (const e of earlier) { try { if (await m.currentTags(e) !== null) await run(e); done++; } catch { failed++; } } }
     return { done, failed };
 }
 
 export async function denyRow(team, row, reason) { const h = begin();
     const out = await decide(team, row, 'deny', reason);
     const m = await importOnce('./inbox_reviews.js').catch(() => null);
-    if (m) out.earlier = await settleEarlierVersions(m, row).catch(() => ({ settled: 0, failed: 1 })); // the older versions leave Needs you with it, quietly: the agent is told once, about the newest
+    if (m) out.earlier = await settleEarlierVersions(m, row).catch(e => ({ settled: 0, failed: 1, ...(e?.message ? { reason: e.message } : {}) })); // the older versions leave Needs you with it, quietly: the agent is told once, about the newest
     settled(row, h); return out;
 }
 /** Dismiss a review row: out of Needs you with no verdict and nobody told; the file stays where it is. Unignore puts it back as it was. */
@@ -108,17 +117,19 @@ export async function unignoreRow(team, row) { const h = begin(); const out = aw
 /** Save for later (#11641): out of Needs you and its counts, kept in Saved with its decisions; nobody is told. Move to Needs you (unsave) puts it back as it was. */
 export async function saveRow(team, row) { const h = begin(); const out = await decide(team, row, 'save'); out.earlier = await onEarlier(row, e => decide(e.team, e, 'save')); settled(row, h); return out; }
 export async function unsaveRow(team, row) { const h = begin(); const out = await decide(team, row, 'unsave'); out.earlier = await onEarlier(row, e => decide(e.team, e, 'unsave')); importOnce('./inbox_reviews.js').then(m => { m.reviewsChangedOnServer(); return m.refreshReviews(true); }).catch(() => {}).then(() => finish(h)); return out; }
-export function saySaved(team, row) {
-    showToast(`Saved for later: ${shown(row.name)}`, false, undefined, { action: { label: 'Undo', onClick: () => unsaveRow(team, row).then(() => announceNotice(`${shown(row.name)} is back in Needs you.`)).catch(e => showToast(e.message)) } });
-    announceNotice(`Saved for later: ${shown(row.name)}. Undo is in the notice.`);
+export function saySaved(team, row, out) {
+    const words = `Saved for later: ${shown(row.name)}.${earlierFailure(out)}`;
+    showToast(words, false, undefined, { action: { label: 'Undo', onClick: () => unsaveRow(team, row).then(() => announceNotice(`${shown(row.name)} is back in Needs you.`)).catch(e => showToast(e.message)) } });
+    announceNotice(`${words} Undo is in the notice.`);
 }
 
 /** Say what an Dismiss did: a toast with Undo (30 s, the notices' rule for a toast with an action) and the same words read out politely. */
-export function sayIgnored(team, row) {
-    showToast(`Dismissed: ${shown(row.name)}`, false, undefined, { action: { label: 'Undo', onClick: () => unignoreRow(team, row).then(() => announceNotice(`${shown(row.name)} is back in Needs you.`)).catch(e => showToast(e.message)) } });
-    announceNotice(`Dismissed: ${shown(row.name)}. Undo is in the notice.`);
+export function sayIgnored(team, row, out) {
+    const words = `Dismissed: ${shown(row.name)}.${earlierFailure(out)}`;
+    showToast(words, false, undefined, { action: { label: 'Undo', onClick: () => unignoreRow(team, row).then(() => announceNotice(`${shown(row.name)} is back in Needs you.`)).catch(e => showToast(e.message)) } });
+    announceNotice(`${words} Undo is in the notice.`);
 }
-export function sayDenied(name, out) { showToast(`Denied ${shown(name)}. ${fromWords(out)}`.trim()); }
+export function sayDenied(name, out) { showToast(`Denied ${shown(name)}. ${fromWords(out)}${earlierFailure(out)}`.trim()); }
 
 /** The Deny dialog: "Deny this?" with an optional reason (500 characters); the agent is told it was declined. Red text, never a red fill. onDone runs after the deny went through. */
 export function openDenyDialog(team, row, onDone) {
@@ -174,7 +185,8 @@ export function openApproveNoteDialog(team, row, onDone) {
 /** Say what an approval did, in a toast. */
 export function sayApproved(rawName, out) {
     const name = shown(rawName);
-    if (out.earlier && out.earlier.failed) showToast(`Approved ${name}, but ${out.earlier.failed} earlier version${out.earlier.failed === 1 ? '' : 's'} could not be cleared: ${out.earlier.failed === 1 ? 'it' : 'they'} stay${out.earlier.failed === 1 ? 's' : ''} in Needs you.`, true);
+    if (out.earlier && out.earlier.failed && out.earlier.reason) showToast(`Approved ${name}, but ${out.earlier.reason} Earlier versions may remain in Needs you.`, true);
+    else if (out.earlier && out.earlier.failed) showToast(`Approved ${name}, but ${out.earlier.failed} earlier version${out.earlier.failed === 1 ? '' : 's'} could not be cleared: ${out.earlier.failed === 1 ? 'it' : 'they'} stay${out.earlier.failed === 1 ? 's' : ''} in Needs you.`, true);
     else if (out.delivered && out.asleep) showToast(`Approved. ${out.to} is asleep: it will see this when it wakes.`);
     else if (out.delivered) showToast(`Approved. ${out.to} was told.`);
     else if (out.reason === 'no_uploader') showToast(`Approved ${name}. No agent is recorded for it, so nobody was told.`);

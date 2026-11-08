@@ -4,7 +4,7 @@ import { setReviewCacheReader } from './ask_filter.js';
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
 import { sourcesKey } from './board_fetch.js';
 import { inboxSources, serverLabel, isOwnerOnlyAnswer } from './inbox_servers.js';
-import { boardFetch, nextArtifactPage, splitKey, serverFetch, identityKey, noteBoardLabels, normServer, isCloud } from './server_base.js';
+import { boardFetch, nextArtifactPage, splitKey, serverFetch, identityKey, noteBoardLabels, normServer } from './server_base.js';
 import { SORT_PARAM } from './filter_model.js';
 import { fetchSkewed } from './query_skew.js';
 import { hideAsksWhen } from './ask_filter.js';
@@ -273,13 +273,12 @@ export async function reviewOfTeam(team, digest, { anyState = false } = {}) {
 /** Expand a capped legacy collapse only when deciding it; ordinary Inbox reads stay bounded.
  * The reviewed row fixes the source, uploader/name group and upper version boundary. */
 export async function legacyEarlierVersions(row) {
-    if (isCloud()) throw new Error("Earlier versions aren't available through Coral Hub.");
     const source = splitKey(row.team), query = new URLSearchParams({ team: source.name, tag: 'for review', versions: 'all', q: row.name || '' });
     if (row.produced_by) query.set('by', row.produced_by);
     const older = new Map(), seen = new Set();
     let cursor = '';
     do {
-        const page = await readComputerPage(source.server, { query: query.toString(), cursor, limit: 50, revisionBound: false });
+        const page = await readComputerPage(source.server, { query: query.toString(), cursor, limit: 50, revisionBound: false, legacyExpansion: true });
         if (page.ownerOnly) throw new Error('Earlier versions are available only to this computer’s owner.');
         for (const a of page.artifacts) if (a.team === row.team && vkey(a) === vkey(row) && a.hex !== row.hex && byAge(a, row) < 0) older.set(a.hex, a);
         if (!page.has_more) return [...older.values()];
@@ -295,7 +294,7 @@ export async function legacyEarlierVersions(row) {
 const reviewQuery = new URLSearchParams({ tag: 'for review', versions: 'newest', starred_first: 'true', facets: 'team,by,goal' }).toString();
 const savedQuery = new URLSearchParams({ tag: 'saved', versions: 'newest' }).toString();
 let pagesReady = false, pendingStarted = 0, finishedAt = 0, finishedRev = -1, lastSources = null, rescans = 0;
-async function readComputerPage(server, { query, cursor, limit, signal, revisionBound = true }) {
+async function readComputerPage(server, { query, cursor, limit, signal, revisionBound = true, legacyExpansion = false }) {
     const started = revision, params = new URLSearchParams(query);
     params.set('limit', String(limit));
     if (cursor) params.set('cursor', cursor); else params.delete('cursor');
@@ -304,6 +303,7 @@ async function readComputerPage(server, { query, cursor, limit, signal, revision
     const asked = dropped.includes('digest') ? new Set((params.get('digest') || '').split(',').filter(Boolean)) : null; // the list came back whole: only the files asked for are kept
     if (signal?.aborted || (revisionBound && started !== revision)) throw Object.assign(new Error('The review read was superseded.'), { name: 'AbortError' });
     if (response.status === 403 && (data.code === 'owner_only' || data.error === 'owner_only')) return { artifacts: [], total: 0, tag_counts: {}, has_more: false, ownerOnly: true };
+    if (legacyExpansion && response.status === 403 && (data.code === 'path_not_allowed' || data.error === 'path_not_allowed')) throw new Error("Earlier versions aren't available through Coral Hub.");
     if (!response.ok) throw new Error(`Review artifacts could not be read (HTTP ${response.status}).`);
     if (!Array.isArray(data.artifacts)) throw new Error('The review page was not a list.');
     if (data.partial || data.failed_boards?.length) throw new Error('Some review files could not be read.');
