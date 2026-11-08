@@ -239,10 +239,11 @@ func runHealthOracle(t *testing.T, seed int64) {
 				bs.ReassignTask(ctx, "team", id, names[1+rng.Intn(len(names)-1)])
 			}
 		}
-		// A member waits on someone (some waits short enough to expire).
+		// A member waits on someone. The store expires a wait by the REAL clock, not the oracle's: a 2-minute wait never expired in a plain run (a few seconds) but did in a -race run of five minutes, at a
+		// different moment on each side, so the two sides differed (#14395). Hours, so no wait expires while the test runs; the same two rng draws as before, so every seed is the same run.
 		if rng.Intn(3) == 0 {
 			who := names[1+rng.Intn(len(names)-1)]
-			bs.RegisterWait(ctx, "team", who, session(who), "message", "Orchestrator", "", []time.Duration{2 * time.Minute, time.Hour}[rng.Intn(2)])
+			bs.RegisterWait(ctx, "team", who, session(who), "message", "Orchestrator", "", []time.Duration{2 * time.Hour, 24 * time.Hour}[rng.Intn(2)])
 		}
 		// A teammate mentions the orchestrator; the orchestrator may read or answer it before it is due.
 		if rng.Intn(3) != 0 {
