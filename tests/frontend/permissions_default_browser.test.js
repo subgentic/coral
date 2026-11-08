@@ -47,6 +47,7 @@ const { guardSettings } = require('./helpers/settings_guard');
     await ev(`import((window.__coralStatic||'/static/')+'agent_presets.js').then(m=>window.__expectedRoleLimits=m.AGENT_PRESETS.find(p=>p.name===${JSON.stringify(role)}).roleLimits.allow.slice().sort())`);
     await ev(`[...document.querySelectorAll('#role-default-probe button')].find(b=>b.textContent==="Apply the role's limits").click();true`);
     await waitFor(`import((window.__coralStatic||'/static/')+'agent_config_form.js').then(m=>JSON.stringify(m.getAgentConfig('role-default-probe').capabilities.allow.slice().sort())===JSON.stringify(window.__expectedRoleLimits))`,'role limits actually narrow the form');
+    assert.ok(await ev(`(()=>{const s=document.querySelector('#role-default-probe [data-role-limit-status]');return s?.getAttribute('role')==='status'&&s?.getAttribute('aria-live')==='polite'&&s.textContent.startsWith('Role limits applied: ')&&s.getBoundingClientRect().height>0})()`),role+' visibly confirms and announces the applied tools');
     const config=await ev(`import((window.__coralStatic||'/static/')+'agent_config_form.js').then(m=>m.getAgentConfig('role-default-probe'))`);
     assert.equal(config.name,role);assert.equal(config.permissionMode,'auto','narrowing tools preserves the selected mode');if(role!=='Terminal')assert.ok(config.prompt.length>0,'role instructions survive');
     assert.deepEqual(config.capabilities.allow.slice().sort(),await ev('window.__expectedRoleLimits'),role+' applies its exact saved tool choices');
