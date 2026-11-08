@@ -43,12 +43,14 @@
 .inbox-ask-reading .inbox-ask-offers { margin-top: 16px; }
 
 /* Binary decisions sit below the draft, directly beside Send reply. */
-.inbox-ask-sendrow:has(.inbox-ask-yes-no) { gap: 6px; }
-.inbox-ask-sendrow .inbox-ask-yes-no { display: flex; flex: none; margin: 0; margin-left: auto; }
+.inbox-ask-sendrow:has(.inbox-ask-yes-no) { gap: 6px; flex-wrap: wrap; justify-content: flex-end; } /* Add image, Yes, No and Send reply: in one row when they fit, else Send reply goes to a row of its own, never clipped (#14419, the reviewer: No was cut off in the narrow compose column at 1280) */
+.inbox-ask-sendrow:has(.inbox-ask-yes-no) .inbox-ask-pick { margin-right: auto; }
+.inbox-ask-sendrow .inbox-ask-yes-no { display: flex; flex: none; margin: 0; }
 .inbox-ask-yes-no .inbox-ask-offers-list { display: flex; flex-wrap: nowrap; gap: 6px; }
-.inbox-ask-yes-no .inbox-ask-offer { flex: none; min-width: 44px; }
-.inbox-ask-yes-no .inbox-ask-offer .btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 44px; min-height: 44px; padding: 0 12px; } /* the icon and the word it sends: Yes, No (#14419) */
+.inbox-ask-yes-no .inbox-ask-offer { flex: none; width: auto; min-width: 44px; }
+.inbox-ask-yes-no .inbox-ask-offer .btn { width: auto; display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 44px; min-height: 44px; padding: 0 12px; } /* the icon and the word it sends: Yes, No (#14419) */
 .inbox-ask-yes-no .inbox-ask-yn-word { font-size: var(--fs-sm); }
+@media (max-width: 400px) { .inbox-ask-yes-no .inbox-ask-offer .btn { padding: 0 8px; gap: 2px; } .inbox-ask-sendrow:has(.inbox-ask-yes-no) { gap: 4px; } } /* a 320 px phone: Add image, Yes, No and Send reply still share one row */
 .inbox-ask-sendrow:has(.inbox-ask-yes-no) .inbox-ask-send { margin-left: 0; min-height: 44px; }
 
 /* "#8" in a question: a link-looking button that opens that message (#14153); inline, the text's own size, 44 px high on a phone through its padding. */

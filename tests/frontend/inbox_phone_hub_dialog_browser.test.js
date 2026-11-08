@@ -20,7 +20,7 @@ const { coralReady } = require('./helpers/wait');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[390, 844, true], [1280, 900, false]]) {
             const at = `${w}: `;
-            const snap = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR; if (!dir) return; fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(`${dir}/hub-dialog-${name}-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+            const snap = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR; if (!dir) return; await ev(`new Promise(r => setTimeout(r, 700))`); /* sleep-ok: a synthesized touch leaves its tap highlight on screen for a moment; the picture waits for it to fade */ fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(`${dir}/hub-dialog-${name}-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
             await setupHubWorld({ client, Page, Emulation, width: w, height: h, mobile, inbox: 'native', needs: true, hubPages: true });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
             await ev(`(() => { const original = window.fetch.bind(window), json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
@@ -43,18 +43,27 @@ const { coralReady } = require('./helpers/wait');
             check(gap && !gap.missing && (w > 760 || gap.gap >= 4), `${at}a file row's name and its question line are not touching: ` + JSON.stringify(gap));
             await snap('rows');
 
-            const openRow = async (id, tapCard) => {
-                await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view tbody tr.dt-row')], row = rows.find(r => /${id}/.test(r.textContent)); const b = [...row.querySelectorAll('button')].find(x => /^Answer the question of/.test(x.getAttribute('aria-label') || '')) || row.querySelector('.dt-mail-open, .dt-primary'); b.click(); return true; })()`);
-                await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open]')`, `${at}the dialog opens`, 8000).catch(async e => { throw new Error(e.message + ' ' + JSON.stringify(await ev(`({ dialogs: document.querySelectorAll('dialog').length, open: document.querySelectorAll('dialog[open]').length, cls: [...document.querySelectorAll('dialog')].map(d => d.className + (d.open ? ' OPEN' : '')), rows: [...document.querySelectorAll('#group-table-view tbody tr.dt-row')].map(r => r.textContent.replace(/\\s+/g, ' ').trim().slice(0, 60)) })`))); });
+            // a person opens the question the way the screen offers it: a touch tap on the visible card at 390, a mouse click on the visible Answer button at 1280 (never a script's click on a button that is off-screen)
+            const tapAt = async (x, y) => { if (mobile) await client.Input.synthesizeTapGesture({ x, y, gestureSourceType: 'touch' }); else { await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x, y }); await client.Input.dispatchMouseEvent({ type: 'mousePressed', x, y, button: 'left', clickCount: 1 }); await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x, y, button: 'left', clickCount: 1 }); } };
+            const openRow = async text => {
+                const target = await ev(`(() => { const row = [...document.querySelectorAll('#group-table-view tbody tr.dt-row')].find(r => ${JSON.stringify(text)} && r.textContent.includes(${JSON.stringify(text)})); if (!row) return null; row.scrollIntoView({ block: 'center' });
+                    const el = ${mobile} ? row.querySelector('.inbox-review-name') || row : [...row.querySelectorAll('button')].find(b => /^Answer the question of/.test(b.getAttribute('aria-label') || '')); if (!el) return null; const r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2, hit = document.elementFromPoint(x, y);
+                    return { x, y, visible: r.width > 0 && r.right <= innerWidth && r.left >= 0 && r.bottom <= innerHeight && r.top >= 0, hit: !!hit && (el === hit || el.contains(hit) || hit.contains(el) || row.contains(hit)) }; })()`);
+                check(!!target && target.visible && target.hit, `${at}the card or button a person taps for "${text}" is on screen and the topmost element at its centre: ` + JSON.stringify(target));
+                await tapAt(target.x, target.y);
+                await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open]')`, `${at}the dialog opens from a real ${mobile ? 'tap' : 'click'}`, 8000);
             };
-            const foot = () => ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); const vis = e => !!e && !e.hidden && e.getClientRects().length > 0; const dm = [...d.querySelectorAll('.inbox-ask-buttons button')].find(b => b.textContent.trim() === 'Dismiss'); const yn = [...d.querySelectorAll('.inbox-ask-yes-no .inbox-ask-offer button')].map(b => ({ text: b.textContent.replace(/\\s+/g, ' ').trim(), w: Math.round(b.getBoundingClientRect().width), h: Math.round(b.getBoundingClientRect().height), right: Math.round(b.getBoundingClientRect().right) })); return { dismiss: vis(dm), dismissBox: dm ? Math.round(dm.getBoundingClientRect().height) : 0, yn, error: d.querySelector('.inbox-ask-error').textContent, overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth, dlgRight: Math.round(d.getBoundingClientRect().right), vw: innerWidth }; })()`);
+            const foot = () => ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); const vis = e => !!e && !e.hidden && e.getClientRects().length > 0; const dm = [...d.querySelectorAll('.inbox-ask-buttons button')].find(b => b.textContent.trim() === 'Dismiss'); const yn = [...d.querySelectorAll('.inbox-ask-yes-no .inbox-ask-offer button')].map(b => { const r = b.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, top = document.elementFromPoint(cx, cy); let inside = true, scrolled = false; for (let a = b.parentElement; a && a !== d.parentElement; a = a.parentElement) { const ar = a.getBoundingClientRect(); if (ar.width > 0 && (r.left < ar.left - 0.5 || r.right > ar.right + 0.5)) inside = false; if (a.scrollWidth - a.clientWidth > 1 && getComputedStyle(a).overflowX !== 'visible') scrolled = true; if (a === d) break; } return { text: b.textContent.replace(/\\s+/g, ' ').trim(), w: Math.round(r.width), h: Math.round(r.height), right: Math.round(r.right), inside, scrolled, hit: top === b || b.contains(top) }; });
+            return { dismiss: vis(dm), dismissBox: dm ? Math.round(dm.getBoundingClientRect().height) : 0, yn, error: d.querySelector('.inbox-ask-error').textContent, overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth, dlgRight: Math.round(d.getBoundingClientRect().right), vw: innerWidth }; })()`);
 
             // the Yes/No question (m1, id 7): words on the buttons, and Dismiss through the Hub
-            await openRow('search index migration');
+            await openRow('Approve the search index migration');
             const f = await foot();
             check(f.yn.length === 2 && /Yes/.test(f.yn[0].text) && /No/.test(f.yn[1].text), `${at}the Yes/No buttons say Yes and No in words: ` + JSON.stringify(f.yn));
             check(f.yn.every(b => b.h >= 44 && b.w >= 44), `${at}and each is a 44 px target: ` + JSON.stringify(f.yn));
             check(f.overflowX === 0 && f.yn.every(b => b.right <= f.vw), `${at}and nothing is pushed off the screen: ` + JSON.stringify([f.overflowX, f.vw]));
+            check(f.yn.length === 2 && f.yn.every(b => b.inside && b.hit), `${at}both Yes and No are fully inside every box that holds them up to the dialog, and hit-testable: ` + JSON.stringify(f.yn));
+            check(f.yn.every(b => !b.scrolled), `${at}and none of those boxes scrolls sideways: ` + JSON.stringify(f.yn));
             check(f.dismiss && f.dismissBox >= 36, `${at}through the Hub the owner's dialog has Dismiss: ` + JSON.stringify(f));
             await snap('yes-no');
             await ev(`window.__closes.length = 0; [...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-buttons button')].find(b => b.textContent.trim() === 'Dismiss').click(); true`);
@@ -65,7 +74,7 @@ const { coralReady } = require('./helpers/wait');
 
             // a grantee's computer (m2): Dismiss is refused owner_only; it goes away and says why
             await ev(`window.__closes.length = 0; true`);
-            await openRow('sandbox ready');
+            await openRow('Is the sandbox ready');
             check((await foot()).dismiss, `${at}m2's dialog offers Dismiss until it says no`);
             await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-buttons button')].find(b => b.textContent.trim() === 'Dismiss').click(); true`);
             await waitFor(`/owner/i.test(document.querySelector('dialog.inbox-ask-dialog .inbox-ask-error').textContent)`, `${at}the refusal is told`, 8000).catch(() => {});
