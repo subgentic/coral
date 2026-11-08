@@ -720,3 +720,4 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-mail-head { display: flex; align-items: baseline; gap: 6px; min-width: 0; max-width: 100%; }
 .dt-mail-computer { flex: none; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* the computer chip on a mail row's title line (#14623): its size and colour are the shared chip's */
 .inbox-needs-results tr:has(.inbox-only-reject) > td { padding-block: 8px; } /* a row whose note wraps (#14661): its buttons do not touch the row's borders */
+@media (max-width: 767px) { .inbox-answers .inbox-only-reject { box-sizing: border-box; padding-inline: 20px 12px; } } /* a phone's note lines up with the button above it (20 px in) and keeps 12 px from the right edge (#14661) */
