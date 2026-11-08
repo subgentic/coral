@@ -3,9 +3,11 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
-const { coralReady } = require('./helpers/wait');
+const { coralReady, framesJs } = require('./helpers/wait');
+const { guardSettings } = require('./helpers/settings_guard');
 
 (async () => {
+    const guard = await guardSettings();
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const problems = [];
     const check = (ok, msg) => { if (!ok) problems.push(msg); };
@@ -24,6 +26,46 @@ const { coralReady } = require('./helpers/wait');
     };
     try {
         await open();
+        await ev(`(()=>{const real=window.fetch;window.__noticeAckPosts=0;window.fetch=(input,options={})=>{if(new URL(String(input),location.href).pathname==='/api/launch-disclosure/ack'&&options.method==='POST')window.__noticeAckPosts++;return real(input,options)};return true})()`);
+        await ev(`fetch('/api/launch-disclosure/ack',{method:'DELETE'}).then(r=>r.ok)`);
+        await ev(`import((window.__coralStatic||'/static/')+'launch_disclosure.js').then(m=>m.refreshLaunchDisclosure())`);
+        await waitFor(`!!document.getElementById('launch-disclosure-banner')`, 'unseen notice');
+        const noticeText = await ev(`document.getElementById('launch-disclosure-banner').textContent`);
+        const size = async height => { await Emulation.setDeviceMetricsOverride({width:950,height,deviceScaleFactor:1,mobile:true}); await ev(framesJs(3)); };
+        await size(500);
+        assert.equal(await rect('#launch-disclosure-banner'), null, 'collapsed notice is absent at the short touch boundary');
+        assert.equal(await ev(`(()=>{const s=document.querySelector('#launch-disclosure-banner summary');s.focus();return document.activeElement===s})()`), false, 'folded notice cannot receive focus');
+        await size(700);
+        assert.ok(await rect('#launch-disclosure-banner'), 'taller view restores the notice');
+        assert.equal(await ev(`document.getElementById('launch-disclosure-banner').textContent`), noticeText, 'restored text is unchanged');
+        await ev(`document.querySelector('#launch-disclosure-banner summary').click();true`);
+        await waitFor(`document.querySelector('#launch-disclosure-banner summary').getAttribute('aria-expanded')==='true'`, 'expanded notice');
+        await size(500);
+        assert.ok(await rect('#launch-disclosure-banner'), 'expanded disclosure stays visible on a short screen');
+        await ev(`document.querySelector('#launch-disclosure-banner summary').click();true`);
+        await waitFor(`document.querySelector('#launch-disclosure-banner summary').getAttribute('aria-expanded')==='false'`, 'collapsed notice');
+        assert.equal(await rect('#launch-disclosure-banner'), null);
+        if (process.env.CORAL_TEST_STRICT) {
+            await ev(`fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({default_permission_mode:''})}).then(r=>r.ok)`);
+            const payload = {board_name:'disclosure-fold-probe',working_dir:'/tmp/coral-disclosure-no-folder',agent_type:'claude',flags:['--permission-mode','auto'],agents:[{name:'Orchestrator',prompt:'Coordinate'}]};
+            const refusal = await ev(`fetch('/api/sessions/launch-team',{method:'POST',headers:{'Content-Type':'application/json'},body:${JSON.stringify(JSON.stringify(payload))}}).then(async r=>({status:r.status,body:await r.json()}))`);
+            assert.equal(refusal.status,409,'folded view still hits the real authenticated launch gate');
+            assert.equal(refusal.body.code,'launch_disclosure_required');
+            await ev(`import((window.__coralStatic||'/static/')+'launch_core.js').then(m=>m._launchOn('local','/api/sessions/launch-team',${JSON.stringify(payload)},'claude'));true`);
+            await waitFor(`document.getElementById('confirm-modal')?.getClientRects().length>0&&document.getElementById('confirm-modal-message')?.textContent===${JSON.stringify(refusal.body.disclosure.text)}`, 'full server disclosure before launch');
+            assert.ok(await rect('#confirm-modal-yes'), 'explicit acknowledgement remains available in launch confirmation');
+            await ev(`[...document.querySelectorAll('#confirm-modal button')].find(b=>b.textContent.trim()==='Cancel').click();true`);
+            await waitFor(`!document.getElementById('confirm-modal').getClientRects().length`, 'launch cancelled');
+        }
+        await ev(`import((window.__coralStatic||'/static/')+'utils.js').then(m=>m.showView('mobile-agent-list'))`);
+        assert.ok(await rect('#launch-disclosure-banner'), 'leaving chat restores the notice');
+        assert.equal(await ev(`document.getElementById('launch-disclosure-banner').textContent`),noticeText);
+        assert.equal(await ev(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json()).then(d=>d.seen)`),false,'folding, expansion, and cancellation never mark the notice seen');
+        assert.equal(await ev(`window.__noticeAckPosts`),0,'no acknowledgement request was sent');
+        await ev(`window.selectLiveSession('coral-go','claude','o1','local');true`);
+        await waitFor(`document.body.classList.contains('live-session-active')`, 'return to chat');
+        await Emulation.setDeviceMetricsOverride({width:844,height:390,deviceScaleFactor:1,mobile:true});
+        await ev(framesJs(3));
         const before = await rect('#live-history-messages');
         await ev(`document.getElementById('command-input').focus(); true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the page folds
         const head = await rect('#live-session-view .terminal-header');
@@ -34,7 +76,7 @@ const { coralReady } = require('./helpers/wait');
         await Emulation.setDeviceMetricsOverride({ width: 844, height: 390, deviceScaleFactor: 1, mobile: true }); await ev(`document.getElementById('command-input').blur(); true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the page unfolds
         const back = await rect('#live-session-view .terminal-header');
         check(!!back, 'the agent header is back when the box loses focus');
-    } finally { await client.close(); }
+    } finally { await guard.restore(); await client.close(); }
     assert.deepEqual(problems, [], 'fold:\n  ' + problems.join('\n  '));
     console.log('PASS fold');
 })().catch(e => { console.error(e); process.exit(1); });

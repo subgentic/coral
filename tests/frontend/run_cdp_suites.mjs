@@ -174,6 +174,7 @@ const keep = flag('--keep');
 // --only, no --stress) adds one such shard at the end; --no-strict leaves it out.
 const strictOnly = flag('--strict');
 const STRICT_SUITES = [
+  'phone_landscape_fold_browser.test.js', // folding must preserve the real authenticated disclosure gate
   'permissions_default_browser.test.js', // the real disclosure gate requires a dashboard sign-in cookie
   'strict_mode_browser.test.js', 'server_switcher_browser.test.js', 'agent_state.test.js',
   'team_view_consolidation.test.js', 'a11y_dashboard_browser.test.js',
