@@ -91,7 +91,7 @@ func TestTheReadButtonsAndTheTagEditorAreRowsAndAnOpenIsNot(t *testing.T) {
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) { next.ServeHTTP(w, asPerson(req)) })
 	})
-	r.Use(ActivityRecorder(e.h.bs))
+	r.Use(ActivityRecorder(e.h.bs, nil))
 	r.Put("/api/board/{project}/artifacts/{id}/tags", e.h.SetArtifactTags)
 	r.Get("/api/activity", e.h.ListActivity)
 	srv := httptest.NewServer(r)
@@ -133,7 +133,7 @@ func TestTheReadButtonsAndTheTagEditorAreRowsAndAnOpenIsNot(t *testing.T) {
 			next.ServeHTTP(w, req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerAgentNoToken)))
 		})
 	})
-	ar.Use(ActivityRecorder(e.h.bs))
+	ar.Use(ActivityRecorder(e.h.bs, nil))
 	ar.Put("/api/board/{project}/artifacts/{id}/tags", e.h.SetArtifactTags)
 	asrv := httptest.NewServer(ar)
 	t.Cleanup(asrv.Close)
