@@ -25,7 +25,7 @@ func TestTheRankOfEachTypesModesIsWhatItCanDoWithoutAsking(t *testing.T) {
 	}{
 		{"claude", "default", rankAsks}, {"claude", "plan", rankAsks}, {"claude", "acceptEdits", rankEdits}, {"claude", "auto", rankJudged}, {"claude", "dontAsk", rankJudged}, {"claude", "bypassPermissions", rankOpen},
 		{"codex", "plan", rankAsks}, {"codex", "default", rankEdits}, {"codex", "acceptEdits", rankEdits}, {"codex", "auto", rankJudged}, {"codex", "bypassPermissions", rankOpen},
-		{"agy", "default", rankAsks}, {"agy", "acceptEdits", rankEdits}, {"agy", "auto", rankAsks}, {"agy", "bypassPermissions", rankOpen},
+		{"agy", "default", rankAsks}, {"agy", "acceptEdits", rankEdits}, {"agy", "auto", rankJudged} /* #14741: agy has its own --mode auto */, {"agy", "bypassPermissions", rankOpen},
 		{"gemini", "acceptEdits", rankEdits}, {"antigravity", "bypassPermissions", rankOpen},
 		{"hermes", "default", rankAsks}, {"hermes", "auto", rankAsks}, {"hermes", "bypassPermissions", rankOpen},
 		{"pi", "default", rankOpen}, {"opencode", "default", rankOpen},

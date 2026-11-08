@@ -1,10 +1,14 @@
 package agent
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // #14741 (the Operator: every agent starts in auto where its CLI has one; Security's rulings (a) and (b)): agy 1.5.3 has --mode auto. Antigravity, Gemini (agy itself) and agy launch in it by default, ONLY when that
@@ -44,6 +48,10 @@ func TestAgyHelpListsAutoOnlyAsAValueOfMode(t *testing.T) {
 	assert.False(t, agyHelpListsAutoMode(agyHelpWithoutAuto))
 	assert.False(t, agyHelpListsAutoMode("  --mode  Set the mode (accept-edits, plan)\n  --auto-approve  yes\n"), "another flag with auto in its name is not the value")
 	assert.False(t, agyHelpListsAutoMode("  --dangerously-skip-permissions  Auto-approve all tool permission requests\n"), "the skip flag's words are not a mode")
+	// QA Reviewer 2's SHOULD on #14741: '--auto-approve' pinned. A flag of that name, on its own line or in the --mode line's own description, is not the value auto.
+	assert.False(t, agyHelpListsAutoMode("  --auto-approve  Approve every tool call\n  --mode  Set the mode (accept-edits, plan)\n"), "--auto-approve on a line of its own")
+	assert.False(t, agyHelpListsAutoMode("  --mode  Set the mode (accept-edits, plan); see also --auto-approve\n"), "--auto-approve named inside the --mode description")
+	assert.False(t, agyHelpListsAutoMode("  --mode  Set the mode (accept-edits, plan) (auto-approve is separate)\n"), "auto-approve is not auto")
 	assert.False(t, agyHelpListsAutoMode(""), "a help that could not be read is no")
 	assert.True(t, agyHelpListsAutoMode("  --mode string  mode: auto|plan|accept-edits\n"), "another list form")
 }
@@ -107,4 +115,25 @@ func TestAgyLaunchModeSaysAutoAndAgreesWithTheBuilder(t *testing.T) {
 	assert.Equal(t, "auto", AgyLaunchMode([]string{"--mode", "auto"}, nil, "", false))
 	assert.Equal(t, "skip", AgyLaunchMode(nil, full, "", false), "full capabilities with NO mode named are still agy's yolo (as before)")
 	assert.True(t, strings.Contains(buildLaunch(&AgyAgent{}, LaunchParams{PermissionMode: "auto", Capabilities: full}), "--mode auto"))
+}
+
+// QA Reviewer 2's SHOULD on #14741: the cache is per FILE (path, size and modification time), so an agy updated in place is asked again. With the stat part of the key turned off this fails: the first answer would
+// be kept for the path whatever the file became.
+func TestTheAutoModeAnswerIsKeptPerFileNotPerPath(t *testing.T) {
+	old := cliHelp
+	cliHelp = func(p string) string { b, _ := os.ReadFile(p); return string(b) } // the "help" of this stand-in agy is its own content
+	agyAutoModeCache.Range(func(k, _ any) bool { agyAutoModeCache.Delete(k); return true })
+	t.Cleanup(func() {
+		cliHelp = old
+		agyAutoModeCache.Range(func(k, _ any) bool { agyAutoModeCache.Delete(k); return true })
+	})
+	p := filepath.Join(t.TempDir(), "agy")
+	require.NoError(t, os.WriteFile(p, []byte(agyHelpWithoutAuto), 0o755))
+	assert.False(t, AgySupportsAutoMode(p), "an agy that does not list auto")
+	assert.False(t, AgySupportsAutoMode(p), "asked again: the same answer from the cache")
+	// the file is replaced by a newer agy at the same path (a different size, and a later time)
+	require.NoError(t, os.WriteFile(p, []byte(agyHelpWithAuto), 0o755))
+	later := time.Now().Add(time.Hour)
+	require.NoError(t, os.Chtimes(p, later, later))
+	assert.True(t, AgySupportsAutoMode(p), "the updated file is asked again, not answered from the old file's entry")
 }
