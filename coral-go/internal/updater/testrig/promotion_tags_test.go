@@ -119,3 +119,92 @@ func TestATaggedPromotionBelowAVerifiedOneThatAnswers404IsSkipped(t *testing.T) 
 	assert.Equal(t, "1.4.131", res.Version)
 	assert.Empty(t, res.NextAttempt)
 }
+
+// A bare promote-* tag (no release made for it) with a higher sequence than the real promotions is junk: its files 404 and the by-tag lookup answers 404, so it is skipped and the real promotion
+// is staged. (coral-hub's Security on #317.)
+func TestABareTagAboveARealPromotionDoesNotBlockIt(t *testing.T) {
+	r := newRig(t)
+	r.publish(Spec{Version: "1.4.131", Sequence: 8})
+	r.gh.ServeRefs = true
+	r.cfg.RefsURL, r.cfg.ReleaseByTagURL = r.gh.RefsURL(), r.gh.ReleaseByTagURL()
+	refs, err := json.Marshal([]map[string]string{{"ref": "refs/tags/" + PromotionTag("v1.4.131", 8)}, {"ref": "refs/tags/" + PromotionTag("v1.4.140", 99)}})
+	require.NoError(t, err)
+	r.gh.RefsBody = refs
+	res := r.check()
+	require.Equal(t, stage.ResultStaged, res.Result, "%+v", res)
+	assert.Equal(t, "1.4.131", res.Version)
+	assert.Equal(t, 1, r.gh.Hits["repos/"+FakeRepo+"/releases/tags/"+PromotionTag("v1.4.140", 99)], "one lookup, for the bare tag")
+}
+
+// A real release whose files 404 still stops the pass, and so does a lookup that fails: only a definite 404 of the release is "bare".
+func TestARealReleaseWithNoFilesYetAndAFailedLookupBothStopThePass(t *testing.T) {
+	for name, fail := range map[string]func(r *rig){
+		"a real release, files not served yet": func(r *rig) {},
+		"the by-tag lookup errs":               func(r *rig) { r.gh.Status["bytag"] = 503 },
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := newRig(t)
+			r.publish(Spec{Version: "1.4.130", Sequence: 5})
+			r.publish(Spec{Version: "1.4.131", Sequence: 8})
+			r.gh.ServeRefs = true
+			r.cfg.RefsURL, r.cfg.ReleaseByTagURL = r.gh.RefsURL(), r.gh.ReleaseByTagURL()
+			if name != "a real release, files not served yet" {
+				// the newest tag has no release the lookup can find, and its files 404; the lookup itself fails
+				r.gh.RefsBody, _ = json.Marshal([]map[string]string{{"ref": "refs/tags/" + PromotionTag("v1.4.130", 5)}, {"ref": "refs/tags/" + PromotionTag("v1.4.140", 99)}})
+			}
+			fail(r)
+			r.gh.Status[PromotionTag("v1.4.131", 8)+"/"+stage.ManifestFile] = 404
+			r.gh.Status[PromotionTag("v1.4.140", 99)+"/"+stage.ManifestFile] = 404
+			res := r.check()
+			assert.Equal(t, stage.ResultFailed, res.Result, "%+v", res)
+			assert.Equal(t, "manifest", res.FailedStage)
+			r.nothingStaged()
+		})
+	}
+}
+
+// GitHub pages the tag list (30 by default, whatever per_page says): all of it is read, with the newest tag last. 31 and 101 tags, and a lookup that fills all five pages falls back to the list.
+func TestThePromotionTagsAreReadAcrossPages(t *testing.T) {
+	for _, c := range []struct {
+		name     string
+		tags     int
+		pageSize int
+	}{{"31 tags, pages of 30", 31, 30}, {"101 tags, pages of 100", 101, 100}} {
+		t.Run(c.name, func(t *testing.T) {
+			r := newRig(t)
+			r.publish(Spec{Version: "1.4.131", Sequence: 1000}) // the newest by sequence; it sorts last by name too
+			r.gh.ServeRefs = true
+			r.gh.RefsPageSize = c.pageSize
+			r.cfg.RefsURL = r.gh.RefsURL()
+			var refs []map[string]string
+			for n := 1; n < c.tags; n++ { // older, junk-by-files tags first
+				refs = append(refs, map[string]string{"ref": "refs/tags/" + PromotionTag("v1.4.120", int64(n))})
+			}
+			refs = append(refs, map[string]string{"ref": "refs/tags/" + PromotionTag("v1.4.131", 1000)}) // the last of the list
+			var err error
+			r.gh.RefsBody, err = json.Marshal(refs)
+			require.NoError(t, err)
+			res := r.check()
+			require.Equal(t, stage.ResultStaged, res.Result, "the last tag on the last page is found: %+v", res)
+			assert.Equal(t, "1.4.131", res.Version)
+		})
+	}
+}
+
+func TestAFullFifthPageOfTagsFallsBackToTheList(t *testing.T) {
+	r := newRig(t)
+	r.publish(Spec{Version: "1.4.131", Sequence: 7})
+	r.gh.ServeRefs = true
+	r.gh.RefsPageSize = 1
+	r.cfg.RefsURL = r.gh.RefsURL()
+	var refs []map[string]string
+	for n := 1; n <= 6; n++ { // more tags than five pages of one
+		refs = append(refs, map[string]string{"ref": "refs/tags/" + PromotionTag("v1.4.120", int64(n))})
+	}
+	var err error
+	r.gh.RefsBody, err = json.Marshal(refs)
+	require.NoError(t, err)
+	res := r.check()
+	require.Equal(t, stage.ResultStaged, res.Result, "the releases list, which has the promotion, answered: %+v", res)
+	assert.Positive(t, r.gh.Hits[listKey], "the list was asked")
+}

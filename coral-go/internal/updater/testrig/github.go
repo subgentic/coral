@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -28,6 +29,8 @@ type FakeGitHub struct {
 	// Off, the path answers 404: a check whose config names no RefsURL never asks.
 	ServeRefs bool
 	RefsBody  []byte
+	// RefsPageSize, when set, makes the tag lookup page like GitHub (by the "page" query, ignoring per_page): a page holds this many tags.
+	RefsPageSize int
 	// FeedExtra are tags the feed names before the releases this server has (newest first): a prerelease, a version this server has no files for. FeedWithPromotions makes the feed name the
 	// promotion releases too; the real feed names none (they are tagged on the promote branch's commit, #9716), so a test turns it on only to check what a feed that did would do.
 	FeedExtra          []string
@@ -168,6 +171,11 @@ func (g *FakeGitHub) RefsURL() string {
 	return g.srv.URL + "/repos/" + FakeRepo + "/git/matching-refs/tags/promote-"
 }
 
+// ReleaseByTagURL is where one release is looked up by its tag (stage.Config.ReleaseByTagURL).
+func (g *FakeGitHub) ReleaseByTagURL() string {
+	return g.srv.URL + "/repos/" + FakeRepo + "/releases/tags/"
+}
+
 // URL is the address of the server.
 func (g *FakeGitHub) URL() string { return g.srv.URL }
 
@@ -254,8 +262,38 @@ func (g *FakeGitHub) serve(w http.ResponseWriter, req *http.Request) {
 			}
 			body, _ = json.Marshal(refs)
 		}
+		if g.RefsPageSize > 0 {
+			var all []json.RawMessage
+			_ = json.Unmarshal(body, &all)
+			page, _ := strconv.Atoi(req.URL.Query().Get("page"))
+			if page < 1 {
+				page = 1
+			}
+			lo, hi := (page-1)*g.RefsPageSize, page*g.RefsPageSize
+			if lo > len(all) {
+				lo = len(all)
+			}
+			if hi > len(all) {
+				hi = len(all)
+			}
+			body, _ = json.Marshal(all[lo:hi])
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write(body)
+		return
+	}
+	if strings.HasPrefix(p, "repos/"+FakeRepo+"/releases/tags/") { // one release by its tag: only a promotion release the server has, and published
+		if code, ok := g.Status["bytag"]; ok {
+			w.WriteHeader(code)
+			return
+		}
+		tag := strings.TrimPrefix(p, "repos/"+FakeRepo+"/releases/tags/")
+		if pr, ok := g.promos[tag]; ok && !pr.draft {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"tag_name":"` + tag + `"}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 	if p == FakeRepo+"/releases.atom" {
