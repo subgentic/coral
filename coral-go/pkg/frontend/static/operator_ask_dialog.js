@@ -1,5 +1,5 @@
 /* The question's reply box, pictures and offered actions; loaded when opened, not for the Inbox badge. */
-import { LOCAL_SERVER, boardTeamKey, normServer, serverFetch } from './server_base.js';
+import { LOCAL_SERVER, boardTeamKey, normServer, serverFetch, decisionNeedsPerson } from './server_base.js';
 import { openWithQuestionReturn } from './suspend_native_dialog.js';
 import { markHidden } from './visible_marks.js';
 import { renderMarkdownStrict } from './utils.js';
