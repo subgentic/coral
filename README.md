@@ -185,10 +185,13 @@ In the dashboard, choose **New agent** (then **New agent** again in the dialog: 
 
 ### Verify your download
 
-Every release lists the SHA-256 of each download in `SHA256SUMS.txt`, and signs that file in the release workflow. Check the file you downloaded against it before you install (the `install.sh` script does this for you). Use the file's name as in the list above (`Coral.dmg`, `coral-linux-amd64.tar.gz` or `coral-linux-arm64.tar.gz`):
+Every release lists the SHA-256 of each download in `SHA256SUMS.txt`, and signs that file in the release workflow. Check the file you downloaded against it before you install (the `install.sh` script does this for you). Run these commands in the folder that holds your download, and use the file's name as in the list above (`Coral.dmg`, `coral-linux-amd64.tar.gz` or `coral-linux-arm64.tar.gz`).
+
+Take `SHA256SUMS.txt` from the same release as your file, not from `latest`: a newer release may have replaced `latest` since you downloaded, and its list names other bytes. Set `TAG` to your release's tag (shown on its [Releases](https://github.com/subgentic/coral/releases) page, for example `v2.0.59`):
 
 ```bash
-curl -fsSLO https://github.com/subgentic/coral/releases/latest/download/SHA256SUMS.txt
+TAG=v2.0.59   # replace with the release you downloaded
+curl -fsSLO "https://github.com/subgentic/coral/releases/download/$TAG/SHA256SUMS.txt"
 # Linux:
 awk '$2 == "coral-linux-amd64.tar.gz"' SHA256SUMS.txt | sha256sum -c -
 # macOS:
@@ -197,10 +200,10 @@ awk '$2 == "Coral.dmg"' SHA256SUMS.txt | shasum -a 256 -c -
 
 On Windows, in PowerShell, compare `(Get-FileHash .\Coral-x64.msi).Hash` (SHA-256 by default; use `Coral-x64-portable.zip` for the ZIP) with the line for that file in `SHA256SUMS.txt`: they must be the same, ignoring upper and lower case.
 
-It must print `OK` for your file. The checksum guards against a damaged or swapped download. To also prove the release came from Coral's release workflow, install [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) and check the signature on `SHA256SUMS.txt`:
+It must print `OK` for your file. The checksum guards against a damaged or swapped download. To also prove the release came from Coral's release workflow, install [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) and check the signature on that same `SHA256SUMS.txt` (same folder, same `TAG`):
 
 ```bash
-curl -fsSLO https://github.com/subgentic/coral/releases/latest/download/SHA256SUMS.txt.sigstore.json
+curl -fsSLO "https://github.com/subgentic/coral/releases/download/$TAG/SHA256SUMS.txt.sigstore.json"
 cosign verify-blob SHA256SUMS.txt --bundle SHA256SUMS.txt.sigstore.json --new-bundle-format \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-identity-regexp '^https://github\.com/subgentic/coral/\.github/workflows/release\.yml@refs/tags/v'
