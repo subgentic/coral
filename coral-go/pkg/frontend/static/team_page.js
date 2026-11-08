@@ -24,7 +24,7 @@ const { el } = await importOnce('./team_table.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
 
 const PHONE_MORE = ['knowledge', 'messages']; // (the last three of TEAM_TABS: the row is its first four, Goals, Agents, Tasks, Artifacts, in the operator's order, #8791) // the tabs a phone puts behind its More menu (CSS hides their tabs under 761 px)
-const LABEL = { goals: 'Goals', messages: 'Board', tasks: 'Tasks', agents: 'Agents', artifacts: 'Artifacts', knowledge: 'Knowledge' };
+const LABEL = { goals: 'Goals', needs: 'Needs you', messages: 'Board', tasks: 'Tasks', agents: 'Agents', artifacts: 'Artifacts', knowledge: 'Knowledge' };
 const S = { team: '', tab: 'goals', item: null, counts: {}, built: false, countSeq: 0, navSeq: 0, noGoal: false }; // noGoal: the next Tasks tab opens filtered to the tasks that serve no goal (the Goals table's last row, #7717)
 const $ = (id) => document.getElementById(id);
 
@@ -74,7 +74,7 @@ function buildOnce() {
         list[to].focus();
         goTab(list[to].dataset.tab, { focus: true, user: true }); // selection follows focus
     });
-    $('team-page-health').addEventListener('click', () => { goTab('agents', { user: true }); });
+    $('team-page-health').addEventListener('click', () => { goTab('needs', { user: true }); });
     $('team-page-missing-back')?.addEventListener('click', () => { go({ view: 'agents' }); });
     $('team-page-back-agent')?.addEventListener('click', backToAgent);
     $('team-page-bar-back')?.addEventListener('click', () => { if (backTo) backToAgent(); else go({ view: 'agents' }); }); // a phone's bar arrow: back to the agent it came from, else to the agent list (#11239)
@@ -275,6 +275,11 @@ function drawCounts() {
 async function readCounts() {
     const team = S.team, seq = ++S.countSeq;
     if (!team) return;
+    S.counts.needs ??= '…';
+    importOnce('./inbox_sidebar.js').then(m => m.refreshTeamNeedsCount(team)).then(count => {
+        if (seq !== S.countSeq || team !== S.team) return;
+        S.counts.needs = count.ownerOnly ? '' : count.complete ? count.value : count.value ? `${count.value}+` : '…'; drawCounts();
+    }).catch(() => { if (seq === S.countSeq && team === S.team) { S.counts.needs = '…'; drawCounts(); } });
     const knowledge = S.knowledgeFor === team ? null : (S.knowledgeFor = team, teamFetch(team, n => `/api/teams/detail/${encodeURIComponent(n)}/knowledge`).then(async r => { const data = await r.json(); return r.ok ? data : null; }).catch(() => null)); // the Knowledge tab's count once per team, with the others (the notes are read again when the tab opens)
     const [goals, tasks, avail, kn] = await Promise.allSettled([
         boardFetch(team, '/goals?state=proposed,active,blocked,done,dropped&limit=200').then(async r => { const data = await r.json(); return r.ok ? data : null; }),
@@ -294,7 +299,13 @@ async function readCounts() {
     drawCounts();
 }
 // A Wake or a Sleep from here: the status is read and drawn at once, not at the next poll (#10359).
-document.addEventListener('coral:needs-updated', () => { if (S.team && currentTeamPage()) drawStatus(S.statusData); });
+function syncNeedsCount() {
+    if (!S.team || !currentTeamPage()) return;
+    const team = S.team;
+    importOnce('./inbox_sidebar.js').then(m => { if (S.team !== team) return; const count = m.teamNeedsCount(team); S.counts.needs = count.ownerOnly ? '' : count.complete ? count.value : count.value ? `${count.value}+` : '…'; drawCounts(); });
+}
+document.addEventListener('coral:needs-updated', () => { if (S.team && currentTeamPage()) drawStatus(S.statusData); syncNeedsCount(); });
+document.addEventListener('coral:team-needs-count', e => { if (e.detail?.team === S.team) syncNeedsCount(); });
 document.addEventListener('coral:team-sleep-changed', e => { if (S.team && e.detail && e.detail.team === S.team) readCounts(); });
 function startCounts() {
     readCounts();
@@ -334,8 +345,10 @@ function markTab(tab) {
 }
 
 /** Choose a tab (the person pressed it, a key moved to it, or an address named it). */
+let disposeNeeds = null;
 export async function goTab(tab, { focus = false, user = false, item = 0, replace = false } = {}) {
     if (!TEAM_TABS.includes(tab)) tab = 'goals';
+    disposeNeeds?.(); disposeNeeds = null;
     S.navSeq++;
     closeDetailPane();
     leaveMessages(tab);
@@ -365,6 +378,10 @@ async function fillTab(tab, item = 0) {
             if (stale()) return;
             m.showGoals(host, team, { page: true, hooks: { ...teamHooks(), onCount: (n) => { S.counts.goals = n; drawCounts(); } } });
             if (item) m.openGoalWhenKnown(item); else if (m.openGoalId()) { S.quiet = true; m.closeGoal(); S.quiet = false; }
+        } else if (tab === 'needs') {
+            const m = await importOnce('./inbox_sidebar.js');
+            if (stale()) return;
+            disposeNeeds = m.showTeamNeeds(host, team, { onCount: count => { S.counts.needs = count; drawCounts(); } });
         } else if (tab === 'tasks') {
             const m = await importOnce('./team_tasks_page.js');
             if (stale()) return;
@@ -526,6 +543,7 @@ export async function applyTeamRoute(team, tab, item, query = '') {
 
 /** Leave the page: the board's column goes back to its own page and the dock's panels back to the dock. */
 function leaveTeamPage() {
+    disposeNeeds?.(); disposeNeeds = null;
     state.lastTeamTab = S.tab; // the tab it was on, for the way back from another tab (#10008)
     S.navSeq++;
     closeItem(false);

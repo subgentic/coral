@@ -29,7 +29,8 @@ const NOT_CALLED = [/^\/api\/saved(\/|$)/, /^\/api\/board\/tasks$/, /^\/api\/sch
 const BASELINE = Object.fromEntries(Object.entries({
     '/api/sessions/history': HISTORY_KEYS, '/api/sessions/history/search': HISTORY_KEYS, '/api/sessions/history/{id}': ['limit'], '/api/sessions/history/{id}/agent-notes': [], '/api/sessions/history/{id}/events': ['limit'],
     '/api/sessions/history/{id}/git': [], '/api/sessions/history/{id}/notes': [], '/api/sessions/history/{id}/tags': [], '/api/sessions/history/{id}/tasks': [], '/api/sessions/{id}/changes': [], '/api/tags': [], '/api/token-usage': ['session_id'],
-    '/api/team-artifacts': Object.keys(REVIEW_BADGE_QUERY),
+    '/api/team-artifacts': [...Object.keys(REVIEW_BADGE_QUERY), 'team'], // #14143: qualified team Needs you count
+    '/api/operator-asks': [], // #14143: team attention includes the Inbox question source
     '/api/needs-you': ['kind'], // the skills that wait for approval, read at each computer through the Hub (#14046: needs_skills.js loadPendingSkills, ?kind=skill)
     '/api/board/projects': [], '/api/board/{team}': [], '/api/board/{team}/artifacts': ['limit'], '/api/board/{team}/goals': ['limit', 'state'], '/api/board/{team}/messages/all': ['format', 'limit', 'offset'], '/api/board/{team}/paused': [],
     '/api/board/{team}/status': [], '/api/board/{team}/subscribers': [], '/api/board/{team}/tasks': ['counts'], '/api/sessions/live/team/{team}/sleep-status': [], '/api/teams/detail/{team}/knowledge': [],
@@ -91,7 +92,7 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
         assert.deepEqual(tabsOutside, [], 'the Chats and Board tabs stay inside the fixed baseline: ' + JSON.stringify(tabsOutside));
         const badgeReads = [...bootA, ...chatsTab, ...boardTab].filter(r => r.p === '/api/team-artifacts');
         assert.ok(badgeReads.length > 0, 'the shared Inbox badge was exercised');
-        for (const request of badgeReads) assert.deepEqual(request.query, REVIEW_BADGE_QUERY, 'cross-tab artifact reads are only the bounded attention summary');
+        for (const request of badgeReads) assert.deepEqual(request.query, { ...REVIEW_BADGE_QUERY, ...(request.query.team === 'same-team' ? { team: 'same-team' } : {}) }, 'cross-tab artifact reads are bounded global or selected-team attention summaries');
         assert.ok(chatsTab.some(r => r.p === '/api/sessions/history') && boardTab.some(r => /\/messages\/all$/.test(r.p)), 'the baseline was driven: the Chats tab and the Board tab read');
         assert.ok(![...chatsTab, ...boardTab].some(r => r.p === ADDED_ROUTE), 'the Chats and Board tabs do not call the counts route');
         const baseline = new Map(Object.entries(BASELINE).map(([k, keys]) => [k, new Set(keys)]));
