@@ -142,3 +142,19 @@ func TestTheFingerprintTellsAnotherMachineOrDataFolder(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, ok, "Take over records this computer")
 }
+
+func TestSetStateAcceptsOnlyTheKnownStates(t *testing.T) {
+	ds, _, _ := dropboxStore(t)
+	ctx := context.Background()
+	_, err := ds.ServerID(ctx)
+	require.NoError(t, err)
+	for _, st := range []string{DropboxStateDisconnected, DropboxStateConnected, DropboxStateReconnect} {
+		assert.NoError(t, ds.SetState(ctx, st), st)
+	}
+	for _, st := range []string{"", "Connected", "paused", "connected; DROP TABLE x"} {
+		assert.Error(t, ds.SetState(ctx, st), st)
+	}
+	c, err := ds.Get(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, DropboxStateReconnect, c.State, "a refused state changes nothing")
+}

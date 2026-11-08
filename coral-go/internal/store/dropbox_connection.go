@@ -199,8 +199,13 @@ func (s *DropboxStore) Get(ctx context.Context) (*DropboxConnection, error) {
 		Connected: r.Token.Valid && r.Account.Valid}, nil
 }
 
-// SetState records a state (for example reconnect, when Dropbox refuses the token).
+// SetState records a state (for example reconnect, when Dropbox refuses the token). Only the three state constants are accepted (Security, #14618).
 func (s *DropboxStore) SetState(ctx context.Context, state string) error {
+	switch state {
+	case DropboxStateDisconnected, DropboxStateConnected, DropboxStateReconnect:
+	default:
+		return errors.New("not a Dropbox connection state")
+	}
 	_, err := s.db.ExecContext(ctx, "UPDATE dropbox_connection SET state = ? WHERE id = 1", state)
 	return err
 }
