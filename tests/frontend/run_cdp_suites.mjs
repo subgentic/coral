@@ -537,7 +537,12 @@ async function startShard(n, gen = 0, strict = false, backend = MAIN_BACKEND) {
   let seedViaApi = false;
   {
     const vals = CLI_TYPES.map(t => `('cli_path_${t}','${MOCK_AGENT.replace(/'/g, "''")}')`).join(',');
-    const sql = `CREATE TABLE IF NOT EXISTS user_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);\nINSERT OR REPLACE INTO user_settings (key,value) VALUES ${vals};`;
+    // The first-launch notice (#14061, the launch disclosure) is a banner at the top of the dashboard until its owner acknowledges it: 431 px on a phone, over every suite's first screen (the trial-t261 reds in phone_polish, needs_phone_proposals,
+    // needs_order_stable, inbox_command_row began exactly where it was merged). Every test server starts with it ACKNOWLEDGED, as a person who has read it; the two suites that are about the notice (permissions_default_browser,
+    // computers_disclosure_browser) take the acknowledgement away themselves (DELETE /api/launch-disclosure/ack) before they look at it. The id is read from the server's own source, so a new notice id is seeded without editing this file.
+    const noticeId = (() => { try { return /LaunchDisclosureID\s*=\s*"([^"]+)"/.exec(fs.readFileSync(path.resolve(goDir, 'internal/server/routes/launch_disclosure.go'), 'utf8'))?.[1] || ''; } catch { return ''; } })();
+    const noticeRow = noticeId ? `,('launch_disclosure_ack','${JSON.stringify({ id: noticeId, at: '2026-01-01T00:00:00Z' }).replace(/'/g, "''")}')` : '';
+    const sql = `CREATE TABLE IF NOT EXISTS user_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);\nINSERT OR REPLACE INTO user_settings (key,value) VALUES ${vals}${noticeRow};`;
     try {
       // The sqlite3 tool when it is on PATH, else Node's own SQLite (helpers/sqlite.js); with neither, the same values are PUT through the settings API once the server is up (below).
       if (sqliteAvailable()) sqliteExec(path.join(data, 'sessions.db'), sql);
