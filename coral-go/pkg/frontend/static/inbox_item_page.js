@@ -28,7 +28,8 @@ export function mountInboxItem(host, { kind, team, id, back, onChanged, backLabe
                 const full = await C.coralInboxAdapter.getTask(team, id);
                 requireOwner();
                 if (disposed) return;
-                const row = { ...full, id: pathId(id), server: source, project: team, board: keyLabel(team) };
+                const row = { ...full, id: pathId(id), server: source, project: team, board: keyLabel(team),
+                    goal: Number.isSafeInteger(Number(full.goal_id)) && Number(full.goal_id) > 0 && full.goal_title ? { id: Number(full.goal_id), title: String(full.goal_title) } : null };
                 host.replaceChildren(links());
                 if (row.parked_reason || row.parked_until) host.append(el('p', 'goals-note', ['Parked', row.parked_reason, row.parked_until].filter(Boolean).join(' · ')));
                 const panel = el('div', 'inbox-task-mount'); host.append(panel);

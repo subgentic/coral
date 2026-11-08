@@ -35,6 +35,9 @@ const {coralReady}=require('./helpers/wait');
     const real=window.fetch;window.__personalCalls=[];
     window.fetch=(u,o={})=>{const url=new URL(String(u),location.href),m=url.pathname.match(/^\\/api\\/remote\\/([^/]+)(\\/api\\/.*)$/);if(!m)return real(u,o);const [,server,path]=m;
      if(path==='/api/board/tasks'){window.__personalCalls.push({server,path,query:url.search,method:o.method||'GET'});return Promise.resolve(Response.json({tasks:[{id:1,board_id:'alpha',title:'Operator '+server,status:'pending',assigned_to:'Operator'},{id:2,board_id:'alpha',title:'Review '+server,status:'review_pending',assigned_to:'Agent'},{id:3,board_id:'alpha',title:'Parked '+server,status:'draft',assigned_to:'Operator',parked_reason:'waiting'},{id:4,board_id:'alpha',title:'Other agent',status:'pending',assigned_to:'Agent'},{id:'../escape',board_id:'alpha',title:'Bad id',assigned_to:'Operator'},{id:5,board_id:'../escape',title:'Bad team',assigned_to:'Operator'}]}));}
+     if(path==='/api/board/alpha/tasks/1'){window.__personalCalls.push({server,path,query:url.search,method:o.method||'GET'});return Promise.resolve(Response.json({id:1,title:'Detail '+server,body:'Task body '+server,status:'pending',assigned_to:'Operator',created_by:'Agent',goal_id:7,goal_title:'Source goal'}));}
+     if(path==='/api/board/alpha/messages/all'){window.__personalCalls.push({server,path,query:url.search,method:o.method||'GET'});return Promise.resolve(Response.json([]));}
+     if(path==='/api/board/alpha/tasks/1/reply'){window.__personalCalls.push({server,path,query:url.search,method:o.method||'GET'});return Promise.resolve(Response.json({error:'Reply refused'},{status:403}));}
      if(path==='/api/saved'){window.__personalCalls.push({server,path,query:url.search,method:o.method||'GET'});return Promise.resolve(Response.json({items:[{id:1,kind:'board',key:'7',ref:'alpha',team:'alpha',title:'Saved '+server,snippet:'private snippet '+server,saved_at:'2026-11-08T10:00:00Z',server:'m3'}],open:1,done:0,has_more:true}));}
      if(path==='/api/saved/1/message'){window.__personalCalls.push({server,path,query:url.search,method:o.method||'GET'});return Promise.resolve(Response.json({text:'Stored source '+server,partial:true,reason:'too_long'}));}
      return real(u,o);
@@ -46,6 +49,13 @@ const {coralReady}=require('./helpers/wait');
    const taskCheck=await ev(`import((window.__coralStatic||'/static/')+'inbox_coral.js').then(async m=>{const rows=await m.coralInboxAdapter.listTasks();return {keys:rows.map(t=>t.project+'#'+t.id).sort(),view:m.coralInboxAdapter.canReply({project:'@m1/alpha',status:'pending'}),interact:m.coralInboxAdapter.canReply({project:'@m2/alpha',status:'pending'}),review:m.coralInboxAdapter.canReply({project:'@m2/alpha',status:'review_pending'}),parked:m.coralInboxAdapter.canReply({project:'@m2/alpha',status:'draft',parked_reason:'wait'}),grantee:m.coralInboxAdapter.canReply({project:'@m3/alpha',status:'pending'})}})`);
    assert.deepEqual(taskCheck.keys,['@m1/alpha#1','@m1/alpha#2','@m1/alpha#3','@m2/alpha#1','@m2/alpha#2','@m2/alpha#3']);
    assert.equal(taskCheck.view.ok,false);assert.equal(taskCheck.interact.ok,true);assert.equal(taskCheck.review.ok,false);assert.equal(taskCheck.parked.ok,false);assert.equal(taskCheck.grantee.ok,false);
+   await ev(`[...document.querySelectorAll('#group-table-view button[data-task-id="1"]')].find(b=>b.textContent.includes('Operator m2')).click();true`);
+   await waitFor(`!!document.querySelector('.ibx-reply-input')&&document.querySelector('.ibx-reply-input').getClientRects().length>0`,'owner Interact task reply is offered');
+   assert.equal(await ev(`document.querySelector('.ibx-task-title').textContent`),'Detail m2');
+   assert.equal(await ev(`!![...document.querySelectorAll('.ibx-goal')].find(b=>b.textContent==='Goal: Source goal')`),true,'source-qualified goal is retained');
+   await ev(`(()=>{const t=document.querySelector('.ibx-reply-input');t.value='One attempted reply';t.dispatchEvent(new Event('input',{bubbles:true}));t.form.requestSubmit();return true})()`);
+   await waitFor(`document.querySelector('.ibx-reply-status')?.textContent==='Reply refused'`,'authoritative reply refusal is shown');
+   assert.equal(await ev(`window.__personalCalls.filter(c=>c.path.endsWith('/reply')).length`),1,'a refused reply is never automatically resent');
    await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.openInboxGroup('saved'))`);
    await waitFor(`import((window.__coralStatic||'/static/')+'saved.js').then(m=>m.savedView().shown.length===2)`,'owned saved sources loaded');
    const before=await ev('window.__personalCalls.length');
