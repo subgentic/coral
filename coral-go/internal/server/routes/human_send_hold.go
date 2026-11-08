@@ -63,7 +63,7 @@ type personHeld struct {
 	typing, cancelled bool
 	// screenOnly: it was held for a prompt on the screen while the agent's signals said no box was open (or had none): with no signals to wait on, only the screen decides when it goes (#14357).
 	screenOnly bool
-	finished          sync.Once
+	finished   sync.Once
 }
 
 // finish settles the message's waiter, once.

@@ -25,7 +25,11 @@ type screenTerm struct {
 	err    error
 }
 
-func (s *screenTerm) set(screen string, err error) { s.mu.Lock(); s.screen, s.err = screen, err; s.mu.Unlock() }
+func (s *screenTerm) set(screen string, err error) {
+	s.mu.Lock()
+	s.screen, s.err = screen, err
+	s.mu.Unlock()
+}
 func (s *screenTerm) AgentScreen(context.Context, string, string, string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
