@@ -36,4 +36,4 @@ If this data folder was copied or restored onto another computer or into another
 - *Couldn't read the Dropbox connection.* means Settings could not read the status; reopen Settings.
 - A program on this computer that already uses port 53682 on `127.0.0.1` also shows as *Another Dropbox sign-in is already waiting.* Close it, or wait and try again.
 
-<!-- Maintainers: not for merge until Dropbox ships (#14684). Written against dropbox-14609-signin 2ed958673 (the sign-in at 1d482cbb9 plus the Hub census fix); re-check each quoted sentence against the revision that ships. -->
+<!-- Maintainers: not for merge until Dropbox ships (#14684). Written against dropbox-14609-signin 77923d71b (the sign-in at 1d482cbb9, the Hub census fix 2ed958673 and the per-code wording); re-check each quoted sentence against the revision that ships. -->
