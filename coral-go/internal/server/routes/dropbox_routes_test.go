@@ -325,3 +325,18 @@ func TestAReconnectWithTheSameTokenRevokesNothing(t *testing.T) {
 	assert.Equal(t, 0, e.dbx.revoked, "the same token is not revoked")
 	assert.Equal(t, true, e.status()["connected"])
 }
+
+// A confirmed switch whose save fails leaves the old sign-in as it was: nothing is revoked before the new one is stored (QA's gap on #14643).
+func TestAFailedSwitchSaveRevokesNothing(t *testing.T) {
+	e := newDropboxEnv(t)
+	require.Contains(t, e.signIn(""), "Connected")
+	e.dbx.account = "dbid:BBB"
+	require.Contains(t, e.signIn(""), "different Dropbox account")
+	e.h.dbx.save = func(context.Context, string, string, string) error { return errors.New("disk full") }
+	rec := e.call(http.MethodPost, "/api/dropbox/switch", true, nil)
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+	assert.Equal(t, 0, e.dbx.revoked, "the old sign-in was not revoked")
+	st := e.status()
+	assert.Equal(t, true, st["connected"])
+	assert.Equal(t, "dbid:AAA", st["account_id"], "the old sign-in is still the stored one")
+}

@@ -37,6 +37,7 @@ type dropboxRoutes struct {
 	appKey    func() string
 	client    func(appKey string) *dropbox.Client
 	machineID func() (string, error)
+	save      func(ctx context.Context, account, refresh, fingerprint string) error // the store's Save; a test makes it fail
 	dataDir   string
 	port      int
 
@@ -63,6 +64,7 @@ func (h *CloudHandler) SetDropbox(ds *store.DropboxStore, dataDir string) {
 		},
 		client:    dropbox.NewClient,
 		machineID: dropbox.MachineID,
+		save:      ds.Save,
 	}
 }
 
@@ -194,7 +196,7 @@ func (d *dropboxRoutes) finish(res dropbox.CallbackResult) string {
 		return "This is a different Dropbox account from before. Go back to Coral to confirm the switch."
 	}
 	old := d.storedRefresh(ctx) // the sign-in this one replaces, kept in memory until the new one is saved
-	if err := d.store.Save(ctx, tok.AccountID, tok.Refresh, fp); err != nil {
+	if err := d.save(ctx, tok.AccountID, tok.Refresh, fp); err != nil {
 		return didNotFinish
 	}
 	if old != "" && old != tok.Refresh { // the same token again is the new sign-in itself: never revoked (Security's SHOULDs a and b on #14640)
@@ -222,7 +224,7 @@ func (h *CloudHandler) DropboxConfirmSwitch(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	old := d.storedRefresh(r.Context()) // the old account's sign-in, kept in memory: the new one is saved first, then the old one revoked, best effort
-	if err := d.store.Save(r.Context(), p.account, p.refresh, p.fingerprint); err != nil {
+	if err := d.save(r.Context(), p.account, p.refresh, p.fingerprint); err != nil {
 		writeError(w, http.StatusInternalServerError, "", "could not save the Dropbox connection")
 		return
 	}

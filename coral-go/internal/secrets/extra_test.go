@@ -89,8 +89,10 @@ func TestCoralsKeyRulesLeaveOrdinaryTextAlone(t *testing.T) {
 		"AKIA is the prefix of an AWS key ID",
 		"sl. is the prefix of a Dropbox token",
 		"the file is sl.txt, see sl.example.com for details",
-		"sl." + fake(40, urlSafe, 32),    // too short for a token
-		"AKIA" + "IOSFODNN7" + "EXAMPLE", // Amazon's documentation key
+		"sl." + fake(40, urlSafe, 32),                                                 // too short for a token
+		"sl." + fake(120, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", 33), // letters only: not a token (QA's gap on #14643)
+		"basl." + fake(120, alnumAZ, 34),                                              // a word that ends in sl.: never masked mid-word
+		"AKIA" + "IOSFODNN7" + "EXAMPLE",                                              // Amazon's documentation key
 		"AKIAlowercase0123456789",
 		"BAKIA" + fake(16, upperNum, 11),
 		"ASIA" + fake(17, upperNum, 12), // too long for a key ID
