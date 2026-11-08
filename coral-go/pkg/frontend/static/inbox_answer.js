@@ -48,6 +48,19 @@ const trustMenu = po => {
     return { no, yes, why: stepClean(po.trust_why).slice(0, 160), folder: po.trust_offer === true && folder && stepClean(folder) === folder ? folder : '' }; // a folder with a hidden or control character is never offered
 };
 
+// Codex's "Approaching rate limits" notice (#14774, #14728 part (a); Security's conditions): the second lasting choice a row may answer, a named exception found by structure. The server says so (rate_limit_offer, with the
+// model it read from the screen's own first option, to the person's own dashboard only); this side checks the same three labels again, draws the model as plain text and asks once more before choice 1 (it changes the
+// model the agent runs with) and choice 3 (it stops the reminder for good). Without the offer (a Hub viewer, another menu) the generic rule stands: only Keep current model is a button.
+const RL_MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/+-]{0,63}$/;
+const rateLimitMenu = po => {
+    const o = po && po.options, offer = po && po.rate_limit_offer;
+    if (!po || po.unnumbered || po.multi || !offer || typeof offer.model !== 'string' || !RL_MODEL.test(offer.model) || !Array.isArray(o) || o.length !== 3) return null;
+    const said = x => String(x && x.label || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    if (!o.every((x, i) => Number(x.n) === i + 1)) return null;
+    if (!said(o[0]).startsWith(`switch to ${offer.model.toLowerCase()}`) || said(o[1]) !== 'keep current model' || !said(o[2]).startsWith('keep current model (never show again)')) return null;
+    return { model: offer.model, switchTo: o[0], keep: o[1], never: o[2] };
+};
+
 // Claude's "Claude wants to use your browser" menu (#14151): the server reads it by structure (browser_menu: the title, then exactly these three rows in this order, one marked, no numbers, no footer). The row takes ONE of
 // them: "Not now" (Claude goes on without browser tools; nothing is installed, nothing is remembered). "Install extension" opens the person's Chrome and "Don't ask again" is lasting, so neither is a button: the row says so.
 // This side checks the same three labels again, so a menu that is not exactly this one gets no button.
@@ -80,6 +93,8 @@ async function readAsk(s) {
     if (browser) return { ask: String(po.ask_id || ''), picks: [browser.notNow], onlyReject, browser: true, question: '' }; // only Not now is a button; Install and Don't ask again are left to Open, and the row says so
     const trust = trustMenu(po);
     if (trust) return trust.folder ? { ask: String(po.ask_id || ''), picks: [trust.no, trust.yes], onlyReject, trust: { folder: trust.folder, yes: trust.yes } } : { ask: String(po.ask_id || ''), picks: [trust.no], onlyReject, held: true, trustWhy: trust.why }; // No only, and the row says the rest is left to Open
+    const rl = rateLimitMenu(po);
+    if (rl) return { ask: String(po.ask_id || ''), picks: [rl.switchTo, rl.keep, rl.never], onlyReject, rateLimit: rl };
     if (po.unnumbered) return none; // an unnumbered menu that is neither the folder-trust nor the browser menu above: no button on a row (the arrows and Enter go into whatever is on that screen; #14151, UI Reviewer), the row says the rest is Open agent's
     const permission = (po.options || []).some(o => PERMISSION_WORDS.test(String(o.label || ''))); // a permission card: only a plain Yes or No is a button; a question's own choices (Red, Blue) are
     const picks = (po.options || []).filter(o => (o.action || 'select') === 'select' && o.label && Number.isInteger(Number(o.n)) && plainlyOneTime(String(o.label), permission) && (!onlyReject || REJECT_FORM.test(wholeLabel(String(o.label)))));
@@ -105,7 +120,7 @@ export async function readWholeQuestion(s) {
 
 const askKey = s => `${sessionServer(s)}:${s.session_id}:${s.waiting_since || ''}`;
 
-async function answer(s, o, ask, cell, step = '', trustFolder = '') { // step: the whole review text the row was drawn for ('' for a step with no review)
+async function answer(s, o, ask, cell, step = '', trustFolder = '', rateLimitModel = '') { // step: the whole review text the row was drawn for ('' for a step with no review)
     const buttons = [...cell.querySelectorAll('button')];
     const had = cell.contains(document.activeElement); // the keyboard is on a choice: it must still be on something when the cell is drawn again or says Answered (#10560)
     const keep = () => { if (had) (cell.querySelector(`.inbox-answer[data-n="${Number(o.n)}"]`) || cell.querySelector('.inbox-answer') || cell.closest('tr')?.querySelector('.dt-primary'))?.focus({ preventScroll: true }); };
@@ -114,7 +129,7 @@ async function answer(s, o, ask, cell, step = '', trustFolder = '') { // step: t
     try {
         if (await hubBlocked(s)) { buttons.forEach(b => { b.disabled = false; }); return; } // a viewer: the reason is said
         const now = await readAsk(s); // the card is read again at the click: a row can be stale
-        if (!ask || now.ask !== ask || (step && now.stepFull !== step) || !now.picks.some(p => Number(p.n) === Number(o.n) && p.label === o.label) || (trustFolder && (!now.trust || now.trust.folder !== trustFolder))) { // a Yes for a folder is sent only while the screen still names that folder // a Submit is sent only while the screen still shows the same review step with the same answers (#11981, Security)
+        if (!ask || now.ask !== ask || (step && now.stepFull !== step) || !now.picks.some(p => Number(p.n) === Number(o.n) && p.label === o.label) || (trustFolder && (!now.trust || now.trust.folder !== trustFolder)) || (rateLimitModel && (!now.rateLimit || now.rateLimit.model !== rateLimitModel))) { // a lasting rate-limit choice is sent only while the screen still offers that model // a Yes for a folder is sent only while the screen still names that folder // a Submit is sent only while the screen still shows the same review step with the same answers (#11981, Security)
             read.delete(askKey(s));
             fill(s, cell).then(keep);
             showToast('That question changed; look at it again.', true);
@@ -122,11 +137,12 @@ async function answer(s, o, ask, cell, step = '', trustFolder = '') { // step: t
         }
         const resp = await serverFetch(sessionServer(s), `/api/sessions/live/${encodeURIComponent(s.name)}/answer-prompt`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ session_id: s.session_id, agent_type: s.agent_type || '', n: Number(o.n), label: o.label, text: '', ask_id: ask, ...(trustFolder ? { trust_folder: trustFolder } : {}) }),
+            body: JSON.stringify({ session_id: s.session_id, agent_type: s.agent_type || '', n: Number(o.n), label: o.label, text: '', ask_id: ask, ...(trustFolder ? { trust_folder: trustFolder } : {}), ...(rateLimitModel ? { rate_limit_model: rateLimitModel } : {}) }),
         });
         if (resp.status === 409) { // told apart by the server's code, never its words (#10516)
             const why = await resp.json().catch(() => ({}));
             if (why.code === 'trust_changed') { read.delete(askKey(s)); fill(s, cell).then(keep); showToast('The folder to trust changed or cannot be trusted from here. Open the agent to answer it.', true); return; } // the server refused the Yes: nothing was sent
+            if (why.code === 'rate_limit_changed') { read.delete(askKey(s)); fill(s, cell).then(keep); showToast('The rate-limit notice changed or cannot be answered from here. Open the agent to answer it.', true); return; } // the server refused: nothing was sent
             if (why.code === 'ask_changed') { read.delete(askKey(s)); fill(s, cell).then(keep); showToast('That question changed; look at it again.', true); return; } // the server saw another ask than the one drawn
             if (why.code === 'answer_sent_prompt_open') { // the key went and the prompt had not cleared: the agent may still be waiting, so the row stays in Needs you (the feed removes it when the agent stops waiting) and says so
                 read.delete(askKey(s));
@@ -167,6 +183,23 @@ function confirmTrust(s, o, ask, cell, trust) {
     cancel.focus({ preventScroll: true }); // the safe choice has the keyboard; Enter does not trust by accident
 }
 
+// The second question before a rate-limit notice's lasting choices (#14774): choice 1 names the model it switches to, choice 3 says in plain words that it stops the reminder for good. Cancel has the keyboard.
+function confirmRateLimit(s, o, ask, cell, rl) {
+    const who = resolveSessionIdentity(s), never = o === rl.never;
+    cell.replaceChildren();
+    const q = document.createElement('span'); q.className = 'inbox-trust-note inbox-trust-confirm inbox-rate-limit-confirm'; q.setAttribute('role', 'group'); q.setAttribute('aria-label', never ? `Stop the reminder for ${who}?` : `Switch ${who} to ${rl.model}?`);
+    if (never) q.append('This stops the reminder for good.');
+    else { const m = document.createElement('code'); m.className = 'inbox-trust-path'; m.textContent = rl.model; q.append('Switch this agent to ', m, '? It changes the model the agent runs with.'); }
+    const go = document.createElement('button'); go.type = 'button'; go.className = 'btn btn-small inbox-answer inbox-trust-go'; go.textContent = never ? 'Never show again' : `Switch to ${rl.model}`;
+    go.dataset.session = s.session_id; go.dataset.n = String(Number(o.n)); go.setAttribute('aria-label', never ? `Stop the rate-limit reminder for ${who}` : `Switch ${who} to ${rl.model}`);
+    const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'btn btn-small inbox-trust-cancel'; cancel.textContent = 'Cancel';
+    go.addEventListener('click', e => { e.stopPropagation(); answer(s, o, ask, cell, '', '', rl.model); });
+    cancel.addEventListener('click', e => { e.stopPropagation(); fill(s, cell).then(() => cell.querySelector('.inbox-answer')?.focus({ preventScroll: true })); });
+    for (const b of [go, cancel]) b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
+    cell.append(q, go, cancel);
+    cancel.focus({ preventScroll: true }); // the safe choice has the keyboard; Enter does not confirm by accident
+}
+
 // A Yes on a permission row ignores clicks for ARM_MS after it is drawn or shown (#14302, Security's INFO on #14173): a row that arrives under a click, or a Yes that a measured block has just turned on, must not be approved by
 // the click that was already on its way. The pointer leaving and entering the button again is a deliberate return: it arms the button at once.
 const ARM_MS = 400;
@@ -195,7 +228,7 @@ const stillArming = b => !!b._armEntry && Date.now() < b._armEntry.at;
 function fill(s, cell, withDismiss = true) {
     const key = askKey(s);
     if (!read.has(key)) read.set(key, readAsk(s).catch(() => ({ ask: '', picks: [], onlyReject: false })));
-    return read.get(key).then(({ ask, picks, onlyReject, held, trustWhy, step, stepFull, question, later, lines, trust, browser, target, targetNote }) => {
+    return read.get(key).then(({ ask, picks, onlyReject, held, trustWhy, step, stepFull, question, later, lines, trust, rateLimit, browser, target, targetNote }) => {
         cell._cmdObserver?.disconnect(); cell._cmdObserver = null; // the earlier block's observer goes with the block (#14173)
         cell.replaceChildren();
         const said = norm => String(norm || '').replace(/[?\s]+$/, '');
@@ -244,7 +277,7 @@ function fill(s, cell, withDismiss = true) {
             const isYes = gateOpt => !REJECT_FORM.test(wholeLabel(String(gateOpt.label)));
             if (typeof gate === 'object' && gate && isYes(o)) { yesButtons.push(b); b.hidden = true; } // hidden until measured: a Yes is never drawn before the block is known to be whole
             const permissionYes = s.waiting_kind === 'permission' && isYes(o); if (permissionYes) b._armKey = `${sessionServer(s)}:${s.session_id}:${s.waiting_since || ''}:${ask}:${o.label}`; if (permissionYes && !(gate && yesButtons.includes(b))) armYes(b); // a Yes of a permission is armed 400 ms after it is drawn (a gated one, when it is turned on)
-            b.addEventListener('click', e => { e.stopPropagation(); if (permissionYes && stillArming(b)) return; if (gate && yesButtons.includes(b) && gate.clipped()) { gate.apply(); return; } if (trust && o === trust.yes) confirmTrust(s, o, ask, cell, trust); else answer(s, o, ask, cell, stepFull || ''); });
+            b.addEventListener('click', e => { e.stopPropagation(); if (permissionYes && stillArming(b)) return; if (gate && yesButtons.includes(b) && gate.clipped()) { gate.apply(); return; } if (trust && o === trust.yes) confirmTrust(s, o, ask, cell, trust); else if (rateLimit && (o === rateLimit.switchTo || o === rateLimit.never)) confirmRateLimit(s, o, ask, cell, rateLimit); else answer(s, o, ask, cell, stepFull || ''); });
             b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
             cell.append(b);
         }

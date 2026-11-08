@@ -87,6 +87,9 @@ type promptScreen struct {
 	TrustOffer  bool   `json:"trust_offer,omitempty"`
 	// TrustWhy: the plain reason there is no Yes on the folder-trust menu when none is offered (#14572); "" when the offer is made or the menu is another.
 	TrustWhy string `json:"trust_why,omitempty"`
+	// RateLimit: Codex's 'Approaching rate limits' notice may be answered whole from a row, to the person's own dashboard only (#14774): the model it offers. Absent for everyone else and for any other menu.
+	RateLimit      *rateLimitOffer `json:"rate_limit_offer,omitempty"`
+	rateLimitModel string          // the model the screen's structure names when it is exactly that notice (markRateLimit); the offer is decided per caller
 	// TrustCut: the folder path ran past the lines Coral joins, so TrustFolder is only its start (#14586); never sent.
 	TrustCut bool `json:"-"`
 	// BrowserMenu: Claude's "Claude wants to use your browser" menu, read by structure (prompt_browser.go, #14151): a row may take its "Not now" only.
@@ -884,6 +887,7 @@ func parseAgentScreen(agentType, text string) (promptScreen, bool) {
 		if agentType == at.Claude {
 			markFolderTrust(text, &s)
 		}
+		markRateLimit(agentType, &s)
 	}
 	return s, ok
 }
@@ -920,14 +924,15 @@ func normalizeLabel(s string) string {
 func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	var body struct {
-		SessionID   string `json:"session_id"`
-		AgentType   string `json:"agent_type"`
-		N           int    `json:"n"`
-		Label       string `json:"label"`
-		Text        string `json:"text"`         // the typed answer, for a "text" option
-		Submit      bool   `json:"submit"`       // take the Submit row of a multi-select question (#5232); no n or label
-		AskID       string `json:"ask_id"`       // the ask the caller drew (a screen's ask_id): another ask now open is refused (#10400); empty: not checked
-		TrustFolder string `json:"trust_folder"` // a row's Yes for the folder-trust menu names the folder it drew: the screen must still name it, and Coral may trust it (#14110); empty: the chat's own answer
+		SessionID      string `json:"session_id"`
+		AgentType      string `json:"agent_type"`
+		N              int    `json:"n"`
+		Label          string `json:"label"`
+		Text           string `json:"text"`             // the typed answer, for a "text" option
+		Submit         bool   `json:"submit"`           // take the Submit row of a multi-select question (#5232); no n or label
+		AskID          string `json:"ask_id"`           // the ask the caller drew (a screen's ask_id): another ask now open is refused (#10400); empty: not checked
+		RateLimitModel string `json:"rate_limit_model"` // a row's answer to Codex's rate-limit notice names the model it drew: the screen must still be exactly that notice with that model, from the person's own dashboard (#14774); empty: the chat's own answer
+		TrustFolder    string `json:"trust_folder"`     // a row's Yes for the folder-trust menu names the folder it drew: the screen must still name it, and Coral may trust it (#14110); empty: the chat's own answer
 	}
 	if err := decodeJSON(r, &body); err != nil || !body.Submit && (body.N < 1 || body.N > 9 || strings.TrimSpace(body.Label) == "") {
 		errBadRequest(w, "n (1-9) and label are required")
@@ -988,6 +993,10 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.TrustFolder != "" && isTrustYes(screen, opt) && (screen.TrustFolder != body.TrustFolder || !h.trustOffered(r, body.SessionID, screen)) { // a row's lasting Yes: only for the folder it showed, a folder Coral may trust, from the person's own dashboard (#14110)
 		writeError(w, http.StatusConflict, "trust_changed", "The folder to trust changed or cannot be trusted from here. Answer it in the agent's own chat.")
+		return
+	}
+	if body.RateLimitModel != "" && (body.AgentType != at.Codex || screen.rateLimitModel != body.RateLimitModel || !trustFolderCaller(r)) { // the row's lasting choice: only for the notice and model it showed, from the person's own dashboard (#14774); a changed screen types nothing
+		writeError(w, http.StatusConflict, "rate_limit_changed", "The rate-limit notice changed or cannot be answered from here. Answer it in the agent's own chat.")
 		return
 	}
 	if note := h.onlyRejectNote(body.SessionID, screen); note != "" && !optionIsReject(opt) { // a request that cannot be shown whole or hides something is never allowed from here (#11399)
