@@ -114,8 +114,17 @@ async function freshServer(standIn) {
         await ev(`document.querySelector('#launch-step-agent [data-on-click="m-launch-session"]').click(); true`);
         return { before };
     };
-    // Whatever stands between Launch and the launch itself (the permission question) is answered the way a first-timer would: the recommended button.
+    // A fresh install must explicitly read and acknowledge the current server notice.
+    // The launch is blocked until this button is pressed; do not bypass the gate in setup.
     const answerQuestions = async () => {
+        const disclosure = await ev(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json())`);
+        assert.equal(disclosure.seen, false, 'fresh install has not acknowledged the notice');
+        await waitFor(`document.getElementById('confirm-modal')?.getClientRects().length>0 && document.getElementById('confirm-modal-message')?.textContent===${JSON.stringify(disclosure.text)}`, 'the full server disclosure before launching', {timeout:10000});
+        assert.equal(await ev(`fetch('/api/sessions/live').then(r=>r.json()).then(l=>(Array.isArray(l)?l:l.sessions||[]).length)`), 0, 'nothing launches before acknowledgement');
+        assert.equal(await ev(`document.getElementById('confirm-modal-yes').textContent.trim()`), 'Continue launch');
+        await ev(`document.getElementById('confirm-modal-yes').click();true`);
+        await waitFor(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json()).then(d=>d.seen===true)`, 'explicit acknowledgement persisted');
+        // Older optional permission questions, if offered, still need their own answer.
         for (let i = 0; i < 40; i++) {
             const btn = await ev(`(() => { const b = document.querySelector('body > .modal:not([id]) [data-action="enable"]'); if (b) { b.click(); return true; } return false; })()`);
             if (btn) return true;
@@ -201,7 +210,14 @@ async function freshServer(standIn) {
                 const after = await ev(`fetch('/api/sessions/live').then(r => r.json()).then(l => (Array.isArray(l) ? l : l.sessions || []).length)`);
                 assert.equal(after, before.length, 'no agent was started');
                 // What the server answers if a launch gets there anyway (an older page, the API), for the record: an error that names the CLI, never a success.
-                const raw = await ev(`fetch('/api/sessions/launch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ working_dir: ${JSON.stringify(s.dirs.work)}, agent_type: 'claude' }) }).then(async r => ({ status: r.status, body: await r.text() }))`);
+                let raw = await ev(`fetch('/api/sessions/launch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ working_dir: ${JSON.stringify(s.dirs.work)}, agent_type: 'claude' }) }).then(async r => ({ status: r.status, body: await r.text() }))`);
+                assert.equal(raw.status,409,'even a missing CLI launch first requires disclosure acknowledgement');
+                assert.equal(JSON.parse(raw.body).code,'launch_disclosure_required');
+                await ev(`document.querySelector('#launch-disclosure-banner summary').click();true`);
+                await waitFor(`document.querySelector('#launch-disclosure-banner summary').getAttribute('aria-expanded')==='true'`, 'read the permissions notice');
+                await ev(`document.querySelector('#launch-disclosure-banner button').click();true`);
+                await waitFor(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json()).then(d=>d.seen===true)`, 'notice acknowledged before CLI error check');
+                raw = await ev(`fetch('/api/sessions/launch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ working_dir: ${JSON.stringify(s.dirs.work)}, agent_type: 'claude' }) }).then(async r => ({ status: r.status, body: await r.text() }))`);
                 assert.ok(raw.status >= 400, `the launch of a missing CLI is an error (got ${raw.status})`);
                 assert.match(raw.body, /not found/i);
                 console.log(`   ✓ said once under the folder with the install page and command; Launch off; no agent; the server answers HTTP ${raw.status}`);
