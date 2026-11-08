@@ -29,7 +29,7 @@ func TestTheRecordCarriesAndFiltersByTheGoalAndTaskOfEachRow(t *testing.T) {
 		}
 	}
 	require.NotZero(t, tid, "the task the file belongs to")
-	goal, err := e.h.bs.CreateGoal(ctx, "alpha", board.GoalInput{Title: "Ship the importer‮", CreatedBy: "Alice"})
+	goal, err := e.h.bs.CreateGoal(ctx, "alpha", board.GoalInput{Title: "Ship the importer" + string(rune(0x202e)), CreatedBy: "Alice"})
 	require.NoError(t, err)
 	gid := goal.ID
 	require.NoError(t, e.h.bs.SetTaskGoal(ctx, "alpha", tid, &gid))
