@@ -56,7 +56,38 @@ func activityActor(id callerIdentity) string {
 	return "hub:unknown"
 }
 
-// GET /api/activity?team=&action=&before=&limit= : the record, newest first, a page at a time, and whether its chain is whole (checked on the first page). Read only; the Operator's alone, at this computer or through
+// activityRowView is a row of the record as the read answers it: the row, and the titles of its goal and task as they are now, looked up live as Needs you does (#14421). A row with no goal or task has no
+// titles; a goal or task deleted since has none either.
+type activityRowView struct {
+	board.OperatorAction
+	GoalTitle string `json:"goal_title,omitempty"`
+	TaskTitle string `json:"task_title,omitempty"`
+}
+
+func (h *BoardHandler) activityRows(ctx context.Context, rows []board.OperatorAction) []activityRowView {
+	out := make([]activityRowView, len(rows))
+	links := map[string]*askSubjectLinks{}
+	for i, r := range rows {
+		out[i].OperatorAction = r
+		if (r.GoalID == nil && r.TaskID == nil) || r.Team == "" {
+			continue
+		}
+		l := links[r.Team]
+		if l == nil {
+			l = &askSubjectLinks{h: h, project: r.Team, goals: map[int64]string{}, tasks: map[int64]string{}}
+			links[r.Team] = l
+		}
+		if r.GoalID != nil {
+			out[i].GoalTitle = needsYouLine(l.goalTitle(ctx, *r.GoalID))
+		}
+		if r.TaskID != nil {
+			out[i].TaskTitle = needsYouLine(l.taskTitle(ctx, *r.TaskID))
+		}
+	}
+	return out
+}
+
+// GET /api/activity?team=&action=&goal=&task=&before=&limit= : the record, newest first, a page at a time, and whether its chain is whole (checked on the first page). Read only; the Operator's alone, at this computer or through
 // Coral Hub as the Hub OWNER (#12070: the tunnel's table lists it as an owner route; nobody else gets it).
 func (h *BoardHandler) ListActivity(w http.ResponseWriter, r *http.Request) {
 	if !operatorOnly(w, r) { // at this computer, the person; through Coral Hub, the account this computer is linked to and nobody else (refuseNonOwner): a guest, a grantee or a viewer is refused owner_only
@@ -80,6 +111,20 @@ func (h *BoardHandler) ListActivity(w http.ResponseWriter, r *http.Request) {
 		if id := hubOwnerRequest(r); id.team {
 			scoped = activityActor(id)
 			f.Actor = scoped
+		}
+	}
+	for _, k := range []string{"goal", "task"} { // only the rows about this goal or task (#14421); a row from before they were saved has neither and is never matched
+		if v := q.Get(k); v != "" {
+			n, err := strconv.ParseInt(v, 10, 64)
+			if err != nil || n <= 0 {
+				errBadRequest(w, "invalid "+k)
+				return
+			}
+			if k == "goal" {
+				f.GoalID = n
+			} else {
+				f.TaskID = n
+			}
 		}
 	}
 	if v := q.Get("before"); v != "" {
@@ -115,7 +160,7 @@ func (h *BoardHandler) ListActivity(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "could not read the record")
 		return
 	}
-	out := map[string]any{"actions": rows, "more": more, "record_id": recordID, "limit_max": board.ActivityMaxLimit}
+	out := map[string]any{"actions": h.activityRows(r.Context(), rows), "more": more, "record_id": recordID, "limit_max": board.ActivityMaxLimit}
 	if f.BeforeID == 0 {
 		chk, err := h.bs.VerifyActivity(r.Context())
 		if err != nil {

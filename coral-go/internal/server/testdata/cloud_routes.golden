@@ -259,6 +259,8 @@ GET /api/templates/commands/{category}/{name} view
 GET /api/themes view
 GET /api/themes/variables view
 GET /api/themes/{name} view
+GET /api/thread view
+GET /api/threads view
 GET /api/token-usage view
 GET /api/token-usage/by-branch view
 GET /api/token-usage/by-team view
