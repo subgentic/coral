@@ -19,7 +19,7 @@ const { canDismissWait, dismissButton, dismissWait, canRemoveWait, removeWait, R
 
 const MAX_CHOICES = 4;
 // Choices that last past this one answer, or change how the agent runs: never a button on a list row (each CLI's own words: Claude's "Yes, and don't ask again for ..." and "Yes, allow all edits during this session", Codex's "Yes, and don't ask again", Antigravity's "always allow").
-const LASTING = /don.?t ask|install|always|allow all|all edits|session|conversation|switch to|persist|remember|from now on|auto mode|accept edits/i;
+const LASTING = /don.?t ask|install|always|never|allow all|all edits|session|conversation|switch to|persist|remember|from now on|auto mode|accept edits/i; // 'never' ("never show again", "never ask again") is a lasting setting too (#14728: Codex's rate-limit notice drew its "Keep current model (never show again)" as a button)
 // A permission's choice is a button only when the WHOLE label (a trailing key hint like "(y)" and final punctuation dropped) is one of these one-time forms, and nothing else (Security Reviewer, #10462): Yes, Allow or Approve,
 // optionally "once", "this once", "proceed", "continue", Antigravity's "run command"; No, Deny or Reject, optionally "cancel" or Codex's "and tell <CLI> what to do differently". Everything else, including every phrasing that
 // lasts ("never ask again", "forever", "trust this workspace", "for the rest of this task") and every one that names a place, is left to Open.
