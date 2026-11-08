@@ -174,6 +174,8 @@ export const CLEANUP_FIELDS = [
     live('settings-message-search-status'),
     { key: 'worktrees', type: 'heading', id: 'wt-title', label: 'Kept worktrees', help: { text: 'Kept because they still hold your work.', more: 'Git worktrees Coral made for teams and jobs and kept when they stopped. Remove one when you no longer need it: Coral never forces a removal, so unsaved changes or unmerged commits keep it.' } },
     { key: 'worktrees_list', type: 'notice', render: slot => { slot.id = 'settings-worktrees-row'; const el = document.getElementById('settings-worktrees-live'); if (el) slot.append(el); } },
+    // The Dropbox backup block (#14609): drawn into its own row, out of the hidden holder it is written in (it was never shown before this row).
+    { key: 'dropbox_backup', type: 'notice', render: slot => { slot.id = 'settings-dropbox-row'; const el = document.getElementById('settings-dropbox'); if (el) slot.append(el); } },
 ];
 
 // The API key's line (#8460): the key (masked, read only; security_settings.js and settings_machine.js fill it) with Show, Copy and the Mobile QR beside it (under it where the panel is narrow). Drawn here, with the component's own line class.
