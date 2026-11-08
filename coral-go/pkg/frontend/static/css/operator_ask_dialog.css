@@ -46,8 +46,9 @@
 .inbox-ask-sendrow:has(.inbox-ask-yes-no) { gap: 6px; }
 .inbox-ask-sendrow .inbox-ask-yes-no { display: flex; flex: none; margin: 0; margin-left: auto; }
 .inbox-ask-yes-no .inbox-ask-offers-list { display: flex; flex-wrap: nowrap; gap: 6px; }
-.inbox-ask-yes-no .inbox-ask-offer { flex: none; width: 44px; min-width: 44px; }
-.inbox-ask-yes-no .inbox-ask-offer .btn { width: 44px; min-width: 44px; min-height: 44px; padding: 0; }
+.inbox-ask-yes-no .inbox-ask-offer { flex: none; min-width: 44px; }
+.inbox-ask-yes-no .inbox-ask-offer .btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 44px; min-height: 44px; padding: 0 12px; } /* the icon and the word it sends: Yes, No (#14419) */
+.inbox-ask-yes-no .inbox-ask-yn-word { font-size: var(--fs-sm); }
 .inbox-ask-sendrow:has(.inbox-ask-yes-no) .inbox-ask-send { margin-left: 0; min-height: 44px; }
 
 /* "#8" in a question: a link-looking button that opens that message (#14153); inline, the text's own size, 44 px high on a phone through its padding. */
