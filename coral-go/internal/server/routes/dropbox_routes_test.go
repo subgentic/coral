@@ -34,11 +34,18 @@ type fakeDropbox struct {
 	sameRefresh bool   // Dropbox answers a reconnect of the same account with the refresh token it gave before
 	issued      int    // codes exchanged, so each sign-in gets its own refresh token by default
 	onRevoke    func() // called when a revoke arrives, before it is answered (to check what is stored at that moment)
+	refreshDead bool   // the token endpoint answers invalid_grant to a refresh
+	// Stage 4's upload side.
+	sessions    map[string][]byte
+	files       map[string][]byte // path -> bytes stored
+	finishCalls int
+	onStart     func() // called when an upload session starts (to change things mid-pass)
+	used, alloc int64
 	srv         *httptest.Server
 }
 
 func newFakeDropbox(t *testing.T) *fakeDropbox {
-	f := &fakeDropbox{account: "dbid:AAA"}
+	f := &fakeDropbox{account: "dbid:AAA", sessions: map[string][]byte{}, files: map[string][]byte{}, used: 0, alloc: 1 << 40}
 	f.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
@@ -59,7 +66,59 @@ func newFakeDropbox(t *testing.T) *fakeDropbox {
 				json.NewEncoder(w).Encode(map[string]any{"access_token": "a-" + f.account, "refresh_token": refresh, "account_id": f.account, "expires_in": 14400})
 				return
 			}
+			if f.refreshDead {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(`{"error":"invalid_grant"}`))
+				return
+			}
 			json.NewEncoder(w).Encode(map[string]any{"access_token": "a1", "expires_in": 14400})
+		case "/2/files/upload_session/start":
+			if f.onStart != nil {
+				f.mu.Unlock()
+				f.onStart()
+				f.mu.Lock()
+			}
+			b, _ := io.ReadAll(r.Body)
+			id := fmt.Sprintf("s%d", len(f.sessions)+1)
+			f.sessions[id] = b
+			json.NewEncoder(w).Encode(map[string]string{"session_id": id})
+		case "/2/files/upload_session/finish_batch_v2":
+			f.finishCalls++
+			var a struct {
+				Entries []struct {
+					Cursor struct {
+						SessionID string `json:"session_id"`
+					} `json:"cursor"`
+					Commit struct {
+						Path string `json:"path"`
+						Mode string `json:"mode"`
+					} `json:"commit"`
+				} `json:"entries"`
+			}
+			json.NewDecoder(r.Body).Decode(&a)
+			var out []any
+			for _, e := range a.Entries {
+				if _, there := f.files[e.Commit.Path]; there || e.Commit.Mode != "add" {
+					out = append(out, map[string]any{".tag": "failure", "failure": map[string]any{".tag": "path", "path": map[string]any{".tag": "conflict"}}})
+					continue
+				}
+				b := f.sessions[e.Cursor.SessionID]
+				f.files[e.Commit.Path] = b
+				out = append(out, map[string]any{".tag": "success", "id": "id:" + e.Commit.Path, "rev": "r1", "content_hash": dropbox.ContentHash(b)})
+			}
+			json.NewEncoder(w).Encode(map[string]any{"entries": out})
+		case "/2/files/get_metadata":
+			var a map[string]string
+			json.NewDecoder(r.Body).Decode(&a)
+			b, ok := f.files[a["path"]]
+			if !ok {
+				w.WriteHeader(http.StatusConflict)
+				w.Write([]byte(`{"error_summary":"path/not_found/"}`))
+				return
+			}
+			json.NewEncoder(w).Encode(map[string]any{".tag": "file", "id": "id:" + a["path"], "rev": "r1", "content_hash": dropbox.ContentHash(b)})
+		case "/2/users/get_space_usage":
+			json.NewEncoder(w).Encode(map[string]any{"used": f.used, "allocation": map[string]any{"allocated": f.alloc}})
 		case "/2/auth/token/revoke":
 			if f.onRevoke != nil {
 				f.mu.Unlock()
@@ -84,6 +143,7 @@ type dropboxEnv struct {
 	dbx     *fakeDropbox
 	machine string
 	host    string // the Host the dashboard was opened at
+	db      *store.DB
 }
 
 func newDropboxEnv(t *testing.T) *dropboxEnv {
@@ -95,7 +155,7 @@ func newDropboxEnv(t *testing.T) *dropboxEnv {
 	h := NewCloudHandler(store.NewSessionStore(db), dir)
 	h.SetPeerCheck(func(*http.Request) (bool, bool) { return true, true })
 	h.SetDropbox(store.NewDropboxStore(db, store.NewRemoteServerStore(db, dir)), dir)
-	e := &dropboxEnv{t: t, h: h, dbx: newFakeDropbox(t), machine: "machine-1", host: "127.0.0.1:8420"}
+	e := &dropboxEnv{t: t, h: h, dbx: newFakeDropbox(t), machine: "machine-1", host: "127.0.0.1:8420", db: db}
 	h.dbx.appKey = func() string { return "appkey" }
 	h.dbx.client = func(k string) *dropbox.Client { return dropbox.NewClientAt(k, e.dbx.srv.URL) }
 	h.dbx.machineID = func() (string, error) { return e.machine, nil }

@@ -23,7 +23,8 @@ import (
 const (
 	DropboxStateDisconnected = "disconnected"
 	DropboxStateConnected    = "connected"
-	DropboxStateReconnect    = "reconnect" // the token was discarded (a re-key) or refused by Dropbox: connect again
+	DropboxStateReconnect    = "reconnect"  // the token was discarded (a re-key) or refused by Dropbox: connect again
+	DropboxStateQuotaFull    = "quota_full" // Dropbox said the account is full: the backup pauses (stage 4)
 )
 
 // ErrNoDropboxConnection is returned when this database holds no Dropbox sign-in.
@@ -202,7 +203,7 @@ func (s *DropboxStore) Get(ctx context.Context) (*DropboxConnection, error) {
 // SetState records a state (for example reconnect, when Dropbox refuses the token). Only the three state constants are accepted (Security, #14618).
 func (s *DropboxStore) SetState(ctx context.Context, state string) error {
 	switch state {
-	case DropboxStateDisconnected, DropboxStateConnected, DropboxStateReconnect:
+	case DropboxStateDisconnected, DropboxStateConnected, DropboxStateReconnect, DropboxStateQuotaFull:
 	default:
 		return errors.New("not a Dropbox connection state")
 	}

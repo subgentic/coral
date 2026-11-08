@@ -550,7 +550,14 @@ func storeArtifactFile(coralDir, sessionID, name, mediaType, tmpPath, hexID stri
 
 // storeArtifactFileAs is storeArtifactFile with a say in the upload record: `shape` (nil for an agent's own upload) changes it before it is written (the Operator's share, which names the Operator as its uploader).
 func storeArtifactFileAs(coralDir, sessionID, name, mediaType, tmpPath, hexID string, size int64, stamp *seriesStamp, taskID int64, shape func(*agentUploadRecord)) (agentArtifactMeta, bool, error) {
-	defer lockArtifact(hexID)()
+	unlock := lockArtifact(hexID)
+	queued := false
+	defer func() {
+		unlock()
+		if queued {
+			noteDropboxUpload(coralDir, sessionID, hexID) // the Dropbox backup queues it, outside the artifact's lock (#14655)
+		}
+	}()
 	mine := agentArtifactMeta{Name: name, MediaType: mediaType, Size: size, Digest: "sha256:" + hexID}
 	st := storeFor(coralDir)
 	objectPath := filepath.Join(coralDir, "artifacts", "objects", hexID)
@@ -605,6 +612,7 @@ func storeArtifactFileAs(coralDir, sessionID, name, mediaType, tmpPath, hexID st
 			rec, _ := json.Marshal(ur)
 			if err := writeFileAtomic(recPath, rec, 0o600); err == nil {
 				noteArtifactRecordChanged(coralDir, ur.Board)
+				queued = true
 			}
 		}
 	}

@@ -22,6 +22,11 @@ func deleteArtifactFiles(coralDir, id string) (freed int64, records int, found b
 	if !objectNameRe.MatchString(id) {
 		return 0, 0, false, nil
 	}
+	defer func() {
+		if found && err == nil {
+			noteDropboxDelete(coralDir, id) // its queued Dropbox files are cancelled: never uploaded afterwards (#14655)
+		}
+	}()
 	// A version of a series is deleted under its series' lock first, the digest's second (#6357), and the series' index forgets it.
 	// The object is one file of bytes that every team holding them shares (the Operator's delete removes the object and every row that lists it, #4379), so the digest is forgotten in EVERY team's series that has it,
 	// not in the first one's alone (#13949); another version of any of those series is untouched. The series locks are taken in id order (a second delete of other bytes cannot take them the other way round).

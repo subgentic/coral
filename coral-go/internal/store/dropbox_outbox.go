@@ -60,7 +60,9 @@ type DropboxOutbox struct{ db *DB }
 // NewDropboxOutbox makes the store.
 func NewDropboxOutbox(db *DB) *DropboxOutbox { return &DropboxOutbox{db: db} }
 
-func ts(t time.Time) string { return t.UTC().Format(time.RFC3339Nano) }
+// ts is a time as the outbox stores and compares it: RFC 3339 to the second, fixed width, so text order is time order (RFC3339Nano drops
+// trailing zeros and would not compare as text).
+func ts(t time.Time) string { return t.UTC().Format(time.RFC3339) }
 
 // Enqueue queues r unless its path already has a row, and reports whether it added one.
 func (o *DropboxOutbox) Enqueue(ctx context.Context, r DropboxOutboxRow) (bool, error) {
@@ -165,3 +167,12 @@ func (o *DropboxOutbox) CancelDigest(ctx context.Context, digest string) (int, e
 	n, err := res.RowsAffected()
 	return int(n), err
 }
+
+// MarkSecret records that a queued file matched a secret shape (the row shows the flag; the hit itself is never stored).
+func (o *DropboxOutbox) MarkSecret(ctx context.Context, id int64) error {
+	_, err := o.db.ExecContext(ctx, "UPDATE dropbox_outbox SET secret_flag = 1 WHERE id = ?", id)
+	return err
+}
+
+// DB is the database (for a caller that reads the outbox alongside other tables).
+func (o *DropboxOutbox) DB() *DB { return o.db }
