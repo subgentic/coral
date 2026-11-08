@@ -561,6 +561,30 @@ CREATE TABLE IF NOT EXISTS dropbox_connection (
     connected_at    TEXT
 );
 
+-- Dropbox stage 4's outbox (#14655): one row per file to back up (an artifact version or its item_data sidecar), by its Dropbox path (ids only,
+-- never a name). artifact_at is the artifact's own time (newest first). Rows hold no names, request ids or bytes. state: queued (handed out when
+-- next_try_at has passed), done (file_id, rev and content_hash from Dropbox), conflict and skipped (parked, never handed out again), failed.
+CREATE TABLE IF NOT EXISTS dropbox_outbox (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind         TEXT NOT NULL,
+    digest       TEXT NOT NULL,
+    doc_id       TEXT NOT NULL,
+    version      INTEGER NOT NULL DEFAULT 1,
+    path         TEXT NOT NULL UNIQUE,
+    artifact_at  TEXT NOT NULL,
+    state        TEXT NOT NULL DEFAULT 'queued',
+    attempts     INTEGER NOT NULL DEFAULT 0,
+    next_try_at  TEXT NOT NULL DEFAULT '',
+    file_id      TEXT,
+    rev          TEXT,
+    content_hash TEXT,
+    secret_flag  INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT NOT NULL,
+    done_at      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_dropbox_outbox_due ON dropbox_outbox(state, next_try_at, artifact_at);
+CREATE INDEX IF NOT EXISTS idx_dropbox_outbox_digest ON dropbox_outbox(digest);
+
 -- Coral Hub enrollment in progress, and its rate limit (one row). The device code is
 -- sealed like the server token. Kept across restarts so a restart loop reuses one code
 -- instead of asking the hub for a new one each time.
