@@ -222,7 +222,7 @@ func TestBothListenersAreKeyedToThePeer(t *testing.T) {
 	}
 	t.Cleanup(func() { srv.Close() })
 
-	status := func(addr, host string, hdr map[string]string) int {
+	statusIn := func(t *testing.T, addr, host string, hdr map[string]string) int {
 		req, err := http.NewRequest(http.MethodGet, "http://"+net.JoinHostPort(addr, strconv.Itoa(port))+"/api/x", nil)
 		require.NoError(t, err)
 		if host != "" {
@@ -236,6 +236,7 @@ func TestBothListenersAreKeyedToThePeer(t *testing.T) {
 		resp.Body.Close()
 		return resp.StatusCode
 	}
+	status := func(addr, host string, hdr map[string]string) int { return statusIn(t, addr, host, hdr) }
 	p := ":" + strconv.Itoa(port)
 	key := map[string]string{"Authorization": "Bearer " + ks.Key()}
 	forged := map[string]string{"X-Coral-Via-Tunnel": "1"}
@@ -244,7 +245,14 @@ func TestBothListenersAreKeyedToThePeer(t *testing.T) {
 	assert.Equal(t, 200, status("127.0.0.1", "", nil))
 	assert.Equal(t, 200, status("127.0.0.1", "localhost"+p, nil))
 	assert.Equal(t, 200, status("127.0.0.1", ip+p, nil), "the listened network address is this server too")
-	assert.Equal(t, 403, status("127.0.0.1", "10.255.255.254"+p, nil), "an IP Coral doesn't listen on is DNS rebinding")
+	t.Run("an IP Coral doesn't listen on is DNS rebinding", func(t *testing.T) {
+		// TEST-NET-1 (RFC 5737), documentation only: no machine should own it. 10.255.255.254 was used before, and WSL's DNS tunneling puts that one on the VM's loopback.
+		const unlisted = "192.0.2.1"
+		if machineHasAddr(t, unlisted) {
+			t.Skipf("this machine has %s on an interface, so it cannot stand for an address Coral doesn't listen on", unlisted)
+		}
+		assert.Equal(t, 403, statusIn(t, "127.0.0.1", unlisted+p, nil))
+	})
 	assert.Equal(t, 403, status("127.0.0.1", "evil.example"+p, nil))
 	assert.Equal(t, 200, status("127.0.0.1", "", forged), "a forged tunnel stamp changes nothing")
 	assert.Equal(t, 401, status("127.0.0.1", "", map[string]string{"X-Forwarded-For": "1.2.3.4"}), "a proxied request isn't direct")
@@ -274,4 +282,17 @@ func TestPrepareLogDirIsPrivate(t *testing.T) {
 	prepareLogDir(dir)
 	fi, _ = os.Stat(dir)
 	assert.Equal(t, os.FileMode(0o700), fi.Mode().Perm(), "an older 0755 folder is tightened")
+}
+
+// machineHasAddr reports whether ip is on one of this machine's interfaces.
+func machineHasAddr(t *testing.T, ip string) bool {
+	t.Helper()
+	addrs, err := net.InterfaceAddrs()
+	require.NoError(t, err)
+	for _, a := range addrs {
+		if n, ok := a.(*net.IPNet); ok && n.IP.String() == ip {
+			return true
+		}
+	}
+	return false
 }
