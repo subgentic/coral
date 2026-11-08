@@ -264,3 +264,60 @@ func TestFolderTrust_RowOffer_And_Answer(t *testing.T) {
 		assert.Equal(t, http.StatusOK, code, "%v", body)
 	})
 }
+
+// #14560 (Beta run 3): a long folder wraps at the terminal's width, and the folder-trust row then offered no Yes: folderTrustPath read the first line only, which is not the session's own folder. A
+// member nobody has opened is at the launch width, so the first agent (opened by the person, resized) offered Yes and the later members did not. The wrapped path is now joined up to the blank line that ends it;
+// it is only ever compared with the session's own folder, a second heading still gives nothing, and a path that runs into the question gives nothing.
+func TestFolderTrustPathJoinsAPathTheTerminalWrapped(t *testing.T) {
+	const long = "/private/tmp/claude-501/-Users-cknorowski-Software-coral-coral-go/b49dc594-d472-3e97-0bcc-c26ce11bce2c/scratchpad/readinglist-proj"
+	screen := func(folderLines ...string) string {
+		return "──────────\n Accessing workspace:\n\n " + strings.Join(folderLines, "\n ") + "\n\n Quick safety check: Is this a project you created or one you trust? (Like your own code)\n\n ❯ No, exit\n   Yes, I trust this folder\n"
+	}
+	for _, width := range []int{60, 80, 100, 130} {
+		var lines []string
+		for rest := long; rest != ""; {
+			n := width - 1
+			if n > len(rest) {
+				n = len(rest)
+			}
+			lines = append(lines, rest[:n])
+			rest = rest[n:]
+		}
+		assert.Equal(t, long, folderTrustPath(screen(lines...)), "wrapped at %d columns (%d lines)", width, len(lines))
+	}
+	assert.Equal(t, long, folderTrustPath(screen(long)), "one line: as before")
+	// a second heading still gives nothing; a path that runs into the question gives nothing
+	assert.Equal(t, "", folderTrustPath("Accessing workspace:\n/x\n"+screen(long)))
+	assert.Equal(t, "", folderTrustPath(" Accessing workspace:\n Quick safety check: Is this a project you created or one you trust?\n"))
+	assert.Equal(t, "", folderTrustPath(" Accessing workspace:\n /a/path\n Quick safety check: Is this a project\n"+" more\n"), "no blank line between the path and the question: the question line is not a path")
+	// the folder joined is not the session's own folder unless it is exactly that folder
+	assert.False(t, sameFolder(folderTrustPath(screen(long[:60], long[60:])+" extra"), long))
+}
+
+// Security's SHOULD 3 on #14560: a deep worktree under a narrow terminal wraps many times. Joined from up to trustPathMaxLines (8) lines: 5 and 8 lines are read whole; a 9-line wrap is a prefix, which is
+// never the session's own folder, so it gets no Yes (fail closed).
+func TestFolderTrustPathJoinsUpToEightWrappedLinesAndNoMore(t *testing.T) {
+	const long = "/private/tmp/claude-501/-Users-cknorowski-Software-coral-coral-go/b49dc594-d472-3e97-0bcc-c26ce11bce2c/scratchpad/readinglist-proj"
+	screenOf := func(chunk int) (string, int) {
+		var lines []string
+		for rest := long; rest != ""; {
+			n := chunk
+			if n > len(rest) {
+				n = len(rest)
+			}
+			lines = append(lines, rest[:n])
+			rest = rest[n:]
+		}
+		return "──────────\n Accessing workspace:\n\n " + strings.Join(lines, "\n ") + "\n\n Quick safety check: Is this a project you created or one you trust? (Like your own code)\n\n ❯ No, exit\n   Yes, I trust this folder\n", len(lines)
+	}
+	for _, c := range []struct{ chunk, lines int }{{28, 5}, {17, 8}} {
+		screen, n := screenOf(c.chunk)
+		require.Equal(t, c.lines, n, "the fixture wraps into %d lines", c.lines)
+		assert.Equal(t, long, folderTrustPath(screen), "%d wrapped lines are read whole", c.lines)
+	}
+	screen, n := screenOf(13)
+	require.Equal(t, 10, n)
+	got := folderTrustPath(screen)
+	assert.NotEqual(t, long, got, "more lines than the cap are read as a prefix")
+	assert.False(t, sameFolder(got, long), "and a prefix is never the session's own folder: no Yes")
+}

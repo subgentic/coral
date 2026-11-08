@@ -27,6 +27,9 @@ const (
 	trustFolderHeading = "Accessing workspace:"
 )
 
+// trustPathMaxLines is the most lines a wrapped folder path is joined from: a longer one reads as a prefix, which is never the session's own folder, so no Yes is offered (fail closed).
+const trustPathMaxLines = 8
+
 // isFolderTrustMenu says whether s is Claude's folder-trust menu, by structure and not by the word trust.
 func isFolderTrustMenu(s promptScreen) bool {
 	return s.Unnumbered && !s.Multi && len(s.Options) == 2 &&
@@ -59,6 +62,18 @@ func folderTrustPath(screen string) string {
 		}
 		if strings.HasPrefix(p, "Quick safety check") || strings.ContainsAny(p, "\x00\r") {
 			return ""
+		}
+		// A long folder wraps at the terminal's width (an agent whose terminal is narrow: one nobody has opened yet is at the launch width): the path goes on over the next lines up to the blank line
+		// that ends it, at most trustPathMaxLines lines (a deep worktree under a narrow terminal wraps many times). The joined text is only ever COMPARED with the session's own recorded folder (trustOffered): a path that is not exactly that folder is never offered a Yes (#14560).
+		for k := j + 1; k < len(lines) && k < j+trustPathMaxLines; k++ {
+			more := strings.TrimSpace(lines[k])
+			if more == "" {
+				break
+			}
+			if strings.HasPrefix(more, "Quick safety check") || strings.ContainsAny(more, "\x00\r") {
+				return ""
+			}
+			p += more
 		}
 		return p
 	}
