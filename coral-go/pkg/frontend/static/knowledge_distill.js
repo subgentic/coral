@@ -10,7 +10,7 @@
    shows the run still going, or its result. The first time the sidebar shows a team, its
    status is asked once, so a run started in another window (or before a reload) is found. */
 
-import { teamFetch, keyLabel } from './server_base.js';
+import { teamFetch, keyLabel, isCloud } from './server_base.js';
 import { showToast } from './utils.js';
 import { importOnce } from './import_once.js';
 import { pollEvery } from './overload.js';
@@ -103,7 +103,7 @@ export async function startDistill(team) {
 /** The sidebar's team header: a chip while the team's knowledge is being distilled. The first
  *  time a team is shown, its status is asked once (a run from another window or before a reload). */
 export function distillChip(team) {
-    if (team && !asked.has(team)) {
+    if (team && !asked.has(team) && !(isCloud() && /^\/inbox(?:\/|$)/.test(location.pathname))) { // hidden Agents sidebar: read status when its team is opened
         asked.add(team);
         refreshDistill(team);
     }

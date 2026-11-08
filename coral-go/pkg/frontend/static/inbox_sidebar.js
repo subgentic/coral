@@ -19,7 +19,7 @@ import { doneGoals, nextQuietEnd, quietEndsAt, hideGoalDone, setGoalDoneCount, i
 import { state } from './state.js';
 import { isPhoneBar } from './phone_layout.js';
 
-const { mutedReviewItems, mutedWords, reviewItems, reviewStarChanged, unreadReviewItems, reviewErrors, refreshReviews, reviewsChangedOnServer, reviewGroups, setReviewRead, markOpenedReadVisibly, isRead, savedFiles, reviewPages, savedReviewPages, loadMoreReviews, loadMoreSavedFiles, queryReviews, queriedReviews, moreQueriedReviews, retryQueriedReviews, reviewQueryState, reviewQueryKey, reviewFilterOptions, countSavedReviews, reviewPageSummary } = await importOnce('./inbox_reviews.js');
+const { activateSavedReviews, mutedReviewItems, mutedWords, reviewItems, reviewStarChanged, unreadReviewItems, reviewErrors, refreshReviews, reviewsChangedOnServer, reviewGroups, setReviewRead, markOpenedReadVisibly, isRead, savedFiles, reviewPages, savedReviewPages, loadMoreReviews, loadMoreSavedFiles, queryReviews, queriedReviews, moreQueriedReviews, retryQueriedReviews, reviewQueryState, reviewQueryKey, reviewFilterOptions, countSavedReviews, reviewPageSummary } = await importOnce('./inbox_reviews.js');
 import { failedUnread, finishedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
 import { operatorAsks, refreshOperatorAsks, askLine, askFull, askIsLong, askOpened, askKey, openAskDialog, askSubjects, questionContextNote } from './operator_asks.js';
 import { go, note, backIs, currentRoute } from './nav.js';
@@ -848,7 +848,8 @@ let _navKey = null, _folders = null, _poll = 0;
 // (the person asked for the page, or changed a goal) but still never overlap another.
 let _goalsAt = 0, _goalsFails = 0, _goalsReading = null;
 const goalsGap = () => { const base = Number(globalThis.__coralGoalsMs) || 30000; return _goalsFails ? Math.min(base * 2 ** _goalsFails, 600000) : base; };
-const liveGoals = () => { refreshGoals(false); };
+let needsBootCountsReady = false;
+const liveGoals = () => { if (isCloud() && group === 'needs' && !needsBootCountsReady) return; refreshGoals(false); };
 /** What the phone's ☰ drawer lists for the Inbox (#13596): every folder the sidebar has, with its count, the open one marked, and the pick. Read when the drawer opens. */
 state.inboxFolderRows = () => ({ sections: folderSections().filter(sec => !sec.items.some(it => String(it.key).startsWith(BOARD_ITEM))), current: navCurrent(), pick: pickFolder });
 /** A folder was picked: a page that is open gives way, and the folder's table opens with the keyboard at its heading. */
@@ -962,6 +963,7 @@ function appendReviewPaging(host, savedPage = false) {
 // ── The tables ───────────────────────────────────────────────────────────
 /** Saved uses the same columns in the Inbox and dock; only its opener and table state differ. */
 function savedListSpec(where = '') {
+    activateSavedReviews();
     const v = saved.savedView();
     const rows = v.shown.map(saved.savedItemFacts);
     const dock = where === 'dock-tab';
@@ -1358,6 +1360,7 @@ function setGroup(key, { auto = false } = {}) {
     if (!groupMeta(key)) key = 'needs';
     const was = group;
     group = key;
+    if (key === 'saved' && was !== key) saved.loadSaved();
     if (key === 'activity' && was !== 'activity') AC.refresh(() => renderInboxNav(true)); // the record is read when its folder is picked (#12070)
     if (!auto) { _autoFrom = ''; browserLocal.set(GROUP_KEY, key); } // a folder the person chose is the remembered one; Needs you opened for them (auto) is not (#10212)
     const input = $('inbox-search'), g = groupMeta(key);
@@ -1526,23 +1529,25 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
     _wasShown = true; _asked = false;
     setGroup(group, { auto });
     renderInboxNav(true);
-    CH.loadChatCounts(() => renderInboxNav(true));
-    refreshBoards(); // the phone drawer's Boards group
-    if (nativeInbox()) { // the Hub-served Inbox draws the chat folders, Goals and Artifacts: Needs you, Tasks and Saved are the Hub's own framed pages (no request for them)
+    const attentionFirst = isCloud() && group === 'needs';
+    const secondaryCounts = () => {
+        needsBootCountsReady = true;
+        CH.loadChatCounts(() => renderInboxNav(true));
+        refreshBoards();
         refreshGoals();
         IA.refreshArtifactCount(() => renderFolderCounts());
-        if (nativeNeeds()) { refreshOperatorAsks(true); refreshReviews(true); refreshProposals(true); } // Coral's own Needs you table through the Hub (#13450): the questions agents asked the Operator (each online computer, through the Hub), the files for review and the proposals
-    } else {
-        refreshTasks();
-        refreshReviews(true);
-        refreshProposals(true);
-        refreshRuns(true);
-        refreshOperatorAsks(true); // the questions agents asked the Operator (#11417)
+    };
+    const attentionReads = [];
+    if (!nativeInbox()) {
+        refreshTasks(); refreshRuns(true);
         if (group === 'activity') AC.refresh(() => renderInboxNav(true));
-        refreshGoals();
-        IA.refreshArtifactCount(() => renderFolderCounts());
-        saved.loadSaved(); // everything's list (the Inbox is the all scope), read for the table and the count
+        if (!attentionFirst || group === 'saved') saved.loadSaved();
     }
+    if (!nativeInbox() || nativeNeeds()) attentionReads.push(refreshOperatorAsks(true), refreshReviews(true), refreshProposals(true));
+    if (attentionFirst) {
+        // Let attention rows paint before folder counts take the computer's six request lanes.
+        Promise.allSettled(attentionReads).then(() => requestAnimationFrame(() => setTimeout(secondaryCounts, 0)));
+    } else secondaryCounts();
     if (quiet || (folder && state.currentSession && state.currentSession.type === 'history')) return; // a chat is on screen, or being opened (a saved message, a link to a chat): the Inbox is drawn under it, for the way back
     if (page) {
         if (isPhoneLayout()) $('inbox-view')?.setAttribute('data-phone-item', '');

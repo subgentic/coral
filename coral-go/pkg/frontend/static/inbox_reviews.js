@@ -4,7 +4,7 @@ import { setReviewCacheReader } from './ask_filter.js';
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
 import { sourcesKey } from './board_fetch.js';
 import { inboxSources, serverLabel, isOwnerOnlyAnswer } from './inbox_servers.js';
-import { boardFetch, nextArtifactPage, splitKey, serverFetch, identityKey, noteBoardLabels, normServer } from './server_base.js';
+import { boardFetch, nextArtifactPage, splitKey, serverFetch, identityKey, noteBoardLabels, normServer, isCloud } from './server_base.js';
 import { SORT_PARAM } from './filter_model.js';
 import { fetchSkewed } from './query_skew.js';
 import { hideAsksWhen } from './ask_filter.js';
@@ -13,6 +13,8 @@ const { createReviewPages } = await importOnce('./review_pages.js');
 const { needsReviewAttention, hasNewVersion, waitingOnAgent } = await importOnce('./inbox_review_state.js');
 
 let items = [], saved = [], muted = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => { if (typeof document !== 'undefined') document.dispatchEvent(new Event('coral:reviews-changed')); };
+let savedActivated = false;
+export function activateSavedReviews() { if (savedActivated) return; savedActivated = true; if (pending) pending.then(() => refreshReviews(true)); else refreshReviews(true); }
 let activated = false, refreshAgain = false, freshnessDirty = false;
 onArtifactsRev(() => {
     if (!activated) return;
@@ -421,7 +423,7 @@ export function refreshReviews(force = false, { reuse = false } = {}) {
     syncPageSources();
     const unchanged = !force && !freshnessDirty && finishedRev === revision ? unchangedComputer : null;
     freshnessDirty = false;
-    pending = Promise.all([reviewPager.refresh({ unchanged }), savedPager.refresh({ unchanged }), refreshActiveQuery(unchanged)]).then(([reviews, saved]) => {
+    pending = Promise.all([reviewPager.refresh({ unchanged }), (!isCloud() || savedActivated ? savedPager.refresh({ unchanged }) : Promise.resolve([])), refreshActiveQuery(unchanged)]).then(([reviews, saved]) => {
         if (started !== revision) return;
         if (!sourceSetChanged && [...reviews, ...saved].every(result => result === false)) return;
         publishPages();
