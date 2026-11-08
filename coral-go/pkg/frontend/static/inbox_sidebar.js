@@ -241,6 +241,7 @@ const agentAskToggle = s => {
     return toggle;
 };
 const agentAskControls = s => { const note = agentAskFailed.has(agentAskKey(s)) ? DT.el('span', 'inbox-ask-note', 'Could not read the whole question. The agent may have moved on.') : null; if (note) note.setAttribute('role', 'status'); return [note, agentAskToggle(s)].filter(Boolean); };
+const pruneAgentAsks = rows => { const live = new Set(rows.filter(s => !isItem(s)).map(agentAskKey)); for (const k of [...askOpen]) if (k.startsWith('agent-ask:') && !live.has(k)) askOpen.delete(k); for (const k of [...agentAskFailed]) if (!live.has(k)) agentAskFailed.delete(k); for (const k of [...agentAskText.keys()]) if (!live.has(k)) agentAskText.delete(k); }; // an agent that stopped waiting, or asked something else (the key has its waiting_since), takes its opened, failed and read entries with it (#14697): they were never dropped
 const agentAskExtra = s => { if (isItem(s) || !agentAskIsLong(s)) return null; const wrap = DT.el('span', 'inbox-agent-ask'), key = agentAskKey(s); if (askOpen.has(key) && agentAskText.has(key)) wrap.append(DT.el('span', 'inbox-ask-whole', `Wants to know: ${agentAskText.get(key)}`)); wrap.append(...agentAskControls(s)); return wrap; }; // a row of only waiting agents (a one-line mail row): its opened words and the toggle under the line (#14637)
 const addAgentAskToggle = (s, tr) => { if (isItem(s) || isPhoneLayout() || !agentAskIsLong(s)) return; const sub = tr.querySelector('.dt-subtitle'); if (sub) sub.after(...agentAskControls(s)); const key = agentAskKey(s); if (askOpen.has(key) && agentAskText.has(key)) { DT.addDetailRow(tr, document.createTextNode(`Wants to know: ${agentAskText.get(key)}`), 'inbox-ask-whole'); } }; // a wide row's agent question: the toggle under its words, the opened question as a full-width row under it, the table's own detail row (#14637); a phone card has both in phoneRow, a one-line mail row in its extra
 const askUnder = a => questionContextNote(a) || 'Needs your answer'; // the row's name now says the whole question (askFull, #14574), so nothing of it goes under the name a second time
@@ -1213,6 +1214,7 @@ export function showTeamNeeds(host, team, { onCount = () => {} } = {}) {
 export function needsListSpec() {
     askBlockers();
     // the goal its task serves (#7302) is a column when any row has one; the goal's cell opens it on its board
+    pruneAgentAsks(allNeeds());
     const rows = needsRows(), dirOf = s => String(s.working_directory || '').replace(/[\\/]+$/, '').split(/[\\/]/).pop();
     const goalOf = s => s.goal && s.goal.id && s.goal.title;
     const goal = rows.some(goalOf);
