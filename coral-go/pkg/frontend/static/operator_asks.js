@@ -214,7 +214,7 @@ async function resumeEndedMember(server, a, name, who, sessionName) {
 /** The dialog names the asker and team; the complete question is shown once in its body (#12722). */
 export function askParts(a) {
     return { title: `${markHidden(a.asker || 'Agent', { strict: true })} · ${markHidden(a.board_label || a.board || 'Team', { strict: true })}`,
-        body: listsOf(askWhole(a).trim()) };
+        body: listsOf(askWhole(a).replace(/^\s*@Operator\b[:,]?\s*/i, '').trim()) };
 }
 
 /** A question written on one line with its steps inline ("... console: 1. Open it. 2. Generate a token. 3. Save it.") is set out as a list: a blank line before the first step and each step on its own line. Only when the

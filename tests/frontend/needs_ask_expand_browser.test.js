@@ -31,10 +31,11 @@ const PLAN = 'Plan for the Reading List app (task #1) — OK to proceed? 1) Scop
             await ev(`(() => { const at = n => new Date(Date.now() - n * 60000).toISOString(); window.__asks = [
                 { board: 'reading', board_label: 'Reading List', kind: 'ask', id: 51, asker: 'Orchestrator', text: '@Operator ' + ${JSON.stringify(PLAN)}, at: at(4) },
                 { board: 'reading', board_label: 'Reading List', kind: 'ask', id: 52, asker: 'Designer', text: '@Operator ' + ${JSON.stringify(PLAN.repeat(2))}, at: at(6) },
+                { board: 'reading', board_label: 'Reading List', kind: 'ask', id: 54, asker: 'Tester', text: '@Operator ' + ${JSON.stringify(PLAN.repeat(2))}, at: at(8) },
                 { board: 'reading', board_label: 'Reading List', kind: 'ask', id: 53, asker: 'Dev', text: '@Operator May I delete the old books table and start again?', at: at(9) }];
                 const orig = window.fetch.bind(window); window.fetch = (u, o) => String(u) === '/api/operator-asks' ? Promise.resolve(new Response(JSON.stringify(window.__asks), { status: 200, headers: { 'Content-Type': 'application/json' } })) : orig(u, o); return true; })()`);
             await ev(`import((window.__coralStatic || '/static/') + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => true)`);
-            await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '5'`, `${w}: waiting badge`, 8000);
+            await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '6'`, `${w}: waiting badge`, 8000);
             if (mobile) {
                 await ev(`document.getElementById('nav-select').click(); true`);
                 await waitFor(`!!document.querySelector('#nav-more-menu [data-arg="hub-inbox"]')`, '390: Inbox in the view dropdown', 5000);
@@ -44,7 +45,7 @@ const PLAN = 'Plan for the Reading List app (task #1) — OK to proceed? 1) Scop
             await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             try { await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' && document.querySelectorAll('#group-table-view .inbox-answer').length === 4`, `${w}: the rows' four choices`, 10000); } catch (e) { await shot(`inbox-answer-fail-${w}`); throw new Error(e.message + ' ' + await ev(`JSON.stringify([document.getElementById('group-table-view').dataset.group, document.getElementById('group-table-view').innerText.slice(0, 200), document.querySelectorAll('.inbox-answer').length])`)); }
             await waitFor(`(() => { const b = document.querySelector('#group-table-view .inbox-answer'); if (!b) return false; if (window.__seen !== b) { window.__seen = b; window.__seenAt = performance.now(); return false; } return performance.now() - window.__seenAt > 500; })()`, `${w}: the table has settled (the same choice for half a second)`, 8000);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 5`, `${w}: five rows (two agents, three questions)`, 8000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 6`, `${w}: six rows (two agents, four questions)`, 8000);
 
             const askRow = who => `[...document.querySelectorAll('#group-table-view tbody tr')].find(tr => tr.querySelector('.inbox-ask-name') && tr.textContent.includes(${JSON.stringify(who)}) && tr.querySelector('.inbox-review-from') && tr.querySelector('.inbox-review-from').textContent.trim() === ${JSON.stringify(who)})`;
             const state = who => ev(`(() => { const tr = ${askRow(who)}; if (!tr) return null; const q = tr.querySelector('.inbox-ask-name'), b = tr.querySelector('.inbox-ask-expand'), r = b && b.getBoundingClientRect(), row = tr.getBoundingClientRect(), next = tr.nextElementSibling && tr.nextElementSibling.getBoundingClientRect(); return { text: q.textContent, len: q.textContent.length, button: b ? { label: b.textContent, expanded: b.getAttribute('aria-expanded'), name: b.getAttribute('aria-label'), h: Math.round(r.height), w: Math.round(r.width), inside: r.left >= row.left - 1 && r.right <= row.right + 1 && r.top >= row.top - 1 && r.bottom <= row.bottom + 1, x: r.left + r.width / 2, y: r.top + r.height / 2 } : null, overlapsNext: !!next && row.bottom > next.top + 1, scroll: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
@@ -66,6 +67,32 @@ const PLAN = 'Plan for the Reading List app (task #1) — OK to proceed? 1) Scop
             assert.ok(!open.overlapsNext && open.scroll <= 0, `${w}: the opened row does not run over the next one and the page does not scroll sideways: ` + JSON.stringify({ o: open.overlapsNext, s: open.scroll }));
             await ev(`${askRow('Designer')}.scrollIntoView({ block: 'center', behavior: 'instant' }); true`);
             await shot(`ask-expand-open-${w}`);
+            // UI Reviewer's MUST: the KEYBOARD. Enter and Space on a toggle open and shut it, focus stays on THE SAME question's toggle (two long questions here: Designer's and Tester's), and Tab goes on from it
+            const focusOn = () => ev(`(() => { const e = document.activeElement; return e && e.classList && e.classList.contains('inbox-ask-expand') ? { key: e.dataset.askKey, asker: (e.closest('tr').querySelector('.inbox-review-from') || {}).textContent, expanded: e.getAttribute('aria-expanded') } : { other: e ? (e.id || e.className || e.tagName) : null }; })()`);
+            const key = async (k, code) => { await client.Input.dispatchKeyEvent({ type: 'keyDown', key: k, code, windowsVirtualKeyCode: k === 'Enter' ? 13 : 32, text: k === 'Enter' ? '\r' : ' ' }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: k, code, windowsVirtualKeyCode: k === 'Enter' ? 13 : 32 }); };
+            const tabKey = async shift => { await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers: shift ? 8 : 0 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers: shift ? 8 : 0 }); };
+            await ev(`${askRow('Designer')}.querySelector('.inbox-ask-expand').focus(); true`);
+            let f = await focusOn(); assert.equal(f.asker, 'Designer', `${w}: the keyboard is on Designer's toggle: ` + JSON.stringify(f));
+            await key('Enter', 'Enter');
+            await waitFor(`(() => { const e = document.activeElement; return !!e && e.classList.contains('inbox-ask-expand') && e.getAttribute('aria-expanded') === 'false'; })()`, `${w}: Enter shuts the open question and the focus is still on a toggle that is shut`, 6000).catch(async e => { throw new Error(e.message + ' | ' + JSON.stringify(await focusOn()) + ' | ' + await ev(`JSON.stringify([...document.querySelectorAll('.inbox-ask-expand')].map(b => [(b.dataset.askKey || '').slice(-12), b.getAttribute('aria-expanded')]))`)); });
+            await new Promise(r => setTimeout(r, 400)); // sleep-ok: a late redraw would show here
+            f = await focusOn(); assert.ok(f.asker === 'Designer' && f.expanded === 'false', `${w}: after Enter the focus is on DESIGNER's toggle, not another question's: ` + JSON.stringify(f));
+            assert.equal((await state('Tester')).button.expanded, 'false', `${w}: Tester's question stayed shut`);
+            await tabKey(false);
+            f = await focusOn(); assert.ok(!f.asker || f.asker !== 'Designer' || f.key !== undefined, `${w}: Tab goes on from Designer's toggle`);
+            const after = await ev(`(() => { const e = document.activeElement, t = ${askRow('Designer')}.querySelector('.inbox-ask-expand'); return { moved: e !== t && e !== document.body, forward: !!(t.compareDocumentPosition(e) & Node.DOCUMENT_POSITION_FOLLOWING), name: e ? (e.getAttribute('aria-label') || e.textContent || e.tagName).slice(0, 40) : null }; })()`);
+            assert.ok(after.moved && after.forward, `${w}: Tab went forward to the next control, not to the page: ` + JSON.stringify(after));
+            await tabKey(true);
+            f = await focusOn(); assert.ok(f.asker === 'Designer', `${w}: Shift+Tab comes back to Designer's toggle: ` + JSON.stringify(f));
+            await key(' ', 'Space');
+            await waitFor(`(() => { const e = document.activeElement; return !!e && e.classList.contains('inbox-ask-expand') && e.getAttribute('aria-expanded') === 'true'; })()`, `${w}: Space opens it again and the focus is still on a toggle that is open`, 6000);
+            await new Promise(r => setTimeout(r, 400)); // sleep-ok: a late redraw would show here
+            f = await focusOn(); assert.ok(f.asker === 'Designer' && f.expanded === 'true', `${w}: after Space the focus is on DESIGNER's toggle: ` + JSON.stringify(f));
+            // the second long question has its own toggle and keeps the focus too
+            await ev(`${askRow('Tester')}.querySelector('.inbox-ask-expand').focus(); true`); await key('Enter', 'Enter');
+            await waitFor(`(() => { const e = document.activeElement; return !!e && e.classList.contains('inbox-ask-expand') && e.getAttribute('aria-expanded') === 'true' && e.closest('tr').textContent.includes('Tester'); })()`, `${w}: Enter on Tester's toggle opens Tester's question and keeps the focus on it`, 6000);
+            assert.equal((await state('Designer')).button.expanded, 'true', `${w}: Designer's question stayed as it was (open) while Tester's opened`);
+            await key('Enter', 'Enter'); await new Promise(r => setTimeout(r, 400)); // sleep-ok: shut Tester again
             const again = await state('Designer'); await tap(again.button);
             await waitFor(`(() => { const tr = ${askRow('Designer')}; const b = tr && tr.querySelector('.inbox-ask-expand'); return !!b && b.getAttribute('aria-expanded') === 'false'; })()`, `${w}: a second tap shuts it`, 6000);
             const back = await state('Designer');
