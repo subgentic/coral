@@ -23,7 +23,7 @@ var (
 )
 
 // threadParams validates the query. ok is false when it answered.
-func threadParams(w http.ResponseWriter, q url.Values, keys map[string]bool) (team string, goal, task int64, limit int, ok bool) {
+func threadParams(w http.ResponseWriter, q url.Values, keys map[string]bool) (team string, goal int64, limit int, ok bool) {
 	for k := range q {
 		if !keys[k] {
 			errBadRequest(w, "unknown query key: "+k)
@@ -35,23 +35,8 @@ func threadParams(w http.ResponseWriter, q url.Values, keys map[string]bool) (te
 		errBadRequest(w, "team is required and must be a team name")
 		return
 	}
-	num := func(key string) (int64, bool) {
-		v := q.Get(key)
-		if v == "" {
-			return 0, true
-		}
-		n, err := strconv.ParseInt(v, 10, 64)
-		if err != nil || n <= 0 {
-			errBadRequest(w, "invalid "+key)
-			return 0, false
-		}
-		return n, true
-	}
 	var good bool
-	if goal, good = num("goal"); !good {
-		return
-	}
-	if task, good = num("task"); !good {
+	if goal, good = threadNumber(w, "goal", q.Get("goal")); !good {
 		return
 	}
 	if v := q.Get("limit"); v != "" {
@@ -62,7 +47,22 @@ func threadParams(w http.ResponseWriter, q url.Values, keys map[string]bool) (te
 		}
 		limit = n // more than board.ThreadMaxLimit is cut to it
 	}
-	return team, goal, task, limit, true
+	return team, goal, limit, true
+}
+
+// threadNumber is an optional positive number of the query (0 when it is not there); ok is false when it answered. The caller reads the key with a literal call on its own url.Values, because
+// tools/gen_route_queries.py builds the tunnel's allowlist of keys from those calls: a key read by name inside a helper is missing from it (#14472: the table listed goal and task, the generator found neither).
+// Keep a key's name out of this comment: the generator reads comments too.
+func threadNumber(w http.ResponseWriter, key, v string) (int64, bool) {
+	if v == "" {
+		return 0, true
+	}
+	n, err := strconv.ParseInt(v, 10, 64)
+	if err != nil || n <= 0 {
+		errBadRequest(w, "invalid "+key)
+		return 0, false
+	}
+	return n, true
 }
 
 // threadActor is the actor a team's Hub owner reads alone (their own Activity rows, #12070), "" for this computer's own person or a personal machine: the rule ListActivity applies.
@@ -92,8 +92,12 @@ func (h *BoardHandler) Thread(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := r.URL.Query()
-	team, goal, task, limit, ok := threadParams(w, q, threadKeys)
+	team, goal, limit, ok := threadParams(w, q, threadKeys)
 	if !ok {
+		return
+	}
+	task, good := threadNumber(w, "task", q.Get("task"))
+	if !good {
 		return
 	}
 	if goal == 0 && task == 0 {
@@ -119,7 +123,7 @@ func (h *BoardHandler) Threads(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := r.URL.Query()
-	team, goal, _, limit, ok := threadParams(w, q, threadsKeys) // task is not one of the summaries' keys: threadParams refuses it as unknown already
+	team, goal, limit, ok := threadParams(w, q, threadsKeys) // task is not one of the summaries' keys: threadParams refuses it as unknown already
 	if !ok {
 		return
 	}
