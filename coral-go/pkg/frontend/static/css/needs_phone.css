@@ -50,3 +50,6 @@
     .inbox-needs-results .inbox-review-item.inbox-agent-first:has(> .inbox-ask-name) { flex-wrap: wrap; }
     .inbox-needs-results .inbox-review-item.inbox-agent-first > .inbox-review-name.inbox-ask-name { flex: 1 1 100%; order: 5; }
 }
+
+/* The computer's name on a phone card's meta line (#14623): a small chip beside the sender and the time. */
+.inbox-computer-chip { flex: none; margin-inline-start: 6px; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

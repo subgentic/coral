@@ -713,3 +713,5 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-group-story[aria-pressed="true"] { border-color: var(--accent); }
 @media (max-width: 767px) { .dt-group-pair .dt-group-toggle { flex-wrap: wrap; position: relative; padding-inline-start: calc(var(--table-pad-x, 12px) + 28px); } .dt-group-pair .dt-group-toggle .dt-group-words { flex: 1 1 9rem; min-width: 9rem; } .dt-group-pair .dt-group-toggle::before { position: absolute; inset-inline-start: var(--table-pad-x, 12px); top: 14px; } } /* a phone: the title keeps a readable line and the chip drops under it; the chevron is out of the flow; the Story control stays at the right of the same heading */
 .dt-story-row > td { padding: 0; }
+.dt-mail-head { display: flex; align-items: baseline; gap: 6px; min-width: 0; max-width: 100%; }
+.dt-mail-computer { flex: none; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* the computer chip on a mail row's title line (#14623): its size and colour are the shared chip's */
