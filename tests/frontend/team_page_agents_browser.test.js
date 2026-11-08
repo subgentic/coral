@@ -117,10 +117,10 @@ const TEAM = `qa-agents-${Date.now() % 100000}`;
             await S.run(`${label}: the health settings button opens the team's Health check section`, async () => {
                 await goTab(ev, settle, 'Goals');
                 if (mobile) {
-                    // The team-page status summary is a different control; it still opens the roster.
+                    // The team-page status summary is a different control; it opens Needs you (#14143).
                     assert.ok(await ev(`(() => { const b = window.__tp.find('button', /^Team health:/); if (!b) return false; b.click(); return true; })()`), 'team status summary remains available');
                     await settle(400);
-                    assert.equal(await ev(`window.__tp.tabLabel(window.__tp.tabs().find(x => x.getAttribute('aria-selected') === 'true'))`), 'Agents');
+                    assert.equal(await ev(`window.__tp.tabLabel(window.__tp.tabs().find(x => x.getAttribute('aria-selected') === 'true'))`), 'Needs you');
                     await ev(`window.mobileBack(); true`);
                     await waitFor(`!!window.__tp.sidebar()`, 'the phone Agents list');
                 }
