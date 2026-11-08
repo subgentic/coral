@@ -133,7 +133,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
     let sortChip = null;
     if (collapsible && spec.sorts && spec.phoneChips) {
         sortChip = make('select', 'btn list-bar-sort-chip'); sortChip.id = `${p}-sort-chip`; sortChip.setAttribute('aria-label', spec.sorts.aria);
-        for (const v of spec.sorts.values) { const o = make('option', null, (spec.sorts.labels && spec.sorts.labels[v]) || v); o.value = v; sortChip.append(o); }
+        for (const v of spec.sorts.values) { const o = make('option', null, (spec.sorts.chipLabels && spec.sorts.chipLabels[v]) || (spec.sorts.labels && spec.sorts.labels[v]) || v); o.value = v; sortChip.append(o); }
         const word = make('span', 'list-bar-toggle-label', 'Filter'); tog.append(word); tog.classList.add('list-bar-toggle-chip');
     }
     // spec.headerSlots (#5315): the owner's title goes before the search box and its action icons after the filter icon, on this one row (setHeader). The slots are display: contents, so their children are the row's own.

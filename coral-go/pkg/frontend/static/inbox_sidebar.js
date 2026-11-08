@@ -324,7 +324,7 @@ function inboxNeedsToolbar() {
     if (!needsBar) {
         needsBar = IT.folderToolbar({
             idp: 'inbox-needs', noun: 'agent', searchLabel: 'Search needs you',
-            sorts: { values: NF.SORTS, labels: NF.SORT_LABEL, aria: 'Sort by how long they have waited' }, phoneChips: true,
+            sorts: { values: NF.SORTS, labels: NF.SORT_LABEL, chipLabels: { newest: 'Newest first', oldest: 'Oldest first', blockers: 'Blocking first' }, aria: 'Sort by how long they have waited' }, phoneChips: true,
             fields: [
                 { type: 'select', key: 'team', id: 'inbox-needs-team', label: 'Team', values: [], labels: {}, any: activeNeedsTeam ? `This team: ${keyLabel(activeNeedsTeam)}` : 'Any team' },
                 { type: 'select', key: 'agent', id: 'inbox-needs-agent', label: 'Agent', values: [], labels: {}, any: 'Any agent' },
