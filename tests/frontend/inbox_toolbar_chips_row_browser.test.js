@@ -37,13 +37,13 @@ const GOALS = [
             await coralReady('startup', 'liveList', 'settings');
             await ev(`try { localStorage.removeItem('coral-inbox-goals-filters'); } catch {} true`);
 
-            await ev(`(() => { const R = window.fetch; window.fetch = (u, o) => /\\/api\\/goals(\\?|$)/.test(String(u)) ? Promise.resolve(new Response(JSON.stringify({ goals: ${JSON.stringify(GOALS)} }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : R(u, o); return true; })()`);
+            await ev(`(() => { const R = window.fetch; window.fetch = (u, o) => /\\/api\\/goals(\\?|$)/.test(String(u)) ? Promise.resolve(new Response(JSON.stringify({ goals: ${JSON.stringify(GOALS)}.filter(g => (g.state === 'done') === /[?&]state=done/.test(String(u))) }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : R(u, o); return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`document.querySelectorAll('.view-list-item').length > 3 || !!document.querySelector('.view-list select')`, 'the folders', 10000);
-            await waitFor(`/Goals5/.test(${FOLDER_ROWS}.join('|')) && /All chats/.test(${FOLDER_ROWS}.join('|'))`, 'the folder counts', 10000);
+            await waitFor(`/Goals4/.test(${FOLDER_ROWS}.join('|')) && /All chats/.test(${FOLDER_ROWS}.join('|'))`, 'the folder counts', 10000);
             if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); if (s) { s.value = 'goals'; s.dispatchEvent(new Event('change', { bubbles: true })); } return true; })()`);
             else await ev(`document.querySelector('.view-list-item[data-key="goals"]').click(); true`);
-            await waitFor(`document.querySelectorAll('button.dt-primary').length >= 5`, 'five goals', 10000); await settle(300);
+            await waitFor(`document.querySelectorAll('button.dt-primary').length >= 4`, 'four open goals', 10000); await settle(300);
             // the Filters panel stays shut: the toolbar's own height is what is measured (the fields are set while it is hidden)
             const none = await bar();
             await setField('inbox-goals-team', 'team-b'); await settle(400);

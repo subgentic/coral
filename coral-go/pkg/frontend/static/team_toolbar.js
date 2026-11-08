@@ -16,7 +16,7 @@ function pillElements(p) {
     const group = el('div', `goals-chips goals-chips-row team-tb-pills${p.items.length > 6 ? ' team-tb-pills-many' : ''}`); group.setAttribute('role', 'group'); group.setAttribute('aria-label', p.label);
     const select = el('select', 'field list-bar-select team-tb-select'); select.setAttribute('aria-label', p.label);
     for (const it of p.items) {
-        const text = `${it.label} ${it.count}`;
+        const text = it.count == null ? it.label : `${it.label} ${it.count}`; // a pill whose count is not known yet (Goals' Done: read when picked, #14641) says no number
         const b = el('button', 'goals-chip', text); b.type = 'button'; b.dataset.filter = it.key; b.setAttribute('aria-pressed', String(p.current === it.key));
         if (!it.count && it.key !== 'all') b.classList.add('goals-chip-zero');
         b.addEventListener('click', () => p.onPick(it.key));
