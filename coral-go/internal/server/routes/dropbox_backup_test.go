@@ -1,15 +1,18 @@
 package routes
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -291,4 +294,212 @@ func TestPrivateRowsAreParkedNotRetried(t *testing.T) {
 	rows, err := be.b.outbox.Next(context.Background(), be.b.now().Add(48*time.Hour), 10)
 	require.NoError(t, err)
 	assert.Empty(t, rows, "never handed out again")
+}
+
+// QA Reviewer 2's test gaps on stage 4 (#14655), Security-shaped first. Each one fails against the mutant named in its comment.
+
+func (be *backupEnv) counts() store.DropboxOutboxCounts {
+	be.t.Helper()
+	c, err := be.b.outbox.Counts(context.Background())
+	require.NoError(be.t, err)
+	return c
+}
+
+func (be *backupEnv) objectPath(d string) string {
+	return filepath.Join(be.h.dbx.dataDir, "artifacts", "objects", d)
+}
+
+// Mutant: readObject opens with os.Open (follows the link).
+func TestAnObjectThatIsALinkIsRefused(t *testing.T) {
+	be := newBackupEnv(t)
+	d := be.put("a.md", "text/markdown", "the same bytes")
+	elsewhere := filepath.Join(t.TempDir(), "outside")
+	require.NoError(t, os.WriteFile(elsewhere, []byte("the same bytes"), 0o600)) // the digest still matches: only the link refuses it
+	require.NoError(t, os.Remove(be.objectPath(d)))
+	if err := os.Symlink(elsewhere, be.objectPath(d)); err != nil {
+		t.Skipf("no symlinks here: %v", err)
+	}
+	be.pass()
+	assert.Empty(t, be.dbx.files, "nothing is read through a link, and its sidecar is not sent either")
+	c := be.counts()
+	assert.Equal(t, 0, c.BackedUp)
+	assert.Equal(t, 0, c.Pending, "parked, not retried every pass")
+}
+
+// Mutant: readObject skips the SHA-256 check.
+func TestAnObjectWhoseBytesAreNotItsDigestIsRefused(t *testing.T) {
+	be := newBackupEnv(t)
+	d := be.put("a.md", "text/markdown", "the real bytes")
+	require.NoError(t, os.WriteFile(be.objectPath(d), []byte("changed on disk"), 0o600))
+	be.pass()
+	for p, b := range be.dbx.files {
+		assert.True(t, strings.HasSuffix(p, ".item_data.json"), "only the sidecar may go, never the changed bytes: %s", p)
+		assert.NotContains(t, string(b), "changed on disk")
+	}
+	assert.Equal(t, 1, be.counts().Failed, "the version is failed")
+}
+
+// Mutant: dropboxExtOf takes the extension from the media type's subtype.
+func TestAnUnknownMediaTypeIsUploadedAsBin(t *testing.T) {
+	for _, mt := range []string{"text/html", "text/html; charset=utf-8", "image/svg+xml", "application/javascript", ""} {
+		assert.Equal(t, "bin", dropboxExtOf(mt), "%q", mt)
+	}
+	assert.Equal(t, "md", dropboxExtOf("Text/Markdown; charset=utf-8"), "a known type, any case, with parameters")
+	be := newBackupEnv(t)
+	be.put("page.html", "text/html", "<script>alert(1)</script>")
+	be.pass()
+	require.Len(t, be.dbx.files, 2)
+	for p := range be.dbx.files {
+		assert.False(t, strings.Contains(strings.ToLower(p), ".htm") || strings.Contains(p, ".svg"), "never active content: %s", p)
+		if !strings.HasSuffix(p, ".item_data.json") {
+			assert.Regexp(t, versionPath, p)
+			assert.True(t, strings.HasSuffix(p, ".bin"), p)
+		}
+	}
+}
+
+// Mutant: cleanValue keeps control and bidi characters.
+func TestTheSidecarHasNoControlOrBidiCharacters(t *testing.T) {
+	be := newBackupEnv(t)
+	d := be.put("a.md", "text/markdown", "a")
+	r := seriesRecord{session: "sess\x1b[31m-1", rec: agentUploadRecord{CreatedAt: "2026-11-08T10:00:00Z", Board: "team\u2066x\u2069", Uploader: "agent\u202e\u200b\r\nname"}}
+	r.rec.Name = "report\u202egpj.exe\x00\x07\n.md"
+	out := be.b.itemData(context.Background(), d, r, 1)
+	var m map[string]any
+	require.NoError(t, json.Unmarshal(out, &m))
+	for _, k := range []string{"name", "agent", "session", "board"} {
+		v, _ := m[k].(string)
+		for _, c := range v {
+			assert.False(t, c < 0x20 || c == 0x7f || (c >= 0x200b && c <= 0x200f) || (c >= 0x202a && c <= 0x202e) || (c >= 0x2066 && c <= 0x2069), "%s carries %U", k, c)
+		}
+	}
+	assert.Equal(t, "reportgpj.exe.md", m["name"])
+	assert.Equal(t, "agentname", m["agent"])
+	long := strings.Repeat("é", 200)
+	assert.LessOrEqual(t, len(cleanValue(long)), dropboxValueMax, "capped in bytes, on a character boundary")
+	assert.True(t, utf8ValidString(cleanValue(long)))
+}
+
+func utf8ValidString(s string) bool { return strings.ToValidUTF8(s, "�") == s }
+
+// Mutant: ready lets reconnect or quota_full through.
+func TestReadyRefusesOnReconnectAndQuotaFull(t *testing.T) {
+	be := newBackupEnv(t)
+	ctx := context.Background()
+	require.True(t, be.b.ready(ctx))
+	for _, st := range []string{store.DropboxStateReconnect, store.DropboxStateQuotaFull} {
+		require.NoError(t, be.h.dbx.store.SetState(ctx, st))
+		assert.False(t, be.b.ready(ctx), st)
+		require.NoError(t, be.h.dbx.store.SetState(ctx, store.DropboxStateConnected))
+		assert.True(t, be.b.ready(ctx))
+	}
+	require.NoError(t, be.h.dbx.store.SetState(ctx, store.DropboxStateReconnect))
+	be.put("a.md", "text/markdown", "a")
+	be.pass()
+	assert.Empty(t, be.dbx.files, "a pass in reconnect sends nothing")
+}
+
+// Mutant: the age condition is dropped from the filter.
+func TestTheAgeFilterHoldsOldArtifactsWithoutDeletingThem(t *testing.T) {
+	be := newBackupEnv(t)
+	be.b.maxAge = func() time.Duration { return 24 * time.Hour }
+	be.put("a.md", "text/markdown", "a")
+	real := be.b.now
+	be.b.now = func() time.Time { return real().Add(48 * time.Hour) }
+	be.pass()
+	assert.Empty(t, be.dbx.files, "older than the limit: not sent")
+	assert.Equal(t, 2, be.counts().Pending, "still queued, never deleted")
+	be.b.maxAge = func() time.Duration { return 0 }
+	be.b.now = func() time.Time { return real().Add(73 * time.Hour) } // the held rows are looked at again a day later
+	be.pass()
+	assert.Len(t, be.dbx.files, 2, "with no limit they go")
+}
+
+// Mutant: a success is marked done without comparing content_hash.
+func TestAContentHashMismatchIsNotDone(t *testing.T) {
+	be := newBackupEnv(t)
+	be.dbx.badHash = true
+	be.put("a.md", "text/markdown", "a")
+	be.pass()
+	c := be.counts()
+	assert.Equal(t, 0, c.BackedUp, "Dropbox's hash is not the bytes': not backed up")
+	assert.Equal(t, 2, c.Failed)
+}
+
+// Mutant: a rate limit waits the usual backoff (or nothing) instead of Retry-After.
+func TestRetryAfterIsHonored(t *testing.T) {
+	be := newBackupEnv(t)
+	t0 := time.Now()
+	be.b.now = func() time.Time { return t0 }
+	be.dbx.rateLimitOnce = 300 // five minutes: longer than the first backoff's minute
+	be.put("a.md", "text/markdown", "a")
+	be.pass()
+	assert.Empty(t, be.dbx.files)
+	assert.Equal(t, dropboxParallel/2, be.b.parallel, "the parallelism is halved")
+	be.b.now = func() time.Time { return t0.Add(2 * time.Minute) }
+	be.pass()
+	assert.Empty(t, be.dbx.files, "not before Retry-After")
+	be.b.now = func() time.Time { return t0.Add(301 * time.Second) }
+	be.pass()
+	assert.Len(t, be.dbx.files, 2, "after it")
+}
+
+type logSink struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (s *logSink) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buf.Write(p)
+}
+
+// Mutant: a log line carries the token, a path, a digest or a name.
+func TestTheLogsCarryCountsAndStateWordsOnly(t *testing.T) {
+	sink := &logSink{}
+	old := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(sink, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	defer slog.SetDefault(old)
+
+	be := newBackupEnv(t)
+	d := be.put("secret-plan.md", "text/markdown", "a")
+	be.pass() // a success
+	be.put("b.md", "text/markdown", "b")
+	be.dbx.refreshDead = true
+	be.pass() // a revoked sign-in
+	require.Len(t, be.dbx.files, 2)
+	require.Equal(t, "reconnect", be.status()["state"])
+
+	refresh, _ := be.h.dbx.store.RefreshToken(context.Background())
+	sink.mu.Lock()
+	text := sink.buf.String()
+	sink.mu.Unlock()
+	seen := 0
+	for _, line := range strings.Split(text, "\n") {
+		if !strings.Contains(line, "[dropbox]") {
+			continue // another test's line
+		}
+		seen++
+		var m map[string]any
+		require.NoError(t, json.Unmarshal([]byte(line), &m))
+		for k, v := range m {
+			switch k {
+			case "time", "level", "msg":
+			case "files", "bytes", "state":
+				if s, ok := v.(string); ok {
+					assert.Regexp(t, `^[a-z_]+$`, s, "a state word")
+				}
+			default:
+				t.Errorf("a dropbox log line carries %q: %s", k, line)
+			}
+		}
+		for _, leak := range []string{"refresh-secret", "a-dbid", "\"a1\"", "Bearer", d, d[:8], "secret-plan", "/v1/", be.h.dbx.dataDir} {
+			assert.NotContains(t, line, leak)
+		}
+		if refresh != "" {
+			assert.NotContains(t, line, refresh)
+		}
+	}
+	assert.GreaterOrEqual(t, seen, 2, "the success and the pause are both logged")
 }

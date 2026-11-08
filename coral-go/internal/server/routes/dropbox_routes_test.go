@@ -36,12 +36,14 @@ type fakeDropbox struct {
 	onRevoke    func() // called when a revoke arrives, before it is answered (to check what is stored at that moment)
 	refreshDead bool   // the token endpoint answers invalid_grant to a refresh
 	// Stage 4's upload side.
-	sessions    map[string][]byte
-	files       map[string][]byte // path -> bytes stored
-	finishCalls int
-	onStart     func() // called when an upload session starts (to change things mid-pass)
-	used, alloc int64
-	srv         *httptest.Server
+	sessions      map[string][]byte
+	files         map[string][]byte // path -> bytes stored
+	finishCalls   int
+	onStart       func() // called when an upload session starts (to change things mid-pass)
+	used, alloc   int64
+	rateLimitOnce int  // the next upload session start answers 429 with this Retry-After (seconds), once
+	badHash       bool // finish_batch answers success with a content_hash that is not the bytes'
+	srv           *httptest.Server
 }
 
 func newFakeDropbox(t *testing.T) *fakeDropbox {
@@ -78,6 +80,13 @@ func newFakeDropbox(t *testing.T) *fakeDropbox {
 				f.onStart()
 				f.mu.Lock()
 			}
+			if f.rateLimitOnce > 0 {
+				w.Header().Set("Retry-After", fmt.Sprint(f.rateLimitOnce))
+				w.WriteHeader(http.StatusTooManyRequests)
+				fmt.Fprintf(w, `{"error_summary":"too_many_requests/","error":{"reason":{".tag":"too_many_requests"},"retry_after":%d}}`, f.rateLimitOnce)
+				f.rateLimitOnce = 0
+				return
+			}
 			b, _ := io.ReadAll(r.Body)
 			id := fmt.Sprintf("s%d", len(f.sessions)+1)
 			f.sessions[id] = b
@@ -104,7 +113,11 @@ func newFakeDropbox(t *testing.T) *fakeDropbox {
 				}
 				b := f.sessions[e.Cursor.SessionID]
 				f.files[e.Commit.Path] = b
-				out = append(out, map[string]any{".tag": "success", "id": "id:" + e.Commit.Path, "rev": "r1", "content_hash": dropbox.ContentHash(b)})
+				hash := dropbox.ContentHash(b)
+				if f.badHash {
+					hash = dropbox.ContentHash(append([]byte("not "), b...))
+				}
+				out = append(out, map[string]any{".tag": "success", "id": "id:" + e.Commit.Path, "rev": "r1", "content_hash": hash})
 			}
 			json.NewEncoder(w).Encode(map[string]any{"entries": out})
 		case "/2/files/get_metadata":
