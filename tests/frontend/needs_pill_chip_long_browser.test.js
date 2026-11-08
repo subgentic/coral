@@ -44,6 +44,13 @@ const { coralReady } = require('./helpers/wait');
             check(`${at}review cards with a version pill are there and the pill is inside the card`, r.cards.filter(c => c.pill).length >= 2 && r.cards.every(c => c.pillInside), JSON.stringify(r.cards.map(c => c.pill)));
             check(`${at}the asker keeps a readable width (at least 56 px)`, r.cards.every(c => c.fromW === null || c.fromW >= 56), JSON.stringify(r.cards.map(c => c.fromW)));
             check(`${at}nothing is wider than the screen`, r.wide <= 0, String(r.wide));
+            // a cut chip says its whole name when tapped (the hover title is no help on a phone, #14705) and the card does not open; a chip that fits leaves the tap to the card
+            const tap = await ev(`(() => { const chips = [...document.querySelectorAll('#group-table-view tbody tr.dt-row .inbox-computer-chip, #group-table-view tbody tr.dt-row .dt-mail-computer')]; const cut = chips.find(c => c.scrollWidth > c.clientWidth + 1); if (!cut) return { none: true, chips: chips.length }; document.querySelectorAll('.toast').forEach(t => t.remove()); cut.scrollIntoView({ block: 'center', behavior: 'instant' }); const full = cut.textContent.trim(); cut.click(); return { full, chips: chips.length }; })()`);
+            if (tap.none) check(`${at}(no chip is cut at this size: nothing to tap)`, true, String(tap.chips));
+            else {
+                await waitFor(`!![...document.querySelectorAll('.toast')].find(t => t.textContent.includes(${JSON.stringify(tap.full)}))`, `${at}the cut chip's tap says its whole name`, 4000);
+                check(`${at}tapping a cut chip says its whole name in a toast and opens no dialog`, await ev(`!document.querySelector('dialog[open]')`), tap.full);
+            }
         }
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
