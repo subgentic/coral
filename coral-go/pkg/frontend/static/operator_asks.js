@@ -44,6 +44,13 @@ export function askFull(a) {
 }
 /** The whole question, hidden characters written out, line breaks kept. */
 export const askWhole = a => markHidden(a && a.text, { strict: true });
+/** Whether the row's preview leaves words out: the question runs past the preview (#14617). */
+export const askIsLong = a => String((a && a.text) == null ? '' : a.text).length > PREVIEW_IN;
+/** The question as an opened row says it (#14617): ALL the words the Operator's list carries (up to 4096 characters), white space collapsed as the preview's is; a question the server itself cut says so after it. */
+export function askOpened(a) {
+    const one = plainMarkdown(askWhole(a)).replace(/\s+/g, ' ').trim();
+    return a && a.cut ? `${one} \u2026 (cut: the board has the rest)` : one;
+}
 /** A stable id of one question among the rows. */
 export const askKey = a => `operator-ask:${a.server && !isLocalServer(a.server) ? `${a.server}/` : ''}${a.board}:${a.kind}:${a.id}`; // two computers can each have a team of one name and a question of one number
 
@@ -207,7 +214,7 @@ async function resumeEndedMember(server, a, name, who, sessionName) {
 /** The dialog names the asker and team; the complete question is shown once in its body (#12722). */
 export function askParts(a) {
     return { title: `${markHidden(a.asker || 'Agent', { strict: true })} · ${markHidden(a.board_label || a.board || 'Team', { strict: true })}`,
-        body: listsOf(askWhole(a).replace(/^\s*@Operator\b[:,]?\s*/i, '').trim()) };
+        body: listsOf(askWhole(a).trim()) };
 }
 
 /** A question written on one line with its steps inline ("... console: 1. Open it. 2. Generate a token. 3. Save it.") is set out as a list: a blank line before the first step and each step on its own line. Only when the
