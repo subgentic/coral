@@ -26,7 +26,9 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`fetch('/api/board/${team}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Plan Writer', job_title: 'Writer' }) }).then(() => true)`);
             await ev(`(() => { const original = window.fetch;
                 const item = { id: '${H3}', name: 'release-plan.md', media_type: 'text/markdown', size: 10500, created_at: new Date(Date.now() - 3600000).toISOString(), source: 'upload', available: true, tags: ['for review'], produced_by: 'Plan Writer', question: 'Ship it?', file_id: '${FILE}', version_line: ${JSON.stringify(lineOf(3))} };
-                window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin), method = (opts.method || 'GET').toUpperCase();
+                window.fetch = (url, opts = {}) => { const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, { '${team}': [item] }) : null; // the Inbox reads review rows from the Servers list (GET /api/team-artifacts), as inbox_row_file_id and needs_row_newest answer it (#14383)
+                    if (reviewPage) return Promise.resolve(new Response(JSON.stringify(reviewPage), { headers: { 'Content-Type': 'application/json' } }));
+                    const u = new URL(String(url), location.origin), method = (opts.method || 'GET').toUpperCase();
                     if (method === 'GET' && u.pathname === '/api/board/${team}/artifacts') return Promise.resolve(new Response(JSON.stringify({ project: '${team}', artifacts: [item], has_more: false }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                     return original(url, opts); };
                 return true; })()`);
