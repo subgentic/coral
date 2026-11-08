@@ -161,12 +161,12 @@ func (d *dialogs) start(name string) bool {
 			why = "no such dialog"
 		}
 		d.mu.Unlock()
-		fmt.Fprintf(d.w(), "\r\n[mock-agent] MOCK_DIALOG %q: %s\r\n", name, why)
+		sayTo(d.w(), "\r\n[mock-agent] MOCK_DIALOG %q: %s\r\n", name, why)
 		return false
 	}
 	if d.open || d.pending {
 		d.mu.Unlock()
-		fmt.Fprint(d.w(), "\r\n[mock-agent] MOCK_DIALOG: a dialog is already open\r\n")
+		sayTo(d.w(), "\r\n[mock-agent] MOCK_DIALOG: a dialog is already open\r\n")
 		return false
 	}
 	if spec.Stranger {
@@ -177,7 +177,7 @@ func (d *dialogs) start(name string) bool {
 	if spec.OpenAfter > 0 {
 		d.pending = true
 		d.mu.Unlock()
-		fmt.Fprintf(d.w(), "\r\n[mock-agent] dialog %s opens in %gs\r\n", name, spec.OpenAfter)
+		sayTo(d.w(), "\r\n[mock-agent] dialog %s opens in %gs\r\n", name, spec.OpenAfter)
 		time.AfterFunc(time.Duration(spec.OpenAfter*float64(time.Second)), func() {
 			d.mu.Lock()
 			d.pending = false
@@ -602,9 +602,9 @@ func (d *dialogs) closeLocked(event string, extra map[string]any, accepted bool)
 	d.log(event, extra)
 	d.eraseLocked()
 	if event == "dismiss" {
-		fmt.Fprintf(d.w(), "[mock-agent] DIALOG %s dismissed\r\n", d.name)
+		sayTo(d.w(), "[mock-agent] DIALOG %s dismissed\r\n", d.name)
 	} else {
-		fmt.Fprintf(d.w(), "[mock-agent] DIALOG %s ANSWERED %s\r\n", d.name, describeAnswer(extra))
+		sayTo(d.w(), "[mock-agent] DIALOG %s ANSWERED %s\r\n", d.name, describeAnswer(extra))
 	}
 	tool := d.spec.toolOf()
 	if accepted && tool != "" && hookOf(d.spec) == "live" {
@@ -642,7 +642,7 @@ func (d *dialogs) runStranger(name string, spec dialogSpec) {
 	d.mu.Unlock()
 	exe, err := os.Executable()
 	if err != nil {
-		fmt.Fprintf(d.w(), "\r\n[mock-agent] stranger: %v\r\n", err)
+		sayTo(d.w(), "\r\n[mock-agent] stranger: %v\r\n", err)
 		return
 	}
 	cmd := exec.Command(exe, "--qa-stranger", os.Getenv("MOCK_AGENT_DIALOGS"), name, d.logPath)
@@ -654,7 +654,7 @@ func (d *dialogs) runStranger(name string, spec dialogSpec) {
 	d.mu.Lock()
 	d.log("stranger_exit", map[string]any{"error": fmt.Sprint(runErr)})
 	d.mu.Unlock()
-	fmt.Fprintf(d.w(), "\r\n[mock-agent] the other program in the terminal ended (%v)\r\n", runErr)
+	sayTo(d.w(), "\r\n[mock-agent] the other program in the terminal ended (%v)\r\n", runErr)
 }
 
 // runStrangerChild is the program runStranger starts: it draws the dialog, logs every byte it is sent as "stranger_key", and answers nothing. It ends at an Escape or a Ctrl-C, or after

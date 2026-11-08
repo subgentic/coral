@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -25,6 +26,13 @@ func say(s string) {
 func sayErrf(format string, a ...any) {
 	if !quietMode() {
 		fmt.Fprintf(os.Stderr, format, a...)
+	}
+}
+
+// sayTo is sayf for a writer of its own (a dialog draws to its writer, dialogs.go): quiet, it prints nothing.
+func sayTo(w io.Writer, format string, a ...any) {
+	if !quietMode() {
+		fmt.Fprintf(w, format, a...)
 	}
 }
 
