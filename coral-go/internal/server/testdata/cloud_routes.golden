@@ -136,6 +136,7 @@ GET /api/chief/triggers never
 GET /api/cloud/owner-label never
 GET /api/cloud/status never
 GET /api/custom-models view
+GET /api/dropbox/status never
 GET /api/filesystem/is-git launch
 GET /api/filesystem/list launch
 GET /api/filesystem/trust-probe never
@@ -394,6 +395,10 @@ POST /api/cloud/guide-revoked never
 POST /api/cloud/owner-label/arm never
 POST /api/cloud/redeem never
 POST /api/cloud/rekey never
+POST /api/dropbox/connect never
+POST /api/dropbox/disconnect never
+POST /api/dropbox/switch never
+POST /api/dropbox/takeover never
 POST /api/folder-tags/{folderName} never
 POST /api/history-import never
 POST /api/hub-auto-accept launch

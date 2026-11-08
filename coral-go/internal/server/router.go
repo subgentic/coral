@@ -510,6 +510,13 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Get("/api/cloud/status", s.cloudHandler.GetStatus)
 	r.Post("/api/cloud/connect", s.cloudHandler.Connect)
 	r.Post("/api/cloud/connect/cancel", s.cloudHandler.CancelConnect)
+	// Dropbox sign-in (#14609): the Operator's, from this computer's dashboard only.
+	s.cloudHandler.SetDropbox(store.NewDropboxStore(s.db, store.NewRemoteServerStore(s.db, s.cfg.CoralDir())), s.cfg.CoralDir())
+	r.Get("/api/dropbox/status", s.cloudHandler.DropboxStatus)
+	r.Post("/api/dropbox/connect", s.cloudHandler.DropboxConnect)
+	r.Post("/api/dropbox/disconnect", s.cloudHandler.DropboxDisconnect)
+	r.Post("/api/dropbox/switch", s.cloudHandler.DropboxConfirmSwitch)
+	r.Post("/api/dropbox/takeover", s.cloudHandler.DropboxTakeOver)
 	r.Post("/api/cloud/disconnect", s.cloudHandler.Disconnect)
 	r.Post("/api/cloud/rekey", s.cloudHandler.Rekey)                   // #3698
 	r.Get("/api/cloud/owner-label", s.cloudHandler.OwnerLabel)         // #6108: is the owner recorded, and who would be

@@ -578,3 +578,8 @@ a POST /api/resources/{name}/renew
 a PUT /api/resources/{name}
 b PUT /api/teams/detail/{name}/daily-knowledge
 b PUT /api/teams/detail/{name}/daily-knowledge/auto-apply
+b GET /api/dropbox/status
+b POST /api/dropbox/connect
+b POST /api/dropbox/disconnect
+b POST /api/dropbox/switch
+b POST /api/dropbox/takeover

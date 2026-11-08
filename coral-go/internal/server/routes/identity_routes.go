@@ -152,10 +152,16 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/cloud/connect":                        "connect to Coral Hub",
 	"POST /api/cloud/connect/cancel":                 "cancel connecting to Coral Hub",
 	"POST /api/cloud/disconnect":                     "disconnect from Coral Hub",
-	"POST /api/cloud/redeem":                         "redeem a Coral Hub credential",
-	"POST /api/cloud/rekey":                          "replace the secret key and discard what it sealed", // #3698
-	"GET /api/cloud/owner-label":                     "see whether Coral Hub's owner is recorded on this computer",
-	"POST /api/cloud/owner-label/arm":                "confirm who owns this computer on Coral Hub",
+	// Dropbox sign-in (#14609): the Operator's, from this computer's dashboard.
+	"GET /api/dropbox/status":         "read the Dropbox connection",
+	"POST /api/dropbox/connect":       "connect Dropbox",
+	"POST /api/dropbox/disconnect":    "disconnect Dropbox",
+	"POST /api/dropbox/switch":        "switch the Dropbox account",
+	"POST /api/dropbox/takeover":      "take over the Dropbox backup",
+	"POST /api/cloud/redeem":          "redeem a Coral Hub credential",
+	"POST /api/cloud/rekey":           "replace the secret key and discard what it sealed", // #3698
+	"GET /api/cloud/owner-label":      "see whether Coral Hub's owner is recorded on this computer",
+	"POST /api/cloud/owner-label/arm": "confirm who owns this computer on Coral Hub",
 	// #3553: the Operator removes an artifact (also refused to anyone but a person, in every mode).
 	"DELETE /api/artifacts/{id}": "delete an artifact",
 	// #5575: the machine-wide list of every artifact (the owner's, here or through Coral Hub): never an agent's.
