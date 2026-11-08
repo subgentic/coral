@@ -85,11 +85,23 @@ function openMore(first) {
     (first === 'last' ? items[items.length - 1] : items.find(i => i.classList.contains('active')) || items[0])?.focus();
 }
 
+/** After a pick the menu is gone, and the item that had the focus with it: the focus goes to the panel that opened, named for its tab, so a keyboard or screen-reader user is
+ *  where they asked to be (coral-hub's UI review of the Branches tab: never body or a hidden item). A panel that cannot take it (not shown) leaves the focus on More. */
+function focusPanel(t) {
+    const p = $(`agentic-panel-${t}`), tab = $(`agentic-tab-${t}`);
+    if (p) {
+        if (!p.hasAttribute('tabindex')) p.setAttribute('tabindex', '-1');
+        if (tab && !p.hasAttribute('aria-label')) setAttr(p, 'aria-label', wordOf(tab));
+        p.focus({ preventScroll: true });
+    }
+    if (document.activeElement !== p) $('agentic-tab-more')?.focus();
+}
+
 const items = () => [...($('agentic-more-menu')?.querySelectorAll('[role=menuitem]') || [])];
 
 registerActions({
     'dock-more-toggle': () => { if (menuOpen) closeMore(true); else openMore(); },
-    'dock-more-pick': el => { const t = el.dataset.tab; closeMore(false); if (RARE.includes(t)) { window.switchAgenticTab?.(t, 'top') } },
+    'dock-more-pick': el => { const t = el.dataset.tab; closeMore(false); if (RARE.includes(t)) { window.switchAgenticTab?.(t, 'top'); focusPanel(t); } },
     'dock-more-key': (el, event) => {
         const list = items(), i = list.indexOf(el);
         if (event.key === 'Escape') { event.preventDefault(); closeMore(true); }
