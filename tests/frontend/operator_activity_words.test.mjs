@@ -30,7 +30,17 @@ assert.deepEqual(activityParts({action:'file_star',item_kind:'file',title:'plan.
 assert.deepEqual(activityParts({action:'file_unstar',item_kind:'file'}, words), {did:'Unstarred',on:'a file',detail:''}, 'an older row falls back to the kind');
 assert.deepEqual(activityParts({action:'task_complete',item_id:'12',title:'Ship release',note:'done'}, words), {did:'Completed',on:'task #12 Ship release',detail:'done'});
 assert.deepEqual(activityParts({action:'approve',item_kind:'file',title:'plan.md'}, words), {did:'Approved',on:'plan.md',detail:''});
-assert.equal(cleanAnswer('@Orchestrator @Lead  go ahead'), 'go ahead');
-assert.equal(cleanAnswer('@Orchestrator'), '@Orchestrator', 'a note that is only a mention is kept');
+assert.equal(cleanAnswer('@Orchestrator Option 2', 'Orchestrator'), 'Option 2', 'the recorded asker\u2019s mention goes');
+assert.equal(cleanAnswer('@orchestrator, Option 2', 'Orchestrator'), 'Option 2', 'in any case, with a comma');
+assert.equal(cleanAnswer('@Head of Security fine by me', 'Head of Security'), 'fine by me', 'a name of several words goes whole');
+assert.equal(cleanAnswer('@Lead go ahead', 'Orchestrator'), '@Lead go ahead', 'another mention at the start is part of the answer');
+assert.equal(cleanAnswer('@Orchestrator @Lead go ahead', 'Orchestrator'), '@Lead go ahead', 'only the asker\u2019s is removed');
+assert.equal(cleanAnswer('@Headline fine', 'Head'), '@Headline fine', 'a name that is only the start of a longer word is not removed');
+assert.equal(cleanAnswer('@Orchestrator Option 2'), '@Orchestrator Option 2', 'no asker known: the note is shown as it is');
+assert.equal(cleanAnswer('@Orchestrator', 'Orchestrator'), '@Orchestrator', 'a note that is only the mention is kept');
+assert.equal(cleanAnswer('@Orchestrator (a+b) ok', 'Orchestrator'), '(a+b) ok');
+assert.equal(cleanAnswer('@A.B ok', 'A.B'), 'ok', 'regex characters in a name are plain');
+assert.deepEqual(activityParts({action:'answer',item_kind:'question',title:'Which?',asker:'Head of Security',note:'@Head of Security yes'}, words).detail, 'from Head of Security · Your answer: yes');
+assert.deepEqual(activityParts({action:'answer',item_kind:'question',title:'Which?',asker:'Orchestrator',note:'@Lead yes'}, words).detail, 'from Orchestrator · Your answer: @Lead yes', 'an unrelated mention stays in the detail');
 for (const value of ACTIONS) { const p = activityParts({action:value,item_kind:'task',item_id:'12',title:'Title'}, words); assert.ok(p.did && p.on, value); }
 console.log('operator_activity_words: verb, object and detail for each row');

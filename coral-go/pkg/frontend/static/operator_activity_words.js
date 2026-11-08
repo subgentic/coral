@@ -13,14 +13,20 @@ export function jobRunParts(value) {
 const FIXED_DISMISS_NOTE = 'Dismissed by the operator'; // what a dismissed ask is recorded with: the verb already says it, so it is not repeated as a detail
 const KIND_OBJECT = ['a file', 'a question', 'a goal', 'a proposal', 'a message', 'a task', 'an agent', 'a chat', 'a run', 'a workflow run', 'an automation run', 'a row in Needs you', 'a goal request'];
 const TASK_DID = { task_create: 'Created', task_complete: 'Completed', task_cancel: 'Cancelled', task_publish: 'Published', task_edit: 'Changed', task_remind: 'Sent a reminder about', task_park: 'Parked or released', task_reply: 'Replied on' };
-/** An answer typed after an @mention of the agent (the way Needs you sends a reply to one) is shown without it: the asker is named on its own. */
-export const cleanAnswer = note => { const t = String(note || '').trim(), s = t.replace(/^(?:@[\w.-]+[\s,:]*)+/, '').trim(); return s || t; };
+/** An answer sent from Needs you starts with the @mention of the agent that asked: it is shown without it, the asker being named on its own. ONLY the recorded asker's mention is removed (its name may be several words, '@Head of Security'), never the first @token of whatever was typed: an answer that starts with another mention keeps it (#14461). With no asker known the note is shown as it is. */
+export const cleanAnswer = (note, asker) => {
+    const t = String(note || '').trim(), name = String(asker || '').trim();
+    if (!name) return t;
+    const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), m = new RegExp(`^@${esc.replace(/\s+/g, '\\s+')}(?![\\w-])[\\s,:]*`, 'i').exec(t);
+    const rest = m ? t.slice(m[0].length).trim() : t;
+    return rest || t;
+};
 /** @returns {{ did: string, on: string, detail: string }} the verb for YOU DID, the object for ON (what the record kept, else the kind), and the detail for its own line. `itemWords(row)` is the row's own object words (inbox_activity.js). */
 export function activityParts(row, itemWords) {
     const obj = itemWords(row), who = row.title || row.item_id || 'an agent', note = String(row.note || '').trim();
     const mk = (did, on, detail = '') => ({ did, on, detail: detail === FIXED_DISMISS_NOTE ? '' : detail });
     if (row.action === 'answer' && row.item_kind === 'question') { // a NEW row: the title is the ask's line and `asker` is who asked; an older row keeps the asker in the title
-        const answer = note ? `Your answer: ${cleanAnswer(note)}` : '';
+        const answer = note ? `Your answer: ${cleanAnswer(note, row.asker || row.title)}` : '';
         if (row.asker) return mk('Answered', row.title || 'a question', [`from ${row.asker}`, answer].filter(Boolean).join(' · '));
         return mk('Answered', row.title ? `${row.title}’s question` : 'a question', answer);
     }
