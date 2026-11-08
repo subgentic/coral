@@ -193,6 +193,8 @@ func (s *Server) registerBoardMessageRoutes(r chi.Router, boardHandler *routes.B
 	r.Get("/api/operator-asks", boardHandler.OperatorAsks)           // the questions agents asked the Operator (post --ask, wait --operator), for Needs you (#11417)
 	// The thread reads filter operator_actions by (team, goal_id) and (team, task_id): both are indexed (idx_operator_actions_team_goal and _team_task in board/operator_actions.go, #14440, Security's INFO 4), so
 	// a thread never reads the whole record; a new filter on these routes needs its index too.
+	// A thread's replies are every board message that carries the task's id, whoever sent it (the board view already shows them all to the Operator): the entry's "from" says who, and nothing here narrows
+	// them to agents only (Security's INFO 4 on S3).
 	r.Get("/api/thread", boardHandler.Thread)                                                                  // #14440: the story of one goal or task, owner only
 	r.Get("/api/threads", boardHandler.Threads)                                                                // #14440: one summary per task for the list pages, owner only
 	r.Get("/api/activity", boardHandler.ListActivity)                                                          // the Activity record of what the Operator did in Needs you (#12069): the Operator's alone, local, never through the Hub (not in the tunnel table)

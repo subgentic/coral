@@ -342,14 +342,14 @@ func TestTaskSummariesCarryWaitingLatestLastDecisionAndCounts(t *testing.T) {
 func TestThreadTextHasNoTerminalControlOrReorderingCharacters(t *testing.T) {
 	s, goal, task := threadFixture(t)
 	ctx := context.Background()
-	dirty := "\x1b[31mred\x1b[0m ‮evil‬ and \x1b]0;title\x07ok"
+	dirty := "\x1b[31mred\x1b[0m \u202eevil\u202c and \x1b]0;title\x07ok"
 	addReply(t, s, "team-a", "Dev", "first line "+dirty+"\nsecond line", task.ID)
 	addAsk(t, s, "team-a", dirty+"\nsecond line of the ask", goal.ID, task.ID, "Operator")
 	require.NoError(t, s.RecordActivity(ctx, opMeta, ActAnswer, "question", "1", "", "team-a"))
 	p, err := s.ThreadEntries(ctx, ThreadQuery{Team: "team-a", GoalID: goal.ID, Redact: keepAll})
 	require.NoError(t, err)
 	bad := func(s string) bool {
-		return strings.ContainsAny(s, "\x1b\x07‮‬")
+		return strings.ContainsAny(s, "\x1b\x07\u202e\u202c")
 	}
 	var sawReply, sawAsk bool
 	for _, e := range p.Entries {
@@ -369,7 +369,7 @@ func TestThreadTextHasNoTerminalControlOrReorderingCharacters(t *testing.T) {
 	}
 	assert.True(t, sawReply && sawAsk)
 	// the titles carried in the header and the summaries
-	task2, err := s.CreateTask(ctx, "team-a", "Title \x1b[31mwith\x1b[0m ‮control", "", "medium", "Lead")
+	task2, err := s.CreateTask(ctx, "team-a", "Title \x1b[31mwith\x1b[0m \u202econtrol", "", "medium", "Lead")
 	require.NoError(t, err)
 	gid := goal.ID
 	require.NoError(t, s.SetTaskGoal(ctx, "team-a", task2.ID, &gid))
