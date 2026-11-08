@@ -24,3 +24,4 @@
     .inbox-ask-expand { min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); } /* Show all / Show less on a long question (#14617) */
     .inbox-proposal-line { font-weight: inherit; }
 }
+.inbox-ask-opened { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; -webkit-line-clamp: unset; line-clamp: none; } /* an agent's question opened in its row (#14637): said whole, wrapped */
