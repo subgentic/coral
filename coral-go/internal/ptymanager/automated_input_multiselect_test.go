@@ -131,3 +131,30 @@ func TestAnEscOnlyFooterIsStillNotAMenu(t *testing.T) {
 	assert.True(t, strings.HasPrefix(why, footerWhy) || strings.HasPrefix(why, busyWhy), "%q", why)
 	assert.False(t, isPromptHold(why), "an esc-only footer holds no send as a question: %q", why)
 }
+
+// QA Reviewer 2's SHOULDs on 227f924e0: ticked rows hold as unticked ones do (a question with every box ticked is still open), and the boundaries are pinned: one check-box row is enough, a numbered or an unnumbered
+// row counts, a markdown task list ("- [ ]") never does, and a footer with one numbered row holds.
+func TestCheckBoxBoundariesOfAMultiSelect(t *testing.T) {
+	holds := map[string]string{
+		"every row ticked with a check mark":   "  1. [✓] Settings\n  2. [✓] Account\n  3. [✓] Docs\n     Next\n",
+		"every row ticked with an x":           "  1. [x] Settings\n  2. [X] Account\n     Next\n",
+		"a heavy check mark":                   "❯ 1. [✔] Settings\n  2. [ ] Account\n",
+		"one check-box row is enough":          "  5. [ ] Type something.\n",
+		"check boxes without numbers":          "  [ ] Settings\n  [ ] Account\n  [✓] Docs\n     Next\n",
+		"one unnumbered check-box row":         "  [ ] Settings\n",
+		"one numbered option under the footer": "  2. Opus\n\n  Enter to select · Esc to exit\n",
+	}
+	for name, screen := range holds {
+		open, why := PromptOnScreen(screen)
+		assert.True(t, open, name)
+		assert.False(t, strings.HasPrefix(why, footerWhy) || strings.HasPrefix(why, busyWhy), "%s: %q", name, why)
+	}
+	for name, screen := range map[string]string{
+		"a markdown task list in a reply":        "● The plan:\n\n  - [ ] Write the test\n  - [x] Fix the bug\n",
+		"a bracket that is not a check box":      "  1. [see docs] Settings\n  2. [link] Account\n",
+		"a reply's check list above an idle box": "● Plan:\n  1. [ ] Write the test\n  2. [ ] Fix\n\n" + idleInputBox,
+	} {
+		open, _ := PromptOnScreen(screen)
+		assert.False(t, open, name)
+	}
+}

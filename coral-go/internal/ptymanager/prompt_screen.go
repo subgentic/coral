@@ -175,8 +175,8 @@ func codexWorkingMatching(screen string, workingRe *regexp.Regexp) (line string,
 	return "", false
 }
 
-// checkBoxRe is a numbered row with a check box: "1. [ ] Settings", "5. [✓] Other". Only a multi-select question draws them.
-var checkBoxRe = regexp.MustCompile(`^\s*([❯›>]\s*)?\d{1,2}[.)]\s+\[[ xX✓✔]\]`)
+// checkBoxRe is a row with a check box, ticked or not, numbered or not: "1. [ ] Settings", "5. [✓] Other", "[x] Docs". Only a multi-select question draws them at the start of a row (a markdown task list starts with "- ").
+var checkBoxRe = regexp.MustCompile(`^\s*([❯›>]\s*)?(\d{1,2}[.)]\s+)?\[[ xX✓✔]\]\s*\S`)
 
 // checkBoxRows counts the numbered check-box rows of lines.
 func checkBoxRows(lines []string) int {
