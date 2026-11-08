@@ -231,6 +231,7 @@ node chat_search_verification.test.js
 node completion_review.test.js
 node task_detail_numbers.test.js
 node task_detail_words.test.mjs
+node task_jump.test.mjs
 node enroll_page.test.js
 node cloud_rekey.test.mjs
 node cloud_signin_return.test.mjs

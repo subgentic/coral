@@ -47,14 +47,17 @@ test('task assignee link uses its team and never falls back to an unrelated stan
     state.liveSessions = [{ ...rows[0], board_project: '' }, ...rows.slice(1)];
     const task = { id: 5, title: 'Work', status: 'in_progress', assigned_to: 'Lead Developer' };
     renderTaskPage(host, task, { project: '@m1/dev', onBack() {} });
-    const link = host.querySelector('dl.facts dd button'); assert.ok(link, 'own team assignee is linked'); link.click();
-    assert.deepEqual(selected, ['m1-dev', 'claude', 'm1-dev', 'm1']);
+    const link = host.querySelector('dl.facts dd .task-jump-btn'); assert.ok(link, 'own team assignee has the Jump to agent button'); link.click();
+    assert.deepEqual(selected, ['m1-dev', 'claude', 'm1-dev', 'm1', { focusChat: true }]);
     renderTaskPage(host, { ...task, session_id: 'local-dev' }, { project: '@m1/dev', onBack() {} });
-    host.querySelector('dl.facts dd button').click();
+    host.querySelector('dl.facts dd .task-jump-btn').click();
     assert.equal(selected[3], 'm1', 'a foreign session hint cannot redirect the task link');
     state.liveSessions = [{ ...rows[0], board_project: '' }, rows[1], rows[2]];
     renderTaskPage(host, task, { project: '@m1/dev', onBack() {} });
-    assert.equal(host.querySelector('dl.facts dd button'), null, 'unrelated agents do not become the assignee link');
+    host.querySelector('dl.facts dd .task-jump-btn').click(); // Jump to agent always shows and always jumps (#14565): with no agent of this team running it opens the assignee on this team's computer, never the unrelated standalone agent
+    assert.equal(selected[2], undefined, 'no session of the unrelated agents is selected');
+    assert.equal(selected[3], 'm1', 'it opens on the team\'s computer');
+    assert.equal(selected[0], 'Lead Developer');
     host.remove();
 });
 test('remote comment Sent to names retain their panel computer', async () => {

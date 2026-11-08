@@ -17,6 +17,7 @@ await loadStyles('phone_lists.css'); // the phone form of a team list (#12230); 
 import { goalTitle, refreshGoalTitles, readGoal, readGoalChoices, noGoalLabel } from './task_goals.js';
 import { taskStatusWord, statusClass, isParked } from './goal_words.js';
 import { state } from './state.js';
+const { jumpTarget } = await importOnce('./task_jump.js'); // lazy: its failure is retried (#14565)
 const { needsReview } = await importOnce('./review_pool.js');
 const { linkArtifactRefsIn, linkedText } = await importOnce('./artifact_refs.js'); // a coral://artifacts/<hex> in a task's words is a link (#11416)
 import { showToast } from './utils.js';
@@ -342,15 +343,6 @@ export async function readTask(project, id) {
     return have || null;
 }
 
-/** The live agent on this computer that has a task (its session, else its assignee's name on this board), or null: the page then has no Open the agent. */
-function agentOf(project, task) {
-    const live = (state.liveSessions || []).filter(s => inTeam(s, project));
-    if (task.session_id) { const bySession = live.find(s => s && s.session_id === task.session_id); if (bySession) return bySession; }
-    const name = task.assigned_to;
-    if (!name) return null;
-    return live.find(s => s.display_name === name || s.name === name) || null;
-}
-
 // ── a task's page ────────────────────────────────────────────────────────
 
 function fact(dl, label, value) {
@@ -481,12 +473,28 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
     if (focus) focus.focus({ preventScroll: true });
 }
 
+/** The Assigned to cell with its Jump to agent button (#14565): the name, then the button that opens the agent's chat (the reviewer's for a task in review). It is always there when the task names someone and always jumps: an agent that sleeps or has ended opens on its own page, where it can be woken. A remote agent (Coral Hub) opens through its computer. */
+function jumpCell(name, jump) {
+    const cell = el('span', 'task-jump');
+    cell.append(el('span', 'task-jump-name', name));
+    const s = jump.session, reviewer = jump.kind === 'reviewer';
+    const b = btn('btn task-jump-btn', 'Jump to agent', () => { window.switchNavTab?.('agents'); window.selectLiveSession?.(s ? s.name : jump.name, s?.agent_type, s ? s.session_id : jump.sessionId, s ? s.server : jump.server, { focusChat: true }); });
+    const words = { running: '', asleep: ', asleep: wake it there', ended: ', not running: open it to wake it' }[jump.state];
+    b.setAttribute('aria-label', `Jump to agent: ${jump.name}${reviewer ? ', the reviewer' : ''}${words}`);
+    b.title = `Open ${jump.name}${reviewer ? ', who is reviewing it' : ''}${words}`;
+    cell.append(b);
+    if (reviewer) cell.append(el('span', 'task-jump-role', `Reviewer: ${jump.name}`));
+    if (jump.state !== 'running') cell.append(el('span', 'task-jump-role', jump.state === 'asleep' ? 'Asleep' : 'Not running'));
+    return cell;
+}
+
 /** The facts of a task's page: who, goal, priority, who made it and when. (What the dialog showed beyond them is under them, taskExtraHtml.) */
 function factsOf(task, ctx) {
     const dl = el('dl', 'facts goals-facts');
-    const who = agentOf(ctx.project, task); // the agent that has it, when it runs here: its name opens it (the old subagent row's "Launched by", for a board's tasks)
     const doer = doerOf(task); // who did the work: for a done task the one who built it (the server's worked_by)
-    fact(dl, isDoneTask(task) ? 'Done by' : 'Assigned to', who && !isDoneTask(task) ? btn('team-link', doer || task.assigned_to, () => { window.switchNavTab?.('agents'); window.selectLiveSession?.(who.name, who.agent_type, who.session_id, who.server); }) : (doer || (isDoneTask(task) ? 'Nobody recorded' : 'Nobody yet')));
+    const jump = jumpTarget(task, (state.liveSessions || []).filter(s => inTeam(s, ctx.project))); // Jump to agent (#14565): the agent that has it, or for a task in review its reviewer
+    const name = doer || (isDoneTask(task) ? 'Nobody recorded' : 'Nobody yet');
+    fact(dl, isDoneTask(task) ? 'Done by' : 'Assigned to', jump ? jumpCell(name, { ...jump, sessionId: task.session_id, server: splitKey(ctx.project).server }) : name);
     if (task.goal_id) {
         const g = btn('team-link', (ctx.goalTitleOf && ctx.goalTitleOf(task.goal_id)) || task.goal_title || goalTitle(ctx.project, task.goal_id) || `Goal ${task.goal_id}`, () => ctx.openGoal(task.goal_id)); // a goal's page already knows the titles
         fact(dl, 'Goal', g);
