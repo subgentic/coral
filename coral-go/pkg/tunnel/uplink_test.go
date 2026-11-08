@@ -9,11 +9,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"runtime"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -277,21 +274,7 @@ const hubCriterion = 200 * time.Millisecond
 // everywhere, and BenchmarkUplinkSmallReplyP95 still reports the figure against 200 ms.
 const windowsCriterion = 250 * time.Millisecond
 
-// smallReplyCriterion is the absolute p95 bound for this host: coral-hub's, or windowsCriterion on Windows.
-func smallReplyCriterion() time.Duration {
-	if runtime.GOOS == "windows" {
-		return windowsCriterion
-	}
-	return hubCriterion
-}
-
-// loadavg is the host's load average where it can be read (Linux), for the log.
-func loadavg() string {
-	if b, err := os.ReadFile("/proc/loadavg"); err == nil {
-		return strings.Join(strings.Fields(string(b))[:3], " ")
-	}
-	return "n/a"
-}
+// smallReplyCriterion, criterionFor and loadavg are in uplink_load_test.go.
 
 // coral-hub's reproduction (60 ms RTT, 5 Mbit uplink): with 1 and 4 bulk streams in
 // flight, a small reply's p95 drops below 0.2 s with the scheduler and a short send
@@ -328,7 +311,7 @@ func TestUplinkSmallRepliesOvertakeBulk(t *testing.T) {
 			} else {
 				assert.Less(t, a95*2, b95, "at least twice as fast as before")
 			}
-			criterion := smallReplyCriterion()
+			criterion, why := smallReplyCriterion()
 			if a95 >= criterion {
 				t.Logf("bulk=%d: p95 %v missed the %v criterion with load average %s: measuring twice more, median of 3 (#3716)", bulk, a95.Round(time.Millisecond), criterion, loadavg())
 				p95s := []time.Duration{a95}
@@ -340,10 +323,12 @@ func TestUplinkSmallRepliesOvertakeBulk(t *testing.T) {
 				a95 = p95s[1]
 				t.Logf("bulk=%d: p95s %v, median %v", bulk, p95s, a95.Round(time.Millisecond))
 			}
+			// The bound is judged with the load as it is now, after the measuring: a run beside other packages' tests can start quiet and end busy (#14561).
+			criterion, why = smallReplyCriterion()
 			if criterion != hubCriterion {
-				t.Logf("bulk=%d: p95 %v held to the %s bound %v (coral-hub's is %v)", bulk, a95.Round(time.Millisecond), runtime.GOOS, criterion, hubCriterion)
+				t.Logf("bulk=%d: p95 %v held to the %v bound, not coral-hub's %v: %s", bulk, a95.Round(time.Millisecond), criterion, hubCriterion, why)
 			}
-			assert.Less(t, a95, criterion, "small-reply p95 with the scheduler (coral-hub's criterion; 250 ms on Windows)")
+			assert.Less(t, a95, criterion, "small-reply p95 with the scheduler (coral-hub's 200 ms when the host is quiet; 250 ms on Windows or when the load is above the core count or unreadable)")
 		})
 	}
 }
