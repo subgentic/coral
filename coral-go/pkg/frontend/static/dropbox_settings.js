@@ -93,10 +93,19 @@ export async function loadDropbox() {
     try {
         const r = await fetch(STATUS, { cache: 'no-store' });
         if (r.ok) st = await r.json();
-        else if (r.status === 403 || r.status === 404) {
-            // Through Coral Hub every Dropbox route is refused (never in the tunnel table): say where it is done instead.
+        else {
+            // A refusal says why, read from the error code ({"error": sentence, "code": code}); never with buttons.
+            let code = '';
+            try { code = String((await r.json()).code || ''); } catch { /* no body */ }
             for (const id of ['settings-dropbox-connect', 'settings-dropbox-disconnect', 'settings-dropbox-switch', 'settings-dropbox-takeover']) show(id, false);
-            setStatus('Dropbox backup is set up on the computer itself, not through Coral Hub.');
+            if (code === 'not_available') {
+                setStatus("Dropbox backup isn't available in this build.");
+            } else if (code === 'local_dashboard_required' || code === 'other_user' || (r.status === 403 && !code)) {
+                // Through Coral Hub (the tunnel's refusal has no code), another dashboard or another user: say where it is done instead.
+                setStatus('Dropbox backup is set up on the computer itself, not through Coral Hub.');
+            } else {
+                setStatus("Couldn't read the Dropbox connection.");
+            }
             return null;
         }
     } catch { /* shown below */ }

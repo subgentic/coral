@@ -127,11 +127,18 @@ const { JSDOM } = require('jsdom');
     m.stopDropboxPoll();
     popupBlocked = false;
 
-    // Through Coral Hub the routes are refused: the block says where Dropbox is set up, with no buttons (hub census: explains).
-    answers['/api/dropbox/status'] = { status: 403, body: { error: 'forbidden' } };
-    await m.loadDropbox();
-    assert.match($('settings-dropbox-status').textContent, /set up on the computer itself, not through Coral Hub/);
-    assert.ok(!shown('settings-dropbox-connect') && !shown('settings-dropbox-disconnect'));
+    // A refused status read says why, by the server's error code (Security's SHOULD on 2ed958673), never with buttons.
+    const refused = async (status, body) => { answers['/api/dropbox/status'] = { status, body }; await m.loadDropbox(); return $('settings-dropbox-status').textContent; };
+    // Through Coral Hub (the tunnel refusal: 403 with no code), a dashboard that is not this computer's own (local_dashboard_required) and another
+    // OS user (other_user): Dropbox is set up on the computer itself (hub census: explains).
+    for (const [status, body] of [[403, { error: 'Cloud connector settings are only available on this computer' }], [403, { error: 'x', code: 'local_dashboard_required' }], [403, { error: 'x', code: 'other_user' }]]) {
+        assert.match(await refused(status, body), /set up on the computer itself, not through Coral Hub/, JSON.stringify(body));
+        assert.ok(!shown('settings-dropbox-connect') && !shown('settings-dropbox-disconnect'));
+    }
+    assert.match(await refused(404, { error: 'Dropbox backup is not available in this build', code: 'not_available' }), /isn't available in this build/);
+    assert.ok(!shown('settings-dropbox-connect'));
+    assert.match(await refused(500, { error: 'boom' }), /Couldn't read the Dropbox connection/);
+    assert.match(await refused(404, { error: 'not found' }), /Couldn't read the Dropbox connection/, 'a 404 with no code is not the build');
 
     // Nothing from the server is put into the page as HTML.
     await status({ app_key_set: true, connected: true, state: 'connected', account_id: '<img src=x onerror=alert(1)>' });
