@@ -637,6 +637,7 @@ async function refreshTasks() {
 }
 
 // ── Goals ────────────────────────────────────────────────────────────────
+let openAt = 0; // when the open goals were last read: with Done saved as the filter the FIRST read is of the open goals (the other pills' counts), and they are read again once a minute (#14663)
 let doneKnown = false; // the finished goals are read only while the Done pill is picked: its count is not known before that (#14641)
 let goals = []; // the open goals of every team (GET /api/goals): id, board_id, title, outcome, state, rollup, updated_at
 const goalKey = g => `${g.board_id}#${g.id}`;
@@ -740,10 +741,11 @@ function refreshGoals(force = true) {
     return _goalsReading;
 }
 async function readGoals() {
-    let ok = true;
+    let ok = true, followWithDone = false;
     try {
-        const finished = goalFilters.state === 'done', read = await listInboxGoals(finished); ok = !goalsReadFailed();
+        const wantsDone = goalFilters.state === 'done', finished = wantsDone && openAt > 0 && Date.now() - openAt < 60000, read = await listInboxGoals(finished); ok = !goalsReadFailed();
         if (ok && finished) doneKnown = true;
+        if (ok && !finished) { openAt = Date.now(); followWithDone = wantsDone; } // a page opened on Done read the open goals first: the finished ones follow at once
         if (ok) { const isDone = g => String(g.state || '').toLowerCase() === 'done'; goals = finished ? [...goals.filter(g => !isDone(g)), ...read] : [...read, ...goals.filter(isDone)]; } // one read per gap: the other kind stays as the last read left it
         else if (!goals.length) goals = [];
     } catch { goals = []; ok = false; }
@@ -754,6 +756,7 @@ async function readGoals() {
     await loadPendingSkills({ hub: nativeInbox(), sources: inboxSources(), urlOf: serverUrl }); // the skills that wait for the Operator are items of Needs you too (#12139); the Hub has no skill store, so its Inbox reads the one list of what waits (/api/needs-you?kind=skill) and shows each as text to approve at the computer (#13841)
     syncGoalDoneCount();
     renderInboxNav(true);
+    if (followWithDone) return readGoals(); // the open goals are known now (openAt), so this read is of the finished ones
     return ok;
 }
 
