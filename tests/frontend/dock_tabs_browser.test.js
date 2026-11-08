@@ -138,15 +138,19 @@ const { settle, coralReady } = require('./helpers/wait');
             await waitFor(`document.getElementById('agentic-panel-branches').classList.contains('active')`, 'Enter opens Branches', 4000);
             const after = await seen();
             assert.deepEqual([after.id, after.label, after.visible], ['agentic-panel-branches', 'Branches', true], `${w}: the focus is on the Branches panel, named and visible: ` + JSON.stringify(after));
+            // the visible tab stops after the panel in document order: with none (the panel is the page's last stop) Tab leaves the page, as the browser does past the last control
+            const stopsAfter = await ev(`(() => { const p = document.getElementById('agentic-panel-branches'); const sel = 'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
+                return [...document.querySelectorAll(sel)].filter(e => !e.disabled && (p.compareDocumentPosition(e) & Node.DOCUMENT_POSITION_FOLLOWING) && !p.contains(e) && e.getBoundingClientRect().width > 0 && getComputedStyle(e).visibility !== 'hidden').length; })()`);
             await key('Tab');
             const next = await seen();
-            assert.ok(next.id !== 'body' && next.visible, `${w}: Tab from the panel goes to a visible control: ` + JSON.stringify(next));
+            if (stopsAfter) assert.ok(next.id !== 'body' && next.visible, `${w}: Tab from the panel goes to a visible control (${stopsAfter} follow it): ` + JSON.stringify(next));
+            else assert.equal(next.id, 'body', `${w}: the panel is the last tab stop, so Tab leaves the page: ` + JSON.stringify(next));
             await ev(`document.getElementById('agentic-panel-branches').focus(); true`);
             await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers: 8 });
             await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers: 8 });
             const prev = await seen();
             assert.ok(prev.id !== 'body' && prev.visible, `${w}: Shift-Tab from the panel goes to a visible control: ` + JSON.stringify(prev));
-            ok(`${w}: picking Branches puts the focus on its panel; Tab goes to ${next.id}, Shift-Tab to ${prev.id}`);
+            ok(`${w}: picking Branches puts the focus on its panel; Tab goes to ${stopsAfter ? next.id : 'outside the page (the panel is the last stop)'}, Shift-Tab to ${prev.id}`);
         }
         console.log('PASS dock tabs');
     } catch (e) { console.error(e && e.stack || e); process.exitCode = 1; }
