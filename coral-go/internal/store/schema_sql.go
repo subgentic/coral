@@ -558,7 +558,9 @@ CREATE TABLE IF NOT EXISTS dropbox_connection (
     refresh_token   TEXT,
     fingerprint     TEXT,
     state           TEXT NOT NULL DEFAULT 'disconnected',
-    connected_at    TEXT
+    connected_at    TEXT,
+    filter_types    TEXT NOT NULL DEFAULT '',  -- stage 4 (#14655): the chosen extensions, comma-separated; '' is every type
+    max_age_days    INTEGER NOT NULL DEFAULT 0 -- only artifacts newer than this many days; 0 is no limit
 );
 
 -- Dropbox stage 4's outbox (#14655): one row per file to back up (an artifact version or its item_data sidecar), by its Dropbox path (ids only,

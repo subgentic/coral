@@ -15,6 +15,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"strings"
 
 	"github.com/subgentic/coral/pkg/secretbox"
 )
@@ -214,5 +215,35 @@ func (s *DropboxStore) SetState(ctx context.Context, state string) error {
 // Disconnect forgets the token, the account and the fingerprint; the server id and the last account stay.
 func (s *DropboxStore) Disconnect(ctx context.Context) error {
 	_, err := s.db.ExecContext(ctx, "UPDATE dropbox_connection SET refresh_token = NULL, account_id = NULL, fingerprint = NULL, state = ?, connected_at = NULL WHERE id = 1", DropboxStateDisconnected)
+	return err
+}
+
+// Filters are the backup's choices (stage 4, #14655): the extensions to back up (none is every type) and the most days old an artifact may be
+// (0 is no limit). Narrowing them never deletes anything already in Dropbox.
+func (s *DropboxStore) Filters(ctx context.Context) (types []string, maxAgeDays int, err error) {
+	if err := s.ensureRow(ctx); err != nil {
+		return nil, 0, err
+	}
+	var r struct {
+		Types string `db:"filter_types"`
+		Days  int    `db:"max_age_days"`
+	}
+	if err := s.db.GetContext(ctx, &r, "SELECT filter_types, max_age_days FROM dropbox_connection WHERE id = 1"); err != nil {
+		return nil, 0, err
+	}
+	for _, t := range strings.Split(r.Types, ",") {
+		if t = strings.TrimSpace(t); t != "" {
+			types = append(types, t)
+		}
+	}
+	return types, r.Days, nil
+}
+
+// SetFilters records the backup's choices; the caller has checked them.
+func (s *DropboxStore) SetFilters(ctx context.Context, types []string, maxAgeDays int) error {
+	if err := s.ensureRow(ctx); err != nil {
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, "UPDATE dropbox_connection SET filter_types = ?, max_age_days = ? WHERE id = 1", strings.Join(types, ","), maxAgeDays)
 	return err
 }

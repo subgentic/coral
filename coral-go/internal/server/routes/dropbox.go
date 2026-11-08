@@ -12,11 +12,13 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -43,6 +45,8 @@ type dropboxRoutes struct {
 
 	mu      sync.Mutex
 	pending *dropboxSwitch // a sign-in to another account, waiting for the Operator's confirm
+
+	outbox *store.DropboxOutbox // the backup's queue (stage 4), set by NewDropboxBackup; nil before
 }
 
 type dropboxSwitch struct {
@@ -110,6 +114,17 @@ func (h *CloudHandler) DropboxStatus(w http.ResponseWriter, r *http.Request) {
 		out["switch_pending"] = map[string]string{"from": c.LastAccountID, "to": p.account}
 	}
 	d.mu.Unlock()
+	if types, days, err := d.store.Filters(r.Context()); err == nil {
+		if types == nil {
+			types = []string{}
+		}
+		out["filters"] = map[string]any{"types": types, "max_age_days": days}
+	}
+	if d.outbox != nil {
+		if counts, err := d.outbox.Counts(r.Context()); err == nil {
+			out["backup"] = counts // counts and the last sync only: no names or paths
+		}
+	}
 	writeJSON(w, http.StatusOK, out)
 }
 
@@ -301,4 +316,53 @@ func (d *dropboxRoutes) revokeRefresh(ctx context.Context, refresh string) bool 
 		return false
 	}
 	return cl.Revoke(ctx, access) == nil
+}
+
+// DropboxSetFilters answers PUT /api/dropbox/filters {"types": [...], "max_age_days": n}: the Operator's choice of what to back up (stage 4, #14655).
+// Types only from the closed extension map; narrowing never deletes anything already in Dropbox.
+func (h *CloudHandler) DropboxSetFilters(w http.ResponseWriter, r *http.Request) {
+	if h.refuseCloud(w, r, allowDashboard) || !requireJSON(w, r) {
+		return
+	}
+	d := h.dbx
+	if d == nil {
+		writeError(w, http.StatusNotFound, "not_available", "Dropbox backup is not available in this build")
+		return
+	}
+	var in struct {
+		Types      []string `json:"types"`
+		MaxAgeDays int      `json:"max_age_days"`
+	}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&in); err != nil {
+		errBadRequest(w, "a filter is {\"types\": [...], \"max_age_days\": n}")
+		return
+	}
+	known := map[string]bool{}
+	for _, e := range dropboxExt {
+		known[e] = true
+	}
+	seen := map[string]bool{}
+	var types []string
+	for _, t := range in.Types {
+		t = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(t), "."))
+		if !known[t] {
+			errBadRequest(w, "not a type Dropbox backup knows")
+			return
+		}
+		if !seen[t] {
+			seen[t] = true
+			types = append(types, t)
+		}
+	}
+	if in.MaxAgeDays < 0 || in.MaxAgeDays > 3650 {
+		errBadRequest(w, "max_age_days is 0 (no limit) to 3650")
+		return
+	}
+	if err := d.store.SetFilters(r.Context(), types, in.MaxAgeDays); err != nil {
+		writeError(w, http.StatusInternalServerError, "", "could not save the filters")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"types": types, "max_age_days": in.MaxAgeDays})
 }

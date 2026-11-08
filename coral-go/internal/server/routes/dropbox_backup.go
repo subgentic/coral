@@ -72,6 +72,7 @@ type DropboxBackup struct {
 	parallel int
 
 	passMu sync.Mutex
+	kick   chan struct{} // an upload asks for a pass soon
 }
 
 var (
@@ -82,16 +83,62 @@ var (
 // NewDropboxBackup makes the worker for the handler's Dropbox sign-in and hooks it to this data folder's uploads and deletes.
 func (h *CloudHandler) NewDropboxBackup(ob *store.DropboxOutbox) *DropboxBackup {
 	_ = secrets.Init()
-	b := &DropboxBackup{d: h.dbx, outbox: ob, coralDir: h.dbx.dataDir, power: osPower, now: time.Now, parallel: dropboxParallel,
-		private: func(context.Context, []string) (map[string]bool, error) { return map[string]bool{}, nil },
+	b := &DropboxBackup{d: h.dbx, outbox: ob, coralDir: h.dbx.dataDir, power: osPower, now: time.Now, parallel: dropboxParallel, kick: make(chan struct{}, 1),
+		private: func(context.Context, []string) (map[string]bool, error) {
+			return nil, errors.New("no private marks to read")
+		}, // fail closed until SetPrivate
 		secret: func(data []byte) bool {
 			out, err := secrets.Redactor().Text(data)
 			return err == nil && !bytes.Equal(out, data)
 		}}
+	// The Operator's filters from the store (the defaults are every type and every age).
+	b.types = func() map[string]bool {
+		types, _, err := b.d.store.Filters(context.Background())
+		if err != nil || len(types) == 0 {
+			return nil
+		}
+		m := map[string]bool{}
+		for _, t := range types {
+			m[t] = true
+		}
+		return m
+	}
+	b.maxAge = func() time.Duration {
+		_, days, err := b.d.store.Filters(context.Background())
+		if err != nil || days <= 0 {
+			return 0
+		}
+		return time.Duration(days) * 24 * time.Hour
+	}
+	h.dbx.outbox = ob
 	dropboxBackupsMu.Lock()
 	dropboxBackups[filepath.Clean(b.coralDir)] = b
 	dropboxBackupsMu.Unlock()
 	return b
+}
+
+// SetPrivate gives the worker the board's private marks (board.Store.PrivateArtifacts).
+func (b *DropboxBackup) SetPrivate(f func(ctx context.Context, ids []string) (map[string]bool, error)) {
+	if f != nil {
+		b.private = f
+	}
+}
+
+// Run is the worker's loop: one backfill, then a pass every interval, or soon after an upload asks for one, until ctx ends.
+func (b *DropboxBackup) Run(ctx context.Context, every time.Duration) {
+	b.Backfill(ctx)
+	b.Pass(ctx)
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		case <-b.kick:
+		}
+		b.Pass(ctx)
+	}
 }
 
 func dropboxBackupFor(coralDir string) *DropboxBackup {
@@ -112,6 +159,11 @@ func noteDropboxUpload(coralDir, session, digest string) {
 	}
 	if err := b.enqueue(context.Background(), digest, rec); err != nil {
 		slog.Warn("[dropbox] an upload was not queued for the backup; the next backfill queues it")
+		return
+	}
+	select {
+	case b.kick <- struct{}{}:
+	default:
 	}
 }
 

@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -214,4 +217,48 @@ func TestOnBatteryNothingIsSent(t *testing.T) {
 	be.put("a.md", "text/markdown", "a")
 	be.pass()
 	assert.Empty(t, be.dbx.files)
+}
+
+func TestTheFiltersAreTheOperatorsAndOnlyClosedTypes(t *testing.T) {
+	be := newBackupEnv(t)
+	put := func(body string, dashboard bool) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPut, "/api/dropbox/filters", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		if dashboard {
+			dashboardRequest(req)
+			req.Host = be.host
+		}
+		rec := httptest.NewRecorder()
+		be.h.DropboxSetFilters(rec, req)
+		return rec
+	}
+	assert.Equal(t, http.StatusForbidden, put(`{"types":["md"],"max_age_days":1}`, false).Code, "not an agent's")
+	assert.Equal(t, http.StatusBadRequest, put(`{"types":["html"],"max_age_days":1}`, true).Code, "only types from the closed map")
+	assert.Equal(t, http.StatusBadRequest, put(`{"types":["md"],"max_age_days":-1}`, true).Code)
+	require.Equal(t, http.StatusOK, put(`{"types":["md","png"],"max_age_days":1}`, true).Code)
+	st := be.status()
+	assert.Equal(t, map[string]any{"types": []any{"md", "png"}, "max_age_days": float64(1)}, st["filters"])
+
+	be.put("a.md", "text/markdown", "a")
+	be.put("b.txt", "text/plain", "b")
+	be.pass()
+	for p := range be.dbx.files {
+		assert.False(t, strings.HasSuffix(p, ".txt"), "the stored filter is what the worker uses")
+	}
+	backup := be.status()["backup"].(map[string]any)
+	assert.EqualValues(t, 2, backup["backed_up"])
+	assert.EqualValues(t, 2, backup["pending"], "the txt and its sidecar wait, never deleted")
+}
+
+func TestTheBackgroundLoopBacksUpAfterAnUpload(t *testing.T) {
+	be := newBackupEnv(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go be.b.Run(ctx, time.Hour) // the five-minute tick is far off: the upload's nudge starts the pass
+	be.put("nudged.md", "text/markdown", "now")
+	require.Eventually(t, func() bool {
+		be.dbx.mu.Lock()
+		defer be.dbx.mu.Unlock()
+		return len(be.dbx.files) == 2
+	}, 5*time.Second, 50*time.Millisecond)
 }

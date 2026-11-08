@@ -517,6 +517,13 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Post("/api/dropbox/disconnect", s.cloudHandler.DropboxDisconnect)
 	r.Post("/api/dropbox/switch", s.cloudHandler.DropboxConfirmSwitch)
 	r.Post("/api/dropbox/takeover", s.cloudHandler.DropboxTakeOver)
+	r.Put("/api/dropbox/filters", s.cloudHandler.DropboxSetFilters) // stage 4 (#14655): what to back up
+	// The Dropbox backup worker (#14655): one background loop; a pass every five minutes or soon after an upload, only while connected.
+	dbxBackup := s.cloudHandler.NewDropboxBackup(store.NewDropboxOutbox(s.db))
+	if s.boardStore != nil {
+		dbxBackup.SetPrivate(s.boardStore.PrivateArtifacts) // without the board store nothing is sent (private marks fail closed)
+	}
+	s.goBackground(func(ctx context.Context) { dbxBackup.Run(ctx, 5*time.Minute) })
 	r.Post("/api/cloud/disconnect", s.cloudHandler.Disconnect)
 	r.Post("/api/cloud/rekey", s.cloudHandler.Rekey)                   // #3698
 	r.Get("/api/cloud/owner-label", s.cloudHandler.OwnerLabel)         // #6108: is the owner recorded, and who would be

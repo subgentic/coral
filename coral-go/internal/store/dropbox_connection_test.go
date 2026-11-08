@@ -172,3 +172,17 @@ func TestADisconnectLeavesNoAccountAndNoSealedToken(t *testing.T) {
 	require.NoError(t, db.GetContext(ctx, &raw, "SELECT refresh_token FROM dropbox_connection WHERE id = 1"))
 	assert.False(t, raw.Valid, "the sealed token column is NULL, not just unreadable")
 }
+
+func TestTheBackupFiltersDefaultToEverything(t *testing.T) {
+	ds, _, _ := dropboxStore(t)
+	ctx := context.Background()
+	types, days, err := ds.Filters(ctx)
+	require.NoError(t, err)
+	assert.Empty(t, types, "every type")
+	assert.Zero(t, days, "every age")
+	require.NoError(t, ds.SetFilters(ctx, []string{"md", "png"}, 3))
+	types, days, err = ds.Filters(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"md", "png"}, types)
+	assert.Equal(t, 3, days)
+}

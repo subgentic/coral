@@ -583,3 +583,4 @@ b POST /api/dropbox/connect
 b POST /api/dropbox/disconnect
 b POST /api/dropbox/switch
 b POST /api/dropbox/takeover
+b PUT /api/dropbox/filters

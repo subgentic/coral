@@ -167,6 +167,7 @@ var activityNotAnInboxAction = map[string]string{
 	"POST /api/dropbox/disconnect":                                         "Dropbox backup settings (#14609): the Operator's, on this computer only",
 	"POST /api/dropbox/switch":                                             "Dropbox backup settings (#14609): the Operator's, on this computer only",
 	"POST /api/dropbox/takeover":                                           "Dropbox backup settings (#14609): the Operator's, on this computer only",
+	"PUT /api/dropbox/filters":                                             "Dropbox backup settings (#14655): the Operator's, on this computer only",
 	"POST /api/folder-tags/{folderName}":                                   "tags on folders",
 	"POST /api/history-import":                                             "importing earlier chats",
 	"POST /api/hub-auto-accept":                                            "settings",
