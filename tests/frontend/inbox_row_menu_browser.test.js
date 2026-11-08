@@ -34,10 +34,13 @@ const AGENTS = [
             await setTheme(ev, theme);
             await ev(INBOX_WORLD);
             await ev(`(() => { window.__dismissed = []; const real = window.fetch; window.fetch = (u, o = {}) => { const p = String(u); if (/\\/dismiss-wait$/.test(p)) { window.__dismissed.push({ url: p, body: JSON.parse(o.body || '{}') }); return Promise.resolve(new Response(JSON.stringify({ dismissed: true }), { status: 200, headers: { 'content-type': 'application/json' } })); } return real(u, o); }; return true; })()`);
-            await ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); const m = await import((window.__coralStatic || '/static/') + 'inbox_tab.js'); state.liveSessions = ${JSON.stringify(AGENTS)}; m.updateInboxTab(); return true; })()`);
+            await ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); const m = await import((window.__coralStatic || '/static/') + 'inbox_tab.js'); state.liveSessions = ${JSON.stringify(AGENTS)}; window.__inboxTab = m; window.__state = state; m.updateInboxTab(); return true; })()`);
             await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await waitFor(`document.querySelectorAll('${T} .dt-table tbody tr').length === 3 && document.querySelector('${T}').getClientRects().length > 0`, at + 'the three waiting agents', 10000);
+            // The list redraws four times in the first ~25 ms after its rows appear (late data), and a tap in that burst lands on a row that is then replaced (#14630): wait until it has been still for 300 ms.
+            await ev(`window.__rowChange = performance.now(); new MutationObserver(() => { window.__rowChange = performance.now(); }).observe(document.querySelector('${T}'), { childList: true, subtree: true }); true`);
+            await waitFor(`performance.now() - window.__rowChange >= 300`, at + 'the list is still', 6000);
             if (!mobile) {
                 const deskState = () => ev(`({ more: document.querySelectorAll('${T} .dt-mail-more').length, dismiss: document.querySelectorAll('${T} .inbox-dismiss').length, w: innerWidth })`);
                 await waitFor(`document.querySelectorAll('${T} .dt-mail-more').length === 0 && document.querySelectorAll('${T} .inbox-dismiss').length >= 1`, at + 'the desktop rows settle: no ⋯, the Dismiss button', 4000).catch(async e => { throw new Error(e.message + ' ' + JSON.stringify(await deskState())); });
@@ -59,18 +62,28 @@ const AGENTS = [
             const clickCurrent = (expression, why) => waitFor(`(() => { const e = (${expression}); if (!e?.isConnected || !e.getClientRects().length) return false; e.click(); return true; })()`, at + why, 4000);
             // a tap opens the menu: Dismiss first, on the screen, focused; the row itself did not open
             const url0 = await ev(`location.href`);
-            await clickCurrent(`(() => { const toggle = (${probe}); window.__rowMenuClicked = toggle; return toggle; })()`, 'tap the current row menu');
-            await waitFor(`!!(${probe}) && !(${probe}).parentElement.querySelector('.menu').hidden`, at + 'the menu opens', 4000).catch(async error => {
-                const diagnostic = await ev(`(() => {
-                    const original = window.__rowMenuClicked, current = (${probe}), menu = current?.parentElement.querySelector('.menu');
-                    return { originalConnected: original?.isConnected ?? false, currentConnected: current?.isConnected ?? false,
-                        expanded: current?.getAttribute('aria-expanded') ?? null, originalExpanded: original?.getAttribute('aria-expanded') ?? null,
-                        menuPresent: !!menu, menuConnected: menu?.isConnected ?? false, menuHidden: menu?.hidden ?? null,
-                        menuVisible: !!menu && !menu.hidden && menu.getClientRects().length > 0 && getComputedStyle(menu).visibility !== 'hidden',
-                        menuDisplay: menu ? getComputedStyle(menu).display : null, redraw: original !== current };
-                })()`).catch(diagnosticError => ({ diagnosticError: String(diagnosticError) }));
-                throw new Error(error.message + ' row-menu diagnostic: ' + JSON.stringify(diagnostic));
-            });
+            // A redraw can replace the row between the tap and the menu opening (the open is after an awaited import), and the menu of a row that is gone is closed: the person taps again. So does the test, up to five times; once (390 dark) a redraw is forced in the same task as the first tap, so this path is always exercised (#14630).
+            const forced = w === 390 && theme === 'dark';
+            const opens = `!!(${probe}) && !(${probe}).parentElement.querySelector('.menu').hidden`;
+            let opened = false, replaced = null, taps = 0, lastDiagnostic = null;
+            for (let attempt = 1; attempt <= 5 && !opened; attempt++) {
+                taps = attempt;
+                if (forced && attempt === 1) replaced = await ev(`(() => { const t = (${probe}); window.__rowMenuClicked = t; t.click(); window.__state.liveSessions = window.__state.liveSessions.map(a => ({ ...a, waiting_since: new Date(Date.parse(a.waiting_since) - 1000).toISOString() })); window.__inboxTab.updateInboxTab(); return !t.isConnected; })()`);
+                else await clickCurrent(`(() => { const toggle = (${probe}); window.__rowMenuClicked = toggle; return toggle; })()`, 'tap the current row menu');
+                opened = await waitFor(opens, at + 'the menu opens', attempt === 5 ? 4000 : 1500).then(() => true, async error => {
+                    lastDiagnostic = error.message + ' row-menu diagnostic: ' + JSON.stringify(await ev(`(() => {
+                        const original = window.__rowMenuClicked, current = (${probe}), menu = current?.parentElement.querySelector('.menu');
+                        return { attempt: ${attempt}, originalConnected: original?.isConnected ?? false, currentConnected: current?.isConnected ?? false,
+                            expanded: current?.getAttribute('aria-expanded') ?? null, originalExpanded: original?.getAttribute('aria-expanded') ?? null,
+                            menuPresent: !!menu, menuConnected: menu?.isConnected ?? false, menuHidden: menu?.hidden ?? null,
+                            menuVisible: !!menu && !menu.hidden && menu.getClientRects().length > 0 && getComputedStyle(menu).visibility !== 'hidden',
+                            menuDisplay: menu ? getComputedStyle(menu).display : null, redraw: original !== current };
+                    })()`).catch(diagnosticError => ({ diagnosticError: String(diagnosticError) })));
+                    return false;
+                });
+            }
+            if (!opened) throw new Error(lastDiagnostic);
+            if (forced) check(at + 'a redraw right after the tap replaced the button, and a second tap opened the menu', replaced === true && taps === 2, JSON.stringify({ replaced, taps }));
             const menu = await ev(`(() => { const t = (${probe}), m = t.parentElement.querySelector('.menu'), r = m.getBoundingClientRect(), items = [...m.querySelectorAll('[role=menuitem]')]; return { expanded: t.getAttribute('aria-expanded'), items: items.map(i => i.textContent), focus: document.activeElement === items[0], role: m.getAttribute('role'), left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), bottom: Math.round(r.bottom), vw: innerWidth, vh: innerHeight, itemH: Math.round(items[0].getBoundingClientRect().height), url: location.href }; })()`);
             check(at + 'the menu opens: Dismiss is its first action, focused, a 44 px row', menu.expanded === 'true' && menu.items[0] === 'Dismiss' && menu.focus && menu.role === 'menu' && menu.itemH >= 44, JSON.stringify(menu));
             check(at + 'the menu is whole on the screen (not cut by the list)', menu.left >= 0 && menu.right <= menu.vw && menu.top >= 0 && menu.bottom <= menu.vh, JSON.stringify(menu));
