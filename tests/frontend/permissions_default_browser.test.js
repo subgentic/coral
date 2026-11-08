@@ -5,6 +5,8 @@ const { coralReady } = require('./helpers/wait');
 const { install: installTeam, openNewTeam, stubModels, T, N } = require('./helpers/new_team');
 const BASE = require('./test_base').BASE;
 const { guardSettings } = require('./helpers/settings_guard');
+const timings=[];
+const recordTiming=row=>{timings.push(row);if(process.env.CORAL_LAUNCH_TIMING_REPORT)require('node:fs').writeFileSync(process.env.CORAL_LAUNCH_TIMING_REPORT,JSON.stringify(timings,null,2)+'\n');};
 (async()=>{
  const guard=await guardSettings();
  const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();
@@ -24,7 +26,9 @@ const { guardSettings } = require('./helpers/settings_guard');
    await ev(`fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({default_permission_mode:''})}).then(r=>r.ok)`);
    if(process.env.CORAL_TEST_STRICT) for(const path of ['/api/sessions/launch','/api/sessions/launch-team']){
     const payload=path.endsWith('launch-team')?{board_name:'disclosure-ui-probe',working_dir:'/tmp/coral-disclosure-no-folder',agent_type:'claude',flags:['--permission-mode','auto'],agents:[{name:'Orchestrator',prompt:'Coordinate'}]}:{name:'disclosure-ui-probe',working_dir:'/tmp/coral-disclosure-no-folder',agent_type:'claude',flags:['--permission-mode','auto']};
+    const requestStarted=Date.now();
     const refusal=await ev(`fetch(${JSON.stringify(path)},{method:'POST',headers:{'Content-Type':'application/json'},body:${JSON.stringify(JSON.stringify(payload))}}).then(async r=>({status:r.status,body:await r.json()}))`);
+    recordTiming({phase:'fresh authenticated launch request',width,path,elapsedMs:Date.now()-requestStarted,status:refusal.status});
     assert.equal(refusal.status,409,path+': real authenticated dialog request is gated before missing-folder checks/spawn');assert.equal(refusal.body.code,'launch_disclosure_required');
    }
 
@@ -68,8 +72,23 @@ const { guardSettings } = require('./helpers/settings_guard');
    await waitFor(`!!document.getElementById('team-permission-mode')`,'team permission field');
    assert.equal(await ev(`document.getElementById('team-permission-mode').value`),'auto','new Claude team follows shipped default');
    const team=T(ev,waitFor);await team.to(3,{name:'permissions-probe',folder:'/work/payments-app'});
-   await ev(`(()=>{const real=window.fetch;window.__teamDefaultPosts=[];window.fetch=(input,options={})=>{if(new URL(String(input),location.href).pathname==='/api/sessions/launch-team'){window.__teamDefaultPosts.push(JSON.parse(options.body));return Promise.resolve(Response.json({error:'Test stopped before spawning'},{status:403}));}return real(input,options)};return true})()`);
-   await team.click('button',N.launch);await waitFor(`window.__teamDefaultPosts.length===1`,'new team launch payload');
+   await ev(`(()=>{const real=window.fetch;window.__teamDefaultPosts=[];window.fetch=(input,options={})=>{if(new URL(String(input),location.href).pathname==='/api/sessions/launch-team'){window.__teamFirstPostAt=performance.now();window.__teamDefaultPosts.push(JSON.parse(options.body));if(window.__teamDefaultPosts.length===1)return new Promise(resolve=>{window.__releaseTeamLaunch=()=>resolve(Response.json({code:'launch_disclosure_required',disclosure:{id:'timing-disclosure',text:'Full permissions allow commands and file changes.',seen:false}},{status:409}))});return Promise.resolve(Response.json({error:'Test stopped before spawning'},{status:403}));}return real(input,options)};return true})()`);
+   const started=await ev(`(()=>{const b=document.getElementById('launch-team-go');const at=performance.now();window.__teamClickAt=at;b.click();return {disabled:b.disabled,busy:b.getAttribute('aria-busy'),words:b.textContent,elapsed:performance.now()-at}})()`);
+   assert.ok(started.disabled&&started.busy==='true'&&/Preparing|Launching/.test(started.words)&&started.elapsed<1000,`${width}: first click immediately shows launch progress before any asynchronous preparation: ${JSON.stringify(started)}`);
+   await waitFor(`window.__teamDefaultPosts.length===1`,'new team launch payload');
+   recordTiming({phase:'click to first POST',width,elapsedMs:await ev('window.__teamFirstPostAt-window.__teamClickAt')});
+   recordTiming({phase:'loaded launch resources',...(await ev(`({width:innerWidth,resources:performance.getEntriesByType('resource').filter(r=>/launch_skills|skills.css|launch_disclosure/.test(r.name)).map(r=>({name:r.name.split('/').pop(),durationMs:r.duration,startMs:r.startTime}))})`))});
+   await ev(`window.launchTeam();true`);
+   await ev(require('./helpers/wait').framesJs(4));
+   assert.equal(await ev('window.__teamDefaultPosts.length'),1,'a second click/call while waiting cannot issue another launch');
+   assert.equal(await ev(`document.getElementById('launch-team-go').getAttribute('aria-busy')`),'true','progress remains while the first response is held');
+   await ev(`window.__disclosureReleasedAt=performance.now();window.__releaseTeamLaunch();true`);
+   await waitFor(`document.getElementById('confirm-modal')?.getClientRects().length>0&&document.getElementById('confirm-modal-message')?.textContent==='Full permissions allow commands and file changes.'`,'permissions confirmation promptly after first response',1000);
+   recordTiming({phase:'409 response to confirmation',width,elapsedMs:await ev('performance.now()-window.__disclosureReleasedAt')});
+   assert.ok(await ev(`performance.now()-window.__disclosureReleasedAt<1000`),'confirmation opens within one second of the server answer');
+   await ev(`[...document.querySelectorAll('#confirm-modal button')].find(b=>b.textContent.trim()==='Cancel').click();true`);
+   await waitFor(`!document.getElementById('launch-team-go').disabled&&!document.getElementById('launch-team-go').hasAttribute('aria-busy')`,'cancellation restores the launch button');
+   assert.equal(await ev('window.__teamDefaultPosts.length'),1,'cancel starts nothing and retries nothing');
    assert.ok(await ev(`window.__teamDefaultPosts[0].flags.join(' ').includes('--permission-mode auto') && window.__teamDefaultPosts[0].agents.every(a=>a.permission_mode!=='default')`),'untouched members inherit the new Auto team default rather than sending explicit Default');
    await waitFor(`!document.getElementById('launch-team-go').disabled`,'launch failure restores button');
    await ev(`(()=>{const row=document.querySelector('#team-agents-list .team-agent-row');const e=document.getElementById(row.dataset.acfId).querySelector('.acf-permission-mode');e.value='default';e.dispatchEvent(new Event('change',{bubbles:true}));window.launchTeam();return true;})()`);

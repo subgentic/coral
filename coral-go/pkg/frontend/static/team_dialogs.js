@@ -733,7 +733,9 @@ function _validateTeamName() {
 }
 window._validateTeamName = _validateTeamName;
 
+let teamLaunchPending = false;
 async function launchTeam() {
+    if (teamLaunchPending) return;
     const boardName = document.getElementById("team-board-name").value.trim();
     if (!boardName) {
         showToast("Team name is required", true);
@@ -812,24 +814,23 @@ async function launchTeam() {
         flags,
         agents,
     };
-    const teamSkills = (await importOnce('./launch_skills.js').catch(() => null))?.launchSkillIds('team-skills') || []; // the approved skills ticked for every member (#12104)
-    if (teamSkills.length) payload.skills = teamSkills;
-    if (boardServer) payload.board_server = boardServer;
-    if (usesSuggestion(document.getElementById('launch-team-dir'))) payload.create_dir = true; // the folder Coral suggested: it makes it now (#11258)
-    else if (document.getElementById('launch-team-dir')?.dataset.createNew === workingDir) payload.create_new_folder = true; // a new folder the person chose, which step 1 said Coral makes (#12833)
-    if (!isHub() && trustTicked()) payload.trust_folder = true; // the person ticked: trust this existing folder for the agents (#11889)
-    if (settings.working_mode) payload.working_mode = settings.working_mode; // the working mode, its guidance and the Additional instructions (#7407)
-    if (settings.health_monitor === false) payload.health_monitor = false; // unticked on a new team (#14091); on is the default and is not sent
-    if (useWorktree) {
-        payload.worktree = true;
-        if (baseBranch) payload.base_branch = baseBranch;
-    }
-
-    // Disable launch button to prevent double-clicks
     const launchBtn = document.getElementById('launch-team-go');
-    if (launchBtn) { launchBtn.disabled = true; launchBtn.textContent = 'Launching\u2026'; }
-
+    teamLaunchPending = true; // lock before the first await: a cold skills module is still launch preparation
+    if (launchBtn) { launchBtn.disabled = true; launchBtn.textContent = 'Preparing launch…'; launchBtn.setAttribute('aria-busy', 'true'); }
     try {
+        const teamSkills = (await importOnce('./launch_skills.js').catch(() => null))?.launchSkillIds('team-skills') || []; // the approved skills ticked for every member (#12104)
+        if (teamSkills.length) payload.skills = teamSkills;
+        if (boardServer) payload.board_server = boardServer;
+        if (usesSuggestion(document.getElementById('launch-team-dir'))) payload.create_dir = true; // the folder Coral suggested: it makes it now (#11258)
+        else if (document.getElementById('launch-team-dir')?.dataset.createNew === workingDir) payload.create_new_folder = true; // a new folder the person chose, which step 1 said Coral makes (#12833)
+        if (!isHub() && trustTicked()) payload.trust_folder = true; // the person ticked: trust this existing folder for the agents (#11889)
+        if (settings.working_mode) payload.working_mode = settings.working_mode; // the working mode, its guidance and the Additional instructions (#7407)
+        if (settings.health_monitor === false) payload.health_monitor = false; // unticked on a new team (#14091); on is the default and is not sent
+        if (useWorktree) {
+            payload.worktree = true;
+            if (baseBranch) payload.base_branch = baseBranch;
+        }
+
         const result = await _launchOn(server, "/api/sessions/launch-team", payload, undefined, { teamFailures: true, fields: { base_branch: document.getElementById('launch-team-base-branch') } });
         const missing = result && result.ok === false && Array.isArray(result.agents) && result.agents.length ? result.agents.find(a => a && /^directory not found/i.test(a.error || '')) : null;
         if (missing && result.agents.every(a => a && /^directory not found/i.test(a.error || ''))) { // every member stopped on the folder: it is said at the Folder field, on the step that has it, not in a list of members (#11336)
@@ -865,7 +866,8 @@ async function launchTeam() {
     } catch (e) {
         showToast("Failed to launch team", true);
     } finally {
-        if (launchBtn) { launchBtn.disabled = false; launchBtn.textContent = 'Launch team'; }
+        teamLaunchPending = false;
+        if (launchBtn) { launchBtn.disabled = false; launchBtn.textContent = 'Launch team'; launchBtn.removeAttribute('aria-busy'); }
     }
 }
 /** A first task's title: its first sentence (up to 80 characters), else its first 60 characters cut at a word with an ellipsis; the whole text is the body (#10279, Beta #10325). */
