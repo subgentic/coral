@@ -167,18 +167,46 @@ Download the latest release from [GitHub Releases](https://github.com/subgentic/
 
 First install and sign in to at least one agent CLI: [Claude Code](https://code.claude.com/docs/en/overview), [Codex](https://github.com/openai/codex), [Antigravity (`agy`)](https://antigravity.google), [Pi](https://pi.dev), [OpenCode](https://opencode.ai), or Hermes (experimental). Coral runs these tools; it does not install or authenticate them.
 
-- **macOS:** Open the DMG, drag `Coral.app` to Applications, then open Coral. The app includes tmux. For terminal commands, run `/Applications/Coral.app/Contents/MacOS/install-cli.sh` and add `~/.local/bin` to your `PATH`.
-- **Windows:** Run the MSI, then open **Coral** from the Start menu. For the portable ZIP, extract it, open PowerShell in that folder, and run `.\coral.exe --no-browser`.
+- **macOS:** Check the download (see "Verify your download" below), then open the DMG, drag `Coral.app` to Applications, then open Coral. The app includes tmux. For terminal commands, run `/Applications/Coral.app/Contents/MacOS/install-cli.sh` and add `~/.local/bin` to your `PATH`.
+- **Windows:** Check the download (see "Verify your download" below), then run the MSI, then open **Coral** from the Start menu. For the portable ZIP, extract it, open PowerShell in that folder, and run `.\coral.exe --no-browser`.
 - **Linux:** Download the archive for your architecture, then extract and start it (ARM64: replace `amd64` with `arm64`):
 
   ```bash
+  # check the download first: see "Verify your download" below
   mkdir -p "$HOME/.local/share/coral"
   tar -xzf coral-linux-amd64.tar.gz -C "$HOME/.local/share/coral"
   export PATH="$HOME/.local/share/coral:$PATH"
   coral --no-browser
   ```
 
-In the dashboard, choose **New agent** (then **New agent** again in the dialog: "One agent in a folder you choose"), choose the agent in step 1, enter an existing project folder on the computer running Coral (or use **Browse**), and choose **Launch**. In the agent's **Terminal**, answer any folder-trust or sign-in prompt, then send a task from **Chat** with Enter. Choose **New team** instead to start several agents together.
+  The `export PATH=...` line lasts only for that terminal. To keep `coral` on your `PATH` in new terminals, add the same line to your shell's startup file (for example `~/.bashrc` or `~/.zshrc`).
+
+In the dashboard, choose **New agent** (then **New agent** again in the dialog: "One agent in a folder you choose"). The dialog has three steps: first the folder (enter an existing project folder on the computer running Coral, or use **Browse**), then an optional persona (the role you give the agent), then the agent itself (choose the agent in step 3); choose **Launch**. In the agent's **Terminal**, answer any folder-trust or sign-in prompt, then send a task from **Chat** with Enter. Choose **New team** instead to start several agents together.
+
+### Verify your download
+
+Every release lists the SHA-256 of each download in `SHA256SUMS.txt`, and signs that file in the release workflow. Check the file you downloaded against it before you install (the `install.sh` script does this for you). Use the file's name as in the list above (`Coral.dmg`, `coral-linux-amd64.tar.gz` or `coral-linux-arm64.tar.gz`):
+
+```bash
+curl -fsSLO https://github.com/subgentic/coral/releases/latest/download/SHA256SUMS.txt
+# Linux:
+awk '$2 == "coral-linux-amd64.tar.gz"' SHA256SUMS.txt | sha256sum -c -
+# macOS:
+awk '$2 == "Coral.dmg"' SHA256SUMS.txt | shasum -a 256 -c -
+```
+
+On Windows, in PowerShell, compare `(Get-FileHash .\Coral-x64.msi).Hash` (SHA-256 by default; use `Coral-x64-portable.zip` for the ZIP) with the line for that file in `SHA256SUMS.txt`: they must be the same, ignoring upper and lower case.
+
+It must print `OK` for your file. The checksum guards against a damaged or swapped download. To also prove the release came from Coral's release workflow, install [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) and check the signature on `SHA256SUMS.txt`:
+
+```bash
+curl -fsSLO https://github.com/subgentic/coral/releases/latest/download/SHA256SUMS.txt.sigstore.json
+cosign verify-blob SHA256SUMS.txt --bundle SHA256SUMS.txt.sigstore.json --new-bundle-format \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github\.com/subgentic/coral/\.github/workflows/release\.yml@refs/tags/v'
+```
+
+With an older cosign, leave out `--new-bundle-format`.
 
 See [Getting started](https://subgentic.github.io/coral/getting-started/) for the full installation and first-agent walkthrough.
 
