@@ -31,14 +31,16 @@ const checks = new Map(); // item (uid) -> { state: 'live' | 'ended' | 'board' |
 // The search and filters (#4778): the server matches (q, kind, conv, order), so a search covers every saved message, not just the ones shown.
 // Native Hub Saved is account-owned state. Keep its filters only in memory so a shared browser
 // never carries one account's team/search choices into the next account.
-const accountScopedSaved = () => isCloud() && nativeSaved();
+// Cloud's flag resolves before app modules normally load, but never read a
+// shared browser filter key in Hub mode even during an early/failed boot.
+const accountScopedSaved = () => isCloud();
 let filters = accountScopedSaved() ? { ...cleanSaved({}) } : loadSavedFilters();
 const setFilters = next => { filters = next; if (!accountScopedSaved()) saveSavedFilters(filters); };
 let bar = null;
 let totals = { open: 0, done: 0 };
 let loadSeq = 0; // the read in flight that was asked for last: an answer that comes after a newer ask is dropped, so a slow read of an old filter never overwrites the list of the newer one (#7945)
 let scope = ALL; // where the panel was opened from (#4792): the agent or the team on screen, or everything; the server matches it, and the counts are its own
-onAccountForgotten(() => { ++loadSeq; items = []; sourceItems = []; down = []; capped = false; checks.clear(); convTitles.clear(); totals = { open: 0, done: 0 }; if (accountScopedSaved()) { filters = { ...cleanSaved({}) }; tab = 'open'; } });
+onAccountForgotten(() => { ++loadSeq; items = []; sourceItems = []; down = []; capped = false; checks.clear(); convTitles.clear(); totals = { open: 0, done: 0 }; if (accountScopedSaved()) { filters = { ...cleanSaved({}) }; tab = 'open'; setScopedCount(0); } });
 const convTitles = new Map(); // conversation reference -> its title, from every list read: the Conversation filter's options (they must outlast a filter that leaves one)
 /** An item's identity across servers: ids are each server's own. */
 const uid = it => `${it.server}:${it.id}`;
@@ -89,6 +91,7 @@ async function loadCloud(mine) {
     convTitles.clear();
     for (const i of sourceItems) if (i.ref && !convTitles.has(i.ref)) convTitles.set(i.ref, i.title || i.ref);
     totals = { open: sourceItems.filter(i => !i.done_at).length, done: sourceItems.filter(i => !!i.done_at).length };
+    setScopedCount(totals.open);
     browserItems();
 }
 function refilterOrRefresh() {
@@ -367,7 +370,7 @@ export function closeSaved({ focus = true } = {}) {
 /** The right sidebar's Saved tab: the right sidebar of the page on screen open on its Saved tab (or the tab focused if it already is), the focus inside it. Every page has the
  *  sidebar and the tab (#4539), so nothing has to be selected first. */
 export async function openSaved() {
-    if (currentScope().kind === 'all') return openSavedView(); // never an all-scope list in the right sidebar (#4811)
+    if (currentScope().kind === 'all' && !(isCloud() && nativeSaved())) return openSavedView(); // Hub native Saved is account-owned and lives in the shared dock
     dropJumpBar();
     // What the sidebar was before, so closing leaves an agent's own dock as it was: open on its tab, or shut.
     if (!savedShowing()) _before = { open: dockOpen(), tab: document.querySelector('#agentic-block-top .agentic-tab.active')?.dataset.tab || '' }; // opening it again (the toast's link) keeps what the dock was before the first open

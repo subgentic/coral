@@ -3,6 +3,7 @@ import { refreshAgentUI } from './agent_ui.js';
 
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
+import { isCloud, nativeSaved } from './server_base.js';
 import { loadChangedFiles } from './changed_files.js';
 import { selectFilesSource } from './team_artifacts.js';
 import { startBoardTaskPoll, stopBoardTaskPoll } from './tasks.js';
@@ -149,7 +150,7 @@ export function restoreAgenticTabs() {
     const saved = rememberedTab();
     if (saved) {
         const tab = document.getElementById(`agentic-tab-${saved}`);
-        if (tab && tab.style.display !== 'none') {
+        if (tab && tab.style.display !== 'none' && !(saved === 'saved' && isCloud() && nativeSaved())) {
             switchAgenticTab(saved, 'top');
         }
     }
@@ -160,6 +161,7 @@ export function restoreAgenticTabs() {
 // The right sidebar is on the agent's page and the pages with a Saved tab (#4539): a page change opens the tab that kind of page last had, or its first one.
 function showPageTab(kind) {
     if (kind === 'none') return; // no right sidebar on the board's page and the team's page
+    if (isCloud() && nativeSaved() && (kind === 'chats' || kind === 'other')) return; // the Hub's Saved list is read only when the person opens its dock tab
     const remembered = rememberedTab(kind);
     const tab = [remembered, DEFAULT_TAB[kind]].find(t => t && tabShown(document.getElementById(`agentic-tab-${t}`))) || DEFAULT_TAB[kind];
     switchAgenticTab(tab, 'top');

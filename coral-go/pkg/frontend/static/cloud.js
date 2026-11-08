@@ -8,7 +8,7 @@
 import { returnAddress } from './served_address.js';
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
-import { isCloud, nativeInbox, initCloudAccountFlags } from './server_base.js';
+import { isCloud, nativeInbox, nativeSaved, initCloudAccountFlags } from './server_base.js';
 import { readAccount, accountNavEntries, ACCOUNT_NAV } from './account_info.js';
 import { MENU_KEYS, menuMove } from './menu_keys.js';
 import { filterSettingsPayload, settingsErrorMessage } from './cloud_settings.js';
@@ -252,6 +252,13 @@ export async function initCloud() {
     const s = await loadSession();
     if (!s.authenticated) { goToSignIn(); return false; }
     await initCloudAccountFlags(); // settle per-account routing before Inbox modules read their initial flags
+    if (nativeSaved()) {
+        document.body.classList.add('cloud-native-saved');
+        // The shared Saved dock is read-only in Hub mode. Reveal it only after
+        // this account's strict capability flag has been resolved.
+        document.getElementById('agentic-tab-saved')?.removeAttribute('data-local-only');
+        document.getElementById('agentic-panel-saved')?.removeAttribute('data-local-only');
+    }
     state.account = { email: s.email };
     const actions = document.querySelector('.top-bar-actions');
     if (actions && !document.getElementById('cloud-account-menu')) actions.append(buildAccountMenu(s.email));

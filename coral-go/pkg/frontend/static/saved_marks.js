@@ -5,7 +5,7 @@ import { isPhoneLayout } from './phone_layout.js';
 import { state } from './state.js';
 import { importOnce } from './import_once.js';
 import { showToast, escapeAttr } from './utils.js';
-import { isCloud, sessionServer, normServer, splitKey, serverFetch, LOCAL_SERVER } from './server_base.js';
+import { isCloud, nativeSaved, sessionServer, normServer, splitKey, serverFetch, LOCAL_SERVER } from './server_base.js';
 import { dockKind, onDockPage } from './dock_page.js';
 import { scopeOf, withScope, ALL } from './saved_scope.js';
 import { setInboxCount } from './inbox_tab.js'; // the count on the Inbox's Saved tab
@@ -143,7 +143,7 @@ export const savedViewShowing = () => !isCloud() && !!document.getElementById('n
 /** Is Saved on screen, as the right sidebar's tab or as the full-screen page? */
 export function savedShowing() {
     if (savedViewShowing()) return true;
-    if (currentScope().kind === 'all') return false; // the sidebar has no Saved tab for everything, hidden or not (#4811)
+    if (currentScope().kind === 'all' && !(isCloud() && nativeSaved())) return false; // Hub native Saved is account-owned and available on its shared pages
     const dock = document.getElementById('agentic-state');
     if (!dock) return false;
     const open = isPhoneLayout() ? dock.classList.contains('mobile-panel-overlay') : !dock.classList.contains('collapsed');
