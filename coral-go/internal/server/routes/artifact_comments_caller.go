@@ -156,8 +156,8 @@ func cleanCommentName(s string) string {
 }
 
 // ownerCommentRequest is ownerCommentWrite or the owner's read of an artifact's comments (GET /api/artifacts/{hex64}/comments, the table's owner-only read): the requests on which the stamped owner is
-// the owner kind, so the answer says what the owner may do (comment, reply, resolve) and which comments are theirs. It adds nothing the table does not list: the owner's edit, delete and lock stay
-// the computer's (commentCaller.ViaHub keeps them off the answer).
+// the owner kind, so the answer says what the owner may do (comment, reply, resolve, and their own edit, delete and the lock, which the table lists for the owner too) and which comments are theirs. It
+// adds nothing the table does not list; a viewer or a grantee never reaches it (TestArtifactCommentsThroughTheHubOnlyTheOwnerMayWrite).
 func ownerCommentRequest(r *http.Request) bool {
 	if r.Method == http.MethodGet {
 		pattern, mode := tunnel.OwnerRoute(r.Method, r.URL.Path)

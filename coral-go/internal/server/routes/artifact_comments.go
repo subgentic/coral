@@ -453,8 +453,17 @@ func (h *SessionsHandler) listArtifactComments(w http.ResponseWriter, r *http.Re
 		return
 	}
 	canCreate, why := commentPolicy(caller, commentCreate, nil, locked, hubWrite)
-	writeJSON(w, http.StatusOK, map[string]any{"comments": out, "locked": locked, "you": map[string]any{"kind": caller.Kind, "name": viewerName(caller), "can_comment": canCreate, "reason": why, "can_lock": caller.Kind == commentCallerOwner},
-		"limits": map[string]int{"body": store.MaxArtifactCommentBody, "quote": maxCommentQuote, "comments": store.MaxArtifactComments}})
+	answer := map[string]any{"comments": out, "locked": locked, "you": map[string]any{"kind": caller.Kind, "name": viewerName(caller), "can_comment": canCreate, "reason": why, "can_lock": caller.Kind == commentCallerOwner},
+		"limits": map[string]int{"body": store.MaxArtifactCommentBody, "quote": maxCommentQuote, "comments": store.MaxArtifactComments}}
+	if locked { // what holds the lock, so the drawer can say it covers a whole board (#14549)
+		if scope, err := h.ss.ArtifactCommentsLockScope(r.Context(), id, board); err == nil && scope != "" {
+			answer["lock_scope"] = scope
+			if scope == "board" {
+				answer["lock_board"] = board
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, answer)
 }
 
 // readJSONBody reads a request body of at most max bytes into v; false means the request was answered.

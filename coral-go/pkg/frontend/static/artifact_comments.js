@@ -225,7 +225,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         }
         const close = btn('ac-sheet-close ic-close', '', 'Hide the comments'); close.addEventListener('click', () => { userSet(false); toggle.focus(); }); head.append(close);
         panel.append(head);
-        if (d.locked) panel.append(el('p', 'ac-note ac-locked', d.canLock ? `Comments are locked: nobody can add comments to this ${opts.words?.subject || 'file'}. You can unlock it any time.` : 'Comments are locked: read only.'));
+        if (d.locked) panel.append(el('p', 'ac-note ac-locked', api.lockedWords(d, opts.words?.subject || 'file')));
         else if (!d.canComment) panel.append(el('p', 'ac-note ac-readonly', d.reason || 'You can read the comments here but not write them.'));
         const setup = !d.locked && askSetup();
         if (setup) { // Send to agent is not offered: say why, and where it is set up (#13230)
