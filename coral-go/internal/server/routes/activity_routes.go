@@ -104,7 +104,9 @@ func ActivityRecorder(bs *board.Store) func(http.Handler) http.Handler {
 			}
 			if pend.set { // a handler that knows more than its route does (the body, a header) said which row this click is
 				if humanInputCaller(r) {
-					_ = bs.RecordActivity(context.WithoutCancel(r.Context()), activityMetaFor(r, pend.title, pend.note), pend.action, pend.kind, pend.item, "", pend.team)
+					meta := activityMetaFor(r, pend.title, pend.note)
+					meta.TaskID = pend.task
+					_ = bs.RecordActivity(context.WithoutCancel(r.Context()), meta, pend.action, pend.kind, pend.item, "", pend.team)
 				}
 				return
 			}
@@ -154,11 +156,41 @@ type activityPendingKey struct{}
 type activityPending struct {
 	set                                   bool
 	action, kind, item, team, title, note string
+	task                                  int64 // the task a file's upload is linked to, when the handler knows it (#14421)
 }
 
 // noteActivity asks the recorder for a row for this request's click; the last call wins. Outside the recorder (a handler called on its own in a test) it does nothing.
 func noteActivity(r *http.Request, action, kind, item, team, title, note string) {
 	if p, _ := r.Context().Value(activityPendingKey{}).(*activityPending); p != nil {
-		*p = activityPending{true, action, kind, item, team, title, note}
+		*p = activityPending{true, action, kind, item, team, title, note, 0}
 	}
+}
+
+// noteActivityTask adds the file's task to the row noteActivity asked for (#14421): the row's goal and task are then saved with it. Call it after noteActivity; a task the team does not have is dropped by the store.
+func noteActivityTask(r *http.Request, task int64) {
+	if p, _ := r.Context().Value(activityPendingKey{}).(*activityPending); p != nil && p.set {
+		p.task = task
+	}
+}
+
+// fileTaskOf is the task a file is linked to: a task's own artifact, or the task an upload's record names (the board says whether it is the team's, as the row's thread does). 0 when it has none.
+func taskOfFile(item teamArtifact) int64 {
+	if item.TaskID > 0 {
+		return item.TaskID
+	}
+	return item.uploadTask
+}
+
+// withFileTask is the Activity meta of a file action with the file's task on it (#14421).
+func withFileTask(m board.ActivityMeta, item teamArtifact) board.ActivityMeta {
+	m.TaskID = taskOfFile(item)
+	return m
+}
+
+// fileTaskOf reads a team file's task for a handler that has not loaded the file.
+func (h *BoardHandler) fileTaskOf(ctx context.Context, project, id string) int64 {
+	if item, ok := h.teamManagedArtifact(ctx, project, id); ok {
+		return taskOfFile(item)
+	}
+	return 0
 }
