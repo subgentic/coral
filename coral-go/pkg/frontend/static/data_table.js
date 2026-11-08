@@ -537,12 +537,20 @@ export function dataTable(cfg) {
         tbody.replaceChildren();
         const list = sortedRows();
         const cols = columns.length + (sel ? 1 : 0);
-        let lastGroup = null;
+        let lastGroup = null, lastParent = null;
+        const groupHead = g => { const gr = el('tr', g.level === 'task' ? 'dt-group dt-group-task' : 'dt-group'); gr.setAttribute('role', 'row'); const gh = el('th', null); gh.colSpan = cols; gh.scope = 'rowgroup'; gh.setAttribute('role', 'rowheader'); // a group with onToggle (a task's items, #14441) is one button that opens and shuts them
+            if (g.onToggle) { const b = el('button', 'dt-group-toggle'); b.type = 'button'; b.setAttribute('aria-expanded', String(g.open !== false)); const words = el('span', 'dt-group-words', g.label); b.append(words); if (g.chip) b.append(el('span', 'chip chip-tag dt-group-chip', g.chip)); b.addEventListener('click', g.onToggle); gh.append(b); } else gh.textContent = g.label;
+            gr.append(gh); tbody.append(gr); };
         const mails = mailOn() ? list.map(r => cfg.mail(r)) : null, gap = !!mails && mails.some(m => m.actions && m.actions.length); // a list with a ⋯ on any row reserves its 44 px on every row, so the times line up (#137104)
         list.forEach((r, i) => {
             if (cfg.groupBy && (!st.sort || cfg.groupSorted)) { // the rows come in the caller's order: a divider where their group changes (a day), none once the person has sorted
                 const g = cfg.groupBy(r);
-                if (g && g.key !== lastGroup) { lastGroup = g.key; const gr = el('tr', 'dt-group'); gr.setAttribute('role', 'row'); const gh = el('th', null, g.label); gh.colSpan = cols; gh.scope = 'rowgroup'; gh.setAttribute('role', 'rowheader'); gr.append(gh); tbody.append(gr); }
+                if (g && g.key !== lastGroup) {
+                    lastGroup = g.key;
+                    if (g.parent) { if (g.parent.key !== lastParent) { lastParent = g.parent.key; groupHead(g.parent); } } else lastParent = g.key; // a group inside another: the outer heading once, before its first inner group
+                    groupHead(g);
+                }
+                if (g && g.open === false) return; // a shut group shows its heading only
             }
             const k = keyOf(r), tr = el('tr', 'dt-row'); tr.setAttribute('role', 'row'); tr.dataset.key = k;
             if (cfg.unread && cfg.unread(r)) tr.classList.add('dt-unread'); // a desktop row the person has not opened since it changed (#9687)
