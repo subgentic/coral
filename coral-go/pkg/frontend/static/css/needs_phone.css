@@ -53,20 +53,3 @@
 
 /* The computer's name on a phone card's meta line (#14623): a small chip beside the sender and the time. */
 .inbox-computer-chip { flex: none; margin-inline-start: 6px; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* The rest of the approved phone mock (#14683, ccdb36ff): the three dots at the card's top right, the version a pill on the title's line, the star a quiet mark on the top line (taking it off is in the dots). */
-@media (max-width: 760px) {
-    .inbox-needs-results tr.dt-row:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) { position: relative; }
-    .inbox-needs-results tr:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-actions.inbox-slots > .inbox-row-more { position: absolute !important; top: 4px; right: 4px; } /* !important: an open menu's wrapper is made relative by data_table.css, which would drop the dots back into the button row */
-    .inbox-needs-results tr:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-item.inbox-agent-first { grid-template-areas: "from chip star wait" "name name name name" "more more more more"; grid-template-columns: minmax(0, 1fr) max-content max-content max-content; }
-    .inbox-needs-results tr:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-item.inbox-agent-first > .inbox-review-star { position: static; grid-area: star; width: auto; height: auto; min-height: 0; padding: 0; pointer-events: none; font-size: var(--fs-md); align-self: baseline; }
-    .inbox-needs-results tr:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-item.inbox-review-star-anchor > .inbox-review-name:not(.inbox-ask-name) { width: auto; max-width: 100%; margin-inline-end: 0; }
-    .inbox-needs-results tr:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-item.inbox-agent-first:has(> .inbox-review-tags .inbox-review-version) { grid-template-areas: "from chip star wait" "name name name pill" "more more more more"; } /* only a card with a version has the pill beside the title */
-    .inbox-needs-results tr:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-item.inbox-agent-first:not(:has(.inbox-review-version)) > .inbox-review-name:not(.inbox-ask-name):not(.inbox-whole-name) { margin-inline-end: 44px; } /* the title stops short of the dots' 44 px target (a card with a version pill has the pill there, which is no control) */
-    .inbox-needs-results tr:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-item.inbox-agent-first > :is(.inbox-ask-name, .inbox-whole-name)::before { content: ""; float: inline-end; width: 44px; height: 20px; } /* a question's first line wraps around the dots; the lines below keep the whole width */
-    .inbox-needs-results tr:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-item.inbox-agent-first > .inbox-review-wait { margin-inline-end: 40px; } /* the time stops short of the dots */
-    .inbox-needs-results tr:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-item.inbox-agent-first > .inbox-review-tags { display: contents; } /* its chip and its version pill are grid items of the card: the chip on the top line, the pill on the title's line */
-    .inbox-needs-results tr:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-item.inbox-agent-first .inbox-computer-chip { grid-area: chip; align-self: baseline; }
-    .inbox-needs-results tr:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-item.inbox-agent-first .inbox-review-version { grid-area: pill; align-self: baseline; }
-    .inbox-needs-results tr:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-version { border: 1px solid var(--border); border-radius: 999px; padding: 0 7px; font-size: var(--fs-sm); line-height: 18px; color: var(--text-secondary); }
-}
