@@ -253,8 +253,14 @@ func (s *Store) buildMessageSearchIndex(ctx context.Context) error {
 			return fmt.Errorf("%s: %w", firstWords(q), err)
 		}
 	}
+	// The chunks run up to the newest message there is NOW, not for as long as posts keep arriving (#14668): a board whose posts outrun the chunks (a slow machine, the race detector, a flood) would otherwise
+	// be chased without end. What is posted after that point is indexed by the last step's transaction below, which takes every id above the chunks, and by the triggers after it.
+	var target int64
+	if err := s.db.GetContext(ctx, &target, `SELECT COALESCE(MAX(id), 0) FROM board_messages`); err != nil {
+		return err
+	}
 	var last int64
-	for {
+	for last < target {
 		var hi int64
 		err := s.db.GetContext(ctx, &hi, `SELECT COALESCE(MAX(id), 0) FROM (SELECT id FROM board_messages WHERE id > ? ORDER BY id LIMIT ?)`, last, messageFTSChunk)
 		if err != nil {

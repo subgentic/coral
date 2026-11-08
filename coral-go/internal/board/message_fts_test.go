@@ -675,3 +675,41 @@ func buildAfterOpenBuild(t *testing.T, s *Store, ctx context.Context) {
 	require.Eventually(t, func() bool { return s.MessageSearchIndexState() != "building" }, 30*time.Second, 2*time.Millisecond, "the build the open started is over")
 	require.NoError(t, s.BuildMessageSearchIndex(ctx))
 }
+
+// #14668: a build ends even when posts arrive faster than the chunks are indexed. It used to chase the table's end until posts stopped (the race shard held 86 minutes on a table grown to 673,000 rows). Chunks of
+// one message and a poster with no pause outrun the builder by far; the build now stops chasing at the newest message it saw when it began, and the last step indexes the rest.
+func TestMessageSearchIndexBuildEndsWhenPostsOutrunIt(t *testing.T) {
+	s := ftsStoreWithMessages(t, ftsTexts, 200)
+	ctx := context.Background()
+	old := messageFTSChunkForTest(1)
+	defer old()
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; ; i++ {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			_, _ = s.PostMessage(ctx, "proj", "dev", fmt.Sprintf("flood %d progress", i), nil)
+		}
+	}()
+	done := make(chan error, 1)
+	go func() { done <- s.BuildMessageSearchIndex(ctx) }()
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(30 * time.Second):
+		close(stop)
+		wg.Wait()
+		t.Fatal("the build is still chasing the posts after 30 s")
+	}
+	close(stop)
+	wg.Wait()
+	_, err := s.db.ExecContext(ctx, `INSERT INTO `+messageFTSTable+`(`+messageFTSTable+`, rank) VALUES ('integrity-check', 1)`)
+	require.NoError(t, err, "every message, the flood too, is indexed once")
+	require.Equal(t, "ready", s.MessageSearchIndexState())
+}
