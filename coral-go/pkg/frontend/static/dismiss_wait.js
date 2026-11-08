@@ -7,6 +7,8 @@ import { showToast } from './utils.js';
 import { askedBefore, dismissAsked } from './asked_before_restart.js';
 import { openAgent } from './agent_live.js';
 import { state } from './state.js';
+import { importOnce } from './import_once.js';
+const { remoteRemoveWaitAllowed, removeWaitRequest } = await importOnce('./remove_wait_policy.js');
 
 /** Whether the Dismiss is drawn for an agent's open request: every waiting agent has one (#11946). The machine clears a permission, question or plan in its record of the wait; any other request (an input prompt, a
  *  dialog, an elicitation, a sign-in) it keeps as hidden, per agent and request, until the agent asks something new; a request made before the agent slept is hidden in this browser. Nothing is sent to the agent. */
@@ -62,7 +64,9 @@ export async function dismissWait(session, button) {
 
 /** Explicit removal hides only this dismissed request, never answers its terminal. */
 export function canRemoveWait(session) {
-    return !isCloud() && sessionServer(session) === 'local' && canDismissWait(session) &&
+    const server = sessionServer(session);
+    const targetAllowed = (!isCloud() && server === 'local') || remoteRemoveWaitAllowed(server, state.servers, { cloud: isCloud() });
+    return targetAllowed && canDismissWait(session) &&
         !!session.waiting_for_input && !!session.wait_ignored && !session.wait_removed &&
         !session.sleeping && !session.archived && Number.isFinite(Date.parse(session.waiting_since));
 }
@@ -74,13 +78,13 @@ export async function removeWait(session, button) {
     }
     if (button) button.disabled = true;
     try {
-        const response = await serverFetch(sessionServer(session), `/api/sessions/live/${encodeURIComponent(session.name)}/dismiss-wait`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ session_id: session.session_id, agent_type: session.agent_type, remove: true }),
-        });
+        const request = removeWaitRequest(session, sessionServer(session));
+        const response = await serverFetch(request.server, request.path, request.options);
         const body = await response.json().catch(() => ({}));
+        if (response.status === 403 && (body.code === 'owner_only' || body.error === 'owner_only')) { showToast('Only the account this computer is linked to can remove it.', true); return; }
         if (!response.ok) { showToast(typeof body.error === 'string' ? body.error : `Could not remove it (HTTP ${response.status}).`, true); return; }
-        if (body.removed) showToast('Removed from Needs you. Nothing was sent to the agent.');
+        if (body.removed === true) showToast('Removed from Needs you. Nothing was sent to the agent.');
+        else if (body.dismissed === false) showToast('It was not waiting any more.');
         await loadLiveSessions();
     } catch { showToast('Could not remove it. Try again.', true); }
     finally { if (button) button.disabled = false; }
