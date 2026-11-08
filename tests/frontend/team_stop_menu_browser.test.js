@@ -5,17 +5,17 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
-const { coralReady } = require('./helpers/wait');
+const { coralReady, framesJs } = require('./helpers/wait');
 const BOARD = 'stop-menu-' + Date.now().toString(36);
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const problems = [];
-    const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; await ev(framesJs(3)); fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const mk = (id, name, sleeping) => ({ session_id: id, name, display_name: name, agent_type: 'claude', summary: 'x', model: 'claude-opus-5-5', branch: 'main', repo_name: 'coral', working_directory: '/work/' + name, status: 'idle', server: 'local', board_project: BOARD, sleeping });
     const items = host => ev(`[...document.querySelectorAll('${host} [data-stop]:not([data-stop="sep"])')].map(b => ({ key: b.dataset.stop, text: ((b.querySelector('.menu-item-text') || b).firstChild || b).textContent.trim(), hint: ((b.querySelector('.menu-item-hint') || {}).textContent || '').trim(), danger: b.classList.contains('menu-item-danger'), shown: b.getClientRects().length > 0, h: Math.round(b.getBoundingClientRect().height) }))`);
     const dialogText = () => ev(`(() => { const d = [...document.querySelectorAll('dialog[open], .dlg-confirm')].find(e => e.getClientRects().length); return d ? d.textContent.replace(/\\s+/g, ' ').trim() : ''; })()`);
-    const closeDialog = () => ev(`(() => { for (const d of document.querySelectorAll('dialog[open]')) { const c = [...d.querySelectorAll('button')].find(b => /^cancel$/i.test(b.textContent.trim())); if (c) c.click(); } return true; })()`);
+    const closeDialog = () => ev(`(() => { for (const d of document.querySelectorAll('dialog[open], .dlg-confirm, #confirm-modal')) { if(!d.getClientRects().length)continue; const c = [...d.querySelectorAll('button')].find(b => /^cancel$/i.test(b.textContent.trim())); if (c) c.click(); } return true; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
@@ -47,6 +47,15 @@ const BOARD = 'stop-menu-' + Date.now().toString(36);
             check(it[0] && !it[0].danger && it[1].danger && it[2].danger, 'Reset Team and Kill All are the danger items, Sleep Team is not');
             check(await ev(`document.querySelectorAll('${host} hr.overflow-menu-divider').length >= 1`), 'the danger items are set apart by a rule');
             await shot(`team-stop-menu-${w}`);
+            const separation=await ev(`(()=>{const host=document.querySelector('${host}'),reset=host.querySelector('[data-stop="reset"]'),kill=host.querySelector('[data-stop="kill"]');return{gap:kill.getBoundingClientRect().top-reset.getBoundingClientRect().bottom,resetRule:parseFloat(getComputedStyle(reset).borderTopWidth),killRule:parseFloat(getComputedStyle(kill).borderTopWidth)}})()`);
+            check(separation.gap>=8&&separation.resetRule>=1&&separation.killRule>=1,`destructive actions have space and a visible boundary: ${JSON.stringify(separation)}`);
+            if(mobile){
+                const deletion=await ev(`(()=>{const b=document.querySelector('#team-page-more-menu #mb-delete-btn');return{margin:parseFloat(getComputedStyle(b).marginTop),rule:parseFloat(getComputedStyle(b).borderTopWidth),height:b.getBoundingClientRect().height}})()`);
+                check(deletion.margin>=8&&deletion.rule>=1&&deletion.height>=44,`Delete team is separated and retains its phone target: ${JSON.stringify(deletion)}`);
+                await ev(`document.querySelector('${host}').scrollTop=document.querySelector('${host}').scrollHeight;true`);
+                await shot(`team-destructive-${w}`);
+                await ev(`document.querySelector('${host}').scrollTop=0;true`);
+            }
             // each asks first
             await ev(`document.querySelector('${host} [data-stop="reset"]').click(); true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the dialog opens
             let d = await dialogText();
@@ -69,6 +78,14 @@ const BOARD = 'stop-menu-' + Date.now().toString(36);
             check(pause.btn === 'Pause Board' && /stop receiving new messages/.test(pause.note || '') && pause.shown && pause.described === 'mb-pause-note', `Pause Board says what it does: ${JSON.stringify(pause)}`);
             if (!mobile) check(await ev(`[...document.querySelectorAll('#team-page-more-menu hr')].every(r => r.getClientRects().length === 0)`), 'a wide More menu has no stray rule (the Stop items are phone-only in it)');
             await shot(`team-more-pause-${w}`);
+            await closeDialog();
+            await ev(`(async()=>{await window.exitTeamPage({force:true});window.switchNavTab('agents');T.render.renderLiveSessions(T.state.liveSessions);if(${mobile})window.mobileBack();return true})()`);
+            const trigger=mobile?'#mobile-session-list .group-kebab-btn':'#live-sessions-list .group-kebab-btn';
+            await waitFor(`!!document.querySelector('${trigger}')?.getClientRects().length`,'team sidebar menu trigger');
+            await ev(`document.querySelector('${trigger}').click();true`);
+            const sidebar=await ev(`(()=>{const host=document.querySelector('${trigger}').nextElementSibling;host.scrollTop=host.scrollHeight;const buttons=[...host.querySelectorAll('[data-on-click="team-reset"],[data-on-click="team-kill"],[data-on-click="team-delete"]')];return{n:buttons.length,heights:buttons.map(b=>b.getBoundingClientRect().height),gaps:buttons.slice(1).map((b,i)=>b.getBoundingClientRect().top-buttons[i].getBoundingClientRect().bottom)}})()`);
+            await shot(`team-sidebar-destructive-${w}`);
+            check(sidebar.n>=2&&sidebar.gaps.every(g=>g>=8)&&(!mobile||sidebar.heights.every(h=>h>=44)),`sidebar destructive actions are separated with phone targets: ${JSON.stringify(sidebar)}`);
         }
     } finally { await removeBoards(ev, [BOARD]).catch(() => {}); await client.close(); }
     assert.deepEqual(problems, [], 'the team page Stop menu:\n  ' + problems.join('\n  '));
