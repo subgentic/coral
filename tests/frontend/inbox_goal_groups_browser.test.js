@@ -14,7 +14,18 @@ for(const [width,theme] of [[1280,'light'],[390,'light'],[320,'light'],[1280,'da
  await waitFor(`document.querySelectorAll('.inbox-review-star').length>=11`,'pins bypass producer cap');
  assert.equal(await ev(`document.querySelector('.inbox-needs-results .dt-row [data-review-artifact]')?.dataset.reviewArtifact`),'d'.padStart(64,'0'),'old pinned document comes first');
  assert.equal(await ev(`document.querySelector('.inbox-group-review-toggle input').checked`),false,'grouping initially off');
+ // #14378 (the Operator): Group by goal is an option of the Filters panel, not a checkbox always on the page under the header
+ const snap=async name=>{if(process.env.CORAL_SCREENSHOT_DIR&&theme==='light'&&width!==320){fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true});fs.writeFileSync(process.env.CORAL_SCREENSHOT_DIR+'/group-by-goal-'+name+'-'+width+'.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}};
+ await snap('closed');
+ const before=await ev(`(()=>{const t=document.querySelector('.inbox-group-review-toggle');return {inPanel:!!(t&&t.closest('.list-bar-menu')),shown:!!t&&t.getClientRects().length>0,pageBox:[...document.querySelectorAll('.inbox-folder-toolbar ~ label, #group-table-view > label')].length}})()`);
+ assert.equal(before.inPanel,true,width+': the option lives in the Filters panel');assert.equal(before.shown,false,width+': and the shut panel shows no checkbox on the page');assert.equal(before.pageBox,0,width+': no checkbox of its own under the header');
+ await ev(`document.getElementById('inbox-needs-toggle').click();true`);
+ await waitFor(`!!document.querySelector('.inbox-group-review-toggle')&&document.querySelector('.inbox-group-review-toggle').getClientRects().length>0`,width+': the option shows when the Filters panel is open');
+ await snap('panel-open');
+ const opt=await ev(`(()=>{const t=document.querySelector('.inbox-group-review-toggle'),r=t.getBoundingClientRect(),i=t.querySelector('input').getBoundingClientRect();return {text:t.textContent.trim(),inside:r.left>=0&&r.right<=innerWidth+1,h:Math.round(r.height),box:Math.round(i.width)}})()`);
+ assert.equal(opt.text,'Group by goal',width+': it is named');assert.ok(opt.inside,width+': inside the screen '+JSON.stringify(opt));assert.ok(opt.h>=44||width>760,width+': a phone tap target '+JSON.stringify(opt));
  await ev(`document.querySelector('.inbox-group-review-toggle input').click();true`);
+ await ev(`document.getElementById('inbox-needs-toggle').click();true`);
  await waitFor(`document.querySelectorAll('.inbox-needs-results .dt-group').length===5`,'pins plus two goals and No goal');
  const headings=await ev(`[...document.querySelectorAll('.inbox-needs-results .dt-group')].map(r=>r.textContent)`);
  assert.match(headings[0],/Starred/);assert.match(headings[1],/Goal #1/);assert.match(headings[2],/Goal #2/);assert.match(headings[3],/No goal/);assert.match(headings[4],/Waiting on agent · 2 shown · 1 unread/);

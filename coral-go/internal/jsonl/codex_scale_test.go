@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -19,11 +21,27 @@ func writeRollouts(t *testing.T, home string, n int) {
 	t.Helper()
 	line := `{"type":"event_msg","payload":{"type":"agent_message","message":"` + strings.Repeat("x", 80) + `"}}` + "\n"
 	body := []byte(strings.Repeat(line, 80)) // about 8 KB, no Coral marker: the scan reads all of it
-	for i := 0; i < n; i++ {
-		dir := filepath.Join(home, "sessions", "2026", fmt.Sprintf("%02d", 1+i%12), fmt.Sprintf("%02d", 1+i%28))
-		require.NoError(t, os.MkdirAll(dir, 0o755))
-		require.NoError(t, os.WriteFile(filepath.Join(dir, fmt.Sprintf("rollout-2026-10-21T10-00-00-%08d-0000-4000-8000-000000000000.jsonl", i)), body, 0o644))
+	// The files are written by a few workers at once: a rollout is its own file, and creating thousands of them one after another is most of this helper's time.
+	workers := 2 * runtime.GOMAXPROCS(0)
+	var wg sync.WaitGroup
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := w; i < n; i += workers {
+				dir := filepath.Join(home, "sessions", "2026", fmt.Sprintf("%02d", 1+i%12), fmt.Sprintf("%02d", 1+i%28))
+				if err := os.MkdirAll(dir, 0o755); err != nil {
+					t.Error(err)
+					return
+				}
+				if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("rollout-2026-10-21T10-00-00-%08d-0000-4000-8000-000000000000.jsonl", i)), body, 0o644); err != nil {
+					t.Error(err)
+					return
+				}
+			}
+		}()
 	}
+	wg.Wait()
 }
 
 func resetCodexMarkers() {

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -40,39 +41,88 @@ func (b *pacedUpload) Read(p []byte) (int, error) {
 }
 func (b *pacedUpload) Close() error { b.cancel(); return nil }
 
+// Both of the next two tests run the production handler with the production 30 s bounds under fake time (testing/synctest), against a Target
+// that reads the upload and answers in the test: no sockets, since a bubble does not advance its clock while a goroutine waits on the network.
+// They used to take 45 s and 31 s of real time against a loopback server.
+
+// A 45 s upload that never stalls for 30 s is not cut by the 30 s wait for the machine's reply: that wait starts when the upload has been consumed.
 func TestProxyHeaderTimeoutSlowUpload(t *testing.T) {
-	t.Parallel()
-	const size = 5 * 1024 * 1024
-	received := make(chan int64, 1)
-	_, hub, _ := setup(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		n, err := io.Copy(io.Discard, r.Body)
-		if err != nil {
-			return
-		}
-		received <- n
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `{"ok":true}`)
-	}), nil)
-	ctx, cancel := context.WithTimeout(context.Background(), 75*time.Second)
-	defer cancel()
-	bodyCtx, closeBody := context.WithCancel(ctx)
-	body := &pacedUpload{ctx: bodyCtx, cancel: closeBody, remaining: size, interval: 45 * time.Second / (size / (32 * 1024))}
-	defer body.Close()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, hub.URL+"/api/remote/a/api/upload", body)
-	require.NoError(t, err)
-	req.ContentLength = size
-	started := time.Now()
-	resp, err := http.DefaultClient.Do(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-	reply, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, resp.StatusCode, string(reply))
-	require.Equal(t, int64(size), <-received)
-	require.GreaterOrEqual(t, time.Since(started), 45*time.Second)
-	require.JSONEq(t, `{"ok":true}`, string(reply))
+	synctest.Test(t, func(t *testing.T) {
+		const size = 5 * 1024 * 1024
+		body := &pacedUpload{remaining: size, interval: 45 * time.Second / (size / (32 * 1024)), cancel: func() {}}
+		var received int64
+		target := uploadTimeoutTarget{roundTrip: func(r *http.Request) (*http.Response, error) {
+			body.ctx = r.Context()
+			var err error
+			if received, err = io.Copy(io.Discard, r.Body); err != nil {
+				return nil, err
+			}
+			return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}},
+				Body: io.NopCloser(strings.NewReader(`{"ok":true}`))}, nil
+		}}
+		req := httptest.NewRequest(http.MethodPost, "/api/remote/a/api/upload", body)
+		req.ContentLength = size
+		recorder := httptest.NewRecorder()
+		started := time.Now()
+		(&Handler{}).proxyHTTP(recorder, req, "a", target, "/api/upload", "/api/upload")
+		require.Equal(t, http.StatusOK, recorder.Code, recorder.Body.String())
+		require.Equal(t, int64(size), received)
+		require.GreaterOrEqual(t, time.Since(started), 45*time.Second)
+		require.JSONEq(t, `{"ok":true}`, recorder.Body.String())
+	})
 }
 
+// stalledUpload sends a few bytes at once and then, after 31 s, a few more: a browser upload that stops for longer than the 30 s stall limit.
+type stalledUpload struct {
+	ctx  context.Context
+	sent bool
+}
+
+func (b *stalledUpload) Read(p []byte) (int, error) {
+	if !b.sent {
+		b.sent = true
+		return copy(p, "upload started"), nil
+	}
+	pause := time.NewTimer(31 * time.Second)
+	defer pause.Stop()
+	select {
+	case <-b.ctx.Done():
+		return 0, b.ctx.Err()
+	case <-pause.C:
+		return copy(p, "too late"), nil
+	}
+}
+
+// An upload that stops for 30 s is cut with the stall code, not reported as an outage of the machine, and the target's reader is released.
+func TestProxyUploadStallTimeout(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		res := &fakeResolver{targets: map[string]HTTPTarget{}, errs: map[string]error{}}
+		body := &stalledUpload{}
+		remoteDone := make(chan struct{})
+		target := uploadTimeoutTarget{roundTrip: func(r *http.Request) (*http.Response, error) {
+			defer close(remoteDone)
+			body.ctx = r.Context()
+			_, err := io.Copy(io.Discard, r.Body)
+			return nil, err
+		}}
+		req := httptest.NewRequest(http.MethodPost, "/api/remote/a/api/upload", body)
+		req.ContentLength = -1
+		recorder := httptest.NewRecorder()
+		started := time.Now()
+		(&Handler{resolver: res}).proxyHTTP(recorder, req, "a", target, "/api/upload", "/api/upload")
+		requireUploadCut(t, recorder.Code, recorder.Body, CodeUploadStalled)
+		require.False(t, res.hasMark("a:"+StatusUnreachable), "a slow browser upload is not an outage of the machine")
+		require.Equal(t, 30*time.Second, time.Since(started), "the stall limit counts from the last byte of the upload")
+		select {
+		case <-remoteDone:
+		default:
+			t.Fatal("stalled upstream body reader was not released")
+		}
+	})
+}
+
+// The 30 s wait for the machine's reply starts when the browser's body has ended, not when the request started; a machine that never sends headers is answered 502 and its
+// request is cancelled. For a chunked upload, a request with no body and an event-stream request. Fake time (testing/synctest) with a Target that reads the body and then waits.
 func TestProxyHeaderTimeoutAfterBody(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -84,52 +134,53 @@ func TestProxyHeaderTimeoutAfterBody(t *testing.T) {
 		{name: "event stream", sse: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			bodyEnded := make(chan time.Time, 1)
-			remoteDone := make(chan struct{})
-			_, hub, _ := setup(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				defer close(remoteDone)
-				if _, err := io.Copy(io.Discard, r.Body); err != nil {
-					return
+			synctest.Test(t, func(t *testing.T) {
+				var bodyEnded time.Time
+				upstreamCancelled := false
+				var body *pacedUpload
+				var reqBody io.Reader
+				if tc.body {
+					body = &pacedUpload{remaining: 4 * 32 * 1024, interval: 500 * time.Millisecond, cancel: func() {}}
+					reqBody = body
 				}
-				bodyEnded <- time.Now()
-				<-r.Context().Done() // The machine never sends response headers.
-			}), nil)
-			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-			defer cancel()
-			var body io.ReadCloser
-			if tc.body {
-				bodyCtx, closeBody := context.WithCancel(ctx)
-				body = &pacedUpload{ctx: bodyCtx, cancel: closeBody, remaining: 4 * 32 * 1024, interval: 500 * time.Millisecond}
-				defer body.Close()
-			}
-			req, err := http.NewRequestWithContext(ctx, http.MethodPost, hub.URL+"/api/remote/a/api/upload", body)
-			require.NoError(t, err)
-			if tc.sse {
-				req.Header.Set("Accept", "text/event-stream")
-			}
-			resp, err := http.DefaultClient.Do(req)
-			answered := time.Now()
-			require.NoError(t, err)
-			defer resp.Body.Close()
-			reply, err := io.ReadAll(resp.Body)
-			require.NoError(t, err)
-			require.Equal(t, http.StatusBadGateway, resp.StatusCode, string(reply))
-			elapsed := answered.Sub(<-bodyEnded)
-			require.GreaterOrEqual(t, elapsed, 29*time.Second, "30 s starts after the body, not at request start")
-			require.Less(t, elapsed, 35*time.Second)
-			select {
-			case <-remoteDone:
-			case <-time.After(2 * time.Second):
-				t.Fatal("upstream context was not canceled")
-			}
+				target := uploadTimeoutTarget{roundTrip: func(r *http.Request) (*http.Response, error) {
+					if body != nil {
+						body.ctx = r.Context()
+					}
+					if r.Body != nil && r.Body != http.NoBody { // a request with no body reaches the transport with none
+						if _, err := io.Copy(io.Discard, r.Body); err != nil {
+							return nil, err
+						}
+					}
+					bodyEnded = time.Now()
+					<-r.Context().Done() // The machine never sends response headers.
+					upstreamCancelled = true
+					return nil, r.Context().Err()
+				}}
+				req := httptest.NewRequest(http.MethodPost, "/api/remote/a/api/upload", reqBody)
+				if tc.body {
+					req.ContentLength = -1
+				}
+				if tc.sse {
+					req.Header.Set("Accept", "text/event-stream")
+				}
+				recorder := httptest.NewRecorder()
+				(&Handler{}).proxyHTTP(recorder, req, "a", target, "/api/upload", "/api/upload")
+				answered := time.Now()
+				require.Equal(t, http.StatusBadGateway, recorder.Code, recorder.Body.String())
+				elapsed := answered.Sub(bodyEnded)
+				require.GreaterOrEqual(t, elapsed, 29*time.Second, "30 s starts after the body, not at request start")
+				require.Less(t, elapsed, 35*time.Second)
+				require.True(t, upstreamCancelled, "upstream context was not canceled")
+			})
 		})
 	}
 }
 
-// A browser that starts an upload then stops must release both sides rather
-// than hold a proxy request and a machine's stream slot indefinitely.
-func TestProxyUploadStallTimeout(t *testing.T) {
+// The one stall test that keeps real sockets and the real 30 s (#6190): a browser upload through the hub to a loopback machine that stops for 31 s. The bubble tests above
+// check the handler's logic; this one checks that the bound reaches the actual connection and body read (a deadline on the wrong object, a client without a timeout).
+// It is t.Parallel(), so its 30 s overlaps the rest of the package.
+func TestProxyUploadStallTimeoutRealSocket(t *testing.T) {
 	t.Parallel()
 	remoteDone := make(chan struct{})
 	res, hub, _ := setup(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

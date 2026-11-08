@@ -13,6 +13,10 @@ assert.deepEqual(ids({ ...AF.EMPTY, q: 'denied' }), [2], 'and the words of the a
 assert.deepEqual(ids({ ...AF.EMPTY, q: 'ship' }), [3], 'and the title');
 assert.deepEqual(ids({ ...AF.EMPTY, team: 'beta' }), [2]);
 assert.deepEqual(ids({ ...AF.EMPTY, action: 'goal_close' }), [3]);
+assert.deepEqual(ids({ ...AF.EMPTY, decision: 'deny' }), [2], 'Decision groups the denial actions');
+assert.equal(AF.decisionOf({action:'ignore'}),'dismiss','ignored asks are Dismissed');
+assert.equal(AF.decisionOf({action:'file_star'}),'','a file star is not an approval');
+assert.equal(AF.matches(row(1,{task_title:'Prepare the launch'}),{...AF.EMPTY,q:'prepare the launch'}),true,'search includes thread context');
 assert.deepEqual(ids({ ...AF.EMPTY, action: 'bogus' }), [3, 2, 1], 'an action that is not one is no filter');
 assert.deepEqual(ids({ ...AF.EMPTY, from: '2026-11-02' }), [3, 2], 'since a day');
 assert.equal(AF.isFiltered(AF.EMPTY), false); assert.equal(AF.isFiltered({ ...AF.EMPTY, team: 'beta' }), true);
