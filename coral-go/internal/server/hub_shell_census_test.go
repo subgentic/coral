@@ -51,6 +51,7 @@ type shellNever struct {
 
 // shellNeverRoutes: a never route one script calls, with what it does today. The key is "script METHOD route" with {} for a variable segment.
 var shellNeverRoutes = map[string]shellNever{
+	"launch_disclosure.js POST /api/launch-disclosure/ack":      {bExplains, `Could not record that you have read this`, "acknowledgement stays never through the Hub; a refused acknowledgement says it could not be recorded and nothing was launched, with no retry; the Computers notice is information only (#14501)", 0},
 	"team_form.js GET /api/filesystem/trust-probe":              {bLocal, `isHub\(\) \|\| d\.dataset\.dirServer`, "only this computer’s folder choice is probed; Hub/remote inputs never request the default and the server rejects tunneled callers (#14090)", 0},
 	"info_tab.js GET /api/sessions/live/{}/mcp-servers":         {bHidden, `if \(!lines\.length\) return`, "the Info tab asks the agent's own computer for its MCP servers; where that read is refused through a Hub (or is empty) no row is drawn and nothing says why: a hidden row, not a wrong one (#13917)", 0},
 	"launch_skills.js GET /api/skills":                          {bExplains, `Skills stay on the computer`, "another computer's launch (and the Hub's) draws the row with the reason and nothing to tick; a refused read on this computer says so (#13871)", 0},
