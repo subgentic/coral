@@ -3,6 +3,7 @@
 package executil
 
 import (
+	"errors"
 	"os"
 	"time"
 	"unsafe"
@@ -127,11 +128,17 @@ func terminate(m member) {
 	_ = windows.TerminateProcess(h, 1)
 }
 
-// exited says whether the process is gone (or ending: Windows refuses to terminate one that is).
+// openForWait opens a process only to wait for it; a test replaces it with a stub that fails as the system does.
+var openForWait = func(pid uint32) (windows.Handle, error) {
+	return windows.OpenProcess(windows.SYNCHRONIZE, false, pid)
+}
+
+// exited says whether the process is gone (or ending: Windows refuses to terminate one that is). Only ERROR_INVALID_PARAMETER, "no process has this id", means gone: any other reason the process cannot be
+// opened (access denied, for one) says nothing about it, so it is not taken as exited, and a kill that failed on a live process keeps its error.
 func exited(pid uint32) bool {
-	h, err := windows.OpenProcess(windows.SYNCHRONIZE, false, pid)
+	h, err := openForWait(pid)
 	if err != nil {
-		return true
+		return errors.Is(err, windows.ERROR_INVALID_PARAMETER)
 	}
 	defer windows.CloseHandle(h)
 	ev, _ := windows.WaitForSingleObject(h, 0)
