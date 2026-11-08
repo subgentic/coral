@@ -520,7 +520,7 @@ var routeTable = cat(
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/needs-you")),
 	// The Activity record (#12069, #12070): what the Operator did in Needs you, read only, the OWNER's alone through the hub (a guest, a grantee or a viewer is refused owner_only). The check of its chain runs on the machine; the
 	// rows hold no comment text, only the Operator's own cut and redacted note and the titles agents gave their items.
-	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/activity")),
+	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/activity", "/api/thread", "/api/threads")), // #14440: the story of a goal or task, and the summaries of a page of them
 	// The Operator's grant to a board's orchestrator and the log of what agents did to the board's agents (#11432) are the OWNER's alone through the hub (an authentic stamp, the owner marker): the switch lets an agent wake,
 	// sleep and start agents. The orchestrator's own wake and sleep routes are not here: they are agent-only and local, so the hub never reaches them.
 	owner(OwnerRefuse, rules(http.MethodGet, TierLaunch, "/api/board/{project}/orchestrator-grant", "/api/board/{project}/lifecycle-log", "/api/board/{project}/guide-roster")),

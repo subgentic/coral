@@ -10,6 +10,8 @@ var routeQueries = map[string]string{
 	"DELETE /api/sessions/live/{}/notes/{}":       "session_id",
 	"DELETE /api/sessions/live/{}/tasks/{}":       "session_id",
 	"GET /api/activity":                           "action,before,before_at,limit,team",
+	"GET /api/thread":                             "after,goal,limit,order,task,team",
+	"GET /api/threads":                            "after,goal,limit,state,team",
 	"GET /api/agent/ui":                           "session_id",
 	"GET /api/agent/ui/{}/content":                "revision,session_id",
 	"GET /api/agent/ui/{}/events":                 "after,session_id",

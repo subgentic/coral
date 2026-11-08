@@ -550,7 +550,6 @@ b GET /api/skills/{id}
 b POST /api/skills/{id}/approve
 b POST /api/skills/{id}/reject
 b DELETE /api/skills/{id}
-
 # #13253: Chief check CRUD is the person's; only a pinned receiving session can report a trigger.
 b GET /api/chief/checks
 b POST /api/chief/checks
@@ -572,3 +571,5 @@ a POST /api/resources/{name}/renew
 a PUT /api/resources/{name}
 b PUT /api/teams/detail/{name}/daily-knowledge
 b PUT /api/teams/detail/{name}/daily-knowledge/auto-apply
+b GET /api/thread
+b GET /api/threads

@@ -120,6 +120,8 @@ GET /api/templates/commands/{category}/{name} redact
 GET /api/themes redact
 GET /api/themes/variables redact
 GET /api/themes/{name} redact
+GET /api/thread redact
+GET /api/threads redact
 GET /api/token-usage redact
 GET /api/token-usage/by-branch redact
 GET /api/token-usage/by-team redact
