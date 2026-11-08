@@ -1,0 +1,50 @@
+1280px  overflow: page scrollWidth/clientWidth 1280/1280, tab row 419/419
+1280px  More button: 57x36
+1280px  More focused  ->  focus: button#agentic-tab-more | More tabs | 57x36
+1280px  Enter on More (menu opened)  ->  focus: button | menuitem | folder_openBrowse | browse | 182x32
+1280px  More items (w x h): browse 182x32, notes 182x32, activity 182x32, agent-ui 182x32, branches 182x32
+1280px  ArrowDown  ->  focus: button | menuitem | edit_noteNotes | notes | 182x32
+1280px  ArrowDown  ->  focus: button | menuitem | timelineActivity | activity | 182x32
+1280px  ArrowDown  ->  focus: button | menuitem | widgetsAgent UI | agent-ui | 182x32
+1280px  ArrowDown  ->  focus: button | menuitem | account_treeBranches | branches | 182x32
+1280px  More menu left/right vs window width: 1056/1248/1280
+1280px  Enter on Branches (panel open)  ->  focus: body
+1280px  More now says: More: Branches, open / word: Branches
+1280px  panel: timed out waiting for the repository in the panel
+1280px  panel text: Reading this agent's repository. If nothing shows, its folder is not in a git repository Coral reads.
+1280px  overflow with Branches open: panel 419/419, page 1280/1280
+1280px  Escape (after Branches opened)  ->  focus: body
+1280px  after that Escape: Branches still open: true, menu hidden: true
+1280px  More, ArrowDown (menu open again)  ->  focus: button | menuitem | account_treeBranches | branches | 182x32
+1280px  Escape (menu open)  ->  focus: button#agentic-tab-more | More: Branches, open | 81x36
+1280px  menu hidden after Escape: true
+390px  overflow: page scrollWidth/clientWidth 390/390, tab row 389/389
+390px  More button: 44x44
+390px  More focused  ->  focus: button#agentic-tab-more | More: Branches, open | 44x44
+390px  Enter on More (menu opened)  ->  focus: button | menuitem | account_treeBranches | branches | 182x44
+390px  More items (w x h): browse 182x44, notes 182x44, activity 182x44, agent-ui 182x44, branches 182x44
+390px  More menu left/right vs window width: 133/325/390
+390px  Enter on Branches (panel open)  ->  focus: button | menuitem | account_treeBranches | branches | 0x0
+390px  More now says: More: Branches, open / word: Branches
+390px  panel text: Counted against main. main this agent main worktree even with the base · 0 changed, 0 untracked feature 1 ahead, 0 behind · 0 changed, 1 untracked
+390px  overflow with Branches open: panel 389/389, page 390/390
+390px  Escape (after Branches opened)  ->  focus: body
+390px  after that Escape: Branches still open: true, menu hidden: true
+390px  More, ArrowDown (menu open again)  ->  focus: button | menuitem | account_treeBranches | branches | 182x44
+390px  Escape (menu open)  ->  focus: button#agentic-tab-more | More: Branches, open | 44x44
+390px  menu hidden after Escape: true
+1280px  overflow: page scrollWidth/clientWidth 1280/1280, tab row 419/419
+1280px  More button: 81x36
+1280px  More focused  ->  focus: button#agentic-tab-more | More: Branches, open | 81x36
+1280px  Enter on More (menu opened)  ->  focus: button | menuitem | account_treeBranches | branches | 182x32
+1280px  More items (w x h): browse 182x32, notes 182x32, activity 182x32, agent-ui 182x32, branches 182x32
+1280px  More menu left/right vs window width: 1056/1248/1280
+1280px  Enter on Branches (panel open)  ->  focus: button | menuitem | account_treeBranches | branches | 0x0
+1280px  More now says: More: Branches, open / word: Branches
+1280px  panel text: Counted against main. main this agent main worktree even with the base · 0 changed, 0 untracked feature 1 ahead, 0 behind · 0 changed, 1 untracked
+1280px  overflow with Branches open: panel 419/419, page 1280/1280
+1280px  Escape (after Branches opened)  ->  focus: body
+1280px  after that Escape: Branches still open: true, menu hidden: true
+1280px  More, ArrowDown (menu open again)  ->  focus: button | menuitem | account_treeBranches | branches | 182x32
+1280px  Escape (menu open)  ->  focus: button#agentic-tab-more | More: Branches, open | 81x36
+1280px  menu hidden after Escape: true
