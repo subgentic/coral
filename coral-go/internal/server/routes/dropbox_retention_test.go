@@ -329,6 +329,11 @@ func TestTheRetentionRouteDryRunsThenSavesWithAnAudit(t *testing.T) {
 	assert.NotEqualValues(t, 200, put(`{"days": 7, "confirm": true}`, false)["_code"], "not from outside the dashboard")
 	assert.NotEqualValues(t, 200, put(`{"days": 7, "confirm": true, "extra": 1}`, true)["_code"], "unknown fields are refused")
 	assert.NotEqualValues(t, 200, put(`{"days": 4000, "confirm": true}`, true)["_code"])
+	for _, bad := range []string{`{"days": 1.9}`, `{"days": 1.9, "confirm": true}`, `{"days": "7"}`, `{"days": -1, "confirm": true}`} {
+		assert.EqualValues(t, http.StatusBadRequest, put(bad, true)["_code"], "only a whole number of days: %s", bad)
+	}
+	days0, _, _ := be.h.dbx.store.Retention(context.Background())
+	assert.Zero(t, days0, "nothing saved by a refused body")
 
 	ok := put(`{"days": 7, "confirm": true, "seen_count": 4, "seen_bytes": 99}`, true)
 	require.EqualValues(t, 200, ok["_code"], ok)

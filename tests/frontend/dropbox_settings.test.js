@@ -278,13 +278,14 @@ const { JSDOM } = require('jsdom');
     $('settings-dropbox-retention-days').value = '7';
     await m.saveRetention();
     assert.deepStrictEqual(retentionCalls().slice(before), [{ days: 7 }], 'first a dry run, nothing confirmed');
-    assert.match($('settings-dropbox-note').textContent, /4 files \(2 KB\) would be deleted from Dropbox now, and 6 more on later passes\. Turn on, or Cancel\./);
+    assert.match($('settings-dropbox-note').textContent, /Keeping files for 7 days: 4 files \(2 KB\) would be deleted from Dropbox now, and 6 more on later passes\. Turn on, or Cancel\./, 'the count names the days it is for');
     assert.ok(shown('settings-dropbox-retention-on') && shown('settings-dropbox-retention-cancel'));
     // Cancel: nothing saved, the field back to what is saved.
     $('settings-dropbox-retention-cancel').click();
     assert.ok(!shown('settings-dropbox-retention-on'));
     assert.match($('settings-dropbox-note').textContent, /Nothing changed/);
     assert.strictEqual($('settings-dropbox-retention-days').value, '0');
+    assert.strictEqual(document.activeElement, $('settings-dropbox-retention-days'), 'focus goes back to the field when the buttons go (SHOULD)');
     assert.strictEqual(retentionCalls().length, before + 1);
     // Turn on: saved with the count the person saw.
     $('settings-dropbox-retention-days').value = '7';
@@ -304,12 +305,76 @@ const { JSDOM } = require('jsdom');
     await status({ ...connected, retention: { days: 0 } });
     $('settings-dropbox-retention-days').value = '2';
     await m.saveRetention();
-    assert.match($('settings-dropbox-note').textContent, /Nothing would be deleted from Dropbox now/);
+    assert.match($('settings-dropbox-note').textContent, /Keeping files for 2 days: nothing would be deleted from Dropbox now/);
     answers['/api/dropbox/status'] = { status: 403, body: { error: 'x', code: 'other_user' } };
     await m.loadDropbox();
     assert.ok(!shown('settings-dropbox-retention-on') && !shown('settings-dropbox-retention-cancel'));
     await m.confirmRetention();
     assert.strictEqual(retentionCalls().pop().confirm, undefined, 'the stale count can no longer be confirmed');
+
+    // UI Reviewer's MUSTs on #14703. (2) Only a whole number 0 to 3650 is sent: anything else sends nothing and shows no Turn on.
+    await status({ ...connected, retention: { days: 0 } });
+    answers['/api/dropbox/retention'] = { status: 200, body: { dry_run: true, days: 1, due: 9, bytes: 1, held: 0 } };
+    for (const bad of ['1.9', '-1', 'abc', '', '4000', '1e3', '7.0', '0x10', '3651']) {
+        const n0 = retentionCalls().length;
+        $('settings-dropbox-retention-days').value = bad;
+        await m.saveRetention();
+        assert.strictEqual(retentionCalls().length, n0, `nothing sent for ${JSON.stringify(bad)}`);
+        assert.ok(!shown('settings-dropbox-retention-on'));
+        assert.match($('settings-dropbox-note').textContent, /whole number of days, 0 \(off\) to 3650/);
+    }
+
+    // (1) The confirm is bound to the days the field shows. Edited after the count (with or without an input event): Turn on goes, and a
+    // confirm sends nothing.
+    answers['/api/dropbox/retention'] = { status: 200, body: { dry_run: true, days: 7, due: 4, bytes: 10, held: 0 } };
+    $('settings-dropbox-retention-days').value = '7';
+    await m.saveRetention();
+    assert.ok(shown('settings-dropbox-retention-on'));
+    $('settings-dropbox-retention-days').value = '30';
+    $('settings-dropbox-retention-days').dispatchEvent(new dom.window.Event('input'));
+    assert.ok(!shown('settings-dropbox-retention-on'), 'a changed field takes Turn on away');
+    let n1 = retentionCalls().length;
+    await m.confirmRetention();
+    assert.strictEqual(retentionCalls().length, n1, 'nothing confirmed for the old count');
+    $('settings-dropbox-retention-days').value = '7';
+    await m.saveRetention();
+    $('settings-dropbox-retention-days').value = '30'; // no input event (a script, an autofill)
+    n1 = retentionCalls().length;
+    await m.confirmRetention();
+    assert.strictEqual(retentionCalls().length, n1, 'the field no longer says 7: nothing confirmed');
+    assert.ok(!shown('settings-dropbox-retention-on'));
+
+    // A dry-run answer for other days than were asked (a stale or mixed-up reply) is not shown as a count to confirm.
+    answers['/api/dropbox/retention'] = { status: 200, body: { dry_run: true, days: 1, due: 99, bytes: 1, held: 0 } };
+    $('settings-dropbox-retention-days').value = '7';
+    await m.saveRetention();
+    assert.ok(!shown('settings-dropbox-retention-on'), 'a count for 1 day never offers Turn on for 7');
+
+    // Out-of-order dry-run answers: the count asked for 7 arrives after the one for 30, and is ignored.
+    const realFetch2 = globalThis.fetch;
+    const waiting = [];
+    globalThis.fetch = (url, opts = {}) => {
+        if (url !== '/api/dropbox/retention') return realFetch2(url, opts);
+        calls.push({ url, method: opts.method || 'GET', headers: opts.headers || {}, body: opts.body });
+        const days = JSON.parse(opts.body).days;
+        return new Promise(res => waiting.push({ days, go: () => res({ ok: true, status: 200, json: async () => ({ dry_run: true, days, due: days, bytes: days * 1024, held: 0 }) }) }));
+    };
+    $('settings-dropbox-retention-days').value = '7';
+    const first = m.saveRetention();
+    $('settings-dropbox-retention-days').value = '30';
+    $('settings-dropbox-retention-days').dispatchEvent(new dom.window.Event('input'));
+    const second = m.saveRetention();
+    await new Promise(r => setTimeout(r, 0));
+    assert.deepStrictEqual(waiting.map(w => w.days), [7, 30]);
+    waiting[1].go();
+    await second;
+    waiting[0].go(); // the late answer for 7
+    await first;
+    globalThis.fetch = realFetch2;
+    assert.match($('settings-dropbox-note').textContent, /Keeping files for 30 days: 30 files/, 'the note is for the days shown');
+    answers['/api/dropbox/retention'] = { status: 200, body: { days: 30 } };
+    await m.confirmRetention();
+    assert.deepStrictEqual(retentionCalls().pop(), { days: 30, confirm: true, seen_count: 30, seen_bytes: 30 * 1024 }, 'what is confirmed is what was shown');
 
     // Nothing from the server is put into the page as HTML.
     await status({ app_key_set: true, connected: true, state: 'connected', account_id: '<img src=x onerror=alert(1)>' });

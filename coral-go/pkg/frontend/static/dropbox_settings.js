@@ -138,6 +138,7 @@ let lastStatus = null; // the last status shown, so a saved filter updates the s
 function hideAll() {
     for (const id of ['settings-dropbox-connect', 'settings-dropbox-disconnect', 'settings-dropbox-switch', 'settings-dropbox-takeover', 'settings-dropbox-recheck']) show(id, false);
     pendingRetention = null;
+    retentionSeq++;
     showRetentionConfirm(false);
     renderBackup(null);
     const counts = $('settings-dropbox-counts');
@@ -346,10 +347,33 @@ function sizeText(bytes) {
     return mb >= 1 ? `${mb.toFixed(1)} MB` : `${Math.max(1, Math.round(Number(bytes || 0) / 1024))} KB`;
 }
 
+// retentionDays reads the field: a whole number 0 to 3650, or null (1.9, -1, letters, an empty field and anything else send nothing; UI Reviewer's MUST 2 on #14703).
+function retentionDays() {
+    const raw = String(($('settings-dropbox-retention-days') || {}).value || '').trim();
+    if (!/^[0-9]{1,4}$/.test(raw)) return null;
+    const days = Number(raw);
+    return days <= 3650 ? days : null;
+}
+
+let retentionSeq = 0; // each dry run's number: a late answer for an older one is ignored (UI Reviewer's MUST 1 on #14703)
+
+// dropRetentionPreview forgets a shown count: the field changed, so Turn on would no longer mean what the note says.
+function dropRetentionPreview() {
+    retentionSeq++;
+    if (!pendingRetention) return;
+    pendingRetention = null;
+    showRetentionConfirm(false);
+    note('');
+}
+
+const dayWord = (k) => `${k} ${k === 1 ? 'day' : 'days'}`;
+
 export async function saveRetention() {
     note('');
-    const days = parseInt(($('settings-dropbox-retention-days') || {}).value || '0', 10);
-    if (!Number.isFinite(days) || days < 0 || days > 3650) { note('Keep in Dropbox is 0 (off) to 3650 days.'); return; }
+    dropRetentionPreview();
+    const days = retentionDays();
+    if (days === null) { note('Keep in Dropbox takes a whole number of days, 0 (off) to 3650.'); return; }
+    const seq = retentionSeq;
     let res;
     if (days === 0) {
         try { res = await post(RETENTION, 'PUT', JSON.stringify({ days: 0 })); } catch { res = { ok: false, body: {} }; }
@@ -359,32 +383,41 @@ export async function saveRetention() {
         return;
     }
     try { res = await post(RETENTION, 'PUT', JSON.stringify({ days })); } catch { res = { ok: false, body: {} }; }
-    if (!res.ok || !res.body.dry_run) { note(String(res.body.error || "Couldn't count what would be deleted. Try again.")); return; }
+    if (seq !== retentionSeq || retentionDays() !== days) return; // superseded: the field changed or another count was asked for
+    if (!res.ok || !res.body.dry_run || Number(res.body.days) !== days) { note(String(res.body.error || "Couldn't count what would be deleted. Try again.")); return; }
     const due = Number(res.body.due || 0);
-    pendingRetention = { days, due, bytes: Number(res.body.bytes || 0) };
-    const what = due ? `${due} ${due === 1 ? 'file' : 'files'} (${sizeText(res.body.bytes)}) would be deleted from Dropbox now` : 'Nothing would be deleted from Dropbox now';
+    pendingRetention = { days, due, bytes: Number(res.body.bytes || 0), seq };
+    const what = due ? `${due} ${due === 1 ? 'file' : 'files'} (${sizeText(res.body.bytes)}) would be deleted from Dropbox now` : 'nothing would be deleted from Dropbox now';
     const later = Number(res.body.held || 0) ? `, and ${res.body.held} more on later passes` : '';
-    note(`${what}${later}. Turn on, or Cancel.`);
+    note(`Keeping files for ${dayWord(days)}: ${what}${later}. Turn on, or Cancel.`);
     showRetentionConfirm(true);
+    focusEl('settings-dropbox-retention-on');
 }
 
 export async function confirmRetention() {
     const p = pendingRetention;
-    if (!p) return;
-    let res;
-    try { res = await post(RETENTION, 'PUT', JSON.stringify({ days: p.days, confirm: true, seen_count: p.due, seen_bytes: p.bytes })); } catch { res = { ok: false, body: {} }; }
+    // The count must still be for the days the field shows (UI Reviewer's MUST 1): anything else sends nothing.
+    if (!p || p.seq !== retentionSeq || retentionDays() !== p.days) { dropRetentionPreview(); return; }
     pendingRetention = null;
     showRetentionConfirm(false);
+    focusEl('settings-dropbox-retention-days');
+    let res;
+    try { res = await post(RETENTION, 'PUT', JSON.stringify({ days: p.days, confirm: true, seen_count: p.due, seen_bytes: p.bytes })); } catch { res = { ok: false, body: {} }; }
     if (!res.ok) { note(String(res.body.error || "Couldn't save. Try again.")); return; }
-    note(`Retention is on: files older than ${p.days} ${p.days === 1 ? 'day' : 'days'} are deleted from Dropbox, at most 100 an hour.`);
+    note(`Retention is on: files older than ${dayWord(p.days)} are deleted from Dropbox, at most 100 an hour.`);
     await loadDropbox();
 }
 
 function cancelRetention() {
-    pendingRetention = null;
-    showRetentionConfirm(false);
+    dropRetentionPreview();
     note('Nothing changed.');
     if (lastStatus) renderBackup(lastStatus);
+    focusEl('settings-dropbox-retention-days'); // the buttons that had focus are gone (UI Reviewer's SHOULD on #14703)
+}
+
+function focusEl(id) {
+    const el = $(id);
+    if (el && typeof el.focus === 'function') el.focus();
 }
 
 function wire() {
@@ -399,5 +432,7 @@ function wire() {
     on('settings-dropbox-retention-save', saveRetention);
     on('settings-dropbox-retention-on', confirmRetention);
     on('settings-dropbox-retention-cancel', cancelRetention);
+    const field = $('settings-dropbox-retention-days');
+    if (field) field.addEventListener('input', dropRetentionPreview); // a changed field takes the shown count and Turn on away
     wired = true;
 }
