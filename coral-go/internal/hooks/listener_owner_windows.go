@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 	"unsafe"
 
@@ -66,6 +67,10 @@ func checkListener(host string, port int) error {
 		pid, connected, cerr = connectionOwnerPID(host, port, connRetryWindow)
 	}
 	if !connected && len(pids) == 0 {
+		if cerr != nil {
+			// Not refused but not connected either (a timeout, an unreachable address): it is not known that nothing is there, so the token is not sent.
+			return &ForeignListenerError{Port: port, Why: fmt.Sprintf("Coral couldn't check who runs the program on that port: %v. Check what is listening on port %d, or start Coral.", cerr, port)}
+		}
 		return nil
 	}
 	if connected {
@@ -380,6 +385,14 @@ type connRow struct {
 	pid          uint32
 }
 
+// dialPort makes the connection whose server end is checked; a test replaces it.
+var dialPort = net.DialTimeout
+
+// connRefused says whether a dial failed because nothing accepted it (Windows reports WSAECONNREFUSED, which errors.Is does not match to syscall.ECONNREFUSED).
+func connRefused(err error) bool {
+	return errors.Is(err, windows.WSAECONNREFUSED) || errors.Is(err, syscall.ECONNREFUSED)
+}
+
 // errNoConnRow: the table never showed the row of the connection's server end within the window.
 var errNoConnRow = errors.New("the system's table never showed who owns the connection")
 
@@ -399,9 +412,12 @@ func connectionOwner(host string, port int, window time.Duration) (pid uint32, c
 	if strings.EqualFold(h, "localhost") {
 		h = "127.0.0.1"
 	}
-	conn, derr := net.DialTimeout("tcp", net.JoinHostPort(h, strconv.Itoa(port)), time.Second)
+	conn, derr := dialPort("tcp", net.JoinHostPort(h, strconv.Itoa(port)), time.Second)
 	if derr != nil {
-		return 0, false, nil
+		if connRefused(derr) {
+			return 0, false, nil // nothing accepted it: nothing is there
+		}
+		return 0, false, derr // a timeout or another failure: whether something is there is not known
 	}
 	defer conn.Close()
 	local, ok := conn.LocalAddr().(*net.TCPAddr)

@@ -159,3 +159,39 @@ func TestARowMissedOnEveryTryRefusesAfterBothWindows(t *testing.T) {
 	assert.GreaterOrEqual(t, took, connReadWindow+connRetryWindow, "both windows ran")
 	assert.Less(t, took, connReadWindow+connRetryWindow+2*time.Second, "and that is the bound")
 }
+
+// With no listener row, only a refused connection means nothing is there. A dial that times out or fails some other way does not say that, so the check refuses with its usual wording.
+func dialRig(t *testing.T, dial func(string, string, time.Duration) (net.Conn, error)) {
+	t.Helper()
+	resetListenerCheck(t, func(string, int) ([]uint32, error) { return nil, nil }, func(uint32) (*windows.SID, string, error) { return nil, "", errors.New("unused") })
+	prevConn, prevDial := connectionOwnerPID, dialPort
+	connectionOwnerPID = connectionOwner
+	if dial != nil {
+		dialPort = dial
+	}
+	t.Cleanup(func() { connectionOwnerPID, dialPort = prevConn, prevDial })
+}
+
+func TestARefusedConnectionWithNoListenerRowIsNothingThere(t *testing.T) {
+	dialRig(t, nil) // the real dial
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	port := ln.Addr().(*net.TCPAddr).Port
+	require.NoError(t, ln.Close()) // nothing listens there now: the dial is refused
+	assert.NoError(t, checkListener("127.0.0.1", port))
+}
+
+func TestADialThatTimesOutOrFailsWithNoListenerRowRefuses(t *testing.T) {
+	for name, derr := range map[string]error{
+		"timeout": &net.OpError{Op: "dial", Net: "tcp", Err: os.ErrDeadlineExceeded},
+		"other":   &net.OpError{Op: "dial", Net: "tcp", Err: windows.WSAENETUNREACH},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dialRig(t, func(string, string, time.Duration) (net.Conn, error) { return nil, derr })
+			err := checkListener("127.0.0.1", 9)
+			var fe *ForeignListenerError
+			require.ErrorAs(t, err, &fe, "refused: %v", err)
+			assert.Contains(t, fe.Why, "couldn't check who runs the program on that port")
+		})
+	}
+}
