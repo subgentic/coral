@@ -199,8 +199,10 @@ func (h *BoardHandler) SetArtifactTags(w http.ResponseWriter, r *http.Request) {
 		} else {
 			noteActivity(r, board.ActMarkUnread, "file", id, project, "", "")
 		}
+		noteActivityTask(r, h.fileTaskOf(r.Context(), project, id)) // the row's goal and task (#14421)
 	case "tags":
 		noteActivity(r, board.ActFileTags, "file", id, project, "", strings.Join(tags, ", "))
+		noteActivityTask(r, h.fileTaskOf(r.Context(), project, id))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"id": id, "tags": tags})
 }

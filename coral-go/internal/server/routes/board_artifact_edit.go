@@ -277,6 +277,7 @@ func (h *BoardHandler) SaveArtifactEdit(w http.ResponseWriter, r *http.Request) 
 	noteArtifactsChanged()
 	h.forgetTaskCounts()
 	noteActivity(r, board.ActFileEdit, "file", hexID, project, meta.Name, "")
+	noteActivityTask(r, h.fileTaskOf(r.Context(), project, hexID)) // the row's goal and task (#14421)
 	reply := editReply(hexID, plan.stamp.Version, plan.id, meta.Name, meta.Size, true)
 	reply["versions"] = versions
 	writeJSON(w, http.StatusCreated, reply)

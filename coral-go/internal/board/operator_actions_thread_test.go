@@ -2,7 +2,10 @@ package board
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -211,7 +214,15 @@ func TestTheChainStaysWholeForOldRowsAndCatchesAnEditedThread(t *testing.T) {
 
 	// the hash of a row with no thread is what it was before the columns (a fixed value pins it)
 	a := OperatorAction{At: "2026-11-07T12:00:00.000000000Z", Actor: "local", Action: ActMessage, ItemKind: "message", ItemID: "1", Team: "team-a", Source: "local"}
-	assert.Equal(t, activityHash("prev", a), activityHash("prev", a))
+	// ... as the code made it before the columns existed, written out here field by field: a row with no thread must hash to exactly this, or every row already in a record would stop matching its hash
+	oldHash := func(prev string, r OperatorAction) string {
+		h := sha256.New()
+		for _, f := range []string{prev, r.At, r.Actor, r.Action, r.ItemKind, r.ItemID, r.Version, r.Team, r.Source, r.Hint, r.Surface, r.Title, r.Note} {
+			fmt.Fprintf(h, "%d:%s|", len(f), f)
+		}
+		return hex.EncodeToString(h.Sum(nil))
+	}
+	assert.Equal(t, oldHash("prev", a), activityHash("prev", a), "a row with no thread hashes as it always did")
 	withGoal := a
 	g := goal.ID
 	withGoal.GoalID = &g

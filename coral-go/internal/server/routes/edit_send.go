@@ -377,6 +377,7 @@ func (h *SessionsHandler) sendEditDiff(w http.ResponseWriter, r *http.Request) {
 	}
 	if sent > 0 {
 		noteActivity(r, board.ActFileEditSend, "file", t.digest, project, t.name, fmt.Sprintf("to %d agent(s)", sent))
+		noteActivityTask(r, h.boardHandler.fileTaskOf(r.Context(), project, t.digest)) // the row's goal and task (#14421)
 	}
 	out := map[string]any{"ok": sent > 0 || status == http.StatusOK, "results": results, "thread_id": root.ID, "version": t.version, "previous_version": t.version - 1, "limited": shownAsNote, "already_sent": alreadySent}
 	if status == http.StatusConflict {
