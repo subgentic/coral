@@ -66,6 +66,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`[...window.__cell.querySelectorAll('button.inbox-answer')][2].click(); true`);
             await waitFor(`!!window.__cell.querySelector('.inbox-rate-limit-confirm')`, `${label}: choice 3 asks once more`, 5000);
             assert.match(await ev(`window.__cell.querySelector('.inbox-rate-limit-confirm').textContent`), /This stops the reminder for good\./, label);
+            assert.equal(await ev(`document.activeElement && document.activeElement.textContent`), 'Cancel', `${label}: after choice 3 the safe choice has the keyboard too`);
             const name3 = await ev(`[...window.__cell.querySelectorAll('button')].find(b => b.textContent === 'Never show again').getAttribute('aria-label')`);
             assert.ok(name3.startsWith('Never show again'), `${label}: the accessible name starts with the visible words: ` + name3);
             assert.equal(await ev(`window.__posts.length`), 0, `${label}: nothing sent by the first click`);
