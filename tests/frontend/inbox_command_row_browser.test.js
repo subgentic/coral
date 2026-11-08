@@ -236,6 +236,7 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
                 check(!(await ev(`document.querySelector('#group-table-view tbody').textContent.includes('a different permission')`)) && /New items are waiting/.test(await ev(`(document.querySelector('#group-table-view .group-table-held') || {}).textContent || ''`)), `${at}a change that is not a waiting agent is still held at 3 s`);
                 await waitFor(`document.querySelector('#group-table-view tbody').textContent.includes('a different permission')`, `${at}and drawn by about 10 s`, 12000);
                 await ev(`window.__sum = undefined; true`);
+                await ev(`window.__sum = undefined; true`);
                 await Input.dispatchMouseEvent({ type: 'mouseMoved', x: 4, y: 4 });
             }
         }

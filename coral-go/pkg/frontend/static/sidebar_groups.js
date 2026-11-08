@@ -248,6 +248,14 @@ if (typeof document !== 'undefined') {
 const HOVER_HOLD_MS = 10000, URGENT_HOLD_MS = 2000; // a row that needs the person (a waiting agent, a permission) is held 2 s at most: enough that a row does not jump under a click, not enough to hide that an agent is waiting (QA Reviewer 2 on #14173); other new rows, 10 s
 const canHover = () => typeof matchMedia === 'function' && matchMedia('(hover: hover)').matches; // a touch screen has no hover: only a pointer that can rest on the list holds it
 let hoverOver = false, hoverHeldSince = null;
+// A row the person just acted on (Ignore, Dismiss, Done, Answer) leaves at once (#14373, saved_files_actions): the hold is for rows that change on their own while the pointer rests, not for the result of the person's own completed action.
+// The action's handler dispatches 'coral:action-result' AFTER the server accepted it and the list it changed has been read again (an event, so no module imports the table). The table then makes ONE redraw, not held, scoped to the table on screen:
+// the token lives only for that call. No click, menu or refused action does it, and there is no time window: a later arrival is held as before.
+let actedRefresh = false;
+if (typeof document !== 'undefined') {
+    document.addEventListener('coral:action-start', e => { if (e.detail && open) e.detail.table = open; }); // the table on screen when the action began
+    document.addEventListener('coral:action-result', e => { const t = e.detail && e.detail.table; if (!t || t !== open) return; actedRefresh = true; try { refreshGroupTable(t.kind); } finally { actedRefresh = false; } }); // only that table, still on screen
+}
 let holdCap = HOVER_HOLD_MS, drawnUrgent = '';
 const hovering = () => hoverOver && hoverHeldSince !== null ? Date.now() - hoverHeldSince < holdCap : hoverOver;
 function showHeldNote() {
@@ -268,7 +276,7 @@ export function refreshGroupTable(kind) {
     const src = sources.get(kind);
     if (open && open.kind === kind) {
         if (src?.holdRedraw && holding()) { deferredKind = kind; flushLater(); return; }
-        if (src?.holdRedraw && hoverOver) { if (hoverHeldSince === null) hoverHeldSince = Date.now(); holdCap = src.urgentSignature && src.urgentSignature() !== drawnUrgent ? URGENT_HOLD_MS : HOVER_HOLD_MS; if (hovering()) { deferredKind = kind; showHeldNote(); setTimeout(() => { const k = deferredKind; if (k && !holding()) { deferredKind = null; refreshGroupTable(k); } }, Math.max(60, holdCap - (Date.now() - hoverHeldSince) + 60)); return; } } // a pointer resting on the list: the rows stay where they are, up to HOVER_HOLD_MS
+        if (src?.holdRedraw && hoverOver && !actedRefresh) { if (hoverHeldSince === null) hoverHeldSince = Date.now(); holdCap = src.urgentSignature && src.urgentSignature() !== drawnUrgent ? URGENT_HOLD_MS : HOVER_HOLD_MS; if (hovering()) { deferredKind = kind; showHeldNote(); setTimeout(() => { const k = deferredKind; if (k && !holding()) { deferredKind = null; refreshGroupTable(k); } }, Math.max(60, holdCap - (Date.now() - hoverHeldSince) + 60)); return; } } // a pointer resting on the list: the rows stay where they are, up to HOVER_HOLD_MS
         const host = document.getElementById('group-table-view');
         if (!host || host.style.display === 'none') { open = null; return; }
         if (drawTable()) return;
