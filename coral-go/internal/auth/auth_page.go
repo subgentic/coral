@@ -145,6 +145,7 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen
   .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--border-light); border-top-color: var(--accent); border-radius: 50%; animation: sp 1s linear infinite; vertical-align: -2px; margin-right: 6px; }
   @keyframes sp { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+  #live:not(:empty) { margin: 12px 0 0; font-size: 0.9375rem; color: var(--text-secondary); }   /* "Signed in. Opening Coral…": the only thing on the card while Coral opens */
   .otherways { margin: 18px 0 0; font-size: 0.8125rem; color: var(--text-secondary); }
   .otherways > summary { cursor: pointer; font-weight: 500; color: var(--text-secondary); padding: 4px 0; }
   .otherways[open] > summary { margin-bottom: 8px; }

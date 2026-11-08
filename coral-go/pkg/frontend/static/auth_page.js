@@ -45,7 +45,7 @@ function clearInvalid(input, box) {
 }
 for (const input of document.querySelectorAll('input.pw-input')) input.addEventListener('input', () => clearInvalid(input, input.closest('section')?.querySelector('.err')));
 function say(text) { $('live').textContent = text; }
-function done() { say('Signed in. Opening Coral…'); window.location.replace(returnTo); }
+function done() { for (const panel of document.querySelectorAll('main.card section.panel, main.card > .note, #hub-flash')) panel.hidden = true; say('Signed in. Opening Coral…'); window.location.replace(returnTo); } // while Coral opens the page is that one line: the form is not shown beside it (#14731)
 
 // A paused form: counts down from the server's wait and opens again by itself.
 let timer = null;

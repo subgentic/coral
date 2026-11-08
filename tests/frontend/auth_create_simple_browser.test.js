@@ -21,11 +21,14 @@ const GOLD = n => fs.readFileSync(path.join(__dirname, '../../coral-go/internal/
         await Page.navigate({ url: BASE + '/' });
         await waitFor(`!!navigator.serviceWorker && Promise.race([navigator.serviceWorker.ready.then(r => !!r.active && !!navigator.serviceWorker.controller), new Promise(r => setTimeout(() => r(false), 100))])`, 'the service worker').catch(() => {});
         await client.Network.setBypassServiceWorker({ bypass: true });
-        await Fetch.enable({ patterns: [{ urlPattern: BASE + '/auth*' }] });
+        await Fetch.enable({ patterns: [{ urlPattern: BASE + '/auth*' }, { urlPattern: BASE + '/zz-hold*' }] });
+        let signinPage = false;
         safePaused(client, async p => {
             const u = new URL(p.request.url);
+            if (u.pathname === '/zz-hold') return Fetch.fulfillRequest({ requestId: p.requestId, responseCode: 204, responseHeaders: [] }); // the page Coral opens answers 204: the browser stays on this page, as it is while Coral "opens"
+            if (u.pathname === '/auth/password' && p.request.method === 'POST') return Fetch.fulfillRequest({ requestId: p.requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'application/json' }], body: Buffer.from('{"ok":true}').toString('base64') });
             if (u.pathname !== '/auth' || p.request.method !== 'GET') return Fetch.continueRequest({ requestId: p.requestId });
-            return Fetch.fulfillRequest({ requestId: p.requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }], body: Buffer.from(GOLD('create')).toString('base64') });
+            return Fetch.fulfillRequest({ requestId: p.requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }], body: Buffer.from(GOLD(signinPage ? 'signin' : 'create')).toString('base64') });
         });
         for (const [w, h, mobile, scale] of [[1280, 900, false, 1], [390, 844, true, 1], [320, 700, true, 2]]) {
             const at = `${w} px${scale > 1 ? ', text 200%' : ''}: `;
@@ -56,6 +59,21 @@ const GOLD = n => fs.readFileSync(path.join(__dirname, '../../coral-go/internal/
             check(`${at}nothing is wider than the screen`, (await ev(`document.documentElement.scrollWidth - innerWidth`)) <= 0);
             if (mobile) check(`${at}the controls are touch targets (44 px)`, await ev(`['create-form', 'other-ways'].every(() => true) && [...document.querySelectorAll('#local-open, #show-key, #submit')].every(e => e.getBoundingClientRect().height >= 43)`));
             await shot(`auth-create-${w}${scale > 1 ? '-200' : ''}-ways`);
+        }
+        // signing in: while Coral opens, the card is that one line, not the form beside "Signed in. Opening Coral…"
+        signinPage = true;
+        for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
+            const at = `${w} px, after signing in: `;
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
+            await Page.navigate({ url: BASE + '/auth?return_to=/zz-hold' });
+            await waitFor(`document.readyState === 'complete' && !!document.getElementById('signin-form') && document.documentElement.dataset.authReady === 'true'`, `${at}the sign-in page`);
+            await ev(`(() => { const p = document.getElementById('password'); p.value = 'a password'; p.dispatchEvent(new Event('input', { bubbles: true })); document.getElementById('signin-form').requestSubmit(); return true; })()`);
+            await waitFor(`/Opening Coral/.test(document.getElementById('live').textContent)`, `${at}the opening line`);
+            await sleep(300); // sleep-ok: the redraw settles
+            const shown = await ev(`[...document.querySelectorAll('main.card > *')].filter(e => e.checkVisibility() && e.getBoundingClientRect().height > 1).map(e => e.id || e.className)`);
+            await shot(`auth-signed-in-${w}`);
+            check(`${at}only the brand and the line are shown (no form beside it)`, shown.every(x => /brand|live/.test(x)) && shown.some(x => /live/.test(x)), JSON.stringify(shown));
+            check(`${at}the line says Signed in. Opening Coral…`, await ev(`document.getElementById('live').textContent === 'Signed in. Opening Coral…'`));
         }
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
