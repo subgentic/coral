@@ -182,14 +182,9 @@ func TestAnAgentDoesNotStartInASavedDefaultThatSkipsThePrompts(t *testing.T) {
 			assert.Equal(t, before, sent(), "%s %s: nothing started", c.agentType, c.mode)
 		} else {
 			require.Equal(t, http.StatusOK, rec.Code, "%s %s: %s", c.agentType, c.mode, rec.Body.String())
-			rig.term.mu.Lock()
-			var last string
-			for _, cmds := range rig.term.sent {
-				if len(cmds) > 0 {
-					last = cmds[len(cmds)-1]
-				}
-			}
-			rig.term.mu.Unlock()
+			all := rig.term.sentCommands()
+			require.NotEmpty(t, all)
+			last := all[len(all)-1]
 			assert.NotContains(t, strings.ToLower(last), "skip-permissions", "%s %s: capped to the caller", c.agentType, c.mode)
 			assert.NotContains(t, last, "bypassPermissions", c.mode)
 		}

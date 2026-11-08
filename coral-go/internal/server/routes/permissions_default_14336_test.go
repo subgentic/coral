@@ -119,15 +119,21 @@ func TestADontAskCallerWithNoShellCannotStartAnAutoMember(t *testing.T) {
 // Build item (1): Codex stays in its sandbox. Full capabilities never translate to "no sandbox" (that is the Bypass mode, or Keep Full access, alone). Pinned per release of the translation:
 // for every mode but Bypass, with and without the full capability set, the command carries no bypass flag and no danger-full-access.
 func TestCodexWithFullCapabilitiesStaysInItsSandbox(t *testing.T) {
-	for _, mode := range []string{"", "default", "plan", "acceptEdits", "auto", "dontAsk"} {
+	// a member names Default with permission_mode, any other mode as the CLI's own flags
+	byFlags := map[string][]string{"": nil, "default": nil, "plan": {"--sandbox", "read-only", "-a", "on-request"}, "acceptEdits": {"--sandbox", "workspace-write", "-a", "on-request"},
+		"auto": {"--sandbox", "workspace-write", "-a", "never"}}
+	for _, mode := range []string{"", "default", "plan", "acceptEdits", "auto"} {
 		for _, withCaps := range []bool{false, true} {
 			t.Run(fmt.Sprintf("mode %q caps=%v", mode, withCaps), func(t *testing.T) {
 				rig := setupAgyTestRig(t)
 				fake := stubScript(t, filepath.Join(t.TempDir(), "mock-codex"), "#!/bin/sh\nexit 0\n")
 				require.NoError(t, rig.ss.SetSetting(context.Background(), agent.CLIPathSettingKey(at.Codex), fake))
 				m := map[string]any{"name": "A"}
-				if mode != "" {
-					m["permission_mode"] = mode
+				if mode == "default" {
+					m["permission_mode"] = "default"
+				}
+				if f := byFlags[mode]; f != nil {
+					m["flags"] = f
 				}
 				if withCaps {
 					m["capabilities"] = map[string]any{"allow": fullCapsList14336}
@@ -144,7 +150,7 @@ func TestCodexWithFullCapabilitiesStaysInItsSandbox(t *testing.T) {
 	rig := setupAgyTestRig(t)
 	fake := stubScript(t, filepath.Join(t.TempDir(), "mock-codex"), "#!/bin/sh\nexit 0\n")
 	require.NoError(t, rig.ss.SetSetting(context.Background(), agent.CLIPathSettingKey(at.Codex), fake))
-	code, out, cmd := teamOf(t, rig, at.Codex, "cx-bypass", map[string]any{"name": "A", "permission_mode": "bypassPermissions"}, nil)
+	code, out, cmd := teamOf(t, rig, at.Codex, "cx-bypass", map[string]any{"name": "A", "flags": []string{"--dangerously-bypass-approvals-and-sandbox"}}, nil)
 	require.Equal(t, http.StatusOK, code, out)
 	assert.Contains(t, cmd, "--dangerously-bypass-approvals-and-sandbox")
 }
@@ -172,7 +178,7 @@ func TestAFullCapabilityLaunchCarriesCoralsOwnProtections(t *testing.T) {
 		require.Contains(t, cmd, "--permission-mode auto")
 		return settingsOf(cmd)
 	}
-	plain := run("prot-plain", map[string]any{"name": "A", "permission_mode": "default"})
+	plain := run("prot-plain", map[string]any{"name": "A"})
 	full := run("prot-full", map[string]any{"name": "A", "capabilities": map[string]any{"allow": fullCapsList14336, "deny": []string{"Bash(rm -rf *)"}}})
 	assert.Equal(t, plain["hooks"], full["hooks"], "the same Coral hooks in every mode")
 	require.NotNil(t, full["hooks"])
@@ -334,4 +340,29 @@ func TestAKeepFullAccessCallerMayStartABypassMember(t *testing.T) {
 	_, refusal = capAgentLaunchFor(authorityFromRow(ls, false), agentLaunchAsk{AgentType: at.Codex, PermissionMode: "bypassPermissions"})
 	require.NotNil(t, refusal)
 	assert.Equal(t, agentLaunchAboveCallerCode, refusal.Code)
+}
+
+// QA Reviewer 2's SHOULD on #14336: claudeLike's type list is pinned. Hermes, Codex, agy and its kin, Pi and opencode rank their own modes and are NOT Claude-like, so a Don't ask Hermes (or Codex) is
+// never ranked by a Claude allow list: that would hand a Hermes caller rank 3 from a bare shell allow.
+func TestClaudeLikeIsOnlyTheTypesWithClaudesModes(t *testing.T) {
+	for typ, want := range map[string]bool{
+		at.Claude: true,
+		at.Hermes: false, at.Codex: false, at.Agy: false, at.Pi: false, at.Opencode: false,
+		"gemini": false, "antigravity": false,
+	} {
+		assert.Equal(t, want, claudeLike(typ), typ)
+	}
+	shell := &agent.Capabilities{Allow: []string{"shell", "file_write"}}
+	// a Don't ask Claude with a bare shell allow runs commands unasked: open. The others are ranked by their own mode, never by a Claude allow list.
+	assert.Equal(t, rankOpen, effectiveRank(at.Claude, "dontAsk", shell, false))
+	assert.Equal(t, rankAsks, effectiveRank(at.Hermes, "dontAsk", shell, false), "Hermes has no Don't ask: it asks")
+	assert.NotEqual(t, rankOpen, effectiveRank(at.Codex, "dontAsk", shell, false), "Codex's Don't ask stays in its sandbox")
+	assert.Equal(t, rankAsks, effectiveRank(at.Agy, "dontAsk", &agent.Capabilities{Allow: []string{"file_read"}}, false), "agy has no Don't ask flag")
+	// and as a CALLER a Hermes row in dontAsk is ranked by Hermes's own table (asks), not lowered or raised by the Claude rule
+	mode := "dontAsk"
+	for _, typ := range []string{at.Hermes, at.Codex, at.Agy} {
+		caps := `{"allow":["shell","file_write"]}`
+		auth := authorityFromRow(&store.LiveSession{SessionID: "s", AgentType: typ, PermissionMode: &mode, Capabilities: &caps}, false)
+		assert.Equal(t, effectiveRank(typ, "dontAsk", &agent.Capabilities{Allow: []string{"shell", "file_write"}}, false), auth.Rank, "%s ranks by its own mode table", typ)
+	}
 }
