@@ -1,5 +1,5 @@
 // probe
-// exists, a computer or the Hub is connected), read or dismissed; they are not in the Inbox badge; Hide all welcome items puts them away; an empty Needs you says "Nothing needs you" with a way to Agents; an install
+// exists, a computer or the Hub is connected), read or dismissed; they are not in the Inbox badge; each is dismissed one at a time (no Hide all, #14742); an empty Needs you says "Nothing needs you" with a way to Agents; an install
 // without the setting never sees them. At 1280 and 390 px, through agent_view_harness.js against the isolated dev server (the settings the page keeps are put in its state; the PUTs are answered here).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -54,7 +54,8 @@ const { coralReady } = require('./helpers/wait');
             await ev(`T.state.liveSessions = []; T.state.settings = { ...T.state.settings, inbox_welcome: 'on', inbox_welcome_done: '' }; import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return true; })`); // the agents go: the five items are back for the rest of the walk
             await waitFor(`document.querySelectorAll('#group-table-view .inbox-review-name').length === 5`, `${tag}: five welcome items again`, 8000);
             await shot(`inbox-welcome-counts-${w}`);
-            await press('Hide all welcome items');
+            for (let i = 0; i < 4; i++) { await press('Dismiss'); await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length === ${4 - i}`, `${tag}: Dismiss took away only that row (${4 - i} left)`, 8000); } // one at a time, like any other item
+            await press('Got it');
             await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length === 0`, `${tag}: the items put away`, 8000);
             const after = await folderCount(), chipsAfter = await pills();
             check(after.every(c => c === '0' || c === '' || c == null) && !chipsAfter.some(c => /^Welcome/.test(c)), `${tag}: the count and the Welcome pill go with them: ` + JSON.stringify([after, chipsAfter]));

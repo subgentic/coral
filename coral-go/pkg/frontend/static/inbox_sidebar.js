@@ -4,7 +4,7 @@ import { rememberFocus } from './dom_morph.js';
 import { onArtifactsRev } from './artifacts_feed.js';
 import { needsYou, askedRow } from './asked_before_restart.js';
 import { unrecordedItem, recordAllAgents } from './waiting.js';
-import { welcomeRows, runWelcome, dismissWelcome, hideAllWelcome } from './welcome_items.js';
+import { welcomeRows, runWelcome, dismissWelcome } from './welcome_items.js';
 import { incompleteNote, readGaps } from './needs_incomplete.js';
 import { loadPendingSkills, skillRows, skillLine, skillName, skillCount, openSkill } from './needs_skills.js';
 import { doneGoals, nextQuietEnd, quietEndsAt, hideGoalDone, setGoalDoneCount, isGoalDoneRead, markGoalDoneRead, markGoalDoneUnread, SETTING as GOAL_DONE_SETTING } from './goal_done.js';
@@ -1307,7 +1307,6 @@ wrap.append(DT.el('span', 'sr-only', `${earlierWords(s.review) ? `, ${earlierWor
             if (!reviewFilters() && (!needsFilters.kind || needsFilters.kind === 'review')) appendReviewPaging(wrap);
             if (groupReviews && rows.some(s => s.review)) wrap.append(DT.el('p', 'goals-note inbox-review-group-note', 'Counts describe the documents shown. More may appear as computers finish loading; additional documents are listed below when a producer has more than ten.'));
             if (isPhoneLayout()) { const bar = (teamNeedsMount?.host || $('group-table-view'))?.querySelector('.gt-toolbar'); Toolbar.mountSelection(bar, needsState.selected.size ? table.bar : null); bar?.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); } // the bar takes the toolbar's line while rows are selected; no Select button: the long press is the way in
-            if (rows.some(r => r.welcome)) { const hide = DT.el('button', 'btn btn-quiet btn-small inbox-welcome-hide', 'Hide all welcome items'); hide.type = 'button'; hide.addEventListener('click', () => { hideAllWelcome(); sayLive('The welcome items are hidden.'); }); wrap.append(hide); } // one quiet way out (#11443)
             if (hidden > 0) {
                 const only = needsFilters.kind && !needsFilters.q && !needsFilters.team && !needsFilters.agent && !needsFilters.goal && !needsFilters.longer && !needsFilters.server;
                 const p = DT.el('p', 'goals-note inbox-filter-hidden', `${hidden} hidden by the ${only ? `${NF.KIND_LABEL[needsFilters.kind] || needsFilters.kind} filter` : 'filters'}. `);
