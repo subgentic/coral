@@ -695,3 +695,5 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .inbox-answers:has(.inbox-remove-wait-help) { width: 280px; white-space: normal; }
 .dt-mail-menu .menu-item-with-help { display: block; white-space: normal; text-align: left; min-height: var(--control-touch-height, 44px); }
 @media (max-width: 760px) { .inbox-needs-results td:has(> .inbox-review-star-anchor) .dt-subtitle { margin-inline-end: 52px; } } /* a phone's review card is as tall as its text (#14574): the star's 44 px target sits beside the summary, so the summary stops short of it */
+.dt-mail-head { display: flex; align-items: baseline; gap: 6px; min-width: 0; max-width: 100%; }
+.dt-mail-computer { flex: none; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* the computer chip on a mail row's title line (#14623): its size and colour are the shared chip's */
