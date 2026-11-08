@@ -340,3 +340,15 @@ func TestAFailedSwitchSaveRevokesNothing(t *testing.T) {
 	assert.Equal(t, true, st["connected"])
 	assert.Equal(t, "dbid:AAA", st["account_id"], "the old sign-in is still the stored one")
 }
+
+// The error envelope the settings page reads (Security's MUST on #14653): open_on_127 is the code, the sentence with the address is the error.
+func TestOpenOn127AnswersTheEnvelopeTheSettingsPageReads(t *testing.T) {
+	e := newDropboxEnv(t)
+	e.host = "localhost:8420"
+	rec := e.call(http.MethodPost, "/api/dropbox/connect", true, nil)
+	require.Equal(t, http.StatusConflict, rec.Code)
+	var body map[string]string
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, "open_on_127", body["code"])
+	assert.Equal(t, "Open Coral at http://127.0.0.1:8420 to connect Dropbox", body["error"])
+}

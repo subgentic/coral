@@ -52,14 +52,15 @@ function render(st) {
         return;
     }
     if (st.switch_pending) {
-        setStatus('This is a different Dropbox account from before. Switch to it, or connect again with the old one.');
+        const sw = st.switch_pending || {};
+        setStatus(`This is a different Dropbox account (${sw.to || 'new account'}) from the one before (${sw.from || 'old account'}). Switch to it, or connect again with the old one.`);
         show('settings-dropbox-switch', true);
         show('settings-dropbox-connect', true);
         $('settings-dropbox-connect').textContent = 'Connect Dropbox…';
         return;
     }
     if (st.connected && st.looks_like_copy) {
-        setStatus('This Coral looks like a copy of one that backs up to Dropbox, so the backup is paused here. Take over to back up from this computer, or leave it paused.');
+        setStatus('This Coral looks like a copy of one that backs up to Dropbox (a copied or restored data folder), so the backup is paused here. If this is now the computer you use, Take over: Coral records this computer as the one that backs up. If the original is still in use, leave it paused.');
         show('settings-dropbox-takeover', true);
         return;
     }
@@ -124,9 +125,10 @@ export async function connectDropbox() {
     let res;
     try { res = await post('/api/dropbox/connect'); } catch { note("Couldn't reach Coral. Try again."); return; }
     if (!res.ok) {
-        const code = res.body.error || '';
+        // The server's error envelope: {"error": <the sentence>, "code": <the code to match on>} (writeError, #5262).
+        const code = String(res.body.code || '');
         if (code === 'open_on_127') {
-            const m = /http:\/\/127\.0\.0\.1:(\d{2,5})/.exec(res.body.message || '');
+            const m = /http:\/\/127\.0\.0\.1:(\d{2,5})/.exec(String(res.body.error || ''));
             const port = m ? m[1] : (window.location.port || '8420');
             note(`Open Coral at http://127.0.0.1:${port} to connect Dropbox:`, `http://127.0.0.1:${port}/`);
             return;

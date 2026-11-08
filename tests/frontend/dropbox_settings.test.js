@@ -56,11 +56,15 @@ const { JSDOM } = require('jsdom');
     // A copy of the data folder: says so, offers Take over, and nothing else.
     await status({ app_key_set: true, connected: true, state: 'connected', account_id: 'dbid:AAA', looks_like_copy: true });
     assert.match($('settings-dropbox-status').textContent, /looks like a copy/);
+    assert.match($('settings-dropbox-status').textContent, /records this computer as the one that backs up/, 'Take over says what it does');
+    assert.match($('settings-dropbox-status').textContent, /If the original is still in use, leave it paused/, 'and when not to');
     assert.ok(shown('settings-dropbox-takeover') && !shown('settings-dropbox-disconnect'));
 
     // A sign-in to another account waits for the confirm.
     await status({ app_key_set: true, connected: false, state: 'disconnected', switch_pending: { from: 'dbid:AAA', to: 'dbid:BBB' } });
     assert.match($('settings-dropbox-status').textContent, /different Dropbox account/);
+    assert.match($('settings-dropbox-status').textContent, /dbid:BBB/, 'the new account');
+    assert.match($('settings-dropbox-status').textContent, /dbid:AAA/, 'and the one before');
     assert.ok(shown('settings-dropbox-switch'));
 
     // Connect: a JSON POST, then Dropbox's page opens.
@@ -76,11 +80,18 @@ const { JSDOM } = require('jsdom');
 
     // Connect from a dashboard opened at localhost: the server says where to open Coral; the note shows it as a link.
     opened = null;
-    answers['/api/dropbox/connect'] = { status: 409, body: { error: 'open_on_127', message: 'Open Coral at http://127.0.0.1:8420 to connect Dropbox' } };
+    // The server's real error envelope (writeError): error is the sentence, code is the code.
+    answers['/api/dropbox/connect'] = { status: 409, body: { error: 'Open Coral at http://127.0.0.1:8420 to connect Dropbox', code: 'open_on_127' } };
     await m.connectDropbox();
     assert.strictEqual(opened, null);
     assert.match($('settings-dropbox-note').textContent, /Open Coral at http:\/\/127\.0\.0\.1:8420/);
     assert.strictEqual($('settings-dropbox-note').querySelector('a').getAttribute('href'), 'http://127.0.0.1:8420/');
+
+    // Another error code with its sentence: the known code's words are shown, never the raw code.
+    answers['/api/dropbox/connect'] = { status: 409, body: { error: 'Another Dropbox sign-in is already waiting; finish or wait five minutes', code: 'signin_busy' } };
+    await m.connectDropbox();
+    assert.match($('settings-dropbox-note').textContent, /already waiting/);
+    assert.ok(!/signin_busy/.test($('settings-dropbox-note').textContent));
 
     // Disconnect that could not end the sign-in at Dropbox: tells the person to remove Coral there (Security's note 6).
     answers['/api/dropbox/disconnect'] = { status: 200, body: { connected: false, revoked: false } };
