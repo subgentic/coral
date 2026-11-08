@@ -39,14 +39,18 @@ async function inboxRows(path, field) {
 }
 
 /** Open goals from this Coral and its registered machines, preserving team identity. */
-let goalsFailed = false;
+let goalsFailed = false, doneCapped = false;
+const DONE_PAGE = 100;
+/** Whether a computer sent a whole page of finished goals: there may be newer ones that are not listed (#14613); the Done list then says it shows the first ones. */
+export const doneGoalsCapped = () => doneCapped;
 export const goalsReadFailed = () => goalsFailed;
 /** The open goals, and the goals finished (state done) so the Goals folder's Done pill has something to show (#14601: the default read is the open ones only, so Done said 0 after a goal finished). Two reads, so the finished ones never crowd an open goal out of the page. */
 export async function listInboxGoals() {
     const open = await inboxRows('/api/goals?limit=100', 'goals'), openFailed = !!inboxRows.failed;
     let done = [], doneFailed = false;
-    try { done = await inboxRows('/api/goals?state=done&limit=100', 'goals'); doneFailed = !!inboxRows.failed; } catch { doneFailed = true; }
+    try { done = await inboxRows('/api/goals?state=done&limit=' + DONE_PAGE, 'goals'); doneFailed = !!inboxRows.failed; } catch { doneFailed = true; }
     goalsFailed = openFailed || doneFailed;
+    doneCapped = Object.values(done.reduce((n, d) => (n[d.server] = (n[d.server] || 0) + 1, n), {})).some(n => n >= DONE_PAGE);
     return [...open, ...done.filter(d => !open.some(o => o.board_id === d.board_id && o.id === d.id))];
 }
 

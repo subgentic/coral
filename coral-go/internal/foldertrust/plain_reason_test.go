@@ -28,7 +28,7 @@ func TestPlainReasonNamesTheKindOfRefusalAndOnlyThat(t *testing.T) {
 	}{
 		"the home folder":            {home, plainHome},
 		"a hidden folder":            {filepath.Join(home, ".hidden", "x"), plainHome},
-		"a direct child of home":     {filepath.Join(home, "work"), plainHome},
+		"a direct child of home":     {filepath.Join(home, "work"), plainDirect},
 		"a folder that is not there": {filepath.Join(home, "work", "gone"), plainFind},
 		"a relative path":            {"work/proj", plainFind},
 	} {
