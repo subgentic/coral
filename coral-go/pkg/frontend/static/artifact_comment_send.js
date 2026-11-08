@@ -3,6 +3,8 @@
  * Local only: it is never offered through Coral Hub. An agent that is asleep or not running cannot be picked (the server refuses it too); one already asked into this thread says so; the agent's reply is a reply in the thread. */
 
 export const MAX_AGENTS = 10;
+/** The most characters of a comment an agent is sent (the computer's own cap, sendCommentCap): the owner reads all of it, the agent the first this many (#14549). */
+export const SEND_COMMENT_CAP = 700;
 
 // What the server's answer for one agent says to the person.
 const RESULT_WORDS = {
@@ -66,6 +68,7 @@ export function buildSendBlock(x) {
     box.setAttribute('aria-labelledby', title.id);
     box.append(title);
     box.append(el('p', 'ac-ask-note', x.note || 'Each agent you pick gets this comment as a message. They answer in this thread.'));
+    if (x.long) box.append(el('p', 'ac-ask-note ac-ask-long', `Only the first ${SEND_COMMENT_CAP} characters are sent to the agent.`));
     if (x.agents === null) { box.append(el('p', 'ac-ask-note', 'Looking for the agents on this board…')); }
     else if (x.agents === 'error') { box.append(el('p', 'ac-error', 'The agents of this board could not be read.')); }
     else if (!x.agents.length) { box.append(el('p', 'ac-ask-note', x.empty || 'No agent on this board can be asked.')); }

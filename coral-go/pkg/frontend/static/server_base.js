@@ -466,7 +466,7 @@ export function decisionNeedsPerson(server) {
 // Explicit account booleans override the existing boot choices independently.
 // Missing/malformed fields and failed reads retain boot behavior for older Hubs.
 // Startup bounds this shared cached read; the Hub still authorizes every write.
-let _needsNative = null, _goalPreview = null, _accountFlagsInit = null;
+let _needsNative = null, _goalPreview = null, _commentWrites = null, _commentSend = null, _accountFlagsInit = null;
 export function initCloudAccountFlags() {
     if (!isCloud()) return Promise.resolve();
     if (!_accountFlagsInit) _accountFlagsInit = (async () => {
@@ -478,9 +478,23 @@ export function initCloudAccountFlags() {
             ]);
             _needsNative = typeof account?.needs_native === 'boolean' ? account.needs_native : null;
             _goalPreview = typeof account?.goal_preview === 'boolean' ? account.goal_preview : null;
+            _commentWrites = typeof account?.comment_writes === 'boolean' ? account.comment_writes : null; // the Hub routes comment writes to the computer (#14549); absent: not offered, as before
+            _commentSend = typeof account?.comment_send === 'boolean' ? account.comment_send : null; // the Hub routes the lock and the send to an agent (#14549)
         } finally { clearTimeout(timer); }
     })();
     return _accountFlagsInit; // a late account answer cannot change routing after startup timed out
+}
+
+/** Whether the Hub says it routes a comment write (a comment, a reply, a resolve, the lock) to the computer for its owner (the account's comment_writes, #14549). Off when the account does not say so: the
+ *  drawer then offers reading only, as it always did. When on, the computer's own answer (can_comment, can, can_lock) says what this person may do; the shell no longer overrides it. */
+export function commentWritesOn() {
+    return isCloud() && _commentWrites === true;
+}
+
+/** Whether the Hub says it routes the lock and Send to agent to the computer for its owner (the account's comment_send, #14549). Only draws the two controls (Send to agent needs the lock's authority on
+ *  the computer's answer): the computer stays the authority and refuses a call it does not allow. Off when the account does not say so. */
+export function commentSendOn() {
+    return isCloud() && _commentSend === true;
 }
 
 /** The cloud account boolean selects preview-before-write, falling back to boot. Local writes stay unchanged. */

@@ -1,6 +1,6 @@
 /* The comments routes of an artifact (#5182), the only place the UI talks to /api/artifacts/{id}/comments, so the server's shape is read in one spot. Every call resolves the parsed answer or throws
  * an Error whose message is the server's reason (a 403 says why) and whose .status is the HTTP status (requestJson, request_json.js). `server` routes the call to a registered remote like the artifact itself. */
-import { serverUrl, isCloud } from './server_base.js';
+import { serverUrl, isCloud, commentWritesOn, commentSendOn } from './server_base.js';
 
 import { requestJson } from './request_json.js';
 
@@ -29,9 +29,10 @@ const boardQuery = (board) => (board ? `&board=${encodeURIComponent(board)}` : '
 export async function listComments(hex, server, board, series = false) {
     const d = await requestJson('GET', `${base(hex, server)}?state=all${boardQuery(board)}${series ? '&series=1' : ''}`);
     const you = d.you || {};
-    const out = { comments: (d.comments || []).map(normalizeComment), locked: !!d.locked, canComment: !!you.can_comment, canLock: !!you.can_lock, reason: you.reason || '', limits: d.limits || {} };
+    const out = { comments: (d.comments || []).map(normalizeComment), locked: !!d.locked, canComment: !!you.can_comment, canLock: !!you.can_lock, reason: you.reason || '', limits: d.limits || {}, lockScope: d.lock_scope || '', lockBoard: d.lock_board || '' };
     // Through Coral Hub the comments can be read and not written: writing, replying, resolving and the lock are not routed from there (pkg/tunnel/routes.go). Offering the controls would end in a refused request, so the panel says where to write instead (#6245).
-    if (isCloud()) {
+    if (isCloud() && commentWritesOn() && !commentSendOn()) out.canLock = false; // writes are routed, the lock and the send to an agent are not said to be: not drawn (#14549)
+    if (isCloud() && !commentWritesOn()) { // the Hub does not say it routes writes: read only, as before. When it does, the computer's own answer (can_comment, can, can_lock) is used as it is (#14549)
         out.canComment = false; out.canLock = false; out.reason = 'Comments can be added on the computer itself.';
         for (const c of out.comments) c.can = { reply: false, edit: false, delete: false, resolve: false };
     }
@@ -78,4 +79,10 @@ export async function sendComment(hex, server, id, agents) {
     try { data = await resp.json(); } catch { /* an answer that is not JSON has no results */ }
     const results = Array.isArray(data.results) ? data.results.map(r => ({ agent: String(r.agent || ''), state: String(r.state || ''), reason: String(r.reason || '') })) : [];
     return { ok: resp.ok && !!data.ok, status: resp.status, results, error: typeof data.error === 'string' ? data.error : (resp.ok ? '' : `HTTP ${resp.status}`) };
+}
+
+/** What the drawer says of a lock (#14549): a lock that covers a whole board says so (every file of the board), one on this file says that; the owner is told they can unlock it, anyone else that it is read only. */
+export function lockedWords(d, subject) {
+    if (d.lockScope === 'board') return `Comments are locked on every file of ${d.lockBoard || 'this board'}: read only. It is a board-wide lock, so it is changed on the computer itself, not from one file.`;
+    return d.canLock ? `Comments are locked: nobody can add comments to this ${subject}. You can unlock it any time.` : 'Comments are locked: read only.';
 }

@@ -293,6 +293,24 @@ func (s *SessionStore) ArtifactCommentsLocked(ctx context.Context, artifactID, b
 	return n > 0, err
 }
 
+// ArtifactCommentsLockScope says what holds the lock of ArtifactCommentsLocked: "artifact" when this artifact is locked itself, else "board" when the board it is commented on is (board may be ""),
+// else "". The drawer says which in plain words (#14549).
+func (s *SessionStore) ArtifactCommentsLockScope(ctx context.Context, artifactID, board string) (string, error) {
+	var scopes []string
+	err := s.reader().SelectContext(ctx, &scopes, "SELECT scope FROM artifact_comment_locks WHERE (scope = 'artifact' AND key = ?) OR (scope = 'board' AND key = ? AND ? <> '')", artifactID, board, board)
+	if err != nil {
+		return "", err
+	}
+	scope := ""
+	for _, sc := range scopes {
+		if sc == "artifact" {
+			return "artifact", nil
+		}
+		scope = sc
+	}
+	return scope, nil
+}
+
 // CountArtifactCommentsBy is how many comments one author identity (issuer, subject) wrote since a time, on any artifact: Coral's own ceiling for a guide, whatever the Hub's rate caps say.
 func (s *SessionStore) CountArtifactCommentsBy(ctx context.Context, issuer, subject string, since time.Time) (int, error) {
 	var n int

@@ -31,8 +31,8 @@ type commentCaller struct {
 	Subject string
 	Name    string
 	Session string // an agent's session name
-	// ViaHub is the Coral Hub's owner (#7052): the owner kind and the owner's own identity, on the requests the tunnel table lists for the owner. What the table does not list (edit, delete, lock) is
-	// not offered in the answer to such a caller.
+	// ViaHub is the Coral Hub's owner (#7052): the owner kind and the owner's own identity, on the requests the tunnel table lists for the owner: a comment, a reply, a resolve, the owner's own edit
+	// and delete, and the lock (TestArtifactCommentsOwnerReadThroughTheHubIsExactlyWhatTheHubMayDo pins what the answer says). What the table does not list (the agent's reply) stays off.
 	ViaHub bool
 }
 

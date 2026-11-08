@@ -60,7 +60,7 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
     const redrawStatus = id => { const p = panel.querySelector(`.ac-card[data-id="${id}"] .ac-ask-status`); if (p) fillStatus(p, id); };
     function askBlock() {
         const k = st.ask;
-        return askUi.buildSendBlock({ id: k.id, board: st.board, agents: k.agents, empty: k.empty, picked: k.picked, asked: k.queue.length > 1 ? new Map() : askedNow(k.id), count: k.queue.length, results: k.results, busy: k.busy, error: k.error,
+        return askUi.buildSendBlock({ id: k.id, board: st.board, agents: k.agents, empty: k.empty, picked: k.picked, asked: k.queue.length > 1 ? new Map() : askedNow(k.id), count: k.queue.length, long: k.queue.some(q => String(q.body || '').length > askUi.SEND_COMMENT_CAP), results: k.results, busy: k.busy, error: k.error,
             onToggle: (role) => { if (k.picked.has(role)) k.picked.delete(role); else if (k.picked.size < askUi.MAX_AGENTS) k.picked.add(role); redrawAsk(role); },
             onCancel: () => { st.ask = null; render(); panel.querySelector(`.ac-card[data-id="${k.id}"] .ac-ask-open`)?.focus(); },
             onSend: () => sendAsk() });
