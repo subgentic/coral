@@ -461,7 +461,6 @@ export function reviewActions(row, inSaved = false) { // inSaved (#11641, #11799
         if (inSaved) menu.push({ label: 'Move to Needs you', title: 'Put it back in Needs you as it was', run: unsave });
         else if (!bookmark) menu.push({ label: 'Save for later', title: 'Keep it in Saved, out of Needs you; nobody is told', run: save });
     }
-    if (isPhoneLayout() && row.starred) menu.push({ label: 'Remove the star', title: 'Take the star off this file', run: b => { b.closest('tr')?.querySelector('.inbox-review-star')?.click(); } }); // the phone card's star is a quiet mark at its top line (#14683, the approved mock has the dots there); taking it off is here
     menu.push({ label: 'Copy version ID', title: 'The id of this version only', run: b => { const hex = row.id; return importOnce('./artifact_clipboard.js').then(m => m.copyArtifactId(hex)).catch(error => failed(b, error)); } });
     if (isRead(row) && !inSaved) { box.classList.add('inbox-review-actions-read'); menu.push({ label: 'Mark unread', title: 'Count it in Needs you again', run: unread }); }
     if (menu.length) { const more = moreMenu(menu, file); more.setAttribute('data-slot', 'dots'); box.append(more); }
@@ -1201,7 +1200,7 @@ export function needsListSpec() {
                 const cell = tr.querySelector('td[data-key="agent"]');
                 const star = starControl(s.review, { hex: s.review.hex, name: markHidden(s.review.name, { strict: true }), reviewPin: true, onChange: on => { const focused = document.activeElement === star; reviewStarChanged(s.review, on); needsOrder = null; needsState.shown = null; renderInboxNav(true); if (focused) requestAnimationFrame(() => (teamNeedsMount?.host || $('group-table-view'))?.querySelector(`tr[data-key="${CSS.escape(needsKey(s))}"] .inbox-review-star`)?.focus({ preventScroll: true })); } });
                 let anchor = null;
-                if (cell && star) { anchor = cell.querySelector('.inbox-review-item'); if (anchor) { anchor.classList.add('inbox-review-star-anchor'); star.classList.add('inbox-review-star'); anchor.append(star); } }
+                if (cell && star) { anchor = cell.querySelector('.inbox-review-item'); if (anchor) { anchor.classList.add('inbox-review-star-anchor'); star.classList.add('inbox-review-star'); anchor.append(star); } } // on a phone card the star is placed by CSS at the end of the button row (#14683: the dots are at the top right, as in the approved mock)
                 if (anchor && s.review.starred) {
                 const goalContext = s.review.goal_id ? `Goal #${s.review.goal_id} · ${markHidden(s.review.goal_title || '', { strict: true })}` : '';
                 const fullContext = [goalContext, reviewSourceLabel(s.review.team)].filter(Boolean).join(' · ');

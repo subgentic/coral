@@ -36,7 +36,7 @@ const { coralReady } = require('./helpers/wait');
             check(!!g.dots && g.dots.t < g.name.t && g.dots.r >= g.card.r - 12 && g.dots.t < g.approve.t - 30, `${at}the three dots are at the card's top right, not in the button row: ` + JSON.stringify([g.dots, g.card, g.approve && g.approve.t]));
             check(!!g.tags && g.tagsText === 'v3' && g.tags.t >= g.name.t - 4 && g.tags.b <= g.name.b + 6 && g.tags.l >= g.name.l, `${at}the version is a pill on the title's line, not in the time line: ` + JSON.stringify([g.tags, g.name, g.tagsText]));
             check(await ev(`(() => { const t = document.querySelector('#group-table-view tbody tr.dt-row .inbox-review-tags .inbox-review-version'); if (!t) return false; const cs = getComputedStyle(t); return parseFloat(cs.borderTopLeftRadius) >= 8 && cs.borderTopWidth === '1px'; })()`), `${at}the version has a pill's border and radius`);
-            check(!g.star || (g.star.b - g.star.t <= 30 && g.star.events === 'none' && Math.abs(g.star.t - g.from.t) <= 8), `${at}a starred card's star is a quiet mark on the top line, not a 44 px target: ` + JSON.stringify(g.star));
+            check(!g.star || (g.star.b - g.star.t >= 43.5 && g.star.r - g.star.l >= 43.5 && g.star.events !== 'none' && g.star.t >= g.approve.t - 4 && g.star.r <= g.card.r - 8), `${at}a starred card's star is a 44 px button at the end of the button row (the dots are at the top right): ` + JSON.stringify(g.star));
             check(g.timeText && !/v3/.test(g.timeText), `${at}the time line says the time only: ` + g.timeText);
             await shot('phone-card-mock-' + w);
 
