@@ -115,6 +115,12 @@ func dumpHealthBoard(t *testing.T, path string) []string {
 				if cols[i] == "created_at" {
 					continue
 				}
+				if tbl == "board_waits" && v != nil && (cols[i] == "resolved_at" || cols[i] == "expires_at" || cols[i] == "timeout_notified_at" || cols[i] == "question_kept_at") {
+					// the run's own wall clock: each side's run starts at its own moment, and on a slow runner (-race) they fall in different seconds (#14395). What the oracle compares is
+					// that the stamp is SET or not (a wait that expired against one that did not), never which second.
+					fmt.Fprintf(&b, " %s=<set>", cols[i])
+					continue
+				}
 				if bs, ok := v.([]byte); ok {
 					v = string(bs)
 				}
