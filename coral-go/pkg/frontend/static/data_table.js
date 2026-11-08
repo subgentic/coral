@@ -23,6 +23,35 @@ import { whenText, shortWhen } from './when_text.js';
 import { browserLocal } from './safe_storage.js';
 import { loadStyles } from './lazy_styles.js';
 
+let lastTap = { id: '', at: -1e9 }; // the last group-heading tap the pointer path handled (every table draws again after a toggle, so this outlives the table that heard it)
+
+// ── A group heading's controls: the button that opens and shuts its rows (a task's, #14441/#14483) and its Story control (#14444) ──
+// Taken from the DOCUMENT, not from a handler on the button or on one table: the page draws its table again while a finger is down (a poll, a read landing), and the new table (a new tbody and a new button) is what the finger is lifted over; the
+// browser then sends the click to the two elements' common parent, so no handler on either ever hears it. The press and the lift are matched by the control's id (the group's key and which control it is: data-group-key, data-group-control),
+// and the action that is current for that id (registered at every draw, by whichever table drew last) runs. The press state lives here, outside every table, so it outlives the table that saw the press. A lift over another group, or
+// after a drag past the tap distance, is not a tap; a click that follows a tap this path already took is not a second one; a keyboard press (a click with no pointer) is taken by the click path.
+const groupActions = new Map(); let pressedGroup = null; // `${groupKey}|${toggle|story}` -> the action of the control as it was last drawn
+const TAP_DISTANCE = 12;
+const controlOf = e => { const b = e.target && e.target.closest && e.target.closest('[data-group-control]'); return b && b.dataset.groupKey ? b : null; };
+const controlId = b => `${b.dataset.groupKey}|${b.dataset.groupControl}`;
+// Only the primary button (a left click, a touch, a pen tip) is a tap: a right or middle click did not press the button before and must not now (the browser sends those as contextmenu / auxclick, never click).
+const primary = e => e.button === 0 && e.isPrimary !== false;
+let rejectedAt = -1e9; // the last press that turned out NOT to be a tap (a drag past the distance, or a lift over another control): the click the browser may still send for it is not a toggle either
+document.addEventListener('pointerdown', e => { if (!primary(e)) { pressedGroup = null; return; } const b = controlOf(e); pressedGroup = b ? { id: controlId(b), x: e.clientX, y: e.clientY } : null; }, true);
+document.addEventListener('pointercancel', () => { if (pressedGroup) rejectedAt = performance.now(); pressedGroup = null; }, true);
+document.addEventListener('pointerup', e => {
+    const d = pressedGroup; pressedGroup = null;
+    if (!d || !primary(e)) return;
+    const b = controlOf(e), tap = !!b && controlId(b) === d.id && Math.hypot(e.clientX - d.x, e.clientY - d.y) <= TAP_DISTANCE;
+    if (!tap) { rejectedAt = e.timeStamp; return; } // a drag or a lift elsewhere: nothing toggles, and a click that follows is swallowed below
+    const run = groupActions.get(d.id); if (run) { lastTap = { id: d.id, at: e.timeStamp }; run(); }
+}, true);
+document.addEventListener('click', e => {
+    const b = controlOf(e); if (!b) return;
+    if (e.detail > 0 && Math.abs(e.timeStamp - rejectedAt) < 600) { e.stopImmediatePropagation(); e.preventDefault(); return; } // the click of a gesture the pointer path refused (a drag released over the same button)
+    const id = controlId(b); if (e.detail > 0 && lastTap.id === id && e.timeStamp - lastTap.at < 600) return; // the pointer path already did this tap
+    const run = groupActions.get(id); if (run) run();
+}, true); // a keyboard press (detail 0), or a click the pointer path did not see
 export const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const button = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 
@@ -548,7 +577,7 @@ export function dataTable(cfg) {
         const cols = columns.length + (sel ? 1 : 0);
         let lastGroup = null, lastParent = null;
         const groupHead = g => { const gr = el('tr', g.level === 'task' ? 'dt-group dt-group-task' : 'dt-group'); gr.setAttribute('role', 'row'); const gh = el('th', null); gh.colSpan = cols; gh.scope = 'rowgroup'; gh.setAttribute('role', 'rowheader'); // a group with onToggle (a task's items, #14441) is one button that opens and shuts them
-            if (g.onToggle) { const b = el('button', 'dt-group-toggle'); b.type = 'button'; b.setAttribute('aria-expanded', String(g.open !== false)); const words = el('span', 'dt-group-words', g.label); b.append(words); if (g.chip) b.append(el('span', 'chip chip-tag dt-group-chip', g.chip)); b.addEventListener('click', g.onToggle); if (!g.onStory) gh.append(b); else { const sb = el('button', 'btn btn-small btn-quiet dt-group-story', 'Story'); sb.type = 'button'; sb.setAttribute('aria-pressed', String(!!g.storyOpen)); sb.setAttribute('aria-label', `Story of ${String(g.label).split('\n')[0]}`); sb.addEventListener('click', g.onStory); const bar = el('div', 'dt-group-pair'); bar.append(b, sb); gh.append(bar); } } else gh.textContent = g.label; // a heading with onStory has a second control, its own: the story of the task (#14444)
+            if (g.onToggle) { const b = el('button', 'dt-group-toggle'); b.type = 'button'; b.setAttribute('aria-expanded', String(g.open !== false)); const words = el('span', 'dt-group-words', g.label); b.append(words); if (g.chip) b.append(el('span', 'chip chip-tag dt-group-chip', g.chip)); b.dataset.groupKey = g.key; b.dataset.groupControl = 'toggle'; groupActions.set(`${g.key}|toggle`, g.onToggle); if (!g.onStory) gh.append(b); else { const sb = el('button', 'btn btn-small btn-quiet dt-group-story', 'Story'); sb.type = 'button'; sb.setAttribute('aria-pressed', String(!!g.storyOpen)); sb.setAttribute('aria-label', `Story of ${String(g.label).split('\n')[0]}`); sb.dataset.groupKey = g.key; sb.dataset.groupControl = 'story'; groupActions.set(`${g.key}|story`, g.onStory); const bar = el('div', 'dt-group-pair'); bar.append(b, sb); gh.append(bar); } } else gh.textContent = g.label; // a heading with onStory has a second control, its own: the story of the task (#14444)
             gr.append(gh); tbody.append(gr);
             if (g.story && g.storyOpen) { const sr = el('tr', 'dt-story-row'); sr.setAttribute('role', 'row'); const sc = el('td', null); sc.colSpan = cols; sc.setAttribute('role', 'cell'); sc.append(g.story()); sr.append(sc); tbody.append(sr); } }; // the story is a second row under the heading, above the items, only while it is on
         const mails = mailOn() ? list.map(r => cfg.mail(r)) : null, gap = !!mails && mails.some(m => m.actions && m.actions.length); // a list with a ⋯ on any row reserves its 44 px on every row, so the times line up (#137104)
