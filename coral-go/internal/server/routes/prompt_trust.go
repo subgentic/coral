@@ -151,7 +151,10 @@ func (h *SessionsHandler) trustVerdict(r *http.Request, sessionID string, s prom
 		return false, "Coral could not check this folder."
 	}
 	if _, err = foldertrust.Check(s.TrustFolder, home, foldertrust.Ticked); err != nil {
-		return false, "Coral does not trust this kind of folder from here (your home folder, a top folder or a hidden one)."
+		if why := foldertrust.PlainReason(err); why != "" {
+			return false, why
+		}
+		return false, "Coral could not confirm this folder is safe to trust from here."
 	}
 	return true, ""
 }

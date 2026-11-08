@@ -48,20 +48,42 @@ var (
 // maxConfigBytes caps what is read of an agent's settings file (Claude's .claude.json grows with its history).
 const maxConfigBytes = 8 << 20
 
+// Refusal is an error from Check that also carries one plain sentence a person can read (no path, no detail): what kind of folder was refused. PlainReason finds it.
+type Refusal struct{ msg, plain string }
+
+func (r *Refusal) Error() string { return r.msg }
+
+const (
+	plainFind   = "Coral could not find this folder on this computer."
+	plainHome   = "Coral does not trust your home folder, a folder that holds it, a top folder or a hidden one from here."
+	plainShared = "Coral does not trust a shared or shallow folder, or one that other people on this computer can write into, from here."
+)
+
+func refuse(plain, msg string) error { return &Refusal{msg: msg, plain: plain} }
+
+// PlainReason is the plain sentence for an error Check returned when it refused the folder itself, and "" for any other error (a missing home, a settings file): the caller then says nothing specific.
+func PlainReason(err error) string {
+	var r *Refusal
+	if errors.As(err, &r) {
+		return r.plain
+	}
+	return ""
+}
+
 // Check says whether path may be trusted for basis, and answers the resolved folder that would be.
 func Check(path, home string, basis Basis) (string, error) {
 	if path == "" || !filepath.IsAbs(path) || strings.ContainsAny(path, "\x00\n\r") {
-		return "", errors.New("the folder is not a plain absolute path")
+		return "", refuse(plainFind, "the folder is not a plain absolute path")
 	}
 	realPath, err := filepath.EvalSymlinks(filepath.Clean(path))
 	if err != nil {
-		return "", fmt.Errorf("the folder cannot be resolved: %w", err)
+		return "", refuse(plainFind, fmt.Sprintf("the folder cannot be resolved: %v", err))
 	}
 	if fi, err := os.Stat(realPath); err != nil || !fi.IsDir() {
-		return "", errors.New("the folder is not an existing folder")
+		return "", refuse(plainFind, "the folder is not an existing folder")
 	}
 	if realPath == filepath.Dir(realPath) {
-		return "", errors.New("a filesystem root is never trusted")
+		return "", refuse(plainHome, "a filesystem root is never trusted")
 	}
 	if home == "" {
 		return "", errors.New("the home folder is not known")
@@ -72,24 +94,24 @@ func Check(path, home string, basis Basis) (string, error) {
 	}
 	rel, err := filepath.Rel(realPath, realHome) // home inside or equal to path: path is home or a parent of it
 	if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return "", errors.New("the home folder, or a folder that holds it, is never trusted")
+		return "", refuse(plainHome, "the home folder, or a folder that holds it, is never trusted")
 	}
 	if inside, err := filepath.Rel(realHome, realPath); err == nil && inside != ".." && !strings.HasPrefix(inside, ".."+string(filepath.Separator)) {
 		parts := strings.Split(inside, string(filepath.Separator))
 		if strings.HasPrefix(parts[0], ".") {
-			return "", errors.New("a hidden folder under home (where agents keep their settings and logins) is never trusted")
+			return "", refuse(plainHome, "a hidden folder under home (where agents keep their settings and logins) is never trusted")
 		}
 		if len(parts) == 1 && basis != Made {
-			return "", errors.New("a direct child of the home folder would trust every repository the person puts under it")
+			return "", refuse(plainHome, "a direct child of the home folder would trust every repository the person puts under it")
 		}
 	} else {
 		// Outside home: the folder may be one other people on the computer can write into. A shared root (/tmp, /Users/Shared), a shallow folder (/srv/x, /Volumes/Backup) and a folder that group or others can
 		// write are refused: whoever can write there can plant the settings, hooks and tools that trust would run with no card (Security's SHOULD on #11889).
 		if why := sharedOrShallow(realPath); why != "" {
-			return "", errors.New(why)
+			return "", refuse(plainShared, why)
 		}
 		if fi, err := os.Stat(realPath); err == nil && runtime.GOOS != "windows" && fi.Mode().Perm()&0o022 != 0 {
-			return "", errors.New("a folder outside home that group or others can write into is never trusted")
+			return "", refuse(plainShared, "a folder outside home that group or others can write into is never trusted")
 		}
 	}
 	switch basis {
