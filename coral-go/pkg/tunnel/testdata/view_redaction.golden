@@ -12,6 +12,7 @@ GET /api/artifacts/{hex64}/comments redact
 GET /api/artifacts/{hex64}/meta redact
 GET /api/artifacts/{hex64}/private redact
 GET /api/artifacts/{hex64}/readers redact
+GET /api/artifacts/{hex64}/thumbnail redact
 GET /api/artifacts/{hex64}/versions redact
 GET /api/automations/runs redact
 GET /api/board/projects redact

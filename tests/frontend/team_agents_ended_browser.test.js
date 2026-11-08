@@ -2,7 +2,7 @@
 // live terminal "Ended" (row and chip) and says why its count differs from the sidebar's: "4 agents, 2 ended". The board's /status answer is stubbed with a free, a waiting, a queued and two ended agents. 1280 and 390 px.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { install: installTP, seed, openTeam } = require('./helpers/team_page');
+const { install: installTP, seed, openTeam, liveWaiting } = require('./helpers/team_page');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
 const { axName } = require('./helpers/ax_tree');
@@ -17,7 +17,7 @@ const TEAM = `qa-ended-${Date.now() % 100000}`;
             const tag = `${w} px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
-            await seed(ev, TEAM);
+            await seed(ev, TEAM); await liveWaiting(ev); // the status below says one agent needs input: a live row agrees (#14437)
             await ev(`(() => { const R = window.fetch.bind(window); window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
                 if (url.pathname === '/api/board/${TEAM}/status') { const a = (name, availability, reason) => ({ name, subscriber_id: name, agent_type: 'claude', availability, available: availability === 'available', reason, tasks: [] });
                     const agents = [a('Free One', 'available', 'Idle'), a('Asker', 'needs_input', 'Waiting for user input or approval'), a('Gone One', 'offline', 'No live terminal session'), a('Gone Two', 'offline', 'No live terminal session'), a('Queued One', 'queued', 'Has ready assigned work')];

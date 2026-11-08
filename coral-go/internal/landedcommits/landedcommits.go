@@ -98,18 +98,33 @@ func DefaultBranch(ctx context.Context, root string) string {
 	return ""
 }
 
+// branchRef is the ref whose history is the branch's: the local branch, else origin's; and when origin's is further along (it contains the local one and is not the same), origin's. The shared checkout's own branch
+// is parked on an old commit when work lands on origin and nothing ever pulls it, and its history would say nothing landed (#14095). A local branch with a commit origin lacks is read as it is.
+func branchRef(ctx context.Context, root, branch string) string {
+	local, remote := "refs/heads/"+branch, "refs/remotes/origin/"+branch
+	hasLocal, hasRemote := refExists(ctx, root, local), refExists(ctx, root, remote)
+	switch {
+	case !hasLocal:
+		return remote
+	case !hasRemote:
+		return local
+	}
+	// the local branch is an ancestor of origin's (equal, or behind it): origin's is the branch as landed
+	if gitutil.Command(ctx, root, "merge-base", "--is-ancestor", local, remote).Run() == nil {
+		return remote
+	}
+	return local
+}
+
 // Read is the non-merge commits of branch committed in [since, until) (git's own --until includes its end, so the end is dropped here), newest first, at most MaxCommits; capped says there were more. The
-// local branch is read, else origin's.
+// local branch is read, else origin's, and origin's when it is further along (branchRef).
 func Read(ctx context.Context, root, branch string, since, until time.Time) (commits []Commit, capped bool, err error) {
 	if !validBranch(branch) {
 		return nil, false, errBadBranch
 	}
-	ref := "refs/heads/" + branch
-	if !refExists(ctx, root, ref) {
-		ref = "refs/remotes/origin/" + branch
-	}
 	ctx, cancel := context.WithTimeout(ctx, readTimeout)
 	defer cancel()
+	ref := branchRef(ctx, root, branch)
 	out, err := gitutil.Command(ctx, root, logArgs(ref, since, until)...).Output()
 	if err != nil {
 		return nil, false, err

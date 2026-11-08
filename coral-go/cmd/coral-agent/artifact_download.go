@@ -27,7 +27,52 @@ import (
 // linkVersion is the query of a versioned artifact link (/api/artifacts/<digest>?v=2).
 var linkVersion = regexp.MustCompile(`^v=[0-9]+$`)
 
+// fileRef is a file id (32 hex), alone or with @<version>, bare or as a coral://artifacts/ link (#14145).
+var fileRef = regexp.MustCompile(`^(?:coral://artifacts/)?(?:series/)?([0-9a-f]{32})(?:@([1-9][0-9]{0,2}))?$`)
+
+// resolveFileRef turns a file id into the digest of the version it names: the newest version this agent may read, or exactly @<n>. The server decides what is readable (the versions route lists only those); the
+// digest the download then fetches is still checked against its bytes (#14145).
+func resolveFileRef(base, id, ver string) (string, error) {
+	client := &http.Client{Timeout: clierr.Timeout(30 * time.Second), CheckRedirect: func(*http.Request, []*http.Request) error { return fmt.Errorf("artifact redirects are not supported") }}
+	resp, err := client.Get(strings.TrimRight(base, "/") + "/api/artifacts/series/" + id + "/versions")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		clierr.NoteStatus(resp.StatusCode)
+		return "", fmt.Errorf("Coral says: no file %s that this agent can read (HTTP %d)", id, resp.StatusCode)
+	}
+	var rows []struct {
+		Digest  string `json:"digest"`
+		Version int    `json:"version"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&rows); err != nil || len(rows) == 0 {
+		return "", fmt.Errorf("Coral says: file %s has no versions this agent can read", id)
+	}
+	pick := rows[len(rows)-1]
+	if ver != "" {
+		found := false
+		for _, r := range rows {
+			if fmt.Sprint(r.Version) == ver {
+				pick, found = r, true
+			}
+		}
+		if !found {
+			return "", fmt.Errorf("Coral says: file %s has no version %s that this agent can read", id, ver)
+		}
+	}
+	if len(pick.Digest) != 64 {
+		return "", fmt.Errorf("Coral sent no digest for file %s", id)
+	}
+	fmt.Fprintf(os.Stderr, "file %s version %d is coral://artifacts/%s\n", id, pick.Version, pick.Digest)
+	return pick.Digest, nil
+}
+
 func artifactDigest(base, ref string) (string, error) {
+	if m := fileRef.FindStringSubmatch(strings.TrimSpace(ref)); m != nil {
+		return resolveFileRef(base, m[1], m[2])
+	}
 	id := strings.TrimPrefix(ref, "coral://artifacts/")
 	if strings.HasPrefix(ref, "/api/artifacts/") {
 		id = strings.TrimPrefix(ref, "/api/artifacts/")
@@ -44,7 +89,7 @@ func artifactDigest(base, ref string) (string, error) {
 		id = strings.TrimPrefix(u.Path, "/api/artifacts/")
 	}
 	if len(id) != 64 {
-		return "", usageError{"expected coral://artifacts/<SHA-256>, /api/artifacts/<SHA-256>, or a SHA-256 digest"}
+		return "", usageError{"expected coral://artifacts/<SHA-256>, /api/artifacts/<SHA-256>, a SHA-256 digest, or a file id (32 hex, optionally @version)"}
 	}
 	if _, err := hex.DecodeString(id); err != nil {
 		return "", usageError{"invalid artifact SHA-256"}

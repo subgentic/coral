@@ -18,6 +18,7 @@ const { coralReady } = require('./helpers/wait');
         window.fetch = (u, o) => { const url = new URL(String(u), location.origin), m = /^\\/api\\/artifacts\\/([0-9a-f]{64})\\/versions$/.exec(url.pathname);
             if (m) { const board = url.searchParams.get('board') || ''; window.__vreads.push(board);
                 const json = (b, status) => Promise.resolve(new Response(JSON.stringify(b), { status: status || 200, headers: { 'Content-Type': 'application/json' } }));
+                if (board && window.__older) return json({ error: 'path not allowed', code: 'path_not_allowed' }, 403); // a computer on v2.0.58 behind a Hub: its versions route takes no query (#14317)
                 if (board === 'alpha') return json(rowsFor('QA Engineer'));
                 if (board === 'beta') return json(rowsFor('Backend Dev', true));
                 if (board === 'solo') return json(rowsFor('Docs Writer'));
@@ -90,6 +91,20 @@ const { coralReady } = require('./helpers/wait');
             check((await ev(vis('#artifact-viewer .av-bar'))) && !(await ev(vis('#artifact-viewer .av-note'))), at + 'an older 409 does not remove the newer file\'s bar or add a note');
             await ev(`window.__hold = false; window.__release = null; globalThis.__coralVersionsPollMs = 8000; true`);
             await closeV();
+            // 9) an older computer refuses ?board= (#14317, Security's INFO 4): no bar, no guess at a series from the plain route, no error toast, one refused read and then none; a direct link with no team is read as before
+            await ev(`window.__older = true; window.__ambiguous = false; window.__vreads = []; true`);
+            await openV({ board: 'alpha' });
+            check(!(await ev(vis('#artifact-viewer .av-bar'))), at + 'an older computer that refuses ?board= gets no version bar (a hidden bar is honest; the plain route would guess a series)');
+            check(!(await ev(`[...document.querySelectorAll('.toast, [role=alert]')].some(e => e.getClientRects().length && /version|team|ambig|403|path/i.test(e.textContent))`)), at + 'and shows no error toast');
+            check(JSON.stringify(await ev(`window.__vreads`)) === JSON.stringify(['alpha']), at + 'one read, the refused one, no plain second read: ' + JSON.stringify(await ev(`window.__vreads`)));
+            await closeV();
+            await openV({ board: 'alpha' });
+            check(JSON.stringify(await ev(`window.__vreads`)) === JSON.stringify(['alpha']) && !(await ev(vis('#artifact-viewer .av-bar'))), at + 'the next file from that computer sends no read at all: ' + JSON.stringify(await ev(`window.__vreads`)));
+            await closeV();
+            await openV({});
+            check(await ev(vis('#artifact-viewer .av-bar')), at + 'a direct link with no team carries no newer key and still shows its bar');
+            await closeV();
+            await ev(`window.__older = false; true`);
         }
     } finally { await client.close(); }
     if (failures.length) { console.error('FAIL\n  ' + failures.join('\n  ')); process.exit(1); }

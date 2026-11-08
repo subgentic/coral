@@ -15,11 +15,14 @@ GET /api/artifacts/{id}/comments view owner-only
 GET /api/artifacts/{id}/meta view owner-only
 GET /api/artifacts/{id}/private view owner-only
 GET /api/artifacts/{id}/readers view owner-only
+GET /api/artifacts/{id}/thumbnail view owner-only
 GET /api/artifacts/{id}/versions view owner-only
 GET /api/board/{project}/artifacts view owner-only
 GET /api/board/{project}/artifacts/{digest}/edit view owner-only
 GET /api/board/{project}/artifacts/{digest}/edit/send view owner-only
 GET /api/board/{project}/cross-team/settings view owner-only-hub
+GET /api/board/{project}/goals view owner-sees
+GET /api/board/{project}/goals/{goalID} view owner-sees
 GET /api/board/{project}/guide-roster launch owner-only
 GET /api/board/{project}/lifecycle-log launch owner-only
 GET /api/board/{project}/orchestrator-grant launch owner-only
@@ -28,6 +31,7 @@ GET /api/board/{project}/settings view owner-sees
 GET /api/board/{project}/tasks/{taskID}/artifact-content view owner-only
 GET /api/chief view owner-only
 GET /api/custom-models view owner-only
+GET /api/goals view owner-sees
 GET /api/launch-disclosure view owner-only
 GET /api/needs-you view owner-only
 GET /api/operator-asks view owner-only

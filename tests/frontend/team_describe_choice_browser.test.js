@@ -11,12 +11,12 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await require('./helpers/new_team').stubFolders(ev); // the made-up wizard folder exists: Next checks it first (#14437, acfb782ec)
         await coralReady('startup', 'liveList', 'settings');
         const vis = sel => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); return !!e && e.checkVisibility({ checkVisibilityCSS: true }); })()`;
         await ev(`(async () => { await window.showLaunchModal(); window._selectLaunchType('team'); return true; })()`);
         await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none'`, 'the team step', 8000);
-        await ev(`{ const n = document.getElementById('team-board-name'); n.value = 'describe-x'; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = '/work/x'; d.dispatchEvent(new Event('input', { bubbles: true })); } document.getElementById('launch-team-next').click(); true`);
+        await ev(`{ const n = document.getElementById('team-board-name'); n.value = 'describe-x'; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = '/work/repo'; d.dispatchEvent(new Event('input', { bubbles: true })); } document.getElementById('launch-team-next').click(); true`);
         await waitFor(vis('#team-template-select'), 'the Members step', 8000);
         const choice = await ev(`(() => { const b = [...document.querySelectorAll('#team-panel-members .team-template-row button')].find(x => /^Describe your team$/.test(x.textContent.trim())); const menu = document.getElementById('team-template-menu');
             return { shown: !!b && b.checkVisibility({ checkVisibilityCSS: true }), inMore: !!b && !!b.closest('#team-template-menu'), moreItems: [...menu.querySelectorAll('button')].map(x => x.textContent.trim()) }; })()`);

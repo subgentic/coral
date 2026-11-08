@@ -36,6 +36,9 @@ const heavyMiniAlias = "coral-heavy-mini"
 // heavyOnMini says whether a pool grant is the mini (by the member's name or its machine).
 func heavyOnMini(member, machine string) bool { return heavy.OnMini(member, machine) }
 
+// heavyOnThisMac says whether a granted slot is on the machine this command runs on: its machine is the Mac. Only this runs a command here; anything else that is not the mini is refused (#14262).
+func heavyOnThisMac(machine string) bool { return strings.EqualFold(strings.TrimSpace(machine), "mac") }
+
 var heavyWord = regexp.MustCompile(`^[A-Za-z0-9_./:=@%+,-]+$`)
 
 // heavyCommand is the shell line to run: one argument is a shell line as it is; several are joined, each quoted when it needs it.
@@ -120,18 +123,43 @@ func cmdHeavy() {
 		case <-time.After(resourcePoll):
 		}
 	}
-	where := res.Entry.Machine
+	// Where the slot is, from the claim's own answer; a plain slot resource (not a pool member) says no machine there on an older server, so the resource is asked what machine it is (#14262)
+	machine := res.Entry.Machine
+	if machine == "" && res.Entry.Member == "" {
+		var rv struct {
+			Machine string `json:"machine"`
+		}
+		if data, status, err := resourceCall("GET", "/"+*pool, nil); err == nil && status == http.StatusOK && json.Unmarshal(data, &rv) == nil {
+			machine = rv.Machine
+		}
+	}
+	where := machine
 	if where == "" {
 		where = res.Entry.Member
 	}
-	mini := heavyOnMini(res.Entry.Member, res.Entry.Machine)
+	mini := heavyOnMini(res.Entry.Member, machine)
+	// Never run on this Mac under a claim for another machine (#14262: a run for the mini printed "running on " with no destination and ran here). A destination that is not known, or is neither the mini nor this Mac, runs nothing.
+	if !mini && !heavyOnThisMac(machine) {
+		release()
+		if strings.TrimSpace(where) == "" {
+			fmt.Printf("[heavy] %s: could not tell which machine this slot is on, so nothing was run (a heavy run never falls back to this Mac). Define the resource with a machine (coral-board resource define %s ... --machine <name>) or ask the Orchestrator.\n", plainText(*pool), plainText(*pool))
+		} else {
+			fmt.Printf("[heavy] %s is on %s, and heavy run drives only the Mac and the mini: nothing was run. Run it there yourself over ssh under coral-board resource claim %s.\n", plainText(*pool), plainText(where), plainText(*pool))
+		}
+		exitFn(1)
+		return
+	}
 	if mini && heavyMacOnly.MatchString(command) {
 		release()
 		fmt.Printf("[heavy] the pool gave you %s, and this command is for the Mac only (it names ~/.coral or port 8420): run it with coral-board resource claim mac-heavy.\n", plainText(where))
 		exitFn(2)
 		return
 	}
-	fmt.Printf("[heavy] %s: running on %s\n", *pool, plainText(where))
+	how := "on this Mac"
+	if mini {
+		how = "over ssh"
+	}
+	fmt.Printf("[heavy] %s: running on %s (%s)\n", *pool, plainText(where), how)
 	// the slot is a lease: a run longer than it renews it while it runs (or the next agent is given the machine under it), and a run that has lost the slot is stopped
 	runCtx, cancelRun := context.WithCancel(ctx)
 	defer cancelRun()

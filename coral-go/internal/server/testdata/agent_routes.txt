@@ -74,6 +74,7 @@ a GET /api/artifacts/{id}
 a GET /api/artifacts/{id}/comments
 a GET /api/artifacts/{id}/meta
 b GET /api/artifacts/{id}/private
+b GET /api/artifacts/{id}/thumbnail
 a GET /api/artifacts/{id}/versions
 b GET /api/artifacts/{id}/readers
 b GET /api/auth/hub-origins
@@ -136,6 +137,7 @@ b GET /api/cloud/owner-label
 c GET /api/cloud/status
 b GET /api/custom-models
 c GET /api/filesystem/is-git
+b GET /api/filesystem/trust-probe
 c GET /api/filesystem/list
 c GET /api/folder-tags
 c GET /api/folder-tags/{folderName}

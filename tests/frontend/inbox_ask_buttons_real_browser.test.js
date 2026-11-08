@@ -215,11 +215,13 @@ async function httpJson(method, path, body, headers = {}) {
             assert.ok(await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-offer button')].every(b => b.getBoundingClientRect().height >= 44) && document.documentElement.scrollWidth <= innerWidth`), at + 'targets of 44 px, no sideways scroll');
 
             if (w === 1280) {
-                await waitFor(`import(${S} + 'state.js').then(m => (m.state.liveSessions || []).some(s => s.session_id === ${JSON.stringify(standIn.sid)}))`, at + 'the agent is in the page\'s live list', 8000).catch(() => {}); // best effort: either way the wake cannot run (the agent is not asleep, or the page has not heard of it yet) and must be given back
+                await waitFor(`import(${S} + 'state.js').then(m => (m.state.liveSessions || []).some(s => s.session_id === ${JSON.stringify(standIn.sid)}))`, at + 'the agent is in the page\'s live list', 8000).catch(() => {}); // best effort: either way the wake cannot run (the agent is not asleep, or the page has not heard of it and the server says it is running, #14420 yet) and must be given back
                 // Wake an agent that is not asleep: it fails in words and the button is given back (the question stays, all three buttons still there)
+                // The harness answers the page's /api/sessions/live from its mocked agents, so the page cannot see the real stand-in there. "Wake it" asks the SERVER's own list before it would resume anything (#14420: a session that is running is never resumed): that one read goes to the real server (XMLHttpRequest, which the harness does not stub).
+                await ev(`(() => { const f = window.fetch; window.fetch = function (u, o) { if (/^\\/api\\/sessions\\/live(\\?.*)?$/.test(String(u)) && ((o && o.method) || 'GET').toUpperCase() === 'GET') return new Promise((res, rej) => { const x = new XMLHttpRequest(); x.open('GET', String(u)); x.onload = () => res(new Response(x.responseText, { status: x.status, headers: { 'content-type': 'application/json' } })); x.onerror = () => rej(new TypeError('network')); x.send(); }); return f.apply(this, arguments); }; return true; })()`);
                 await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-offer button')].find(b => b.textContent === 'Wake it').click(); true`);
                 await waitFor(`!document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the dialog closes on a click', 6000);
-                await waitFor(`/not asleep|not running on this computer/.test([...document.querySelectorAll('.toast')].map(t => t.textContent).join(' '))`, at + 'it says why: ' + await toast(), 8000);
+                await waitFor(`/ is running|not asleep|not running on this computer/.test([...document.querySelectorAll('.toast')].map(t => t.textContent).join(' '))`, at + 'it says why: ' + await toast(), 8000);
                 asks = await mine();
                 const again = asks.find(a => a.id === q1);
                 assert.ok(again && again.buttons.every(b => b.state === 'pending'), at + 'the failed wake was given back: ' + JSON.stringify(again));

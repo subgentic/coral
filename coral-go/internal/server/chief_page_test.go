@@ -63,6 +63,7 @@ func TestChiefPageServesOnlyTheRecordedAgentWhileTheSettingIsOn(t *testing.T) {
 	code, body := get()
 	assert.Equal(t, http.StatusOK, code)
 	assert.NotContains(t, body, `data-target-session-id="`+chiefSID, "nothing recorded: no agent is shown")
+	assert.Contains(t, body, `>Back to Coral</a>`, "an unconfigured Chief page still has a way back")
 	assert.Contains(t, body, "Chief is not set up", "it says so, with no data")
 
 	// An agent that made a team named chief is not Chief: only the recorded session is.

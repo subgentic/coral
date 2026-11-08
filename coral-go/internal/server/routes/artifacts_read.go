@@ -117,6 +117,7 @@ func (h *SessionsHandler) getAgentArtifactMeta(w http.ResponseWriter, r *http.Re
 		if sid, n, in := callerSeries(r, h.cfg.CoralDir(), id); in { // the caller's own team's series: another team's id and counts never reach it (#13949)
 			ms := seriesMembers(h.cfg.CoralDir(), sid)
 			out["series_id"], out["version"], out["versions"], out["is_latest"] = sid, n, len(ms), len(ms) > 0 && ms[len(ms)-1].Digest == id
+			out["file_id"], out["version_line"] = sid, versionLine(n, meta.Name, sid) // #14145: the same words everywhere
 		}
 	}
 	if _, isAgent := agentSessionOf(r); !isAgent && !isGuideCaller(r) { // the owner only: a delete by digest removes the one object every team shares, and the confirmation says how many others hold it (Security, #13949)

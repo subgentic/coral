@@ -39,7 +39,7 @@
 .inbox-ask-pics .ac-add-image { width: 44px; min-height: 44px; padding: 0; }
 
 /* #13583: quick choices follow the question; the reply keeps the freed lines and grows with input. */
-.inbox-ask-dialog .inbox-ask-box { min-height: 9em; }
+.inbox-ask-dialog .inbox-ask-box { height: min(9em, 40dvh); min-height: min(9em, 40dvh); max-height: 40dvh; resize: none; overflow-y: auto; } /* a fixed box that scrolls inside (#14153): a box that grew as you typed pushed Send reply down from under the pointer */
 .inbox-ask-reading .inbox-ask-offers { margin-top: 16px; }
 
 /* Binary decisions sit below the draft, directly beside Send reply. */
@@ -49,3 +49,7 @@
 .inbox-ask-yes-no .inbox-ask-offer { flex: none; width: 44px; min-width: 44px; }
 .inbox-ask-yes-no .inbox-ask-offer .btn { width: 44px; min-width: 44px; min-height: 44px; padding: 0; }
 .inbox-ask-sendrow:has(.inbox-ask-yes-no) .inbox-ask-send { margin-left: 0; min-height: 44px; }
+
+/* "#8" in a question: a link-looking button that opens that message (#14153); inline, the text's own size, 44 px high on a phone through its padding. */
+.inbox-ask-text .msg-ref { display: inline; padding: 0; min-height: 0; border: 0; background: none; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
+@media (max-width: 768px) { .inbox-ask-text .msg-ref { padding: 10px 4px; margin: -10px -2px; } }

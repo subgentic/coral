@@ -169,6 +169,11 @@ export function toggleAgentSleep(name, agentType, sessionId, action) {
                 if (sleeping && action === 'sleep') s.sleep_reason = null; // a terminal-gone agent put to sleep is plain sleeping now (#13171)
             }
             redrawLiveList();
+            // The chat open on this agent follows now, not on a later feed tick that may not come: a Wake from the panel left "asleep" and its Wake in the chat until it was pressed there (#14323). The same as archive below.
+            const cur = state.currentSession;
+            if (cur && cur.type === 'live' && cur.session_id === sessionId && sessionServer(cur) === server && !!cur.sleeping !== sleeping) {
+                await window.selectLiveSession(cur.name, cur.agent_type, cur.session_id, server);
+            }
             const who = (s && s.display_name) || name; // the agent's name, not its folder ("home")
             showToast(sleeping ? `"${who}" is now sleeping` : `"${who}" is awake`);
             return true;

@@ -58,11 +58,13 @@ type claudeTurnCache struct {
 	transcriptReadState
 	event   string
 	at      time.Time
-	version string         // the newest line's "version": the running Claude Code's own (#3573)
-	model   string         // the newest assistant entry's model (#4065)
-	effort  string         // the newest assistant entry's effort: the thinking level that turn ran at (#4969)
-	turnAt  time.Time      // when that assistant entry was written (#6225)
-	apiErr  ClaudeAPIError // the latest message, when it is an API error (#3830)
+	version string    // the newest line's "version": the running Claude Code's own (#3573)
+	model   string    // the newest assistant entry's model (#4065)
+	effort  string    // the newest assistant entry's effort: the thinking level that turn ran at (#4969)
+	turnAt  time.Time // when that assistant entry was written (#6225)
+	// assistantAt is when the newest assistant entry of the MAIN thread was written: a subagent's (isSidechain), a tool result's carrier (a user entry) and Claude Code's own <synthetic> entries never count (#14345)
+	assistantAt time.Time
+	apiErr      ClaudeAPIError // the latest message, when it is an API error (#3830)
 }
 
 // piTurnCache is what the Pi turn reader holds of a Pi session file (#11091): the newest turn event (a turn going on is "prompt_submit", its end "stop"), the model and thinking level the chips show,

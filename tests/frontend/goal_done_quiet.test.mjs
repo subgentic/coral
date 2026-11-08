@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
-const { doneGoals, quietMs, quietEndsAt, nextQuietEnd } = await import(pathToFileURL(path.resolve(here, '../../coral-go/pkg/frontend/static/goal_done.js')).href);
+const { doneGoals, quietMs, quietEndsAt, nextQuietEnd, isGoalDoneRead } = await import(pathToFileURL(path.resolve(here, '../../coral-go/pkg/frontend/static/goal_done.js')).href);
 
 const MIN = 60000, now = Date.parse('2026-11-02T12:00:00Z');
 const at = minutesAgo => new Date(now - minutesAgo * MIN).toISOString();
@@ -37,3 +37,22 @@ assert.equal(nextQuietEnd([goal(1, 10), goal(2, 3), goal(3, 40)], team, {}, now)
 assert.equal(nextQuietEnd([goal(3, 40)], team, {}, now), null, 'nothing waiting');
 assert.equal(nextQuietEnd([goal(1, 10, { rollup: { done: 1, active: 1, blocked: 0, queued: 0 } })], team, {}, now), null, 'a goal with an open task is not waiting for its period');
 console.log('goal_done_quiet: ok');
+
+// Remote projections belong to one source; Hub settings must not override them.
+const remote = goal(7, 20, { board_id: '@m2/team', updated_at: at(20) });
+const staleHub = { goal_done_hidden: '["@m2/team|7|*"]', goal_done_read: JSON.stringify([`@m2/team|7|2|${remote.updated_at}`]) };
+assert.equal(doneGoals([remote], g => g.board_id, staleHub, now).length, 1);
+assert.equal(isGoalDoneRead(remote.board_id, remote, staleHub), false);
+for (const hidden of ['dismissed', 'not_yet']) {
+    const hiddenRemote = { ...remote, done_state: { hidden } };
+    assert.equal(doneGoals([hiddenRemote], g => g.board_id, {}, now).length, 0);
+    assert.equal(nextQuietEnd([{ ...hiddenRemote, looks_done_at: at(1) }], g => g.board_id, {}, now), null);
+}
+assert.equal(isGoalDoneRead(remote.board_id, { ...remote, done_state: { read: true } }, {}), true);
+assert.equal(doneGoals([{ ...remote, board_id: '@m1/team' }, { ...remote, done_state: { hidden: 'dismissed' } }], g => g.board_id, {}, now).length, 1);
+assert.deepEqual(ids([goal(9,60,{moved_open:1})]),[],'old completed tasks cannot hide unfinished work moved to another goal');
+assert.equal(nextQuietEnd([goal(9,60,{moved_open:1})],team,{},now),null,'no timer can promote a goal while moved work is unfinished');
+assert.equal(quietEndsAt(goal(9,15,{updated_at:'2000-01-01T00:00:00Z',moved_open:0}),{}),now,'the arrival time follows the completion candidate and quiet period, not the goal’s old edit time');
+
+const {toGoal}=await import(pathToFileURL(path.resolve(here,'../../coral-go/pkg/frontend/static/goals_adapter.js')).href);
+assert.deepEqual(ids([toGoal(goal(10,60,{moved_open:1}))]),[],'the goal detail adapter preserves the moved-work eligibility guard');

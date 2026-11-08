@@ -78,13 +78,13 @@ func TestReplyChecksItsArgumentsBeforeAnyRequest(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { hit = true }))
 	defer srv.Close()
 	for name, tc := range map[string]struct{ ref, id, text string }{
-		"not a digest":         {"coral://artifacts/nope", "7", "text"},
-		"a series link":        {"coral://artifacts/series/5e7d5e7d5e7d5e7d5e7d5e7d5e7d5e7d", "7", "text"},
-		"a non-number id":      {"coral://artifacts/" + replyDigest, "seven", "text"},
-		"a negative id":        {"coral://artifacts/" + replyDigest, "-1", "text"},
-		"a path in the id":     {"coral://artifacts/" + replyDigest, "7/../8", "text"},
-		"empty text":           {"coral://artifacts/" + replyDigest, "7", "   "},
-		"another server's url": {"https://elsewhere.example/api/artifacts/" + replyDigest, "7", "text"},
+		"not a digest":           {"coral://artifacts/nope", "7", "text"},
+		"a file id, bad version": {"coral://artifacts/5e7d5e7d5e7d5e7d5e7d5e7d5e7d5e7d@0", "7", "text"}, // a file id is now a link (#14145); its version must be a whole number from 1
+		"a non-number id":        {"coral://artifacts/" + replyDigest, "seven", "text"},
+		"a negative id":          {"coral://artifacts/" + replyDigest, "-1", "text"},
+		"a path in the id":       {"coral://artifacts/" + replyDigest, "7/../8", "text"},
+		"empty text":             {"coral://artifacts/" + replyDigest, "7", "   "},
+		"another server's url":   {"https://elsewhere.example/api/artifacts/" + replyDigest, "7", "text"},
 	} {
 		if err := replyToComment(srv.URL, tc.ref, tc.id, tc.text, io.Discard); err == nil {
 			t.Errorf("%s: want an error", name)

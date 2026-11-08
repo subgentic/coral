@@ -16,3 +16,17 @@ assert.equal(order(date, [{ id: 'iso', t: '2026-10-27T10:00:00Z' }, { id: 'empty
 assert.deepEqual(order({ sort: 'number', sortValue: r => r.t }, [{ id: 'b', t: 10 }, { id: 'a', t: 9 }, { id: 'c', t: '11' }]), ['a', 'b', 'c'], 'sort number: numbers and numeric strings by size');
 assert.deepEqual(order({ sortValue: r => r.t }, [{ id: 'b', t: 'Box 10' }, { id: 'a', t: 'box 9' }]), ['a', 'b'], 'text: natural order, case ignored');
 console.log('data_table_compare: ok (date sort takes numbers, ISO strings and empty values; number and text sorts)');
+
+const {dataTable}=await importUi('data_table');
+const {openMenu,closeMenus}=await importUi('menu_button');
+const make=label=>dataTable({label,rows:[],rowKey:r=>r.id,columns:[{key:'name',label:'Item',primary:true,cell:r=>r.name}]}).el;
+const first=make('First list'),second=make('Second list');document.body.append(first,second);
+const firstButton=first.querySelector('.cols-hidden-btn'),secondButton=second.querySelector('.cols-hidden-btn');
+const firstMenu=first.querySelector('.cols-hidden-menu'),secondMenu=second.querySelector('.cols-hidden-menu');
+// Open the second table's control through the same shared menu implementation as a click.
+openMenu(secondButton,{focusFirst:false});
+assert.equal(secondMenu.hidden,false,'the second control opens its own menu');
+assert.equal(firstMenu.hidden,true,'the first table is untouched');
+assert.notEqual(firstButton.getAttribute('aria-controls'),secondButton.getAttribute('aria-controls'),'both accessible menu relationships identify their own menu');
+closeMenus();first.remove();second.remove();
+console.log('data_table_hidden_menu: a second table opens only its own hidden-column menu');

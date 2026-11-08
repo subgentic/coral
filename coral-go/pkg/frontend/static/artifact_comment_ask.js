@@ -9,7 +9,7 @@ const askUi = await importOnce('./artifact_comment_send.js');
 const { agentLink } = await importOnce('./agent_link.js');
 
 /** The ask state and actions of one comments panel: `st` is the panel's state (`st.ask` is the open picker), the rest are its draw and announce hooks. */
-export function createAsk({ st, panel, render, announce, refresh, ownHex, uploaderHint }) {
+export function createAsk({ st, panel, render, announce, refresh, ownHex, uploaderHint, ago = () => '' }) {
     const askedBy = new Map(); // comment id -> Map(agent role, lowercase -> words): who was asked into a thread from this panel (the server refuses a second ask of an open one, and says so)
     const canAsk = (c) => !decisionNeedsPerson(st.server) && !!st.board && !!st.data?.canLock && !c.deleted && !c.resolved && c.parentId == null;
     /** Why Send to agent is not offered on this computer's file, when the reason is the missing Approve secret (#13230): `{ id, ssh }` for the computer, null when nothing is wrong. A person who comments on a file from a computer set up
@@ -33,12 +33,28 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
         for (const [role, words] of askedOf(id)) m.set(role, words);
         return m;
     }
-    /** The line under a comment that says whether an agent has it: at rest, and again as soon as a send answers (#12112: it kept saying "Not sent to an agent yet" beside "Asked just now"). */
-    const fillStatus = (p, id) => { // each name as written and a button to the agent's chat (#12168)
-        const asked = [...askedNow(id)]; p.replaceChildren();
-        if (!asked.length) { p.textContent = 'Not sent to an agent yet'; return; }
-        p.append('Sent to ');
-        asked.forEach(([role, words], i) => { if (i) p.append(', '); p.append(agentLink(names.get(role) || role, { board: boardTeamKey(st.server, st.board) }), ` (${words.replace(/^./, c => c.toLowerCase())})`); });
+    // The line's rows: each agent asked into the thread with where its ask stands. The server's list wins once it shows more than Sent (a read, a reply); this page's own newest words ('Asked just now') cover only the moment after a send, before the list has caught up.
+    function statusNow(id) {
+        const m = new Map();
+        const c = st.data && st.data.comments.find(x => x.id === id);
+        for (const k of (c && c.asks) || []) if (k.open && k.agent) { m.set(k.agent.toLowerCase(), { k, words: askUi.askedWords(k) }); names.set(k.agent.toLowerCase(), k.agent); }
+        for (const [role, words] of askedOf(id)) { const cur = m.get(role); if (!cur || askUi.askState(cur.k) === 'sent') m.set(role, { k: cur ? cur.k : null, words }); }
+        return m;
+    }
+    /** The line under a comment that says where an agent has it (#14129): Sent to A, then Read by A (with the time the server saw its own read call return the comment), then A replied; at rest, and again as soon as a send answers (#12112: it kept saying "Not sent to an agent yet" beside "Asked just now"). Each name as written, a button to the agent's chat (#12168). */
+    const fillStatus = (p, id) => {
+        const rows = [...statusNow(id)]; p.replaceChildren();
+        if (!rows.length) { p.textContent = 'Not sent to an agent yet'; return; }
+        rows.forEach(([role, s], i) => {
+            if (i) p.append('; ');
+            const link = agentLink(names.get(role) || role, { board: boardTeamKey(st.server, st.board) }), state = s.k ? askUi.askState(s.k) : 'sent';
+            if (state === 'replied') p.append(link, ` replied${s.k.replies > 1 ? ` (${s.k.replies} times)` : ''}`);
+            else if (state === 'read') {
+                p.append('Read by ', link);
+                if (s.k.readAt) { const t = document.createElement('span'); t.textContent = `, ${ago(s.k.readAt)}`; t.title = s.k.readAt; p.append(t); }
+            } else p.append('Sent to ', link, ` (${s.words.replace(/^./, c => c.toLowerCase())})`);
+            if (s.k && s.k.nudged && state !== 'sent') p.append(', reminded');
+        });
     };
     const statusWords = id => { const p = document.createElement('p'); fillStatus(p, id); return p.textContent; };
     const redrawStatus = id => { const p = panel.querySelector(`.ac-card[data-id="${id}"] .ac-ask-status`); if (p) fillStatus(p, id); };

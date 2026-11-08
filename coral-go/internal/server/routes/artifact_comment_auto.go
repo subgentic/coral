@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -103,11 +104,13 @@ func (h *SessionsHandler) deliverOperatorComment(r *http.Request, caller comment
 			continue
 		}
 		msg := sendMessage(title, "the owner", h.sendVersionLine(id, b), sendReplyCommand(id, rootID), text, snippet, names, commentPictureLinks(c.ImagesJSON)...)
-		if _, err := h.bs.PostDefusedMessage(ctx, b, board.OperatorName, msg); err != nil {
+		posted, err := h.bs.PostDefusedMessage(ctx, b, board.OperatorName, msg)
+		if err != nil {
 			slog.Warn("[artifact comments] message not posted", "board", b, "error", err)
 			reason = firstReason(reason, "failed")
 			continue
 		}
+		h.linkCommentMessage(ctx, b, posted, rootID, t.sessionID)
 		h.operatorPosted(b, msg)
 		sent = append(sent, title)
 		slog.Info("[artifact comments] the Operator's comment sent to an agent", "artifact", id, "comment", c.ID, "agent", title, "board", b)
@@ -119,6 +122,27 @@ func (h *SessionsHandler) deliverOperatorComment(r *http.Request, caller comment
 		h.boardHandler.notifyFn(b)
 	}
 	return autoDelivery{To: strings.Join(sent, ", ")}
+}
+
+// linkCommentMessage records that the board message posted delivered the thread's comment to the agent session: that agent's coral-board read of it is when it read the comment (#14130). A failure is logged
+// and the delivery stands.
+func (h *SessionsHandler) linkCommentMessage(ctx context.Context, project string, posted *board.Message, rootID int64, agentSession string) {
+	if posted == nil || h.ss == nil {
+		return
+	}
+	if err := h.ss.LinkCommentMessage(ctx, project, posted.ID, rootID, agentSession); err != nil {
+		slog.Warn("[artifact comments] read stamp link not recorded", "board", project, "error", err)
+	}
+}
+
+// StampCommentReads is what a member's coral-board read tells the comments (#14130): the board messages the session read, of which those that delivered a comment to THAT session stamp the thread's ask as read.
+func (h *SessionsHandler) StampCommentReads(ctx context.Context, project, readerSession string, messageIDs []int64) {
+	if h.ss == nil || readerSession == "" || len(messageIDs) == 0 {
+		return
+	}
+	if _, err := h.ss.MarkCommentMessagesRead(ctx, project, readerSession, messageIDs, time.Now()); err != nil {
+		slog.Warn("[artifact comments] read stamp not recorded", "board", project, "error", err)
+	}
 }
 
 func firstReason(have, next string) string {

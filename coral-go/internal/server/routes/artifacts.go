@@ -83,6 +83,7 @@ func (h *SessionsHandler) RegisterAgentArtifacts(r chi.Router) {
 	r.Get("/api/artifacts/series/{series_id}/versions", h.seriesVersions) // #6357
 	r.Delete("/api/artifacts/series/{series_id}", h.deleteSeries)         // #6357: the Operator's, every version
 	r.Get("/api/artifacts/{id}", h.getAgentArtifact)
+	r.Get("/api/artifacts/{id}/thumbnail", h.artifactThumbnail)
 	r.Get("/api/artifacts/{id}/meta", h.getAgentArtifactMeta) // metadata only: do you have it (#5465)
 	r.Get("/api/artifacts/{id}/versions", h.artifactVersions) // #6357: the list of its series, found from any version
 	r.Get("/api/artifacts/{id}/readers", h.artifactReaders)   // who can read it, for its owner (#5577)
@@ -287,6 +288,16 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 		callerBoard, _, _ := uploaderOf(sid)
 		var perr error
 		plan, perr = planNewVersion(coralDir, ref, callerBoard, hexID)
+		if plan != nil {
+			plan.caller = chainUploader
+			// A new version keeps its file's name (#14145): a different name is a different file unless the agent says it is a rename. Only an upload that NAMED its file is checked: the server's own join of a task chain
+			// is one file per chain, not per file name (#12144), and never refuses on a name.
+			if cur := plan.currentName(); !autoChain && plan.same == nil && cur != "" && cur != name && r.Header.Get("X-Artifact-Rename") != "1" {
+				plan.unlock()
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": nameDiffersSentence(plan.id, cur, name), "code": "name_differs", "file_id": plan.id, "current_name": cur})
+				return
+			}
+		}
 		switch {
 		case perr != nil && autoChain:
 			plan = nil // the chain's file cannot take it (another team's, an older bytes match, ...): a new series, never a refused upload
@@ -445,6 +456,7 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 		"digest":     meta.Digest,
 		"stripped":   stripped, // image metadata was removed: the id is the hash of the stored bytes
 	}
+	fileID, fileVersion := "", 0 // the file's stable id and this version's number (#14145), told the same way everywhere by versionLine
 	if linkNote != "" {
 		reply["task_note"] = linkNote // why the upload is linked to no task, when it could have been (#12755)
 	}
@@ -467,7 +479,11 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 			if sidOf, n, in := digestSeriesOnBoard(coralDir, hexID, callerBoard); in {
 				if ms := seriesMembers(coralDir, sidOf); len(ms) > 0 && ms[0].Board == callerBoard {
 					reply["series_id"], reply["version"], reply["versions"] = sidOf, n, len(ms)
+					fileID, fileVersion = sidOf, n
 				}
+			} else {
+				reply["version"] = 1
+				fileID, fileVersion = virtualFileID(callerBoard, hexID), 1 // never versioned: its id is derived, and it is version 1
 			}
 		}
 	}
@@ -479,7 +495,11 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 			return
 		}
 		reply["series_id"], reply["version"], reply["versions"] = plan.id, plan.stamp.Version, versions
+		fileID, fileVersion = plan.id, plan.stamp.Version
 		slog.Info("[artifacts] a new version", "series", plan.id, "version", plan.stamp.Version, "digest", hexID, "session", sid) // one audit line per version: who, which series, which digest, no content
+	}
+	if fileID != "" {
+		reply["file_id"], reply["version_line"] = fileID, versionLine(fileVersion, meta.Name, fileID)
 	}
 	writeJSON(w, http.StatusCreated, reply)
 }
@@ -505,10 +525,11 @@ func (h *SessionsHandler) answerSeriesRefusal(w http.ResponseWriter, coralDir, h
 
 // answerExistingVersion answers an upload whose bytes are the newest version of its series: that version, as stored, with the series' numbers.
 func (h *SessionsHandler) answerExistingVersion(w http.ResponseWriter, coralDir string, plan *seriesPlan, latest seriesMember) {
-	body := map[string]any{"uri": "coral://artifacts/" + latest.Digest, "url": artifactURL(latest.Digest), "digest": "sha256:" + latest.Digest, "series_id": plan.id, "version": latest.N, "versions": len(plan.rows), "same": true,
+	body := map[string]any{"uri": "coral://artifacts/" + latest.Digest, "url": artifactURL(latest.Digest), "digest": "sha256:" + latest.Digest, "series_id": plan.id, "file_id": plan.id, "version": latest.N, "versions": len(plan.rows), "same": true,
 		"message": "these bytes are the newest version: nothing was added"}
 	if m, found := readSidecar(filepath.Join(coralDir, "artifacts", "objects", latest.Digest+".json")); found {
 		body["name"], body["media_type"], body["size"] = m.Name, m.MediaType, m.Size
+		body["version_line"] = versionLine(latest.N, m.Name, plan.id)
 	}
 	writeJSON(w, http.StatusOK, body)
 }

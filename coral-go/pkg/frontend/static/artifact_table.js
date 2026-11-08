@@ -4,7 +4,7 @@ import { browserLocal } from './safe_storage.js';
 import { importOnce } from './import_once.js';
 const DT = await importOnce('./data_table.js');
 const Tags = await importOnce('./artifact_tags.js');
-const { fileIconHtml } = await importOnce('./file_explorer.js');
+const { artifactThumbnail } = await importOnce('./artifact_thumbnail.js');
 const { readableName, itemKey, sizeText, typeText, isUnverified, uploaderText, isOperatorUpload } = await importOnce('./artifact_item.js');
 const SORT_KEY = 'coral-artifact-table-sort';
 const keys = ['uploader', 'name', 'type', 'tags', 'size', 'updated'];
@@ -37,8 +37,8 @@ export function artifactTable(cfg) {
             const badge = cfg.nameBadge?.(item);
             const wrap = DT.el('span', 'dt-title-cell');
             // Browse owns the filename mapping and decorative SVG markup.
-            const icon = DT.el('span', 'artifact-name-icon');
-            icon.innerHTML = fileIconHtml(readableName(item));
+            const icon = artifactThumbnail({ ...item, name: readableName(item) }, { url: cfg.thumbnailURL?.(item) });
+            icon.classList.add('artifact-name-icon');
             wrap.append(icon, b);
             if (badge) wrap.append(badge);
             const star = cfg.star?.(item); // the star: a glyph when starred, a button at a hover (artifact_star.js, #9834)

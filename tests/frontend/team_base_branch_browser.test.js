@@ -21,6 +21,7 @@ const MISSING = 'The base branch main does not exist in /work/repo. Its branches
             await ev(`(async () => { window.__launches = []; window.__repoBranch = 'master'; window.__launchAnswer = null;
                 const real = window.fetch; const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
                 window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href), m = o.method || 'GET';
+                    if (p.pathname === '/api/filesystem/list' && ['/work/repo', '/work/other'].includes(p.searchParams.get('path'))) return json({ path: p.searchParams.get('path'), entries: [] }); // the made-up folders exist: Next checks the folder first and, for one not found, refuses with its own focus on the folder field, which raced with the base branch field's (acfb782ec, #14437)
                     if (p.pathname === '/api/filesystem/is-git') return json({ is_git: true, branch: p.searchParams.get('path') === '/work/other' ? 'develop' : window.__repoBranch });
                     if (p.pathname === '/api/sessions/launch-team' && m === 'POST') { window.__launches.push(JSON.parse(o.body)); return window.__launchAnswer ? json(window.__launchAnswer.body, window.__launchAnswer.status) : json({ agents: [{ name: 'A', session_id: 's' }] }); }
                     if (p.pathname === '/api/board/projects') return json([]);
@@ -45,9 +46,11 @@ const MISSING = 'The base branch main does not exist in /work/repo. Its branches
             await ev(`{ const i = document.getElementById('launch-team-base-branch'); i.value = 'main'; i.dispatchEvent(new Event('input', { bubbles: true })); } true`);
             await ev(`window.__launchAnswer = { status: 400, body: { error: ${JSON.stringify(MISSING)}, code: 'base_branch_missing', field: 'base_branch', branches: ['master'], default_branch: 'master' } }; document.querySelectorAll('.toast').forEach(t => t.remove()); true`);
             await click('#launch-team-next'); // step 2: a template, the members the launch needs
+            await waitFor(`document.getElementById('launch-step-team').dataset.stage === 'members'`, 'step 2 shows: Next checks the folder first and goes on when it is found (acfb782ec; #14437)', 6000);
             await ev(`{ const sel = document.getElementById('team-template-select'); sel.value = [...sel.options].find(o => o.value).value; sel.dispatchEvent(new Event('change', { bubbles: true })); } true`);
             await waitFor(`document.querySelectorAll('#team-agents-list .team-agent-row').length > 0`, 'the template members');
             await click('#launch-team-next'); // step 3
+            await waitFor(`document.getElementById('launch-step-team').dataset.stage === 'start'`, 'step 3 shows', 6000);
             await click('#launch-team-go');
             await waitFor(`!!document.getElementById('launch-team-base-branch-error')`, 'the inline error', 6000);
             await sleep(300); // sleep-ok: the absence of a toast

@@ -133,9 +133,14 @@ const B = 'goal-done-' + Date.now().toString(36);
         await waitFor(`Number((document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0) === ${unreadBadge}`, 'unread again after another task was finished', 20000);
         assert.ok((await root('GET', '/api/needs-you?limit=50')).json.items.some(i => i.id === `goal_done:${B}:${gid}`), 'and in /api/needs-you again');
 
-        // Dismiss with Undo
+        // Dismiss with Undo, with a pointer RESTING on the table (#14373): the person's own completed Dismiss is not held (a hold is up to 10 s)
+        const rowAt = await ev(`(() => { const r = [...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)); r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { x: Math.round(b.left + 40), y: Math.round(b.top + b.height / 2) }; })()`);
+        await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: rowAt.x, y: rowAt.y }); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the pointer events reach the page
+        const dismissAt = Date.now();
         await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('button[aria-label^="Dismiss"]').click(); true`);
         await waitFor(`!/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the item gone after Dismiss', 8000);
+        assert.ok(Date.now() - dismissAt < 4000, `the dismissed goal left at once under a resting pointer (took ${Date.now() - dismissAt} ms)`);
+        await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: 4, y: 4 });
         assert.ok(JSON.parse((await root('GET', '/api/settings')).json.settings.goal_done_hidden).includes(`${B}|${gid}|*`), 'Dismiss is kept');
         await waitFor(`!![...document.querySelectorAll('.toast button, [role=status] button, #toast-container button')].find(b => /^Undo$/.test(b.textContent.trim()))`, 'the Undo in the notice', 5000);
         await ev(`[...document.querySelectorAll('.toast button, [role=status] button, #toast-container button')].find(b => /^Undo$/.test(b.textContent.trim())).click(); true`);

@@ -80,7 +80,7 @@ func TestExecuteRunAgreesWithBefore4845(t *testing.T) {
 	counts := map[string]int{}
 	bump := func(k string) { mu.Lock(); counts[k]++; mu.Unlock() }
 	t.Run("seeds", func(t *testing.T) {
-		for seed := int64(1); seed <= 260; seed++ {
+		for seed := int64(1); seed <= int64(oracleSeeds(260)); seed++ {
 			t.Run(fmt.Sprint(seed), func(t *testing.T) {
 				t.Parallel()
 				sides := newSides(t)
@@ -193,6 +193,9 @@ func TestExecuteRunAgreesWithBefore4845(t *testing.T) {
 		}
 	})
 	t.Logf("compared, per outcome: %v", counts)
+	if raceEnabled {
+		return // few seeds under -race: the coverage floors are for the plain run (#14281)
+	}
 	for name, floor := range executeRunOutcomes {
 		require.GreaterOrEqual(t, counts[name], floor, "%q went (almost) unexercised", name)
 	}

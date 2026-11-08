@@ -31,7 +31,7 @@ export const ALLOW = new Map([
     ['mountSelection', 'the toolbar\'s place for the selection bar of data_table (#7743, Frontend Dev builds it on this contract); team_toolbar_browser drives it by URL until that table is built'],
     ['__coralReady', 'the suites wait on it (ready.js): a promise-like with the page\'s startup parts, in 117 suites and the harness preload'],
     ['__coralTest', 'the namespace test_hooks.js installs when the page\'s boot data asks for it (dev build, CORAL_TEST_HOOKS=1)'],
-    ['_resetForTests', 'artifact_readers.js remembers once per page whether this person may see who can read an artifact; the suite forgets it between its cases'],
+    ['_resetForTests', 'artifact_readers.js remembers once per page whether this person may see who can read an artifact; the suite forgets it between its cases; query_skew.js (#14317) remembers which computers refused a newer query key, and version_skew_reads forgets them between its cases'],
     ['_setHubForTests', 'update_settings.js and team_cross_team_fields.js load lazily, so test_hooks.js cannot import them; update_channel_browser and team_messaging_tab_browser import the module by URL to draw the Hub view of the pane or tab'],
     ['mountMessaging', 'team_cross_team_fields.js: the Messaging group on a view of its own; the product draws it inside the team page (createMessaging); hub_cross_team_owner and qa_team_messaging_hostile mount it on a host with stubbed answers'],
     ['_resetHubNavForTests', 'hub_nav.js loads lazily, so test_hooks.js cannot import it; its suite imports the module by URL'],

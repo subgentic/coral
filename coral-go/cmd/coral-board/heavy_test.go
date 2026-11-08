@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -18,7 +19,8 @@ type heavyStub struct {
 	reqs        []string
 	grants      []string // the claim answers, in order (the last repeats)
 	n           int
-	renewStatus int // 0: 200; else the renew answer (409: the slot is no longer ours)
+	renewStatus int    // 0: 200; else the renew answer (409: the slot is no longer ours)
+	statusBody  string // the answer to a GET of the resource itself (its own machine), when set
 	renews      int
 }
 
@@ -40,6 +42,10 @@ func (s *heavyStub) handler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusAccepted)
 		}
 		w.Write([]byte(g))
+		return
+	}
+	if r.Method == http.MethodGet && s.statusBody != "" {
+		w.Write([]byte(s.statusBody))
 		return
 	}
 	if strings.HasSuffix(r.URL.Path, "/renew") {
@@ -234,5 +240,67 @@ func TestALostSlotIsNeverReportedAsSuccess(t *testing.T) {
 	}
 	if got := heavyFinalCode(3, false); got != 3 {
 		t.Fatalf("%d", got)
+	}
+}
+
+// #14262: a heavy run for the mini printed "running on " with no destination and ran the command on THIS Mac while holding the mini's claim (the claim reply named neither a member nor a machine, because the mini is a plain
+// slot resource, not a pool). A destination that is unknown, or that is neither the mini nor this Mac, now runs nothing, gives the slot back and exits non-zero.
+func TestAHeavyRunWhoseClaimNamesNoMachineRunsNothingHere(t *testing.T) {
+	marker := filepath.Join(t.TempDir(), "ran-here")
+	s := &heavyStub{grants: []string{`{"granted":true,"place":0,"entry":{"id":1}}`}}
+	out, code := runHeavy(t, s, "run", "--pool", "mini", "--", "touch "+marker)
+	if code == 0 {
+		t.Fatalf("no destination is a refusal, not a run: code=%d out=%q", code, out)
+	}
+	if _, err := os.Stat(marker); err == nil {
+		t.Fatalf("the command ran on this Mac under a claim for another machine: %q", out)
+	}
+	if !strings.Contains(out, "could not tell which machine") || !strings.Contains(out, "never falls back to this Mac") {
+		t.Fatalf("it says why: %q", out)
+	}
+	if !s.saw("/mini/release") {
+		t.Fatalf("the slot is given back: %v", s.reqs)
+	}
+	if strings.Contains(out, "running on") {
+		t.Fatalf("it never says it is running: %q", out)
+	}
+}
+
+func TestAHeavyRunWhoseClaimIsSilentAsksTheResourceItsMachine(t *testing.T) {
+	inTempRepo(t)
+	prev := heavyTestTransport
+	heavyTestTransport = wrapperTransport(t)
+	defer func() { heavyTestTransport = prev }()
+	// an older server: the claim names no machine for a plain resource; the resource itself says mini
+	s := &heavyStub{grants: []string{`{"granted":true,"place":0,"entry":{"id":1}}`}, statusBody: `{"name":"mini","machine":"mini"}`}
+	out, code := runHeavy(t, s, "run", "--pool", "mini", "--", "echo hi-from-the-mini-path")
+	if code != 0 || !strings.Contains(out, "running on mini (over ssh)") {
+		t.Fatalf("it runs on the mini, over ssh, saying so: code=%d out=%q", code, out)
+	}
+	// and a plain resource whose own machine is the Mac runs here
+	s = &heavyStub{grants: []string{`{"granted":true,"place":0,"entry":{"id":1}}`}, statusBody: `{"name":"mac-heavy","machine":"mac"}`}
+	out, code = runHeavy(t, s, "run", "--pool", "mac-heavy", "--", "echo hi-from-here")
+	if code != 0 || !strings.Contains(out, "hi-from-here") || !strings.Contains(out, "(on this Mac)") {
+		t.Fatalf("a Mac resource runs here and says so: code=%d out=%q", code, out)
+	}
+}
+
+func TestAHeavyRunOnAMachineItDoesNotDriveRunsNothing(t *testing.T) {
+	for _, grant := range []string{
+		`{"granted":true,"place":0,"entry":{"id":1,"member":"epoch-go","machine":"epoch"}}`,
+		`{"granted":true,"place":0,"entry":{"id":1,"member":"mac-heavy"}}`, // a member with no machine is not known to be the Mac
+	} {
+		marker := filepath.Join(t.TempDir(), "ran-here")
+		s := &heavyStub{grants: []string{grant}}
+		out, code := runHeavy(t, s, "run", "--", "touch "+marker)
+		if code == 0 {
+			t.Fatalf("%s: a machine heavy run does not drive is refused: %q", grant, out)
+		}
+		if _, err := os.Stat(marker); err == nil {
+			t.Fatalf("%s: it ran here: %q", grant, out)
+		}
+		if !s.saw("/heavy/release") {
+			t.Fatalf("%s: the slot is given back: %v", grant, s.reqs)
+		}
 	}
 }
