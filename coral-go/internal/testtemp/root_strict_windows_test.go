@@ -83,8 +83,13 @@ func TestOutsideRootUnderAShortNameIsAccepted(t *testing.T) {
 	if reason := checkOutsideRoot(root); reason != "" {
 		t.Fatalf("a root under the short path %q: %q", short, reason)
 	}
-	if got := longPath(root); !strings.EqualFold(got, filepath.Join(base, rootName)) {
-		t.Errorf("longPath(%q) = %q, want the long form %q", root, got, filepath.Join(base, rootName))
+	// the long form is what the system resolves the test's own folder to: t.TempDir is itself under a short name on GitHub's runner (RUNNER~1 for runneradmin), so base is not it
+	real, err := filepath.EvalSymlinks(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := longPath(root), filepath.Join(real, rootName); !strings.EqualFold(got, want) {
+		t.Errorf("longPath(%q) = %q, want the long form the system gives, %q", root, got, want)
 	}
 }
 
