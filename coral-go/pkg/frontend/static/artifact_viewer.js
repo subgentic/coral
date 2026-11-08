@@ -474,6 +474,54 @@ export function openArtifactViewer(hex, opts = {}) {
     return true;
 }
 
+/** A document that ships with Coral (the Getting Started guide, #14744), shown in this same viewer: fetched from its own address only when it is asked for, drawn as markdown, with none of a stored file's comments, versions, review or edit (it is not one).
+ *  `onOpened()` is called once it is on screen. Resolves true when it opened. */
+export async function openBundledDocument({ title, url, name, onOpened }) {
+    ++_openIntent;
+    if (_editor?.beforeLeave(() => openBundledDocument({ title, url, name, onOpened }))) return false;
+    if (_editSend?.beforeLeave()) return false;
+    stopEditSend(); stopMarkdownEdit();
+    const d = _dialog || (_dialog = _build());
+    if (d.hidden) _returnFocus = document.activeElement;
+    d.style.display = ''; // display-ok: as openArtifactViewer: the viewer shows and hides with `hidden`
+    _abort?.abort(); _abort = new AbortController();
+    const gen = ++_gen, signal = _abort.signal;
+    _hex = ''; _lastOpts = {}; _line = null; _barLine = null; _layoutType = null;
+    _versions?.close(); _review?.close(); _comments?.close(); _details.clear();
+    for (const sel of ['.artifact-edit-send-action', '.artifact-viewer-edit', '.artifact-viewer-edit-item', '.artifact-viewer-markup', '.artifact-viewer-markup-item', '.artifact-viewer-newtab', '.artifact-viewer-source', '.artifact-viewer-from']) { const el = d.querySelector(sel); if (el) el.hidden = true; }
+    d.querySelector('.artifact-edit-send-note').hidden = true;
+    d.classList.remove('is-image');
+    paintLine(d);
+    const titleEl = d.querySelector('.artifact-viewer-title'), nameEl = document.createElement('span');
+    nameEl.className = 'artifact-viewer-title-name'; nameEl.textContent = title; titleEl.replaceChildren(nameEl); titleEl.classList.remove('is-open');
+    const dl = d.querySelector('.artifact-viewer-download');
+    dl.hidden = false; dl.href = url; dl.removeAttribute('aria-disabled'); dl.setAttribute('download', name || 'guide.md'); dl.onclick = null;
+    d.querySelector('.artifact-viewer-copy-id').hidden = true;
+    d.querySelector('.artifact-viewer-sandbox').hidden = true;
+    const body = d.querySelector('.artifact-viewer-body');
+    body.innerHTML = '<div class="inline-preview-loading">Loading...</div>';
+    const wasOpen = !d.hidden;
+    d.hidden = false;
+    syncTitleExpand(d);
+    if (!wasOpen && isPhoneLayout() && !_overlay) _overlay = pushOverlay(() => closeArtifactViewer({ popped: true }));
+    d.querySelector('.artifact-viewer-fullscreen').disabled = false;
+    if (!wasOpen) d.querySelector('.artifact-viewer-close').focus();
+    try {
+        const resp = await fetch(url, { signal });
+        if (!resp.ok) throw new Error(String(resp.status));
+        const text = await resp.text();
+        if (gen !== _gen || d.hidden) return false;
+        _layoutType = 'text/markdown';
+        renderArtifactText(body, text, name || 'guide.md', undefined);
+        if (onOpened) onOpened();
+        return true;
+    } catch (error) {
+        if (error?.name === 'AbortError' || gen !== _gen) return false;
+        body.innerHTML = '<div class="inline-preview-error">This guide could not be opened.</div>';
+        return false;
+    }
+}
+
  function closeArtifactViewer(opts = {}) {
     _openIntent++;
     if (!_dialog || _dialog.hidden) return;
