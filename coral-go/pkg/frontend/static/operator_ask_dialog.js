@@ -40,9 +40,9 @@ export function openAskDialog(a, onDone, runners = {}) {
     if (!fromAnotherComputer(a)) importOnce('./message_refs.js').then(m => { if (whole.isConnected) m.linkMessageRefsIn(whole, (id, b) => openWithQuestionReturn(b, async () => { const nav = await importOnce('./nav.js'); await nav.go({ view: 'team', id: boardTeamKey(a.server, a.board), sub: 'messages', item: id }); }).catch(e => { err.textContent = e.message || 'The message could not be opened.'; }), { who }); }).catch(() => {}); // "#8" in the question opens message 8 of the asker's team, and Back returns to the question (#14153)
     whole.hidden = !parts.body && !a.cut; // an empty question has no body
     const label = document.createElement('label'); label.className = 'inbox-ask-label'; label.textContent = 'Your reply';
-    const box = document.createElement('textarea'); box.className = 'field inbox-ask-box'; box.rows = 6; box.placeholder = 'Write a reply…'; box.maxLength = 8000; label.append(box);
+    const box = document.createElement('textarea'); box.className = 'field inbox-ask-box'; box.rows = 6; box.placeholder = 'Write a reply…'; box.maxLength = 8000; box.readOnly = missingCloudSource; label.append(box);
     const pics = document.createElement('div'); pics.className = 'inbox-ask-pics'; // pictures for the reply (#12173): the comment composer's tray, loaded with the dialog
-    const err = document.createElement('p'); err.className = 'inbox-ask-error'; err.setAttribute('role', 'alert');
+    const err = document.createElement('p'); err.className = 'inbox-ask-error'; err.id = 'inbox-ask-error'; err.setAttribute('role', 'alert');
     const row = document.createElement('div'); row.className = 'inbox-ask-buttons';
     const send = document.createElement('button'); send.type = 'button'; send.className = 'btn btn-primary inbox-ask-send'; send.textContent = 'Send reply'; send.disabled = missingCloudSource;
     const close = document.createElement('button'); close.type = 'button'; close.className = 'btn'; close.textContent = 'Close';
@@ -112,7 +112,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     const addSlot = document.createElement('div'); addSlot.className = 'inbox-ask-attach'; pics.append(addSlot);
     const sendRow = document.createElement('div'); sendRow.className = 'inbox-ask-sendrow'; const pickSlot = document.createElement('span'); pickSlot.className = 'inbox-ask-pick'; sendRow.append(pickSlot, send); addSlot.append(sendRow); // Add image on the left, Send reply on the right, the pictures note under them (#13148)
     compose.append(label, pics, err);
-    if (missingCloudSource) err.textContent = 'This question’s computer is not loaded yet. Close and reopen it after the computer list arrives.';
+    if (missingCloudSource) dlg.setAttribute('aria-describedby', err.id);
     const contextNote = document.createElement('p'); contextNote.className = 'inbox-ask-sub'; contextNote.textContent = questionContextNote(a); contextNote.hidden = !contextNote.textContent;
     dlg.append(title, sub, ...(contextNote.hidden ? [] : [contextNote]), ...(links.hidden ? [] : [links]), reading, compose, foot);
     drawOffers();
@@ -144,6 +144,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     document.body.append(dlg);
     dlg.showModal();
     box.focus();
+    if (missingCloudSource) err.textContent = 'This question’s computer is not loaded yet. Close and reopen it after the computer list arrives.';
     // Older list/link snapshots may precede the question's button metadata.
     // Keep the reply/draft open while loading choices from its captured computer.
     if (!missingCloudSource && a.kind === 'ask' && !Array.isArray(a.buttons)) {
