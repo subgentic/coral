@@ -46,6 +46,9 @@ var updateTaskOutcomes = map[string]int{
 	"reassigned to the same assignee (no nudge)": 5,
 }
 
+// oracleDocID masks a received row's document id (#14551): random on each side, so only its presence is compared.
+var oracleDocID = regexp.MustCompile(`"doc_id":"[0-9a-f]{32}"`)
+
 var oracleStamp = regexp.MustCompile(`\d{4}-\d\d-\d\d[T ][0-9:.]+(Z|[+-]\d\d:\d\d)?`)
 
 // #4756: UpdateTask split into allowTaskEdit, applyTaskEdit and announceTaskEdit. Two handlers, each with its own

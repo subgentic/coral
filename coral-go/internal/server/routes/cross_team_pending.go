@@ -205,6 +205,8 @@ const maxAlsoReceipts = 20
 func (h *BoardHandler) noteAlsoReceived(first, later crossTeamArtifactRecord) {
 	h.alsoMu.Lock()
 	defer h.alsoMu.Unlock()
+	receivedRowMu.Lock() // the document-id migration rewrites rows too (#14551): neither loses the other's change
+	defer receivedRowMu.Unlock()
 	// Read again under the lock: a row may have gained an entry since it was read.
 	if cur, ok := h.crossTeamRecord("received", first.Board, first.ID); ok {
 		first = cur
