@@ -17,7 +17,24 @@ var agentShellVars = []string{
 	"CORAL_TMUX_SOCKET", "CORAL_TMUX_FALLBACK", "CORAL_AGENT_HELPER", "CORAL_AGENT_ARGS", "CORAL_BOARD_HELPER", "CORAL_BOARD_ARGS",
 }
 
-var agentShellPrefixes = []string{"CORAL_WORKFLOW_", "CORAL_PREV", "CORAL_STEP_"}
+// credentialPrefixes are the families an agent CLI's own session exports: the Claude Code session (CLAUDE_CODE_SESSION_ID, CLAUDE_PID, its messaging socket and token), API keys and OAuth
+// tokens (ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN, CLAUDE_CODE_OAUTH_TOKEN), and the Codex, Gemini and Pi homes. Run from an agent's shell, a test process would hold a REAL credential
+// (#413). A test that needs one sets it with t.Setenv or a child's Env, as the real-CLI tests already do. This is the safety half; for the test CACHE the go tool's own environment
+// must also be the same in every shell (the cache hashes the go tool's value of each variable a test reads), which tools/ and the Makefile test target handle.
+var credentialPrefixes = []string{"CLAUDE_", "ANTHROPIC_", "CODEX_", "GEMINI_", "PI_", "OPENAI_", "GOOGLE_", "AWS_"}
+
+// credentialNames are single variables of the same kind: forge and agent credentials a shell may carry. GITHUB_ is not a prefix here (GITHUB_ACTIONS is a CI marker tests read).
+var credentialNames = []string{"GH_TOKEN", "GITHUB_TOKEN", "SSH_AUTH_SOCK"}
+
+// agentHomePointers name where an agent CLI keeps its sign-in files. Dropping them would send a test that reads the folder to the person's REAL ~/.codex or ~/.claude (the default under the home
+// folder), where the credentials live, so they are not dropped: each is pointed at a folder that does not exist, per process. A package whose TestMain makes a private home (testtemp) has them
+// removed again there (they are listed in sandboxedPointers for it), so the default under THAT home applies, as the tests expect. A test that wants one sets it with t.Setenv.
+var agentHomePointers = []string{"CODEX_HOME", "CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR", "GEMINI_CLI_HOME", "GEMINI_TMP_DIR", "ANTIGRAVITY_DATA_DIR"}
+
+// SandboxedPointersEnv lists (comma separated) the pointers this init pointed at the sandbox, for testtemp to remove once HOME is private. Not a CORAL_ name.
+const SandboxedPointersEnv = "TESTGUARD_SANDBOXED_POINTERS"
+
+var agentShellPrefixes = append([]string{"CORAL_WORKFLOW_", "CORAL_PREV", "CORAL_STEP_"}, credentialPrefixes...)
 
 // scrubbedMarker is set once the scrub has run, and test binaries started from a test
 // (helper re-execs such as the CLI help tests) inherit it, so they keep the CORAL_* values
@@ -40,6 +57,9 @@ func scrubAgentShellEnv() {
 	for _, k := range agentShellVars {
 		os.Unsetenv(k)
 	}
+	for _, k := range credentialNames {
+		os.Unsetenv(k)
+	}
 	isolateDataDir()
 	for _, kv := range os.Environ() {
 		k, _, _ := strings.Cut(kv, "=")
@@ -50,6 +70,12 @@ func scrubAgentShellEnv() {
 			}
 		}
 	}
+	// after the prefix drop (CODEX_, CLAUDE_, PI_, GEMINI_ cover these names): point, do not leave unset
+	sandbox := filepath.Join(os.TempDir(), "coral-testguard-agent-"+strconv.Itoa(os.Getpid()))
+	for _, k := range agentHomePointers {
+		os.Setenv(k, filepath.Join(sandbox, strings.ToLower(k)))
+	}
+	os.Setenv(SandboxedPointersEnv, strings.Join(agentHomePointers, ","))
 }
 
 // isolateDataDir keeps a test binary out of the production data folder. Agent

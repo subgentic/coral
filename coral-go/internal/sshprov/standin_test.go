@@ -14,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/subgentic/coral/internal/testtemp"
 )
 
 // This test binary is also the stand-in for ssh (and, as the tests are ported, ssh-keyscan and the far computer), so the tests run the same on Windows, where there is no sh, tar or sha256sum to script
@@ -30,7 +32,7 @@ func TestMain(m *testing.M) {
 		fmt.Fprintln(os.Stderr, "sshprov tests: this binary runs tests only under go test (-test. flags) and answers as ssh only under that name; nothing else")
 		os.Exit(2)
 	}
-	os.Exit(m.Run())
+	os.Exit(testtemp.Run(m)) // the tests in a private temp, home and data folder (#356; the home census): datadir_unix_test names the home folder
 }
 
 const (
