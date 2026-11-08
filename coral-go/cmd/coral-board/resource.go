@@ -393,7 +393,7 @@ func resourceKick(rest []string) {
 	fmt.Printf("Dropped entry #%d.\n", id)
 }
 
-// onWords says where a pool's grant is: " on Mac mini" (the machine, else the member), "" for a resource that is not a pool.
+// onWords says where a pool's grant is: " on Studio" (the machine, else the member), "" for a resource that is not a pool.
 func onWords(machine, member string) string {
 	switch {
 	case machine != "":

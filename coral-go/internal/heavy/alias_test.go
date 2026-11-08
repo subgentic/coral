@@ -14,7 +14,7 @@ import (
 // environment variable cannot send a worktree anywhere else; the Host block of that name is in the Operator's ssh config.
 func TestAliasForIsTheGrantsMachineAndNothingElse(t *testing.T) {
 	for machine, want := range map[string]string{
-		"mini":         "coral-heavy-mini",
+		"box":          "coral-heavy-box",
 		"Build Box 2":  "coral-heavy-build-box-2",
 		"  box  ":      "coral-heavy-box",
 		"../etc":       "coral-heavy-etc",

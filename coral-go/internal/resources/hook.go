@@ -355,10 +355,14 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 	// already in the line or holding?
 	mine, holding := entryOf(st, agent)
 	if mine != nil && holding {
-		if machine, remote := h.onRemote(res, mine); remote { // the pool's slot is on a remote machine: not run here (#13751)
+		if machine, where := h.slotWhere(res, mine); where == whereRemote || where == whereUnknown { // the pool's slot is on a remote machine, or on one that does not say: not run here (#13751, #14354)
 			if ah := h.hold[key]; ah != nil {
 				ah.session = session
 				ah.window = h.o.Now().Add(h.o.ClaimWindow)
+			}
+			if where == whereUnknown {
+				h.event(HookEvent{Kind: "refused", Resource: res.Key, Pattern: pattern, Agent: agent, Session: session})
+				return unplaced(res.Key, machine, h.o.ClaimWindow)
 			}
 			h.event(HookEvent{Kind: "redirected", Resource: res.Key, Pattern: pattern, Agent: agent, Session: session})
 			return redirection(res.Key, machine, h.o.ClaimWindow)
@@ -382,9 +386,13 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 		ah := &autoHold{entry: r.Entry.ID, session: session, name: name, pattern: pattern, calls: map[string]bool{}, refused: map[string]bool{}}
 		h.hold[key] = ah
 		if r.Granted {
-			if machine, remote := h.onRemote(res, &r.Entry); remote { // granted a slot on a remote machine: not run here; the agent is told how, and keeps the slot a moment for the follow-up
+			if machine, where := h.slotWhere(res, &r.Entry); where == whereRemote || where == whereUnknown { // granted a slot on a remote machine, or on one that does not say where it runs: not run here; the agent is told, and keeps the slot a moment
 				ah.granted = h.o.Now()
 				ah.window = ah.granted.Add(h.o.ClaimWindow)
+				if where == whereUnknown {
+					h.event(HookEvent{Kind: "refused", Resource: res.Key, Pattern: pattern, Agent: agent, Session: session})
+					return unplaced(res.Key, machine, h.o.ClaimWindow)
+				}
 				h.event(HookEvent{Kind: "redirected", Resource: res.Key, Pattern: pattern, Agent: agent, Session: session})
 				return redirection(res.Key, machine, h.o.ClaimWindow)
 			}
@@ -422,16 +430,40 @@ func redirection(pool, machine string, window time.Duration) string {
 		"Your slot is kept for %d minutes. Do not retry the command here.", pool, machine, int(window/time.Minute))
 }
 
-// onRemote says whether the pool entry holds a slot on a remote machine (its resource is defined remote, #14354), and that machine's name for the message.
-func (h *Hook) onRemote(res resourcequeue.Resource, e *resourcequeue.Entry) (string, bool) {
+// Where a pool's slot is, as the hook acts on it (#14354): not a pool member's slot at all (whereNone), a member defined here, one defined remote, or one whose definition says nothing (whereUnknown): the
+// last is never taken for local, so nothing is run on a machine nobody said it runs on.
+const (
+	whereNone    = ""
+	whereHere    = "here"
+	whereRemote  = "remote"
+	whereUnknown = "unknown"
+)
+
+// unplaced is what an agent is told when the pool gave it a slot on a machine whose resource does not say where it runs: nothing ran, here or there. It names the pool and the machine, never the command.
+func unplaced(pool, machine string, window time.Duration) string {
+	if machine == "" {
+		machine = "a machine"
+	}
+	return fmt.Sprintf("Coral did NOT run this command: the %s pool gave your slot on %s, whose resource does not say where it runs (here or remote), so it is not run here or there. Ask the Operator or an Orchestrator to define it: coral-board resource define <name> ... --here or --remote. "+
+		"Your slot is kept for %d minutes. Do not retry the command here.", pool, machine, int(window/time.Minute))
+}
+
+// slotWhere says where the pool entry's slot is (its member's definition, #14354), and that machine's name for the message.
+func (h *Hook) slotWhere(res resourcequeue.Resource, e *resourcequeue.Entry) (string, string) {
 	if len(res.Members) == 0 || e == nil || e.Member == "" {
-		return "", false
+		return "", whereNone
 	}
-	machine, remote := "", false
-	if ms, err := h.m.Queue().Status(e.Member); err == nil {
-		machine, remote = ms.Resource.Machine, ms.Resource.Where == resourcequeue.WhereRemote
+	ms, err := h.m.Queue().Status(e.Member)
+	if err != nil {
+		return "", whereUnknown
 	}
-	return machine, remote
+	switch ms.Resource.Where {
+	case resourcequeue.WhereRemote:
+		return ms.Resource.Machine, whereRemote
+	case resourcequeue.WhereHere:
+		return ms.Resource.Machine, whereHere
+	}
+	return ms.Resource.Machine, whereUnknown
 }
 
 // attachHeavyRun ties the agent's pool hold to the heavy-run call that follows a redirect: the slot is then the call's, kept while it runs and given back when it ends.

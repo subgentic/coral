@@ -132,16 +132,22 @@ func TestAMemberWhoseResourceSaysRemoteIsRedirectedWhateverItIsCalled(t *testing
 	assert.Equal(t, "", g2.h.Before(t.Context(), "s-b", "s-b", "call-2", heavy), "a member named mini whose resource says here is run here: no redirect")
 }
 
-// A resource that says nothing about where it runs is not redirected by the hook either (heavy run refuses it, #14354): the hook only redirects what is defined remote.
-func TestAMemberWhoseResourceSaysNothingIsNotRedirected(t *testing.T) {
+// A pool member that says nothing about where it runs is UNKNOWN to the hook (#14354, Security's INFO 6): the agent is told, and nothing is run, here or there; before, it was taken for local. A member that says here still runs.
+func TestAMemberWhoseResourceSaysNothingIsUnknownNotLocal(t *testing.T) {
 	g := newHookRig(t)
 	q := g.m.Queue()
 	require.NoError(t, q.Remove("mac-heavy"))
-	require.NoError(t, q.Define(resourcequeue.Resource{Key: "one", Slots: 1, Machine: "Mac", MaxLease: 30 * time.Minute}))
+	require.NoError(t, q.Define(resourcequeue.Resource{Key: "one", Slots: 1, Machine: "Mac", Where: resourcequeue.WhereHere, MaxLease: 30 * time.Minute}))
 	require.NoError(t, q.Define(resourcequeue.Resource{Key: "mini", Slots: 1, Machine: "Mini", MaxLease: 30 * time.Minute}))
 	require.NoError(t, q.Define(resourcequeue.Resource{Key: "heavy", Members: []string{"one", "mini"}, Match: []string{"go test ./..."}}))
 	require.Equal(t, "", g.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy))
-	assert.Equal(t, "", g.h.Before(t.Context(), "s-b", "s-b", "call-2", heavy), "no Where: no redirect")
+	msg := g.h.Before(t.Context(), "s-b", "s-b", "call-2", heavy)
+	assert.Contains(t, msg, "does not say where it runs", "no Where: the agent is told, and the command is held")
+	assert.Contains(t, msg, "--here or --remote", "with the command that fixes it")
+	assert.Contains(t, msg, "Mini", "naming the machine")
+	assert.NotContains(t, msg, "coral-board heavy run --", "and it is not sent to a heavy run, which would refuse too")
+	// the same agent asking again while it holds that slot is told the same, not let through
+	assert.Contains(t, g.h.Before(t.Context(), "s-b", "s-b", "call-3", heavy), "does not say where it runs")
 }
 
 // Once the follow-up heavy run has started, the sweep never frees the slot, however far the clock goes past the claim window, while the call is running; and each sweep keeps the lease renewed.
