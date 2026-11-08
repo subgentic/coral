@@ -252,6 +252,8 @@ func storeArtifactVia(coralDir, sessionID, name, mediaType, uploadedBy, source, 
 		if os.MkdirAll(up, 0o700) == nil {
 			r := newUploadRecord(mine, sessionID, uploadedBy, source)
 			r.HubUser = hubUser
+			prev, _ := readUploadRecord(coralDir, sessionID, hexID) // a re-upload keeps its document id (#14551)
+			r.DocID = docIDFor(docIDOf(prev), nil)
 			rec, _ := json.Marshal(r)
 			if err := writeFileAtomic(filepath.Join(up, hexID+".json"), rec, 0o600); err == nil {
 				noteArtifactRecordChanged(coralDir, r.Board)
