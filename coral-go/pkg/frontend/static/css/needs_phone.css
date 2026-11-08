@@ -44,8 +44,8 @@
 }
 
 /* A question is read where it stands (#14574, Beta run 3): the row's name is the whole question (up to the preview's 500 characters), so it wraps, on a wide row and on a phone, and nothing clamps it to a line or two. Last in this sheet: it outranks the phone's two-line and one-line clamps above. */
-.inbox-needs-results .inbox-review-item.inbox-agent-first > .inbox-review-name.inbox-ask-name,
-.inbox-needs-results .inbox-review-item > .inbox-review-name.inbox-ask-name { display: block; min-width: 0; max-width: 100%; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; -webkit-line-clamp: unset; line-clamp: none; }
+.inbox-needs-results .inbox-review-item.inbox-agent-first > .inbox-review-name:is(.inbox-ask-name, .inbox-whole-name),
+.inbox-needs-results .inbox-review-item > .inbox-review-name:is(.inbox-ask-name, .inbox-whole-name) { display: block; min-width: 0; max-width: 100%; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; -webkit-line-clamp: unset; line-clamp: none; }
 @media (min-width: 768px) { /* a wide row: the asker on the first line, the question under it across the column, not squeezed beside the name */
     .inbox-needs-results .inbox-review-item.inbox-agent-first:has(> .inbox-ask-name) { flex-wrap: wrap; }
     .inbox-needs-results .inbox-review-item.inbox-agent-first > .inbox-review-name.inbox-ask-name { flex: 1 1 100%; order: 5; }

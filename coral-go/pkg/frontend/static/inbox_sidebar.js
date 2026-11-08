@@ -182,7 +182,7 @@ const waitMark = s => {
     mark.append(DT.el('span', 'sr-only', text), visible); return [mark];
 }; // every phone kind uses one compact time; desktop's Waiting cell keeps the full words
 /** One phone row for every kind (#13911, the Operator: "Layout A"): the sender or the intro on line one with the time since at its right, then the description, at most two lines; the same grid whatever the kind, so the icon, the time and the line count are the same in every row. `from` is the element that names the sender or the intro. */
-const phoneRow = (s, from, desc, extra = [], whole = false) => { const wrap = DT.el('span', 'inbox-review-item inbox-agent-first'), name = DT.el('span', whole ? 'inbox-review-name inbox-ask-name' : 'inbox-review-name', desc); // whole: a waiting agent's question is said whole, wrapped (#14574)
+const phoneRow = (s, from, desc, extra = [], whole = false) => { const wrap = DT.el('span', 'inbox-review-item inbox-agent-first'), name = DT.el('span', whole ? 'inbox-review-name inbox-whole-name' : 'inbox-review-name', desc); // whole: a waiting agent's question is said whole, wrapped (#14574)
     DT.tipIf(name, desc, () => name.scrollHeight > name.clientHeight + 1); if (extra.length) name.append(' ', ...extra); wrap.append(from, name, ...waitMark(s)); return wrap; }; // a badge that is words (New comments) goes on the description's own line, after it; a row is three lines at most (#13911)
 /** A phone card's computer (#14623, the approved phone mock): with two or more computers its name is a small chip on the card's meta line, beside the sender and the time, not a Computer line of its own under the text. */
 const addComputerChip = (s, tr) => {
