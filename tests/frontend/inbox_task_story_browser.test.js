@@ -14,7 +14,7 @@ const BASE = require('./test_base').BASE;
     const failures = [];
     const check = (ok, what) => { if (!ok) failures.push(what); };
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: "localStorage.removeItem('coral-inbox-group-review-goal'); localStorage.removeItem('coral-inbox-task-open');" });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: "localStorage.removeItem('coral-inbox-group-review-goal');localStorage.removeItem('coral-inbox-group-mode'); localStorage.removeItem('coral-inbox-task-open');" });
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             const at = `${w}: `;
             const snap = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR; if (!dir) return; fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(`${dir}/task-story-${name}-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
@@ -49,7 +49,7 @@ const BASE = require('./test_base').BASE;
             // Group by goal on, through the Filters panel
             await ev(`document.getElementById('inbox-needs-toggle').click(); true`);
             await waitFor(`!!document.querySelector('.inbox-group-review-toggle') && document.querySelector('.inbox-group-review-toggle').getClientRects().length > 0`, `${at}the option shows`, 8000);
-            await ev(`document.querySelector('.inbox-group-review-toggle input').click(); true`);
+            await ev(`(()=>{const s=document.querySelector('.inbox-group-review-toggle select');s.value='task';s.dispatchEvent(new Event('change',{bubbles:true}))})(); true`);
             await ev(`document.getElementById('inbox-needs-toggle').click(); true`);
             await waitFor(`document.querySelectorAll('.dt-group-task').length === 2`, `${at}two task headings`, 10000);
             const heading = n => `[...document.querySelectorAll('.dt-group-task')].find(tr => tr.textContent.includes('Task #${n}'))`;
