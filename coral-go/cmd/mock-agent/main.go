@@ -336,7 +336,7 @@ func readMessages(baseURL, board string) int {
 		if err != nil {
 			return -1
 		}
-		return strings.Count(string(out), "\n[")
+		return countPrintedMessages(string(out))
 	}
 	resp, err := http.Get(fmt.Sprintf("%s/api/board/%s/messages", baseURL, board))
 	if err != nil {
@@ -347,6 +347,18 @@ func readMessages(baseURL, board string) int {
 	var msgs []any
 	json.Unmarshal(data, &msgs)
 	return len(msgs)
+}
+
+// countPrintedMessages is how many messages a coral-board read printed: one per line that opens a message ("[YYYY-MM-DDTHH:MM] role: text"). The first message has no newline before it, so counting
+// "\n[" found none for a single message and the heartbeat's log said msgs=0 when its read had taken one (#14412, #14416).
+func countPrintedMessages(out string) int {
+	n := 0
+	for _, line := range strings.Split(out, "\n") {
+		if len(line) > 17 && line[0] == '[' && line[5] == '-' && line[8] == '-' && line[11] == 'T' && line[14] == ':' && line[17] == ']' {
+			n++
+		}
+	}
+	return n
 }
 
 // coralBoard is the coral-board the stand-in posts and reads through, like a real agent, so its
