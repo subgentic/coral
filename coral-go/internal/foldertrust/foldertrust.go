@@ -56,7 +56,7 @@ func (r *Refusal) Error() string { return r.msg }
 const (
 	plainFind   = "Coral could not find this folder on this computer."
 	plainHome   = "Coral does not trust your home folder, a folder that holds it, a top folder or a hidden one from here."
-	plainDirect = "Coral doesn't trust a folder directly under your home folder from here, because it would cover every project there. A folder one level deeper works."
+	plainDirect = "Coral doesn't trust a folder directly under your home folder from here, because it would cover every project there. Try a project folder one level deeper (a hidden, unowned, linked or missing folder can still be refused)."
 	plainShared = "Coral does not trust a shared or shallow folder, or one that other people on this computer can write into, from here."
 )
 

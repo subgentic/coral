@@ -1290,7 +1290,7 @@ registerGroupSource('hub-inbox', {
         if (key === 'goals') {
             const rows = goalRows();
             const waitingGoals = goalProposals().length, waitingNote0 = waitingGoals ? `${waitingGoals} goal${waitingGoals === 1 ? '' : 's'} an agent proposed ${waitingGoals === 1 ? 'is' : 'are'} waiting for your approval in Needs you.` : '';
-            const waitingNote = [waitingNote0, goalFilters.state === 'done' && doneGoalsCapped() ? 'Showing the first 100 finished goals of a computer; newer ones are not listed here.' : ''].filter(Boolean).join(' ');
+            const waitingNote = [waitingNote0, goalFilters.state === 'done' && doneGoalsCapped() ? 'Each computer shows up to 100 finished goals, oldest first. Newer goals may be missing when this limit is reached.' : ''].filter(Boolean).join(' ');
             return { title: 'Goals', noun: ['goal', 'goals'], rows, ...(waitingNote ? { note: waitingNote } : {}), empty: { line: GF.isFiltered(goalFilters) ? 'No goal matches the search and filters.' : 'No open goals.', hint: waitingNote || (GF.isFiltered(goalFilters) ? undefined : "A team's Goals tab has New goal; an Orchestrator can propose one too.") },
                 signature: JSON.stringify(rows.map(g => [g.board_id, g.id, g.title, g.outcome, g.state, g.updated_at, g.rollup])),
                 node: () => { const phone = isPhoneLayout(), mountBar = () => { const bar = document.querySelector('#group-table-view .gt-toolbar'); if (bar) { Toolbar.mountSelection(bar, goalsState.selected.size ? table.bar : null); bar.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); } }; const table = DT.dataTable({ label: `Goals, ${rows.length}`, rows, rowKey: goalKey, state: goalsState, rowName: g => g.title,
