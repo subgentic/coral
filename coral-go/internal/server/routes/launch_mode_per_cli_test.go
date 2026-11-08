@@ -63,9 +63,9 @@ func TestALaunchRecordsOnlyAModeItsCLIHas(t *testing.T) {
 			"auto":        {"auto", "-c sandbox_workspace_write.network_access=true --sandbox workspace-write -a never"}, "bypassPermissions": {"bypassPermissions", "--dangerously-bypass-approvals-and-sandbox"},
 			"dontAsk": {"dontAsk", "-c sandbox_workspace_write.network_access=true --sandbox workspace-write -a never"},
 		},
-		at.Agy: { // Antigravity is unchanged: what its launch records and runs with today (its Auto launches with the bypass flag and its Don't ask as Plan; not this task's to change)
+		at.Agy: { // Antigravity: its Auto is agy's own --mode auto, only for an agy whose --help lists it (this stub lists nothing, so the command has no flag and it asks), never the skip flag it was before #14741; Don't ask is still Plan
 			"default": {"default", ""}, "plan": {"plan", "--mode plan"}, "acceptEdits": {"acceptEdits", "--mode accept-edits"},
-			"auto": {"auto", "--dangerously-skip-permissions"}, "bypassPermissions": {"bypassPermissions", "--dangerously-skip-permissions"}, "dontAsk": {"dontAsk", "--mode plan"},
+			"auto": {"auto", ""}, "bypassPermissions": {"bypassPermissions", "--dangerously-skip-permissions"}, "dontAsk": {"dontAsk", "--mode plan"},
 		},
 	}
 	for cli, byMode := range want {

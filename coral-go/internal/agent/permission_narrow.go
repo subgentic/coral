@@ -70,6 +70,7 @@ const (
 	agyRankDefault = iota
 	agyRankPlan
 	agyRankAcceptEdits
+	agyRankAuto // --mode auto: judged by agy's own safety gate, between accept-edits and nothing asking (#14741)
 	agyRankSkip
 )
 
@@ -79,7 +80,9 @@ func agyRankForMode(mode string) (int, bool) {
 		return agyRankPlan, true
 	case "acceptEdits":
 		return agyRankAcceptEdits, true
-	case "auto", "bypassPermissions":
+	case "auto":
+		return agyRankAuto, true // not the skip flag: auto is its own mode (#14741, Security: auto never silently becomes Bypass)
+	case "bypassPermissions":
 		return agyRankSkip, true
 	}
 	return 0, false
@@ -91,6 +94,8 @@ func agyRankOf(p *AgyPermissions) int {
 		return agyRankSkip
 	case p.Mode == "accept-edits":
 		return agyRankAcceptEdits
+	case p.Mode == "auto":
+		return agyRankAuto
 	case p.Mode == "plan":
 		return agyRankPlan
 	}
@@ -109,6 +114,8 @@ func narrowAgyPermissions(caps *AgyPermissions, mode int) *AgyPermissions {
 		out.DangerouslySkipPermissions = true
 	case agyRankAcceptEdits:
 		out.Mode = "accept-edits"
+	case agyRankAuto:
+		out.Mode = "auto"
 	case agyRankPlan:
 		out.Mode = "plan"
 	}

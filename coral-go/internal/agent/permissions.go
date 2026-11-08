@@ -421,6 +421,9 @@ func DefaultLaunchPermissionMode(agentType string) string {
 	if agentType == "" || agentType == "claude" || agentType == at.Codex {
 		return "auto"
 	}
+	if agentType == at.Agy || agentType == at.Antigravity || agentType == at.Gemini {
+		return "auto" // agy's own --mode auto (#14741: the Operator, every agent we ship starts in auto where its CLI has one); an agy whose --help does not list it asks, and never takes a skip flag in its place (appendAgyPermissionMode)
+	}
 	if agentType == at.Opencode {
 		return "bypassPermissions" // opencode's own defaults ask nothing inside its folder: a launch that names no mode starts as it always did, and "default" is the ask-first mode (#11395)
 	}

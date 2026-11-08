@@ -282,7 +282,7 @@ func TestATeamRelaunchByBoardIDKeepsTheConfirmModeForAMemberThatNamesNothing(t *
 }
 
 // The real proof for what a team member that names NO mode is spawned with (Frontend Dev's request on #14337, the Orchestrator's on #14336): the launch line of each type. Claude Auto, Codex's
-// workspace-write with no approvals (never no-sandbox), Hermes Bypass (--yolo), Antigravity stays Default (no skip flag). The stored row says the same.
+// workspace-write with no approvals (never no-sandbox), Hermes Bypass (--yolo), Antigravity Auto (agy's own --mode auto where its --help lists it; no skip flag ever). The stored row says the same.
 func TestATeamMemberThatNamesNoModeIsSpawnedWithEachTypesMapping(t *testing.T) {
 	for _, c := range []struct {
 		cli       string
@@ -292,7 +292,7 @@ func TestATeamMemberThatNamesNoModeIsSpawnedWithEachTypesMapping(t *testing.T) {
 		{at.Claude, []string{"--permission-mode auto"}, []string{"bypassPermissions", "skip-permissions"}, "auto"},
 		{at.Codex, []string{"--sandbox workspace-write -a never"}, []string{"--dangerously-bypass-approvals-and-sandbox", "danger-full-access"}, "auto"},
 		{at.Hermes, []string{"--yolo"}, nil, "bypassPermissions"},
-		{at.Agy, nil, []string{"--dangerously-skip-permissions", "--yolo"}, "default"},
+		{at.Agy, nil, []string{"--dangerously-skip-permissions", "--yolo"}, "auto"}, // #14741: Auto; this stub CLI lists no --mode auto, so its line has no mode flag (it asks) and never a skip flag
 	} {
 		t.Run(c.cli, func(t *testing.T) {
 			rig := setupAgyTestRig(t)

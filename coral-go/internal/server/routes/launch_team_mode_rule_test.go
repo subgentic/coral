@@ -38,7 +38,7 @@ func TestTheTeamModeReachesEveryMemberAndCapabilitiesOnlyNarrowIt(t *testing.T) 
 		at.Agy: {
 			"plan":   {"none": {[]string{"--mode plan"}, []string{"skip-permissions"}}, "four chips": {[]string{"--mode plan"}, []string{"skip-permissions"}}, "read-only": {[]string{"--mode plan"}, nil}},
 			"bypass": {"none": {[]string{"--dangerously-skip-permissions"}, nil}, "four chips": {[]string{"--dangerously-skip-permissions"}, nil}, "read-only": {[]string{"--mode plan"}, []string{"skip-permissions"}}},
-			"":       {"none": {nil, []string{"skip-permissions", "--mode"}}, "four chips": {[]string{"--dangerously-skip-permissions"}, nil}, "read-only": {[]string{"--mode plan"}, nil}},
+			"":       {"none": {nil, []string{"skip-permissions", "--mode"}}, "four chips": {nil, []string{"skip-permissions"}}, "read-only": {[]string{"--mode plan"}, nil}}, // the default is Auto now (#14741): full capabilities narrow it, they never widen it to agy's skip flag
 		},
 	}
 	n := 0
