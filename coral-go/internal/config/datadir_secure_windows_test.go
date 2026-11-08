@@ -65,11 +65,16 @@ func TestExistingDataFolderOthersCanReadIsTightened(t *testing.T) {
 	assert.Equal(t, "db", string(data))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "new.db"), []byte("n"), 0o600))
 	assert.Empty(t, readersOf(t, filepath.Join(dir, "new.db")))
-	// The outcome is what the dashboard's data-folder line shows.
-	w := DataDirWarning(dir)
+	// What was done is told once, as a fix; the folder is private now, so it is no longer a warning (#295).
+	assert.Empty(t, DataDirWarning(dir), "a fixed folder is not a warning")
+	w := DataDirFixed()
 	assert.Contains(t, w, "made its data folder")
 	assert.Contains(t, w, "Users")
 	assert.NotContains(t, w, "WARNING")
+	assert.Equal(t, w, DataDirFixed(), "reading it does not use it up")
+	AckDataDirFixed()
+	assert.Empty(t, DataDirFixed(), "told until the dashboard has shown it")
+	assert.Empty(t, DataDirWarning(dir), "and never as a warning")
 	// A second start finds nothing to do and keeps saying what happened.
 	require.NoError(t, EnsureDataDir(dir))
 	assert.Empty(t, readersOf(t, dir))
@@ -78,6 +83,7 @@ func TestExistingDataFolderOthersCanReadIsTightened(t *testing.T) {
 // A folder that is already private is left alone, with no notice.
 func TestPrivateDataFolderIsLeftAlone(t *testing.T) {
 	setDataDirNotice("")
+	setDataDirFixed("")
 	dir := filepath.Join(privateRoot(t), "coral")
 	require.NoError(t, EnsureDataDir(dir)) // new: protected
 	require.NoError(t, EnsureDataDir(dir)) // existing, already private
@@ -92,7 +98,7 @@ func TestDataFolderAnotherAccountOwnsIsRefusedUnlessAllowed(t *testing.T) {
 	usersCanRead(t, dir)
 	prev := ownedByUs
 	ownedByUs = func(windows.Handle) (bool, error) { return false, nil }
-	t.Cleanup(func() { ownedByUs = prev; SetAllowSharedDataDir(false); setDataDirNotice("") })
+	t.Cleanup(func() { ownedByUs = prev; SetAllowSharedDataDir(false); setDataDirNotice(""); setDataDirFixed("") })
 
 	err := EnsureDataDir(dir)
 	require.ErrorIs(t, err, ErrSharedDataDir)
@@ -137,13 +143,14 @@ func TestDataFolderLinksAreNeverFollowed(t *testing.T) {
 	assert.Empty(t, readersOf(t, dir), "the data folder is private")
 	assert.NotEmpty(t, readersOf(t, outside), "the folder the junction points to is not touched")
 	assert.NotEmpty(t, readersOf(t, secret), "nor what is in it")
-	assert.True(t, strings.Contains(DataDirWarning(dir), "links were left alone"), DataDirWarning(dir))
+	assert.Empty(t, DataDirWarning(dir))
+	assert.Contains(t, DataDirFixed(), "links were left alone")
 
 	// The data folder is itself a junction to a shared folder: refused, not changed.
 	link := filepath.Join(root, "datalink")
 	out, err = consoletest.HiddenCommand("cmd", "/c", "mklink", "/J", link, outside).CombinedOutput()
 	require.NoError(t, err, string(out))
-	t.Cleanup(func() { SetAllowSharedDataDir(false); setDataDirNotice("") })
+	t.Cleanup(func() { SetAllowSharedDataDir(false); setDataDirNotice(""); setDataDirFixed("") })
 	err = EnsureDataDir(link)
 	// Refused by name on every Windows (#350): where junctions can be followed Coral reads the target's list and refuses it as shared; where Windows will not open
 	// the target (build 26300 and later: untrusted mount point), the folder behind it cannot be shown to be private, so it is refused the same way.
@@ -174,12 +181,13 @@ func TestExistingDataFolderGrantingOtherAccountsIsTightened(t *testing.T) {
 
 	assert.Empty(t, readersOf(t, dir))
 	assert.Empty(t, readersOf(t, old), "the explicit entry on the old file did not survive")
-	assert.Contains(t, DataDirWarning(dir), "Guest")
+	assert.Contains(t, DataDirFixed(), "Guest")
 }
 
 // A data folder whose only extra entries are Administrators, SYSTEM and this user is already private: nothing is done.
 func TestDataFolderWithOnlyAdministratorsIsLeftAlone(t *testing.T) {
 	setDataDirNotice("")
+	setDataDirFixed("")
 	dir := filepath.Join(privateRoot(t), "coral")
 	require.NoError(t, os.Mkdir(dir, 0o700))
 	out, err := consoletest.HiddenCommand("icacls", dir, "/grant", "*S-1-5-32-544:(OI)(CI)F").CombinedOutput()
@@ -204,7 +212,7 @@ func TestFolderThatIsNotCoralsIsRefusedAndLeftAlone(t *testing.T) {
 	usersCanRead(t, dir)
 	other := filepath.Join(dir, "main.go")
 	require.NoError(t, os.WriteFile(other, []byte("package main"), 0o600))
-	t.Cleanup(func() { SetAllowSharedDataDir(false); setDataDirNotice("") })
+	t.Cleanup(func() { SetAllowSharedDataDir(false); setDataDirNotice(""); setDataDirFixed("") })
 
 	err := EnsureDataDir(dir)
 	require.ErrorIs(t, err, ErrSharedDataDir)
@@ -220,7 +228,7 @@ func TestFolderTheInstallerMadeWithOnlyTheEulaMarkerIsTightened(t *testing.T) {
 	usersCanRead(t, dir)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, ".eula-accepted"), []byte("1"), 0o600))
 	require.NotEmpty(t, readersOf(t, dir))
-	t.Cleanup(func() { SetAllowSharedDataDir(false); setDataDirNotice("") })
+	t.Cleanup(func() { SetAllowSharedDataDir(false); setDataDirNotice(""); setDataDirFixed("") })
 
 	require.NoError(t, EnsureDataDir(dir))
 	assert.Empty(t, readersOf(t, dir), "the folder is private now")

@@ -2,7 +2,7 @@
 import { markReady } from './ready.js';
 import { isSignedOut } from './overload.js';
 import { fetchSystemStatus } from './system_status.js';
-import { showDatabaseWarning, showDataFolderWarning, showFirewallWarning, showSecurityWarning } from './update_check.js';
+import { showDatabaseWarning, showDataFolderWarning, showFirewallWarning, showSecurityNotice, showSecurityWarning } from './update_check.js';
 import { importOnce } from './import_once.js';
 import { dashboardSessionsLoaded, dashboardStartupComplete, dashboardFailed } from './dashboard_analytics.js';
 import { loadLiveSessions } from './api.js';
@@ -64,6 +64,7 @@ export function pollStartupStatus() {
                     .catch(() => {}).then(() => el.classList.add('hidden'));
                 if (data.security_warning) showSecurityWarning(data.security_warning); // #3637
                 if (data.data_folder_warning) showDataFolderWarning(data.data_folder_warning, adoptDataFolder); // #12591: Coral runs as usual; this only offers to adopt the folder
+                if (data.security_notice) showSecurityNotice(data.security_notice); // #295: a folder Coral made private is told once, as a fix
                 if (data.firewall_warning) showFirewallWarning(data.firewall_warning); // #97: a broad Windows Firewall rule for Coral's programs
                 startSigninLine(data); // #5478: the one calm line while Claude is not signed in
                 // The server checks its databases a minute after it starts (#4157): look again then.
