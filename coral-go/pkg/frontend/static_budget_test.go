@@ -28,7 +28,8 @@ const (
 	// #13756: lazy Markdown editor assets bring the tree to 5,826,723 bytes; plus 64 KiB, rounded up. Startup CSS and page-weight caps are unchanged.
 	// v2.0.59 facets integration (#13172 merged onto v2.0.58): the facet and review-query code in the Inbox and Needs you (inbox_reviews.js and its neighbours) is 1400 bytes over the v2.0.58 limit; raised by the tree plus 64 KiB, as the standing OK for approved work allows.
 	// v2.0.60 batch (the Inbox paging, version bar, Needs you cards, thumbnails, trust, version-skew fallback and the rest): the tree is 5,972,141 bytes; plus 64 KiB, rounded up. Standing OK for approved work.
-	staticBudget = 6_038_528
+	// Trial-t261 with the row-menu focus follow-up: 6,039,563 bytes plus 64 KiB, rounded up, under the standing policy.
+	staticBudget = 6_106_112
 	// fileBudget is the most one embedded file may hold (the CodeMirror bundle, the largest, is ~1 MB).
 	fileBudget = 1536 << 10
 	// budgetWarnRoom is the room under which the test warns, and budgetPolicyRoom the room a raise leaves.
