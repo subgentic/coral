@@ -27,13 +27,15 @@ export function activityParts(row, itemWords) {
     const mk = (did, on, detail = '') => ({ did, on, detail: detail === FIXED_DISMISS_NOTE ? '' : detail });
     if (row.action === 'answer' && row.item_kind === 'question') { // a NEW row: the title is the ask's line and `asker` is who asked; an older row keeps the asker in the title
         const answer = note ? `Your answer: ${cleanAnswer(note, row.asker || row.title)}` : '';
-        if (row.asker) return mk('Answered', row.title || 'a question', [`from ${row.asker}`, answer].filter(Boolean).join(' · '));
+        if (row.asker) return mk('Answered', String(row.title || '').replace(/^@Operator\b[\s,:]*/i, '').trim() || 'a question', [`from ${row.asker}`, answer].filter(Boolean).join(' · '));
         return mk('Answered', row.title ? `${row.title}’s question` : 'a question', answer);
     }
     if (row.action === 'prompt_allow') return mk('Allowed', `${who}’s permission request`, note);
     if (row.action === 'prompt_reject') return mk('Refused', `${who}’s permission request`, note);
     if (row.action === 'prompt_answer') return mk('Answered', `${who}’s permission prompt`, note);
     if (TASK_DID[row.action]) return mk(TASK_DID[row.action], `task #${row.item_id}${row.title ? ` ${row.title}` : ''}`, note);
+    if (row.action === 'file_tags' && row.title) return mk('Changed the tags', obj, note);
+    if (row.action === 'file_share') return mk('Shared', obj, note);
     if (row.action === 'file_edit_send') return mk('Sent your edit', `${row.title || 'a file'}`, [note, 'to agents'].filter(Boolean).join(' · '));
     if (row.action === 'file_edit') return mk('Saved a new version', `${row.title || 'a file'}`, note);
     if (row.action === 'wait_dismiss') return mk('Dismissed', `${who}’s waiting card`);
