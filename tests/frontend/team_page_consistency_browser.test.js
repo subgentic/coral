@@ -30,12 +30,12 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
         await S.run('a waiting agent is "needs attention", not "All well"', async () => {
             assert.equal(await status(), '1 needs attention', `got ${JSON.stringify(await status())}`);
         });
-        await S.run('with agents needing attention the status is a button named "Team health: 1 needs attention" that opens the Agents tab', async () => {
+        await S.run('with agents needing attention the status is a button named "Team health: 1 needs attention" that opens the Needs you tab', async () => {
             const b = await ev(`(() => { const e = document.getElementById('team-page-health'); const r = e.getBoundingClientRect(); const reg = document.getElementById('team-page-status'); return { shown: !e.hidden && r.width > 0, name: e.getAttribute('aria-label'), text: e.textContent.trim(), role: e.tagName, regionHidden: getComputedStyle(reg).position === 'absolute', insideRegion: reg.contains(e) }; })()`);
             assert.deepEqual([b.shown, b.name, b.text, b.role, b.insideRegion], [true, 'Team health: 1 needs attention', '1 needs attention', 'BUTTON', false], JSON.stringify(b));
             assert.equal(b.regionHidden, true, 'the live region is for the screen reader, not drawn twice');
             await ev(`document.getElementById('team-page-health').click(); true`); await settle(500);
-            assert.equal(await ev(`document.querySelector('#team-tabs [aria-selected=true]').id`), 'team-tab-agents', 'it opens the Agents tab');
+            assert.equal(await ev(`document.querySelector('#team-tabs [aria-selected=true]').id`), 'team-tab-needs', 'it opens the Needs you tab');
             await ev(`document.getElementById('team-tab-goals').click(); true`); await settle(300);
         });
         await S.run('with nobody waiting, offline or queued the status is "All well"', async () => {

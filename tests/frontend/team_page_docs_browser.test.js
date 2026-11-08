@@ -44,6 +44,7 @@ const TEAM = `qa-docs-${Date.now() % 100000}`;
                 assert.ok((await ev(`window.__tp.rows()`)).length >= 5, 'the first page is present (the visible footer may already append the second)');
             });
             await S.run(`${label}: automatic paging appends the next page without duplicate or reordered rows`, async () => {
+                await ev(`window.__tp.table().querySelector('tbody tr:last-child')?.scrollIntoView({block:'start'});true`); // the phone's first page fills the pane: reveal its paging footer without pressing Load more
                 await waitFor(`window.__tp.rows().length === 10`, 'ten rows after automatic paging', 6000);
                 const names = await ev(`[...window.__tp.table().querySelectorAll('tbody .dt-primary')].map(b => (b.textContent.match(/^Report \\d+/) || [b.textContent])[0])`); // a phone's row is a mail row: the name, then its goal and date in the same button (#12230)
                 assert.deepEqual(names, [0, 1, 2, 3, 4, 100, 101, 102, 103, 104].map(n => 'Report ' + n), 'both pages retain their order with no duplicate rows');
