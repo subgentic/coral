@@ -9,6 +9,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
 
+const WHY = 'The folder on the screen is not the one this agent was started in.';
 const FOLDER = '/Users/qa/work/a-very-long-folder-name-for-a-project-that-keeps-going/and-deeper/still-deeper/project';
 const MENU = (extra = {}) => ({ question: 'Quick safety check: Is this a project you created or one you trust?', ask_id: 'trust-ask', unnumbered: true, options: [{ n: 1, label: 'No, exit', action: 'select' }, { n: 2, label: 'Yes, I trust this folder', action: 'select' }], trust_folder: FOLDER, trust_offer: true, ...extra });
 
@@ -104,6 +105,7 @@ const MENU = (extra = {}) => ({ question: 'Quick safety check: Is this a project
             const cases = {
                 'no offer': [MENU({ trust_offer: false }), 1],
                 'no folder': [MENU({ trust_folder: '' }), 1],
+                'no offer, with the reason (#14572)': [MENU({ trust_offer: false, trust_why: WHY }), 1],
                 'a hidden character in the folder': [MENU({ trust_folder: '/Users/qa/work/pro\u202Eject' }), 1],
                 'a lasting Yes with other words': [MENU({ options: [{ n: 1, label: 'No, exit', action: 'select' }, { n: 2, label: 'Yes, always trust this folder', action: 'select' }] }), 0],
                 'a third option': [MENU({ options: [{ n: 1, label: 'No, exit', action: 'select' }, { n: 2, label: 'Yes, I trust this folder', action: 'select' }, { n: 3, label: 'Yes, and every folder under it', action: 'select' }] }), 0],
@@ -118,6 +120,7 @@ const MENU = (extra = {}) => ({ question: 'Quick safety check: Is this a project
                 const got = await rowButtons();
                 check(!got.some(l => /trust/i.test(l)) && (expect === 0 ? JSON.stringify(got) === JSON.stringify(['Open agent']) : got.length === expect), `${at}${name}: no Yes on the row (${expect ? expect + ' choice' : 'only Open agent'}): ` + JSON.stringify(got));
                 if (name === 'no offer' || name === 'no folder' || name === 'a hidden character in the folder') check(JSON.stringify(got) === JSON.stringify(['No, exit']) && /open the agent/i.test(await ev(`document.querySelector('#group-table-view .inbox-answers').textContent`)), `${at}${name}: No only, the rest is left to Open: ` + JSON.stringify(got));
+                if (name === 'no offer, with the reason (#14572)') check((await ev(`document.querySelector('#group-table-view .inbox-only-reject')?.textContent || ''`)).includes(`No Yes here: ${WHY} Open the agent to answer.`), `${at}${name}: the row says why there is no Yes`);
             }
 
             // 5) the server refuses the Yes (the folder changed): told, nothing claimed, the choices drawn again

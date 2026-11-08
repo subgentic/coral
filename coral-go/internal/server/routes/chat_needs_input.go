@@ -206,7 +206,7 @@ func (h *SessionsHandler) addNeedsInput(r *http.Request, reply map[string]any, n
 		return s, true
 	})
 	if shown {
-		screen.TrustOffer = h.trustOffered(r, sessionID, screen) // per caller: the cached screen is shared, the offer is not (#14110)
+		screen.TrustOffer, screen.TrustWhy = h.trustVerdict(r, sessionID, screen) // per caller: the cached screen is shared, the offer is not (#14110); the reason there is no Yes is said too (#14572)
 		reply["prompt_options"] = screen
 	}
 }

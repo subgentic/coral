@@ -106,23 +106,40 @@ func sameFolder(a, b string) bool {
 // trustOffered says whether the row may offer Yes for s to this caller: the menu is the folder-trust menu, its folder was read and is one Coral may trust, the folder is the live session's
 // OWN recorded working directory or its worktree folder (what Coral knows, not what the terminal printed: Security's MUST on #14110), and the caller is the person's own dashboard.
 func (h *SessionsHandler) trustOffered(r *http.Request, sessionID string, s promptScreen) bool {
-	if s.TrustFolder == "" || !isFolderTrustMenu(s) || !trustFolderCaller(r) || sessionID == "" || h.ss == nil {
-		return false
+	ok, _ := h.trustVerdict(r, sessionID, s)
+	return ok
+}
+
+// trustVerdict is trustOffered with the reason there is no Yes, in plain words for the row (#14572): the one check that refused it, said once. The rule is the same; only what is said about a refusal is new.
+// why is "" when the offer is made, and when s is not the folder-trust menu (nothing to say).
+func (h *SessionsHandler) trustVerdict(r *http.Request, sessionID string, s promptScreen) (bool, string) {
+	if !isFolderTrustMenu(s) {
+		return false, ""
+	}
+	switch {
+	case !trustFolderCaller(r):
+		return false, "Only the person at this computer's own dashboard can say Yes to this."
+	case s.TrustFolder == "":
+		return false, "Coral could not read which folder this is from the screen."
+	case sessionID == "" || h.ss == nil:
+		return false, "Coral cannot tell which agent this is."
 	}
 	ls, err := h.ss.GetLiveSession(r.Context(), sessionID)
 	if err != nil || ls == nil {
-		return false
+		return false, "Coral cannot find this agent's own folder to compare it with."
 	}
 	own := sameFolder(s.TrustFolder, ls.WorkingDir) || (ls.WorktreePath != nil && sameFolder(s.TrustFolder, *ls.WorktreePath))
 	if !own {
-		return false
+		return false, "The folder on the screen is not the one this agent was started in."
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return false
+		return false, "Coral could not check this folder."
 	}
-	_, err = foldertrust.Check(s.TrustFolder, home, foldertrust.Ticked)
-	return err == nil
+	if _, err = foldertrust.Check(s.TrustFolder, home, foldertrust.Ticked); err != nil {
+		return false, "Coral does not trust this kind of folder from here (your home folder, a top folder or a hidden one)."
+	}
+	return true, ""
 }
 
 // isTrustYes is whether option opt of s is the folder-trust menu's Yes.
