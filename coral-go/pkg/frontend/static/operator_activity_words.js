@@ -43,3 +43,12 @@ export function activityParts(row, itemWords) {
     if (kind && obj !== undefined) { const bare = did.slice(0, -(kind.length + 1)); if (!/\b(?:of|to|for|the)$/.test(bare)) did = bare; } // "Starred a file" is Starred | the file
     return mk(did, obj, note);
 }
+
+/** The goal and task a row was about, when the record kept them (#14421, S1): "Goal #233 · Threaded Needs you · Task #14390 · Mockups". A task's own row is not told its task again, nor a goal's row its goal; a row from before the record kept them, or about
+ *  neither, has none (never guessed). The titles are the ones the server looks up now, so they are words an agent may have written: the caller writes them as text. */
+export function aboutWords(row) {
+    const goalId = Number(row.goal_id) || 0, taskId = Number(row.task_id) || 0, out = [];
+    if (goalId && !(row.item_kind === 'goal' && String(row.item_id) === String(goalId))) out.push(`Goal #${goalId}${row.goal_title ? ` \u00b7 ${row.goal_title}` : ''}`);
+    if (taskId && !(row.item_kind === 'task' && String(row.item_id) === String(taskId))) out.push(`Task #${taskId}${row.task_title ? ` \u00b7 ${row.task_title}` : ''}`);
+    return out.join(' \u00b7 ');
+}
