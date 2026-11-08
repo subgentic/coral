@@ -22,6 +22,7 @@ import { whenText, shortWhen } from './when_text.js';
 import { browserLocal } from './safe_storage.js';
 import { loadStyles } from './lazy_styles.js';
 
+let lastTap = { key: '', at: -1e9 }; // the last group-heading tap the pointer path handled (every table draws again after a toggle, so this outlives the table that heard it)
 export const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const button = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 
@@ -210,6 +211,13 @@ export function dataTable(cfg) {
     const table = el('table', 'dt-table'); table.setAttribute('aria-label', cfg.label); table.setAttribute('role', 'table');
     if (cfg.layout === 'fixed' || cfg.oneLine) table.style.tableLayout = 'fixed'; // grouped lists share column widths even when their contents differ
     const thead = el('thead'); thead.setAttribute('role', 'rowgroup'); const tbody = el('tbody'); tbody.setAttribute('role', 'rowgroup');
+    // A group heading that opens and shuts its rows (a task's, #14441/#14483) is toggled from here, not from a handler on the button: the table is drawn again while a finger is down (a poll, a read landing), the button is a new element when it
+    // is lifted, and the browser then sends the click to their common parent, so a handler on the button never heard it. The press and the lift are matched by the group's KEY, and the toggle that is current for that key (set at every draw) runs.
+    const groupToggles = new Map(); let pressed = null;
+    const toggleOf = e => { const b = e.target && e.target.closest && e.target.closest('.dt-group-toggle'); return b && b.dataset.groupKey ? b : null; };
+    tbody.addEventListener('pointerdown', e => { const b = toggleOf(e); pressed = b ? { key: b.dataset.groupKey, x: e.clientX, y: e.clientY } : null; });
+    tbody.addEventListener('pointerup', e => { const b = toggleOf(e), d = pressed; pressed = null; if (!b || !d || b.dataset.groupKey !== d.key || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 12) return; const run = groupToggles.get(d.key); if (run) { lastTap = { key: d.key, at: e.timeStamp }; run(); } });
+    tbody.addEventListener('click', e => { const b = toggleOf(e); if (!b) return; if (e.detail > 0 && lastTap.key === b.dataset.groupKey && e.timeStamp - lastTap.at < 600) return; /* the pointer path already did this tap: it drew the table again, so this click is on the NEW table and the guard is module-wide */ const run = groupToggles.get(b.dataset.groupKey); if (run) run(); }); // a keyboard press (detail 0), or a click the pointer path did not see
     const colgroup = el('colgroup');
     table.append(colgroup, thead, tbody);
     // the columns left out to fit the panel are never silently gone (#11943): a quiet control says how many, lists them and brings one back (it then keeps its place and the others give way by the same rules)
@@ -539,7 +547,7 @@ export function dataTable(cfg) {
         const cols = columns.length + (sel ? 1 : 0);
         let lastGroup = null, lastParent = null;
         const groupHead = g => { const gr = el('tr', g.level === 'task' ? 'dt-group dt-group-task' : 'dt-group'); gr.setAttribute('role', 'row'); const gh = el('th', null); gh.colSpan = cols; gh.scope = 'rowgroup'; gh.setAttribute('role', 'rowheader'); // a group with onToggle (a task's items, #14441) is one button that opens and shuts them
-            if (g.onToggle) { const b = el('button', 'dt-group-toggle'); b.type = 'button'; b.setAttribute('aria-expanded', String(g.open !== false)); const words = el('span', 'dt-group-words', g.label); b.append(words); if (g.chip) b.append(el('span', 'chip chip-tag dt-group-chip', g.chip)); b.addEventListener('click', g.onToggle); gh.append(b); } else gh.textContent = g.label;
+            if (g.onToggle) { const b = el('button', 'dt-group-toggle'); b.type = 'button'; b.setAttribute('aria-expanded', String(g.open !== false)); const words = el('span', 'dt-group-words', g.label); b.append(words); if (g.chip) b.append(el('span', 'chip chip-tag dt-group-chip', g.chip)); b.dataset.groupKey = g.key; groupToggles.set(g.key, g.onToggle); gh.append(b); } else gh.textContent = g.label;
             gr.append(gh); tbody.append(gr); };
         const mails = mailOn() ? list.map(r => cfg.mail(r)) : null, gap = !!mails && mails.some(m => m.actions && m.actions.length); // a list with a ⋯ on any row reserves its 44 px on every row, so the times line up (#137104)
         list.forEach((r, i) => {
