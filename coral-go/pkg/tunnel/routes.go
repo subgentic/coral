@@ -246,6 +246,8 @@ var routeTable = cat(
 		"/api/sessions/live/{name}/notices/resume",
 	)),
 	owner(OwnerRefuse, rules(http.MethodGet, TierView,
+		// The first-launch notice (#14353, #14414): the text and whether this computer's owner has read it, for the Computers page. Read only, no query. Acknowledging and clearing it are not listed (never): that is the person at the computer's own dashboard.
+		"/api/launch-disclosure",
 		"/api/artifacts/{hex64}",
 		// Which artifact a shortened link in an old message means (#9841): link, repeatable, the owner's alone like the reads around it.
 		"/api/artifacts/resolve",

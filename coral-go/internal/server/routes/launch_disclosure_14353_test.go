@@ -39,7 +39,9 @@ func newDiscRig(t *testing.T) *discRig {
 }
 
 func withKind(kind string) func(*http.Request) *http.Request {
-	return func(r *http.Request) *http.Request { return r.WithContext(context.WithValue(r.Context(), callerKindKey{}, kind)) }
+	return func(r *http.Request) *http.Request {
+		return r.WithContext(context.WithValue(r.Context(), callerKindKey{}, kind))
+	}
 }
 
 func asAgentToken(r *http.Request) *http.Request {
