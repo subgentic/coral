@@ -50,9 +50,10 @@ export function loadInitialData(popout) {
     loadLiveSessions(dashboardFailed).then(ok => {
         markReady('liveList'); // already marked by the render; this covers a failed first load
         dashboardSessionsLoaded(ok);
+        if (!popout && isCloud()) loadPinnedFolders(); // computer inventory is now known; never ask the Hub origin for pins
         if (!isCloud()) loadAllFolderTags().then(() => importOnce('./render.js')).then(m => m.scheduleLiveSessionsRender()); // the Hub reads a folder's tags when its own menu opens, not on Chats/Board startup
     }).finally(() => { _startListLoadSettled(); _liveListLoaded(); });
-    if (!popout) loadPinnedFolders();
+    if (!popout && !isCloud()) loadPinnedFolders();
     if (!popout) importOnce('./received_cap_notice.js').then(m => m.checkReceivedCap()).catch(() => {}); // #4441: told once when received files reach 80% of their limit
     if (!popout) importOnce('./terminal_backend.js').then(m => { m.checkTerminalNotices(); m.watchAutoWake(); m.watchHooksStatus(); }).catch(() => {}); // #3634, #3636, #3665
     for (const [n, f] of [['loadCustomViews', loadCustomViews], ['initTabCustomize', initTabCustomize], ['initDockTabs', initDockTabs], ['initAgentUI', initAgentUI]]) { // a failing step must not stop the feed

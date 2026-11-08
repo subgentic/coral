@@ -30,6 +30,7 @@ const {setupHubWorld,BASE}=require('./helpers/hub_world');
   assert.ok(!report.calls.some(c=>c.path.endsWith('/distill-knowledge')),'hidden Agents team chips defer distill reads');
   assert.ok(!report.calls.some(c=>c.source==='hub'&&c.path==='/api/pinned-folders'),'cloud startup does not ask Hub origin for computer pins');
   assert.ok(!report.calls.some(c=>/\/board\/[^/]+\/artifacts$/.test(c.path)&&/tag=/.test(c.query)),'no per-board Saved/review fan-out before Needs you paints');
+  await waitFor(`window.__loadCalls.some(c=>c.source==='m2'&&c.path==='/api/pinned-folders')`,'computer pins load after inventory arrives');
   await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.openInboxGroup('saved'))`);
   await waitFor(`window.__loadCalls.some(c=>c.source==='m2'&&new URLSearchParams(c.query).get('tag')==='saved')`,'opening Saved activates its cross-team file read');
   await ev(`import((window.__coralStatic||'/static/')+'team_availability.js').then(m=>m.refreshTeamAvailability('@m2/same-team',true))`);
