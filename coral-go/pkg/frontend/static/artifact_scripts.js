@@ -9,6 +9,7 @@ import { serverFetch } from './server_base.js';
 export const MAX_SCRIPT_HTML_BYTES = 2 * 1024 * 1024;
 const HOST_URL = '/static/artifact_host.html';
 const MAX_HEIGHT = 20000;
+export const HEIGHT_GAP_MS = 250;
 const HEX_RE = /^[a-f0-9]{64}$/;
 
 /** Is this digest trusted to run scripts? true only on a clean 200 `{trusted:true}`; anything else (an error, a refusal, a network failure, odd JSON) is false: it fails closed. */
@@ -77,7 +78,7 @@ function scriptFrame(html, name, { onNavigated }) {
     frame.setAttribute('sandbox', 'allow-scripts');
     frame.setAttribute('allow', '');
     frame.setAttribute('referrerpolicy', 'no-referrer');
-    let ready = false, sent = false;
+    let ready = false, sent = false, lastHeightAt = -Infinity;
     const handler = e => {
         if (e.source !== frame.contentWindow) return; // only this host
         const m = e.data;
@@ -87,8 +88,12 @@ function scriptFrame(html, name, { onNavigated }) {
             ready = true;
             if (!sent && frame.contentWindow) { sent = true; frame.contentWindow.postMessage({ type: 'coral-artifact-load', html }, '*'); }
         } else if (m.type === 'coral-artifact-height') {
+            // the file's one message: a whole number, never taller than the window, and at most one every 250 ms (a file that asks over and over is ignored, not obeyed)
+            const now = Date.now();
+            if (now - lastHeightAt < HEIGHT_GAP_MS) return;
+            lastHeightAt = now;
             const h = clampHeight(m.height);
-            if (h !== null && h >= 120) frame.style.minHeight = `${h}px`;
+            if (h !== null && h >= 120) frame.style.minHeight = `${Math.min(h, Math.max(240, window.innerHeight))}px`;
         } else if (m.type === 'coral-artifact-navigated') onNavigated();
     };
     window.addEventListener('message', handler);
@@ -99,7 +104,7 @@ function scriptFrame(html, name, { onNavigated }) {
 
 /** Draw the file with its scripts running, under a bar OUTSIDE the frame that says so and holds Turn off. `turnOff()` is called when the person turns it off (after the record is deleted). */
 export function drawScripted(wrapper, { html, name, turnOff, line }) {
-    const strip = bar('artifact-scripts-bar', 'Scripts are on for this version of the file. They can draw and animate; Coral blocks them from the internet, your files, Coral and other pages. ');
+    const strip = bar('artifact-scripts-bar', 'Scripts are on for this version of the file. Coral limits what they can reach: no web requests, no cookies, no files. ');
     strip.setAttribute('role', 'status');
     const off = button('Turn off', 'artifact-scripts-off', () => { off.disabled = true; turnOff(); });
     strip.append(off);
@@ -121,7 +126,7 @@ export function drawOffer(wrapper, { hex, server, onTrusted, fetchFn = serverFet
         const box = document.createElement('div');
         box.className = 'artifact-scripts-sure'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Run scripts in this file');
         const words = document.createElement('p');
-        words.textContent = 'This file can run scripts. They can draw and animate. Coral blocks them from the internet, your files, Coral and other pages. Trust it only from an agent you trust.';
+        words.textContent = 'This file can run scripts. They can draw and animate. Coral limits what they can reach: no web requests, no cookies, no files. Do not trust a file you would not open.';
         const msg = document.createElement('p'); msg.className = 'artifact-scripts-msg'; msg.setAttribute('role', 'status');
         const go = button('Run scripts', 'btn-primary artifact-scripts-go', async () => {
             go.disabled = true;

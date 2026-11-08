@@ -122,6 +122,14 @@ const base = require('./test_base').BASE;
         const real = await leaksOf('', 'real', '', u => /\/static\/artifact_host\.html/.test(u));
         assert.deepEqual(real, [], 'the real host leaks: ' + JSON.stringify(real));
         assert.deepEqual(hits, [], 'no request left any file: ' + JSON.stringify(hits.slice(0, 5)));
+        // a file's height requests: the first is obeyed up to the window's height, the ones that follow at once are ignored (one every 250 ms), whatever number they carry
+        {
+            await ev(`window.runFile('height', ${JSON.stringify(page("parent.postMessage({ type: 'coral-artifact-height', height: 99999 }, '*'); parent.postMessage({ type: 'coral-artifact-height', height: 130 }, '*');"))}, '', '')`);
+            let px = ''; for (let i = 0; i < 120 && !px; i++) { await sleep(50); px = await ev(`window.runs[window.runs.length - 1].frame.style.minHeight`); }
+            const inner = await ev(`window.innerHeight`);
+            assert.equal(px, `${Math.max(240, inner)}px`, 'the first height was capped to the window and the one right after it was ignored');
+            await ev(`window.clearRuns()`);
+        }
         // the file may only ask for a height: a forged load, an oversized one and a wrong type are ignored by the host; a clamped height is the one thing relayed
         for (const n of Object.keys(mutants)) {
             hits.length = 0;

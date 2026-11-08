@@ -80,7 +80,7 @@ const OTHER = 'cd'.repeat(32);
             // 2. the confirmation: the words, Cancel changes nothing
             await click('.artifact-scripts-ask');
             assert.ok(await q('.artifact-scripts-sure'), `${w}: the confirmation opens in place`);
-            assert.equal((await text('.artifact-scripts-sure p')).trim(), 'This file can run scripts. They can draw and animate. Coral blocks them from the internet, your files, Coral and other pages. Trust it only from an agent you trust.', `${w}: the confirmation says what the design says`);
+            assert.equal((await text('.artifact-scripts-sure p')).trim(), 'This file can run scripts. They can draw and animate. Coral limits what they can reach: no web requests, no cookies, no files. Do not trust a file you would not open.', `${w}: the confirmation says what the design says`);
             await shot('scripts-confirm-' + w);
             await click('.artifact-scripts-cancel');
             assert.ok(!(await q('.artifact-scripts-sure')) && (await q('.artifact-scripts-ask')), `${w}: Cancel closes it and the offer is back`);
@@ -96,7 +96,7 @@ const OTHER = 'cd'.repeat(32);
             assert.equal(f.sandbox, 'allow-scripts', `${w}: the frame is sandboxed with allow-scripts and nothing else`);
             assert.equal(f.allow, '', `${w}: no device or feature is allowed`);
             assert.equal(f.ref, 'no-referrer'); assert.equal(f.src, '/static/artifact_host.html');
-            assert.ok(f.barOutside && /Scripts are on/.test(f.bar) && f.off, `${w}: the bar is outside the frame, says Scripts are on and holds Turn off: ` + JSON.stringify(f));
+            assert.ok(f.barOutside && /Scripts are on/.test(f.bar) && /no web requests, no cookies, no files/.test(f.bar) && !/blocks them/.test(f.bar) && f.off, `${w}: the bar is outside the frame, says Scripts are on and holds Turn off: ` + JSON.stringify(f));
             assert.ok(!f.plainBanner && f.chipHidden, `${w}: the plain banner and its chip are gone while scripts are on: ` + JSON.stringify(f));
             await waitFor(`true`, 'tick', 100);
             let ran = null; for (let i = 0; i < 200 && ran !== 'RAN'; i++) { ran = await frameText(true); if (ran !== 'RAN') await sleep(50); }
