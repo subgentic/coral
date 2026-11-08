@@ -60,6 +60,18 @@ func folderTrustPath(screen string) string {
 		if strings.HasPrefix(p, "Quick safety check") || strings.ContainsAny(p, "\x00\r") {
 			return ""
 		}
+		// A long folder wraps at the terminal's width (an agent whose terminal is narrow: one nobody has opened yet is at the launch width): the path goes on over the next lines up to the blank line
+		// that ends it. The joined text is only ever COMPARED with the session's own recorded folder (trustOffered): a path that is not exactly that folder is never offered a Yes (#14560).
+		for k := j + 1; k < len(lines) && k <= j+3; k++ {
+			more := strings.TrimSpace(lines[k])
+			if more == "" {
+				break
+			}
+			if strings.HasPrefix(more, "Quick safety check") || strings.ContainsAny(more, "\x00\r") {
+				return ""
+			}
+			p += more
+		}
 		return p
 	}
 	return ""
