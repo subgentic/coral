@@ -180,7 +180,8 @@ async function serverLiveRow(server, sessionName) {
     const raw = await r.json().catch(() => null);
     const rows = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.sessions) ? raw.sessions : null);
     if (!rows) return { failed: 'its list was not readable' };
-    return { row: rows.find(s => s && sessionServer(s) === server && `${s.agent_type}-${s.session_id}` === sessionName) || null };
+    // The list was asked of ONE computer, so its rows are that computer's: a remote answers machine-local rows with no server tag (the tag is what the page adds when it merges lists), and an untagged row must not be taken for the local computer's (#14420, UI Reviewer). Only a row tagged for ANOTHER computer (a hub's merged list) is not this one's.
+    return { row: rows.find(s => s && (!s.server || sessionServer(s) === server) && `${s.agent_type}-${s.session_id}` === sessionName) || null };
 }
 
 /** An ended agent's Restart from a question (#14172): no live row any more, so its earlier chat is resumed (resume_ended.js), under its own name and team. */

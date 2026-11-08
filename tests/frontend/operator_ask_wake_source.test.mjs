@@ -64,4 +64,24 @@ test('an agent the server lists on another computer is not this one: it is resum
     await wakeMember({ board: 'team a' }, name);
     assert.equal(launches.length, 1, 'the one on another computer does not make this one running');
 });
+// #14420 (UI Reviewer's MUST): the rows a REMOTE computer answers carry no server tag; the request's target says whose they are. A running or sleeping remote member is found, never taken for absent.
+const askRemote = (rows, launches, wakes) => { state.liveSessions = []; calls = []; const R = '/api/remote/m1'; globalThis.fetch = window.fetch = async (url, opts = {}) => { const u = String(url); calls.push({ url: u, method: opts.method || 'GET' }); if (u === R + '/api/board/team%20a/subscribers') return Response.json([member]); if (u === R + '/api/sessions/live') return Response.json(rows); if (u === R + '/api/sessions/live/' + id + '/wake' && opts.method === 'POST') { wakes.push(u); return Response.json({ ok: true }); } if (u === R + '/api/sessions/history/' + id + '/resume-info') return Response.json({ working_dir: '/work/crew', working_dir_exists: true, agent_type: 'claude', display_name: 'Planner', permission_mode: 'default' }); if (u === R + '/api/sessions/launch' && opts.method === 'POST') { launches.push(u); return Response.json({ ok: true }); } return Response.json({}, { status: 404 }); }; };
+test('a running agent on another computer, listed WITHOUT a server tag, is never resumed', async () => {
+    const launches = [], wakes = [];
+    askRemote([{ agent_type: 'claude', session_id: id, sleeping: false }], launches, wakes);
+    await assert.rejects(wakeMember({ server: 'm1', board: 'team a' }, name), /Planner is running/);
+    assert.deepEqual(launches, [], 'nothing launched'); assert.deepEqual(wakes, [], 'nothing woken'); assert.equal(calls.some(c => c.url.includes('resume-info')), false, 'no resume-info read');
+});
+test('a sleeping agent on another computer, listed without a server tag, is woken on that computer, not resumed', async () => {
+    const launches = [], wakes = [];
+    askRemote([{ agent_type: 'claude', session_id: id, sleeping: true }], launches, wakes);
+    await wakeMember({ server: 'm1', board: 'team a' }, name);
+    assert.deepEqual(wakes, ['/api/remote/m1/api/sessions/live/' + id + '/wake'], 'the wake route of that computer'); assert.deepEqual(launches, [], 'not resumed'); assert.equal(calls.some(c => c.url.includes('resume-info')), false);
+});
+test('an agent on another computer that its list does not hold is resumed there, as ended', async () => {
+    const launches = [], wakes = [];
+    askRemote([], launches, wakes);
+    await wakeMember({ server: 'm1', board: 'team a' }, name);
+    assert.deepEqual(launches, ['/api/remote/m1/api/sessions/launch'], 'resumed on that computer'); assert.deepEqual(wakes, []);
+});
 test.after(()=>dom.window.close());
