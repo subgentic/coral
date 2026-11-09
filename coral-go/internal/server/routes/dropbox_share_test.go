@@ -268,7 +268,7 @@ func TestSharingIsTheOperatorsPressOnThisComputer(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, code, "the press is required")
 	code, out := be.share(d, `{"name":"x.md","audience":"team","confirm":true}`)
 	assert.Equal(t, http.StatusBadRequest, code, "no team: %v", out)
-	for _, kind := range []string{"", callerHub, callerAgentToken, callerAPIKey, callerLocalOther} {
+	for _, kind := range []string{"", callerHub, callerHubOwner, callerAgentToken, callerAPIKey, callerLocalOther} {
 		code, _ = be.shareCall(http.MethodPost, "/api/dropbox/share/"+d, `{"name":"x.md","audience":"public","confirm":true}`, kind)
 		assert.Equal(t, http.StatusForbidden, code, "caller %q", kind)
 		code, _ = be.shareCall(http.MethodGet, "/api/dropbox/shares", "", kind)
@@ -400,6 +400,7 @@ func TestABasicAccountGetsNoExpiryAndTheCleanupUndoesAHalfMadeShare(t *testing.T
 	code, out := be.share(d, `{"name":"x.md","audience":"public","expire":true,"confirm":true}`)
 	require.Equal(t, http.StatusOK, code, "%v", out)
 	assert.Nil(t, out["expires_at"])
+	assert.Contains(t, out["expiry"], "not available on this Dropbox plan", "asked for, not available: said (QA's INFO 6)")
 
 	// A crash after the link: the row is still preparing, the link is not stored. The cleanup finds it in Dropbox and revokes it.
 	ctx := context.Background()

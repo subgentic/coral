@@ -369,6 +369,9 @@ func (h *CloudHandler) DropboxShare(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, code, refusal)
 		return
 	}
+	if in.Expire && acct.Basic && in.Audience != store.DropboxSharePeople {
+		res["expiry"] = "Expiry is not available on this Dropbox plan: the link does not expire until you stop sharing" // said, not silently none (QA's INFO 6)
+	}
 	writeJSON(w, http.StatusOK, res)
 }
 

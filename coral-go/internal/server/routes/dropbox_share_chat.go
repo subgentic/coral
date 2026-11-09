@@ -331,6 +331,9 @@ func (h *CloudHandler) DropboxShareChat(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	delete(res, "version")
+	if in.Expire && acct.Basic && in.Audience != store.DropboxSharePeople {
+		res["expiry"] = "Expiry is not available on this Dropbox plan: the link does not expire until you stop sharing" // said, not silently none (QA's INFO 6)
+	}
 	res["included"] = page.included
 	writeJSON(w, http.StatusOK, res)
 }
