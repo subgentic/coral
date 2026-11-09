@@ -1,0 +1,6 @@
+/* The home page's Run your own hub box (#14976): drawn by home_own_hub.js, which loads this when it fills the box (not in the start stylesheet). */
+.editions-home-own { cursor: default; padding-inline-end: 14px; } /* a box with its own buttons, not one big button (#14976) */
+.editions-home-own-state { display: block; margin-top: 6px; color: var(--text-secondary); font-size: var(--fs-sm); }
+.editions-home-own-state:empty { display: none; }
+.editions-home-own-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.editions-home-own-actions .btn { margin: 0; } /* the page's bare button margin is not wanted in a row of small buttons */

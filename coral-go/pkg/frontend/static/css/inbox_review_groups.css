@@ -11,3 +11,4 @@
 
 .inbox-group-mode { min-width: 0; max-width: 100%; } /* Group by (#14729): the choice after its label */
 @media (max-width: 760px), (pointer: coarse) { .inbox-group-mode { min-height: var(--control-touch-height, 44px); } }
+.inbox-needs-results .inbox-file-question { padding-inline-end: 52px; } /* the star has its own room at the end of the row: the question and the uploader under the name stop before it (#14968) */

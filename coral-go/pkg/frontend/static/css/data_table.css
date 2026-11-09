@@ -669,7 +669,6 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 /* Needs you goal dividers and document pins (#13888/#13889). */
 .inbox-needs-results .dt-group th { white-space: pre-line; text-transform: none; letter-spacing: normal; font-size: var(--fs-sm); line-height: var(--lh-body); overflow-wrap: anywhere; color: var(--text-secondary); padding-block: 10px; }
 .inbox-needs-results .inbox-review-star.dt-star-on { color: var(--accent); }
-.inbox-needs-results .dt-td:has(.inbox-review-star) .dt-subtitle { padding-inline-end: 52px; box-sizing: border-box; } /* the star has its own room at the end of the row: the question and the uploader under the name stop before it (#14968) */
 
 /* A task's heading inside its goal in Needs you (#14441): one button that opens and shuts the task's items; a chevron, the title and counts, a chip while something waits on the Operator. 44 px high, the whole width. */
 :is(.inbox-needs-results, .activity-folder) .dt-group-task th { padding: 0; }

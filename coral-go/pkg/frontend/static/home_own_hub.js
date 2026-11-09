@@ -2,6 +2,7 @@
  * implementation: the same route (GET/PUT /api/system/hub-mode, which answers only the dashboard on this computer, never Coral Hub, never an agent or another local user) and the same restart, through
  * hub_mode_setting.js. Turning it on asks first and says what it does; turning it off is one press. If the state cannot be read (an older server, another computer) the box is what it was: the explainer only. */
 import { importOnce } from './import_once.js';
+import { loadStyles } from './lazy_styles.js';
 
 const root = () => document.getElementById('editions-home-own');
 const q = sel => root()?.querySelector(sel);
@@ -32,6 +33,7 @@ function draw(st, note = '') {
 /** Read the state into the box (called when the home section is shown). */
 export async function syncOwnHub() {
     if (!root()) return;
+    await loadStyles('home_own_hub.css').catch(() => {}); // the box's own rules, before its buttons are shown
     try { const m = await importOnce('./hub_mode_setting.js'); draw(await m.readHubMode()); } catch { draw(null); }
 }
 

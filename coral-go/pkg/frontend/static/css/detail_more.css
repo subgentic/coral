@@ -1,0 +1,7 @@
+/* The file detail pane's More menu (#14963): detail_pane.js loads this when it builds the pane (not in the start stylesheet). */
+.detail-more { position: relative; display: inline-flex; margin-right: auto; } /* the one More menu of the file's actions, at the left edge of the bar (#14963) */
+.detail-more .team-more-menu { top: auto; bottom: calc(100% + 4px); left: 0; right: auto; min-width: 16rem; max-width: min(22rem, 90vw); }
+.detail-more .menu-item-described { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.detail-more .more-item-desc { color: var(--text-secondary); font-size: var(--fs-sm); white-space: normal; text-align: left; }
+.detail-more .menu-sep { margin: 4px 0; border: 0; border-top: 1px solid var(--border); }
+@media (max-width: 767px), (pointer: coarse) { .detail-foot .detail-more { flex: 1 1 auto; margin-right: 0; } .detail-foot .detail-more .task-more-btn { flex: 1; } } /* a phone's bar: three equal buttons, More the first (#14963) */
