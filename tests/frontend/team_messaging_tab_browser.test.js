@@ -41,10 +41,13 @@ const SID = '0b7c2e4a-5d1f-4c8e-9a36-2f4d8e1b7c90';
         await ev(`document.getElementById('team-settings-workspace')?.remove(); import(${S} + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { page: (document.getElementById('qa-ts-host') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'qa-ts-host', style: 'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)' }))) })); true`);
         await waitFor(`${opts.noHealth ? 'true' : "!!document.querySelector('#team-settings-workspace .settings-tab[data-section=health]')"} && !!document.querySelector('#team-settings-messaging [name=cross_team_messaging], #team-settings-messaging .ct-unavailable')`, 'the settings dialog and the Messaging panel', 15000);
         await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=messaging]').click(); true`);
+        await waitFor(`!!document.querySelector('#team-settings-messaging .xt-line, #team-settings-messaging .ct-unavailable')`, 'the Messaging panel has drawn its status line (a form field is there before the line is: under CPU x8 and on Windows the test read an empty panel, #14926)', 15000);
+        await require('./helpers/wait').waitStable(ev, `(() => { const h = document.querySelector('#team-settings-messaging'); return h ? h.innerHTML.length + ':' + [...h.querySelectorAll('input')].map(i => (i.checked ? 1 : 0) + (i.disabled ? 'd' : '')).join('') : 0; })()`, 'the Messaging panel and its switches have stopped changing (the page sets the switches from what it read, after the tab is drawn: a tick made before that is overwritten, #14926)', 400, { timeout: 15000 });
         await settle(150);
     };
     const P = '#team-settings-messaging';
-    const panel = () => ev(`(() => { const q = s => document.querySelector('${P} ' + s); const shown = n => { const i = q('input[name=' + n + ']'); const r = i && i.closest('.sv-row'); return !!r && !r.hidden; }; const all = s => [...document.querySelectorAll('${P} ' + s)];
+    const panel = async () => { await waitFor(`!!document.querySelector('${P} .xt-line, ${P} .ct-unavailable')`, 'the panel has drawn its status line', 15000).catch(() => {}); await require('./helpers/wait').waitStable(ev, `document.querySelector('${P}')?.innerHTML.length`, 'the panel has stopped changing', 300, { timeout: 10000 }).catch(() => {}); return readPanel(); }; // (a read before the line is drawn found nothing on a slow machine, #14926; a panel that never draws is reported by the checks)
+    const readPanel = () => ev(`(() => { const q = s => document.querySelector('${P} ' + s); const shown = n => { const i = q('input[name=' + n + ']'); const r = i && i.closest('.sv-row'); return !!r && !r.hidden; }; const all = s => [...document.querySelectorAll('${P} ' + s)];
         const dot = q('.xt-head .update-state-dot'); const prim = q('.xt-primary');
         return { line: (q('.xt-line') || {}).textContent || '', dot: dot ? dot.dataset.k || '' : null, prim: prim ? { tag: prim.tagName, text: prim.textContent.replace(/\\s+/g, ' ').trim(), href: prim.getAttribute('href'), target: prim.target, rel: prim.rel, act: prim.dataset.act || '' } : null,
             msg: shown('cross_team_messaging') ? q('input[name=cross_team_messaging]').checked : null, files: shown('cross_team_artifacts') ? q('input[name=cross_team_artifacts]').checked : null,
@@ -120,9 +123,12 @@ const SID = '0b7c2e4a-5d1f-4c8e-9a36-2f4d8e1b7c90';
             await board('/settings', 'PUT', { subscriber_id: 'Operator', cross_team_messaging: true });
             await open();
             await ev(`(() => { const c = document.querySelector('${P} input[name=cross_team_messaging]'); c.checked = false; c.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(100);
+            await waitFor(`document.querySelector('${P} .xt-line')?.textContent === 'Cross-team messaging is off for this team.'`, 'the line follows the unticked switch', 10000).catch(() => {}); // (a slow machine draws it later)
             p = await panel(); check(`${tag}: a draft is not a state: with the switch unticked the line says off and the primary turns it back on (${p.line})`, p.line === 'Cross-team messaging is off for this team.' && p.prim.act === 'turn-on');
             // a server that sends no state at all
-            await setState(null); await open(); p = await panel();
+            await setState(null); await open();
+            await waitFor(`document.querySelector('${P} .xt-line')?.textContent === 'Cross-team messaging is on for this team.'`, 'the line from the switch alone', 10000).catch(() => {});
+            p = await panel();
             check(`${tag}: no state route: the tab still works from the switch alone (${p.line})`, p.msg === true && p.line === 'Cross-team messaging is on for this team.' && p.teams.length === 0);
 
             // 3. the linked teams are text only, bounded, and a bad id is dropped
