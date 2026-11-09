@@ -206,6 +206,9 @@ function hideAll() {
     renderBackup(null);
     const counts = $('settings-dropbox-counts');
     if (counts) counts.textContent = '';
+    show('settings-dropbox-delete-rule', false);
+    const rm = $('settings-dropbox-removals');
+    if (rm) { rm.hidden = true; rm.textContent = ''; }
     lastStatus = null;
 }
 
@@ -237,12 +240,14 @@ function render(st) {
         show('settings-dropbox-recheck', true);
         show('settings-dropbox-disconnect', true);
         show('settings-dropbox-delete', true);
+        loadRemovals();
         return;
     }
     if (st.connected) {
         setStatus(`Connected to Dropbox (${st.account_id || 'account'}).`);
         show('settings-dropbox-disconnect', true);
         show('settings-dropbox-delete', true);
+        loadRemovals();
         return;
     }
     if (st.signin_pending) {
@@ -372,6 +377,106 @@ export async function disconnectDropbox() {
     if (res.body.revoked === false) {
         note('Disconnected here, but Coral could not end its sign-in at Dropbox. To finish, remove Coral under Connected apps in your Dropbox settings.');
     }
+}
+
+// Removals after a delete here (#14814, the Operator's answer 3): a file deleted in Coral leaves Dropbox 24 hours later, by the backup worker. Settings
+// lists what waits, what is held because many files were deleted at once, and what Coral would not remove on its own (another Coral keeps it only in
+// Dropbox, its markers could not be read, or it was edited in Dropbox), each with the Operator's own control. Every word is set as text.
+const REMOVALS = '/api/dropbox/removals';
+let removalsSeq = 0;
+
+export async function loadRemovals() {
+    const box = $('settings-dropbox-removals');
+    if (!box) return;
+    show('settings-dropbox-delete-rule', true);
+    const seq = ++removalsSeq;
+    let j = null;
+    try { const r = await fetch(REMOVALS, { cache: 'no-store' }); j = r.ok ? await r.json() : null; } catch { j = null; }
+    if (seq !== removalsSeq) return; // a newer read is on its way
+    renderRemovals(j && Array.isArray(j.removals) ? j.removals : []);
+}
+
+const rmButton = (text, onClick) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-small'; b.textContent = text; b.addEventListener('click', onClick); return b; };
+const rmLine = (text, cls = 'settings-hint') => { const p = document.createElement('p'); p.className = cls; p.textContent = text; return p; };
+const rmName = r => String(r.name || 'A file');
+
+function renderRemovals(rows) {
+    const box = $('settings-dropbox-removals');
+    if (!box) return;
+    box.textContent = '';
+    const waiting = rows.filter(r => r.state === 'waiting'), held = rows.filter(r => r.state === 'held');
+    const asked = rows.filter(r => r.state === 'kept' || r.state === 'edited');
+    box.hidden = !rows.length;
+    if (waiting.length) {
+        const first = waiting.map(r => Date.parse(r.due_at)).filter(t => !Number.isNaN(t)).sort((a, b) => a - b)[0];
+        const when = first ? new Date(first).toLocaleString() : 'later';
+        const acts = document.createElement('div'); acts.className = 'dropbox-inline';
+        acts.append(rmButton('Keep them in Dropbox', () => cancelRemovals({ state: 'waiting' }, 'They stay in Dropbox.')));
+        box.append(rmLine(`${waiting.length} deleted ${waiting.length === 1 ? 'file' : 'files'} will be removed from Dropbox from ${when}.`), acts);
+    }
+    if (held.length) {
+        const acts = document.createElement('div'); acts.className = 'dropbox-inline';
+        acts.append(rmButton('Remove them from Dropbox', confirmHeld), rmButton('Keep them in Dropbox', () => cancelRemovals({ state: 'held' }, 'They stay in Dropbox.')));
+        box.append(rmLine(`${held.length} deleted ${held.length === 1 ? 'file waits' : 'files wait'} for your OK before leaving Dropbox: many files were deleted at once.`), acts);
+    }
+    if (asked.length) {
+        const list = document.createElement('ul'); list.className = 'settings-dropbox-edits';
+        for (const r of asked) list.append(askedRemoval(r));
+        box.append(rmLine('Deleted here, but Coral did not remove these from Dropbox on its own:'), list);
+    }
+}
+
+// askedRemoval is one file Coral would not remove on its own, with the Operator's control: the typed last 4 of each other Coral, Try again, or
+// Remove anyway at the rev Dropbox showed; and Keep it in Dropbox.
+function askedRemoval(r) {
+    const li = document.createElement('li'); li.className = 'settings-dropbox-edit';
+    const idBase = `settings-dropbox-rm-${String(r.digest || '').slice(0, 12)}`;
+    const name = document.createElement('strong'); name.textContent = rmName(r);
+    const why = document.createElement('p'); why.className = 'settings-hint'; why.id = `${idBase}-why`;
+    const acts = document.createElement('div'); acts.className = 'dropbox-inline';
+    const body = { confirm: true };
+    let typed = null;
+    if (r.state === 'edited') {
+        why.textContent = 'It was edited in Dropbox after Coral backed it up. Remove anyway deletes the version Dropbox has now.';
+        body.anyway = Object.fromEntries((Array.isArray(r.edited) ? r.edited : []).filter(e => e && e.path && e.rev).map(e => [String(e.path), String(e.rev)]));
+    } else if (r.reason === 'markers_unreadable') {
+        why.textContent = 'Coral could not check whether another Coral keeps it only in Dropbox, so it was left there.';
+    } else {
+        const ids = (Array.isArray(r.others) ? r.others : []).map(String);
+        const unknown = Number(r.unknown || 0);
+        why.textContent = `Another Coral keeps it only in Dropbox (…${ids.join(', …')})${unknown ? ` and ${unknown} marker${unknown === 1 ? '' : 's'} Coral cannot read (type unknown)` : ''}. Removing it loses it there. Type the last 4 characters of each, separated by spaces:`;
+        typed = document.createElement('input'); typed.type = 'text'; typed.className = 'settings-input';
+        typed.setAttribute('aria-label', `The last 4 characters of each other Coral, to remove ${rmName(r)}`);
+        typed.setAttribute('aria-describedby', why.id);
+    }
+    const go = rmButton(r.state === 'edited' ? 'Remove anyway' : (typed ? 'Remove from Dropbox' : 'Try again'), async () => {
+        go.disabled = true;
+        if (typed) body.typed = typed.value.trim().split(/\s+/).filter(Boolean);
+        let res;
+        try { res = await post(`/api/dropbox/remove/${encodeURIComponent(String(r.digest || ''))}`, 'POST', JSON.stringify(body)); } catch { res = { ok: false, status: 0, body: {} }; }
+        go.disabled = false;
+        if (res.ok && !(Array.isArray(res.body.edited) && res.body.edited.length)) { note(res.body.in_progress ? 'Dropbox is still removing it.' : `${rmName(r)} was removed from Dropbox.`); loadRemovals(); return; }
+        if (res.ok) { note('It was edited in Dropbox again. Nothing more was removed.'); loadRemovals(); return; }
+        note(res.body.code === 'others_offloaded' ? 'Those are not the right characters. Nothing was removed.' : String(res.body.error || 'Not removed: Coral could not reach Dropbox. Try again.'));
+    });
+    const keep = rmButton('Keep it in Dropbox', () => cancelRemovals({ digest: String(r.digest || '') }, `${rmName(r)} stays in Dropbox.`));
+    acts.append(...(typed ? [typed] : []), go, keep);
+    li.append(name, why, acts);
+    return li;
+}
+
+async function cancelRemovals(what, said) {
+    let res;
+    try { res = await post(`${REMOVALS}/cancel`, 'POST', JSON.stringify(what)); } catch { res = { ok: false, body: {} }; }
+    note(res.ok ? said : 'Not changed: Coral could not save it.');
+    loadRemovals();
+}
+
+async function confirmHeld() {
+    let res;
+    try { res = await post(`${REMOVALS}/confirm`, 'POST', JSON.stringify({ confirm: true })); } catch { res = { ok: false, body: {} }; }
+    note(res.ok ? 'They will be removed from Dropbox once their 24 hours have passed.' : 'Not changed: Coral could not save it.');
+    loadRemovals();
 }
 
 // Disconnect and delete the backup (stage 6a, #14814): the server says what the confirm needs (the files not from this computer and the other

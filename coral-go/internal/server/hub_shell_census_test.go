@@ -80,7 +80,7 @@ var shellNeverFiles = map[string]shellNever{
 	"chief_setup.js":            {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
 	"cloud.js":                  {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
 	"cloud/enroll.js":           {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
-	"dropbox_settings.js":       {bExplains, `set up on the computer itself, not through Coral Hub`, "Dropbox backup is set up on this computer's own dashboard: through a Hub every Dropbox route is never, the status read is refused and the block says where it is done, with no buttons (#14609)", 8},
+	"dropbox_settings.js":       {bExplains, `set up on the computer itself, not through Coral Hub`, "Dropbox backup is set up on this computer's own dashboard: through a Hub every Dropbox route is never, the status read is refused and the block says where it is done, with no buttons (#14609); the removals list and its two routes are read only once connected (#14814)", 10},
 	"cloud_connect.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 12},
 	"cloud_server_view.js":      {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"controls.js":               {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},

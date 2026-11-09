@@ -615,6 +615,25 @@ CREATE TABLE IF NOT EXISTS dropbox_edits (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_dropbox_edits_open ON dropbox_edits(doc_id) WHERE state IN ('pending', 'deciding');
 
+-- Removals from Dropbox after the Operator deleted an artifact here (#14814, the Operator's answer 3 and Security's conditions on it): one row an
+-- object, queued by the Operator's own delete only, run by the backup worker once due_at has passed (a 24-hour grace), retried with backoff,
+-- cancelled by an upload of the same bytes. state: waiting; held (many deletes at once: nothing goes until the Operator confirms in Settings);
+-- kept (another Coral keeps it only in Dropbox, or its markers could not be read: left alone, listed); edited (edited in Dropbox: listed with
+-- Remove anyway). A finished removal leaves no row (the outbox rows say removed). name is the file's name when it was deleted, for Settings only.
+CREATE TABLE IF NOT EXISTS dropbox_removals (
+    digest      TEXT PRIMARY KEY,
+    name        TEXT NOT NULL DEFAULT '',
+    state       TEXT NOT NULL,
+    queued_at   TEXT NOT NULL,
+    due_at      TEXT NOT NULL,
+    next_try_at TEXT NOT NULL DEFAULT '',
+    attempts    INTEGER NOT NULL DEFAULT 0,
+    reason      TEXT NOT NULL DEFAULT '',
+    others      TEXT NOT NULL DEFAULT '',
+    unknown     INTEGER NOT NULL DEFAULT 0,
+    edited      TEXT NOT NULL DEFAULT ''
+);
+
 -- Dropbox stage 4b's audit (#14703): each retention setting change (who, old and new days, the dry-run count the page showed) and each retention
 -- pass (counts and bytes). Never a name, path, digest or token. The newest 500 rows are kept.
 CREATE TABLE IF NOT EXISTS dropbox_audit (

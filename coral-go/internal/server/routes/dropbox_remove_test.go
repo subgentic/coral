@@ -38,7 +38,6 @@ func (be *backupEnv) removeCall(action, digest, body string, dashboard bool) (in
 	be.t.Helper()
 	r := chi.NewRouter()
 	r.Post("/api/dropbox/remove/{digest}", be.h.DropboxRemove)
-	r.Post("/api/dropbox/private/{digest}", be.h.DropboxRemovePrivate)
 	r.Post("/api/dropbox/resend/{digest}", be.h.DropboxResend)
 	req := httptest.NewRequest(http.MethodPost, "/api/dropbox/"+action+"/"+digest, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -87,7 +86,7 @@ func TestRemoveTakesTheArtifactOutOfDropboxForGood(t *testing.T) {
 // Mutant: the routes take a request from outside the dashboard, or an id that is not 64 hex.
 func TestTheRemovalRoutesAreTheOperatorsOnThisComputer(t *testing.T) {
 	be, ds := newRemovalEnv(t, 1)
-	for _, action := range []string{"remove", "private"} {
+	for _, action := range []string{"remove", "resend"} {
 		code, _ := be.removeCall(action, ds[0], `{"confirm": true}`, false)
 		assert.NotEqual(t, http.StatusOK, code, action)
 	}
@@ -151,28 +150,6 @@ func TestAFileEditedInDropboxIsReportedAndRemoveAnywayUsesTheShownRev(t *testing
 	code, _ = be.removeCall("remove", ds[0], fmt.Sprintf(`{"confirm": true, "anyway": {%q: "r3"}}`, p), true)
 	require.Equal(t, http.StatusOK, code)
 	assert.NotContains(t, be.dbx.files, p, "deleted at the shown rev")
-}
-
-// Security's 2e. Mutants: the removal runs before the mark; a failed removal clears the mark.
-func TestMarkPrivateSetsTheMarkFirst(t *testing.T) {
-	be, ds := newRemovalEnv(t, 1)
-	var order []string
-	be.b.SetMarkPrivate(func(_ context.Context, d string) error {
-		order = append(order, "mark:"+fmt.Sprint(be.inDropbox(d)))
-		be.private[d] = true
-		return nil
-	})
-	be.marker(ds[0], strings.Repeat("3", 28)+"c0de")
-	code, out := be.removeCall("private", ds[0], `{"confirm": true}`, true)
-	assert.Equal(t, http.StatusConflict, code)
-	assert.Equal(t, true, out["private"], "marked private here")
-	assert.Contains(t, out["note"], "still there", "and says the shared copy is still there")
-	assert.Equal(t, []string{"mark:2"}, order, "the mark is set while the copy is still in Dropbox")
-	code, _ = be.removeCall("private", ds[0], `{"confirm": true, "typed": ["c0de"]}`, true)
-	require.Equal(t, http.StatusOK, code)
-	assert.Zero(t, be.inDropbox(ds[0]))
-	a, _ := be.h.dbx.store.Audits(context.Background(), 1)
-	assert.Equal(t, "private", a[0].Reason)
 }
 
 // Security's 1b and 2b. Mutants: delete-all without the typed word or the foreign count; the sign-in forgotten before the delete finished.

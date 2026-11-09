@@ -84,8 +84,6 @@ type DropboxBackup struct {
 	editBounds   editBounds
 	editsWaiting atomic.Int64 // edits the last listing pass left in Dropbox because of a bound
 
-	markPrivate func(ctx context.Context, digest string) error // stage 6a: the board's private mark (SetMarkPrivate); nil: Mark private is not offered
-
 	passMu sync.Mutex
 	kick   chan struct{} // an upload asks for a pass soon
 }
@@ -171,8 +169,9 @@ func (b *DropboxBackup) Run(ctx context.Context, every time.Duration) {
 		case <-b.kick:
 		}
 		b.Pass(ctx)
-		b.Retain(ctx) // stage 4b: at most once an hour, only when the Operator turned it on
-		b.Notice(ctx) // stage 5a: edits made in Dropbox
+		b.Retain(ctx)   // stage 4b: at most once an hour, only when the Operator turned it on
+		b.Notice(ctx)   // stage 5a: edits made in Dropbox
+		b.Removals(ctx) // #14814: removals after the Operator's deletes here, once their grace has passed
 	}
 }
 
@@ -188,6 +187,7 @@ func noteDropboxUpload(coralDir, session, digest string) {
 	if b == nil {
 		return
 	}
+	b.cancelRemovalOnUpload(context.Background(), digest) // the same bytes again: the file is wanted, so it stays in Dropbox
 	rec, ok := readUploadRecord(coralDir, session, digest)
 	if !ok {
 		return

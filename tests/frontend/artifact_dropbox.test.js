@@ -1,5 +1,5 @@
-// An artifact's place in the Dropbox backup, in its Details (Dropbox stage 6a, #14814): drawn only when the backup holds it or removed it; Remove and
-// Mark private and remove ask first and send the confirm; another Coral's marker asks for the typed last 4; a file edited in Dropbox offers Remove
+// An artifact's place in the Dropbox backup, in its own view (Dropbox stage 6a, #14814): drawn only when the backup holds it or removed it; Remove
+// asks first and sends the confirm (no Mark private and remove: the Operator); another Coral's marker asks for the typed last 4; a file edited in Dropbox offers Remove
 // anyway at the rev the server named; a removed artifact offers Send to Dropbox again; nothing from the server is put in as HTML. Run: node artifact_dropbox.test.js
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -48,7 +48,8 @@ const { JSDOM } = require('jsdom');
     b = mk(); await b.show();
     assert.match(b.block.textContent, /In Dropbox \(2 files, with its details\)/);
     const btn = t => Array.from(b.block.querySelectorAll('button')).find(x => x.textContent === t);
-    assert.ok(btn('Remove from Dropbox…') && btn('Mark private and remove…'));
+    assert.ok(btn('Remove from Dropbox…'));
+    assert.ok(!Array.from(b.block.querySelectorAll('button')).some(x => /private/i.test(x.textContent)), 'no Mark private and remove (the Operator: as few controls as possible)');
 
     // Remove: the confirm says it is for every Coral and stays out until sent again; another Coral's marker asks for the typed last 4.
     btn('Remove from Dropbox…').click();
@@ -85,13 +86,6 @@ const { JSDOM } = require('jsdom');
     btn('Send to Dropbox again').click(); await tick(); await tick(); await tick();
     assert.ok(calls.some(c => c.url === `/api/dropbox/resend/${hex}` && c.method === 'POST'));
     assert.match(b.block.textContent, /It will be backed up again\./);
-
-    // Mark private and remove goes to its own route; a refusal says the shared copy is still there.
-    answers[`/api/dropbox/private/${hex}`] = { status: 409, body: { code: 'markers_unreadable', private: true, note: 'It is marked private here; its copy in Dropbox is still there.' } };
-    btn('Mark private and remove…').click();
-    assert.strictEqual(document.activeElement && document.activeElement.textContent, 'Cancel', 'Mark private and remove opens on Cancel too');
-    btn('Mark private and remove').click(); await tick(); await tick();
-    assert.match(b.block.textContent, /its copy in Dropbox is still there/);
 
     // Cancel changes nothing, and gives the keyboard back to the button that opened the confirm.
     btn('Remove from Dropbox…').focus();

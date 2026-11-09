@@ -14,6 +14,8 @@ const { JSDOM } = require('jsdom');
         <button id="settings-dropbox-disconnect" hidden></button>
         <button id="settings-dropbox-delete" hidden></button>
         <div id="settings-dropbox-delete-confirm" hidden></div>
+        <p id="settings-dropbox-delete-rule" hidden></p>
+        <div id="settings-dropbox-removals" hidden></div>
         <button id="settings-dropbox-switch" hidden></button>
         <button id="settings-dropbox-takeover" hidden></button>
         <button id="settings-dropbox-recheck" hidden></button>
@@ -454,6 +456,62 @@ const { JSDOM } = require('jsdom');
     // Nothing from the server is put into the page as HTML.
     await status({ app_key_set: true, connected: true, state: 'connected', account_id: '<img src=x onerror=alert(1)>' });
     assert.strictEqual(document.querySelector('#settings-dropbox img'), null);
+
+    // Removals after a delete here (#14814 reworked): the rule is said once connected; what waits, what is held and what Coral would not remove
+    // on its own are listed with the Operator's own controls; nothing from the server is put in as HTML.
+    const tick = () => new Promise(r => setTimeout(r, 0));
+    const hexA = 'a'.repeat(64), hexB = 'b'.repeat(64), hexC = 'c'.repeat(64), hexD = 'd'.repeat(64), hexE = 'e'.repeat(64);
+    answers['/api/dropbox/removals'] = { status: 200, body: { removals: [
+        { digest: hexA, name: 'plan.md', state: 'held', due_at: '2026-11-10T12:00:00Z' },
+        { digest: hexB, name: '<img src=x onerror=alert(1)>.md', state: 'kept', reason: 'others_offloaded', others: ['c0de'], unknown: 0 },
+        { digest: hexC, name: 'notes.md', state: 'edited', edited: [{ path: '/v1/ccc/x/v1-cccccccc.md', rev: 'r2' }] },
+        { digest: hexD, name: 'q.md', state: 'kept', reason: 'markers_unreadable' },
+        { digest: hexE, name: 'w.md', state: 'waiting', due_at: '2026-11-10T12:00:00Z' },
+    ] } };
+    await status({ app_key_set: true, connected: true, state: 'connected', account_id: 'dbid:AAA', backup: { backed_up: 3 }, filters: { types: [], max_age_days: 0 }, retention: { days: 0 } });
+    await tick(); await tick();
+    const rm = $('settings-dropbox-removals');
+    assert.ok(shown('settings-dropbox-delete-rule'), 'the rule is said once connected');
+    assert.ok(!rm.hidden);
+    assert.match(rm.textContent, /1 deleted file will be removed from Dropbox from/);
+    assert.match(rm.textContent, /1 deleted file waits for your OK before leaving Dropbox: many files were deleted at once/);
+    assert.match(rm.textContent, /Another Coral keeps it only in Dropbox \(…c0de\)/);
+    assert.match(rm.textContent, /edited in Dropbox after Coral backed it up/);
+    assert.match(rm.textContent, /could not check whether another Coral keeps it/);
+    assert.strictEqual(rm.querySelector('img'), null, 'a name is text, never HTML');
+    const rmBtn = t => Array.from(rm.querySelectorAll('button')).find(x => x.textContent === t);
+    const rmBtns = t => Array.from(rm.querySelectorAll('button')).filter(x => x.textContent === t);
+    const field = rm.querySelector('input');
+    assert.ok(field && field.getAttribute('aria-label') && field.getAttribute('aria-describedby'), 'the typed field is labelled and described');
+    assert.ok(document.getElementById(field.getAttribute('aria-describedby')).textContent.includes('Type the last 4 characters'));
+    // The held ones: Remove them / Keep them in Dropbox.
+    answers['/api/dropbox/removals/confirm'] = { status: 200, body: { confirmed: 1 } };
+    rmBtn('Remove them from Dropbox').click(); await tick(); await tick();
+    let c = calls.filter(x => x.url === '/api/dropbox/removals/confirm').pop();
+    assert.deepStrictEqual(JSON.parse(c.body), { confirm: true });
+    // The typed confirm, trimmed.
+    answers[`/api/dropbox/remove/${hexB}`] = { status: 200, body: { removed: 2 } };
+    rm.querySelector('input').value = ' c0de '; // the list was drawn again after the confirm
+    rmBtn('Remove from Dropbox').click(); await tick(); await tick();
+    c = calls.filter(x => x.url === `/api/dropbox/remove/${hexB}`).pop();
+    assert.deepStrictEqual(JSON.parse(c.body), { confirm: true, typed: ['c0de'] });
+    assert.match($('settings-dropbox-note').textContent, /was removed from Dropbox/);
+    // Remove anyway at the rev shown.
+    answers[`/api/dropbox/remove/${hexC}`] = { status: 200, body: { removed: 1 } };
+    rmBtn('Remove anyway').click(); await tick(); await tick();
+    c = calls.filter(x => x.url === `/api/dropbox/remove/${hexC}`).pop();
+    assert.deepStrictEqual(JSON.parse(c.body), { confirm: true, anyway: { '/v1/ccc/x/v1-cccccccc.md': 'r2' } });
+    // Keep it in Dropbox: one file; Keep them: the waiting ones.
+    answers['/api/dropbox/removals/cancel'] = { status: 200, body: { kept: 1 } };
+    rmBtns('Keep it in Dropbox')[0].click(); await tick(); await tick();
+    c = calls.filter(x => x.url === '/api/dropbox/removals/cancel').pop();
+    assert.deepStrictEqual(JSON.parse(c.body), { digest: hexB });
+    rmBtns('Keep them in Dropbox').pop().click(); await tick(); await tick();
+    c = calls.filter(x => x.url === '/api/dropbox/removals/cancel').pop();
+    assert.ok(['held', 'waiting'].includes(JSON.parse(c.body).state));
+    // Not connected: nothing about removals.
+    await status({ app_key_set: true, connected: false, state: 'disconnected' });
+    assert.ok(rm.hidden && !shown('settings-dropbox-delete-rule'));
 
     console.log('dropbox_settings.test.js: ok');
 })().catch(e => { console.error(e); process.exit(1); });

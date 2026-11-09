@@ -591,7 +591,9 @@ b PUT /api/dropbox/retention
 b POST /api/dropbox/edits/{doc}/promote
 b POST /api/dropbox/edits/{doc}/separate
 b POST /api/dropbox/remove/{digest}
-b POST /api/dropbox/private/{digest}
+b GET /api/dropbox/removals
+b POST /api/dropbox/removals/cancel
+b POST /api/dropbox/removals/confirm
 b POST /api/dropbox/resend/{digest}
 b GET /api/dropbox/artifact/{digest}
 b GET /api/thread
