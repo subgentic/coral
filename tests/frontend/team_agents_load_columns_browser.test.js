@@ -44,6 +44,14 @@ const TEAM = `qa-load-${Date.now() % 100000}`;
                 await settle(300);
                 const order2 = await ev(`[...document.querySelectorAll('tr.dt-row')].filter(r => r.getClientRects().length).map(r => (r.innerText.match(/Backend Dev|Orchestrator|Frontend Dev/) || [''])[0])`);
                 check(JSON.stringify(order1) !== JSON.stringify(order2) && (order1[0] === 'Orchestrator' || order2[0] === 'Orchestrator') && (order1[2] === 'Backend Dev' || order2[2] === 'Backend Dev'), `${at}Open tasks sorts both ways: ${JSON.stringify([order1, order2])}`);
+                // Time on task: a row with no task is last under both orders (UI Accessibility, #14861), and its dash is named none
+                const clickHead = label => ev(`(() => { const th = [...document.querySelectorAll('th')].filter(h => h.getClientRects().length).find(h => h.textContent.trim().startsWith(${JSON.stringify(label)})); (th.querySelector('button, .dt-sort, a') || th).click(); return true; })()`);
+                const names = () => ev(`[...document.querySelectorAll('tr.dt-row')].filter(r => r.getClientRects().length).map(r => (r.innerText.match(/Backend Dev|Orchestrator|Frontend Dev/) || [''])[0])`);
+                await clickHead('Time on task'); await settle(300); const t1 = await names();
+                await clickHead('Time on task'); await settle(300); const t2 = await names();
+                check(t1[2] === 'Orchestrator' && t2[2] === 'Orchestrator' && JSON.stringify(t1) !== JSON.stringify(t2), `${at}Time on task sorts both ways and the row with no task is last in both: ${JSON.stringify([t1, t2])}`);
+                check(await ev(`!!document.querySelector('tr.dt-row [aria-label="none"]')`), `${at}the dash is named none for a screen reader`);
+                check(await ev(`!![...document.querySelectorAll('button.dt-link')].find(b => b.getAttribute('aria-label') === '3 open tasks: Backend Dev')`), `${at}the number's link is named '3 open tasks: Backend Dev'`);
                 // the number is a link to the Tasks tab filtered to the agent
                 await ev(`[...document.querySelectorAll('tr.dt-row')].filter(r => r.getClientRects().length).find(r => r.innerText.includes('Backend Dev')).querySelector('button.dt-link:not([data-chat])') && [...[...document.querySelectorAll('tr.dt-row')].find(r => r.innerText.includes('Backend Dev')).querySelectorAll('button.dt-link')].find(b => b.textContent.trim() === '3').click(); true`);
                 await waitFor(`/agent=Backend(\\+|%20)Dev/.test(location.search) && /tasks/.test(location.pathname + location.search)`, `${at}the 3 opens the Tasks tab filtered to Backend Dev`, { timeout: 8000 });

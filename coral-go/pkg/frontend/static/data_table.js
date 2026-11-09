@@ -4,7 +4,7 @@
  *   dataTable({ label, columns, rows, rowKey, keepOrder, orderKey, groupBy(row) -> { key, label }, groupSorted, orderRows(rows), open, current, state, onSort, layout, fold, foldAt, sortBar, defaultSortLabel, bare, empty, footer, selectable, rowName, quiet, scroll, detail, decorate, decorateHead }) -> { el, bar, selectButton, selection(), clear(), state }
  *   selectable = { contextKey, onChange(keys), longPress (a touch screen selects a row by pressing and holding it), clearLabel (the bar's last button, 'Clear'), iconBar (one line: Cancel as an X, the count, actions with icon() as icon buttons, and those with more: true in a three-dot menu), actions (an action may have askWhen(n) and confirm(n): it asks first only when askWhen says so): [{ label, run(rows, keys, value), danger, confirm, choose: { label, options() -> [{ value, label }] } }] }: a danger action confirms in the bar, a choose action asks for its value there.
  *   Column = { key, label, field | cell(row, ctx), primary, tone: 'primary'|'secondary'|'tertiary', width: 'grow'|'content'|'<n>rem', fixed (with a rem width: that width, no resize handle, never squeezed or kept: a list's Actions, #9845), nowrap, align: 'start'|'end', numeric,
- *              sort: true|'number'|'date'|fn(a, b), sortValue(row), firstDir: 'asc'|'desc', foldFirst, narrowHide, line: 0|1|2, foldLabel, when(row), subtitle(row), subtitleTitle(row), title(row), filter: { label, active(), open(button) }, hideLabel }
+ *              sort: true|'number'|'date'|fn(a, b), sortValue(row), blankLast(row), firstDir: 'asc'|'desc', foldFirst, narrowHide, line: 0|1|2, foldLabel, when(row), subtitle(row), subtitleTitle(row), title(row), filter: { label, active(), open(button) }, hideLabel }
  *   column widths (#7949): every header has a resize handle on its right edge (drag, Left and Right keys, double-click or Enter to fit the content); the widths are kept per list in this browser (widthsKey, else the label without its row count), and there is no reset button: a double click on a column edge fits it to its content (#9845). minWidth per column (64 px by default), resize: false for one that must not.
  *   detail = { id(row), open(row) -> bool, render(row) -> Node }: a second full-width row under each row (hidden while open(row) is false); the surface's own toggle in a cell opens it (Coral Hub's Servers: health, what applies).
  *   decorate(row, tr, detailTr) and decorateHead(th, column): called each time the rows (or the header) are drawn, for the hooks a surface keeps on them.
@@ -436,8 +436,8 @@ export function dataTable(cfg) {
     const sortedOnly = () => {
         const s = st.sort && columns.find(c => c.key === st.sort.key);
         if (!s || !s.sort || cfg.onSort) return rows;
-        const cmp = compareBy(s), dir = st.sort.dir === 'desc' ? -1 : 1;
-        return rows.slice().sort((a, b) => dir * cmp(a, b));
+        const cmp = compareBy(s), dir = st.sort.dir === 'desc' ? -1 : 1, blank = typeof s.blankLast === 'function' ? s.blankLast : null; // blankLast(row): a row with nothing in this column goes last in BOTH directions (#14861: a dash is not the smallest or the largest)
+        return rows.slice().sort((a, b) => { if (blank) { const x = blank(a), y = blank(b); if (x !== y) return x ? 1 : -1; } return dir * cmp(a, b); });
     };
     /** keepOrder (#12636): a list that fills in as computers answer keeps the order the person is looking at under every sort: a row already shown stays where it is, a new row goes after them, and a different
     *  sort (or cfg.orderKey, the caller's own search and filters) starts the order afresh. Only under a header sort: with none, the caller's order stands. The memory is in the table's state, so it survives the redraws. */
