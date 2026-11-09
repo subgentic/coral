@@ -15,6 +15,7 @@ import (
 	"github.com/subgentic/coral/internal/background"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/store/storetest"
 )
 
 // closeSpy is a terminal backend that only records that it was closed, and whether a run goroutine was still going when it was.
@@ -34,7 +35,7 @@ func (c *closeSpy) Close() error {
 // Shutdown waits for the job scheduler's run goroutines before it closes the backend (#6918, #6927: Security's #6930 point 5, QA's LOW): a run goroutine never acts on a closed backend, and the wait is a call
 // Shutdown makes, which nothing else pinned.
 func TestShutdownWaitsForRunGoroutinesBeforeClosingTheBackend(t *testing.T) {
-	db, err := store.OpenWithKey(context.Background(), filepath.Join(t.TempDir(), "sessions.db"), "")
+	db, err := storetest.OpenPath(context.Background(), filepath.Join(t.TempDir(), "sessions.db"), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
 	sched := background.NewJobScheduler(store.NewScheduleStore(db), time.Minute)

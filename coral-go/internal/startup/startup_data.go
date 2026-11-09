@@ -145,16 +145,23 @@ func refuseKeyFileReplacement(cfg *config.Config, coralDir, boardPath string, se
 
 // openDatabases opens the sessions database and probes the separate board database with the same key before the
 // server is built: a wrong key fails closed rather than starting with only one database open.
+// The opens of the databases at start, as variables so a test package can start from a copy of a migrated database instead of running the whole schema for every server it starts (#14893: internal/startup under -race
+// took 532 to 900 s, a third of it parsing the schema). Production never changes them.
+var (
+	openSessionsDB = store.OpenWithKey
+	openBoardDB    = board.NewStoreWithKey
+)
+
 func openDatabases(ctx context.Context, cfg *config.Config, boardPath, dbKey string, security dbcrypt.Bootstrap) (*store.DB, error) {
 	openDone := noticeSlowOpen(cfg.DBPath)
-	db, err := store.OpenWithKey(ctx, cfg.DBPath, dbKey)
+	db, err := openSessionsDB(ctx, cfg.DBPath, dbKey)
 	openDone()
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 	dbcrypt.SetEffectiveMode(security.DatabaseEncryption)
 	openDone = noticeSlowOpen(boardPath)
-	boardProbe, err := board.NewStoreWithKey(boardPath, dbKey)
+	boardProbe, err := openBoardDB(boardPath, dbKey)
 	openDone()
 	if err != nil {
 		db.Close()

@@ -89,3 +89,24 @@ func Open(tb testing.TB, path string) (*store.DB, error) {
 	tb.Cleanup(func() { db.Close() })
 	return db, nil
 }
+
+// OpenPath is store.OpenWithKey for a test's seam that has no testing.TB (a package's TestMain pointing the server's own open at it): a plaintext database that does not exist yet is written from the migrated
+// template and opened without the schema step; an existing file, or any key, opens through the normal path. The caller closes it.
+func OpenPath(ctx context.Context, path, key string) (*store.DB, error) {
+	if key == "" {
+		if _, statErr := os.Stat(path); os.IsNotExist(statErr) {
+			img, err := templateImage()
+			if err != nil {
+				return nil, err
+			}
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				return nil, err
+			}
+			if err := os.WriteFile(path, img, 0o644); err != nil {
+				return nil, err
+			}
+			return store.OpenPrepared(ctx, path)
+		}
+	}
+	return store.OpenWithKey(ctx, path, key)
+}

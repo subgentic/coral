@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/store/storetest"
 )
 
 // #5136: every way Coral can listen is this-computer-only by default, and only the remote_access_enabled gate (the saved setting, or --remote)
@@ -485,7 +486,7 @@ func TestRemoteOffBindsLoopbackOnly(t *testing.T) {
 	const unreadable = "(settings database closed)" // a read that fails must not widen either
 	settings := []string{"", "false", "False", "0", "no", "off", "yes", "1", "enabled", "tru", "true!", "\"true\"", "null", unreadable}
 	for _, setting := range settings {
-		db, err := store.OpenWithKey(ctx, filepath.Join(t.TempDir(), "sessions.db"), "")
+		db, err := storetest.OpenPath(ctx, filepath.Join(t.TempDir(), "sessions.db"), "")
 		require.NoError(t, err)
 		defer db.Close()
 		switch setting {
@@ -537,7 +538,7 @@ func TestRemoteOnWidensOnlyAsDocumented(t *testing.T) {
 		{"--remote, list asked for: kept", "127.0.0.1,100.64.0.1", true, true, "", "127.0.0.1,100.64.0.1"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			db, err := store.OpenWithKey(ctx, filepath.Join(t.TempDir(), "sessions.db"), "")
+			db, err := storetest.OpenPath(ctx, filepath.Join(t.TempDir(), "sessions.db"), "")
 			require.NoError(t, err)
 			defer db.Close()
 			if tc.saved != "" {

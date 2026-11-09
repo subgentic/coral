@@ -7,7 +7,10 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/subgentic/coral/internal/board/boardtest"
 	"github.com/subgentic/coral/internal/secfile/secfiletest"
+	"github.com/subgentic/coral/internal/server"
+	"github.com/subgentic/coral/internal/store/storetest"
 	"github.com/subgentic/coral/internal/testleak"
 )
 
@@ -31,6 +34,9 @@ func TestMain(m *testing.M) {
 		_ = os.MkdirAll(v, 0o700)
 		os.Setenv(k, v)
 	}
+	// Every test that starts a server opens its databases: from a copy of a migrated one, not by running the whole schema each time (#14893: under -race this package took 532 to 900 s, a third of it the schema).
+	openSessionsDB, openBoardDB = storetest.OpenPath, boardtest.OpenKey
+	server.UseBoardOpener(boardtest.OpenKey)
 	var mu sync.Mutex
 	var hit []string
 	launchSweepGuard = func(dir string) {

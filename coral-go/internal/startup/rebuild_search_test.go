@@ -14,6 +14,7 @@ import (
 	"github.com/subgentic/coral/internal/background"
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/store/storetest"
 )
 
 // searchEnv is a data folder whose sessions.db has the search text of 60 sessions; damage deletes one page of the FTS5 index,
@@ -22,7 +23,7 @@ func searchEnv(t *testing.T, damage bool) *config.Config {
 	t.Helper()
 	cfg := config.Load(t.TempDir())
 	ctx := context.Background()
-	db, err := store.OpenWithKey(ctx, cfg.DBPath, "")
+	db, err := storetest.OpenPath(ctx, cfg.DBPath, "")
 	require.NoError(t, err)
 	s := store.NewSessionStore(db)
 	words := strings.Fields("function handler request response error cache index session transcript window cursor refactor rename extract inline fixture assert mutation oracle floor build vet lint format alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima")
@@ -61,14 +62,14 @@ func TestRebuildSearchRepairsADamagedIndexAndKeepsEverySession(t *testing.T) {
 	backups, err := filepath.Glob(filepath.Join(filepath.Dir(cfg.DBPath), "sessions.before-rebuild-search-*.db"))
 	require.NoError(t, err)
 	require.Len(t, backups, 1)
-	bdb, err := store.OpenWithKey(ctx, backups[0], "")
+	bdb, err := storetest.OpenPath(ctx, backups[0], "")
 	require.NoError(t, err, "the backup is a usable database")
 	bproblems, err := background.QuickCheck(ctx, bdb.DB)
 	require.NoError(t, err)
 	assert.NotEmpty(t, bproblems, "the backup is the database as it was, damage included")
 	bdb.Close()
 
-	db, err := store.OpenWithKey(ctx, cfg.DBPath, "")
+	db, err := storetest.OpenPath(ctx, cfg.DBPath, "")
 	require.NoError(t, err)
 	defer db.Close()
 	problems, err := background.QuickCheck(ctx, db.DB)

@@ -17,6 +17,7 @@ import (
 
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/store/storetest"
 )
 
 // agentCLIBinaries are the binaries the six agent types run (claude, codex, pi, and agy for agy,
@@ -75,7 +76,7 @@ func bootStubCLIs(t *testing.T, seed func(ctx context.Context, db *store.DB, hom
 
 	if seed != nil {
 		ctx := context.Background()
-		db, err := store.OpenWithKey(ctx, filepath.Join(home, "sessions.db"), "")
+		db, err := storetest.OpenPath(ctx, filepath.Join(home, "sessions.db"), "")
 		require.NoError(t, err)
 		seed(ctx, db, home)
 		require.NoError(t, db.Close())

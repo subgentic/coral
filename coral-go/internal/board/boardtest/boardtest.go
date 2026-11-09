@@ -65,3 +65,12 @@ func Open(path string) (*board.Store, error) {
 	}
 	return board.NewStoreWithKey(path, "")
 }
+
+// OpenKey is board.NewStoreWithKey for a test's seam (a package's TestMain pointing the server's own open at it): a plaintext board that does not exist yet starts from the migrated template (Open); any key, or an
+// existing file, opens through the normal path.
+func OpenKey(path, key string) (*board.Store, error) {
+	if key == "" {
+		return Open(path)
+	}
+	return board.NewStoreWithKey(path, key)
+}

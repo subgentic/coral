@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/subgentic/coral/internal/cmdhandoff"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/store/storetest"
 )
 
 // #4381: at startup launch temp files move to <data dir>/tmp, and the stale ones are swept. In the
@@ -30,7 +31,7 @@ func TestStartupSweepsOnlyItsOwnEndedSessionsFromTheSharedTempFolder(t *testing.
 	}
 	t.Cleanup(func() { listRunningCommandLines = prev })
 	dataDir := t.TempDir()
-	db, err := store.OpenWithKey(context.Background(), filepath.Join(dataDir, "sessions.db"), "")
+	db, err := storetest.OpenPath(context.Background(), filepath.Join(dataDir, "sessions.db"), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
 	ss := store.NewSessionStore(db)
@@ -78,7 +79,7 @@ func TestStartupSweepsOnlyItsOwnEndedSessionsFromTheSharedTempFolder(t *testing.
 func TestStartupMakesTheLaunchFolderTheStartCommandScriptsFallback(t *testing.T) {
 	t.Setenv("TMPDIR", t.TempDir())
 	dataDir := t.TempDir()
-	db, err := store.OpenWithKey(context.Background(), filepath.Join(dataDir, "sessions.db"), "")
+	db, err := storetest.OpenPath(context.Background(), filepath.Join(dataDir, "sessions.db"), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
 	t.Cleanup(func() { cmdhandoff.SetFallbackDir(func() string { return "" }) })

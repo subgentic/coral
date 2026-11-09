@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/store/storetest"
 )
 
 // #4937 part 2: end to end, a dev build pointed at a fake capture endpoint through the dev-only
@@ -161,7 +162,7 @@ func TestTelemetrySinkE2E(t *testing.T) {
 		}
 		if seed != nil {
 			ctx := context.Background()
-			db, err := store.OpenWithKey(ctx, filepath.Join(data, "sessions.db"), "")
+			db, err := storetest.OpenPath(ctx, filepath.Join(data, "sessions.db"), "")
 			require.NoError(t, err)
 			seed(ctx, store.NewSessionStore(db))
 			require.NoError(t, db.Close())

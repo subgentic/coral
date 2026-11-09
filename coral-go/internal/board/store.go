@@ -248,6 +248,11 @@ func UseDatabase(ctx context.Context, db *sqlx.DB) (*Store, error) {
 	return s, nil
 }
 
+// UseDatabasePrepared is UseDatabase for a database that is a copy of one this build already migrated (store.OpenPrepared, tests only): the schema step is not run again.
+func UseDatabasePrepared(db *sqlx.DB) *Store {
+	return &Store{db: db, completionCheckRunner: NewLocalRegisteredCheckRunner(os.Getenv("CORAL_CHECK_WORKDIR")), completionChecksEnabled: completionChecksEnabledFromEnv()}
+}
+
 func (s *Store) RecoverTaskReadiness(ctx context.Context) error { return s.recoverTaskReadiness(ctx) }
 
 func nowUTC() string {
