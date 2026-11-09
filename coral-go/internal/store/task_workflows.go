@@ -23,7 +23,12 @@ func AgentTaskProject(name string, sid *string) string {
 // Keep the legacy checklist as a projection for dashboard, history and cost
 // queries. All lifecycle mutations go through the board engine in this same DB.
 // IDs, timestamps and existing session ownership are preserved on migration.
-func (d *DB) initAgentTaskEngine(ctx context.Context) error {
+func (d *DB) initAgentTaskEngine(ctx context.Context, schemaDone bool) error {
+	if schemaDone {
+		// A copy of a database this build already migrated (OpenPrepared, tests only): the engine's tables and triggers are in it, so the board schema is not parsed and the script below is not run again.
+		d.TaskEngine = board.UseDatabasePrepared(d.DB)
+		return nil
+	}
 	engine, err := board.UseDatabase(ctx, d.DB)
 	if err != nil {
 		return err

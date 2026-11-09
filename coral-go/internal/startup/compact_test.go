@@ -12,7 +12,7 @@ import (
 
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/dbcrypt"
-	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/store/storetest"
 )
 
 // compactEnv is a data folder with a database that has lots of free pages.
@@ -20,7 +20,7 @@ func compactEnv(t *testing.T) *config.Config {
 	t.Helper()
 	dir := t.TempDir()
 	cfg := config.Load(dir)
-	db, err := store.OpenWithKey(context.Background(), cfg.DBPath, "")
+	db, err := storetest.OpenPath(context.Background(), cfg.DBPath, "")
 	require.NoError(t, err)
 	_, err = db.Exec(`WITH RECURSIVE c(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM c WHERE i < 50000)
 		INSERT INTO call_metrics(call_type, operation, method, created_at) SELECT 'api', '/api/some/long/operation/name', 'GET', '2026-01-01T00:00:00Z' FROM c`)
@@ -46,11 +46,11 @@ func TestCompactShrinksAndBacksUp(t *testing.T) {
 	backups, err := filepath.Glob(filepath.Join(filepath.Dir(cfg.DBPath), "sessions.before-compact-*.db"))
 	require.NoError(t, err)
 	require.Len(t, backups, 1)
-	bdb, err := store.OpenWithKey(context.Background(), backups[0], "")
+	bdb, err := storetest.OpenPath(context.Background(), backups[0], "")
 	require.NoError(t, err, "the backup is a usable database")
 	bdb.Close()
 
-	db, err := store.OpenWithKey(context.Background(), cfg.DBPath, "")
+	db, err := storetest.OpenPath(context.Background(), cfg.DBPath, "")
 	require.NoError(t, err, "the database still opens")
 	db.Close()
 	// The lock is released: it can be taken again (on Windows the file itself stays, for the next server).

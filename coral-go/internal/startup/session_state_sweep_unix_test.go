@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/store/storetest"
 )
 
 // #4411: the startup sweep removes the per-session state of a session that ended in THIS Coral over
@@ -32,7 +33,7 @@ func TestSessionStateSweep(t *testing.T) {
 	t.Setenv("CORAL_DATA_DIR", dataDir)
 	require.NoError(t, os.MkdirAll(filepath.Join(dataDir, "pi-sessions"), 0o700))
 
-	db, err := store.OpenWithKey(context.Background(), filepath.Join(dataDir, "sessions.db"), "")
+	db, err := storetest.OpenPath(context.Background(), filepath.Join(dataDir, "sessions.db"), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
 	ss := store.NewSessionStore(db)

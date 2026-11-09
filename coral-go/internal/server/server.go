@@ -53,6 +53,12 @@ import (
 // the identical frontend.
 var staticFS = frontend.Static
 
+// openBoardStore opens the board database; a variable so a test package can start from a migrated copy (UseBoardOpener, #14893). Production never changes it.
+var openBoardStore = board.NewStoreWithKey
+
+// UseBoardOpener replaces how the server opens its board database. It is for a test package's TestMain; nothing in the program calls it.
+func UseBoardOpener(open func(path, key string) (*board.Store, error)) { openBoardStore = open }
+
 // Server holds dependencies and exposes the HTTP router.
 type Server struct {
 	resourceMgr     *resources.Manager // the resource queue, when it is open (its history file closes with the server, #13671)
@@ -118,7 +124,7 @@ func NewWithKey(cfg *config.Config, db *store.DB, backend ptymanager.TerminalBac
 	}
 
 	// Open the board store (separate SQLite DB)
-	boardStore, err := board.NewStoreWithKey(filepath.Join(cfg.CoralDir(), "messageboard.db"), dbKey)
+	boardStore, err := openBoardStore(filepath.Join(cfg.CoralDir(), "messageboard.db"), dbKey)
 	if err != nil {
 		log.Printf("Warning: failed to open board store: %v", err)
 	}
