@@ -23,12 +23,12 @@ const TEAM = `qa-agents-${Date.now() % 100000}`;
             await seed(ev, TEAM); await agentsUp(ev); await liveWaiting(ev); // agentsUp's status says the second agent needs input: its live row agrees (#14437)
             if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await openTeam(ev, waitFor, TEAM).catch(() => {});
-            await S.run(`${label}: the Agents tab's name carries the count (2) and the tab opens a table with Agent, Status, Doing, Provider, Chat`, async () => {
+            await S.run(`${label}: the Agents tab's name carries the count (2) and the tab opens a table with Agent, Status, Doing, Open tasks, Provider, Chat`, async () => {
                 await goTab(ev, settle, 'Agents');
                 const full = await ev(`(() => { const t = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === 'Agents'); return t ? window.__na.name(t) : ''; })()`);
                 assert.ok(/Agents\s*[2-3]/.test(full), `the tab says Agents with its count (got ${JSON.stringify(full)})`);
                 const hd = await ev(`window.__tp.headers()`); assert.ok(hd, 'the Agents tab has a table');
-                if (!mobile) assert.deepEqual(hd.map(x => x.replace(/[↕↑↓]/g, '').trim()).slice(0, 5), ['Agent', 'Status', 'Doing', 'Provider', 'Chat'], 'the columns');
+                if (!mobile) assert.deepEqual(hd.map(x => x.replace(/[↕↑↓]/g, '').trim()).slice(0, 6), ['Agent', 'Status', 'Doing', 'Open tasks', 'Provider', 'Chat'], 'the columns (#14861: Open tasks always, Time on task only while an agent has a task in progress; none has here): ' + JSON.stringify(hd));
                 const rows = await ev(`window.__tp.rows()`); assert.ok(rows.some(r => /Orchestrator/.test(r)) && rows.some(r => /Backend Dev/.test(r)), `both agents are rows (${JSON.stringify(rows.map(r => r.slice(0, 30)))})`);
             });
             await S.run(`${label}: no folder line and no Refresh button (the tab refreshes itself); the Orchestrator is the first row; Knowledge has no "0" badge`, async () => {

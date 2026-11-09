@@ -33,16 +33,19 @@ type availabilityTask struct {
 }
 
 type availableAgent struct {
-	SessionID               string                `json:"session_id,omitempty"`
-	SubscriberID            string                `json:"subscriber_id,omitempty"`
-	Name                    string                `json:"name"`
-	AgentType               string                `json:"agent_type,omitempty"`
-	Role                    string                `json:"role,omitempty"`
-	Availability            string                `json:"availability"`
-	Available               bool                  `json:"available"`
-	Reason                  string                `json:"reason"`
-	TaskState               string                `json:"task_state,omitempty"`
-	Tasks                   []availabilityTask    `json:"tasks"`
+	SessionID    string             `json:"session_id,omitempty"`
+	SubscriberID string             `json:"subscriber_id,omitempty"`
+	Name         string             `json:"name"`
+	AgentType    string             `json:"agent_type,omitempty"`
+	Role         string             `json:"role,omitempty"`
+	Availability string             `json:"availability"`
+	Available    bool               `json:"available"`
+	Reason       string             `json:"reason"`
+	TaskState    string             `json:"task_state,omitempty"`
+	Tasks        []availabilityTask `json:"tasks"`
+	// OpenTasks is the board tasks assigned to this agent that are pending, in progress or in review, and TaskSince the claim of its task in progress (the earliest when there are several): the team Agents view's Open tasks and Time on current task (#14861).
+	OpenTasks               int                   `json:"open_tasks"`
+	TaskSince               string                `json:"task_since,omitempty"`
 	WaitingOn               *board.RegisteredWait `json:"waiting_on,omitempty"`
 	Reminder                bool                  `json:"reminder,omitempty"`
 	ReminderIntervalSeconds int                   `json:"reminder_interval_seconds,omitempty"`
@@ -274,6 +277,7 @@ func (h *SessionsHandler) liveAgentStatus(ctx context.Context, snap *boardStatus
 	}
 	if a.SubscriberID != "" {
 		a.Tasks = append(a.Tasks, boardTasksAssignedTo(snap.tasks, a.SubscriberID)...)
+		a.OpenTasks, a.TaskSince = taskLoad(snap.tasks, a.SubscriberID)
 	}
 	if includeActivity && len(a.Tasks) > 0 && subscribed && sub.SessionName != "" && h.terminal != nil {
 		captureCtx, cancel := context.WithTimeout(ctx, 250*time.Millisecond)
@@ -316,6 +320,7 @@ func (h *SessionsHandler) offlineSubscriberStatus(snap *boardStatusSnapshot, nam
 		a.Reason = "Remote agent availability is not observed locally"
 	}
 	a.Tasks = append(a.Tasks, boardTasksAssignedTo(snap.tasks, sub.SubscriberID)...)
+	a.OpenTasks, a.TaskSince = taskLoad(snap.tasks, sub.SubscriberID)
 	if wait := snap.waitsBySubscriber[sub.SubscriberID]; wait != nil && wait.SessionName == "" { // a wait made from a Coral session whose session is gone (Kill All, a crash) is not an agent that needs a person: it is offline (#12081); one made with no session of Coral's is an agent of its own, still waiting
 		a.WaitingOn = wait
 		a.Availability = "waiting"
@@ -568,4 +573,24 @@ func openReviewLines(tasks []board.Task, now time.Time) []string {
 		}
 	}
 	return lines
+}
+
+// taskLoad is how many of subscriber's board tasks are open as the Operator counts them (pending, in progress, in review) and when its task in progress was claimed (the earliest claim when it has several; "" when none or the claim is unknown).
+func taskLoad(tasks []board.Task, subscriber string) (int, string) {
+	open, since := 0, ""
+	for _, t := range tasks {
+		if t.AssignedTo == nil || *t.AssignedTo != subscriber {
+			continue
+		}
+		switch t.Status {
+		case "pending", "review_pending":
+			open++
+		case "in_progress":
+			open++
+			if t.ClaimedAt != nil && *t.ClaimedAt != "" && (since == "" || *t.ClaimedAt < since) {
+				since = *t.ClaimedAt
+			}
+		}
+	}
+	return open, since
 }
