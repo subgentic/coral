@@ -109,12 +109,15 @@ password
 pause
 pause_circle
 pending
+people
 people_alt
+person
 php
 pin
 play_arrow
 preview
 psychology
+public
 qr_code_2
 queue
 radio

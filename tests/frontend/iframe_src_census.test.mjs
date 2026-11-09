@@ -33,7 +33,9 @@ for (const f of fs.readdirSync(STATIC).filter(n => n.endsWith('.js'))) {
 assert.deepEqual(found, ALLOWED, `the dashboard's iframe addresses: ${JSON.stringify(found)}; a new one needs a look from Security and a line in this test`);
 // A frame can also get its whole document from data with srcdoc (always inside a sandbox and a CSP meta of its own: sandbox_frame.js,
 // panel_sandbox.js and view_sandbox.js explain why), or be built in an HTML string. Both are counted here too, so a new one needs a look.
-const SRCDOC = { 'artifact_preview.js': 1, 'custom_views.js': 1, 'preview_content.js': 1 };
+// dropbox_share.js (#14944): the shared chat page's preview, built by the server (escaped, under its own CSP meta), shown in a frame with sandbox=""
+// (no scripts, no same origin), as Security asked on 31cb747a4.
+const SRCDOC = { 'artifact_preview.js': 1, 'custom_views.js': 1, 'dropbox_share.js': 1, 'preview_content.js': 1 };
 const srcdocFound = {};
 for (const f of fs.readdirSync(STATIC).filter(n => n.endsWith('.js'))) {
     const src = fs.readFileSync(path.join(STATIC, f), 'utf8');

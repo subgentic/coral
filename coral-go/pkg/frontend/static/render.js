@@ -531,5 +531,6 @@ registerActions({
     'board-chat-select-all': () => boardChatNow()?._boardChatSelectAll(),
     'board-chat-select-none': () => boardChatNow()?._boardChatSelectNone(),
     'board-chat-export': () => boardChatNow()?._exportBoardChatSelected(),
+    'board-chat-share-dropbox': () => boardChatNow()?._shareBoardChatSelected(), // #14944
     'board-chat-select-cancel': () => boardChatNow()?._cancelBoardChatSelect(),
 });

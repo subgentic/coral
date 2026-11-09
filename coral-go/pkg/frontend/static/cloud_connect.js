@@ -458,10 +458,14 @@ class CloudPanel {
     // Replace a refused secret key (#3698), after a confirmation that lists what is discarded.
     async rekey() {
         if (!this.secretKey) return;
-        await this.confirm('Replace the secret key', rekeyText(this.secretKey) + ' This cannot be undone.', async () => {
-            const r = await post('POST', '/api/cloud/rekey', { confirm: true });
+        const go = async (leaveShared) => {
+            const r = await post('POST', '/api/cloud/rekey', leaveShared ? { confirm: true, leave_shared: true } : { confirm: true });
             let out = null;
             try { out = await r.json(); } catch { /* below */ }
+            if (r.status === 409 && out && out.code === 'still_shared' && !leaveShared) { // files shared through Dropbox (#14944): a confirm, never a refusal
+                await this.confirm('Files are still shared through Dropbox', String(out.error || '') + ' Replace the key anyway and leave them shared?', () => go(true), { label: 'Replace key and leave them shared', danger: true });
+                return;
+            }
             if (r.ok && out && out.status) {
                 this.render(out.status);
                 this.say('The secret key was replaced. ' + (out.discarded_hub_enrollment ? 'Connect to Coral Hub again. ' : '') +
@@ -470,7 +474,8 @@ class CloudPanel {
             }
             if (r.status === 403) { this.elsewhere(out); return; }
             this.say((out && out.error) || 'The secret key could not be replaced');
-        }, { label: 'Replace key', danger: true });
+        };
+        await this.confirm('Replace the secret key', rekeyText(this.secretKey) + ' This cannot be undone.', () => go(false), { label: 'Replace key', danger: true });
     }
 
     bind() {

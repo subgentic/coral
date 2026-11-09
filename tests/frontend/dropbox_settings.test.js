@@ -16,6 +16,7 @@ const { JSDOM } = require('jsdom');
         <div id="settings-dropbox-delete-confirm" hidden></div>
         <p id="settings-dropbox-delete-rule" hidden></p>
         <div id="settings-dropbox-removals" hidden></div>
+        <div id="settings-dropbox-shares" hidden></div>
         <button id="settings-dropbox-switch" hidden></button>
         <button id="settings-dropbox-takeover" hidden></button>
         <button id="settings-dropbox-recheck" hidden></button>
@@ -531,6 +532,53 @@ const { JSDOM } = require('jsdom');
     // Not connected: nothing about removals.
     await status({ app_key_set: true, connected: false, state: 'disconnected' });
     assert.ok(rm.hidden && !shown('settings-dropbox-delete-rule'));
+
+    // Share via Dropbox (#14944): Settings lists the shared copies with Stop sharing and Stop all; Disconnect and Switch while files are shared say
+    // how many and offer Stop all first, or leaving them shared (a second request with leave_shared).
+    answers['/api/dropbox/shares'] = { status: 200, body: { connected: true, shares: [
+        { id: 7, name: 'release-plan.md', audience: 'public', state: 'live', expires_at: '2026-12-09T10:00:00Z' },
+        { id: 8, name: '<b>notes</b>.md', audience: 'people', people: 2, state: 'stopping' }] } };
+    await status({ app_key_set: true, connected: true, state: 'connected', account_id: 'dbid:A' });
+    await m.loadShares();
+    const sh = $('settings-dropbox-shares');
+    assert.ok(!sh.hidden, 'the shares are listed');
+    assert.match(sh.textContent, /Shared through Dropbox \(2\)/);
+    assert.match(sh.textContent, /release-plan\.md.*Shared with anyone with the link, until/);
+    assert.match(sh.textContent, /Shared with 2 people\. Stopping did not finish: its link may still work\./);
+    assert.ok(!sh.querySelector('b'), 'a name is text, never markup');
+    assert.ok(!/https?:/.test(sh.textContent), 'no link is listed in Settings');
+    const stopBtns = [...sh.querySelectorAll('button')].filter(b => b.textContent === 'Stop sharing');
+    assert.strictEqual(stopBtns[0].getAttribute('aria-label'), 'Stop sharing release-plan.md');
+    answers['/api/dropbox/share/stop/7'] = { status: 200, body: { stopped: 1 } };
+    stopBtns[0].click(); await tick(); await tick(); await tick();
+    assert.ok(calls.some(x => x.url === '/api/dropbox/share/stop/7' && x.method === 'POST'));
+    assert.match($('settings-dropbox-note').textContent, /release-plan\.md is no longer shared/);
+
+    answers['/api/dropbox/disconnect'] = { status: 409, body: { code: 'still_shared', count: 2, error: '2 files are still shared through Dropbox. Stop sharing them first, or leave them shared: after you disconnect, Coral can no longer stop sharing them, but you can in Dropbox' } };
+    await m.disconnectDropbox();
+    const box = $('settings-dropbox-delete-confirm');
+    assert.ok(!box.hidden);
+    assert.match(box.textContent, /2 files are still shared/);
+    const labels = [...box.querySelectorAll('button')].map(b => b.textContent);
+    assert.deepStrictEqual(labels, ['Stop all, then disconnect', 'Leave them shared and disconnect', 'Cancel']);
+    answers['/api/dropbox/disconnect'] = { status: 200, body: { connected: false, revoked: true } };
+    box.querySelectorAll('button')[1].click(); await tick(); await tick(); await tick();
+    const last = calls.filter(x => x.url === '/api/dropbox/disconnect').pop();
+    assert.deepStrictEqual(JSON.parse(last.body), { leave_shared: true }, 'leaving them shared is a second, explicit request');
+    assert.ok(box.hidden);
+
+    // Stop all, then disconnect: Stop all first, then the plain disconnect again.
+    answers['/api/dropbox/disconnect'] = { status: 409, body: { code: 'still_shared', count: 1, error: '1 file is still shared through Dropbox.' } };
+    await m.disconnectDropbox();
+    answers['/api/dropbox/shares/stop-all'] = { status: 200, body: { stopped: 1 } };
+    answers['/api/dropbox/disconnect'] = { status: 200, body: { connected: false, revoked: true } };
+    const callsBefore = calls.length;
+    $('settings-dropbox-delete-confirm').querySelector('button').click();
+    for (let i = 0; i < 6; i++) await tick();
+    const after = calls.slice(callsBefore).map(x => x.url + ' ' + (x.body || ''));
+    const iStop = after.findIndex(u => u.startsWith('/api/dropbox/shares/stop-all {"confirm":true}'));
+    const iDisc = after.findIndex(u => u.startsWith('/api/dropbox/disconnect {}'));
+    assert.ok(iStop >= 0 && iDisc > iStop, 'Stop all, then the disconnect without leave_shared: ' + JSON.stringify(after));
 
     console.log('dropbox_settings.test.js: ok');
 })().catch(e => { console.error(e); process.exit(1); });
