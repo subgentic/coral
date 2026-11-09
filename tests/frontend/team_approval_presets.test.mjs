@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { APPROVAL_PRESETS, NEW_TEAM_APPROVAL, presetOf, presetFlags, approvalField } from '../../coral-go/pkg/frontend/static/team_approval_presets.js';
 
 assert.deepEqual(APPROVAL_PRESETS.map(p => p.label), ['Operator approves tasks', 'Operator approves goals', 'Fully autonomous'], 'the Operator\'s three words, in order');
-assert.equal(NEW_TEAM_APPROVAL, 'goals', 'a new team starts on Operator approves goals');
+assert.equal(NEW_TEAM_APPROVAL, 'auto', 'a new team starts on Fully autonomous: approval is chosen, never a default (#14997)');
 
 // flags -> name
 assert.equal(presetOf({ goals_need_approval: true, tasks_need_approval: true, require_goal: true }), 'tasks');
