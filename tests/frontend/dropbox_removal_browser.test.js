@@ -75,6 +75,9 @@ const S = `(window.__coralStatic || '/static/')`;
             console.log(`${tag}: Disconnect and delete the backup`);
             await ev(`window.showSettingsModal('cleanup'); true`);
             await waitFor(`!!document.getElementById('settings-dropbox-delete') && !document.getElementById('settings-dropbox-delete').hidden`, 'the delete button', 8000);
+            // Settings fills its rows (the Dropbox block among them) before the dialog is shown: a click before then focuses a field nobody can see,
+            // which is what failed 3 of 5 under --stress (QA on #14814). A person clicks a shown dialog, after its own focus has moved in.
+            await waitFor(`(() => { const m = document.getElementById('settings-modal'); return !!m && getComputedStyle(m).display !== 'none' && m.contains(document.activeElement); })()`, 'Settings shown with the focus in it', 8000);
             await ev(`document.getElementById('settings-dropbox-delete').scrollIntoView({ block: 'center' }); document.getElementById('settings-dropbox-delete').click(); true`);
             await waitFor(`!document.getElementById('settings-dropbox-delete-confirm').hidden`, 'the delete confirm', 6000);
             const del = await ev(`(() => { const b = document.getElementById('settings-dropbox-delete-confirm'), i = document.getElementById('settings-dropbox-delete-typed'); b.scrollIntoView({ block: 'center' }); return { text: b.textContent, label: i && i.getAttribute('aria-label'), focused: document.activeElement === i }; })()`);
