@@ -181,6 +181,8 @@ var activityNotAnInboxAction = map[string]string{
 	"POST /api/dropbox/share/{digest}":                                     "Share via Dropbox (#14944): the Operator's, on this computer only; audited (a word and counts)",
 	"POST /api/dropbox/share/stop/{id}":                                    "Stop sharing via Dropbox (#14944): the Operator's, on this computer only; audited",
 	"POST /api/dropbox/shares/stop-all":                                    "Stop all Dropbox shares (#14944): the Operator's, on this computer only; audited",
+	"POST /api/dropbox/share-chat/{project}/preview":                       "Share via Dropbox chat preview (#14944): builds the page here, nothing leaves the computer; read-only",
+	"POST /api/dropbox/share-chat/{project}":                               "Share a chat via Dropbox (#14944): the Operator's, on this computer only; audited",
 	"POST /api/dropbox/check":                                              "Dropbox Check again (#14693): asks the backup for a pass, on this computer only",
 	"POST /api/folder-tags/{folderName}":                                   "tags on folders",
 	"POST /api/history-import":                                             "importing earlier chats",

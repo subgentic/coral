@@ -26,6 +26,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/dropbox"
 	"github.com/subgentic/coral/internal/executil"
 	"github.com/subgentic/coral/internal/safego"
@@ -65,10 +66,11 @@ type DropboxBackup struct {
 	outbox   *store.DropboxOutbox
 	coralDir string
 
-	private    func(ctx context.Context, ids []string) (map[string]bool, error) // the private marks; nil reads none (tests set it)
-	references func(ctx context.Context) (map[string]bool, error)               // stage 6b: the digests a running task or an open session names (SetReferences); unset frees nothing
-	types      func() map[string]bool                                           // the chosen types; nil or empty is every type
-	maxAge     func() time.Duration                                             // only artifacts newer than this; 0 is no limit
+	private    func(ctx context.Context, ids []string) (map[string]bool, error)            // the private marks; nil reads none (tests set it)
+	references func(ctx context.Context) (map[string]bool, error)                          // stage 6b: the digests a running task or an open session names (SetReferences); unset frees nothing
+	chat       func(ctx context.Context, project string, id int64) (*board.Message, error) // #14944: a board message, for a shared chat page; nil: no chat sharing
+	types      func() map[string]bool                                                      // the chosen types; nil or empty is every type
+	maxAge     func() time.Duration                                                        // only artifacts newer than this; 0 is no limit
 	power      func() (onBattery, metered bool)
 	secret     func([]byte) bool
 	now        func() time.Time
@@ -152,6 +154,13 @@ func (h *CloudHandler) NewDropboxBackup(ob *store.DropboxOutbox) *DropboxBackup 
 }
 
 // SetPrivate gives the worker the board's private marks (board.Store.PrivateArtifacts).
+// SetChat gives the worker the board's messages, for Share via Dropbox's chat page (#14944).
+func (b *DropboxBackup) SetChat(f func(ctx context.Context, project string, id int64) (*board.Message, error)) {
+	if f != nil {
+		b.chat = f
+	}
+}
+
 func (b *DropboxBackup) SetPrivate(f func(ctx context.Context, ids []string) (map[string]bool, error)) {
 	if f != nil {
 		b.private = f
