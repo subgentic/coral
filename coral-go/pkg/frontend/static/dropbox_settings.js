@@ -331,6 +331,7 @@ function render(st) {
         show('settings-dropbox-disconnect', true);
         show('settings-dropbox-delete', true);
         loadRemovals();
+        loadShares();
         return;
     }
     if (st.connected) {
@@ -338,6 +339,7 @@ function render(st) {
         show('settings-dropbox-disconnect', true);
         show('settings-dropbox-delete', true);
         loadRemovals();
+        loadShares();
         return;
     }
     if (st.signin_pending) {
@@ -459,10 +461,11 @@ export async function connectDropbox() {
 
 const DISCONNECT = '/api/dropbox/disconnect';
 
-export async function disconnectDropbox() {
+export async function disconnectDropbox(leaveShared = false) {
     note('');
     let res;
-    try { res = await post(DISCONNECT); } catch { note("Couldn't reach Coral. Try again."); return; }
+    try { res = await post(DISCONNECT, 'POST', JSON.stringify(leaveShared ? { leave_shared: true } : {})); } catch { note("Couldn't reach Coral. Try again."); return; }
+    if (res.status === 409 && res.body.code === 'still_shared') { stillShared(res.body, 'Disconnect', () => disconnectDropbox(), () => disconnectDropbox(true)); return; }
     if (!res.ok) { note("Couldn't disconnect. Try again."); return; }
     await loadDropbox();
     if (res.body.revoked === false) {
@@ -577,6 +580,7 @@ export async function deleteBackupStart() {
     note('');
     let res;
     try { res = await post(DISCONNECT, 'POST', JSON.stringify({ delete_backup: true })); } catch { note("Couldn't reach Coral. Try again."); return; }
+    if (res.status === 409 && res.body.code === 'still_shared') { stillShared(res.body, 'Delete the backup', () => deleteBackupStart(), null); return; } // stop sharing first; then the delete's own confirm
     if (res.status === 409 && res.body.code === 'confirm_delete_backup') { showDeleteConfirm(res.body); return; }
     note(String(res.body.error || "Couldn't check the backup. Try again."));
 }
@@ -622,10 +626,11 @@ export async function deleteBackupConfirm(typedText) {
     note('The Dropbox backup was deleted and Coral disconnected.');
 }
 
-async function confirmSwitch() {
+async function confirmSwitch(leaveShared = false) {
     note('');
     let res;
-    try { res = await post('/api/dropbox/switch'); } catch { note("Couldn't reach Coral. Try again."); return; }
+    try { res = await post('/api/dropbox/switch', 'POST', JSON.stringify(leaveShared ? { leave_shared: true } : {})); } catch { note("Couldn't reach Coral. Try again."); return; }
+    if (res.status === 409 && res.body.code === 'still_shared') { stillShared(res.body, 'Switch', () => confirmSwitch(), () => confirmSwitch(true)); return; }
     if (!res.ok) { note('The switch is no longer waiting. Connect again.'); }
     await loadDropbox();
 }
@@ -729,6 +734,72 @@ function cancelRetention() {
     note('Nothing changed.');
     if (lastStatus) renderBackup(lastStatus);
     focusEl('settings-dropbox-keep-for'); // the buttons that had focus are gone (UI Reviewer's SHOULD on #14703)
+}
+
+// Files shared through Dropbox (#14944): Settings lists them, each with Stop sharing, and Stop all. The links are not listed here (each file's
+// own dialog shows its link); the names and who can open them are.
+const SHARES = '/api/dropbox/shares';
+const audienceWords = { people: 'specific people', team: 'your Dropbox team', public: 'anyone with the link' };
+let sharesSeq = 0;
+
+export async function loadShares() {
+    const box = $('settings-dropbox-shares');
+    if (!box) return;
+    const seq = ++sharesSeq;
+    let j = null;
+    try { const r = await fetch(SHARES, { cache: 'no-store' }); j = r.ok ? await r.json() : null; } catch { j = null; }
+    if (seq !== sharesSeq) return;
+    const rows = j && Array.isArray(j.shares) ? j.shares : [];
+    box.textContent = '';
+    box.hidden = !rows.length;
+    if (!rows.length) return;
+    const list = document.createElement('ul'); list.className = 'settings-dropbox-edits';
+    for (const s of rows) {
+        const li = document.createElement('li'); li.className = 'settings-dropbox-edit';
+        const name = document.createElement('strong'); name.textContent = String(s.name || 'A copy');
+        const who = s.audience === 'people' ? `${Number(s.people || 0)} ${Number(s.people || 0) === 1 ? 'person' : 'people'}` : (audienceWords[s.audience] || '');
+        const exp = s.expires_at ? new Date(s.expires_at) : null;
+        const words = rmLine(`Shared with ${who}${exp && !Number.isNaN(exp.getTime()) ? `, until ${exp.toLocaleDateString()}` : ''}${s.state === 'stopping' ? '. Stopping did not finish: its link may still work.' : '.'}${s.other_account ? ' From another Dropbox account: stop it in that Dropbox.' : ''}`);
+        const acts = document.createElement('div'); acts.className = 'dropbox-inline';
+        const stop = rmButton('Stop sharing', async () => {
+            stop.disabled = true;
+            let res; try { res = await post(`/api/dropbox/share/stop/${encodeURIComponent(String(s.id))}`); } catch { res = { ok: false, body: {} }; }
+            note(res.ok ? `${String(s.name || 'It')} is no longer shared.` : String(res.body.error || "Couldn't stop sharing it. Try again."));
+            await loadShares();
+            $('settings-dropbox-shares')?.querySelector('button')?.focus?.();
+        });
+        stop.setAttribute('aria-label', `Stop sharing ${String(s.name || 'this copy')}`);
+        acts.append(stop);
+        li.append(name, words, acts);
+        list.append(li);
+    }
+    const all = rmButton('Stop all', () => stopAllShares());
+    box.append(rmLine(`Shared through Dropbox (${rows.length}), as copies in Dropbox › Shared from Coral:`), list, all);
+}
+
+async function stopAllShares(then) {
+    let res; try { res = await post(`${SHARES}/stop-all`, 'POST', JSON.stringify({ confirm: true })); } catch { res = { ok: false, body: {} }; }
+    await loadShares();
+    if (!res.ok) { note(String(res.body.error || "Couldn't stop sharing every file. Try again.")); return false; }
+    note(`Sharing stopped for ${Number(res.body.stopped || 0)} ${Number(res.body.stopped || 0) === 1 ? 'file' : 'files'}.`);
+    if (then) await then();
+    return true;
+}
+
+// stillShared is Disconnect's, Switch's and Delete the backup's answer while files are still shared (#14944, Security's condition 9): the count,
+// Stop all and go on, or (for Disconnect and Switch) leave them shared and go on.
+function stillShared(info, action, retry, leave) {
+    const box = $('settings-dropbox-delete-confirm');
+    if (!box) { note(String(info.error || 'Files are still shared through Dropbox. Stop sharing them first.')); return; }
+    box.textContent = ''; box.hidden = false;
+    box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Files still shared through Dropbox');
+    const p = document.createElement('p'); p.id = 'settings-dropbox-shared-words'; p.textContent = String(info.error || 'Files are still shared through Dropbox.');
+    const hide = () => { box.hidden = true; box.textContent = ''; };
+    const stopFirst = rmButton(`Stop all, then ${action.toLowerCase()}`, async () => { hide(); await stopAllShares(retry); });
+    box.append(p, stopFirst);
+    if (leave) box.append(rmButton(`Leave them shared and ${action.toLowerCase()}`, () => { hide(); leave(); }));
+    box.append(rmButton('Cancel', () => { hide(); note('Nothing changed.'); }));
+    stopFirst.focus?.();
 }
 
 function focusEl(id) {

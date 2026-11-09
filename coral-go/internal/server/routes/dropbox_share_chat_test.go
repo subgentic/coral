@@ -126,6 +126,8 @@ func TestAChatIsSharedExactlyAsPreviewed(t *testing.T) {
 	require.Equal(t, http.StatusOK, code, "%v", prev)
 	assert.EqualValues(t, 3, prev["included"])
 	assert.EqualValues(t, 2, prev["left_out"])
+	assert.Equal(t, true, prev["connected"])
+	assert.Equal(t, true, prev["can_expire"])
 	hash, _ := prev["hash"].(string)
 	assert.Empty(t, be.sharedPaths(), "a preview sends nothing")
 

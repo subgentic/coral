@@ -246,8 +246,14 @@ func (h *CloudHandler) DropboxShareChatPreview(w http.ResponseWriter, r *http.Re
 		writeError(w, code, "chat", msg)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"html": string(page.html), "hash": page.hash, "size": len(page.html),
-		"included": page.included, "left_out": page.leftOut, "name": cleanShareName(project+" chat", ".html")})
+	out := map[string]any{"connected": false, "html": string(page.html), "hash": page.hash, "size": len(page.html),
+		"included": page.included, "left_out": page.leftOut, "name": cleanShareName(project+" chat", ".html")}
+	if cl, access, account, err := b.dropboxAccess(r.Context()); err == nil { // the dialog's choices: the team, and whether a link can expire
+		if acct, err := cl.CurrentAccount(r.Context(), access); err == nil && acct.AccountID == account {
+			out["connected"], out["team"], out["can_expire"] = true, acct.TeamName, !acct.Basic
+		}
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 // DropboxShareChat answers POST /api/dropbox/share-chat/{project}: render the page again, refuse it unless its SHA-256 is the preview's, then
