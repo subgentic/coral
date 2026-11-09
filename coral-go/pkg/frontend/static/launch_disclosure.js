@@ -4,7 +4,14 @@ import { serverFetch, normServer, isCloud } from './server_base.js';
 import { showToast } from './utils.js';
 import { showConfirmModal } from './confirm_dialog.js';
 import { announceNotice } from './notifications.js';
+import { browserLocal } from './safe_storage.js';
 let readGeneration = 0;
+const HINT_KEY = 'coral-launch-notice'; // "p|53" or "d|73": this browser last saw the notice unseen, on a phone-sized or a wider screen, at that height (theme_init.js reserves its row before first paint)
+const hint = {
+    set(px) { browserLocal.set(HINT_KEY, `${window.innerWidth <= 600 ? 'p' : 'd'}|${Math.max(0, Math.min(999, Math.round(px)))}`); }, // storage that is blocked just means no reserved row
+    clear() { browserLocal.remove(HINT_KEY); },
+    release() { document.getElementById('launch-notice-room')?.remove(); document.documentElement.removeAttribute('data-launch-notice'); }, // the notice fills the room, or there is none to fill
+};
 const headline = 'Agents default to auto mode.';
 function disclosureSection(id, title, disclosure) {
     const section = document.createElement('details'); section.className = 'disclosure';
@@ -22,7 +29,7 @@ async function acknowledge(server, disclosure) {
     const response = await serverFetch(server, '/api/launch-disclosure/ack', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: disclosure.id }) });
     const answer = await response.json().catch(() => null);
     if (!response.ok || answer?.id !== disclosure.id || answer.seen !== true) throw new Error('Could not record that you have read this. Nothing was launched. Try again.');
-    if (normServer(server) === 'local') { readGeneration++; document.getElementById('launch-disclosure-banner')?.remove(); }
+    if (normServer(server) === 'local') { readGeneration++; document.getElementById('launch-disclosure-banner')?.remove(); hint.clear(); hint.release(); }
 }
 export async function confirmLaunchDisclosure(server, disclosure) {
     if (!valid(disclosure) || disclosure.seen !== false) { showToast('The launch disclosure could not be read. Nothing was launched.', true); return false; }
@@ -32,11 +39,11 @@ export async function confirmLaunchDisclosure(server, disclosure) {
     catch (error) { showToast(error.message, true); return false; }
 }
 export async function refreshLaunchDisclosure() {
-    if (isCloud() || document.body.classList.contains('popout-mode')) return;
+    if (isCloud() || document.body.classList.contains('popout-mode')) { hint.release(); return; }
     const generation = ++readGeneration;
     try {
         const response = await serverFetch('local', '/api/launch-disclosure', { cache: 'no-store' });
-        if (!response.ok) return; // older servers and non-owners have no offer
+        if (!response.ok) { hint.clear(); hint.release(); return; } // older servers and non-owners have no offer: nothing is reserved for it
         const disclosure = await response.json(); if (generation !== readGeneration || !valid(disclosure)) return;
         const mode = document.getElementById('settings-permission-mode');
         if (mode) {
@@ -45,8 +52,9 @@ export async function refreshLaunchDisclosure() {
             line.textContent = disclosure.text;
         }
         const previous = document.getElementById('launch-disclosure-banner');
-        if (disclosure.seen === true) { previous?.remove(); return; }
-        if (disclosure.seen !== false || previous?.dataset.disclosureId === disclosure.id) return;
+        if (disclosure.seen === true) { previous?.remove(); hint.clear(); hint.release(); return; }
+        if (disclosure.seen === false && previous?.dataset.disclosureId === disclosure.id) { hint.set(previous.getBoundingClientRect().height); return; } // already drawn (an earlier read): the hint is kept as it is
+        if (disclosure.seen !== false) return;
         previous?.remove();
         const banner = document.createElement('div'); banner.id = 'launch-disclosure-banner'; banner.dataset.disclosureId = disclosure.id; banner.className = 'notice notice-info notice-bar notice-compact'; banner.setAttribute('role', 'note');
         const { section, body } = disclosureSection('launch-disclosure-body', headline, disclosure);
@@ -69,6 +77,7 @@ export async function refreshLaunchDisclosure() {
         const after = document.getElementById('local-auth-banner') || document.querySelector('header.top-bar');
         if (after) after.after(banner); else document.body.prepend(banner);
         window.dispatchEvent(new Event('coral:launch-disclosure-shown'));
+        hint.release(); hint.set(banner.getBoundingClientRect().height); // the notice now holds the room; the next load reserves it from the start
         announceNotice(headline);
     } catch { /* no unauthenticated or network failure is an acknowledgement */ }
 }
