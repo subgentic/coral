@@ -117,6 +117,11 @@ var releaseDigests = map[string]ReleaseDigests{
 		AMD64: "062e5bdeb0ea5910af07dcb2d05c570c4cba39f3aeaef30ddcd399a29ba8f06d",
 		ARM64: "c69ec852c06316e2900da35736f4a706a3b93192257d58f6b277637bf0a7236b",
 	},
+	// 2.0.60: the two Linux lines of the v2.0.60 release's SHA256SUMS.txt, cosign-verified by tools/pin-release-digests.sh against https://github.com/subgentic/coral/.github/workflows/release.yml@refs/tags/v2.0.60 at commit bd3f9cb36045a5154cc9dad78004cd25f8fa5d56 (an immutable release).
+	"2.0.60": {
+		AMD64: "1f93e13aace0a7b1a2fec917eb39676d689690adba09997561b4d2768d29fc1d",
+		ARM64: "00d6c155b0f767aa8caf000c649257f4e0cec7f3b37a2a027b34e3c2021ef551",
+	},
 }
 
 var sha256HexRe = regexp.MustCompile(`^[0-9a-f]{64}$`)
