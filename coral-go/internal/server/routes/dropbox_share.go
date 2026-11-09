@@ -17,6 +17,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/mail"
 	"path"
@@ -694,6 +695,39 @@ func (b *DropboxBackup) CleanShares(ctx context.Context) {
 	for _, sh := range stale {
 		if sh.AccountID == account {
 			_ = b.stopShare(ctx, cl, access, sh)
+		}
+	}
+}
+
+// sharesGuard is Disconnect's, Switch's and Rekey's check (Security's condition 9): while files are still shared through Dropbox it answers 409
+// with how many, so the page offers Stop all first; leave (the Operator's confirm to leave them shared in their Dropbox, theirs to manage there)
+// lets the action go on. It reports whether the caller may go on.
+func (d *dropboxRoutes) sharesGuard(ctx context.Context, w http.ResponseWriter, leave bool, after string) bool {
+	if d == nil || d.backup == nil || leave {
+		return true
+	}
+	n, err := d.backup.outbox.SharedCount(ctx)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "", "could not read the files shared through Dropbox")
+		return false
+	}
+	if n == 0 {
+		return true
+	}
+	files := "files are"
+	if n == 1 {
+		files = "file is"
+	}
+	writeJSON(w, http.StatusConflict, map[string]any{"code": "still_shared", "count": n,
+		"error": fmt.Sprintf("%d %s still shared through Dropbox. Stop sharing them first, or leave them shared: %s", n, files, after)})
+	return false
+}
+
+// forgetShares drops the share rows after a Disconnect, Switch or Rekey that went ahead: their copies and links stay in the person's Dropbox.
+func (d *dropboxRoutes) forgetShares(ctx context.Context) {
+	if d != nil && d.backup != nil {
+		if _, err := d.backup.outbox.ForgetShares(ctx); err != nil {
+			slog.Warn("[dropbox] the list of shared files was not cleared")
 		}
 	}
 }

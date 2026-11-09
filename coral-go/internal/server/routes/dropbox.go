@@ -249,6 +249,17 @@ func (h *CloudHandler) DropboxConfirmSwitch(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusNotFound, "not_available", "Dropbox backup is not available in this build")
 		return
 	}
+	var in struct {
+		LeaveShared bool `json:"leave_shared"` // #14944
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<10)
+	if err := decodeJSONStrict(r, &in); err != nil && !errors.Is(err, io.EOF) {
+		errBadRequest(w, `send {} or {"leave_shared": true}`)
+		return
+	}
+	if !d.sharesGuard(r.Context(), w, in.LeaveShared, "after the switch, Coral can no longer stop sharing them, but you can in the old account's Dropbox") {
+		return // the switch stays waiting, for Stop all and then the confirm again
+	}
 	d.mu.Lock()
 	p := d.pending
 	d.pending = nil
@@ -263,6 +274,9 @@ func (h *CloudHandler) DropboxConfirmSwitch(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	oldRevoked := old != "" && old != p.refresh && d.revokeRefresh(r.Context(), old)
+	if p.account != "" {
+		d.forgetShares(r.Context()) // the shares were the old account's (a reconnect of the same account never comes here)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"connected": true, "account_id": p.account, "old_revoked": oldRevoked})
 }
 
@@ -282,10 +296,14 @@ func (h *CloudHandler) DropboxDisconnect(w http.ResponseWriter, r *http.Request)
 	var in struct {
 		DeleteBackup bool     `json:"delete_backup"`
 		Typed        []string `json:"typed"`
+		LeaveShared  bool     `json:"leave_shared"` // #14944: the Operator's confirm to leave files shared through Dropbox
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
 	if err := decodeJSONStrict(r, &in); err != nil && !errors.Is(err, io.EOF) {
 		errBadRequest(w, `send {} or {"delete_backup": true, "typed": [...]}`)
+		return
+	}
+	if !d.sharesGuard(r.Context(), w, in.LeaveShared, "after you disconnect, Coral can no longer stop sharing them, but you can in Dropbox") {
 		return
 	}
 	if in.DeleteBackup {
@@ -315,6 +333,7 @@ func (h *CloudHandler) DropboxDisconnect(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusInternalServerError, "", "could not forget the Dropbox connection")
 		return
 	}
+	d.forgetShares(r.Context())
 	writeJSON(w, http.StatusOK, map[string]any{"connected": false, "revoked": revoked})
 }
 

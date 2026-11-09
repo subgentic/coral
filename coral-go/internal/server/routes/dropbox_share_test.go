@@ -442,3 +442,66 @@ func TestTheCleanupLeavesAnotherFileAtANeverCopiedSharesPath(t *testing.T) {
 	be.b.CleanShares(ctx)
 	assert.Equal(t, []string{p}, be.sharedPaths(), "the unrecorded copy is deleted")
 }
+
+// Condition 9. Mutants: Disconnect, Switch or Rekey goes ahead while files are shared; the 409 does not name the count; leave_shared keeps rows
+// for an account that is gone; a refused Switch loses the waiting switch.
+func TestDisconnectSwitchAndRekeySayWhatIsStillShared(t *testing.T) {
+	be, d := newDropboxShareEnv(t)
+	code, out := be.share(d, `{"name":"a.md","audience":"public","confirm":true}`)
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	code, out = be.share(d, `{"name":"b.md","audience":"people","emails":["ana@example.com"],"confirm":true}`)
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	shared := func() int { n, _ := be.b.outbox.SharedCount(context.Background()); return n }
+
+	// Rekey: refused while shared, with the count; with leave_shared it goes on to its own checks (the key here is usable: rekey_not_needed).
+	rekey := func(body string) (int, map[string]any) {
+		req := httptest.NewRequest(http.MethodPost, "/api/cloud/rekey", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		dashboardRequest(req)
+		req.Host = be.host
+		rec := httptest.NewRecorder()
+		be.h.Rekey(rec, req)
+		var m map[string]any
+		_ = json.Unmarshal(rec.Body.Bytes(), &m)
+		return rec.Code, m
+	}
+	code, out = rekey(`{"confirm":true}`)
+	assert.Equal(t, http.StatusConflict, code)
+	assert.Equal(t, "still_shared", out["code"])
+	assert.EqualValues(t, 2, out["count"])
+	assert.Contains(t, out["error"], "2 files are still shared")
+	code, out = rekey(`{"confirm":true,"leave_shared":true}`)
+	assert.Equal(t, "rekey_not_needed", out["code"], "the guard let it through: %d %v", code, out)
+
+	// Switch: refused while shared, and the waiting switch is kept for the confirm again.
+	be.dbx.account = "dbid:BBB"
+	require.Contains(t, be.signIn(""), "different Dropbox account")
+	be.body = `{}`
+	rec := be.call(http.MethodPost, "/api/dropbox/switch", true, nil)
+	assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), "still_shared")
+	assert.NotNil(t, be.status()["switch_pending"], "the switch still waits")
+	assert.Equal(t, 2, shared())
+
+	// Disconnect: refused while shared; with leave_shared it disconnects and forgets the rows (the copies stay in Dropbox).
+	be.body = `{}`
+	rec = be.call(http.MethodPost, "/api/dropbox/disconnect", true, nil)
+	assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+	assert.Equal(t, true, be.status()["connected"])
+	be.body = `{"leave_shared":true}`
+	rec = be.call(http.MethodPost, "/api/dropbox/disconnect", true, nil)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Zero(t, shared())
+	assert.Len(t, be.sharedPaths(), 2, "left shared in the person's Dropbox")
+}
+
+// Mutant: Stop all then Disconnect still asks (the guard counts stopped shares).
+func TestAfterStopAllDisconnectNeedsNoConfirm(t *testing.T) {
+	be, d := newDropboxShareEnv(t)
+	_, _ = be.share(d, `{"name":"a.md","audience":"public","confirm":true}`)
+	code, _ := be.shareCall(http.MethodPost, "/api/dropbox/shares/stop-all", `{"confirm":true}`, callerDashCookie)
+	require.Equal(t, http.StatusOK, code)
+	be.body = `{}`
+	rec := be.call(http.MethodPost, "/api/dropbox/disconnect", true, nil)
+	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+}
