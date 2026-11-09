@@ -78,7 +78,6 @@ const { answerCell, rowActions, readWholeQuestion } = await importOnce('./inbox_
 
 /** The agent's own chat card, on the Agents tab (a row that needs an answer shows the chat card, not the terminal saved last, #10141). */
 const openInAgents = s => { window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s))).then(() => window.showChatView?.()); };
-/** A quiet line under Needs you for as long as alerts are off and could be turned on (#11837: the one-time banner was dismissed and two questions waited 14 and 29 minutes): the same call as the banner's button and Settings > Notifications. */
 /** A computer cut its list short and no filter is applied (#14827): the one case where a filter helps, said once under the list. A list that is filtered, or complete, says nothing. */
 const cutShort = () => !NF.isFiltered(needsFilters) && reviewPages().some(p => p.truncated);
 function cutShortLine() { return cutShort() ? DT.el('p', 'goals-note inbox-cut-short', 'This list is cut short. Use Filters to narrow it.') : null; }
