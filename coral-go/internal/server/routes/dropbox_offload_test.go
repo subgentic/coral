@@ -626,6 +626,27 @@ func TestAFileMadePrivateDuringThePassIsNotFreed(t *testing.T) {
 				return map[string]bool{d: true}, nil
 			}
 		},
+		// QA's SHOULD on fda9e55d2: the re-read itself fails (an error, not a hit).
+		"the private marks unreadable on the re-read": func(be *backupEnv, d string) {
+			calls := 0
+			be.b.private = func(context.Context, []string) (map[string]bool, error) {
+				calls++
+				if calls == 1 {
+					return map[string]bool{}, nil
+				}
+				return nil, errors.New("board unreadable")
+			}
+		},
+		"the reference scan fails on the re-read": func(be *backupEnv, d string) {
+			calls := 0
+			be.b.references = func(context.Context) (map[string]bool, error) {
+				calls++
+				if calls == 1 {
+					return map[string]bool{}, nil
+				}
+				return nil, errors.New("no scan")
+			}
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			be, d := offloadEnv(t)
@@ -633,6 +654,8 @@ func TestAFileMadePrivateDuringThePassIsNotFreed(t *testing.T) {
 			n, _ := be.b.Offload(context.Background())
 			assert.Zero(t, n)
 			assert.True(t, be.objectHereNow(d))
+			assert.False(t, be.offloaded(d))
+			assert.False(t, be.markerOf(d), "the marker written for it is taken back (Security's INFO on fda9e55d2)")
 		})
 	}
 }
