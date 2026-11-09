@@ -28,6 +28,10 @@ const (
 	dropboxRemoveBatch = 100
 )
 
+// dropboxListPagesMax bounds delete-all's listing of /v1; a listing cut off with more to read refuses (Security's SHOULD 4 on cb3ff32dd). A var so a
+// test can make it small.
+var dropboxListPagesMax = 1000
+
 var (
 	dropboxDigestRe   = regexp.MustCompile(`^[0-9a-f]{64}$`)
 	dropboxServerIDRe = regexp.MustCompile(`^[0-9a-f]{32}$`)
@@ -123,12 +127,12 @@ func (b *DropboxBackup) removeDigest(ctx context.Context, digest string, typed [
 	if err != nil {
 		return res, http.StatusConflict, map[string]any{"code": "not_connected", "error": "Connect Dropbox first"}, err
 	}
-	_, _ = b.outbox.RemoveQueued(ctx, digest) // nothing still waiting is sent
 	rows, err := b.outbox.LedgerOfDigest(ctx, account, digest)
 	if err != nil {
 		return res, http.StatusInternalServerError, nil, err
 	}
 	if len(rows) == 0 {
+		_, _ = b.outbox.RemoveQueued(ctx, digest) // nothing in Dropbox yet: only what still waits, so it is not sent
 		return res, http.StatusOK, nil, nil
 	}
 	others, unknown, err := b.markerHolders(ctx, cl, access, digest)
@@ -139,6 +143,9 @@ func (b *DropboxBackup) removeDigest(ctx context.Context, digest string, typed [
 		return res, http.StatusConflict, map[string]any{"code": "others_offloaded", "others": last4(others), "unknown": unknown,
 			"error": "Another Coral keeps this file only in Dropbox. Removing it loses it there. Type the last 4 characters of each to go on."}, nil
 	}
+	// The checks passed: only now is what still waits for this artifact taken out of the backup (Security's SHOULD 5 on cb3ff32dd), so a
+	// refused removal leaves the backup as it was.
+	_, _ = b.outbox.RemoveQueued(ctx, digest)
 	if len(rows) > dropboxRemoveMax {
 		res.Remaining = len(rows) - dropboxRemoveMax
 		rows = rows[:dropboxRemoveMax]
@@ -296,7 +303,8 @@ func (b *DropboxBackup) deleteBackup(ctx context.Context, typed []string) (int, 
 	foreign, files := 0, 0
 	othersSet := map[string]bool{}
 	cursor := ""
-	for pages := 0; pages < 1000; pages++ {
+	complete := false
+	for pages := 0; pages < dropboxListPagesMax; pages++ {
 		var page dropbox.ListPage
 		if cursor == "" {
 			page, err = cl.ListFolder(ctx, access, "/v1")
@@ -304,6 +312,7 @@ func (b *DropboxBackup) deleteBackup(ctx context.Context, typed []string) (int, 
 			page, err = cl.ListFolderContinue(ctx, access, cursor)
 		}
 		if errors.Is(err, dropbox.ErrNotFound) && cursor == "" {
+			complete = true
 			break // nothing backed up
 		}
 		if err != nil {
@@ -327,8 +336,12 @@ func (b *DropboxBackup) deleteBackup(ctx context.Context, typed []string) (int, 
 		}
 		cursor = page.Cursor
 		if !page.HasMore {
+			complete = true
 			break
 		}
+	}
+	if !complete { // cut off with more to read: the foreign count would be too low, so nothing is deleted
+		return http.StatusServiceUnavailable, map[string]any{"code": "listing_unreadable", "error": "The backup is too big to list in one go. Nothing was deleted."}, nil
 	}
 	var others []string
 	unknown := 0

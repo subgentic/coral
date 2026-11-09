@@ -221,3 +221,36 @@ func TestPlainDisconnectIsUnchanged(t *testing.T) {
 	assert.Len(t, be.dbx.files, 2, "nothing deleted in Dropbox")
 	assert.Equal(t, 2, be.counts().BackedUp, "the ledger kept")
 }
+
+// Security's SHOULD 4 on cb3ff32dd. Mutant: a listing cut off with more to read goes on to delete.
+func TestDeleteAllRefusesAListingCutOff(t *testing.T) {
+	be, _ := newRemovalEnv(t, 3) // 6 files
+	old := dropboxListPagesMax
+	dropboxListPagesMax = 1
+	t.Cleanup(func() { dropboxListPagesMax = old })
+	be.dbx.pageSize = 2 // three pages: the one allowed does not finish
+	be.body = `{"delete_backup": true, "typed": ["delete"]}`
+	rec := be.call(http.MethodPost, "/api/dropbox/disconnect", true, nil)
+	assert.Equal(t, http.StatusServiceUnavailable, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), "listing_unreadable")
+	assert.Len(t, be.dbx.files, 6, "nothing deleted")
+	assert.True(t, be.status()["connected"].(bool))
+}
+
+// Security's SHOULD 5 on cb3ff32dd. Mutant: the queued rows go before the marker check (a refused removal has already changed the backup).
+func TestARefusedRemovalLeavesWhatStillWaits(t *testing.T) {
+	be, ds := newRemovalEnv(t, 1)
+	_, err := be.db.ExecContext(context.Background(), `INSERT INTO dropbox_outbox (kind, digest, doc_id, version, path, artifact_at, created_at) VALUES ('version', ?, ?, 2, '/v1/zzz/waiting.md', ?, ?)`,
+		ds[0], strings.Repeat("e", 32), time.Now().UTC().Format(time.RFC3339), time.Now().UTC().Format(time.RFC3339))
+	require.NoError(t, err)
+	be.marker(ds[0], strings.Repeat("4", 28)+"beef")
+	code, _ := be.removeCall("remove", ds[0], `{"confirm": true}`, true)
+	require.Equal(t, http.StatusConflict, code)
+	row, err := be.b.outbox.ByPath(context.Background(), "/v1/zzz/waiting.md")
+	require.NoError(t, err)
+	assert.Equal(t, store.DropboxOutboxQueued, row.State, "still waiting: the refused removal changed nothing")
+	code, _ = be.removeCall("remove", ds[0], `{"confirm": true, "typed": ["beef"]}`, true)
+	require.Equal(t, http.StatusOK, code)
+	row, _ = be.b.outbox.ByPath(context.Background(), "/v1/zzz/waiting.md")
+	assert.Equal(t, store.DropboxOutboxRemoved, row.State, "once the removal goes ahead, it is not sent")
+}

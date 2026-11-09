@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/subgentic/coral/internal/auth"
 )
 
 // CallbackPath is the path Dropbox returns the browser to on the one-shot listener.
@@ -40,8 +42,7 @@ func ServeCallbackOnce(port int, ttl time.Duration, handle func(CallbackResult) 
 	redirect = fmt.Sprintf("http://127.0.0.1:%d%s", ln.Addr().(*net.TCPAddr).Port, CallbackPath)
 	var once sync.Once
 	done := make(chan struct{})
-	srv := &http.Server{ReadHeaderTimeout: 10 * time.Second}
-	srv.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Referrer-Policy", "no-referrer")
@@ -65,6 +66,8 @@ func ServeCallbackOnce(port int, ttl time.Duration, handle func(CallbackResult) 
 		http.SetCookie(w, &http.Cookie{Name: FlowCookie, Value: "", Path: CallbackPath, MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode})
 		fmt.Fprintln(w, handle(res))
 	})
+	// Its own handler (never http.DefaultServeMux), and each connection attributed like Coral's own server's (the startup censuses, #14714).
+	srv := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second, ConnContext: auth.ConnContext}
 	go func() { _ = srv.Serve(ln) }()
 	go func() {
 		select {
