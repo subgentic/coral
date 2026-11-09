@@ -281,6 +281,11 @@ func newFakeDropbox(t *testing.T) *fakeDropbox {
 				json.NewEncoder(w).Encode(map[string]any{"entries": ents, "cursor": "m", "has_more": false})
 				return
 			}
+			if lp, _ := la["path"].(string); lp == "/v1/offloaded" && f.markersFail { // stage 6b: retention's marker listing fails
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(`{"error_summary":"internal_error/"}`))
+				return
+			}
 			// A full listing: every file stored, with the changes made so far counted as seen (the cursor points after them).
 			var all []map[string]any
 			for p, b := range f.files {
