@@ -184,7 +184,7 @@ function upgradeControl(s, remoteVersion, busy) {
     const label = order === null ? 'Upgrade' : `${order > 0 ? 'Downgrade' : 'Upgrade'} to v${escHtml(hub)}`;
     return `<button type="button" class="btn${order < 0 ? ' btn-primary' : ''}" data-action="ssh-upgrade" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>${label}</button>`;
 }
-const RECONNECT_HINT = "Checks the server now and restarts the hub's connection to it.";
+const RECONNECT_HINT = "Checks the computer now and restarts the hub's connection to it.";
 
 /** A server's page: its facts, what to do about a problem, and Test, Edit and Remove in a bar pinned at its foot (Remove the danger button, the primary last). */
 function pageHtml(s) {
@@ -403,7 +403,7 @@ async function doTest(id, verb = 'test') {
     const failed = verb === 'reconnect' ? 'Reconnect failed: could not reach the hub.' : 'Test failed: could not reach the hub.';
     _busyVerb = verb; setBusy(id, true); render();
     try {
-        const resp = await fetch(`/api/servers/${encodeURIComponent(id)}/${verb}`, { method: 'POST' });
+        const resp = await (verb === 'reconnect' ? fetch(`/api/servers/${encodeURIComponent(id)}/reconnect`, { method: 'POST' }) : fetch(`/api/servers/${encodeURIComponent(id)}/test`, { method: 'POST' })); // both routes written out: the Hub shell census reads them
         const body = await readBody(resp);
         if (!resp.ok) {
             _loadError = describeServerError(resp.status, body);
