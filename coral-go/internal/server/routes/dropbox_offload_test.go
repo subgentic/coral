@@ -127,3 +127,110 @@ func TestAProbeACrashLeftIsDeleted(t *testing.T) {
 		assert.False(t, strings.HasPrefix(p, "/v1/probe/"), "no probe stays: %s", p)
 	}
 }
+
+// offloadedEnv is offloadEnv after one pass: the object freed. The fake keeps the stored rev's bytes, as Dropbox keeps a file's revisions.
+func offloadedEnv(t *testing.T) (*backupEnv, string, []byte) {
+	t.Helper()
+	be, d := offloadEnv(t)
+	orig, err := os.ReadFile(be.objectPath(d))
+	require.NoError(t, err)
+	n, _ := be.b.Offload(context.Background())
+	require.Equal(t, 1, n)
+	be.dbx.mu.Lock()
+	if be.dbx.revBytes == nil {
+		be.dbx.revBytes = map[string][]byte{}
+	}
+	be.dbx.revBytes["r1"] = orig
+	be.dbx.mu.Unlock()
+	return be, d, orig
+}
+
+// Security's 3a. Mutants: the fetch served without the SHA-256 check; the marker or the row left after a fetch; the fetch not recorded as an open.
+func TestFetchBackBringsTheExactBytesBack(t *testing.T) {
+	be, d, orig := offloadedEnv(t)
+	here, err := be.b.FetchBack(context.Background(), d)
+	require.NoError(t, err)
+	require.True(t, here)
+	got, err := os.ReadFile(be.objectPath(d))
+	require.NoError(t, err)
+	assert.Equal(t, orig, got)
+	assert.False(t, be.offloaded(d), "the row goes")
+	assert.False(t, be.markerOf(d), "this Coral's marker goes")
+	var opened int
+	require.NoError(t, be.db.Get(&opened, "SELECT COUNT(*) FROM dropbox_opened WHERE digest = ?", d))
+	assert.Equal(t, 1, opened, "a fetch is an open: not freed again for 30 days")
+}
+
+// Security's 3a and condition 9. Mutants: the fetch by the file's current rev (an edit made in Dropbox served under the old digest); other bytes
+// stored; a fetch in another account.
+func TestFetchBackNeverServesOtherBytes(t *testing.T) {
+	t.Run("edited in Dropbox since: the stored rev", func(t *testing.T) {
+		be, d, orig := offloadedEnv(t)
+		p := be.versionFile(d)
+		be.dbx.mu.Lock()
+		be.dbx.files[p] = []byte("# edited in Dropbox\n")
+		be.dbx.revs = map[string]string{p: "r2"}
+		be.dbx.mu.Unlock()
+		here, err := be.b.FetchBack(context.Background(), d)
+		require.NoError(t, err)
+		require.True(t, here)
+		got, _ := os.ReadFile(be.objectPath(d))
+		assert.Equal(t, orig, got, "the stored rev's bytes, never the edit's")
+	})
+	t.Run("bytes that are not the digest", func(t *testing.T) {
+		be, d, _ := offloadedEnv(t)
+		be.dbx.mu.Lock()
+		be.dbx.revBytes["r1"] = []byte("something else")
+		be.dbx.mu.Unlock()
+		here, err := be.b.FetchBack(context.Background(), d)
+		assert.Error(t, err)
+		assert.False(t, here)
+		assert.False(t, be.objectHereNow(d), "nothing stored")
+		assert.True(t, be.offloaded(d), "nothing forgotten")
+		assert.True(t, be.markerOf(d))
+	})
+	t.Run("another account connected", func(t *testing.T) {
+		be, d, _ := offloadedEnv(t)
+		_, err := be.db.Exec("UPDATE dropbox_offloaded SET account_id = 'dbid:OTHER' WHERE digest = ?", d)
+		require.NoError(t, err)
+		_, err = be.b.FetchBack(context.Background(), d)
+		assert.ErrorIs(t, err, errOtherAccount)
+		assert.False(t, be.objectHereNow(d))
+	})
+}
+
+// Security's 3b. Mutants: Remove from Dropbox deletes the only copy of an offloaded artifact; a failed fetch-back removes anyway; a deleted
+// artifact's own marker left behind.
+func TestRemovingAnOffloadedArtifactFromDropboxFetchesItBackFirst(t *testing.T) {
+	t.Run("still here: fetched back, then removed", func(t *testing.T) {
+		be, d, orig := offloadedEnv(t)
+		code, out := be.removeCall("remove", d, `{"confirm": true}`, true)
+		require.Equal(t, 200, code, "%v", out)
+		got, err := os.ReadFile(be.objectPath(d))
+		require.NoError(t, err, "the bytes are back on this computer")
+		assert.Equal(t, orig, got)
+		assert.Zero(t, be.inDropbox(d), "then removed from Dropbox")
+		assert.False(t, be.offloaded(d))
+	})
+	t.Run("the fetch fails: nothing removed", func(t *testing.T) {
+		be, d, _ := offloadedEnv(t)
+		be.dbx.mu.Lock()
+		delete(be.dbx.revBytes, "r1")
+		be.dbx.mu.Unlock()
+		code, out := be.removeCall("remove", d, `{"confirm": true}`, true)
+		assert.Equal(t, 409, code)
+		assert.Equal(t, "kept_in_dropbox", out["code"])
+		assert.Equal(t, 2, be.inDropbox(d), "the only copy stays")
+		assert.True(t, be.offloaded(d))
+	})
+	t.Run("deleted here: its own marker goes, then the removal", func(t *testing.T) {
+		be, d, _ := offloadedEnv(t)
+		_, _, _, err := deleteArtifactFiles(be.h.dbx.dataDir, d)
+		require.NoError(t, err)
+		code, out := be.removeCall("remove", d, `{"confirm": true}`, true)
+		require.Equal(t, 200, code, "%v", out)
+		assert.False(t, be.markerOf(d))
+		assert.False(t, be.offloaded(d))
+		assert.Zero(t, be.inDropbox(d))
+	})
+}

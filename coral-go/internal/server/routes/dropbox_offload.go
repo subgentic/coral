@@ -220,3 +220,90 @@ func (b *DropboxBackup) offloadOne(ctx context.Context, cl *dropbox.Client, acce
 	storeFor(b.coralDir).removed(st.Size())
 	return st.Size(), true
 }
+
+var (
+	errKeptInDropbox = errors.New("this file is kept only in Dropbox and could not be fetched right now")
+	errOtherAccount  = errors.New("the Dropbox account connected now is not the one that keeps this file")
+)
+
+// fetchBackLocked brings an offloaded object's bytes back (Security's 3a), the caller holding the digest lock: by the ledger path's stored rev
+// (Dropbox keeps a file's earlier revisions, so an edit made there since is never served under this digest), capped by the recorded size, into an
+// exclusive 0600 temp file in the objects folder, SHA-256 equal to the digest, fits() checked, then renamed into place. Only then this Coral's marker
+// is deleted (read back as gone) and the offload row forgotten, and the fetch is recorded as an open. Nothing changes on any failure. It answers
+// true when the bytes are here (fetched now, or never freed).
+func (b *DropboxBackup) fetchBackLocked(ctx context.Context, digest string) (bool, error) {
+	row, ok, err := b.outbox.Offloaded(ctx, digest)
+	if err != nil {
+		return false, err
+	}
+	obj := filepath.Join(b.coralDir, "artifacts", "objects", digest)
+	if !ok {
+		_, serr := os.Lstat(obj)
+		return serr == nil, nil
+	}
+	cl, access, account, err := b.dropboxAccess(ctx)
+	if err != nil {
+		return false, errKeptInDropbox
+	}
+	if account != row.AccountID {
+		return false, errOtherAccount
+	}
+	if !storeFor(b.coralDir).fits(row.Size) {
+		return false, errStoreFull
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(obj), artifactUploadTempP+"*")
+	if err != nil {
+		return false, err
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath) // a no-op once renamed
+	h := sha256.New()
+	_, n, derr := cl.Download(ctx, access, row.Rev, row.Size, io.MultiWriter(tmp, h))
+	cerr := tmp.Close()
+	if derr != nil || cerr != nil || n != row.Size || hex.EncodeToString(h.Sum(nil)) != digest {
+		return false, errKeptInDropbox // never other bytes under this digest
+	}
+	if err := os.Rename(tmpPath, obj); err != nil {
+		return false, err
+	}
+	storeFor(b.coralDir).added(row.Size)
+	if serverID, err := b.d.store.ServerID(ctx); err == nil && serverID != "" {
+		marker := offloadMarker(digest, serverID)
+		if m, merr := cl.Metadata(ctx, access, marker); merr == nil {
+			_, _, _ = b.runDelete(ctx, cl, access, []dropbox.Delete{{Path: marker, Rev: m.Rev}})
+		}
+		if _, merr := cl.Metadata(ctx, access, marker); merr == nil || !errors.Is(merr, dropbox.ErrNotFound) {
+			// The bytes are here; the marker stays until a later fetch or pass removes it. Keeping the row would say the bytes are away, so it
+			// goes: a stray marker of this Coral only keeps retention from deleting the Dropbox copy, which is the safe side.
+			slog.Warn("[dropbox] a fetched-back file's marker could not be removed yet")
+		}
+	}
+	_ = b.outbox.ForgetOffloaded(ctx, digest)
+	_ = b.outbox.RecordOpened(ctx, digest, time.Now())
+	return true, nil
+}
+
+// FetchBack is fetchBackLocked under the digest lock.
+func (b *DropboxBackup) FetchBack(ctx context.Context, digest string) (bool, error) {
+	if !objectNameRe.MatchString(digest) {
+		return false, errors.New("not an artifact id")
+	}
+	defer lockArtifact(digest)()
+	return b.fetchBackLocked(ctx, digest)
+}
+
+// forgetOwnMarkerLocked removes this Coral's marker of a digest (read back as gone) and its offload row, the caller holding the digest lock: for an
+// artifact deleted here, whose Dropbox copy the Operator's removal then deletes. A marker that will not go keeps the row (fail closed).
+func (b *DropboxBackup) forgetOwnMarkerLocked(ctx context.Context, cl *dropbox.Client, access, digest string) {
+	serverID, err := b.d.store.ServerID(ctx)
+	if err != nil || serverID == "" {
+		return
+	}
+	marker := offloadMarker(digest, serverID)
+	if m, merr := cl.Metadata(ctx, access, marker); merr == nil {
+		_, _, _ = b.runDelete(ctx, cl, access, []dropbox.Delete{{Path: marker, Rev: m.Rev}})
+	}
+	if _, merr := cl.Metadata(ctx, access, marker); merr != nil && errors.Is(merr, dropbox.ErrNotFound) {
+		_ = b.outbox.ForgetOffloaded(ctx, digest)
+	}
+}
