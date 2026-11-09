@@ -567,7 +567,9 @@ CREATE TABLE IF NOT EXISTS dropbox_connection (
     list_cursor         TEXT,                       -- stage 5a (#14714): the listing cursor of /v1 for the account connected now; cleared by any new sign-in
     offload_days        INTEGER NOT NULL DEFAULT 0, -- stage 6b (#14845): keep artifacts older than this many days only in Dropbox; 0 is off (the default)
     offload_since       TEXT,                       -- when the Operator confirmed it
-    offload_last_pass   TEXT                        -- the last offload pass
+    offload_last_pass   TEXT,                       -- the last offload pass
+    autosync_off        INTEGER NOT NULL DEFAULT 0, -- 5a auto-sync (#14714, the Operator): 1 when the Operator turned off "Take edits made in Dropbox as new versions"
+    autosync_paused     TEXT NOT NULL DEFAULT ''    -- why auto-sync is paused ('' runs): signin (another account, a disconnect, a re-key) or breaker (too many in an hour)
 );
 
 -- Dropbox stage 4's outbox (#14655): one row per file to back up (an artifact version or its item_data sidecar), by its Dropbox path (ids only,
@@ -636,6 +638,25 @@ CREATE TABLE IF NOT EXISTS dropbox_offloaded (
 CREATE TABLE IF NOT EXISTS dropbox_opened (
     digest TEXT PRIMARY KEY,
     at     TEXT NOT NULL
+);
+
+-- Removals from Dropbox after the Operator deleted an artifact here (#14814, the Operator's answer 3 and Security's conditions on it): one row an
+-- object, queued by the Operator's own delete only, run by the backup worker once due_at has passed (a 24-hour grace), retried with backoff,
+-- cancelled by an upload of the same bytes. state: waiting; held (many deletes at once: nothing goes until the Operator confirms in Settings);
+-- kept (another Coral keeps it only in Dropbox, or its markers could not be read: left alone, listed); edited (edited in Dropbox: listed with
+-- Remove anyway). A finished removal leaves no row (the outbox rows say removed). name is the file's name when it was deleted, for Settings only.
+CREATE TABLE IF NOT EXISTS dropbox_removals (
+    digest      TEXT PRIMARY KEY,
+    name        TEXT NOT NULL DEFAULT '',
+    state       TEXT NOT NULL,
+    queued_at   TEXT NOT NULL,
+    due_at      TEXT NOT NULL,
+    next_try_at TEXT NOT NULL DEFAULT '',
+    attempts    INTEGER NOT NULL DEFAULT 0,
+    reason      TEXT NOT NULL DEFAULT '',
+    others      TEXT NOT NULL DEFAULT '',
+    unknown     INTEGER NOT NULL DEFAULT 0,
+    edited      TEXT NOT NULL DEFAULT ''
 );
 
 -- Dropbox stage 4b's audit (#14703): each retention setting change (who, old and new days, the dry-run count the page showed) and each retention

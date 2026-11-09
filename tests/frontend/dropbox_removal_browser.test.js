@@ -1,6 +1,6 @@
-// The Dropbox removal confirms (Dropbox stage 6a, #14814), as a person sees them at 1280 and 390: an artifact's Remove from Dropbox and Mark private
-// and remove confirms, the typed confirm when another Coral keeps the file only in Dropbox, Send to Dropbox again, and Settings' Disconnect and
-// delete the backup. Checks: a destructive confirm opens with the keyboard on Cancel (Enter never removes by accident), or on the typed field when one
+// The Dropbox removal confirms (Dropbox stage 6a, #14814, reworked to the Operator's answers), as a person sees them at 1280 and 390: an artifact's
+// Remove from Dropbox confirm (no Mark private and remove), the typed confirm when another Coral keeps the file only in Dropbox, Send to Dropbox
+// again, Settings' list of files deleted here that leave Dropbox 24 hours later, and Settings' Disconnect and delete the backup. Checks: a destructive confirm opens with the keyboard on Cancel (Enter never removes by accident), or on the typed field when one
 // is shown, and that field has a label; nothing scrolls sideways; the words say it is for every Coral that uses the backup. The server's answers are the
 // page's fetch. Screenshots go to CORAL_SCREENSHOT_DIR for the Operator. Drives Chrome over CDP through agent_view_harness.js against the isolated
 // dev server.
@@ -30,6 +30,11 @@ const S = `(window.__coralStatic || '/static/')`;
                     if (p === '/api/dropbox/artifact/${hex}') return json(window.__state);
                     if (p === '/api/dropbox/remove/${hex}' && m === 'POST') { window.__posts.push('remove'); return json({ code: 'others_offloaded', others: ['a3f2'], unknown: 0, error: 'x' }, 409); }
                     if (p === '/api/dropbox/status') return json(window.__dbx);
+                    if (p === '/api/dropbox/removals') return json({ removals: [
+                        { digest: 'b'.repeat(64), name: 'design notes.md', state: 'held', due_at: '2026-11-10T12:00:00Z' },
+                        { digest: 'c'.repeat(64), name: 'plan.md', state: 'kept', reason: 'others_offloaded', others: ['c0de'], unknown: 0 },
+                        { digest: 'd'.repeat(64), name: 'report.pdf', state: 'edited', edited: [{ path: '/v1/ddd/x/v1-dddddddd.pdf', rev: 'r2' }] },
+                        { digest: 'e'.repeat(64), name: 'old.md', state: 'waiting', due_at: '2026-11-10T12:00:00Z' } ] });
                     if (p === '/api/dropbox/disconnect' && m === 'POST') { window.__posts.push('disconnect'); return json({ code: 'confirm_delete_backup', files: 12, foreign: 2, others: ['a3f2'], unknown: 0 }, 409); }
                     return real(u, o); };
                 return true; })()`);
@@ -57,12 +62,7 @@ const S = `(window.__coralStatic || '/static/')`;
             await shot(`dropbox-remove-typed-${w}`);
             await ev(`${btn('Cancel')}.click(); true`);
 
-            console.log(`${tag}: Mark private and remove`);
-            await ev(`${btn('Mark private and remove…')}.click(); true`);
-            check(`${tag}: the Mark private confirm says what it does`, await ev(`/Mark it private and remove it from Dropbox for every Coral that uses this backup/.test(window.__block.textContent)`));
-            check(`${tag}: and opens on Cancel`, (await ev(`document.activeElement && document.activeElement.textContent`)) === 'Cancel');
-            await shot(`dropbox-private-confirm-${w}`);
-            await ev(`${btn('Cancel')}.click(); true`);
+            check(`${tag}: no Mark private and remove (the Operator: as few controls as possible)`, await ev(`!Array.from(window.__block.querySelectorAll('button')).some(b => /private/i.test(b.textContent))`));
 
             console.log(`${tag}: Send to Dropbox again`);
             await ev(`(async () => { window.__state = { connected: true, in_dropbox: 0, removed: true }; window.__block.remove(); const m = await import(${S} + 'artifact_dropbox.js');
@@ -78,6 +78,16 @@ const S = `(window.__coralStatic || '/static/')`;
             // Settings fills its rows (the Dropbox block among them) before the dialog is shown: a click before then focuses a field nobody can see,
             // which is what failed 3 of 5 under --stress (QA on #14814). A person clicks a shown dialog, after its own focus has moved in.
             await waitFor(`(() => { const m = document.getElementById('settings-modal'); return !!m && getComputedStyle(m).display !== 'none' && m.contains(document.activeElement); })()`, 'Settings shown with the focus in it', 8000);
+            await waitFor(`!document.getElementById('settings-dropbox-removals').hidden`, 'the removals list', 6000);
+            const rm = await ev(`(() => { const b = document.getElementById('settings-dropbox-removals'); b.scrollIntoView({ block: 'center' }); const i = b.querySelector('input');
+                return { text: b.textContent, rule: !document.getElementById('settings-dropbox-delete-rule').hidden && document.getElementById('settings-dropbox-delete-rule').textContent, label: i && i.getAttribute('aria-label'),
+                    buttons: Array.from(b.querySelectorAll('button')).map(x => x.textContent) }; })()`);
+            check(`${tag}: Settings says a file deleted here leaves Dropbox 24 hours later`, /removes its Dropbox copy 24 hours later/.test(rm.rule || ''), rm.rule);
+            check(`${tag}: it lists the held, waiting, kept and edited files, each with its own control`, /wait for your OK|waits for your OK/.test(rm.text) && /will be removed from Dropbox from/.test(rm.text) && /Another Coral keeps it only in Dropbox/.test(rm.text) && /edited in Dropbox/.test(rm.text)
+                && ['Remove them from Dropbox', 'Remove anyway', 'Keep it in Dropbox'].every(t => rm.buttons.includes(t)), JSON.stringify(rm.buttons));
+            check(`${tag}: the typed field there is labelled`, !!rm.label, rm.label);
+            check(`${tag}: no sideways scroll with the list`, await ev(`document.documentElement.scrollWidth <= innerWidth + 1`));
+            await shot(`dropbox-removals-settings-${w}`);
             await ev(`document.getElementById('settings-dropbox-delete').scrollIntoView({ block: 'center' }); document.getElementById('settings-dropbox-delete').click(); true`);
             await waitFor(`!document.getElementById('settings-dropbox-delete-confirm').hidden`, 'the delete confirm', 6000);
             const del = await ev(`(() => { const b = document.getElementById('settings-dropbox-delete-confirm'), i = document.getElementById('settings-dropbox-delete-typed'); b.scrollIntoView({ block: 'center' }); return { text: b.textContent, label: i && i.getAttribute('aria-label'), focused: document.activeElement === i }; })()`);

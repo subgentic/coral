@@ -139,6 +139,7 @@ GET /api/cloud/owner-label never
 GET /api/cloud/status never
 GET /api/custom-models view
 GET /api/dropbox/artifact/{digest} never
+GET /api/dropbox/removals never
 GET /api/dropbox/status never
 GET /api/filesystem/is-git launch
 GET /api/filesystem/list launch
@@ -405,11 +406,13 @@ POST /api/dropbox/connect never
 POST /api/dropbox/disconnect never
 POST /api/dropbox/edits/{doc}/promote never
 POST /api/dropbox/edits/{doc}/separate never
-POST /api/dropbox/private/{digest} never
+POST /api/dropbox/removals/cancel never
+POST /api/dropbox/removals/confirm never
 POST /api/dropbox/remove/{digest} never
 POST /api/dropbox/resend/{digest} never
 POST /api/dropbox/switch never
 POST /api/dropbox/takeover never
+POST /api/dropbox/undo/{digest} never
 POST /api/folder-tags/{folderName} never
 POST /api/history-import never
 POST /api/hub-auto-accept launch
@@ -538,6 +541,7 @@ PUT /api/cloud/hub-relaunch never
 PUT /api/cloud/max-mode never
 PUT /api/cloud/redact-tokens never
 PUT /api/custom-models launch
+PUT /api/dropbox/autosync never
 PUT /api/dropbox/filters never
 PUT /api/dropbox/retention never
 PUT /api/resources/{name} never

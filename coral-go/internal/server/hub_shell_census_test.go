@@ -52,7 +52,6 @@ type shellNever struct {
 // shellNeverRoutes: a never route one script calls, with what it does today. The key is "script METHOD route" with {} for a variable segment.
 var shellNeverRoutes = map[string]shellNever{
 	"launch_disclosure.js POST /api/launch-disclosure/ack":      {bExplains, `Could not record that you have read this`, "acknowledgement stays never through the Hub; a refused acknowledgement says it could not be recorded and nothing was launched, with no retry; the Computers notice is information only (#14501)", 0},
-	"needs_dropbox.js GET /api/dropbox/status":                  {bLocal, `if \(hub \|\| typeof get !== 'function'\)`, "the Inbox row of edits made in Dropbox reads this computer's own status only: on any Hub page (isCloud()) it asks for nothing and shows no row (#14777, Security's SHOULD 4)", 0},
 	"team_form.js GET /api/filesystem/trust-probe":              {bLocal, `isHub\(\) \|\| d\.dataset\.dirServer`, "only this computer’s folder choice is probed; Hub/remote inputs never request the default and the server rejects tunneled callers (#14090)", 0},
 	"info_tab.js GET /api/sessions/live/{}/mcp-servers":         {bHidden, `if \(!lines\.length\) return`, "the Info tab asks the agent's own computer for its MCP servers; where that read is refused through a Hub (or is empty) no row is drawn and nothing says why: a hidden row, not a wrong one (#13917)", 0},
 	"launch_skills.js GET /api/skills":                          {bExplains, `Skills stay on the computer`, "another computer's launch (and the Hub's) draws the row with the reason and nothing to tick; a refused read on this computer says so (#13871)", 0},
@@ -80,7 +79,7 @@ var shellNeverFiles = map[string]shellNever{
 	"chief_setup.js":            {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
 	"cloud.js":                  {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
 	"cloud/enroll.js":           {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
-	"dropbox_settings.js":       {bExplains, `set up on the computer itself, not through Coral Hub`, "Dropbox backup is set up on this computer's own dashboard: through a Hub every Dropbox route is never, the status read is refused and the block says where it is done, with no buttons (#14609)", 8},
+	"dropbox_settings.js":       {bExplains, `set up on the computer itself, not through Coral Hub`, "Dropbox backup is set up on this computer's own dashboard: through a Hub every Dropbox route is never, the status read is refused and the block says where it is done, with no buttons (#14609); the removals list and its two routes are read only once connected (#14814); the auto-sync switch's route (#14714)", 11},
 	"cloud_connect.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 12},
 	"cloud_server_view.js":      {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"controls.js":               {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},

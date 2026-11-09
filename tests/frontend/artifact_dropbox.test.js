@@ -1,5 +1,5 @@
-// An artifact's place in the Dropbox backup, in its Details (Dropbox stage 6a, #14814): drawn only when the backup holds it or removed it; Remove and
-// Mark private and remove ask first and send the confirm; another Coral's marker asks for the typed last 4; a file edited in Dropbox offers Remove
+// An artifact's place in the Dropbox backup, in its own view (Dropbox stage 6a, #14814): drawn only when the backup holds it or removed it; Remove
+// asks first and sends the confirm (no Mark private and remove: the Operator); another Coral's marker asks for the typed last 4; a file edited in Dropbox offers Remove
 // anyway at the rev the server named; a removed artifact offers Send to Dropbox again; nothing from the server is put in as HTML. Run: node artifact_dropbox.test.js
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -48,7 +48,8 @@ const { JSDOM } = require('jsdom');
     b = mk(); await b.show();
     assert.match(b.block.textContent, /In Dropbox \(2 files, with its details\)/);
     const btn = t => Array.from(b.block.querySelectorAll('button')).find(x => x.textContent === t);
-    assert.ok(btn('Remove from Dropbox…') && btn('Mark private and remove…'));
+    assert.ok(btn('Remove from Dropbox…'));
+    assert.ok(!Array.from(b.block.querySelectorAll('button')).some(x => /private/i.test(x.textContent)), 'no Mark private and remove (the Operator: as few controls as possible)');
 
     // Remove: the confirm says it is for every Coral and stays out until sent again; another Coral's marker asks for the typed last 4.
     btn('Remove from Dropbox…').click();
@@ -86,13 +87,6 @@ const { JSDOM } = require('jsdom');
     assert.ok(calls.some(c => c.url === `/api/dropbox/resend/${hex}` && c.method === 'POST'));
     assert.match(b.block.textContent, /It will be backed up again\./);
 
-    // Mark private and remove goes to its own route; a refusal says the shared copy is still there.
-    answers[`/api/dropbox/private/${hex}`] = { status: 409, body: { code: 'markers_unreadable', private: true, note: 'It is marked private here; its copy in Dropbox is still there.' } };
-    btn('Mark private and remove…').click();
-    assert.strictEqual(document.activeElement && document.activeElement.textContent, 'Cancel', 'Mark private and remove opens on Cancel too');
-    btn('Mark private and remove').click(); await tick(); await tick();
-    assert.match(b.block.textContent, /its copy in Dropbox is still there/);
-
     // Cancel changes nothing, and gives the keyboard back to the button that opened the confirm.
     btn('Remove from Dropbox…').focus();
     btn('Remove from Dropbox…').click();
@@ -101,6 +95,23 @@ const { JSDOM } = require('jsdom');
     assert.strictEqual(calls.length, before);
     assert.match(b.block.textContent, /Nothing changed\./);
     assert.strictEqual(document.activeElement && document.activeElement.textContent, 'Remove from Dropbox…', 'the keyboard is back on its trigger');
+    // Undo this edit (#14714): offered when the server says the newest version is an edit from Dropbox; it confirms first, on Cancel.
+    answers[`/api/dropbox/artifact/${hex}`] = { status: 200, body: { connected: true, in_dropbox: 0, removed: false, undo: true } };
+    b = mk(); await b.show();
+    assert.ok(b.block.isConnected, 'shown for an edit even before it is backed up');
+    assert.match(b.block.textContent, /This version is an edit made in Dropbox/);
+    const undoBtn = () => Array.from(b.block.querySelectorAll('button')).find(x => x.textContent === 'Undo this edit…');
+    undoBtn().click();
+    assert.strictEqual(b.block.querySelector('[role=group]').getAttribute('aria-label'), 'Confirm undoing this edit', 'the group is named for the undo');
+    assert.match(b.block.textContent, /removes the edited version here\. The edit stays in your Dropbox history/);
+    assert.strictEqual(document.activeElement && document.activeElement.textContent, 'Cancel');
+    answers[`/api/dropbox/undo/${hex}`] = { status: 200, body: { undone: true } };
+    answers[`/api/dropbox/artifact/${hex}`] = { status: 200, body: { connected: true, in_dropbox: 2, removed: false, undo: false } };
+    Array.from(b.block.querySelectorAll('button')).find(x => x.textContent === 'Undo this edit').click(); await tick(); await tick(); await tick();
+    assert.deepStrictEqual(JSON.parse(calls.filter(c => c.url === `/api/dropbox/undo/${hex}`).pop().body), { confirm: true });
+    assert.match(b.block.textContent, /The edit was undone/);
+    assert.ok(!undoBtn(), 'no Undo once the newest is not an edit');
+    assert.ok(document.activeElement && document.activeElement.isConnected && b.block.contains(document.activeElement), 'the keyboard is on a live button of the block, not a removed one');
     assert.strictEqual(b.block.querySelector('img'), null);
     console.log('artifact_dropbox.test.js: ok');
 })().catch(e => { console.error(e); process.exit(1); });

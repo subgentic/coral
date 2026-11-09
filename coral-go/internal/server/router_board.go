@@ -53,7 +53,6 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 	boardHandler.SetCommentReadStamp(sessHandler.StampCommentReads)                    // the Operator's comment says when the asked agent read it (#14130)
 	boardHandler.SetIdleWaker(sessHandler.WakeIdleForDelivery)                         // any typed delivery to an auto-asleep agent wakes it first (#12111)
 	boardHandler.SetNeedsYouSkills(routes.NewSkillsHandler(s.db, s.cfg).NeedsYouItems) // the skills that wait for the Operator are items of Needs you (#12139)
-	boardHandler.SetNeedsYouDropbox(routes.DropboxEditItems(s.cfg.CoralDir()))         // edits made in Dropbox held for the Operator (#14714), this computer only
 	boardHandler.SetSessionThinkingLookup(routes.SessionThinkingLookup(store.NewSessionStore(s.db)))
 	boardHandler.SetTaskArtifactWriter(s.cfg.CoralDir(), sessHandler.PersistTaskChanges)
 	s.goBackground(func(context.Context) { boardHandler.WarmUploads() }) // the first artifacts read after a start no longer pays for reading every upload record (#13292)

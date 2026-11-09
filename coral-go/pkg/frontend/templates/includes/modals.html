@@ -667,8 +667,15 @@
                                 </div>
                                 <div id="settings-dropbox-note" class="settings-hint" role="status"></div>
                                 <div id="settings-dropbox-delete-confirm" class="settings-dropbox-delete-confirm" hidden></div>
+                                <p id="settings-dropbox-delete-rule" class="settings-hint" hidden>Deleting a file in Coral removes its Dropbox copy 24 hours later.</p>
+                                <div id="settings-dropbox-removals" class="settings-dropbox-removals" role="group" aria-label="Files to remove from Dropbox" hidden></div>
                                 <div id="settings-dropbox-backup" class="settings-dropbox-backup" hidden>
                                     <div id="settings-dropbox-counts" class="settings-hint"></div>
+                                    <div class="dropbox-inline">
+                                        <label for="settings-dropbox-autosync"><input type="checkbox" id="settings-dropbox-autosync"> Take edits made in Dropbox as new versions</label>
+                                        <button type="button" class="btn btn-small" id="settings-dropbox-autosync-resume" hidden>Resume</button>
+                                    </div>
+                                    <p id="settings-dropbox-autosync-note" class="settings-hint" role="status"></p>
                                     <ul id="settings-dropbox-edits" class="settings-dropbox-edits" aria-label="Files edited in Dropbox" hidden></ul>
                                     <fieldset class="settings-dropbox-filters">
                                         <legend>What to back up</legend>

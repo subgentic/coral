@@ -199,6 +199,8 @@ func (b *DropboxBackup) noticeEntry(ctx context.Context, cl *dropbox.Client, acc
 		if prev.Digest != "" && prev.Digest != digest {
 			b.dropHeld(ctx, prev.Digest) // the older edit of this document is replaced: its bytes go
 		}
+		b.autoPromote(ctx, store.DropboxEdit{AccountID: account, DocID: row.DocID, Version: row.Version, OrigDigest: row.Digest, Path: row.Path,
+			Digest: digest, MediaType: mt, Size: size, Rev: e.Rev}) // auto-sync (#14714): the next version on its own, unless held for the Operator
 	} else {
 		b.dropHeld(ctx, digest) // not held (a decision is being written): the fetched bytes go
 	}

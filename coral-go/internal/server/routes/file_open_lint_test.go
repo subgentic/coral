@@ -73,6 +73,7 @@ var reviewedFileOpens = map[string]string{
 	"dropbox_backup.go:DropboxBackup.readObject:OpenNoFollow":             "artifacts/objects/<64-hex digest of an outbox row the server wrote>: opened once without following a link, a regular file, capped, and its SHA-256 checked against the digest (#14655, #14691)",
 	"dropbox_backup.go:osPower:ReadFile":                                  "fixed files under /sys/class/power_supply (the OS's own battery state, Linux): no name from a request or a listing",
 	"dropbox_edits.go:DropboxBackup.openHeld:OpenNoFollow":                "artifacts/dropbox-held/<64-hex digest of an open edit>: opened without following a link, a regular file of the edit's size, its SHA-256 checked (#14714, Security's conditions a and b)",
+	"dropbox_autosync.go:DropboxBackup.uploadChecks:OpenNoFollow":         "artifacts/dropbox-held/<64-hex digest of the edit just held>: read without following a link, capped at the edit's maximum, to apply the image metadata rule before an automatic promotion (#14714, Security's SHOULD 3)",
 	"artifacts_list_all.go:listAllArtifactRows:ReadFile":                  "the machine-wide list (#5575): objects/<64 lower-case hex>.json sidecars (size-bounded) and artifacts/received/<32-hex board>/<64-hex>.json rows the server wrote; every name is checked against objectNameRe and boardDirName",
 }
 

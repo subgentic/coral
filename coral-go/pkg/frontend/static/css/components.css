@@ -4214,17 +4214,3 @@ dialog.team-link-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 .agent-sections .info-command-row { flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; }
 .agent-sections .info-command-row .copy-btn { width: auto; align-self: flex-start; opacity: 1; background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--control-border); }
 @media (max-width: 767px), (pointer: coarse) { .agent-sections .info-command-row .copy-btn { min-height: 44px; } } /* a touch size, as the shared buttons have */
-
-/* The Dropbox backup block in Storage and cleanup (#14736, the Operator: "needs some love"): plain sections instead of boxed fieldsets, the types as a
-   compact grid of box-then-name pairs, and each field on one line with its label, unit and button (wrapping on a phone). */
-#settings-dropbox .settings-dropbox-filters { border: 0; padding: 0; margin: 14px 0 0; min-width: 0; }
-#settings-dropbox .settings-dropbox-filters legend { padding: 0; margin-bottom: 6px; font-size: var(--fs-md); font-weight: var(--fw-strong); } /* a section of the block: no larger than its title */
-#settings-modal #settings-dropbox-title { margin: 0 0 4px; font-size: var(--fs-lg); font-weight: var(--fw-strong); } /* the block's title, the size of the page's other row titles */
-#settings-modal #settings-dropbox .settings-dropbox-actions .btn { margin: 4px 8px 4px 0; } /* the buttons start at the block's left edge, not indented by the dialog's button margin */
-#settings-dropbox .settings-dropbox-types { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 4px 12px; }
-#settings-modal #settings-dropbox .settings-dropbox-types label { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; margin: 0; cursor: pointer; }
-#settings-modal #settings-dropbox .settings-dropbox-types input[type="checkbox"] { display: inline-block; width: auto; margin: 0; flex: 0 0 auto; }
-#settings-dropbox .dropbox-inline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
-#settings-modal #settings-dropbox .dropbox-inline label { display: inline; margin: 0; }
-#settings-dropbox .dropbox-inline input[type="number"] { width: 6em; flex: 0 0 auto; }
-#settings-dropbox .settings-dropbox-filters p.settings-hint { margin: 4px 0 8px; }

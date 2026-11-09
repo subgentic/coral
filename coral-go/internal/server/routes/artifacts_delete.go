@@ -151,7 +151,8 @@ func (h *SessionsHandler) deleteArtifactCore(w http.ResponseWriter, r *http.Requ
 		_, _ = h.db.ExecContext(r.Context(), "DELETE FROM artifact_stars WHERE hex = ?", id)        // and its star (#9819)
 		_, _ = h.db.ExecContext(r.Context(), "DELETE FROM artifact_person_stars WHERE hex = ?", id) // and every person's (#13910)
 	}
-	h.dropArtifactComments(r.Context(), id) // and the comments on it (#5176)
+	h.dropArtifactComments(r.Context(), id)               // and the comments on it (#5176)
+	noteOperatorDelete(h.cfg.CoralDir(), id, name, false) // the Operator's own delete: its Dropbox copy goes too, after the grace (#14814)
 	slog.Info("[artifacts] deleted by the Operator", "digest", id, "bytes", freed, "upload_records", removed)
 	out := map[string]any{"deleted": true, "bytes": freed}
 	note := ""

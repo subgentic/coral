@@ -135,8 +135,6 @@ type BoardHandler struct {
 	needsYouAgents func(r *http.Request) ([]NeedsYouItem, error)
 	// needsYouSkills lists the skills waiting for approval for GET /api/needs-you (SetNeedsYouSkills). Nil: none.
 	needsYouSkills func(ctx context.Context) ([]NeedsYouItem, error)
-	// needsYouDropbox lists the edits made in Dropbox held for the Operator (SetNeedsYouDropbox, Dropbox stage 5a): this computer only. Nil: none.
-	needsYouDropbox func(r *http.Request) ([]NeedsYouItem, error)
 	// uploads caches per-session upload records for the artifact views.
 	uploads uploadDirCache
 	// taskCounts keeps each board's artifact count per task for a few seconds (taskArtifactCounts, #8591).

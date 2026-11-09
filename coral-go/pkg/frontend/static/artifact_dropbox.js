@@ -1,12 +1,13 @@
-/* An artifact's place in the Dropbox backup (Dropbox stage 6a, #14814), in its Details beside "Private": the Operator on this computer sees whether it
- * is in Dropbox and can remove it (for every Coral that uses the backup), mark it private and remove it (privacy wins), or send a removed artifact
- * again (Security's SHOULD 6). Routes: GET /api/dropbox/artifact/{id}, POST /api/dropbox/remove|private|resend/{id}; all are this computer's alone,
+/* An artifact's place in the Dropbox backup (Dropbox stage 6a, #14814), in the artifact's own view only (the Operator: Dropbox controls are part of
+ * the artifact, never of a main screen or a list): the Operator on this computer sees whether it is in Dropbox and can remove it (for every Coral
+ * that uses the backup), or send a removed artifact again (Security's SHOULD 6). Deleting the artifact removes its Dropbox copy on its own, 24 hours
+ * later (Settings lists those). Routes: GET /api/dropbox/artifact/{id}, POST /api/dropbox/remove|resend/{id}; all are this computer's alone,
  * so through Coral Hub the read is refused and nothing is drawn. The server decides: the typed confirm when another Coral keeps the file only in
  * Dropbox (the last 4 characters of each), and "Remove anyway" at the rev a file edited in Dropbox has now. Every word is ours, set as text. */
 import { serverUrl } from './server_base.js';
 
 const HEX_RE = /^[a-f0-9]{64}$/;
-const REMOVE = '/api/dropbox/remove/', PRIVATE = '/api/dropbox/private/', RESEND = '/api/dropbox/resend/', STATE = '/api/dropbox/artifact/';
+const REMOVE = '/api/dropbox/remove/', RESEND = '/api/dropbox/resend/', STATE = '/api/dropbox/artifact/', UNDO = '/api/dropbox/undo/';
 const url = (prefix, hex, server) => serverUrl(prefix + hex, server);
 
 /** The block, loaded when the Details are shown; taken out again when there is nothing to say (not connected, never backed up, or refused). */
@@ -32,14 +33,13 @@ export function dropboxBlock(hex, server, details) {
         return { status: r.status, body: j || {} };
     };
 
-    // ask shows the confirm for a removal (or Mark private and remove), and what the server needs next: the typed ids, or Remove anyway.
+    // ask shows the confirm for a removal, and what the server needs next: the typed ids, or Remove anyway.
     const ask = (path, typedNeeded = null, anyway = null) => {
         if (document.activeElement && acts.contains(document.activeElement)) trigger = document.activeElement;
         confirmBox.textContent = ''; confirmBox.hidden = false;
+        confirmBox.setAttribute('aria-label', 'Confirm removing this file from Dropbox'); // its own name again after an Undo confirm (UI Accessibility, round 4)
         const words = document.createElement('p'); words.id = `${idBase}-words`;
-        words.textContent = path === PRIVATE
-            ? 'Mark it private and remove it from Dropbox for every Coral that uses this backup. Dropbox may keep it for a while in its deleted files. It stays out of the backup until you send it again.'
-            : 'Remove it from Dropbox for every Coral that uses this backup. Dropbox may keep it for a while in its deleted files. It stays out of the backup until you send it again.';
+        words.textContent = 'Remove it from Dropbox for every Coral that uses this backup. Dropbox may keep it for a while in its deleted files. It stays out of the backup until you send it again.';
         confirmBox.append(words);
         let typed = null;
         if (typedNeeded) {
@@ -56,7 +56,7 @@ export function dropboxBlock(hex, server, details) {
             note.textContent = `${anyway.length} ${anyway.length === 1 ? 'file was' : 'files were'} edited in Dropbox and kept. Remove anyway deletes the version Dropbox has now.`;
             confirmBox.append(note);
         }
-        const go = button(anyway ? 'Remove anyway' : (path === PRIVATE ? 'Mark private and remove' : 'Remove from Dropbox'), async () => {
+        const go = button(anyway ? 'Remove anyway' : 'Remove from Dropbox', async () => {
             go.disabled = true; say.textContent = '';
             const body = { confirm: true };
             if (typed) body.typed = typed.value.trim().split(/\s+/).filter(Boolean);
@@ -68,7 +68,7 @@ export function dropboxBlock(hex, server, details) {
             const edited = Array.isArray(r.body.edited) ? r.body.edited.filter(e => e && e.path && e.rev) : [];
             if (edited.length) { ask(path, null, edited); say.textContent = 'A file was edited in Dropbox and kept: Remove anyway, or Cancel.'; return; }
             confirmBox.hidden = true;
-            say.textContent = r.body.in_progress ? 'Dropbox is still removing it.' : (path === PRIVATE ? 'Marked private and removed from Dropbox.' : 'Removed from Dropbox.');
+            say.textContent = r.body.in_progress ? 'Dropbox is still removing it.' : 'Removed from Dropbox.';
             await load(true);
             const first = acts.querySelector('button'); (first || trigger)?.focus?.(); // the keyboard goes back to the block's own button
         });
@@ -77,19 +77,42 @@ export function dropboxBlock(hex, server, details) {
         (typed || cancel).focus?.(); // a destructive confirm starts on Cancel, or on the field the person must type
     };
 
+    // askUndo confirms Undo this edit (Security's condition 3): the edited version goes here; Dropbox keeps the edit in its history.
+    const askUndo = () => {
+        if (document.activeElement && acts.contains(document.activeElement)) trigger = document.activeElement;
+        confirmBox.textContent = ''; confirmBox.hidden = false;
+        confirmBox.setAttribute('aria-label', 'Confirm undoing this edit'); // the group is named for what it confirms (UI Accessibility, round 4)
+        const words = document.createElement('p'); words.id = `${idBase}-undo`;
+        words.textContent = 'This removes the edited version here. The edit stays in your Dropbox history.';
+        const go = button('Undo this edit', async () => {
+            go.disabled = true;
+            const r = await post(UNDO, { confirm: true });
+            go.disabled = false;
+            confirmBox.hidden = true;
+            say.textContent = r.status === 200 ? 'The edit was undone: the version before it is the newest again.' : String(r.body.error || 'Not undone: Coral could not change the file.');
+            if (r.status === 200) await load(true);
+            (acts.querySelector('button') || trigger)?.focus?.(); // the buttons were drawn again: a live one, never the removed trigger
+        });
+        const cancel = button('Cancel', () => { confirmBox.hidden = true; confirmBox.textContent = ''; say.textContent = 'Nothing changed.'; trigger?.focus?.(); });
+        confirmBox.append(words, go, cancel);
+        cancel.focus?.(); // a destructive confirm starts on Cancel
+    };
+
     let loaded = false;
     const load = async (again = false) => {
         if (loaded && !again) return;
         loaded = true;
         let j = null;
         try { const r = await fetch(url(STATE, hex, server), { cache: 'no-store' }); j = r.ok ? await r.json().catch(() => null) : null; } catch { j = null; }
-        if (!j || !j.connected || (!(Number(j.in_dropbox) > 0) && !j.removed)) { details.remove(block); return; } // refused, not connected, or never backed up
+        if (!j || !j.connected || (!(Number(j.in_dropbox) > 0) && !j.removed && !j.undo)) { details.remove(block); return; } // refused, not connected, or never backed up
         acts.textContent = '';
+        if (j.undo) acts.append(button('Undo this edit…', askUndo)); // the newest version is an edit made in Dropbox (#14714)
+        state.textContent = j.undo ? 'This version is an edit made in Dropbox.' : '';
         if (Number(j.in_dropbox) > 0) {
             const n = Number(j.in_dropbox);
             state.textContent = `In Dropbox (${n} ${n === 1 ? 'file' : 'files'}, with its details).`;
-            acts.append(button('Remove from Dropbox…', () => ask(REMOVE)), button('Mark private and remove…', () => ask(PRIVATE)));
-        } else {
+            acts.append(button('Remove from Dropbox…', () => ask(REMOVE)));
+        } else if (j.removed) {
             state.textContent = 'Removed from Dropbox: it stays out of the backup until you send it again.';
             acts.append(button('Send to Dropbox again', async () => {
                 const r = await post(RESEND);

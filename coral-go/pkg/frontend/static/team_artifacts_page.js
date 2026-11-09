@@ -32,7 +32,6 @@ const { loadPanelOpen, savePanelOpen, buildMoreMenu } = await importOnce('./list
 const { isOwnerLabelRefusal, OWNER_LABEL_TEXT } = await importOnce('./owner_label.js');
 const { readersAllowed, readersBlock } = await importOnce('./artifact_readers.js');
 const { privateBlock } = await importOnce('./artifact_private.js'); // the owner's Private switch, beside it (#11457)
-const { dropboxBlock } = await importOnce('./artifact_dropbox.js'); // its place in the Dropbox backup (#14814): this computer's Operator only
 const { HEX_RE, managedHex, itemKey: artifactKey, isUnverified, readableName, sizeText, typeText, createdText, taskText, linkOfItem, renderText, orderByGroup, groupHead, uploaderText, isOperatorUpload } = await importOnce('./artifact_item.js');
 
 const Tags = await importOnce('./artifact_tags.js');
@@ -593,7 +592,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             sub: [un ? '' : typeText(item), un ? '' : sizeText(item.size), whenText(item.created_at)].filter(Boolean).join(' · '), subTitle: createdText(item), // the exact time behind the one in words
             facts: facts.filter(([, v]) => v != null && v !== ''),
             details: link && link.preview && hex ? (h, { isStale }) => { // the Operator's "Who can read this" (#5577) is behind Details with the facts, for a stored artifact
-                readersAllowed(hex, link.server).then(ok => { if (ok && !isStale()) { h.add(readersBlock(hex, link.server, h)); h.add(privateBlock(hex, link.server, h)); h.add(dropboxBlock(hex, link.server, h)); } }).catch(() => {});
+                readersAllowed(hex, link.server).then(ok => { if (ok && !isStale()) { h.add(readersBlock(hex, link.server, h)); h.add(privateBlock(hex, link.server, h)); } }).catch(() => {});
             } : null,
             body: link && link.preview ? (host, { signal, isStale }) => {
                 return renderArtifact(host, hex ? `coral://artifacts/${hex}` : item.uri || '', { server: link.server, filename: name, mediaType: item.media_type, contentURL: link.contentURL }, { signal, isStale, renderContent: renderText, openEntry: () => {}, setMeta: () => {} }); } : null,

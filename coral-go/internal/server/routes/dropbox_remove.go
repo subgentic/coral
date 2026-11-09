@@ -1,7 +1,7 @@
 package routes
 
 // Dropbox stage 6a, explicit removal (#14814; design v33 §4a and Security's conditions 2a to 2g on the 6 delta). The Operator removes an artifact from
-// Dropbox, marks it private (the mark first, then the removal), or deletes the whole backup with Disconnect. Before any removal Coral lists the
+// Dropbox from its own view, a removal after a delete here runs on its own (dropbox_removals.go), or the whole backup goes with Disconnect. Before any removal Coral lists the
 // artifact's offload markers: a marker of another Coral means that Coral keeps the file only in Dropbox, so the removal needs the last 4 characters of
 // every such Coral's id typed (checked here against this listing, never the page's idea). Only "not found" means no markers; any other answer refuses
 // (fail closed). Per-file deletes carry the ledger's rev (parent_rev), so a file edited in Dropbox is refused and reported; "Remove anyway" deletes only
@@ -215,24 +215,12 @@ func (b *DropboxBackup) runDelete(ctx context.Context, cl *dropbox.Client, acces
 	return nil, false, nil
 }
 
-// SetMarkPrivate gives the worker the board's way to mark an artifact private (board.Store.SetArtifactPrivate), for "Mark private" (Security's 2e).
-func (b *DropboxBackup) SetMarkPrivate(f func(ctx context.Context, digest string) error) {
-	if f != nil {
-		b.markPrivate = f
-	}
-}
-
 // DropboxRemove answers POST /api/dropbox/remove/{digest}: remove the artifact from Dropbox (the Operator's, on this computer only).
 func (h *CloudHandler) DropboxRemove(w http.ResponseWriter, r *http.Request) {
-	h.removeRoute(w, r, false)
+	h.removeRoute(w, r)
 }
 
-// DropboxRemovePrivate answers POST /api/dropbox/private/{digest}: mark the artifact private, then remove it from Dropbox (privacy wins).
-func (h *CloudHandler) DropboxRemovePrivate(w http.ResponseWriter, r *http.Request) {
-	h.removeRoute(w, r, true)
-}
-
-func (h *CloudHandler) removeRoute(w http.ResponseWriter, r *http.Request, private bool) {
+func (h *CloudHandler) removeRoute(w http.ResponseWriter, r *http.Request) {
 	if h.refuseCloud(w, r, allowDashboard) || !requireJSON(w, r) {
 		return
 	}
@@ -258,35 +246,19 @@ func (h *CloudHandler) removeRoute(w http.ResponseWriter, r *http.Request, priva
 	}
 	b := d.backup
 	ctx := r.Context()
-	reason := "removed"
-	if private {
-		reason = "private"
-		if b.markPrivate == nil {
-			writeError(w, http.StatusNotFound, "not_available", "Marking private is not available here")
-			return
-		}
-		if err := b.markPrivate(ctx, digest); err != nil { // the mark first, never the other order (Security's 2e)
-			writeError(w, http.StatusInternalServerError, "", "could not save the private mark: nothing was removed")
-			return
-		}
-	}
 	res, code, refusal, err := b.removeDigest(ctx, digest, in.Typed, in.Anyway)
 	if refusal != nil || (err != nil && code != http.StatusOK) {
 		if refusal == nil {
 			refusal = map[string]any{"error": "could not remove it from Dropbox"}
 		}
-		if private {
-			refusal["private"] = true
-			refusal["note"] = "It is marked private here; its copy in Dropbox is still there."
-		}
 		writeJSON(w, code, refusal)
 		return
 	}
-	_ = d.store.AddAudit(ctx, store.DropboxAudit{Kind: store.DropboxAuditRemoval, Who: "operator", Count: res.Removed, Reason: reason})
-	out := map[string]any{"removed": res.Removed, "in_progress": res.InProgress, "remaining": res.Remaining, "edited": res.Edited}
-	if private {
-		out["private"] = true
+	_ = d.store.AddAudit(ctx, store.DropboxAudit{Kind: store.DropboxAuditRemoval, Who: "operator", Count: res.Removed, Reason: "removed"})
+	if !res.InProgress && res.Remaining == 0 && len(res.Edited) == 0 {
+		_, _ = b.outbox.CancelRemoval(ctx, digest) // a removal waiting after a delete here is done with (Settings' kept and edited rows end here)
 	}
+	out := map[string]any{"removed": res.Removed, "in_progress": res.InProgress, "remaining": res.Remaining, "edited": res.Edited}
 	writeJSON(w, http.StatusOK, out)
 }
 
@@ -445,5 +417,11 @@ func (h *CloudHandler) DropboxArtifact(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "", "could not read the backup")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"connected": true, "in_dropbox": in, "removed": removed})
+	undo := false // the newest version of its series and an edit made in Dropbox: the file's view offers Undo this edit (#14714)
+	if sid, _, ok := digestSeries(d.backup.coralDir, digest); ok {
+		if ms := seriesMembers(d.backup.coralDir, sid); len(ms) > 1 && ms[len(ms)-1].Digest == digest && ms[len(ms)-1].Source == sourceDropboxEdit {
+			undo = true
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"connected": true, "in_dropbox": in, "removed": removed, "undo": undo})
 }
