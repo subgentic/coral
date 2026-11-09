@@ -84,7 +84,12 @@ func (c *Client) doHeader(req *http.Request, access string, out any) (http.Heade
 func respError(resp *http.Response, data []byte) error {
 	var e apiError
 	_ = json.Unmarshal(data, &e)
-	tag := strings.SplitN(e.Summary, "/", 2)[0]
+	parts := strings.Split(e.Summary, "/")
+	tag := parts[0]
+	// The second tag too, when it is one (Share via Dropbox, #14944: access_error/invalid_file is "not shared", access_error/no_permission is not).
+	if len(parts) > 1 && strings.Trim(parts[1], ".") != "" && validTag(parts[0]) && validTag(tag+"/"+parts[1]) {
+		tag += "/" + parts[1]
+	}
 	switch {
 	case resp.StatusCode == http.StatusTooManyRequests || tag == "too_many_requests":
 		after := time.Second
