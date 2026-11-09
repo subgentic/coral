@@ -95,7 +95,7 @@ function page(q) {
             console.log(`${tag}: the keyboard's Jump to first message gets to the start`);
             await ev(`window.location.reload(); true`);
             await coralReady();
-            await waitFor(`window.__coral.boardCounts && window.__coral.boardCounts().shown === 50`, 'the newest page again');
+            await waitFor(`window.__coral && window.__coral.boardCounts && window.__coral.boardCounts().shown === 50`, 'the newest page again'); // __coral is set a moment after the reload settles: the guard the first wait has too (without it a slow page threw here)
             // Jump to first message is in the board toolbar's More menu: open it and press it, as the keyboard does
             await ev(`(() => { const more = [...document.querySelectorAll('#mb-tools button')].find(b => /^More\\b/.test((b.getAttribute('aria-label') || b.textContent).trim())); more.click(); return true; })()`);
             await waitFor(`[...document.querySelectorAll('[role="menuitem"], .list-bar-menu button')].some(b => /Jump to first message/.test(b.textContent))`, 'the More menu');
