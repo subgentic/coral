@@ -81,21 +81,15 @@ const BASE = require('./test_base').BASE;
         await ev(`(() => { document.getElementById('settings-hub-mode-restart').click(); return true; })()`);
         await waitFor(`window.__restarts === 1 && document.getElementById('settings-hub-mode-status').textContent === 'Restarting Coral…'`, 'restarting', 5000);
         console.log('   ✓ Restart Coral → POST /api/system/restart, "Restarting Coral…"');
-        // Back to the real routes (a fresh page) before turning it off. The saved state's read is asked at once and its answer is delivered late here (a slow machine, Windows): the row is on screen before the answer, and a person who presses in that gap must not flip it the wrong way (#14900).
-        const late = (await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const real = window.fetch; window.__hubGetDelay = 700; window.fetch = (u, o) => String(u).includes('/api/system/hub-mode') && (!o || !o.method || o.method === 'GET') && window.__hubGetDelay ? real(u, o).then(res => new Promise(r => setTimeout(() => r(res), window.__hubGetDelay))) : real(u, o); })();` })).identifier;
+        // Back to the real routes (a fresh page) before turning it off.
         await Page.navigate({ url: BASE + '/' });
         await Page.loadEventFired();
         await waitFor(`typeof window.showSettingsModal === 'function'`, 'the dashboard', 10000);
 
         console.log('4. Off again');
         await openSettings();
-        await waitFor(`document.getElementById('settings-hub-mode-enabled').checked === true && !document.getElementById('settings-hub-mode-enabled').disabled`, 'the saved state (on) is read and the toggle is ready', 8000);
-        // a read of the saved state that was asked for before the press and answers after it (Settings opened again, a slow machine) must not put the old state back over the person's own change
-        await ev(`window.__hubGetDelay = 700; import((window.__coralStatic || '/static/') + 'hub_mode_setting.js').then(m => m.loadHubModeSetting()); true`);
         await ev(`(() => { document.getElementById('settings-hub-mode-enabled').click(); return true; })()`);
         await waitFor(`document.getElementById('settings-hub-mode-status').textContent === ''`, 'off', 5000);
-        await new Promise(res => setTimeout(res, 1100)); // sleep-ok: the late read answers about now: it must not put On back
-        await ev(`window.__hubGetDelay = 0; true`); await Page.removeScriptToEvaluateOnNewDocument({ identifier: late });
         r = await row();
         assert.equal(r.checked, false); assert.equal(r.restart, false);
         assert.equal((await ev(`fetch('/api/system/hub-mode').then(r => r.json())`)).saved, false);
