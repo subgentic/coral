@@ -33,6 +33,12 @@ type joinEntry struct {
 
 // joinSites is "file<TAB>function" -> its joins, by file relative to coral-go.
 var joinSites = map[string]joinEntry{
+	"internal/server/routes/dropbox_autosync.go\tDropboxBackup.undoEdit":                     {2, joinID, "the digest is checked first (objectNameRe: 64 lower-case hex) and the uploads folder comes from uploadsDir with the session of the series' own member (#14714 Undo this edit)"},
+	"internal/server/routes/dropbox_backup.go\tDropboxBackup.Pass":                           {1, joinID, "the outbox row's digest is checked (objectNameRe) before it names the object (#14655)"},
+	"internal/server/routes/dropbox_backup.go\tDropboxBackup.readObject":                     {1, joinID, "the digest is checked first (objectNameRe); the object is then opened without following a link (#14655)"},
+	"internal/server/routes/dropbox_edits.go\tDropboxBackup.heldPath":                        {1, joinID, "only a digest that is 64 lower-case hex (objectNameRe) names a held file; anything else gets an empty path that opens nothing (#14714)"},
+	"internal/server/routes/dropbox_edits.go\tDropboxBackup.sweepHeld":                       {1, joinFixed, "names from the held folder's own listing, each checked to be exactly 64 hex (or a temp file's own prefix) and a regular file before it is removed (#14714)"},
+	"internal/server/routes/dropbox_removals.go\tDropboxBackup.objectHere":                   {1, joinID, "the digest is checked first (objectNameRe) before it names the object (#14814)"},
 	"internal/server/routes/artifact_docid.go\tforEachRecordFile":                            {1, joinOwn, "the name is one of the directory's own entries and is checked first: exactly 64 hex characters and .json (objectNameRe), so no separator, no dot dot and no other file can reach the join (#14551, #14759)"},
 	"internal/server/routes/artifact_docid.go\tmigrateDocIDsCtx":                             {1, joinOwn, "the board folder's name comes from the received folder's own listing and is checked first: a directory (a link is not one here) whose name matches boardDirName, before the join (#14551, #14759)"},
 	"internal/heavy/client.go\tFileList":                                                     {2, joinOwn, "the worktree root the caller gave plus a name from git ls-files -z; each name is checked first (cleanName: relative, no .., no NUL or backslash, no .git) and the file is only Lstat'd and Readlink'd; a link that leaves the worktree is skipped"},

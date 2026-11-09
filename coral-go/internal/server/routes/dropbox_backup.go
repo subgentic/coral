@@ -18,7 +18,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -28,6 +27,8 @@ import (
 	"unicode"
 
 	"github.com/subgentic/coral/internal/dropbox"
+	"github.com/subgentic/coral/internal/executil"
+	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/secfile"
 	"github.com/subgentic/coral/internal/secrets"
 	"github.com/subgentic/coral/internal/store"
@@ -271,6 +272,9 @@ func (b *DropboxBackup) record(digest, doc string) (seriesRecord, int, bool) {
 
 // readObject reads artifacts/objects/<digest> without following a link, as a regular file, capped, and checks its SHA-256 equals the digest.
 func (b *DropboxBackup) readObject(digest string) ([]byte, error) {
+	if !objectNameRe.MatchString(digest) {
+		return nil, errors.New("not an artifact id")
+	}
 	f, err := secfile.OpenNoFollow(filepath.Join(b.coralDir, "artifacts", "objects", digest), os.O_RDONLY, 0) // every platform: never through a link (#14691)
 	if err != nil {
 		return nil, err
@@ -421,6 +425,9 @@ func (b *DropboxBackup) Pass(ctx context.Context) {
 		var data []byte
 		if row.Kind == store.DropboxKindItemData {
 			// The sidecar goes only while its artifact's bytes are here: an artifact gone since it was queued sends nothing at all.
+			if !objectNameRe.MatchString(row.Digest) {
+				continue // only a 64-hex digest names an object
+			}
 			if st, err := os.Lstat(filepath.Join(b.coralDir, "artifacts", "objects", row.Digest)); err != nil || !st.Mode().IsRegular() {
 				_ = b.outbox.MarkParked(ctx, row.ID, store.DropboxOutboxSkipped)
 				continue
@@ -463,6 +470,7 @@ func (b *DropboxBackup) send(ctx context.Context, cl *dropbox.Client, access str
 		wg.Add(1)
 		sem <- struct{}{}
 		go func(i int) {
+			defer safego.Recover("dropbox upload session")
 			defer wg.Done()
 			defer func() { <-sem }()
 			id, err := cl.StartSession(ctx, access, batch[i].data)
@@ -621,7 +629,7 @@ func backoff(attempts int) time.Duration {
 func osPower() (onBattery, metered bool) {
 	switch runtime.GOOS {
 	case "darwin":
-		out, err := exec.Command("/usr/bin/pmset", "-g", "batt").Output()
+		out, err := executil.Command(context.Background(), "/usr/bin/pmset", "-g", "batt").Output() // its console window hidden on every platform (the console lint)
 		return err == nil && bytes.Contains(out, []byte("'Battery Power'")), false
 	case "linux":
 		ac, _ := filepath.Glob("/sys/class/power_supply/A*/online")

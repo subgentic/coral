@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/auth"
+	"github.com/subgentic/coral/internal/safego"
 )
 
 // CallbackPath is the path Dropbox returns the browser to on the one-shot listener.
@@ -68,8 +69,9 @@ func ServeCallbackOnce(port int, ttl time.Duration, handle func(CallbackResult) 
 	})
 	// Its own handler (never http.DefaultServeMux), and each connection attributed like Coral's own server's (the startup censuses, #14714).
 	srv := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second, ConnContext: auth.ConnContext}
-	go func() { _ = srv.Serve(ln) }()
+	go func() { defer safego.Recover("dropbox sign-in callback server"); _ = srv.Serve(ln) }()
 	go func() {
+		defer safego.Recover("dropbox sign-in callback shutdown")
 		select {
 		case <-done:
 			time.Sleep(200 * time.Millisecond) // let the answer go out

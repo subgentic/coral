@@ -25,6 +25,7 @@ var tooManyRequestsSites = map[string]struct {
 	"internal/httputil/limit.go":                        {1, "WriteActionLimit itself: always sends X-Coral-Limit: action"},
 	"internal/auth/middleware.go":                       {1, "too many wrong API keys: marked by hand (X-Coral-Limit set just before), plain-text body"},
 	"internal/cloud/enroll.go":                          {2, "client side: reads Coral Hub's 429, never writes one"},
+	"internal/dropbox/upload.go":                        {1, "client side: reads Dropbox's 429 (and too_many_requests) as RateLimited with its Retry-After, never writes one (#14655)"},
 	"internal/cloud/redeem.go":                          {1, "client side: reads Coral Hub's 429"},
 	"internal/cloud/signin.go":                          {1, "client side: the Hub sign-in check reads Coral Hub's busy 429 as transient, like no answer (#3966)"},
 	"internal/tracking/posthog.go":                      {2, "client side: retries the analytics service's 429 (and says so in a comment)"},

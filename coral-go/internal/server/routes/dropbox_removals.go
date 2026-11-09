@@ -66,6 +66,9 @@ func (b *DropboxBackup) cancelRemovalOnUpload(ctx context.Context, digest string
 
 // objectHere reports whether the artifact's bytes are on this computer again (restored or uploaded since the delete).
 func (b *DropboxBackup) objectHere(digest string) bool {
+	if !objectNameRe.MatchString(digest) {
+		return false
+	}
 	_, err := os.Lstat(filepath.Join(b.coralDir, "artifacts", "objects", digest))
 	return err == nil
 }
