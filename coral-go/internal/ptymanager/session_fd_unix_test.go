@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,6 +23,20 @@ func openFDs(t *testing.T) int {
 	}
 	t.Skip("cannot count open descriptors here")
 	return 0
+}
+
+// describeFDs names what each open descriptor is (the link under /proc/self/fd), so a failed count says which descriptors were open.
+func describeFDs() string {
+	entries, err := os.ReadDir("/proc/self/fd")
+	if err != nil {
+		return "(no /proc/self/fd here)"
+	}
+	var out []string
+	for _, e := range entries {
+		target, _ := os.Readlink("/proc/self/fd/" + e.Name())
+		out = append(out, e.Name()+"->"+target)
+	}
+	return strings.Join(out, " ")
 }
 
 // settledFDs is the open descriptor count once it has stopped changing: the same value on five reads in a row, 100 ms apart. After a session ended and was drained its descriptors go in the order the
@@ -56,6 +71,7 @@ func TestSessionsThatEndOnTheirOwnLeaveNoDescriptorsOpen(t *testing.T) {
 	// one throwaway run first: the first spawn opens a few process-wide descriptors of its own (the guardian, /dev/ptmx's first use)
 	require.NoError(t, backend.Spawn("fd-warm", "test", t.TempDir(), "sid-fd-warm", "true", 80, 24))
 	before := settledFDs(t)
+	beforeNames := describeFDs()
 
 	const runs = 12
 	for i := 0; i < runs; i++ {
@@ -63,7 +79,7 @@ func TestSessionsThatEndOnTheirOwnLeaveNoDescriptorsOpen(t *testing.T) {
 	}
 	require.Eventually(t, func() bool { return openFDs(t) <= before+2 }, 2*time.Minute, 100*time.Millisecond,
 		"descriptors after %d sessions ended on their own: %d (before %d)", runs, openFDs(t), before)
-	assert.LessOrEqual(t, openFDs(t), before+2)
+	assert.LessOrEqual(t, openFDs(t), before+2, "open now: %s\nbefore: %s", describeFDs(), beforeNames)
 }
 
 // Security's #6826 LOW (the exit watcher's own case): the shell exits but a child it left behind keeps the terminal open, so readLoop never sees the end of the output. The descriptor is closed by the watcher after
