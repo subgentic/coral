@@ -13,6 +13,10 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+
+	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/store"
 )
 
 // artifactRefRe finds an artifact id in any text: coral://artifacts/<hex>, /api/artifacts/<hex>
@@ -364,4 +368,11 @@ func (h *SessionsHandler) objectCandidates(ctx context.Context, o pruneOptions, 
 		out = append(out, objectCandidate{id: id, bytes: info.Size(), name: name, use: use})
 	}
 	return out, nil
+}
+
+// ArtifactReferencesOf is the prune's reference scan for the Dropbox offload pass (stage 6b, #14845): what a running task or an open session names is
+// never freed. It needs only the session and board databases and the data folder, as the prune does.
+func ArtifactReferencesOf(db *store.DB, cfg *config.Config, bs *board.Store) func(ctx context.Context) (map[string]bool, error) {
+	h := &SessionsHandler{db: db, cfg: cfg, bs: bs}
+	return h.scanArtifactReferences
 }
