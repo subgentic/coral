@@ -1,5 +1,5 @@
 /* How much the Operator approves (#11657, from #11589's design): three names for combinations of the team's existing flags, never a new stored setting, so nothing can go out of step. Team settings shows the name the flags match
- * (Custom when they match none) and a choice sets the flags; the New team step offers the same three and a new team starts on "Operator approves goals". Planning approval only: it does not touch auto-accept, the Orchestrator's
+ * (Custom when they match none) and a choice sets the flags; the New team step offers the same three and a new team starts on "Fully autonomous" (#14997, the operator: approval is a choice, not a default). Planning approval only: it does not touch auto-accept, the Orchestrator's
  * access, cross-team switches, Guides or health, and a file tagged "for review" or a question to the Operator reaches Needs you whatever the choice. */
 
 export const APPROVAL_PRESETS = [
@@ -11,7 +11,7 @@ export const APPROVAL_PRESETS = [
         help: 'Agents plan freely. This is planning only: a file tagged for review and a question to you still reach Needs you, and nothing else about what agents may do changes.' },
 ];
 const CUSTOM = { id: 'custom', label: 'Custom', help: 'The switches below do not match one of the three choices.' };
-export const NEW_TEAM_APPROVAL = 'goals'; // what a new team starts on (the Operator's choice, #11589)
+export const NEW_TEAM_APPROVAL = 'auto'; // what a new team starts on (#14997, the Operator: new goals need approval only where someone chose it; it was 'goals', #11589)
 
 /** The preset the flags match: 'tasks', 'goals', 'auto', or 'custom'. Fully autonomous does not care about require_goal (it keeps whatever the team has). */
 export function presetOf(v) {

@@ -70,7 +70,7 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(await ev(`${q('select[name=planning_approval]')}.value`), 'auto');
         console.log('   ✓ Team settings');
 
-        // 2. the New team step: starts on Operator approves goals
+        // 2. the New team step: starts on Fully autonomous (#14997: approval is chosen, never a default)
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await installNT(ev);
         await stubModels(ev); await openNewTeam(ev, waitFor);
         const t = T(ev, waitFor);
@@ -82,11 +82,15 @@ const { coralReady } = require('./helpers/wait');
         await ev(`(() => { const m = document.querySelector('#team-start-host select[name=mode]'); m.value = 'none'; m.dispatchEvent(new Event('input', { bubbles: true })); m.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); // the template the helper picks names a working mode, which the menu says first
         let n = await w();
         assert.deepEqual(n.options, ['tasks', 'goals', 'auto'], 'a new team has the three choices, no Custom');
-        assert.equal(n.value, 'goals', 'a new team starts on Operator approves goals');
-        assert.deepEqual([n.requireGoal, n.rgDisabled], [true, true], 'which holds Require a goal on (it is needed, so it is not offered)');
-        assert.equal(n.state, 'you approve goals', 'the menu says it');
-        assert.deepEqual(n.board, { require_goal: true, goals_need_approval: true }, 'what the new team is given: the flags, never the name');
+        assert.equal(n.value, 'auto', 'a new team starts on Fully autonomous');
+        assert.deepEqual([n.requireGoal, n.rgDisabled], [true, false], 'with Require a goal on, as a new team has it (#14997), and the person\'s to change');
+        assert.deepEqual(n.board, { require_goal: true }, 'and a new team is given no approval flags: its goals are active at once, its tasks need a goal');
         const pick = (id) => ev(`(() => { const s = document.querySelector('#team-start-host select[name=planning_approval]'); s.value = ${JSON.stringify(id)}; s.dispatchEvent(new Event('input', { bubbles: true })); s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+        await pick('goals');
+        n = await w();
+        assert.deepEqual([n.requireGoal, n.rgDisabled], [true, true], 'Operator approves goals holds Require a goal on (it is needed, so it is not offered)');
+        assert.equal(n.state, 'you approve goals', 'the menu says it');
+        assert.deepEqual(n.board, { require_goal: true, goals_need_approval: true }, 'what the new team is given when it is chosen: the flags, never the name');
         await pick('tasks');
         n = await w();
         assert.deepEqual(n.board, { require_goal: true, goals_need_approval: true, tasks_need_approval: true }, 'Operator approves tasks');
@@ -97,6 +101,6 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(n.board, null, 'and a new team on it is given nothing to save');
         assert.equal(n.state, 'no extra rules');
         console.log('   ✓ New team step');
-        console.log('PASS approval presets: three names for the flags in Team settings and the New team step; a new team starts on Operator approves goals');
+        console.log('PASS approval presets: three names for the flags in Team settings and the New team step; a new team starts on Fully autonomous');
     } finally { await removeBoards(ev, [TEAM]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
