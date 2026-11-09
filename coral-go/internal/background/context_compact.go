@@ -2,6 +2,7 @@ package background
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -28,6 +29,29 @@ const (
 	// compactFocusClaude is what Claude's /compact keeps.
 	compactFocusClaude = "keep: open tasks, team rules, recent decisions, and what I was last asked"
 )
+
+const (
+	// clearSettle is how long after a /clear the agent is left before its line is typed: the CLI starts the new session and shows its box.
+	clearSettle = 10 * time.Second
+	// clearGiveUp is how long a cleared agent is waited for: past it the line is dropped (the agent's own board nudges reach it anyway).
+	clearGiveUp = 5 * time.Minute
+)
+
+// clearCommand is the command that clears an agent's context, "" for a type with none known to Coral.
+func clearCommand(agentType string) string {
+	if agentType == "claude" {
+		return "/clear"
+	}
+	return ""
+}
+
+// clearedText is the one fixed line a cleared agent is sent: a notice (it starts with a notice opener), with the number of its next task and nothing else that is not Coral's own words.
+func clearedText(next int64) string {
+	if next > 0 {
+		return fmt.Sprintf("[Coral] Your context was cleared to save tokens. Read your board with 'coral-board read', then run 'coral-board task claim %d' to start your next task.", next)
+	}
+	return "[Coral] Your context was cleared to save tokens. Read your board with 'coral-board read', then run 'coral-board wait' for your next task."
+}
 
 // compactCommand is the command that compacts an agent of this type, "" for a type with none known to Coral (never guessed: Codex, Antigravity, Hermes and Pi have commands of their own, measured
 // but not wired in this slice).
@@ -63,8 +87,18 @@ type ContextCompact struct {
 
 	Interval time.Duration
 
-	mu   sync.Mutex
-	last map[string]compacted // by session name
+	// nextTask is the number of the next task assigned to a member (board.Store.NextPendingTaskForSubscriber), 0 when there is none.
+	nextTask func(ctx context.Context, project, subscriberID string) int64
+
+	mu      sync.Mutex
+	last    map[string]compacted // by session name
+	pending map[string]bootstrap // a cleared agent waits here for its one line, by session name
+}
+
+// bootstrap is the line a cleared agent is sent once it has settled.
+type bootstrap struct {
+	at   time.Time
+	text string
 }
 
 type compacted struct {
@@ -74,7 +108,7 @@ type compacted struct {
 
 // NewContextCompact returns the service with its design values.
 func NewContextCompact(bs *board.Store, discover func(context.Context) ([]AgentInfo, error)) *ContextCompact {
-	return &ContextCompact{store: bs, discover: discover, now: time.Now, started: time.Now(), logger: slog.Default().With("service", "context_compact"), Interval: time.Minute, last: map[string]compacted{}}
+	return &ContextCompact{store: bs, discover: discover, now: time.Now, started: time.Now(), logger: slog.Default().With("service", "context_compact"), Interval: time.Minute, last: map[string]compacted{}, pending: map[string]bootstrap{}}
 }
 
 // Wire gives the service its views of the agents and the way to type through.
@@ -91,10 +125,13 @@ func (c *ContextCompact) Wire(signal func(context.Context, string) (agentSignal,
 func (c *ContextCompact) Attach(ts *store.TaskStore, usage *store.TokenUsageStore, rt AgentRuntime, paused func(string) bool) {
 	c.Wire(hookSignal(ts), screenLimit(rt), usage.GetLatestTurnContextBySessionIDs, c.store.UnreadForSessions, paused, rt)
 	c.finished = c.store.FinishedTaskAt
-	c.active = func(ctx context.Context, project, id string) bool {
-		busy, err := c.store.HasActiveTaskForAssignee(ctx, project, id, 0)
-		return err != nil || busy // not told: treat it as at work
+	c.nextTask = func(ctx context.Context, project, id string) int64 {
+		if t := c.store.NextPendingTaskForSubscriber(ctx, project, id); t != nil && t.AssignedTo != nil && board.SameIdentity(*t.AssignedTo, id) {
+			return t.ID
+		}
+		return 0
 	}
+	c.active = c.busy
 }
 
 // LastCompacted is when a session was last compacted by this service and the context it had then; false when it was not.
@@ -115,6 +152,7 @@ func (c *ContextCompact) RunOnce(ctx context.Context) {
 	if c.deliver == nil || c.signal == nil || c.tokens == nil || c.unread == nil {
 		return
 	}
+	c.sendPending(ctx)
 	projects, err := c.store.ListProjects(ctx)
 	if err != nil {
 		return
@@ -204,7 +242,18 @@ func (c *ContextCompact) runProject(ctx context.Context, project string, hs boar
 		if u, ok := unread[names[i]]; !ok || u.Err != nil || u.Unread > 0 {
 			continue // messages waiting (or a count that failed): a turn is about to start
 		}
-		sent, err := c.deliver(ctx, a, compactCommand(a.AgentType))
+		command, next := compactCommand(a.AgentType), int64(0)
+		if hs.Method == board.CompactMethodClearNext && clearCommand(a.AgentType) != "" {
+			// A clear forgets the work in hand: only an agent with no task in progress is cleared, whatever the trigger.
+			if c.active == nil || c.active(ctx, project, subIDs[i]) {
+				continue
+			}
+			command = clearCommand(a.AgentType)
+			if c.nextTask != nil {
+				next = c.nextTask(ctx, project, subIDs[i])
+			}
+		}
+		sent, err := c.deliver(ctx, a, command)
 		if err != nil {
 			c.logger.Warn("compact not sent", "project", project, "session", names[i], "error", err)
 			continue
@@ -214,9 +263,18 @@ func (c *ContextCompact) runProject(ctx context.Context, project string, hs boar
 		}
 		c.mu.Lock()
 		c.last[names[i]] = compacted{at: now, tokens: n}
+		if command == clearCommand(a.AgentType) && command != "" {
+			c.pending[names[i]] = bootstrap{at: now, text: clearedText(next)}
+		}
 		c.mu.Unlock()
-		c.logger.Info("compacted an idle agent's context", "project", project, "agent", a.DisplayName, "session", names[i], "context_tokens", n, "threshold_tokens", hs.ThresholdK*1000)
+		c.logger.Info("compacted or cleared an idle agent's context", "project", project, "agent", a.DisplayName, "session", names[i], "command", command, "context_tokens", n, "threshold_tokens", hs.ThresholdK*1000)
 	}
+}
+
+// busy is whether the member has a task in progress; a read that fails is "busy", never "free": an agent is compacted or cleared only when the board says it has nothing in hand (#14849, QA's T8).
+func (c *ContextCompact) busy(ctx context.Context, project, subscriberID string) bool {
+	busy, err := c.store.HasActiveTaskForAssignee(ctx, project, subscriberID, 0)
+	return err != nil || busy
 }
 
 // finishedAndFree is whether the member finished a task since the service started and since it was last compacted, and has none in progress: its work is done and it is waiting, so what it carries is only weight.
@@ -261,4 +319,47 @@ func deliverCommand(ctx context.Context, rt AgentRuntime, logger *slog.Logger, n
 		return false, nil
 	}
 	return delivery != ptymanager.Skipped, err
+}
+
+// sendPending types the one line to each cleared agent that has settled: idle at its box, ten seconds after the clear. A line is typed once; an agent that is gone, or is not settled within five minutes, is dropped.
+func (c *ContextCompact) sendPending(ctx context.Context) {
+	c.mu.Lock()
+	if len(c.pending) == 0 {
+		c.mu.Unlock()
+		return
+	}
+	todo := map[string]bootstrap{}
+	for name, p := range c.pending {
+		todo[name] = p
+	}
+	c.mu.Unlock()
+	live, err := c.discover(ctx)
+	if err != nil {
+		return
+	}
+	agents := map[string]AgentInfo{}
+	for _, a := range live {
+		agents[naming.SessionName(a.AgentType, a.SessionID)] = a
+	}
+	now := c.now()
+	for name, p := range todo {
+		a, ok := agents[name]
+		if !ok || now.Sub(p.at) > clearGiveUp {
+			c.drop(name)
+			continue
+		}
+		sig, known := c.signal(ctx, a.SessionID)
+		if !known || sig.InTurn || sig.NeedsInput || now.Sub(p.at) < clearSettle {
+			continue
+		}
+		if sent, err := c.deliver(ctx, a, p.text); err == nil && sent {
+			c.drop(name)
+		}
+	}
+}
+
+func (c *ContextCompact) drop(name string) {
+	c.mu.Lock()
+	delete(c.pending, name)
+	c.mu.Unlock()
 }

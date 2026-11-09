@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -58,12 +59,18 @@ func TestAClearKeepsTheRecordedAgentProcessAndAnEndDropsIt(t *testing.T) {
 // id, or the agent's own changes nothing.
 func TestAClearsNewSessionIDIsFollowedAndNoOtherIs(t *testing.T) {
 	r := newHoldRig(t, true)
-	t.Cleanup(func() { jsonl.SetTranscriptAlias(r.sid, "") })
+	t.Cleanup(func() { jsonl.SetTranscriptAlias(r.sid, "", time.Time{}) })
 	const other, fresh = "cccccccc-6610-4000-8000-000000000002", "dddddddd-6610-4000-8000-000000000003"
 	require.NoError(t, r.h.ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: other, AgentType: "claude", AgentName: "other", WorkingDir: "/tmp/other"}))
 
 	r.post(`{"event_type":"session_reset","summary":"Session reset: /clear","detail_json":{"claude_session_id":"` + other + `","source":"clear"}}`)
 	assert.Empty(t, jsonl.TranscriptAlias(r.sid), "another agent's session is not this agent's transcript")
+	// a session of Coral's that has ended (no live row, but it sent events) is refused too
+	const ended = "eeeeeeee-6610-4000-8000-000000000004"
+	_, err := r.h.ts.InsertAgentEvent(context.Background(), &store.AgentEvent{AgentName: "gone", SessionID: &[]string{ended}[0], EventType: "stop", Summary: "stopped"})
+	require.NoError(t, err)
+	r.post(`{"event_type":"session_reset","summary":"Session reset: /clear","detail_json":{"claude_session_id":"` + ended + `","source":"clear"}}`)
+	assert.Empty(t, jsonl.TranscriptAlias(r.sid), "an ended session of Coral's is not this agent's transcript")
 	r.post(`{"event_type":"session_reset","summary":"Session reset: /clear","detail_json":{"claude_session_id":"../../etc/passwd","source":"clear"}}`)
 	assert.Empty(t, jsonl.TranscriptAlias(r.sid), "not a session id")
 	r.post(`{"event_type":"session_reset","summary":"Session reset: /clear","detail_json":{"claude_session_id":"` + r.sid + `","source":"clear"}}`)

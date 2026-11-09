@@ -59,7 +59,7 @@ export function valuesToHealth(v, base) {
     for (const k of ['goals_ready', 'unowned_tasks']) if (h[k] && v[`${k}_on`] !== undefined) h[k] = { ...h[k], on: !!v[`${k}_on`], wait_min: Number.isInteger(v[`${k}_wait_min`]) ? v[`${k}_wait_min`] : h[k].wait_min, nudge: v[`${k}_nudge`] || '' };
     if (h.dialog_timeout && v.dialog_timeout_on !== undefined) h.dialog_timeout = { ...h.dialog_timeout, on: !!v.dialog_timeout_on, after_min: Number.isInteger(v.dialog_timeout_after_min) ? v.dialog_timeout_after_min : h.dialog_timeout.after_min };
     if (h.goal_size && v.goal_size_on !== undefined) h.goal_size = { ...h.goal_size, on: !!v.goal_size_on, limit: v.goal_size_limit };
-    if (h.compact_context && v.compact_context_on !== undefined) h.compact_context = { ...h.compact_context, on: !!v.compact_context_on, threshold_k: Number.isInteger(v.compact_context_threshold_k) ? v.compact_context_threshold_k : h.compact_context.threshold_k, orchestrator: !!v.compact_context_orchestrator, trigger: v.compact_context_trigger || h.compact_context.trigger || 'threshold' };
+    if (h.compact_context && v.compact_context_on !== undefined) h.compact_context = { ...h.compact_context, on: !!v.compact_context_on, threshold_k: Number.isInteger(v.compact_context_threshold_k) ? v.compact_context_threshold_k : h.compact_context.threshold_k, orchestrator: !!v.compact_context_orchestrator, trigger: v.compact_context_trigger || h.compact_context.trigger || 'threshold', method: v.compact_context_method || h.compact_context.method || 'compact' };
     return h;
 }
 
@@ -123,6 +123,9 @@ export function healthFields(ctx) {
         { key: 'compact_context_trigger', type: 'select', label: 'When', visibleWhen: v => v.compact_context_on !== undefined, disabledWhen: v => !v.compact_context_on,
             help: 'Past the size above, after an agent finishes a task and has none in progress (and its context is at least 50 thousand tokens), or either.',
             options: async () => [{ value: 'threshold', label: 'When the context is large' }, { value: 'task', label: 'After a finished task' }, { value: 'both', label: 'Either' }] },
+        { key: 'compact_context_method', type: 'select', label: 'What it does', visibleWhen: v => v.compact_context_on !== undefined, disabledWhen: v => !v.compact_context_on,
+            help: 'Compact keeps a summary of the work. Clear starts the agent empty and tells it to read its board and take its next task; it is only done to an agent with no task in progress.',
+            options: async () => [{ value: 'compact', label: 'Compact (keep a summary)' }, { value: 'clear_next', label: 'Clear, then the next task' }] },
         { key: 'compact_context_orchestrator', type: 'toggle', label: 'Compact the orchestrator too', visibleWhen: v => v.compact_context_on !== undefined, disabledWhen: v => !v.compact_context_on,
             help: 'The orchestrator holds the most state, so it is left alone unless you say so.' },
         { key: 'health_landing', type: 'heading', label: 'Landing', help: 'Finished work that has not landed. Reads the local branch only, never CI or GitHub.' },

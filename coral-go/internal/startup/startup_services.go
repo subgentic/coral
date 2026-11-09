@@ -128,7 +128,7 @@ func startBackgroundServices(ctx context.Context, db *store.DB, cfg *config.Conf
 	// An agent that was cleared keeps reading its new transcript across a restart (#14849).
 	if aliases, err := taskStore.TranscriptAliases(ctx); err == nil {
 		for session, alias := range aliases {
-			jsonl.SetTranscriptAlias(session, alias)
+			jsonl.SetTranscriptAlias(session, alias.ID, alias.At)
 		}
 	}
 	sessStore := store.NewSessionStore(db)

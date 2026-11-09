@@ -28,5 +28,9 @@ func TestTranscriptAliasesAreTheNewestClearOfEachSession(t *testing.T) {
 	add(b, "session_reset", "")
 	got, err := ts.TranscriptAliases(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, map[string]string{a: "dddddddd-4444-4444-8444-444444444444"}, got, "the newest clear of a; b was never cleared")
+	require.Len(t, got, 1, "b was never cleared")
+	assert.Equal(t, "dddddddd-4444-4444-8444-444444444444", got[a].ID, "the newest clear of a")
+	assert.False(t, got[a].At.IsZero(), "and when it was told")
+	assert.True(t, ts.SessionSentEvents(ctx, a), "an id that sent events is a session of Coral's")
+	assert.False(t, ts.SessionSentEvents(ctx, "cccccccc-3333-4333-8333-333333333333"), "the id a clear moved to is not")
 }

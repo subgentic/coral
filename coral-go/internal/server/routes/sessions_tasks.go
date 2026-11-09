@@ -835,5 +835,8 @@ func (h *SessionsHandler) noteTranscriptAlias(ctx context.Context, sessionID str
 	if ls, err := h.ss.GetLiveSession(ctx, id); err == nil && ls != nil {
 		return // another agent's session
 	}
-	jsonl.SetTranscriptAlias(sessionID, id)
+	if h.ts.SessionSentEvents(ctx, id) {
+		return // a session of Coral's that has ended: still not this agent's transcript
+	}
+	jsonl.SetTranscriptAlias(sessionID, id, time.Now())
 }
