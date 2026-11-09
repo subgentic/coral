@@ -2,8 +2,6 @@ package routes
 
 import (
 	"net/http"
-	"os"
-	"path/filepath"
 
 	"github.com/go-chi/chi/v5"
 
@@ -30,7 +28,7 @@ func (h *SessionsHandler) artifactPrivateRoute(w http.ResponseWriter, r *http.Re
 		errBadRequest(w, "invalid artifact id")
 		return
 	}
-	if _, err := os.Stat(filepath.Join(h.cfg.CoralDir(), "artifacts", "objects", id)); err != nil {
+	if !objectHereOrOffloaded(h.cfg.CoralDir(), id) { // a privacy control works on a file kept only in Dropbox too (stage 6b, Security's 3d)
 		errNotFound(w, "artifact not found")
 		return
 	}

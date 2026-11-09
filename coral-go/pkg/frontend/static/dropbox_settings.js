@@ -112,6 +112,7 @@ function renderBackup(st, keepControls = false) {
     }
     renderEdits(ed.items || []);
     renderAutoSync(st.autosync);
+    renderOffload(st.offload, keepControls);
     if (keepControls) return;
     const chosen = new Set((st.filters && st.filters.types) || []);
     if (box) for (const input of box.querySelectorAll('input[type=checkbox]')) input.checked = chosen.has(input.value);
@@ -119,6 +120,65 @@ function renderBackup(st, keepControls = false) {
     if (age) age.value = String((st.filters && st.filters.max_age_days) || 0);
     const ret = $('settings-dropbox-keep-for');
     if (ret && !pendingRetention) ret.value = String(keep);
+}
+
+// Free up space (stage 6b, #14845): keep files older than N days only in Dropbox. Turning it on shows the dry run's count and asks for both
+// sentences (the risk and the warning) before Turn on; 0 turns it off, and the files kept only in Dropbox come back over the next passes.
+let offloadSeen = null; // the dry run Turn on confirms: {days, count, bytes}
+function renderOffload(o, keepControls) {
+    const kept = $('settings-dropbox-offload-kept'), field = $('settings-dropbox-offload-for');
+    const days = o ? Number(o.days || 0) : 0, n = o ? Number(o.kept || 0) : 0;
+    if (kept) {
+        kept.textContent = n ? `${n} ${n === 1 ? 'file is' : 'files are'} (${sizeText(Number(o.kept_bytes || 0))}) kept only in Dropbox${days ? '' : ': they are coming back to this computer'}.` : (days ? `Files older than ${days} days are kept only in Dropbox.` : '');
+    }
+    if (field && !keepControls && !offloadSeen) field.value = String(days);
+}
+
+function offloadConfirm(show) {
+    const box = $('settings-dropbox-offload-confirm');
+    if (!box) return;
+    box.textContent = '';
+    box.hidden = !show;
+}
+
+export async function saveOffload() {
+    const field = $('settings-dropbox-offload-for');
+    const days = Number(field && field.value);
+    if (!Number.isInteger(days) || days < 0 || days > 3650 || (days > 0 && days < 30)) { note('Free up space is 0 (off) or 30 to 3650 days.'); return; }
+    offloadConfirm(false);
+    offloadSeen = null;
+    let res;
+    try { res = await post('/api/dropbox/offload', 'PUT', JSON.stringify({ days })); } catch { res = { ok: false, body: {} }; }
+    if (!res.ok) { note(String(res.body.error || "Couldn't save Free up space.")); return; }
+    if (!days) { note('Free up space is off. Files kept only in Dropbox come back to this computer over the next passes.'); return; }
+    offloadSeen = { days, count: Number(res.body.count || 0), bytes: Number(res.body.bytes || 0) };
+    const box = $('settings-dropbox-offload-confirm');
+    if (!box) return;
+    box.hidden = false;
+    const p = document.createElement('p'); p.id = 'settings-dropbox-offload-count';
+    p.textContent = `The next pass may free about ${offloadSeen.count} ${offloadSeen.count === 1 ? 'file' : 'files'} (${sizeText(offloadSeen.bytes)}) older than ${days} days.`;
+    const tick = (id, text) => { const l = document.createElement('label'); const c = document.createElement('input'); c.type = 'checkbox'; c.id = id; l.append(c, document.createTextNode(' ' + text)); return { l, c }; };
+    const risk = tick('settings-dropbox-offload-risk', String(res.body.risk || ''));
+    const warn = tick('settings-dropbox-offload-warning', String(res.body.warning || ''));
+    const on = document.createElement('button'); on.type = 'button'; on.className = 'btn btn-small'; on.textContent = 'Turn on'; on.disabled = true;
+    const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'btn btn-small'; cancel.textContent = 'Cancel';
+    const sync = () => { on.disabled = !(risk.c.checked && warn.c.checked); };
+    risk.c.addEventListener('change', sync); warn.c.addEventListener('change', sync);
+    if (field) field.addEventListener('input', () => { offloadSeen = null; offloadConfirm(false); }, { once: true }); // a changed field takes the count away
+    on.addEventListener('click', async () => {
+        const seen = offloadSeen;
+        if (!seen || Number(field && field.value) !== seen.days) { offloadConfirm(false); return; }
+        let r2;
+        try { r2 = await post('/api/dropbox/offload', 'PUT', JSON.stringify({ days: seen.days, confirm: true, risk_ok: risk.c.checked, warning_ok: warn.c.checked, seen_count: seen.count, seen_bytes: seen.bytes })); } catch { r2 = { ok: false, body: {} }; }
+        offloadConfirm(false);
+        offloadSeen = null;
+        if (r2.status === 409 && r2.body.code === 'changed') { note(`More files would be freed now (${Number(r2.body.count || 0)}). Press Save to see the new count, then confirm again.`); focusEl('settings-dropbox-offload-for'); return; }
+        note(r2.ok ? `Free up space is on: files older than ${seen.days} days are kept only in Dropbox after the next pass.` : String(r2.body.error || "Couldn't turn Free up space on."));
+        focusEl('settings-dropbox-offload-for');
+    });
+    cancel.addEventListener('click', () => { offloadConfirm(false); offloadSeen = null; note('Nothing changed.'); focusEl('settings-dropbox-offload-for'); });
+    box.append(p, risk.l, warn.l, on, cancel);
+    cancel.focus?.();
 }
 
 // renderAutoSync shows the auto-sync switch (#14714, the Operator: edits made in Dropbox become new versions on their own) and why it is paused, with
@@ -271,6 +331,7 @@ function render(st) {
         show('settings-dropbox-disconnect', true);
         show('settings-dropbox-delete', true);
         loadRemovals();
+        loadShares();
         return;
     }
     if (st.connected) {
@@ -278,6 +339,7 @@ function render(st) {
         show('settings-dropbox-disconnect', true);
         show('settings-dropbox-delete', true);
         loadRemovals();
+        loadShares();
         return;
     }
     if (st.signin_pending) {
@@ -399,10 +461,11 @@ export async function connectDropbox() {
 
 const DISCONNECT = '/api/dropbox/disconnect';
 
-export async function disconnectDropbox() {
+export async function disconnectDropbox(leaveShared = false) {
     note('');
     let res;
-    try { res = await post(DISCONNECT); } catch { note("Couldn't reach Coral. Try again."); return; }
+    try { res = await post(DISCONNECT, 'POST', JSON.stringify(leaveShared ? { leave_shared: true } : {})); } catch { note("Couldn't reach Coral. Try again."); return; }
+    if (res.status === 409 && res.body.code === 'still_shared') { stillShared(res.body, 'Disconnect', () => disconnectDropbox(), () => disconnectDropbox(true)); return; }
     if (!res.ok) { note("Couldn't disconnect. Try again."); return; }
     await loadDropbox();
     if (res.body.revoked === false) {
@@ -517,6 +580,7 @@ export async function deleteBackupStart() {
     note('');
     let res;
     try { res = await post(DISCONNECT, 'POST', JSON.stringify({ delete_backup: true })); } catch { note("Couldn't reach Coral. Try again."); return; }
+    if (res.status === 409 && res.body.code === 'still_shared') { stillShared(res.body, 'Delete the backup', () => deleteBackupStart(), null); return; } // stop sharing first; then the delete's own confirm
     if (res.status === 409 && res.body.code === 'confirm_delete_backup') { showDeleteConfirm(res.body); return; }
     note(String(res.body.error || "Couldn't check the backup. Try again."));
 }
@@ -562,10 +626,11 @@ export async function deleteBackupConfirm(typedText) {
     note('The Dropbox backup was deleted and Coral disconnected.');
 }
 
-async function confirmSwitch() {
+async function confirmSwitch(leaveShared = false) {
     note('');
     let res;
-    try { res = await post('/api/dropbox/switch'); } catch { note("Couldn't reach Coral. Try again."); return; }
+    try { res = await post('/api/dropbox/switch', 'POST', JSON.stringify(leaveShared ? { leave_shared: true } : {})); } catch { note("Couldn't reach Coral. Try again."); return; }
+    if (res.status === 409 && res.body.code === 'still_shared') { stillShared(res.body, 'Switch', () => confirmSwitch(), () => confirmSwitch(true)); return; }
     if (!res.ok) { note('The switch is no longer waiting. Connect again.'); }
     await loadDropbox();
 }
@@ -671,6 +736,72 @@ function cancelRetention() {
     focusEl('settings-dropbox-keep-for'); // the buttons that had focus are gone (UI Reviewer's SHOULD on #14703)
 }
 
+// Files shared through Dropbox (#14944): Settings lists them, each with Stop sharing, and Stop all. The links are not listed here (each file's
+// own dialog shows its link); the names and who can open them are.
+const SHARES = '/api/dropbox/shares';
+const audienceWords = { people: 'specific people', team: 'your Dropbox team', public: 'anyone with the link' };
+let sharesSeq = 0;
+
+export async function loadShares() {
+    const box = $('settings-dropbox-shares');
+    if (!box) return;
+    const seq = ++sharesSeq;
+    let j = null;
+    try { const r = await fetch(SHARES, { cache: 'no-store' }); j = r.ok ? await r.json() : null; } catch { j = null; }
+    if (seq !== sharesSeq) return;
+    const rows = j && Array.isArray(j.shares) ? j.shares : [];
+    box.textContent = '';
+    box.hidden = !rows.length;
+    if (!rows.length) return;
+    const list = document.createElement('ul'); list.className = 'settings-dropbox-edits';
+    for (const s of rows) {
+        const li = document.createElement('li'); li.className = 'settings-dropbox-edit';
+        const name = document.createElement('strong'); name.textContent = String(s.name || 'A copy');
+        const who = s.audience === 'people' ? `${Number(s.people || 0)} ${Number(s.people || 0) === 1 ? 'person' : 'people'}` : (audienceWords[s.audience] || '');
+        const exp = s.expires_at ? new Date(s.expires_at) : null;
+        const words = rmLine(`Shared with ${who}${exp && !Number.isNaN(exp.getTime()) ? `, until ${exp.toLocaleDateString()}` : ''}${s.state === 'stopping' ? '. Stopping did not finish: its link may still work.' : '.'}${s.other_account ? ' From another Dropbox account: stop it in that Dropbox.' : ''}`);
+        const acts = document.createElement('div'); acts.className = 'dropbox-inline';
+        const stop = rmButton('Stop sharing', async () => {
+            stop.disabled = true;
+            let res; try { res = await post(`/api/dropbox/share/stop/${encodeURIComponent(String(s.id))}`); } catch { res = { ok: false, body: {} }; }
+            note(res.ok ? `${String(s.name || 'It')} is no longer shared.` : String(res.body.error || "Couldn't stop sharing it. Try again."));
+            await loadShares();
+            $('settings-dropbox-shares')?.querySelector('button')?.focus?.();
+        });
+        stop.setAttribute('aria-label', `Stop sharing ${String(s.name || 'this copy')}`);
+        acts.append(stop);
+        li.append(name, words, acts);
+        list.append(li);
+    }
+    const all = rmButton('Stop all', () => stopAllShares());
+    box.append(rmLine(`Shared through Dropbox (${rows.length}), as copies in Dropbox › Shared from Coral:`), list, all);
+}
+
+async function stopAllShares(then) {
+    let res; try { res = await post(`${SHARES}/stop-all`, 'POST', JSON.stringify({ confirm: true })); } catch { res = { ok: false, body: {} }; }
+    await loadShares();
+    if (!res.ok) { note(String(res.body.error || "Couldn't stop sharing every file. Try again.")); return false; }
+    note(`Sharing stopped for ${Number(res.body.stopped || 0)} ${Number(res.body.stopped || 0) === 1 ? 'file' : 'files'}.`);
+    if (then) await then();
+    return true;
+}
+
+// stillShared is Disconnect's, Switch's and Delete the backup's answer while files are still shared (#14944, Security's condition 9): the count,
+// Stop all and go on, or (for Disconnect and Switch) leave them shared and go on.
+function stillShared(info, action, retry, leave) {
+    const box = $('settings-dropbox-delete-confirm');
+    if (!box) { note(String(info.error || 'Files are still shared through Dropbox. Stop sharing them first.')); return; }
+    box.textContent = ''; box.hidden = false;
+    box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Files still shared through Dropbox');
+    const p = document.createElement('p'); p.id = 'settings-dropbox-shared-words'; p.textContent = String(info.error || 'Files are still shared through Dropbox.');
+    const hide = () => { box.hidden = true; box.textContent = ''; };
+    const stopFirst = rmButton(`Stop all, then ${action.toLowerCase()}`, async () => { hide(); await stopAllShares(retry); });
+    box.append(p, stopFirst);
+    if (leave) box.append(rmButton(`Leave them shared and ${action.toLowerCase()}`, () => { hide(); leave(); }));
+    box.append(rmButton('Cancel', () => { hide(); note('Nothing changed.'); }));
+    stopFirst.focus?.();
+}
+
 function focusEl(id) {
     const el = $(id);
     if (el && typeof el.focus === 'function') el.focus();
@@ -692,6 +823,7 @@ function wire() {
     const sync = $('settings-dropbox-autosync');
     if (sync) sync.addEventListener('change', () => setAutoSync(sync.checked));
     on('settings-dropbox-autosync-resume', () => setAutoSync(true));
+    on('settings-dropbox-offload-save', saveOffload);
     const field = $('settings-dropbox-keep-for');
     if (field) field.addEventListener('input', dropRetentionPreview); // a changed field takes the shown count and Turn on away
     wired = true;

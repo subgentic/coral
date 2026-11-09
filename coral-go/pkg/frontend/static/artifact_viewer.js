@@ -17,6 +17,7 @@ const { linkArtifactRefsIn } = await importOnce('./artifact_refs.js'); // a cora
 import { pushOverlay, popOverlay } from './overlay_history.js';
 import { setDialogHide } from './modal_chrome.js';
 import { browserLocal } from './safe_storage.js';
+
 import { loadStyles } from './lazy_styles.js';
 import { state } from './state.js';
 import { showToast } from './notifications.js';
@@ -31,6 +32,7 @@ const { makeDetails } = await importOnce('./details_disclosure.js'); // "Who can
 const { attachComments, commentBoard } = await importOnce('./artifact_comments.js');
 const { attachVersions } = await importOnce('./artifact_versions.js');
 const { attachReview } = await importOnce('./artifact_review.js');
+const { dropboxConnected } = await importOnce('./dropbox_connected.js'); // Share via Dropbox's entries (#14944): a lazy module loads it through importOnce, so a failed load is retried
 
 const HEX_RE = /^[a-f0-9]{64}$/;
 let _dialog = null;
@@ -117,6 +119,7 @@ function _build() {
                     <button type="button" class="menu-item artifact-viewer-copy-id" role="menuitem" title="The id of this version only">Copy version ID</button>
                     <button type="button" class="menu-item artifact-viewer-scripts-item" role="menuitem" hidden>Run scripts…</button>
                     <a class="menu-item artifact-viewer-newtab" role="menuitem" target="_blank" rel="noopener noreferrer" hidden>Open in new tab</a>
+                    <button type="button" class="menu-item artifact-viewer-dropbox-share" role="menuitem" hidden>Share via Dropbox…</button>
                     <a class="menu-item artifact-viewer-download" role="menuitem" rel="noopener noreferrer" download>Download</a>
                 </div>
             </span>
@@ -131,6 +134,7 @@ function _build() {
     _details = makeDetails({ panel: d.querySelector('.artifact-viewer-readers'), remember: false, hide: true }); // closed on every open of the viewer: one open Details no longer fills the next file's screen (#12725)
     _details.button.classList.add('artifact-viewer-details'); d.querySelector('.artifact-viewer-morewrap').before(_details.button); // Details is a button in the header row, beside ⋯: where a person looks to close it (#12725) header row (#12223)
     // the HTML preview's banner is said once; after that a "Sandboxed" chip in the header says it, and a tap shows or hides the banner (#12224)
+    d.querySelector('.artifact-viewer-dropbox-share').addEventListener('click', e => { const b = e.currentTarget; importOnce('./dropbox_share.js').then(m => m.openShareDialog({ hex: b.dataset.hex, filename: b.dataset.name, opener: d.querySelector('.artifact-viewer-more') })).catch(() => {}); }); // Share via Dropbox (#14944): the dialog loads on the press
     d.querySelector('.artifact-viewer-copyid-item').addEventListener('click', e => { const id = e.currentTarget.dataset.fileId; copyFileId({ file_id: id }, showToast); }); // the menu closes itself on a choice // Copy file ID: the id alone; a failed copy says so (#14178)
     const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'chip artifact-viewer-sandbox'; chip.hidden = true; chip.setAttribute('aria-expanded', 'false');
     chip.textContent = 'Sandboxed'; // words only: the icon font is a subset and has no shield
@@ -405,7 +409,9 @@ export function openArtifactViewer(hex, opts = {}) {
     if (!opts.sourceNamed) { const computer = (state.servers || []).find(s => s.id === opts.server), name = opts.server === 'local' ? 'this computer' : (computer?.label || computer?.name || opts.server); sourceNote.textContent = `Viewing from ${markHidden(name, { strict: true })}. Source inferred; read only.`; }
     const dl = d.querySelector('.artifact-viewer-download');
     const newTab = d.querySelector('.artifact-viewer-newtab');
-    newTab.hidden = true; newTab.removeAttribute('href'); // its address comes with the kind (typeKnown): a manifest's own bytes are a list, not what to open
+    newTab.hidden = true; newTab.removeAttribute('href');
+    const share = d.querySelector('.artifact-viewer-dropbox-share'); share.hidden = true; share.dataset.hex = hex; share.dataset.name = opts.filename || '';
+    if (opts.server === 'local' && !isCloud()) dropboxConnected().then(on => { if (on && share.dataset.hex === hex) share.hidden = false; }); // this computer's file, Dropbox connected (#14944) // its address comes with the kind (typeKnown): a manifest's own bytes are a list, not what to open
     d.classList.remove('is-image');
     dl.href = url;
     dl.hidden = false; // a manifest may have hidden it (below): this artifact is not that one
@@ -505,7 +511,7 @@ export async function openBundledDocument({ title, url, name, onOpened }) {
     const gen = ++_gen, signal = _abort.signal;
     _hex = ''; _lastOpts = {}; _line = null; _barLine = null; _layoutType = null;
     _versions?.close(); _review?.close(); _comments?.close(); _details.clear();
-    for (const sel of ['.artifact-edit-send-action', '.artifact-viewer-edit', '.artifact-viewer-edit-item', '.artifact-viewer-markup', '.artifact-viewer-markup-item', '.artifact-viewer-newtab', '.artifact-viewer-source', '.artifact-viewer-from']) { const el = d.querySelector(sel); if (el) el.hidden = true; }
+    for (const sel of ['.artifact-edit-send-action', '.artifact-viewer-edit', '.artifact-viewer-edit-item', '.artifact-viewer-markup', '.artifact-viewer-markup-item', '.artifact-viewer-newtab', '.artifact-viewer-dropbox-share', '.artifact-viewer-source', '.artifact-viewer-from']) { const el = d.querySelector(sel); if (el) el.hidden = true; }
     d.querySelector('.artifact-edit-send-note').hidden = true;
     d.classList.remove('is-image');
     paintLine(d);

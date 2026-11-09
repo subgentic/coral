@@ -597,8 +597,16 @@ b GET /api/dropbox/removals
 b POST /api/dropbox/removals/cancel
 b POST /api/dropbox/removals/confirm
 b PUT /api/dropbox/autosync
+b PUT /api/dropbox/offload
 b POST /api/dropbox/undo/{digest}
 b POST /api/dropbox/resend/{digest}
 b GET /api/dropbox/artifact/{digest}
+b GET /api/dropbox/share/{digest}
+b POST /api/dropbox/share/{digest}
+b POST /api/dropbox/share/stop/{id}
+b GET /api/dropbox/shares
+b POST /api/dropbox/shares/stop-all
+b POST /api/dropbox/share-chat/{project}/preview
+b POST /api/dropbox/share-chat/{project}
 b GET /api/thread
 b GET /api/threads

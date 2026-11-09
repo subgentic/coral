@@ -151,7 +151,7 @@ func (s *DropboxStore) Save(ctx context.Context, accountID, refreshToken, finger
 	}
 	// Every new sign-in starts with retention off (Security's answer 2 on #14703): the Operator turns it on again through the dry run.
 	_, err = s.db.ExecContext(ctx, `UPDATE dropbox_connection SET account_id = ?, last_account_id = ?, refresh_token = ?, fingerprint = ?, state = ?, connected_at = ?,
-		retention_days = 0, retention_since = NULL, list_cursor = NULL,
+		retention_days = 0, retention_since = NULL, list_cursor = NULL, offload_days = 0, offload_since = NULL,
 		autosync_paused = CASE WHEN last_account_id IS NOT NULL AND last_account_id <> ? THEN 'signin' ELSE autosync_paused END WHERE id = 1`,
 		accountID, accountID, env, fingerprint, DropboxStateConnected, nowUTC(), accountID) // another account than before pauses auto-sync (Security's 6 on auto-sync)
 	return err
@@ -217,7 +217,7 @@ func (s *DropboxStore) SetState(ctx context.Context, state string) error {
 
 // Disconnect forgets the token, the account and the fingerprint; the server id and the last account stay.
 func (s *DropboxStore) Disconnect(ctx context.Context) error {
-	_, err := s.db.ExecContext(ctx, "UPDATE dropbox_connection SET refresh_token = NULL, account_id = NULL, fingerprint = NULL, state = ?, connected_at = NULL, retention_days = 0, retention_since = NULL, list_cursor = NULL, autosync_paused = 'signin' WHERE id = 1", DropboxStateDisconnected)
+	_, err := s.db.ExecContext(ctx, "UPDATE dropbox_connection SET refresh_token = NULL, account_id = NULL, fingerprint = NULL, state = ?, connected_at = NULL, retention_days = 0, retention_since = NULL, list_cursor = NULL, offload_days = 0, offload_since = NULL, autosync_paused = 'signin' WHERE id = 1", DropboxStateDisconnected)
 	return err
 }
 
@@ -277,12 +277,15 @@ const (
 	DropboxAuditPass    = "pass"
 	DropboxAuditEdit    = "edit"    // stage 5a: the Operator's decision on an edit made in Dropbox (reason: promoted or separate)
 	DropboxAuditRemoval = "removal" // stage 6a: an explicit removal (reason: removed, private or delete_all; count: files)
+	DropboxAuditShare   = "share"   // Share via Dropbox (#14944): reason people, team or public (count: people), or stopped (count: shares)
 	dropboxAuditKeep    = 500
 )
 
 // AddAudit writes one audit row and keeps the newest 500.
 func (s *DropboxStore) AddAudit(ctx context.Context, a DropboxAudit) error {
-	if a.Kind != DropboxAuditSetting && a.Kind != DropboxAuditPass && a.Kind != DropboxAuditEdit && a.Kind != DropboxAuditRemoval {
+	switch a.Kind {
+	case DropboxAuditSetting, DropboxAuditPass, DropboxAuditEdit, DropboxAuditRemoval, DropboxAuditOffloadSetting, DropboxAuditOffloadPass, DropboxAuditShare:
+	default:
 		return errors.New("not a Dropbox audit kind")
 	}
 	if a.At == "" {

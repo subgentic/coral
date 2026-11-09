@@ -295,5 +295,6 @@ registerActions({
     'mb-select-all': () => selectAllMessages(),
     'mb-select-none': () => selectNoneMessages(),
     'mb-export-selected': () => exportSelectedAsMarkdown(),
+    'mb-share-dropbox': () => BX.shareSelectedViaDropbox(), // #14944
     'mb-select-cancel': () => cancelSelectMode(),
 });

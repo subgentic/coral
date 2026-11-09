@@ -31,7 +31,8 @@ const (
 	// Trial-t261 with the row-menu focus follow-up: 6,039,563 bytes plus 64 KiB, rounded up, under the standing policy.
 	// #14744: the Getting Started guide (guide/getting-started.md, 394,556 bytes with its five screenshots) is fetched only when its welcome row is opened; the tree is 6,445,093 bytes, plus 64 KiB, rounded up. The Operator's standing OK for approved work (not the start-CSS cap).
 	// v2.0.62 trial: the last approved picks (the goal header's More tap fix, the board search jump, the Needs you and viewer fixes) put the tree at 6,511,946 bytes, 330 over the previous budget; plus 64 KiB, rounded up. Standing OK for approved work; the start-CSS cap is unchanged.
-	staticBudget = 6_578_176
+	// #14944, Share via Dropbox (approved by the Operator on #197874): the dialog module (dropbox_share.js, loaded only on the press), the viewer's item and Settings' shared list bring the tree to 6,529,154 bytes; plus 64 KiB, rounded up. The Operator's standing OK for approved work (not the start-CSS cap).
+	staticBudget = 6_595_584
 	// fileBudget is the most one embedded file may hold (the CodeMirror bundle, the largest, is ~1 MB).
 	fileBudget = 1536 << 10
 	// budgetWarnRoom is the room under which the test warns, and budgetPolicyRoom the room a raise leaves.

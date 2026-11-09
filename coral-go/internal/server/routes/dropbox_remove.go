@@ -127,6 +127,21 @@ func (b *DropboxBackup) removeDigest(ctx context.Context, digest string, typed [
 	if err != nil {
 		return res, http.StatusConflict, map[string]any{"code": "not_connected", "error": "Connect Dropbox first"}, err
 	}
+	// Stage 6b (Security's 3b on 386472699): an object this Coral keeps only in Dropbox is never removed from there as is. The removal takes the
+	// same digest lock as the offload pass; while the artifact is still here (its records), its bytes are fetched back first, or the removal is
+	// refused; once it is deleted here (no record left), only this Coral's own marker and row go, and the removal goes on as for any file.
+	defer lockArtifact(digest)()
+	if _, off, oerr := b.outbox.Offloaded(ctx, digest); oerr != nil {
+		return res, http.StatusInternalServerError, nil, oerr
+	} else if off {
+		if len(recordsOfDigest(b.coralDir, digest)) > 0 {
+			if _, ferr := b.fetchBackLocked(ctx, digest); ferr != nil {
+				return res, http.StatusConflict, map[string]any{"code": "kept_in_dropbox", "error": "This file is kept only in Dropbox and could not be fetched back first, so it was not removed. Try again."}, ferr
+			}
+		} else {
+			b.forgetOwnMarkerLocked(ctx, cl, access, digest)
+		}
+	}
 	rows, err := b.outbox.LedgerOfDigest(ctx, account, digest)
 	if err != nil {
 		return res, http.StatusInternalServerError, nil, err
@@ -423,5 +438,6 @@ func (h *CloudHandler) DropboxArtifact(w http.ResponseWriter, r *http.Request) {
 			undo = true
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"connected": true, "in_dropbox": in, "removed": removed, "undo": undo})
+	_, kept, _ := d.backup.outbox.Offloaded(r.Context(), digest) // stage 6b: kept only in Dropbox (an unreadable table says no here: a line, not a decision)
+	writeJSON(w, http.StatusOK, map[string]any{"connected": true, "in_dropbox": in, "removed": removed, "undo": undo, "kept_in_dropbox": kept})
 }

@@ -141,6 +141,8 @@ GET /api/cloud/status never
 GET /api/custom-models view
 GET /api/dropbox/artifact/{digest} never
 GET /api/dropbox/removals never
+GET /api/dropbox/share/{digest} never
+GET /api/dropbox/shares never
 GET /api/dropbox/status never
 GET /api/filesystem/is-git launch
 GET /api/filesystem/list launch
@@ -412,6 +414,11 @@ POST /api/dropbox/removals/cancel never
 POST /api/dropbox/removals/confirm never
 POST /api/dropbox/remove/{digest} never
 POST /api/dropbox/resend/{digest} never
+POST /api/dropbox/share-chat/{project} never
+POST /api/dropbox/share-chat/{project}/preview never
+POST /api/dropbox/share/stop/{id} never
+POST /api/dropbox/share/{digest} never
+POST /api/dropbox/shares/stop-all never
 POST /api/dropbox/switch never
 POST /api/dropbox/takeover never
 POST /api/dropbox/undo/{digest} never
@@ -545,6 +552,7 @@ PUT /api/cloud/redact-tokens never
 PUT /api/custom-models launch
 PUT /api/dropbox/autosync never
 PUT /api/dropbox/filters never
+PUT /api/dropbox/offload never
 PUT /api/dropbox/retention never
 PUT /api/resources/{name} never
 PUT /api/scheduled/jobs/{jobID} never

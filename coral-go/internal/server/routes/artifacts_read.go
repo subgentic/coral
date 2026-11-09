@@ -16,7 +16,7 @@ import (
 // openArtifactForRead is what the content read and the metadata read share (#5465), so that they answer the same for the same id: the owner's switch for a pasted image
 // through Coral Hub (404), a missing or unreadable record or object (404), and a stored object whose length disagrees with its record (500, artifact_corrupt: a damaged store
 // is said, not served). The object is opened once, without following a link, and the caller uses that handle. On false the answer has been written.
-func (h *SessionsHandler) openArtifactForRead(w http.ResponseWriter, r *http.Request, id string) (*os.File, agentArtifactMeta, os.FileInfo, bool) {
+func (h *SessionsHandler) openArtifactForRead(w http.ResponseWriter, r *http.Request, id string, fetch bool) (*os.File, agentArtifactMeta, os.FileInfo, bool) {
 	// The one read check (#5577), before the record or the object is touched: an agent that may not read this answers exactly as for an artifact that does not exist.
 	if !artifactReadable(r, h.cfg.CoralDir(), id) {
 		errNotFound(w, "artifact not found")
@@ -32,6 +32,16 @@ func (h *SessionsHandler) openArtifactForRead(w http.ResponseWriter, r *http.Req
 	// The object is opened once and served from that handle, its length from the file itself
 	// (Security's #4438 INFO 4): a sidecar that disagrees with the file means the store is corrupt,
 	// and the download is refused rather than sent with a length that doesn't match its bytes.
+	// Stage 6b (Security's 3c and 3d): bytes kept only in Dropbox. A single open by the Operator (the dashboard or the signed command line) or by
+	// the Hub's owner (the only Hub reader this route serves) fetches them back first; anything else (an agent, a thumbnail, the metadata read)
+	// answers 503 kept_in_dropbox and fetches nothing. The Operator's opens are recorded, so a file in use is not freed.
+	owner := operatorFetchCaller(r) // exactly the Operator or the Hub's owner (Security's MUST on e0c7213ba)
+	if !fetchOffloaded(w, h.cfg.CoralDir(), id, fetch && owner) {
+		return nil, agentArtifactMeta{}, nil, false
+	}
+	if fetch && owner {
+		recordOperatorOpen(h.cfg.CoralDir(), id)
+	}
 	f, err := secfile.OpenNoFollow(path, os.O_RDONLY, 0)
 	if err != nil {
 		errNotFound(w, "artifact not found")
@@ -67,7 +77,7 @@ func (h *SessionsHandler) getAgentArtifact(w http.ResponseWriter, r *http.Reques
 		errBadRequest(w, "invalid artifact link version")
 		return
 	}
-	f, meta, info, ok := h.openArtifactForRead(w, r, id)
+	f, meta, info, ok := h.openArtifactForRead(w, r, id, true) // the content read: a single open
 	if !ok {
 		return
 	}
@@ -101,7 +111,7 @@ func (h *SessionsHandler) getAgentArtifactMeta(w http.ResponseWriter, r *http.Re
 		errBadRequest(w, "invalid artifact id")
 		return
 	}
-	f, meta, info, ok := h.openArtifactForRead(w, r, id)
+	f, meta, info, ok := h.openArtifactForRead(w, r, id, false) // the metadata read never fetches
 	if !ok {
 		return
 	}

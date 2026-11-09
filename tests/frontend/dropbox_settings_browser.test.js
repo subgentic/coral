@@ -77,7 +77,7 @@ const { coralReady } = require('./helpers/wait');
             const head = await ev(`(() => { const px = el => parseFloat(getComputedStyle(el).fontSize); const t = document.getElementById('settings-dropbox-title'); const legends = [...document.querySelectorAll('#settings-dropbox legend')];
                 const sec = document.getElementById('settings-dropbox').getBoundingClientRect(), d = document.getElementById('settings-dropbox-disconnect').getBoundingClientRect();
                 return { title: px(t), legends: legends.map(px), indent: Math.round(d.left - sec.left) }; })()`);
-            check(`${tag}: the section headings are no larger than the block's title`, head.legends.length === 2 && head.legends.every(s => s <= head.title), JSON.stringify(head));
+            check(`${tag}: the section headings are no larger than the block's title`, head.legends.length === 3 && head.legends.every(s => s <= head.title), JSON.stringify(head));
             check(`${tag}: Disconnect starts at the block's left edge (not indented)`, head.indent <= 1, JSON.stringify(head));
             check(`${tag}: the age field is a small box in the page${w > 600 ? ', on the line of its label' : ''}`, lay.ageW < 140 && lay.ageInPane && (w <= 600 || lay.ageBesideLabel), JSON.stringify(lay));
             await shot(`dropbox-settings-layout-${w}`);

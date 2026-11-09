@@ -26,6 +26,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/dropbox"
 	"github.com/subgentic/coral/internal/executil"
 	"github.com/subgentic/coral/internal/safego"
@@ -65,13 +66,15 @@ type DropboxBackup struct {
 	outbox   *store.DropboxOutbox
 	coralDir string
 
-	private  func(ctx context.Context, ids []string) (map[string]bool, error) // the private marks; nil reads none (tests set it)
-	types    func() map[string]bool                                           // the chosen types; nil or empty is every type
-	maxAge   func() time.Duration                                             // only artifacts newer than this; 0 is no limit
-	power    func() (onBattery, metered bool)
-	secret   func([]byte) bool
-	now      func() time.Time
-	parallel int
+	private    func(ctx context.Context, ids []string) (map[string]bool, error)            // the private marks; nil reads none (tests set it)
+	references func(ctx context.Context) (map[string]bool, error)                          // stage 6b: the digests a running task or an open session names (SetReferences); unset frees nothing
+	chat       func(ctx context.Context, project string, id int64) (*board.Message, error) // #14944: a board message, for a shared chat page; nil: no chat sharing
+	types      func() map[string]bool                                                      // the chosen types; nil or empty is every type
+	maxAge     func() time.Duration                                                        // only artifacts newer than this; 0 is no limit
+	power      func() (onBattery, metered bool)
+	secret     func([]byte) bool
+	now        func() time.Time
+	parallel   int
 
 	// Stage 4b, retention (#14703).
 	retainEvery time.Duration                                           // at most one retention pass this often (an hour)
@@ -100,6 +103,9 @@ func (h *CloudHandler) NewDropboxBackup(ob *store.DropboxOutbox) *DropboxBackup 
 	b := &DropboxBackup{d: h.dbx, outbox: ob, coralDir: h.dbx.dataDir, power: osPower, now: time.Now, parallel: dropboxParallel, kick: make(chan struct{}, 1),
 		retainEvery: time.Hour, retainPoll: time.Second, retainWait: 30 * time.Second,
 		edits: store.NewDropboxEdits(ob.DB()), editBounds: defaultEditBounds,
+		references: func(context.Context) (map[string]bool, error) {
+			return nil, errors.New("no reference scan")
+		},
 		private: func(context.Context, []string) (map[string]bool, error) {
 			return nil, errors.New("no private marks to read")
 		}, // fail closed until SetPrivate
@@ -148,6 +154,13 @@ func (h *CloudHandler) NewDropboxBackup(ob *store.DropboxOutbox) *DropboxBackup 
 }
 
 // SetPrivate gives the worker the board's private marks (board.Store.PrivateArtifacts).
+// SetChat gives the worker the board's messages, for Share via Dropbox's chat page (#14944).
+func (b *DropboxBackup) SetChat(f func(ctx context.Context, project string, id int64) (*board.Message, error)) {
+	if f != nil {
+		b.chat = f
+	}
+}
+
 func (b *DropboxBackup) SetPrivate(f func(ctx context.Context, ids []string) (map[string]bool, error)) {
 	if f != nil {
 		b.private = f
@@ -170,9 +183,12 @@ func (b *DropboxBackup) Run(ctx context.Context, every time.Duration) {
 		case <-b.kick:
 		}
 		b.Pass(ctx)
-		b.Retain(ctx)   // stage 4b: at most once an hour, only when the Operator turned it on
-		b.Notice(ctx)   // stage 5a: edits made in Dropbox
-		b.Removals(ctx) // #14814: removals after the Operator's deletes here, once their grace has passed
+		b.Retain(ctx)      // stage 4b: at most once an hour, only when the Operator turned it on
+		b.Notice(ctx)      // stage 5a: edits made in Dropbox
+		b.Removals(ctx)    // #14814: removals after the Operator's deletes here, once their grace has passed
+		b.Offload(ctx)     // stage 6b: Free up space, at most once an hour, only when the Operator turned it on
+		b.BringBack(ctx)   // stage 6b: while it is off, the files kept only in Dropbox come back
+		b.CleanShares(ctx) // #14944: shares a crash or a failure left half made or half stopped
 	}
 }
 

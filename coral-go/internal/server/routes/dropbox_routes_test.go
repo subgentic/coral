@@ -55,16 +55,33 @@ type fakeDropbox struct {
 	deleteCalls [][]string          // the paths of each delete_batch call
 	checkCalls  int
 	// Stage 5a's listing and download side.
-	changes       []map[string]any  // entries list_folder/continue answers after a cursor (an edit, a touch, a delete)
-	revBytes      map[string][]byte // bytes of each rev an edit made
-	pageSize      int               // entries a page (0: all)
-	resetNext     bool              // the next continue answers reset
-	downloads     []string          // revs downloaded
-	lieSize       int64             // download answers this size in Dropbox-API-Result while sending the real bytes
-	extraBytes    []byte            // download appends these to the body (a stream longer than declared)
-	listCalls     int
-	failDownloads int  // the next downloads answer 500 (Dropbox's own trouble)
-	markersFail   bool // stage 6a: a marker listing answers 500
+	changes        []map[string]any  // entries list_folder/continue answers after a cursor (an edit, a touch, a delete)
+	revBytes       map[string][]byte // bytes of each rev an edit made
+	pageSize       int               // entries a page (0: all)
+	resetNext      bool              // the next continue answers reset
+	downloads      []string          // revs downloaded
+	lieSize        int64             // download answers this size in Dropbox-API-Result while sending the real bytes
+	extraBytes     []byte            // download appends these to the body (a stream longer than declared)
+	listCalls      int
+	failDownloads  int  // the next downloads answer 500 (Dropbox's own trouble)
+	markersFail    bool // stage 6a: a marker listing answers 500
+	probeBad       bool // stage 6b: a probe reads back other bytes than were sent
+	markerReadFail bool // stage 6b: reading a marker back answers not found
+	// Share via Dropbox (#14944).
+	links       map[string][]fakeLink // path -> its shared links
+	members     map[string][]string   // file id -> emails it is shared with
+	basic       bool                  // the account is basic (no link expiry)
+	team        string                // the account's team ('' none)
+	noScope     bool                  // sharing calls answer missing_scope (an older sign-in)
+	copyBadHash bool                  // copy_v2 answers a content hash that is not the bytes'
+	revokeFail  bool                  // revoke_shared_link answers 500
+	membersFail bool                  // add_file_member refuses the member
+	copies      int                   // copy_v2 calls
+	checkFail   string                // the sharing check (list_shared_links with no path) answers 409 with this summary
+}
+
+type fakeLink struct {
+	url, aud, expires string
 }
 
 // edit replaces path's bytes as a person would in Dropbox (a new rev, a new content hash).
@@ -225,12 +242,31 @@ func newFakeDropbox(t *testing.T) *fakeDropbox {
 				if f.badHash {
 					hash = dropbox.ContentHash(append([]byte("not "), b...))
 				}
-				out = append(out, map[string]any{".tag": "success", "id": "id:" + e.Commit.Path, "rev": "r1", "content_hash": hash})
+				rev := "r1"
+				if strings.HasPrefix(e.Commit.Path, "/v1/probe/") { // stage 6b's probe: its own rev, readable by Download
+					rev = "probe-" + strings.TrimPrefix(e.Commit.Path, "/v1/probe/")
+					if f.revs == nil {
+						f.revs = map[string]string{}
+					}
+					if f.revBytes == nil {
+						f.revBytes = map[string][]byte{}
+					}
+					f.revs[e.Commit.Path], f.revBytes[rev] = rev, b
+					if f.probeBad {
+						f.revBytes[rev] = append([]byte("not "), b...)
+					}
+				}
+				out = append(out, map[string]any{".tag": "success", "id": "id:" + e.Commit.Path, "rev": rev, "content_hash": hash})
 			}
 			json.NewEncoder(w).Encode(map[string]any{"entries": out})
 		case "/2/files/get_metadata":
 			var a map[string]string
 			json.NewDecoder(r.Body).Decode(&a)
+			if f.markerReadFail && strings.HasPrefix(a["path"], "/v1/offloaded/") { // stage 6b: a marker written but not read back
+				w.WriteHeader(http.StatusConflict)
+				w.Write([]byte(`{"error_summary":"path/not_found/"}`))
+				return
+			}
 			b, ok := f.files[a["path"]]
 			if !ok {
 				w.WriteHeader(http.StatusConflict)
@@ -246,7 +282,7 @@ func newFakeDropbox(t *testing.T) *fakeDropbox {
 			f.listCalls++
 			var la map[string]any
 			_ = json.NewDecoder(r.Body).Decode(&la)
-			if lp, _ := la["path"].(string); strings.HasPrefix(lp, "/v1/offloaded/") { // stage 6a: one marker folder, by name
+			if lp, _ := la["path"].(string); strings.HasPrefix(lp, "/v1/offloaded/") || strings.HasPrefix(lp, "/v1/probe/") || strings.HasPrefix(lp, "/Shared from Coral/") { // one folder, by name: 6a's markers, 6b's probe, #14944's shared folder
 				if f.markersFail {
 					w.WriteHeader(http.StatusInternalServerError)
 					w.Write([]byte(`{"error_summary":"internal_error/"}`))
@@ -264,6 +300,11 @@ func newFakeDropbox(t *testing.T) *fakeDropbox {
 					return
 				}
 				json.NewEncoder(w).Encode(map[string]any{"entries": ents, "cursor": "m", "has_more": false})
+				return
+			}
+			if lp, _ := la["path"].(string); lp == "/v1/offloaded" && f.markersFail { // stage 6b: retention's marker listing fails
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(`{"error_summary":"internal_error/"}`))
 				return
 			}
 			// A full listing: every file stored, with the changes made so far counted as seen (the cursor points after them).
@@ -379,6 +420,9 @@ func newFakeDropbox(t *testing.T) *fakeDropbox {
 			}
 			delete(f.jobs, a["async_job_id"])
 			json.NewEncoder(w).Encode(map[string]any{".tag": "complete", "entries": f.applyDeletes(keyed)})
+		case "/2/files/copy_v2", "/2/users/get_current_account", "/2/sharing/add_file_member", "/2/sharing/create_shared_link_with_settings",
+			"/2/sharing/list_shared_links", "/2/sharing/revoke_shared_link", "/2/sharing/unshare_file":
+			f.sharing(w, r)
 		case "/2/users/get_space_usage":
 			if f.noDate {
 				w.Header()["Date"] = nil // net/http adds a Date unless it is set to nil

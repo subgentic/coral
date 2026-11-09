@@ -6,7 +6,8 @@ const { agentLinkHtml } = await importOnce('./agent_link.js'); // an agent's nam
 import { formatHourMinute } from './format.js';
 import { morphHtml } from './dom_morph.js';
 import { OPERATOR_ID, isOperatorId, escapeHtml, showToast, escapeAttr, getAgentColor, askBadge, externalMessageBadge, replyWithHtml, hubUserBadge, boardSenderName, renderBoardMessageBody, setBoardMentionNames, highlightMentionsIn, boardMessageColorStyle } from './utils.js';
-import { splitKey, keyLabel, boardFetch } from './server_base.js';
+import { splitKey, keyLabel, boardFetch, isCloud, LOCAL_SERVER } from './server_base.js';
+
 import { groupTaskQueueRuns, renderTaskQueueRun } from './board_system_lines.js';
 const { threadItems } = await importOnce('./board_threads.js'); // a part of the board page's group
 const { setReplyStrip } = await importOnce('./board_reply_strip.js');
@@ -23,6 +24,7 @@ import { browserLocal } from './safe_storage.js';
 import { createBoardSearch } from './board_search.js';
 import { menuMove } from './menu_keys.js';
 import { state } from './state.js';
+const { dropboxConnected } = await importOnce('./dropbox_connected.js'); // Share via Dropbox's entries (#14944): a lazy module loads it through importOnce, so a failed load is retried
 
 // ── Board (right-panel tab) ──────────────────────────────────────
 let _boardChatTimer = null;
@@ -473,9 +475,21 @@ function _updateBoardChatSelectBar() {
         <button class="btn btn-small" data-on-click="board-chat-select-all">Select All</button>
         <button class="btn btn-small" data-on-click="board-chat-select-none">None</button>
         <button class="btn btn-small btn-primary" data-on-click="board-chat-export" ${count === 0 ? 'disabled' : ''}>Export Markdown</button>
+        <button class="btn btn-small board-chat-share-dropbox" data-on-click="board-chat-share-dropbox" ${count === 0 ? 'disabled' : ''} hidden>Share via Dropbox…</button>
         <button class="btn btn-small" data-on-click="board-chat-select-cancel">Cancel</button>
     `;
     bar.style.display = '';
+    // Share via Dropbox (#14944): this computer's own board, outside Coral Hub, while Dropbox is connected.
+    if (!isCloud() && splitKey(_activeBoardChat).server === LOCAL_SERVER) dropboxConnected().then(on => { const b = bar.querySelector('.board-chat-share-dropbox'); if (b && on) b.hidden = false; });
+}
+
+/** Share via Dropbox (#14944): the selected messages, oldest first, as one page built and previewed by the server. */
+export async function _shareBoardChatSelected() {
+    const ids = _boardChatMessages.filter(m => _boardChatSelectedIds.has(m.id)).sort((a, b) => (a.created_at || '').localeCompare(b.created_at || '')).map(m => m.id);
+    if (!ids.length || !_activeBoardChat) return;
+    const opener = document.querySelector('#board-chat-select-bar .board-chat-share-dropbox');
+    const m = await importOnce('./dropbox_share.js');
+    m.openChatShareDialog({ project: splitKey(_activeBoardChat).name, ids, opener });
 }
 
 export async function _exportBoardChatSelected() {

@@ -25,6 +25,10 @@
       "count": 8,
       "reason": "the Analytics page is this computer's: every one of its cost routes is a bare path, and the page has no computer switch"
     },
+    "dropbox_connected.js": {
+      "count": 1,
+      "reason": "Share via Dropbox (#14944): the Dropbox status, read only for this computer's own file or board outside Coral Hub, to show the share entries; Dropbox is this computer's alone"
+    },
     "job_form.js": {
       "count": 5,
       "reason": "Automations (scheduled jobs and workflows) run on this computer: the page has no server for them"

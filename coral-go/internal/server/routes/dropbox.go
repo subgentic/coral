@@ -135,6 +135,10 @@ func (h *CloudHandler) DropboxStatus(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		out["retention"] = ret
+		if days, _, err := d.store.Offload(r.Context()); err == nil && d.backup != nil {
+			n, bytes, _ := d.backup.outbox.OffloadedTotals(r.Context())
+			out["offload"] = map[string]any{"days": days, "kept": n, "kept_bytes": bytes} // stage 6b: Free up space and the files kept only in Dropbox
+		}
 		if on, paused, err := d.store.AutoSync(r.Context()); err == nil {
 			out["autosync"] = map[string]any{"on": on, "paused": paused} // 5a auto-sync (#14714): the switch and why it is paused ('' runs)
 		}
@@ -249,6 +253,20 @@ func (h *CloudHandler) DropboxConfirmSwitch(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusNotFound, "not_available", "Dropbox backup is not available in this build")
 		return
 	}
+	if h.refuseWhileOffloaded(w, r) { // stage 6b: never strand files kept only in Dropbox
+		return
+	}
+	var in struct {
+		LeaveShared bool `json:"leave_shared"` // #14944
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<10)
+	if err := decodeJSONStrict(r, &in); err != nil && !errors.Is(err, io.EOF) {
+		errBadRequest(w, `send {} or {"leave_shared": true}`)
+		return
+	}
+	if !d.sharesGuard(r.Context(), w, in.LeaveShared, "after the switch, Coral can no longer stop sharing them, but you can in the old account's Dropbox") {
+		return // the switch stays waiting, for Stop all and then the confirm again
+	}
 	d.mu.Lock()
 	p := d.pending
 	d.pending = nil
@@ -263,6 +281,9 @@ func (h *CloudHandler) DropboxConfirmSwitch(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	oldRevoked := old != "" && old != p.refresh && d.revokeRefresh(r.Context(), old)
+	if p.account != "" {
+		d.forgetShares(r.Context()) // the shares were the old account's (a reconnect of the same account never comes here)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"connected": true, "account_id": p.account, "old_revoked": oldRevoked})
 }
 
@@ -277,15 +298,22 @@ func (h *CloudHandler) DropboxDisconnect(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusNotFound, "not_available", "Dropbox backup is not available in this build")
 		return
 	}
+	if h.refuseWhileOffloaded(w, r) { // stage 6b: never strand files kept only in Dropbox
+		return
+	}
 	// Stage 6a (#14814): {"delete_backup": true, "typed": [...]} deletes the backup in Dropbox first, after its typed confirm; the sign-in is
 	// revoked and forgotten only when that delete finished (Security's 2b). Without it, Disconnect is as it was.
 	var in struct {
 		DeleteBackup bool     `json:"delete_backup"`
 		Typed        []string `json:"typed"`
+		LeaveShared  bool     `json:"leave_shared"` // #14944: the Operator's confirm to leave files shared through Dropbox
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
 	if err := decodeJSONStrict(r, &in); err != nil && !errors.Is(err, io.EOF) {
 		errBadRequest(w, `send {} or {"delete_backup": true, "typed": [...]}`)
+		return
+	}
+	if !d.sharesGuard(r.Context(), w, in.LeaveShared, "after you disconnect, Coral can no longer stop sharing them, but you can in Dropbox") {
 		return
 	}
 	if in.DeleteBackup {
@@ -315,6 +343,7 @@ func (h *CloudHandler) DropboxDisconnect(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusInternalServerError, "", "could not forget the Dropbox connection")
 		return
 	}
+	d.forgetShares(r.Context())
 	writeJSON(w, http.StatusOK, map[string]any{"connected": false, "revoked": revoked})
 }
 
@@ -326,6 +355,9 @@ func (h *CloudHandler) DropboxTakeOver(w http.ResponseWriter, r *http.Request) {
 	d := h.dbx
 	if d == nil {
 		writeError(w, http.StatusNotFound, "not_available", "Dropbox backup is not available in this build")
+		return
+	}
+	if h.refuseWhileOffloaded(w, r) { // stage 6b: never strand files kept only in Dropbox
 		return
 	}
 	id, err := d.machineID()

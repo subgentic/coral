@@ -1,0 +1,638 @@
+package routes
+
+// Dropbox stage 6b, piece 2 (#14845; the 6b delta v2 and Security Reviewer's conditions 1 to 10, 3a and 3b): the offload pass. Once an hour, when
+// the Operator turned Free up space on, it frees the local bytes of old artifacts whose copy Dropbox holds, one object at a time, each step only
+// after the one before succeeded:
+//  1. a sample round trip (a random 1 KiB probe under /v1/probe/<server id>/, uploaded, read back by its rev, deleted at its rev; a probe a crash
+//     left is deleted first); any failure frees nothing;
+//  2. the candidates from the store (piece 1), less any the board marks private (fail closed: an unreadable mark frees nothing) and any a running
+//     task or an open session references (the prune's own scan; unreadable frees nothing);
+//  3. per object, under its digest lock: the local file is regular and its SHA-256 is the digest; Dropbox's content hash of these bytes equals the
+//     ledger's and the file's fresh metadata (rev and content hash) at the ledger path; this Coral's marker v1/offloaded/<hhh>/<digest>/<server id>
+//     is written and read back; the offload row is committed; only then the bytes go (the sidecar and every record stay);
+//  4. at most 200 objects and 2 GiB a pass. A crash between steps leaves the bytes in place.
+
+import (
+	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+
+	"github.com/subgentic/coral/internal/cliauth"
+	"github.com/subgentic/coral/internal/dropbox"
+	"github.com/subgentic/coral/internal/secfile"
+	"github.com/subgentic/coral/internal/store"
+)
+
+const (
+	offloadPerPass      = 200
+	offloadBytesPerPass = 2 << 30
+	offloadEvery        = time.Hour
+)
+
+var errOffloadProbe = errors.New("the Dropbox round trip failed")
+
+// SetReferences gives the worker the prune's reference scan (the digests a running task or an open session names). Without it nothing is freed.
+func (b *DropboxBackup) SetReferences(f func(ctx context.Context) (map[string]bool, error)) {
+	if f != nil {
+		b.references = f
+	}
+}
+
+// offloadMarker is this Coral's marker for digest: an empty file that says this Coral keeps the object only in Dropbox.
+func offloadMarker(digest, serverID string) string {
+	return "/v1/offloaded/" + digest[:3] + "/" + digest + "/" + serverID
+}
+
+// uploadOne stores data at path in add mode (never over a file already there) and answers what Dropbox stored.
+func uploadOne(ctx context.Context, cl *dropbox.Client, access, path string, data []byte) (dropbox.CommitResult, error) {
+	sid, err := cl.StartSession(ctx, access, data)
+	if err != nil {
+		return dropbox.CommitResult{}, err
+	}
+	res, err := cl.FinishBatch(ctx, access, []dropbox.Commit{{SessionID: sid, Size: int64(len(data)), Path: path}})
+	if err != nil || len(res) != 1 {
+		return dropbox.CommitResult{}, errors.Join(err, errOffloadProbe)
+	}
+	return res[0], nil
+}
+
+// probe is the sample round trip: a probe a crash left is deleted first, then a new one is uploaded, downloaded by its rev and compared, and
+// deleted at its rev. Any failure is an error and frees nothing.
+func (b *DropboxBackup) probe(ctx context.Context, cl *dropbox.Client, access, serverID string) error {
+	folder := "/v1/probe/" + serverID
+	if names, err := cl.ListNames(ctx, access, folder); err == nil {
+		for _, n := range names {
+			m, merr := cl.Metadata(ctx, access, folder+"/"+n)
+			if merr != nil {
+				return merr
+			}
+			if _, _, derr := b.runDelete(ctx, cl, access, []dropbox.Delete{{Path: folder + "/" + n, Rev: m.Rev}}); derr != nil {
+				return derr
+			}
+		}
+	} else if !errors.Is(err, dropbox.ErrNotFound) {
+		return err
+	}
+	data := make([]byte, 1024)
+	if _, err := rand.Read(data); err != nil {
+		return err
+	}
+	name := make([]byte, 8)
+	_, _ = rand.Read(name)
+	path := folder + "/" + hex.EncodeToString(name)
+	res, err := uploadOne(ctx, cl, access, path, data)
+	if err != nil || res.Outcome != dropbox.CommitOK || res.ContentHash != dropbox.ContentHash(data) {
+		return errors.Join(err, errOffloadProbe)
+	}
+	h := sha256.New()
+	if _, _, err := cl.Download(ctx, access, res.Rev, int64(len(data)), h); err != nil {
+		return err
+	}
+	want := sha256.Sum256(data)
+	if hex.EncodeToString(h.Sum(nil)) != hex.EncodeToString(want[:]) {
+		return errOffloadProbe
+	}
+	outs, done, err := b.runDelete(ctx, cl, access, []dropbox.Delete{{Path: path, Rev: res.Rev}})
+	if err != nil || !done || len(outs) != 1 || outs[0] != dropbox.DeleteOK {
+		return errors.Join(err, errOffloadProbe)
+	}
+	return nil
+}
+
+// Offload is the pass (at most once an hour, only when the Operator turned Free up space on). It reports how many objects and bytes it freed.
+func (b *DropboxBackup) Offload(ctx context.Context) (int, int64) {
+	days, last, err := b.d.store.Offload(ctx)
+	if err != nil || days <= 0 || !b.ready(ctx) {
+		return 0, 0
+	}
+	now := time.Now()
+	if t, perr := time.Parse(time.RFC3339, last); perr == nil && (now.Before(t) || now.Sub(t) < offloadEvery) {
+		return 0, 0 // at most once an hour, and never when the clock is behind the last pass
+	}
+	if onBattery, metered := b.power(); onBattery || metered {
+		return 0, 0
+	}
+	_ = b.d.store.SetOffloadPass(ctx, now.UTC().Format(time.RFC3339))
+	refuse := func(word string) (int, int64) {
+		_ = b.d.store.AddAudit(ctx, store.DropboxAudit{Kind: store.DropboxAuditOffloadPass, Reason: word})
+		return 0, 0
+	}
+	cl, access, account, err := b.dropboxAccess(ctx)
+	if err != nil {
+		return refuse("not_connected")
+	}
+	serverID, err := b.d.store.ServerID(ctx)
+	if err != nil || serverID == "" {
+		return refuse("no_server_id")
+	}
+	if err := b.probe(ctx, cl, access, serverID); err != nil {
+		return refuse("probe_failed")
+	}
+	cands, err := b.outbox.OffloadCandidates(ctx, account, now.Add(-time.Duration(days)*24*time.Hour), now.Add(-store.DropboxOffloadOpenedFor), offloadPerPass)
+	if err != nil || len(cands) == 0 {
+		return 0, 0
+	}
+	ids := make([]string, len(cands))
+	for i, c := range cands {
+		ids[i] = c.Digest
+	}
+	private, err := b.private(ctx, ids)
+	if err != nil {
+		return refuse("private_unreadable") // fail closed (Security's 3a)
+	}
+	refs, err := b.references(ctx)
+	if err != nil {
+		return refuse("references_unreadable") // fail closed (Security's 3b)
+	}
+	n, freed := 0, int64(0)
+	for _, c := range cands {
+		if ctx.Err() != nil || freed+c.Size > offloadBytesPerPass {
+			break
+		}
+		if private[c.Digest] || refs[c.Digest] {
+			continue
+		}
+		size, ok := b.offloadOne(ctx, cl, access, account, serverID, c)
+		if ok {
+			n++
+			freed += size
+		}
+	}
+	_ = b.d.store.AddAudit(ctx, store.DropboxAudit{Kind: store.DropboxAuditOffloadPass, Count: n, Bytes: freed})
+	if n > 0 {
+		noteArtifactsChanged()
+	}
+	slog.Info("[dropbox] offload pass", "freed", n, "bytes", freed)
+	return n, freed
+}
+
+// offloadOne frees one object, under its digest lock, only after every check (see the file's comment). It never removes a byte when a step fails.
+func (b *DropboxBackup) offloadOne(ctx context.Context, cl *dropbox.Client, access, account, serverID string, c store.OffloadCandidate) (int64, bool) {
+	if !objectNameRe.MatchString(c.Digest) {
+		return 0, false
+	}
+	defer lockArtifact(c.Digest)()
+	obj := filepath.Join(b.coralDir, "artifacts", "objects", c.Digest)
+	f, err := secfile.OpenNoFollow(obj, os.O_RDONLY, 0)
+	if err != nil {
+		return 0, false
+	}
+	st, err := f.Stat()
+	if err != nil || !st.Mode().IsRegular() {
+		_ = f.Close()
+		return 0, false
+	}
+	data, err := io.ReadAll(io.LimitReader(f, maxAgentArtifactSize+1))
+	_ = f.Close()
+	if err != nil || int64(len(data)) != st.Size() {
+		return 0, false
+	}
+	sum := sha256.Sum256(data)
+	if hex.EncodeToString(sum[:]) != c.Digest {
+		return 0, false // not its digest: never freed
+	}
+	local := dropbox.ContentHash(data)
+	m, err := cl.Metadata(ctx, access, c.Path)
+	if err != nil || m.Rev != c.Rev || m.ContentHash != c.ContentHash || local != c.ContentHash {
+		return 0, false // Dropbox does not hold these exact bytes at the ledger's place today (Security's condition 3)
+	}
+	marker := offloadMarker(c.Digest, serverID)
+	res, err := uploadOne(ctx, cl, access, marker, nil)
+	if err != nil || (res.Outcome != dropbox.CommitOK && res.Outcome != dropbox.CommitConflict) {
+		return 0, false
+	}
+	if _, err := cl.Metadata(ctx, access, marker); err != nil {
+		return 0, false // not read back: nothing goes
+	}
+	// Read again just before anything goes (QA Reviewer 2's INFO on 4f3f79b72): a file made private, or named by a task or a session, during the
+	// pass is not freed; either read failing frees nothing.
+	// A refusal here takes back the marker just written (Security's INFO on fda9e55d2): no Coral is told this one keeps the file only in Dropbox.
+	if priv, perr := b.private(ctx, []string{c.Digest}); perr != nil || priv[c.Digest] {
+		b.dropMarker(ctx, cl, access, marker)
+		return 0, false
+	}
+	if refs, rerr := b.references(ctx); rerr != nil || refs[c.Digest] {
+		b.dropMarker(ctx, cl, access, marker)
+		return 0, false
+	}
+	if err := b.outbox.RecordOffloaded(ctx, store.DropboxOffloaded{Digest: c.Digest, AccountID: account, Path: c.Path, Rev: c.Rev, ContentHash: c.ContentHash, Size: st.Size()}); err != nil {
+		return 0, false
+	}
+	if err := os.Remove(obj); err != nil {
+		_ = b.outbox.ForgetOffloaded(context.WithoutCancel(ctx), c.Digest) // the bytes are still here: no row says otherwise
+		return 0, false
+	}
+	storeFor(b.coralDir).removed(st.Size())
+	return st.Size(), true
+}
+
+var (
+	errKeptInDropbox = errors.New("this file is kept only in Dropbox and could not be fetched right now")
+	errOtherAccount  = errors.New("the Dropbox account connected now is not the one that keeps this file")
+)
+
+// fetchBackLocked brings an offloaded object's bytes back (Security's 3a), the caller holding the digest lock: by the ledger path's stored rev
+// (Dropbox keeps a file's earlier revisions, so an edit made there since is never served under this digest), capped by the recorded size, into an
+// exclusive 0600 temp file in the objects folder, SHA-256 equal to the digest, fits() checked, then renamed into place. Only then this Coral's marker
+// is deleted (read back as gone) and the offload row forgotten, and the fetch is recorded as an open. Nothing changes on any failure. It answers
+// true when the bytes are here (fetched now, or never freed).
+func (b *DropboxBackup) fetchBackLocked(ctx context.Context, digest string) (bool, error) {
+	row, ok, err := b.outbox.Offloaded(ctx, digest)
+	if err != nil {
+		return false, err
+	}
+	obj := filepath.Join(b.coralDir, "artifacts", "objects", digest)
+	if !ok {
+		_, serr := os.Lstat(obj)
+		return serr == nil, nil
+	}
+	cl, access, account, err := b.dropboxAccess(ctx)
+	if err != nil {
+		return false, errKeptInDropbox
+	}
+	if account != row.AccountID {
+		return false, errOtherAccount
+	}
+	if !storeFor(b.coralDir).fits(row.Size) {
+		return false, errStoreFull
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(obj), artifactUploadTempP+"*")
+	if err != nil {
+		return false, err
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath) // a no-op once renamed
+	h := sha256.New()
+	_, n, derr := cl.Download(ctx, access, row.Rev, row.Size, io.MultiWriter(tmp, h))
+	cerr := tmp.Close()
+	if derr != nil || cerr != nil || n != row.Size || hex.EncodeToString(h.Sum(nil)) != digest {
+		return false, errKeptInDropbox // never other bytes under this digest
+	}
+	if err := os.Rename(tmpPath, obj); err != nil {
+		return false, err
+	}
+	storeFor(b.coralDir).added(row.Size)
+	if serverID, err := b.d.store.ServerID(ctx); err == nil && serverID != "" {
+		marker := offloadMarker(digest, serverID)
+		if m, merr := cl.Metadata(ctx, access, marker); merr == nil {
+			_, _, _ = b.runDelete(ctx, cl, access, []dropbox.Delete{{Path: marker, Rev: m.Rev}})
+		}
+		if _, merr := cl.Metadata(ctx, access, marker); merr == nil || !errors.Is(merr, dropbox.ErrNotFound) {
+			// The bytes are here; the marker stays until a later fetch or pass removes it. Keeping the row would say the bytes are away, so it
+			// goes: a stray marker of this Coral only keeps retention from deleting the Dropbox copy, which is the safe side.
+			slog.Warn("[dropbox] a fetched-back file's marker could not be removed yet")
+		}
+	}
+	_ = b.outbox.ForgetOffloaded(ctx, digest)
+	_ = b.outbox.RecordOpened(ctx, digest, time.Now())
+	return true, nil
+}
+
+// FetchBack is fetchBackLocked under the digest lock.
+func (b *DropboxBackup) FetchBack(ctx context.Context, digest string) (bool, error) {
+	if !objectNameRe.MatchString(digest) {
+		return false, errors.New("not an artifact id")
+	}
+	defer lockArtifact(digest)()
+	return b.fetchBackLocked(ctx, digest)
+}
+
+// forgetOwnMarkerLocked removes this Coral's marker of a digest (read back as gone) and its offload row, the caller holding the digest lock: for an
+// artifact deleted here, whose Dropbox copy the Operator's removal then deletes. A marker that will not go keeps the row (fail closed).
+func (b *DropboxBackup) forgetOwnMarkerLocked(ctx context.Context, cl *dropbox.Client, access, digest string) {
+	serverID, err := b.d.store.ServerID(ctx)
+	if err != nil || serverID == "" {
+		return
+	}
+	marker := offloadMarker(digest, serverID)
+	if m, merr := cl.Metadata(ctx, access, marker); merr == nil {
+		_, _, _ = b.runDelete(ctx, cl, access, []dropbox.Delete{{Path: marker, Rev: m.Rev}})
+	}
+	if _, merr := cl.Metadata(ctx, access, marker); merr != nil && errors.Is(merr, dropbox.ErrNotFound) {
+		_ = b.outbox.ForgetOffloaded(ctx, digest)
+	}
+}
+
+// refuseWhileOffloaded answers 409 when this Coral keeps files only in Dropbox (or cannot tell): Disconnect (with or without deleting the backup),
+// Switch, Take over and Rekey would leave them with no way back (Security's condition 5 and 3b on d766be37a). It reports whether it refused.
+func (h *CloudHandler) refuseWhileOffloaded(w http.ResponseWriter, r *http.Request) bool {
+	if h.dbx == nil || h.dbx.outbox == nil {
+		return false
+	}
+	n, _, err := h.dbx.outbox.OffloadedTotals(r.Context())
+	if err != nil {
+		writeError(w, http.StatusConflict, "kept_in_dropbox", "Coral could not check whether files are kept only in Dropbox, so nothing was changed. Try again.")
+		return true
+	}
+	if n > 0 {
+		writeError(w, http.StatusConflict, "kept_in_dropbox", fmt.Sprintf("%d %s kept only in Dropbox. Bring them back first (turn off Free up space), then try again.", n, map[bool]string{true: "file is", false: "files are"}[n == 1]))
+		return true
+	}
+	return false
+}
+
+// keptInDropboxConfirmed is Rekey's confirm while files are kept only in Dropbox: the request must name their count (kept_in_dropbox), so the
+// Operator has read what the re-key means for them. It answers the count, and false after writing the refusal (409 with the count and the words,
+// or the same when the count cannot be read).
+func (h *CloudHandler) keptInDropboxConfirmed(w http.ResponseWriter, r *http.Request, said *int) (int, bool) {
+	if h.dbx == nil || h.dbx.outbox == nil {
+		return 0, true
+	}
+	n, _, err := h.dbx.outbox.OffloadedTotals(r.Context())
+	if err != nil {
+		writeError(w, http.StatusConflict, "kept_in_dropbox", "Coral could not check whether files are kept only in Dropbox, so nothing was changed. Try again.")
+		return 0, false
+	}
+	if n > 0 && (said == nil || *said != n) {
+		writeJSON(w, http.StatusConflict, map[string]any{"code": "confirm_kept_in_dropbox", "kept_in_dropbox": n,
+			"error": fmt.Sprintf("%d %s kept only in Dropbox. After the re-key, sign in to the same Dropbox account again to bring them back; until you do they cannot be opened. Send the count to go on.", n, map[bool]string{true: "file is", false: "files are"}[n == 1])})
+		return n, false
+	}
+	return n, true
+}
+
+// objectHereOrOffloaded reports whether an object's bytes are on this computer, or kept only in Dropbox by this Coral (stage 6b, Security's 3e):
+// anything that removes records of a missing object asks this, never the object file alone. An offload table that cannot be read counts as kept
+// (fail closed: a record is never removed on a guess).
+func objectHereOrOffloaded(coralDir, digest string) bool {
+	if !objectNameRe.MatchString(digest) {
+		return false
+	}
+	if _, err := os.Lstat(filepath.Join(coralDir, "artifacts", "objects", digest)); err == nil {
+		return true
+	}
+	b := dropboxBackupFor(coralDir)
+	if b == nil || b.outbox == nil {
+		return false
+	}
+	_, ok, err := b.outbox.Offloaded(context.Background(), digest)
+	return ok || err != nil
+}
+
+// Fetch-back limits (Security's condition 2): at most two at once, one at a time a digest (FetchBack holds the digest lock), and a budget of bytes
+// an hour, so repeated opens cannot spend the account's quota.
+var (
+	fetchSlots     = make(chan struct{}, 2)
+	fetchBudgetMu  sync.Mutex
+	fetchBudgetAt  time.Time
+	fetchBudgetN   int64
+	fetchBudgetMax int64 = 2 << 30
+)
+
+// fetchBudgetRoom says whether n more bytes fit in this hour's budget; fetchBudgetCharge counts them once the fetch succeeded (QA Reviewer 2's
+// INFO on 4f3f79b72: a failed fetch spends nothing).
+func fetchBudgetRoom(n int64) bool {
+	fetchBudgetMu.Lock()
+	defer fetchBudgetMu.Unlock()
+	if now := time.Now(); now.Sub(fetchBudgetAt) > time.Hour {
+		fetchBudgetAt, fetchBudgetN = now, 0
+	}
+	return fetchBudgetN+n <= fetchBudgetMax
+}
+
+func fetchBudgetCharge(n int64) {
+	fetchBudgetMu.Lock()
+	defer fetchBudgetMu.Unlock()
+	fetchBudgetN += n
+}
+
+// fetchOffloaded makes sure a read can go on: true when the bytes are here (or were never freed). For bytes kept only in Dropbox it fetches them
+// back when allowed (a single open by the owner), within the limits, or answers 503 kept_in_dropbox (written here) and returns false.
+func fetchOffloaded(w http.ResponseWriter, coralDir, digest string, allowed bool) bool {
+	if _, err := os.Lstat(filepath.Join(coralDir, "artifacts", "objects", digest)); err == nil {
+		return true
+	}
+	b := dropboxBackupFor(coralDir)
+	if b == nil || b.outbox == nil {
+		return true // no backup: the caller's own not-found answers
+	}
+	row, off, err := b.outbox.Offloaded(context.Background(), digest)
+	if err == nil && !off {
+		return true
+	}
+	if !allowed {
+		writeError(w, http.StatusServiceUnavailable, "kept_in_dropbox", "This file is kept only in Dropbox: ask the owner to open it on the computer")
+		return false
+	}
+	select {
+	case fetchSlots <- struct{}{}:
+		defer func() { <-fetchSlots }()
+	default:
+		writeError(w, http.StatusServiceUnavailable, "kept_in_dropbox", "This file is kept only in Dropbox and is being fetched: try again in a moment")
+		return false
+	}
+	if err != nil || !fetchBudgetRoom(row.Size) {
+		writeError(w, http.StatusServiceUnavailable, "kept_in_dropbox", "This file is kept in Dropbox and could not be fetched right now")
+		return false
+	}
+	if here, ferr := b.FetchBack(context.Background(), digest); ferr != nil || !here {
+		writeError(w, http.StatusServiceUnavailable, "kept_in_dropbox", "This file is kept in Dropbox and could not be fetched right now")
+		return false
+	}
+	fetchBudgetCharge(row.Size)
+	return true
+}
+
+// recordOperatorOpen notes the Operator's open of an artifact (Security's 3c), so Free up space leaves it for 30 days. Nothing without a backup.
+func recordOperatorOpen(coralDir, digest string) {
+	b := dropboxBackupFor(coralDir)
+	if b == nil || b.outbox == nil {
+		return
+	}
+	now := time.Now()
+	key := coralDir + "\x00" + digest // one data folder's record: two Corals in one process (tests) never share a throttle
+	openedMu.Lock()
+	if t, ok := openedAt[key]; ok && now.Sub(t) < time.Hour { // at most one write an hour a file
+		openedMu.Unlock()
+		return
+	}
+	if len(openedAt) > 10000 {
+		openedAt = map[string]time.Time{}
+	}
+	openedAt[key] = now
+	openedMu.Unlock()
+	_ = b.outbox.RecordOpened(context.Background(), digest, now)
+}
+
+var (
+	openedMu sync.Mutex
+	openedAt = map[string]time.Time{}
+)
+
+// operatorFetchCaller is who may make Coral fetch a file back from Dropbox (Security's conditions 2 and 5, and the MUST on e0c7213ba): the
+// Operator's own dashboard on this computer (with or without its cookie), the signed command line whose signature was checked, or the Hub's owner
+// by the genuine owner stamp. Never a session token (an agent), a guide, another Hub reader, or a bare X-Coral-Via-Tunnel header, which any
+// process can send.
+func operatorFetchCaller(r *http.Request) bool {
+	if r.Header.Get(store.SessionTokenHeader) != "" {
+		return false
+	}
+	if _, ok := r.Context().Value(verifiedSessionKey{}).(*store.SessionTokenOwner); ok {
+		return false
+	}
+	if isGuideCaller(r) {
+		return false
+	}
+	switch kind, _ := r.Context().Value(callerKindKey{}).(string); kind {
+	case callerDashCookie, callerDashNoCookie, callerHubOwner:
+		return true
+	case callerCLISigned:
+		return cliauth.Verified(r)
+	}
+	return false
+}
+
+// The risk sentence and the warning the Operator confirms before Free up space is turned on (the 6b delta §1). The keychain-protected token of a
+// signed macOS build is not used yet, so the risk sentence is asked on every system.
+const (
+	offloadRiskSentence = "On this computer, your Dropbox access is protected only by your user account. A program that takes it could delete your backup, and with Free up space on, that may be the only copy of older files."
+	offloadWarning      = "Files freed from this computer live only in Dropbox. Editing or deleting them there loses them."
+)
+
+// DropboxSetOffload answers PUT /api/dropbox/offload (stage 6b, #14845): the Operator's "Free up space: keep artifacts older than N days only in
+// Dropbox", on this computer only (never through Coral Hub, never an agent). {days: 0} turns it off; the files kept only in Dropbox are then
+// fetched back over the next passes. To turn it on: without confirm it is a dry run (the count and bytes the next pass may free, and the two
+// sentences); with confirm it needs risk_ok and warning_ok (the Operator ticked both sentences) and a connection, and the audit row records the
+// count the page showed.
+func (h *CloudHandler) DropboxSetOffload(w http.ResponseWriter, r *http.Request) {
+	if h.refuseCloud(w, r, allowDashboard) || !requireJSON(w, r) {
+		return
+	}
+	if !operatorFetchCaller(r) {
+		writeError(w, http.StatusForbidden, "operator_only", "only the Operator can change Free up space, from this computer's dashboard")
+		return
+	}
+	d := h.dbx
+	if d == nil || d.backup == nil {
+		writeError(w, http.StatusNotFound, "not_available", "Dropbox backup is not available in this build")
+		return
+	}
+	var in struct {
+		Days      int   `json:"days"`
+		Confirm   bool  `json:"confirm"`
+		RiskOK    bool  `json:"risk_ok"`
+		WarningOK bool  `json:"warning_ok"`
+		SeenCount int   `json:"seen_count"`
+		SeenBytes int64 `json:"seen_bytes"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<10)
+	if err := decodeJSONStrict(r, &in); err != nil {
+		errBadRequest(w, `free up space is {"days": n, "confirm": true|false, "risk_ok": true, "warning_ok": true}`)
+		return
+	}
+	if in.Days != 0 && (in.Days < store.DropboxOffloadMinDays || in.Days > store.DropboxOffloadMaxDays) {
+		errBadRequest(w, "days is 0 (off) or 30 to 3650")
+		return
+	}
+	ctx := r.Context()
+	old, _, err := d.store.Offload(ctx)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "", "could not read the setting")
+		return
+	}
+	if in.Days > 0 {
+		c, cerr := d.store.Get(ctx)
+		if cerr != nil || !c.Connected {
+			writeError(w, http.StatusConflict, "not_connected", "Connect Dropbox first")
+			return
+		}
+		if !in.Confirm {
+			now := time.Now()
+			cands, perr := d.backup.outbox.OffloadCandidates(ctx, c.AccountID, now.Add(-time.Duration(in.Days)*24*time.Hour), now.Add(-store.DropboxOffloadOpenedFor), 100000)
+			if perr != nil {
+				writeError(w, http.StatusInternalServerError, "", "could not count what Free up space would free")
+				return
+			}
+			var bytes int64
+			for _, x := range cands {
+				bytes += x.Size
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"dry_run": true, "days": in.Days, "count": len(cands), "bytes": bytes, "risk": offloadRiskSentence, "warning": offloadWarning})
+			return
+		}
+		if !in.RiskOK || !in.WarningOK {
+			writeError(w, http.StatusBadRequest, "confirm_required", "Turning Free up space on needs both sentences confirmed")
+			return
+		}
+		// What is confirmed is what will happen (Security's SHOULD on 057d293d3): the candidates are counted again, and a count well above the one
+		// the page showed (more than 10 percent and more than 10 files) answers 409 changed with the new count, nothing saved.
+		now := time.Now()
+		cands, perr := d.backup.outbox.OffloadCandidates(ctx, c.AccountID, now.Add(-time.Duration(in.Days)*24*time.Hour), now.Add(-store.DropboxOffloadOpenedFor), 100000)
+		if perr != nil {
+			writeError(w, http.StatusInternalServerError, "", "could not count what Free up space would free")
+			return
+		}
+		if n, seen := len(cands), max(in.SeenCount, 0); n > seen+seen/10 && n-seen > 10 {
+			var bytes int64
+			for _, x := range cands {
+				bytes += x.Size
+			}
+			writeJSON(w, http.StatusConflict, map[string]any{"code": "changed", "count": n, "bytes": bytes, "error": "More files would be freed than the count you saw: look at the new count and confirm again"})
+			return
+		}
+	}
+	if err := d.store.SetOffload(ctx, in.Days); err != nil {
+		writeError(w, http.StatusInternalServerError, "", "could not save the setting")
+		return
+	}
+	a := store.DropboxAudit{Kind: store.DropboxAuditOffloadSetting, Who: "operator", OldDays: old, NewDays: in.Days}
+	if in.Days > 0 {
+		a.Count, a.Bytes = max(in.SeenCount, 0), max(in.SeenBytes, 0)
+	}
+	_ = d.store.AddAudit(ctx, a)
+	if in.Days == 0 {
+		d.backup.Nudge() // the files kept only in Dropbox start coming back at once
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"days": in.Days})
+}
+
+// BringBack fetches back the files kept only in Dropbox while Free up space is off (turned off by the Operator, or by a new sign-in, a disconnect
+// or a re-key), oldest first, at most 200 and 2 GiB a pass; a full store stops the pass. Each fetch is FetchBack (verified, capped, under the digest
+// lock, the marker removed after). It reports how many came back.
+func (b *DropboxBackup) BringBack(ctx context.Context) int {
+	days, _, err := b.d.store.Offload(ctx)
+	if err != nil || days > 0 || !b.ready(ctx) {
+		return 0
+	}
+	rows, err := b.outbox.OffloadedAll(ctx, offloadPerPass)
+	if err != nil || len(rows) == 0 {
+		return 0
+	}
+	n, bytes := 0, int64(0)
+	for _, row := range rows {
+		if ctx.Err() != nil || bytes+row.Size > offloadBytesPerPass {
+			break
+		}
+		here, ferr := b.FetchBack(ctx, row.Digest)
+		if errors.Is(ferr, errStoreFull) {
+			break
+		}
+		if ferr == nil && here {
+			n++
+			bytes += row.Size
+		}
+	}
+	if n > 0 {
+		noteArtifactsChanged()
+		slog.Info("[dropbox] files brought back from Dropbox", "count", n)
+	}
+	return n
+}
+
+// dropMarker deletes this Coral's marker at its rev (best effort: a stray marker of this Coral only keeps retention and other Corals on the safe
+// side, and the next pass writes or removes it again).
+func (b *DropboxBackup) dropMarker(ctx context.Context, cl *dropbox.Client, access, marker string) {
+	if m, err := cl.Metadata(ctx, access, marker); err == nil {
+		_, _, _ = b.runDelete(ctx, cl, access, []dropbox.Delete{{Path: marker, Rev: m.Rev}})
+	}
+}

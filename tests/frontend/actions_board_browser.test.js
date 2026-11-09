@@ -67,6 +67,14 @@ const { removeBoards, removeTeams } = require('./helpers/board_cleanup');
         await ev(`document.getElementById('mb-post-input').value = ''; true`);
 
         // ── Select mode ────────────────────────────────────────────────────
+        // Share via Dropbox (#14944): with Dropbox connected (stubbed), the selection bar offers it beside Export Markdown.
+        await ev(`(() => { const inner = window.fetch; window.__dbxPreview = null;
+            const json = o => Promise.resolve(new Response(JSON.stringify(o), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+            window.fetch = (u, o) => { const p = new URL(String(u), location.origin).pathname;
+                if (p === '/api/dropbox/status') return json({ connected: true });
+                if (p.startsWith('/api/dropbox/share-chat/') && p.endsWith('/preview')) { window.__dbxPreview = { path: p, body: JSON.parse(o.body) }; return json({ connected: true, text: 'x', hash: 'h'.repeat(64), size: 1, included: 2, left_out: 0, name: 'chat.md' }); }
+                return inner(u, o); };
+            return true; })()`);
         await ev(`(() => { const b = document.getElementById('mb-select-btn'); b.style.display = ''; b.click(); return true; })()`);
         await until(`document.querySelectorAll('#mb-messages [data-on-click="mb-msg-select"]').length >= 2`, 'the select checkboxes');
         const sel = await ev(`(() => {
@@ -84,6 +92,15 @@ const { removeBoards, removeTeams } = require('./helpers/board_cleanup');
         check('a message\'s checkbox selects it; All selects all; None clears them', sel.one === 1 && sel.all === sel.boxes && sel.none === 0, JSON.stringify(sel));
         await until(`window.__downloads.length > 0`, 'the selected export', 3000);
         check('Export Markdown downloads the selection', (await ev(`window.__downloads`)).some(d => /selected-export\.md$/.test(d)), JSON.stringify(await ev(`window.__downloads`)));
+        await until(`!!document.querySelector('#mb-select-bar .mb-share-dropbox') && !document.querySelector('#mb-select-bar .mb-share-dropbox').hidden`, 'Share via Dropbox in the bar', 4000);
+        check('Share via Dropbox… sits beside Export Markdown (#14944)', (await ev(`[...document.querySelectorAll('#mb-select-bar button')].map(b => b.textContent).join('|')`)).includes('Export Markdown|Share via Dropbox…'));
+        await ev(`document.querySelector('[data-on-click="mb-select-all"]').click(); true`);
+        await until(`!!document.querySelector('#mb-select-bar .mb-share-dropbox') && !document.querySelector('#mb-select-bar .mb-share-dropbox').hidden && !document.querySelector('#mb-select-bar .mb-share-dropbox').disabled`, 'Share via Dropbox enabled', 4000);
+        await ev(`document.querySelector('#mb-select-bar .mb-share-dropbox').click(); true`);
+        await until(`!!window.__dbxPreview && !!document.querySelector('#dropbox-share-dialog[open]')`, 'the chat share dialog', 6000);
+        const pv = await ev(`window.__dbxPreview`);
+        check('it opens the chat dialog with the selected messages, oldest first', pv.path === '/api/dropbox/share-chat/' + encodeURIComponent(agent.board) + '/preview' && pv.body.ids.length === sel.boxes, JSON.stringify(pv));
+        await ev(`document.getElementById('dropbox-share-dialog').close(); true`);
         await ev(`document.querySelector('[data-on-click="mb-select-cancel"]').click(); true`);
         check('Cancel leaves select mode', await ev(`document.querySelectorAll('#mb-messages [data-on-click="mb-msg-select"]').length === 0`));
 

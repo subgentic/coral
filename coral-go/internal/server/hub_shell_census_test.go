@@ -61,6 +61,8 @@ var shellNeverRoutes = map[string]shellNever{
 	"automations_queue.js POST /api/resources/entries/{}/move":  {bExplains, `The queue is kept by each computer`, "no row loads through a Hub, and the folder says why (#13871)", 0},
 	"automations_queue.js DELETE /api/resources/entries/{}":     {bExplains, `The queue is kept by each computer`, "no row loads through a Hub, and the folder says why (#13871)", 0},
 	"artifact_source.js GET /api/servers":                       {bExplains, `The computer list could not be loaded`, "the viewer reads the computer list from this page's own Coral (LOCAL_SERVER) once at startup; where that read is refused or is not a list, opening a file says 'The computer list could not be loaded. Please try opening the file again.' (#13838)", 0},
+	"dropbox_connected.js GET /api/dropbox/status":              {bHidden, `only for this computer's own file or board, outside Coral Hub`, "Share via Dropbox (#14944): the status read behind the viewer's item and the two board chats' buttons, each asked for only for this computer's own file or board outside Coral Hub; through a Hub nothing is offered and the status is not read", 0},
+	"dropbox_share.js POST /api/dropbox/connect":                {bHidden, `not offered through Coral Hub`, "Share via Dropbox (#14944): the dialog's Sign in again; the dialog opens only from the viewer's item, which is never offered through a Hub", 0},
 	"needs_skills.js GET /api/skills":                           {bExplains, `approve at the computer`, "through a Hub the skills come from one read of GET /api/needs-you?kind=skill, drawn as plain rows that say to approve at the computer, with no buttons; this read is the computer's own list (#13841)", 0},
 }
 
@@ -79,7 +81,7 @@ var shellNeverFiles = map[string]shellNever{
 	"chief_setup.js":            {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
 	"cloud.js":                  {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
 	"cloud/enroll.js":           {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
-	"dropbox_settings.js":       {bExplains, `set up on the computer itself, not through Coral Hub`, "Dropbox backup is set up on this computer's own dashboard: through a Hub every Dropbox route is never, the status read is refused and the block says where it is done, with no buttons (#14609); the removals list and its two routes are read only once connected (#14814); the auto-sync switch's route (#14714)", 11},
+	"dropbox_settings.js":       {bExplains, `set up on the computer itself, not through Coral Hub`, "Dropbox backup is set up on this computer's own dashboard: through a Hub every Dropbox route is never, the status read is refused and the block says where it is done, with no buttons (#14609); the removals list and its two routes are read only once connected (#14814); the auto-sync switch's route (#14714); Free up space's route (#14845); the shared-files list, its Stop sharing and Stop all (#14944), read only once connected", 14},
 	"cloud_connect.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 12},
 	"cloud_server_view.js":      {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"controls.js":               {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},

@@ -468,3 +468,32 @@ func TestPairsNeverCrossDocuments(t *testing.T) {
 	assert.Equal(t, doc(call[0]), doc(call[1]), "both files of one document, never one from each")
 	assert.Equal(t, 2, be.audits()[0].Held, "the other document's pair waits whole")
 }
+
+// Stage 6b's keepDoc MUST (#14845). Mutants: the marker listing not read (a document another Coral keeps only in Dropbox deleted); a failed listing
+// read as "no markers".
+func TestRetentionKeepsWhatAnyCoralKeepsOnlyInDropbox(t *testing.T) {
+	be, ds := newRetentionEnv(t, 4)
+	be.age(400, ds[1:]...)
+	be.age(500, ds[0])                               // the oldest: the first retention would take
+	be.marker(ds[0], strings.Repeat("3", 28)+"c0de") // another Coral keeps ds[0] only in Dropbox
+	be.retain(30)
+	assert.Equal(t, 2, be.inDropbox(ds[0]), "a document with any marker is kept")
+	gone := 0
+	for _, d := range ds[1:] {
+		if be.inDropbox(d) == 0 {
+			gone++
+		}
+	}
+	assert.Positive(t, gone, "the others go as usual")
+
+	be2, ds2 := newRetentionEnv(t, 4)
+	be2.age(400, ds2...)
+	be2.dbx.markersFail = true
+	be2.retain(30)
+	for _, d := range ds2 {
+		assert.Equal(t, 2, be2.inDropbox(d), "an unreadable marker listing deletes nothing")
+	}
+	a := be2.audits()
+	require.NotEmpty(t, a)
+	assert.Equal(t, "markers_unreadable", a[0].Reason)
+}

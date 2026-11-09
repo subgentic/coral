@@ -12,3 +12,25 @@
 #settings-modal #settings-dropbox .dropbox-inline label { display: inline; margin: 0; }
 #settings-dropbox .dropbox-inline input[type="number"] { width: 6em; flex: 0 0 auto; }
 #settings-dropbox .settings-dropbox-filters p.settings-hint { margin: 4px 0 8px; }
+
+/* Share via Dropbox (#14944): the dialog a file's More actions opens. */
+dialog.modal-content.dropbox-share-dialog { position: fixed; inset: 0; margin: auto; height: fit-content; max-height: calc(100dvh - 32px); overflow-y: auto; box-sizing: border-box; }
+dialog.dropbox-share-dialog .dropbox-share-choice input[type="radio"], dialog.dropbox-share-dialog .dropbox-share-tick input[type="checkbox"] { display: inline-block; width: auto; flex: 0 0 auto; margin: 3px 0 0; }
+dialog.dropbox-share-dialog label.dropbox-share-choice, dialog.dropbox-share-dialog label.dropbox-share-tick { display: flex; flex-direction: row; align-items: flex-start; gap: 10px; margin: 0; }
+dialog.dropbox-share-dialog label.dropbox-share-tick[hidden] { display: none; }
+dialog.dropbox-share-dialog .dropbox-share-choice > span, dialog.dropbox-share-dialog .dropbox-share-tick > span { min-width: 0; }
+.dropbox-share-body { display: flex; flex-direction: column; gap: 8px; }
+.dropbox-share-body .settings-input { width: 100%; box-sizing: border-box; }
+.dropbox-share-choices { display: flex; flex-direction: column; gap: 6px; margin: 4px 0; }
+.dropbox-share-choice { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 8px 10px; cursor: pointer; min-height: 44px; box-sizing: border-box; }
+.dropbox-share-choice:has(input:checked) { border-color: var(--accent); }
+.dropbox-share-choice input { margin-top: 3px; }
+.dropbox-share-choice b { display: block; }
+.dropbox-share-tick { display: flex; gap: 8px; align-items: flex-start; }
+.dropbox-share-tick[hidden], .dropbox-share-people[hidden] { display: none; }
+.dropbox-share-who { border-left: 3px solid var(--accent); padding: 4px 8px; margin: 0; font-size: var(--fs-md); }
+.dropbox-share-preview { width: 100%; max-height: 320px; overflow: auto; margin: 0; padding: 8px; box-sizing: border-box; border: 1px solid var(--border); border-radius: var(--radius-md); white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: var(--fs-sm); }
+.dropbox-share-list { margin: 0; padding-left: 18px; }
+.dropbox-share-list li { margin: 4px 0; overflow-wrap: anywhere; }
+.dropbox-share-dialog .modal-footer { flex-wrap: wrap; }
+@media (max-width: 480px) { .dropbox-share-dialog .modal-footer .btn { min-height: 44px; } .dropbox-share-preview { max-height: 240px; } }
