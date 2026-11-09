@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -44,7 +42,7 @@ func (h *SessionsHandler) starArtifactRoute(w http.ResponseWriter, r *http.Reque
 			}
 		}
 	} else {
-		if _, statErr := os.Stat(filepath.Join(h.cfg.CoralDir(), "artifacts", "objects", id)); statErr != nil {
+		if !objectHereOrOffloaded(h.cfg.CoralDir(), id) { // Star works on a file kept only in Dropbox too (stage 6b)
 			errNotFound(w, "artifact not found")
 			return
 		}

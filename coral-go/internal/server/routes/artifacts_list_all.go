@@ -49,6 +49,8 @@ type allArtifact struct {
 	// Records counts the sessions that uploaded the same bytes; Available is false when the file itself is gone and only its record is left.
 	Records   int  `json:"records"`
 	Available bool `json:"available"`
+	// KeptInDropbox: the bytes are kept only in Dropbox (stage 6b): not available here, but not gone; opening it fetches them back.
+	KeptInDropbox bool `json:"kept_in_dropbox,omitempty"`
 	// SeriesID, Version, Versions and IsLatest are present only on a version of an artifact series (#6357), from the upload records: the series' id, this version's number, how many versions
 	// the series has and whether this is the newest. Absent on an unversioned artifact; nothing else in the row depends on them.
 	SeriesID string `json:"series_id,omitempty"`
@@ -159,6 +161,8 @@ func listAllArtifactRows(coralDir string) []allArtifact {
 		if blob, err := os.Lstat(filepath.Join(objects, id)); err == nil && blob.Mode().IsRegular() {
 			row.Available, row.Size = true, blob.Size()
 			row.CreatedAt = blob.ModTime().UTC().Format(time.RFC3339)
+		} else if objectHereOrOffloaded(coralDir, id) {
+			row.KeptInDropbox = true // not "unavailable": its bytes are in Dropbox, opening it fetches them back (stage 6b, Security's 3d)
 		}
 		if recs := records[id]; len(recs) > 0 {
 			sort.Slice(recs, func(i, j int) bool {
