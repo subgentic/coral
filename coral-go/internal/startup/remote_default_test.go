@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/store/storetest"
 )
 
 // #5124: Coral listens on this computer only by default; remote access (the saved setting or --remote) widens the default host to every
@@ -37,7 +38,7 @@ func TestBindHostByRemoteAccessSetting(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			db, err := store.OpenWithKey(ctx, filepath.Join(t.TempDir(), "sessions.db"), "")
+			db, err := storetest.OpenPath(ctx, filepath.Join(t.TempDir(), "sessions.db"), "")
 			require.NoError(t, err)
 			defer db.Close()
 			if tc.setting != "" {
@@ -53,7 +54,7 @@ func TestBindHostByRemoteAccessSetting(t *testing.T) {
 // Settings that cannot be read never widen the bind, but --remote still does.
 func TestBindHostWhenSettingsAreUnreadable(t *testing.T) {
 	ctx := context.Background()
-	db, err := store.OpenWithKey(ctx, filepath.Join(t.TempDir(), "sessions.db"), "")
+	db, err := storetest.OpenPath(ctx, filepath.Join(t.TempDir(), "sessions.db"), "")
 	require.NoError(t, err)
 	require.NoError(t, db.Close()) // a closed database fails the read
 

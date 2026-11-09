@@ -18,6 +18,7 @@ import (
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/license"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/store/storetest"
 	"github.com/subgentic/coral/internal/testguard"
 	"github.com/subgentic/coral/internal/tracking"
 )
@@ -52,7 +53,7 @@ func TestEULAAcceptedFollowsTheSavedAnalyticsChoice(t *testing.T) {
 			require.NoError(t, os.MkdirAll(filepath.Join(iso, "home"), 0o700))
 			require.NoError(t, os.MkdirAll(home, 0o700))
 			if tc.saved != "" {
-				db, err := store.OpenWithKey(context.Background(), filepath.Join(home, "sessions.db"), "")
+				db, err := storetest.OpenPath(context.Background(), filepath.Join(home, "sessions.db"), "")
 				require.NoError(t, err)
 				require.NoError(t, store.NewSessionStore(db).SetSetting(context.Background(), "telemetry_enabled", tc.saved))
 				require.NoError(t, db.Close())
@@ -172,7 +173,7 @@ func newFunnelEnv(t *testing.T) *funnelEnv {
 }
 
 func (e *funnelEnv) save(setting, value string) {
-	db, err := store.OpenWithKey(context.Background(), filepath.Join(e.home, "sessions.db"), "")
+	db, err := storetest.OpenPath(context.Background(), filepath.Join(e.home, "sessions.db"), "")
 	require.NoError(e.t, err)
 	require.NoError(e.t, store.NewSessionStore(db).SetSetting(context.Background(), setting, value))
 	require.NoError(e.t, db.Close())

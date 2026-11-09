@@ -11,7 +11,7 @@ import (
 
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/config"
-	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/store/storetest"
 )
 
 // #9936: a headless first start (a cloud machine with a Coral Hub credential and nobody at a terminal) takes its Terms from the Hub: the start goes on only when the bootstrap ended with
@@ -101,7 +101,7 @@ func TestAPersonAtATerminalCanAcceptWhenTheHubDoesNot(t *testing.T) {
 	promptTerms = func() bool { asked++; return true }
 
 	home := t.TempDir()
-	db, err := store.OpenWithKey(context.Background(), filepath.Join(home, "sessions.db"), "")
+	db, err := storetest.OpenPath(context.Background(), filepath.Join(home, "sessions.db"), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
 	cfg := &config.Config{TermsViaHub: true} // no Hub configured: the Hub cannot confirm anything

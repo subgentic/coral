@@ -15,6 +15,7 @@ import (
 
 	"github.com/subgentic/coral/internal/server/routes"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/store/storetest"
 )
 
 // #4602/#4678: Start raises an unset artifact limit once when the store already holds 80% of the 20 GiB default. The routes tests cover the
@@ -60,7 +61,7 @@ func seedSparseArtifact(t *testing.T, home string, size int64) {
 func bootedSettings(t *testing.T, home string) map[string]string {
 	t.Helper()
 	ctx := context.Background()
-	db, err := store.OpenWithKey(ctx, filepath.Join(home, "sessions.db"), "")
+	db, err := storetest.OpenPath(ctx, filepath.Join(home, "sessions.db"), "")
 	require.NoError(t, err)
 	defer db.Close()
 	s, err := store.NewSessionStore(db).GetSettings(ctx)
