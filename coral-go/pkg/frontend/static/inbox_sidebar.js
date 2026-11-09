@@ -21,7 +21,7 @@ import { state } from './state.js';
 import { isPhoneBar } from './phone_layout.js';
 
 const { activateSavedReviews, mutedReviewItems, mutedWords, reviewItems, reviewStarChanged, unreadReviewItems, reviewErrors, refreshReviews, reviewsChangedOnServer, reviewGroups, setReviewRead, markOpenedReadVisibly, isRead, savedFiles, reviewPages, savedReviewPages, loadMoreReviews, loadMoreSavedFiles, queryReviews, queriedReviews, moreQueriedReviews, retryQueriedReviews, reviewQueryState, reviewQueryKey, reviewFilterOptions, countSavedReviews, reviewPageSummary } = await importOnce('./inbox_reviews.js');
-import { failedUnread, finishedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
+import { failedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
 import { operatorAsks, refreshOperatorAsks, askLine, askFull, askIsLong, askOpened, askKey, openAskDialog, askSubjects, questionContextNote } from './operator_asks.js';
 import { go, note, backIs, currentRoute } from './nav.js';
 import { unreadReviewCount, reviewAttentionCount } from './ask_filter.js'; // the files waiting: the full read's once it has run, else what the computers counted (#13172)
@@ -79,9 +79,9 @@ const { answerCell, rowActions, readWholeQuestion } = await importOnce('./inbox_
 
 /** The agent's own chat card, on the Agents tab (a row that needs an answer shows the chat card, not the terminal saved last, #10141). */
 const openInAgents = s => { window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s))).then(() => window.showChatView?.()); };
-const DN = await importOnce('./desktop_notify.js'); // lazy: its failure is retried
-/** A quiet line under Needs you for as long as alerts are off and could be turned on (#11837: the one-time banner was dismissed and two questions waited 14 and 29 minutes): the same call as the banner's button and Settings > Notifications. */
-const alertsOffered = () => DN.desktopNotifySupported() && !DN.desktopNotifyEnabled() && !DN.desktopNotifyBlocked();
+/** A computer cut its list short and no filter is applied (#14827): the one case where a filter helps, said once under the list. A list that is filtered, or complete, says nothing. */
+const cutShort = () => !NF.isFiltered(needsFilters) && reviewPages().some(p => p.truncated);
+function cutShortLine() { return cutShort() ? DT.el('p', 'goals-note inbox-cut-short', 'This list is cut short. Use Filters to narrow it.') : null; }
 /** The one quiet line under Needs you when the Operator's own switches keep files out of it (#12144): what and how many, and the way to them (their folder, Artifacts). Never counted, never pushed: a line, not an item. */
 // A muted file that is more than a day old and still unread surfaces ONCE, in this quiet line only (never in the badge or a push): the ones already shown in an earlier visit are remembered in this browser, the ones shown
 // in this page session stay while it lasts. A muted finished request, release summary or decision is not shown again after that.
@@ -115,20 +115,7 @@ function moreFilesLine() {
     if (st.failed) { const b = DT.el('button', 'btn btn-quiet btn-small', 'Retry'); b.type = 'button'; b.addEventListener('click', () => { retryQueriedReviews(f); }); p.append(' ', b); } // the computers that did not answer are asked again, each from where it stopped
     return p;
 }
-const needsFoot = () => { const parts = [mutedLine(), alertsLine(), moreFilesLine()].filter(Boolean); if (!parts.length) return null; const wrap = DT.el('div', 'inbox-needs-foot'); wrap.append(...parts); return wrap; };
-function alertsLine() {
-    if (!alertsOffered()) return null;
-    const p = DT.el('p', 'goals-note inbox-alerts-link', 'Get an alert when an agent waits for you while you are in another tab. ');
-    const b = DT.el('button', 'btn btn-quiet btn-small', 'Turn on alerts'); b.type = 'button';
-    b.addEventListener('click', async () => {
-        const granted = await DN.enableDesktopNotify();
-        const { showToast } = await importOnce('./notifications.js');
-        showToast(granted ? 'Alerts are on. Change them in Settings > Notifications.' : 'Alerts stay off: your browser did not allow them. You can try again in Settings > Notifications.');
-        if (granted) p.remove();
-    });
-    p.append(document.createElement('br'), b); // the button on its own line: beside the words it made a 44 px line box between them
-    return p;
-}
+const needsFoot = () => { const parts = [mutedLine(), moreFilesLine(), cutShortLine()].filter(Boolean); if (!parts.length) return null; const wrap = DT.el('div', 'inbox-needs-foot'); wrap.append(...parts); return wrap; };
 const CH = await importOnce('./mailbox_chats.js'); // the chat folders (#7776): All chats, Board history, By CLI, Tags
 const IR = await importOnce('./inbox_read.js'); // which chats, boards and tasks the person has opened since they changed (#9687)
 const { providerName } = await importOnce('./model_labels.js'); // a CLI by its name (Claude, Codex, Antigravity), as the Chats list says it
@@ -1009,7 +996,6 @@ function syncReviewPagingControls() {
 function appendReviewPaging(host, savedPage = false) {
     for (const page of (savedPage ? savedReviewPages() : reviewPages())) {
         if (page.ownerOnly) continue;
-        if (page.truncated) host.append(DT.el('p', 'goals-note', `${pagingServerLabel(page.server)} returned an incomplete list. Narrow the filters to find other files.`));
         if (!page.has_more && !page.error) continue;
         const line = DT.el('p', 'inbox-review-more');
         line.append(document.createTextNode(`${pagingServerLabel(page.server)}: `));
@@ -1272,7 +1258,7 @@ export function needsListSpec() {
     const manyTeams = new Set(allNeeds().map(teamOf).filter(Boolean)).size > 1; // with two or more teams waiting, a one-line row names its team
     const waitingForServers = isCloud() && !state.serversKnown;
     return { title: 'Needs you', noun: ['item', 'items'], rows, count: (!needsFilters.kind || needsFilters.kind === 'review') ? `${attention.complete ? '' : 'at least '}${totalAttention}` : totalCounted > rowsCounted ? `${rowsCounted} of ${totalCounted}` : totalCounted, status: needsCountWords(), note: [...reviewErrors(), incompleteNote()].filter(Boolean).join(' '), empty: waitingForServers ? { line: 'Loading Needs you…', hint: 'Checking linked computers…' } : openPages ? null : { line: reviewErrors().length ? 'Review documents could not be refreshed' : NF.isFiltered(needsFilters) ? 'Nothing that needs you matches the search and filters.' : 'Nothing needs you', hint: reviewErrors().length ? 'Some computers could not be read. Try again to check what needs you.' : NF.isFiltered(needsFilters) ? undefined : answered || 'An agent that asks a question or wants permission, and a review artifact, appear here. A task assigned to you is under Tasks.', go: reviewErrors().length ? undefined : NF.isFiltered(needsFilters) ? undefined : { action: 'inbox-go-agents', label: 'Go to Agents' } },
-        foot: needsFoot, signature: JSON.stringify([[...askOpen, ...[...agentAskFailed].map(k => `failed:${k}`)], reviewPagingSignature(), reviewQueryState(), needsCountWords(), alertsOffered(), mutedWords(mutedReviewItems()), dayOldMutedFiles().map(a => a.hex), groupReviews, groupMode + (groupReviews ? JSON.stringify([taskOpenState, [...storyOpenState]]) : ''), rows.map(s => !!s.review?.starred), hidden, finishedUnread().length, answered || '', manyTeams, needsOverflow().map(g => [g.name, g.more.map(a => a.reviewKey)]), reviewErrors(), incompleteNote(), rows.map(blocksOf), rows.map(s => [s.operatorAsk ? [s.operatorAsk.id, s.operatorAsk.text] : 0, sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, s.task ? [s.task.id, s.task.title] : 0, dirOf(s), s.review ? [needsReviewAttention(s.review), s.review.version, s.review.opened_version, s.review.new_comments, waitingOnAgent(s.review)] : 0, s.proposal ? s.proposal.state : 0])]), // the words move on with the clock: they are part of what was drawn
+        foot: needsFoot, signature: JSON.stringify([[...askOpen, ...[...agentAskFailed].map(k => `failed:${k}`)], reviewPagingSignature(), reviewQueryState(), needsCountWords(), cutShort(), mutedWords(mutedReviewItems()), dayOldMutedFiles().map(a => a.hex), groupReviews, groupMode + (groupReviews ? JSON.stringify([taskOpenState, [...storyOpenState]]) : ''), rows.map(s => !!s.review?.starred), hidden, answered || '', manyTeams, needsOverflow().map(g => [g.name, g.more.map(a => a.reviewKey)]), reviewErrors(), incompleteNote(), rows.map(blocksOf), rows.map(s => [s.operatorAsk ? [s.operatorAsk.id, s.operatorAsk.text] : 0, sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, s.task ? [s.task.id, s.task.title] : 0, dirOf(s), s.review ? [needsReviewAttention(s.review), s.review.version, s.review.opened_version, s.review.new_comments, waitingOnAgent(s.review)] : 0, s.proposal ? s.proposal.state : 0])]), // the words move on with the clock: they are part of what was drawn
         node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const groupFor = reviewGroupLookup(rows, groupReviews, r => !needsReviewAttention(r), reviewSourceLabel, taskHeads, byTask); const oneLineNeeds = !rows.some(isItem); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, ...(!oneLineNeeds ? { foldAt: () => isPhoneLayout() ? 48 : 40 } : {}), rows, orderRows: list => arrangeReviewRows(list, groupReviews), groupSorted: true, groupBy: groupFor, keepOrder: true, orderKey: JSON.stringify([needsFilters, queries.needs]), rowKey: s => `${sessionServer(s)}:${s.session_id}`, unread: needsUnread, ...(isPhoneLayout() ? { selectable: { contextKey: 'inbox-needs', longPress: true, iconBar: true, clearLabel: 'Cancel', canSelect: s => !!(s.review || s.operatorAsk || s.welcome || s.autorun || s.proposal || s.goalDone), actions: needsBulkActions(), onChange: keys => Toolbar.mountSelection((teamNeedsMount?.host || $('group-table-view'))?.querySelector('.gt-toolbar'), keys.size ? table.bar : null) } } : {}), decorate: (s, tr) => { NF.decorateKindRow(tr); addComputerChip(s, tr); addAgentAskToggle(s, tr); if (!needsUnread(s)) tr.classList.add('dt-read'); if (s.welcome && s.welcome.dismiss) tr.dataset.welcomeId = s.welcome.id; if (s.review && !decisionNeedsPerson(splitKey(s.review.team).server)) {
                 const cell = tr.querySelector('td[data-key="agent"]');
                 const star = starControl(s.review, { hex: s.review.hex, name: markHidden(s.review.name, { strict: true }), reviewPin: true, onChange: on => { const focused = document.activeElement === star; reviewStarChanged(s.review, on); needsOrder = null; needsState.shown = null; renderInboxNav(true); if (focused) requestAnimationFrame(() => (teamNeedsMount?.host || $('group-table-view'))?.querySelector(`tr[data-key="${CSS.escape(needsKey(s))}"] .inbox-review-star`)?.focus({ preventScroll: true })); } });
@@ -1360,12 +1346,6 @@ wrap.append(DT.el('span', 'sr-only', `${earlierWords(s.review) ? `, ${earlierWor
             for (const g of needsOverflow()) {
                 const p = DT.el('p', 'inbox-review-more', `${g.name}: ${g.more.length} more for review. `);
                 for (const team of new Set(g.more.map(a => a.team))) p.append(DT.link(`Open ${keyLabel(team)} artifacts`, () => go(keyRoute('team', team, 'artifacts'))));
-                wrap.append(p);
-            }
-            const finished = activeNeedsTeam ? 0 : finishedUnread().length;
-            if (finished > 0) { // a run that passed is not something that needs the person, so it is a line under the list, not a row (#10515)
-                const p = DT.el('p', 'goals-note inbox-runs-finished', `${finished} ${finished === 1 ? 'run' : 'runs'} finished since you looked. `);
-                p.append(DT.link('See them', () => go({ view: 'automations', folder: 'recent' })));
                 wrap.append(p);
             }
             if (rows.some(r => (r.welcome && r.welcome.dismiss) || r.review || (r.operatorAsk && r.operatorAsk.kind === 'ask') || r.autorun) && (isPhoneLayout() || matchMedia('(pointer: coarse)').matches)) importOnce('./welcome_swipe.js').then(m => m.attachWelcomeSwipe(wrap)).catch(() => {}); // a touch screen, or a phone-sized window whatever its pointer says (#11765), swipes a row away (#11542); lazy

@@ -224,7 +224,7 @@ export const reviewQueryState = () => {
         more: pages.some(p => p.has_more), loading: pages.some(p => p.loading),
         attentionTotal: fview.localFilters ? completeWindow ? rows.filter(needsReviewAttention).length : null : attentionKnown ? pages.reduce((n, p) => n + p.attentionTotal, 0) : null,
         goalFiltered: !!fview.goal, localFilters: fview.localFilters,
-        error: !hasSources ? 'No selected computer is online.' : pages.some(p => p.error) ? 'Some computers could not be asked.' : pages.some(p => p.truncated) ? 'A computer returned an incomplete list. Narrow the filters to find other files.' : '', failed: pages.filter(p => p.error).length + (hasSources ? 0 : 1) };
+        error: !hasSources ? 'No selected computer is online.' : pages.some(p => p.error) ? 'Some computers could not be asked.' : '', failed: pages.filter(p => p.error).length + (hasSources ? 0 : 1) };
 };
 export const clearReviewQuery = () => { if (fview) { const old = fview; fview = null; old.pager.reset([]); changed(); } };
 export function queryReviews(f) {
@@ -382,7 +382,6 @@ function publishPages() {
     const next = [], nextSaved = [], nextMuted = [], failed = [];
     for (const source of reviewPager.snapshot()) {
         if (source.error) failed.push(`${source.server} review artifacts could not be refreshed: ${source.error}`);
-        else if (source.truncated) failed.push(`${serverLabel(source.server)} returned an incomplete review list. Narrow the filters to find other files.`);
         for (const a of source.artifacts) {
             const tags = a.tags || [], decidedWithNews = a.new_comments > 0 && (tags.includes('approved') || tags.includes('denied')) && !tags.includes('for review');
             if (!(tags.includes('for review') || decidedWithNews) || tags.includes('saved') || tags.includes('ignored') || tags.includes('superseded') || !a.available) continue;

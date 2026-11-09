@@ -1,4 +1,4 @@
-// A lasting way to turn alerts on (#11837, moment 11): the one-time banner was dismissed and two questions waited 14 and 29 minutes unseen. Needs you carries a quiet line, "Get an alert when an agent waits for you
+// The alerts line is gone from Needs you (#14827; it was a lasting way to turn alerts on, #11837, moment 11): the one-time banner was dismissed and two questions waited 14 and 29 minutes unseen. Needs you carries a quiet line, "Get an alert when an agent waits for you
 // while you are in another tab. [Turn on alerts]", for as long as this browser could turn alerts on and has not: with nothing waiting and with rows, on a desktop and a phone; the button asks the browser (the
 // same call as the banner's and Settings > Notifications), the line goes when alerts are on, and it is not there when alerts are on already or the browser blocks them. The browser's Notification is a page stub.
 const fs = require('node:fs');
@@ -34,18 +34,12 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const at = `${w} px, ${withRows ? 'with rows' : 'nothing waiting'}: `;
             await open(w, mobile, false); await ev(`localStorage.removeItem('__perm'); localStorage.removeItem('coral-desktop-notify'); true`);
             await open(w, mobile, withRows);
+            // #14827 (the operator: 'These are not that useful to show'): the line is NOT under Needs you any more, in the very state that used to show it (alerts can be turned on and are not). They are turned on in Settings > Notifications, or from the one-time offer.
+            check(await ev(`!!window.Notification && Notification.permission === 'default'`), at + 'alerts can be turned on here and are not (the state that showed the line)');
             const l = await link();
-            check(!!l && l.button && l.shown && l.inside, at + 'the line is under Needs you: ' + JSON.stringify(l));
-            check(!!l && /^Get an alert when an agent waits for you while you are in another tab\. Turn on alerts$/.test(l.text), at + 'it says: ' + (l && l.text));
-            if (withRows) await shot(`needs-alerts-link-${w}`);
-            await ev(`document.querySelector('${T} .inbox-alerts-link button').click(); true`);
-            await waitFor(`!document.querySelector('${T} .inbox-alerts-link')`, at + 'the line goes when alerts are on', 6000).catch(() => {});
-            check(!(await link()) && (await ev(`localStorage.getItem('coral-desktop-notify')`)) === '1', at + 'alerts are on and the line is gone');
-            await open(w, mobile, withRows);
-            check(!(await link()), at + 'with alerts on, a later visit has no line');
-            await ev(`localStorage.removeItem('coral-desktop-notify'); localStorage.setItem('__perm', 'denied'); true`);
-            await open(w, mobile, withRows);
-            check(!(await link()), at + 'with the browser blocking alerts the line is not offered');
+            check(!l, at + 'no alerts line under Needs you: ' + JSON.stringify(l));
+            check(await ev(`!/Get an alert when an agent waits|Turn on alerts/.test(document.querySelector('${T}').textContent)`), at + 'nor any such words in the list');
+            if (withRows) await shot(`needs-no-alerts-link-${w}`);
         }
     } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
     if (failures.length) { console.error(failures.join('\n')); process.exit(1); }

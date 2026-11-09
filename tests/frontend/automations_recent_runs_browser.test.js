@@ -103,13 +103,14 @@ const STUB = `(() => {
             assert.ok(byName('nightly-build') && /Run failed: Step 2, Test, failed with exit code 3/.test(byName('nightly-build').text), `${at}and the workflow's: ${JSON.stringify(rowsText)}`);
             assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`), '2', `${at}the Inbox badge counts them`);
             await themed('needs', w);
-            // a run that passed is not Needs you: a line under the list says how many finished since the person looked, and opens Recent runs (#10515 point 2)
-            assert.equal(await ev(`document.querySelector('.inbox-runs-finished')?.textContent.trim()`), '2 runs finished since you looked. See them', `${at}the line under the list`);
+            // a run that passed is not Needs you, and Needs you does not count them either (#14827, the operator: 'not that useful to show'): no line under the list, no rows; they are in Automations > Recent runs
+            assert.equal(await ev(`document.querySelector('.inbox-runs-finished')`), null, `${at}no runs-finished line under the list`);
+            assert.ok(await ev(`!/runs? finished since you looked/.test(document.getElementById('group-table-view').textContent)`), `${at}nor those words`);
             assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length`), 2, `${at}and they are not rows`);
-            await ev(`[...document.querySelectorAll('.inbox-runs-finished a, .inbox-runs-finished button')].find(x => /See them/.test(x.textContent)).click(); true`);
-            await waitFor(`document.querySelector('#group-table-title') && document.querySelector('#group-table-title').textContent === 'Recent runs'`, `${at}See them opens Recent runs`, 8000);
+            await ev(`import((window.__coralStatic || '/static/') + 'nav.js').then(n => n.go({ view: 'automations', folder: 'recent' })); true`);
+            await waitFor(`document.querySelector('#group-table-title') && document.querySelector('#group-table-title').textContent === 'Recent runs'`, `${at}Recent runs still opens`, 8000);
             await ev(`history.back(); true`);
-            await waitFor(`!!document.querySelector('.inbox-runs-finished') && document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 2`, `${at}back in Needs you`, 8000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 2`, `${at}back in Needs you`, 8000);
             await installGuard(ev); // a dismissal sends nothing to an agent (the operator's rule, #11552)
             // a phone's row has no button (#11671): Dismiss is in the row's three-dot menu (or a swipe), and a tap on the row opens it
             if (mobile) await ev(`document.querySelector('#group-table-view button.menu-item[aria-label^="Dismiss: nightly-build-job"]').click(); true`);
