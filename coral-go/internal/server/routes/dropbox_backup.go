@@ -64,13 +64,14 @@ type DropboxBackup struct {
 	outbox   *store.DropboxOutbox
 	coralDir string
 
-	private  func(ctx context.Context, ids []string) (map[string]bool, error) // the private marks; nil reads none (tests set it)
-	types    func() map[string]bool                                           // the chosen types; nil or empty is every type
-	maxAge   func() time.Duration                                             // only artifacts newer than this; 0 is no limit
-	power    func() (onBattery, metered bool)
-	secret   func([]byte) bool
-	now      func() time.Time
-	parallel int
+	private    func(ctx context.Context, ids []string) (map[string]bool, error) // the private marks; nil reads none (tests set it)
+	references func(ctx context.Context) (map[string]bool, error)               // stage 6b: the digests a running task or an open session names (SetReferences); unset frees nothing
+	types      func() map[string]bool                                           // the chosen types; nil or empty is every type
+	maxAge     func() time.Duration                                             // only artifacts newer than this; 0 is no limit
+	power      func() (onBattery, metered bool)
+	secret     func([]byte) bool
+	now        func() time.Time
+	parallel   int
 
 	// Stage 4b, retention (#14703).
 	retainEvery time.Duration                                           // at most one retention pass this often (an hour)
@@ -99,6 +100,9 @@ func (h *CloudHandler) NewDropboxBackup(ob *store.DropboxOutbox) *DropboxBackup 
 	b := &DropboxBackup{d: h.dbx, outbox: ob, coralDir: h.dbx.dataDir, power: osPower, now: time.Now, parallel: dropboxParallel, kick: make(chan struct{}, 1),
 		retainEvery: time.Hour, retainPoll: time.Second, retainWait: 30 * time.Second,
 		edits: store.NewDropboxEdits(ob.DB()), editBounds: defaultEditBounds,
+		references: func(context.Context) (map[string]bool, error) {
+			return nil, errors.New("no reference scan")
+		},
 		private: func(context.Context, []string) (map[string]bool, error) {
 			return nil, errors.New("no private marks to read")
 		}, // fail closed until SetPrivate
