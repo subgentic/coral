@@ -13,6 +13,7 @@ let current = -1;
 let observer = null;
 let refreshTimer = null;
 let loadingOlder = false;
+let noticeResizeObserver = null;
 
 // The live chat's messages, or the past chat's in the Inbox when that is the one on screen (#10533, the Desktop tester: Ctrl/Cmd+F did nothing in a past chat).
 function container() {
@@ -54,6 +55,12 @@ function ensureBar() {
 
 function setFindBtn(on) {
     document.getElementById('chat-find-btn')?.setAttribute('aria-pressed', String(on));
+}
+
+function watchLaunchDisclosure() {
+    const notice = document.getElementById('launch-disclosure-banner');
+    if (notice && noticeResizeObserver) noticeResizeObserver.observe(notice);
+    placeBar();
 }
 
 function placeBar() {
@@ -205,6 +212,9 @@ export function toggleChatFind() {
 export function initChatFind() {
     window.toggleChatFind = toggleChatFind;
     window.closeChatFind = closeFind;
+    if (typeof ResizeObserver === 'function') noticeResizeObserver = new ResizeObserver(placeBar);
+    window.addEventListener('coral:launch-disclosure-shown', watchLaunchDisclosure);
+    watchLaunchDisclosure();
     document.addEventListener('keydown', e => {
         if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f' && chatVisible()) {
             // Leave the terminal's own shortcuts alone.
