@@ -37,8 +37,8 @@ type chatPage struct {
 // renderChatPage builds the transcript from the messages, in the order given, with sharedOn's date in its header: a Markdown file (.md), which
 // Dropbox's preview shows (the Operator found it does not render an .html file, comment 372, and chose Markdown, #14982). Coral writes the
 // only markup (the title and each message's heading); every character of a message, an author and the team is escaped (escapeMarkdown), so a
-// message cannot make a link, an image, a heading, code, HTML or an entity: it shows as written, links as plain text. Each message is redacted
-// for secrets first and fails closed; control and format characters (bidi included) are dropped. Left out: Coral's own system posts, messages
+// message cannot make a link, an image, a heading, code, HTML or an entity: it shows as written, links as plain text. Control and format
+// characters (bidi and zero-width included) are dropped first, then each message is redacted for secrets (failing closed), then escaped. Left out: Coral's own system posts, messages
 // to a group only, and every id.
 func renderChatPage(team string, msgs []*board.Message, sharedOn time.Time) (chatPage, error) {
 	var page chatPage
@@ -50,7 +50,7 @@ func renderChatPage(team string, msgs []*board.Message, sharedOn time.Time) (cha
 			page.leftOut++
 			continue
 		}
-		text, err := red.Text([]byte(m.Content))
+		text, err := red.Text([]byte(chatBodyText(m.Content))) // control and format characters dropped BEFORE redacting: a key split by a zero-width character cannot slip past and rejoin (Security's INFO 6 on 44d03efa3)
 		if err != nil {
 			return chatPage{}, err
 		}
