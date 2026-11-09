@@ -51,16 +51,16 @@ func (b *DropboxBackup) uploadChecks(e store.DropboxEdit) string {
 	if !st.chargeUpload(autoSyncBucket, e.Size) {
 		return "hourly_cap"
 	}
-	if head, err := readHead(b.heldPath(e.Digest), 16); err == nil && sniffImageFamily(head) != "" {
-		f, err := secfile.OpenNoFollow(b.heldPath(e.Digest), os.O_RDONLY, 0)
-		if err != nil {
-			return "image_unreadable"
-		}
-		data, rerr := io.ReadAll(io.LimitReader(f, dropboxEditMaxSize+1))
-		_ = f.Close()
-		if rerr != nil {
-			return "image_unreadable"
-		}
+	f, err := secfile.OpenNoFollow(b.heldPath(e.Digest), os.O_RDONLY, 0) // no-follow for every read (Security's INFO on b11590071)
+	if err != nil {
+		return "unreadable"
+	}
+	data, rerr := io.ReadAll(io.LimitReader(f, dropboxEditMaxSize+1))
+	_ = f.Close()
+	if rerr != nil {
+		return "unreadable"
+	}
+	if sniffImageFamily(data) != "" {
 		if _, changed, cerr := cleanUploadedImage(data); cerr != nil || changed {
 			return "image_metadata"
 		}
@@ -153,6 +153,7 @@ func (b *DropboxBackup) undoEdit(ctx context.Context, digest string) (int, strin
 		return http.StatusConflict, "not_an_edit", "This version is not an edit made in Dropbox"
 	}
 	defer lockArtifact(digest)()
+	rec, _ := readUploadRecord(b.coralDir, last.Session, digest) // its document and version, read before the record goes
 	if up := uploadsDir(b.coralDir, last.Session); up != "" {
 		if err := os.Remove(filepath.Join(up, digest+".json")); err != nil && !os.IsNotExist(err) {
 			return http.StatusInternalServerError, "", "could not undo the edit"
@@ -166,7 +167,7 @@ func (b *DropboxBackup) undoEdit(ctx context.Context, digest string) (int, strin
 		}
 		_ = os.Remove(obj + ".json")
 	}
-	_ = b.outbox.ForgetDigest(ctx, digest)
+	_ = b.outbox.ForgetVersion(ctx, digest, docIDOf(rec), last.N) // only this document's version: another document with the same bytes keeps its rows
 	_, _ = b.edits.MarkUndone(ctx, digest)
 	_ = b.d.store.AddAudit(ctx, store.DropboxAudit{Kind: store.DropboxAuditEdit, Who: "operator", Count: 1, Reason: "undone"})
 	noteArtifactsChanged()

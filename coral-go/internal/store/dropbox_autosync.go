@@ -81,9 +81,10 @@ func (e *DropboxEdits) MarkUndone(ctx context.Context, digest string) (bool, err
 	return n > 0, err
 }
 
-// ForgetDigest drops every outbox row of a digest without any Dropbox call (an undone edit: the upload worker never sends it again, nothing waits
-// for it, and its copy in Dropbox stays as Dropbox's own history).
-func (o *DropboxOutbox) ForgetDigest(ctx context.Context, digest string) error {
-	_, err := o.db.ExecContext(ctx, "DELETE FROM dropbox_outbox WHERE digest = ?", digest)
+// ForgetVersion drops the outbox rows of one document's version without any Dropbox call (an undone edit: the upload worker never sends it
+// again, nothing waits for it, and its copy in Dropbox stays as Dropbox's own history). Another document holding the same bytes keeps its rows
+// (Security's SHOULD 5 on b11590071).
+func (o *DropboxOutbox) ForgetVersion(ctx context.Context, digest, doc string, version int) error {
+	_, err := o.db.ExecContext(ctx, "DELETE FROM dropbox_outbox WHERE digest = ? AND doc_id = ? AND version = ?", digest, doc, version)
 	return err
 }

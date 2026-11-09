@@ -216,6 +216,9 @@ func TestUndoThisEdit(t *testing.T) {
 	be.pass() // the new version is backed up as v2
 	files := len(be.dbx.files)
 
+	_, err := be.db.Exec(`INSERT INTO dropbox_outbox (kind, digest, doc_id, version, path, artifact_at, state, created_at) VALUES ('version', ?, ?, 1, '/v1/fff/other/v1-x.md', '2026-01-01T00:00:00Z', 'done', '2026-01-01T00:00:00Z')`,
+		v2, strings.Repeat("f", 32)) // another document holding the same bytes (Security's SHOULD 5 on b11590071)
+	require.NoError(t, err)
 	assert.NotEqual(t, http.StatusOK, be.undoCall(v2, false), "the Operator's, on this computer only")
 	assert.Equal(t, http.StatusConflict, be.undoCall(ds[0], true), "version 1 is not the newest")
 	require.Equal(t, http.StatusOK, be.undoCall(v2, true))
@@ -225,15 +228,17 @@ func TestUndoThisEdit(t *testing.T) {
 	ms := seriesMembers(be.h.dbx.dataDir, sid)
 	require.Len(t, ms, 1, "the version before is the newest again")
 	assert.Equal(t, ds[0], ms[0].Digest)
-	_, err := os.Stat(be.objectPath(v2))
+	_, err = os.Stat(be.objectPath(v2))
 	assert.True(t, os.IsNotExist(err), "no other record uses the bytes: they go")
 	assert.Equal(t, files, len(be.dbx.files), "nothing is removed from Dropbox: its history keeps the edit")
 	var queued int
 	require.NoError(t, be.db.Get(&queued, "SELECT COUNT(*) FROM dropbox_removals"))
 	assert.Zero(t, queued, "no Dropbox removal is queued")
 	var rows int
-	require.NoError(t, be.db.Get(&rows, "SELECT COUNT(*) FROM dropbox_outbox WHERE digest = ?", v2))
-	assert.Zero(t, rows, "the outbox forgets it: never sent again")
+	require.NoError(t, be.db.Get(&rows, "SELECT COUNT(*) FROM dropbox_outbox WHERE digest = ? AND doc_id <> ?", v2, strings.Repeat("f", 32)))
+	assert.Zero(t, rows, "the outbox forgets this version: never sent again")
+	require.NoError(t, be.db.Get(&rows, "SELECT COUNT(*) FROM dropbox_outbox WHERE digest = ? AND doc_id = ?", v2, strings.Repeat("f", 32)))
+	assert.Equal(t, 1, rows, "another document's rows of the same bytes stay")
 	var state string
 	require.NoError(t, be.db.Get(&state, "SELECT state FROM dropbox_edits WHERE digest = ?", v2))
 	assert.Equal(t, store.DropboxEditUndone, state)
