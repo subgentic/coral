@@ -35,11 +35,15 @@ export async function syncOwnHub() {
     try { const m = await importOnce('./hub_mode_setting.js'); draw(await m.readHubMode()); } catch { draw(null); }
 }
 
+const plain = e => String((e && e.message) || e).replace(/[.\s]+$/, ''); // a message that ends with a full stop is not given a second one
+/** A pressed button that hides itself (Enable after it is on, Turn off, Restart) must not drop the keyboard to the page: it goes to the box's next button. */
+function keepFocus() { const next = ['manage-hub', 'enable-hub', 'disable-hub', 'home-own'].map(act).find(b => b && !b.hidden && b.getClientRects().length); if (next && (!document.activeElement || document.activeElement === document.body || document.activeElement.hidden || !document.activeElement.getClientRects().length)) next.focus(); }
+
 async function change(on, button) {
     button.disabled = true;
     try { const m = await importOnce('./hub_mode_setting.js'); draw(await m.saveHubMode(on)); }
-    catch (e) { draw(_st, `Not saved: ${e.message}.`); }
-    finally { button.disabled = false; }
+    catch (e) { draw(_st, `Not saved: ${plain(e)}.`); }
+    finally { button.disabled = false; keepFocus(); }
 }
 
 document.addEventListener('click', async e => {
@@ -54,6 +58,6 @@ document.addEventListener('click', async e => {
     else if (action === 'restart-hub') {
         e.preventDefault(); e.stopPropagation(); t.disabled = true;
         try { const m = await importOnce('./hub_mode_setting.js'); await m.restartForHubMode(!!(_st && (_st.saved || _st.forced))); document.getElementById('editions-home-own-state').textContent = 'Restarting Coral\u2026'; }
-        catch (err) { t.disabled = false; draw(_st, `Could not restart: ${err.message}.`); }
+        catch (err) { t.disabled = false; draw(_st, `Could not restart: ${plain(err)}.`); } finally { keepFocus(); }
     } else if (action === 'manage-hub') { e.preventDefault(); e.stopPropagation(); window.showSettingsModal?.('network'); }
 }, true);

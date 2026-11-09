@@ -18,7 +18,7 @@ const path = require('node:path');
         window.__hub = { saved: false, running: false, can_restart: false, calls: [], fail: false, unreadable: false };
         window.fetch = (u, o = {}) => { const p = new URL(String(u && u.url || u), location.href).pathname, m = (o.method || 'GET').toUpperCase();
             if (p === '/api/system/hub-mode') { const h = window.__hub; if (h.unreadable) return json({ error: 'no' }, 403); h.calls.push(m + ' ' + (o.body || ''));
-                if (m === 'PUT') { if (h.fail) return json({ error: 'disk full' }, 500); h.saved = JSON.parse(o.body).enabled; }
+                if (m === 'PUT') { if (h.fail) return json({ error: 'disk full.' }, 500); h.saved = JSON.parse(o.body).enabled; }
                 return json({ saved: h.saved, running: h.running, forced: false, restart_required: h.saved !== h.running, can_restart: h.can_restart }); }
             return real(u, o); }; return true; })()`;
     try {
@@ -45,6 +45,7 @@ const path = require('node:path');
             await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, `${at}the confirmation again`, 6000);
             await ev(`document.getElementById('confirm-modal-yes').click(); true`);
             await waitFor(`window.__hub.saved === true && /Saved: this Coral becomes a hub/.test(document.getElementById('editions-home-own-state').textContent)`, `${at}the box says it is saved`, 6000);
+            check(await ev(`document.activeElement === document.querySelector('#editions-home-own [data-editions=manage-hub]')`), `${at}after Enable the focus is on Manage in Settings, not dropped to the page (${await ev(`document.activeElement.tagName + '.' + document.activeElement.className`)})`);
             const calls = await ev(`window.__hub.calls`);
             check(calls.includes('PUT {"enabled":true}'), `${at}it saved through PUT /api/system/hub-mode {enabled:true}: ${JSON.stringify(calls)}`);
             const after = await ev(`(() => { const shown = n => { const b = document.querySelector('#editions-home-own [data-editions=' + n + ']'); return !!b && !b.hidden; }; return { enable: shown('enable-hub'), off: shown('disable-hub'), manage: shown('manage-hub'), restart: shown('restart-hub') }; })()`);
@@ -53,6 +54,15 @@ const path = require('node:path');
             // Turn off
             await ev(`document.querySelector('#editions-home-own [data-editions=disable-hub]').click(); true`);
             await waitFor(`window.__hub.saved === false && !!document.querySelector('#editions-home-own [data-editions=enable-hub]:not([hidden])')`, `${at}Turn off saves and the box offers Enable again`, 6000);
+            check(await ev(`document.activeElement === document.querySelector('#editions-home-own [data-editions=enable-hub]')`), `${at}after Turn off the focus is on Enable`);
+            // a refusal whose message ends with a full stop is not given a second one
+            await ev(`window.__hub.fail = true; document.querySelector('#editions-home-own [data-editions=enable-hub]').click(); true`);
+            await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, `${at}the confirmation for the refused save`, 6000);
+            await ev(`document.getElementById('confirm-modal-yes').click(); true`);
+            await waitFor(`/Not saved/.test(document.getElementById('editions-home-own-state').textContent)`, `${at}the refusal is said`, 6000);
+            const refused = await ev(`document.getElementById('editions-home-own-state').textContent`);
+            check(/Not saved: disk full\.(?!\.)/.test(refused) && !/\.\./.test(refused), `${at}one full stop after the refusal: ${JSON.stringify(refused)}`);
+            await ev(`window.__hub.fail = false; true`);
             // an unreadable state: the explainer only
             await ev(`window.__hub.unreadable = true; import((window.__coralStatic || '/static/') + 'home_own_hub.js').then(m => m.syncOwnHub()).then(() => true)`);
             check(await ev(`document.querySelector('#editions-home-own [data-editions=enable-hub]').hidden === true && !!document.querySelector('#editions-home-own [data-editions=home-own]')`), `${at}where the state cannot be read there is no Enable, only the explainer`);
