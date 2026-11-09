@@ -700,6 +700,17 @@
                                         </div>
                                         <p class="settings-hint">Older files are deleted from Dropbox for every Coral that uses this backup. Copies on this computer are not touched. Dropbox may keep deleted files for a while in its own deleted files and version history, where they can still be read.</p>
                                     </fieldset>
+                                    <fieldset class="settings-dropbox-filters">
+                                        <legend>Free up space</legend>
+                                        <div class="dropbox-inline">
+                                            <label for="settings-dropbox-offload-for">Keep files older than</label>
+                                            <input type="number" id="settings-dropbox-offload-for" min="0" max="3650" step="1" inputmode="numeric" class="settings-input settings-input-small">
+                                            <span class="settings-hint">days only in Dropbox (0 is off)</span>
+                                            <button type="button" class="btn btn-small" id="settings-dropbox-offload-save">Save</button>
+                                        </div>
+                                        <div id="settings-dropbox-offload-confirm" role="group" aria-label="Turn on Free up space" hidden></div>
+                                        <p id="settings-dropbox-offload-kept" class="settings-hint" role="status"></p>
+                                    </fieldset>
                                 </div>
                             </section>
                             <div id="settings-worktrees-live">

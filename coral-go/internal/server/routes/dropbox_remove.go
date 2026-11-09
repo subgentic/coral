@@ -438,5 +438,6 @@ func (h *CloudHandler) DropboxArtifact(w http.ResponseWriter, r *http.Request) {
 			undo = true
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"connected": true, "in_dropbox": in, "removed": removed, "undo": undo})
+	_, kept, _ := d.backup.outbox.Offloaded(r.Context(), digest) // stage 6b: kept only in Dropbox (an unreadable table says no here: a line, not a decision)
+	writeJSON(w, http.StatusOK, map[string]any{"connected": true, "in_dropbox": in, "removed": removed, "undo": undo, "kept_in_dropbox": kept})
 }

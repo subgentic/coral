@@ -108,6 +108,7 @@ function renderBackup(st, keepControls = false) {
     }
     renderEdits(ed.items || []);
     renderAutoSync(st.autosync);
+    renderOffload(st.offload, keepControls);
     if (keepControls) return;
     const chosen = new Set((st.filters && st.filters.types) || []);
     if (box) for (const input of box.querySelectorAll('input[type=checkbox]')) input.checked = chosen.has(input.value);
@@ -115,6 +116,65 @@ function renderBackup(st, keepControls = false) {
     if (age) age.value = String((st.filters && st.filters.max_age_days) || 0);
     const ret = $('settings-dropbox-keep-for');
     if (ret && !pendingRetention) ret.value = String(keep);
+}
+
+// Free up space (stage 6b, #14845): keep files older than N days only in Dropbox. Turning it on shows the dry run's count and asks for both
+// sentences (the risk and the warning) before Turn on; 0 turns it off, and the files kept only in Dropbox come back over the next passes.
+let offloadSeen = null; // the dry run Turn on confirms: {days, count, bytes}
+function renderOffload(o, keepControls) {
+    const kept = $('settings-dropbox-offload-kept'), field = $('settings-dropbox-offload-for');
+    const days = o ? Number(o.days || 0) : 0, n = o ? Number(o.kept || 0) : 0;
+    if (kept) {
+        kept.textContent = n ? `${n} ${n === 1 ? 'file is' : 'files are'} (${sizeText(Number(o.kept_bytes || 0))}) kept only in Dropbox${days ? '' : ': they are coming back to this computer'}.` : (days ? `Files older than ${days} days are kept only in Dropbox.` : '');
+    }
+    if (field && !keepControls && !offloadSeen) field.value = String(days);
+}
+
+function offloadConfirm(show) {
+    const box = $('settings-dropbox-offload-confirm');
+    if (!box) return;
+    box.textContent = '';
+    box.hidden = !show;
+}
+
+export async function saveOffload() {
+    const field = $('settings-dropbox-offload-for');
+    const days = Number(field && field.value);
+    if (!Number.isInteger(days) || days < 0 || days > 3650 || (days > 0 && days < 30)) { note('Free up space is 0 (off) or 30 to 3650 days.'); return; }
+    offloadConfirm(false);
+    offloadSeen = null;
+    let res;
+    try { res = await post('/api/dropbox/offload', 'PUT', JSON.stringify({ days })); } catch { res = { ok: false, body: {} }; }
+    if (!res.ok) { note(String(res.body.error || "Couldn't save Free up space.")); return; }
+    if (!days) { note('Free up space is off. Files kept only in Dropbox come back to this computer over the next passes.'); return; }
+    offloadSeen = { days, count: Number(res.body.count || 0), bytes: Number(res.body.bytes || 0) };
+    const box = $('settings-dropbox-offload-confirm');
+    if (!box) return;
+    box.hidden = false;
+    const p = document.createElement('p'); p.id = 'settings-dropbox-offload-count';
+    p.textContent = `The next pass may free about ${offloadSeen.count} ${offloadSeen.count === 1 ? 'file' : 'files'} (${sizeText(offloadSeen.bytes)}) older than ${days} days.`;
+    const tick = (id, text) => { const l = document.createElement('label'); const c = document.createElement('input'); c.type = 'checkbox'; c.id = id; l.append(c, document.createTextNode(' ' + text)); return { l, c }; };
+    const risk = tick('settings-dropbox-offload-risk', String(res.body.risk || ''));
+    const warn = tick('settings-dropbox-offload-warning', String(res.body.warning || ''));
+    const on = document.createElement('button'); on.type = 'button'; on.className = 'btn btn-small'; on.textContent = 'Turn on'; on.disabled = true;
+    const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'btn btn-small'; cancel.textContent = 'Cancel';
+    const sync = () => { on.disabled = !(risk.c.checked && warn.c.checked); };
+    risk.c.addEventListener('change', sync); warn.c.addEventListener('change', sync);
+    if (field) field.addEventListener('input', () => { offloadSeen = null; offloadConfirm(false); }, { once: true }); // a changed field takes the count away
+    on.addEventListener('click', async () => {
+        const seen = offloadSeen;
+        if (!seen || Number(field && field.value) !== seen.days) { offloadConfirm(false); return; }
+        let r2;
+        try { r2 = await post('/api/dropbox/offload', 'PUT', JSON.stringify({ days: seen.days, confirm: true, risk_ok: risk.c.checked, warning_ok: warn.c.checked, seen_count: seen.count, seen_bytes: seen.bytes })); } catch { r2 = { ok: false, body: {} }; }
+        offloadConfirm(false);
+        offloadSeen = null;
+        if (r2.status === 409 && r2.body.code === 'changed') { note(`More files would be freed now (${Number(r2.body.count || 0)}). Press Save to see the new count, then confirm again.`); focusEl('settings-dropbox-offload-for'); return; }
+        note(r2.ok ? `Free up space is on: files older than ${seen.days} days are kept only in Dropbox after the next pass.` : String(r2.body.error || "Couldn't turn Free up space on."));
+        focusEl('settings-dropbox-offload-for');
+    });
+    cancel.addEventListener('click', () => { offloadConfirm(false); offloadSeen = null; note('Nothing changed.'); focusEl('settings-dropbox-offload-for'); });
+    box.append(p, risk.l, warn.l, on, cancel);
+    cancel.focus?.();
 }
 
 // renderAutoSync shows the auto-sync switch (#14714, the Operator: edits made in Dropbox become new versions on their own) and why it is paused, with
@@ -687,6 +747,7 @@ function wire() {
     const sync = $('settings-dropbox-autosync');
     if (sync) sync.addEventListener('change', () => setAutoSync(sync.checked));
     on('settings-dropbox-autosync-resume', () => setAutoSync(true));
+    on('settings-dropbox-offload-save', saveOffload);
     const field = $('settings-dropbox-keep-for');
     if (field) field.addEventListener('input', dropRetentionPreview); // a changed field takes the shown count and Turn on away
     wired = true;

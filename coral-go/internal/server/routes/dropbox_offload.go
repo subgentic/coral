@@ -548,6 +548,22 @@ func (h *CloudHandler) DropboxSetOffload(w http.ResponseWriter, r *http.Request)
 			writeError(w, http.StatusBadRequest, "confirm_required", "Turning Free up space on needs both sentences confirmed")
 			return
 		}
+		// What is confirmed is what will happen (Security's SHOULD on 057d293d3): the candidates are counted again, and a count well above the one
+		// the page showed (more than 10 percent and more than 10 files) answers 409 changed with the new count, nothing saved.
+		now := time.Now()
+		cands, perr := d.backup.outbox.OffloadCandidates(ctx, c.AccountID, now.Add(-time.Duration(in.Days)*24*time.Hour), now.Add(-store.DropboxOffloadOpenedFor), 100000)
+		if perr != nil {
+			writeError(w, http.StatusInternalServerError, "", "could not count what Free up space would free")
+			return
+		}
+		if n, seen := len(cands), max(in.SeenCount, 0); n > seen+seen/10 && n-seen > 10 {
+			var bytes int64
+			for _, x := range cands {
+				bytes += x.Size
+			}
+			writeJSON(w, http.StatusConflict, map[string]any{"code": "changed", "count": n, "bytes": bytes, "error": "More files would be freed than the count you saw: look at the new count and confirm again"})
+			return
+		}
 	}
 	if err := d.store.SetOffload(ctx, in.Days); err != nil {
 		writeError(w, http.StatusInternalServerError, "", "could not save the setting")
