@@ -60,7 +60,11 @@ function placeBar() {
     const c = container();
     if (!c || !bar) return;
     const r = c.getBoundingClientRect();
-    bar.style.top = `${Math.max(r.top + 8, 8)}px`;
+    // The first-launch notice can finish loading after first paint and sits above the chat.
+    // Keep the fixed find controls below it when large text makes both headers tall.
+    const notice = document.getElementById('launch-disclosure-banner');
+    const noticeBottom = notice && getComputedStyle(notice).display !== 'none' ? notice.getBoundingClientRect().bottom + 8 : 8;
+    bar.style.top = `${Math.max(r.top + 8, noticeBottom, 8)}px`;
     bar.style.right = `${Math.max(window.innerWidth - r.right + 20, 8)}px`;
 }
 
