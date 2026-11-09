@@ -283,7 +283,16 @@ type HealthCompact struct {
 	Orchestrator bool `json:"orchestrator"`
 	// Trigger is when it acts: "threshold" (a context past ThresholdK), "task" (an agent that has finished a task and has none in progress, with a context of at least CompactTaskFloorK), or "both".
 	Trigger string `json:"trigger"`
+	// Method is what it does: "compact" (the CLI's own /compact, the agent keeps a summary) or "clear_next" (/clear, then one fixed line that sends the agent to its board and its next task; only for an
+	// agent with no task in progress, since a clear forgets what the work in hand was).
+	Method string `json:"method"`
 }
+
+// The methods of HealthCompact.
+const (
+	CompactMethodCompact   = "compact"
+	CompactMethodClearNext = "clear_next"
+)
 
 // The triggers of HealthCompact.
 const (
@@ -316,7 +325,7 @@ func DefaultHealthSettings() HealthSettings {
 		PostNoTask:     HealthRuleOn{On: true},
 		UploadNoTask:   HealthRuleOn{On: true},
 		GoalSize:       HealthGoalSize{On: true, Limit: 15},
-		CompactContext: HealthCompact{On: false, ThresholdK: CompactThresholdDefaultK, Trigger: CompactTriggerThreshold},
+		CompactContext: HealthCompact{On: false, ThresholdK: CompactThresholdDefaultK, Trigger: CompactTriggerThreshold, Method: CompactMethodCompact},
 		AskReminder:    HealthMentionNudge{On: true, AfterMin: 15},
 		Deviations:     HealthRuleOn{On: true},
 		ActionList:     HealthActionList{StuckWaitMin: 10, OverloadedTasks: 5, OverloadedSleeping: 1, StaleReviewHours: 24, MentionMin: 30},
@@ -348,6 +357,9 @@ func (h HealthSettings) Clamp() HealthSettings {
 		h.CompactContext.ThresholdK = CompactThresholdDefaultK // a body that does not carry the setting
 	}
 	h.CompactContext.ThresholdK = min(max(h.CompactContext.ThresholdK, CompactThresholdMinK), CompactThresholdMaxK)
+	if h.CompactContext.Method != CompactMethodClearNext {
+		h.CompactContext.Method = CompactMethodCompact // a body that does not carry it, or a word that is neither
+	}
 	switch h.CompactContext.Trigger {
 	case CompactTriggerThreshold, CompactTriggerTask, CompactTriggerBoth:
 	default:

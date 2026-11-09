@@ -100,8 +100,8 @@ func resolveClaudeTranscript(sessionID, workingDirectory string) string {
 		return ""
 	}
 	// A /clear moved the session to a new transcript file: the newest one is the live one (the old one stays on disk, and is the fallback while the new one is not written yet).
-	if alias := TranscriptAlias(sessionID); alias != "" {
-		if p := resolveClaudeTranscriptFile(alias, workingDirectory); p != "" {
+	if rec, ok := aliasOf(sessionID); ok {
+		if p := resolveClaudeTranscriptFile(rec.id, workingDirectory); p != "" && startedAfter(p, rec.since) {
 			return p
 		}
 	}
