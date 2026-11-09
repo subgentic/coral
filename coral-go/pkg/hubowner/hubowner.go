@@ -97,7 +97,7 @@ var routes = []route{
 	{"DELETE /api/artifacts/{id}/star", 2},
 	{"PUT /api/artifacts/{id}/keep", 2},
 	{"DELETE /api/artifacts/{id}/keep", 2},
-	{"PUT /api/artifacts/{id}/trust-preview", 2},    // #14730: the owner turns a file's scripts on for one version, and off again
+	{"PUT /api/artifacts/{id}/trust-preview", 2}, // #14730: the owner turns a file's scripts on for one version, and off again
 	{"DELETE /api/artifacts/{id}/trust-preview", 2},
 	{"DELETE /api/artifacts/{id}", 2},
 	{"DELETE /api/artifacts/series/{series_id}", 2},
