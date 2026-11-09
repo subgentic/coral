@@ -11,7 +11,7 @@ const SOURCE = `(() => {
     const tabs = () => { const t = tablist(); return t ? [...t.querySelectorAll('[role=tab]')].filter(A.vis) : []; };
     // every tab of the list, including the ones a phone puts behind its More menu (Artifacts, Knowledge, Settings: display none under 761 px)
     const allTabs = () => { const t = tablist(); return t ? [...t.querySelectorAll('[role=tab]')] : []; };
-    const tabLabel = e => A.name(e).replace(/\\s*\\d[\\d,]*\\s*$/, '').trim();
+    const tabLabel = e => A.name(e).replace(/\\s*(\\d[\\d,]*|\u2026)\\s*$/, '').trim(); // a count, or the ellipsis a tab shows while its count is still loading (a slower runner sees it)
     const find = (sel, rx) => { const m = page(); return m ? [...m.querySelectorAll(sel)].filter(A.vis).find(e => rx.test(A.name(e))) || null : null; };
     // On a phone the list the sidebar holds is the Agents screen (the bottom bar's Agents tab), not an aside.
     const sidebar = () => [...document.querySelectorAll('aside')].filter(A.vis).find(a => /^Agents$/i.test(A.name(a))) || [...document.querySelectorAll('#mobile-agent-list')].filter(A.vis)[0] || null;
