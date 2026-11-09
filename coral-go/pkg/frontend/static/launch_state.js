@@ -14,6 +14,8 @@ export const launch = {
     // With hub mode off both stay "local" and nothing touches /api/remote/*.
     server: LOCAL_SERVER,
     serverLocked: false,
+    computerChosen: false, // on a Hub, New agent and New team open on 'Which computer?' (#15014); true once it was answered in this dialog
+    pendingType: null, // the type the computer step is for
     // Add agent (#7778): New Agent's own dialog with the folder and the team preset: { board: the team's key ('' for a folder's agent with no team), workDir, skipFolder } while it is open, else null.
     addTo: null,
     teamAgentCounter: 0,
