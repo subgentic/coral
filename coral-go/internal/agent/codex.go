@@ -222,6 +222,11 @@ func parseCodexSessionWithOpen(fpath string, mtime float64, open func(string) (*
 	if msgCount == 0 {
 		return nil, nil
 	}
+	if firstTyped == "" && firstItem == "" && coralSessionID == "" {
+		// No person-written turn and not an agent Coral started (its marker is in the launch prompt): a sub-agent's or a background run's rollout, not a chat. It is left out of History as a guardian's is,
+		// never listed under its file name (#15012: a dozen rows titled "Chat rollou").
+		return &IndexedSession{Excluded: true, SourceType: "codex", SourceFile: fpath, FileMtime: mtime, IndexVersion: codexHistoryIndexVersion}, nil
+	}
 	if coralSessionID != "" {
 		sessionID = coralSessionID
 	}

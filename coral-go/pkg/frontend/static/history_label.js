@@ -3,6 +3,10 @@ export function historyLabel(s) {
     const title = String((s && s.title) || '').replace(/\s+/g, ' ').trim()
         .replace(/(?:\/[\w.@~+-]+){2,}\/?/g, m => m.replace(/\/+$/, '').split('/').pop()) // a path is its last folder
         .replace(/\b[A-Za-z]:\\(?:[^\\\s]+\\)*([^\\\s]+)/g, '$1');
+    if (!title && s && /^rollout-/.test(String(s.session_id || ''))) { // a Codex rollout file's name is never a title (#15012): the time it ran, else plain words
+        const t = new Date(s.last_timestamp || s.first_timestamp || ''), ok = !isNaN(t);
+        return ok ? `Codex session, ${t.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}` : 'Codex session';
+    }
     return title || (s && s.session_id ? `Chat ${String(s.session_id).replace(/^board:/, '').slice(0, 6)}` : 'Chat'); // an untitled chat still tells its row from the next one's (#6961)
 }
 

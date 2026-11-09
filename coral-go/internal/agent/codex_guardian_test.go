@@ -64,14 +64,15 @@ func TestCodexGuardianRealRolloutAndNormalParent(t *testing.T) {
 
 func TestCodexIndexKeepsRepeatedMessagesButMergesFormatCopies(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "rollout-repeat.jsonl")
-	require.NoError(t, os.WriteFile(p, []byte(`{"timestamp":"2026-10-22T00:00:00Z","type":"event_msg","payload":{"type":"agent_message","message":"guardian_review is ordinary text"}}
+	require.NoError(t, os.WriteFile(p, []byte(`{"timestamp":"2026-10-22T00:00:00Z","type":"event_msg","payload":{"type":"user_message","message":"what is guardian_review?","images":[]}}
+{"timestamp":"2026-10-22T00:00:00Z","type":"event_msg","payload":{"type":"agent_message","message":"guardian_review is ordinary text"}}
 {"timestamp":"2026-10-22T00:00:00Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"guardian_review is ordinary text"}]}}
 {"timestamp":"2026-10-22T00:00:00Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"guardian_review is ordinary text"}]}}
 `), 0600))
 	got, err := parseCodexSession(p, 1)
 	require.NoError(t, err)
 	require.NotNil(t, got)
-	assert.Equal(t, 2, got.MessageCount)
+	assert.Equal(t, 3, got.MessageCount, "the person's question, and the reply once: a format copy is merged (a rollout with no typed turn is not a chat, #15012)")
 	assert.Contains(t, got.DisplaySummary, "guardian_review")
 }
 
