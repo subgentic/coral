@@ -533,7 +533,7 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	// The Dropbox backup worker (#14655): one background loop; a pass every five minutes or soon after an upload, only while connected.
 	dbxBackup := s.cloudHandler.NewDropboxBackup(store.NewDropboxOutbox(s.db))
 	if s.boardStore != nil {
-		dbxBackup.SetPrivate(s.boardStore.PrivateArtifacts) // without the board store nothing is sent (private marks fail closed)
+		dbxBackup.SetPrivate(s.boardStore.PrivateArtifacts)                             // without the board store nothing is sent (private marks fail closed)
 		dbxBackup.SetReferences(routes.ArtifactReferencesOf(s.db, s.cfg, s.boardStore)) // stage 6b: nothing a running task or an open session names is freed
 	}
 	s.goBackground(func(ctx context.Context) { dbxBackup.Run(ctx, 5*time.Minute) })
