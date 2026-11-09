@@ -13,7 +13,7 @@ const BASE = require('./test_base').BASE;
     const failures = [];
     const check = (ok, what) => { if (!ok) failures.push(what); };
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: "localStorage.removeItem('coral-inbox-group-review-goal');localStorage.removeItem('coral-inbox-group-mode'); localStorage.removeItem('coral-inbox-task-open');" });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: "if (!sessionStorage.getItem('keep-group-keys')) { localStorage.removeItem('coral-inbox-group-review-goal');localStorage.removeItem('coral-inbox-group-mode'); localStorage.removeItem('coral-inbox-task-open'); }" }); // a page load starts clean, except the two loads below that keep what they were given
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             const at = `${w}: `;
             const snap = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR; if (!dir) return; fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(`${dir}/task-threads-${name}-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
@@ -55,6 +55,26 @@ const BASE = require('./test_base').BASE;
             check(await ev(`localStorage.getItem('coral-inbox-group-mode')`) === 'task', `${at}the choice is kept in this browser`);
             await setMode('.inbox-group-review-toggle', 'none'); await waitFor(`document.querySelectorAll('.dt-group-task').length === 0`, `${at}None again: the list as it was`, 8000);
             check(await ev(`localStorage.getItem('coral-inbox-group-mode')`) === 'none' && (await counts()).goals === 0, `${at}None is kept too, and the headings are gone`);
+            // after a reload the choice is still there (#14729's SHOULD): Goal is chosen, the page is loaded again, and the select reads Goal; so does Goal and task
+            const afterReload = async (seed) => {
+                await ev(`sessionStorage.setItem('keep-group-keys', '1'); ${seed}; true`);
+                await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
+                await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
+                await waitFor(`!!document.getElementById('inbox-needs-toggle')`, `${at}Needs you's Filters button after the reload`, 15000);
+                await panel(true);
+                await waitFor(`!!document.querySelector('.inbox-group-review-toggle select')`, `${at}the Group by option after the reload`, 8000);
+                const v = await ev(`document.querySelector('.inbox-group-review-toggle select').value`);
+                await ev(`sessionStorage.removeItem('keep-group-keys'); true`);
+                return v;
+            };
+            check(await afterReload(`localStorage.setItem('coral-inbox-group-mode', 'goal')`) === 'goal', `${at}a reload keeps Group by: Goal`);
+            check(await afterReload(`localStorage.setItem('coral-inbox-group-mode', 'task')`) === 'task', `${at}a reload keeps Group by: Goal and task`);
+            // the old "Group by goal" checkbox, on and with no new key, is Goal and task; off (or never set) is None
+            check(await afterReload(`localStorage.removeItem('coral-inbox-group-mode'); localStorage.setItem('coral-inbox-group-review-goal', 'true')`) === 'task', `${at}the old Group by goal key that was on is Goal and task`);
+            check(await afterReload(`localStorage.removeItem('coral-inbox-group-mode'); localStorage.setItem('coral-inbox-group-review-goal', 'false')`) === 'none', `${at}the old key that was off is None`);
+            check(await afterReload(`localStorage.removeItem('coral-inbox-group-mode'); localStorage.removeItem('coral-inbox-group-review-goal')`) === 'none', `${at}neither key is None`);
+            // a new choice wins over the old key
+            check(await afterReload(`localStorage.setItem('coral-inbox-group-mode', 'goal'); localStorage.setItem('coral-inbox-group-review-goal', 'true')`) === 'goal', `${at}the new key wins over the old one`);
         }
     } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
     if (failures.length) { console.error('FAIL\n  ' + failures.join('\n  ')); process.exit(1); }
