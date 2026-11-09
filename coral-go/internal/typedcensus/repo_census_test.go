@@ -51,6 +51,7 @@ func TestAliasedTerminalInputImports(t *testing.T) {
 // Security on #210).
 var coralOriginFiles = map[string]string{
 	"internal/background/agent_exited.go":            "deliverAutomatedIfWanted: the background senders' one gate; its callers are in background's census",
+	"internal/background/context_compact.go":         "deliverCommand (#14849): the CLI's own /compact (one fixed line with nothing quoted in it), through the gate; the typed-notice census lists the call and the line's test (TestTheCompactLineIsFixedAndHoldsNothingAShellActsOn)",
 	"internal/ptymanager/automated_input_deliver.go": "the automated-input gate itself (DeliverAutomated, DeliverNow)",
 	"internal/ptymanager/notice_pause.go":            "the one line for the notices held while an agent's notices are paused (#11387): counts and fixed words only (heldSummary), a typed builder in ptymanager's census, typed through the gate",
 	"internal/server/routes/agent_exited.go":         "deliverAutomated: the routes senders' one gate; its callers are in routes' census",
