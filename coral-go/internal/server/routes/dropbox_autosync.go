@@ -139,6 +139,9 @@ func (h *CloudHandler) DropboxSetAutoSync(w http.ResponseWriter, r *http.Request
 // when no other record uses them, the series index forgets it so the version before is the newest again, the outbox forgets its rows without a
 // Dropbox call, and the edit is recorded as undone with its rev so the same revision is never taken again.
 func (b *DropboxBackup) undoEdit(ctx context.Context, digest string) (int, string, string) {
+	if !objectNameRe.MatchString(digest) {
+		return http.StatusBadRequest, "bad_request", "not an artifact id"
+	}
 	sid, _, ok := digestSeries(b.coralDir, digest)
 	if !ok {
 		return http.StatusNotFound, "not_found", "This file has no versions"

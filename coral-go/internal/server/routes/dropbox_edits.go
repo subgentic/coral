@@ -25,6 +25,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/subgentic/coral/internal/dropbox"
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/secfile"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -243,7 +244,7 @@ func (b *DropboxBackup) fetchEdit(ctx context.Context, cl *dropbox.Client, acces
 	if _, err := os.Lstat(final); err == nil {
 		return digest, n, mt, nil // the same bytes are held already
 	}
-	if err := os.Rename(tmpPath, final); err != nil {
+	if err := fsreplace.Rename(tmpPath, final); err != nil {
 		return "", 0, "", err
 	}
 	return digest, n, mt, nil
@@ -255,7 +256,12 @@ func (b *DropboxBackup) heldDir() string {
 }
 
 // heldPath is a held edit's file, named by its digest (64 hex, from the hash computed on arrival).
-func (b *DropboxBackup) heldPath(digest string) string { return filepath.Join(b.heldDir(), digest) }
+func (b *DropboxBackup) heldPath(digest string) string {
+	if !objectNameRe.MatchString(digest) {
+		return "" // only a 64-hex digest names a held file: an empty path opens, renames and removes nothing
+	}
+	return filepath.Join(b.heldDir(), digest)
+}
 
 var heldNameRe = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
