@@ -486,9 +486,9 @@ export function reviewActions(row, inSaved = false) { // inSaved (#11641, #11799
     const approveNote = b => { const settle = keepPlace(b); return importOnce('./artifact_review.js').then(({ openApproveNoteDialog }) => openApproveNoteDialog(row.team, row, async () => { sayLive(`Approved ${file} with a note.`); await settle(); })).catch(error => failed(b, error)); }; // #11888: approved with one short comment for the agent, not shown again
     const deny = b => { const settle = keepPlace(b); return importOnce('./artifact_review.js').then(({ openDenyDialog }) => openDenyDialog(row.team, row, async () => { sayLive(`Denied ${file}.`); await settle(); })).catch(error => failed(b, error)); };
     const ignore = b => { b.disabled = true; errorText.textContent = ''; const settle = keepPlace(b);
-        return importOnce('./artifact_review.js').then(async ({ ignoreRow, sayIgnored }) => { await ignoreRow(row.team, row); sayIgnored(row.team, row); sayLive(`Dismissed ${file}.`); await settle(); }).catch(error => failed(b, error)); };
+        return importOnce('./artifact_review.js').then(async ({ ignoreRow, sayIgnored }) => { const out = await ignoreRow(row.team, row); sayIgnored(row.team, row, out); sayLive(`Dismissed ${file}.`); await settle(); }).catch(error => failed(b, error)); };
     const save = b => { b.disabled = true; errorText.textContent = ''; const settle = keepPlace(b); // Save for later (#11641): out of Needs you, kept in Saved, nobody told
-        return importOnce('./artifact_review.js').then(async ({ saveRow, saySaved }) => { await saveRow(row.team, row); saySaved(row.team, row); sayLive(`Saved ${file} for later.`); await settle(); }).catch(error => failed(b, error)); };
+        return importOnce('./artifact_review.js').then(async ({ saveRow, saySaved }) => { const out = await saveRow(row.team, row); saySaved(row.team, row, out); sayLive(`Saved ${file} for later.`); await settle(); }).catch(error => failed(b, error)); };
     const unsave = b => { b.disabled = true; errorText.textContent = '';
         return importOnce('./artifact_review.js').then(async ({ unsaveRow }) => { await unsaveRow(row.team, row); sayLive(`${file} is back in Needs you.`); }).catch(error => failed(b, error)); };
     box._ignore = ignore; // a swipe on a phone is the same Dismiss (#11642)
@@ -921,7 +921,7 @@ function wireSaveDrop(list) {
     list.addEventListener('dragover', e => { if (dragging && target(e)) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; target(e).classList.add('drop-over'); } });
     list.addEventListener('dragleave', e => target(e)?.classList.remove('drop-over'));
     list.addEventListener('drop', e => { const t = target(e); if (!t || !dragging) return; e.preventDefault(); t.classList.remove('drop-over'); const row = dragging; dragging = null;
-        importOnce('./artifact_review.js').then(async ({ saveRow, saySaved }) => { await saveRow(row.team, row); saySaved(row.team, row); sayLive(`Saved ${markHidden(row.name, { strict: true })} for later.`); }).catch(error => sayLive(error.message)); });
+        importOnce('./artifact_review.js').then(async ({ saveRow, saySaved }) => { const out = await saveRow(row.team, row); saySaved(row.team, row, out); sayLive(`Saved ${markHidden(row.name, { strict: true })} for later.`); }).catch(error => sayLive(error.message)); });
 }
 function renderInboxNav(force = false) {
     syncReviewPagingControls();
