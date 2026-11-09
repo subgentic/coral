@@ -6,7 +6,7 @@
 //                           [--sequences] [--strict | --no-strict] [--tmux | --no-tmux] [--part K/N] [--results-out FILE]
 //
 // It builds coral with -tags "dev fts5" into a temp dir, starts it with a temp CORAL_DATA_DIR on a
-// free non-default port (never ~/.coral, never :8420), starts headless Chrome with a temp profile and
+// free non-default port (never ~/.coral, never :8420 or :8450), starts headless Chrome with a temp profile and
 // a debugging port, runs every CDP and server suite (see suites.mjs) one at a time with a timeout, and
 // prints pass/fail per suite. It refuses to start (exit 2) while any *.test.js/mjs file here has no runner
 // or more than one, so a suite can't be silently skipped.
@@ -15,11 +15,17 @@
 // key event sent through Input.dispatchKeyEvent, and a hidden page runs no animation frames (#3707). The preload
 // switches on focus emulation for each CDP connection a suite makes; CDP_KEEP_VISIBLE=0 turns it off.
 //
-// --shards N (default 1) starts N such server+Chrome pairs, each with its own data dir, ports and profile,
+// --shards N starts N such server+Chrome pairs, each with its own data dir, ports and profile,
 // and runs N suites at once: each shard takes the next suite from one shared queue, so within a shard
-// suites still run one at a time. Output is printed per suite as it finishes.
+// suites still run one at a time. Output is printed per suite as it finishes. The default is 1 in CI (CI set),
+// with --only, --sequences or --part, and 3 with --stress; a full local run gets one shard per 4 CPUs, 1 to 8
+// (helpers/local_shards.mjs; #415, 48 CPUs on Linux: 1,350 s on 6 shards, 1,184 on 8, 1,174 on 10, 1,111 on 12, the CPU never above 90%;
+// on a 48-CPU Windows machine 12 shards gave three suite timeouts that pass at 3, so the default stops at 8, and --shards N asks
+// for more. A smaller machine gets fewer: 8 CPUs, 2 shards. #351: a full
+// run on Windows took 78 min on 1 shard, 27.5 on 3 and 15.5 on 6; each shard is a Coral and a
+// Chrome, about 250 MB).
 //
-// --timeout S (default 120) is a hard wall-clock limit per suite attempt. When it fires (typically a hung
+// --timeout S (default 180, as CI passes) is a hard wall-clock limit per suite attempt. When it fires (typically a hung
 // CDP socket), the suite's whole process group is killed, which closes its CDP client, and that shard's
 // Chrome and Coral server are replaced with fresh ones before its next suite, so a wedged browser can't
 // fail the suites after it. The attempt is reported as TIMEOUT. A shard whose Chrome or server died
@@ -96,6 +102,7 @@ import { failingOutput } from './failing_output.mjs';
 import { suiteTimeoutS } from './suite_timeout.mjs';
 import { shardDirName } from './shard_dir.mjs';
 import { pruneOldRunFolders, stripOldRunFolders, liveRunFolders, KEEP_RUNS, KEEP_HOURS, BINARY_HOURS } from './helpers/run_folders.mjs';
+import { localShardDefault } from './helpers/local_shards.mjs';
 import { sqliteAvailable, sqliteExec } from './helpers/sqlite.js';
 import { redactEvidence as redactEvidenceText } from './helpers/redact_evidence.mjs';
 import { snapshot as serverSnapshot, diff as serverDiff, rowLeaks, restoreSettings, leftovers, cleanup as cleanupLeftovers } from './helpers/server_state.mjs';
@@ -139,8 +146,9 @@ const intArg = (name, def, min) => {
 };
 const stress = flag('--stress');
 const only = arg('--only', '');
-const timeoutS = intArg('--timeout', 120, 1);
-const shards = intArg('--shards', stress ? 3 : 1, 1);
+const timeoutS = intArg('--timeout', 180, 1);
+const localShards = localShardDefault({ cpus: os.availableParallelism(), ci: !!process.env.CI, narrowed: !!(only || flag('--sequences') || arg('--part', '')) });
+const shards = intArg('--shards', stress ? 3 : localShards, 1);
 const retries = stress ? 0 : intArg('--retries', 1, 0);
 const runs = stress ? intArg('--runs', 3, 1) : 1;
 const throttle = stress ? Number(arg('--cpu-throttle', '4')) : 1;
@@ -166,6 +174,7 @@ const keep = flag('--keep');
 // --only, no --stress) adds one such shard at the end; --no-strict leaves it out.
 const strictOnly = flag('--strict');
 const STRICT_SUITES = [
+  'phone_landscape_fold_browser.test.js', // folding must preserve the real authenticated disclosure gate
   'permissions_default_browser.test.js', // the real disclosure gate requires a dashboard sign-in cookie
   'strict_mode_browser.test.js', 'server_switcher_browser.test.js', 'agent_state.test.js',
   'team_view_consolidation.test.js', 'a11y_dashboard_browser.test.js',
@@ -194,7 +203,8 @@ const NO_TMUX_HERE = process.platform === 'win32';
 if (tmuxOnly && NO_TMUX_HERE) { console.error('--tmux: Coral has no tmux backend on Windows, so there is nothing to run'); process.exit(2); }
 const tmuxShard = !NO_TMUX_HERE && (tmuxOnly || (!flag('--no-tmux') && !only && !stress && !flag('--sequences') && !part));
 const strictShard = strictOnly || (!flag('--no-strict') && !tmuxOnly && !only && !stress && !flag('--sequences') && !part);
-const PROD_PORT = 8420;
+// The live Coral's default ports: 8450 on Windows, 8420 elsewhere. Both are refused, the same list as Go's testguard (defaultPorts).
+const PROD_PORTS = [8420, 8450];
 const chromePath = arg('--chrome', process.env.CHROME || [
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser',
 ].find(p => fs.existsSync(p)));
@@ -213,7 +223,7 @@ const freePort = async () => {
     const p = await new Promise((res, rej) => {
       const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const q = s.address().port; s.close(() => res(q)); }); s.on('error', rej);
     });
-    if (p !== PROD_PORT) return p; // never the production Coral port, even by chance
+    if (!PROD_PORTS.includes(p)) return p; // never a production Coral port, even by chance
   }
 };
 const sleep = ms => new Promise(r => setTimeout(r, ms));

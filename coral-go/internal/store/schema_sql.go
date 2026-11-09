@@ -652,6 +652,12 @@ CREATE TABLE IF NOT EXISTS artifact_keep (
     kept_at TEXT NOT NULL
 );
 
+-- HTML files whose preview the owner trusted to run its scripts (#14730, design v3): per EXACT bytes (the object's digest) on this computer; a new version has a new digest and is untrusted again; undone by deleting the row.
+CREATE TABLE IF NOT EXISTS artifact_preview_trust (
+    hex        TEXT PRIMARY KEY,
+    trusted_at TEXT NOT NULL
+);
+
 -- Artifacts the Operator stars (#9819), to find them again: per artifact id (the object's digest) and per computer; no effect on what is stored or pruned.
 CREATE TABLE IF NOT EXISTS artifact_stars (
     hex        TEXT PRIMARY KEY,

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -408,11 +407,9 @@ func TestSavedListWithThousandsOfCodexRolloutsAnswersInsideItsBudget(t *testing.
 	t.Setenv("CODEX_HOME", home)
 	line := `{"type":"event_msg","payload":{"type":"agent_message","message":"` + strings.Repeat("x", 80) + `"}}` + "\n"
 	body := []byte(strings.Repeat(line, 80))
-	for i := 0; i < 5000; i++ {
-		dir := filepath.Join(home, "sessions", "2026", fmt.Sprintf("%02d", 1+i%12), fmt.Sprintf("%02d", 1+i%28))
-		require.NoError(t, os.MkdirAll(dir, 0o755))
-		require.NoError(t, os.WriteFile(filepath.Join(dir, fmt.Sprintf("rollout-x-%08d.jsonl", i)), body, 0o644))
-	}
+	writeFilesParallel(t, 5000, func(i int) string { // the same 5,000 files, written from several goroutines (#359)
+		return filepath.Join(home, "sessions", "2026", fmt.Sprintf("%02d", 1+i%12), fmt.Sprintf("%02d", 1+i%28), fmt.Sprintf("rollout-x-%08d.jsonl", i))
+	}, body)
 	was := savedCheckBudget
 	savedCheckBudget = 100 * time.Millisecond
 	t.Cleanup(func() { savedCheckBudget = was })

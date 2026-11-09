@@ -88,11 +88,12 @@ func TestAClaudeLaunchWithNoChosenPermissionModeStartsInAuto(t *testing.T) {
 	assert.NotContains(t, cmd, "--permission-mode auto")
 	assert.Equal(t, "default", stored)
 
-	// another CLI with nothing chosen starts as it did: no Auto
+	// agy with nothing chosen starts in Auto too (#14741): recorded as Auto; its command has agy's own --mode auto only when its --help lists it (this stub lists nothing: no flag), and never a skip flag
 	require.NoError(t, rig.ss.SetSetting(ctx, "default_permission_mode", ""))
 	cmd, stored = launch(map[string]any{"agent_type": at.Agy})
 	assert.NotContains(t, cmd, "--permission-mode auto")
-	assert.Equal(t, "default", stored)
+	assert.NotContains(t, cmd, "--dangerously-skip-permissions")
+	assert.Equal(t, "auto", stored)
 
 	// Codex uses the sandbox default through the real launch route, and stores it
 	// for restarts. Saved Settings modes still choose exactly what the person saved.
@@ -120,7 +121,10 @@ func TestTheDefaultLaunchPermissionModeIsAutoForClaudeAndCodex(t *testing.T) {
 	assert.Equal(t, "auto", agent.DefaultLaunchPermissionMode("claude"))
 	assert.Equal(t, "auto", agent.DefaultLaunchPermissionMode(""))
 	assert.Equal(t, "auto", agent.DefaultLaunchPermissionMode(at.Codex))
-	for _, other := range []string{at.Agy, at.Antigravity, at.Gemini, "pi", "terminal"} {
+	for _, agyType := range []string{at.Agy, at.Antigravity, at.Gemini} {
+		assert.Equal(t, "auto", agent.DefaultLaunchPermissionMode(agyType), agyType+": agy has its own --mode auto (#14741)")
+	}
+	for _, other := range []string{"pi", "terminal"} {
 		assert.Equal(t, "default", agent.DefaultLaunchPermissionMode(other), other)
 	}
 }
@@ -135,8 +139,9 @@ func TestAnAutoAcceptingTaskRunStartsClaudeInAuto(t *testing.T) {
 	assert.Equal(t, "--dangerously-skip-permissions", taskRunFlags("claude", "--dangerously-skip-permissions", true), "a bypass the run names itself stays")
 	assert.Equal(t, "--permission-mode auto", taskRunFlags("claude", "--permission-mode auto", true), "not added twice")
 	assert.Equal(t, "--full-auto", taskRunFlags("codex", "", true))
-	assert.Equal(t, "--dangerously-skip-permissions", taskRunFlags("agy", "", true))
-	assert.Equal(t, "--dangerously-skip-permissions", taskRunFlags("gemini", "", true))
+	for _, agy := range []string{"agy", "antigravity", "gemini"} { // agy's own Auto, no longer its skip flag (#14772); the launch turns it into --mode auto only where agy lists it
+		assert.Equal(t, "--permission-mode auto", taskRunFlags(agy, "", true), agy)
+	}
 	assert.Equal(t, "--model x", taskRunFlags("claude", " --model x ", false), "no auto-accept: the caller's flags only")
 }
 

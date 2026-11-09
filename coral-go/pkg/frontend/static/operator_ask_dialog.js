@@ -1,5 +1,5 @@
 /* The question's reply box, pictures and offered actions; loaded when opened, not for the Inbox badge. */
-import { LOCAL_SERVER, boardTeamKey, normServer, serverFetch, decisionNeedsPerson } from './server_base.js';
+import { LOCAL_SERVER, boardTeamKey, normServer, serverFetch, decisionNeedsPerson, isCloud } from './server_base.js';
 import { openWithQuestionReturn } from './suspend_native_dialog.js';
 import { markHidden } from './visible_marks.js';
 import { renderMarkdownStrict } from './utils.js';
@@ -13,6 +13,7 @@ await loadStyles('operator_ask_dialog.css');
 const isReply = action => /^reply$/.test(action);
 
 export function openAskDialog(a, onDone, runners = {}) {
+    const missingCloudSource = isCloud() && !a.server;
     a = { ...a, server: a.server || LOCAL_SERVER }; // freeze the question's computer across navigation
     const dlg = document.createElement('dialog');
     dlg.className = 'modal-content dlg-flow inbox-ask-dialog'; // shared flow size on wide screens; narrow CSS keeps the form size and phone sheet
@@ -39,21 +40,21 @@ export function openAskDialog(a, onDone, runners = {}) {
     if (!fromAnotherComputer(a)) importOnce('./message_refs.js').then(m => { if (whole.isConnected) m.linkMessageRefsIn(whole, (id, b) => openWithQuestionReturn(b, async () => { const nav = await importOnce('./nav.js'); await nav.go({ view: 'team', id: boardTeamKey(a.server, a.board), sub: 'messages', item: id }); }).catch(e => { err.textContent = e.message || 'The message could not be opened.'; }), { who }); }).catch(() => {}); // "#8" in the question opens message 8 of the asker's team, and Back returns to the question (#14153)
     whole.hidden = !parts.body && !a.cut; // an empty question has no body
     const label = document.createElement('label'); label.className = 'inbox-ask-label'; label.textContent = 'Your reply';
-    const box = document.createElement('textarea'); box.className = 'field inbox-ask-box'; box.rows = 6; box.placeholder = 'Write a reply…'; box.maxLength = 8000; label.append(box);
+    const box = document.createElement('textarea'); box.className = 'field inbox-ask-box'; box.rows = 6; box.placeholder = 'Write a reply…'; box.maxLength = 8000; box.readOnly = missingCloudSource; label.append(box);
     const pics = document.createElement('div'); pics.className = 'inbox-ask-pics'; // pictures for the reply (#12173): the comment composer's tray, loaded with the dialog
-    const err = document.createElement('p'); err.className = 'inbox-ask-error'; err.setAttribute('role', 'alert');
+    const err = document.createElement('p'); err.className = 'inbox-ask-error'; err.id = 'inbox-ask-error'; err.setAttribute('role', 'alert');
     const row = document.createElement('div'); row.className = 'inbox-ask-buttons';
-    const send = document.createElement('button'); send.type = 'button'; send.className = 'btn btn-primary inbox-ask-send'; send.textContent = 'Send reply';
+    const send = document.createElement('button'); send.type = 'button'; send.className = 'btn btn-primary inbox-ask-send'; send.textContent = 'Send reply'; send.disabled = missingCloudSource;
     const close = document.createElement('button'); close.type = 'button'; close.className = 'btn'; close.textContent = 'Close';
     // Dismiss closes a question with no answer and nothing said to the agent, as the row's own Dismiss does (#12599): the same route and the same toast with Undo. A wait has no ask row to close, so it has no Dismiss.
-    const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'btn btn-quiet'; dismiss.textContent = 'Dismiss'; dismiss.title = 'Take it out of Needs you; nobody is told'; dismiss.hidden = a.kind !== 'ask' || (fromAnotherComputer(a) && decisionNeedsPerson(a.server)); // the close route is served for this computer's question and, through the Hub, for the computer's owner (coral-hub batch-125): a phone's rows have no Dismiss of their own (#14419), so the dialog must
+    const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'btn btn-quiet'; dismiss.textContent = 'Dismiss'; dismiss.title = 'Take it out of Needs you; nobody is told'; dismiss.hidden = missingCloudSource || a.kind !== 'ask' || (fromAnotherComputer(a) && decisionNeedsPerson(a.server)); // the close route is served for this computer's question and, through the Hub, for the computer's owner (coral-hub batch-125): a phone's rows have no Dismiss of their own (#14419), so the dialog must
     row.append(close, ...(dismiss.hidden ? [] : [dismiss])); // Close and Dismiss stay in the footer; Send reply is on the row right under the reply box (#13148, the Operator: 'The send reply is too far away from text input')
     let tray = null;
     const finish = () => { if (tray) tray.destroy(); dlg.close(); dlg.remove(); if (onDone) onDone(); };
     let sending = false; const choices = [];
     const picturesBlocked = () => !!tray && (tray.busy() || tray.failed());
     const replyText = () => [box.value.trim(), tray ? tray.hexes().map(h => `coral://artifacts/${h}`).join('\n') : ''].filter(Boolean).join('\n\n');
-    const sync = () => { send.disabled = sending || picturesBlocked(); choices.forEach(c => { c.disabled = sending || (binary && picturesBlocked()); }); }; // Send waits for a picture going up, and for a failed one to be taken out
+    const sync = () => { send.disabled = missingCloudSource || sending || picturesBlocked(); choices.forEach(c => { c.disabled = missingCloudSource || sending || (binary && picturesBlocked()); }); }; // Send waits for a picture going up, and for a failed one to be taken out
     let binary = yesNoButtons(a), offered = null;
     const drawOffers = () => {
         offered?.remove(); offered = null; choices.length = 0;
@@ -111,10 +112,11 @@ export function openAskDialog(a, onDone, runners = {}) {
     const addSlot = document.createElement('div'); addSlot.className = 'inbox-ask-attach'; pics.append(addSlot);
     const sendRow = document.createElement('div'); sendRow.className = 'inbox-ask-sendrow'; const pickSlot = document.createElement('span'); pickSlot.className = 'inbox-ask-pick'; sendRow.append(pickSlot, send); addSlot.append(sendRow); // Add image on the left, Send reply on the right, the pictures note under them (#13148)
     compose.append(label, pics, err);
+    if (missingCloudSource) dlg.setAttribute('aria-describedby', err.id);
     const contextNote = document.createElement('p'); contextNote.className = 'inbox-ask-sub'; contextNote.textContent = questionContextNote(a); contextNote.hidden = !contextNote.textContent;
     dlg.append(title, sub, ...(contextNote.hidden ? [] : [contextNote]), ...(links.hidden ? [] : [links]), reading, compose, foot);
     drawOffers();
-    if (!fromAnotherComputer(a)) { // the picture is stored on the question's own team, as a goal's pictures are
+    if (!missingCloudSource && !fromAnotherComputer(a)) { // the picture is stored on the question's own team, as a goal's pictures are
         Promise.all([importOnce('./artifact_comment_images.js'), importOnce('./artifact_comments_api.js')]).then(([m, api]) => {
             if (!dlg.isConnected) return;
             tray = m.createImageTray({ upload: (blob, versionOf) => api.uploadCommentImage(null, a.server, blob, versionOf, a.board) });
@@ -142,9 +144,10 @@ export function openAskDialog(a, onDone, runners = {}) {
     document.body.append(dlg);
     dlg.showModal();
     box.focus();
+    if (missingCloudSource) err.textContent = 'This question’s computer is not loaded yet. Close and reopen it after the computer list arrives.';
     // Older list/link snapshots may precede the question's button metadata.
     // Keep the reply/draft open while loading choices from its captured computer.
-    if (a.kind === 'ask' && !Array.isArray(a.buttons)) {
+    if (!missingCloudSource && a.kind === 'ask' && !Array.isArray(a.buttons)) {
         serverFetch(a.server, '/api/operator-asks', { signal: AbortSignal.timeout(5000) }).then(async response => {
             if (!response.ok) throw new Error('Question choices could not be read.');
             const rows = await response.json();

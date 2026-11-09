@@ -115,6 +115,7 @@ function _build() {
                     <button type="button" class="menu-item artifact-viewer-markup-item" role="menuitem" hidden>Mark up</button>
                     <button type="button" class="menu-item artifact-viewer-copyid-item" role="menuitem" title="The id that stays the same across versions" hidden>Copy file ID</button>
                     <button type="button" class="menu-item artifact-viewer-copy-id" role="menuitem" title="The id of this version only">Copy version ID</button>
+                    <button type="button" class="menu-item artifact-viewer-scripts-item" role="menuitem" hidden>Run scripts…</button>
                     <a class="menu-item artifact-viewer-newtab" role="menuitem" target="_blank" rel="noopener noreferrer" hidden>Open in new tab</a>
                     <a class="menu-item artifact-viewer-download" role="menuitem" rel="noopener noreferrer" download>Download</a>
                 </div>
@@ -134,6 +135,9 @@ function _build() {
     const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'chip artifact-viewer-sandbox'; chip.hidden = true; chip.setAttribute('aria-expanded', 'false');
     chip.textContent = 'Sandboxed'; // words only: the icon font is a subset and has no shield
     d.querySelector('.artifact-viewer-chips').append(chip);
+    const onChip = document.createElement('span'); onChip.className = 'chip artifact-viewer-scriptson'; onChip.hidden = true; onChip.textContent = 'Scripts on'; // while this version's scripts run (#14783); the bar under the header holds Turn off
+    d.querySelector('.artifact-viewer-chips').append(onChip);
+    d.querySelector('.artifact-viewer-scripts-item').addEventListener('click', () => { const body = d.querySelector('.artifact-viewer-body'); (body.querySelector('.artifact-scripts-off') || body.querySelector('.artifact-scripts-ask'))?.click(); }); // the same two buttons as the preview's own: one path, one confirmation
     chip.addEventListener('click', () => { const note = d.querySelector('.artifact-linked-notice'); if (!note) return; note.hidden = !note.hidden; chip.setAttribute('aria-expanded', String(!note.hidden)); });
     // the line under the header (who sent it, what they ask) is one cut line; a tap, Enter or Space shows all of it
     const fromEl = d.querySelector('.artifact-viewer-from'); fromEl.tabIndex = 0; fromEl.setAttribute('role', 'button'); fromEl.setAttribute('aria-expanded', 'false');
@@ -215,6 +219,14 @@ function _build() {
 }
 
 /** The sandboxed HTML preview's banner: shown the first time, then the header's Sandboxed chip says it (its tooltip is the explanation, a tap shows or hides the banner). */
+/** The "Scripts on" chip and the ⋯ menu's Run scripts… / Turn off scripts follow what the preview shows (#14783): scripts running (the bar), or offered (the button), or neither (any other file). */
+function syncScripts(d, body) {
+    const running = !!body.querySelector('.artifact-scripts-bar'), offered = !!body.querySelector('.artifact-scripts-ask');
+    d.querySelector('.artifact-viewer-scriptson').hidden = !running;
+    const item = d.querySelector('.artifact-viewer-scripts-item');
+    item.hidden = !running && !offered;
+    item.textContent = running ? 'Turn off scripts' : 'Run scripts…';
+}
 function syncSandbox(d, body) {
     const note = body.querySelector('.artifact-linked-notice'), chip = d.querySelector('.artifact-viewer-sandbox');
     chip.hidden = !note;
@@ -403,6 +415,7 @@ export function openArtifactViewer(hex, opts = {}) {
     dl.onclick = isCloud() ? (e) => { e.preventDefault(); if (dl.getAttribute('aria-disabled') === 'true') return; downloadArtifact(url, sanitizeDownloadName(opts.filename || 'artifact')).catch(err => { title.textContent = err.message; }); } : null;
     const body = d.querySelector('.artifact-viewer-body');
     const wasOpen = !d.hidden;
+    if (!d._sandboxRedraw) { d._sandboxRedraw = true; body.addEventListener('coral-preview-redrawn', () => { syncSandbox(d, body); syncScripts(d, body); }); } // scripts turned on or off (#14730) change which banner is there
     if (typeof opts.onClose === 'function') _onClose = opts.onClose;
     else if (!wasOpen) _onClose = null;
     d.hidden = false;
@@ -441,7 +454,7 @@ export function openArtifactViewer(hex, opts = {}) {
     readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) { _details.add(readersBlock(hex, opts.server, _details)); if (opts.sourceNamed) _details.add(privateBlock(hex, opts.server, _details)); _details.add(dropboxBlock(hex, opts.server, _details)); } }).catch(() => {});
     if (!opts.switched) d.querySelector('.artifact-viewer-close').focus(); // a version chosen from the bar keeps the keyboard on the bar
     let textShown = false; // the strict text view drew it: comments can point into it. Anything else (a frame, a picture, a PDF, a table, a video, a download) takes whole-document comments (#11444).
-    Promise.resolve(renderArtifact(body, `coral://artifacts/${hex}`, { server: opts.server, board: opts.board, sourceNamed: opts.sourceNamed, filename: opts.filename, mediaType: opts.mediaType }, {
+    Promise.resolve(renderArtifact(body, `coral://artifacts/${hex}`, { server: opts.server, board: opts.board, sourceNamed: opts.sourceNamed, filename: opts.filename, mediaType: opts.mediaType, scripts: true }, {
         signal: _abort.signal,
         isStale: () => gen !== _gen || d.hidden,
         opened: () => { if (opts.sourceNamed && gen === _gen && !d.hidden) importOnce('./inbox_reviews.js').then(m => m.recordOpenedVersion(hex, { server: opts.server, board: opts.board })).catch(() => {}); },
@@ -471,8 +484,56 @@ export function openArtifactViewer(hex, opts = {}) {
             dl.href = target.url; dl.setAttribute('download', target.name);
             dl.onclick = isCloud() ? (e) => { e.preventDefault(); if (dl.getAttribute('aria-disabled') === 'true') return; downloadArtifact(target.url, sanitizeDownloadName(target.name)).catch(err => { title.textContent = err.message; }); } : null;
         },
-    })).then(() => { if (gen !== _gen) return; syncSandbox(d, body); d.classList.toggle('is-image', !!body.querySelector('.image-panes')); d._markUp.picture(!!body.querySelector('.image-panes')); if (!textShown) _comments.docWhole(); }, () => {}); // a picture opens taller (css), not as a strip of its own height
+    })).then(() => { if (gen !== _gen) return; syncSandbox(d, body); syncScripts(d, body); d.classList.toggle('is-image', !!body.querySelector('.image-panes')); d._markUp.picture(!!body.querySelector('.image-panes')); if (!textShown) _comments.docWhole(); }, () => {}); // a picture opens taller (css), not as a strip of its own height
     return true;
+}
+
+/** A document that ships with Coral (the Getting Started guide, #14744), shown in this same viewer: fetched from its own address only when it is asked for, drawn as markdown, with none of a stored file's comments, versions, review or edit (it is not one).
+ *  `onOpened()` is called once it is on screen. Resolves true when it opened. */
+export async function openBundledDocument({ title, url, name, onOpened }) {
+    ++_openIntent;
+    if (_editor?.beforeLeave(() => openBundledDocument({ title, url, name, onOpened }))) return false;
+    if (_editSend?.beforeLeave()) return false;
+    stopEditSend(); stopMarkdownEdit();
+    const d = _dialog || (_dialog = _build());
+    if (d.hidden) _returnFocus = document.activeElement;
+    d.style.display = ''; // display-ok: as openArtifactViewer: the viewer shows and hides with `hidden`
+    _abort?.abort(); _abort = new AbortController();
+    const gen = ++_gen, signal = _abort.signal;
+    _hex = ''; _lastOpts = {}; _line = null; _barLine = null; _layoutType = null;
+    _versions?.close(); _review?.close(); _comments?.close(); _details.clear();
+    for (const sel of ['.artifact-edit-send-action', '.artifact-viewer-edit', '.artifact-viewer-edit-item', '.artifact-viewer-markup', '.artifact-viewer-markup-item', '.artifact-viewer-newtab', '.artifact-viewer-source', '.artifact-viewer-from']) { const el = d.querySelector(sel); if (el) el.hidden = true; }
+    d.querySelector('.artifact-edit-send-note').hidden = true;
+    d.classList.remove('is-image');
+    paintLine(d);
+    const titleEl = d.querySelector('.artifact-viewer-title'), nameEl = document.createElement('span');
+    nameEl.className = 'artifact-viewer-title-name'; nameEl.textContent = title; titleEl.replaceChildren(nameEl); titleEl.classList.remove('is-open');
+    const dl = d.querySelector('.artifact-viewer-download');
+    dl.hidden = false; dl.href = url; dl.removeAttribute('aria-disabled'); dl.setAttribute('download', name || 'guide.md'); dl.onclick = null;
+    d.querySelector('.artifact-viewer-copy-id').hidden = true;
+    d.querySelector('.artifact-viewer-sandbox').hidden = true;
+    const body = d.querySelector('.artifact-viewer-body');
+    body.innerHTML = '<div class="inline-preview-loading">Loading...</div>';
+    const wasOpen = !d.hidden;
+    d.hidden = false;
+    syncTitleExpand(d);
+    if (!wasOpen && isPhoneLayout() && !_overlay) _overlay = pushOverlay(() => closeArtifactViewer({ popped: true }));
+    d.querySelector('.artifact-viewer-fullscreen').disabled = false;
+    if (!wasOpen) d.querySelector('.artifact-viewer-close').focus();
+    try {
+        const resp = await fetch(url, { signal });
+        if (!resp.ok) throw new Error(String(resp.status));
+        const text = await resp.text();
+        if (gen !== _gen || d.hidden) return false;
+        _layoutType = 'text/markdown';
+        renderArtifactText(body, text, name || 'guide.md', undefined);
+        if (onOpened) onOpened();
+        return true;
+    } catch (error) {
+        if (error?.name === 'AbortError' || gen !== _gen) return false;
+        body.innerHTML = '<div class="inline-preview-error">This guide could not be opened.</div>';
+        return false;
+    }
 }
 
  function closeArtifactViewer(opts = {}) {

@@ -50,7 +50,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
                     if (!g) continue;
                     check(g.fromBottom <= g.nameTop + 2 && Math.abs(g.nameLeft - g.fromLeft) <= 2 && g.fromWeight >= 600, `${at}${what}: the agent's name is line one (strong) and the ask line two, under it: ${JSON.stringify(g)}`);
                     check(g.subjectsDrawn === 0, `${at}${what}: no Goal or Task link is drawn: ${JSON.stringify(g)}`);
-                    check(String(g.clamp) === '2' && g.boxH <= 48 && g.nameFull, `${at}${what}: the ask is on line two, at most two lines, an ellipsis only after the second (the button holds all of it): ${JSON.stringify(g)}`);
+                    check(what === 'a question' ? ((String(g.clamp) === 'none' || String(g.clamp) === '') && g.nameFull) : (String(g.clamp) === '2' && g.boxH <= 48 && g.nameFull), `${at}${what}: ${what === 'a question' ? 'a question to the Operator is on line two and said whole, wrapped, not clamped (#14574)' : 'the ask is on line two, at most two lines, an ellipsis only after the second (the button holds all of it)'}: ${JSON.stringify(g)}`);
                     check(g.waitShown && g.waitLeft > g.fromLeft && Math.abs(g.waitTop - g.fromBoxTop) <= 8 && /waiting/.test(g.waitText), `${at}${what}: the time since is at the right of line one, the sender's (Layout A, #13911): ${JSON.stringify(g)}`);
                     check(!g.colShown, `${at}${what}: the Waiting column is not drawn twice`);
                     check(g.kindWords === 0, `${at}${what}: the kind's words are left to the icon: ${g.kindWords}`);

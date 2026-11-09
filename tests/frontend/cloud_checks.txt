@@ -19,6 +19,7 @@ node import_hygiene.test.js
 node vendor_manifest.mjs
 node run_folders.test.mjs
 node run_folders_qa.test.mjs
+node local_shards.test.mjs
 node sandbox_profile.test.mjs
 node when_text.test.mjs
 node artifact_tag_rules_unit.test.mjs
@@ -225,6 +226,7 @@ node review_attention_count.test.mjs
 node inbox_reviews_query.test.mjs
 node review_counts.test.mjs
 node review_counts_cloud.test.mjs
+node personal_inbox_policy.test.mjs
 node artifact_review_words.test.mjs
 node inbox_reviews_cloud.test.mjs
 node task_list_data.test.mjs
@@ -402,6 +404,9 @@ node artifact_opened_version.test.mjs
 node artifact_pinned_cleanup.test.mjs
 
 node inbox_review_legacy_versions.test.mjs
+node inbox_review_legacy_versions_hub.test.mjs
 node codex_mode.test.mjs
 node resume_ended.test.mjs
 node version_skew_reads.test.mjs
+
+node remove_wait_remote_policy.test.mjs

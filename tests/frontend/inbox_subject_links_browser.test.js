@@ -14,9 +14,14 @@ const {coralReady}=require('./helpers/wait');const BASE=require('./test_base').B
  const shot=async name=>{const d=process.env.CORAL_SCREENSHOT_DIR;if(d){fs.mkdirSync(d,{recursive:true});fs.writeFileSync(d+'/'+name+'.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}};
  const load=async()=>{await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev,'startup','settings');};
  const question=async()=>{
-  await ev(`(()=>{window.__subjectWrites=[];const orig=window.fetch.bind(window);window.fetch=(u,o={})=>{const p=new URL(String(u),location.href).pathname;if(p==='/api/operator-asks')return Promise.resolve(new Response(JSON.stringify([{board:${JSON.stringify(board)},board_label:'Subject team',kind:'ask',id:441,asker:'Orchestrator',goal_id:${goal},goal_title:'Actual subject goal',task_id:${task},task_title:'Actual subject task',text:'@Operator Please check the goal and task before answering.',at:new Date().toISOString()}]),{headers:{'Content-Type':'application/json'}}));if(o.method&&o.method!=='GET'&&p!=='/api/tracking/event')window.__subjectWrites.push({path:p,method:o.method});return orig(u,o);};return true;})()`);
+  await ev(`(()=>{window.__subjectWrites=[];window.__goalCountReadDone=false;const orig=window.fetch.bind(window);window.fetch=(u,o={})=>{const p=new URL(String(u),location.href).pathname;if(p==='/api/operator-asks')return Promise.resolve(new Response(JSON.stringify([{board:${JSON.stringify(board)},board_label:'Subject team',kind:'ask',id:441,asker:'Orchestrator',goal_id:${goal},goal_title:'Actual subject goal',task_id:${task},task_title:'Actual subject task',text:'@Operator Please check the goal and task before answering.',at:new Date().toISOString()}]),{headers:{'Content-Type':'application/json'}}));if(p==='/api/goals')return new Promise((resolve,reject)=>{window.__releaseGoalCountRead=()=>orig(u,o).then(r=>{window.__goalCountReadDone=true;resolve(r);},reject);});if(o.method&&o.method!=='GET'&&p!=='/api/tracking/event')window.__subjectWrites.push({path:p,method:o.method});return orig(u,o);};return true;})()`);
   await ev(`window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
-  await waitFor(`!!document.querySelector('.inbox-review-earlier')`,'subject row');
+  await waitFor(`document.querySelectorAll('.inbox-ask-subject-links a').length===2`,'both subject links');
+  await waitFor(`typeof window.__releaseGoalCountRead==='function'`,'deferred Goals count read');
+  await ev(`window.__subjectGoalAnchor=document.querySelector('.inbox-ask-subject-links a[data-subject-kind="goal"]');window.__releaseGoalCountRead();true`);
+  await waitFor(`window.__goalCountReadDone===true`,'deferred Goals count completion');
+  await ev(require('./helpers/wait').framesJs(2));
+  assert.equal(await ev(`window.__subjectGoalAnchor===document.querySelector('.inbox-ask-subject-links a[data-subject-kind="goal"]')`),true,'deferred counts preserve the same Goal link node');
  };
  try{
   await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:'window.__subjectDirectFetch=window.fetch.bind(window);'});await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});await load();
@@ -50,7 +55,7 @@ const {coralReady}=require('./helpers/wait');const BASE=require('./test_base').B
     await waitFor(kind==='goal'?`document.querySelector('#team-panel-goals #goals-detail-title')?.textContent==='Actual subject goal'`:`document.querySelector('#team-panel-item #team-task-title')?.textContent.includes('Actual subject task')`,'actual '+kind+' content',15000);
     assert.equal(await ev(`!!document.querySelector('dialog.inbox-ask-dialog')`),false,'link does not open question');
     assert.deepEqual(await ev('window.__subjectWrites'),[],'link performs no read/answer mutation');
-    await ev(`window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);await waitFor(`document.querySelectorAll('.inbox-review-earlier a').length===2`,'row returns');await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.filterInbox('')).then(()=>true)`);
+    await ev(`window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);await waitFor(`document.querySelectorAll('.inbox-ask-subject-links a').length===2`,'row returns');await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.filterInbox('')).then(()=>true)`);
    }
    await ev(`document.querySelector('.inbox-ask-name').click();true`);await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open]')`,'rest of row still opens question');await ev(`document.querySelector('dialog.inbox-ask-dialog .inbox-ask-buttons .btn').click();true`);
   }
@@ -61,7 +66,7 @@ const {coralReady}=require('./helpers/wait');const BASE=require('./test_base').B
   for(const width of [1280,390]){
    await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});await Emulation.setTouchEmulationEnabled({enabled:width===390});await load();
    await ev(`(()=>{window.__sourceReads=[];window.__subjectWrites=[];const old=window.fetch.bind(window);window.fetch=(u,o={})=>{const p=new URL(String(u),location.href);if(p.pathname.endsWith('/api/operator-asks'))return Promise.resolve(new Response(JSON.stringify(p.pathname.includes('/remote/m1/')?[{board:${JSON.stringify(board)},board_label:'Source team',kind:'ask',id:442,asker:'Remote orchestrator',goal_id:${remoteGoal},goal_title:'Remote source goal',task_id:${remoteTask},task_title:'Remote source task',text:'@Operator Keep the computer with each reference.',at:new Date().toISOString()}]:[]),{headers:{'Content-Type':'application/json'}}));if(o.method&&o.method!=='GET'&&p.pathname!=='/api/tracking/event')window.__subjectWrites.push({path:p.pathname,method:o.method});const prefix='/api/remote/m1/api/board/'+${JSON.stringify(board)};if(p.pathname.startsWith(prefix)){window.__sourceReads.push(p.pathname);return window.__subjectDirectFetch('/api/board/'+${JSON.stringify(remoteBoard)}+p.pathname.slice(prefix.length)+p.search,o);}return old(u,o);};return true;})()`);
-   await ev(`window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);await waitFor(`document.querySelectorAll('.inbox-review-earlier a').length===2`,'remote subject links');
+   await ev(`window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);await waitFor(`document.querySelectorAll('.inbox-ask-subject-links a').length===2`,'remote subject links');
    if(width<=760){assert.equal(await ev(`[...document.querySelectorAll('.inbox-ask-subject-links a')].filter(a=>a.getClientRects().length>0).length`),0,'a phone draws no subject link');continue;}
    for(const kind of ['goal','task']){
     const id=kind==='goal'?remoteGoal:remoteTask;
@@ -69,7 +74,7 @@ const {coralReady}=require('./helpers/wait');const BASE=require('./test_base').B
     await ev(`document.querySelector('.inbox-review-earlier a[data-subject-kind="${kind}"]').click();true`);
     await waitFor(kind==='goal'?`document.querySelector('#team-panel-goals #goals-detail-title')?.textContent==='Remote source goal'`:`document.querySelector('#team-panel-item #team-task-title')?.textContent.includes('Remote source task')`,'real source-scoped team '+kind,15000);
     assert.ok(await ev(`window.__sourceReads.some(p=>p.endsWith('/${kind}s/${id}'))`),'computer carried to target API');assert.equal(await ev(`!!document.querySelector('dialog.inbox-ask-dialog')`),false);assert.deepEqual(await ev('window.__subjectWrites'),[]);
-    await ev(`window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);await waitFor(`document.querySelectorAll('.inbox-review-earlier a').length===2`,'remote row returns');
+    await ev(`window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);await waitFor(`document.querySelectorAll('.inbox-ask-subject-links a').length===2`,'remote row returns');
    }
   }
   assert.deepEqual(failures,[],'bold linked subjects on every layout/theme');

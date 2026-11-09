@@ -39,8 +39,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
                     const nb = nm.getBoundingClientRect(), tn = [...nm.childNodes].find(n => n.nodeType === 3); let seen = ''; if (tn) for (let k = 0; k < tn.length; k++) { const rg = document.createRange(); rg.setStart(tn, k); rg.setEnd(tn, k + 1); const qb = rg.getBoundingClientRect(); if (qb.width && qb.right <= nb.right + 0.5 && qb.bottom <= nb.bottom + 1) seen += tn.data[k]; }
                     return { name: nm.textContent, seen, nameBottom: Math.round(nb.bottom), waitTop: Math.round(wtext.getBoundingClientRect().top), h: Math.round(b.height), nameBase: Math.round(base(nm) * 10) / 10, waitBase: Math.round(base(wtext) * 10) / 10, nameRight: Math.round(nm.getBoundingClientRect().right), waitLeft: Math.round(wtext.getBoundingClientRect().left), waitCut: wtext.scrollWidth > wtext.clientWidth + 1, gap: Math.round(b.bottom - lowest), q: !!q }; }); })()`);
             rows.forEach((r, i) => {
-                check(r.h >= 60 && r.h <= 135, `${at}row ${i + 1} is as tall as its content (one line taller than before is the Operator's choice), 60 to 135 px: ${r.h}`);
-                check(r.gap <= 14, `${at}row ${i + 1} has no empty line under its text (${r.gap} px below the last cell, the card's 12 px padding and 1 px border): ${JSON.stringify(r)}`);
+                check(r.h >= 60 && r.h <= 172, `${at}row ${i + 1} is as tall as its content (a review card now has its 44 px button row at rest, #14627), 60 to 172 px: ${r.h}`);
+                check(r.gap <= 14 + 60, `${at}row ${i + 1} has no empty line under its text but its 44 px button row at rest (#14627) (${r.gap} px below the last cell, the card's 12 px padding and 1 px border, and the buttons' 16 + 44): ${JSON.stringify(r)}`);
                 check(r.waitTop >= r.nameBottom - 1, `${at}row ${i + 1}: "waiting N min" is under the file name, not beside it (name ends ${r.nameBottom}, wait starts ${r.waitTop})`);
                 check(!r.waitCut, `${at}row ${i + 1}: the wait text is not cut: ${JSON.stringify(r)}`);
             });

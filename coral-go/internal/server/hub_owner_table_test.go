@@ -118,17 +118,18 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"GET /api/analytics/activity":                   "owner-only", // the activity counts of the Analytics tabs (#11225)
 		"POST /api/sessions/live/{name}/notices/pause":  "owner-only", // pausing Coral's notices to an agent (#11387)
 		"POST /api/sessions/live/{name}/notices/resume": "owner-only",
-		"GET /api/operator-asks":                        "owner-only", // the questions agents asked the Operator, for Needs you (#11417)
-		"GET /api/needs-you":                            "owner-only", // what is waiting for the Operator, for the Hub's phone push (#11596)
-		"GET /api/activity":                             "owner-only", // the record of what the Operator did in Needs you, read only (#12070)
-		"GET /api/board/{project}/orchestrator-grant":   "owner-only", // the grant to a board's orchestrator (#11432)
-		"PUT /api/board/{project}/orchestrator-grant":   "owner-only",
-		"GET /api/board/{project}/lifecycle-log":        "owner-only",
-		"GET /api/chief":                                "owner-only", // the recorded Chief, for the Hub's own Chief page (#11470)
-		"GET /api/artifacts/{hex64}/private":            "owner-only", // the manager's private mark (#11457)
-		"PUT /api/artifacts/{hex64}/private":            "owner-only",
-		"GET /api/board/{project}/guide-roster":         "owner-only", // which name goes with which guide (#11457)
-		"PUT /api/board/{project}/guide-roster":         "owner-only",
+		"GET /api/operator-asks":                        "owner-only",                                   // the questions agents asked the Operator, for Needs you (#11417)
+		"GET /api/needs-you":                            "owner-only",                                   // what is waiting for the Operator, for the Hub's phone push (#11596)
+		"GET /api/activity":                             "owner-only",                                   // the record of what the Operator did in Needs you, read only (#12070)
+		"GET /api/thread":                               "owner-only", "GET /api/threads": "owner-only", // the story of a goal or task, and the summaries of a page of them (#14440)
+		"GET /api/board/{project}/orchestrator-grant": "owner-only", // the grant to a board's orchestrator (#11432)
+		"PUT /api/board/{project}/orchestrator-grant": "owner-only",
+		"GET /api/board/{project}/lifecycle-log":      "owner-only",
+		"GET /api/chief":                              "owner-only", // the recorded Chief, for the Hub's own Chief page (#11470)
+		"GET /api/artifacts/{hex64}/private":          "owner-only", // the manager's private mark (#11457)
+		"PUT /api/artifacts/{hex64}/private":          "owner-only",
+		"GET /api/board/{project}/guide-roster":       "owner-only", // which name goes with which guide (#11457)
+		"PUT /api/board/{project}/guide-roster":       "owner-only",
 		// A comment (or reply), a resolve and a reopen through the Hub are the owner's alone (#7052).
 		"POST /api/artifacts/{hex64}/comments":              "owner-only",
 		"POST /api/artifacts/{hex64}/comments/{id}/resolve": "owner-only",
@@ -136,7 +137,7 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		// The owner's version list and series reads, comment edit, delete, lock and the change-request send through the Hub (#11354).
 		"GET /api/artifacts/{hex64}/versions": "owner-only", "GET /api/artifacts/series/{series}": "owner-only", "GET /api/artifacts/series/{series}/versions": "owner-only",
 		"PATCH /api/artifacts/{hex64}/comments/{id}": "owner-sees", "DELETE /api/artifacts/{hex64}/comments/{id}": "owner-sees",
-		"PUT /api/artifacts/{hex64}/comments/lock": "owner-only", "DELETE /api/artifacts/{hex64}/comments/lock": "owner-only", "POST /api/artifacts/{hex64}/comments/{id}/send": "owner-only", "POST /api/artifacts/{hex64}/comment-images": "owner-only", "POST /api/board/{project}/goal-images": "owner-only",
+		"GET /api/artifacts/{hex64}/trust-preview": "owner-only", "PUT /api/artifacts/{hex64}/trust-preview": "owner-only", "DELETE /api/artifacts/{hex64}/trust-preview": "owner-only", "PUT /api/artifacts/{hex64}/comments/lock": "owner-only", "DELETE /api/artifacts/{hex64}/comments/lock": "owner-only", "POST /api/artifacts/{hex64}/comments/{id}/send": "owner-only", "POST /api/artifacts/{hex64}/comment-images": "owner-only", "POST /api/board/{project}/goal-images": "owner-only",
 		// Approve, or ask changes of, a for-review artifact through the Hub is the owner's alone (#136584, #11354).
 		"POST /api/board/{project}/artifacts/{id}/review":                      "owner-only",
 		"PUT /api/board/{project}/artifacts/{id}/review":                       "owner-only",

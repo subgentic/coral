@@ -2,6 +2,7 @@ DELETE /api/artifacts/{id} launch owner-only
 DELETE /api/artifacts/{id}/comments/lock interact owner-only
 DELETE /api/artifacts/{id}/comments/{cid} interact owner-sees
 DELETE /api/artifacts/{id}/star interact owner-only
+DELETE /api/artifacts/{id}/trust-preview interact owner-only
 DELETE /api/board/{project}/artifacts/{id}/review interact owner-only
 DELETE /api/saved/{id} interact owner-only
 GET /api/activity view owner-only
@@ -16,6 +17,7 @@ GET /api/artifacts/{id}/meta view owner-only
 GET /api/artifacts/{id}/private view owner-only
 GET /api/artifacts/{id}/readers view owner-only
 GET /api/artifacts/{id}/thumbnail view owner-only
+GET /api/artifacts/{id}/trust-preview view owner-only
 GET /api/artifacts/{id}/versions view owner-only
 GET /api/board/{project}/artifacts view owner-only
 GET /api/board/{project}/artifacts/{digest}/edit view owner-only
@@ -43,6 +45,8 @@ GET /api/sessions/live view owner-sees
 GET /api/settings/prompt-inspection launch owner-only
 GET /api/system/update view owner-update
 GET /api/team-artifacts view owner-only
+GET /api/thread view owner-only
+GET /api/threads view owner-only
 PATCH /api/artifacts/{id}/comments/{cid} interact owner-sees
 PATCH /api/saved/{id} interact owner-only
 POST /api/artifacts/{id}/comment-images interact owner-only
@@ -89,6 +93,7 @@ POST /api/teams/detail/{name}/daily-knowledge/revert interact owner-only
 PUT /api/artifacts/{id}/comments/lock interact owner-only
 PUT /api/artifacts/{id}/private interact owner-only
 PUT /api/artifacts/{id}/star interact owner-only
+PUT /api/artifacts/{id}/trust-preview interact owner-only
 PUT /api/board/{project}/artifacts/{id}/review interact owner-only
 PUT /api/board/{project}/artifacts/{id}/tags interact owner-only
 PUT /api/board/{project}/guide-roster launch owner-only

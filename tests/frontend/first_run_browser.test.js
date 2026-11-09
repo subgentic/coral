@@ -34,7 +34,7 @@ async function freshServer(standIn) {
     const root = fs.mkdtempSync(path.join(require('./helpers/tmp_root'), 'coral-firstrun-'));
     const dirs = { root, home: path.join(root, 'home'), data: path.join(root, 'data'), bin: path.join(root, 'bin'), work: path.join(root, 'project') };
     for (const d of [dirs.home, dirs.data, dirs.bin, dirs.work]) fs.mkdirSync(d);
-    const ran = path.join(root, 'ran'), got = path.join(root, 'got');
+    const ran = path.join(root, 'ran'), got = path.join(root, 'got'), markerRelease = path.join(root, 'release-marker');
     if (standIn) {
         const banner = standIn === 'login'
             ? "printf 'Welcome to Claude Code\\n\\nSelect login method:\\n\\n 1. Claude account with subscription\\n 2. Anthropic Console account\\n\\n'"
@@ -43,6 +43,8 @@ async function freshServer(standIn) {
             '#!/bin/sh',
             // --version and Coral's sign-in check ("auth status --json", asked once after a launch, #5838) are answered like the CLI does and never taken for a launch ("ran").
             'case "$1" in --version) echo "2.0.0 (stand-in)"; exit 0;; auth) echo \'' + (standIn === 'login' ? '{"loggedIn": false}\'; exit 1' : '{"loggedIn": true}\'; exit 0') + ';; esac',
+            // Keep the login scenario's process-start marker pending until the terminal has mounted.
+            ...(standIn === 'login' ? [`while [ ! -f '${markerRelease}' ]; do sleep 0.05; done`] : []),
             `: > '${ran}'`,
             banner,
             `while IFS= read -r line; do printf '%s\\n' "$line" >> '${got}'; done`,
@@ -69,7 +71,7 @@ async function freshServer(standIn) {
         try { fs.chmodSync(root, 0o700); } catch { /* ok */ }
         if (!process.env.QA_KEEP_FIRST_RUN) fs.rmSync(root, { recursive: true, force: true });
     };
-    return { base, dirs, ran, got, log, stop };
+    return { base, dirs, ran, got, markerRelease, log, stop };
 }
 
 (async () => {
@@ -114,8 +116,17 @@ async function freshServer(standIn) {
         await ev(`document.querySelector('#launch-step-agent [data-on-click="m-launch-session"]').click(); true`);
         return { before };
     };
-    // Whatever stands between Launch and the launch itself (the permission question) is answered the way a first-timer would: the recommended button.
+    // A fresh install must explicitly read and acknowledge the current server notice.
+    // The launch is blocked until this button is pressed; do not bypass the gate in setup.
     const answerQuestions = async () => {
+        const disclosure = await ev(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json())`);
+        assert.equal(disclosure.seen, false, 'fresh install has not acknowledged the notice');
+        await waitFor(`document.getElementById('confirm-modal')?.getClientRects().length>0 && document.getElementById('confirm-modal-message')?.textContent===${JSON.stringify(disclosure.text)}`, 'the full server disclosure before launching', {timeout:10000});
+        assert.equal(await ev(`fetch('/api/sessions/live').then(r=>r.json()).then(l=>(Array.isArray(l)?l:l.sessions||[]).length)`), 0, 'nothing launches before acknowledgement');
+        assert.equal(await ev(`document.getElementById('confirm-modal-yes').textContent.trim()`), 'Continue launch');
+        await ev(`document.getElementById('confirm-modal-yes').click();true`);
+        await waitFor(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json()).then(d=>d.seen===true)`, 'explicit acknowledgement persisted');
+        // Older optional permission questions, if offered, still need their own answer.
         for (let i = 0; i < 40; i++) {
             const btn = await ev(`(() => { const b = document.querySelector('body > .modal:not([id]) [data-action="enable"]'); if (b) { b.click(); return true; } return false; })()`);
             if (btn) return true;
@@ -178,7 +189,9 @@ async function freshServer(standIn) {
             const tab = await waitFor(`(() => { const t = document.getElementById('live-view-btn-terminal'); if (!t || t.offsetParent === null) return null; t.click(); return true; })()`, 'a visible Terminal tab on the new agent', { timeout: 10000, diag: `[...document.querySelectorAll('#live-session-view .live-view-toggle-btn')].map(b => b.id + '|' + b.textContent.trim())` });
             assert.ok(tab);
             await waitFor(`!!document.querySelector('.xterm, #terminal-container .xterm, .terminal-container')`, 'the terminal view mounting', { timeout: 10000 });
-            assert.ok(fs.existsSync(s.ran), 'the stand-in claude was started by the launch');
+            assert.equal(fs.existsSync(s.ran), false, 'terminal mount does not imply the stand-in has written its marker');
+            fs.writeFileSync(s.markerRelease, 'release');
+            await require('./helpers/wait').waitFor(async () => fs.existsSync(s.ran), '', 'the stand-in launch marker after terminal mount', {timeout:10000});
             console.log('   ✓ the agent opened and its terminal is one click away (the login menu is in it)');
             await s.stop(); servers.splice(servers.indexOf(s), 1);
         });
@@ -201,7 +214,14 @@ async function freshServer(standIn) {
                 const after = await ev(`fetch('/api/sessions/live').then(r => r.json()).then(l => (Array.isArray(l) ? l : l.sessions || []).length)`);
                 assert.equal(after, before.length, 'no agent was started');
                 // What the server answers if a launch gets there anyway (an older page, the API), for the record: an error that names the CLI, never a success.
-                const raw = await ev(`fetch('/api/sessions/launch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ working_dir: ${JSON.stringify(s.dirs.work)}, agent_type: 'claude' }) }).then(async r => ({ status: r.status, body: await r.text() }))`);
+                let raw = await ev(`fetch('/api/sessions/launch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ working_dir: ${JSON.stringify(s.dirs.work)}, agent_type: 'claude' }) }).then(async r => ({ status: r.status, body: await r.text() }))`);
+                assert.equal(raw.status,409,'even a missing CLI launch first requires disclosure acknowledgement');
+                assert.equal(JSON.parse(raw.body).code,'launch_disclosure_required');
+                await ev(`document.querySelector('#launch-disclosure-banner summary').click();true`);
+                await waitFor(`document.querySelector('#launch-disclosure-banner summary').getAttribute('aria-expanded')==='true'`, 'read the permissions notice');
+                await ev(`document.querySelector('#launch-disclosure-banner button').click();true`);
+                await waitFor(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json()).then(d=>d.seen===true)`, 'notice acknowledged before CLI error check');
+                raw = await ev(`fetch('/api/sessions/launch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ working_dir: ${JSON.stringify(s.dirs.work)}, agent_type: 'claude' }) }).then(async r => ({ status: r.status, body: await r.text() }))`);
                 assert.ok(raw.status >= 400, `the launch of a missing CLI is an error (got ${raw.status})`);
                 assert.match(raw.body, /not found/i);
                 console.log(`   ✓ said once under the folder with the install page and command; Launch off; no agent; the server answers HTTP ${raw.status}`);

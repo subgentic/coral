@@ -64,8 +64,8 @@ func AuthPage(s PageState) string {
 
 var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen"}}{{if .LocalOpen}}
     <form method="post" action="/auth/local" id="local-open-form" class="local-open">
-      <div class="btnrow"><button type="submit" disabled data-needs-script class="btn btn-primary wide" id="local-open">Open Coral on this computer</button></div>
-      <p class="note" id="local-open-note">This browser is on the computer that runs Coral, in the same account, so it can open Coral from here.{{if not .PasswordSet}} Coral then asks you to create a password, which keeps other people and other devices out.{{end}}</p>
+      <div class="btnrow"><button type="submit" disabled data-needs-script class="btn{{if .PasswordSet}} btn-primary{{end}} wide" id="local-open">Open Coral on this computer</button></div>
+      <p class="note" id="local-open-note">This browser is on the computer that runs Coral, in the same account, so it can open Coral from here.{{if not .PasswordSet}} Coral then asks you to create a password.{{end}}</p>
     </form>
 {{end}}{{end}}{{define "hubwarn"}}
 {{if or (eq .HubSignin "disabled_in_hub") (eq .HubSignin "ready")}}
@@ -145,6 +145,14 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen
   .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--border-light); border-top-color: var(--accent); border-radius: 50%; animation: sp 1s linear infinite; vertical-align: -2px; margin-right: 6px; }
   @keyframes sp { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+  #live:not(:empty) { margin: 12px 0 0; font-size: 0.9375rem; color: var(--text-secondary); }   /* "Signed in. Opening Coral…": the only thing on the card while Coral opens */
+  .otherways { margin: 18px 0 0; font-size: 0.8125rem; color: var(--text-secondary); }
+  .otherways > summary { cursor: pointer; font-weight: 500; color: var(--text-secondary); padding: 4px 0; }
+  .otherways[open] > summary { margin-bottom: 8px; }
+  .otherways .local-open { margin: 0 0 12px; }
+  .otherways .btn.wide { flex: none; width: 100%; }
+  .pw-strength .pw-meter { height: 4px; margin: 0 0 4px; }
+  .pw-strength .pw-hint { min-height: 1.45em; margin: 0 0 12px; font-size: 0.75rem; }   /* one line of advice, not the two-line reserve the dialogs keep: the page had an empty gap under the bar */
   .pw-input.bad { border-color: #e5534b; }
   .setup-input { padding-right: 11px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .12em; text-transform: uppercase; }
   @media (max-width: 480px) { .card { padding: 24px 18px; } }
@@ -194,7 +202,7 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen
   <section id="panel-create" class="panel">
     <h1>Create a password</h1>
     <p class="sub">{{if .Local}}A password keeps other people and other devices out of Coral when it is opened in a web browser.{{else}}Coral has no password yet. Choose one to open it in this browser, with the setup code from the computer that runs Coral.{{end}}</p>
-{{template "localopen" .}}    <div id="err" class="err" role="alert" hidden></div>
+    <div id="err" class="err" role="alert" hidden></div>
     <div id="lock" class="lock" role="status" hidden><span>&#9202;</span><span><b>Setup is paused.</b> Too many wrong attempts. It opens again in <span class="count" id="count">0:00</span>.</span></div>
     <form id="create-form" autocomplete="on">
       <input type="text" name="username" value="coral" autocomplete="username" hidden aria-hidden="true" readonly tabindex="-1">
@@ -208,7 +216,7 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen
       <label class="check"><input type="checkbox" id="keep"><span>Keep me signed in on this browser<small>For 30 days. Leave it off on a shared computer.</small></span></label>
       <div class="btnrow"><button type="submit" disabled data-needs-script id="submit" class="btn btn-primary wide">Create password and open Coral</button></div>
     </form>
-    <p class="note">It keeps other people and other devices out of Coral in a web browser. Your password manager can save it. Forgot it? Run coral reset-password in a terminal on this computer.</p>
+    <p class="note">{{if not .Local}}A password keeps other people and other devices out of Coral when it is opened in a web browser. {{end}}Your password manager can save it. Forgot it later? Run coral reset-password in a terminal on this computer.</p>
 {{if or .Locked (not .Local)}}
     <details class="howin" id="how-in">
       <summary>Other ways to sign in</summary>
@@ -221,8 +229,11 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen
 {{end}}
     </details>
 {{end}}
-{{template "hubquiet" .}}
-    <div class="linkrow linkcol">{{if eq .HubSignin "unpaired"}}<button type="button" class="link" id="hub-link-open">Link this computer to Coral Hub and sign in</button>{{end}}<button type="button" class="link" id="show-key">Use an API key instead</button></div>
+    <details class="otherways" id="other-ways">
+      <summary>Other ways in</summary>
+{{template "localopen" .}}{{template "hubquiet" .}}
+      <div class="linkrow linkcol">{{if eq .HubSignin "unpaired"}}<button type="button" class="link" id="hub-link-open">Link this computer to Coral Hub and sign in</button>{{end}}<button type="button" class="link" id="show-key">Use an API key instead</button></div>
+    </details>
   </section>
 {{end}}
 {{if eq .HubSignin "unpaired"}}

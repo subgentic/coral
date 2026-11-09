@@ -3,7 +3,7 @@ import { importOnce } from './import_once.js';
 import { bindNativeDialog } from './modal_chrome.js';
 import { escapeHtml } from './utils.js';
 import { state } from './state.js';
-import { boardFetch, dropBody, fetchValidated, inTeam, keyLabel, sessionTeamKey } from './server_base.js';
+import { boardFetch, dropBody, fetchValidated, inTeam, keyLabel, sessionTeamKey, isCloud } from './server_base.js';
 import { platform } from './platform/detect.js';
 
 const availabilityCache = new Map();
@@ -105,6 +105,7 @@ function availabilitySignature(data) {
  *  sidebar renders (availability badge, reminder) changed, so a poll with no
  *  change does not trigger another full re-render. */
 export async function refreshTeamAvailabilityIfChanged(team) {
+    if (isCloud() && /^\/inbox(?:\/|$)/.test(location.pathname)) return false; // Inbox reads its attention sources; hidden Agents badges refresh when that view opens.
     const before = availabilitySignature(availabilityCache.get(team));
     const snapshot = await refreshTeamAvailability(team);
     return !!snapshot && availabilitySignature(snapshot) !== before;

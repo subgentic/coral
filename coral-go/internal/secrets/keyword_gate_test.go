@@ -37,6 +37,7 @@ func sameCoverage(t *testing.T, what, text string) {
 }
 
 func TestKeywordGateFindsWhatTheRulesFind(t *testing.T) {
+	t.Parallel() // pure and read-only on the redactor: runs after the timing tests, together (#354)
 	for _, sh := range append(shapes(), shapes2()...) {
 		r := rand.New(rand.NewSource(58))
 		for i := 0; i < 200; i++ {
@@ -79,6 +80,7 @@ func TestKeywordGateOnLongLines(t *testing.T) {
 }
 
 func TestKeywordGateOnRandomText(t *testing.T) {
+	t.Parallel() // pure and read-only on the redactor: runs after the timing tests, together (#354)
 	pieces := []string{"api_key", "token", "TOKEN", "x-api-key", "password", "Password", "secret", "mytoken", "tokens", "DB_PASSWORD", "PGPASSWORD", "MYSQL_PWD",
 		"AWS_SECRET", "STRIPE_KEY", "key", "sig", "auth", "authorization", "Authorization", "Cookie", "Set-Cookie", "session", "SID", "curl", "-u", "--user",
 		"mysql", "-p", "sshpass", "--password", "--token", "--api-key", "--", "-", "bearer", "Bearer", "=", ":", "＝", "：", "%3D", "%253D", "%3F", "%3A", "%253A", "%20", "+", "&quot;", "&#34;", "&#x22;", "&apos;", "&#39;", "&amp;", "%26", "&", "?", ";", ",",

@@ -106,6 +106,7 @@ export function showToast(message, isError = false, duration, opts = {}) {
         };
     }
     toastHost().appendChild(toast);
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(placeNotices); // the column is not drawn while it is empty, so it had no size when it was placed: place it again now it has one (the answer card is measured against the column's real width and height)
     watchPinnedBar();
     if (Number.isFinite(duration)) timer = setTimeout(dismiss, duration);
     return toast;
@@ -226,7 +227,8 @@ function placeNotices() {
     const inboxRow = document.querySelector(".list-bar-search-wrap.phone-searched")?.parentElement; // a phone's Inbox page has no tab strip (#13596): its title and Filters row, under the pill, is not covered either
     const bottomOf = e => (e && e.getClientRects().length ? Math.round(e.getBoundingClientRect().bottom) : 0);
     const headBottom = Math.max(bottomOf(head), bottomOf(listTitle), bottomOf(teamHead), bottomOf(teamTabs), bottomOf(inboxTabs), bottomOf(inboxRow), bottomOf(inboxRow ? document.getElementById("group-table-title") : null), bottomOf(goalHead), bottomOf(goalTitle));
-    let topPx = Math.max(bar ? Math.round(bar.getBoundingClientRect().bottom) : 0, banner ? Math.round(banner.getBoundingClientRect().bottom) : 0, headBottom, 0) + 8;
+    const launchNotice = document.getElementById("launch-disclosure-banner"); // the launch notice (#14825): its buttons are never under a toast either, on any page (an error toast hid "I've read this" at 390 px, 200% text)
+    let topPx = Math.max(bar ? Math.round(bar.getBoundingClientRect().bottom) : 0, banner ? Math.round(banner.getBoundingClientRect().bottom) : 0, bottomOf(launchNotice), headBottom, 0) + 8;
     // A text field just under that line (the list's filter box), or a phone list's view picker (the button naming the folder: "Needs you", #10525), is not covered either (#10458): the column starts below it. Only a field the card would reach is looked at, so a form further down never moves it.
     const shown = document.getElementById("notices");
     const reach = shown && shown.getClientRects().length ? Math.max(shown.getBoundingClientRect().height, TOAST_REACH) : TOAST_REACH; // the column's own height: what it would cover from its new top
@@ -259,14 +261,17 @@ function placeNotices() {
     if (notices) { const low = bottomOf(inboxTabs) > 0 || bottomOf(inboxRow) > 0; /* the Inbox's list on a phone: the old tab strip or, now there is none (#13596), its title row */ notices.toggleAttribute("data-bottom", low); if (low) notices.style.setProperty("--notice-bottom", `${barRect ? Math.ceil(window.innerHeight - barRect.top) + 8 : 20}px`); }
     if (!placeNotices._wired) {
         placeNotices._wired = true; window.addEventListener("resize", placeNotices);
-        if (typeof ResizeObserver === 'function') { const observer = new ResizeObserver(placeNotices); if (bar) observer.observe(bar); if (banner) observer.observe(banner); }
+        if (typeof ResizeObserver === 'function') { const observer = placeNotices._ro = new ResizeObserver(placeNotices); if (bar) observer.observe(bar); if (banner) observer.observe(banner); }
     }
+    // the launch notice comes after the first paint and changes size when it is opened: the column follows it (observed once per element)
+    if (launchNotice && placeNotices._ro && placeNotices._watchedNotice !== launchNotice) { placeNotices._watchedNotice = launchNotice; placeNotices._ro.observe(launchNotice); }
 }
 
 /** A notification toast (an agent needs input, a workflow notice) sits in the one column with the short toasts, not fixed at the top right over the agent's name and menu (#10194): the column is placed under the headers on a phone and above the composer on a desktop, so it never covers Send. */
 function joinColumn(toast) {
     for (const [k, v] of [["position", "static"], ["top", "auto"], ["right", "auto"], ["min-width", "0"], ["max-width", "none"], ["pointer-events", "auto"]]) toast.style.setProperty(k, v);
     toastHost().appendChild(toast);
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(placeNotices); // as showToast: the empty column had no size when it was last placed
     syncMenuOpen();
 }
 

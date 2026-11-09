@@ -40,7 +40,7 @@ const BASE = require('./test_base').BASE;
         // 1. nav [goals, nope, usage]
         await load({ status: 200, body: { nav: [{ key: 'goals', label: 'Evil', path: 'https://evil.example/' }, { key: 'nope' }, { key: 'usage' }], artifacts_frame: true, team_link_dialog: true } });
         await waitFor(`[...document.querySelectorAll('#cloud-account-menu [role=menuitem]')].some(e => e.textContent.trim() === 'Usage')`, 'Usage from the nav', 6000);
-        assert.deepEqual(await entries(), [['Computers', null], ['Goals', '/goals'], ['Usage', '/usage'], ['Sign out', null]], 'Servers, then Goals and Usage from Coral\'s table (nothing for nope, nothing of the response\'s label or path), Sign out last');
+        assert.deepEqual(await entries(), [['Settings', null], ['Account', '/account'], ['Docs', null], ['Computers', null], ['GitHub', 'https://github.com/subgentic/coral'], ['Goals', '/goals'], ['Usage', '/usage'], ['Sign out', null]], 'the six, then Goals and Usage from Coral\'s table between GitHub and Sign out (nothing for nope, nothing of the response\'s label or path)');
         assert.equal(accountReads, 1, 'one request to /api/account on load (the menu, the Artifacts tab and the team-link flag share it)');
         assert.equal(await ev(`!document.getElementById('nav-tab-artifacts').hidden`), true, 'the Artifacts tab used the same answer (artifacts_frame)');
         // 2. the menu keyboard
@@ -48,28 +48,32 @@ const BASE = require('./test_base').BASE;
         await key('ArrowDown', 40);
         await waitFor(`!document.getElementById('cloud-account-menu').hidden && document.activeElement === document.querySelector('#cloud-account-menu [role=menuitem]')`, 'ArrowDown on the button opens the menu on its first item', 4000);
         const act = () => ev(`document.activeElement.textContent.trim()`);
-        await key('ArrowDown', 40); assert.equal(await act(), 'Goals', 'Down: the next item');
+        await key('ArrowDown', 40); assert.equal(await act(), 'Account', 'Down: the next item');
         await key('End', 35); assert.equal(await act(), 'Sign out', 'End: the last');
-        await key('ArrowDown', 40); assert.equal(await act(), 'Computers', 'Down from the last wraps to the first');
+        await key('ArrowDown', 40); assert.equal(await act(), 'Settings', 'Down from the last wraps to the first');
         await key('ArrowUp', 38); assert.equal(await act(), 'Sign out', 'Up from the first wraps to the last');
-        await key('Home', 36); assert.equal(await act(), 'Computers', 'Home: the first');
+        await key('Home', 36); assert.equal(await act(), 'Settings', 'Home: the first');
         await key('Escape', 27);
         await waitFor(`document.getElementById('cloud-account-menu').hidden && document.activeElement === document.querySelector('.cloud-account-btn')`, 'Escape closes the menu and gives the focus back to the button', 4000);
         await ev(`document.querySelector('.cloud-account-btn').click(); true`);
         await waitFor(`!document.getElementById('cloud-account-menu').hidden && document.activeElement === document.querySelector('#cloud-account-menu [role=menuitem]')`, 'a click opens it on the first item too', 4000);
         // 3. no nav: today's links; a failed read: today's links; an older Hub with analytics_tab: Usage after Saved for later
         await load({ status: 200, body: { artifacts_frame: false } });
-        assert.deepEqual(await entries(), [['Computers', null], ['Account', '/account'], ['Saved for later', '/saved'], ['Sign out', null]], 'no nav: Account and Saved for later');
+        assert.deepEqual(await entries(), [['Settings', null], ['Account', '/account'], ['Docs', null], ['Computers', null], ['GitHub', 'https://github.com/subgentic/coral'], ['Saved for later', '/saved'], ['Sign out', null]], 'no nav: Account and Saved for later');
         await load({ status: 500, body: { error: 'x' } });
-        assert.deepEqual(await entries(), [['Computers', null], ['Account', '/account'], ['Saved for later', '/saved'], ['Sign out', null]], 'a failed read changes nothing');
+        assert.deepEqual(await entries(), [['Settings', null], ['Account', '/account'], ['Docs', null], ['Computers', null], ['GitHub', 'https://github.com/subgentic/coral'], ['Saved for later', '/saved'], ['Sign out', null]], 'a failed read changes nothing');
         await load({ status: 200, body: '"not an object"' });
-        assert.deepEqual(await entries(), [['Computers', null], ['Account', '/account'], ['Saved for later', '/saved'], ['Sign out', null]], 'an answer that is not an object changes nothing');
+        assert.deepEqual(await entries(), [['Settings', null], ['Account', '/account'], ['Docs', null], ['Computers', null], ['GitHub', 'https://github.com/subgentic/coral'], ['Saved for later', '/saved'], ['Sign out', null]], 'an answer that is not an object changes nothing');
         await load({ status: 200, body: { analytics_tab: true } });
         await waitFor(`[...document.querySelectorAll('#cloud-account-menu [role=menuitem]')].some(e => e.textContent.trim() === 'Usage')`, 'Usage for an older Hub with analytics_tab', 6000);
-        assert.deepEqual(await entries(), [['Computers', null], ['Account', '/account'], ['Saved for later', '/saved'], ['Usage', '/usage'], ['Sign out', null]], 'an older Hub with analytics_tab and no nav: Usage after Saved for later (#11018)');
+        assert.deepEqual(await entries(), [['Settings', null], ['Account', '/account'], ['Docs', null], ['Computers', null], ['GitHub', 'https://github.com/subgentic/coral'], ['Saved for later', '/saved'], ['Usage', '/usage'], ['Sign out', null]], 'an older Hub with analytics_tab and no nav: Usage after Saved for later (#11018)');
+        // 3b. the account-only nav a Hub sends today (#14718): exactly the six
+        await load({ status: 200, body: { nav: [{ key: 'account' }] } });
+        await waitFor(`!document.querySelector('#cloud-account-menu a[href="/saved"]')`, 'an account-only nav drops the default Saved for later', 6000);
+        assert.deepEqual(await entries(), [['Settings', null], ['Account', '/account'], ['Docs', null], ['Computers', null], ['GitHub', 'https://github.com/subgentic/coral'], ['Sign out', null]], 'an account-only nav: exactly Settings, Account, Docs, Computers, GitHub, Sign out');
         // 4. an empty nav: nothing between Servers and Sign out
         await load({ status: 200, body: { nav: [] } });
-        await waitFor(`document.querySelectorAll('#cloud-account-menu [role=menuitem]').length === 2`, 'an empty nav draws no entry', 6000);
+        await waitFor(`document.querySelectorAll('#cloud-account-menu [role=menuitem]').length === 6`, 'an empty nav draws only the six', 6000);
         console.log('PASS the account menu draws the Hub\'s nav by key, reads /api/account once and has a menu keyboard');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

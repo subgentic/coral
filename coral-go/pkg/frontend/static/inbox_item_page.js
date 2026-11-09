@@ -1,12 +1,12 @@
 // Inbox owns the navigation shell; the task and Board retain their existing renderers.
 import { importOnce } from './import_once.js';
 import { build, keyRoute } from './routes.js';
-import { keyLabel } from './server_base.js';
+import { keyLabel, isCloud, nativeTasks, splitKey, personalInboxAllowed, pathId } from './server_base.js';
 import { go } from './nav.js';
 const el = (tag, cls, text) => { const e = document.createElement(tag); e.className = cls; if (text) e.textContent = text; return e; };
 
 export function mountInboxItem(host, { kind, team, id, back, onChanged, backLabel = '' }) {
-    let disposed = false, leaveBoard = null;
+    let disposed = false, leaveBoard = null, personalPanel = null;
     const task = kind === 'tasks';
     const teamURL = build(keyRoute('team', team, task ? 'tasks' : 'messages', task ? id : null));
     const backButton = () => {
@@ -20,7 +20,26 @@ export function mountInboxItem(host, { kind, team, id, back, onChanged, backLabe
     async function load() {
         host.replaceChildren(links(), el('p', 'goals-note', 'Loading…'));
         try {
-            if (task) {
+            if (task && isCloud() && nativeTasks()) {
+                const source = splitKey(team).server;
+                const requireOwner = () => { if (!personalInboxAllowed(source)) throw new Error('Only the computer owner can read these tasks; ownership and connection must be known.'); };
+                requireOwner(); pathId(id);
+                const [I, C] = await Promise.all([importOnce('./inbox_panel.js'), importOnce('./inbox_coral.js')]);
+                const full = await C.coralInboxAdapter.getTask(team, id);
+                requireOwner();
+                if (disposed) return;
+                const row = { ...full, id: pathId(id), server: source, project: team, board: keyLabel(team),
+                    goal: Number.isSafeInteger(Number(full.goal_id)) && Number(full.goal_id) > 0 && full.goal_title ? { id: Number(full.goal_id), title: String(full.goal_title) } : null };
+                host.replaceChildren(links());
+                if (row.parked_reason || row.parked_until) host.append(el('p', 'goals-note', ['Parked', row.parked_reason, row.parked_until].filter(Boolean).join(' · ')));
+                const panel = el('div', 'inbox-task-mount'); host.append(panel);
+                const adapter = { ...C.coralInboxAdapter,
+                    listTasks: async () => { requireOwner(); return [row]; },
+                    getTask: async () => { requireOwner(); return full; },
+                    listTaskMessages: async (project, taskId) => { requireOwner(); return C.coralInboxAdapter.listTaskMessages(project, taskId); },
+                };
+                personalPanel = I.mountInbox(panel, adapter, { region: false, only: { project: team, id } });
+            } else if (task) {
                 const m = await importOnce('./team_tasks_page.js');
                 const full = await m.readTask(team, id);
                 if (disposed) return;
@@ -48,6 +67,7 @@ export function mountInboxItem(host, { kind, team, id, back, onChanged, backLabe
     load();
     return { dispose() {
         disposed = true;
+        personalPanel?.destroy(); personalPanel = null;
         host._taskConversation?.destroy({ keepDrafts: true }); host._taskConversation = null;
         leaveBoard?.(); host.replaceChildren();
     } };

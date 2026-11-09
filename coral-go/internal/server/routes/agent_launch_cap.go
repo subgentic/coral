@@ -66,7 +66,9 @@ func modeRank(agentType, mode string) int {
 			return rankOpen
 		case "acceptEdits":
 			return rankEdits
-		default: // "auto" and "dontAsk" have no flag for agy: they ask
+		case "auto":
+			return rankJudged // agy's own --mode auto (#14741); an agy that does not list it launches asking, which is lower than this, never higher
+		default: // "dontAsk" is Plan for agy (--mode plan, read-only: #14772), which asks for everything
 			return rankAsks
 		}
 	}
@@ -153,8 +155,8 @@ func effectiveRank(agentType, mode string, caps *agent.Capabilities, keepFull bo
 	if cr, ok := capsRank(agentType, caps); ok {
 		switch mode {
 		case "", "default", "auto", "dontAsk":
-			if isAgyType(agentType) || mode == "" || mode == "default" {
-				r = cr
+			if mode == "" || mode == "default" {
+				r = cr // no mode named: the capabilities are the rank (agy's yolo from full capabilities). An agy launch that NAMES auto is narrowed by them, never widened (#14741: auto never becomes Bypass)
 			} else if cr < r {
 				r = cr
 			}
@@ -184,7 +186,7 @@ func modeForRank(agentType string, max int) (string, bool) {
 	case agentType == at.Hermes:
 		ladder = []cand{{"default", rankAsks}, {"bypassPermissions", rankOpen}}
 	case isAgyType(agentType):
-		ladder = []cand{{"default", rankAsks}, {"acceptEdits", rankEdits}, {"bypassPermissions", rankOpen}}
+		ladder = []cand{{"default", rankAsks}, {"acceptEdits", rankEdits}, {"auto", rankJudged}, {"bypassPermissions", rankOpen}}
 	default:
 		ladder = []cand{{"default", rankAsks}, {"acceptEdits", rankEdits}, {"auto", rankJudged}, {"bypassPermissions", rankOpen}}
 	}

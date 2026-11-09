@@ -14,6 +14,8 @@
 /* the sandbox chip and the one-line question (#12224) */
 .artifact-viewer-sandbox { flex: none; cursor: pointer; border: 0; background: var(--bg-tertiary); color: var(--text-secondary); font: inherit; font-size: var(--fs-sm); height: auto; padding: 2px 10px; }
 .artifact-viewer-sandbox[hidden], .artifact-linked-notice[hidden] { display: none; }
+.artifact-viewer-scriptson { flex: none; background: var(--bg-tertiary); color: var(--text-secondary); font-size: var(--fs-sm); height: auto; padding: 2px 10px; } /* Scripts on (#14783): words only, not a button: Turn off is in the bar under the header and in the ⋯ menu */
+.artifact-viewer-scriptson[hidden] { display: none; }
 .artifact-viewer-versionline { flex: none; margin: 0; padding: 6px 16px 0; color: var(--text-secondary); font-size: var(--fs-sm); line-height: var(--lh-body); overflow-wrap: anywhere; } /* the file's version line on a row of its own UNDER the header, never in the header's row: at 390 px row one stays the name, Comments and the ⋯ button (#14178) */
 .artifact-viewer-versionline[hidden] { display: none; }
 @media (max-width: 767px) { .artifact-viewer-versionline { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } } /* a phone: one line (the whole line is in Copy file ID and Details) so the rows above the file stay within the phone suite's budget */

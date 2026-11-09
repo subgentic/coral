@@ -6,7 +6,7 @@
 
 import { showToast } from './utils.js';
 import { unpinWords } from './agent_words.js';
-import { identityKey, LOCAL_SERVER, serverFetch, normServer, isLocalServer, splitKey } from './server_base.js';
+import { identityKey, LOCAL_SERVER, serverFetch, normServer, isLocalServer, splitKey, isCloud } from './server_base.js';
 import { inboxSources } from './inbox_servers.js';
 import { attachDialogFocus } from './dialog_focus.js';
 import { importOnce } from './import_once.js';
@@ -58,7 +58,9 @@ function rerender() {
 export async function loadPinnedFolders({ render = true } = {}) {
     // Every computer the page reads (this one, and each registered one that is online; through the Hub only those): a bare /api path through the Hub is the Hub's own, which pins nothing (coral-hub #156820).
     // A computer that cannot be read keeps the pins it had.
-    const sources = inboxSources(), asked = sources.length ? sources : [LOCAL_SERVER];
+    const sources = inboxSources();
+    if (isCloud() && !sources.length) return _pins; // Hub origin owns no computer pins; wait for inventory.
+    const asked = sources.length ? sources : [LOCAL_SERVER];
     const lists = await Promise.all(asked.map(async server => {
         try {
             const resp = await serverFetch(isLocalServer(server) ? undefined : server, '/api/pinned-folders');

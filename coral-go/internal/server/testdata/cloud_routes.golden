@@ -5,6 +5,7 @@ DELETE /api/artifacts/{id}/comments/lock interact
 DELETE /api/artifacts/{id}/comments/{cid} interact
 DELETE /api/artifacts/{id}/keep never
 DELETE /api/artifacts/{id}/star interact
+DELETE /api/artifacts/{id}/trust-preview interact
 DELETE /api/auth/sessions/{id} never
 DELETE /api/board/remotes never
 DELETE /api/board/{project} launch
@@ -71,6 +72,7 @@ GET /api/artifacts/{id}/meta view
 GET /api/artifacts/{id}/private view
 GET /api/artifacts/{id}/readers view
 GET /api/artifacts/{id}/thumbnail view
+GET /api/artifacts/{id}/trust-preview view
 GET /api/artifacts/{id}/versions view
 GET /api/auth/hub-origins never
 GET /api/auth/hub-signin never
@@ -263,6 +265,8 @@ GET /api/templates/commands/{category}/{name} view
 GET /api/themes view
 GET /api/themes/variables view
 GET /api/themes/{name} view
+GET /api/thread view
+GET /api/threads view
 GET /api/token-usage view
 GET /api/token-usage/by-branch view
 GET /api/token-usage/by-team view
@@ -515,6 +519,7 @@ PUT /api/artifacts/{id}/comments/lock interact
 PUT /api/artifacts/{id}/keep never
 PUT /api/artifacts/{id}/private interact
 PUT /api/artifacts/{id}/star interact
+PUT /api/artifacts/{id}/trust-preview interact
 PUT /api/auth/hub-origins never
 PUT /api/auth/hub-signin never
 PUT /api/board/{project}/artifacts/{id}/review interact

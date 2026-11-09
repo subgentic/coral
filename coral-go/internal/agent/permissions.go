@@ -368,13 +368,13 @@ func PermissionFlagsForAgent(agentType, mode string) []string {
 		return []string{"--permission-mode", mode}
 	case at.Agy, "antigravity", "gemini":
 		switch mode {
-		case "plan":
+		case "plan", "dontAsk": // agy has no mode that allows only what was approved ahead of time: Don't ask is Plan (read-only), as the launch types it (#14772)
 			return []string{"--mode", "plan"}
 		case "acceptEdits":
 			return []string{"--mode", "accept-edits"}
 		case "bypassPermissions":
 			return []string{"--dangerously-skip-permissions"}
-		default:
+		default: // "auto" is agy's own --mode auto only for an agy whose --help lists it, which a mode name alone cannot know: the launch builder adds it (AgySupportsAutoMode)
 			return nil
 		}
 	case at.Hermes:
@@ -420,6 +420,9 @@ func PermissionModeForCLI(agentType, mode string) string {
 func DefaultLaunchPermissionMode(agentType string) string {
 	if agentType == "" || agentType == "claude" || agentType == at.Codex {
 		return "auto"
+	}
+	if agentType == at.Agy || agentType == at.Antigravity || agentType == at.Gemini {
+		return "auto" // agy's own --mode auto (#14741: the Operator, every agent we ship starts in auto where its CLI has one); an agy whose --help does not list it asks, and never takes a skip flag in its place (appendAgyPermissionMode)
 	}
 	if agentType == at.Opencode {
 		return "bypassPermissions" // opencode's own defaults ask nothing inside its folder: a launch that names no mode starts as it always did, and "default" is the ask-first mode (#11395)

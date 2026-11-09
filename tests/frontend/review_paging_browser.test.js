@@ -66,7 +66,7 @@ function installReviews() {
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         const first = await ev(`(async () => {
-            localStorage.removeItem('coral-inbox-needs-filters'); localStorage.removeItem('coral-inbox-group-review-goal');
+            localStorage.removeItem('coral-inbox-needs-filters'); localStorage.removeItem('coral-inbox-group-review-goal');localStorage.removeItem('coral-inbox-group-mode');
             const { state } = await import(${S} + 'state.js'); state.hub = true; state.serversKnown = true;
             state.servers = [{ id: 'box-b', label: 'Other computer', status: 'online', owner_stamp: true }]; state.liveSessions = [];
             state.settings = { ...state.settings, inbox_welcome: 'off' };

@@ -21,5 +21,9 @@
 @media (max-width: 767px) {
     .proposal-buttons .btn-primary { order: -1; flex: 1 1 100%; }
     .inbox-ask-name { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+    .inbox-ask-expand { min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); } /* Show all / Show less on a long question (#14617) */
     .inbox-proposal-line { font-weight: inherit; }
 }
+.inbox-agent-ask { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; max-width: 100%; }
+.inbox-ask-whole { white-space: normal; overflow-wrap: anywhere; font-size: var(--fs-md); color: var(--text-primary); } /* an agent's question opened under its one-line row (#14637) */
+.inbox-ask-note { max-width: 100%; white-space: normal; overflow-wrap: anywhere; font-size: var(--fs-sm); color: var(--text-secondary); } /* the read gave nothing: said, with Try again */

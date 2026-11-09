@@ -38,6 +38,9 @@ func TestBigBoardRoutesStayInsideTheirBudgets(t *testing.T) {
 	if testing.Short() {
 		t.Skip("the big-board budgets seed 20,000 uploads: skipped with -short")
 	}
+	if raceEnabled {
+		t.Skip("a time budget means nothing under the race detector (about 10 to 20 times slower); the normal run keeps it (#14280)")
+	}
 	start := time.Now()
 	_, h := setupBoardTestServer(t)
 	coralDir := t.TempDir()

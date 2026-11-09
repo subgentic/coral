@@ -26,7 +26,7 @@ const { installGuard, reached } = require('./helpers/silent_dismiss');
             T.state.settings = { ...T.state.settings, inbox_welcome: 'on', inbox_welcome_done: '' }; T.state.liveSessions = []; T.state.servers = []; true`);
         await installGuard(ev); // nothing a dismissal does reaches an agent (the operator's rule, #11552)
         await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
-        await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length === 5`, 'five welcome items', 8000);
+        await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length === 6`, 'six welcome items', 8000);
         await waitFor(`!!document.getElementById('group-table-view')._welcomeSwipe`, 'the swipe is attached (lazy, for a touch screen)', 8000);
         // a row's name has the kind icon as its first child since #13144: the title is its first node that is not the icon
         const NAME_TEXT = "(e => { const t = [...e.childNodes].find(n => !(n.nodeType === 1 && n.classList.contains('inbox-kind-icon'))); return t ? t.textContent : ''; })";
@@ -56,7 +56,7 @@ const { installGuard, reached } = require('./helpers/silent_dismiss');
         await ev(`window.__said = []; new MutationObserver(recs => { for (const r of recs) { const t = (r.target.textContent || ''); if (t) window.__said.push(t); } }).observe(document.body, { childList: true, characterData: true, subtree: true }); true`); // what is written into the page while it happens: a live region says its words and clears them
         g = await geo(AGENT); end = await swipe(g, -g.width * 0.7); await touch('touchEnd', end, g.y);
         await waitFor(`!(${'[...document.querySelectorAll(\'#group-table-view .inbox-welcome-name\')]'}.some(e => ${NAME_TEXT}(e) === ${JSON.stringify(AGENT)}))`, 'the row is dismissed', 6000).catch(() => {});
-        check(!(await titles()).includes(AGENT) && (await titles()).length === 4, 'a long drag dismisses the row: ' + JSON.stringify(await titles()));
+        check(!(await titles()).includes(AGENT) && (await titles()).length === 5, 'a long drag dismisses the row: ' + JSON.stringify(await titles()));
         const puts = await ev(`window.__puts`);
         check(puts.some(p => String(p.inbox_welcome_done || '').split(',').includes('agent')), 'the dismissal is saved like the button\'s: ' + JSON.stringify(puts));
         const toast = await ev(`(() => { const t = [...document.querySelectorAll('.toast')].find(x => /Dismissed: Start your first agent/.test(x.textContent)); return t ? { text: t.textContent.replace(/\\s+/g, ' ').trim(), undo: !!([...t.querySelectorAll('button')].find(b => b.textContent.trim() === 'Undo')), x: 1} : null; })()`);

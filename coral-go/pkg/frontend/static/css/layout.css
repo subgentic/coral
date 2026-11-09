@@ -994,6 +994,18 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 /* The launch notice stays in flow, but cannot consume a phone's app viewport,
    including enlarged text. Its full server text and acknowledgement scroll together. */
 #launch-disclosure-banner { flex: 0 0 auto; min-height: 0; max-height: 25dvh; overflow-y: auto; }
+@media (max-width: 767px), (pointer: coarse) { #launch-disclosure-banner { padding-block: 0; } } /* Keep the collapsed notice to its 44 px summary row so the phone list retains the space it needs. */
 #launch-disclosure-banner > details { min-width: 0; width: 100%; overflow-wrap: anywhere; }
-#launch-disclosure-banner summary { min-height: 44px; }
+#launch-disclosure-banner summary { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; width: 100%; min-height: 44px; list-style: none; }
+#launch-disclosure-banner summary::-webkit-details-marker { display: none; }
+#launch-disclosure-banner summary::before { content: '\25B8' / ''; flex: none; }
+#launch-disclosure-banner details[open] > summary::before { content: '\25BE' / ''; }
+#launch-disclosure-banner .launch-disclosure-summary-text { flex: 1 1 14rem; min-width: 0; }
+#launch-disclosure-banner .launch-disclosure-dismiss { flex: 0 0 auto; min-width: 44px; min-height: 44px; margin: 0; }
 #launch-disclosure-body > p { margin-bottom: 8px; }
+/* A short touch-screen agent view gives the conversation its rows back. This
+   folds only the collapsed notice; leaving the agent view or rotating back
+   restores it. Reading an expanded notice and the launch gate are unchanged. */
+@media (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    body.live-session-active #launch-disclosure-banner:not(:has(details[open])) { display: none; }
+}

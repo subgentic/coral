@@ -256,7 +256,8 @@ func startScheduler(ctx context.Context, cfg *config.Config, srv *server.Server,
 		got, err := taskStore.SessionsWithAnyEvent(ctx, []string{sessionID})
 		return err != nil || got[sessionID] // a read that fails never judges a run
 	})
-	scheduler.SetSessionTurn(taskStore.SessionTurn) // a scheduled prompt run finishes on its agent's accepted turn end (#7090)
+	scheduler.SetAgentWaiting(background.AgentWaitingFromEvents(taskStore)) // a run that runs out of time at a prompt says so (#14772)
+	scheduler.SetSessionTurn(taskStore.SessionTurn)                         // a scheduled prompt run finishes on its agent's accepted turn end (#7090)
 	scheduler.SetRuntime(agentRT)
 	scheduler.SetNextFireTimeFn(background.NextFireTime)
 	scheduler.SetWorktreeRoot(coralnames.WorktreesRoot(cfg.CoralDir()))

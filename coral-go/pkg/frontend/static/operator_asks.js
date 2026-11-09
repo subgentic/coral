@@ -37,10 +37,20 @@ export function askLine(a) {
     const one = plainMarkdown(previewText(a)).replace(/\s+/g, ' ').trim();
     return one.length > LINE_MAX ? `${one.slice(0, LINE_MAX - 1).trimEnd()}…` : one;
 }
+/** A question as a row says it (#14574, Beta run 3): all of the preview (the first PREVIEW_IN characters, Markdown marks dropped, white space collapsed) so the row wraps it and an inbox-only person reads it where it stands; a question longer than the preview ends in an ellipsis, and Answer opens it whole. */
+export function askFull(a) {
+    const one = plainMarkdown(previewText(a)).replace(/\s+/g, ' ').trim();
+    return String((a && a.text) == null ? '' : a.text).length > PREVIEW_IN ? `${one.trimEnd()}\u2026` : one;
+}
 /** The whole question, hidden characters written out, line breaks kept. */
 export const askWhole = a => markHidden(a && a.text, { strict: true });
-/** The whole question as plain text (a row's second line): the same words, line breaks kept, without the Markdown marks. */
-export const askPlain = a => plainMarkdown(previewText(a));
+/** Whether the row's preview leaves words out: the question runs past the preview (#14617). */
+export const askIsLong = a => String((a && a.text) == null ? '' : a.text).length > PREVIEW_IN;
+/** The question as an opened row says it (#14617): ALL the words the Operator's list carries (up to 4096 characters), white space collapsed as the preview's is; a question the server itself cut says so after it. */
+export function askOpened(a) {
+    const one = plainMarkdown(askWhole(a)).replace(/\s+/g, ' ').trim();
+    return a && a.cut ? `${one} \u2026 (cut: the board has the rest)` : one;
+}
 /** A stable id of one question among the rows. */
 export const askKey = a => `operator-ask:${a.server && !isLocalServer(a.server) ? `${a.server}/` : ''}${a.board}:${a.kind}:${a.id}`; // two computers can each have a team of one name and a question of one number
 
@@ -48,10 +58,17 @@ export const askKey = a => `operator-ask:${a.server && !isLocalServer(a.server) 
 export function refreshOperatorAsks(force = false) {
     if (pending) return pending;
     if (!force && Date.now() - lastRead < FRESH_MS) return null;
-    lastRead = Date.now();
     // Every computer the page reads (this one, and each registered computer that is online through the Hub; through the Hub itself only those): a bare /api path through the Hub is the Hub's own, which has no questions (#12612, coral-hub #156454).
     // A row from another computer carries that computer's id, so the dialog and the row know it is not this one's; a computer that cannot be read keeps the rows it had.
-    const sources = inboxSources(), asked = sources.length ? sources : [LOCAL_SERVER];
+    const sources = inboxSources();
+    if (!sources.length && isCloud()) {
+        // A cold Hub may render Needs before its linked-computer list arrives. There is no local questions route on the Hub; clear any old local gap and let the next list refresh retry.
+        readOutcome('questions', LOCAL_SERVER, true);
+        lastRead = 0; // the next list refresh retries at once (the Hub inventory is pending, not a failed question read)
+        return null;
+    }
+    const asked = sources.length ? sources : [LOCAL_SERVER];
+    lastRead = Date.now();
     // One computer's read: a list only when the answer was a 200 with an array (an empty one too: nothing is waiting there); anything else (refused, no route, a failure, a body that is not a list) is null, which keeps the rows
     // that were drawn and tells the Inbox it is not everything (#13841). The warning is cleared only after the body was checked.
     const readAsks = async server => {

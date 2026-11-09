@@ -165,6 +165,42 @@ function _renderSandboxed(body, { url, content, name, isStale }) {
     body.replaceChildren(wrapper);
 }
 
+/** The preview of an HTML file with the person's choice about scripts (#14730): trusted (this exact version) runs them in the host frame; otherwise the plain preview gets the "Run scripts…" offer.
+ *  Never throws and fails closed: a trust that cannot be read, a hash that does not match or a file over 2 MiB leaves the plain preview. */
+async function _scriptsFor(body, { hex, content, name, server, board, ctx }) {
+    try {
+        const wrapper = body.querySelector('.artifact-linked-preview');
+        if (!wrapper) return;
+        const scripts = await importOnce('./artifact_scripts.js');
+        if (ctx.isStale()) return;
+        const plain = (line) => {
+            _renderSandboxed(body, { content, name, isStale: ctx.isStale });
+            const w = body.querySelector('.artifact-linked-preview');
+            if (line) scripts.drawNote(w, line);
+            return w;
+        };
+        if (new TextEncoder().encode(content).byteLength > scripts.MAX_SCRIPT_HTML_BYTES) { scripts.drawNote(wrapper, 'This file is over 2 MiB, which is too large to run scripts.'); return; }
+        const offer = () => scripts.drawOffer(body.querySelector('.artifact-linked-preview') || wrapper, { hex, server, onTrusted: () => { _scriptsFor(body, { hex, content, name, server, board, ctx }); } });
+        if (!(await scripts.readTrust(hex, server))) { if (!ctx.isStale()) offer(); return; }
+        if (ctx.isStale()) return;
+        if ((await scripts.sha256Hex(content)) !== hex) { scripts.drawNote(wrapper, 'Scripts are off: Coral could not check that this is the version you trusted.'); return; }
+        if (ctx.isStale()) return;
+        const redrawn = () => body.dispatchEvent(new CustomEvent('coral-preview-redrawn', { bubbles: true })); // the viewer's "Sandboxed" chip follows the banner that is there now
+        scripts.drawScripted(wrapper, {
+            html: content, name,
+            turnOff: async () => {
+                const state = await scripts.writeTrust(hex, server, false);
+                if (ctx.isStale()) return;
+                const w = plain(state === false ? '' : 'Scripts are off here, but Coral could not save that. They may run again next time.');
+                scripts.drawOffer(w, { hex, server, onTrusted: () => { _scriptsFor(body, { hex, content, name, server, board, ctx }); } });
+                redrawn();
+            },
+        });
+        redrawn();
+        scripts.newerVersionExists(hex, server, board).then(newer => { if (newer && !ctx.isStale() && body.querySelector('.artifact-scripts-bar')) scripts.drawNote(body.querySelector('.artifact-linked-preview'), 'A newer version of this file exists. Scripts are off for it until you turn them on there.'); });
+    } catch { /* the plain preview stays */ }
+}
+
 /** Resolve where an artifact's bytes come from; null when the source is unusable. */
 export function resolveArtifactSource(uri, options = {}) {
     const match = CORAL_ARTIFACT_URI_RE.exec(uri);
@@ -259,7 +295,10 @@ async function _renderArtifactInto(body, uri, options, ctx, source, kind) {
             if (ctx.isStale()) return;
             if (isHTML) {
                 _renderSandboxed(body, { content, name: filename, isStale: ctx.isStale });
-                rendered = true; return;
+                rendered = true;
+                // Scripts: only in the single-artifact viewer (it passes options.scripts), for a stored file, on a computer that is not the Hub (#14730: its host header is not live there yet).
+                if (options.scripts && opened && !isCloud() && !ctx.isStale()) await _scriptsFor(body, { hex: opened[1], content, name: filename, server: source.server, board: options.board || '', ctx });
+                return;
             }
             const delimited = [type, declaredType].some(v => v === 'text/tab-separated-values') || filenameHints.some(n => /\.tsv$/i.test(n)) ? 'tsv'
                 : [type, declaredType].some(v => v === 'text/csv' || v === 'application/csv' || v === 'text/x-csv') || filenameHints.some(n => /\.csv$/i.test(n)) ? 'csv' : '';

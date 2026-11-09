@@ -8,6 +8,7 @@ package routes
 // never touches an object or a sidecar, never follows a link, skips a record it cannot read (counted, logged, left as it is), and never blocks or fails startup.
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -15,6 +16,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/secfile"
@@ -62,10 +64,41 @@ type docIDMigration struct {
 // docIDMigrationStart starts the migration when the artifact routes are registered; the package's tests run it in place, so no background writer outlives a test's folder.
 var docIDMigrationStart = startDocIDMigration
 
-// startDocIDMigration runs migrateDocIDs in the background: startup never waits for it, and a failure is a warning.
+// docIDRuns is the migration running for each Coral folder (coralDir -> *docIDRun), so the server that started it can stop it and wait for it at shutdown (#14759).
+var docIDRuns sync.Map
+
+type docIDRun struct {
+	cancel context.CancelFunc
+	done   chan struct{}
+}
+
+// StopDocIDMigration ends the document-id migration of this Coral folder, if one is running, and waits (at most wait) for the record in hand to be written or left: a shutdown, or a test's cleanup, then
+// finds no writer in the artifacts folder (#14759: the stamping was still writing a record's temporary file when a test removed its folder). Safe to call when none runs, and more than once.
+func StopDocIDMigration(coralDir string, wait time.Duration) {
+	v, ok := docIDRuns.LoadAndDelete(coralDir)
+	if !ok {
+		return
+	}
+	run := v.(*docIDRun)
+	run.cancel()
+	select {
+	case <-run.done:
+	case <-time.After(wait):
+		slog.Warn("[artifacts] the document-id migration was still writing after the wait; it stops after its current record", "wait", wait.String())
+	}
+}
+
+// startDocIDMigration runs migrateDocIDs in the background: startup never waits for it, and a failure is a warning. It checks for a stop between records (StopDocIDMigration): a record is rewritten whole or
+// not at all, so a stop leaves the folder as a next start can finish (the migration is safe to run again).
 func startDocIDMigration(coralDir string) {
+	ctx, cancel := context.WithCancel(context.Background())
+	run := &docIDRun{cancel: cancel, done: make(chan struct{})}
+	if old, loaded := docIDRuns.Swap(coralDir, run); loaded { // a second start for the same folder replaces the first, which is told to stop
+		old.(*docIDRun).cancel()
+	}
 	safego.Go("artifact-doc-ids", func() {
-		res := migrateDocIDs(coralDir)
+		defer close(run.done)
+		res := migrateDocIDsCtx(ctx, coralDir)
 		switch {
 		case res.Failed > 0:
 			slog.Warn("[artifacts] some artifacts did not get a document id; they keep working, and the next start tries again", "stamped", res.Stamped, "failed", res.Failed)
@@ -77,6 +110,11 @@ func startDocIDMigration(coralDir string) {
 
 // migrateDocIDs gives every upload record and received row that has no document id one. It is safe to run again: a record with an id is left alone.
 func migrateDocIDs(coralDir string) docIDMigration {
+	return migrateDocIDsCtx(context.Background(), coralDir)
+}
+
+// migrateDocIDsCtx is migrateDocIDs that stops, between records, once ctx is done.
+func migrateDocIDsCtx(ctx context.Context, coralDir string) docIDMigration {
 	var res docIDMigration
 	if coralDir == "" {
 		return res
@@ -95,25 +133,37 @@ func migrateDocIDs(coralDir string) docIDMigration {
 		if seriesIDRe.MatchString(rec.SeriesID) && seriesIDRe.MatchString(rec.DocID) && seriesDocs[rec.SeriesID] == "" {
 			seriesDocs[rec.SeriesID] = rec.DocID
 		}
-		return true
+		return ctx.Err() == nil
 	})
 	if sessions, err := os.ReadDir(filepath.Join(coralDir, "artifacts", "uploads")); err == nil {
 		for _, s := range sessions {
+			if ctx.Err() != nil {
+				return res
+			}
 			up := uploadsDir(coralDir, s.Name())
 			if up == "" || !s.IsDir() { // a link is not a directory here: never followed
 				continue
 			}
 			forEachRecordFile(up, func(path, digest string) {
+				if ctx.Err() != nil {
+					return
+				}
 				count(stampDocID(path, digest, seriesDocs))
 			})
 		}
 	}
 	if boards, err := os.ReadDir(filepath.Join(coralDir, "artifacts", "received")); err == nil {
 		for _, b := range boards {
+			if ctx.Err() != nil {
+				return res
+			}
 			if !b.IsDir() || !boardDirName.MatchString(b.Name()) {
 				continue
 			}
 			forEachRecordFile(filepath.Join(coralDir, "artifacts", "received", b.Name()), func(path, digest string) {
+				if ctx.Err() != nil {
+					return
+				}
 				receivedRowMu.Lock()
 				defer receivedRowMu.Unlock()
 				count(stampDocID(path, digest, nil))

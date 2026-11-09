@@ -12,13 +12,13 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
     const failures = [];
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const mode of ['one', 'older', 'older-comment-refused', 'older-comment-lost', 'older-send-refused', 'older-send-lost', 'older-send-lost-file', 'older-send-lost-words', 'pictures', 'in-progress', 'not-delivered', 'already-sent', 'hub', 'held-close', 'held-switch', 'text-not-kept', 'unsupported-images', 'other-refusal', 'cloud']) {
+        for (const mode of ['one', 'older', 'older-comment-refused', 'older-comment-lost', 'older-send-refused', 'older-send-lost', 'older-send-lost-file', 'older-send-lost-words', 'pictures', 'in-progress', 'not-delivered', 'already-sent', 'hub', 'held-close', 'held-switch', 'text-not-kept', 'unsupported-images', 'other-refusal', 'cloud', 'cloud-older', 'too-long']) {
             try {
-                if (mode === 'cloud') await setupHubWorld({ client, Page, Emulation, width: 1280, height: 900, mobile: false, inbox: true, hubFeed: true });
+                if (mode === 'cloud' || mode === 'cloud-older') await setupHubWorld({ client, Page, Emulation, width: 1280, height: 900, mobile: false, inbox: true, hubFeed: true });
                 await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
                 await coralReady(ev, 'startup', 'liveList', 'settings');
                 await ev(`(async () => {
-                    const mode = ${JSON.stringify(mode)}, server = (mode === 'hub' || mode === 'cloud') ? 'review-box' : 'local';
+                    const mode = ${JSON.stringify(mode)}, server = (mode === 'hub' || mode === 'cloud' || mode === 'cloud-older') ? 'review-box' : 'local';
                     const { state } = await import((window.__coralStatic || '/static/') + 'state.js');
                     state.hub = true; state.serversKnown = true; state.servers = [{id:'review-box',status:'online',owner_stamp:true}];
                     const real = window.fetch, json = (body,status=200) => Promise.resolve(Response.json(body,{status}));
@@ -36,9 +36,10 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                                 if (mode === 'other-refusal') return json({code:'words_not_supported',message:'Write refused.'},400);
                                 if (mode === 'unsupported-images' && body.text) return json({code:'images_not_in_this_slice',message:'Use a comment for pictures.'},400);
                                 if (mode === 'in-progress') return json({code:'already_in_progress',message:'retry in a moment'},409);
-                                if (mode.startsWith('older') || mode === 'pictures') return json({state:'changes requested',delivered:false});
+                                if (mode.startsWith('older') || mode === 'pictures' || mode === 'cloud-older') return json({state:'changes requested',delivered:false});
                                 return json({state:'changes requested',text_kept:true,comment_id:7,delivered:mode!=='not-delivered' && mode!=='already-sent',...(mode==='not-delivered'?{reason:'agent_unavailable'}:mode==='already-sent'?{reason:'already_sent'}:{to:'Writer A'})});
                             }
+                            if (path.endsWith('/comments') && mode === 'cloud-older') return json({error:'not_found'},404); // the Hub keeps comment writes closed until its flag is on (#14797)
                             if (path.endsWith('/comments') && mode === 'older-comment-refused') return json({error:'Comment refused'},403);
                             if (path.endsWith('/comments') && mode === 'older-comment-lost') return Promise.reject(new TypeError('Connection lost'));
                             if (path.endsWith('/send') && mode.startsWith('older-send-lost') && !window.__retryDelivery) return Promise.reject(new TypeError('Delivery acknowledgement lost'));
@@ -60,7 +61,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                     await ev(`(() => { const b=Uint8Array.from(atob('${PNG}'),c=>c.charCodeAt(0)),dt=new DataTransfer();dt.items.add(new File([b],'example.png',{type:'image/png'})); const input=document.querySelector('#one-call-review .ac-picker input');input.files=dt.files;input.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
                     await waitFor(`!!document.querySelector('#one-call-review .ac-thumb-ready')`, 'picture upload finishes');
                 }
-                await ev(`document.querySelector('#one-call-review textarea').value='Keep these exact words.'; document.querySelector('#one-call-review form').requestSubmit(); true`);
+                await ev(`document.querySelector('#one-call-review textarea').value=${JSON.stringify(mode === 'too-long' ? 'é'.repeat(501) : 'Keep these exact words.')}; document.querySelector('#one-call-review form').requestSubmit(); true`);
                 if (mode === 'held-close' || mode === 'held-switch') {
                     await waitFor(`typeof window.__releaseDecision === 'function'`, 'the old response is held');
                     if (mode === 'held-close') await ev(`window.__control.close(); true`);
@@ -113,6 +114,10 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                         assert.equal(sends.length,2,mode+': retry sends only the existing comment');
                         assert.equal(sends[0].path,sends[1].path,mode+': both sends address the same comment');
                     }
+                } else if (mode === 'too-long') {
+                    await waitFor(`/Keep it to 500 characters: it is 501/.test(document.querySelector('#one-call-review .artifact-review-error').textContent)`, 'the 501-character words are refused in the form, before sending');
+                    assert.equal(await ev(`window.__writes.length`),0,'501 characters (not bytes) are never sent: the Hub takes 1 to 500 (#14797)');
+                    assert.equal(await ev(`document.querySelector('#one-call-review textarea').value.length`),501,'the words are kept, never cut');
                 } else if (mode === 'text-not-kept' || mode === 'other-refusal') {
                     await waitFor(`!!document.querySelector('#one-call-review .artifact-review-error').textContent`, 'the refusal stays in the form');
                     const error = await ev(`document.querySelector('#one-call-review .artifact-review-error').textContent`);
@@ -135,7 +140,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                         assert.equal(writes.length,1,mode+' is one call');
                         assert.ok(writes[0].path.endsWith('/review')); assert.equal(writes[0].body.text,'Keep these exact words.');
                         assert.equal(writes[0].body.decision,'changes');
-                    } else {
+                    } else if (mode !== 'cloud-older') {
                         assert.equal(writes.length,mode==='unsupported-images'?4:3,mode+' counts every request, including the explicit unsupported refusal');
                         if (mode === 'pictures') assert.ok(writes.every(w=>!Object.hasOwn(w.body,'text')),'pictures never send a one-call text request');
                         if (mode === 'unsupported-images') { assert.equal(writes[0].body.text,'Keep these exact words.'); assert.equal(Object.hasOwn(writes.at(-1).body,'text'),false,'the fallback decision carries no text'); }
@@ -145,8 +150,16 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                         assert.equal(comment.body.body,'Changes requested: Keep these exact words.');
                         assert.deepEqual(comment.body.images || [],mode==='pictures'?[PIC]:[]);
                     }
+                    if (mode === 'cloud-older') {
+                        assert.equal(writes.length,1,'Hub with comment writes off: the decision is the one call; no comment, no send (#14797)');
+                        assert.ok(writes[0].path.endsWith('/review') && writes[0].body.decision === 'changes' && writes[0].body.text === 'Keep these exact words.','that one call is the review with the words');
+                        assert.equal(await ev(`[...document.querySelectorAll('.toast')].some(t=>/not_found/.test(t.textContent))`),false,'no bare error code is shown');
+                        assert.equal(await ev(`[...document.querySelectorAll('.toast')].some(t=>/Changes requested/.test(t.textContent))`),true,'the person is told changes were requested');
+                    }
+                    if (mode === 'cloud') assert.equal(await ev(`[...document.querySelectorAll('.toast')].some(t=>/Changes requested\. Your words are on the file\./.test(t.textContent))`),true,'Hub, comment writes off, the computer kept the words (text_kept): the toast says they are on the file (#14797)');
+                    if (mode === 'cloud-older') assert.equal(await ev(`[...document.querySelectorAll('.toast')].some(t=>/Your words were not added to the thread/.test(t.textContent))`),true,'an older computer dropped the words: the toast says they were not added');
                     if (mode === 'hub' || mode === 'cloud') assert.ok(writes.every(w=>w.path.startsWith('/api/remote/review-box/')),'all writes retain the captured computer');
-                    if (mode === 'cloud') assert.equal(await ev(`import((window.__coralStatic || '/static/')+'server_base.js').then(m=>m.isCloud())`),true,'the Cloud Hub boot mode is exercised');
+                    if (mode === 'cloud' || mode === 'cloud-older') assert.equal(await ev(`import((window.__coralStatic || '/static/')+'server_base.js').then(m=>m.isCloud())`),true,'the Cloud Hub boot mode is exercised');
                     if (mode === 'already-sent') assert.match(await ev(`[...document.querySelectorAll('.toast')].map(t=>t.textContent).join(' ')`),/Writer A was already told/);
                     if (mode === 'not-delivered') {
                         const toast=await ev(`[...document.querySelectorAll('.toast')].map(t=>t.textContent).join(' ')`);

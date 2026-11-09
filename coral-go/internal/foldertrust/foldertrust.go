@@ -56,6 +56,7 @@ func (r *Refusal) Error() string { return r.msg }
 const (
 	plainFind   = "Coral could not find this folder on this computer."
 	plainHome   = "Coral does not trust your home folder, a folder that holds it, a top folder or a hidden one from here."
+	plainDirect = "Coral doesn't trust a folder directly under your home folder from here, because it would cover every project there. Try a project folder one level deeper (a hidden, unowned, linked or missing folder can still be refused)."
 	plainShared = "Coral does not trust a shared or shallow folder, or one that other people on this computer can write into, from here."
 )
 
@@ -102,7 +103,7 @@ func Check(path, home string, basis Basis) (string, error) {
 			return "", refuse(plainHome, "a hidden folder under home (where agents keep their settings and logins) is never trusted")
 		}
 		if len(parts) == 1 && basis != Made {
-			return "", refuse(plainHome, "a direct child of the home folder would trust every repository the person puts under it")
+			return "", refuse(plainDirect, "a direct child of the home folder would trust every repository the person puts under it")
 		}
 	} else {
 		// Outside home: the folder may be one other people on the computer can write into. A shared root (/tmp, /Users/Shared), a shallow folder (/srv/x, /Volumes/Backup) and a folder that group or others can

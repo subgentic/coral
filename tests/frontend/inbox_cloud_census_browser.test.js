@@ -15,7 +15,7 @@ const HISTORY_KEYS = ['type', 'source_types', 'date_from', 'date_to', 'q', 'page
 // What the plan adds (section 3, rows 1 to 6).
 const ADDED_ROUTE = '/api/sessions/history/counts';
 // The Hub-served Inbox's Goals and Artifacts folders (#11071): two more View routes, each read once a computer with their own query keys. A route outside these is still a stray.
-const FOLDER_ROUTES = { '/api/goals': ['limit'], '/api/team-artifacts': ['limit', 'offset', 'sort', 'versions', 'starred', 'starred_first'] };
+const FOLDER_ROUTES = { '/api/goals': ['limit', 'state'], '/api/team-artifacts': ['limit', 'offset', 'sort', 'versions', 'starred', 'starred_first', 'facets'] };
 const ADDED_KEYS = ['active', 'agent_name', 'archived', 'starred', 'with_notes'];
 // #13958: the Inbox badge is dashboard chrome on every tab. It reads one
 // owner-protected attention summary per computer; it never loads a file window.
@@ -32,6 +32,7 @@ const BASELINE = Object.fromEntries(Object.entries({
     '/api/team-artifacts': [...Object.keys(REVIEW_BADGE_QUERY), 'team'], // #14143: qualified team Needs you count
     '/api/operator-asks': [], // #14143: team attention includes the Inbox question source
     '/api/needs-you': ['kind'], // the skills that wait for approval, read at each computer through the Hub (#14046: needs_skills.js loadPendingSkills, ?kind=skill)
+    '/api/pinned-folders': [], // #14524: computer-owned pins, loaded only after inventory
     '/api/board/projects': [], '/api/board/{team}': [], '/api/board/{team}/artifacts': ['limit'], '/api/board/{team}/goals': ['limit', 'state'], '/api/board/{team}/messages/all': ['format', 'limit', 'offset'], '/api/board/{team}/paused': [],
     '/api/board/{team}/status': [], '/api/board/{team}/subscribers': [], '/api/board/{team}/tasks': ['counts'], '/api/sessions/live/team/{team}/sleep-status': [], '/api/teams/detail/{team}/knowledge': [],
 }).map(([k, v]) => [`GET ${k}`, v]));
@@ -180,6 +181,10 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
         const unproxied = inbox.filter(r => !r.proxied && /^\/api\/sessions\/history(\/|$)/.test(r.p));
         const proxied = inbox.filter(r => r.proxied);
         assert.deepEqual(proxied.filter(r => r.m !== 'GET').map(r => `${r.m} ${r.p}`), [], 'read-only: the Inbox sends nothing but GET through the Hub');
+        for (const r of proxied) {
+            if (r.p === '/api/goals' && r.query.state !== undefined) assert.equal(r.query.state, 'done', 'only the explicit Done window adds a state query');
+            if (r.p === '/api/team-artifacts' && r.query.facets !== undefined) assert.equal(r.query.facets, 'team,by,goal', 'review facets use the bounded supported dimensions');
+        }
         const stray = [], newKeys = new Set(), newRoutes = new Set();
         for (const [route, keys] of keysByPath(proxied)) {
             const base = baseline.get(route);

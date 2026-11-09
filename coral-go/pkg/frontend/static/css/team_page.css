@@ -5,8 +5,8 @@
 .team-page-title { margin: 0; font-size: var(--fs-2xl); font-weight: var(--fw-title); line-height: var(--lh-label); overflow-wrap: anywhere; min-width: 0; }
 .team-page-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
 .team-page-machine { font-weight: var(--fw-regular); font-size: var(--fs-lg); color: var(--text-secondary); }
-.team-page-status { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-secondary); }
-.team-page-status:empty { display: none; }
+.team-page-status { flex: 1 1 12rem; min-width: 0; display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-secondary); }
+.team-page-status:empty { display: none; } /* flex 12rem (#14659): a long line ("Waiting for first signal. A signal is an agent's first message.") wraps inside its own box instead of onto a row of its own, so the title is on the same row, at the same top, whatever the read says */
 .team-page-health { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; padding: 4px 0; min-height: 32px; font: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--link-text, var(--accent)); cursor: pointer; text-align: left; }
 .team-page-health[hidden] { display: none; }
 .team-page-health:hover { text-decoration: underline; }
@@ -467,6 +467,7 @@ dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-
     .team-bar-back { display: grid; grid-column: 1; grid-row: 1 / span 2; place-items: center; width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); padding: 0; border: 0; border-radius: 22px; background: none; color: var(--text-primary); cursor: pointer; }
     .team-page-title { grid-column: 2; grid-row: 1; font-size: var(--fs-xl); font-weight: var(--fw-strong); line-height: var(--lh-label); }
     .team-page-status { display: block; min-width: 0; grid-column: 2; grid-row: 2; font-size: var(--fs-md); color: var(--text-secondary); overflow-wrap: anywhere; } /* it wraps: '2 of 3 waiting for first signal. A signal is an agent's first message.' was cut with an ellipsis (#12534) */
+    .team-page-status:not(:empty) { min-height: 2lh; } /* the line is two lines high whatever it says (a long one wraps, a short one does not): its words change with the first read, and a height that changes above a scrolled page moves it (scroll anchoring; team_redraw_keeps_scroll on Linux CI, #14569) */
     .team-page-no-team .team-bar-back { display: none; } /* a team that is not there: the page says so and has its own Back to Agents button */
     .team-page-no-team .team-page-head { grid-template-columns: minmax(0, 1fr); padding-inline: 16px; }
     .team-page-no-team .team-page-title { grid-column: 1; }
@@ -501,3 +502,8 @@ dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-
 .team-task-page .task-jump { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .team-task-page .task-jump-role { color: var(--text-secondary); }
 @media (pointer: coarse), (max-width: 767px) { .team-task-page .task-jump-btn { min-height: var(--control-touch-height, 44px); } }
+/* Give each destructive team action its own boundary; the menu still scrolls on phones. */
+:is(#team-page-stop-menu, #team-page-more-menu) > :is([data-stop="reset"], [data-stop="kill"], #mb-delete-btn) {
+    margin-top: 12px;
+    border-top: 1px solid var(--border);
+}

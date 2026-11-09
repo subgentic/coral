@@ -324,6 +324,7 @@ func (a *AgyAgent) LaunchCommand(params LaunchParams) (string, error) {
 		parts = append(parts, "--conversation", params.ResumeSessionID)
 	}
 
+	autoOK := func() bool { return AgySupportsAutoMode(bin) } // asked of agy's own --help, once per file (cached), and only when an auto mode is in play
 	// The Operator's "keep Full access" choice (#14061, #14085) is every relaunch's switch, after the capabilities and whatever the mode or the stored flags say.
 	if params.KeepFullAccess {
 		parts = append(parts, "--dangerously-skip-permissions")
@@ -335,7 +336,7 @@ func (a *AgyAgent) LaunchCommand(params LaunchParams) (string, error) {
 		if perms.DangerouslySkipPermissions {
 			parts = append(parts, "--dangerously-skip-permissions")
 		}
-		if perms.Mode != "" {
+		if perms.Mode != "" && (perms.Mode != "auto" || autoOK()) { // --mode auto only for an agy that lists it; otherwise it asks
 			parts = append(parts, "--mode", perms.Mode)
 		}
 		if perms.Sandbox {
@@ -361,7 +362,7 @@ func (a *AgyAgent) LaunchCommand(params LaunchParams) (string, error) {
 				slog.Info("dropping --approval-mode for agy agent: its capabilities or an earlier mode set it", "value", value)
 				continue
 			}
-			parts = appendAgyPermissionMode(parts, mode)
+			parts = appendAgyPermissionMode(parts, mode, mode == "auto" && autoOK())
 			permissionApplied = true
 			continue
 		}
@@ -406,7 +407,7 @@ func (a *AgyAgent) LaunchCommand(params LaunchParams) (string, error) {
 			if i+1 < len(params.Flags) {
 				i++
 				if !permissionApplied {
-					parts = appendAgyPermissionMode(parts, params.Flags[i])
+					parts = appendAgyPermissionMode(parts, params.Flags[i], params.Flags[i] == "auto" && autoOK())
 					permissionApplied = true
 				}
 			}
@@ -414,7 +415,7 @@ func (a *AgyAgent) LaunchCommand(params LaunchParams) (string, error) {
 		}
 		if mode, ok := strings.CutPrefix(flag, "--permission-mode="); ok {
 			if !permissionApplied {
-				parts = appendAgyPermissionMode(parts, mode)
+				parts = appendAgyPermissionMode(parts, mode, mode == "auto" && autoOK())
 				permissionApplied = true
 			}
 			continue
@@ -423,7 +424,7 @@ func (a *AgyAgent) LaunchCommand(params LaunchParams) (string, error) {
 	}
 
 	if !permissionApplied && params.PermissionMode != "" && params.PermissionMode != "default" {
-		parts = appendAgyPermissionMode(parts, params.PermissionMode)
+		parts = appendAgyPermissionMode(parts, params.PermissionMode, params.PermissionMode == "auto" && autoOK())
 	}
 
 	// Action prompt via temp file for robustness
@@ -526,14 +527,19 @@ func agyApprovalModeValue(flags []string, i *int) (value string, ok bool) {
 	return "", true
 }
 
-func appendAgyPermissionMode(parts []string, mode string) []string {
+// appendAgyPermissionMode adds agy's flag for a generic mode. "auto" is agy's own --mode auto, and only when this agy's own --help lists it (autoOK, AgySupportsAutoMode): an agy without it gets no
+// flag and asks, never a skip flag in its place (#14741, Security: auto never silently becomes Bypass; it was --dangerously-skip-permissions before agy had a mode of its own).
+func appendAgyPermissionMode(parts []string, mode string, autoOK bool) []string {
 	switch mode {
 	case "", "default":
 		return parts
 	case "bypassPermissions":
 		return append(parts, "--dangerously-skip-permissions")
 	case "auto":
-		return append(parts, "--dangerously-skip-permissions")
+		if autoOK {
+			return append(parts, "--mode", "auto")
+		}
+		return parts
 	case "acceptEdits":
 		return append(parts, "--mode", "accept-edits")
 	case "plan":

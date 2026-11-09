@@ -888,6 +888,8 @@ func (s *Server) registerStatic(r *chi.Mux) {
 		w.Header().Set("Content-Type", "application/javascript")
 		http.ServeFileFS(w, r, staticFS, "static/sw.js")
 	})
+	// The host document of a trusted HTML preview (#14730): loaded by URL so its own headers govern it, never the dashboard's policy.
+	r.Get("/static/artifact_host.html", serveArtifactHost(staticFS))
 	// Files: ETag + no-cache revalidation, gzip for text (static_assets.go). Directories
 	// and misses keep the old no-store FileServer behaviour.
 	r.Handle("/static/*", http.StripPrefix("/static/", staticAssetHandler(staticSub, noCacheHandler(http.FileServer(http.FS(staticSub))), cacheRevalidate)))

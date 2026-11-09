@@ -33,6 +33,8 @@ type joinEntry struct {
 
 // joinSites is "file<TAB>function" -> its joins, by file relative to coral-go.
 var joinSites = map[string]joinEntry{
+	"internal/server/routes/artifact_docid.go\tforEachRecordFile":                            {1, joinOwn, "the name is one of the directory's own entries and is checked first: exactly 64 hex characters and .json (objectNameRe), so no separator, no dot dot and no other file can reach the join (#14551, #14759)"},
+	"internal/server/routes/artifact_docid.go\tmigrateDocIDsCtx":                             {1, joinOwn, "the board folder's name comes from the received folder's own listing and is checked first: a directory (a link is not one here) whose name matches boardDirName, before the join (#14551, #14759)"},
 	"internal/heavy/client.go\tFileList":                                                     {2, joinOwn, "the worktree root the caller gave plus a name from git ls-files -z; each name is checked first (cleanName: relative, no .., no NUL or backslash, no .git) and the file is only Lstat'd and Readlink'd; a link that leaves the worktree is skipped"},
 	"internal/heavy/client.go\tWriteStream":                                                  {1, joinOwn, "the same worktree root plus a name FileList already checked and kept; opened read-only to be put in the archive"},
 	"internal/heavy/extract.go\tlinkTarget":                                                  {1, joinContained, "path.Join is only a lexical cleaning of a link's target against its own folder, compared with .. to refuse one that leaves the run folder; nothing is opened"},

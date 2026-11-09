@@ -1,6 +1,6 @@
-/* The Inbox's welcome items for a new install (#11443, the operator via coral-hub #139185): five rows in Needs you, each a real action that marks itself done when its step is seen.
+/* The Inbox's welcome items for a new install (#11443, the operator via coral-hub #139185): six rows in Needs you, each a real action that marks itself done when its step is seen.
  * The server turns them on for an install that has never run (inbox_welcome = on, server.go seedNewInstallInboxWelcome); one that has run never has the setting. What is done, read or dismissed is
- * kept in inbox_welcome_done (comma-separated ids) with the Coral's settings, so another browser agrees; when all five are done, or the person hides them, the setting goes off for good.
+ * kept in inbox_welcome_done (comma-separated ids) with the Coral's settings, so another browser agrees; when all six are done, or the person hides them, the setting goes off for good.
  * Detection is the step itself: an agent exists, a team exists, a computer or the Hub is connected. They are not alarms: not in the Inbox badge, no toast, no alert, and they sit under real work. */
 import { state } from './state.js';
 import { serverFetch, currentServer } from './server_base.js';
@@ -8,13 +8,15 @@ import { importOnce } from './import_once.js';
 import { registerActions } from './actions.js';
 import { browserSession } from './safe_storage.js';
 
-export const WELCOME_IDS = ['welcome', 'agent', 'team', 'connect', 'asks'];
+export const WELCOME_IDS = ['welcome', 'agent', 'team', 'connect', 'asks', 'guide'];
+const GUIDE_URL = '/static/guide/getting-started.md';
 export const WELCOME = {
     welcome: { title: 'Welcome to Coral', text: 'This is your Inbox. Anything an agent needs from you shows up here, so you never have to watch a terminal.', go: 'Got it', dismiss: false },
     agent: { title: 'Start your first agent', text: 'Pick a folder and a CLI, and Coral starts it for you.', go: 'New agent', dismiss: true },
     team: { title: 'Make a team so agents can work together', text: 'A team gives agents a shared board to talk and hand off work.', go: 'New team', dismiss: true },
     connect: { title: 'Connect a second computer or the Hub', text: 'Run agents on another computer, or reach this one from your phone.', go: 'Connect', dismiss: true, optional: true },
     asks: { title: 'How agents ask you for things', text: 'Approvals, dialogs and review artifacts all land here. A short read, then it clears.', go: 'Read it', dismiss: true },
+    guide: { title: 'Read the Coral guide', text: 'How to set Coral up, and a tour of what it can do.', go: 'Open guide', dismiss: true },
 };
 
 export const welcomeOn = () => (state.settings || {}).inbox_welcome === 'on';
@@ -55,7 +57,7 @@ export function save(values) {
     _saving = _saving.then(() => fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values) })).catch(() => {}); // kept for this page if it fails: the server shows them again next time
 }
 
-/** Keep the setting in step: a step seen is remembered (deleting the agent later brings nothing back), and with all five done the items are off for good. Safe to call often. */
+/** Keep the setting in step: a step seen is remembered (deleting the agent later brings nothing back), and with all six done the items are off for good. Safe to call often. */
 export function syncWelcome() {
     if (!welcomeOn()) return;
     if (!finished().has('team')) readTeams();
@@ -72,8 +74,6 @@ function mark(id) {
     document.dispatchEvent(new CustomEvent('coral:welcome-changed'));
 }
 
-/** Hide every welcome item for good. */
-export function hideAllWelcome() { save({ inbox_welcome: 'off' }); document.dispatchEvent(new CustomEvent('coral:welcome-changed')); }
 export const dismissWelcome = id => mark(id);
 
 /** An item's own action. */
@@ -81,6 +81,7 @@ export function runWelcome(id) {
     if (id === 'welcome') { mark('welcome'); return; }
     if (id === 'agent' || id === 'team') { window.showLaunchModal?.(); window._selectLaunchType?.(id); return; }
     if (id === 'connect') { window.switchNavTab?.('servers'); return; }
+    if (id === 'guide') { importOnce('./artifact_viewer.js').then(m => m.openBundledDocument({ title: 'Getting started with Coral', name: 'getting-started.md', url: GUIDE_URL, onOpened: () => mark('guide') })); return; } // the guide (about 400 KB with its pictures) is fetched when the row is opened, never at start (page_weight)
     if (id === 'asks') importOnce('./welcome_asks.js').then(m => m.readAsks(WELCOME.asks.title, () => mark('asks'))); // the long read arrives when it is opened, not at start (page_weight)
 }
 

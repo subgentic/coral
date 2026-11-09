@@ -5,10 +5,12 @@ import { showToast } from './utils.js';
 import { showConfirmModal } from './confirm_dialog.js';
 import { announceNotice } from './notifications.js';
 let readGeneration = 0;
-const headline = 'New agents start with full permissions: they can run commands and change files without asking you';
+const headline = 'Agents default to auto mode.';
 function disclosureSection(id, title, disclosure) {
     const section = document.createElement('details'); section.className = 'disclosure';
-    const summary = document.createElement('summary'); summary.textContent = title;
+    const summary = document.createElement('summary');
+    const summaryText = document.createElement('span'); summaryText.className = 'launch-disclosure-summary-text'; summaryText.textContent = title;
+    summary.append(summaryText);
     summary.setAttribute('aria-expanded', 'false'); summary.setAttribute('aria-controls', id);
     const body = document.createElement('div'); body.id = id; body.hidden = true;
     const text = document.createElement('p'); text.textContent = disclosure.text; body.append(text);
@@ -48,11 +50,25 @@ export async function refreshLaunchDisclosure() {
         previous?.remove();
         const banner = document.createElement('div'); banner.id = 'launch-disclosure-banner'; banner.dataset.disclosureId = disclosure.id; banner.className = 'notice notice-info notice-bar notice-compact'; banner.setAttribute('role', 'note');
         const { section, body } = disclosureSection('launch-disclosure-body', headline, disclosure);
+        const summary = section.querySelector('summary');
+        const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'btn btn-small launch-disclosure-dismiss'; dismiss.textContent = 'Dismiss'; dismiss.setAttribute('aria-label', 'Dismiss, I have read this');
         const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-small'; button.textContent = "I've read this";
-        button.addEventListener('click', async () => { if (!section.open) return; button.disabled = true; try { await acknowledge('local', disclosure); } catch (error) { button.disabled = false; showToast(error.message, true); } });
+        const acknowledgeButtons = () => [...banner.querySelectorAll('button')];
+        const acknowledgeFromNotice = async () => {
+            const buttons = acknowledgeButtons(); buttons.forEach(control => { control.disabled = true; });
+            try { await acknowledge('local', disclosure); }
+            catch (error) { buttons.forEach(control => { control.disabled = false; }); showToast(error.message, true); }
+        };
+        button.addEventListener('click', () => { if (section.open) acknowledgeFromNotice(); });
+        dismiss.addEventListener('click', event => {
+            event.preventDefault(); event.stopPropagation();
+            acknowledgeFromNotice();
+        });
+        summary.append(dismiss);
         body.append(button); banner.append(section);
         const after = document.getElementById('local-auth-banner') || document.querySelector('header.top-bar');
         if (after) after.after(banner); else document.body.prepend(banner);
+        window.dispatchEvent(new Event('coral:launch-disclosure-shown'));
         announceNotice(headline);
     } catch { /* no unauthenticated or network failure is an acknowledgement */ }
 }

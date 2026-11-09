@@ -93,6 +93,9 @@ func TestNeedsYouWalkOfABigBoardIsUnderTheGoal(t *testing.T) {
 	if testing.Short() {
 		t.Skip("seeds 20,000 uploads: skipped with -short")
 	}
+	if raceEnabled {
+		t.Skip("a time budget means nothing under the race detector (about 10 to 20 times slower); the normal run keeps it (#14280)")
+	}
 	_, srv, _ := bigBoardWalkRig(t, true)
 	scale := 1.0
 	if v := os.Getenv("CORAL_PERF_BUDGET_SCALE"); v != "" {

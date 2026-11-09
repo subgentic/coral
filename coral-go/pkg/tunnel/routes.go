@@ -292,6 +292,11 @@ var routeTable = cat(
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/chief")),
 	owner(OwnerRefuse, rules(http.MethodPut, TierInteract, "/api/artifacts/{hex64}/comments/lock")),
 	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/artifacts/{hex64}/comments/lock")),
+	// Trust one version of an HTML file to run its scripts in the viewer's sealed frame (#14730, design v3, Security): the owner's alone through the Hub (a grantee, guide or viewer is refused by the machine), the read
+	// included (the page starts scripts only on a clean "trusted" answer; any refusal means none). Keyed by the file's digest. It changes a record on this computer and runs nothing on it, so Interact for the writes.
+	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/artifacts/{hex64}/trust-preview")),
+	owner(OwnerRefuse, rules(http.MethodPut, TierInteract, "/api/artifacts/{hex64}/trust-preview")),
+	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/artifacts/{hex64}/trust-preview")),
 	// The edit and delete are the owner's AND the comment's author's (the operator, 2026-10-30: the owner gets more, a guest loses nothing): the machine stamps the owner marker and the handler decides. A Hub viewer allowed
 	// to comment (artifact_comments_hub_write on) edits and deletes only a comment whose stored author is that same Hub viewer; the owner only their own too (the comment policy), never another's.
 	owner(OwnerSees, rules(http.MethodPatch, TierInteract, "/api/artifacts/{hex64}/comments/{id}")),
@@ -524,7 +529,7 @@ var routeTable = cat(
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/needs-you")),
 	// The Activity record (#12069, #12070): what the Operator did in Needs you, read only, the OWNER's alone through the hub (a guest, a grantee or a viewer is refused owner_only). The check of its chain runs on the machine; the
 	// rows hold no comment text, only the Operator's own cut and redacted note and the titles agents gave their items.
-	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/activity")),
+	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/activity", "/api/thread", "/api/threads")), // #14440: the story of a goal or task, and the summaries of a page of them
 	// The Operator's grant to a board's orchestrator and the log of what agents did to the board's agents (#11432) are the OWNER's alone through the hub (an authentic stamp, the owner marker): the switch lets an agent wake,
 	// sleep and start agents. The orchestrator's own wake and sleep routes are not here: they are agent-only and local, so the hub never reaches them.
 	owner(OwnerRefuse, rules(http.MethodGet, TierLaunch, "/api/board/{project}/orchestrator-grant", "/api/board/{project}/lifecycle-log", "/api/board/{project}/guide-roster")),

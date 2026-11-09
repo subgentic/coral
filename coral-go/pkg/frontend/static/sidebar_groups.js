@@ -235,8 +235,8 @@ export function openGroupTable(kind, key, { focus = false } = {}) {
 // a click that opens an item page (an artifact viewer is an iframe, so its pointerup never reaches this document) leaves the row hidden, and the redraws that follow must not wait for a release that is not coming.
 let heldAt = null, heldEl = null, deferredKind = null, flushTimer = null;
 const holding = () => heldAt !== null && Date.now() - heldAt < 10000 && !!heldEl && heldEl.isConnected && heldEl.getClientRects().length > 0;
-function flushLater() { if (flushTimer !== null) return; flushTimer = setTimeout(() => { flushTimer = null; if (deferredKind === null) return; if (holding()) { flushLater(); return; } const k = deferredKind; deferredKind = null; refreshGroupTable(k); }, 300); } // a deferred redraw is not lost if the release never arrives
-function releasePointer() { if (heldAt === null) return; heldAt = null; heldEl = null; const k = deferredKind; deferredKind = null; if (k) setTimeout(() => { if (!holding()) refreshGroupTable(k); }, 0); } // after the mouseup and the click of this very press have reached the button that was pressed (a redraw inside pointerup would take it out of the page first)
+function flushLater() { if (flushTimer !== null) return; flushTimer = setTimeout(() => { flushTimer = null; if (deferredKind === null) return; if (holding()) { flushLater(); return; } const k = deferredKind; deferredKind = null; redrawDeferred(k); }, 300); } // a deferred redraw is not lost if the release never arrives
+function releasePointer() { if (heldAt === null) return; heldAt = null; heldEl = null; const k = deferredKind; deferredKind = null; if (k) setTimeout(() => { if (!holding()) redrawDeferred(k); }, 0); } // after the mouseup and the click of this very press have reached the button that was pressed (a redraw inside pointerup would take it out of the page first)
 if (typeof document !== 'undefined') {
     document.addEventListener('pointerdown', e => { if (e.target instanceof Element && e.target.closest('#group-table-view')) { heldAt = Date.now(); heldEl = e.target; } }, true);
     document.addEventListener('pointerup', releasePointer, true); document.addEventListener('pointercancel', releasePointer, true); window.addEventListener('blur', releasePointer);
@@ -251,7 +251,8 @@ let hoverOver = false, hoverHeldSince = null;
 // A row the person just acted on (Ignore, Dismiss, Done, Answer) leaves at once (#14373, saved_files_actions): the hold is for rows that change on their own while the pointer rests, not for the result of the person's own completed action.
 // The action's handler dispatches 'coral:action-result' AFTER the server accepted it and the list it changed has been read again (an event, so no module imports the table). The table then makes ONE redraw, not held, scoped to the table on screen:
 // the token lives only for that call. No click, menu or refused action does it, and there is no time window: a later arrival is held as before.
-let actedRefresh = false;
+let actedRefresh = false, actedDeferred = false;
+const redrawDeferred = k => { const acted = actedDeferred; actedDeferred = false; actedRefresh = acted; try { refreshGroupTable(k); } finally { actedRefresh = false; } }; // the redraw the press hold kept back, drawn as what it was: the person's own result, or an arrival
 if (typeof document !== 'undefined') {
     document.addEventListener('coral:action-start', e => { if (e.detail && open) e.detail.table = open; }); // the table on screen when the action began
     document.addEventListener('coral:action-result', e => { const t = e.detail && e.detail.table; if (!t || t !== open) return; actedRefresh = true; try { refreshGroupTable(t.kind); } finally { actedRefresh = false; } }); // only that table, still on screen
@@ -275,7 +276,7 @@ if (typeof document !== 'undefined') {
 export function refreshGroupTable(kind) {
     const src = sources.get(kind);
     if (open && open.kind === kind) {
-        if (src?.holdRedraw && holding()) { deferredKind = kind; flushLater(); return; }
+        if (src?.holdRedraw && holding()) { deferredKind = kind; if (actedRefresh) actedDeferred = true; flushLater(); return; } // the person's own result keeps being theirs while the press hold lets go of it (#14483)
         if (src?.holdRedraw && hoverOver && !actedRefresh) { if (hoverHeldSince === null) hoverHeldSince = Date.now(); holdCap = src.urgentSignature && src.urgentSignature() !== drawnUrgent ? URGENT_HOLD_MS : HOVER_HOLD_MS; if (hovering()) { deferredKind = kind; showHeldNote(); setTimeout(() => { const k = deferredKind; if (k && !holding()) { deferredKind = null; refreshGroupTable(k); } }, Math.max(60, holdCap - (Date.now() - hoverHeldSince) + 60)); return; } } // a pointer resting on the list: the rows stay where they are, up to HOVER_HOLD_MS
         const host = document.getElementById('group-table-view');
         if (!host || host.style.display === 'none') { open = null; return; }

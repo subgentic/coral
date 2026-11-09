@@ -23,6 +23,35 @@ import { whenText, shortWhen } from './when_text.js';
 import { browserLocal } from './safe_storage.js';
 import { loadStyles } from './lazy_styles.js';
 
+let lastTap = { id: '', at: -1e9 }; // the last group-heading tap the pointer path handled (every table draws again after a toggle, so this outlives the table that heard it)
+
+// ── A group heading's controls: the button that opens and shuts its rows (a task's, #14441/#14483) and its Story control (#14444) ──
+// Taken from the DOCUMENT, not from a handler on the button or on one table: the page draws its table again while a finger is down (a poll, a read landing), and the new table (a new tbody and a new button) is what the finger is lifted over; the
+// browser then sends the click to the two elements' common parent, so no handler on either ever hears it. The press and the lift are matched by the control's id (the group's key and which control it is: data-group-key, data-group-control),
+// and the action that is current for that id (registered at every draw, by whichever table drew last) runs. The press state lives here, outside every table, so it outlives the table that saw the press. A lift over another group, or
+// after a drag past the tap distance, is not a tap; a click that follows a tap this path already took is not a second one; a keyboard press (a click with no pointer) is taken by the click path.
+const groupActions = new Map(); let pressedGroup = null; // `${groupKey}|${toggle|story}` -> the action of the control as it was last drawn
+const TAP_DISTANCE = 12;
+const controlOf = e => { const b = e.target && e.target.closest && e.target.closest('[data-group-control]'); return b && b.dataset.groupKey ? b : null; };
+const controlId = b => `${b.dataset.groupKey}|${b.dataset.groupControl}`;
+// Only the primary button (a left click, a touch, a pen tip) is a tap: a right or middle click did not press the button before and must not now (the browser sends those as contextmenu / auxclick, never click).
+const primary = e => e.button === 0 && e.isPrimary !== false;
+let rejectedAt = -1e9; // the last press that turned out NOT to be a tap (a drag past the distance, or a lift over another control): the click the browser may still send for it is not a toggle either
+document.addEventListener('pointerdown', e => { if (!primary(e)) { pressedGroup = null; return; } const b = controlOf(e); pressedGroup = b ? { id: controlId(b), x: e.clientX, y: e.clientY } : null; }, true);
+document.addEventListener('pointercancel', () => { if (pressedGroup) rejectedAt = performance.now(); pressedGroup = null; }, true);
+document.addEventListener('pointerup', e => {
+    const d = pressedGroup; pressedGroup = null;
+    if (!d || !primary(e)) return;
+    const b = controlOf(e), tap = !!b && controlId(b) === d.id && Math.hypot(e.clientX - d.x, e.clientY - d.y) <= TAP_DISTANCE;
+    if (!tap) { rejectedAt = e.timeStamp; return; } // a drag or a lift elsewhere: nothing toggles, and a click that follows is swallowed below
+    const run = groupActions.get(d.id); if (run) { lastTap = { id: d.id, at: e.timeStamp }; run(); }
+}, true);
+document.addEventListener('click', e => {
+    const b = controlOf(e); if (!b) return;
+    if (e.detail > 0 && Math.abs(e.timeStamp - rejectedAt) < 600) { e.stopImmediatePropagation(); e.preventDefault(); return; } // the click of a gesture the pointer path refused (a drag released over the same button)
+    const id = controlId(b); if (e.detail > 0 && lastTap.id === id && e.timeStamp - lastTap.at < 600) return; // the pointer path already did this tap
+    const run = groupActions.get(id); if (run) run();
+}, true); // a keyboard press (detail 0), or a click the pointer path did not see
 export const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const button = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 
@@ -118,7 +147,7 @@ export const compareBy = (col) => { // exported for its unit test (data_table_co
 };
 
 /** The phone's mail row (#9545, UI/UX's spec): a 44 px leading target holding a 32 px avatar, the title and the first words of what it says on one line, the time at the right, and under the line (Needs you only) the ask.
- *  A caller opts in with `mail(row) -> { actions?: [{ label, title?, off?, confirm?, onArm?, run(button) }] (a ⋯ button at the row's right opens them, #137104), lead: { text, name?, square?, icon? }, kindIcon? (a node drawn in the full-height leading column), title, snippet?, state?, ask?, askTag?, time?, unread?, mark?, data?, tip?, team?, teamAlways?, nameTeam?, snippetTip? }` (nameTeam: the team is in the button's name but not drawn on the line, so Needs you is one line, #9986) (state: the word the row shows for what it is in (a task's Queued, In review), said in the button's name after the title, so a screen reader hears <name>, <state> (#9747)) (team: after the title in tertiary, always when teamAlways, else only for a title two rows share) (data: attributes for the open button, as `{ taskId: 5 }` is data-task-id="5"); on a phone the row is this cell alone (the columns are the desktop's), and its button is the row's open control.
+ *  A caller opts in with `mail(row) -> { actions?: [{ label, title?, off?, confirm?, onArm?, run(button) }] (a ⋯ button at the row's right opens them, #137104), lead: { text, name?, square?, icon? }, kindIcon? (a node drawn in the full-height leading column), title, snippet?, state?, ask?, askTag?, time?, unread?, mark?, data?, tip?, team?, teamAlways?, nameTeam?, snippetTip?, computer?, extra? (a node under the line, before the choices) }` (nameTeam: the team is in the button's name but not drawn on the line, so Needs you is one line, #9986) (state: the word the row shows for what it is in (a task's Queued, In review), said in the button's name after the title, so a screen reader hears <name>, <state> (#9747)) (team: after the title in tertiary, always when teamAlways, else only for a title two rows share) (data: attributes for the open button, as `{ taskId: 5 }` is data-task-id="5"); on a phone the row is this cell alone (the columns are the desktop's), and its button is the row's open control.
  *  `unread` makes the title 600 (a read one is 500) and draws an accent dot under the time that is named "Unread" for a screen reader: a list says it only where a read state exists (Needs you; chats, boards and tasks through inbox_read.js, #9687). `mark: 'attention'` is the amber dot under the time and outranks the unread dot (one dot a row). A desktop table takes `unread(row)` for the same look as a `dt-unread` row. Text is set with textContent only. */
 const MAIL_QUERY = '(max-width: 767px)';
 let rowMenus = 0;
@@ -149,7 +178,14 @@ function rowMore(actions, label) {
         });
         menu.append(b);
     }
-    toggle.addEventListener('click', async e => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(toggle); });
+    toggle.addEventListener('click', async e => {
+        e.stopPropagation();
+        // The menu module loads on the first tap, and a redraw that lands meanwhile replaces this button with a new one (late data redraws the list): the tap opens the menu of the button that is there now, found by its row's key, and not of a detached one (#14757; the same class as #14631, which keeps an open menu across a redraw).
+        const key = toggle.closest('tr[data-key]')?.dataset.key;
+        const menus = await importOnce('./menu_button.js');
+        const live = toggle.isConnected ? toggle : key ? [...document.querySelectorAll('#group-table-view tr[data-key]')].find(r => r.dataset.key === key)?.querySelector('.dt-mail-more-toggle') : null;
+        if (live) menus.toggleMenu(live);
+    });
     wrap.append(toggle, menu);
     return wrap;
 }
@@ -169,7 +205,7 @@ const mailCell = (m, label, open, pick, showTeam = false, gap = false) => { // o
     if (open) { body.type = 'button'; body.dataset.rowName = label; { const kind = m.kindIcon && m.kindIcon.getAttribute('aria-label'); const named = ((showTeam || m.nameTeam) && m.team ? `${label}, ${m.team}` : label) + (kind ? `, ${kind}` : '') + (m.state ? `, ${m.state}` : '') + (m.starred && !/, starred$/.test(String(label)) ? ', starred' : '') + (m.live ? `, ${m.live.toLowerCase()}` : ''); body.setAttribute('aria-label', (m.unread && !m.mark ? `${named}, unread` : named) + (m.time && !String(named).includes(m.time) ? `, ${m.time}` : '')); } } // the name holds every word the row shows (the time too), so a visible label is in its name; its click is the row's (a .dt-primary button is not interactive to the row's handler: it opens, or toggles while selecting)
     const text = el('span', 'dt-mail-text'), line = el('span', 'dt-mail-line');
     const titleEl = el('span', `dt-mail-title${m.medium ? ' dt-mail-medium' : ''}`, m.title || '');
-    line.append(titleEl); // medium: the title is a name (an agent), so 13/500, not a row's own title at 400 (#9758)
+    if (m.computer) { const head = el('span', 'dt-mail-head'), chip = el('span', 'chip chip-tag dt-mail-computer', m.computer); chip.title = `On ${m.computer}`; head.append(titleEl, chip); line.append(head); } else line.append(titleEl); // the computer's name is a small chip beside the title when a Hub has several (Needs you, #14623) // medium: the title is a name (an agent), so 13/500, not a row's own title at 400 (#9758)
     if (m.starred) { const star = el('span', 'dt-star dt-star-on dt-mail-star material-icons', 'star'); star.setAttribute('aria-hidden', 'true'); line.append(star); } // a starred artifact keeps its glyph on a phone, which is a mark, not a button (#9834)
     if (showTeam && m.team) line.append(el('span', 'dt-mail-team', ` - ${m.team}`)); // who is asking: the team (with its computer when a hub has several) after the title in the tertiary colour
     { const sn = el('span', 'dt-mail-snippet', m.snippet || ''); if (m.snippetTip && m.snippet) sn.title = m.snippetTitle || m.snippet; line.append(' ', sn); } // snippetTip: the whole words are the snippet's hover (snippetTitle: longer words than the line shows, #11442) where the line cuts it (Needs you's ask, #9495, #9986) // a space between the words: the row reads as words, not run together
@@ -183,9 +219,15 @@ const mailCell = (m, label, open, pick, showTeam = false, gap = false) => { // o
     td.append(lead, body);
     if (m.actions && m.actions.length) td.append(rowMore(m.actions, label)); // a row's ⋯ menu, after the row's button and before its choices
     else if (gap) { const g = el('span', 'dt-mail-more-gap'); g.setAttribute('aria-hidden', 'true'); td.append(g); }
+    if (m.extra) { const x = el('span', 'dt-mail-extra'); x.append(m.extra); td.append(x); } // words and a control under the line (an agent's whole question and its Show all, #14637), before the choices
     if (m.answers) td.append(m.answers); // a Needs you row's choices, under the line (#10400)
     return td;
 };
+
+/** A full-width row under `tr` with `node` in it (#14637): the table's own detail row for one row's words (an agent's whole question, opened). Called from a surface's decorate, so it is drawn again with its row. */
+export function addDetailRow(tr, node, cls = '') {
+    const dr = el('tr', 'dt-detail'), td = el('td', `dt-detail-cell${cls ? ` ${cls}` : ''}`); dr.setAttribute('role', 'row'); td.setAttribute('role', 'cell'); td.colSpan = tr.cells.length; td.append(node); dr.append(td); tr.after(dr); return dr;
+}
 
 // Menu controls belong to table instances, including multiple tables on one page.
 let hiddenSeq = 0;
@@ -546,12 +588,21 @@ export function dataTable(cfg) {
         tbody.replaceChildren();
         const list = sortedRows();
         const cols = columns.length + (sel ? 1 : 0);
-        let lastGroup = null;
+        let lastGroup = null, lastParent = null;
+        const groupHead = g => { const gr = el('tr', g.level === 'task' ? 'dt-group dt-group-task' : 'dt-group'); gr.setAttribute('role', 'row'); const gh = el('th', null); gh.colSpan = cols; gh.scope = 'rowgroup'; gh.setAttribute('role', 'rowheader'); // a group with onToggle (a task's items, #14441) is one button that opens and shuts them
+            if (g.onToggle) { const b = el('button', 'dt-group-toggle'); b.type = 'button'; b.setAttribute('aria-expanded', String(g.open !== false)); const words = el('span', 'dt-group-words', g.label); b.append(words); if (g.chip) b.append(el('span', 'chip chip-tag dt-group-chip', g.chip)); b.dataset.groupKey = g.key; b.dataset.groupControl = 'toggle'; groupActions.set(`${g.key}|toggle`, g.onToggle); if (!g.onStory) gh.append(b); else { const sb = el('button', 'btn btn-small btn-quiet dt-group-story', 'Story'); sb.type = 'button'; sb.setAttribute('aria-pressed', String(!!g.storyOpen)); sb.setAttribute('aria-label', `Story of ${String(g.label).split('\n')[0]}`); sb.dataset.groupKey = g.key; sb.dataset.groupControl = 'story'; groupActions.set(`${g.key}|story`, g.onStory); const bar = el('div', 'dt-group-pair'); bar.append(b, sb); gh.append(bar); } } else gh.textContent = g.label; // a heading with onStory has a second control, its own: the story of the task (#14444)
+            gr.append(gh); tbody.append(gr);
+            if (g.story && g.storyOpen) { const sr = el('tr', 'dt-story-row'); sr.setAttribute('role', 'row'); const sc = el('td', null); sc.colSpan = cols; sc.setAttribute('role', 'cell'); sc.append(g.story()); sr.append(sc); tbody.append(sr); } }; // the story is a second row under the heading, above the items, only while it is on
         const mails = mailOn() ? list.map(r => cfg.mail(r)) : null, gap = !!mails && mails.some(m => m.actions && m.actions.length); // a list with a ⋯ on any row reserves its 44 px on every row, so the times line up (#137104)
         list.forEach((r, i) => {
             if (cfg.groupBy && (!st.sort || cfg.groupSorted)) { // the rows come in the caller's order: a divider where their group changes (a day), none once the person has sorted
                 const g = cfg.groupBy(r);
-                if (g && g.key !== lastGroup) { lastGroup = g.key; const gr = el('tr', 'dt-group'); gr.setAttribute('role', 'row'); const gh = el('th', null, g.label); gh.colSpan = cols; gh.scope = 'rowgroup'; gh.setAttribute('role', 'rowheader'); gr.append(gh); tbody.append(gr); }
+                if (g && g.key !== lastGroup) {
+                    lastGroup = g.key;
+                    if (g.parent) { if (g.parent.key !== lastParent) { lastParent = g.parent.key; groupHead(g.parent); } } else lastParent = g.key; // a group inside another: the outer heading once, before its first inner group
+                    groupHead(g);
+                }
+                if (g && g.open === false) return; // a shut group shows its heading only
             }
             const k = keyOf(r), tr = el('tr', 'dt-row'); tr.setAttribute('role', 'row'); tr.dataset.key = k;
             if (cfg.unread && cfg.unread(r)) tr.classList.add('dt-unread'); // a desktop row the person has not opened since it changed (#9687)

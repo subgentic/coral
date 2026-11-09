@@ -34,14 +34,34 @@ const AGENTS = [
             await setTheme(ev, theme);
             await ev(INBOX_WORLD);
             await ev(`(() => { window.__dismissed = []; const real = window.fetch; window.fetch = (u, o = {}) => { const p = String(u); if (/\\/dismiss-wait$/.test(p)) { window.__dismissed.push({ url: p, body: JSON.parse(o.body || '{}') }); return Promise.resolve(new Response(JSON.stringify({ dismissed: true }), { status: 200, headers: { 'content-type': 'application/json' } })); } return real(u, o); }; return true; })()`);
-            await ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); const m = await import((window.__coralStatic || '/static/') + 'inbox_tab.js'); state.liveSessions = ${JSON.stringify(AGENTS)}; m.updateInboxTab(); return true; })()`);
+            await ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); const m = await import((window.__coralStatic || '/static/') + 'inbox_tab.js'); state.liveSessions = ${JSON.stringify(AGENTS)}; window.__inboxTab = m; window.__state = state; m.updateInboxTab(); return true; })()`);
             await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await waitFor(`document.querySelectorAll('${T} .dt-table tbody tr').length === 3 && document.querySelector('${T}').getClientRects().length > 0`, at + 'the three waiting agents', 10000);
+            // The list redraws four times in the first ~25 ms after its rows appear (late data), and a tap in that burst lands on a row that is then replaced (#14630): wait until it has been still for 300 ms.
+            await ev(`window.__rowChange = performance.now(); new MutationObserver(() => { window.__rowChange = performance.now(); }).observe(document.querySelector('${T}'), { childList: true, subtree: true }); true`);
+            await waitFor(`performance.now() - window.__rowChange >= 300`, at + 'the list is still', 6000);
             if (!mobile) {
                 const deskState = () => ev(`({ more: document.querySelectorAll('${T} .dt-mail-more').length, dismiss: document.querySelectorAll('${T} .inbox-dismiss').length, w: innerWidth })`);
                 await waitFor(`document.querySelectorAll('${T} .dt-mail-more').length === 0 && document.querySelectorAll('${T} .inbox-dismiss').length >= 1`, at + 'the desktop rows settle: no ⋯, the Dismiss button', 4000).catch(async e => { throw new Error(e.message + ' ' + JSON.stringify(await deskState())); });
                 check(at + 'a desktop has no ⋯ and keeps its Dismiss button', true);
+                await ev(`(async()=>{const S=window.__coralStatic||'/static/',DT=await import(S+'data_table.js'),G=await import(S+'sidebar_groups.js'),M=await import(S+'menu_button.js');window.__refreshRows=[{id:'same-row',waiting_since:'old'}];window.__chosen=[];const node=()=>DT.dataTable({label:'Refresh menu',rows:window.__refreshRows,rowKey:r=>r.id,columns:[{key:'name',label:'Agent',primary:true,cell:r=>r.id},{key:'action',label:'Actions',cell:r=>{const wrap=document.createElement('span'),t=document.createElement('button'),m=document.createElement('div');t.textContent='More';t.className='refresh-test-toggle';t.setAttribute('aria-haspopup','menu');t.setAttribute('aria-expanded','false');t.setAttribute('aria-controls','refresh-test-menu');m.id='refresh-test-menu';m.className='menu';m.hidden=true;for(const label of (r.actions||['First','Second'])){const b=document.createElement('button');b.textContent=label;b.setAttribute('role','menuitem');b.addEventListener('click',()=>window.__chosen.push(r.waiting_since+label));m.append(b)}t.addEventListener('click',()=>M.toggleMenu(t));wrap.append(t,m);return wrap}}],state:DT.tableState()}).el;G.registerGroupSource('refresh-menu-test',{keys:()=>['needs','other'],table:()=>({title:'Needs you refresh fixture',rows:window.__refreshRows,node,signature:JSON.stringify(window.__refreshRows)})});G.openGroupTable('refresh-menu-test','needs');window.__redrawMenu=()=>G.refreshGroupTable('refresh-menu-test');window.__renderMenuNode=node;document.querySelector('.refresh-test-toggle').click();return true})()`);
+                await waitFor(`document.querySelector('.refresh-test-toggle')?.getAttribute('aria-expanded')==='true'`,at+'desktop table menu open');
+                await ev(`document.querySelectorAll('#refresh-test-menu [role=menuitem]')[1].focus();window.__oldDesktopToggle=document.querySelector('.refresh-test-toggle');window.__refreshRows=[{id:'same-row',waiting_since:'new'}];window.__redrawMenu();true`);
+                await waitFor(`!window.__oldDesktopToggle.isConnected&&document.querySelector('.refresh-test-toggle')?.getAttribute('aria-expanded')==='true'`,at+'desktop refresh restores same-row menu');
+                assert.equal(await ev(`document.activeElement?.textContent`),'Second',at+'same action keeps keyboard focus');
+                await key('Enter','Enter',13);
+                assert.deepEqual(await ev('window.__chosen'),['newSecond'],at+'the refreshed action uses the new row data');
+                await ev(`document.querySelector('.refresh-test-toggle').click();document.querySelectorAll('#refresh-test-menu [role=menuitem]')[1].focus();window.__oldDesktopToggle=document.querySelector('.refresh-test-toggle');window.__refreshRows=[{id:'same-row',waiting_since:'removed-action',actions:['First']}];window.__redrawMenu();true`);
+                await waitFor(`!window.__oldDesktopToggle.isConnected&&document.querySelector('.refresh-test-toggle')?.getAttribute('aria-expanded')==='true'`,at+'refresh removes the focused action');
+                assert.equal(await ev(`document.activeElement===document.querySelector('.refresh-test-toggle')`),true,at+'removed focused action returns focus to toggle, never another action');
+                await key('Enter','Enter',13);
+                assert.deepEqual(await ev('window.__chosen'),['newSecond'],at+'Enter on fallback toggle does not execute a different action');
+                await ev(`document.querySelector('.refresh-test-toggle').click();window.__oldFolderMenu=document.getElementById('refresh-test-menu');window.__folderScope=document.getElementById('group-table-view');window.__folderScope.dataset.group='refresh-menu-test:other';window.__folderScope.replaceChildren(window.__renderMenuNode());true`);
+                await waitFor(`document.querySelector('#group-table-view').dataset.group==='refresh-menu-test:other'&&document.querySelector('.refresh-test-toggle')?.getAttribute('aria-expanded')==='false'`,at+'folder change closes rather than restoring same-key row menu');
+                assert.equal(await ev(`document.getElementById('refresh-test-menu').hidden&&document.getElementById('group-table-view')===window.__folderScope&&document.querySelector('#group-table-view tr[data-key]').dataset.key==='same-row'`),true,at+'same scope and row key in new folder have no open menu');
+                await ev(`document.querySelector('.refresh-test-toggle').click();window.__refreshRows=[];window.__redrawMenu();true`);
+                await waitFor(`!document.getElementById('refresh-test-menu')||document.getElementById('refresh-test-menu').hidden`,at+'removed row does not leave an orphan menu');
                 continue;
             }
             const rows = await ev(`[...document.querySelectorAll('${T} tr.dt-mailed')].map(tr => { const b = tr.querySelector('.dt-mail-more-toggle'), r = b && b.getBoundingClientRect(), box = tr.getBoundingClientRect(); return { title: tr.querySelector('.dt-mail-title').textContent, h: Math.round(box.height), more: !!b, w: r ? Math.round(r.width) : 0, bh: r ? Math.round(r.height) : 0, name: b && b.getAttribute('aria-label'), popup: b && b.getAttribute('aria-haspopup'), expanded: b && b.getAttribute('aria-expanded'), inline: !!tr.querySelector('.inbox-dismiss'), sameLine: Math.abs(tr.querySelector('.dt-mail-title').getBoundingClientRect().top - tr.querySelector('.dt-mail-snippet').getBoundingClientRect().top) < 4, inside: !!(b && !b.closest('.dt-mail-open')) }; })`);
@@ -59,22 +79,36 @@ const AGENTS = [
             const clickCurrent = (expression, why) => waitFor(`(() => { const e = (${expression}); if (!e?.isConnected || !e.getClientRects().length) return false; e.click(); return true; })()`, at + why, 4000);
             // a tap opens the menu: Dismiss first, on the screen, focused; the row itself did not open
             const url0 = await ev(`location.href`);
-            await clickCurrent(`(() => { const toggle = (${probe}); window.__rowMenuClicked = toggle; return toggle; })()`, 'tap the current row menu');
-            await waitFor(`!!(${probe}) && !(${probe}).parentElement.querySelector('.menu').hidden`, at + 'the menu opens', 4000).catch(async error => {
-                const diagnostic = await ev(`(() => {
-                    const original = window.__rowMenuClicked, current = (${probe}), menu = current?.parentElement.querySelector('.menu');
-                    return { originalConnected: original?.isConnected ?? false, currentConnected: current?.isConnected ?? false,
-                        expanded: current?.getAttribute('aria-expanded') ?? null, originalExpanded: original?.getAttribute('aria-expanded') ?? null,
-                        menuPresent: !!menu, menuConnected: menu?.isConnected ?? false, menuHidden: menu?.hidden ?? null,
-                        menuVisible: !!menu && !menu.hidden && menu.getClientRects().length > 0 && getComputedStyle(menu).visibility !== 'hidden',
-                        menuDisplay: menu ? getComputedStyle(menu).display : null, redraw: original !== current };
-                })()`).catch(diagnosticError => ({ diagnosticError: String(diagnosticError) }));
-                throw new Error(error.message + ' row-menu diagnostic: ' + JSON.stringify(diagnostic));
-            });
+            // A redraw can replace the row between the tap and the menu opening (the open is after an awaited import), and the tap opens the menu of the button that is in the row now (data_table.js, #14757): nobody taps again. Once (390 dark) a redraw is forced in the same task as the first tap and the same tap must open the menu (taps === 1); the loop only guards a run where it did not (#14630).
+            const forced = w === 390 && theme === 'dark';
+            const opens = `!!(${probe}) && !(${probe}).parentElement.querySelector('.menu').hidden`;
+            let opened = false, replaced = null, taps = 0, lastDiagnostic = null;
+            for (let attempt = 1; attempt <= 5 && !opened; attempt++) {
+                taps = attempt;
+                if (forced && attempt === 1) replaced = await ev(`(() => { const t = (${probe}); window.__rowMenuClicked = t; t.click(); window.__state.liveSessions = window.__state.liveSessions.map(a => ({ ...a, waiting_since: new Date(Date.parse(a.waiting_since) - 1000).toISOString() })); window.__inboxTab.updateInboxTab(); return !t.isConnected; })()`);
+                else await clickCurrent(`(() => { const toggle = (${probe}); window.__rowMenuClicked = toggle; return toggle; })()`, 'tap the current row menu');
+                opened = await waitFor(opens, at + 'the menu opens', attempt === 5 ? 4000 : 1500).then(() => true, async error => {
+                    lastDiagnostic = error.message + ' row-menu diagnostic: ' + JSON.stringify(await ev(`(() => {
+                        const original = window.__rowMenuClicked, current = (${probe}), menu = current?.parentElement.querySelector('.menu');
+                        return { attempt: ${attempt}, originalConnected: original?.isConnected ?? false, currentConnected: current?.isConnected ?? false,
+                            expanded: current?.getAttribute('aria-expanded') ?? null, originalExpanded: original?.getAttribute('aria-expanded') ?? null,
+                            menuPresent: !!menu, menuConnected: menu?.isConnected ?? false, menuHidden: menu?.hidden ?? null,
+                            menuVisible: !!menu && !menu.hidden && menu.getClientRects().length > 0 && getComputedStyle(menu).visibility !== 'hidden',
+                            menuDisplay: menu ? getComputedStyle(menu).display : null, redraw: original !== current };
+                    })()`).catch(diagnosticError => ({ diagnosticError: String(diagnosticError) })));
+                    return false;
+                });
+            }
+            if (!opened) throw new Error(lastDiagnostic);
+            if (forced) check(at + 'a redraw right after the tap replaced the button, and the same tap still opened the menu (no second tap)', replaced === true && taps === 1, JSON.stringify({ replaced, taps }));
             const menu = await ev(`(() => { const t = (${probe}), m = t.parentElement.querySelector('.menu'), r = m.getBoundingClientRect(), items = [...m.querySelectorAll('[role=menuitem]')]; return { expanded: t.getAttribute('aria-expanded'), items: items.map(i => i.textContent), focus: document.activeElement === items[0], role: m.getAttribute('role'), left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), bottom: Math.round(r.bottom), vw: innerWidth, vh: innerHeight, itemH: Math.round(items[0].getBoundingClientRect().height), url: location.href }; })()`);
             check(at + 'the menu opens: Dismiss is its first action, focused, a 44 px row', menu.expanded === 'true' && menu.items[0] === 'Dismiss' && menu.focus && menu.role === 'menu' && menu.itemH >= 44, JSON.stringify(menu));
             check(at + 'the menu is whole on the screen (not cut by the list)', menu.left >= 0 && menu.right <= menu.vw && menu.top >= 0 && menu.bottom <= menu.vh, JSON.stringify(menu));
             check(at + 'the press on the ⋯ did not open the row', menu.url === url0);
+            await ev(`(async()=>{window.__beforeRefreshToggle=(${probe});const {state}=await import((window.__coralStatic||'/static/')+'state.js');state.liveSessions=state.liveSessions.map(s=>s.session_id===${JSON.stringify(AGENTS[0].session_id)}?{...s,waiting_since:new Date().toISOString()}:s);(await import((window.__coralStatic||'/static/')+'inbox_tab.js')).updateInboxTab();return true})()`);
+            await waitFor(`!window.__beforeRefreshToggle.isConnected`,at+'forced waiting_since update replaces the row');
+            await waitFor(`(${probe})?.getAttribute('aria-expanded')==='true'`,at+'same-row refresh keeps menu open');
+            check(at+'refreshed menu remains focused and on screen',await ev(`(()=>{const t=(${probe}),m=document.getElementById(t.getAttribute('aria-controls')),r=m.getBoundingClientRect();return m.contains(document.activeElement)&&!m.hidden&&r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight})()`));
             await shot(`inbox-row-menu-${w}-${theme}`);
             // Escape closes it and gives the focus back to the button
             await key('Escape', 'Escape', 27);

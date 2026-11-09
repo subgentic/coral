@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; frame-src about:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<!-- The trusted HOST of an HTML file the person chose to run scripts for (#14730, design v3). Loaded by URL (/artifact_host.html) so its own
+     response headers govern it (see artifactHostCSP in internal/server): default-src 'none', script-src 'unsafe-inline', frame-src about:,
+     sandbox allow-scripts. The dashboard frames it with sandbox="allow-scripts" (an opaque origin: no cookies, no storage, no access to Coral)
+     and posts the file's HTML ONCE; the host runs it in a child frame that can neither navigate nor make a request.
+     No bridge: the only things that cross are the HTML in (once) and one clamped whole number out (the page's height, so the frame can fit). -->
+<style>html,body{margin:0;height:100%}iframe{border:0;width:100%;height:100%;display:block;background:#fff}</style></head>
+<body><script>
+(function () {
+  'use strict';
+  var CHILD_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
+  var MAX_HTML = 2 * 1024 * 1024 + 16 * 1024, MAX_HEIGHT = 20000;
+  var child = null, started = false, loads = 0;
+  function up(m) { window.parent.postMessage(m, '*'); }
+  window.addEventListener('message', function (e) {
+    var m = e.data;
+    if (!m || typeof m !== 'object') return;
+    if (e.source === window.parent) {
+      if (m.type === 'coral-artifact-load' && !started && typeof m.html === 'string' && m.html.length <= MAX_HTML) { started = true; start(m.html); }
+      return;
+    }
+    // The only thing the file may send out: a whole number, clamped here and again by the dashboard; nothing else of its message is kept.
+    if (child && e.source === child.contentWindow && m.type === 'coral-artifact-height' && typeof m.height === 'number' && isFinite(m.height)) {
+      up({ type: 'coral-artifact-height', height: Math.max(0, Math.min(MAX_HEIGHT, Math.floor(m.height))) });
+    }
+  });
+  function start(html) {
+    var f = document.createElement('iframe');
+    f.setAttribute('sandbox', 'allow-scripts');
+    f.setAttribute('csp', CHILD_CSP);
+    f.setAttribute('allow', '');
+    f.referrerPolicy = 'no-referrer';
+    // A document can navigate ITSELF; this host's CSP (frame-src about:) forbids it, and a second load removes the frame.
+    f.addEventListener('load', function () { if (++loads > 1) { f.remove(); child = null; up({ type: 'coral-artifact-navigated' }); } });
+    f.srcdoc = '<!doctype html><meta http-equiv="Content-Security-Policy" content="' + CHILD_CSP + '">' + html;
+    child = f;
+    document.body.appendChild(f);
+  }
+  up({ type: 'coral-artifact-host-ready' });
+})();
+</script></body></html>

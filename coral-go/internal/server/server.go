@@ -259,6 +259,7 @@ func (s *Server) Close() {
 		if s.opencode != nil {
 			s.opencode.Close() // every opencode server Coral started ends with it, by its own pid
 		}
+		routes.StopDocIDMigration(s.cfg.CoralDir(), closeWait) // the startup stamping of document ids is a writer in the artifacts folder: it stops, and is waited for, with the rest (#14759)
 		if s.bgStop != nil {
 			s.bgStop()
 		}

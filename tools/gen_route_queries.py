@@ -100,10 +100,10 @@ ENUM = {
     'POST /api/sessions/record-agents': {'dry_run': ['1']},
     # diff=fields (#3281) only changes the feed's shape (partial rows for a dashboard); only that exact value passes.
     'GET /ws/coral': {'feed': ['hub'], 'diff': ['fields']},
-    # One row per file (#11700, coral-hub's ask #11782): versions accepts only newest through the tunnel. The handler also takes "all", which the Hub has no use for; any other word is refused here as it is by the handler.
+    # One row per file (#11700): ordinary artifact lists use versions=newest. The Operator's decision-time legacy expansion uses versions=all on the owner-only cross-team route, with team/tag/name/uploader filters; other values stay refused.
     'GET /api/board/{}/artifacts': {'versions': ['newest']},
     # The starred series first (#13910): only starred_first=true passes.
-    'GET /api/team-artifacts': {'versions': ['newest'], 'starred_first': ['true']},
+    'GET /api/team-artifacts': {'versions': ['newest', 'all'], 'starred_first': ['true']},
     # The artifact link form (#3168): only v=2 passes; any other value or a second v is refused. open=1 (#11836, #11845) is the viewer's Open in new tab (a readable tab, not a download); only that exact value passes.
     'GET /api/artifacts/{}': {'v': ['2'], 'open': ['1']},
     # The earlier versions' comments (#6459, #13502): the handler acts on series=1 only and ignores any other value, so only that exact value passes (the shell sends nothing else).

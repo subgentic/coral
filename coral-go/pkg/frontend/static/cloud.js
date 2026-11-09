@@ -8,7 +8,7 @@
 import { returnAddress } from './served_address.js';
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
-import { isCloud, nativeInbox, initCloudAccountFlags } from './server_base.js';
+import { isCloud, nativeInbox, nativeSaved, initCloudAccountFlags } from './server_base.js';
 import { readAccount, accountNavEntries, ACCOUNT_NAV } from './account_info.js';
 import { MENU_KEYS, menuMove } from './menu_keys.js';
 import { filterSettingsPayload, settingsErrorMessage } from './cloud_settings.js';
@@ -205,13 +205,19 @@ const signOut = signOutThisBrowser; // drafts, pending messages, recent folders,
 const navLink = ([text, href]) => h('a', { className: 'menu-item overflow-menu-item', role: 'menuitem', href, text, ...(href === '/usage' ? { id: 'cloud-account-usage' } : {}) });
 
 function buildAccountMenu(email) {
-    // The hub's own pages, on this origin (the dashboard is served by the hub): plain links, same tab. Until the account answers (and for an older Hub, or a failed read) the entries are Account (coral-go#1) and Saved for later (the hub's roll-up of every machine's saved messages, #4596).
-    const defaults = [navLink(ACCOUNT_NAV.account), navLink(ACCOUNT_NAV.saved)];
-    const signOutBtn = h('button', { type: 'button', className: 'menu-item overflow-menu-item', role: 'menuitem', text: 'Sign out', onclick: signOut });
+    // The desktop account menu is the phone drawer's list (#14764, #14718): Settings, Account, Docs, Computers, GitHub, Sign out, in that order, and nothing else. Account is the Hub's own page on this origin (a plain link, same tab); the Hub's other pages
+    // (Saved for later, Usage, Billing, Team...) are reached from Account. Until the account answers (and for an older Hub, or a failed read) Account is the default entry.
+    const accountEntry = navLink(ACCOUNT_NAV.account);
+    const button = (text, run) => h('button', { type: 'button', className: 'menu-item overflow-menu-item', role: 'menuitem', text, onclick: run });
+    const signOutBtn = button('Sign out', signOut);
+    const github = h('a', { className: 'menu-item overflow-menu-item', role: 'menuitem', href: 'https://github.com/subgentic/coral', text: 'GitHub' });
     const menu = h('div', { className: 'menu cloud-account-menu', id: 'cloud-account-menu', 'data-coral-hook': 'account-menu', hidden: true, role: 'menu' },
         h('div', { className: 'cloud-account-email', text: email, title: email }),
-        h('button', { type: 'button', className: 'menu-item overflow-menu-item', role: 'menuitem', text: 'Computers', onclick: () => { setOpen(false); importOnce('./servers.js', 'the computer list').then(m => m.showServersModal(), () => {}); } }),
-        ...defaults, signOutBtn,
+        button('Settings', () => { setOpen(false); window.showSettingsModal?.(); }),
+        accountEntry,
+        button('Docs', () => { setOpen(false); window.switchNavTab?.('docs'); }),
+        button('Computers', () => { setOpen(false); importOnce('./servers.js', 'the computer list').then(m => m.showServersModal(), () => {}); }),
+        github, signOutBtn,
     );
     const items = () => [...menu.querySelectorAll('[role="menuitem"]')];
     const setOpen = (open, focus = true) => {
@@ -232,11 +238,13 @@ function buildAccountMenu(email) {
         e.preventDefault(); list[to].focus();
     });
     btn.addEventListener('keydown', e => { if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && menu.hidden) { e.preventDefault(); setOpen(true); } });
-    // What the Hub says this account may use: one read of /api/account for the page (account_info.js). A failed read, or an answer with no `nav`, changes nothing.
+    // What the Hub says this account may use: one read of /api/account for the page (account_info.js). The six above are always there; the Hub's `nav` entries it still sends (other than Account, which is one of the six) go between GitHub and Sign out (#14764).
+    // A Hub that sends no `nav` (an older one, or a failed read) keeps Saved for later, and with analytics_tab Usage after it, as before.
+    const saved = navLink(ACCOUNT_NAV.saved); signOutBtn.before(saved);
     readAccount().then(d => {
         const entries = accountNavEntries(d && d.nav);
-        if (entries) { defaults.forEach(a => a.remove()); signOutBtn.before(...entries.map(navLink)); return; }
-        if (d && d.analytics_tab === true) defaults[1].after(navLink(ACCOUNT_NAV.usage)); // an older Hub that names no `nav` but has the rolled-up Analytics (#11018): Usage after Saved for later, as before
+        if (entries) { saved.remove(); signOutBtn.before(...entries.filter(e => e !== ACCOUNT_NAV.account).map(navLink)); return; }
+        if (d && d.analytics_tab === true) saved.after(navLink(ACCOUNT_NAV.usage));
     });
     return h('div', { className: 'cloud-account-wrapper' }, btn, menu);
 }
@@ -252,6 +260,13 @@ export async function initCloud() {
     const s = await loadSession();
     if (!s.authenticated) { goToSignIn(); return false; }
     await initCloudAccountFlags(); // settle per-account routing before Inbox modules read their initial flags
+    if (nativeSaved()) {
+        document.body.classList.add('cloud-native-saved');
+        // The shared Saved dock is read-only in Hub mode. Reveal it only after
+        // this account's strict capability flag has been resolved.
+        document.getElementById('agentic-tab-saved')?.removeAttribute('data-local-only');
+        document.getElementById('agentic-panel-saved')?.removeAttribute('data-local-only');
+    }
     state.account = { email: s.email };
     const actions = document.querySelector('.top-bar-actions');
     if (actions && !document.getElementById('cloud-account-menu')) actions.append(buildAccountMenu(s.email));

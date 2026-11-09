@@ -282,10 +282,11 @@ func TestHostFlagDefaultsAreThisComputer(t *testing.T) {
 	remoteish := regexp.MustCompile(`(?i)remote|public|expose|lan`)
 	found := map[string]bool{}
 	allowed := map[string]string{
-		"cmd/coral/main.go:defineServerFlags:host":   `default "": the server's default (this computer only)`,
-		"cmd/coral/main.go:defineServerFlags:remote": "default false",
-		"cmd/coral-tray/main.go:main:host":           `default "": hostArgs hands the server no --host`,
-		"cmd/coral/main.go:defineServerFlags:hub":    "not an address: hub mode does not change the bind",
+		"cmd/coral/main.go:defineServerFlags:host":          `default "": the server's default (this computer only)`,
+		"cmd/coral/main.go:defineServerFlags:remote":        "default false",
+		"cmd/coral-tray/main.go:main:host":                  `default "": hostArgs hands the server no --host`,
+		"cmd/coral/main.go:defineServerFlags:hub":           "not an address: hub mode does not change the bind",
+		"cmd/coral-board/resource.go:resourceDefine:remote": "default false: names a resource's machine for heavy runs over ssh (coral-board heavy run, #14354); not a listener, and nothing it does opens a port",
 	}
 	for _, src := range productionSources(t) {
 		if !strings.HasPrefix(src.rel, "cmd/") {

@@ -2,6 +2,7 @@
 // same words each time, and a screen reader says a rewritten region again: one tap on Next with no name said "Team name is required" seven times (#10693, the first-run keyboard and screen-reader pass). Now an unchanged line is left
 // alone: a blocked Next, a step shown again and typing that changes nothing write it at most once. At 1280 and 390 px. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
+const { teamDir } = require('./helpers/team_dir');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
@@ -31,9 +32,9 @@ const { coralReady } = require('./helpers/wait');
             const same = await writes();
             if (same !== 0) problems.push(`${w}: the same line written again ${same} times when nothing changed`);
             // (3) a real change still writes it: a name and a folder, then step 2's recap names the team
-            await ev(`{ const n = document.getElementById('team-board-name'); n.value = 'first-run'; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = '/tmp/first-run'; d.dispatchEvent(new Event('input', { bubbles: true })); document.getElementById('launch-team-next').click(); } true`);
+            await ev(`{ const n = document.getElementById('team-board-name'); n.value = 'first-run'; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = ${JSON.stringify(teamDir('first-run'))}; d.dispatchEvent(new Event('input', { bubbles: true })); document.getElementById('launch-team-next').click(); } true`);
             await waitFor(`document.getElementById('launch-step-team').dataset.stage === 'members'`, `${w}: step 2`, 8000);
-            await waitFor(`/first-run: \\d+ members?, \\/tmp\\/first-run/.test(document.getElementById('team-recap').textContent)`, `${w}: the recap names the team and its folder`, 5000);
+            await waitFor(`/first-run: \\d+ members?, /.test(document.getElementById('team-recap').textContent) && document.getElementById('team-recap').textContent.includes(${JSON.stringify(teamDir('first-run'))})`, `${w}: the recap names the team and its folder`, 5000);
             await watch();
             await ev(`document.dispatchEvent(new Event('team-step-shown', { bubbles: true })); true`);
             if ((await writes()) !== 0) problems.push(`${w}: step 2's recap is written again when nothing changed`);

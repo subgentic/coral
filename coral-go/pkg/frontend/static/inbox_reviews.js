@@ -2,9 +2,10 @@ import { artifactRevision, artifactsUnchanged, onArtifactsRev } from './artifact
 import { setReviewCacheReader } from './ask_filter.js';
 /* Review artifacts use the same owner-protected team list and tags routes as Artifacts.
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
+import { nativeSavedSourceAllowed } from './server_status.js';
 import { sourcesKey } from './board_fetch.js';
 import { inboxSources, serverLabel, isOwnerOnlyAnswer } from './inbox_servers.js';
-import { boardFetch, nextArtifactPage, splitKey, serverFetch, identityKey, noteBoardLabels, normServer } from './server_base.js';
+import { boardFetch, nextArtifactPage, splitKey, serverFetch, identityKey, noteBoardLabels, normServer, isCloud, nativeSaved } from './server_base.js';
 import { SORT_PARAM } from './filter_model.js';
 import { fetchSkewed } from './query_skew.js';
 import { hideAsksWhen } from './ask_filter.js';
@@ -12,7 +13,13 @@ import { importOnce } from './import_once.js';
 const { createReviewPages } = await importOnce('./review_pages.js');
 const { needsReviewAttention, hasNewVersion, waitingOnAgent } = await importOnce('./inbox_review_state.js');
 
-let items = [], saved = [], muted = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => { if (typeof document !== 'undefined') document.dispatchEvent(new Event('coral:reviews-changed')); };
+let items = [], saved = [], muted = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = (detail = null) => { if (typeof document !== 'undefined') document.dispatchEvent(new CustomEvent('coral:reviews-changed', { detail })); };
+let savedActivated = false;
+export function activateSavedReviews() {
+    if (savedActivated) return pending || Promise.resolve();
+    savedActivated = true;
+    return pending ? pending.then(() => refreshReviews(true)) : refreshReviews(true);
+}
 let activated = false, refreshAgain = false, freshnessDirty = false;
 onArtifactsRev(() => {
     if (!activated) return;
@@ -91,9 +98,10 @@ hideAsksWhen(a => { const key = askReviewKey(a); return !!key && (linkedReviews.
 let savedFor = null, savedRev = -1, savedView = [];
 /** The saved files, one row per file like Needs you (#11937): the newest version, with the older saved ones as `earlier`. */
 export const savedFiles = () => {
-    if (savedFor === saved && savedRev === revision) return savedView;
+    const permitted = rows => isCloud() && nativeSaved() ? rows.filter(row => nativeSavedSourceAllowed(splitKey(row.team).server)) : rows;
+    if (savedFor === saved && savedRev === revision) return permitted(savedView);
     savedView = collapseVersions(saved); savedFor = saved; savedRev = revision;
-    return savedView;
+    return permitted(savedView);
 };
 export const isRead = a => !!(a.tags && a.tags.includes('read')) && !(a.new_comments > 0) && !hasNewVersion(a); // a read file whose Operator-started thread has agent replies not yet opened is unread again, counted once as itself (#12026)
 export const unreadReviewItems = () => reviewItems().filter(needsReviewAttention);
@@ -262,6 +270,7 @@ export async function reviewOfTeam(team, digest, { anyState = false } = {}) {
     const hex = String(digest || '').toLowerCase();
     if (!/^[a-f0-9]{64}$/.test(hex)) throw new Error('The review file has no valid digest.');
     const source = splitKey(team);
+    if (anyState && isCloud() && nativeSaved() && !nativeSavedSourceAllowed(source.server)) throw new Error('Saved file lookup requires an owned, online computer running Coral 2.0.62 or newer.');
     const params = new URLSearchParams({ team: source.name, digest: hex, ...(!anyState ? { tag: 'for review' } : {}) });
     const query = params.toString();
     const data = await readComputerPage(source.server, { query, cursor: '', limit: 50, revisionBound: !anyState }); // viewer state can overlap its own mark-read write
@@ -274,11 +283,17 @@ export async function reviewOfTeam(team, digest, { anyState = false } = {}) {
  * The reviewed row fixes the source, uploader/name group and upper version boundary. */
 export async function legacyEarlierVersions(row) {
     const source = splitKey(row.team), query = new URLSearchParams({ team: source.name, tag: 'for review', versions: 'all', q: row.name || '' });
-    if (row.produced_by) query.set('by', row.produced_by);
+    const name = String(row.name || ''), uploader = String(row.produced_by || '');
+    if (new TextEncoder().encode(name).length > 200) throw new Error('The file name exceeds Coral Hub’s 200-byte search limit; earlier versions could not be checked.');
+    const hasUnsupportedSpaceOrControl = value => [...value].some(ch => ch !== ' ' && /[\p{Cc}\p{White_Space}]/u.test(ch));
+    if (hasUnsupportedSpaceOrControl(name) || hasUnsupportedSpaceOrControl(uploader) || uploader.includes(',') || source.name.includes(',')) {
+        throw new Error('The file name, uploader, or team contains characters Coral Hub cannot safely search; earlier versions could not be checked.');
+    }
+    if (uploader) query.set('by', uploader);
     const older = new Map(), seen = new Set();
     let cursor = '';
     do {
-        const page = await readComputerPage(source.server, { query: query.toString(), cursor, limit: 50, revisionBound: false });
+        const page = await readComputerPage(source.server, { query: query.toString(), cursor, limit: 50, revisionBound: false, legacyExpansion: true });
         if (page.ownerOnly) throw new Error('Earlier versions are available only to this computer’s owner.');
         for (const a of page.artifacts) if (a.team === row.team && vkey(a) === vkey(row) && a.hex !== row.hex && byAge(a, row) < 0) older.set(a.hex, a);
         if (!page.has_more) return [...older.values()];
@@ -294,7 +309,7 @@ export async function legacyEarlierVersions(row) {
 const reviewQuery = new URLSearchParams({ tag: 'for review', versions: 'newest', starred_first: 'true', facets: 'team,by,goal' }).toString();
 const savedQuery = new URLSearchParams({ tag: 'saved', versions: 'newest' }).toString();
 let pagesReady = false, pendingStarted = 0, finishedAt = 0, finishedRev = -1, lastSources = null, rescans = 0;
-async function readComputerPage(server, { query, cursor, limit, signal, revisionBound = true }) {
+async function readComputerPage(server, { query, cursor, limit, signal, revisionBound = true, legacyExpansion = false }) {
     const started = revision, params = new URLSearchParams(query);
     params.set('limit', String(limit));
     if (cursor) params.set('cursor', cursor); else params.delete('cursor');
@@ -303,6 +318,7 @@ async function readComputerPage(server, { query, cursor, limit, signal, revision
     const asked = dropped.includes('digest') ? new Set((params.get('digest') || '').split(',').filter(Boolean)) : null; // the list came back whole: only the files asked for are kept
     if (signal?.aborted || (revisionBound && started !== revision)) throw Object.assign(new Error('The review read was superseded.'), { name: 'AbortError' });
     if (response.status === 403 && (data.code === 'owner_only' || data.error === 'owner_only')) return { artifacts: [], total: 0, tag_counts: {}, has_more: false, ownerOnly: true };
+    if (legacyExpansion && response.status === 403 && (data.code === 'path_not_allowed' || data.error === 'path_not_allowed')) throw new Error("Earlier versions aren't available through Coral Hub.");
     if (!response.ok) throw new Error(`Review artifacts could not be read (HTTP ${response.status}).`);
     if (!Array.isArray(data.artifacts)) throw new Error('The review page was not a list.');
     if (data.partial || data.failed_boards?.length) throw new Error('Some review files could not be read.');
@@ -325,14 +341,14 @@ const reviewPager = createReviewPages({ read: readComputerPage, key: pageKey });
 const savedPager = createReviewPages({ read: readComputerPage, key: pageKey });
 function syncPageSources() {
     const servers = inboxSources();
-    if (!pagesReady) { reviewPager.reset(servers, reviewQuery); savedPager.reset(servers, savedQuery); pagesReady = true; }
-    else { reviewPager.setSources(servers); savedPager.setSources(servers); }
+    if (!pagesReady) { reviewPager.reset(servers, reviewQuery); savedPager.reset(isCloud() && nativeSaved() ? servers.filter(server => nativeSavedSourceAllowed(server)) : servers, savedQuery); pagesReady = true; }
+    else { reviewPager.setSources(servers); savedPager.setSources(isCloud() && nativeSaved() ? servers.filter(server => nativeSavedSourceAllowed(server)) : servers); }
 }
 export const reviewPages = () => reviewPager.status();
 export const savedReviewPages = () => savedPager.status();
 /** Saved is an intersection: the saved query's for-review tag count covers off-page review files. */
 export function countSavedReviews() {
-    const pages = savedReviewPages(), unknown = new Set();
+    const pages = savedReviewPages().filter(page => !isCloud() || !nativeSaved() || nativeSavedSourceAllowed(page.server)), unknown = new Set();
     let value = 0, complete = pages.length > 0;
     for (const page of pages) {
         if (page.ownerOnly) continue;
@@ -361,6 +377,7 @@ export function reviewPageSummary() {
         hasMore: sources.some(s => s.has_more), partial: !ready || sources.some(s => s.truncated),
         failed: sources.filter(s => s.error).map(s => s.server) };
 }
+let pagesPublished = false;
 function publishPages() {
     const next = [], nextSaved = [], nextMuted = [], failed = [];
     for (const source of reviewPager.snapshot()) {
@@ -377,7 +394,8 @@ function publishPages() {
         for (const a of source.artifacts) if (a.tags?.includes('saved') && a.tags.includes('for review') && a.available) nextSaved.push(a);
     }
     items = next.sort(byAge); saved = nextSaved.sort(byAge); muted = nextMuted.sort(byAge); errors = failed;
-    changed();
+    changed({ countsUnchanged: !pagesPublished }); // initial page publication is not an edit: the independent startup summary is already reading
+    pagesPublished = true;
 }
 async function appendReviews(pager, server) {
     if (!activated) return;
@@ -421,7 +439,7 @@ export function refreshReviews(force = false, { reuse = false } = {}) {
     syncPageSources();
     const unchanged = !force && !freshnessDirty && finishedRev === revision ? unchangedComputer : null;
     freshnessDirty = false;
-    pending = Promise.all([reviewPager.refresh({ unchanged }), savedPager.refresh({ unchanged }), refreshActiveQuery(unchanged)]).then(([reviews, saved]) => {
+    pending = Promise.all([reviewPager.refresh({ unchanged }), (!isCloud() || savedActivated ? savedPager.refresh({ unchanged }) : Promise.resolve([])), refreshActiveQuery(unchanged)]).then(([reviews, saved]) => {
         if (started !== revision) return;
         if (!sourceSetChanged && [...reviews, ...saved].every(result => result === false)) return;
         publishPages();

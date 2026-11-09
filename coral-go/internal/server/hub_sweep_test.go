@@ -137,7 +137,7 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 	routes.SetHubOwnerLabel(func(context.Context) (string, error) { return sweepOwner, nil })
 	t.Cleanup(func() { routes.SetHubOwnerLabel(nil) })
 	owner := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: sweepOwner}
-	ownerOnly := map[string]bool{"/api/launch-disclosure": true, "/api/artifacts": true, "/api/artifacts/resolve": true, "/api/artifacts/{id}": true, "/api/artifacts/{id}/meta": true, "/api/artifacts/{id}/thumbnail": true, "/api/artifacts/{id}/comments": true, "/api/artifacts/{id}/readers": true,
+	ownerOnly := map[string]bool{"/api/artifacts/{id}/trust-preview": true, "/api/thread": true, "/api/threads": true, "/api/launch-disclosure": true, "/api/artifacts": true, "/api/artifacts/resolve": true, "/api/artifacts/{id}": true, "/api/artifacts/{id}/meta": true, "/api/artifacts/{id}/thumbnail": true, "/api/artifacts/{id}/comments": true, "/api/artifacts/{id}/readers": true,
 		"/api/board/{project}/artifacts": true, "/api/board/{project}/cross-team/settings": true, "/api/session-artifacts": true, "/api/team-artifacts": true, "/api/board/{project}/tasks/{taskID}/artifact-content": true,
 		"/api/saved": true, "/api/saved/{id}/message": true, // saved for later is the owner's alone since #5753
 		"/api/artifacts/{id}/versions": true, "/api/artifacts/series/{series_id}": true, "/api/artifacts/series/{series_id}/versions": true, // the owner's version list and series reads (#11354)
@@ -186,6 +186,9 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		if f[1] == "/api/artifacts/{id}/readers" { // who can read that artifact (#5577)
 			path = "/api/artifacts/" + artifactHex + "/readers"
 		}
+		if f[1] == "/api/artifacts/{id}/trust-preview" { // the owner's trust record of that artifact (#14730)
+			path = "/api/artifacts/" + artifactHex + "/trust-preview"
+		}
 		if f[1] == "/api/artifacts/{id}/versions" { // the version list of that artifact (#11354)
 			path = "/api/artifacts/" + artifactHex + "/versions"
 		}
@@ -225,7 +228,9 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		// The editor's capability read (#13757) names a file of the board; the rig's artifact is on no team, so the owner's answer is the route's own 404 (the plain hub caller was refused above).
 		editAbsent := ownerOnly[f[1]] && (strings.HasSuffix(f[1], "/edit") || strings.HasSuffix(f[1], "/edit/send")) && (rec.Code == 404 || rec.Code == 409) // 409 not_an_edit: the rig's artifact is no saved edit
 		thumbnailAbsent := f[1] == "/api/artifacts/{id}/thumbnail" && rec.Code == 404 && strings.Contains(rec.Body.String(), "thumbnail unavailable")
-		if rec.Code == 200 || thumbnailAbsent || versionsAbsent || editAbsent || resolveAnswered || updateOff || savedAbsent || (strings.HasPrefix(f[1], "/api/templates/") && rec.Code == 404 && strings.Contains(rec.Body.String(), "template_not_found")) {
+		// The thread reads (#14440) need a team and a goal or task of it: the rig sends neither, so the owner's answer is the route's own 400 or 404 (the plain hub caller was refused above).
+		threadAbsent := (f[1] == "/api/thread" || f[1] == "/api/threads") && (rec.Code == 400 || rec.Code == 404)
+		if rec.Code == 200 || thumbnailAbsent || threadAbsent || versionsAbsent || editAbsent || resolveAnswered || updateOff || savedAbsent || (strings.HasPrefix(f[1], "/api/templates/") && rec.Code == 404 && strings.Contains(rec.Body.String(), "template_not_found")) {
 			answered++
 		}
 		for _, home := range homes {

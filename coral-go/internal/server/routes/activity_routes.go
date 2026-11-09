@@ -47,6 +47,8 @@ var activityRoutes = map[string]activityRoute{
 	"PUT /api/artifacts/{id}/star":                        {board.ActFileStar, "file", "id", ""},
 	"DELETE /api/artifacts/{id}/star":                     {board.ActFileUnstar, "file", "id", ""},
 	"PUT /api/artifacts/{id}/keep":                        {board.ActFileKeep, "file", "id", ""},
+	"PUT /api/artifacts/{id}/trust-preview":               {board.ActPreviewTrust, "file", "id", ""},
+	"DELETE /api/artifacts/{id}/trust-preview":            {board.ActPreviewUntrust, "file", "id", ""},
 	"DELETE /api/artifacts/{id}/keep":                     {board.ActFileRelease, "file", "id", ""},
 	"DELETE /api/artifacts/{id}":                          {board.ActFileDelete, "file", "id", ""},
 	"DELETE /api/artifacts/series/{series_id}":            {board.ActFileDelete, "file", "series_id", ""},
