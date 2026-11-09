@@ -4,7 +4,7 @@
 import { importOnce } from './import_once.js';
 import { boardFetch } from './server_base.js';
 const { refusalOf, answeredLocally } = await importOnce('./owner_refusal.js');
-const { OG_KEYS, seatOfName, logLine } = await importOnce('./orchestrator_grant_words.js');
+const { OG_KEYS, seatOfName, logLine, defaultSeat } = await importOnce('./orchestrator_grant_words.js');
 export { OG_KEYS };
 
 const LIMITS = { perHour: [1, 100], live: [1, 50], idle: [1, 120] }; // the server's bounds (board.MaxOrchMaxPerHour, MaxOrchMaxLive, MaxOrchIdleMin)
@@ -50,7 +50,8 @@ export function createOrchestratorGrant(team, members) {
             const l = await boardFetch(team, '/lifecycle-log').catch(() => null);
             log = l && l.ok ? await l.json().catch(() => []) : [];
             drawLog();
-            return { values: { og_enabled: !!base.enabled, og_seat: base.seat_session || '', og_max_per_hour: base.max_per_hour, og_max_live: base.max_live, og_idle_minutes: base.idle_minutes } };
+            const seat = base.seat_session || defaultSeat(await members().catch(() => [])); // never chosen: the team's Orchestrator is the one offered (#14998); the switch stays the Operator's
+            return { values: { og_enabled: !!base.enabled, og_seat: seat, og_max_per_hour: base.max_per_hour, og_max_live: base.max_live, og_idle_minutes: base.idle_minutes } };
         },
         bind(v) { view = v; },
         /** Saves the whole grant (the route takes it whole) and shows what the server kept. */
