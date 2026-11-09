@@ -65,9 +65,11 @@ async function waitForRestart(wantHub) {
 }
 
 /** Load the current state into the section (called when Settings opens). */
+let _gen = 0; // each read and each change takes the next number: an answer of an earlier one is not drawn (#14900: a read asked for before the person's change and answered after it put the old state back over it)
 export async function loadHubModeSetting() {
     wire();
-    try { render(await call('GET')); } catch (e) { render(null, `Could not load: ${e.message}`); }
+    const gen = ++_gen;
+    try { const st = await call('GET'); if (gen === _gen) render(st); } catch (e) { if (gen === _gen) render(null, `Could not load: ${e.message}`); }
 }
 
 function wire() {
@@ -79,6 +81,7 @@ function wire() {
     box.addEventListener('change', async () => {
         const want = box.checked;
         box.disabled = true;
+        _gen++; // reads still out are older than this change
         try { render(await call('PUT', { enabled: want })); }
         catch (e) { box.checked = !want; render(_last, `Not saved: ${e.message}.`); }
         finally { if (_last && !_last.forced) box.disabled = false; }
