@@ -18,6 +18,8 @@ const {coralReady}=require('./helpers/wait');const BASE=require('./test_base').B
   await ev(`window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
   await waitFor(`document.querySelectorAll('.inbox-ask-subject-links a').length===2`,'both subject links');
   await waitFor(`typeof window.__releaseGoalCountRead==='function'`,'deferred Goals count read');
+  // The Needs table is drawn again when the review pages' total and completeness arrive (a diagnostic of one failing run in 60 showed `total` null -> 0 and the complete flag flipping in the draw string 176 ms after the Goals read was released): that count is not the one under test, so take the anchor once the table has been still for 600 ms; the Goals count read that is released next must then leave this node alone.
+  await require('./helpers/wait').waitStable(ev,`document.getElementById('group-table-view').dataset.drawn`,'the Needs table is still before the Goals count read',600,{timeout:10000});
   await ev(`window.__subjectGoalAnchor=document.querySelector('.inbox-ask-subject-links a[data-subject-kind="goal"]');window.__releaseGoalCountRead();true`);
   await waitFor(`window.__goalCountReadDone===true`,'deferred Goals count completion');
   await ev(require('./helpers/wait').framesJs(2));
