@@ -67,11 +67,19 @@ const BASE = require('./test_base').BASE;
             if(width===1280) await ev(`(()=>{const b=document.createElement('button');b.id='test-hub-account-menu';b.setAttribute('data-on-click','m-top-menu');b.setAttribute('data-hamburger','');b.setAttribute('aria-controls','nav-more-menu');b.textContent='Hub account menu';document.body.append(b);return true})()`);
             const visibleButton=`[...document.querySelectorAll(${JSON.stringify(width===390?'[data-account]':'#test-hub-account-menu')})].find(b=>b.getClientRects().length>0)`; // on a phone the agent home hides the top bar (and its #top-phone-bar): the visible [data-account] is the home's own account button
             await waitFor(`!!(${visibleButton})`,'visible shared account/menu button');
-            await ev(`(${visibleButton}).click();true`);
-            await waitFor(`!document.getElementById('nav-more-menu').hidden`,'shared account menu open');
-            const section=await ev(`(()=>{const start=document.querySelector('#nav-more-menu [data-account-start]'),entries=[];for(let e=start;e;e=e.nextElementSibling)if(e.matches('[role=menuitem]'))entries.push({label:e.lastElementChild.textContent.trim(),icon:e.firstElementChild.textContent,href:e.getAttribute('href'),target:e.getAttribute('target')});return entries})()`);
+            // The section is read in the same task as the tap (the desktop's stand-in button is a hamburger, which the nav's layout pass closes on a wide window: a pass that lands between the tap and a later read, as on a loaded machine, shut the menu first, #14987). The phone's first tap imports the drawer's code, so it waits for the menu.
+            const SECTION=`(()=>{const start=document.querySelector('#nav-more-menu [data-account-start]'),entries=[];for(let e=start;e;e=e.nextElementSibling)if(e.matches('[role=menuitem]'))entries.push({label:e.lastElementChild.textContent.trim(),icon:e.firstElementChild.textContent,href:e.getAttribute('href'),target:e.getAttribute('target')});return entries})()`;
+            let section;
+            if(width===1280){
+                section=await ev(`(()=>{(${visibleButton}).click();if(document.getElementById('nav-more-menu').hidden)return null;return ${SECTION}})()`);
+                assert.ok(section,'shared account menu open at once on a wide window');
+            }else{
+                await ev(`(${visibleButton}).click();true`);
+                await waitFor(`!document.getElementById('nav-more-menu').hidden`,'shared account menu open');
+                section=await ev(SECTION);
+            }
             accountSections.push({width,section});
-            if(process.env.CORAL_SCREENSHOT_DIR){fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true});fs.writeFileSync(process.env.CORAL_SCREENSHOT_DIR+'/hub-account-'+width+'.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}
+            if(process.env.CORAL_SCREENSHOT_DIR){if(width===1280)await ev(`(()=>{if(document.getElementById('nav-more-menu').hidden)(${visibleButton}).click();return true})()`); /* open it again for the picture: the nav's layout pass may have closed it */ fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true});fs.writeFileSync(process.env.CORAL_SCREENSHOT_DIR+'/hub-account-'+width+'.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}
         }
         for(const {width,section} of accountSections){
             assert.deepEqual(section.map(e=>e.label),['Settings','Account','Docs','Computers','GitHub','Sign out'],width+': exact Hub account section');
