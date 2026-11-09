@@ -1010,8 +1010,3 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 @media (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     body.live-session-active #launch-disclosure-banner:not(:has(details[open])) { display: none; }
 }
-.editions-home-own { cursor: default; padding-inline-end: 14px; } /* a box with its own buttons, not one big button (#14976) */
-.editions-home-own-state { display: block; margin-top: 6px; color: var(--text-secondary); font-size: var(--fs-sm); }
-.editions-home-own-state:empty { display: none; }
-.editions-home-own-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.editions-home-own-actions .btn { margin: 0; } /* the page's bare button margin is not wanted in a row of small buttons */

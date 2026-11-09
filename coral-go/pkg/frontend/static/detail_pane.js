@@ -12,6 +12,7 @@ import { importOnce } from './import_once.js';
 const { el } = await importOnce('./team_table.js'); // lazy: its failure is retried
 const { attachDockResize, DOCK_MIN_WIDTH, dockMaxWidth } = await importOnce('./dock_resize.js'); // the goal page column's resize
 const { foldWayBack } = await importOnce('./way_back.js');
+const { loadStyles } = await importOnce('./lazy_styles.js'); await loadStyles('detail_more.css'); // the More menu's own rules: loaded with the pane, not at start
 const { moreMenu } = await importOnce('./more_menu.js'); // the file's More menu (#14963)
 const { makeDetails } = await importOnce('./details_disclosure.js'); // the facts and more behind one Details button (#7775)
 import { trapTab } from './dialog_focus.js';
