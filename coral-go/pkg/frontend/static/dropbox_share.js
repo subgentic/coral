@@ -2,8 +2,8 @@
  * board chat, the chat's own menu). It asks every time who can open the copy: Specific people (by email, the default), People in your team (only
  * on a Dropbox team account) or Anyone with the link; everything is view only. Nothing is shared before the press; a link needs its own box
  * ticked; a file that looks like it holds a key or token needs a second box. After a link is made the dialog shows it with Copy link, Share…
- * (the system sheet, where the browser has one), Open in Dropbox and Stop sharing. A chat is previewed first, in a sandboxed frame (no scripts,
- * no same origin), and shared exactly as previewed. Every server text is set as text; a link is shown only when it is https on www.dropbox.com.
+ * (the system sheet, where the browser has one), Open in Dropbox and Stop sharing. A chat is a Markdown transcript (#14982: Dropbox's preview does not
+ * render .html; the Operator chose .md), previewed first as text in the dialog and shared exactly as previewed. Every server text is set as text; a link is shown only when it is https on www.dropbox.com.
  * A native <dialog> opened with showModal(): Escape, its × and Cancel always close it, also while a request runs (that request still finishes;
  * Settings lists what it shared), and so does moving to another screen (the Operator's walk, #198059); Tab stays inside; the focus goes back to the
  * opener. This computer's Operator only: the server refuses everyone else, and the item is not offered through Coral Hub. */
@@ -111,12 +111,11 @@ export async function openChatShareDialog(opts) {
     if (!res.body.connected) { f.body.append(mk('p', null, 'Connect Dropbox in Settings, Storage and cleanup, to share through it.')); return; }
     const p = res.body;
     const n = Number(p.included || 0), left = Number(p.left_out || 0);
-    f.body.append(mk('p', 'settings-hint', `One readable page of ${n} ${n === 1 ? 'message' : 'messages'}${left ? ` (${left} left out: Coral's own posts and messages to a group)` : ''}. ` +
+    f.body.append(mk('p', 'settings-hint', `One Markdown file of ${n} ${n === 1 ? 'message' : 'messages'}${left ? ` (${left} left out: Coral's own posts and messages to a group)` : ''}, which Dropbox shows; what the messages say is shown as written, never as links or formatting. ` +
         'Secrets that look like keys or tokens are removed. Check the preview for private names and paths. Images and attachments are not included.'));
-    const pv = mk('iframe', 'dropbox-share-preview');
-    pv.setAttribute('sandbox', ''); // no scripts, no same origin, no forms, no navigation (Security's INFO on 31cb747a4)
-    pv.setAttribute('referrerpolicy', 'no-referrer'); pv.title = 'Preview of the page to share';
-    pv.srcdoc = String(p.html || '');
+    const pv = mk('pre', 'dropbox-share-preview'); // the transcript, set as text (#14982)
+    pv.tabIndex = 0; pv.setAttribute('aria-label', 'Preview of the file to share');
+    pv.textContent = String(p.text || '');
     const show = btn('Open the preview', 'btn btn-small', () => { pv.hidden = !pv.hidden; show.textContent = pv.hidden ? 'Open the preview' : 'Hide the preview'; show.setAttribute('aria-expanded', String(!pv.hidden)); });
     pv.hidden = true; show.setAttribute('aria-expanded', 'false');
     f.body.append(show, pv);

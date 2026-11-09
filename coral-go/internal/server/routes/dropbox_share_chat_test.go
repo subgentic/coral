@@ -8,7 +8,6 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -38,13 +37,6 @@ func fakeToken() string {
 	return "AKIA" + b.String()
 }
 
-// pageTags is every tag of the page, as written: text a message held is escaped, so any of its markup would show up here as a tag.
-var tagRe = regexp.MustCompile(`<[^>]*>`)
-
-var allowedTag = regexp.MustCompile(`^<(!doctype html|/?(html lang="en"|html|head|title|style|body|h1|article|header|b|time|pre|code|p)|p class="meta"|br|` +
-	`meta charset="utf-8"|meta name="viewport" content="width=device-width, initial-scale=1"|meta name="referrer" content="no-referrer"|` +
-	`meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'")>$`)
-
 func hostileMessages() []*board.Message {
 	group := "g1"
 	return []*board.Message{
@@ -56,36 +48,46 @@ func hostileMessages() []*board.Message {
 	}
 }
 
-// Mutants: a message's text is written unescaped; links become anchors; the CSP meta is dropped; secrets are not redacted; system or group posts
-// are included; an id is printed.
-func TestTheChatPageIsInertEscapedAndRedacted(t *testing.T) {
+// #14982 (the Operator's walk: Dropbox does not render .html; the Operator chose .md): the chat is a Markdown transcript where Coral writes the only
+// markup. Mutants: a message's punctuation is not escaped (a link, image, tag, autolink or code fence would render); secrets are not redacted;
+// system or group posts are included; an id is printed; a format character (bidi) is kept.
+func TestTheChatTranscriptIsEscapedMarkdownRedactedAndComplete(t *testing.T) {
 	page, err := renderChatPage("team-a", hostileMessages(), time.Date(2026, 11, 9, 12, 0, 0, 0, time.UTC))
 	require.NoError(t, err)
-	s := string(page.html)
-	assert.Contains(t, s, `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">`)
-	for _, tag := range tagRe.FindAllString(s, -1) {
-		assert.Regexp(t, allowedTag, tag, "only the page's own tags, no attribute a message could add")
-	}
-	style := s[strings.Index(s, "<style>"):strings.Index(s, "</style>")]
-	for _, bad := range []string{"url(", "@import", "expression("} {
-		assert.NotContains(t, style, bad, "the style loads nothing")
-	}
-	assert.Contains(t, s, "&lt;script&gt;alert(1)&lt;/script&gt;", "shown as text")
-	assert.Contains(t, s, "javascript:alert(3)", "a link is text")
-	assert.Contains(t, s, "QA &lt;b&gt;Bold&lt;/b&gt;", "the author is escaped")
-	assert.Contains(t, s, "<pre><code>fmt.Println(&#34;&lt;x&gt;&#34;)</code></pre>", "a fenced block, escaped, without its language word")
-	assert.Contains(t, s, "<code>inline &lt;y&gt;</code>")
+	s := string(page.text)
+	assert.True(t, strings.HasPrefix(s, "# team\\-a chat\n\n9 Nov 2026 10\\:01 UTC to 9 Nov 2026 10\\:03 UTC · 3 messages · shared from Coral on 9 Nov 2026\\. Secrets"), s[:160])
+	assert.Contains(t, s, "### Lead · 9 Nov 2026 10\\:01 UTC\n\nPlan\\:\n\n\\<script\\>alert\\(1\\)\\<\\/script\\> and \\<img src\\=x onerror\\=alert\\(2\\)\\> and \\[click\\]\\(javascript\\:alert\\(3\\)\\)\n",
+		"a tag, an image and a link are escaped: they show as written")
+	assert.Contains(t, s, "### QA \\<b\\>Bold\\<\\/b\\> · ")
+	assert.Contains(t, s, "\\`\\`\\`go  \nfmt\\.Println\\(\\\"\\<x\\>\\\"\\)  \n\\`\\`\\`", "a code fence is escaped, its lines kept")
 	assert.NotContains(t, s, "\u202e", "format characters are dropped")
 	assert.NotContains(t, s, fakeToken(), "the token is redacted")
 	assert.NotContains(t, s, "system post")
 	assert.NotContains(t, s, "group only")
-	for _, id := range []string{"sub-Lead", "sub-QA", "Task #9"} {
+	for _, id := range []string{"sub\\-Lead", "sub\\-QA", "Task \\#9"} {
 		assert.NotContains(t, s, id)
 	}
 	assert.Equal(t, 3, page.included)
 	assert.Equal(t, 2, page.leftOut)
-	sum := sha256.Sum256(page.html)
+	sum := sha256.Sum256(page.text)
 	assert.Equal(t, hex.EncodeToString(sum[:]), page.hash)
+
+	// Every ASCII punctuation character of a message is escaped: none is left bare in the message's part of the file.
+	evil := "**bold** _x_ ![img](http://e.example/i.png) <a href=x>y</a> https://e.example www.e.example &amp; `c` # h\n> quote\n- item\n1. one\n| t | u |\n    indented"
+	page, err = renderChatPage("t", []*board.Message{chatMsg(1, "A", evil)}, time.Now())
+	require.NoError(t, err)
+	msg := string(page.text)[strings.Index(string(page.text), "### A · "):]
+	msg = msg[strings.Index(msg, "\n\n")+2:]
+	for i := 0; i < len(msg); i++ {
+		c := msg[i]
+		if c < 0x80 && strings.ContainsRune("!\"#$%&'()*+,-./:;<=>?@[]^_`{|}~", rune(c)) {
+			require.True(t, i > 0 && msg[i-1] == '\\', "%q bare at %d in %q", c, i, msg)
+		}
+		if c == '\\' {
+			i++ // the escape and the character it escapes
+		}
+	}
+	assert.Contains(t, msg, "\u00a0\u00a0\u00a0\u00a0indented", "leading spaces kept as no-break spaces, not an indented code block")
 
 	_, err = renderChatPage("team-a", hostileMessages()[3:], time.Now())
 	assert.Error(t, err, "nothing left to share")
@@ -147,7 +149,7 @@ func TestAChatIsSharedExactlyAsPreviewed(t *testing.T) {
 	require.Equal(t, http.StatusOK, code, "%v", out)
 	paths := be.sharedPaths()
 	require.Len(t, paths, 1)
-	assert.Equal(t, shareRoot+"/team-a/Team A chat.html", paths[0])
+	assert.Equal(t, shareRoot+"/team-a/Team A chat.md", paths[0])
 	be.dbx.mu.Lock()
 	got := be.dbx.files[paths[0]]
 	be.dbx.mu.Unlock()

@@ -72,7 +72,7 @@ const { removeBoards, removeTeams } = require('./helpers/board_cleanup');
             const json = o => Promise.resolve(new Response(JSON.stringify(o), { status: 200, headers: { 'Content-Type': 'application/json' } }));
             window.fetch = (u, o) => { const p = new URL(String(u), location.origin).pathname;
                 if (p === '/api/dropbox/status') return json({ connected: true });
-                if (p.startsWith('/api/dropbox/share-chat/') && p.endsWith('/preview')) { window.__dbxPreview = { path: p, body: JSON.parse(o.body) }; return json({ connected: true, html: '<p>x</p>', hash: 'h'.repeat(64), size: 9, included: 2, left_out: 0, name: 'chat.html' }); }
+                if (p.startsWith('/api/dropbox/share-chat/') && p.endsWith('/preview')) { window.__dbxPreview = { path: p, body: JSON.parse(o.body) }; return json({ connected: true, text: 'x', hash: 'h'.repeat(64), size: 1, included: 2, left_out: 0, name: 'chat.md' }); }
                 return inner(u, o); };
             return true; })()`);
         await ev(`(() => { const b = document.getElementById('mb-select-btn'); b.style.display = ''; b.click(); return true; })()`);
