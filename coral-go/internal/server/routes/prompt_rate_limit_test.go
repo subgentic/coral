@@ -67,7 +67,7 @@ func TestRateLimitNoticeIsRecognisedByItsStructureAlone(t *testing.T) {
 	look("choice 1 is not a switch", strings.Replace(rateLimitScreen, "1. Switch to gpt-6-luna", "1. Upgrade to gpt-6-luna", 1))
 	look("a model with markup", strings.Replace(strings.Replace(rateLimitScreen, "Switch to gpt-6-luna", "Switch to <b>x</b>", 2), "gpt-6-luna for lower", "<b>x</b> for lower", 1))
 	look("the question names another model", strings.Replace(rateLimitScreen, "Switch to gpt-6-luna for lower", "Switch to gpt-9-evil for lower", 1))
-	look("a model with a control character", strings.Replace(rateLimitScreen, "gpt-6-luna    Fast", "gpt-6‮luna    Fast", 1))
+	look("a model with a control character", strings.Replace(rateLimitScreen, "gpt-6-luna    Fast", "gpt-6\u202eluna    Fast", 1))
 }
 
 func TestRateLimitNoticeIsOfferedToTheOwnDashboardAndAnsweredOnlyWhileItIsTheSameNotice(t *testing.T) {
