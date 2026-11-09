@@ -28,6 +28,7 @@ let _confirmDelete = null;
 let _open = null;         // the id whose page is open (a server's page: facts, and Test, Edit and Remove in its pinned bar), null for the table
 let _focusNext = null;    // 'back' | 'row': where the focus goes after the next draw (opening a page, coming back)
 let _busy = new Set();    // ids (or '*') with a request in flight
+let _busyVerb = '';       // which of Test and Reconnect is in flight, so only that button says so
 let _loadError = '';
 let _formError = '';
 let _draft = null;        // non-secret field values kept across a failed submit
@@ -148,6 +149,8 @@ function factHtml(label, value) {
     return value ? `<div class="servers-fact"><dt>${escHtml(label)}</dt><dd>${value}</dd></div>` : '';
 }
 
+const RECONNECT_HINT = "Checks the server now and restarts the hub's connection to it.";
+
 /** A server's page: its facts, what to do about a problem, and Test, Edit and Remove in a bar pinned at its foot (Remove the danger button, the primary last). */
 function pageHtml(s) {
     const live = liveOf(s);
@@ -171,8 +174,9 @@ function pageHtml(s) {
     const bar = confirming
         ? `<button type="button" class="btn" data-action="delete-cancel">Cancel</button>
            <button type="button" class="btn btn-danger" data-action="delete-confirm" data-id="${escHtml(s.id)}">Confirm remove</button>`
-        : `<button type="button" class="btn" data-action="test" data-id="${escHtml(s.id)}"${busy ? ' disabled aria-busy="true"' : ''}>${busy ? 'Testing...' : 'Test'}</button>
-           <button type="button" class="btn" data-action="reconnect" data-id="${escHtml(s.id)}" title="Check the server now and restart the hub's connection to it"${busy ? ' disabled' : ''}>Reconnect</button>
+        : `<button type="button" class="btn" data-action="test" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}${busy && _busyVerb === 'test' ? ' aria-busy="true"' : ''}>${busy && _busyVerb === 'test' ? 'Testing...' : 'Test'}</button>
+           <button type="button" class="btn" data-action="reconnect" data-id="${escHtml(s.id)}" aria-describedby="reconnect-hint-${escHtml(s.id)}" title="${escHtml(RECONNECT_HINT)}"${busy ? ' disabled' : ''}${busy && _busyVerb === 'reconnect' ? ' aria-busy="true"' : ''}>${busy && _busyVerb === 'reconnect' ? 'Reconnecting...' : 'Reconnect'}</button>
+           <span class="sr-only" id="reconnect-hint-${escHtml(s.id)}">${escHtml(RECONNECT_HINT)}</span>
            <button type="button" class="btn" data-action="edit" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Edit</button>
            <button type="button" class="btn btn-danger servers-remove" data-action="delete" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Remove</button>`;
     return `<section class="servers-page" id="server-row-${escHtml(s.id)}" tabindex="-1" data-id="${escHtml(s.id)}" aria-labelledby="servers-page-name">
@@ -297,7 +301,7 @@ async function onClick(e) {
 /** Test, or Reconnect (a Test that also restarts the hub's connection to the server): the toast says the status and, when it is not online, the hub's reason. */
 async function doTest(id, verb = 'test') {
     const failed = verb === 'reconnect' ? 'Reconnect failed: could not reach the hub.' : 'Test failed: could not reach the hub.';
-    setBusy(id, true); render();
+    _busyVerb = verb; setBusy(id, true); render();
     try {
         const resp = await fetch(`/api/servers/${encodeURIComponent(id)}/${verb}`, { method: 'POST' });
         const body = await readBody(resp);
@@ -311,7 +315,7 @@ async function doTest(id, verb = 'test') {
     } catch {
         _loadError = failed;
     }
-    setBusy(id, false);
+    setBusy(id, false); _busyVerb = '';
     await load();
 }
 

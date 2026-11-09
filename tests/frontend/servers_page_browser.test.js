@@ -29,7 +29,7 @@ const SERVERS = [
                 if (p === '/api/health') return json(200, { status: 'ok', hub: true, version: '1.4.75' });
                 if (p === '/api/servers' && m === 'GET') return json(200, window.__list);
                 const t = p.match(/^\\/api\\/servers\\/([^/]+)(\\/test|\\/reconnect)?$/);
-                if (t && t[2] && m === 'POST') { const verb = t[2].slice(1); window.__calls.push(verb + ' ' + t[1]); return json(200, verb === 'reconnect' ? { id: t[1], label: t[1], status: 'unreachable', last_error: 'remote refused the connection: nothing is listening at that address and port' } : { id: t[1], label: t[1], status: 'online' }); }
+                if (t && t[2] && m === 'POST') { const verb = t[2].slice(1); window.__calls.push(verb + ' ' + t[1]); if (window.__slow) return new Promise(r => { window.__release = () => r(json(200, { id: t[1], label: t[1], status: 'unreachable', last_error: 'remote refused the connection: nothing is listening at that address and port' })); }); return json(200, verb === 'reconnect' ? { id: t[1], label: t[1], status: 'unreachable', last_error: 'remote refused the connection: nothing is listening at that address and port' } : { id: t[1], label: t[1], status: 'online' }); }
                 if (t && m === 'DELETE') { window.__calls.push('delete ' + t[1]); window.__list = window.__list.filter(s => s.id !== t[1]); return json(200, {}); }
                 return R(u, o); }; })();` });
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
@@ -135,7 +135,13 @@ const SERVERS = [
             ok(at + 'Test stays on the page; Edit is the form in the page, Cancel returns to the page');
 
             // 3b. Reconnect posts to /reconnect (never /test), stays on the page and says why the server is still unreachable
-            await ev(`document.querySelector('.servers-page [data-action=reconnect]').click(); true`);
+            // while it runs only Reconnect says so (Reconnecting..., aria-busy), Test keeps its name, and its explanation is a description, not only a tooltip
+            await ev(`window.__slow = true; document.querySelector('.servers-page [data-action=reconnect]').click(); true`);
+            await waitFor(`!!document.querySelector('.servers-page [data-action=reconnect][aria-busy=true]')`, 'Reconnect busy');
+            const busy = await ev(`(() => { const r = document.querySelector('.servers-page [data-action=reconnect]'), te = document.querySelector('.servers-page [data-action=test]'); const d = document.getElementById(r.getAttribute('aria-describedby')); return { r: r.textContent.trim(), t: te.textContent.trim(), tBusy: te.getAttribute('aria-busy'), desc: d ? d.textContent.trim() : '', disabled: r.disabled && te.disabled }; })()`);
+            assert.equal(busy.r, 'Reconnecting...', at + 'Reconnect says what it is doing'); assert.equal(busy.t, 'Test', at + 'Test keeps its name while Reconnect runs'); assert.equal(busy.tBusy, null, at + 'Test is not marked busy'); assert.equal(busy.disabled, true);
+            assert.match(busy.desc, /restarts the hub's connection/, at + 'the explanation is the button\'s description');
+            await ev(`window.__slow = false; window.__release(); true`);
             await waitFor(`window.__calls.includes('reconnect lan')`, 'the reconnect request');
             await waitFor(`!!document.getElementById('servers-page-name') && !document.querySelector('[data-action=reconnect][disabled]')`, 'back on the page after the reconnect');
             assert.match(await ev(`document.body.textContent`), /remote refused the connection: nothing is listening/, at + 'the toast names the cause');
