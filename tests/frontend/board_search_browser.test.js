@@ -72,6 +72,13 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(`window.selectBoardProject(${JSON.stringify(BOARD)}); true`);
         await settle(`document.querySelectorAll('#mb-messages > .mb-message').length >= 50`, 'the latest page');
 
+        // A jump while the box is at its end and the box changes height in the same frame (the search's results row opens above it) stayed at the end: the resize pin was stale until the scroll event (#14950, the intermittent 'the match is marked, visible and holds the focus' with the match 50 px above the view).
+        const jumped = await ev(`(async () => { const c = document.getElementById('mb-messages'); const m = await import((window.__coralStatic || '/static/') + 'board_window.js'); const rows = [...c.querySelectorAll(':scope > .mb-message[data-message-id]')]; const row = rows[Math.floor(rows.length / 2)];
+            c.scrollTop = c.scrollHeight; await ${require('./helpers/wait').framesJs(2)};
+            m.focusMessageById(row.dataset.messageId); const tools = document.getElementById('mb-tools'); const was = tools.style.paddingBottom; tools.style.paddingBottom = '40px';
+            await new Promise(r => setTimeout(r, 1500)); /* sleep-ok: waiting for a move that must NOT happen (the stale pin's drag to the end), there is no event to wait for */ tools.style.paddingBottom = was;
+            const a = row.getBoundingClientRect(), b = c.getBoundingClientRect(); return { visible: a.top >= b.top - 2 && a.bottom <= b.bottom + 2, top: Math.round(a.top - b.top), h: Math.round(b.height), end: c.scrollHeight - c.scrollTop - c.clientHeight < 6 }; })()`);
+        check('a jump with the box at its end stays on the message when the box changes height in the same frame', jumped.visible && !jumped.end, JSON.stringify(jumped));
         let s = await snap();
         check('the tools row has the Filters icon and the More icon (the jumps are in its menu, #7686; Expand all and Collapse all belong to the table and show on the team page Board tab, #7921, #8129); no results line yet (#7183)', s.controls.join() === 'Filters,More board actions' && s.menu.join() === 'Expand all,Collapse all,Jump to first message,Jump to latest message' && s.results === null, JSON.stringify([s.controls, s.menu, s.results]));
         // The retry total: messages with the word retry in any form (the code messages hold it too).

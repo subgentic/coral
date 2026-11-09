@@ -125,6 +125,7 @@ function wireBoardScroll(container) {
     });
     // The newest message stays in view when the box changes height (the keyboard comes up or goes, the composer grows): a box that was at the end is at the end again (#10088); one scrolled up stays where it was.
     let pinned = isAtBottom(container);
+    container._mbUnpin = () => { pinned = false; }; // a jump to a message (a search hit, a link) is a read higher up: the pin is stale until the scroll event says where the box is, and a resize in that frame must not drag it to the end (#14950)
     if (typeof ResizeObserver === 'function') new ResizeObserver(() => { if (pinned && container.clientHeight > 0) container.scrollTop = container.scrollHeight; }).observe(container);
     container.addEventListener('scroll', () => {
         pinned = isAtBottom(container);
@@ -249,6 +250,7 @@ function prependEarlier(container, count) {
 // The jump's landing: the message in the middle of the board with the focus on it (Save for Later's jump and the search's, #4510, #4771); the one before it loses its mark.
 /** instant: the jump came after pages were loaded above it (the rows moved under it, a smooth scroll would be cut short by the page's own scroll adjustments, and a row near the top loads one more page): it lands at once. */
 function revealMessage(target, instant = false) {
+    document.getElementById('mb-messages')?._mbUnpin?.();
     for (const old of document.querySelectorAll('#mb-messages .chat-search-target')) if (old !== target) old.classList.remove('chat-search-target');
     const run = target.closest('details');
     if (run) run.open = true; // a task-queue line inside a collapsed row
