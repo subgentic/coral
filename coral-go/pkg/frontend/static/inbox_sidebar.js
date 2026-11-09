@@ -811,8 +811,11 @@ async function readGoals() {
         const r = await fetch('/api/settings');
         if (r.ok) { const saved = (await r.json()).settings || {}; state.settings = { ...(state.settings || {}), [GOAL_DONE_SETTING]: saved[GOAL_DONE_SETTING] || '' }; }
     } catch { /* the list this page has stays */ }
-    await loadPendingSkills({ hub: nativeInbox(), sources: inboxSources(), urlOf: serverUrl }); // the skills that wait for the Operator are items of Needs you too (#12139); the Hub has no skill store, so its Inbox reads the one list of what waits (/api/needs-you?kind=skill) and shows each as text to approve at the computer (#13841)
-    await loadDropboxEdits({ hub: isCloud(), get: (p, o) => serverFetch(LOCAL_SERVER, p, o) }); // edits made in Dropbox held for the Operator (#14777): this computer only; on any Hub page nothing is asked (Security's SHOULD 4)
+    // The skills that wait for the Operator and the edits made in Dropbox are read together: one round trip, so the Inbox is not drawn later than before (#14814).
+    await Promise.all([
+        loadPendingSkills({ hub: nativeInbox(), sources: inboxSources(), urlOf: serverUrl }), // the skills that wait for the Operator are items of Needs you too (#12139); the Hub has no skill store, so its Inbox reads the one list of what waits (/api/needs-you?kind=skill) and shows each as text to approve at the computer (#13841)
+        loadDropboxEdits({ hub: isCloud(), get: (p, o) => serverFetch(LOCAL_SERVER, p, o) }), // edits made in Dropbox held for the Operator (#14777): this computer only; on any Hub page nothing is asked (Security's SHOULD 4)
+    ]);
     syncGoalDoneCount();
     renderInboxNav(true);
     if (followWithDone) return readGoals(); // the open goals are known now (openAt), so this read is of the finished ones
