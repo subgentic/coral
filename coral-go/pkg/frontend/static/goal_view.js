@@ -42,7 +42,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     const doneOf = rollup => rollup.done, totalOf = rollup => W.allTasksOf(rollup);
     const closeGoal = () => back();
     const drawPage = () => { if (!disposed && current) drawGoalPageRaw(root); };
-    const drawDetail = drawPage;
+    const drawDetail = () => drawWhenMenuClosed(); // every draw that is data arriving (the tasks, more tasks, a count) waits for an open header menu, not only a goal update (#14892 follow-up, goal_operator_dialogs)
     const focusDetail = () => (root.querySelector('.goal-main .goals-back') || root.querySelector('.goals-back') || root.querySelector('#goals-detail-title'))?.focus({ preventScroll: true }); // the keyboard starts at the way back, not at the heading: no ring round plain words (#7404)
     const loadGoals = () => refresh ? refresh() : reload();
     const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
@@ -416,6 +416,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     function drawGoalPageRaw(col) {
         const g = goalById(model.openId);
         const keep = document.activeElement && document.activeElement.id === 'goals-detail-title', keepBack = document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('goals-back') && col.contains(document.activeElement);
+        const keepMore = !!(document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('task-more-btn') && col.contains(document.activeElement) && document.activeElement.closest('.goal-head-actions')); // Escape from the header's More menu leaves the keyboard on its button: a redraw that waited for the menu keeps it there
         const place = scrollPlace(col); // the person's place (#11646): the page is drawn again for a tab, and the box that scrolled it is a new one
         col.replaceChildren();
         const split = el('div', 'goal-split'); split.dataset.goal = String(g.id); split.classList.toggle('goal-split-open', !previewEl.hidden);
@@ -426,6 +427,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         place.restore(main);
         if (keep) h.focus();
         else if (keepBack) main.querySelector('.goals-back')?.focus({ preventScroll: true });
+        else if (keepMore) main.querySelector('.goal-head-actions .task-more-btn')?.focus({ preventScroll: true });
     }
 
     // ── closing and reopening (#7272, UI/UX's #7270) ─────
@@ -523,7 +525,18 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     }
 
 
-    const update = g => { const again = current && current.id === g.id && JSON.stringify(current.rollup) !== JSON.stringify(g.rollup); current = g; drawPage(); if (again) { artifacts.api?.refresh(); countArtifacts(g.id, true); } }; // the tasks moved: their files may have
+    // A goal that changes under the person (a poll, a task landing) draws the page again; with the header's More menu OPEN that tore the menu down, dropped the keyboard to the page and let the next Escape leave the goal (#14892).
+    // The draw waits until the menu closes, once, with the newest data (a menu is open for seconds; the data is a poll old at worst). A tab's own draw is the person's action and is not held.
+    let waitingForMenu = false;
+    const drawWhenMenuClosed = () => {
+        const open = root.querySelector('.goal-head-actions .task-more-btn[aria-expanded="true"]');
+        if (!open) { drawPage(); return; }
+        if (waitingForMenu) return;
+        waitingForMenu = true;
+        const mo = new MutationObserver(() => { if (disposed || !open.isConnected || open.getAttribute('aria-expanded') !== 'true') { mo.disconnect(); waitingForMenu = false; if (!disposed) drawPage(); } });
+        mo.observe(open, { attributes: true, attributeFilter: ['aria-expanded'] });
+    };
+    const update = g => { const again = current && current.id === g.id && JSON.stringify(current.rollup) !== JSON.stringify(g.rollup); current = g; drawWhenMenuClosed(); if (again) { artifacts.api?.refresh(); countArtifacts(g.id, true); } }; // the tasks moved: their files may have
     let reading = false, again = false, signature = '', first = true;
     async function reload() {
         if (disposed) return;
