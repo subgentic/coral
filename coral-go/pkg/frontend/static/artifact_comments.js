@@ -128,7 +128,7 @@ export function attachComments(dialog, body, host, opts = {}) {
             st.data = data; st.gone = false;
             if (!st.visibilitySet) {
                 st.visibilitySet = true;
-                setSheet(opts.initialOpen ?? remembered() ?? (st.video ? true : opts.toggleHost ? !phone.matches && openCount() > 0 : false)); // the viewer: closed until the person opens it, and then as they left it, so the file has the whole width (#12225); the docked preview keeps opening when there are comments
+                setSheet(opts.initialOpen ?? remembered() ?? (st.video ? true : opts.toggleHost ? !phone.matches && !sheet() && openCount() > 0 : false)); // a docked pane too narrow for the column (it would be a sheet over the document) starts closed too (#14846: it opened over the file and froze it); the viewer: closed until the person opens it, and then as they left it, so the file has the whole width (#12225); the docked preview keeps opening when there are comments
             }
         } catch (e) {
             if (hex !== st.hex || gen !== ctxGen) return;
@@ -390,7 +390,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     function syncInert() {
         const open = panel.classList.contains('ac-sheet-open');
         panel.inert = !st.shownNow || !open;
-        body.inert = !!st.shownNow && sheet() && open && !st.video;
+        body.inert = !!st.shownNow && sheet() && open && !st.video && phone.matches; // only a phone's sheet is modal: a docked pane's open sheet leaves the file above it to scroll (#14846)
     }
     phone.addEventListener('change', () => { syncInert(); syncOn(); });
     if (opts.observe && typeof ResizeObserver === 'function') new ResizeObserver(() => { syncInert(); syncToggle(); paintToggle(); }).observe(opts.observe); // the pane's width decides whether the panel is a sheet
