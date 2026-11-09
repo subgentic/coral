@@ -422,10 +422,11 @@ export function _renderAgentListWithSubgroups(agents, teamDefaultDir, isCompact,
     return html;
 }
 
-/** Show summary and Show model (#10816, after ce1946c0c): off unless on, kept per viewer; each adds one line. */
+/** Show summary and Show model (#10816, after ce1946c0c): kept per viewer; each adds one line. Summary is off unless on; Show model is on unless the person turned it off (#14977, the operator). */
 const ROW_LINE_KEY = { summary: 'coral-show-summary', model: 'coral-show-model' };
 export function isRowLineShown(part) {
-    try { return browserLocal.get(ROW_LINE_KEY[part]) === 'true'; } catch { return false; }
+    const unset = part === 'model'; // what a viewer who never chose gets
+    try { const v = browserLocal.get(ROW_LINE_KEY[part]); return v === null || v === undefined ? unset : v === 'true'; } catch { return unset; }
 }
 export function setRowLineShown(part, on) {
     try { browserLocal.set(ROW_LINE_KEY[part], on ? 'true' : 'false'); } catch { /* per-viewer only */ }

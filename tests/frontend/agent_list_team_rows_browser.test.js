@@ -24,6 +24,7 @@ const { connect } = require('./agent_view_harness');
         const load = async view => {
             await Emulation.setDeviceMetricsOverride({ width: view.width, height: view.height, deviceScaleFactor: 1, mobile: view.mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
+            await ev(`try { localStorage.setItem('coral-show-model', 'false'); } catch (e) {} true`); // one-line rows: Show model is on for a fresh profile (#14977), this suite is about the rows without it
         };
         const list = view => view.mobile ? '#mobile-agent-list' : '.sidebar';
         const rows = view => ev(`(() => {
