@@ -582,7 +582,11 @@ func (h *SessionsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		// The agent's process ended (Claude's SessionEnd): nothing held for it may be
 		// typed into whatever runs in that terminal next (#3481). Not on SessionStart:
 		// a launch's first prompt is a held send waiting for that very start.
-		ptymanager.ForgetSession(owner.SessionName)
+		if sessionEndReason(body.DetailJSON) == "clear" {
+			ptymanager.ForgetSessionKeepingProcess(owner.SessionName) // a /clear ends the CLI's session, not its process: board notices must still reach the agent
+		} else {
+			ptymanager.ForgetSession(owner.SessionName)
+		}
 		h.liveModes.Delete(body.SessionID) // an ended session keeps no mode (and the map no id for the life of the process)
 		// /exit or a quit leaves the CLI gone and its shell there: Ended now, not at the reconciler's next passes (#10295). /clear also says SessionEnd, and its CLI stays: the watch marks only a shell left alone.
 		h.watchForExit(owner.SessionName, agentType, body.SessionID)
@@ -805,4 +809,11 @@ func dropOtherCases(d map[string]any, name string) {
 			delete(d, k)
 		}
 	}
+}
+
+// sessionEndReason is the reason a session_end event says (Claude's SessionEnd: "clear", "logout", "prompt_input_exit", "other"), "" when it says none.
+func sessionEndReason(detail any) string {
+	d, _ := detail.(map[string]any)
+	r, _ := d["reason"].(string)
+	return r
 }

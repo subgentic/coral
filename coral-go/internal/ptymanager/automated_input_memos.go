@@ -38,6 +38,17 @@ func OnSessionEnd(f func(name string)) {
 	sessionEndHooks = append(sessionEndHooks, f)
 }
 
+// processEndHooks are what must be forgotten only when the agent's process really ends (killed, restarted, resumed, launched again): what Coral recorded of that process. A /clear ends the CLI's session
+// and leaves the process (#14849: its SessionEnd made every later notice "not recorded").
+var processEndHooks []func(string)
+
+// OnProcessEnd registers f to run when a session's agent process is forgotten (ForgetSession, not ForgetSessionKeepingProcess). Register once, at package init.
+func OnProcessEnd(f func(name string)) {
+	sessionEndMu.Lock()
+	defer sessionEndMu.Unlock()
+	processEndHooks = append(processEndHooks, f)
+}
+
 func forgetSessionMemos(name string) {
 	tmux.ForgetBareNameWarning(name)
 	sessionEndMu.Lock()
@@ -50,7 +61,13 @@ func forgetSessionMemos(name string) {
 
 // ForgetSession is called when a session's agent is killed, restarted, resumed or launched again: what Coral remembers of the old process
 // (the text it typed last and the send it skipped) is not true of a new one.
-func ForgetSession(name string) {
+func ForgetSession(name string) { forgetSession(name, true) }
+
+// ForgetSessionKeepingProcess is ForgetSession for a session whose CLI went on: a /clear says SessionEnd and the same process runs the next session. What Coral typed and skipped is forgotten, and a held
+// message of the old session is answered, but the recorded agent process stays, so board notices still reach the agent (found live: after a /clear every notice was refused as "the agent's process is not recorded").
+func ForgetSessionKeepingProcess(name string) { forgetSession(name, false) }
+
+func forgetSession(name string, processEnded bool) {
 	name = sessionOfTarget(name)
 	forgotten.notify(name)
 	gate.mu.Lock()
@@ -60,6 +77,14 @@ func ForgetSession(name string) {
 	delete(skipped.m, name)
 	skipped.Unlock()
 	forgetSessionMemos(name)
+	if processEnded {
+		sessionEndMu.Lock()
+		hooks := append([]func(string){}, processEndHooks...)
+		sessionEndMu.Unlock()
+		for _, f := range hooks {
+			f(name)
+		}
+	}
 	forgetNotices(name)
 }
 
