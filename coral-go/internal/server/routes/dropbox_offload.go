@@ -347,3 +347,21 @@ func (h *CloudHandler) keptInDropboxConfirmed(w http.ResponseWriter, r *http.Req
 	}
 	return n, true
 }
+
+// objectHereOrOffloaded reports whether an object's bytes are on this computer, or kept only in Dropbox by this Coral (stage 6b, Security's 3e):
+// anything that removes records of a missing object asks this, never the object file alone. An offload table that cannot be read counts as kept
+// (fail closed: a record is never removed on a guess).
+func objectHereOrOffloaded(coralDir, digest string) bool {
+	if !objectNameRe.MatchString(digest) {
+		return false
+	}
+	if _, err := os.Lstat(filepath.Join(coralDir, "artifacts", "objects", digest)); err == nil {
+		return true
+	}
+	b := dropboxBackupFor(coralDir)
+	if b == nil || b.outbox == nil {
+		return false
+	}
+	_, ok, err := b.outbox.Offloaded(context.Background(), digest)
+	return ok || err != nil
+}

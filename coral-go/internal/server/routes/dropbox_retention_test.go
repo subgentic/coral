@@ -474,7 +474,7 @@ func TestPairsNeverCrossDocuments(t *testing.T) {
 func TestRetentionKeepsWhatAnyCoralKeepsOnlyInDropbox(t *testing.T) {
 	be, ds := newRetentionEnv(t, 4)
 	be.age(400, ds[1:]...)
-	be.age(500, ds[0]) // the oldest: the first retention would take
+	be.age(500, ds[0])                               // the oldest: the first retention would take
 	be.marker(ds[0], strings.Repeat("3", 28)+"c0de") // another Coral keeps ds[0] only in Dropbox
 	be.retain(30)
 	assert.Equal(t, 2, be.inDropbox(ds[0]), "a document with any marker is kept")
