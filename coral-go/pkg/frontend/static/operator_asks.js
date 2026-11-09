@@ -58,12 +58,17 @@ export const askKey = a => `operator-ask:${a.server && !isLocalServer(a.server) 
 export function refreshOperatorAsks(force = false) {
     if (pending) return pending;
     if (!force && Date.now() - lastRead < FRESH_MS) return null;
-    lastRead = Date.now();
     // Every computer the page reads (this one, and each registered computer that is online through the Hub; through the Hub itself only those): a bare /api path through the Hub is the Hub's own, which has no questions (#12612, coral-hub #156454).
     // A row from another computer carries that computer's id, so the dialog and the row know it is not this one's; a computer that cannot be read keeps the rows it had.
     const sources = inboxSources();
-    if (isCloud() && !sources.length) { lastRead = 0; return null; } // inventory is pending, not a failed Hub question source
+    if (!sources.length && isCloud()) {
+        // A cold Hub may render Needs before its linked-computer list arrives. There is no local questions route on the Hub; clear any old local gap and let the next list refresh retry.
+        readOutcome('questions', LOCAL_SERVER, true);
+        lastRead = 0; // the next list refresh retries at once (the Hub inventory is pending, not a failed question read)
+        return null;
+    }
     const asked = sources.length ? sources : [LOCAL_SERVER];
+    lastRead = Date.now();
     // One computer's read: a list only when the answer was a 200 with an array (an empty one too: nothing is waiting there); anything else (refused, no route, a failure, a body that is not a list) is null, which keeps the rows
     // that were drawn and tells the Inbox it is not everything (#13841). The warning is cleared only after the body was checked.
     const readAsks = async server => {
