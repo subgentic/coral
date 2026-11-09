@@ -49,12 +49,12 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await until(`!!document.getElementById('agentic-tab-artifacts')`, 'the Artifacts tab');
         await ev(`document.getElementById('agentic-tab-artifacts').click(); true`);
         const row = `[...document.querySelectorAll('#agentic-panel-artifacts tbody tr')].find(r => r.textContent.includes('delete-me.txt'))`;
-        const del = `[...document.querySelectorAll('#agentic-detail-pane .detail-foot .btn')].find(b => b.textContent === 'Delete')`; // the sheet's Delete
+        const del = `[...document.querySelectorAll('#agentic-detail-pane .detail-foot .menu-item')].find(b => b.textContent === 'Delete')`; // the sheet's Delete
         const openRow = async tr => { await ev(`(${tr}).querySelector('.artifact-details').click(); true`); await until(`!document.getElementById('agentic-detail-pane').hidden`, 'the sheet'); };
         await until(`!!(${row})`, 'the uploaded artifact');
         await openRow(row);
-        const btn = await ev(`(() => { const b = ${del}; return b && { tag: b.tagName, type: b.type, danger: b.classList.contains('btn-danger') }; })()`);
-        check('its sheet has a Delete button, a danger button', !!btn && btn.tag === 'BUTTON' && btn.type === 'button' && btn.danger, JSON.stringify(btn));
+        const btn = await ev(`(() => { const b = ${del}; return b && { tag: b.tagName, type: b.type, danger: b.classList.contains('menu-item-danger') }; })()`);
+        check('its sheet has a Delete item in the More menu, a danger item', !!btn && btn.tag === 'BUTTON' && btn.type === 'button' && btn.danger, JSON.stringify(btn));
 
         // The confirmation: no default, honest text.
         await ev(`(${del}).click(); true`);

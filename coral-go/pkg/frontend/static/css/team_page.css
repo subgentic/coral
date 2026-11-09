@@ -124,6 +124,11 @@
 .detail-foot .btn { min-height: 36px; }
 .detail-foot .btn-danger { color: var(--error-text); border-color: var(--error); background: transparent; margin-right: auto; } /* one danger button, at the left edge: error-colour text with a 1 px error-colour edge, no fill, the size of the other buttons (UI/UX) */
 .detail-foot a.btn { text-decoration: none; display: inline-flex; align-items: center; }
+.detail-more { position: relative; display: inline-flex; margin-right: auto; } /* the one More menu of the file's actions, at the left edge of the bar (#14963) */
+.detail-more .team-more-menu { top: auto; bottom: calc(100% + 4px); left: 0; right: auto; min-width: 16rem; max-width: min(22rem, 90vw); }
+.detail-more .menu-item-described { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.detail-more .more-item-desc { color: var(--text-secondary); font-size: var(--fs-sm); white-space: normal; text-align: left; }
+.detail-more .menu-sep { margin: 4px 0; border: 0; border-top: 1px solid var(--border); }
 #team-panel-messages { padding: 16px 24px 0; } /* the same top as the other tabs (a tab's body starts 16 px under the strip, 12 on a phone), and the search row's left edge where theirs is (the messages themselves stay on the tables' edge) */
 .team-panel .list-bar-bar { padding: 0 0 8px; } /* a tab's search starts on the page edge where its chips and table do, not 12 px in (UI/UX 170 consistency, item 3) */
 #team-panel-messages .mb-tools { padding: 0; }
@@ -507,3 +512,4 @@ dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-
     margin-top: 12px;
     border-top: 1px solid var(--border);
 }
+@media (max-width: 767px), (pointer: coarse) { .detail-foot .detail-more { flex: 1 1 auto; margin-right: 0; } .detail-foot .detail-more .task-more-btn { flex: 1; } } /* a phone's bar: three equal buttons, More the first (#14963) */

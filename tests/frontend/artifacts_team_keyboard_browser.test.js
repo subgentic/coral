@@ -62,14 +62,17 @@ const HEX = n => String(n).repeat(64).slice(0, 64);
         a = await active(); assert.match(a.cls, /artifact-details/, 'the focus is back on the Details link: ' + JSON.stringify(a)); assert.equal(a.row, 0);
 
         console.log('3. Keep by Space keeps the focus');
-        const FOOT = (t) => `[...document.querySelectorAll('#agentic-detail-pane .detail-foot .btn')].find(b => /^(${t})$/.test(b.textContent))`;
+        const FOOT = (t) => `[...document.querySelectorAll('#agentic-detail-pane .detail-foot .menu-item')].find(b => /^(${t})$/.test((b.querySelector('.more-item-label') || b).textContent))`;
+        const MORE = `document.querySelector('#agentic-detail-pane .detail-foot .task-more-btn')`;
+        const openFootMenu = async () => { await ev(`(${MORE}).focus(); true`); await press('Enter', 'Enter', 13); await waitFor(`(${MORE}).getAttribute('aria-expanded') === 'true'`, 'the More menu of the sheet', 4000); }; // the file's secondary actions are one More menu (#14963)
         await ev(`document.querySelectorAll('${ROW} .artifact-details')[1].focus(); true`);
         await press('Enter', 'Enter', 13);
         await waitFor(`!document.getElementById('agentic-detail-pane').hidden && !!(${FOOT('Keep|Kept')})`, 'the second row\'s sheet', 6000);
+        await openFootMenu();
         await ev(`(${FOOT('Keep|Kept')}).focus(); true`);
         await press(' ', 'Space', 32);
-        await waitFor(`(${FOOT('Keep|Kept')}).getAttribute('aria-pressed') === 'true'`, 'Keep to toggle', 4000);
-        a = await active(); assert.equal(a.label, 'Kept', 'the focus stays on the Keep button: ' + JSON.stringify(a));
+        await waitFor(`(${FOOT('Keep|Kept')}).getAttribute('aria-checked') === 'true'`, 'Keep to toggle', 4000);
+        a = await active(); assert.equal(a.label, 'More', 'the menu closes and the focus is back on the sheet\'s More button: ' + JSON.stringify(a));
 
         console.log('4. The More menu opens by key and Escape returns to its button; a quiet reload keeps the focus');
         await ev(`document.querySelector('#agentic-panel-artifacts-view .list-bar-more-btn').focus(); true`);
@@ -88,6 +91,7 @@ const HEX = n => String(n).repeat(64).slice(0, 64);
         await ev(`document.querySelectorAll('${ROW} .artifact-details')[2].focus(); true`);
         await press('Enter', 'Enter', 13);
         await waitFor(`!document.getElementById('agentic-detail-pane').hidden && !!(${FOOT('Delete')}) && document.querySelector('#agentic-detail-pane .detail-title').textContent === 'report-3.md'`, 'the third row\'s sheet', 6000);
+        await openFootMenu();
         await ev(`(${FOOT('Delete')}).focus(); true`);
         await press('Enter', 'Enter', 13);
         await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirm dialog', 4000);
@@ -96,7 +100,7 @@ const HEX = n => String(n).repeat(64).slice(0, 64);
         await press('Escape', 'Escape', 27); await sleep(400); // sleep-ok: a redraw and a layout settle over frames; no completion event
         assert.equal(await ev(`getComputedStyle(document.getElementById('confirm-modal')).display`), 'none', 'Escape closes the confirm dialog');
         assert.ok(!(await ev(`window.__calls.includes('DELETE')`)), 'nothing was deleted');
-        a = await active(); assert.equal(a.label, 'Delete', 'the focus is back on the Delete button: ' + JSON.stringify(a));
+        a = await active(); assert.equal(a.label, 'More', 'the focus is back on the sheet\'s More button, where the Delete was chosen from: ' + JSON.stringify(a));
 
         console.log('6. Team view');
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_availability.js'); window.__tv = m; await m.showTeamAvailability(${JSON.stringify(team)}); return true; })()`);

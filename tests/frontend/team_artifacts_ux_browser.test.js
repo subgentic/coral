@@ -42,7 +42,9 @@ const HEX = c => c.repeat(64);
             const side = document.getElementById('agentic-state'); side.classList.remove('collapsed'); side.style.width = '680px'; files.initFileSearch(); files.syncFilesViewerSession(); return true; })()`);
         await ev(`localStorage.removeItem('coral-agentic-tab-top'); document.getElementById('agentic-tab-artifacts').click(); true`);
         const ROWS = '#agentic-panel-artifacts-view tbody tr';
-        const FOOT = t => `[...document.querySelectorAll('#agentic-detail-pane .detail-foot .btn')].find(b => b.textContent === '${t}')`;
+        const FOOT = t => `[...document.querySelectorAll('#agentic-detail-pane .detail-foot .menu-item, #agentic-detail-pane .detail-foot .btn')].find(b => (b.querySelector('.more-item-label') || b).textContent === '${t}')`;
+        const MORE = `document.querySelector('#agentic-detail-pane .detail-foot .task-more-btn')`;
+        const openFootMenu = async () => { await ev(`(${MORE}).focus(); true`); await press('Enter', 'Enter', 13); await waitFor(`(${MORE}).getAttribute('aria-expanded') === 'true'`, 'the More menu of the sheet', 4000); }; // the file's secondary actions are one More menu (#14963)
         await waitFor(`document.querySelectorAll('${ROWS}').length === 3`, 'the three rows', 8000);
 
         console.log('1. Desktop: a row is one control and overlaps nothing');
@@ -70,6 +72,7 @@ const HEX = c => c.repeat(64);
             await ev(`document.querySelectorAll('${ROWS} .artifact-details')[${i}].focus(); true`);
             await press('Enter', 'Enter', 13);
             await waitFor(`!document.getElementById('agentic-detail-pane').hidden && !!(${FOOT('Delete')})`, 'the sheet', 8000);
+            await openFootMenu();
             await ev(`(${FOOT('Delete')}).focus(); true`);
             await press('Enter', 'Enter', 13);
             await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirmation', 8000);

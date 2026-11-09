@@ -50,7 +50,7 @@ assert.equal(pane.hidden, true, 'a second click needs no close step');
 const { showArtifacts } = await importUi('team_artifacts_page');
 await showArtifacts(view, 'test', {detailHost:pane});
 rows = [...view.querySelectorAll('tbody tr')];
-const copyLink = () => [...pane.querySelectorAll('.detail-foot .btn')].find(b => b.textContent === 'Copy link');
+const copyLink = () => [...pane.querySelectorAll('.detail-foot .menu-item')].find(b => b.textContent === 'Copy link') // Copy link is in the file's More menu (#14963);
 const openRow = async (i) => { rows[i].querySelector('.dt-primary').click(); await until(() => !pane.hidden); return copyLink(); };
 
 const first = await openRow(0);

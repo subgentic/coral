@@ -49,8 +49,10 @@ const HEX = '5'.repeat(64);
             // the sheet says what Star and Keep do
             await ev(`document.querySelector('#agentic-panel-artifacts-view tbody tr .artifact-details').click(); true`);
             await waitFor(`!document.getElementById('agentic-detail-pane').hidden`, `${w}: the sheet`, 6000);
-            const note = await ev(`(document.querySelector('#agentic-detail-pane .detail-note') || {}).textContent || ''`);
-            assert.match(note, /Star puts it in your Starred list\. Keep stops Coral.s cleanup from deleting the file\./, `${w}: one line says how Star and Keep differ: ${note}`);
+            const note = await ev(`[...document.querySelectorAll('#agentic-detail-pane .detail-foot .menu-item .more-item-desc')].map(d => d.textContent).join(' | ')`);
+            assert.match(note, /Adds it to your Starred list/, `${w}: Star says what it does in the More menu: ${note}`);
+            assert.match(note, /cleanup never deletes it/, `${w}: Keep says what it does in the More menu: ${note}`);
+            assert.equal(await ev(`!document.querySelector('#agentic-detail-pane .detail-note')`), true, `${w}: the help line above the buttons is gone`);
             await ev(`document.getElementById('agentic-detail-pane').querySelector('.detail-close, [aria-label="Close"]')?.click(); true`);
 
             // the viewer's own Share button is whole

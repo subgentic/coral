@@ -12,6 +12,7 @@ import { importOnce } from './import_once.js';
 const { el } = await importOnce('./team_table.js'); // lazy: its failure is retried
 const { attachDockResize, DOCK_MIN_WIDTH, dockMaxWidth } = await importOnce('./dock_resize.js'); // the goal page column's resize
 const { foldWayBack } = await importOnce('./way_back.js');
+const { moreMenu } = await importOnce('./more_menu.js'); // the file's More menu (#14963)
 const { makeDetails } = await importOnce('./details_disclosure.js'); // the facts and more behind one Details button (#7775)
 import { trapTab } from './dialog_focus.js';
 
@@ -97,7 +98,12 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     main.append(doc);
     const foot = el('div', 'pane-foot detail-foot');
     const rank = a => (a.danger ? 0 : a.primary ? 2 : 1); // the bar's one order: a danger button first (at the left edge), the primary last (#7684)
-    for (const a of [...actions].sort((x, y) => rank(x) - rank(y))) {
+    const inMenu = actions.filter(a => a.menu); // menu: true, or its place in the menu (1 first); the secondary actions are one More menu (#14963: eight buttons in two rows were too much): the primary and Download stay buttons
+    if (inMenu.length) {
+        const items = [...inMenu].sort((x, y) => (x.menu === true ? 5 : x.menu) - (y.menu === true ? 5 : y.menu) || (x.danger ? 1 : 0) - (y.danger ? 1 : 0)).map((a, i, all) => ({ label: a.label, description: a.description, title: a.title, danger: a.danger, pressed: a.pressed, run: b => (a.run ? a.run(b) : a.onclick?.()), separatorBefore: !!a.danger && i > 0 && !all[i - 1].danger }));
+        foot.append(moreMenu('detail-more', items, { label: 'More actions for this file', wrapClass: 'detail-more', restoreFocus: true }));
+    }
+    for (const a of [...actions].filter(a => !a.menu).sort((x, y) => rank(x) - rank(y))) {
         let b;
         if (a.href) { b = el('a', `btn${a.primary ? ' btn-primary' : ''}`, a.label); b.href = a.href; b.target = '_blank'; b.rel = 'noopener noreferrer'; if (a.download) b.setAttribute('download', ''); }
         else { b = el('button', `btn${a.primary ? ' btn-primary' : ''}`, a.label); b.type = 'button'; }
