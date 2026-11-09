@@ -171,6 +171,7 @@ export async function loadModelPicker(container, agentType) {
     container._defaultModelUsed = false; // once for each load of the list (the dialog is opened again, the type changes), not once for the page
     if (container._addType !== agentType) closeAdd(container, false); // a reload of the SAME provider's list (a late CLI check, the dialog drawing again) leaves an open add form and the keyboard in it: only another provider's list closes it (#11763)
     if (agentType === 'terminal') { wrap.hidden = true; container._thinkingLevels = []; syncThinking(container); return; }
+    if ((container.querySelector('.acf-agent-type')?.value || 'claude') !== agentType) return; // a load asked for a CLI the form is no longer on draws nothing (a refresh that outlived a switch of type)
     const cached = readModelsCache(_acfServer(container), agentType);
     if (cached) fill(container, agentType, cached); else { wrap.hidden = true; if (input) input.hidden = false; }
     const server = _acfServer(container); // #5996: a hub grantee cannot add models
@@ -263,7 +264,7 @@ export function wireModelPicker(container) {
             const got = await fetchList(container, agentType, { refresh: true });
             if (got) {
                 applyAnswer(container, agentType, got);
-                if (got.data.refreshing) await loadModelPicker(container, agentType);
+                if (got.data.refreshing && (container.querySelector('.acf-agent-type')?.value || 'claude') === agentType) await loadModelPicker(container, agentType); // not for a CLI the form has left (#14872: its cached list was drawn into the other's form and the note went)
             }
         } catch { showToast('Could not reach Coral to refresh the list.', true); }
         container._refreshAsked = false;

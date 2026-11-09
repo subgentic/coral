@@ -107,6 +107,19 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`/^Couldn.t load the model list/.test(document.querySelector('#acf-t .acf-model-note').textContent)`, 'the note for a list that failed', 4000); // its own words, not any text: a note that was there for another reason had changed again by the read below (#14318, a Windows retry)
         const failNote = await ev(`document.querySelector('#acf-t .acf-model-note').textContent`);
         assert.match(failNote, /^Couldn.t load the model list \(the CLI didn.t answer in time\)\. .*refresh.*Other/i, `a failed list says what happened and what to do: ${failNote}`);
+        // a refresh the person pressed for one CLI that is still polling when they switch to another does not draw its list over the other's (#14872: the failed list's note went empty a moment after it showed, and the options
+        // were the first CLI's): claude's refresh is out and says it is still refreshing, the form moves to agy, whose list failed
+        await ev(`{ window.__delay = 250; window.__serve.claude = { models: [${JSON.stringify(OPUS)}, ${JSON.stringify(SONNET)}], refreshing: true }; const t = document.querySelector('#acf-t .acf-agent-type'); t.value = 'claude'; t.dispatchEvent(new Event('change', { bubbles: true })); true }`);
+        await waitFor(`document.querySelector('#acf-t .acf-model-select').options.length >= 4`, 'the claude list', 4000);
+        await ev(`document.querySelector('#acf-t .acf-model-refresh').click(); window.__delay = 900; const t = document.querySelector('#acf-t .acf-agent-type'); t.value = 'agy'; t.dispatchEvent(new Event('change', { bubbles: true })); window.__seen = []; const sel = document.querySelector('#acf-t .acf-model-select'); new MutationObserver(() => window.__seen.push(sel.options.length)).observe(sel, { childList: true }); true`);
+        await sleep(600); // sleep-ok: claude's refresh answers at 250 ms, agy's list only at 900: in between the form is on agy and must not hold claude's list
+        const between = await ev(`({ options: document.querySelector('#acf-t .acf-model-select').options.length, seen: window.__seen.slice(), type: document.querySelector('#acf-t .acf-agent-type').value })`);
+        assert.ok(between.type === 'agy' && between.options <= 4, `a refresh pressed for claude does not draw claude's list into the agy form while agy's is out: ${JSON.stringify(between)}`);
+        await waitFor(`/^Couldn.t load the model list/.test(document.querySelector('#acf-t .acf-model-note').textContent)`, 'the failed note for agy', 4000);
+        await sleep(900); // sleep-ok: a negative: claude's polling would have drawn its list by now
+        const kept = await ev(`({ note: document.querySelector('#acf-t .acf-model-note').textContent, options: document.querySelector('#acf-t .acf-model-select').options.length, type: document.querySelector('#acf-t .acf-agent-type').value })`);
+        assert.ok(kept.type === 'agy' && /^Couldn.t load the model list/.test(kept.note) && kept.options <= 4, `a refresh pressed for claude does not draw claude's list over agy's failed one: ${JSON.stringify(kept)}`);
+        await ev(`window.__delay = 0; window.__serve.claude = { models: [${JSON.stringify(OPUS)}, ${JSON.stringify(SONNET)}, ${JSON.stringify(HAIKU)}], refreshing: false }; true`);
         await ev(`{ const t = document.querySelector('#acf-t .acf-agent-type'); t.value = 'claude'; t.dispatchEvent(new Event('change', { bubbles: true })); true }`);
         await waitFor(`document.querySelector('#acf-t .acf-model-select').options.length === 6`, 'the claude list again after the failed one', 4000);
         await ev(`window.__calls.length = 0; window.__serve.claude = { models: [${JSON.stringify(OPUS)}, ${JSON.stringify(SONNET)}], refreshing: true }; document.querySelector('#acf-t .acf-model-refresh').click(); true`);
