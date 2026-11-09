@@ -400,3 +400,4 @@ node artifact_pinned_cleanup.test.mjs
 node inbox_review_legacy_versions.test.mjs
 node resume_ended.test.mjs
 node version_skew_reads.test.mjs
+node history_label_codex.test.mjs
