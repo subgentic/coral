@@ -99,6 +99,16 @@ func resolveClaudeTranscript(sessionID, workingDirectory string) string {
 	if !transcriptlink.IsSessionID(sessionID) {
 		return ""
 	}
+	// A /clear moved the session to a new transcript file: the newest one is the live one (the old one stays on disk, and is the fallback while the new one is not written yet).
+	if alias := TranscriptAlias(sessionID); alias != "" {
+		if p := resolveClaudeTranscriptFile(alias, workingDirectory); p != "" {
+			return p
+		}
+	}
+	return resolveClaudeTranscriptFile(sessionID, workingDirectory)
+}
+
+func resolveClaudeTranscriptFile(sessionID, workingDirectory string) string {
 	home, _ := os.UserHomeDir()
 	basePath := os.Getenv("CLAUDE_PROJECTS_DIR")
 	if basePath == "" {

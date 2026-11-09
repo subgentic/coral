@@ -1,12 +1,16 @@
 package routes
 
 import (
+	"context"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/jsonl"
 	"github.com/subgentic/coral/internal/ptymanager"
+	"github.com/subgentic/coral/internal/store"
 )
 
 var (
@@ -48,4 +52,22 @@ func TestAClearKeepsTheRecordedAgentProcessAndAnEndDropsIt(t *testing.T) {
 	assert.Equal(t, 1, processEndedOf(r.name), "any other end forgets it")
 	r.post(`{"event_type":"session_end","summary":"Session ended"}`)
 	assert.Equal(t, 2, processEndedOf(r.name), "an end that names no reason is an end")
+}
+
+// After a /clear the hook tells the CLI's new session id on the session_reset event (#14849) and Coral reads that transcript from then on; an id that is another agent's session, one that is not a session
+// id, or the agent's own changes nothing.
+func TestAClearsNewSessionIDIsFollowedAndNoOtherIs(t *testing.T) {
+	r := newHoldRig(t, true)
+	t.Cleanup(func() { jsonl.SetTranscriptAlias(r.sid, "") })
+	const other, fresh = "cccccccc-6610-4000-8000-000000000002", "dddddddd-6610-4000-8000-000000000003"
+	require.NoError(t, r.h.ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: other, AgentType: "claude", AgentName: "other", WorkingDir: "/tmp/other"}))
+
+	r.post(`{"event_type":"session_reset","summary":"Session reset: /clear","detail_json":{"claude_session_id":"` + other + `","source":"clear"}}`)
+	assert.Empty(t, jsonl.TranscriptAlias(r.sid), "another agent's session is not this agent's transcript")
+	r.post(`{"event_type":"session_reset","summary":"Session reset: /clear","detail_json":{"claude_session_id":"../../etc/passwd","source":"clear"}}`)
+	assert.Empty(t, jsonl.TranscriptAlias(r.sid), "not a session id")
+	r.post(`{"event_type":"session_reset","summary":"Session reset: /clear","detail_json":{"claude_session_id":"` + r.sid + `","source":"clear"}}`)
+	assert.Empty(t, jsonl.TranscriptAlias(r.sid), "its own id is no alias")
+	r.post(`{"event_type":"session_reset","summary":"Session reset: /clear","detail_json":{"claude_session_id":"` + fresh + `","source":"clear"}}`)
+	assert.Equal(t, fresh, jsonl.TranscriptAlias(r.sid), "the new session of a cleared agent is its transcript")
 }

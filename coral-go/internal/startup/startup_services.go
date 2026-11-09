@@ -125,6 +125,12 @@ func safeGo(ctx context.Context, name string, fn func()) {
 func startBackgroundServices(ctx context.Context, db *store.DB, cfg *config.Config, srv *server.Server, agentRT background.AgentRuntime) (*background.WorkflowRunner, *background.JobScheduler) {
 	gitStore := store.NewGitStore(db)
 	taskStore := store.NewTaskStore(db)
+	// An agent that was cleared keeps reading its new transcript across a restart (#14849).
+	if aliases, err := taskStore.TranscriptAliases(ctx); err == nil {
+		for session, alias := range aliases {
+			jsonl.SetTranscriptAlias(session, alias)
+		}
+	}
 	sessStore := store.NewSessionStore(db)
 	schedStore := store.NewScheduleStore(db)
 	rbStore := store.NewRemoteBoardStore(db)
