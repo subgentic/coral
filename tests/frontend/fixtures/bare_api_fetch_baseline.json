@@ -5,10 +5,6 @@
       "count": 1,
       "reason": "the Analytics page is this computer's: every one of its cost and efficiency routes is a bare path, and the page has no computer switch"
     },
-    "artifact_viewer.js": {
-      "count": 1,
-      "reason": "Share via Dropbox (#14944): the Dropbox status, read only for this computer's own file outside Coral Hub, to show the More actions item; Dropbox is this computer's alone"
-    },
     "automation_runs.js": {
       "count": 1,
       "reason": "Recent runs (#13183) are this computer's jobs and workflows runs: Automations has no server switch and the route is not on the Hub's allowlist"
@@ -16,10 +12,6 @@
     "automations_queue.js": {
       "count": 1,
       "reason": "the Queue folder of Automations reads this computer's own resource queue (GET /api/resources); Automations is local-only, as the jobs and workflows its other folders read with bare fetches"
-    },
-    "board_chat.js": {
-      "count": 1,
-      "reason": "Share via Dropbox (#14944): the Dropbox status, read only for this computer's own board outside Coral Hub, to show the selection bar's Share via Dropbox button; Dropbox is this computer's alone"
     },
     "board_export.js": {
       "count": 1,
@@ -32,6 +24,10 @@
     "cost_dashboard.js": {
       "count": 8,
       "reason": "the Analytics page is this computer's: every one of its cost routes is a bare path, and the page has no computer switch"
+    },
+    "dropbox_connected.js": {
+      "count": 1,
+      "reason": "Share via Dropbox (#14944): the Dropbox status, read only for this computer's own file or board outside Coral Hub, to show the share entries; Dropbox is this computer's alone"
     },
     "job_form.js": {
       "count": 5,

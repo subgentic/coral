@@ -96,6 +96,10 @@ func (f *fakeDropbox) sharing(w http.ResponseWriter, r *http.Request) {
 		f.links[p] = append(f.links[p], l)
 		json.NewEncoder(w).Encode(f.linkJSON(l))
 	case "/2/sharing/list_shared_links":
+		if f.checkFail != "" && str("path") == "" {
+			refuse(http.StatusConflict, f.checkFail)
+			return
+		}
 		var out []any
 		for _, l := range f.links[str("path")] {
 			out = append(out, f.linkJSON(l))
@@ -505,4 +509,19 @@ func TestAfterStopAllDisconnectNeedsNoConfirm(t *testing.T) {
 	be.body = `{}`
 	rec := be.call(http.MethodPost, "/api/dropbox/disconnect", true, nil)
 	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+}
+
+// The Operator's walk (#198059): a refused sharing check says Dropbox's tag (it said only "Could not reach Dropbox"), and the sign-in-again answer
+// names the app permissions. Mutant: the old sentence without the cause.
+func TestARefusedSharingCheckSaysWhy(t *testing.T) {
+	be, d := newDropboxShareEnv(t)
+	be.dbx.checkFail = "path/malformed_path/"
+	code, out := be.share(d, `{"name":"x.md","audience":"public","confirm":true}`)
+	assert.Equal(t, http.StatusBadGateway, code)
+	assert.Contains(t, out["error"], "path/malformed_path", "the cause is said")
+	assert.Empty(t, be.sharedPaths())
+	be.dbx.checkFail = ""
+	be.dbx.noScope = true
+	_, out = be.share(d, `{"name":"x.md","audience":"public","confirm":true}`)
+	assert.Contains(t, out["error"], "sharing.write and sharing.read")
 }

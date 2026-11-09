@@ -85,6 +85,25 @@ const LINK = 'https://www.dropbox.com/scl/fi/abc/release-plan.md?rlkey=k&dl=0';
             check(`${tag}: the focus goes back to More actions`, back, await ev(`document.activeElement ? document.activeElement.className : ''`));
             await ev(`window.closeArtifactViewer ? window.closeArtifactViewer() : (document.getElementById('artifact-viewer').hidden = true); true`);
 
+            // The Operator's walk (#198059): the dialog must always close: on a route change, on Escape while a request is still running, and by
+            // its own close button.
+            console.log(`${tag}: it always closes`);
+            const openIt = async () => { await ev(`(async () => { const m = await import(${S} + 'dropbox_share.js'); m.openShareDialog({ hex: '${H3}', filename: 'release-plan.md', opener: document.body }); return true; })()`); await waitFor(`!!document.querySelector('#dropbox-share-dialog[open] .dropbox-share-choices')`, 'the dialog', 6000); };
+            await openIt();
+            await ev(`document.dispatchEvent(new CustomEvent('coral:route-changed')); true`);
+            check(`${tag}: a route change closes it`, await waitFor(`!document.querySelector('#dropbox-share-dialog[open]')`, 'closed on a route change', 2000).then(() => true, () => false));
+            await openIt();
+            await ev(`(() => { const inner = window.fetch; window.fetch = (u, o) => (new URL(String(u), location.origin).pathname === '/api/dropbox/share/${H3}' && o && o.method === 'POST') ? new Promise(() => {}) : inner(u, o); return true; })()`);
+            await ev(`document.getElementById('dropbox-share-link-ok') && (document.querySelector('#dropbox-share-dialog input[value="public"]').click(), document.getElementById('dropbox-share-link-ok').click()); [...document.querySelectorAll('#dropbox-share-dialog .modal-footer button')].pop().click(); true`);
+            await ev(`document.getElementById('dropbox-share-dialog').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); (() => { const d = document.getElementById('dropbox-share-dialog'); const e = new Event('cancel', { cancelable: true }); d.dispatchEvent(e); if (!e.defaultPrevented) d.close(); })(); true`);
+            check(`${tag}: Escape closes it while a request is still running`, await waitFor(`!document.querySelector('#dropbox-share-dialog[open]')`, 'closed by Escape', 2000).then(() => true, () => false));
+            await openIt();
+            const x = await ev(`(() => { const b = document.querySelector('#dropbox-share-dialog .modal-header button'); return b ? b.getAttribute('aria-label') : ''; })()`);
+            check(`${tag}: it has its own close button`, x === 'Close', x);
+            if (x) await ev(`document.querySelector('#dropbox-share-dialog .modal-header button').click(); true`);
+            check(`${tag}: the close button closes it`, await waitFor(`!document.querySelector('#dropbox-share-dialog[open]')`, 'closed by its button', 2000).then(() => true, () => false));
+            await ev(`document.getElementById('dropbox-share-dialog')?.close(); true`);
+
             console.log(`${tag}: a chat`);
             await ev(`(() => { const inner = window.fetch;
                 const json = (o, s) => Promise.resolve(new Response(JSON.stringify(o), { status: s || 200, headers: { 'Content-Type': 'application/json' } }));

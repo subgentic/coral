@@ -2,10 +2,12 @@
  * connectBoard, and the select-mode state lives here). */
 import { importOnce } from './import_once.js';
 import { escapeHtml, escapeAttr, showToast } from './utils.js';
-import { keyLabel, splitKey, sessionTeamKey, boardFetch } from './server_base.js';
+import { keyLabel, splitKey, sessionTeamKey, boardFetch, isCloud, LOCAL_SERVER } from './server_base.js';
+
 import { attachDialogFocus } from './dialog_focus.js';
 import { fetchAllBoardMessages, fetchAllHistory, fetchAllLiveChat, fetchSubscribers } from './board_fetch.js';
 const { parseAgentHistory, renderExportHTML, renderExportMarkdown } = await importOnce('./board_export_render.js'); // a part of the board page's group: loaded with it
+const { dropboxConnected } = await importOnce('./dropbox_connected.js'); // Share via Dropbox's entries (#14944): a lazy module loads it through importOnce, so a failed load is retried
 
 let _selectMode = false;
 let _selectedIds = new Set();
@@ -259,9 +261,20 @@ function updateSelectBar() {
         <button class="btn btn-small" data-on-click="mb-select-all">Select All</button>
         <button class="btn btn-small" data-on-click="mb-select-none">None</button>
         <button class="btn btn-small btn-primary" data-on-click="mb-export-selected" ${count === 0 ? 'disabled' : ''}>Export Markdown</button>
+        <button class="btn btn-small mb-share-dropbox" data-on-click="mb-share-dropbox" ${count === 0 ? 'disabled' : ''} hidden>Share via Dropbox…</button>
         <button class="btn btn-small" data-on-click="mb-select-cancel">Cancel</button>
     `;
     bar.style.display = '';
+    // Share via Dropbox (#14944): this computer's own board, outside Coral Hub, while Dropbox is connected.
+    if (!isCloud() && splitKey(host.project()).server === LOCAL_SERVER) dropboxConnected().then(on => { const b = bar.querySelector('.mb-share-dropbox'); if (b && on) b.hidden = false; });
+}
+
+/** Share via Dropbox (#14944): the selected messages, oldest first, as one page built and previewed by the server. */
+export async function shareSelectedViaDropbox() {
+    const ids = host.messages().filter(m => _selectedIds.has(m.id)).sort((a, b) => (a.created_at || '').localeCompare(b.created_at || '')).map(m => m.id);
+    if (!ids.length) return;
+    const m = await importOnce('./dropbox_share.js');
+    m.openChatShareDialog({ project: splitKey(host.project()).name, ids, opener: document.querySelector('#mb-select-bar .mb-share-dropbox') });
 }
 
 export async function exportSelectedAsMarkdown() {

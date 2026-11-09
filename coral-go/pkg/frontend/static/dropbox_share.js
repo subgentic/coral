@@ -4,7 +4,8 @@
  * ticked; a file that looks like it holds a key or token needs a second box. After a link is made the dialog shows it with Copy link, Share…
  * (the system sheet, where the browser has one), Open in Dropbox and Stop sharing. A chat is previewed first, in a sandboxed frame (no scripts,
  * no same origin), and shared exactly as previewed. Every server text is set as text; a link is shown only when it is https on www.dropbox.com.
- * A native <dialog> opened with showModal(): Escape closes it (not while a request is in flight), Tab stays inside, and the focus goes back to the
+ * A native <dialog> opened with showModal(): Escape, its × and Cancel always close it, also while a request runs (that request still finishes;
+ * Settings lists what it shared), and so does moving to another screen (the Operator's walk, #198059); Tab stays inside; the focus goes back to the
  * opener. This computer's Operator only: the server refuses everyone else, and the item is not offered through Coral Hub. */
 import { el as mk } from './dom_el.js';
 import { loadStyles } from './lazy_styles.js';
@@ -14,7 +15,7 @@ const LINK_RE = /^https:\/\/www\.dropbox\.com\/(scl|s)\//;
 const EMAIL_RE = /^[^\s@,;<>"']+@[^\s@,;<>"']+\.[^\s@,;<>"']+$/;
 
 let dialog = null;
-const close = () => { if (dialog && dialog.open && !dialog.dataset.busy) dialog.close(); };
+const close = () => { if (dialog && dialog.open) dialog.close(); };
 const safeLink = (u) => typeof u === 'string' && LINK_RE.test(u) && !/[\s"'<>`\\]/.test(u);
 
 async function call(method, url, body) {
@@ -32,17 +33,20 @@ function ensureDialog(opener) {
         dialog = mk('dialog', 'modal-content dlg-form dropbox-share-dialog');
         dialog.id = 'dropbox-share-dialog';
         dialog.setAttribute('role', 'dialog'); dialog.setAttribute('aria-modal', 'true'); dialog.setAttribute('aria-labelledby', 'dropbox-share-title');
-        dialog.addEventListener('cancel', (e) => { if (dialog.dataset.busy) e.preventDefault(); });
         document.body.appendChild(dialog);
+        document.addEventListener('coral:route-changed', close); // another screen: the dialog does not stay over it (#198059)
+        window.addEventListener('popstate', close);
     }
     if (dialog.open) dialog.close();
+    delete dialog.dataset.busy;
     dialog.replaceChildren();
     dialog.addEventListener('close', () => { if (opener && opener.isConnected) opener.focus({ preventScroll: true }); }, { once: true });
     return dialog;
 }
 
 function frame(titleText) {
-    const head = mk('div', 'modal-header'); const h = mk('h3', null, titleText); h.id = 'dropbox-share-title'; head.append(h);
+    const head = mk('div', 'modal-header'); const h = mk('h3', null, titleText); h.id = 'dropbox-share-title';
+    const x = btn('×', 'btn btn-icon modal-close', close); x.setAttribute('aria-label', 'Close'); head.append(h, x); // always there, always closes (#198059)
     const body = mk('div', 'modal-body dropbox-share-body');
     const say = mk('p', 'field-error dropbox-share-say'); say.setAttribute('role', 'alert'); say.hidden = true;
     const acts = mk('div', 'modal-actions modal-footer');
@@ -59,7 +63,7 @@ let busyFocus = null;
 function busy(on) {
     if (!dialog) return;
     if (on) { dialog.dataset.busy = '1'; busyFocus = dialog.contains(document.activeElement) ? document.activeElement : null; } else delete dialog.dataset.busy;
-    for (const b of dialog.querySelectorAll('button, input, textarea')) b.disabled = on;
+    for (const b of dialog.querySelectorAll('button, input, textarea')) b.disabled = on && !b.classList.contains('modal-close');
     if (!on && busyFocus && busyFocus.isConnected && dialog.contains(busyFocus)) busyFocus.focus();
     if (!on) busyFocus = null;
 }
@@ -175,7 +179,9 @@ function form(f, info, send, whatText) {
         if (!name.value.trim()) { sayIt(f.say, 'Give the file a name recipients will see.'); name.focus(); return; }
         busy(true);
         const res = await send({ name: name.value.trim(), audience: a, emails: a === 'people' ? list : [], expire: true, confirm: true, ...(a !== 'people' && info.secret ? { secret_ok: secretTick.checked } : {}) });
-        busy(false);
+        if (!f.body.isConnected) return; // closed (or opened again) meanwhile: this answer is not the dialog's any more
+        if (!f.body.isConnected) return;
+    busy(false);
         if (res.status === 200) { shared(f, res.body, a); return; }
         if (res.body.code === 'sign_in_again') { signInAgain(f); return; }
         sayIt(f.say, String(res.body.error || 'Dropbox did not share it. Try again.'));
@@ -230,6 +236,7 @@ async function stopOne(f, id) {
     sayIt(f.say, '');
     busy(true);
     const res = await call('POST', STOP + encodeURIComponent(String(id)), {});
+    if (!f.body.isConnected) return;
     busy(false);
     if (res.status === 200) {
         f.body.replaceChildren(mk('p', null, 'Sharing stopped: the link no longer works and the copy was deleted from Dropbox.'));
@@ -242,11 +249,13 @@ async function stopOne(f, id) {
 
 // signInAgain is an older Dropbox sign-in (it predates sharing): one way on, the existing Reconnect.
 function signInAgain(f) {
-    f.body.replaceChildren(mk('p', null, 'To share, sign in to Dropbox again to allow sharing. Your backup keeps running meanwhile.'));
+    f.body.replaceChildren(mk('p', null, 'Dropbox does not allow this sign-in to share. In the Dropbox App Console, the Coral app needs the sharing.write and sharing.read permissions; then sign in to Dropbox again. Your backup keeps running meanwhile.'));
     const go = btn('Sign in again', 'btn btn-primary', async () => {
         busy(true);
         const res = await call('POST', '/api/dropbox/connect', {});
-        busy(false);
+        if (!f.body.isConnected) return; // closed (or opened again) meanwhile: this answer is not the dialog's any more
+        if (!f.body.isConnected) return;
+    busy(false);
         const url = String(res.body.authorize_url || '');
         if (res.status !== 200 || !url.startsWith('https://www.dropbox.com/')) { sayIt(f.say, String(res.body.error || "Dropbox sign-in didn't start. Try again from Settings.")); return; }
         window.open(url, '_blank', 'noopener');
