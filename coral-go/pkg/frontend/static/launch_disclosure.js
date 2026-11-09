@@ -6,9 +6,11 @@ import { showConfirmModal } from './confirm_dialog.js';
 import { announceNotice } from './notifications.js';
 import { browserLocal } from './safe_storage.js';
 let readGeneration = 0;
-const HINT_KEY = 'coral-launch-notice'; // "p|53" or "d|73": this browser last saw the notice unseen, on a phone-sized or a wider screen, at that height (theme_init.js reserves its row before first paint)
+const HINT_KEY = 'coral-launch-notice'; // "p|3.3" or "d|4.6": this browser last saw the notice unseen, on a phone-sized or a wider screen, at that height in rem (theme_init.js reserves its row before first paint)
 const hint = {
-    set(px) { browserLocal.set(HINT_KEY, `${window.innerWidth <= 600 ? 'p' : 'd'}|${Math.max(0, Math.min(999, Math.round(px)))}`); }, // storage that is blocked just means no reserved row
+    // The height is kept in rem, not px, so a text size changed since (200% text, a bigger system font) reserves the notice's real size (#14835, UI Accessibility), and only for the notice CLOSED: an opened one is taller, and its
+    // height would reserve more than the collapsed row every later load shows. Storage that is blocked just means no reserved row.
+    set(banner) { if (banner.querySelector('details')?.open) return; const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16; browserLocal.set(HINT_KEY, `${window.innerWidth <= 600 ? 'p' : 'd'}|${Math.max(0, Math.min(99, Math.round(banner.getBoundingClientRect().height / rem * 10) / 10))}`); },
     clear() { browserLocal.remove(HINT_KEY); },
     release() { document.getElementById('launch-notice-room')?.remove(); document.documentElement.removeAttribute('data-launch-notice'); }, // the notice fills the room, or there is none to fill
 };
@@ -44,7 +46,7 @@ export async function refreshLaunchDisclosure() {
     try {
         const response = await serverFetch('local', '/api/launch-disclosure', { cache: 'no-store' });
         if (!response.ok) { hint.clear(); hint.release(); return; } // older servers and non-owners have no offer: nothing is reserved for it
-        const disclosure = await response.json(); if (generation !== readGeneration || !valid(disclosure)) return;
+        const disclosure = await response.json(); if (generation !== readGeneration) return; if (!valid(disclosure)) { hint.release(); return; } // an answer that is not a notice reserves nothing (the hint stays: the next read may be right)
         const mode = document.getElementById('settings-permission-mode');
         if (mode) {
             let line = document.getElementById('settings-launch-disclosure');
@@ -53,7 +55,7 @@ export async function refreshLaunchDisclosure() {
         }
         const previous = document.getElementById('launch-disclosure-banner');
         if (disclosure.seen === true) { previous?.remove(); hint.clear(); hint.release(); return; }
-        if (disclosure.seen === false && previous?.dataset.disclosureId === disclosure.id) { hint.set(previous.getBoundingClientRect().height); return; } // already drawn (an earlier read): the hint is kept as it is
+        if (disclosure.seen === false && previous?.dataset.disclosureId === disclosure.id) { hint.set(previous); return; } // already drawn (an earlier read): the hint is kept as it is
         if (disclosure.seen !== false) return;
         previous?.remove();
         const banner = document.createElement('div'); banner.id = 'launch-disclosure-banner'; banner.dataset.disclosureId = disclosure.id; banner.className = 'notice notice-info notice-bar notice-compact'; banner.setAttribute('role', 'note');
@@ -77,7 +79,7 @@ export async function refreshLaunchDisclosure() {
         const after = document.getElementById('local-auth-banner') || document.querySelector('header.top-bar');
         if (after) after.after(banner); else document.body.prepend(banner);
         window.dispatchEvent(new Event('coral:launch-disclosure-shown'));
-        hint.release(); hint.set(banner.getBoundingClientRect().height); // the notice now holds the room; the next load reserves it from the start
+        hint.release(); hint.set(banner); // the notice now holds the room; the next load reserves it from the start
         announceNotice(headline);
-    } catch { /* no unauthenticated or network failure is an acknowledgement */ }
+    } catch { hint.release(); /* no unauthenticated or network failure is an acknowledgement, and nothing is left reserved for a notice that did not come */ }
 }

@@ -4,7 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
-const { coralReady } = require('./helpers/wait');
+const { coralReady, framesJs } = require('./helpers/wait');
 const { guardSettings } = require('./helpers/settings_guard');
 
 (async () => {
@@ -34,7 +34,7 @@ const { guardSettings } = require('./helpers/settings_guard');
             await ev(`import((window.__coralStatic || '/static/') + 'launch_disclosure.js').then(m => m.refreshLaunchDisclosure())`);
             await waitFor(`!!document.getElementById('launch-disclosure-banner')`, `${at}the unseen notice`, 10000);
             const hint = await ev(`localStorage.getItem('coral-launch-notice')`);
-            check(/^[pd]\|\d+$/.test(hint || ''), `${at}the notice leaves a hint of its kind of screen and its height: ${JSON.stringify(hint)}`);
+            check(/^[pd]\|\d{1,2}(\.\d)?$/.test(hint || ''), `${at}the notice leaves a hint of its kind of screen and its height in rem: ${JSON.stringify(hint)}`);
             // 2. a later load while it is unseen: nothing under the banners moves when it arrives
             trackId = (await Page.addScriptToEvaluateOnNewDocument({ source: TRACK })).identifier;
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
@@ -50,6 +50,36 @@ const { guardSettings } = require('./helpers/settings_guard');
             await Page.removeScriptToEvaluateOnNewDocument({ identifier: trackId }); trackId = null;
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
             check(await ev(`!document.documentElement.hasAttribute('data-launch-notice') && !document.getElementById('launch-notice-room')`), `${at}once it is read nothing is reserved on the next load`);
+        }
+        // UI Accessibility's three SHOULDs on #14835 (1280 px)
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
+        // (1) text size is not in the hint: the room is kept in rem, so at 200% text (a 32 px root) the reserved row is twice as tall
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+        await ev(`localStorage.setItem('coral-launch-notice', 'd|4.6'); true`);
+        const early = (await Page.addScriptToEvaluateOnNewDocument({ source: `window.__room = []; const iv = setInterval(() => { if (document.documentElement) document.documentElement.style.fontSize = '32px'; const l = document.querySelector('.layout'); if (l && !document.getElementById('launch-disclosure-banner') && window.__room.length < 3) window.__room.push(getComputedStyle(l).marginTop); if (window.__room.length >= 3 || document.getElementById('launch-disclosure-banner')) clearInterval(iv); }, 2);` })).identifier;
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+        await waitFor(`window.__room && window.__room.length >= 1`, 'the reserved row at 200% text', 8000);
+        const mt = parseFloat((await ev(`window.__room[0]`)));
+        check(Math.abs(mt - 4.6 * 32) < 1.5, `the room is kept in rem: at a 32 px root the reserved row is ${4.6 * 32} px (it is ${mt} px)`);
+        await Page.removeScriptToEvaluateOnNewDocument({ identifier: early });
+        // (2) the hint is written for the notice CLOSED only: an opened notice is taller and must not become the reserved row
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
+        await ev(`fetch('/api/launch-disclosure/ack', { method: 'DELETE' }).then(r => r.ok)`);
+        await ev(`import((window.__coralStatic || '/static/') + 'launch_disclosure.js').then(m => m.refreshLaunchDisclosure())`);
+        await waitFor(`!!document.getElementById('launch-disclosure-banner')`, 'the notice', 10000);
+        await ev(`localStorage.setItem('coral-launch-notice', 'd|4.6'); document.querySelector('#launch-disclosure-banner details').open = true; true`);
+        await ev(`import((window.__coralStatic || '/static/') + 'launch_disclosure.js').then(m => m.refreshLaunchDisclosure())`);
+        await ev(framesJs(3));
+        check(await ev(`localStorage.getItem('coral-launch-notice')`) === 'd|4.6', 'an opened notice does not rewrite the hint: ' + await ev(`localStorage.getItem('coral-launch-notice')`));
+        // (3) a read that fails or is not a notice releases the room (the hint stays for the next read)
+        for (const [what, reply] of [['an invalid answer', `new Response(JSON.stringify({ nope: 1 }), { status: 200, headers: { 'Content-Type': 'application/json' } })`], ['a failed read', `Promise.reject(new TypeError('network'))`]]) {
+            const stub = (await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const real = window.fetch; window.fetch = (u, o) => String(u).includes('/api/launch-disclosure') && !String(u).includes('/ack') ? ${reply.startsWith('new') ? 'Promise.resolve(' + reply + ')' : reply} : real(u, o); })();` })).identifier;
+            await ev(`localStorage.setItem('coral-launch-notice', 'd|4.6'); true`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
+            await ev(`import((window.__coralStatic || '/static/') + 'launch_disclosure.js').then(m => m.refreshLaunchDisclosure())`);
+            await waitFor(`!document.documentElement.hasAttribute('data-launch-notice') && !document.getElementById('launch-notice-room')`, `${what} releases the reserved room`, 8000);
+            check(await ev(`localStorage.getItem('coral-launch-notice')`) === 'd|4.6', `${what}: the hint stays for the next read`);
+            await Page.removeScriptToEvaluateOnNewDocument({ identifier: stub });
         }
     } finally { await guard.restore().catch(() => {}); await client.close(); }
     if (problems.length) { console.error('FAIL\n  ' + problems.join('\n  ')); process.exit(1); }
