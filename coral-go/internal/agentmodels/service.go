@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -85,6 +86,7 @@ type Group struct {
 
 type entry struct {
 	key         string // the CLI's path, modification time and size
+	path        string // the CLI's resolved path the list belongs to: another path is another program, whose list is not this one's (samePath)
 	models      []Model
 	source      string
 	fetchedAt   time.Time
@@ -132,6 +134,14 @@ func NewService(find func(agentType string) (string, error)) *Service {
 // SetFetcher replaces how a CLI is run (tests).
 // SetFetcher has no production caller: it is exported for tests in server/routes.
 func (s *Service) SetFetcher(f Fetcher) { s.fetch = f }
+
+// samePath says a and b name the same CLI: equal, or equal but for case on Windows, whose file names are not case-sensitive.
+func samePath(a, b string) bool {
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(a, b)
+	}
+	return a == b
+}
 
 // cliKey identifies a build of the CLI at path.
 func cliKey(path string) string {
@@ -219,6 +229,12 @@ func (s *Service) get(agentType string, manual bool) Result {
 		e = &entry{}
 		s.entries[family] = e
 	}
+	if e.path != "" && !samePath(e.path, path) {
+		// Another program (Settings points elsewhere, or a stand-in is gone): its list, source and error go at once, so the built-in list is served until this one's
+		// fetch succeeds. Another build of the same program (its time or size changed) keeps its list while it is asked again.
+		e.models, e.source, e.err, e.groups, e.defaultMod, e.fetchedAt = nil, "", "", nil, "", time.Time{}
+	}
+	e.path = path
 	due := manual || e.key != key ||
 		(e.err == "" && now.Sub(e.fetchedAt) >= maxAge) ||
 		(e.err != "" && now.Sub(e.attemptedAt) >= retryAfterError)
@@ -265,6 +281,9 @@ func (s *Service) runFetch(family, path, key string) {
 	defer s.mu.Unlock()
 	e := s.entries[family]
 	e.refreshing = false
+	if !samePath(e.path, path) {
+		return // the CLI's path changed while this ran: its answer is another program's, so it is not kept (the next Get asks the new one)
+	}
 	e.key = key // a failure too: this build is retried after retryAfterError, not on every Get
 	if err != nil {
 		e.err = describe(err)
