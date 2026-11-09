@@ -453,3 +453,81 @@ func TestAPlaceTheHookMadeIsNotTakenForAbandonedForNotAsking(t *testing.T) {
 	st, _ := q.Status("mac")
 	assert.Equal(t, []string{"hooked"}, names(st.Holders), "the hook's place waited five minutes and still gets the slot")
 }
+
+// The Operator's resource page (#14857): the last HistoryKeep finished holds of a resource, newest first, with how each ended, and a result recorded while held or just after the release.
+func TestFinishedHoldsAreKeptNewestFirstUpToTwentyWithHowTheyEnded(t *testing.T) {
+	q, c := fixture(t, Config{})
+	for i := 0; i < HistoryKeep+5; i++ {
+		_, err := q.Claim("mac", Claimant{Agent: "a", Task: i, Cmd: "go test", Head: "abcdef0"})
+		require.NoError(t, err)
+		c.add(time.Minute)
+		require.NoError(t, q.Release("mac", "a"))
+	}
+	st, err := q.Status("mac")
+	require.NoError(t, err)
+	require.Len(t, st.History, HistoryKeep, "twenty are kept")
+	assert.Equal(t, HistoryKeep+4, st.History[0].Task, "the newest first")
+	assert.Equal(t, int64(60), st.History[0].TookS)
+	assert.Equal(t, "released", st.History[0].How)
+	assert.Equal(t, "go test", st.History[0].Cmd)
+
+	// a lease that runs out and a person's kick
+	q2, c2 := fixture(t, Config{})
+	claim(t, q2, "mac", "x", 0)
+	c2.add(DefaultLease + time.Minute)
+	_, _ = q2.Reap()
+	r := claim(t, q2, "mac", "y", 0)
+	require.NoError(t, q2.Cancel(r.Entry.ID))
+	st, _ = q2.Status("mac")
+	require.Len(t, st.History, 2)
+	assert.Equal(t, "kicked", st.History[0].How)
+	assert.Equal(t, "expired", st.History[1].How)
+	// a place in line that ended is not a run
+	claim(t, q2, "mac", "z", 0)
+	w := claim(t, q2, "mac", "w", 0)
+	require.False(t, w.Granted)
+	require.NoError(t, q2.Release("mac", "w"))
+	v := claim(t, q2, "mac", "v", 0)
+	require.False(t, v.Granted)
+	require.NoError(t, q2.Cancel(v.Entry.ID)) // a person kicks a place in line, not a hold
+	st, _ = q2.Status("mac")
+	assert.Len(t, st.History, 2, "w and v only waited: a place in line that ended, even kicked, is not a run")
+}
+
+func TestAResultIsRecordedWhileHeldOrJustAfterTheReleaseAndOnlyByTheOwner(t *testing.T) {
+	q, c := fixture(t, Config{})
+	claim(t, q, "mac", "a", 0)
+	require.ErrorIs(t, q.Result("mac", "other", 0, ""), ErrNotHolder, "not the caller's own run")
+	require.NoError(t, q.Result("mac", "a", 3, "FAIL"))
+	require.NoError(t, q.Release("mac", "a"))
+	st, _ := q.Status("mac")
+	require.NotNil(t, st.History[0].Exit)
+	assert.Equal(t, 3, *st.History[0].Exit)
+	assert.Equal(t, "FAIL", st.History[0].Line)
+
+	claim(t, q, "mac", "a", 0)
+	require.NoError(t, q.Release("mac", "a"))
+	require.ErrorIs(t, q.Result("mac", "other", 9, "not mine"), ErrNotHolder, "another agent cannot mark a finished run that is not its own")
+	require.NoError(t, q.Result("mac", "a", 0, "ok"), "just after the release")
+	require.ErrorIs(t, q.Result("mac", "a", 1, "again"), ErrNotHolder, "once")
+	claim(t, q, "mac", "a", 0)
+	require.NoError(t, q.Release("mac", "a"))
+	c.add(ResultRecentFor + time.Minute)
+	require.ErrorIs(t, q.Result("mac", "a", 0, "late"), ErrNotHolder, "too long after it")
+	require.ErrorIs(t, q.Result("nothing", "a", 0, ""), ErrNoResource)
+}
+
+func TestHistoryAndResultsSurviveARestart(t *testing.T) {
+	p := &memPersist{}
+	q, c := fixture(t, Config{Persist: p})
+	claim(t, q, "mac", "a", 0)
+	require.NoError(t, q.Result("mac", "a", 2, "boom"))
+	c.add(time.Minute)
+	require.NoError(t, q.Release("mac", "a"))
+	q2, err := New(Config{Persist: p, Now: c.now})
+	require.NoError(t, err)
+	st, err := q2.Status("mac")
+	require.NoError(t, err)
+	require.Len(t, st.History, 1)
+	assert.Equal(t, "boom", st.History[0].Line)
+}

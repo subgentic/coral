@@ -50,6 +50,11 @@ type Claimant struct {
 	Via      string // how the claim came: "hook" for the shell hook's own, "" for a person's or an agent's (#13671)
 	Polls    bool   // #14170: the claim came from a command that keeps asking about its place (the CLI, every 3 s); only such a place can be taken for abandoned
 	Pattern  string // for a hook claim, the resource's match pattern that fired (never the command)
+	// What the run is (#14857, the Operator's resource page): the command the agent says it will run, the commit it runs on and the minutes it expects, for people to read. Text only: the caller cleans and cuts it,
+	// nothing here is run, and the hook's claims have none.
+	Cmd       string
+	Head      string
+	ExpectMin int
 }
 
 // Entry is one agent's place in a resource's line, or its hold of a slot.
@@ -64,6 +69,8 @@ type Entry struct {
 	Pin      int       // a person's override: bigger is nearer the front among the waiting (set by Move)
 	Renews   int       // #14222: how many times the lease was renewed while held, told once in the hold's end event (a row per renewal buried the record: 46,260 in 31 hours)
 	Polled   time.Time // #14170: when the agent last asked about this place (a waiting claim asks every few seconds); an entry nobody has asked about for WaitStale is not waited on: its command ended
+	Exit     *int      // #14857: the result the agent recorded for this hold (its exit code), nil until it does
+	Line     string    // and the last line it printed, cut by the caller
 	Away     time.Time // #13706: the agent's wait ended without a turn (its --timeout, its tool call) and its place is kept until this time; a claim from it again clears it. Zero: present
 }
 
@@ -81,6 +88,7 @@ type Result struct {
 type Status struct {
 	Resource Resource
 	Now      time.Time
+	History  []Run   // #14857: the last HistoryKeep finished holds, newest first
 	Holders  []Entry // granted, oldest first
 	Queue    []Entry // waiting, in the order they will be granted
 }
@@ -119,6 +127,7 @@ func (q *Queue) note(kind string, e *Entry) { q.noteWhy(kind, "", e) }
 
 // noteWhy is note for an event that ENDS a hold or a place: it says why, and carries how many times the lease was renewed (#14222). Every way an entry leaves the queue goes through it once.
 func (q *Queue) noteWhy(kind, why string, e *Entry) {
+	q.recordRun(kind, e)
 	if q.cfg.OnEvent == nil {
 		return
 	}
@@ -176,6 +185,7 @@ type State struct {
 	Resources []Resource
 	Entries   []Entry
 	NextID    int64
+	History   map[string][]Run // #14857: the last HistoryKeep finished holds of each resource, newest first
 }
 
 // Queue is the whole thing.
@@ -185,7 +195,8 @@ type Queue struct {
 	res     map[string]*Resource
 	entries []*Entry
 	nextID  int64
-	pend    []Event // events noted under the lock, told to the sink after it (OnEvent)
+	history map[string][]Run // #14857: finished holds by resource, newest first, at most HistoryKeep each
+	pend    []Event          // events noted under the lock, told to the sink after it (OnEvent)
 }
 
 // New makes an empty Queue, or one loaded from cfg.Persist.
@@ -193,7 +204,7 @@ func New(cfg Config) (*Queue, error) {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
-	q := &Queue{cfg: cfg, res: map[string]*Resource{}, nextID: 1}
+	q := &Queue{cfg: cfg, res: map[string]*Resource{}, nextID: 1, history: map[string][]Run{}}
 	if cfg.Persist != nil {
 		st, err := cfg.Persist.Load()
 		if err != nil {
@@ -209,6 +220,12 @@ func New(cfg Config) (*Queue, error) {
 		}
 		if st.NextID > q.nextID {
 			q.nextID = st.NextID
+		}
+		for k, runs := range st.History {
+			if len(runs) > HistoryKeep {
+				runs = runs[:HistoryKeep]
+			}
+			q.history[k] = append([]Run(nil), runs...)
 		}
 	}
 	return q, nil
@@ -857,6 +874,7 @@ func (q *Queue) status(r *Resource) Status {
 	for _, e := range q.line(r.Key) {
 		st.Queue = append(st.Queue, *e)
 	}
+	st.History = append([]Run(nil), q.history[r.Key]...)
 	return st
 }
 
@@ -872,6 +890,12 @@ func (q *Queue) state() State {
 	}
 	for _, e := range q.entries {
 		st.Entries = append(st.Entries, *e)
+	}
+	if len(q.history) > 0 {
+		st.History = make(map[string][]Run, len(q.history))
+		for k, runs := range q.history {
+			st.History[k] = append([]Run(nil), runs...)
+		}
 	}
 	return st
 }
@@ -890,4 +914,89 @@ func (q *Queue) notify(granted []Entry) {
 	for _, e := range granted {
 		q.cfg.OnGrant(e)
 	}
+}
+
+// HistoryKeep is how many finished holds a resource keeps (#14857).
+const HistoryKeep = 20
+
+// Run is one finished hold of a resource, for the Operator's page: who held it, what the run was, how it ended and how long it took (#14857). It is kept in the queue's own state, with the command and the last line
+// the agent gave: text for people to read, never run, and nothing from an environment.
+type Run struct {
+	ID       int64  // the entry's id
+	Agent    string // who
+	Task     int
+	Project  string
+	Note     string
+	Cmd      string
+	Head     string
+	Machine  string // where the resource was
+	Granted  time.Time
+	Released time.Time
+	How      string // released (given back), kicked (a person removed it) or expired (the lease ran out, or the agent's session ended)
+	Exit     *int   // the exit code the agent recorded, nil when it recorded none
+	Line     string // the last line it recorded
+	TookS    int64
+}
+
+// recordRun adds the finished hold of e to its resource's history. Only a hold that was granted counts (a place in line that ended is not a run), and only the ways a hold ends.
+func (q *Queue) recordRun(kind string, e *Entry) {
+	if e.Waiting() {
+		return
+	}
+	how := ""
+	switch kind {
+	case "released":
+		how = "released"
+	case "kicked":
+		how = "kicked"
+	case "expired", "gone":
+		how = "expired"
+	default:
+		return
+	}
+	now := q.now()
+	run := Run{ID: e.ID, Agent: e.Agent, Task: e.Task, Project: e.Project, Note: e.Note, Cmd: e.Cmd, Head: e.Head, Granted: e.Granted, Released: now, How: how, Exit: e.Exit, Line: e.Line, TookS: int64(now.Sub(e.Granted) / time.Second)}
+	key := e.Resource
+	if e.Member != "" {
+		key = e.Member // a pool's hold is a run of the member that served it, shown on the member's row
+	}
+	if r := q.res[key]; r != nil {
+		run.Machine = r.Machine
+	}
+	runs := append([]Run{run}, q.history[key]...)
+	if len(runs) > HistoryKeep {
+		runs = runs[:HistoryKeep]
+	}
+	q.history[key] = runs
+}
+
+// ResultRecentFor is how long after its hold ended an agent may still record the result of that run: a command that releases in the same breath as it records is the common case.
+const ResultRecentFor = 15 * time.Minute
+
+// Result records how the agent's run went: its exit code and last line (cut by the caller). It is the agent's own hold that is marked; a hold that has just ended (the agent released first) is marked too, once,
+// when the agent has no hold of the resource but the newest finished one of its own has no result yet.
+func (q *Queue) Result(key, agent string, exit int, line string) error {
+	q.mu.Lock()
+	defer q.unlockEmit()
+	if _, ok := q.res[key]; !ok {
+		return ErrNoResource
+	}
+	if e := q.entryFor(key, agent); e != nil && !e.Waiting() {
+		code := exit
+		e.Exit, e.Line = &code, line
+		return q.save()
+	}
+	runs := q.history[key]
+	for i := range runs {
+		if runs[i].Agent != agent {
+			continue
+		}
+		if runs[i].Exit != nil || q.now().Sub(runs[i].Released) > ResultRecentFor {
+			break // the newest of its own is answered already, or too old to be this call's
+		}
+		code := exit
+		runs[i].Exit, runs[i].Line = &code, line
+		return q.save()
+	}
+	return ErrNotHolder
 }

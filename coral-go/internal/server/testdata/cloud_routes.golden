@@ -404,6 +404,7 @@ POST /api/resources/entries/{id}/move never
 POST /api/resources/{name}/claim never
 POST /api/resources/{name}/release never
 POST /api/resources/{name}/renew never
+POST /api/resources/{name}/result never
 POST /api/saved interact
 POST /api/scheduled/jobs never
 POST /api/scheduled/jobs/init-repo never

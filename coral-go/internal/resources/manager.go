@@ -90,6 +90,23 @@ func (m *Manager) ClaimPolling(ctx context.Context, resource, agent, note string
 	return m.claim(ctx, resource, resourcequeue.Claimant{Agent: agent, Note: note, Polls: true})
 }
 
+// Details say what a claimed run is (#14857, the Operator's resource page): text for people to read, cleaned and cut by the caller, never run.
+type Details struct {
+	Cmd       string
+	Head      string
+	ExpectMin int
+}
+
+// ClaimPollingDetails is ClaimPolling with the run's details.
+func (m *Manager) ClaimPollingDetails(ctx context.Context, resource, agent, note string, d Details) (resourcequeue.Result, error) {
+	return m.claim(ctx, resource, resourcequeue.Claimant{Agent: agent, Note: note, Polls: true, Cmd: d.Cmd, Head: d.Head, ExpectMin: d.ExpectMin})
+}
+
+// Result records the exit code and last line of the agent's own run of the resource (#14857).
+func (m *Manager) Result(resource, agent string, exit int, line string) error {
+	return m.q.Result(resource, agent, exit, line)
+}
+
 // ClaimAuto is the shell hook's claim (#13645): the same as Claim, marked as the hook's own with the pattern that fired (the record keeps the pattern, never the command).
 func (m *Manager) ClaimAuto(ctx context.Context, resource, agent, pattern string) (resourcequeue.Result, error) {
 	return m.claim(ctx, resource, resourcequeue.Claimant{Agent: agent, Note: "auto: " + pattern, Via: "hook", Pattern: pattern})

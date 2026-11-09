@@ -169,6 +169,7 @@ var activityNotAnInboxAction = map[string]string{
 	"POST /api/resources/entries/{id}/move":                                "the shared-resource queue (an agent's claim, or the Resources screen's rename, move and release of a slot): not an Inbox action",
 	"POST /api/resources/{name}/claim":                                     "the shared-resource queue (an agent's claim, or the Resources screen's rename, move and release of a slot): not an Inbox action",
 	"POST /api/resources/{name}/release":                                   "the shared-resource queue (an agent's claim, or the Resources screen's rename, move and release of a slot): not an Inbox action",
+	"POST /api/resources/{name}/result":                                    "the shared-resource queue (an agent's claim, or the Resources screen's rename, move and release of a slot): not an Inbox action",
 	"POST /api/resources/{name}/renew":                                     "the shared-resource queue (an agent's claim, or the Resources screen's rename, move and release of a slot): not an Inbox action",
 	"POST /api/scheduled/jobs":                                             "the Automations tab",
 	"POST /api/scheduled/jobs/init-repo":                                   "the Automations tab",

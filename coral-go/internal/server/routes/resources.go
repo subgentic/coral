@@ -60,22 +60,47 @@ type entryView struct {
 	IdleMin   *int   `json:"idle_min,omitempty"`  // #14079: minutes with nothing running under the claim (0 is shown too); absent: working, or not a claim Coral can look at
 	Member    string `json:"member,omitempty"`    // a pool's hold: the member it was granted (#13719)
 	Machine   string `json:"machine,omitempty"`   // and that member's machine, for people to read
+	// What the run is (#14857): the command the agent said it runs, the commit, the minutes it expects and, once it records them, its exit code and last line. Text for people to read, never run.
+	Cmd       string `json:"cmd,omitempty"`
+	Head      string `json:"head,omitempty"`
+	ExpectMin int    `json:"expect_min,omitempty"`
+	Exit      *int   `json:"exit,omitempty"`
+	Line      string `json:"line,omitempty"`
+}
+
+// resourceRunView is one finished run of a resource (#14857): the last resourcequeue.HistoryKeep, newest first.
+type resourceRunView struct {
+	ID       int64  `json:"id"`
+	Agent    string `json:"agent"`
+	Task     int    `json:"task,omitempty"`
+	Project  string `json:"project,omitempty"`
+	Note     string `json:"note,omitempty"`
+	Cmd      string `json:"cmd,omitempty"`
+	Head     string `json:"head,omitempty"`
+	Machine  string `json:"machine,omitempty"`
+	Granted  string `json:"granted_at"`
+	Released string `json:"released_at"`
+	How      string `json:"how"`
+	Exit     *int   `json:"exit,omitempty"`
+	Line     string `json:"line,omitempty"`
+	TookS    int64  `json:"took_s"`
 }
 
 type resourceView struct {
-	Name     string      `json:"name"`
-	Slots    int         `json:"slots"`
-	Machine  string      `json:"machine,omitempty"`
-	MaxLease int         `json:"max_lease_seconds"`
-	Members  []string    `json:"members,omitempty"` // a pool: its members, in the order they are tried
-	Allowed  []string    `json:"allowed,omitempty"`
-	Match    []string    `json:"match,omitempty"`
-	Holders  []entryView `json:"holders"`
-	Queue    []entryView `json:"queue"`
+	Name     string            `json:"name"`
+	Slots    int               `json:"slots"`
+	Machine  string            `json:"machine,omitempty"`
+	MaxLease int               `json:"max_lease_seconds"`
+	Members  []string          `json:"members,omitempty"` // a pool: its members, in the order they are tried
+	Allowed  []string          `json:"allowed,omitempty"`
+	Match    []string          `json:"match,omitempty"`
+	Holders  []entryView       `json:"holders"`
+	Queue    []entryView       `json:"queue"`
+	History  []resourceRunView `json:"history"` // the last finished runs, newest first (#14857)
 }
 
 func viewEntry(e resourcequeue.Entry, place int) entryView {
-	v := entryView{ID: e.ID, Agent: e.Agent, Task: e.Task, Project: e.Project, Priority: e.Priority, Note: e.Note, Enqueued: e.Enqueued.UTC().Format(time.RFC3339), Member: e.Member, Pinned: e.Pin > 0, Place: place}
+	v := entryView{ID: e.ID, Agent: e.Agent, Task: e.Task, Project: e.Project, Priority: e.Priority, Note: e.Note, Enqueued: e.Enqueued.UTC().Format(time.RFC3339), Member: e.Member, Pinned: e.Pin > 0, Place: place, Cmd: e.Cmd, Head: e.Head, ExpectMin: e.ExpectMin, Exit: e.Exit, Line: e.Line}
 	if !e.Granted.IsZero() {
 		v.Granted = e.Granted.UTC().Format(time.RFC3339)
 		v.Lease = e.Lease.UTC().Format(time.RFC3339)
@@ -94,6 +119,11 @@ func viewStatus(st resourcequeue.Status) resourceView {
 	}
 	for i, e := range st.Queue {
 		v.Queue = append(v.Queue, viewEntry(e, i+1))
+	}
+	v.History = []resourceRunView{}
+	for _, r := range st.History {
+		v.History = append(v.History, resourceRunView{ID: r.ID, Agent: r.Agent, Task: r.Task, Project: r.Project, Note: r.Note, Cmd: r.Cmd, Head: r.Head, Machine: r.Machine,
+			Granted: r.Granted.UTC().Format(time.RFC3339), Released: r.Released.UTC().Format(time.RFC3339), How: r.How, Exit: r.Exit, Line: r.Line, TookS: r.TookS})
 	}
 	return v
 }
@@ -210,7 +240,14 @@ type agentBody struct {
 	SubscriberID string `json:"subscriber_id"`
 	Note         string `json:"note"`
 	KeepPlace    bool   `json:"keep_place,omitempty"` // release: a wait that ended without a turn (the CLI's --timeout): the place in line is kept for a grace, not dropped (#13706)
-	ParentPID    int    `json:"parent_pid,omitempty"` // a claim by an agent: the shell that ran coral-board (a job in the background keeps the slot while it runs, #13718)
+	// What the run is (#14857), for the Operator's resource page: claim carries the command and the commit the agent says it runs and the minutes it expects; result carries the exit code and the last line. Text for
+	// people to read, cleaned, redacted and cut here; nothing in it is ever run.
+	Cmd       string `json:"cmd,omitempty"`
+	Head      string `json:"head,omitempty"`
+	ExpectMin int    `json:"expect_min,omitempty"`
+	Exit      *int   `json:"exit,omitempty"`
+	Line      string `json:"line,omitempty"`
+	ParentPID int    `json:"parent_pid,omitempty"` // a claim by an agent: the shell that ran coral-board (a job in the background keeps the slot while it runs, #13718)
 }
 
 // agent reads the body and the verified name of the caller.
@@ -240,7 +277,8 @@ func (h *ResourcesHandler) Claim(w http.ResponseWriter, r *http.Request) {
 	}
 	h.reap()
 	name := chi.URLParam(r, "name")
-	res, err := h.M.ClaimPolling(resources.WithSession(r.Context(), callerActor(r).Session), name, who, cleanText(body.Note, 200))
+	res, err := h.M.ClaimPollingDetails(resources.WithSession(r.Context(), callerActor(r).Session), name, who, cleanText(body.Note, 200),
+		resources.Details{Cmd: cleanRunText(body.Cmd, maxRunCmd), Head: cleanHead(body.Head), ExpectMin: cleanExpect(body.ExpectMin)})
 	if err != nil {
 		h.fail(w, err)
 		return
@@ -269,6 +307,70 @@ func (h *ResourcesHandler) Claim(w http.ResponseWriter, r *http.Request) {
 		ev.Machine = ms.Resource.Machine // and a plain slot resource's grant says its own (#14262: a claim for the mini named no machine, and heavy run took it for the Mac)
 	}
 	writeJSON(w, code, map[string]any{"granted": res.Granted, "place": res.Place, "entry": ev})
+}
+
+// What the Operator's page shows of a run is text an agent wrote: cut here, and never run (#14857).
+const (
+	maxRunCmd  = 300 // the command
+	maxRunLine = 200 // the last line of the result
+	maxExpect  = 24 * 60
+)
+
+// envAssign is an environment assignment in a command (TOKEN=abc): its value is never kept, whatever it holds (no env values, #14857).
+var envAssign = regexp.MustCompile(`\b([A-Z][A-Z0-9_]+)=\S+`)
+
+// cleanRunText is text an agent gave about its run: control characters out, secrets redacted (the comments' redactor), the values of environment assignments hidden, cut to n characters. "" when the redactor cannot be
+// trusted: a run shown with no command is better than one that leaks.
+func cleanRunText(s string, n int) string {
+	s = cleanText(s, 4*n)
+	if s == "" {
+		return ""
+	}
+	red, ok := redactComment(s)
+	if !ok {
+		return ""
+	}
+	return cleanText(envAssign.ReplaceAllString(red, "$1=…"), n)
+}
+
+// cleanHead is a commit as 7 to 40 hex characters, lower case; anything else is nothing.
+func cleanHead(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	if len(s) < 7 || len(s) > 40 {
+		return ""
+	}
+	for _, c := range s {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return ""
+		}
+	}
+	return s
+}
+
+// cleanExpect is the expected minutes: 0 (none) to a day.
+func cleanExpect(n int) int {
+	if n < 0 || n > maxExpect {
+		return 0
+	}
+	return n
+}
+
+// Result answers POST /api/resources/{name}/result {subscriber_id, exit, line}: how the agent's own run went (#14857). An agent records only the result of its own hold, or of the one it has just given back.
+func (h *ResourcesHandler) Result(w http.ResponseWriter, r *http.Request) {
+	body, who, ok := h.agent(w, r)
+	if !ok {
+		return
+	}
+	if body.Exit == nil || *body.Exit < -1 || *body.Exit > 255 {
+		errBadRequest(w, "exit must be a number from -1 to 255")
+		return
+	}
+	h.reap()
+	if err := h.M.Result(chi.URLParam(r, "name"), who, *body.Exit, cleanRunText(body.Line, maxRunLine)); err != nil {
+		h.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 // Release answers POST /api/resources/{name}/release.

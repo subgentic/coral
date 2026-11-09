@@ -111,6 +111,7 @@ func (s *Server) registerResources(r chi.Router, sess *routes.SessionsHandler) {
 	r.Get("/api/resources/{name}", h.Get)
 	r.Post("/api/resources/{name}/claim", h.Claim)
 	r.Post("/api/resources/{name}/release", h.Release)
+	r.Post("/api/resources/{name}/result", h.Result) // an agent records how its own run went (#14857)
 	r.Post("/api/resources/{name}/renew", h.Renew)
 	r.Put("/api/resources/{name}", h.Define)
 	r.Delete("/api/resources/{name}", h.Remove)

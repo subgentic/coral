@@ -572,6 +572,7 @@ a GET /api/resources/{name}
 a POST /api/resources/entries/{id}/move
 a POST /api/resources/{name}/claim
 a POST /api/resources/{name}/release
+a POST /api/resources/{name}/result
 a POST /api/resources/{name}/renew
 a PUT /api/resources/{name}
 b PUT /api/teams/detail/{name}/daily-knowledge

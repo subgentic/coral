@@ -24,8 +24,11 @@ The queue is cooperation, not isolation: it tells the team who is using a machin
 
   resource list [--json]                          Every resource: slots, who holds them, the line in order
   resource status <name> [--json]                 One resource, and your place
-  resource claim <name> [--wait] [--timeout 30m] [--note "why"]
-                                                  A slot now (exit 0), or a place in line: with --wait the command waits until the slot is yours
+  resource claim <name> [--wait] [--timeout 30m] [--note "why"] [--cmd "what runs"] [--head SHA] [--expect-min N]
+                                                  A slot now (exit 0), or a place in line: with --wait the command waits until the slot is yours.
+                                                  --cmd, --head and --expect-min say what the run is, for the Operator's Resources page (text only, never run; values of NAME=value words are hidden)
+  resource result <name> --exit N [--line "last line"]
+                                                  Record how your own run went (its exit code and last line); the page shows it with the run, after you release
   resource release <name>                         Give the slot back, or leave the line
   resource renew <name>                           A full lease from now
   resource define <name> (--slots N | --pool a,b) [--machine M] [--lease 30m] [--allow a,b] [--match "go test ./..."]...
@@ -63,6 +66,8 @@ func cmdResource() {
 		resourceClaim(rest)
 	case "release", "renew":
 		resourceSimple(sub, rest)
+	case "result":
+		resourceResult(rest)
 	case "define":
 		resourceDefine(rest)
 	case "remove":
@@ -223,9 +228,21 @@ func resourceClaim(rest []string) {
 	wait := fs.Bool("wait", false, "wait in line until the slot is yours")
 	timeout := fs.Duration("timeout", 0, "give up waiting after this long (0: wait as long as it takes)")
 	note := fs.String("note", "", "why, for the others to read")
+	cmdText := fs.String("cmd", "", "the command you are about to run, for the Operator's page (text only, never run)")
+	head := fs.String("head", "", "the commit it runs on: 7 to 40 hex characters")
+	expect := fs.Int("expect-min", 0, "about how many minutes it takes (0: not said)")
 	clihelp.ParseFlags(fs, rest[1:], func() string { return resourceUsageText })
 	me := resolveSubscriberID()
-	body := map[string]any{"subscriber_id": me, "note": flagText(*note, "note"), "parent_pid": os.Getppid()} // the shell that runs this command: a job in the background keeps the slot while it runs
+	body := map[string]any{"subscriber_id": me, "note": flagText(*note, "note"), "parent_pid": os.Getppid()}
+	if *cmdText != "" {
+		body["cmd"] = flagText(*cmdText, "cmd")
+	}
+	if *head != "" {
+		body["head"] = *head
+	}
+	if *expect > 0 {
+		body["expect_min"] = *expect
+	} // the shell that runs this command: a job in the background keeps the slot while it runs
 	data, status, err := resourceCall("POST", "/"+name+"/claim", body)
 	if err != nil || (status != http.StatusOK && status != http.StatusAccepted) {
 		resourceFail("Could not claim "+rest[0], err, status, data)
@@ -293,6 +310,30 @@ func resourceSimple(what string, rest []string) {
 	} else {
 		fmt.Println("Lease on " + rest[0] + " renewed.")
 	}
+}
+
+// resourceResult records how the agent's own run went: its exit code and last line, shown with the run on the Operator's Resources page (#14857).
+func resourceResult(rest []string) {
+	name := resourceName(rest, "result")
+	fs := flag.NewFlagSet("resource-result", flag.ContinueOnError)
+	exit := fs.Int("exit", -2, "the exit code of the run (-1 to 255)")
+	line := fs.String("line", "", "the last line it printed")
+	clihelp.ParseFlags(fs, rest[1:], func() string { return resourceUsageText })
+	if *exit < -1 || *exit > 255 {
+		fmt.Fprintln(os.Stderr, "--exit N is required: the run's exit code, from -1 to 255")
+		exitFn(1)
+		return
+	}
+	body := map[string]any{"subscriber_id": resolveSubscriberID(), "exit": *exit}
+	if *line != "" {
+		body["line"] = flagText(*line, "line")
+	}
+	data, status, err := resourceCall("POST", "/"+name+"/result", body)
+	if err != nil || status != http.StatusOK {
+		resourceFail("Could not record the result for "+rest[0], err, status, data)
+		return
+	}
+	fmt.Printf("Recorded: %s exited %d.\n", rest[0], *exit)
 }
 
 func resourceDefine(rest []string) {
