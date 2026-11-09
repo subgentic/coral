@@ -87,6 +87,7 @@
     .top-menu-btn .material-icons { font-size: var(--glyph-sm); flex-shrink: 0; position: relative; }
     .agent-bar-menu .material-icons, .phone-menu-btn .material-icons { position: relative; }
     .top-menu-btn[data-waiting] .material-icons::after, .agent-bar-menu[data-waiting] .material-icons::after, .phone-menu-btn[data-waiting] .material-icons::after { content: ""; position: absolute; top: -2px; right: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--warning); box-shadow: 0 0 0 2px var(--topbar-bg); } /* something waits for the person: the Needs input amber on the icon's corner, no number (#9829); the button's name says what waits */
+    .top-menu-btn[data-waiting] .material-icons, .agent-bar-menu[data-waiting] .material-icons, .phone-menu-btn[data-waiting] .material-icons { overflow: visible; } /* the dot sits 3 px outside the 1em icon box, and the icon's box clips (overflow hidden): without this the dot is cut off, and the phone scan sees the icon 21 wide in 18 (#14933) */
     .top-menu-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 
