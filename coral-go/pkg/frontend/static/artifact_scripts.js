@@ -5,6 +5,7 @@
  * Its own policy (header and meta) blocks every request; the file's HTML is posted into it ONCE, after Coral has hashed the bytes it fetched and found them equal to the
  * digest that was trusted. Any other answer (a failed read of the trust, a different hash, a file over 2 MiB, no way to hash) leaves scripts OFF, with the plain preview. */
 import { serverFetch } from './server_base.js';
+import { isPhoneLayout } from './phone_layout.js';
 
 export const MAX_SCRIPT_HTML_BYTES = 2 * 1024 * 1024;
 const HOST_URL = '/static/artifact_host.html';
@@ -134,7 +135,7 @@ export function drawScripted(wrapper, { html, name, turnOff, line }) {
 export function drawOffer(wrapper, { hex, server, onTrusted, fetchFn = serverFetch }) {
     const row = document.createElement('div');
     row.className = 'artifact-scripts-offer';
-    const ask = button('Run scripts…', 'artifact-scripts-ask', () => {
+    const ask = button('Run scripts…', 'btn-small artifact-scripts-ask', () => {
         ask.hidden = true;
         const box = document.createElement('div');
         box.className = 'artifact-scripts-sure'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Run scripts in this file');
@@ -147,14 +148,17 @@ export function drawOffer(wrapper, { hex, server, onTrusted, fetchFn = serverFet
             if (on === true) onTrusted();
             else { go.disabled = false; msg.textContent = 'Could not turn scripts on. Nothing was changed.'; }
         });
-        const cancel = button('Cancel', 'artifact-scripts-cancel', () => { box.remove(); ask.hidden = false; ask.focus(); });
+        const cancel = button('Cancel', 'artifact-scripts-cancel', () => { box.remove(); if (!row.contains(ask)) row.remove(); ask.hidden = false; ask.focus(); });
         const actions = document.createElement('div'); actions.className = 'artifact-scripts-actions'; actions.append(go, cancel);
         box.append(words, actions, msg);
+        if (!row.isConnected) (wrapper.querySelector('.artifact-linked-notice') || wrapper).after(row); // the row exists only while the confirmation is open (#14916)
         row.append(box);
         go.focus();
     });
-    row.append(ask);
+    // The offer is a button on the notice's own line, not a row of its own: a row above the frame took 60 px of an HTML file's preview (artifact_viewer_slim_footer: the frame fell under 75% of the dialog, #14916). The confirmation is the
+    // row, and only while it is open. With no notice the button is the row's, as before.
     const notice = wrapper.querySelector('.artifact-linked-notice');
-    if (notice) notice.after(row); else wrapper.prepend(row);
+    // (A phone keeps the row: its notice is folded behind the header's Sandboxed chip, and the offer must stay in view.)
+    if (notice && !isPhoneLayout()) notice.append(ask); else if (notice) { row.append(ask); notice.after(row); } else { row.append(ask); wrapper.prepend(row); }
     return row;
 }
