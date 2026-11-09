@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/subgentic/coral/internal/dropbox"
@@ -365,3 +366,88 @@ func objectHereOrOffloaded(coralDir, digest string) bool {
 	_, ok, err := b.outbox.Offloaded(context.Background(), digest)
 	return ok || err != nil
 }
+
+// Fetch-back limits (Security's condition 2): at most two at once, one at a time a digest (FetchBack holds the digest lock), and a budget of bytes
+// an hour, so repeated opens cannot spend the account's quota.
+var (
+	fetchSlots     = make(chan struct{}, 2)
+	fetchBudgetMu  sync.Mutex
+	fetchBudgetAt  time.Time
+	fetchBudgetN   int64
+	fetchBudgetMax int64 = 2 << 30
+)
+
+func fetchBudget(n int64) bool {
+	fetchBudgetMu.Lock()
+	defer fetchBudgetMu.Unlock()
+	if now := time.Now(); now.Sub(fetchBudgetAt) > time.Hour {
+		fetchBudgetAt, fetchBudgetN = now, 0
+	}
+	if fetchBudgetN+n > fetchBudgetMax {
+		return false
+	}
+	fetchBudgetN += n
+	return true
+}
+
+// fetchOffloaded makes sure a read can go on: true when the bytes are here (or were never freed). For bytes kept only in Dropbox it fetches them
+// back when allowed (a single open by the owner), within the limits, or answers 503 kept_in_dropbox (written here) and returns false.
+func fetchOffloaded(w http.ResponseWriter, coralDir, digest string, allowed bool) bool {
+	if _, err := os.Lstat(filepath.Join(coralDir, "artifacts", "objects", digest)); err == nil {
+		return true
+	}
+	b := dropboxBackupFor(coralDir)
+	if b == nil || b.outbox == nil {
+		return true // no backup: the caller's own not-found answers
+	}
+	row, off, err := b.outbox.Offloaded(context.Background(), digest)
+	if err == nil && !off {
+		return true
+	}
+	if !allowed {
+		writeError(w, http.StatusServiceUnavailable, "kept_in_dropbox", "This file is kept only in Dropbox: ask the owner to open it on the computer")
+		return false
+	}
+	select {
+	case fetchSlots <- struct{}{}:
+		defer func() { <-fetchSlots }()
+	default:
+		writeError(w, http.StatusServiceUnavailable, "kept_in_dropbox", "This file is kept only in Dropbox and is being fetched: try again in a moment")
+		return false
+	}
+	if err != nil || !fetchBudget(row.Size) {
+		writeError(w, http.StatusServiceUnavailable, "kept_in_dropbox", "This file is kept in Dropbox and could not be fetched right now")
+		return false
+	}
+	if here, ferr := b.FetchBack(context.Background(), digest); ferr != nil || !here {
+		writeError(w, http.StatusServiceUnavailable, "kept_in_dropbox", "This file is kept in Dropbox and could not be fetched right now")
+		return false
+	}
+	return true
+}
+
+// recordOperatorOpen notes the Operator's open of an artifact (Security's 3c), so Free up space leaves it for 30 days. Nothing without a backup.
+func recordOperatorOpen(coralDir, digest string) {
+	b := dropboxBackupFor(coralDir)
+	if b == nil || b.outbox == nil {
+		return
+	}
+	now := time.Now()
+	key := coralDir + "\x00" + digest // one data folder's record: two Corals in one process (tests) never share a throttle
+	openedMu.Lock()
+	if t, ok := openedAt[key]; ok && now.Sub(t) < time.Hour { // at most one write an hour a file
+		openedMu.Unlock()
+		return
+	}
+	if len(openedAt) > 10000 {
+		openedAt = map[string]time.Time{}
+	}
+	openedAt[key] = now
+	openedMu.Unlock()
+	_ = b.outbox.RecordOpened(context.Background(), digest, now)
+}
+
+var (
+	openedMu sync.Mutex
+	openedAt = map[string]time.Time{}
+)

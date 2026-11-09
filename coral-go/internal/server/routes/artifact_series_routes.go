@@ -28,8 +28,8 @@ func (h *SessionsHandler) readableVersions(r *http.Request, id string) []seriesM
 		if !artifactReadable(r, coralDir, m.Digest) {
 			continue
 		}
-		if fi, err := os.Lstat(filepath.Join(coralDir, "artifacts", "objects", m.Digest)); err != nil || !fi.Mode().IsRegular() {
-			continue
+		if fi, err := os.Lstat(filepath.Join(coralDir, "artifacts", "objects", m.Digest)); (err != nil || !fi.Mode().IsRegular()) && !(err != nil && objectHereOrOffloaded(coralDir, m.Digest)) {
+			continue // gone (a version kept only in Dropbox is still a member: stage 6b, Security's 3d)
 		}
 		out = append(out, m)
 	}

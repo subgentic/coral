@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -314,4 +315,80 @@ func TestASweeperKeepsTheRecordsOfAnOffloadedObject(t *testing.T) {
 	_, err = os.Stat(gone)
 	assert.True(t, os.IsNotExist(err), "a record whose object is truly gone is still swept")
 	assert.True(t, objectHereOrOffloaded(be.h.dbx.dataDir, d))
+}
+
+func (be *backupEnv) readArtifact(path, d string, operator bool) *httptest.ResponseRecorder {
+	be.t.Helper()
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	if operator {
+		req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+	}
+	rc := chi.NewRouteContext()
+	rc.URLParams.Add("id", d)
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rc))
+	rec := httptest.NewRecorder()
+	h := be.sessions()
+	if strings.HasSuffix(path, "/thumbnail") {
+		h.artifactThumbnail(rec, req)
+	} else {
+		h.getAgentArtifact(rec, req)
+	}
+	return rec
+}
+
+// Security's 3c and 3d. Mutants: anyone's read fetches (an agent spends the Operator's Dropbox); a thumbnail fetches; the Operator's open not
+// fetched, or not recorded.
+func TestOnlyTheOperatorsOpenFetchesAnOffloadedFile(t *testing.T) {
+	be, d, orig := offloadedEnv(t)
+	rec := be.readArtifact("/api/artifacts/"+d, d, false)
+	assert.Equal(t, http.StatusServiceUnavailable, rec.Code, "not the Operator: kept only in Dropbox")
+	assert.Contains(t, rec.Body.String(), "kept_in_dropbox")
+	rec = be.readArtifact("/api/artifacts/"+d+"/thumbnail", d, true)
+	assert.Equal(t, http.StatusServiceUnavailable, rec.Code, "a thumbnail never fetches")
+	assert.False(t, be.objectHereNow(d), "nothing fetched yet")
+	rec = be.readArtifact("/api/artifacts/"+d, d, true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Equal(t, orig, rec.Body.Bytes(), "the Operator's open fetches the exact bytes back and serves them")
+	assert.False(t, be.offloaded(d))
+	var at string
+	require.NoError(t, be.db.Get(&at, "SELECT at FROM dropbox_opened WHERE digest = ?", d))
+	assert.NotEmpty(t, at, "the open is recorded")
+}
+
+// Security's 3d (b). Mutants: Keep or Star refused on an offloaded file (Mark private, the board's route, asks the same objectHereOrOffloaded).
+func TestAnOffloadedFileIsStillThere(t *testing.T) {
+	be, d, _ := offloadedEnv(t)
+	assert.True(t, objectHereOrOffloaded(be.h.dbx.dataDir, d))
+	h := be.sessions()
+	for _, path := range []string{"/api/artifacts/" + d + "/keep", "/api/artifacts/" + d + "/star"} {
+		req := httptest.NewRequest(http.MethodPut, path, strings.NewReader(`{"private": true}`))
+		req.Header.Set("Content-Type", "application/json")
+		req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+		rc := chi.NewRouteContext()
+		rc.URLParams.Add("id", d)
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rc))
+		rec := httptest.NewRecorder()
+		switch {
+		case strings.HasSuffix(path, "/keep"):
+			h.keepArtifactRoute(rec, req)
+		case strings.HasSuffix(path, "/star"):
+			h.starArtifactRoute(rec, req)
+		}
+		assert.NotEqual(t, http.StatusNotFound, rec.Code, "%s works on a file kept only in Dropbox: %s", path, rec.Body.String())
+	}
+}
+
+// Security's 3c. Mutant: the Operator's open of a file still here not recorded (it would be freed although in use); an agent's read recorded.
+func TestTheOperatorsOpenIsRecorded(t *testing.T) {
+	be, d := offloadEnv(t)
+	require.Equal(t, http.StatusOK, be.readArtifact("/api/artifacts/"+d, d, false).Code)
+	var n int
+	require.NoError(t, be.db.Get(&n, "SELECT COUNT(*) FROM dropbox_opened WHERE digest = ?", d))
+	assert.Zero(t, n, "an agent's read is not the Operator's open")
+	require.Equal(t, http.StatusOK, be.readArtifact("/api/artifacts/"+d, d, true).Code)
+	require.NoError(t, be.db.Get(&n, "SELECT COUNT(*) FROM dropbox_opened WHERE digest = ?", d))
+	assert.Equal(t, 1, n)
+	got, err := be.b.outbox.OffloadCandidates(context.Background(), "dbid:AAA", time.Now().Add(-90*24*time.Hour), time.Now().Add(-store.DropboxOffloadOpenedFor), 10)
+	require.NoError(t, err)
+	assert.Empty(t, got, "opened now: not freed for 30 days")
 }

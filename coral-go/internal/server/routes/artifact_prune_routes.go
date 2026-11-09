@@ -5,8 +5,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"os"
-	"path/filepath"
 	"sort"
 	"time"
 
@@ -100,7 +98,7 @@ func (h *SessionsHandler) keepArtifactRoute(w http.ResponseWriter, r *http.Reque
 	if r.Method == http.MethodDelete {
 		_, err = h.db.ExecContext(r.Context(), "DELETE FROM artifact_keep WHERE hex = ?", id)
 	} else {
-		if _, statErr := os.Stat(filepath.Join(h.cfg.CoralDir(), "artifacts", "objects", id)); statErr != nil {
+		if !objectHereOrOffloaded(h.cfg.CoralDir(), id) { // Keep works on a file kept only in Dropbox too (stage 6b)
 			errNotFound(w, "artifact not found")
 			return
 		}

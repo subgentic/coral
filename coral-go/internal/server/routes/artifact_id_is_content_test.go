@@ -96,7 +96,9 @@ func TestOnlyTheReviewedFilesWriteIntoTheObjectsFolder(t *testing.T) {
 		}
 	}
 	sort.Strings(got)
-	want := []string{"artifact_comment_images.go", "artifacts.go", "artifacts_store.go", "board_artifact_edit.go", "cross_team_pending.go", "operator_artifacts.go"}
+	// dropbox_offload.go (#14845): fetch-back writes an object only from an exclusive temp file whose SHA-256 is the digest, under the digest lock.
+	// cross_team_pending.go still writes pending records, but names the objects folder only through objectHereOrOffloaded now.
+	want := []string{"artifact_comment_images.go", "artifacts.go", "artifacts_store.go", "board_artifact_edit.go", "dropbox_offload.go", "operator_artifacts.go"}
 	assert.Equal(t, want, got, "the files of this package that name the objects folder and write a file changed: review how the new one names and writes an object")
 }
 

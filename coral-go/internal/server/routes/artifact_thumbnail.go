@@ -99,7 +99,7 @@ func (h *SessionsHandler) artifactThumbnail(w http.ResponseWriter, r *http.Reque
 		errBadRequest(w, "thumbnail parameters are not supported")
 		return
 	}
-	f, _, info, ok := h.openArtifactForRead(w, r, id)
+	f, _, info, ok := h.openArtifactForRead(w, r, id, false) // a thumbnail is a bulk read: never a fetch (stage 6b)
 	if !ok {
 		return
 	}
