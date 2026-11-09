@@ -175,7 +175,7 @@ func TestTheNetworksWaysToBeWrongAreRefusedAndStageNothing(t *testing.T) {
 		}, stage.ResultFailed, "manifest"},
 		{"the manifest answers with a server error", func(r *rig, rel *Release) { r.gh.Status[PromotionTag("v1.4.131", 1)+"/"+stage.ManifestFile] = 503 }, stage.ResultFailed, "manifest"},
 		{"the list of releases answers with a server error", func(r *rig, rel *Release) { r.gh.Status["list"] = 503 }, stage.ResultFailed, "manifest"},
-		{"the list of releases is larger than the limit", func(r *rig, rel *Release) { r.gh.ListBody = bytes.Repeat([]byte(" "), 1<<20+10) }, stage.ResultFailed, "manifest"},
+		{"the list of releases is larger than the limit", func(r *rig, rel *Release) { r.gh.ListBody = bytes.Repeat([]byte(" "), 8<<20+10) }, stage.ResultFailed, "manifest"},
 		{"the list of releases is not a list", func(r *rig, rel *Release) { r.gh.ListBody = []byte(`{"message":"API rate limit exceeded"}`) }, stage.ResultFailed, "manifest"},
 		{"a bundle answers with a server error", func(r *rig, rel *Release) { r.gh.Status["v1.4.131/"+stage.SumsBundleFile] = 500 }, stage.ResultFailed, stage.SumsBundleFile},
 		{"the sums bundle is larger than the limit", func(r *rig, rel *Release) {
