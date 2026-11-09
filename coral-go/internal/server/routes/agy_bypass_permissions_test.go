@@ -480,7 +480,7 @@ func TestPermissionModeFromFlags_TableTest_NeverWidens(t *testing.T) {
 			name:         "permission-mode dontAsk",
 			flags:        []string{"--permission-mode", "dontAsk"},
 			expectedMode: "dontAsk",
-			agyFlags:     nil,
+			agyFlags:     []string{"--mode", "plan"}, // Don't ask is Plan for agy, as the launch types it (#14772)
 			claudeFlags:  []string{"--permission-mode", "dontAsk"},
 			codexFlags:   []string{"--sandbox", "workspace-write", "-a", "never"},
 		},

@@ -32,7 +32,12 @@ assert.deepEqual(t('claude', 'plan', four), { narrowed: false });
 assert.deepEqual(t('claude', 'default', four), { narrowed: false });
 // Antigravity: the mode's rank, narrowed by the chips'
 assert.deepEqual(t('agy', 'auto', { allow: ['file_read'] }), { narrowed: true, text: 'Plan' }, 'Auto + read-only chips is plan');
-assert.deepEqual(t('agy', 'auto', { allow: ['shell', 'file_write'] }), { narrowed: false, warn: true }, 'Auto + Shell and Write: skip permissions, as the mode says');
+assert.deepEqual(t('agy', 'auto', { allow: ['shell', 'file_write'] }), { narrowed: false }, 'Auto + Shell and Write: Auto stands, the chips never widen it to skip permissions, and no Bypass warning (#14772)');
+assert.deepEqual(t('agy', 'auto', null), { narrowed: false }, 'Auto alone is not a Bypass: no warning (#14772)');
+assert.deepEqual(t('agy', 'bypassPermissions', null), { narrowed: false, warn: true }, 'Bypass warns');
+assert.deepEqual(t('agy', 'bypassPermissions', { allow: ['shell', 'file_write'] }), { narrowed: false, warn: true }, 'Bypass + Shell and Write: skip permissions');
+assert.deepEqual(t('agy', 'bypassPermissions', { allow: ['file_read'] }), { narrowed: true, text: 'Plan' }, 'the chips still narrow Bypass');
+assert.deepEqual(t('agy', 'auto', { allow: ['file_read', 'file_write'] }), { narrowed: true, text: 'Accepts edits' }, 'Auto + file chips: accept edits narrows it');
 assert.deepEqual(t('agy', 'plan', { allow: ['shell', 'file_write'] }), { narrowed: false }, 'Plan stands');
 assert.deepEqual(t('agy', 'default', { allow: ['shell', 'file_write'] }), { narrowed: true, text: 'Skips permission prompts', warn: true }, 'no mode: the chips decide');
 assert.deepEqual(t('agy', 'default', null), { narrowed: false });

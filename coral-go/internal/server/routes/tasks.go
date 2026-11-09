@@ -53,7 +53,7 @@ func (h *TasksHandler) SetProxyStore(ps *proxy.Store) {
 const errAutoAcceptHasNoCount = "not supported: auto-accept has no count"
 
 // taskRunFlags is the CLI flags of a task run: the ones the caller gave, and for an auto-accepting run the permission flag of its agent type (#5836): Claude's Auto mode, not a
-// bypass of every prompt; Codex's --full-auto (Coral's own alias: the Codex CLI removed it, and the launch translates it to --sandbox workspace-write -a never) and Antigravity's skip-permissions as before. A permission flag the run names itself (a mode, or a bypass) is the person's choice and
+// bypass of every prompt; Codex's --full-auto (Coral's own alias: the Codex CLI removed it, and the launch translates it to --sandbox workspace-write -a never) and Antigravity's own auto (#14772; it was its skip-permissions). A permission flag the run names itself (a mode, or a bypass) is the person's choice and
 // stays: the default is added only when there is none.
 func taskRunFlags(agentType, rawFlags string, autoAccept bool) string {
 	flags := strings.TrimSpace(rawFlags)
@@ -64,8 +64,8 @@ func taskRunFlags(agentType, rawFlags string, autoAccept bool) string {
 	switch agentType {
 	case at.Codex:
 		skipFlag = "--full-auto"
-	case at.Agy, at.Antigravity, at.Gemini:
-		skipFlag = "--dangerously-skip-permissions"
+	// Antigravity and Gemini (agy) get the generic Auto like Claude: the launch builder turns '--permission-mode auto' into agy's own '--mode auto' only when that agy's --help lists it, and else adds no flag
+	// (the run asks). It was agy's skip-permissions flag, i.e. Bypass (#14772, Security: auto never silently becomes Bypass).
 	default:
 		skipFlag = "--permission-mode auto"
 	}
