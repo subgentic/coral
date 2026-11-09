@@ -81,9 +81,9 @@ assert.deepStrictEqual(reads, [], 'code reads an inline handler attribute (none 
 for (const f of HTML) {
     for (const m of src.get(f).matchAll(/<script\b([^>]*)>/g)) {
         if (/\bsrc=/.test(m[1]) || /type="application\/json"/.test(m[1])) continue;
-        // panel_host.html and view_host.html are the sandboxed hosts of agent panels and custom views: loaded by URL
+        // panel_host.html, view_host.html and artifact_host.html are the sandboxed hosts of agent panels, custom views and a trusted HTML file (#14730): loaded by URL
         // into an opaque-origin frame, each with its own CSP (they exist so that the dashboard's is not inherited).
-        if (rel(f) === 'static/panel_host.html' || rel(f) === 'static/view_host.html') continue;
+        if (rel(f) === 'static/panel_host.html' || rel(f) === 'static/view_host.html' || rel(f) === 'static/artifact_host.html') continue;
         assert.fail(`${rel(f)}: an inline <script> (the dashboard CSP has no unsafe-inline): <script${m[1]}>`);
     }
 }

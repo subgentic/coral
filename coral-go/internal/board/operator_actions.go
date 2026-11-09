@@ -78,12 +78,15 @@ const (
 	ActWaitSend     = "wait_send"
 	ActMessage      = "message" // a message the Operator posted to a team's board
 	// Slice 2 (#13609): the rest of the Inbox, Files, Saved and Chats clicks.
-	ActMarkUnread     = "mark_unread" // with ActMarkRead: the explicit Mark read and Mark unread buttons (opening a file marks it read by itself: not a click)
-	ActFileTags       = "file_tags"   // the tag editor of a file
-	ActFileStar       = "file_star"
-	ActFileUnstar     = "file_unstar"
-	ActFileKeep       = "file_keep"
-	ActFileRelease    = "file_release"
+	ActMarkUnread  = "mark_unread" // with ActMarkRead: the explicit Mark read and Mark unread buttons (opening a file marks it read by itself: not a click)
+	ActFileTags    = "file_tags"   // the tag editor of a file
+	ActFileStar    = "file_star"
+	ActFileUnstar  = "file_unstar"
+	ActFileKeep    = "file_keep"
+	ActFileRelease = "file_release"
+	// ActPreviewTrust and ActPreviewUntrust: the owner turned scripts on for one version of an HTML file in the viewer, or off again (#14730).
+	ActPreviewTrust   = "preview_trust"
+	ActPreviewUntrust = "preview_untrust"
 	ActFileDelete     = "file_delete"
 	ActFileShare      = "file_share"     // a file shared with an agent
 	ActFileEditSend   = "file_edit_send" // the Operator sent a saved edit of a file, as a diff, to agents (#13802)

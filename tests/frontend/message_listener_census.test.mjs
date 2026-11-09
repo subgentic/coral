@@ -5,6 +5,7 @@
 // A new listener fails this until it is looked at: add it here with its check, or the check to it.
 //   agent_ui.js       matches event.source to a mounted panel frame before acting
 //   panel_sandbox.js  e.source !== frame.contentWindow
+//   artifact_scripts.js  e.source !== frame.contentWindow (#14730: the trusted-HTML host frame; relays no file message except a clamped height)
 //   view_sandbox.js   two: the dashboard side (answers only the view's own frame) and the bridge script inside the custom view (e.source !== window.parent)
 // node message_listener_census.test.mjs
 import assert from 'node:assert/strict';
@@ -13,7 +14,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const STATIC = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'coral-go', 'pkg', 'frontend', 'static');
-const WINDOW_LISTENERS = { 'agent_ui.js': 1, 'panel_sandbox.js': 1, 'view_sandbox.js': 2 };
+const WINDOW_LISTENERS = { 'agent_ui.js': 1, 'artifact_scripts.js': 1, 'panel_sandbox.js': 1, 'view_sandbox.js': 2 };
 const CHANNEL_LISTENERS = {
     'ownership.js': 1,      // BroadcastChannel between this browser's own tabs: the message is an ownership claim, never acted on without the tab's own checks
     'team_artifacts_page.js': 1, // BroadcastChannel (the team page's Artifacts tab, #7453): the same 64-hex id of a deleted artifact, shape-checked, only used to drop its row

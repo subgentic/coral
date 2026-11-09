@@ -292,6 +292,11 @@ var routeTable = cat(
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/chief")),
 	owner(OwnerRefuse, rules(http.MethodPut, TierInteract, "/api/artifacts/{hex64}/comments/lock")),
 	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/artifacts/{hex64}/comments/lock")),
+	// Trust one version of an HTML file to run its scripts in the viewer's sealed frame (#14730, design v3, Security): the owner's alone through the Hub (a grantee, guide or viewer is refused by the machine), the read
+	// included (the page starts scripts only on a clean "trusted" answer; any refusal means none). Keyed by the file's digest. It changes a record on this computer and runs nothing on it, so Interact for the writes.
+	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/artifacts/{hex64}/trust-preview")),
+	owner(OwnerRefuse, rules(http.MethodPut, TierInteract, "/api/artifacts/{hex64}/trust-preview")),
+	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/artifacts/{hex64}/trust-preview")),
 	// The edit and delete are the owner's AND the comment's author's (the operator, 2026-10-30: the owner gets more, a guest loses nothing): the machine stamps the owner marker and the handler decides. A Hub viewer allowed
 	// to comment (artifact_comments_hub_write on) edits and deletes only a comment whose stored author is that same Hub viewer; the owner only their own too (the comment policy), never another's.
 	owner(OwnerSees, rules(http.MethodPatch, TierInteract, "/api/artifacts/{hex64}/comments/{id}")),

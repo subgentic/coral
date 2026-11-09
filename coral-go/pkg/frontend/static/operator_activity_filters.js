@@ -16,7 +16,7 @@ export const ACTION_LABEL = {
     mark_unread: 'Marked unread', file_tags: 'Changed the tags of a file', file_star: 'Starred a file', file_unstar: 'Unstarred a file', file_keep: 'Kept a file', file_release: 'Released a file', file_delete: 'Deleted a file', file_share: 'Shared a file with an agent', file_edit: 'Saved a new version of a file', file_edit_send: 'Sent an edit of a file to agents',
     saved_add: 'Saved a message', saved_update: 'Changed a saved message', saved_remove: 'Removed a saved message', chat_flag: 'Starred or archived a chat', chat_send: 'Sent words to an agent', run_seen: 'Opened or dismissed a failed run',
     agents_record: 'Recorded for all agents', keep_full_access: 'Changed Full access on restart', goal_create: 'Created a goal', goal_edit: 'Changed a goal', goal_driver: 'Changed the driver of a goal', goal_move: 'Moved a goal to another team', goal_request_accept: 'Accepted a goal request',
-    goal_request_decline: 'Declined a goal request', inbox_hide: 'Dismissed a row in Needs you',
+    goal_request_decline: 'Declined a goal request', inbox_hide: 'Dismissed a row in Needs you', preview_trust: 'Trusted a file to run scripts in its preview', preview_untrust: 'Turned scripts off in a file preview',
     hub_update_check: 'Coral Hub checked for an update', hub_update_relaunch: 'Coral Hub relaunched into an update',
 };
 export const DECISION_LABEL = { approve: 'Approved', changes: 'Asked for changes', deny: 'Denied', answer: 'Answered', dismiss: 'Dismissed' };

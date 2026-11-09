@@ -70,7 +70,7 @@ func TestAssetsEmbedded(t *testing.T) {
 	for _, p := range []string{
 		"static/app.js", "static/actions.js", "static/cloud.js", "static/server_access.js", "static/servers.js", "static/server_controller.js", "static/server_table.js",
 		"static/cloud_server_view.js", "static/registered_server_view.js", "static/theme_init.js",
-		"static/sw_register.js", "static/view_host.html", "static/panel_host.html", "static/cloud/signin.js", "static/cloud/enroll.js", "static/css/cloud.css",
+		"static/sw_register.js", "static/view_host.html", "static/panel_host.html", "static/artifact_host.html", "static/cloud/signin.js", "static/cloud/enroll.js", "static/css/cloud.css",
 		"templates/cloud/signin.html", "templates/cloud/enroll.html",
 	} {
 		if _, err := Static.ReadFile(p); err != nil {

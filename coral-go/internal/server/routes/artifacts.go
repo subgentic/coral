@@ -96,8 +96,11 @@ func (h *SessionsHandler) RegisterAgentArtifacts(r chi.Router) {
 	r.Post("/api/artifacts/received/unlisted/delete", h.deleteUnlistedReceivedRoute) // #4441
 	r.Get("/api/system/artifact-store/kept", h.keptListRoute)                        // #3554
 	r.Post("/api/artifacts/prune", h.pruneArtifactsRoute)
-	r.Post("/api/artifacts/retention/ack", h.retentionAckRoute)  // #3554
-	r.Put("/api/artifacts/{id}/keep", h.keepArtifactRoute)       // #3554
+	r.Post("/api/artifacts/retention/ack", h.retentionAckRoute)     // #3554
+	r.Put("/api/artifacts/{id}/keep", h.keepArtifactRoute)          // #3554
+	r.Get("/api/artifacts/{id}/trust-preview", h.trustPreviewRoute) // #14730: the owner's trust of one HTML version, to run its scripts in the viewer
+	r.Put("/api/artifacts/{id}/trust-preview", h.trustPreviewRoute)
+	r.Delete("/api/artifacts/{id}/trust-preview", h.trustPreviewRoute)
 	r.Delete("/api/artifacts/{id}/keep", h.keepArtifactRoute)    // #3554
 	r.Get("/api/artifacts/{id}/private", h.artifactPrivateRoute) // #11457: the manager's private mark: a guide never reads a private artifact
 	r.Put("/api/artifacts/{id}/private", h.artifactPrivateRoute)
