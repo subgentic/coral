@@ -564,7 +564,10 @@ CREATE TABLE IF NOT EXISTS dropbox_connection (
     retention_days      INTEGER NOT NULL DEFAULT 0, -- stage 4b (#14703): delete the Dropbox copies older than this many days; 0 is off (the default)
     retention_since     TEXT,                       -- when the Operator confirmed it
     retention_last_pass TEXT,                       -- the last retention pass (a local clock earlier than this refuses a pass)
-    list_cursor         TEXT                        -- stage 5a (#14714): the listing cursor of /v1 for the account connected now; cleared by any new sign-in
+    list_cursor         TEXT,                       -- stage 5a (#14714): the listing cursor of /v1 for the account connected now; cleared by any new sign-in
+    offload_days        INTEGER NOT NULL DEFAULT 0, -- stage 6b (#14845): keep artifacts older than this many days only in Dropbox; 0 is off (the default)
+    offload_since       TEXT,                       -- when the Operator confirmed it
+    offload_last_pass   TEXT                        -- the last offload pass
 );
 
 -- Dropbox stage 4's outbox (#14655): one row per file to back up (an artifact version or its item_data sidecar), by its Dropbox path (ids only,
@@ -614,6 +617,26 @@ CREATE TABLE IF NOT EXISTS dropbox_edits (
     result      TEXT NOT NULL DEFAULT ''
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_dropbox_edits_open ON dropbox_edits(doc_id) WHERE state IN ('pending', 'deciding');
+
+-- Dropbox stage 6b (#14845; the 6b delta v2): artifacts whose local bytes were freed because Dropbox holds them. One row an object (digest): the
+-- ledger row that was checked byte for byte (path, rev and Dropbox's content hash) right before the bytes went, for the account connected then.
+-- The upload records and sidecars stay, so the artifact is still listed; anything that removes records of a missing object reads this first.
+CREATE TABLE IF NOT EXISTS dropbox_offloaded (
+    digest       TEXT PRIMARY KEY,
+    account_id   TEXT NOT NULL,
+    path         TEXT NOT NULL,
+    rev          TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    size         INTEGER NOT NULL,
+    at           TEXT NOT NULL
+);
+
+-- Stage 6b's record of when an artifact was last opened, for the rule that nothing opened in the last 30 days is freed (Security's 1c on the 6b
+-- delta): a fetch-back and the Operator's recorded open write it; the later of this and the artifact's own time counts.
+CREATE TABLE IF NOT EXISTS dropbox_opened (
+    digest TEXT PRIMARY KEY,
+    at     TEXT NOT NULL
+);
 
 -- Dropbox stage 4b's audit (#14703): each retention setting change (who, old and new days, the dry-run count the page showed) and each retention
 -- pass (counts and bytes). Never a name, path, digest or token. The newest 500 rows are kept.
