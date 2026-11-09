@@ -13,8 +13,8 @@ const { coralReady, framesJs } = require('./helpers/wait');
     const B = 'ra-' + Date.now().toString(36);
     let sid = null, sname = null;
     const api = (method, path, body, headers) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: ${JSON.stringify(headers || { 'Content-Type': 'application/json' })}, body: ${body === undefined ? 'undefined' : typeof body === 'string' ? JSON.stringify(body) : JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }))`);
-    const buttons = () => ev(`[...document.querySelectorAll('button')].filter(b => b.getClientRects().length).map(b => b.textContent.trim())`);
-    const press = label => ev(`(() => { const b = [...document.querySelectorAll('button')].filter(b => b.getClientRects().length).find(b => b.textContent.trim() === ${JSON.stringify(label)}); b.click(); return true; })()`);
+    const buttons = () => ev(`[...document.querySelectorAll('button')].filter(b => b.getClientRects().length || b.matches('.menu-item')).map(b => (b.querySelector('.more-item-label') || b).textContent.trim())`); // (the file's secondary actions are items of its More menu, #14963)
+    const press = label => ev(`(() => { const b = [...document.querySelectorAll('button')].filter(b => b.getClientRects().length || b.matches('.menu-item')).find(b => (b.querySelector('.more-item-label') || b).textContent.trim() === ${JSON.stringify(label)}); b.click(); return true; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -35,7 +35,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'artifacts' }); true`);
         await waitFor(`document.querySelectorAll('#team-panel-artifacts [data-artifact-id]').length === 1`, 'the file of this computer\'s team', 15000);
         await ev(`document.querySelector('#team-panel-artifacts [data-artifact-id]').click(); true`);
-        await waitFor(`[...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Delete' && b.getClientRects().length)`, 'Delete in this computer\'s file', 10000);
+        await waitFor(`[...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Delete' && (b.getClientRects().length || b.matches('.menu-item')))`, 'Delete in this computer\'s file', 10000);
         let b = await buttons();
         assert.ok(b.includes('Star') && (b.includes('Keep') || b.includes('Kept')) && b.includes('Delete'), 'this computer\'s file offers Star, Keep and Delete: ' + JSON.stringify(b));
         await press('Keep');
@@ -60,7 +60,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await ev(`window.openTeamPage('@box-1/rteam', { tab: 'artifacts' }); true`);
         await waitFor(`!!document.querySelector('#team-panel-artifacts [data-artifact-id]') && /remote plan/.test(document.querySelector('#team-panel-artifacts [data-artifact-id]').textContent)`, 'the file of the other computer\'s team', 15000);
         await ev(`document.querySelector('#team-panel-artifacts [data-artifact-id]').click(); true`);
-        await waitFor(`[...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Star' && b.getClientRects().length)`, 'Star on the other computer\'s file', 10000);
+        await waitFor(`[...document.querySelectorAll('button')].some(b => (b.querySelector('.more-item-label') || b).textContent.trim() === 'Star' && (b.getClientRects().length || b.matches('.menu-item')))`, 'Star on the other computer\'s file', 10000);
         b = await buttons();
         assert.ok(!b.includes('Keep') && !b.includes('Kept') && !b.includes('Delete'), 'the other computer\'s file offers no Keep or Delete: ' + JSON.stringify(b));
         await press('Star');
