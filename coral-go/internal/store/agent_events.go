@@ -526,3 +526,20 @@ func (s *TaskStore) ClearAgentEvents(ctx context.Context, agentName string, sess
 		args...)
 	return err
 }
+
+// TranscriptAliases is the transcript each session was moved to by a /clear: the newest session_reset event of each that told the CLI's new session id (#14849), so a Coral restart keeps following the new file.
+func (s *TaskStore) TranscriptAliases(ctx context.Context) (map[string]string, error) {
+	var rows []struct {
+		SessionID string `db:"session_id"`
+		Alias     string `db:"alias"`
+	}
+	if err := s.reader().SelectContext(ctx, &rows, `SELECT session_id, json_extract(detail_json, '$.claude_session_id') AS alias FROM agent_events
+		WHERE event_type = 'session_reset' AND json_extract(detail_json, '$.claude_session_id') IS NOT NULL ORDER BY id`); err != nil {
+		return nil, err
+	}
+	out := map[string]string{}
+	for _, r := range rows {
+		out[r.SessionID] = r.Alias // the newest wins
+	}
+	return out, nil
+}

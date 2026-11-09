@@ -430,11 +430,16 @@ func parseAgenticEvent(d map[string]any, hookType, sessionID string) map[string]
 	// SessionStart / /clear: a turn boundary whatever started the session; its summary says what did, from
 	// the hook's source (Claude and Codex both send it; a fresh launch was shown as "/clear", #4545).
 	if hookType == "SessionStart" || d["_coral_session_clear"] != nil {
-		return map[string]any{
+		event := map[string]any{
 			"event_type": "session_reset",
 			"summary":    sessionStartSummary(d),
 			"session_id": sessionID,
 		}
+		// After a /clear the CLI's session has a new id and a new transcript file, while Coral's id for the agent is the one it launched it under: the new id is told, so Coral reads the new file (#14849).
+		if own := hooks.StrVal(d, "session_id"); own != "" && own != sessionID && (d["_coral_session_clear"] != nil || hooks.StrVal(d, "source") == "clear") {
+			event["detail_json"] = map[string]any{"claude_session_id": own, "source": "clear"}
+		}
+		return event
 	}
 
 	// UserPromptSubmit
