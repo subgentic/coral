@@ -136,6 +136,7 @@ GET /api/chief/triggers never
 GET /api/cloud/owner-label never
 GET /api/cloud/status never
 GET /api/custom-models view
+GET /api/dropbox/artifact/{digest} never
 GET /api/dropbox/status never
 GET /api/filesystem/is-git launch
 GET /api/filesystem/list launch
@@ -402,6 +403,7 @@ POST /api/dropbox/edits/{doc}/promote never
 POST /api/dropbox/edits/{doc}/separate never
 POST /api/dropbox/private/{digest} never
 POST /api/dropbox/remove/{digest} never
+POST /api/dropbox/resend/{digest} never
 POST /api/dropbox/switch never
 POST /api/dropbox/takeover never
 POST /api/folder-tags/{folderName} never

@@ -39,6 +39,7 @@ func (be *backupEnv) removeCall(action, digest, body string, dashboard bool) (in
 	r := chi.NewRouter()
 	r.Post("/api/dropbox/remove/{digest}", be.h.DropboxRemove)
 	r.Post("/api/dropbox/private/{digest}", be.h.DropboxRemovePrivate)
+	r.Post("/api/dropbox/resend/{digest}", be.h.DropboxResend)
 	req := httptest.NewRequest(http.MethodPost, "/api/dropbox/"+action+"/"+digest, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	if dashboard {
@@ -253,4 +254,59 @@ func TestARefusedRemovalLeavesWhatStillWaits(t *testing.T) {
 	require.Equal(t, http.StatusOK, code)
 	row, _ = be.b.outbox.ByPath(context.Background(), "/v1/zzz/waiting.md")
 	assert.Equal(t, store.DropboxOutboxRemoved, row.State, "once the removal goes ahead, it is not sent")
+}
+
+// Security's SHOULD 6 on cb3ff32dd. Mutants: resend leaves the removed rows (the artifact stays out); resend takes a request from outside the dashboard.
+func TestSendToDropboxAgainPutsARemovedArtifactBack(t *testing.T) {
+	be, ds := newRemovalEnv(t, 1)
+	code, _ := be.removeCall("remove", ds[0], `{"confirm": true}`, true)
+	require.Equal(t, http.StatusOK, code)
+	require.Zero(t, be.inDropbox(ds[0]))
+	code, _ = be.removeCall("resend", ds[0], `{}`, false)
+	assert.NotEqual(t, http.StatusOK, code, "not from outside the dashboard")
+	code, out := be.removeCall("resend", ds[0], `{}`, true)
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Equal(t, true, out["queued"])
+	be.pass()
+	assert.Equal(t, 2, be.inDropbox(ds[0]), "backed up again: the version and its sidecar")
+	be.private[ds[0]] = true // a private mark still keeps it out after a resend
+	code, _ = be.removeCall("remove", ds[0], `{"confirm": true}`, true)
+	require.Equal(t, http.StatusOK, code)
+	_, _ = be.removeCall("resend", ds[0], `{}`, true)
+	be.pass()
+	assert.Zero(t, be.inDropbox(ds[0]), "marked private: not sent, resend or not")
+}
+
+// The Details block's read (#14814). Mutants: the state counts another account's rows, or misses the removed mark; the read is served outside the
+// dashboard.
+func TestTheArtifactStateSaysInDropboxThenRemoved(t *testing.T) {
+	be, ds := newRemovalEnv(t, 1)
+	get := func(dashboard bool) (int, map[string]any) {
+		r := chi.NewRouter()
+		r.Get("/api/dropbox/artifact/{digest}", be.h.DropboxArtifact)
+		req := httptest.NewRequest(http.MethodGet, "/api/dropbox/artifact/"+ds[0], nil)
+		if dashboard {
+			dashboardRequest(req)
+			req.Host = be.host
+		}
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		var m map[string]any
+		_ = json.Unmarshal(rec.Body.Bytes(), &m)
+		return rec.Code, m
+	}
+	code, _ := get(false)
+	assert.NotEqual(t, http.StatusOK, code, "not from outside the dashboard")
+	code, out := get(true)
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, map[string]any{"connected": true, "in_dropbox": float64(2), "removed": false}, out)
+	_, err := be.db.ExecContext(context.Background(), "UPDATE dropbox_outbox SET account_id = 'dbid:OLD' WHERE digest = ? AND kind = 'item_data'", ds[0])
+	require.NoError(t, err)
+	_, out = get(true)
+	assert.EqualValues(t, 1, out["in_dropbox"], "only the connected account's files")
+	code, _ = be.removeCall("remove", ds[0], `{"confirm": true}`, true)
+	require.Equal(t, http.StatusOK, code)
+	_, out = get(true)
+	assert.Equal(t, true, out["removed"])
+	assert.EqualValues(t, 0, out["in_dropbox"])
 }

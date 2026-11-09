@@ -197,10 +197,12 @@ let lastStatus = null; // the last status shown, so a saved filter updates the s
 
 // hideAll takes every button and the backup part (with its counts) off the screen: a refused or failed read shows none of a stale state (UI Reviewer's MUST 2 on #14693).
 function hideAll() {
-    for (const id of ['settings-dropbox-connect', 'settings-dropbox-disconnect', 'settings-dropbox-switch', 'settings-dropbox-takeover', 'settings-dropbox-recheck']) show(id, false);
+    for (const id of ['settings-dropbox-connect', 'settings-dropbox-disconnect', 'settings-dropbox-switch', 'settings-dropbox-takeover', 'settings-dropbox-recheck', 'settings-dropbox-delete']) show(id, false);
     pendingRetention = null;
     retentionSeq++;
     showRetentionConfirm(false);
+    const del = $('settings-dropbox-delete-confirm');
+    if (del) { del.hidden = true; del.textContent = ''; }
     renderBackup(null);
     const counts = $('settings-dropbox-counts');
     if (counts) counts.textContent = '';
@@ -234,11 +236,13 @@ function render(st) {
         note('Free up space in Dropbox, or get more, then Check again:', 'https://www.dropbox.com/plans', true, 'Get more Dropbox space');
         show('settings-dropbox-recheck', true);
         show('settings-dropbox-disconnect', true);
+        show('settings-dropbox-delete', true);
         return;
     }
     if (st.connected) {
         setStatus(`Connected to Dropbox (${st.account_id || 'account'}).`);
         show('settings-dropbox-disconnect', true);
+        show('settings-dropbox-delete', true);
         return;
     }
     if (st.signin_pending) {
@@ -357,15 +361,66 @@ export async function connectDropbox() {
     poll();
 }
 
+const DISCONNECT = '/api/dropbox/disconnect';
+
 export async function disconnectDropbox() {
     note('');
     let res;
-    try { res = await post('/api/dropbox/disconnect'); } catch { note("Couldn't reach Coral. Try again."); return; }
+    try { res = await post(DISCONNECT); } catch { note("Couldn't reach Coral. Try again."); return; }
     if (!res.ok) { note("Couldn't disconnect. Try again."); return; }
     await loadDropbox();
     if (res.body.revoked === false) {
         note('Disconnected here, but Coral could not end its sign-in at Dropbox. To finish, remove Coral under Connected apps in your Dropbox settings.');
     }
+}
+
+// Disconnect and delete the backup (stage 6a, #14814): the server says what the confirm needs (the files not from this computer and the other
+// Corals keeping files only in Dropbox); the person types delete, that count and each other Coral's last 4; the sign-in goes only when the delete
+// finished.
+export async function deleteBackupStart() {
+    note('');
+    let res;
+    try { res = await post(DISCONNECT, 'POST', JSON.stringify({ delete_backup: true })); } catch { note("Couldn't reach Coral. Try again."); return; }
+    if (res.status === 409 && res.body.code === 'confirm_delete_backup') { showDeleteConfirm(res.body); return; }
+    note(String(res.body.error || "Couldn't check the backup. Try again."));
+}
+
+function showDeleteConfirm(info) {
+    const box = $('settings-dropbox-delete-confirm');
+    if (!box) return;
+    box.textContent = '';
+    box.hidden = false;
+    const files = Number(info.files || 0), foreign = Number(info.foreign || 0);
+    const others = Array.isArray(info.others) ? info.others.map(String) : [];
+    const unknown = Number(info.unknown || 0);
+    const need = ['delete', ...(foreign ? [String(foreign)] : []), ...others, ...(unknown ? ['unknown'] : [])];
+    const p = document.createElement('p');
+    p.textContent = `This deletes the Dropbox backup (${files} ${files === 1 ? 'file' : 'files'}) for every Coral that uses it, then disconnects.`
+        + (foreign ? ` ${foreign} of them did not come from this computer.` : '')
+        + (others.length ? ` Other Corals keep files only in Dropbox (…${others.join(', …')}): they lose them.` : '')
+        + ` Dropbox may keep deleted files for a while. To go on, type: ${need.join(' ')}`;
+    const input = document.createElement('input');
+    input.type = 'text'; input.className = 'settings-input'; input.id = 'settings-dropbox-delete-typed';
+    input.setAttribute('aria-label', 'Type the words shown to delete the backup');
+    const go = document.createElement('button'); go.type = 'button'; go.className = 'btn btn-small'; go.textContent = 'Delete the backup and disconnect';
+    const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'btn btn-small'; cancel.textContent = 'Cancel';
+    go.addEventListener('click', () => deleteBackupConfirm(input.value));
+    cancel.addEventListener('click', () => { box.hidden = true; box.textContent = ''; note('Nothing changed.'); });
+    box.append(p, input, go, cancel);
+    input.focus?.();
+}
+
+export async function deleteBackupConfirm(typedText) {
+    const typed = String(typedText || '').trim().split(/\s+/).filter(Boolean);
+    let res;
+    try { res = await post(DISCONNECT, 'POST', JSON.stringify({ delete_backup: true, typed })); } catch { note("Couldn't reach Coral. Try again."); return; }
+    if (res.status === 409 && res.body.code === 'confirm_delete_backup') { showDeleteConfirm(res.body); note('Those are not the words shown. Nothing was deleted.'); return; }
+    if (res.status === 202) { note('Dropbox is still deleting the backup. You are still connected; press it again in a while.'); return; }
+    if (!res.ok) { note(String(res.body.error || "Couldn't delete the backup. You are still connected.")); return; }
+    const box = $('settings-dropbox-delete-confirm');
+    if (box) { box.hidden = true; box.textContent = ''; }
+    await loadDropbox();
+    note('The Dropbox backup was deleted and Coral disconnected.');
 }
 
 async function confirmSwitch() {
@@ -487,6 +542,7 @@ function wire() {
     const on = (id, fn) => { const el = $(id); if (el) el.addEventListener('click', () => { fn(); }); };
     on('settings-dropbox-connect', connectDropbox);
     on('settings-dropbox-disconnect', disconnectDropbox);
+    on('settings-dropbox-delete', deleteBackupStart);
     on('settings-dropbox-switch', confirmSwitch);
     on('settings-dropbox-takeover', takeOver);
     on('settings-dropbox-filters-save', saveDropboxFilters);

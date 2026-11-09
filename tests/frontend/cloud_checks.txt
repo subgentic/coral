@@ -128,6 +128,7 @@ node request_json.test.mjs
 node image_source.test.js
 node artifact_download.test.js
 node cloud_settings.test.js
+node artifact_dropbox.test.js
 node dropbox_settings.test.js
 node board_mentions.test.js
 node settings_diff.test.mjs

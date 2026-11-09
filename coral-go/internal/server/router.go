@@ -524,6 +524,8 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Post("/api/dropbox/edits/{doc}/separate", s.cloudHandler.DropboxSeparateEdit) // stage 5a: keep it as its own artifact
 	r.Post("/api/dropbox/remove/{digest}", s.cloudHandler.DropboxRemove)            // stage 6a (#14814): remove an artifact from Dropbox
 	r.Post("/api/dropbox/private/{digest}", s.cloudHandler.DropboxRemovePrivate)    // stage 6a: mark it private, then remove it from Dropbox
+	r.Post("/api/dropbox/resend/{digest}", s.cloudHandler.DropboxResend)            // stage 6a: send a removed artifact to Dropbox again
+	r.Get("/api/dropbox/artifact/{digest}", s.cloudHandler.DropboxArtifact)         // stage 6a: what the backup holds of one artifact
 	// The Dropbox backup worker (#14655): one background loop; a pass every five minutes or soon after an upload, only while connected.
 	dbxBackup := s.cloudHandler.NewDropboxBackup(store.NewDropboxOutbox(s.db))
 	if s.boardStore != nil {

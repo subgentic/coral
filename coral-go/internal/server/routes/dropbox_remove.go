@@ -389,3 +389,61 @@ func (b *DropboxBackup) deleteBackup(ctx context.Context, typed []string) (int, 
 	_ = b.d.store.AddAudit(ctx, store.DropboxAudit{Kind: store.DropboxAuditRemoval, Who: "operator", Count: files, Reason: "delete_all"})
 	return http.StatusOK, nil, nil
 }
+
+// DropboxResend answers POST /api/dropbox/resend/{digest}: the Operator's "Send to Dropbox again" for an artifact removed from Dropbox (Security's
+// SHOULD 6 on cb3ff32dd). The removed rows are forgotten and the backfill queues it again like any upload (a private mark still keeps it out).
+func (h *CloudHandler) DropboxResend(w http.ResponseWriter, r *http.Request) {
+	if h.refuseCloud(w, r, allowDashboard) || !requireJSON(w, r) {
+		return
+	}
+	d := h.dbx
+	if d == nil || d.backup == nil {
+		writeError(w, http.StatusNotFound, "not_available", "Dropbox backup is not available in this build")
+		return
+	}
+	digest := chi.URLParam(r, "digest")
+	if !dropboxDigestRe.MatchString(digest) {
+		errBadRequest(w, "not an artifact id")
+		return
+	}
+	n, err := d.backup.outbox.Unremove(r.Context(), digest)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "", "could not change the backup")
+		return
+	}
+	if n > 0 {
+		d.backup.Backfill(r.Context())
+		d.backup.Nudge()
+		_ = d.store.AddAudit(r.Context(), store.DropboxAudit{Kind: store.DropboxAuditRemoval, Who: "operator", Count: n, Reason: "resend"})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"queued": n > 0})
+}
+
+// DropboxArtifact answers GET /api/dropbox/artifact/{digest}: what the backup holds of one artifact (for its Details block): connected or not,
+// files in Dropbox, removed or not. Counts only; the Operator's, on this computer only.
+func (h *CloudHandler) DropboxArtifact(w http.ResponseWriter, r *http.Request) {
+	if h.refuseCloud(w, r, allowDashboard) {
+		return
+	}
+	d := h.dbx
+	if d == nil || d.backup == nil {
+		writeError(w, http.StatusNotFound, "not_available", "Dropbox backup is not available in this build")
+		return
+	}
+	digest := chi.URLParam(r, "digest")
+	if !dropboxDigestRe.MatchString(digest) {
+		errBadRequest(w, "not an artifact id")
+		return
+	}
+	c, err := d.store.Get(r.Context())
+	if err != nil || !c.Connected {
+		writeJSON(w, http.StatusOK, map[string]any{"connected": false})
+		return
+	}
+	in, removed, err := d.backup.outbox.DigestState(r.Context(), c.AccountID, digest)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "", "could not read the backup")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"connected": true, "in_dropbox": in, "removed": removed})
+}

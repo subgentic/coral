@@ -171,6 +171,7 @@ var activityNotAnInboxAction = map[string]string{
 	"POST /api/dropbox/edits/{doc}/promote":                                "Dropbox edit decision (#14714): the Operator's, on this computer only",
 	"POST /api/dropbox/edits/{doc}/separate":                               "Dropbox edit decision (#14714): the Operator's, on this computer only",
 	"POST /api/dropbox/remove/{digest}":                                    "Dropbox removal (#14814): the Operator's, on this computer only",
+	"POST /api/dropbox/resend/{digest}":                                    "Dropbox Send again (#14814): the Operator's, on this computer only",
 	"POST /api/dropbox/private/{digest}":                                   "Dropbox Mark private and removal (#14814): the Operator's, on this computer only",
 	"PUT /api/dropbox/retention":                                           "Dropbox retention (#14703): the Operator's, on this computer only",
 	"POST /api/dropbox/check":                                              "Dropbox Check again (#14693): asks the backup for a pass, on this computer only",

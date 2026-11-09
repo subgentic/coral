@@ -350,6 +350,29 @@ func (o *DropboxOutbox) WasRemoved(ctx context.Context, digest string) (bool, er
 	return n > 0, err
 }
 
+// DigestState is what the backup holds of one artifact, for its Details block: files in Dropbox (done or edited) and whether it was removed.
+func (o *DropboxOutbox) DigestState(ctx context.Context, accountID, digest string) (inDropbox int, removed bool, err error) {
+	var r struct {
+		In  int `db:"in_dropbox"`
+		Rem int `db:"removed"`
+	}
+	err = o.db.GetContext(ctx, &r, `SELECT COALESCE(SUM(CASE WHEN state IN (?, ?) AND account_id = ? THEN 1 ELSE 0 END), 0) AS in_dropbox,
+		COALESCE(SUM(CASE WHEN state = ? THEN 1 ELSE 0 END), 0) AS removed FROM dropbox_outbox WHERE digest = ?`,
+		DropboxOutboxDoneS, DropboxOutboxEdited, accountID, DropboxOutboxRemoved, digest)
+	return r.In, r.Rem > 0, err
+}
+
+// Unremove forgets the removed rows of a digest (the Operator's "Send to Dropbox again", Security's SHOULD 6 on cb3ff32dd): the next backfill queues
+// the artifact like any other, through the private marks, the filters and retention's window. It reports how many rows went.
+func (o *DropboxOutbox) Unremove(ctx context.Context, digest string) (int, error) {
+	res, err := o.db.ExecContext(ctx, "DELETE FROM dropbox_outbox WHERE digest = ? AND state = ?", digest, DropboxOutboxRemoved)
+	if err != nil {
+		return 0, err
+	}
+	n, err := res.RowsAffected()
+	return int(n), err
+}
+
 // ClearAll forgets the whole ledger (Disconnect, then Delete the Dropbox backup too: the backup is gone, and a later sign-in starts afresh, backing
 // everything up again; the per-artifact "removed" rule is for one artifact the Operator took out of a backup that goes on).
 func (o *DropboxOutbox) ClearAll(ctx context.Context) error {

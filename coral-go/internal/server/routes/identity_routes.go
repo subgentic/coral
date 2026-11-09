@@ -162,6 +162,8 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/dropbox/edits/{doc}/promote":  "use an edit made in Dropbox as the next version",
 	"POST /api/dropbox/edits/{doc}/separate": "keep an edit made in Dropbox as its own file",
 	"POST /api/dropbox/remove/{digest}":      "remove an artifact from Dropbox",
+	"GET /api/dropbox/artifact/{digest}":     "see whether an artifact is in the Dropbox backup",
+	"POST /api/dropbox/resend/{digest}":      "send an artifact removed from Dropbox to Dropbox again",
 	"POST /api/dropbox/private/{digest}":     "mark an artifact private and remove it from Dropbox",
 	"PUT /api/dropbox/retention":             "choose how long Dropbox keeps backed-up files",
 	"POST /api/dropbox/check":                "ask the Dropbox backup to check for space again",

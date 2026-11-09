@@ -12,6 +12,8 @@ const { JSDOM } = require('jsdom');
         <div id="settings-dropbox-status"></div>
         <button id="settings-dropbox-connect" hidden></button>
         <button id="settings-dropbox-disconnect" hidden></button>
+        <button id="settings-dropbox-delete" hidden></button>
+        <div id="settings-dropbox-delete-confirm" hidden></div>
         <button id="settings-dropbox-switch" hidden></button>
         <button id="settings-dropbox-takeover" hidden></button>
         <button id="settings-dropbox-recheck" hidden></button>
@@ -421,6 +423,29 @@ const { JSDOM } = require('jsdom');
     answers['/api/dropbox/retention'] = { status: 200, body: { days: 30 } };
     await m.confirmRetention();
     assert.deepStrictEqual(retentionCalls().pop(), { days: 30, confirm: true, seen_count: 30, seen_bytes: 30 * 1024 }, 'what is confirmed is what was shown');
+
+    // Disconnect and delete the backup (#14814): the server says what to type; the sign-in goes only when the delete finished.
+    await status({ ...connected });
+    assert.ok(shown('settings-dropbox-delete'), 'offered beside Disconnect');
+    answers['/api/dropbox/disconnect'] = { status: 409, body: { code: 'confirm_delete_backup', files: 12, foreign: 2, others: ['a3f2'], unknown: 0 } };
+    await m.deleteBackupStart();
+    const dc = $('settings-dropbox-delete-confirm');
+    assert.ok(!dc.hidden);
+    assert.match(dc.textContent, /deletes the Dropbox backup \(12 files\) for every Coral that uses it, then disconnects\. 2 of them did not come from this computer\. Other Corals keep files only in Dropbox \(…a3f2\): they lose them\./);
+    assert.match(dc.textContent, /To go on, type: delete 2 a3f2/);
+    let sentDel = calls.filter(c => c.url === '/api/dropbox/disconnect').pop();
+    assert.deepStrictEqual(JSON.parse(sentDel.body), { delete_backup: true }, 'the first ask types nothing');
+    answers['/api/dropbox/disconnect'] = { status: 202, body: { deleting: true } };
+    await m.deleteBackupConfirm('delete 2 a3f2');
+    sentDel = calls.filter(c => c.url === '/api/dropbox/disconnect').pop();
+    assert.deepStrictEqual(JSON.parse(sentDel.body), { delete_backup: true, typed: ['delete', '2', 'a3f2'] });
+    assert.match($('settings-dropbox-note').textContent, /still deleting the backup\. You are still connected/);
+    answers['/api/dropbox/disconnect'] = { status: 200, body: { connected: false, revoked: true } };
+    answers['/api/dropbox/status'] = { status: 200, body: { app_key_set: true, connected: false, state: 'disconnected' } };
+    await m.deleteBackupConfirm('delete 2 a3f2');
+    assert.match($('settings-dropbox-note').textContent, /The Dropbox backup was deleted and Coral disconnected/);
+    assert.ok($('settings-dropbox-delete-confirm').hidden);
+    assert.strictEqual($('settings-dropbox-delete-confirm').querySelector('img'), null);
 
     // Nothing from the server is put into the page as HTML.
     await status({ app_key_set: true, connected: true, state: 'connected', account_id: '<img src=x onerror=alert(1)>' });
