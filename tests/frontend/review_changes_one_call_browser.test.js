@@ -156,6 +156,8 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                         assert.equal(await ev(`[...document.querySelectorAll('.toast')].some(t=>/not_found/.test(t.textContent))`),false,'no bare error code is shown');
                         assert.equal(await ev(`[...document.querySelectorAll('.toast')].some(t=>/Changes requested/.test(t.textContent))`),true,'the person is told changes were requested');
                     }
+                    if (mode === 'cloud') assert.equal(await ev(`[...document.querySelectorAll('.toast')].some(t=>/Changes requested\. Your words are on the file\./.test(t.textContent))`),true,'Hub, comment writes off, the computer kept the words (text_kept): the toast says they are on the file (#14797)');
+                    if (mode === 'cloud-older') assert.equal(await ev(`[...document.querySelectorAll('.toast')].some(t=>/Your words were not added to the thread/.test(t.textContent))`),true,'an older computer dropped the words: the toast says they were not added');
                     if (mode === 'hub' || mode === 'cloud') assert.ok(writes.every(w=>w.path.startsWith('/api/remote/review-box/')),'all writes retain the captured computer');
                     if (mode === 'cloud' || mode === 'cloud-older') assert.equal(await ev(`import((window.__coralStatic || '/static/')+'server_base.js').then(m=>m.isCloud())`),true,'the Cloud Hub boot mode is exercised');
                     if (mode === 'already-sent') assert.match(await ev(`[...document.querySelectorAll('.toast')].map(t=>t.textContent).join(' ')`),/Writer A was already told/);
