@@ -27,6 +27,7 @@ const { coralReady } = require('./helpers/wait');
         if (at('Rename') > 3 || at('Sleep') > 4 || at('Archive') > 5) problems.push(`they are among the first items (${JSON.stringify(m.shown)})`);
         for (const w of ['Set Icon', 'Session Info']) if (at(w) >= 0) problems.push(`"${w}" is under More, not in the first list`);
         if (!(at('Restart, same settings') > at('Archive') && at('Restart with changes') > at('Restart, same settings') && at('Restart with changes') <= 7)) problems.push(`both Restart items are in the first list, right after Archive, without opening More (the menu shows ${JSON.stringify(m.shown)})`);
+        if (!(await ev(`(() => { const r = document.querySelector('[data-on-click="agent-restart-same"][data-session-id="w-sid"]'); const prev = r && r.previousElementSibling; return !!prev && prev.matches('hr.overflow-menu-divider'); })()`))) problems.push('a divider sits before the Restart pair, so it is not right under Archive (#14996, UI Accessibility)');
         if (m.inGroup && m.inGroup.some(x => /^Restart/.test(x))) problems.push(`no Restart item is left under More (${JSON.stringify(m.inGroup)})`);
         if (!m.more || !m.inGroup) problems.push('there is a More item with its group hidden under it');
         else for (const w of ['Set Icon', 'Session Info']) if (!m.inGroup.some(x => x.startsWith(w))) problems.push(`"${w}" is in the More group (${JSON.stringify(m.inGroup)})`);
