@@ -250,3 +250,12 @@
 .queue-actions { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
 .queue-act:disabled, .queue-act:disabled:hover { border-color: transparent; background: transparent; }
 .queue-act.queue-sure { color: var(--danger, var(--text-primary)); border-color: currentColor; }
+
+/* The Queue folder's details (#14857): a row opens to its full note, command, head, times and, after it ended, its result. Text only; a long command wraps, never cuts. */
+.queue-more[aria-expanded="true"] .material-icons { transform: rotate(180deg); }
+@media (prefers-reduced-motion: no-preference) { .queue-more .material-icons { transition: transform 0.15s; } }
+.queue-detail { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 16px; margin: 0; padding: 4px 0 4px 2.75rem; font-size: var(--fs-md); color: var(--text-secondary); }
+.queue-detail dt { color: var(--text-tertiary, var(--text-secondary)); font-weight: 500; }
+.queue-detail dd { margin: 0; min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; color: var(--text-primary); }
+.queue-detail dd.queue-detail-code { font-family: var(--font-mono); font-size: var(--fs-sm); }
+@media (max-width: 639px) { .queue-detail { grid-template-columns: minmax(0, 1fr); gap: 0; padding-left: 0; } .queue-detail dd { margin-bottom: 8px; } }
