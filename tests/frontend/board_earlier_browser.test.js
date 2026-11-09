@@ -10,6 +10,7 @@ const CDP = require('chrome-remote-interface');
 const BASE = require('./test_base').BASE;
 const { safePaused } = require('./helpers/paused');
 const { removeBoards } = require('./helpers/board_cleanup');
+const { guardSettings } = require('./helpers/settings_guard');
 
 const B = 'earlier-board-7762';
 const TOTAL = 130; // three pages: 50 + 50 + 30
@@ -24,6 +25,7 @@ function page(q) {
 }
 
 (async () => {
+    const guard = await guardSettings(); // the launch notice's acknowledgement is set below: put back at the end, whatever happens (--fail-on-leak, #14945)
     const client = await CDP({ port: Number(process.env.CDP_PORT || 9222) });
     const { Page, Runtime, Emulation, Fetch } = client;
     const ev = async expression => {
@@ -107,5 +109,5 @@ function page(q) {
             assert.equal(await ev(`document.activeElement && document.activeElement.dataset.messageId`), '1', 'focus is on the first message');
         }
         console.log(`\nAll earlier-messages checks passed`);
-    } finally { try { await Fetch.disable(); await removeBoards(ev, [B]); } catch { /* the cleanup report names a leak */ } await client.close(); }
+    } finally { try { await Fetch.disable(); await removeBoards(ev, [B]); } catch { /* the cleanup report names a leak */ } await guard.restore().catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
