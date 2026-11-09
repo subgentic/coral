@@ -173,7 +173,7 @@ func (h *SessionsHandler) deliverGoalComment(r *http.Request, caller commentCall
 	if note != "" {
 		context += ". " + note
 	}
-	msg := sendMessageOf(sendOnGoal, title, "the owner", context, sendReplyCommand(id, rootID), text, snippet, names, commentPictureLinks(c.ImagesJSON)...)
+	msg := sendMessageOf(sendOnGoal, title, sendAuthorOperator, context, sendReplyCommand(id, rootID), text, snippet, names, commentPictureLinks(c.ImagesJSON)...)
 	posted, err := h.bs.PostDefusedMessage(ctx, team, board.OperatorName, msg)
 	if err != nil {
 		slog.Warn("[goal comments] message not posted", "board", team, "error", err)

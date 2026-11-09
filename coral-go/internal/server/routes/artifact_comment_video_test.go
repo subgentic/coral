@@ -87,7 +87,7 @@ func TestVideoCommentDeliveryIncludesTimeAndReplyThread(t *testing.T) {
 	require.Len(t, msgs, 1)
 	require.Contains(t, msgs[0].Content, "Video time: 01:05–01:10")
 	require.Contains(t, msgs[0].Content, fmt.Sprintf("%s %d", cmtDoc, int64(out["id"].(float64))))
-	require.Contains(t, msgs[0].Content, "untrusted")
+	require.Contains(t, msgs[0].Content, "The Operator commented on an artifact")
 }
 
 func TestVideoCommentArtifactRejectsNonDigestBeforeReadingMetadata(t *testing.T) {

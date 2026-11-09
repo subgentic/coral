@@ -52,7 +52,7 @@ func TestTheOperatorsCommentOnAnAgentsDiffGoesToThatAgentNamingTheFileAndLinesAn
 	require.Len(t, msgs, 1, "one message, to the agent whose diff it is")
 	m := msgs[0].Content
 	cid := int64(out["id"].(float64))
-	for _, want := range []string{"@Dev ", "Why not wrap this error?", "pkg/a.go, lines 3-4 on the new side of your changes", "return err", "From the Operator", "untrusted",
+	for _, want := range []string{"@Dev ", "Why not wrap this error?", "pkg/a.go, lines 3-4 on the new side of your changes", "return err", "The Operator commented on your changes", "(untrusted)",
 		fmt.Sprintf("coral-agent artifact reply coral://diffs/team-a/%s/%s %d", sid, diffPathHash("pkg/a.go"), cid)} {
 		assert.Contains(t, m, want)
 	}
