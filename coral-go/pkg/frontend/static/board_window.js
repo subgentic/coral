@@ -258,6 +258,28 @@ function revealMessage(target, instant = false) {
     else target.scrollIntoView({ block: 'center', behavior: instant ? 'auto' : scrollBehavior() });
     target.setAttribute('tabindex', '-1'); // the focus goes to the message
     target.focus({ preventScroll: true });
+    if (!(target.classList.contains('mb-message') && target.parentElement && target.parentElement.classList.contains('mb-table'))) keepInView(target, instant); // the table's rows are placed under its sticky head by revealRow: that is its own placing
+}
+
+// The jump scrolls to its message once; rows and counts that arrive a moment later (an older page, an opened thread, day dividers) move it away, and on a slow machine the smooth scroll is still on its way when they do (#14881: the match
+// was marked and focused and out of view). After a jump the message is looked at again when the list's size changes and once more when the scroll has settled, and put back in view if it is not, until the person takes over (a wheel, a touch,
+// a key or a press in the list) or three seconds have passed.
+function keepInView(target, instant) {
+    const box = target.closest('#mb-messages');
+    if (!box) return;
+    box._keepOff?.(); // one watch at a time: a newer jump replaces the older
+    let timer = 0, ended = false, ro = null;
+    const inView = () => { const a = target.getBoundingClientRect(), b = box.getBoundingClientRect(); return a.top >= b.top - 1 && a.bottom <= b.bottom + 1 || a.height > b.height && a.top <= b.top + 1 && a.bottom >= b.bottom - 1; };
+    const look = () => { if (ended) return; if (!target.isConnected || !target.classList.contains('chat-search-target')) return end(); if (!inView()) target.scrollIntoView({ block: 'center', behavior: 'auto' }); };
+    const later = ms => { clearTimeout(timer); timer = setTimeout(look, ms); };
+    const events = ['wheel', 'touchstart', 'keydown', 'pointerdown'];
+    function end() { if (ended) return; ended = true; clearTimeout(timer); clearTimeout(stop); ro?.disconnect(); for (const e of events) box.removeEventListener(e, end, true); if (box._keepOff === end) box._keepOff = null; }
+    const stop = setTimeout(end, 3000);
+    for (const e of events) box.addEventListener(e, end, { capture: true, passive: true });
+    if (typeof ResizeObserver === 'function') { ro = new ResizeObserver(() => later(60)); for (const el of [box, ...box.children]) ro.observe(el); }
+    box._keepOff = end;
+    later(instant ? 60 : 500); // a smooth scroll is on its way: looked at once it has had time to land
+    if (typeof box.addEventListener === 'function') box.addEventListener('scrollend', () => later(0), { once: true });
 }
 
 /** Go to a message of the board, loading the older pages until it is there (the board's own jump; the search's matches use it). */
