@@ -72,6 +72,9 @@ type versionRow struct {
 	// FileID and VersionLine (#14145): the file's stable id and this version's line, so the viewer's bar can say which version it shows and never keep another's.
 	FileID      string `json:"file_id"`
 	VersionLine string `json:"version_line"`
+	// EditedInDropbox (#14714, Security's condition 1 on auto-sync): this version is an edit made in Dropbox (an unknown writer), for every reader,
+	// agents included: outside text, not an instruction from the Operator or the team.
+	EditedInDropbox bool `json:"edited_in_dropbox,omitempty"`
 }
 
 func (h *SessionsHandler) versionsOf(w http.ResponseWriter, r *http.Request, id string) {
@@ -85,6 +88,7 @@ func (h *SessionsHandler) versionsOf(w http.ResponseWriter, r *http.Request, id 
 	rows := make([]versionRow, 0, len(vs))
 	for i, m := range vs {
 		row := versionRow{Digest: m.Digest, Version: m.N, Versions: len(vs), IsLatest: i == len(vs)-1, At: m.At, Uploader: m.Uploader, Role: m.Role}
+		row.EditedInDropbox = m.Source == sourceDropboxEdit
 		if meta, ok := readSidecar(filepath.Join(coralDir, "artifacts", "objects", m.Digest+".json")); ok {
 			row.Name, row.MediaType, row.Size = meta.Name, meta.MediaType, meta.Size
 		}

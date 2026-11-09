@@ -7,7 +7,7 @@
 import { serverUrl } from './server_base.js';
 
 const HEX_RE = /^[a-f0-9]{64}$/;
-const REMOVE = '/api/dropbox/remove/', RESEND = '/api/dropbox/resend/', STATE = '/api/dropbox/artifact/';
+const REMOVE = '/api/dropbox/remove/', RESEND = '/api/dropbox/resend/', STATE = '/api/dropbox/artifact/', UNDO = '/api/dropbox/undo/';
 const url = (prefix, hex, server) => serverUrl(prefix + hex, server);
 
 /** The block, loaded when the Details are shown; taken out again when there is nothing to say (not connected, never backed up, or refused). */
@@ -76,19 +76,41 @@ export function dropboxBlock(hex, server, details) {
         (typed || cancel).focus?.(); // a destructive confirm starts on Cancel, or on the field the person must type
     };
 
+    // askUndo confirms Undo this edit (Security's condition 3): the edited version goes here; Dropbox keeps the edit in its history.
+    const askUndo = () => {
+        if (document.activeElement && acts.contains(document.activeElement)) trigger = document.activeElement;
+        confirmBox.textContent = ''; confirmBox.hidden = false;
+        const words = document.createElement('p'); words.id = `${idBase}-undo`;
+        words.textContent = 'This removes the edited version here. The edit stays in your Dropbox history.';
+        const go = button('Undo this edit', async () => {
+            go.disabled = true;
+            const r = await post(UNDO, { confirm: true });
+            go.disabled = false;
+            confirmBox.hidden = true;
+            say.textContent = r.status === 200 ? 'The edit was undone: the version before it is the newest again.' : String(r.body.error || 'Not undone: Coral could not change the file.');
+            if (r.status === 200) await load(true);
+            trigger?.focus?.();
+        });
+        const cancel = button('Cancel', () => { confirmBox.hidden = true; confirmBox.textContent = ''; say.textContent = 'Nothing changed.'; trigger?.focus?.(); });
+        confirmBox.append(words, go, cancel);
+        cancel.focus?.(); // a destructive confirm starts on Cancel
+    };
+
     let loaded = false;
     const load = async (again = false) => {
         if (loaded && !again) return;
         loaded = true;
         let j = null;
         try { const r = await fetch(url(STATE, hex, server), { cache: 'no-store' }); j = r.ok ? await r.json().catch(() => null) : null; } catch { j = null; }
-        if (!j || !j.connected || (!(Number(j.in_dropbox) > 0) && !j.removed)) { details.remove(block); return; } // refused, not connected, or never backed up
+        if (!j || !j.connected || (!(Number(j.in_dropbox) > 0) && !j.removed && !j.undo)) { details.remove(block); return; } // refused, not connected, or never backed up
         acts.textContent = '';
+        if (j.undo) acts.append(button('Undo this edit…', askUndo)); // the newest version is an edit made in Dropbox (#14714)
+        state.textContent = j.undo ? 'This version is an edit made in Dropbox.' : '';
         if (Number(j.in_dropbox) > 0) {
             const n = Number(j.in_dropbox);
             state.textContent = `In Dropbox (${n} ${n === 1 ? 'file' : 'files'}, with its details).`;
             acts.append(button('Remove from Dropbox…', () => ask(REMOVE)));
-        } else {
+        } else if (j.removed) {
             state.textContent = 'Removed from Dropbox: it stays out of the backup until you send it again.';
             acts.append(button('Send to Dropbox again', async () => {
                 const r = await post(RESEND);

@@ -15,40 +15,30 @@ import (
 // #14777, Security's SHOULD 7 on the 5a approval: through Coral Hub the Needs you answer carries no dropbox_edit item and counts none, and an
 // agent's token can neither read the held edit nor decide it.
 
-// Mutant: the board serves the Dropbox items through the tunnel (the provider's own check removed).
-func TestThroughTheHubNeedsYouHasNoDropboxEdit(t *testing.T) {
+// The Operator (#196894): no Dropbox item in Needs you, on this computer or through Coral Hub; a held edit is in Settings only. Mutant: the
+// dropbox_edit kind (or its provider) back in the board's Needs you.
+func TestNeedsYouHasNoDropboxEditAnywhere(t *testing.T) {
 	resetOwnerState(t)
-	withLabel(t, ownerLabel, nil) // the Hub's owner of this computer: the one Hub reader who gets every kind of Needs you
-	be, _, e := heldEdit(t)
+	withLabel(t, ownerLabel, nil)
+	heldEdit(t)
 	h, _ := operatorAsksRig(t)
-	h.SetNeedsYouDropbox(DropboxEditItems(be.h.dbx.dataDir))
-
-	code, out := readNeedsYou(t, h, "", asPerson)
-	require.Equal(t, http.StatusOK, code)
-	assert.EqualValues(t, 1, out["counts"].(map[string]any)["dropbox_edit"], "on this computer the edit is counted")
-	found := false
-	for _, it := range needsYouItems(out) {
-		if it["kind"] == "dropbox_edit" && it["id"] == "dropbox_edit:"+e.DocID {
-			found = true
-		}
-	}
-	assert.True(t, found, "and listed")
-
 	viaHub := func(r *http.Request) *http.Request {
 		for k, v := range ownerHeaders(ownerLabel) {
 			r.Header.Set(k, v)
 		}
 		return asPerson(r)
 	}
-	code, out = readNeedsYou(t, h, "", viaHub)
-	require.Equal(t, http.StatusOK, code, "the Hub's owner reads Needs you: %v", out)
-	assert.EqualValues(t, 0, out["counts"].(map[string]any)["dropbox_edit"], "through the Hub: counted as none")
-	for _, it := range needsYouItems(out) {
-		assert.NotEqual(t, "dropbox_edit", it["kind"], "through the Hub: never listed")
+	for _, as := range []func(*http.Request) *http.Request{asPerson, viaHub} {
+		code, out := readNeedsYou(t, h, "", as)
+		require.Equal(t, http.StatusOK, code)
+		_, has := out["counts"].(map[string]any)["dropbox_edit"]
+		assert.False(t, has, "no dropbox_edit count")
+		for _, it := range needsYouItems(out) {
+			assert.NotEqual(t, "dropbox_edit", it["kind"])
+		}
+		code, _ = readNeedsYou(t, h, "?kind=dropbox_edit", as)
+		assert.Equal(t, http.StatusBadRequest, code, "not a kind of Needs you any more")
 	}
-	code, out = readNeedsYou(t, h, "?kind=dropbox_edit", viaHub)
-	require.Equal(t, http.StatusOK, code)
-	assert.Empty(t, needsYouItems(out), "not even asked for by kind")
 }
 
 // Mutant: the decision routes take an agent's token.

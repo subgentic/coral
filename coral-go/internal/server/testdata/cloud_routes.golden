@@ -412,6 +412,7 @@ POST /api/dropbox/remove/{digest} never
 POST /api/dropbox/resend/{digest} never
 POST /api/dropbox/switch never
 POST /api/dropbox/takeover never
+POST /api/dropbox/undo/{digest} never
 POST /api/folder-tags/{folderName} never
 POST /api/history-import never
 POST /api/hub-auto-accept launch

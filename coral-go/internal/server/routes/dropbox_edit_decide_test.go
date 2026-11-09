@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/store"
-	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // #14714, Dropbox stage 5a piece 2: the Operator's decision on an edit made in Dropbox. Each test names the mutant it fails against.
@@ -191,22 +190,9 @@ func TestTheDecisionRoutesAreTheOperatorsOnThisComputer(t *testing.T) {
 	assert.True(t, open, "still pending: nothing was decided")
 }
 
-// Security's SHOULD G. Mutant: the items are served through Coral Hub.
-func TestHeldEditsAreNeedsYouItemsOnThisComputerOnly(t *testing.T) {
-	be, _, e := heldEdit(t)
-	items := DropboxEditItems(be.h.dbx.dataDir)
-	req := httptest.NewRequest(http.MethodGet, "/api/needs-you", nil)
-	got, err := items(req)
-	require.NoError(t, err)
-	require.Len(t, got, 1)
-	assert.Equal(t, "dropbox_edit", got[0].Kind)
-	assert.Equal(t, "dropbox_edit:"+e.DocID, got[0].ID)
-	assert.Equal(t, "doc0.md was edited in Dropbox", got[0].Line, "Coral's own name, nothing from the edit")
-	hub := httptest.NewRequest(http.MethodGet, "/api/needs-you", nil)
-	hub.Header.Set(tunnel.ViaHeader, "1")
-	got, err = items(hub)
-	require.NoError(t, err)
-	assert.Empty(t, got, "never through Coral Hub")
+// Security's SHOULD E. Mutant: the Settings row's next version or Dropbox link is wrong.
+func TestHeldEditsAreListedInSettings(t *testing.T) {
+	be, _, _ := heldEdit(t)
 	st, _ := be.status()["edits"].(map[string]any)
 	rows, _ := st["items"].([]any)
 	require.Len(t, rows, 1)

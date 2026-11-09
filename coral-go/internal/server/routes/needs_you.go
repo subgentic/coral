@@ -28,7 +28,7 @@ const (
 )
 
 // needsYouKinds are the kinds an item can be (the keys of the answer's counts), the values ?kind= takes.
-var needsYouKinds = map[string]bool{"agent": true, "question": true, "wait": true, "proposal": true, "review": true, "goal_done": true, "skill": true, "dropbox_edit": true}
+var needsYouKinds = map[string]bool{"agent": true, "question": true, "wait": true, "proposal": true, "review": true, "goal_done": true, "skill": true}
 
 // needsYouNotIncluded names what the Inbox counts that this read cannot see. A consumer must treat a word it does not know as informational (a later release may name more), never as an error: it means "this read does not cover that", not that the answer is invalid. A read that fails (refused, 404) is a different thing from an empty answer and must be shown as an incomplete list.
 var needsYouNotIncluded = []string{"failed_runs", "welcome", "unrecorded_agents"}
@@ -68,11 +68,6 @@ type needsYouAnswer struct {
 // SetNeedsYouSkills tells the board how to list the skills that wait for the Operator (the Skills Store owns them). Nil: none.
 func (h *BoardHandler) SetNeedsYouSkills(fn func(ctx context.Context) ([]NeedsYouItem, error)) {
 	h.needsYouSkills = fn
-}
-
-// SetNeedsYouDropbox tells the board how to list the edits made in Dropbox that wait for the Operator (Dropbox stage 5a, #14714). Nil: none.
-func (h *BoardHandler) SetNeedsYouDropbox(fn func(r *http.Request) ([]NeedsYouItem, error)) {
-	h.needsYouDropbox = fn
 }
 
 // SetNeedsYouAgents tells the board how to list the agents waiting on the Operator (the live list's rows; the sessions handler owns them).
@@ -176,7 +171,7 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 	// ?kind=<kind> (#13834): only that kind's items are listed (count and counts stay the whole answer's, true), so a Hub's shell can read the skill rows without paging past newer questions. One of the kinds in counts; anything else is 400.
 	kind := r.URL.Query().Get("kind")
 	if kind != "" && !needsYouKinds[kind] {
-		errBadRequest(w, "kind is one of agent, question, wait, proposal, review, goal_done, skill, dropbox_edit")
+		errBadRequest(w, "kind is one of agent, question, wait, proposal, review, goal_done, skill")
 		return
 	}
 	items, unread, muted, err := h.needsYouItems(r)
@@ -184,7 +179,7 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "could not read the boards")
 		return
 	}
-	ans := needsYouAnswer{Count: len(items), Counts: map[string]int{"agent": 0, "question": 0, "wait": 0, "proposal": 0, "review": 0, "goal_done": 0, "skill": 0, "dropbox_edit": 0}, Items: []NeedsYouItem{}, NotIncluded: needsYouNotIncluded, Unread: unread}
+	ans := needsYouAnswer{Count: len(items), Counts: map[string]int{"agent": 0, "question": 0, "wait": 0, "proposal": 0, "review": 0, "goal_done": 0, "skill": 0}, Items: []NeedsYouItem{}, NotIncluded: needsYouNotIncluded, Unread: unread}
 	if len(muted) > 0 {
 		ans.Muted = muted
 	}
@@ -447,14 +442,6 @@ func (h *BoardHandler) needsYouItems(r *http.Request) (items []NeedsYouItem, unr
 	if h.needsYouSkills != nil { // the skills that wait for the Operator's approval (#12139)
 		if rows, err := h.needsYouSkills(ctx); err != nil {
 			unread = appendOnce(unread, "skills")
-		} else {
-			items = append(items, rows...)
-		}
-	}
-
-	if h.needsYouDropbox != nil { // edits made in Dropbox held for the Operator (#14714): the provider answers nothing through Coral Hub
-		if rows, err := h.needsYouDropbox(r); err != nil {
-			unread = appendOnce(unread, "dropbox_edits")
 		} else {
 			items = append(items, rows...)
 		}

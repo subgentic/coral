@@ -66,3 +66,24 @@ func (e *DropboxEdits) PromotionsSince(ctx context.Context, since time.Time, doc
 		FROM dropbox_edits WHERE state = ? AND decided_at >= ?`, doc, DropboxEditPromoted, since.UTC().Format(ISOFormat)) // decided_at is written in ISOFormat
 	return r.All, r.Doc, err
 }
+
+// DropboxEditUndone is an edit made in Dropbox that became a version and that the Operator undid: kept with its rev, so the listing never takes
+// the same revision again (a newer revision of the file is a new edit).
+const DropboxEditUndone = "undone"
+
+// MarkUndone records that the Operator undid the version an edit became.
+func (e *DropboxEdits) MarkUndone(ctx context.Context, digest string) (bool, error) {
+	res, err := e.db.ExecContext(ctx, "UPDATE dropbox_edits SET state = ? WHERE digest = ? AND state = ?", DropboxEditUndone, digest, DropboxEditPromoted)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
+// ForgetDigest drops every outbox row of a digest without any Dropbox call (an undone edit: the upload worker never sends it again, nothing waits
+// for it, and its copy in Dropbox stays as Dropbox's own history).
+func (o *DropboxOutbox) ForgetDigest(ctx context.Context, digest string) error {
+	_, err := o.db.ExecContext(ctx, "DELETE FROM dropbox_outbox WHERE digest = ?", digest)
+	return err
+}

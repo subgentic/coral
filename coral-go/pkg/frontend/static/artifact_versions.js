@@ -159,7 +159,7 @@ export function attachVersions(dialog, hooks) {
             // the shown version is the list's one Tab stop; the arrow keys move between the rest (a roving tabindex)
             const li = el('li', 'av-option'); li.setAttribute('role', 'option'); li.id = `av-opt-${r.version}`; li.tabIndex = r.digest === st.hex ? 0 : -1; li.dataset.version = String(r.version);
             li.setAttribute('aria-selected', String(r.digest === st.hex)); li.title = w.full;
-            li.append(artifactThumbnail(r, { url: thumbnailPath(r) ? serverUrl(thumbnailPath(r), st.server) : '' }), el('span', 'av-vname', `v${r.version}${r.is_latest ? ' (latest)' : ''}`), el('span', 'av-who', [w.label, r.role || r.uploader].filter(Boolean).join(' · ')), el('span', 'av-size', sizeOf(r.size || 0)));
+            li.append(artifactThumbnail(r, { url: thumbnailPath(r) ? serverUrl(thumbnailPath(r), st.server) : '' }), el('span', 'av-vname', `v${r.version}${r.is_latest ? ' (latest)' : ''}`), el('span', 'av-who', r.edited_in_dropbox ? `Edited in Dropbox · ${w.label}` : [w.label, r.role || r.uploader].filter(Boolean).join(' · ')), el('span', 'av-size', sizeOf(r.size || 0)));
             li.addEventListener('click', () => choose(r));
             li.addEventListener('focus', () => { for (const o of options()) o.tabIndex = o === li ? 0 : -1; });
             list.append(li);
@@ -289,7 +289,7 @@ export function attachVersions(dialog, hooks) {
             draw();
             if (switched && !bar.hidden) {
                 const row = st.rows[cur()], w = whenOf(row.at);
-                say(`Showing v${row.version} of ${st.rows.length}, ${w.label} (${w.full}), ${row.role || row.uploader || 'unknown'}`);
+                say(`Showing v${row.version} of ${st.rows.length}, ${w.label} (${w.full}), ${row.edited_in_dropbox ? 'edited in Dropbox' : (row.role || row.uploader || 'unknown')}`); // an edit made in Dropbox is said as such (#14714)
                 bar.querySelector('.av-current')?.focus();
             }
         },

@@ -10,10 +10,16 @@ package routes
 
 import (
 	"context"
+	"io"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+
+	"github.com/subgentic/coral/internal/secfile"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -30,6 +36,38 @@ func autoSyncAnomaly(origType string, origSize int64, e store.DropboxEdit) strin
 	return ""
 }
 
+// autoSyncBucket is auto-sync's own hourly upload bucket: its promotions count like any agent's uploads.
+const autoSyncBucket = "dropbox:autosync"
+
+// uploadChecks applies to the held bytes what the upload route applies to an agent's bytes, since the edit never went through that route: the
+// hourly cap (auto-sync's own bucket, charged with the size) and the image metadata rule (an image that carries metadata, or that cannot be read
+// to strip it, is held: Coral never rewrites bytes that came from Dropbox on its own). The store quota is fits() in the promote path itself. The
+// secret flag is not an upload-route step: the backup flags a secret-shaped text when it sends the new version, as for any upload.
+func (b *DropboxBackup) uploadChecks(e store.DropboxEdit) string {
+	st := storeFor(b.coralDir)
+	if ok, _ := st.admitUpload(autoSyncBucket); !ok {
+		return "hourly_cap"
+	}
+	if !st.chargeUpload(autoSyncBucket, e.Size) {
+		return "hourly_cap"
+	}
+	if head, err := readHead(b.heldPath(e.Digest), 16); err == nil && sniffImageFamily(head) != "" {
+		f, err := secfile.OpenNoFollow(b.heldPath(e.Digest), os.O_RDONLY, 0)
+		if err != nil {
+			return "image_unreadable"
+		}
+		data, rerr := io.ReadAll(io.LimitReader(f, dropboxEditMaxSize+1))
+		_ = f.Close()
+		if rerr != nil {
+			return "image_unreadable"
+		}
+		if _, changed, cerr := cleanUploadedImage(data); cerr != nil || changed {
+			return "image_metadata"
+		}
+	}
+	return ""
+}
+
 // autoPromote promotes a newly held edit when auto-sync is on and not paused, the edit is not an anomaly and the breaker allows it. It never fails
 // the listing pass: anything it does not do leaves the edit held, as 5a did.
 func (b *DropboxBackup) autoPromote(ctx context.Context, e store.DropboxEdit) {
@@ -42,6 +80,10 @@ func (b *DropboxBackup) autoPromote(ctx context.Context, e store.DropboxEdit) {
 		return
 	}
 	if why := autoSyncAnomaly(orig.rec.MediaType, orig.rec.Size, e); why != "" {
+		slog.Info("[dropbox] an edit made in Dropbox is held for the Operator", "reason", why)
+		return
+	}
+	if why := b.uploadChecks(e); why != "" { // what the upload route applies to bytes (Security's SHOULD 3 on 5d1b9457e): a refusal holds it
 		slog.Info("[dropbox] an edit made in Dropbox is held for the Operator", "reason", why)
 		return
 	}
@@ -90,4 +132,78 @@ func (h *CloudHandler) DropboxSetAutoSync(w http.ResponseWriter, r *http.Request
 	_ = d.store.AddAudit(r.Context(), store.DropboxAudit{Kind: store.DropboxAuditSetting, Who: "operator", Reason: reason})
 	on, paused, _ := d.store.AutoSync(r.Context())
 	writeJSON(w, http.StatusOK, map[string]any{"on": on, "paused": paused})
+}
+
+// undoEdit removes the version an edit made in Dropbox became, when it is still the newest of its series (Security's conditions 1 to 6 on
+// "Undo this edit"): never through the Operator's delete (no Dropbox removal is queued: Dropbox keeps the edit in its history), the bytes go only
+// when no other record uses them, the series index forgets it so the version before is the newest again, the outbox forgets its rows without a
+// Dropbox call, and the edit is recorded as undone with its rev so the same revision is never taken again.
+func (b *DropboxBackup) undoEdit(ctx context.Context, digest string) (int, string, string) {
+	sid, _, ok := digestSeries(b.coralDir, digest)
+	if !ok {
+		return http.StatusNotFound, "not_found", "This file has no versions"
+	}
+	defer lockSeries(sid)()
+	members := seriesMembers(b.coralDir, sid)
+	if len(members) < 2 || members[len(members)-1].Digest != digest {
+		return http.StatusConflict, "not_newest", "Only the newest version can be undone, and only when it is an edit from Dropbox: a later version was added since"
+	}
+	last := members[len(members)-1]
+	if last.Source != sourceDropboxEdit {
+		return http.StatusConflict, "not_an_edit", "This version is not an edit made in Dropbox"
+	}
+	defer lockArtifact(digest)()
+	if up := uploadsDir(b.coralDir, last.Session); up != "" {
+		if err := os.Remove(filepath.Join(up, digest+".json")); err != nil && !os.IsNotExist(err) {
+			return http.StatusInternalServerError, "", "could not undo the edit"
+		}
+	}
+	forgetVersion(b.coralDir, sid, digest)
+	if len(recordsOfDigest(b.coralDir, digest)) == 0 { // no other record uses these bytes: they go (as a delete's do), under the digest lock
+		obj := filepath.Join(b.coralDir, "artifacts", "objects", digest)
+		if st, err := os.Lstat(obj); err == nil && st.Mode().IsRegular() && os.Remove(obj) == nil {
+			storeFor(b.coralDir).removed(st.Size())
+		}
+		_ = os.Remove(obj + ".json")
+	}
+	_ = b.outbox.ForgetDigest(ctx, digest)
+	_, _ = b.edits.MarkUndone(ctx, digest)
+	_ = b.d.store.AddAudit(ctx, store.DropboxAudit{Kind: store.DropboxAuditEdit, Who: "operator", Count: 1, Reason: "undone"})
+	noteArtifactsChanged()
+	return http.StatusOK, "", ""
+}
+
+// DropboxUndoEdit answers POST /api/dropbox/undo/{digest} {"confirm": true}: the Operator undoes an edit made in Dropbox that became the newest
+// version. A person at this computer only (never through Coral Hub, 403 for an agent's token).
+func (h *CloudHandler) DropboxUndoEdit(w http.ResponseWriter, r *http.Request) {
+	if h.refuseCloud(w, r, allowDashboard) || !requireJSON(w, r) {
+		return
+	}
+	if !humanInputCaller(r) {
+		writeError(w, http.StatusForbidden, "operator_only", "only the Operator can undo an edit, from this computer's dashboard")
+		return
+	}
+	d := h.dbx
+	if d == nil || d.backup == nil || d.backup.edits == nil {
+		writeError(w, http.StatusNotFound, "not_available", "Dropbox backup is not available in this build")
+		return
+	}
+	digest := chi.URLParam(r, "digest")
+	if !dropboxDigestRe.MatchString(digest) {
+		errBadRequest(w, "not an artifact id")
+		return
+	}
+	var in struct {
+		Confirm bool `json:"confirm"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<10)
+	if err := decodeJSONStrict(r, &in); err != nil || !in.Confirm {
+		writeError(w, http.StatusBadRequest, "confirm_required", "Undoing the edit needs your confirm")
+		return
+	}
+	if code, errCode, msg := d.backup.undoEdit(r.Context(), digest); code != http.StatusOK {
+		writeError(w, code, errCode, msg)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"undone": true})
 }

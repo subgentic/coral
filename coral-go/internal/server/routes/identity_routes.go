@@ -171,6 +171,7 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/dropbox/removals/confirm":     "let held removals from Dropbox go ahead",
 	"PUT /api/dropbox/retention":             "choose how long Dropbox keeps backed-up files",
 	"PUT /api/dropbox/autosync":              "choose whether edits made in Dropbox become new versions",
+	"POST /api/dropbox/undo/{digest}":        "undo an edit made in Dropbox that became the newest version",
 	"POST /api/dropbox/check":                "ask the Dropbox backup to check for space again",
 	"POST /api/cloud/redeem":                 "redeem a Coral Hub credential",
 	"POST /api/cloud/rekey":                  "replace the secret key and discard what it sealed", // #3698

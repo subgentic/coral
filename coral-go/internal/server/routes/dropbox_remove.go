@@ -417,5 +417,11 @@ func (h *CloudHandler) DropboxArtifact(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "", "could not read the backup")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"connected": true, "in_dropbox": in, "removed": removed})
+	undo := false // the newest version of its series and an edit made in Dropbox: the file's view offers Undo this edit (#14714)
+	if sid, _, ok := digestSeries(d.backup.coralDir, digest); ok {
+		if ms := seriesMembers(d.backup.coralDir, sid); len(ms) > 1 && ms[len(ms)-1].Digest == digest && ms[len(ms)-1].Source == sourceDropboxEdit {
+			undo = true
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"connected": true, "in_dropbox": in, "removed": removed, "undo": undo})
 }

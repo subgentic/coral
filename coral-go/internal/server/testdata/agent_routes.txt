@@ -595,6 +595,7 @@ b GET /api/dropbox/removals
 b POST /api/dropbox/removals/cancel
 b POST /api/dropbox/removals/confirm
 b PUT /api/dropbox/autosync
+b POST /api/dropbox/undo/{digest}
 b POST /api/dropbox/resend/{digest}
 b GET /api/dropbox/artifact/{digest}
 b GET /api/thread

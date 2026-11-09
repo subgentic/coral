@@ -4,7 +4,7 @@ package routes
 // makes the held bytes the next version of the document's series (written through the editor's own path, under the series lock, as "unknown writer
 // in Dropbox", promoted by the Operator, with no review, approval, keep, star, grant or notice state). Keep separate files them as their own
 // artifact with a new document id. One decision a held edit: an atomic move to deciding, so a second click or the other button gets 409. Both routes
-// are the Operator's on this computer only. A held edit is also an item of Needs you on this computer, never served through Coral Hub.
+// are the Operator's on this computer only. Held edits are listed in Settings (never in Needs you: the Operator, #196894), and auto-sync (dropbox_autosync.go) decides most on its own.
 
 import (
 	"context"
@@ -17,7 +17,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -204,36 +203,6 @@ func (b *DropboxBackup) decide(ctx context.Context, doc string, promote bool, wh
 	noteArtifactsChanged()
 	out["decision"] = state
 	return out, http.StatusOK, "", ""
-}
-
-// DropboxEditItems is the held edits as Needs you items for the board's list (this computer only: Security's SHOULD G). Each names Coral's own
-// name for the file, never anything from the edited bytes.
-func DropboxEditItems(coralDir string) func(r *http.Request) ([]NeedsYouItem, error) {
-	return func(r *http.Request) ([]NeedsYouItem, error) {
-		if cloud.Tunneled(r) {
-			return nil, nil // never through Coral Hub
-		}
-		b := dropboxBackupFor(coralDir)
-		if b == nil || b.edits == nil {
-			return nil, nil
-		}
-		open, err := b.edits.Open(r.Context())
-		if err != nil {
-			return nil, err
-		}
-		items := make([]NeedsYouItem, 0, len(open))
-		for _, e := range open {
-			if e.State != store.DropboxEditPending {
-				continue
-			}
-			name, team := "A file", ""
-			if orig, _, ok := b.record(e.OrigDigest, e.DocID); ok {
-				name, team = cleanValue(orig.rec.Name), orig.rec.Board
-			}
-			items = append(items, NeedsYouItem{Kind: "dropbox_edit", ID: "dropbox_edit:" + e.DocID, Line: name + " was edited in Dropbox", Team: team, At: e.SeenAt})
-		}
-		return items, nil
-	}
 }
 
 // dropboxAppFolder is the app folder's name in the person's Dropbox (Apps/<it>): Dropbox's own web view of a file is built from it and the
