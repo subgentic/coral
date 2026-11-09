@@ -992,8 +992,10 @@ async function runOnce(run) {
       if (leakLine) console.log(leakLine);
       // CDP_FULL=1 prints a failing attempt's whole output. The default shows its last 30 lines, plus every
       // [FAIL] line above them, so no failing check leaves the console (#3609); results.json has it in full.
+      // A failed attempt that a retry then passed (a FLAKY suite) is printed WHOLE, whatever CDP_FULL says: results.json is uploaded only when a job fails, so a flake that passed on its retry left only
+      // 'N earlier lines not shown' and nothing to name its failing check (board_icon_buttons_browser on Windows, #14833).
       for (const x of attempts.filter(x => x.status !== 'pass')) {
-        console.log(failingOutput(x.out, { keep: 30, full: !!process.env.CDP_FULL }).map(l => '      ' + l).join('\n'));
+        console.log(failingOutput(x.out, { keep: 30, full: !!process.env.CDP_FULL || (status === 'flaky' && x !== final) }).map(l => '      ' + l).join('\n'));
       }
     }
   }));
