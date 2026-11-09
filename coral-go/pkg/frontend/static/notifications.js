@@ -106,6 +106,7 @@ export function showToast(message, isError = false, duration, opts = {}) {
         };
     }
     toastHost().appendChild(toast);
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(placeNotices); // the column is not drawn while it is empty, so it had no size when it was placed: place it again now it has one (the answer card is measured against the column's real width and height)
     watchPinnedBar();
     if (Number.isFinite(duration)) timer = setTimeout(dismiss, duration);
     return toast;
@@ -267,6 +268,7 @@ function placeNotices() {
 function joinColumn(toast) {
     for (const [k, v] of [["position", "static"], ["top", "auto"], ["right", "auto"], ["min-width", "0"], ["max-width", "none"], ["pointer-events", "auto"]]) toast.style.setProperty(k, v);
     toastHost().appendChild(toast);
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(placeNotices); // as showToast: the empty column had no size when it was last placed
     syncMenuOpen();
 }
 
