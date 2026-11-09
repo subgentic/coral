@@ -4,7 +4,11 @@
 
 import { loadStyles } from './lazy_styles.js';
 
-await loadStyles('dropbox.css'); // the block's own sheet, not at start (page_weight)
+// The block's own sheet loads when its section (Storage and cleanup) is shown, not when Settings opens (modals_lazy's cap) nor at start
+// (page_weight). The block is drawn either way; only its spacing waits for the sheet.
+const dropboxStyles = () => loadStyles('dropbox.css');
+const cleanupShown = () => { const p = document.getElementById('settings-pane-cleanup'); return !!p && !p.hidden; };
+document.addEventListener('coral-settings-group', e => { if (e.detail?.id === 'cleanup') dropboxStyles(); });
 const STATUS = '/api/dropbox/status';
 const POLL_MS = 2000;
 const POLL_FOR_MS = 5 * 60 * 1000; // a sign-in waits five minutes on the server side too
@@ -294,6 +298,7 @@ function render(st) {
 // loadDropbox reads the status and shows it; it returns the status (or null when it could not be read).
 export async function loadDropbox() {
     wire();
+    if (cleanupShown()) await dropboxStyles(); // opened straight on Storage and cleanup: styled before it draws
     let st = null;
     try {
         const r = await fetch(STATUS, { cache: 'no-store' });
