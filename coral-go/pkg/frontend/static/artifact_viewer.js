@@ -18,15 +18,6 @@ import { pushOverlay, popOverlay } from './overlay_history.js';
 import { setDialogHide } from './modal_chrome.js';
 import { browserLocal } from './safe_storage.js';
 
-// dropboxConnected says whether Dropbox is connected, for the Share via Dropbox item (#14944): read at most once a minute, false on any refusal
-// (through Coral Hub the status route is refused, so the item is never offered there).
-let _dbxAt = 0, _dbxOn = null;
-function dropboxConnected() {
-    if (_dbxOn && Date.now() - _dbxAt < 60_000) return _dbxOn;
-    _dbxAt = Date.now();
-    _dbxOn = fetch('/api/dropbox/status', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(j => !!(j && j.connected)).catch(() => false);
-    return _dbxOn;
-}
 import { loadStyles } from './lazy_styles.js';
 import { state } from './state.js';
 import { showToast } from './notifications.js';
@@ -41,6 +32,7 @@ const { makeDetails } = await importOnce('./details_disclosure.js'); // "Who can
 const { attachComments, commentBoard } = await importOnce('./artifact_comments.js');
 const { attachVersions } = await importOnce('./artifact_versions.js');
 const { attachReview } = await importOnce('./artifact_review.js');
+const { dropboxConnected } = await importOnce('./dropbox_connected.js'); // Share via Dropbox's entries (#14944): a lazy module loads it through importOnce, so a failed load is retried
 
 const HEX_RE = /^[a-f0-9]{64}$/;
 let _dialog = null;

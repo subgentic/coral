@@ -7,6 +7,7 @@ import { formatHourMinute } from './format.js';
 import { morphHtml } from './dom_morph.js';
 import { OPERATOR_ID, isOperatorId, escapeHtml, showToast, escapeAttr, getAgentColor, askBadge, externalMessageBadge, replyWithHtml, hubUserBadge, boardSenderName, renderBoardMessageBody, setBoardMentionNames, highlightMentionsIn, boardMessageColorStyle } from './utils.js';
 import { splitKey, keyLabel, boardFetch, isCloud, LOCAL_SERVER } from './server_base.js';
+
 import { groupTaskQueueRuns, renderTaskQueueRun } from './board_system_lines.js';
 const { threadItems } = await importOnce('./board_threads.js'); // a part of the board page's group
 const { setReplyStrip } = await importOnce('./board_reply_strip.js');
@@ -23,6 +24,7 @@ import { browserLocal } from './safe_storage.js';
 import { createBoardSearch } from './board_search.js';
 import { menuMove } from './menu_keys.js';
 import { state } from './state.js';
+const { dropboxConnected } = await importOnce('./dropbox_connected.js'); // Share via Dropbox's entries (#14944): a lazy module loads it through importOnce, so a failed load is retried
 
 // ── Board (right-panel tab) ──────────────────────────────────────
 let _boardChatTimer = null;
@@ -479,15 +481,6 @@ function _updateBoardChatSelectBar() {
     bar.style.display = '';
     // Share via Dropbox (#14944): this computer's own board, outside Coral Hub, while Dropbox is connected.
     if (!isCloud() && splitKey(_activeBoardChat).server === LOCAL_SERVER) dropboxConnected().then(on => { const b = bar.querySelector('.board-chat-share-dropbox'); if (b && on) b.hidden = false; });
-}
-
-// dropboxConnected: whether Dropbox is connected, read at most once a minute (false on any refusal; through Coral Hub the read is refused).
-let _dbxAt = 0, _dbxOn = null;
-function dropboxConnected() {
-    if (_dbxOn && Date.now() - _dbxAt < 60_000) return _dbxOn;
-    _dbxAt = Date.now();
-    _dbxOn = fetch('/api/dropbox/status', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(j => !!(j && j.connected)).catch(() => false);
-    return _dbxOn;
 }
 
 /** Share via Dropbox (#14944): the selected messages, oldest first, as one page built and previewed by the server. */

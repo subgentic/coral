@@ -75,6 +75,7 @@ type fakeDropbox struct {
 	revokeFail  bool                  // revoke_shared_link answers 500
 	membersFail bool                  // add_file_member refuses the member
 	copies      int                   // copy_v2 calls
+	checkFail   string                // the sharing check (list_shared_links with no path) answers 409 with this summary
 }
 
 type fakeLink struct {

@@ -34,6 +34,10 @@ import (
 	"github.com/subgentic/coral/internal/store"
 )
 
+// signInAgainText is the answer when Dropbox says this sign-in may not share: the Coral app in the Dropbox App Console needs sharing.write and
+// sharing.read, and a sign-in made before they were added must be made again (#198059: the app lacked them in the Operator's walk).
+const signInAgainText = "Dropbox does not allow this sign-in to share. In the Dropbox App Console, the Coral app needs the sharing.write and sharing.read permissions; then sign in to Dropbox again."
+
 const (
 	shareRoot       = "/Shared from Coral"
 	shareExpiry     = 30 * 24 * time.Hour
@@ -388,11 +392,17 @@ func shareRefusal(code, msg string) map[string]any { return map[string]any{"code
 // link. Any failure after the copy undoes it (people removed, links revoked, the copy deleted at its rev) before answering.
 func (b *DropboxBackup) share(ctx context.Context, cl *dropbox.Client, access, account, kind, digest string, src shareSource, name, audience string,
 	emails []string, expires time.Time) (map[string]any, int, map[string]any) {
-	if err := cl.CanShare(ctx, access); err != nil { // an older sign-in is told before anything is made
-		if errors.Is(err, dropbox.ErrMissingScope) {
-			return nil, http.StatusForbidden, shareRefusal("sign_in_again", "To share, sign in to Dropbox again to allow sharing")
+	if err := cl.CanShare(ctx, access); err != nil { // an older sign-in, or an app without the sharing permissions, is told before anything is made
+		var wait *dropbox.RateLimited
+		switch {
+		case errors.Is(err, dropbox.ErrMissingScope):
+			return nil, http.StatusForbidden, shareRefusal("sign_in_again", signInAgainText)
+		case errors.As(err, &wait):
+			return nil, http.StatusTooManyRequests, shareRefusal("dropbox_wait", fmt.Sprintf("Dropbox asked Coral to wait %s; nothing was shared. Try again then.", wait.After))
 		}
-		return nil, http.StatusBadGateway, shareRefusal("dropbox", "Could not reach Dropbox; nothing was shared")
+		// The client's errors carry Dropbox's tag only (never a body, token or link): said and logged, so a failure names its cause (#198059).
+		slog.Warn("[dropbox] the sharing check failed", "error", err.Error())
+		return nil, http.StatusBadGateway, shareRefusal("dropbox", "Dropbox refused the sharing check ("+err.Error()+"); nothing was shared")
 	}
 	folder := shareRoot + "/" + shareFolder(src.team)
 	taken := map[string]bool{}
@@ -435,7 +445,7 @@ func (b *DropboxBackup) share(ctx context.Context, cl *dropbox.Client, access, a
 	if err != nil {
 		_ = b.outbox.ShareGone(ctx, id)
 		if errors.Is(err, dropbox.ErrMissingScope) {
-			return nil, http.StatusForbidden, shareRefusal("sign_in_again", "To share, sign in to Dropbox again to allow sharing")
+			return nil, http.StatusForbidden, shareRefusal("sign_in_again", signInAgainText)
 		}
 		return nil, http.StatusBadGateway, shareRefusal("copy", "Could not make the copy to share; nothing was shared")
 	}
@@ -480,7 +490,7 @@ func (b *DropboxBackup) share(ctx context.Context, cl *dropbox.Client, access, a
 		case stopErr != nil:
 			return nil, http.StatusBadGateway, shareRefusal("still_shared", "Sharing failed part way and Coral could not undo it yet: Settings lists it with Stop sharing")
 		case errors.Is(err, dropbox.ErrMissingScope):
-			return nil, http.StatusForbidden, shareRefusal("sign_in_again", "To share, sign in to Dropbox again to allow sharing")
+			return nil, http.StatusForbidden, shareRefusal("sign_in_again", signInAgainText)
 		case errors.Is(err, dropbox.ErrLinkSettings):
 			return nil, http.StatusConflict, shareRefusal("settings", "Your Dropbox plan does not allow this kind of link")
 		}
