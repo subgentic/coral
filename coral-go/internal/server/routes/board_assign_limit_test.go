@@ -109,3 +109,98 @@ func TestTheLimitIsTheTeamsOwnAndZeroTurnsItOff(t *testing.T) {
 	require.NoError(t, handler.bs.SetHealthSettings(t.Context(), "team", s))
 	assert.Equal(t, http.StatusCreated, add("Orchestrator"), "a higher limit lets more through")
 }
+
+func subscribeAgents(t *testing.T, base string, names ...string) {
+	t.Helper()
+	for _, n := range names {
+		postJSON(t, base+"/subscribe", map[string]string{"subscriber_id": n, "job_title": "Developer", "session_name": "claude-" + strings.ReplaceAll(n, " ", "-")}).Body.Close()
+	}
+}
+
+// QA's L8 (#14948): editing a task's assignee is an assignment too: past the limit it answers 409 with the options, and --force goes through and is recorded on the board.
+func TestEditingATasksAssigneePastTheLimitIsRefusedAndForceIsRecorded(t *testing.T) {
+	server, handler := setupBoardTestServer(t)
+	registerTaskPlanner(t, handler, "team", "Orchestrator")
+	base := server.URL + "/api/board/team"
+	subscribeAgents(t, base, "Dev A", "Dev B")
+	for i := 0; i < 3; i++ {
+		resp := postJSON(t, base+"/tasks", map[string]any{"title": "work", "created_by": "Orchestrator", "assigned_to": "Dev A"})
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+		resp.Body.Close()
+	}
+	resp := postJSON(t, base+"/tasks", map[string]any{"title": "for B", "created_by": "Orchestrator", "assigned_to": "Dev B"})
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	id := int64(readBody(t, resp)["id"].(float64))
+
+	resp = patchJSON(t, base+"/tasks/"+itoa(id), map[string]any{"subscriber_id": "Orchestrator", "assigned_to": "Dev A"})
+	require.Equal(t, http.StatusConflict, resp.StatusCode, "an edit of the assignee past the limit is refused")
+	out := readBody(t, resp)
+	assert.Equal(t, "assignee_overloaded", out["code"])
+	assert.Contains(t, out["error"], "Dev A has 3 waiting")
+	task, err := handler.bs.GetTask(t.Context(), "team", id)
+	require.NoError(t, err)
+	assert.Equal(t, "Dev B", *task.AssignedTo, "nothing was changed")
+
+	resp = patchJSON(t, base+"/tasks/"+itoa(id), map[string]any{"subscriber_id": "Orchestrator", "assigned_to": "Dev A", "force": true})
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	resp.Body.Close()
+	task, _ = handler.bs.GetTask(t.Context(), "team", id)
+	assert.Equal(t, "Dev A", *task.AssignedTo)
+	require.Eventually(t, func() bool {
+		msgs, _ := handler.bs.ListMessages(t.Context(), "team", 50, 0, 0)
+		for _, m := range msgs {
+			if strings.Contains(m.Content, "[Task #"+itoa(id)+" assigned to Dev A past the limit (3 waiting) by Orchestrator with --force]") {
+				return true
+			}
+		}
+		return false
+	}, 2*time.Second, 20*time.Millisecond, "a forced edit is recorded on the board with who forced it")
+}
+
+// QA's L3 (#14948): an agent that creates a task for itself while over the limit is not refused (its own plan is not an assignment to it); someone else assigning to the same agent is.
+func TestAnAgentCreatingATaskForItselfOverTheLimitIsNotRefused(t *testing.T) {
+	server, handler := setupBoardTestServer(t)
+	registerTaskPlanner(t, handler, "team", "Orchestrator")
+	base := server.URL + "/api/board/team"
+	_, err := handler.bs.Subscribe(t.Context(), "team", "Lead A", "Orchestrator", "claude-lead-a", nil, "all") // a planner with a session of its own: it may create tasks, and be assigned them
+	require.NoError(t, err)
+	for i := 0; i < 3; i++ {
+		resp := postJSON(t, base+"/tasks", map[string]any{"title": "work", "created_by": "Orchestrator", "assigned_to": "Lead A"})
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+		resp.Body.Close()
+	}
+	resp := postJSON(t, base+"/tasks", map[string]any{"title": "by someone else", "created_by": "Orchestrator", "assigned_to": "Lead A"})
+	assert.Equal(t, http.StatusConflict, resp.StatusCode, "another's assignment past the limit is refused")
+	resp.Body.Close()
+	resp = postJSON(t, base+"/tasks", map[string]any{"title": "my own plan", "created_by": "Lead A", "assigned_to": "Lead A"})
+	assert.Equal(t, http.StatusCreated, resp.StatusCode, "its own task for itself is not")
+	resp.Body.Close()
+}
+
+// QA's L7 (#14948): the refusal names at most 5 less loaded agents, the least loaded first.
+func TestTheRefusalNamesAtMostFiveLessLoadedAgents(t *testing.T) {
+	server, handler := setupBoardTestServer(t)
+	registerTaskPlanner(t, handler, "team", "Orchestrator")
+	base := server.URL + "/api/board/team"
+	subscribeAgents(t, base, "Dev A", "Dev 1", "Dev 2", "Dev 3", "Dev 4", "Dev 5", "Dev 6", "Dev 7")
+	for i := 0; i < 3; i++ {
+		resp := postJSON(t, base+"/tasks", map[string]any{"title": "work", "created_by": "Orchestrator", "assigned_to": "Dev A"})
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+		resp.Body.Close()
+	}
+	for _, n := range []string{"Dev 1", "Dev 2"} { // two of the seven have one waiting each: they are the last of the options
+		resp := postJSON(t, base+"/tasks", map[string]any{"title": "work", "created_by": "Orchestrator", "assigned_to": n})
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+		resp.Body.Close()
+	}
+	resp := postJSON(t, base+"/tasks", map[string]any{"title": "more", "created_by": "Orchestrator", "assigned_to": "Dev A"})
+	require.Equal(t, http.StatusConflict, resp.StatusCode)
+	out := readBody(t, resp)
+	options := out["options"].([]any)
+	require.Len(t, options, 5, "seven agents are less loaded; five are named")
+	for _, o := range options {
+		assert.EqualValues(t, 0, o.(map[string]any)["waiting"], "the least loaded come first: the two with one waiting are cut")
+	}
+	assert.NotContains(t, out["error"], "Dev 1 (")
+	assert.NotContains(t, out["error"], "Dev 2 (")
+}
