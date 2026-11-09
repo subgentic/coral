@@ -440,7 +440,7 @@ export function refreshReviews(force = false, { reuse = false } = {}) {
     freshnessDirty = false;
     pending = Promise.all([reviewPager.refresh({ unchanged }), (!isCloud() || savedActivated ? savedPager.refresh({ unchanged }) : Promise.resolve([])), refreshActiveQuery(unchanged)]).then(([reviews, saved]) => {
         if (started !== revision) return;
-        if (!sourceSetChanged && [...reviews, ...saved].every(result => result === false)) return;
+        if (!sourceSetChanged && [...reviews, ...saved].every(result => result === false)) { changed(); return; } // nothing new, but the read that was out has ended: the list redraws (its signature holds the pages' loading state, so a draw that would be the same is skipped) (#14841)
         publishPages();
         if (typeof document !== 'undefined') importOnce('./operator_asks.js').then(m => m.refreshReviewAskVisibility()).catch(() => {});
         if (!errors.length) { finishedAt = Date.now(); finishedRev = revision; }
