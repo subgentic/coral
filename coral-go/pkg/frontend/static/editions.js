@@ -251,6 +251,7 @@ function _dismiss(choice) {
     el.hidden = !_available() || hidden;
     const again = document.querySelector('#welcome-screen [data-editions="show-home"]'); // a hidden strip can be shown again, under the cards (#10572)
     if (again) again.hidden = !_available() || !hidden;
+    if (_available() && !hidden) importOnce('./home_own_hub.js').then(m => m.syncOwnHub()).catch(() => {}); // the Run your own hub box's state (#14976)
 }
 
 // A server enrolled with the hub's old host (#3546, hub_moved; the header indicator reports the

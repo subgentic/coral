@@ -64,6 +64,11 @@ async function waitForRestart(wantHub) {
     if (status) status.textContent = 'Coral has not come back yet. If it does not, start it again.';
 }
 
+/** The home page's shortcut uses the SAME route and the same restart (#14976): the saved state; save a change (it applies at the next start); restart Coral and reload once it is back as asked. No second implementation. */
+export const readHubMode = () => call('GET');
+export async function saveHubMode(enabled) { _gen++; const st = await call('PUT', { enabled: !!enabled }); render(st); return st; } // (render keeps Settings' own row in step when it is on the page)
+export async function restartForHubMode(wantHub) { await call('POST', {}); waitForRestart(!!wantHub); }
+
 /** Load the current state into the section (called when Settings opens). */
 let _gen = 0; // each read and each change takes the next number: an answer of an earlier one is not drawn (#14900: a read asked for before the person's change and answered after it put the old state back over it)
 export async function loadHubModeSetting() {
