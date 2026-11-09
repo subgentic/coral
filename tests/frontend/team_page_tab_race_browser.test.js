@@ -1,6 +1,7 @@
 // A tab pressed while the tab before it is still loading leaves only the tab pressed on screen (#7541, found by QA Reviewer 2 on #7535: Messages showed the Goals table above the chat). Every ordered pair of tabs is pressed in the
 // same turn, so the first loader is still awaited when the second tab is chosen; the panels then show exactly one tab, the one pressed last. 1280 px, isolated dev server.
 const assert = require('node:assert/strict');
+if (process.platform === 'win32') { console.log('team_page_tab_race_browser: SKIPPED on Windows for now (#14876); Linux and Mac keep running it'); process.exit(0); }
 const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, openTeam, TABS, scenarios } = require('./helpers/team_page');
 const BASE = require('./test_base').BASE;

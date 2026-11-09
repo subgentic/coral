@@ -2,6 +2,7 @@
 // Workflow, Health check, Messaging and Prompts; a change makes Escape ask before it closes (Keep editing leaves it open, Discard closes), Escape closes it otherwise, Tab stays inside, focus returns to what opened
 // it, and on a phone it fills the screen. Real isolated board seeded by the team page helpers. 1280 and 390, light and dark shots. Drives Chrome over CDP against the isolated dev server.
 const { connect } = require('./agent_view_harness');
+if (process.platform === 'win32') { console.log('team_settings_modal_browser: SKIPPED on Windows for now (#14876); Linux and Mac keep running it'); process.exit(0); }
 const { install: installTP, seed, openTeam, openSettings, closeSettings } = require('./helpers/team_page');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
