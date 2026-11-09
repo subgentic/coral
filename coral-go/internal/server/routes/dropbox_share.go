@@ -399,7 +399,7 @@ func (b *DropboxBackup) share(ctx context.Context, cl *dropbox.Client, access, a
 	for _, n := range names {
 		taken[strings.ToLower(n)] = true
 	}
-	sh := store.DropboxShare{Digest: digest, Kind: store.DropboxShareArtifact, Audience: audience, People: len(emails), AccountID: account}
+	sh := store.DropboxShare{Digest: digest, Kind: store.DropboxShareArtifact, Audience: audience, People: len(emails), AccountID: account, Hash: dropbox.ContentHash(src.data)}
 	if !expires.IsZero() {
 		sh.ExpiresAt = expires.Format(time.RFC3339)
 	}
@@ -531,13 +531,16 @@ func (b *DropboxBackup) stopShare(ctx context.Context, cl *dropbox.Client, acces
 	if err := b.outbox.ShareStopping(ctx, sh.ID); err != nil {
 		return err
 	}
-	if sh.FileID == "" { // reserved, never copied: nothing in Dropbox is Coral's to stop
-		if m, err := cl.Metadata(ctx, access, sh.Path); err == nil {
-			sh.FileID, sh.Rev = m.FileID, m.Rev // a crash between the copy and recording it: the copy at the reserved path is this share's
-		} else if !errors.Is(err, dropbox.ErrNotFound) {
-			return err
-		} else {
+	if sh.FileID == "" { // reserved, never recorded as copied
+		m, err := cl.Metadata(ctx, access, sh.Path)
+		switch {
+		case err == nil && sh.Hash != "" && m.ContentHash == sh.Hash:
+			sh.FileID, sh.Rev = m.FileID, m.Rev // a crash between the copy and recording it: the file is this share's copy
+		case err == nil || errors.Is(err, dropbox.ErrNotFound):
+			// Nothing there, or a file that is not these bytes (the person put one at that name since): not Coral's, left alone.
 			return b.outbox.ShareGone(ctx, sh.ID)
+		default:
+			return err
 		}
 	}
 	// A sign-in without the sharing scopes cannot have shared it, and cannot read or revoke what an earlier one did: deleting the copy below

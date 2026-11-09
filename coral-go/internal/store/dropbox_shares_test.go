@@ -12,7 +12,7 @@ import (
 )
 
 func aShare(path string) DropboxShare {
-	return DropboxShare{Path: path, Digest: "d1", Kind: DropboxShareArtifact, Audience: DropboxSharePublic, AccountID: "dbid:A"}
+	return DropboxShare{Path: path, Digest: "d1", Kind: DropboxShareArtifact, Audience: DropboxSharePublic, AccountID: "dbid:A", Hash: "h1"}
 }
 
 // #14944: a share is reserved, copied, made live, stopped and gone; the table never holds the link or who it was shared with.
