@@ -77,7 +77,7 @@ const { coralReady } = require('./helpers/wait');
         await t.to(3);
         await ev(`document.querySelector('#team-start-host .settings-tab[data-section="workflow"]').click(); true`);
         await waitFor(`!!document.querySelector('#team-start-host select[name=planning_approval]')`, 'the approval row', 5000);
-        const w = () => ev(`(() => { const h = document.querySelector('#team-start-host'), s = h.querySelector('select[name=planning_approval]'), rg = h.querySelector('[name=require_goal]'); return { value: s.value, options: [...s.options].map(o => o.value), requireGoal: rg.checked, rgDisabled: rg.disabled, state: h.querySelector('.settings-tab[data-section="workflow"] .menu-item-state').textContent, board: window.__launch.read().board }; })()`);
+        const w = () => ev(`(() => { const h = document.querySelector('#team-start-host'), s = h.querySelector('select[name=planning_approval]'), rg = h.querySelector('[name=require_goal]'); return { value: s.value, options: [...s.options].map(o => o.value), requireGoal: rg.checked, rgDisabled: rg.disabled, state: h.querySelector('.settings-tab[data-section="workflow"] .menu-item-state').textContent, help: (s.closest('.sv-row').querySelector('.sv-help-text, .sv-help') || {}).textContent || '', board: window.__launch.read().board }; })()`);
         await ev(`import(${S} + 'team_launch_settings.js').then(m => { window.__launch = { read: () => m.readTeamLaunchSettings() }; return true; })`);
         await ev(`(() => { const m = document.querySelector('#team-start-host select[name=mode]'); m.value = 'none'; m.dispatchEvent(new Event('input', { bubbles: true })); m.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); // the template the helper picks names a working mode, which the menu says first
         let n = await w();
@@ -100,6 +100,15 @@ const { coralReady } = require('./helpers/wait');
         assert.deepEqual([n.requireGoal, n.rgDisabled], [false, false], 'Fully autonomous is how teams were: no goal rule, and the switch is the person\'s again');
         assert.equal(n.board, null, 'and a new team on it is given nothing to save');
         assert.equal(n.state, 'no extra rules');
+        // the sentence under the menu is the one for the choice shown, first draw and after leaving the step and coming back (#14997: the Operator saw Fully autonomous over the goals sentence)
+        n = await w();
+        assert.equal(n.value, 'auto'); assert.match(n.help, /Agents plan freely/, 'Fully autonomous: its own sentence: ' + n.help);
+        await t.click('button', /^Back$/i); await t.step(2); await t.click('button', /^Next$/i); await t.step(3);
+        await ev(`document.querySelector('#team-start-host .settings-tab[data-section="workflow"]').click(); true`);
+        await waitFor(`!!document.querySelector('#team-start-host select[name=planning_approval]')`, 'the approval row again', 5000);
+        n = await w();
+        assert.equal(n.value, 'auto', 'the choice is kept across the steps');
+        assert.match(n.help, /Agents plan freely/, 'and so is its sentence, not the goals one: ' + n.help);
         console.log('   ✓ New team step');
         console.log('PASS approval presets: three names for the flags in Team settings and the New team step; a new team starts on Fully autonomous');
     } finally { await removeBoards(ev, [TEAM]).catch(() => {}); await client.close(); }
