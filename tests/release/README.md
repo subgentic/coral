@@ -93,3 +93,7 @@ program byte for byte TO's own tarball), 7 tmux (the agent's session and pane pr
 made-up data, compares with the previous release's shots, and files the contact sheet and the shots as Coral
 artifacts on the `UI review: vX.Y.Z` task. A plain script, no agent and no tokens; DevOps runs it after
 `verify-release`, and a failure never blocks the release. See `screens/README.md`.
+
+## msi_version_test.ps1: the version the MSI carries
+
+`powershell -NoProfile -ExecutionPolicy Bypass -File tests/release/msi_version_test.ps1` is a unit test of `ConvertTo-MsiVersion` in `tools/msi_version.ps1` (#365): the MSI's ProductVersion is the three numbers at the front of the tag (`1.4.167-rc1`, `1.4.167-dev` and `1.4.167` all carry `1.4.167`; `0.0.0-ci` carries `0.0.0`), and anything that is not X.Y.Z with an optional `-suffix` or `+suffix`, or does not fit Windows Installer's limits (major and minor to 255, build to 65535), is refused. It needs no msiexec, no build and no installed Coral.
