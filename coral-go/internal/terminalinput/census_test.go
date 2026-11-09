@@ -311,6 +311,7 @@ func TestEveryCallOfASenderPassesAReviewedOrigin(t *testing.T) {
 var reviewedOrigins = map[string]bool{
 	"cmd/launch-coral/main.go	launchAgentSessions	SendKeysToTarget	Internal":                                         true,
 	"internal/background/agent_exited.go	deliverAutomatedIfWanted	SendInput	Coral":                                   true,
+	"internal/background/context_compact.go	deliverCommand	SendInput	Coral":                                          true, // the CLI's own /compact or /clear and the cleared agent's fixed line, through DeliverAutomated (#14849)
 	"internal/background/launcher.go	AgentLauncher.startPromptDelivery	SendPrompt	?":                                 true, // AgentLauncher.SendPrompt, a method of its own that hands the prompt to the automated-input gate (Coral's text)
 	"internal/background/runtime_pty.go	PTYRuntime.SendEnter	SendInput	Internal":                                     true,
 	"internal/background/runtime_pty.go	PTYRuntime.SendInput	SendText	o":                                             true,
