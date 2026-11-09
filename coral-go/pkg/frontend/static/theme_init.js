@@ -18,6 +18,16 @@
         var m = document.querySelector('meta[name="theme-color"]'); // the first one: the one above
         if (m) m.setAttribute('content', barColour());
     }
+    // The launch notice's row (#14835): it is read after first paint, and arriving moved the page by its height. A browser that last saw it unseen kept a hint (a convenience only: the server's 409 gate is the authority), and its room is reserved
+    // here, before first paint, until the notice fills it (launch_disclosure.js releases it). The hint is for this kind of screen (phone or not: a phone's window is not its final width while the head is read, so its screen counts too), whose notice is that tall; the hub's pages and a pop-out never get the notice.
+    try {
+        var hint = /^([pd])\|(\d{1,3})$/.exec(localStorage.getItem('coral-launch-notice') || '');
+        if (hint && mode !== 'cloud' && (hint[1] === 'p') === (window.innerWidth <= 600 || screen.width <= 600) && location.pathname.indexOf('/agent/') !== 0 && document.head) {
+            var room = document.createElement('style'); room.id = 'launch-notice-room';
+            room.textContent = 'html[data-launch-notice]:not(:has(#launch-disclosure-banner)) .layout{margin-top:' + hint[2] + 'px}'; // the notice sits just above the layout (after the sign-in banner, which is in the page from the start, hidden until shown)
+            document.head.appendChild(room); document.documentElement.setAttribute('data-launch-notice', '1');
+        }
+    } catch (_) {}
     document.addEventListener('DOMContentLoaded', paintBar);
     new MutationObserver(paintBar).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 })();
