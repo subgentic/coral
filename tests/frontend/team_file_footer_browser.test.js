@@ -53,9 +53,10 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
             check(`${at}Star and Keep say what they do, and the menu is whole inside the window`, /Starred list/.test(menu.descs[menu.items.indexOf('Star')]) && /cleanup never deletes/.test(menu.descs[menu.items.indexOf('Keep')]) && menu.inside, JSON.stringify(menu));
             // Star toggles in the menu
             await ev(`[...document.querySelectorAll('${PANE} .detail-foot [role=menuitemcheckbox]')].find(b => b.querySelector('.more-item-label').textContent === 'Star').click(); true`);
-            await waitFor(`[...document.querySelectorAll('${PANE} .detail-foot [role=menuitemcheckbox]')].some(b => b.getAttribute('aria-checked') === 'true' && b.querySelector('.more-item-label').textContent === 'Starred')`, `${at}Star turns to Starred in the menu`, 6000);
+            await waitFor(`[...document.querySelectorAll('${PANE} .detail-foot [role=menuitemcheckbox]')].some(b => b.getAttribute('aria-checked') === 'true' && b.querySelector('.more-item-label').textContent === 'Star')`, `${at}Star is checked in the menu and keeps its name (the state is aria-checked, not a new label)`, 6000);
+            check(`${at}no menu item repeats its description as a title`, await ev(`[...document.querySelectorAll('${PANE} .detail-foot [role^=menuitem]')].every(b => !b.querySelector('.more-item-desc') || !b.title)`));
             check(`${at}choosing an item closes the menu and the focus is back on More`, await ev(`document.querySelector('${PANE} .detail-foot .task-more-btn').getAttribute('aria-expanded') === 'false' && document.activeElement === document.querySelector('${PANE} .detail-foot .task-more-btn')`));
-            await ev(`[...document.querySelectorAll('${PANE} .detail-foot [role=menuitemcheckbox]')].find(b => b.querySelector('.more-item-label').textContent === 'Starred').click(); true`); // back to unstarred: the next width starts clean
+            await ev(`[...document.querySelectorAll('${PANE} .detail-foot [role=menuitemcheckbox]')].find(b => b.querySelector('.more-item-label').textContent === 'Star').click(); true`); // back to unstarred: the next width starts clean
             await press('Enter', 'Enter', 13); await press('Escape', 'Escape', 27);
             check(`${at}Escape closes the menu and keeps the focus on More`, await ev(`document.querySelector('${PANE} .detail-foot .task-more-btn').getAttribute('aria-expanded') === 'false' && document.activeElement === document.querySelector('${PANE} .detail-foot .task-more-btn')`));
         }

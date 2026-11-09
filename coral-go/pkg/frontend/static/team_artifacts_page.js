@@ -110,14 +110,14 @@ export function createArtifactsList({ inbox = false } = {}) {
     }
 
     const isOn = b => (b.getAttribute('role') === 'menuitemcheckbox' ? b.getAttribute('aria-checked') : b.getAttribute('aria-pressed')) === 'true'; // a toggle is a pressed button, or a checked item in the More menu
-    const setOn = (b, on, label) => { b.setAttribute(b.getAttribute('role') === 'menuitemcheckbox' ? 'aria-checked' : 'aria-pressed', String(on)); const l = b.querySelector('.more-item-label'); (l || b).textContent = label; };
+    const setOn = (b, on, label) => { if (b.getAttribute('role') === 'menuitemcheckbox') { b.setAttribute('aria-checked', String(on)); return; } b.setAttribute('aria-pressed', String(on)); b.textContent = label; }; // a menu item keeps its name (Star, Keep) and says its state with aria-checked; a button's name follows its state (#14972)
     async function toggleKeep(hex, name, button) {
         const on = !isOn(button);
         const r = await serverFetch(server(), `/api/artifacts/${hex}/keep`, { method: on ? 'PUT' : 'DELETE' }).catch(() => null); // on this list's own computer (the page's bare /api is the Hub's through the Hub, #12617)
         if (!r || !r.ok) { showToast(`Couldn't ${on ? 'keep' : 'release'} ${name}.`, true); return; }
         if (on) model.kept.add(hex); else model.kept.delete(hex);
         setOn(button, on, on ? 'Kept' : 'Keep');
-        button.title = on ? 'Kept: Coral\u2019s cleanup never deletes this file (click to release)' : 'Keep: Coral\u2019s cleanup never deletes this file';
+        if (button.getAttribute('role') !== 'menuitemcheckbox') button.title = on ? 'Kept: Coral\u2019s cleanup never deletes this file (click to release)' : 'Keep: Coral\u2019s cleanup never deletes this file';
         say(`${on ? 'Kept' : 'Released'} ${name}`);
     }
 
@@ -129,7 +129,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         item.starred = on;
         document.dispatchEvent(new CustomEvent('artifact-star-changed')); // the Inbox's Starred folder reads its artifacts again (#10258)
         setOn(button, on, on ? 'Starred' : 'Star');
-        button.title = on ? 'Starred (click to remove the star)' : 'Star: add it to your Starred list (it can still be cleaned up)';
+        if (button.getAttribute('role') !== 'menuitemcheckbox') button.title = on ? 'Starred (click to remove the star)' : 'Star: add it to your Starred list (it can still be cleaned up)';
         say(`${on ? 'Starred' : 'Unstarred'} ${name}`);
     }
 

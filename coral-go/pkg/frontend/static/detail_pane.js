@@ -100,7 +100,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     const rank = a => (a.danger ? 0 : a.primary ? 2 : 1); // the bar's one order: a danger button first (at the left edge), the primary last (#7684)
     const inMenu = actions.filter(a => a.menu); // menu: true, or its place in the menu (1 first); the secondary actions are one More menu (#14963: eight buttons in two rows were too much): the primary and Download stay buttons
     if (inMenu.length) {
-        const items = [...inMenu].sort((x, y) => (x.menu === true ? 5 : x.menu) - (y.menu === true ? 5 : y.menu) || (x.danger ? 1 : 0) - (y.danger ? 1 : 0)).map((a, i, all) => ({ label: a.label, description: a.description, title: a.title, danger: a.danger, pressed: a.pressed, run: b => (a.run ? a.run(b) : a.onclick?.()), separatorBefore: !!a.danger && i > 0 && !all[i - 1].danger }));
+        const items = [...inMenu].sort((x, y) => (x.menu === true ? 5 : x.menu) - (y.menu === true ? 5 : y.menu) || (x.danger ? 1 : 0) - (y.danger ? 1 : 0)).map((a, i, all) => ({ label: a.label, description: a.description, title: a.description ? undefined : a.title, danger: a.danger, pressed: a.pressed, run: b => (a.run ? a.run(b) : a.onclick?.()), separatorBefore: !!a.danger && i > 0 && !all[i - 1].danger }));
         foot.append(moreMenu('detail-more', items, { label: 'More actions for this file', wrapClass: 'detail-more', restoreFocus: true }));
     }
     for (const a of [...actions].filter(a => !a.menu).sort((x, y) => rank(x) - rank(y))) {
