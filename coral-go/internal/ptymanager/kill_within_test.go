@@ -46,7 +46,7 @@ func TestKillWithinDoesNotWaitForAProcessThatExitsOnSIGTERM(t *testing.T) {
 	if err := b.KillWithin(name, 3*time.Second); err != nil {
 		t.Fatal(err)
 	}
-	if took := time.Since(start); took > time.Second {
+	if took := time.Since(start); took > killBudget {
 		t.Fatalf("a process that exits on SIGTERM is not waited for past its exit: %v", took)
 	}
 	if err := b.KillWithin(name, time.Second); err == nil {
@@ -60,6 +60,10 @@ func TestKillWithinDoesNotWaitForAProcessThatExitsOnSIGTERM(t *testing.T) {
 // skipIfHangupIgnored: a process that starts with SIGHUP ignored (a test run under nohup, or from a detached script) passes that to every child
 // it starts, and a shell cannot undo it; a SIGHUP then ends nothing and the kill waits its grace, as it did before #4984. That is the
 // environment, not the code (it made both tests below fail on every run of a nohup'd epoch job, #4979).
+// killBudget is how long a kill that needs no grace may take. What these tests guard is that a SIGHUP ends the shell at once instead of the kill waiting out the whole 5 s grace (#4984): the budget sits
+// well under that, with room for the scans of the process table a kill does (they take a second on a busy computer under -race: 481 of 600 loaded runs took 1.0 to 1.2 s against a 1 s budget, #14881).
+const killBudget = 2500 * time.Millisecond
+
 func skipIfHangupIgnored(t *testing.T) {
 	t.Helper()
 	if signal.Ignored(syscall.SIGHUP) {
@@ -81,7 +85,7 @@ func TestKillEndsAProcessThatIgnoresSIGTERMButNotSIGHUPAtOnce(t *testing.T) {
 	if err := b.Kill(name); err != nil { // the full 5 s grace is on offer
 		t.Fatal(err)
 	}
-	if took := time.Since(start); took > time.Second {
+	if took := time.Since(start); took > killBudget {
 		t.Fatalf("a process that ignores SIGTERM but not SIGHUP ends at once, took %v", took)
 	}
 	if b.IsRunning(name) {
@@ -106,7 +110,7 @@ func TestKillEndsAnInteractiveShellWithinASecond(t *testing.T) {
 	if err := b.Kill(name); err != nil {
 		t.Fatal(err)
 	}
-	if took := time.Since(start); took > time.Second {
-		t.Fatalf("an interactive shell ends within a second of Kill, took %v", took)
+	if took := time.Since(start); took > killBudget {
+		t.Fatalf("an interactive shell ends within %v of Kill (not the whole grace), took %v", killBudget, took)
 	}
 }
