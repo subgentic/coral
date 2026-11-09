@@ -763,5 +763,6 @@ export function dataTable(cfg) {
     }
     if (typeof ResizeObserver === 'function') new ResizeObserver(() => applyWidths()).observe(box); // every column is laid out again whenever the box changes (the elastic column takes what the others leave)
     mailQuery?.addEventListener?.('change', () => { box.classList.toggle('dt-mail-on', mailOn()); drawBody(); cfg.onModeChange?.(); }); // the window crosses the phone's width: the rows are drawn again in the other form; a list whose selection exists on a phone only (selectable is decided when the spec is drawn) asks its owner to draw the table again
+    if (sel) box.addEventListener('keydown', e => { if (e.key === 'Escape' && st.selected.size && !e.defaultPrevented && !e.target.closest?.('input[type=text], input[type=search], textarea, [role=menu], dialog')) { e.preventDefault(); clear(); } }); // Escape leaves the selection (#15015); a menu, a field or a dialog keeps its own Escape
     return { el: box, bar, selectButton, selection: () => new Set(st.selected), clear, state: st };
 }
