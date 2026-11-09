@@ -449,6 +449,7 @@ func TestIdentityQueryReadsAreClassified(t *testing.T) {
 // names a thing the request is about (a member named in a path is a target, as the group member
 // to remove). A new one, such as {subscriberID}, fails here until it is classified.
 var knownPathParams = map[string]string{
+	"doc":          "an edit made in Dropbox, by its document id (32 hex, checked): a target; only the Operator on this computer decides it (refuseCloud), and only for the account connected now (#14714)",
 	"project":      "the board (an id or a label); the identity layer resolves it and compares it with the token's board",
 	"name":         "the thing addressed by name: a live session, a theme, a team, an agent template, a workflow by name: a target",
 	"sessionID":    "a session addressed (live, history, or a group member to remove): a target",

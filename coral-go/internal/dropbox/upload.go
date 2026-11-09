@@ -1,0 +1,544 @@
+package dropbox
+
+// The calls Dropbox stage 4's upload worker makes (#14655): upload sessions committed in batches (never overwriting: mode add, strict_conflict),
+// file metadata, space usage, and Dropbox's content hash. Through the same gated client as the sign-in; errors carry a tag only.
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+)
+
+var (
+	// ErrNotFound: Dropbox has no file at that path.
+	ErrNotFound = errors.New("Dropbox has no file there")
+	// ErrAccessExpired: the access token expired; refresh it and try again.
+	ErrAccessExpired = errors.New("the Dropbox access token expired")
+)
+
+// RateLimited is Dropbox asking Coral to slow down, with how long to wait.
+type RateLimited struct{ After time.Duration }
+
+func (r *RateLimited) Error() string { return fmt.Sprintf("Dropbox asked Coral to wait %s", r.After) }
+
+const blockSize = 4 << 20
+
+// ContentHash is Dropbox's content_hash of data: SHA-256 over the SHA-256 of each 4 MiB block.
+func ContentHash(data []byte) string {
+	var all []byte
+	for i := 0; i < len(data); i += blockSize {
+		end := i + blockSize
+		if end > len(data) {
+			end = len(data)
+		}
+		h := sha256.Sum256(data[i:end])
+		all = append(all, h[:]...)
+	}
+	sum := sha256.Sum256(all)
+	return hex.EncodeToString(sum[:])
+}
+
+// apiError is Dropbox's error answer, of which only the summary's first tag is kept.
+type apiError struct {
+	Summary string `json:"error_summary"`
+}
+
+func (c *Client) do(req *http.Request, access string, out any) error {
+	_, err := c.doHeader(req, access, out)
+	return err
+}
+
+// doHeader is do, also returning the answer's headers (for Dropbox's Date: stage 4b's clock check).
+func (c *Client) doHeader(req *http.Request, access string, out any) (http.Header, error) {
+	req.Header.Set("Authorization", "Bearer "+access)
+	req.Header.Set("User-Agent", c.userAgent)
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("could not reach Dropbox: %w", stripURL(err))
+	}
+	defer resp.Body.Close()
+	hdr := resp.Header
+	data, _ := io.ReadAll(io.LimitReader(resp.Body, maxBody))
+	if resp.StatusCode == http.StatusOK {
+		if out == nil {
+			return hdr, nil
+		}
+		if err := json.Unmarshal(data, out); err != nil {
+			return hdr, errors.New("Dropbox: an answer Coral does not understand")
+		}
+		return hdr, nil
+	}
+	return hdr, respError(resp, data)
+}
+
+// respError turns a refused answer into an error that carries Dropbox's tag only (never a token or a body).
+func respError(resp *http.Response, data []byte) error {
+	var e apiError
+	_ = json.Unmarshal(data, &e)
+	tag := strings.SplitN(e.Summary, "/", 2)[0]
+	switch {
+	case resp.StatusCode == http.StatusTooManyRequests || tag == "too_many_requests":
+		after := time.Second
+		if n, err := strconv.Atoi(strings.TrimSpace(resp.Header.Get("Retry-After"))); err == nil && n > 0 && n <= 3600 {
+			after = time.Duration(n) * time.Second
+		}
+		return &RateLimited{After: after}
+	case resp.StatusCode == http.StatusUnauthorized && tag == "expired_access_token":
+		return ErrAccessExpired
+	case resp.StatusCode == http.StatusConflict && strings.Contains(e.Summary, "not_found"):
+		return ErrNotFound
+	}
+	if !validTag(tag) {
+		tag = "unknown"
+	}
+	return fmt.Errorf("Dropbox: %d %s", resp.StatusCode, tag)
+}
+
+func (c *Client) rpc(ctx context.Context, access, endpoint string, arg, out any) error {
+	var body io.Reader = http.NoBody
+	if arg != nil {
+		b, err := json.Marshal(arg)
+		if err != nil {
+			return err
+		}
+		body = bytes.NewReader(b)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.api+"/2/"+endpoint, body)
+	if err != nil {
+		return err
+	}
+	if arg != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	return c.do(req, access, out)
+}
+
+// StartSession sends a whole file as one closed upload session and returns its id, for a later batch commit.
+func (c *Client) StartSession(ctx context.Context, access string, data []byte) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.content+"/2/files/upload_session/start", bytes.NewReader(data))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req.Header.Set("Dropbox-API-Arg", `{"close":true}`)
+	var out struct {
+		SessionID string `json:"session_id"`
+	}
+	if err := c.do(req, access, &out); err != nil {
+		return "", err
+	}
+	if out.SessionID == "" {
+		return "", errors.New("Dropbox: no upload session id")
+	}
+	return out.SessionID, nil
+}
+
+// Commit is one finished upload session to commit at Path.
+type Commit struct {
+	SessionID string
+	Size      int64
+	Path      string
+}
+
+// CommitOutcome is how one commit of a batch ended.
+type CommitOutcome int
+
+// Commit outcomes.
+const (
+	CommitOK            CommitOutcome = iota
+	CommitConflict                    // a file already at that path: never overwritten
+	CommitNoSpace                     // the Dropbox account is full
+	CommitTooManyWrites               // Dropbox asked Coral to slow down its writes
+	CommitOther
+)
+
+// CommitResult is one commit's outcome; on CommitOK, what Dropbox stored.
+type CommitResult struct {
+	Outcome     CommitOutcome
+	FileID      string
+	Rev         string
+	ContentHash string
+}
+
+// FinishBatch commits up to 1,000 sessions in one call with mode add (a file already at a path is a conflict, never overwritten) and returns each
+// commit's outcome in order. A batch answered asynchronously is followed until it ends.
+func (c *Client) FinishBatch(ctx context.Context, access string, commits []Commit) ([]CommitResult, error) {
+	type cursor struct {
+		SessionID string `json:"session_id"`
+		Offset    int64  `json:"offset"`
+	}
+	type commitInfo struct {
+		Path           string `json:"path"`
+		Mode           string `json:"mode"`
+		Autorename     bool   `json:"autorename"`
+		Mute           bool   `json:"mute"`
+		StrictConflict bool   `json:"strict_conflict"`
+	}
+	type entry struct {
+		Cursor cursor     `json:"cursor"`
+		Commit commitInfo `json:"commit"`
+	}
+	arg := struct {
+		Entries []entry `json:"entries"`
+	}{}
+	for _, cm := range commits {
+		arg.Entries = append(arg.Entries, entry{Cursor: cursor{cm.SessionID, cm.Size}, Commit: commitInfo{Path: cm.Path, Mode: "add", Mute: true, StrictConflict: true}})
+	}
+	var out struct {
+		Tag     string            `json:".tag"`
+		JobID   string            `json:"async_job_id"`
+		Entries []json.RawMessage `json:"entries"`
+	}
+	if err := c.rpc(ctx, access, "files/upload_session/finish_batch_v2", arg, &out); err != nil {
+		return nil, err
+	}
+	for i := 0; out.Tag == "async_job_id" && i < 120; i++ {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(time.Second):
+		}
+		out.Tag = ""
+		if err := c.rpc(ctx, access, "files/upload_session/finish_batch/check", map[string]string{"async_job_id": out.JobID}, &out); err != nil {
+			return nil, err
+		}
+		if out.Tag == "in_progress" {
+			out.Tag = "async_job_id"
+		}
+	}
+	if len(out.Entries) != len(commits) {
+		return nil, errors.New("Dropbox: the batch answer does not match the commits")
+	}
+	res := make([]CommitResult, len(commits))
+	for i, raw := range out.Entries {
+		var e struct {
+			Tag         string          `json:".tag"`
+			ID          string          `json:"id"`
+			Rev         string          `json:"rev"`
+			ContentHash string          `json:"content_hash"`
+			Failure     json.RawMessage `json:"failure"`
+		}
+		_ = json.Unmarshal(raw, &e)
+		switch {
+		case e.Tag == "success":
+			res[i] = CommitResult{Outcome: CommitOK, FileID: e.ID, Rev: e.Rev, ContentHash: e.ContentHash}
+		case bytes.Contains(e.Failure, []byte(`"conflict"`)):
+			res[i] = CommitResult{Outcome: CommitConflict}
+		case bytes.Contains(e.Failure, []byte(`"insufficient_space"`)):
+			res[i] = CommitResult{Outcome: CommitNoSpace}
+		case bytes.Contains(e.Failure, []byte(`"too_many_write_operations"`)):
+			res[i] = CommitResult{Outcome: CommitTooManyWrites}
+		default:
+			res[i] = CommitResult{Outcome: CommitOther}
+		}
+	}
+	return res, nil
+}
+
+// Meta is what Dropbox says about a stored file.
+type Meta struct {
+	FileID      string
+	Rev         string
+	ContentHash string
+}
+
+// Metadata reads a file's id, rev and content hash. ErrNotFound when there is none.
+func (c *Client) Metadata(ctx context.Context, access, path string) (Meta, error) {
+	var out struct {
+		Tag         string `json:".tag"`
+		ID          string `json:"id"`
+		Rev         string `json:"rev"`
+		ContentHash string `json:"content_hash"`
+	}
+	if err := c.rpc(ctx, access, "files/get_metadata", map[string]string{"path": path}, &out); err != nil {
+		return Meta{}, err
+	}
+	if out.Tag != "file" {
+		return Meta{}, ErrNotFound
+	}
+	return Meta{FileID: out.ID, Rev: out.Rev, ContentHash: out.ContentHash}, nil
+}
+
+// SpaceUsage reads how much of the account is used and how much it has (bytes).
+func (c *Client) SpaceUsage(ctx context.Context, access string) (used, allocated int64, err error) {
+	used, allocated, _, err = c.SpaceUsageAt(ctx, access)
+	return used, allocated, err
+}
+
+// SpaceUsageAt is SpaceUsage with Dropbox's own time, from the answer's Date header (zero when there is none): stage 4b's clock check.
+func (c *Client) SpaceUsageAt(ctx context.Context, access string) (used, allocated int64, at time.Time, err error) {
+	var out struct {
+		Used       int64 `json:"used"`
+		Allocation struct {
+			Allocated int64 `json:"allocated"`
+		} `json:"allocation"`
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.api+"/2/users/get_space_usage", http.NoBody)
+	if err != nil {
+		return 0, 0, time.Time{}, err
+	}
+	hdr, err := c.doHeader(req, access, &out)
+	if err != nil {
+		return 0, 0, time.Time{}, err
+	}
+	if d, perr := http.ParseTime(hdr.Get("Date")); perr == nil {
+		at = d
+	}
+	return out.Used, out.Allocation.Allocated, at, nil
+}
+
+// Delete is one file for DeleteBatch: its path, and the rev it must still have (parent_rev), so a file changed in Dropbox since Coral stored it is
+// refused by Dropbox itself (stage 4b, Security's answer 1 on #14703: by path, never by id).
+type Delete struct {
+	Path string
+	Rev  string
+}
+
+// DeleteOutcome is how one delete of a batch ended.
+type DeleteOutcome int
+
+// Delete outcomes.
+const (
+	DeleteOK       DeleteOutcome = iota + 1
+	DeleteNotFound               // nothing at that path any more (moved, renamed or removed in Dropbox): left alone
+	DeleteRetry                  // too many writes, or Dropbox's own trouble: try again later
+	DeleteRefused                // anything else, a rev that no longer matches included: the file is kept and never retried
+)
+
+// DeleteBatch starts deleting files and returns the async job's id when Dropbox answers later, or the outcomes in order when it answered at once.
+func (c *Client) DeleteBatch(ctx context.Context, access string, dels []Delete) (job string, res []DeleteOutcome, err error) {
+	type entry struct {
+		Path      string `json:"path"`
+		ParentRev string `json:"parent_rev"`
+	}
+	arg := struct {
+		Entries []entry `json:"entries"`
+	}{}
+	for _, d := range dels {
+		if d.Rev == "" {
+			return "", nil, errors.New("a delete needs the rev Coral stored")
+		}
+		arg.Entries = append(arg.Entries, entry{Path: d.Path, ParentRev: d.Rev})
+	}
+	var out deleteJobAnswer
+	if err := c.rpc(ctx, access, "files/delete_batch", arg, &out); err != nil {
+		return "", nil, err
+	}
+	if out.Tag == "async_job_id" {
+		if out.JobID == "" {
+			return "", nil, errors.New("Dropbox: no delete job id")
+		}
+		return out.JobID, nil, nil
+	}
+	res, err = out.outcomes(len(dels))
+	return "", res, err
+}
+
+// ErrJobUnknown is a delete job Dropbox no longer knows (too old, or not this account's).
+var ErrJobUnknown = errors.New("Dropbox does not know that delete job")
+
+// DeleteBatchCheck reads a delete job once: done false while it is still running, else the outcomes in the order of the batch (n files).
+func (c *Client) DeleteBatchCheck(ctx context.Context, access, job string, n int) (done bool, res []DeleteOutcome, err error) {
+	var out deleteJobAnswer
+	if err := c.rpc(ctx, access, "files/delete_batch/check", map[string]string{"async_job_id": job}, &out); err != nil {
+		if strings.Contains(err.Error(), "invalid_async_job_id") || errors.Is(err, ErrNotFound) {
+			return false, nil, ErrJobUnknown
+		}
+		return false, nil, err
+	}
+	switch out.Tag {
+	case "in_progress":
+		return false, nil, nil
+	case "complete":
+		res, err = out.outcomes(n)
+		return true, res, err
+	default: // failed: the whole job, nothing deleted that Coral can count on; every file is tried again later
+		res = make([]DeleteOutcome, n)
+		for i := range res {
+			res[i] = DeleteRetry
+		}
+		return true, res, nil
+	}
+}
+
+type deleteJobAnswer struct {
+	Tag     string            `json:".tag"`
+	JobID   string            `json:"async_job_id"`
+	Entries []json.RawMessage `json:"entries"`
+}
+
+func (a deleteJobAnswer) outcomes(n int) ([]DeleteOutcome, error) {
+	if a.Tag != "complete" || len(a.Entries) != n {
+		return nil, errors.New("Dropbox: the delete answer does not match the batch")
+	}
+	res := make([]DeleteOutcome, n)
+	for i, raw := range a.Entries {
+		var e struct {
+			Tag     string          `json:".tag"`
+			Failure json.RawMessage `json:"failure"`
+		}
+		_ = json.Unmarshal(raw, &e)
+		switch {
+		case e.Tag == "success":
+			res[i] = DeleteOK
+		case bytes.Contains(e.Failure, []byte(`"too_many_write_operations"`)) || bytes.Contains(e.Failure, []byte(`"internal_error"`)) || bytes.Contains(e.Failure, []byte(`"too_many_files"`)):
+			res[i] = DeleteRetry
+		case bytes.Contains(e.Failure, []byte(`"path_lookup"`)) && bytes.Contains(e.Failure, []byte(`"not_found"`)):
+			res[i] = DeleteNotFound
+		default:
+			res[i] = DeleteRefused // a rev that no longer matches, or anything Coral does not know: keep the file
+		}
+	}
+	return res, nil
+}
+
+// Stage 5a (#14714): the listing that notices edits, and the download of exactly the listed rev.
+
+// ListEntry is one entry of a folder listing: a file (with its rev, size and content hash) or a deleted path.
+type ListEntry struct {
+	Tag         string `json:".tag"` // file, folder or deleted
+	PathLower   string `json:"path_lower"`
+	Rev         string `json:"rev"`
+	Size        int64  `json:"size"`
+	ContentHash string `json:"content_hash"`
+}
+
+// ListPage is one page of a listing. Pages are handled one at a time (Security's SHOULD H on #14714): never built into one list.
+type ListPage struct {
+	Entries []ListEntry `json:"entries"`
+	Cursor  string      `json:"cursor"`
+	HasMore bool        `json:"has_more"`
+}
+
+// ErrCursorReset is Dropbox saying the stored cursor is no longer valid: list again from the start.
+var ErrCursorReset = errors.New("Dropbox reset the listing cursor")
+
+// ListFolder starts a recursive listing of path.
+func (c *Client) ListFolder(ctx context.Context, access, path string) (ListPage, error) {
+	var p ListPage
+	err := c.rpc(ctx, access, "files/list_folder", map[string]any{"path": path, "recursive": true, "include_deleted": true, "limit": 2000}, &p)
+	return p, err
+}
+
+// ListFolderContinue reads the next page after cursor (the changes since it, once a listing is complete).
+func (c *Client) ListFolderContinue(ctx context.Context, access, cursor string) (ListPage, error) {
+	var p ListPage
+	err := c.rpc(ctx, access, "files/list_folder/continue", map[string]string{"cursor": cursor}, &p)
+	if err != nil && strings.Contains(err.Error(), " reset") {
+		return p, ErrCursorReset
+	}
+	return p, err
+}
+
+// ErrTooBig is a file over the caller's cap: refused from its declared size, or cut off while reading.
+var ErrTooBig = errors.New("Dropbox file over the size cap")
+
+// Downloaded is what Dropbox said about the file it sent.
+type Downloaded struct {
+	Rev         string `json:"rev"`
+	Size        int64  `json:"size"`
+	ContentHash string `json:"content_hash"`
+}
+
+// Download writes exactly the file's rev (rev:<rev>) to w, at most max bytes: a declared size over max is refused before any read, and the read is
+// cut at max plus one byte whatever Content-Length says (Security's MUST C on #14714). It returns Dropbox's own account of the file and the bytes
+// written.
+func (c *Client) Download(ctx context.Context, access, rev string, max int64, w io.Writer) (Downloaded, int64, error) {
+	var d Downloaded
+	if rev == "" {
+		return d, 0, errors.New("a download needs the rev")
+	}
+	arg, _ := json.Marshal(map[string]string{"path": "rev:" + rev})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.content+"/2/files/download", http.NoBody)
+	if err != nil {
+		return d, 0, err
+	}
+	req.Header.Set("Dropbox-API-Arg", string(arg))
+	req.Header.Set("Authorization", "Bearer "+access)
+	req.Header.Set("User-Agent", c.userAgent)
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return d, 0, fmt.Errorf("could not reach Dropbox: %w", stripURL(err))
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		data, _ := io.ReadAll(io.LimitReader(resp.Body, maxBody))
+		return d, 0, respError(resp, data)
+	}
+	if err := json.Unmarshal([]byte(resp.Header.Get("Dropbox-API-Result")), &d); err != nil {
+		return d, 0, errors.New("Dropbox: a download answer Coral does not understand")
+	}
+	if d.Size > max || resp.ContentLength > max {
+		return d, 0, ErrTooBig
+	}
+	n, err := io.Copy(w, io.LimitReader(resp.Body, max+1))
+	if err != nil {
+		return d, n, fmt.Errorf("Dropbox: the download stopped: %w", stripURL(err))
+	}
+	if n > max {
+		return d, n, ErrTooBig
+	}
+	return d, n, nil
+}
+
+// Stage 6a (#14814): explicit removal.
+
+// DeleteFolder starts deleting a whole folder (the backup's /v1, after the Operator's typed confirm): delete_batch with one entry and no
+// parent_rev, which Dropbox runs as a job for a big folder. It returns the job's id, or the outcome when Dropbox answered at once.
+func (c *Client) DeleteFolder(ctx context.Context, access, path string) (job string, res []DeleteOutcome, err error) {
+	if path == "" || path == "/" {
+		return "", nil, errors.New("never the whole app folder")
+	}
+	arg := map[string]any{"entries": []map[string]string{{"path": path}}}
+	var out deleteJobAnswer
+	if err := c.rpc(ctx, access, "files/delete_batch", arg, &out); err != nil {
+		return "", nil, err
+	}
+	if out.Tag == "async_job_id" {
+		if out.JobID == "" {
+			return "", nil, errors.New("Dropbox: no delete job id")
+		}
+		return out.JobID, nil, nil
+	}
+	res, err = out.outcomes(1)
+	return "", res, err
+}
+
+// ListNames lists the names directly in folder (one level; for the offload markers of a digest). ErrNotFound means the folder is not there;
+// any other error is returned as it is, so the caller fails closed (Security's 2a on #14814).
+func (c *Client) ListNames(ctx context.Context, access, folder string) ([]string, error) {
+	var names []string
+	var p struct {
+		Entries []struct {
+			Name string `json:"name"`
+		} `json:"entries"`
+		Cursor  string `json:"cursor"`
+		HasMore bool   `json:"has_more"`
+	}
+	if err := c.rpc(ctx, access, "files/list_folder", map[string]any{"path": folder, "recursive": false, "limit": 2000}, &p); err != nil {
+		return nil, err
+	}
+	for i := 0; ; i++ {
+		for _, e := range p.Entries {
+			names = append(names, e.Name)
+		}
+		if !p.HasMore || i > 100 {
+			break
+		}
+		cur := p.Cursor
+		p.Entries, p.HasMore = nil, false
+		if err := c.rpc(ctx, access, "files/list_folder/continue", map[string]string{"cursor": cur}, &p); err != nil {
+			return nil, err
+		}
+	}
+	return names, nil
+}

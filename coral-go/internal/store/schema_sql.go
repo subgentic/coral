@@ -545,6 +545,113 @@ CREATE TABLE IF NOT EXISTS cloud_connection (
     last_error TEXT
 );
 
+-- This database's Dropbox sign-in (#14609, Dropbox stage 3a). One row, made the first time the server id is asked for, and kept through a
+-- disconnect: server_id belongs to the database (a restored copy keeps it). refresh_token holds a "v1:" secretbox envelope bound to
+-- account_id as AAD, never plaintext; NULL when not connected. fingerprint is SHA-256 of fp_salt, the machine id and the data folder (never
+-- the machine id itself). last_account_id is the account of the last connection, so a connect to another account is a confirmed switch.
+CREATE TABLE IF NOT EXISTS dropbox_connection (
+    id              INTEGER PRIMARY KEY CHECK (id = 1),
+    server_id       TEXT NOT NULL,
+    fp_salt         TEXT NOT NULL,
+    account_id      TEXT,
+    last_account_id TEXT,
+    refresh_token   TEXT,
+    fingerprint     TEXT,
+    state           TEXT NOT NULL DEFAULT 'disconnected',
+    connected_at    TEXT,
+    filter_types    TEXT NOT NULL DEFAULT '',  -- stage 4 (#14655): the chosen extensions, comma-separated; '' is every type
+    max_age_days    INTEGER NOT NULL DEFAULT 0, -- only artifacts newer than this many days; 0 is no limit
+    retention_days      INTEGER NOT NULL DEFAULT 0, -- stage 4b (#14703): delete the Dropbox copies older than this many days; 0 is off (the default)
+    retention_since     TEXT,                       -- when the Operator confirmed it
+    retention_last_pass TEXT,                       -- the last retention pass (a local clock earlier than this refuses a pass)
+    list_cursor         TEXT,                       -- stage 5a (#14714): the listing cursor of /v1 for the account connected now; cleared by any new sign-in
+    autosync_off        INTEGER NOT NULL DEFAULT 0, -- 5a auto-sync (#14714, the Operator): 1 when the Operator turned off "Take edits made in Dropbox as new versions"
+    autosync_paused     TEXT NOT NULL DEFAULT ''    -- why auto-sync is paused ('' runs): signin (another account, a disconnect, a re-key) or breaker (too many in an hour)
+);
+
+-- Dropbox stage 4's outbox (#14655): one row per file to back up (an artifact version or its item_data sidecar), by its Dropbox path (ids only,
+-- never a name). artifact_at is the artifact's own time (newest first). Rows hold no names, request ids or bytes. state: queued (handed out when
+-- next_try_at has passed), done (file_id, rev and content_hash from Dropbox), conflict and skipped (parked, never handed out again), failed.
+CREATE TABLE IF NOT EXISTS dropbox_outbox (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind         TEXT NOT NULL,
+    digest       TEXT NOT NULL,
+    doc_id       TEXT NOT NULL,
+    version      INTEGER NOT NULL DEFAULT 1,
+    path         TEXT NOT NULL UNIQUE,
+    artifact_at  TEXT NOT NULL,
+    state        TEXT NOT NULL DEFAULT 'queued',
+    attempts     INTEGER NOT NULL DEFAULT 0,
+    next_try_at  TEXT NOT NULL DEFAULT '',
+    file_id      TEXT,
+    rev          TEXT,
+    content_hash TEXT,
+    secret_flag  INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT NOT NULL,
+    done_at      TEXT,
+    account_id   TEXT,                      -- stage 4b (#14703): the Dropbox account the file was stored in (retention reads only the current one's)
+    size         INTEGER NOT NULL DEFAULT 0, -- its bytes, for retention's dry-run count
+    delete_job   TEXT                       -- a retention delete job still running for this row (state deleting)
+);
+CREATE INDEX IF NOT EXISTS idx_dropbox_outbox_due ON dropbox_outbox(state, next_try_at, artifact_at);
+
+-- Dropbox stage 5a (#14714): edits made in Dropbox, held for the Operator. The edited bytes are an object (digest) with NO upload record until a
+-- decision, so nothing that lists, searches, links, grants or serves uploads can show them. One pending row a document (a newer edit replaces it).
+-- path is the ledger's own path (a Coral-made string), never anything from a listing. state: pending, deciding (a decision being written: retention
+-- still holds it), promoted, separate.
+CREATE TABLE IF NOT EXISTS dropbox_edits (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id  TEXT NOT NULL,
+    doc_id      TEXT NOT NULL,
+    version     INTEGER NOT NULL,
+    orig_digest TEXT NOT NULL,
+    path        TEXT NOT NULL,
+    digest      TEXT NOT NULL,
+    media_type  TEXT NOT NULL,
+    size        INTEGER NOT NULL,
+    rev         TEXT NOT NULL,
+    state       TEXT NOT NULL DEFAULT 'pending',
+    seen_at     TEXT NOT NULL,
+    decided_at  TEXT,
+    result      TEXT NOT NULL DEFAULT ''
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_dropbox_edits_open ON dropbox_edits(doc_id) WHERE state IN ('pending', 'deciding');
+
+-- Removals from Dropbox after the Operator deleted an artifact here (#14814, the Operator's answer 3 and Security's conditions on it): one row an
+-- object, queued by the Operator's own delete only, run by the backup worker once due_at has passed (a 24-hour grace), retried with backoff,
+-- cancelled by an upload of the same bytes. state: waiting; held (many deletes at once: nothing goes until the Operator confirms in Settings);
+-- kept (another Coral keeps it only in Dropbox, or its markers could not be read: left alone, listed); edited (edited in Dropbox: listed with
+-- Remove anyway). A finished removal leaves no row (the outbox rows say removed). name is the file's name when it was deleted, for Settings only.
+CREATE TABLE IF NOT EXISTS dropbox_removals (
+    digest      TEXT PRIMARY KEY,
+    name        TEXT NOT NULL DEFAULT '',
+    state       TEXT NOT NULL,
+    queued_at   TEXT NOT NULL,
+    due_at      TEXT NOT NULL,
+    next_try_at TEXT NOT NULL DEFAULT '',
+    attempts    INTEGER NOT NULL DEFAULT 0,
+    reason      TEXT NOT NULL DEFAULT '',
+    others      TEXT NOT NULL DEFAULT '',
+    unknown     INTEGER NOT NULL DEFAULT 0,
+    edited      TEXT NOT NULL DEFAULT ''
+);
+
+-- Dropbox stage 4b's audit (#14703): each retention setting change (who, old and new days, the dry-run count the page showed) and each retention
+-- pass (counts and bytes). Never a name, path, digest or token. The newest 500 rows are kept.
+CREATE TABLE IF NOT EXISTS dropbox_audit (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    at       TEXT NOT NULL,
+    kind     TEXT NOT NULL,              -- setting or pass
+    who      TEXT NOT NULL DEFAULT '',   -- operator (the person at this computer) for a setting; '' for a pass
+    old_days INTEGER NOT NULL DEFAULT 0,
+    new_days INTEGER NOT NULL DEFAULT 0,
+    count    INTEGER NOT NULL DEFAULT 0, -- a setting: the dry-run count shown; a pass: files deleted
+    bytes    INTEGER NOT NULL DEFAULT 0,
+    held     INTEGER NOT NULL DEFAULT 0, -- a pass: due files left for later by the ceiling
+    reason   TEXT NOT NULL DEFAULT ''    -- a pass that deleted nothing: the reason word (clock_behind, clock_skew, ...); an edit decision: promoted or separate
+);
+CREATE INDEX IF NOT EXISTS idx_dropbox_outbox_digest ON dropbox_outbox(digest);
+
 -- Coral Hub enrollment in progress, and its rate limit (one row). The device code is
 -- sealed like the server token. Kept across restarts so a restart loop reuses one code
 -- instead of asking the hub for a new one each time.

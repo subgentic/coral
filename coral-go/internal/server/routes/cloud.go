@@ -19,6 +19,9 @@ import (
 
 // CloudHandler serves the "Connect to Coral Hub" settings section.
 type CloudHandler struct {
+	// dbx is the Dropbox sign-in (#14609), set by SetDropbox; nil in a build or test without it.
+	dbx *dropboxRoutes
+
 	// OfferAtLaunch is config.OffersCloudConnect (#3459), set by the server.
 	OfferAtLaunch bool
 

@@ -510,6 +510,32 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Get("/api/cloud/status", s.cloudHandler.GetStatus)
 	r.Post("/api/cloud/connect", s.cloudHandler.Connect)
 	r.Post("/api/cloud/connect/cancel", s.cloudHandler.CancelConnect)
+	// Dropbox sign-in (#14609): the Operator's, from this computer's dashboard only.
+	s.cloudHandler.SetDropbox(store.NewDropboxStore(s.db, store.NewRemoteServerStore(s.db, s.cfg.CoralDir())), s.cfg.CoralDir())
+	r.Get("/api/dropbox/status", s.cloudHandler.DropboxStatus)
+	r.Post("/api/dropbox/connect", s.cloudHandler.DropboxConnect)
+	r.Post("/api/dropbox/disconnect", s.cloudHandler.DropboxDisconnect)
+	r.Post("/api/dropbox/switch", s.cloudHandler.DropboxConfirmSwitch)
+	r.Post("/api/dropbox/takeover", s.cloudHandler.DropboxTakeOver)
+	r.Put("/api/dropbox/filters", s.cloudHandler.DropboxSetFilters)                 // stage 4 (#14655): what to back up
+	r.Post("/api/dropbox/check", s.cloudHandler.DropboxCheckAgain)                  // stage 4c (#14693): Check again after freeing space
+	r.Put("/api/dropbox/retention", s.cloudHandler.DropboxSetRetention)             // stage 4b (#14703): Keep in Dropbox for N days
+	r.Put("/api/dropbox/autosync", s.cloudHandler.DropboxSetAutoSync)               // 5a auto-sync (#14714): take edits made in Dropbox as new versions
+	r.Post("/api/dropbox/undo/{digest}", s.cloudHandler.DropboxUndoEdit)            // auto-sync: undo an edit made in Dropbox that became the newest version
+	r.Post("/api/dropbox/edits/{doc}/promote", s.cloudHandler.DropboxPromoteEdit)   // stage 5a (#14714): use an edit made in Dropbox as the next version
+	r.Post("/api/dropbox/edits/{doc}/separate", s.cloudHandler.DropboxSeparateEdit) // stage 5a: keep it as its own artifact
+	r.Post("/api/dropbox/remove/{digest}", s.cloudHandler.DropboxRemove)            // stage 6a (#14814): remove an artifact from Dropbox
+	r.Get("/api/dropbox/removals", s.cloudHandler.DropboxRemovals)                  // #14814 rework: removals after a delete here (Settings)
+	r.Post("/api/dropbox/removals/cancel", s.cloudHandler.DropboxCancelRemovals)    // keep files in Dropbox: one, the waiting or the held
+	r.Post("/api/dropbox/removals/confirm", s.cloudHandler.DropboxConfirmRemovals)  // let the held removals go
+	r.Post("/api/dropbox/resend/{digest}", s.cloudHandler.DropboxResend)            // stage 6a: send a removed artifact to Dropbox again
+	r.Get("/api/dropbox/artifact/{digest}", s.cloudHandler.DropboxArtifact)         // stage 6a: what the backup holds of one artifact
+	// The Dropbox backup worker (#14655): one background loop; a pass every five minutes or soon after an upload, only while connected.
+	dbxBackup := s.cloudHandler.NewDropboxBackup(store.NewDropboxOutbox(s.db))
+	if s.boardStore != nil {
+		dbxBackup.SetPrivate(s.boardStore.PrivateArtifacts) // without the board store nothing is sent (private marks fail closed)
+	}
+	s.goBackground(func(ctx context.Context) { dbxBackup.Run(ctx, 5*time.Minute) })
 	r.Post("/api/cloud/disconnect", s.cloudHandler.Disconnect)
 	r.Post("/api/cloud/rekey", s.cloudHandler.Rekey)                   // #3698
 	r.Get("/api/cloud/owner-label", s.cloudHandler.OwnerLabel)         // #6108: is the owner recorded, and who would be

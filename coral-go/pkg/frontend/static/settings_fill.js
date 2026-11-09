@@ -132,6 +132,7 @@ export async function _fillMachineSettings(s) {
         // Loaded with the dialog, through importOnce so a failed load is retried (#3140).
         importOnce('./cloud_connect.js').then(m => { m.initCloudConnect(); m.loadCloudStatus(); }).catch(() => {});
         importOnce('./hub_mode_setting.js').then(m => m.loadHubModeSetting()).catch(() => {});
+        importOnce('./dropbox_settings.js').then(m => m.loadDropbox()).catch(() => {}); // the Dropbox backup block of Storage and cleanup (#14609)
         importOnce('./setup_code_setting.js').then(m => m.initSetupCode()).catch(() => {}); // read only while Network and Hub is the pane in view (#6410)
     }
 }

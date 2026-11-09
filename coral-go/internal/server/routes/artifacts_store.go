@@ -225,7 +225,14 @@ func storeArtifactBy(coralDir, sessionID, name, mediaType, uploadedBy, source st
 func storeArtifactVia(coralDir, sessionID, name, mediaType, uploadedBy, source, hubUser string, data []byte) (string, agentArtifactMeta, error) {
 	digestBytes := sha256.Sum256(data)
 	hexID := hex.EncodeToString(digestBytes[:])
-	defer lockArtifact(hexID)() // a delete of the same digest waits (#3553)
+	unlock := lockArtifact(hexID) // a delete of the same digest waits (#3553)
+	queued := false
+	defer func() {
+		unlock()
+		if queued {
+			noteDropboxUpload(coralDir, sessionID, hexID) // the Dropbox backup queues it, outside the artifact's lock (#14655)
+		}
+	}()
 	mine := agentArtifactMeta{Name: name, MediaType: mediaType, Size: int64(len(data)), Digest: "sha256:" + hexID}
 	dir := filepath.Join(coralDir, "artifacts", "objects")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
@@ -257,6 +264,7 @@ func storeArtifactVia(coralDir, sessionID, name, mediaType, uploadedBy, source, 
 			rec, _ := json.Marshal(r)
 			if err := writeFileAtomic(filepath.Join(up, hexID+".json"), rec, 0o600); err == nil {
 				noteArtifactRecordChanged(coralDir, r.Board)
+				queued = true
 			}
 		}
 	}

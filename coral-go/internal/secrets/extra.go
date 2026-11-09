@@ -37,6 +37,12 @@ var extraRules = []extraRule{
 	// Hugging Face and Google OAuth access tokens.
 	{re: regexp.MustCompile(`\bhf_[A-Za-z0-9]{34,}`), ok: mixesLettersAndDigits},
 	{re: regexp.MustCompile(`\bya29\.[A-Za-z0-9_-]{30,}`)},
+	// Dropbox refresh tokens and authorization codes have no prefix, so no rule can tell them from other text: they are safe only because nothing logs
+	// them (Coral keeps them in local variables and the sealed store, never in a log, an error or the board; Security's note on #14640).
+	// A Dropbox access token, sl.<about 135 or more characters> or the newer sl.u.<...> (#14609): betterleaks' Dropbox rules need the word "dropbox" within
+	// about 20 characters, so a bare one (a log line, a terminal) was shown whole. A hundred characters or more, mixing letters and digits: "sl." in a
+	// file name or a sentence is left alone.
+	{re: regexp.MustCompile(`\bsl\.(?:u\.)?[A-Za-z0-9_=-]{100,}`), ok: mixesLettersAndDigits},
 	// An AWS secret access key after its name, with or without spaces around the "=".
 	{re: regexp.MustCompile(`(?i)aws_?secret_?access_?key["']?\s*[:=]\s*["']?([A-Za-z0-9/+=]{40})`), group: 1},
 	// sk-ant-api03-..., sk-ant-admin01-..., any later or shorter form.

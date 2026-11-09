@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const html = fs.readFileSync(path.resolve(here, '../../coral-go/pkg/frontend/templates/includes/modals.html'), 'utf8');
-const NAMES = new Set(['Coral', 'Hub', 'Claude', 'Codex', 'Antigravity', 'Pi', 'Git', 'GitHub', 'API', 'CLI', 'PTY', 'GiB', 'Persona', 'Role', 'Name', 'Operator']); // Operator: the person who runs this Coral, a defined role ("Don't let Coral Hub act as the Operator")
+const NAMES = new Set(['Coral', 'Hub', 'Claude', 'Codex', 'Antigravity', 'Pi', 'Git', 'GitHub', 'API', 'CLI', 'PTY', 'GiB', 'Persona', 'Role', 'Name', 'Operator', 'Dropbox']); // Operator: the person who runs this Coral, a defined role ("Don't let Coral Hub act as the Operator")
 const strip = (s) => s.replace(/<[^>]*>/g, ' ').replace(/&[a-z]+;/g, ' ').replace(/\s+/g, ' ').trim();
 
 /** The label texts to check: the row titles (<dt>) and switch labels (<label for="settings-...">) of the Settings dialog, each without the help text inside it. */
@@ -33,7 +33,7 @@ export function titleCased(text) {
 
 // self-test: what it must catch and let through
 assert.ok(titleCased('Show Scrollbars') && titleCased('Default Working Directory') && titleCased('File Search Mode'));
-assert.ok(!titleCased('Show scrollbars') && !titleCased('Coral Hub') && !titleCased('Default models') && !titleCased('Artifact store limit (GiB)') && !titleCased('CLI paths') && !titleCased('Run as a hub'));
+assert.ok(!titleCased('Show scrollbars') && !titleCased('Coral Hub') && !titleCased('Default models') && !titleCased('Artifact store limit (GiB)') && !titleCased('CLI paths') && !titleCased('Run as a hub') && !titleCased('Keep files in Dropbox for'));
 assert.deepEqual(labels('<dt>Theme</dt><label for="settings-x">Check Updates<span>Help Text Here</span></label><label for="other">Not Settings</label>'), ['Theme', 'Check Updates']);
 
 // the groups that are fields (settings_fields.js, #7838): each field's label, not its options' labels
