@@ -3,7 +3,7 @@
 //   node waitfor_helper.test.js
 'use strict';
 const assert = require('node:assert/strict');
-const { waitFor, waitStable, isNavigationError } = require('./helpers/wait');
+const { waitFor, waitStable, coralReady, isNavigationError, READY_TIMEOUT_MS } = require('./helpers/wait');
 
 (async () => {
     for (const m of ['Inspected target navigated or closed', 'Execution context was destroyed, most likely because of a navigation.', 'Cannot find context with specified id']) assert.equal(isNavigationError(new Error(m)), true, m);
@@ -34,5 +34,13 @@ const { waitFor, waitStable, isNavigationError } = require('./helpers/wait');
     await assert.rejects(waitStable(async () => { throw new Error('Execution context was destroyed'); }, 'x', 'a stuck list', 60, { timeout: 200 }), /timed out after 200ms waiting for a stuck list to settle/);
     // An expression that answers undefined is a value (stable), not a navigation.
     assert.equal(await waitStable(async () => undefined, 'x', 'nothing', 40, { timeout: 1000 }), null);
+    // coralReady's ceiling is 30 s (#14852: a loaded Windows runner missed 10 s once with nothing drawn; the retry passed): the hook wait and the in-page race both use it, and a ready page answers at once.
+    assert.ok(READY_TIMEOUT_MS >= 30000, 'the readiness ceiling is at least 30 s');
+    const seen = [];
+    const readyEv = async expr => { seen.push(expr); return expr.includes('Promise.race') ? true : true; };
+    const t1 = Date.now();
+    await coralReady(readyEv);
+    assert.ok(Date.now() - t1 < 1000, 'a ready page does not wait for the ceiling');
+    assert.ok(seen.some(e => e.includes(`r(false), ${READY_TIMEOUT_MS})`)), 'the in-page race uses the ceiling: ' + seen.join(' | '));
     console.log('waitfor_helper: ok');
 })().catch(e => { console.error(e); process.exit(1); });
