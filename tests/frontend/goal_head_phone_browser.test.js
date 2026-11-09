@@ -67,8 +67,16 @@ const { coralReady } = require('./helpers/wait');
             if (w === 390 && fs16 === 16 && theme === 'light') await shot('goal-phone-menu-390');
             await ev(require('./helpers/wait').framesJs(4)); // a scroll that the keyboard's own move caused is reported a frame later: it must not close the menu (a short window, landscape at 200% text)
             assert.equal(await ev(`!document.querySelector('${M} .goal-head-actions .task-more-menu').hidden && document.activeElement.textContent.trim() === 'Move to another team'`), true, `${tag}: the menu is still open, with the keyboard on the item, a few frames after ArrowDown`);
+            // the goal changes under the person while the menu is open (a poll, a task landing): the page is not drawn again under the open menu, so the menu and the keyboard in it stay; it is drawn once the menu closes, with the new words (#14892)
+            await ev(`window.__oldMore = document.querySelector('${M} .goal-head-actions .task-more-btn'); true`);
+            const said = 'said again ' + tag;
+            assert.equal((await api('PATCH', `/api/board/${board}/goals/${openId}`, { subscriber_id: 'Operator', outcome: 'Less clutter, ' + said })).status, 200, `${tag}: the goal is changed`);
+            await ev(`window.dispatchEvent(new Event('focus')); true`);
+            await new Promise(r => setTimeout(r, 700)); // sleep-ok: the page's refresh reads the goal and would draw it again here: the open menu must be left alone
+            assert.equal(await ev(`window.__oldMore.isConnected && !document.querySelector('${M} .goal-head-actions .task-more-menu').hidden && document.activeElement.textContent.trim() === 'Move to another team'`), true, `${tag}: the open menu and the keyboard in it are left alone by the refresh`);
             await key('Escape', 'Escape', 27);
-            assert.equal(await ev(`document.activeElement.classList.contains('task-more-btn')`), true, `${tag}: Escape gives the focus back to More`);
+            await waitFor(`document.querySelector('${M}').textContent.includes(${JSON.stringify(said)})`, `${tag}: the page is drawn with the new words once the menu has closed`, 8000);
+            await waitFor(`document.activeElement && document.activeElement.classList.contains('task-more-btn')`, `${tag}: Escape gives the focus back to More, also after the page was drawn again`, 4000);
             if (w === 390 && fs16 === 16 && theme === 'light') {
                 // a dialog opened from the menu gives the focus back to the visible More toggle, whether it is closed with Escape or Cancel (#13119, UI Reviewer M1)
                 for (const [first, downs, how] of [['Change driver', 0, 'Escape'], ['Change driver', 0, 'Cancel'], ['Move to another team', 1, 'Escape'], ['Move to another team', 1, 'Cancel']]) {
