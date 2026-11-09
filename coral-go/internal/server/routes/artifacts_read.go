@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/secfile"
 )
 
@@ -36,7 +35,7 @@ func (h *SessionsHandler) openArtifactForRead(w http.ResponseWriter, r *http.Req
 	// Stage 6b (Security's 3c and 3d): bytes kept only in Dropbox. A single open by the Operator (the dashboard or the signed command line) or by
 	// the Hub's owner (the only Hub reader this route serves) fetches them back first; anything else (an agent, a thumbnail, the metadata read)
 	// answers 503 kept_in_dropbox and fetches nothing. The Operator's opens are recorded, so a file in use is not freed.
-	owner := cloud.Tunneled(r) || humanInputCaller(r)
+	owner := operatorFetchCaller(r) // exactly the Operator or the Hub's owner (Security's MUST on e0c7213ba)
 	if !fetchOffloaded(w, h.cfg.CoralDir(), id, fetch && owner) {
 		return nil, agentArtifactMeta{}, nil, false
 	}

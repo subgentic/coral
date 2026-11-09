@@ -16,8 +16,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/secretbox"
+	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // #14845, Dropbox stage 6b piece 2: the offload pass, against the fake Dropbox. Each test names the mutant it fails against.
@@ -391,4 +393,46 @@ func TestTheOperatorsOpenIsRecorded(t *testing.T) {
 	got, err := be.b.outbox.OffloadCandidates(context.Background(), "dbid:AAA", time.Now().Add(-90*24*time.Hour), time.Now().Add(-store.DropboxOffloadOpenedFor), 10)
 	require.NoError(t, err)
 	assert.Empty(t, got, "opened now: not freed for 30 days")
+}
+
+// Security's MUST on e0c7213ba. Mutant: the old test (cloud.Tunneled || humanInputCaller), under which an agent adding X-Coral-Via-Tunnel, a guide or
+// any Hub reader at Interact tier could make Coral fetch from the Operator's Dropbox.
+func TestOnlyTheOperatorOrTheHubOwnerMayFetch(t *testing.T) {
+	req := func(kind string, hdr map[string]string) *http.Request {
+		r := httptest.NewRequest(http.MethodGet, "/api/artifacts/x", nil)
+		for k, v := range hdr {
+			r.Header.Set(k, v)
+		}
+		if kind != "" {
+			r = r.WithContext(context.WithValue(r.Context(), callerKindKey{}, kind))
+		}
+		return r
+	}
+	tunnelHdr := map[string]string{tunnel.ViaHeader: "1"}
+	assert.True(t, operatorFetchCaller(req(callerDashCookie, nil)), "the dashboard")
+	assert.True(t, operatorFetchCaller(req(callerDashNoCookie, nil)), "this computer's browser without its cookie")
+	assert.True(t, operatorFetchCaller(req(callerHubOwner, nil)), "the Hub's owner, by the genuine stamp")
+	assert.False(t, operatorFetchCaller(req(callerCLISigned, nil)), "a command-line signature nobody checked")
+	assert.False(t, operatorFetchCaller(req(callerAgentToken, tunnelHdr)), "(a) an agent adding the tunnel header")
+	assert.False(t, operatorFetchCaller(req("", tunnelHdr)), "a bare tunnel header")
+	assert.False(t, operatorFetchCaller(req(callerHub, tunnelHdr)), "(b, c) a guide or any other Hub reader")
+	assert.False(t, operatorFetchCaller(req(callerDashCookie, map[string]string{store.SessionTokenHeader: "t"})), "a session token, whatever else")
+	assert.False(t, operatorFetchCaller(req(callerLocalOther, nil)), "a script")
+	assert.False(t, operatorFetchCaller(req(callerHub, gaGuide(gaDana))), "(b) a genuine guide through the tunnel (the reachable case: a guide passes refuseNonOwner on a guide route)")
+	viewer := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: "hub-user-0000beef"}
+	assert.False(t, operatorFetchCaller(req(callerHub, viewer)), "(c) a genuine Hub reader at Interact tier who is not the owner")
+
+	// The route: an agent's read with the tunnel header added fetches nothing.
+	be, d, _ := offloadedEnv(t)
+	r := httptest.NewRequest(http.MethodGet, "/api/artifacts/"+d, nil)
+	r.Header.Set(tunnel.ViaHeader, "1")
+	r = r.WithContext(context.WithValue(r.Context(), callerKindKey{}, callerAgentToken))
+	rc := chi.NewRouteContext()
+	rc.URLParams.Add("id", d)
+	r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rc))
+	rec := httptest.NewRecorder()
+	be.sessions().getAgentArtifact(rec, r)
+	assert.NotEqual(t, http.StatusOK, rec.Code)
+	assert.False(t, be.objectHereNow(d), "nothing fetched")
+	assert.True(t, be.offloaded(d))
 }

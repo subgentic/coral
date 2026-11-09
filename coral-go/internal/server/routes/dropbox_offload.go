@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/subgentic/coral/internal/cliauth"
 	"github.com/subgentic/coral/internal/dropbox"
 	"github.com/subgentic/coral/internal/secfile"
 	"github.com/subgentic/coral/internal/store"
@@ -451,3 +452,26 @@ var (
 	openedMu sync.Mutex
 	openedAt = map[string]time.Time{}
 )
+
+// operatorFetchCaller is who may make Coral fetch a file back from Dropbox (Security's conditions 2 and 5, and the MUST on e0c7213ba): the
+// Operator's own dashboard on this computer (with or without its cookie), the signed command line whose signature was checked, or the Hub's owner
+// by the genuine owner stamp. Never a session token (an agent), a guide, another Hub reader, or a bare X-Coral-Via-Tunnel header, which any
+// process can send.
+func operatorFetchCaller(r *http.Request) bool {
+	if r.Header.Get(store.SessionTokenHeader) != "" {
+		return false
+	}
+	if _, ok := r.Context().Value(verifiedSessionKey{}).(*store.SessionTokenOwner); ok {
+		return false
+	}
+	if isGuideCaller(r) {
+		return false
+	}
+	switch kind, _ := r.Context().Value(callerKindKey{}).(string); kind {
+	case callerDashCookie, callerDashNoCookie, callerHubOwner:
+		return true
+	case callerCLISigned:
+		return cliauth.Verified(r)
+	}
+	return false
+}
