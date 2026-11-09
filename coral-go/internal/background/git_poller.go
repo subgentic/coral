@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"github.com/subgentic/coral/internal/branches"
 	"github.com/subgentic/coral/internal/logsafe"
 	"log/slog"
 	"os"
@@ -77,6 +78,9 @@ type GitPoller struct {
 	// landing, when set, is told each pass where the agents' repositories are (the landing alert, #8942).
 	landing *LandingWatch
 
+	// branches, when set, reads the worktrees of the agents' repositories each pass (the Branches tab, goal #11).
+	branches *branches.Collector
+
 	// identityHash makes the stored pseudonym of a git email address (store.IdentityHasher); nil stores none, and commits are then matched to sessions by name only.
 	identityHash store.IdentityHasher
 
@@ -86,6 +90,9 @@ type GitPoller struct {
 
 // SetLandingWatch gives the poller the landing alert to feed.
 func (p *GitPoller) SetLandingWatch(w *LandingWatch) { p.landing = w }
+
+// SetBranches gives the poller the Branches tab's collector, read once a pass for the repositories the agents work in.
+func (p *GitPoller) SetBranches(c *branches.Collector) { p.branches = c }
 
 // gitFailureBackoff is how long a folder whose git query failed is left alone before it is
 // checked again (it may have become a repository since).
@@ -189,11 +196,19 @@ func (p *GitPoller) Run(ctx context.Context) error {
 	wait, _ := p.nextWait()
 	timer := time.NewTimer(wait)
 	defer timer.Stop()
+	var kicks <-chan struct{} // nil without a Branches collector: never ready
+	if p.branches != nil {
+		kicks = p.branches.Kicks()
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
+		case <-kicks:
+			if _, enabled := p.nextWait(); enabled {
+				p.branchesPass(ctx) // in this loop, so never beside a full pass
+			}
 		case <-timer.C:
 			if _, enabled := p.nextWait(); enabled {
 				if err := p.PollOnce(ctx); err != nil {
@@ -204,6 +219,22 @@ func (p *GitPoller) Run(ctx context.Context) error {
 			timer.Reset(next)
 		}
 	}
+}
+
+// branchesPass reads only the Branches tab's repositories, when a tab asked for one that has no picture yet (branches.Collector.Kicks): the same agents and git
+// roots as a full pass, and the collector's own limits (only the wanted repositories, each at most once a minute, within its pass budget).
+func (p *GitPoller) branchesPass(ctx context.Context) {
+	agents, err := p.discoverAgents(ctx)
+	if err != nil {
+		p.logger.Debug("branches pass: discover agents", "error", err)
+		return
+	}
+	dirToAgents := p.groupByGitRoot(ctx, agents)
+	roots := make([]string, 0, len(dirToAgents))
+	for root := range dirToAgents {
+		roots = append(roots, root)
+	}
+	p.branches.Observe(ctx, roots)
 }
 
 // PollOnce performs a single git polling pass for all live agents.
@@ -232,6 +263,13 @@ func (p *GitPoller) PollOnce(ctx context.Context) error {
 
 	if p.landing != nil {
 		p.landing.Observe(ctx, dirToAgents)
+	}
+	if p.branches != nil {
+		roots := make([]string, 0, len(dirToAgents))
+		for root := range dirToAgents {
+			roots = append(roots, root)
+		}
+		p.branches.Observe(ctx, roots)
 	}
 
 	// Forget agents that are gone, so the map stays bounded.

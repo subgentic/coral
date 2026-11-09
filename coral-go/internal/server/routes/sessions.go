@@ -46,6 +46,7 @@ type SessionsHandler struct {
 	focus    terminalFocus  // when a dashboard terminal view of each agent last said it was focused (dialog_timeout.go)
 	// noticeInStep runs a close's notice in step with the close (tests); in Coral it runs on a goroutine outside the agent's lock (dialog_timeout.go afterClose).
 	noticeInStep bool
+	branches     BranchesSource  // the worktrees of the repositories the live agents work in (branches.go); nil until the server wires it
 	opencode     OpencodeRuntime // the opencode servers, one per agent; nil until the server wires it
 
 	resourceHook *resources.Hook // the resource queue's shell hook (#13645); nil when the queue is off

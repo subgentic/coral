@@ -42,7 +42,7 @@ const TEAM = `qa-team-${Date.now() % 100000}`;
                 assert.ok(r.add, 'a button named Add agent'); assert.ok(r.more, 'a button named Actions (the header\'s was More: the tab strip has one too, #10942)');
                 assert.ok(r.statuses.length <= 1, `one status in the header, not ${r.statuses.length}: ${JSON.stringify(r.statuses)}`);
             });
-            await S.run(`${label}: the tablist named Team has the seven tabs in order, each name carrying its count where it has one`, async () => {
+            await S.run(`${label}: the tablist named Team has the eight tabs in order (Needs you second, Board seventh, Branches last), each name carrying its count where it has one`, async () => {
                 const names = await ev(`window.__tp.allTabs().map(t => window.__tp.tabLabel(t))`); // a phone has Knowledge and Board behind its More menu (team_tabs_more_browser): they are still the tablist's tabs
                 assert.deepEqual(names, TABS, 'the tabs, in order');
                 const full = await ev(`window.__tp.allTabs().map(t => window.__na.name(t))`);
@@ -55,7 +55,7 @@ const TEAM = `qa-team-${Date.now() % 100000}`;
                 const tabindexes = await ev(`window.__tp.tabs().map(t => t.tabIndex)`);
                 assert.deepEqual(tabindexes.filter(i => i === 0).length, 1, `exactly one tab is a tab stop (got ${JSON.stringify(tabindexes)})`);
                 await key('ArrowRight'); assert.equal(await focusedTab(), 'Needs you', 'Right moves to Needs you');
-                const last = 'Board'; /* a phone's strip has every tab too (#11239 slice B): it ends at Board as a desktop's does */
+                const last = 'Branches'; /* a phone's strip has every tab too (#11239 slice B): it ends at Branches, after Board, as a desktop's does */
                 await key('End'); assert.equal(await focusedTab(), last, `End moves to ${last}`);
                 await key('ArrowRight'); assert.equal(await focusedTab(), 'Goals', 'Right wraps to Goals');
                 await key('ArrowLeft'); assert.equal(await focusedTab(), last, `Left wraps to ${last}`);

@@ -22,6 +22,7 @@ GET /api/board/{project} redact
 GET /api/board/{project}/artifacts redact
 GET /api/board/{project}/artifacts/{digest}/edit redact
 GET /api/board/{project}/artifacts/{digest}/edit/send redact
+GET /api/board/{project}/branches redact
 GET /api/board/{project}/cross-team/settings redact
 GET /api/board/{project}/goals redact
 GET /api/board/{project}/goals/{id} redact
@@ -77,6 +78,7 @@ GET /api/sessions/history/{id}/tasks redact
 GET /api/sessions/live redact
 GET /api/sessions/live/team/{board}/sleep-status redact
 GET /api/sessions/live/{name} redact
+GET /api/sessions/live/{name}/branches redact
 GET /api/sessions/live/{name}/capture redact
 GET /api/sessions/live/{name}/changes.diff redact
 GET /api/sessions/live/{name}/chat redact

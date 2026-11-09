@@ -525,6 +525,13 @@ func (s *Server) StartMachineHealth(ctx context.Context, wd *stallwatch.Watchdog
 // ResourceQueue is the resource queue's lines, for the health check (#13707); nil when the queue is off.
 func (s *Server) ResourceQueue() *resourcequeue.Queue { return s.resourceQueue }
 
+// SetBranches gives the sessions routes the git poller's worktree snapshot (the Branches tab).
+func (s *Server) SetBranches(src routes.BranchesSource) {
+	if s.sessHandler != nil {
+		s.sessHandler.SetBranches(src)
+	}
+}
+
 func (s *Server) BoardStore() *board.Store {
 	return s.boardStore
 }

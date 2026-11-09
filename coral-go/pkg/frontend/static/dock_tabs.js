@@ -1,5 +1,5 @@
 /* The agent's side panel tabs say their words (UI/UX's 170 list, item 1, #7621): at 1280 px and up each tab shows its word beside its icon when ALL the words fit the row on one line (a panel dragged narrow,
- * or text at 200%, falls back to icons alone, whose name is the title and the aria-label: no word is clipped and the row does not wrap), and the four rarely used tabs (Browse, Notes, Activity, Agent UI) sit behind one
+ * or text at 200%, falls back to icons alone, whose name is the title and the aria-label: no word is clipped and the row does not wrap), and the five rarely used tabs (Browse, Notes, Activity, Agent UI, Branches) sit behind one
  * More menu. They stay the real tab buttons (their panels, counts and handlers are the old ones): in More they are only drawn out of the way (.tab-more) and out of the tab order, and the menu's items
  * open them through switchAgenticTab. When the open tab is one of those, More carries its word and is the selected one: the open tab is always seen. */
 import { registerActions } from './actions.js';
@@ -8,7 +8,7 @@ import { setText, setHidden, setAttr, setTitle, setHtml } from './dom_write.js';
 import { menuMove } from './menu_keys.js';
 import { watchScrollCue } from './scroll_cue.js';
 
-const RARE = ['browse', 'notes', 'activity', 'agent-ui'];
+const RARE = ['browse', 'notes', 'activity', 'agent-ui', 'branches'];
 const WIDE = window.matchMedia('(min-width: 1280px)');
 const $ = id => document.getElementById(id);
 const strip = () => document.querySelector('#agentic-block-top .agentic-state-tabs');
@@ -85,11 +85,23 @@ function openMore(first) {
     (first === 'last' ? items[items.length - 1] : items.find(i => i.classList.contains('active')) || items[0])?.focus();
 }
 
+/** After a pick the menu is gone, and the item that had the focus with it: the focus goes to the panel that opened, named for its tab, so a keyboard or screen-reader user is
+ *  where they asked to be (coral-hub's UI review of the Branches tab: never body or a hidden item). A panel that cannot take it (not shown) leaves the focus on More. */
+function focusPanel(t) {
+    const p = $(`agentic-panel-${t}`), tab = $(`agentic-tab-${t}`);
+    if (p) {
+        if (!p.hasAttribute('tabindex')) p.setAttribute('tabindex', '-1');
+        if (tab && !p.hasAttribute('aria-label')) setAttr(p, 'aria-label', wordOf(tab));
+        p.focus({ preventScroll: true });
+    }
+    if (document.activeElement !== p) $('agentic-tab-more')?.focus();
+}
+
 const items = () => [...($('agentic-more-menu')?.querySelectorAll('[role=menuitem]') || [])];
 
 registerActions({
     'dock-more-toggle': () => { if (menuOpen) closeMore(true); else openMore(); },
-    'dock-more-pick': el => { const t = el.dataset.tab; closeMore(false); if (RARE.includes(t)) { window.switchAgenticTab?.(t, 'top') } },
+    'dock-more-pick': el => { const t = el.dataset.tab; closeMore(false); if (RARE.includes(t)) { window.switchAgenticTab?.(t, 'top'); focusPanel(t); } },
     'dock-more-key': (el, event) => {
         const list = items(), i = list.indexOf(el);
         if (event.key === 'Escape') { event.preventDefault(); closeMore(true); }

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/subgentic/coral/internal/psquote"
 	"github.com/subgentic/coral/internal/winshell"
@@ -78,19 +79,74 @@ func shellBase(shell string) string {
 // isCmdShell reports whether shell names cmd.exe.
 func isCmdShell(shell string) bool { return shellBase(shell) == "cmd" }
 
+// executableDir is the folder this program runs from, symlinks resolved, found once: a running program's own path does not change, and resolving it walks and stats every folder above it
+// (CoralToolsSource runs for every launch). Under 'go test' each of those stats is an entry in the test's input log that cmd/go then resolves, so a package that launches thousands of agents
+// made the Go tool spend minutes per run on them (#413).
+var executableDirOnce struct {
+	sync.Once
+	dir string
+	ok  bool
+}
+
+func executableDir() (string, bool) {
+	executableDirOnce.Do(func() {
+		exe, err := os.Executable()
+		if err != nil {
+			return
+		}
+		if exe, err = filepath.EvalSymlinks(exe); err != nil {
+			return
+		}
+		executableDirOnce.dir, executableDirOnce.ok = filepath.Dir(exe), true
+	})
+	return executableDirOnce.dir, executableDirOnce.ok
+}
+
 // AppBundleBinDir returns the directory containing hook binaries if the
 // current executable is running from a macOS .app bundle or a similar
 // packaged install. Returns empty string if not in a bundle.
-func appBundleBinDir() string {
-	exe, err := os.Executable()
-	if err != nil {
+func appBundleBinDir() string { return bundleDir.get(findAppBundleBinDir) }
+
+// bundleDir remembers what appBundleBinDir found: hooks next to the running program do not move while it runs, and the look is a stat per call (#413, see executableDir). A found folder is
+// kept; an empty answer only for emptyFor, so tools that appear after it was given are seen.
+var bundleDir foundMemo
+
+// emptyFor is how long a "nothing found" answer is reused. A found answer is kept; a missing one is asked again soon, because "nothing" sends agents to whatever is first on PATH, the
+// less trusted choice, and a tool installed a moment later should be seen (Security on #413). toolsClock is the clock; a test stores its own (an atomic: a goroutine an earlier test left running may read it) and stores nil to restore time.Now.
+const emptyFor = 10 * time.Second
+
+var toolsClock atomic.Pointer[func() time.Time]
+
+func toolsNow() time.Time {
+	if f := toolsClock.Load(); f != nil {
+		return (*f)()
+	}
+	return time.Now()
+}
+
+// foundMemo is one remembered answer of a lookup that returns "" when it finds nothing.
+type foundMemo struct {
+	mu  sync.Mutex
+	val string
+	ok  bool
+	at  time.Time
+}
+
+func (m *foundMemo) get(find func() string) string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.ok && (m.val != "" || toolsNow().Sub(m.at) < emptyFor) {
+		return m.val
+	}
+	m.val, m.ok, m.at = find(), true, toolsNow()
+	return m.val
+}
+
+func findAppBundleBinDir() string {
+	dir, ok := executableDir()
+	if !ok {
 		return ""
 	}
-	exe, err = filepath.EvalSymlinks(exe)
-	if err != nil {
-		return ""
-	}
-	dir := filepath.Dir(exe)
 
 	// macOS .app bundle: .../Coral.app/Contents/MacOS/coral
 	if strings.Contains(dir, ".app"+string(os.PathSeparator)+"Contents"+string(os.PathSeparator)+"MacOS") ||
@@ -159,19 +215,51 @@ func CoralToolsSource() (dir, source string) {
 	if d := strings.TrimSpace(os.Getenv(HookDirEnv)); d != "" {
 		return d, HookDirEnv
 	}
+	key := toolsKey{fallback: installedFallback.Load(), installed: installedToolsDir}
+	toolsFound.Lock()
+	defer toolsFound.Unlock()
+	if r, ok := toolsFound.m[key]; ok && (r.dir != "" || toolsNow().Sub(r.at) < emptyFor) {
+		return r.dir, r.source
+	}
+	dir, source = findCoralTools(key)
+	if toolsFound.m == nil {
+		toolsFound.m = map[toolsKey]toolsResult{}
+	}
+	toolsFound.m[key] = toolsResult{dir, source, toolsNow()}
+	return dir, source
+}
+
+// toolsFound remembers where the tools were found for one setting of the installed-app fallback and one installed folder (CORAL_HOOK_DIR is read before, at every call): the places looked at
+// are the folder the program runs from and the installed app's, and neither changes while a program runs (an update restarts it). Every launch asks, and each look is a stat that a
+// test binary's input log keeps and cmd/go resolves again (#413: about 27k entries in routes' log). A found folder is kept; "none" is kept for emptyFor only. A test that changes the
+// answer changes the key (SetInstalledToolsFallback, installedToolsDir).
+var toolsFound struct {
+	sync.Mutex
+	m map[toolsKey]toolsResult
+}
+
+type toolsKey struct {
+	fallback  bool
+	installed string
+}
+
+type toolsResult struct {
+	dir, source string
+	at          time.Time
+}
+
+func findCoralTools(key toolsKey) (dir, source string) {
 	if d := appBundleBinDir(); d != "" {
 		return d, "this build"
 	}
-	if exe, err := os.Executable(); err == nil {
-		if exe, err = filepath.EvalSymlinks(exe); err == nil {
-			if _, err := os.Stat(filepath.Join(filepath.Dir(exe), "coral-board")); err == nil {
-				return filepath.Dir(exe), "this build (coral-board only)"
-			}
+	if dir, ok := executableDir(); ok {
+		if _, err := os.Stat(filepath.Join(dir, "coral-board")); err == nil {
+			return dir, "this build (coral-board only)"
 		}
 	}
-	if installedFallback.Load() {
-		if _, err := os.Stat(filepath.Join(installedToolsDir, "coral-board")); err == nil {
-			return installedToolsDir, "the installed Coral app"
+	if key.fallback {
+		if _, err := os.Stat(filepath.Join(key.installed, "coral-board")); err == nil {
+			return key.installed, "the installed Coral app"
 		}
 	}
 	return "", ""

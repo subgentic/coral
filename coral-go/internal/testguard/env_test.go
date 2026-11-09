@@ -13,13 +13,22 @@ import (
 func TestAgentShellEnvIsScrubbedAtInit(t *testing.T) {
 	if os.Getenv("TESTGUARD_SCRUB_CHILD") == "1" {
 		var seen []string
-		for _, k := range []string{"CORAL_HUB", "CORAL_SESSION_ID", "CORAL_CLOUD_URL", "CORAL_PREV", "CORAL_STEP_2_OUTPUT", "CORAL_WORKFLOW_RUN_ID"} {
+		for _, k := range []string{"CORAL_HUB", "CORAL_SESSION_ID", "CORAL_CLOUD_URL", "CORAL_PREV", "CORAL_STEP_2_OUTPUT", "CORAL_WORKFLOW_RUN_ID",
+			"CLAUDE_CODE_SESSION_ID", "CLAUDE_PID", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN",
+			"OPENAI_API_KEY", "GOOGLE_API_KEY", "AWS_SECRET_ACCESS_KEY", "GH_TOKEN", "GITHUB_TOKEN", "SSH_AUTH_SOCK"} {
 			if v, ok := os.LookupEnv(k); ok {
 				seen = append(seen, k+"="+v)
 			}
 		}
 		if len(seen) > 0 {
 			t.Fatalf("agent-shell variables reached the test binary: %v", seen)
+		}
+		// the agent CLIs' folder pointers are not unset (the default would be the real ~/.codex): they point at a sandbox that is not the shell's value
+		for _, k := range []string{"CODEX_HOME", "CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR", "GEMINI_TMP_DIR"} {
+			v := os.Getenv(k)
+			if v == "" || v == "fake" || !strings.HasPrefix(v, os.TempDir()) || !strings.Contains(v, "coral-testguard-agent-") {
+				t.Fatalf("%s = %q: want a testguard sandbox folder under the temp dir", k, v)
+			}
 		}
 		if os.Getenv("CORAL_BACKEND") != "tmux" {
 			t.Fatalf("a test knob was scrubbed too: CORAL_BACKEND=%q", os.Getenv("CORAL_BACKEND"))
@@ -37,7 +46,10 @@ func TestAgentShellEnvIsScrubbedAtInit(t *testing.T) {
 	}
 	cmd.Env = append(env, "TESTGUARD_SCRUB_CHILD=1",
 		"CORAL_HUB=1", "CORAL_SESSION_ID=agent-session", "CORAL_CLOUD_URL=https://example.invalid", "CORAL_PREV=x",
-		"CORAL_STEP_2_OUTPUT=y", "CORAL_WORKFLOW_RUN_ID=7", "CORAL_BACKEND=tmux")
+		"CORAL_STEP_2_OUTPUT=y", "CORAL_WORKFLOW_RUN_ID=7", "CORAL_BACKEND=tmux",
+		"CLAUDE_CODE_SESSION_ID=fake-session", "CLAUDE_PID=1", "ANTHROPIC_API_KEY=fake-not-a-key", "ANTHROPIC_AUTH_TOKEN=fake-not-a-token", "CLAUDE_CODE_OAUTH_TOKEN=fake-not-a-token",
+		"CODEX_HOME=fake", "CLAUDE_CONFIG_DIR=fake", "GEMINI_TMP_DIR=fake", "PI_CODING_AGENT_DIR=fake",
+		"OPENAI_API_KEY=fake-not-a-key", "GOOGLE_API_KEY=fake-not-a-key", "AWS_SECRET_ACCESS_KEY=fake-not-a-key", "GH_TOKEN=fake-not-a-token", "GITHUB_TOKEN=fake-not-a-token", "SSH_AUTH_SOCK=fake")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("child test binary failed: %v\n%s", err, out)

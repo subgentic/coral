@@ -27,7 +27,7 @@ export const PAGES = [
     { id: 'agent-chat-waiting', world: 'seeded', path: '/agents/{agentWaiting}', notes: 'an agent waiting for the person: the permission question' },
     { id: 'agent-chat-idle', world: 'seeded', path: '/agents/{agentIdle}', notes: 'an idle agent that has answered' },
     { id: 'agent-asleep', world: 'seeded', path: '/agents/{agentAsleep}', notes: 'a sleeping agent' },
-    ...['board', 'tasks', 'notes', 'files', 'browse', 'artifacts', 'activity', 'agent-ui'].map(sub => agent('tab', 'Working', sub)),
+    ...['board', 'tasks', 'notes', 'files', 'browse', 'artifacts', 'activity', 'agent-ui', 'branches'].map(sub => agent('tab', 'Working', sub)),
     // A team and its tabs (the path word of the Board tab is "board")
     { id: 'team-goals', world: 'seeded', path: '/team/{team}' },
     { id: 'team-agents', world: 'seeded', path: '/team/{team}/agents' },
@@ -35,6 +35,7 @@ export const PAGES = [
     { id: 'team-artifacts', world: 'seeded', path: '/team/{team}/artifacts' },
     { id: 'team-knowledge', world: 'seeded', path: '/team/{team}/knowledge' },
     { id: 'team-board', world: 'seeded', path: '/team/{team}/board' },
+    { id: 'team-branches', world: 'seeded', path: '/team/{team}/branches' },
     { id: 'team-goal-page', world: 'seeded', path: '/team/{team}/goals/{goal}' },
     { id: 'team-task-page', world: 'seeded', path: '/team/{team}/tasks/{task}' },
     { id: 'team-settings', world: 'seeded', open: 'teamSettings', widths: ['1440', '900'], notes: 'the popout of the team page\'s Settings button; a phone reaches it through the page\'s More menu, which this run does not open' },

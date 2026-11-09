@@ -109,6 +109,7 @@ export function switchAgenticTab(tabName, blockId) {
 
     if (tabName === 'agent-ui') refreshAgentUI();
     if (tabName === 'info') importOnce('./info_tab.js').then(m => m.showInfoTab()).catch(() => {}); // the Info tab (#13917): the agent's session info, MCP servers, skills and memory, read when it is shown
+    if (tabName === 'branches') importOnce('./branches_tab.js').then(m => m.loadBranches()).catch(() => {}); // read only when shown (goal #11)
 
     // Saved for later (#4510): the list is read when its tab is shown, not while the sidebar is shut behind it (the home page's tab is Saved, and startup must not load the list: #4326);
     // opening the sidebar on it reads the list (sidebar.js)

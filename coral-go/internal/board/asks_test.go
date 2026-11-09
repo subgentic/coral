@@ -97,6 +97,37 @@ func TestAnAskNeedsSomeoneToAskAndAReplyNeedsAMessage(t *testing.T) {
 	assert.ErrorIs(t, s.CheckReplyTo(ctx, "alpha", other.ID), ErrReplyToUnknown, "another board's message is no message of this board")
 }
 
+// A question to @Operator is asked of the Operator on a board they never joined (post --ask "@Operator ..." as the help says), once, and never by the Operator of themselves.
+func TestAnAskToTheOperatorNeedsNoOperatorMember(t *testing.T) {
+	s, ctx := askBoard(t)
+	to, err := s.AskTargets(ctx, "alpha", "Lead", "@Operator ship the release?")
+	require.NoError(t, err)
+	assert.Equal(t, []string{OperatorName}, to)
+	to, err = s.AskTargets(ctx, "alpha", "Lead", "@Operator and @Dev A: ship it?")
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"Dev A", OperatorName}, to)
+	_, err = s.AskTargets(ctx, "alpha", "Operator", "@Operator note to self")
+	assert.ErrorIs(t, err, ErrAskNobody, "the Operator is not asked by themselves")
+	_, err = s.AskTargets(ctx, "alpha", "Lead", "@Operators and the @operator-team")
+	assert.ErrorIs(t, err, ErrAskNobody, "only the exact tag")
+	assert.Equal(t, []string{OperatorName}, s.NotifiedBy(ctx, "alpha", "Lead", "@Operator ship the release?"), "notified once")
+
+	q := askPost(t, s, ctx, "Lead", "@Operator ship the release?", true, 0)
+	info := askOf(t, s, ctx, q.ID)
+	require.NotNil(t, info)
+	assert.Equal(t, []string{OperatorName}, info.To)
+	assert.Equal(t, []string{OperatorName}, info.Open, "open until the Operator answers")
+	askPost(t, s, ctx, "Operator", "yes", false, q.ID)
+	assert.True(t, askOf(t, s, ctx, q.ID).Answered)
+
+	// a board the Operator joined asks them once, not twice
+	_, err = s.Subscribe(ctx, "alpha", "Operator", "Operator", "", nil, "")
+	require.NoError(t, err)
+	to, err = s.AskTargets(ctx, "alpha", "Lead", "@Operator again?")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"Operator"}, to)
+}
+
 // Messages read as a list carry ask and reply_to, and OpenAsks lists one row per member still owing (the reminder and the health check read it).
 func TestOpenAsksAreOneRowPerMemberStillOwing(t *testing.T) {
 	s, ctx := askBoard(t)

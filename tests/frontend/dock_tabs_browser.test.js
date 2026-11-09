@@ -1,5 +1,5 @@
 // The agent's side panel tabs say their words (UI/UX's 170 list, item 1, #7621): at 1280 px and up each tab shows its word beside its icon when all the words fit the row on one line (a panel dragged
-// narrow, or text at 200%, falls back to icons alone: no word clipped, no wrapped row), the Tasks count stays a badge, and the four rarely used tabs (Browse, Notes, Activity, Agent UI) are behind one More menu that
+// narrow, or text at 200%, falls back to icons alone: no word clipped, no wrapped row), the Tasks count stays a badge, and the five rarely used tabs (Browse, Notes, Activity, Agent UI, Branches) are behind one More menu that
 // opens them with the keyboard and carries the open one's word. Below 1280 the tabs are icons alone with their names as title and aria-label. Drives the real dashboard over CDP; an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -34,7 +34,7 @@ const { settle, coralReady } = require('./helpers/wait');
         const named = r.shown.filter(([t]) => t !== 'customize'); // the Customize button at the row's end is an icon alone, as it was
         assert.deepEqual(named.map(([t, w]) => [t, w]), [['files', 'Files'], ['artifacts', 'Artifacts'], ['tasks', 'Tasks'], ['info', 'Info'], ['saved', 'Saved'], ['more', 'More']], 'each shown tab says its word: ' + JSON.stringify(r.shown));
         assert.deepEqual([r.tops.length, r.clipped], [1, false], 'one line, nothing clipped: ' + JSON.stringify(r));
-        assert.ok(!r.shown.some(([t]) => ['browse', 'notes', 'activity', 'agent-ui'].includes(t)), 'the four rare tabs are not in the row: ' + JSON.stringify(r.shown));
+        assert.ok(!r.shown.some(([t]) => ['browse', 'notes', 'activity', 'agent-ui', 'branches'].includes(t)), 'the five rare tabs are not in the row: ' + JSON.stringify(r.shown));
         assert.equal(r.more[0], 'More tabs'); ok('Files, Artifacts, Tasks, Info, Saved and More with their words, on one line');
         await shot('dock-tabs-1280');
 
@@ -53,7 +53,7 @@ const { settle, coralReady } = require('./helpers/wait');
         await key('ArrowDown');
         await waitFor(`!document.getElementById('agentic-more-menu').hidden && document.activeElement.getAttribute('role') === 'menuitem'`, 'the menu opens on ArrowDown with the focus in it', 4000);
         const items = await ev(`[...document.querySelectorAll('#agentic-more-menu [role=menuitem]')].map(i => i.dataset.tab + ':' + i.textContent.trim())`);
-        assert.deepEqual(items, ['browse:folder_openBrowse', 'notes:edit_noteNotes', 'activity:timelineActivity', 'agent-ui:widgetsAgent UI'], JSON.stringify(items));
+        assert.deepEqual(items, ['browse:folder_openBrowse', 'notes:edit_noteNotes', 'activity:timelineActivity', 'agent-ui:widgetsAgent UI', 'branches:account_treeBranches'], JSON.stringify(items));
         await shot('dock-tabs-more-open');
         await key('ArrowDown'); await key('ArrowDown'); await key('Enter'); // the menu opens on Browse: two steps down is Activity (Notes is the second item)
         await waitFor(`document.getElementById('agentic-panel-activity').classList.contains('active')`, 'Enter opens Activity', 4000);
@@ -123,6 +123,35 @@ const { settle, coralReady } = require('./helpers/wait');
         r = await row();
         assert.ok(r.tops.length === 1 && !r.clipped, 'wide counts: icons alone, one line, nothing clipped: ' + JSON.stringify(r));
         ok('a count that widens the tabs takes the words off: one line, nothing clipped');
+        // coral-hub's UI review of the Branches tab: after a pick from More the focus is on a visible target, the opened panel (named for its tab), never body or the menu
+        // item that went with the menu; Tab and Shift-Tab then move between visible controls. At 1280 and at 390 (phone).
+        const seen = () => ev(`(() => { const a = document.activeElement; if (!a || a === document.body) return { id: 'body' }; const r = a.getBoundingClientRect();
+            return { id: a.id || a.tagName.toLowerCase(), role: a.getAttribute('role') || '', label: a.getAttribute('aria-label') || '', visible: r.width > 0 && r.height > 0 && getComputedStyle(a).visibility !== 'hidden' }; })()`);
+        for (const [w, mobile] of [[1280, false], [390, true]]) {
+            console.log(`${w}: the focus after a pick from More`);
+            await load(w, mobile);
+            await ev(`document.getElementById('agentic-tab-more').focus(); true`);
+            await key('ArrowDown');
+            await waitFor(`!document.getElementById('agentic-more-menu').hidden`, 'the menu opens', 4000);
+            for (let i = 0; i < 6 && !(await ev(`document.activeElement && document.activeElement.dataset.tab === 'branches'`)); i++) await key('ArrowDown');
+            await key('Enter');
+            await waitFor(`document.getElementById('agentic-panel-branches').classList.contains('active')`, 'Enter opens Branches', 4000);
+            const after = await seen();
+            assert.deepEqual([after.id, after.label, after.visible], ['agentic-panel-branches', 'Branches', true], `${w}: the focus is on the Branches panel, named and visible: ` + JSON.stringify(after));
+            // the visible tab stops after the panel in document order: with none (the panel is the page's last stop) Tab leaves the page, as the browser does past the last control
+            const stopsAfter = await ev(`(() => { const p = document.getElementById('agentic-panel-branches'); const sel = 'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
+                return [...document.querySelectorAll(sel)].filter(e => !e.disabled && (p.compareDocumentPosition(e) & Node.DOCUMENT_POSITION_FOLLOWING) && !p.contains(e) && e.getBoundingClientRect().width > 0 && getComputedStyle(e).visibility !== 'hidden').length; })()`);
+            await key('Tab');
+            const next = await seen();
+            if (stopsAfter) assert.ok(next.id !== 'body' && next.visible, `${w}: Tab from the panel goes to a visible control (${stopsAfter} follow it): ` + JSON.stringify(next));
+            else assert.equal(next.id, 'body', `${w}: the panel is the last tab stop, so Tab leaves the page: ` + JSON.stringify(next));
+            await ev(`document.getElementById('agentic-panel-branches').focus(); true`);
+            await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers: 8 });
+            await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers: 8 });
+            const prev = await seen();
+            assert.ok(prev.id !== 'body' && prev.visible, `${w}: Shift-Tab from the panel goes to a visible control: ` + JSON.stringify(prev));
+            ok(`${w}: picking Branches puts the focus on its panel; Tab goes to ${stopsAfter ? next.id : 'outside the page (the panel is the last stop)'}, Shift-Tab to ${prev.id}`);
+        }
         console.log('PASS dock tabs');
     } catch (e) { console.error(e && e.stack || e); process.exitCode = 1; }
     try { await client.close(); } catch (_) {}

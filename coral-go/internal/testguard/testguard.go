@@ -10,8 +10,7 @@ package testguard
 
 import (
 	"fmt"
-	"os"
-	"os/user"
+	"github.com/subgentic/coral/internal/testguard/protectedpath"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -23,26 +22,7 @@ import (
 // HOME at a temp dir resolves ~/.coral there, which is allowed. They are
 // computed only in test binaries: user.Current can block on directory-service
 // Macs, and shipped binaries such as the agent hooks never need it.
-var protectedDirs = sync.OnceValue(func() []string {
-	var dirs []string
-	add := func(home string) {
-		if home == "" {
-			return
-		}
-		d := filepath.Clean(filepath.Join(home, ".coral"))
-		for _, existing := range dirs {
-			if existing == d {
-				return
-			}
-		}
-		dirs = append(dirs, d)
-	}
-	if u, err := user.Current(); err == nil {
-		add(u.HomeDir)
-	}
-	add(os.Getenv("HOME"))
-	return dirs
-})
+var protectedDirs = protectedpath.Dirs
 
 // enabled reports whether the guard applies: only in a running test binary (InTestRun), never on the strength of the program's name or arguments,
 // which a launcher of a shipped binary controls (the coral-go-team's Security on #214). It is a variable so the guard's own tests can exercise the
@@ -98,22 +78,7 @@ func inMemoryDB(name string) bool {
 
 // sourceTree is the module's source folder: the nearest parent of the test's working directory (a test runs in its package's folder) that
 // holds go.mod, or "" when there is none.
-var sourceTree = sync.OnceValue(func() string {
-	wd, err := os.Getwd()
-	if err != nil {
-		return ""
-	}
-	for dir := wd; ; {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return ""
-		}
-		dir = parent
-	}
-})
+var sourceTree = func() string { return protectedpath.SourceTree().Dir }
 
 // inSourceTree reports whether path is, or is inside, the module's source folder. A relative path counts from the working directory, which is a
 // folder of the source tree: the "" data folder a Config falls back to is exactly that.
@@ -122,15 +87,39 @@ func inSourceTree(path string) (string, bool) {
 	if root == "" {
 		return "", false
 	}
-	p, cd := comparable(path), comparable(root)
+	p, cd := comparable(path), sourceTreeResolved()
 	if p == cd || strings.HasPrefix(p, cd+string(filepath.Separator)) {
 		return root, true
 	}
 	return "", false
 }
 
+// sourceTreeResolved is the source folder's real path, worked out once, as sourceTree itself is: resolving it walks and stats every folder above it, at every CheckDataPath (about 7,500
+// calls in routes, four stats each in the test's input log that cmd/go resolves again, #413). The path being checked is still resolved at every call.
+var sourceTreeResolved = sync.OnceValue(func() string { return comparable(sourceTree()) })
+
+// protectedResolved is each protected folder with its real path, worked out once: the folders are the person's real ~/.coral, which does not move while a test binary runs, and resolving
+// one walks and stats every folder above it. CheckDataPath runs for every store or socket a test opens (about 7,500 times in routes), and under 'go test' each of those stats is an entry
+// in the test's input log that cmd/go resolves again, so resolving the live folder per check cost the Go tool minutes per run on a folder no test should touch (#413). The path being
+// checked is still resolved at every call, so a symlink that points into the protected folder is still caught. A protected folder that becomes a symlink after the first check is not.
+var protectedResolved = sync.OnceValue(func() []protectedDir {
+	var out []protectedDir
+	for _, d := range protectedDirs() {
+		out = append(out, protectedDir{dir: d, real: comparable(d)})
+	}
+	return out
+})
+
+type protectedDir struct{ dir, real string }
+
 func protected(path string) (string, bool) {
-	return protectedIn(path, protectedDirs())
+	p := comparable(path)
+	for _, d := range protectedResolved() {
+		if p == d.real || strings.HasPrefix(p, d.real+string(filepath.Separator)) {
+			return d.dir, true
+		}
+	}
+	return "", false
 }
 
 // protectedIn reports whether path is, or is inside, one of dirs. Both sides
@@ -159,21 +148,4 @@ func comparable(path string) string {
 // realPath is path made absolute with symlinks resolved. A path that does
 // not exist yet (a socket or database about to be created) is resolved
 // through its nearest existing ancestor.
-func realPath(path string) string {
-	p := filepath.Clean(path)
-	if abs, err := filepath.Abs(p); err == nil {
-		p = abs
-	}
-	var rest []string
-	for cur := p; ; {
-		if resolved, err := filepath.EvalSymlinks(cur); err == nil {
-			return filepath.Join(append([]string{resolved}, rest...)...)
-		}
-		parent := filepath.Dir(cur)
-		if parent == cur {
-			return p
-		}
-		rest = append([]string{filepath.Base(cur)}, rest...)
-		cur = parent
-	}
-}
+func realPath(path string) string { return protectedpath.RealPath(path) }

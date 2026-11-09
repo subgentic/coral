@@ -210,7 +210,7 @@ registerActions({
     'toggle-group-by-server': () => window.toggleGroupByServer(),
 });
 
-const AGENTIC_TABS = new Set(['board', 'files', 'browse', 'artifacts', 'tasks', 'notes', 'activity', 'info', 'agent-ui', 'saved']);
+const AGENTIC_TABS = new Set(['board', 'files', 'browse', 'artifacts', 'tasks', 'notes', 'activity', 'info', 'agent-ui', 'branches', 'saved']);
 
 registerActions({
     'mobile-back': () => window.mobileBack(),
