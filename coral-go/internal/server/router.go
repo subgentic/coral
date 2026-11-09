@@ -858,6 +858,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 		r.Get("/api/servers/provision/{plan}", prov.Status)
 		r.Post("/api/servers/provision/{plan}/forget-key", prov.ForgetKey)
 		r.Delete("/api/servers/provision/{plan}", prov.Cancel)
+		r.Post("/api/servers/{id}/reconnect", rsHandler.Reconnect)
 		remoteResolver := routes.NewRemoteResolver(rsHandler.Store())
 		routes.MountRemoteProxy(r, remoteResolver)
 		s.remoteAgents = background.NewRemoteAgentHub(rsHandler.Store(), remoteResolver, remoteAgentHubConfig)
@@ -865,6 +866,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 		rsHandler.SetOnDelete(remoteResolver.Forget)
 		prov.SetOnRemoved(remoteResolver.Forget)
 		prov.SetStatusListener(s.remoteAgents.Refresh) // a server the setup registered shows at once
+		rsHandler.SetReconnector(s.remoteAgents.Reconnect)
 		remoteResolver.SetFailureSink(s.remoteAgents)
 		sessHandler.SetRemoteAgents(s.remoteAgents)
 	}

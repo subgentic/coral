@@ -109,7 +109,7 @@ var shellNeverFiles = map[string]shellNever{
 	"notice_pause.js":           {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"password_ui.js":            {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
 	"received_cap_notice.js":    {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
-	"registered_server_view.js": {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 6},
+	"registered_server_view.js": {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 7}, // 7: Reconnect (POST /api/servers/{id}/reconnect, a route that never goes through a Hub)
 	"scheduler.js":              {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 3},
 	"search_access.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
 	"security_settings.js":      {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 9},

@@ -30,6 +30,7 @@ let _open = null;         // the id whose page is open (a server's page: facts, 
 let _focusNext = null;    // 'back' | 'row': where the focus goes after the next draw (opening a page, coming back)
 let _busy = new Set();    // ids (or '*') with a request in flight
 let _plans = new Map();   // server id -> the stop, upgrade or uninstall the hub is running or has just finished for it ({ plan, kind, phase }); read from the hub, so a refresh or another tab finds it too (#12372)
+let _busyVerb = '';       // which of Test and Reconnect is in flight, so only that button says so
 let _loadError = '';
 let _formError = '';
 let _draft = null;        // non-secret field values kept across a failed submit
@@ -183,6 +184,7 @@ function upgradeControl(s, remoteVersion, busy) {
     const label = order === null ? 'Upgrade' : `${order > 0 ? 'Downgrade' : 'Upgrade'} to v${escHtml(hub)}`;
     return `<button type="button" class="btn${order < 0 ? ' btn-primary' : ''}" data-action="ssh-upgrade" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>${label}</button>`;
 }
+const RECONNECT_HINT = "Checks the computer now and restarts the hub's connection to it.";
 
 /** A server's page: its facts, what to do about a problem, and Test, Edit and Remove in a bar pinned at its foot (Remove the danger button, the primary last). */
 function pageHtml(s) {
@@ -197,7 +199,7 @@ function pageHtml(s) {
     // One line says what to do; the raw error is behind Details, for support (#3981).
     const act = (s.status === 'key_unreadable' || s.status === 'unauthorized')
         ? statusMeta(s.status).hint
-        : s.status === 'unreachable' ? 'Is Coral running on that computer? Check the URL.' : '';
+        : s.status === 'unreachable' ? (s.last_error || 'Is Coral running on that computer? Check the URL.') : ''; // the hub's own reason (refused, no such host, private address, TLS, timed out) reads better than a guess
     const raw = s.last_error && s.last_error !== act ? s.last_error : '';
     const attention = act
         ? `<div class="servers-row-error" role="status"><span class="servers-row-hint">${escHtml(act)}</span>${raw ? ` <details class="servers-row-detail"><summary>Details</summary>${escHtml(raw)}</details>` : ''}</div>`
@@ -209,7 +211,9 @@ function pageHtml(s) {
     const bar = confirming
         ? `<button type="button" class="btn" data-action="delete-cancel">Cancel</button>
            <button type="button" class="btn btn-danger" data-action="delete-confirm" data-id="${escHtml(s.id)}">Confirm remove</button>`
-        : `<button type="button" class="btn" data-action="test" data-id="${escHtml(s.id)}"${busy ? ' disabled aria-busy="true"' : ''}>${busy ? 'Testing...' : 'Test'}</button>
+        : `<button type="button" class="btn" data-action="test" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}${busy && _busyVerb === 'test' ? ' aria-busy="true"' : ''}>${busy && _busyVerb === 'test' ? 'Testing...' : 'Test'}</button>
+           <button type="button" class="btn" data-action="reconnect" data-id="${escHtml(s.id)}" aria-describedby="reconnect-hint-${escHtml(s.id)}" title="${escHtml(RECONNECT_HINT)}"${busy ? ' disabled' : ''}${busy && _busyVerb === 'reconnect' ? ' aria-busy="true"' : ''}>${busy && _busyVerb === 'reconnect' ? 'Reconnecting...' : 'Reconnect'}</button>
+           <span class="sr-only" id="reconnect-hint-${escHtml(s.id)}">${escHtml(RECONNECT_HINT)}</span>
            <button type="button" class="btn" data-action="edit" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Edit</button>
            ${s.transport === 'ssh' && !running ? `${upgradeControl(s, version, busy)}
            ${s.owner_stamp ? '' : `<button type="button" class="btn" data-action="ssh-approvals" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Set up approvals</button>`}
@@ -391,24 +395,27 @@ async function onClick(e) {
     if (action === 'delete-cancel') { _confirmDelete = null; return render(); }
     if (action === 'delete-confirm') return doDelete(id);
     if (action === 'test') return doTest(id);
+    if (action === 'reconnect') return doTest(id, 'reconnect');
 }
 
-async function doTest(id) {
-    setBusy(id, true); render();
+/** Test, or Reconnect (a Test that also restarts the hub's connection to the server): the toast says the status and, when it is not online, the hub's reason. */
+async function doTest(id, verb = 'test') {
+    const failed = verb === 'reconnect' ? 'Reconnect failed: could not reach the hub.' : 'Test failed: could not reach the hub.';
+    _busyVerb = verb; setBusy(id, true); render();
     try {
-        const resp = await fetch(`/api/servers/${encodeURIComponent(id)}/test`, { method: 'POST' });
+        const resp = await (verb === 'reconnect' ? fetch(`/api/servers/${encodeURIComponent(id)}/reconnect`, { method: 'POST' }) : fetch(`/api/servers/${encodeURIComponent(id)}/test`, { method: 'POST' })); // both routes written out: the Hub shell census reads them
         const body = await readBody(resp);
         if (!resp.ok) {
             _loadError = describeServerError(resp.status, body);
         } else {
             _loadError = '';
             const m = statusMeta(body.status);
-            showToast(`${body.label || id}: ${m.label}`, body.status !== 'online');
+            showToast(`${body.label || id}: ${m.label}${body.status !== 'online' && body.last_error ? `. ${body.last_error}` : ''}`, body.status !== 'online');
         }
     } catch {
-        _loadError = 'Test failed: could not reach the hub.';
+        _loadError = failed;
     }
-    setBusy(id, false);
+    setBusy(id, false); _busyVerb = '';
     await load();
 }
 
