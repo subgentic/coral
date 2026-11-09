@@ -108,27 +108,26 @@ const LINK = 'https://www.dropbox.com/scl/fi/abc/release-plan.md?rlkey=k&dl=0';
             await ev(`(() => { const inner = window.fetch;
                 const json = (o, s) => Promise.resolve(new Response(JSON.stringify(o), { status: s || 200, headers: { 'Content-Type': 'application/json' } }));
                 window.fetch = (u, o) => { const p = new URL(String(u), location.origin).pathname, m = (o && o.method) || 'GET';
-                    if (p === '/api/dropbox/share-chat/team-a/preview') { window.__shareCalls.push(JSON.parse(o.body)); return json({ connected: true, can_expire: false, team: '', html: '<!doctype html><title>x</title><p>Hello</p><script>parent.__ran = 1</script>', hash: 'h'.repeat(64), size: 2048, included: 3, left_out: 1, name: 'team-a chat.html' }); }
-                    if (p === '/api/dropbox/share-chat/team-a' && m === 'POST') { window.__shareCalls.push(JSON.parse(o.body)); return json({ id: 9, name: 'team-a chat.html', folder: '/Shared from Coral/team-a', audience: 'people', people: 1 }); }
+                    if (p === '/api/dropbox/share-chat/team-a/preview') { window.__shareCalls.push(JSON.parse(o.body)); return json({ connected: true, can_expire: false, team: '', text: 'team-a chat\\n<p>Hello</p><script>parent.__ran = 1</script>\\n', hash: 'h'.repeat(64), size: 2048, included: 3, left_out: 1, name: 'team-a chat.md' }); }
+                    if (p === '/api/dropbox/share-chat/team-a' && m === 'POST') { window.__shareCalls.push(JSON.parse(o.body)); return json({ id: 9, name: 'team-a chat.md', folder: '/Shared from Coral/team-a', audience: 'people', people: 1 }); }
                     return inner(u, o); };
                 return true; })()`);
             await ev(`(async () => { const m = await import(${S} + 'dropbox_share.js'); m.openChatShareDialog({ project: 'team-a', ids: [3, 1, 2], opener: document.body }); return true; })()`);
             await waitFor(`!!document.querySelector('#dropbox-share-dialog[open] .dropbox-share-preview')`, 'the chat dialog', 6000);
-            const pv = await ev(`(() => { const f = document.querySelector('#dropbox-share-dialog .dropbox-share-preview'); return [f.getAttribute('sandbox'), f.hidden, /<p>Hello/.test(f.srcdoc)].join('|'); })()`);
-            check(`${tag}: the preview is a sandboxed frame, closed until asked for`, pv === '|true|true', pv);
+            const pv = await ev(`(() => { const f = document.querySelector('#dropbox-share-dialog .dropbox-share-preview'); return [f.tagName, f.hidden, f.textContent.includes('<script>parent.__ran = 1</script>'), f.children.length].join('|'); })()`);
+            check(`${tag}: the preview is the transcript as text, closed until asked for`, pv === 'PRE|true|true|0', pv);
             check(`${tag}: it says what to check`, await ev(`/Check the preview for private names and paths/.test(document.querySelector('#dropbox-share-dialog').textContent)`));
             check(`${tag}: without a team account, two choices`, (await ev(`document.querySelectorAll('#dropbox-share-dialog .dropbox-share-choice').length`)) === 2);
             check(`${tag}: a plan without expiry says so`, await ev(`/cannot set an expiry/.test(document.querySelector('#dropbox-share-dialog').textContent)`));
             await ev(`[...document.querySelectorAll('#dropbox-share-dialog button')].find(b => b.textContent === 'Open the preview').click(); true`);
-            await sleep(300); // sleep-ok: a sandboxed frame's script would have run by now if it could
-            check(`${tag}: the preview's script does not run`, !(await ev(`!!window.__ran`)));
+            check(`${tag}: text in the transcript never runs`, !(await ev(`!!window.__ran`)));
             check(`${tag}: no sideways scroll with the preview`, await ev(`document.documentElement.scrollWidth <= innerWidth + 1`));
             await shot(`dropbox-share-chat-${w}`);
             await ev(`(() => { const t = document.getElementById('dropbox-share-emails'); t.value = 'ana@example.com'; t.dispatchEvent(new Event('input')); return true; })()`);
             await ev(`[...document.querySelectorAll('#dropbox-share-dialog .modal-footer button')].pop().click(); true`);
             await waitFor(`/Shared with 1 person/.test(document.querySelector('#dropbox-share-dialog').textContent)`, 'shared', 6000);
             const chatSent = await ev(`JSON.stringify(window.__shareCalls.slice(-1)[0])`);
-            check(`${tag}: the share sends the ids and the preview's hash`, chatSent === JSON.stringify({ name: 'team-a chat.html', audience: 'people', emails: ['ana@example.com'], expire: true, confirm: true, ids: [3, 1, 2], hash: 'h'.repeat(64) }), chatSent);
+            check(`${tag}: the share sends the ids and the preview's hash`, chatSent === JSON.stringify({ name: 'team-a chat.md', audience: 'people', emails: ['ana@example.com'], expire: true, confirm: true, ids: [3, 1, 2], hash: 'h'.repeat(64) }), chatSent);
             await ev(`document.getElementById('dropbox-share-dialog').close(); true`);
         }
     } finally { await client.close(); }

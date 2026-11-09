@@ -1,21 +1,17 @@
 package routes
 
-// Share via Dropbox, a board chat (#14944, Security's condition 6): one self-contained HTML page of the messages the Operator chose, built HERE
+// Share via Dropbox, a board chat (#14944, Security's condition 6): one Markdown transcript of the messages the Operator chose, built HERE
 // (never by the browser), previewed before anything leaves the computer, and shared exactly as previewed (its SHA-256 is checked again).
-//
-// The page: no script, no event handler, no outside request, under a CSP meta (default-src 'none'; style-src 'unsafe-inline'). Every word an
-// agent, a guest or a person wrote is escaped; the formatting kept is paragraphs, line breaks, fenced and inline code; links are text, never
-// anchors; no images or attachments (named in the text only). Each message is redacted for secrets first (the credential rules, failing closed).
-// Left out: Coral's own system posts, messages to a group only, and every id (session, subscriber, message, task).
+// Markdown since #14982: Dropbox's preview does not render an .html file (the Operator's walk), and the Operator chose .md. Every character of
+// a message is escaped (escapeMarkdown); each message is redacted for secrets first (the credential rules, failing closed). Left out: Coral's own system
+// posts, messages to a group only, and every id (session, subscriber, message, task); no images or attachments.
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"html"
 	"net/http"
 	"strings"
 	"time"
@@ -28,24 +24,25 @@ import (
 	"github.com/subgentic/coral/internal/store"
 )
 
-const (
-	chatShareMaxMessages = 2000
-	chatPageCSP          = "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
-)
+const chatShareMaxMessages = 2000
 
-// chatPage is a rendered chat page and what it holds.
+// chatPage is a rendered chat transcript and what it holds.
 type chatPage struct {
-	html     []byte
+	text     []byte
 	hash     string
 	included int
 	leftOut  int
 }
 
-// renderChatPage builds the page from the messages, in the order given, with sharedOn's date in its header. It fails closed when a message
-// cannot be checked for secrets.
+// renderChatPage builds the transcript from the messages, in the order given, with sharedOn's date in its header: a Markdown file (.md), which
+// Dropbox's preview shows (the Operator found it does not render an .html file, comment 372, and chose Markdown, #14982). Coral writes the
+// only markup (the title and each message's heading); every character of a message, an author and the team is escaped (escapeMarkdown), so a
+// message cannot make a link, an image, a heading, code, HTML or an entity: it shows as written, links as plain text. Each message is redacted
+// for secrets first and fails closed; control and format characters (bidi included) are dropped. Left out: Coral's own system posts, messages
+// to a group only, and every id.
 func renderChatPage(team string, msgs []*board.Message, sharedOn time.Time) (chatPage, error) {
 	var page chatPage
-	var body bytes.Buffer
+	var body strings.Builder
 	first, last := "", ""
 	red := secrets.CredentialRedactor()
 	for _, m := range msgs {
@@ -71,8 +68,7 @@ func renderChatPage(team string, msgs []*board.Message, sharedOn time.Time) (cha
 		if author == "" {
 			author = "Unknown"
 		}
-		fmt.Fprintf(&body, "<article><header><b>%s</b> <time>%s</time></header>%s</article>\n",
-			html.EscapeString(plainText(author, 80)), html.EscapeString(at), formatChatText(string(text)))
+		fmt.Fprintf(&body, "### %s · %s\n\n%s\n\n", escapeMarkdown(plainText(author, 80)), escapeMarkdown(plainText(at, 40)), markdownLines(chatBodyText(string(text))))
 		page.included++
 	}
 	if page.included == 0 {
@@ -82,33 +78,19 @@ func renderChatPage(team string, msgs []*board.Message, sharedOn time.Time) (cha
 	if last != first {
 		span = first + " to " + last
 	}
-	var out bytes.Buffer
-	fmt.Fprintf(&out, `<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="%s">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="referrer" content="no-referrer">
-<title>%s</title>
-<style>
-body{margin:0 auto;max-width:860px;padding:16px;font:15px/1.5 -apple-system,system-ui,sans-serif;color:#1d1f23;background:#fff}
-h1{font-size:20px;margin:0 0 4px}.meta{color:#5b6070;margin:0 0 20px;font-size:13px}
-article{border-top:1px solid #e3e5ea;padding:10px 0}article header{margin-bottom:4px}time{color:#5b6070;font-size:12px;margin-left:6px}
-p{margin:0 0 8px;overflow-wrap:anywhere}pre{background:#f4f5f7;padding:8px;border-radius:6px;overflow-x:auto;white-space:pre-wrap;overflow-wrap:anywhere}
-code{background:#f4f5f7;padding:0 3px;border-radius:3px;font-size:13px}pre code{padding:0;background:none}
-@media (prefers-color-scheme: dark){body{color:#e6e7ea;background:#16171b}article{border-color:#30333b}.meta,time{color:#9a9ea8}pre,code{background:#22252c}}
-</style></head><body>
-<h1>%s</h1>
-<p class="meta">%s · %d %s · shared from Coral on %s. Secrets that looked like keys or tokens were removed.</p>
-%s</body></html>
-`, chatPageCSP, html.EscapeString("Coral chat: "+plainText(team, 60)), html.EscapeString(plainText(team, 60)+" chat"), html.EscapeString(span),
-		page.included, map[bool]string{true: "message", false: "messages"}[page.included == 1], sharedOn.UTC().Format("2 Jan 2006"), body.String())
-	page.html = out.Bytes()
-	sum := sha256.Sum256(page.html)
+	words := "messages"
+	if page.included == 1 {
+		words = "message"
+	}
+	head := fmt.Sprintf("# %s\n\n%s\n\n---\n\n", escapeMarkdown(plainText(team, 60)+" chat"),
+		escapeMarkdown(fmt.Sprintf("%s · %d %s · shared from Coral on %s. Secrets that looked like keys or tokens were removed.", span, page.included, words, sharedOn.UTC().Format("2 Jan 2006"))))
+	page.text = []byte(head + strings.TrimRight(body.String(), "\n") + "\n")
+	sum := sha256.Sum256(page.text)
 	page.hash = hex.EncodeToString(sum[:])
 	return page, nil
 }
 
-// plainText drops control and format characters (bidi included) and caps the length in characters.
+// plainText drops control and format characters (bidi included), puts a line on one line, and caps the length in characters.
 func plainText(s string, max int) string {
 	s = strings.Map(func(r rune) rune {
 		if r == '\n' || r == '\t' {
@@ -125,9 +107,37 @@ func plainText(s string, max int) string {
 	return strings.TrimSpace(s)
 }
 
-// formatChatText turns a message into escaped HTML: ``` fences become <pre><code>, blank lines split paragraphs, a line break is <br>, `x` is
-// <code>. Nothing else is markup: every character of the text is escaped, so a tag, an event handler or a javascript: link is shown as text.
-func formatChatText(s string) string {
+// escapeMarkdown puts a backslash before every ASCII punctuation character, which CommonMark (and Dropbox's preview) then shows as itself: no
+// emphasis, link, image, autolink (the ':' and '.' of an address are escaped), code, heading, list, quote, table, HTML tag or entity can start.
+func escapeMarkdown(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if r < 0x80 && unicode.IsPunct(r) || r < 0x80 && unicode.IsSymbol(r) {
+			b.WriteByte('\\')
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+// markdownLines escapes a message's text and keeps its line breaks: each line ends in a hard break (two spaces), a blank line stays a new
+// paragraph, and a line's leading spaces are kept as no-break spaces (they would otherwise make an indented code block).
+func markdownLines(s string) string {
+	lines := strings.Split(s, "\n")
+	for i, l := range lines {
+		lead := len(l) - len(strings.TrimLeft(l, " \t"))
+		l = strings.Repeat("\u00a0", lead) + escapeMarkdown(l[lead:])
+		if l != "" && i < len(lines)-1 && lines[i+1] != "" {
+			l += "  "
+		}
+		lines[i] = l
+	}
+	return strings.Join(lines, "\n")
+}
+
+// chatBodyText is a message's text for the transcript: its lines as written (a tab kept), control and format characters dropped, Windows line
+// ends made plain, and runs of blank lines kept to one.
+func chatBodyText(s string) string {
 	s = strings.Map(func(r rune) rune {
 		if r == '\n' || r == '\t' {
 			return r
@@ -137,50 +147,10 @@ func formatChatText(s string) string {
 		}
 		return r
 	}, strings.ReplaceAll(s, "\r\n", "\n"))
-	var out strings.Builder
-	parts := strings.Split(s, "```")
-	for i, part := range parts {
-		if i%2 == 1 && i < len(parts)-1 { // inside a closed fence: drop the language word on its first line
-			if nl := strings.IndexByte(part, '\n'); nl >= 0 && !strings.ContainsAny(part[:nl], " \t") {
-				part = part[nl+1:]
-			}
-			out.WriteString("<pre><code>" + html.EscapeString(strings.TrimRight(part, "\n")) + "</code></pre>")
-			continue
-		}
-		if i%2 == 1 { // an unclosed fence: its text is plain text
-			part = "```" + part
-		}
-		for _, para := range strings.Split(part, "\n\n") {
-			para = strings.Trim(para, "\n")
-			if strings.TrimSpace(para) == "" {
-				continue
-			}
-			lines := strings.Split(para, "\n")
-			for j, l := range lines {
-				lines[j] = inlineCode(l)
-			}
-			out.WriteString("<p>" + strings.Join(lines, "<br>") + "</p>")
-		}
+	for strings.Contains(s, "\n\n\n") {
+		s = strings.ReplaceAll(s, "\n\n\n", "\n\n")
 	}
-	return out.String()
-}
-
-// inlineCode escapes a line and wraps each `pair` in <code>.
-func inlineCode(l string) string {
-	segs := strings.Split(l, "`")
-	var b strings.Builder
-	for i, seg := range segs {
-		e := html.EscapeString(seg)
-		switch {
-		case i%2 == 1 && i < len(segs)-1:
-			b.WriteString("<code>" + e + "</code>")
-		case i%2 == 1:
-			b.WriteString("`" + e)
-		default:
-			b.WriteString(e)
-		}
-	}
-	return b.String()
+	return strings.TrimSpace(s)
 }
 
 type chatShareRequest struct {
@@ -219,7 +189,7 @@ func (b *DropboxBackup) chatPageFor(ctx context.Context, project string, ids []i
 	if err != nil {
 		return chatPage{}, http.StatusUnprocessableEntity, "Could not make the page: " + err.Error()
 	}
-	if len(page.html) > dropboxObjectMax {
+	if len(page.text) > dropboxObjectMax {
 		return chatPage{}, http.StatusRequestEntityTooLarge, "The page is too big for Dropbox backup's size; choose fewer messages"
 	}
 	return page, http.StatusOK, ""
@@ -246,8 +216,8 @@ func (h *CloudHandler) DropboxShareChatPreview(w http.ResponseWriter, r *http.Re
 		writeError(w, code, "chat", msg)
 		return
 	}
-	out := map[string]any{"connected": false, "html": string(page.html), "hash": page.hash, "size": len(page.html),
-		"included": page.included, "left_out": page.leftOut, "name": cleanShareName(project+" chat", ".html")}
+	out := map[string]any{"connected": false, "text": string(page.text), "hash": page.hash, "size": len(page.text),
+		"included": page.included, "left_out": page.leftOut, "name": cleanShareName(project+" chat", ".md")}
 	if cl, access, account, err := b.dropboxAccess(r.Context()); err == nil { // the dialog's choices: the team, and whether a link can expire
 		if acct, err := cl.CurrentAccount(r.Context(), access); err == nil && acct.AccountID == account {
 			out["connected"], out["team"], out["can_expire"] = true, acct.TeamName, !acct.Basic
@@ -301,7 +271,7 @@ func (h *CloudHandler) DropboxShareChat(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusConflict, "changed", "The chat changed since the preview; open the preview again")
 		return
 	}
-	name := cleanShareName(in.Name, ".html")
+	name := cleanShareName(in.Name, ".md")
 	if name == "" {
 		writeError(w, http.StatusBadRequest, "name", "Give the file a name recipients will see")
 		return
@@ -324,7 +294,7 @@ func (h *CloudHandler) DropboxShareChat(w http.ResponseWriter, r *http.Request) 
 	if in.Expire && !acct.Basic && in.Audience != store.DropboxSharePeople {
 		expires = b.clock().Add(shareExpiry).UTC().Truncate(time.Second)
 	}
-	src := shareSource{data: page.html, name: name, ext: ".html", team: project, version: 1}
+	src := shareSource{data: page.text, name: name, ext: ".md", team: project, version: 1}
 	res, code, refusal := b.share(ctx, cl, access, account, store.DropboxShareChat, "", src, name, in.Audience, emails, expires)
 	if refusal != nil {
 		writeJSON(w, code, refusal)
