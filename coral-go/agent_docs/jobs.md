@@ -51,7 +51,7 @@ Queues a new agent task. Returns immediately — all work (worktree creation, ag
 | `display_name` | string | `null` | Label shown in the UI. Defaults to `Task #<run_id>`. |
 | ~~`webhook_url`~~ | | | Not supported: Coral doesn't send webhooks, and a request with one is refused with 400. |
 | ~~`max_auto_accepts`~~ | | | Not supported: auto-accept has no count (it is the agent's permission flag), and a request with the field is refused with 400. |
-| `auto_accept` | bool | `false` | Adds the agent's permission flag so the run does not stop at permission prompts: `--permission-mode auto` for Claude, `--full-auto` for Codex, `--dangerously-skip-permissions` for Antigravity; a permission flag in `flags` is kept as it is. |
+| `auto_accept` | bool | `false` | Adds the agent's permission flag so the run does not stop at permission prompts: `--permission-mode auto` for Claude, `--full-auto` for Codex, and for Antigravity, agy and Gemini `--permission-mode auto`, which becomes agy's own `--mode auto` only where that agy lists it (otherwise the run asks) and never the skip flag; a permission flag in `flags` is kept as it is. |
 
 ### Example
 
@@ -254,7 +254,7 @@ Set `create_worktree: false` to run the agent directly in `repo_path` — useful
 
 ## Auto-accept
 
-When `auto_accept: true`, the agent's permission flag is added to its CLI flags, which skips most prompts at the agent level: `--permission-mode auto` for Claude (Auto mode, with Claude's safety checks), `--full-auto` for Codex, `--dangerously-skip-permissions` for Antigravity. A permission flag you pass in `flags` (a mode, or a bypass) is kept and nothing is added. Coral does not answer prompts itself and has no count of acceptances: the flag is the whole mechanism.
+When `auto_accept: true`, the agent's permission flag is added to its CLI flags, which skips most prompts at the agent level: `--permission-mode auto` for Claude (Auto mode, with Claude's safety checks), `--full-auto` for Codex, and agy's own Auto for Antigravity, agy and Gemini (`--permission-mode auto`, turned into `--mode auto` only where that agy lists it; never the skip flag). An agy job in Auto may still stop to ask: if the run's time runs out while its agent is at a prompt, the run is stopped with the exit reason `timeout_waiting_for_answer` and the fixed sentence *Stopped waiting for your answer: the agent was at a prompt when the run's time ran out.* (never the prompt's own words). A permission flag you pass in `flags` (a mode, or a bypass) is kept and nothing is added. Coral does not answer prompts itself and has no count of acceptances: the flag is the whole mechanism.
 
 !!! warning
     Auto-accept is inherently risky. The agent may accept destructive operations. Prefer reviewing agent output in the dashboard for sensitive tasks.
