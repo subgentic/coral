@@ -71,8 +71,11 @@ async function waitStable(ev, expression, what, quietMs = 300, { timeout = 5000,
 // render, the feed connected, the first history list and settings loaded. `step` names a per-view hook on
 // the same object (e.g. 'agentSelected'); its arguments follow. A build without the hook fails loudly
 // rather than falling back to a sleep.
+// The ceiling, not a delay: a page that is ready answers at once (0.2 s on a quiet Mac, 1.4 s at CPU x10), and only a stalled one runs to it. It was 10 s, which a loaded Windows runner missed once with
+// nothing drawn yet (#14852: feed, list and Hub frame all false, and the retry passed in 99 s); 30 s still names the step and the parts that were missing, well before the suite's own limit.
+const READY_TIMEOUT_MS = 30000;
 async function coralReady(ev, step = null, ...args) {
-    const timeout = 10000;
+    const timeout = READY_TIMEOUT_MS;
     await waitFor(ev, `!!window.__coralReady`, 'window.__coralReady (the app readiness hook)', { timeout });
     const call = step ? `window.__coralReady.${step}(...${JSON.stringify(args)})` : `window.__coralReady`;
     // Never hang a suite: a hook that does not resolve fails with what it was waiting for.
@@ -115,7 +118,7 @@ async function settle(ev, ms, quietMs = 120) {
 }
 
 module.exports = {
-    waitFor, waitStable, coralReady, nextFrame, framesJs, settle, isNavigationError,
+    waitFor, waitStable, coralReady, nextFrame, framesJs, settle, isNavigationError, READY_TIMEOUT_MS,
     bind: ev => ({
         nextFrame: () => nextFrame(ev),
         waitFor: (expression, what, opts) => waitFor(ev, expression, what, opts),
