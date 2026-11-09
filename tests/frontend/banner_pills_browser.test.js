@@ -88,6 +88,7 @@ const STUB = `(() => {
             // a phone's Keys strip opens by itself for a question (#6802) and moves the view by design; this suite is about the pills moving nothing, so the strip and its chip are out of the page here (agent_keys_browser covers them)
             if (phone) await ev(`(() => { const st = document.createElement('style'); st.textContent = '.keys-chip, #terminal-key-bar { display: none !important; }'; document.head.appendChild(st); return true; })()`);
             await ev(`window.__cls = 0; window.__shifts = []; window.__flips.length = 0; true`);
+            await waitFor(`!!document.getElementById('launch-disclosure-banner')`, 'the launch notice (it is read after first paint and moves the page when it arrives: that is not the pill)', { timeout: 8000 }).catch(() => {}); await ev(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`);
             const g0 = await geometry();
             assert.ok(g0.header && g0.capture, `${tag}: the agent view is on screen: ` + JSON.stringify(g0));
 
