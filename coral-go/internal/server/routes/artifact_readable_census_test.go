@@ -87,4 +87,6 @@ func TestArtifactReadableRefusesATunneledRequestThatNamesNoHubAccount(t *testing
 	assert.False(t, artifactReadable(req(map[string]string{tunnel.ViaHeader: cloud.ViaSecret()}), dir, id), "the real stamp and no Hub account")
 	assert.False(t, artifactReadable(req(map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: "not a hub user"}), dir, id), "an account name that is not a Hub user id")
 	assert.True(t, artifactReadable(req(map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: "hub-user-9999ffff"}), dir, id), "a Hub account: the route decides what it may do")
+	assert.False(t, artifactReadable(req(map[string]string{tunnel.ViaHeader: "1", tunnel.HubUserHeader: "hub-user-9999ffff"}), dir, id), "a forged stamp with a valid Hub user is nothing: the stamp must be the connector's own (#14912)")
+	assert.True(t, artifactReadable(req(map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: "hub-user-1234abcd"}), dir, id), "the connector's own stamp with a valid Hub user reads here")
 }
