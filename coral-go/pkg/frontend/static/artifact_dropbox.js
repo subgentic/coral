@@ -37,6 +37,7 @@ export function dropboxBlock(hex, server, details) {
     const ask = (path, typedNeeded = null, anyway = null) => {
         if (document.activeElement && acts.contains(document.activeElement)) trigger = document.activeElement;
         confirmBox.textContent = ''; confirmBox.hidden = false;
+        confirmBox.setAttribute('aria-label', 'Confirm removing this file from Dropbox'); // its own name again after an Undo confirm (UI Accessibility, round 4)
         const words = document.createElement('p'); words.id = `${idBase}-words`;
         words.textContent = 'Remove it from Dropbox for every Coral that uses this backup. Dropbox may keep it for a while in its deleted files. It stays out of the backup until you send it again.';
         confirmBox.append(words);
@@ -80,6 +81,7 @@ export function dropboxBlock(hex, server, details) {
     const askUndo = () => {
         if (document.activeElement && acts.contains(document.activeElement)) trigger = document.activeElement;
         confirmBox.textContent = ''; confirmBox.hidden = false;
+        confirmBox.setAttribute('aria-label', 'Confirm undoing this edit'); // the group is named for what it confirms (UI Accessibility, round 4)
         const words = document.createElement('p'); words.id = `${idBase}-undo`;
         words.textContent = 'This removes the edited version here. The edit stays in your Dropbox history.';
         const go = button('Undo this edit', async () => {
@@ -89,7 +91,7 @@ export function dropboxBlock(hex, server, details) {
             confirmBox.hidden = true;
             say.textContent = r.status === 200 ? 'The edit was undone: the version before it is the newest again.' : String(r.body.error || 'Not undone: Coral could not change the file.');
             if (r.status === 200) await load(true);
-            trigger?.focus?.();
+            (acts.querySelector('button') || trigger)?.focus?.(); // the buttons were drawn again: a live one, never the removed trigger
         });
         const cancel = button('Cancel', () => { confirmBox.hidden = true; confirmBox.textContent = ''; say.textContent = 'Nothing changed.'; trigger?.focus?.(); });
         confirmBox.append(words, go, cancel);
