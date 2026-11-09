@@ -2,6 +2,8 @@ package routes
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/subgentic/coral/internal/config"
@@ -28,6 +31,8 @@ type RemoteServersHandler struct {
 	statusListener func(id, status string)
 	// onDelete, when set, hears the id of a server that was deleted, so what is kept for it in memory (an ssh stream target and its key) goes too (#11370).
 	onDelete func(id string)
+	// reconnector restarts the hub's workers for one server (Reconnect).
+	reconnector func(id string)
 
 	store         *store.RemoteServerStore
 	healthTimeout time.Duration
@@ -177,6 +182,48 @@ func keyRenewWarning(since *string) string {
 	return "other accounts on this computer could read this server's API key until " + day + ", when Coral found its data folder open: make a new key on that server and enter it here with Edit"
 }
 
+// addrRefusedError marks a dial the hub refused before connecting: the host did not resolve, or
+// it resolves to a private or reserved address and "Allow private network" is off.
+type addrRefusedError struct{ err error }
+
+func (e *addrRefusedError) Error() string { return e.err.Error() }
+func (e *addrRefusedError) Unwrap() error { return e.err }
+
+// probeFailure says why a health probe did not connect, in a sentence that names the cause and
+// what to do, never the URL, a header or the key (a transport error names the URL, so its text is
+// not used). A cause that is not recognised stays "remote unreachable", the text the dashboard maps.
+func probeFailure(err error) string {
+	var ar *addrRefusedError
+	var dns *net.DNSError
+	var unknownCA x509.UnknownAuthorityError
+	var hostErr x509.HostnameError
+	var certInvalid x509.CertificateInvalidError
+	var notTLS tls.RecordHeaderError
+	switch {
+	case errors.As(err, &ar) && strings.Contains(ar.Error(), "private or reserved"):
+		return "remote address is private or reserved: tick Allow private network for this server if it is on your LAN or tailnet"
+	case errors.As(err, &dns) || (ar != nil && strings.Contains(ar.Error(), "cannot resolve")):
+		return "remote host name could not be resolved: check the URL's host name"
+	case errors.As(err, &ar):
+		return "remote URL is not valid: " + ar.Error()
+	case errors.As(err, &unknownCA), errors.As(err, &hostErr), errors.As(err, &certInvalid):
+		return "remote TLS certificate was not accepted: check the certificate and the host name in the URL"
+	case errors.As(err, &notTLS), strings.Contains(err.Error(), "server gave HTTP response to HTTPS client"):
+		return "remote does not speak TLS at that address (it looks like plain http): use an http:// URL"
+	case errors.Is(err, syscall.ECONNREFUSED):
+		return "remote refused the connection: nothing is listening at that address and port (is Coral running there, and is a port forward or tunnel to it up?)"
+	case errors.Is(err, syscall.ENETUNREACH), errors.Is(err, syscall.EHOSTUNREACH):
+		return "remote network or host is unreachable from this hub: check the route, VPN or tailnet"
+	case errors.Is(err, syscall.ECONNRESET), errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
+		return "remote closed the connection: is the URL's scheme (http or https) and port right?"
+	}
+	var ne net.Error
+	if errors.As(err, &ne) && ne.Timeout() {
+		return "remote timed out"
+	}
+	return "remote unreachable"
+}
+
 // CheckRemoteHealth calls GET {baseURL}/api/health with the key. Unless
 // allowPrivate, the hostname is resolved, validated and then dialled by IP so
 // DNS rebinding between check and connect cannot reach a private address.
@@ -195,7 +242,7 @@ func CheckRemoteHealth(ctx context.Context, baseURL, apiKey string, allowPrivate
 			}
 			ip, err := httputil.ResolveAndValidateURL("http://" + addr)
 			if err != nil {
-				return nil, err
+				return nil, &addrRefusedError{err}
 			}
 			return dialer.DialContext(ctx, network, net.JoinHostPort(ip, port))
 		},
@@ -216,13 +263,7 @@ func CheckRemoteHealth(ctx context.Context, baseURL, apiKey string, allowPrivate
 	req.Header.Set("Accept", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		// Transport errors name the URL, never request headers.
-		msg := "remote unreachable"
-		var ne net.Error
-		if errors.As(err, &ne) && ne.Timeout() {
-			msg = "remote timed out"
-		}
-		return RemoteHealth{Status: store.RemoteStatusUnreachable, Err: msg}
+		return RemoteHealth{Status: store.RemoteStatusUnreachable, Err: probeFailure(err)}
 	}
 	defer resp.Body.Close()
 	switch rerr := proxy.Refusal(resp); {
@@ -434,7 +475,14 @@ func (h *RemoteServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 // Test handles POST /api/servers/{id}/test and records the outcome.
-func (h *RemoteServersHandler) Test(w http.ResponseWriter, r *http.Request) {
+func (h *RemoteServersHandler) Test(w http.ResponseWriter, r *http.Request) { h.probe(w, r, false) }
+
+// Reconnect handles POST /api/servers/{id}/reconnect: a Test that also drops the hub's workers for
+// the server (poll loop, feed, idle connections) and starts them again, so a server stuck on an old
+// failure is dialled from scratch. Operator only.
+func (h *RemoteServersHandler) Reconnect(w http.ResponseWriter, r *http.Request) { h.probe(w, r, true) }
+
+func (h *RemoteServersHandler) probe(w http.ResponseWriter, r *http.Request, reconnect bool) {
 	id := urlParam(r, "id")
 	cur, err := h.store.Get(r.Context(), id)
 	if err != nil {
@@ -461,6 +509,9 @@ func (h *RemoteServersHandler) Test(w http.ResponseWriter, r *http.Request) {
 		health = CheckRemoteHealth(r.Context(), cur.URL, key, cur.AllowPrivate, h.healthTimeout)
 	}
 	h.store.SetStatus(r.Context(), id, health.Status, health.Err)
+	if reconnect && h.reconnector != nil {
+		h.reconnector(id)
+	}
 	h.tellStatus(id, health.Status)
 	srv, _ := h.store.Get(r.Context(), id)
 	writeJSON(w, http.StatusOK, viewRemote(srv))
@@ -468,6 +519,9 @@ func (h *RemoteServersHandler) Test(w http.ResponseWriter, r *http.Request) {
 
 // SetOnDelete sets who hears a deleted server's id.
 func (h *RemoteServersHandler) SetOnDelete(f func(id string)) { h.onDelete = f }
+
+// SetStatusListener sets who hears the status an edit or a Test found (the hub's remote workers).
+func (h *RemoteServersHandler) SetReconnector(f func(id string)) { h.reconnector = f }
 
 // SetStatusListener sets who hears the status an edit or a Test found (the hub's remote workers).
 func (h *RemoteServersHandler) SetStatusListener(f func(id, status string)) { h.statusListener = f }

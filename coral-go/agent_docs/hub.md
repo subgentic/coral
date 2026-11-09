@@ -20,7 +20,8 @@ User guide: [Multi-server hub](https://subgentic.github.io/coral/multi-server-hu
 | POST | `/api/servers` | Add `{id, label, url, api_key, allow_private?}`. The hub calls the remote's `/api/health` with the key before saving. A server not marked `allow_private` must be `https`. |
 | PATCH | `/api/servers/{id}` | Edit label, URL, `allow_private` or key (the key is write-only; omit to keep it). |
 | DELETE | `/api/servers/{id}` | Remove. |
-| POST | `/api/servers/{id}/test` | Re-run the connectivity and key check. |
+| POST | `/api/servers/{id}/test` | Re-run the connectivity and key check. A failure's `last_error` names the cause (connection refused, host name not resolved, private address not allowed, TLS certificate rejected, timed out). |
+| POST | `/api/servers/{id}/reconnect` | Operator only. A Test that also stops and restarts the hub's poller and feed for the server and drops its idle connections. |
 
 `id` is a slug (`[a-z0-9-]`, up to 32 characters, not `local`).
 
