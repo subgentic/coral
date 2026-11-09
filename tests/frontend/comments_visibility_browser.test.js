@@ -67,7 +67,8 @@ const COMMENTS = [
             let s=await state();assert.equal(s.text,'Comments (1)');assert.equal(s.expanded,'false');
             await ev(`window.BL.remove('coral-artifact-comments-open');window.PP.closeAllTabs();true`);await open();
             s=await state();assert.equal(s.text,'Comments (1)');
-            assert.equal(s.expanded,width===390?'false':'true','phone starts on the document, desktop shows open threads');
+            const paneW = await ev(`document.querySelector('#preview-main').clientWidth`);
+            assert.equal(s.expanded, width === 390 || paneW < 720 ? 'false' : 'true', `a phone, or a docked pane too narrow for the column (${paneW} px: its comments would be a sheet over the file), starts on the document; a wide pane shows open threads (#14846)`);
             // The saved open choice also survives reload on a phone.
             await ev(`(()=>{const t=document.querySelector('#preview-toolbar .ac-toggle');if(t.getAttribute('aria-expanded')==='true')t.click();t.click();})()`);
             await load(width,theme,COMMENTS,false);s=await state();assert.equal(s.expanded,'true');
