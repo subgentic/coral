@@ -1,5 +1,6 @@
 /* Bounded browser observations only. Never send session IDs, text, or errors. */
 import { pollEvery } from './overload.js';
+import { isCloud } from './server_base.js';
 let enabled = false;
 let initialized = false;
 let sessionsReady = false;
@@ -24,6 +25,7 @@ function observeActiveDay(force = false) {
 }
 
 function emit(event, props = {}) {
+    if (isCloud()) return; // through the Hub the bare path is dropped (a 204, #14820): not sent
     try {
         fetch('/api/tracking/event', {
             method:'POST', headers:{'Content-Type':'application/json'},

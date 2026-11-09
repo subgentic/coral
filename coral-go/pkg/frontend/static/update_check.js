@@ -6,6 +6,7 @@ import { browserLocal } from './safe_storage.js';
 import { reportUpdate } from './dashboard_analytics.js';
 import { noticeColumn, announceNotice } from './notifications.js';
 import { importOnce } from './import_once.js';
+import { isCloud } from './server_base.js';
 
 /**
  * Fetch update info from the backend and show a toast if a new version is available.
@@ -14,6 +15,7 @@ import { importOnce } from './import_once.js';
 export async function checkForUpdates(force = false) {
     // Respect opt-out (only for automatic checks)
     if (!force && browserLocal.get("coral-update-check-enabled") === "false") return;
+    if (isCloud()) return; // through the Hub the bare path is the Hub's own, a fixed 'nothing to update' (#14820): a computer's update is its own (its Computers row)
 
     try {
         // A manual check asks again (the server answers from a cache and refreshes at most once a minute, #4133).

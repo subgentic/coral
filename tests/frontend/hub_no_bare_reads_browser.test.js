@@ -7,9 +7,8 @@ const { coralReady } = require('./helpers/wait');
 const { setupHubWorld } = require('./helpers/hub_world');
 // What the Hub itself serves at its own origin (the stub Hub world answers these too).
 const HUB_OWN = [/^\/api\/account$/, /^\/api\/servers(\/|$)/, /^\/api\/sessions\/live$/, /^\/api\/settings$/, /^\/api\/health$/, /^\/api\/needs-you$/, /^\/api\/system\/cli-check$/, /^\/api\/token-usage$/, /^\/api\/remote\//, /^\/api\/cloud-unavailable$/, /^\/api\/auth\//, /^\/api\/me$/];
-// Bare reads that are NOT yet known to be the Hub's own: found by this census on the first run (#14766) and listed so the census holds the rest at zero. coral-hub is asked which of them the Hub serves; the ones it does not should be skipped in Hub mode
-// (and leave this list): update-check (update_check.js), scheduled/jobs (scheduler.js), system/status (system_status.js, settings_dialog.js), tracking/event (dashboard_analytics.js; api.js names it as never proxied, so probably the Hub's own).
-const ASK_HUB = [/^\/api\/system\/update-check$/, /^\/api\/scheduled\/jobs$/, /^\/api\/system\/status$/, /^\/api\/tracking\/event$/];
+// None allowed: the four stubs the Hub answered (system/status, update-check, scheduled/jobs, tracking/event) are skipped in Hub mode (#14820), so a bare read of any of them fails this census.
+const ASK_HUB = [];
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const check = (label, ok, detail) => { console.log(`[${ok ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' — ' + detail : ''}`); if (!ok) process.exitCode = 1; };
@@ -26,7 +25,7 @@ const ASK_HUB = [/^\/api\/system\/update-check$/, /^\/api\/scheduled\/jobs$/, /^
             const counts = {}; for (const p of all) counts[p] = (counts[p] || 0) + 1;
             console.log(`${at}bare /api requests: ` + JSON.stringify(counts));
             const stray = Object.keys(counts).filter(p => !HUB_OWN.some(re => re.test(p)) && !ASK_HUB.some(re => re.test(p)));
-            check(`${at}no NEW bare read of a computer's route (only the Hub's own routes, and the four listed for coral-hub, are asked at its origin)`, stray.length === 0, JSON.stringify(stray));
+            check(`${at}no bare read: only the Hub's own routes are asked at its origin`, stray.length === 0, JSON.stringify(stray));
         }
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

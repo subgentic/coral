@@ -3,6 +3,7 @@
 import { isPhoneLayout } from './phone_layout.js';
 import { keepMenuOnScreen } from './menu_fit.js';
 import { state } from './state.js';
+import { isCloud } from './server_base.js';
 import { escapeHtml, escapeAttr, showToast, showView, setRowCurrent, focusPageHeading } from './utils.js';
 import { announceNotice } from './notifications.js';
 import { registerActions, withId, uuidOf } from './actions.js';
@@ -41,6 +42,7 @@ function announceFailedRuns(before) {
 }
 
 async function fetchJobs() {
+    if (isCloud()) { scheduledJobs = []; for (const f of jobsListeners) f(); return; } // through the Hub the bare path is its own fixed empty list (#14820); no request
     try {
         const resp = await fetch('/api/scheduled/jobs');
         const data = await resp.json();
