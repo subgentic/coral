@@ -122,7 +122,6 @@ document.addEventListener('keydown', e => {
     if (to < 0) return;
     e.preventDefault();
     list[to]?.focus();
-    current.scrolled = scrollPositions(toggle); // moving the keyboard to an item can scroll the box the menu sits in (a short window: a phone on its side at 200% text); that scroll is the menu's own, and its event, a frame later, must not close it (goal_head_phone: 'Escape gives the focus back to More')
 }, true); // capture: before the page's Escape closes the dialog behind the menu
 
 document.addEventListener('click', e => {
