@@ -76,7 +76,7 @@ func TestManyDeletesInAnHourAreHeldForTheOperator(t *testing.T) {
 func TestCancelKeepAndEditedRemovals(t *testing.T) {
 	ob := NewDropboxOutbox(openTestDB(t))
 	ctx := context.Background()
-	_, _ = ob.QueueRemoval(ctx, rmHex("a"), "a‮b\x00.md", removalNow, false)
+	_, _ = ob.QueueRemoval(ctx, rmHex("a"), "a\u202eb\x00.md", removalNow, false)
 	_, _ = ob.QueueRemoval(ctx, rmHex("b"), "b", removalNow, false)
 	_, _ = ob.QueueRemoval(ctx, rmHex("c"), "c", removalNow, true)
 	r, _, _ := ob.Removal(ctx, rmHex("a"))
