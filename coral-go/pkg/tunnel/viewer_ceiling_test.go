@@ -115,10 +115,20 @@ func TestViewerTierCapsRequestsAndTerminalFrames(t *testing.T) {
 		w, err := sess.DialWS(c, "/ws/terminal/a", "", nil)
 		require.NoError(t, err, tier)
 		_, _, _ = w.Read(ctx)
-		n := len(fc.seenInputs())
+		// Count the typed frames, not every frame: the View viewer's ping (above) is forwarded to the terminal too, and it may still be in flight here.
+		typed := func() int {
+			n := 0
+			for _, f := range fc.seenInputs() {
+				if strings.Contains(f, `"terminal_input"`) {
+					n++
+				}
+			}
+			return n
+		}
+		n := typed()
 		ok, _ := json.Marshal(map[string]string{"type": "terminal_input", "data": "ls\n"})
 		require.NoError(t, w.Write(ctx, websocket.MessageText, ok), tier)
-		require.Eventually(t, func() bool { return len(fc.seenInputs()) == n+1 }, 3*time.Second, 10*time.Millisecond, "%q types", tier)
+		require.Eventually(t, func() bool { return typed() == n+1 }, 10*time.Second, 10*time.Millisecond, "%q types", tier)
 		w.CloseNow()
 	}
 }
