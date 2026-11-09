@@ -675,6 +675,27 @@ CREATE TABLE IF NOT EXISTS dropbox_audit (
 );
 CREATE INDEX IF NOT EXISTS idx_dropbox_outbox_digest ON dropbox_outbox(digest);
 
+-- Share via Dropbox (#14944): one row a copy made to share, so Stop sharing works after a restart and Disconnect, Rekey and Switch can say what is
+-- still shared (Security's conditions 7 and 9). Never the link itself (read again from Dropbox when shown), never who it was shared with (only how
+-- many), never a token. preparing: reserved before the copy is made (a crash leaves a row the cleanup undoes); live; stopping: being stopped.
+CREATE TABLE IF NOT EXISTS dropbox_shares (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    path       TEXT NOT NULL UNIQUE,         -- the copy, under /Shared from Coral/
+    digest     TEXT NOT NULL DEFAULT '',     -- what was shared (an artifact's bytes); '' for a chat page
+    kind       TEXT NOT NULL,                -- artifact or chat
+    audience   TEXT NOT NULL,                -- people, team or public
+    people     INTEGER NOT NULL DEFAULT 0,   -- how many people it was shared with (never who)
+    account_id TEXT NOT NULL,
+    file_id    TEXT NOT NULL DEFAULT '',
+    rev        TEXT NOT NULL DEFAULT '',     -- the copy's rev: it is deleted at this rev
+    state      TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_dropbox_shares_digest ON dropbox_shares(digest);
+-- When each share was made, for the 20-an-hour bound (a stopped share still counts); rows older than two hours are dropped.
+CREATE TABLE IF NOT EXISTS dropbox_share_log (at TEXT NOT NULL);
+
 -- Coral Hub enrollment in progress, and its rate limit (one row). The device code is
 -- sealed like the server token. Kept across restarts so a restart loop reuses one code
 -- instead of asking the hub for a new one each time.
