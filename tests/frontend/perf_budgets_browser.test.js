@@ -111,6 +111,9 @@ const { framesJs, coralReady } = require('./helpers/wait');
             mo.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
             T.ws.handleCoralMessage({ type: 'coral_diff', changed: [e], removed: [] }); await ${framesJs(3)}; seen.push(...mo.takeRecords().map(r => ({ type: r.type, inList: false, target: 'late' }))); mo.disconnect(); return seen; })()`);
         await feed({ summary: 'budget settled' }); // the first message may still be settling what the last one changed
+        // and the page's own late work (the switched-to agent's changed-files list answering a moment after the switch: 1 run in 25 at CPU x4 saw it inside the next count) is waited out: nothing writes anywhere for 400 ms
+        await ev(`window.__writes = 0; new MutationObserver(rs => { window.__writes += rs.length; }).observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true }); true`);
+        await require('./helpers/wait').waitStable(ev, 'window.__writes', 'the page has stopped writing before a quiet message is counted', 400, { timeout: 10000 });
         const quiet = await feed({ staleness_seconds: 7 });
         assert.deepEqual(quiet, [], 'a message that changes nothing drawn writes nothing to the page: ' + JSON.stringify(quiet));
         const one = await feed({ summary: 'budget step ' + Math.random() });
