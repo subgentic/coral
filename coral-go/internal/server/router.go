@@ -520,6 +520,7 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Put("/api/dropbox/filters", s.cloudHandler.DropboxSetFilters)                 // stage 4 (#14655): what to back up
 	r.Post("/api/dropbox/check", s.cloudHandler.DropboxCheckAgain)                  // stage 4c (#14693): Check again after freeing space
 	r.Put("/api/dropbox/retention", s.cloudHandler.DropboxSetRetention)             // stage 4b (#14703): Keep in Dropbox for N days
+	r.Put("/api/dropbox/autosync", s.cloudHandler.DropboxSetAutoSync)               // 5a auto-sync (#14714): take edits made in Dropbox as new versions
 	r.Post("/api/dropbox/edits/{doc}/promote", s.cloudHandler.DropboxPromoteEdit)   // stage 5a (#14714): use an edit made in Dropbox as the next version
 	r.Post("/api/dropbox/edits/{doc}/separate", s.cloudHandler.DropboxSeparateEdit) // stage 5a: keep it as its own artifact
 	r.Post("/api/dropbox/remove/{digest}", s.cloudHandler.DropboxRemove)            // stage 6a (#14814): remove an artifact from Dropbox

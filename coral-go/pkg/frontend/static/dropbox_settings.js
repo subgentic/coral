@@ -104,6 +104,7 @@ function renderBackup(st, keepControls = false) {
         }
     }
     renderEdits(ed.items || []);
+    renderAutoSync(st.autosync);
     if (keepControls) return;
     const chosen = new Set((st.filters && st.filters.types) || []);
     if (box) for (const input of box.querySelectorAll('input[type=checkbox]')) input.checked = chosen.has(input.value);
@@ -111,6 +112,28 @@ function renderBackup(st, keepControls = false) {
     if (age) age.value = String((st.filters && st.filters.max_age_days) || 0);
     const ret = $('settings-dropbox-keep-for');
     if (ret && !pendingRetention) ret.value = String(keep);
+}
+
+// renderAutoSync shows the auto-sync switch (#14714, the Operator: edits made in Dropbox become new versions on their own) and why it is paused, with
+// Resume. Edits it holds (a changed type, a big size jump, the switch off or paused) are the list below, with their two decisions.
+function renderAutoSync(a) {
+    const box = $('settings-dropbox-autosync'), resume = $('settings-dropbox-autosync-resume'), why = $('settings-dropbox-autosync-note');
+    if (!box) return;
+    const on = !a || a.on !== false, paused = a && a.paused ? String(a.paused) : '';
+    box.checked = on;
+    if (resume) resume.hidden = !(on && paused);
+    if (!why) return;
+    why.textContent = !on ? 'Edits made in Dropbox wait here for you to decide.'
+        : paused === 'breaker' ? 'Edits from Dropbox are paused: too many arrived in an hour. They wait here until you Resume.'
+        : paused === 'signin' ? 'Edits from Dropbox are paused after a change of sign-in. They wait here until you Resume.'
+        : 'An edited file becomes its next version, marked as edited in Dropbox. A file whose type changed, or that grew very large, waits here for you.';
+}
+
+export async function setAutoSync(on) {
+    let res;
+    try { res = await post('/api/dropbox/autosync', 'PUT', JSON.stringify({ on: !!on })); } catch { res = { ok: false, body: {} }; }
+    if (!res.ok) { note('Not changed: Coral could not save it.'); }
+    renderAutoSync(res.ok ? res.body : lastStatus && lastStatus.autosync);
 }
 
 // renderEdits draws the edits made in Dropbox that wait for the Operator (stage 5a, #14714): Coral's own name for the file, the edit's size and
@@ -658,6 +681,9 @@ function wire() {
     on('settings-dropbox-retention-save', saveRetention);
     on('settings-dropbox-retention-on', confirmRetention);
     on('settings-dropbox-retention-cancel', cancelRetention);
+    const sync = $('settings-dropbox-autosync');
+    if (sync) sync.addEventListener('change', () => setAutoSync(sync.checked));
+    on('settings-dropbox-autosync-resume', () => setAutoSync(true));
     const field = $('settings-dropbox-keep-for');
     if (field) field.addEventListener('input', dropRetentionPreview); // a changed field takes the shown count and Turn on away
     wired = true;

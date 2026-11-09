@@ -26,6 +26,7 @@ func heldEdit(t *testing.T) (*backupEnv, []string, store.DropboxEdit) {
 	t.Helper()
 	be, ds := newDropboxEditEnv(t, 2)
 	giveRecordsATeam(t, be.h.dbx.dataDir, "team-a")
+	require.NoError(t, be.h.dbx.store.SetAutoSync(context.Background(), false)) // the Operator decides (auto-sync off): these tests are of that decision
 	be.dbx.edit(be.versionFile(ds[0]), []byte("# doc 0, edited in Dropbox\n"))
 	be.notice()
 	open := be.open()

@@ -135,6 +135,9 @@ func (h *CloudHandler) DropboxStatus(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		out["retention"] = ret
+		if on, paused, err := d.store.AutoSync(r.Context()); err == nil {
+			out["autosync"] = map[string]any{"on": on, "paused": paused} // 5a auto-sync (#14714): the switch and why it is paused ('' runs)
+		}
 	}
 	if d.backup != nil && d.backup.edits != nil {
 		if n, _, err := d.backup.edits.Stats(r.Context()); err == nil {

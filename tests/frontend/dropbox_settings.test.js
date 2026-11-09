@@ -22,6 +22,7 @@ const { JSDOM } = require('jsdom');
         <div id="settings-dropbox-note"></div>
         <div id="settings-dropbox-backup" hidden>
           <div id="settings-dropbox-counts"></div>
+          <input type="checkbox" id="settings-dropbox-autosync"><button id="settings-dropbox-autosync-resume" hidden></button><p id="settings-dropbox-autosync-note"></p>
           <ul id="settings-dropbox-edits" hidden></ul>
           <div id="settings-dropbox-types"></div>
           <input id="settings-dropbox-age" type="number">
@@ -509,6 +510,24 @@ const { JSDOM } = require('jsdom');
     rmBtns('Keep them in Dropbox').pop().click(); await tick(); await tick();
     c = calls.filter(x => x.url === '/api/dropbox/removals/cancel').pop();
     assert.ok(['held', 'waiting'].includes(JSON.parse(c.body).state));
+    // Auto-sync of edits made in Dropbox (#14714): the switch, why it is paused, and Resume.
+    await status({ app_key_set: true, connected: true, state: 'connected', account_id: 'dbid:AAA', backup: {}, filters: { types: [], max_age_days: 0 }, retention: { days: 0 }, autosync: { on: true, paused: 'breaker' } });
+    assert.ok($('settings-dropbox-autosync').checked);
+    assert.match($('settings-dropbox-autosync-note').textContent, /paused: too many arrived in an hour/);
+    assert.ok(shown('settings-dropbox-autosync-resume'), 'Resume is offered');
+    answers['/api/dropbox/autosync'] = { status: 200, body: { on: true, paused: '' } };
+    $('settings-dropbox-autosync-resume').click(); await tick(); await tick();
+    let sync = calls.filter(x => x.url === '/api/dropbox/autosync').pop();
+    assert.strictEqual(sync.method, 'PUT');
+    assert.deepStrictEqual(JSON.parse(sync.body), { on: true });
+    assert.ok(!shown('settings-dropbox-autosync-resume'), 'resumed');
+    answers['/api/dropbox/autosync'] = { status: 200, body: { on: false, paused: '' } };
+    $('settings-dropbox-autosync').checked = false;
+    $('settings-dropbox-autosync').dispatchEvent(new dom.window.Event('change')); await tick(); await tick();
+    sync = calls.filter(x => x.url === '/api/dropbox/autosync').pop();
+    assert.deepStrictEqual(JSON.parse(sync.body), { on: false });
+    assert.match($('settings-dropbox-autosync-note').textContent, /wait here for you to decide/);
+
     // Not connected: nothing about removals.
     await status({ app_key_set: true, connected: false, state: 'disconnected' });
     assert.ok(rm.hidden && !shown('settings-dropbox-delete-rule'));

@@ -31,7 +31,7 @@ var dropboxDocRe = regexp.MustCompile(`^[0-9a-f]{32}$`)
 var errEditNoTeam = errors.New("the file belongs to no team")
 
 // promoteEdit writes the held bytes as the next version of the document's series and returns the version number.
-func (b *DropboxBackup) promoteEdit(e store.DropboxEdit) (int, error) {
+func (b *DropboxBackup) promoteEdit(e store.DropboxEdit, who string) (int, error) {
 	orig, _, ok := b.record(e.OrigDigest, e.DocID)
 	if !ok {
 		return 0, errNoOriginal
@@ -61,6 +61,9 @@ func (b *DropboxBackup) promoteEdit(e store.DropboxEdit) (int, error) {
 		rec.Board, rec.OwnerKind, rec.OwnerID = orig.rec.Board, base.OwnerKind, base.OwnerID
 		rec.Uploader, rec.Role = dropboxEditUploader, ""
 		rec.UploadedBy, rec.Source, rec.PromotedBy = "owner", sourceDropboxEdit, "operator"
+		if who == "dropbox" { // auto-sync (#14714): never the Operator, never the original uploader (Security's condition 1)
+			rec.UploadedBy, rec.PromotedBy = "dropbox", "auto_sync"
+		}
 		rec.TaskID = 0
 	}); err != nil {
 		return 0, err
@@ -132,22 +135,30 @@ func (h *CloudHandler) decideEdit(w http.ResponseWriter, r *http.Request, promot
 		errBadRequest(w, "not a document id")
 		return
 	}
-	b := d.backup
-	ctx := r.Context()
-	e, err := b.edits.Begin(ctx, doc)
-	if errors.Is(err, store.ErrNotPending) {
-		writeError(w, http.StatusConflict, "not_pending", "This edit was already decided, or is being decided")
+	out, code, errCode, msg := d.backup.decide(r.Context(), doc, promote, "operator")
+	if code != http.StatusOK {
+		writeError(w, code, errCode, msg)
 		return
 	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// decide is one decision on a held edit, the Operator's (who "operator") or auto-sync's (who "dropbox"): Begin (one decision an edit), the account
+// check (condition c), the held bytes read again without following a link (a and b), then Promote or Keep separate, recorded and audited. It answers
+// the HTTP code, and on a refusal its error code and sentence.
+func (b *DropboxBackup) decide(ctx context.Context, doc string, promote bool, who string) (map[string]any, int, string, string) {
+	d := b.d
+	e, err := b.edits.Begin(ctx, doc)
+	if errors.Is(err, store.ErrNotPending) {
+		return nil, http.StatusConflict, "not_pending", "This edit was already decided, or is being decided"
+	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "", "could not read the edit")
-		return
+		return nil, http.StatusInternalServerError, "", "could not read the edit"
 	}
 	// An edit of an account no longer connected is not decided here (Security's condition c); it is dropped on the next pass.
 	if c, cerr := d.store.Get(ctx); cerr != nil || !c.Connected || c.AccountID != e.AccountID {
 		_ = b.edits.Abandon(context.WithoutCancel(ctx), e.ID)
-		writeError(w, http.StatusConflict, "other_account", "This edit was made in a Dropbox account that is not the one connected now")
-		return
+		return nil, http.StatusConflict, "other_account", "This edit was made in a Dropbox account that is not the one connected now"
 	}
 	// The held bytes are read again, without following a link, and must still be the digest (conditions a and b).
 	if err := b.openHeld(e); err != nil {
@@ -155,14 +166,13 @@ func (h *CloudHandler) decideEdit(w http.ResponseWriter, r *http.Request, promot
 		_ = b.edits.Forget(bg, e.ID)                   // not this edit's bytes any more: it is forgotten,
 		b.dropHeld(bg, e.Digest)                       // its file goes (a regular file only),
 		_ = d.store.SetListCursor(bg, e.AccountID, "") // and the next listing reads Dropbox again from the start, so it is fetched again
-		writeError(w, http.StatusConflict, "held_changed", "The held edit changed on this computer: Coral will fetch it again from Dropbox")
-		return
+		return nil, http.StatusConflict, "held_changed", "The held edit changed on this computer: Coral will fetch it again from Dropbox"
 	}
 	state, result, out := store.DropboxEditSeparate, "", map[string]any{}
 	if promote {
 		state = store.DropboxEditPromoted
 		var n int
-		if n, err = b.promoteEdit(e); err == nil {
+		if n, err = b.promoteEdit(e, who); err == nil {
 			result, out["version"] = fmt.Sprint(n), n
 		}
 	} else {
@@ -174,26 +184,26 @@ func (h *CloudHandler) decideEdit(w http.ResponseWriter, r *http.Request, promot
 	if err != nil {
 		_ = b.edits.Abandon(context.WithoutCancel(ctx), e.ID) // pending again: nothing was decided
 		if errors.Is(err, errEditNoTeam) {
-			writeError(w, http.StatusConflict, "no_team", "This file belongs to no team, so it cannot take a new version. Keep the edit separate instead.")
-			return
+			return nil, http.StatusConflict, "no_team", "This file belongs to no team, so it cannot take a new version. Keep the edit separate instead."
 		}
 		if errors.Is(err, errStoreFull) {
-			writeError(w, http.StatusRequestEntityTooLarge, "store_full", "The artifact store is full: free space or raise the limit (Settings > Storage and cleanup)")
-			return
+			return nil, http.StatusRequestEntityTooLarge, "store_full", "The artifact store is full: free space or raise the limit (Settings > Storage and cleanup)"
 		}
-		writeError(w, http.StatusInternalServerError, "", "could not record the decision")
-		return
+		return nil, http.StatusInternalServerError, "", "could not record the decision"
 	}
 	if err := b.edits.Finish(ctx, e.ID, state, result); err != nil {
-		writeError(w, http.StatusInternalServerError, "", "the decision was written but not recorded")
-		return
+		return nil, http.StatusInternalServerError, "", "the decision was written but not recorded"
 	}
-	_ = d.store.AddAudit(ctx, store.DropboxAudit{Kind: store.DropboxAuditEdit, Who: "operator", Reason: state}) // no names, ids or bytes
-	b.dropHeld(ctx, e.Digest)                                                                                   // in the store now (or the same bytes were already): the held copy goes
-	b.sweepHeld(ctx)                                                                                            // and anything else no open edit names
+	reason := state
+	if who == "dropbox" {
+		reason = "auto_" + state
+	}
+	_ = d.store.AddAudit(ctx, store.DropboxAudit{Kind: store.DropboxAuditEdit, Who: who, Reason: reason}) // no names, ids or bytes
+	b.dropHeld(ctx, e.Digest)                                                                             // in the store now (or the same bytes were already): the held copy goes
+	b.sweepHeld(ctx)                                                                                      // and anything else no open edit names
 	noteArtifactsChanged()
 	out["decision"] = state
-	writeJSON(w, http.StatusOK, out)
+	return out, http.StatusOK, "", ""
 }
 
 // DropboxEditItems is the held edits as Needs you items for the board's list (this computer only: Security's SHOULD G). Each names Coral's own

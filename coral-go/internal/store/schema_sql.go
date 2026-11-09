@@ -564,7 +564,9 @@ CREATE TABLE IF NOT EXISTS dropbox_connection (
     retention_days      INTEGER NOT NULL DEFAULT 0, -- stage 4b (#14703): delete the Dropbox copies older than this many days; 0 is off (the default)
     retention_since     TEXT,                       -- when the Operator confirmed it
     retention_last_pass TEXT,                       -- the last retention pass (a local clock earlier than this refuses a pass)
-    list_cursor         TEXT                        -- stage 5a (#14714): the listing cursor of /v1 for the account connected now; cleared by any new sign-in
+    list_cursor         TEXT,                       -- stage 5a (#14714): the listing cursor of /v1 for the account connected now; cleared by any new sign-in
+    autosync_off        INTEGER NOT NULL DEFAULT 0, -- 5a auto-sync (#14714, the Operator): 1 when the Operator turned off "Take edits made in Dropbox as new versions"
+    autosync_paused     TEXT NOT NULL DEFAULT ''    -- why auto-sync is paused ('' runs): signin (another account, a disconnect, a re-key) or breaker (too many in an hour)
 );
 
 -- Dropbox stage 4's outbox (#14655): one row per file to back up (an artifact version or its item_data sidecar), by its Dropbox path (ids only,

@@ -175,6 +175,7 @@ var activityNotAnInboxAction = map[string]string{
 	"POST /api/dropbox/removals/cancel":                                    "Dropbox removals after a delete (#14814): keep files in Dropbox, the Operator's, on this computer only",
 	"POST /api/dropbox/removals/confirm":                                   "Dropbox removals after a delete (#14814): let held removals go, the Operator's, on this computer only",
 	"PUT /api/dropbox/retention":                                           "Dropbox retention (#14703): the Operator's, on this computer only",
+	"PUT /api/dropbox/autosync":                                            "Dropbox auto-sync of edits (#14714): the Operator's, on this computer only",
 	"POST /api/dropbox/check":                                              "Dropbox Check again (#14693): asks the backup for a pass, on this computer only",
 	"POST /api/folder-tags/{folderName}":                                   "tags on folders",
 	"POST /api/history-import":                                             "importing earlier chats",

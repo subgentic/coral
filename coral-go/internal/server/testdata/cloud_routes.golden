@@ -540,6 +540,7 @@ PUT /api/cloud/hub-relaunch never
 PUT /api/cloud/max-mode never
 PUT /api/cloud/redact-tokens never
 PUT /api/custom-models launch
+PUT /api/dropbox/autosync never
 PUT /api/dropbox/filters never
 PUT /api/dropbox/retention never
 PUT /api/resources/{name} never

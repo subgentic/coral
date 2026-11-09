@@ -66,6 +66,7 @@ type agentUploadRecord struct {
 	DocID string `json:"doc_id,omitempty"`
 	// PromotedBy is "operator" on a version that was an edit made in Dropbox and that the Operator chose to use (Dropbox stage 5a, #14714): the
 	// explicit exception to the series' own-uploader rule is this one decision, recorded, never a loosening of the rule.
+	// "auto_sync" when the Operator's auto-sync switch promoted it (#14714): UploadedBy is then "dropbox", never the owner.
 	PromotedBy string `json:"promoted_by,omitempty"`
 }
 
