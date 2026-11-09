@@ -32,7 +32,7 @@ type retentionPlan struct {
 }
 
 // planRetention picks whole pairs (a version and its sidecar) of the account's due rows, oldest first, up to the ceiling.
-func (b *DropboxBackup) planRetention(ctx context.Context, account string, days int, now time.Time) (retentionPlan, error) {
+func (b *DropboxBackup) planRetention(ctx context.Context, account string, days int, now time.Time, markers map[string]bool) (retentionPlan, error) {
 	var p retentionPlan
 	n, err := b.outbox.LedgerSize(ctx, account)
 	if err != nil {
@@ -51,7 +51,7 @@ func (b *DropboxBackup) planRetention(ctx context.Context, account string, days 
 		}
 		pair := due[i:j]
 		i = j
-		if !strings.HasPrefix(pair[0].Path, "/v1/") || b.keepDoc(ctx, pair[0].DocID, pair[0].Version) || len(p.take)+len(pair) > ceiling {
+		if !strings.HasPrefix(pair[0].Path, "/v1/") || b.keepDoc(ctx, pair[0].DocID, pair[0].Version) || markers[pair[0].Digest] || len(p.take)+len(pair) > ceiling {
 			p.held += len(pair)
 			continue
 		}
@@ -73,7 +73,7 @@ func (b *DropboxBackup) RetentionPreview(ctx context.Context, days int) (count i
 		return 0, 0, 0, 0, nil
 	}
 	_, _ = b.outbox.StampAccount(ctx, c.AccountID)
-	p, err := b.planRetention(ctx, c.AccountID, days, b.now())
+	p, err := b.planRetention(ctx, c.AccountID, days, b.now(), nil) // the dry run calls no Dropbox: no marker listing (the pass itself keeps them)
 	return len(p.take), p.bytes, p.held, p.ledger, err
 }
 
@@ -165,7 +165,14 @@ func (b *DropboxBackup) Retain(ctx context.Context) {
 		}
 	}
 
-	p, err := b.planRetention(ctx, c.AccountID, days, now)
+	// Stage 6b's keepDoc MUST (Security, the 6b delta): the offload markers are listed once a pass; a document whose bytes any Coral keeps only in
+	// Dropbox is kept, and a listing that fails or is cut off deletes nothing this pass.
+	markers, merr := b.markerDigests(ctx, cl, access)
+	if merr != nil {
+		refuse("markers_unreadable")
+		return
+	}
+	p, err := b.planRetention(ctx, c.AccountID, days, now, markers)
 	if err != nil {
 		return
 	}
@@ -216,4 +223,33 @@ func (b *DropboxBackup) Retain(ctx context.Context) {
 		}
 	}
 	// Still running: the rows stay deleting with the job's id, and the next pass reads its answer.
+}
+
+// markerDigests lists v1/offloaded once (recursive, page by page, bounded) and answers the digests that any Coral keeps only in Dropbox. No
+// marker folder is no marker; any other failure, or a listing cut off with more to read, is an error (fail closed).
+func (b *DropboxBackup) markerDigests(ctx context.Context, cl *dropbox.Client, access string) (map[string]bool, error) {
+	out := map[string]bool{}
+	page, err := cl.ListFolder(ctx, access, "/v1/offloaded")
+	if errors.Is(err, dropbox.ErrNotFound) {
+		return out, nil
+	}
+	for pages := 0; ; pages++ {
+		if err != nil {
+			return nil, err
+		}
+		for _, e := range page.Entries {
+			// v1/offloaded/<hhh>/<digest>/<server id>: the digest is the folder above a marker.
+			parts := strings.Split(strings.TrimPrefix(strings.ToLower(e.PathLower), "/"), "/")
+			if len(parts) >= 4 && parts[0] == "v1" && parts[1] == "offloaded" && objectNameRe.MatchString(parts[3]) {
+				out[parts[3]] = true
+			}
+		}
+		if !page.HasMore {
+			return out, nil
+		}
+		if pages+1 >= dropboxListPagesMax {
+			return nil, errors.New("the marker listing was cut off")
+		}
+		page, err = cl.ListFolderContinue(ctx, access, page.Cursor)
+	}
 }
