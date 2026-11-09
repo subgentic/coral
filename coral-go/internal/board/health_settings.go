@@ -34,6 +34,9 @@ type HealthSettings struct {
 	UploadNoTask HealthRuleOn       `json:"upload_no_task"`
 	// GoalSize tells the orchestrator when a goal has more than Limit tasks (#7808, goal #21 part 6), counting its open and its done ones: once per crossing, and again at each further Limit.
 	GoalSize HealthGoalSize `json:"goal_size"`
+	// CompactContext types the CLI's own /compact to a member that is idle at its prompt with a context past ThresholdK thousand tokens (#14849): off by default, for Claude agents only. Orchestrator: the team's
+	// orchestrator is compacted too (off: it holds the most state, so it is left alone until the Operator says otherwise).
+	CompactContext HealthCompact `json:"compact_context"`
 	// AskReminder reminds a member, once, of a question (post --ask, asks.go) that @mentions them and that they have not answered for AfterMin (#7794). It runs for a team whether or not the
 	// orchestrator's check is on: a reminder to one agent costs the team nothing.
 	AskReminder HealthMentionNudge `json:"ask_reminder"`
@@ -273,6 +276,20 @@ type HealthMentionNudge struct {
 	AfterMin int  `json:"after_min"`
 }
 
+// HealthCompact: compact an idle agent's context past ThresholdK thousand tokens (#14849).
+type HealthCompact struct {
+	On           bool `json:"on"`
+	ThresholdK   int  `json:"threshold_k"`
+	Orchestrator bool `json:"orchestrator"`
+}
+
+// CompactThresholdK bounds: below 50k a compaction saves little and costs a request, above 900k the CLI has compacted on its own.
+const (
+	CompactThresholdDefaultK = 200
+	CompactThresholdMinK     = 50
+	CompactThresholdMaxK     = 900
+)
+
 // DefaultHealthSettings are the design's values. The check is ON for a team that has not set it (the operator, 2026-11-07: "turn health check on for teams by default", #14091, which reverses #4962's off-by-default):
 // a team that stored OFF keeps off, and the migration that kept the older teams on stays as it is. The rules and numbers below are what it uses; its cost is bounded (a check goes out only when something changed,
 // and the heartbeat is off: see TestANewTeamsFirstHourOfHealthChecksIsFew).
@@ -288,6 +305,7 @@ func DefaultHealthSettings() HealthSettings {
 		PostNoTask:     HealthRuleOn{On: true},
 		UploadNoTask:   HealthRuleOn{On: true},
 		GoalSize:       HealthGoalSize{On: true, Limit: 15},
+		CompactContext: HealthCompact{On: false, ThresholdK: CompactThresholdDefaultK},
 		AskReminder:    HealthMentionNudge{On: true, AfterMin: 15},
 		Deviations:     HealthRuleOn{On: true},
 		ActionList:     HealthActionList{StuckWaitMin: 10, OverloadedTasks: 5, OverloadedSleeping: 1, StaleReviewHours: 24, MentionMin: 30},
@@ -315,6 +333,10 @@ func (h HealthSettings) Clamp() HealthSettings {
 	h.HeldNotice.AfterMin = min(max(h.HeldNotice.AfterMin, 5), 1440)
 	h.BusyNoTask.AfterMin = min(max(h.BusyNoTask.AfterMin, 5), 1440)
 	h.GoalSize.Limit = min(max(h.GoalSize.Limit, 5), 500)
+	if h.CompactContext.ThresholdK == 0 {
+		h.CompactContext.ThresholdK = CompactThresholdDefaultK // a body that does not carry the setting
+	}
+	h.CompactContext.ThresholdK = min(max(h.CompactContext.ThresholdK, CompactThresholdMinK), CompactThresholdMaxK)
 	h.AskReminder.AfterMin = min(max(h.AskReminder.AfterMin, 5), 1440)
 	h.ActionList = h.ActionList.clamp()
 	h.Landing.Branch = strings.TrimSpace(h.Landing.Branch)

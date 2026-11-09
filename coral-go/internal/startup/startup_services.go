@@ -318,6 +318,15 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 		safeGo(ctx, "health_nudges", func() { healthNudges.Run(ctx) })
 	}
 
+	// A large context is compacted at a quiet moment, for the teams that turned it on (off by default, #14849).
+	contextCompact := background.NewContextCompact(srv.BoardStore(), discoverFn)
+	var pausedFn func(string) bool
+	if bh := srv.BoardHandler(); bh != nil {
+		pausedFn = bh.IsPaused
+	}
+	contextCompact.Attach(taskStore, store.NewTokenUsageStore(sessStore.DB()), agentRT, pausedFn)
+	safeGo(ctx, "context_compact", func() { contextCompact.Run(ctx) })
+
 	// Tasks' one-time reminders (task add --remind-at, #4175 step 3): asked for by a person or
 	// the orchestrator, so they go out whatever the health monitor setting says.
 	taskReminders := background.NewTaskReminders(srv.BoardStore(), agentRT, discoverFn)
