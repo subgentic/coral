@@ -91,3 +91,51 @@ func TestTheNextVersionOfAFileWithChangesRequestedComesBackForReview(t *testing.
 	require.NoError(t, err)
 	assert.NotContains(t, tags[plain], "for review", "an ordinary upload is not tagged for review")
 }
+
+// #14964 (the Operator): a file sent for review as version 1 and then uploaded as versions 2 to 4 with --new-version-of and no --tag showed in Needs you as "version 1" with Approve, and versions 2 to 4 were not
+// there at all: an approval of version 1 would stand for none of them. A new version of a file still waiting for review is the one for review (the newest), and the older versions' reviews are closed.
+func TestANewVersionOfAFileStillWaitingForReviewIsTheOneForReview(t *testing.T) {
+	rig, _ := ownerRig(t)
+	_, bh := setupBoardTestServer(t)
+	rig.h.bs = bh.bs
+	bh.coralDir = rig.coralDir
+	ctx := context.Background()
+	up := func(text, ref string, tagged bool) string {
+		url := rig.srv.URL + "/api/agent/artifacts?session_id=a1"
+		if tagged {
+			url += "&tag=for+review&question=Approve+the+mock%3F"
+		}
+		req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(text))
+		require.NoError(t, err)
+		req.Header.Set("X-Artifact-Name", "mock.html")
+		req.Header.Set("X-Artifact-Media-Type", "text/plain")
+		if ref != "" {
+			req.Header.Set(seriesHeader, ref)
+		}
+		resp, err := agentClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Contains(t, []int{http.StatusOK, http.StatusCreated}, resp.StatusCode, text)
+		var out map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+		return strings.TrimPrefix(out["uri"].(string), "coral://artifacts/")
+	}
+	v1 := up("mock v1", "", true)
+	v2 := up("mock v2", "coral://artifacts/"+v1, false)
+	v3 := up("mock v3", "coral://artifacts/"+v2, false)
+	v4 := up("mock v4", "coral://artifacts/"+v3, false)
+	tags, err := rig.h.bs.ArtifactTags(ctx, "team-a")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"for review"}, tags[v4], "the newest version is the one for review")
+	for _, old := range []string{v1, v2, v3} {
+		assert.NotContains(t, tags[old], "for review", "an older version is superseded, not a decision of its own")
+	}
+	assert.Equal(t, []string{"superseded"}, tags[v1])
+
+	// a file that was never for review does not become so by a new version
+	p1 := up("plain v1", "", false)
+	p2 := up("plain v2", "coral://artifacts/"+p1, false)
+	tags, err = rig.h.bs.ArtifactTags(ctx, "team-a")
+	require.NoError(t, err)
+	assert.NotContains(t, tags[p2], "for review", "a file that was not for review does not become so by a new version")
+}
