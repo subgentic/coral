@@ -34,6 +34,8 @@ type HealthSettings struct {
 	UploadNoTask HealthRuleOn       `json:"upload_no_task"`
 	// GoalSize tells the orchestrator when a goal has more than Limit tasks (#7808, goal #21 part 6), counting its open and its done ones: once per crossing, and again at each further Limit.
 	GoalSize HealthGoalSize `json:"goal_size"`
+	// AssignLimit is how many waiting (pending) tasks an agent may have before assigning it another is refused with the other agents by load (#14862, the Operator's assignment limit); --force overrides. 0: no limit.
+	AssignLimit int `json:"assign_limit"`
 	// AskReminder reminds a member, once, of a question (post --ask, asks.go) that @mentions them and that they have not answered for AfterMin (#7794). It runs for a team whether or not the
 	// orchestrator's check is on: a reminder to one agent costs the team nothing.
 	AskReminder HealthMentionNudge `json:"ask_reminder"`
@@ -273,6 +275,9 @@ type HealthMentionNudge struct {
 	AfterMin int  `json:"after_min"`
 }
 
+// DefaultAssignLimit is the waiting tasks an agent may have before a new assignment to it is refused (#14862).
+const DefaultAssignLimit = 2
+
 // DefaultHealthSettings are the design's values. The check is ON for a team that has not set it (the operator, 2026-11-07: "turn health check on for teams by default", #14091, which reverses #4962's off-by-default):
 // a team that stored OFF keeps off, and the migration that kept the older teams on stays as it is. The rules and numbers below are what it uses; its cost is bounded (a check goes out only when something changed,
 // and the heartbeat is off: see TestANewTeamsFirstHourOfHealthChecksIsFew).
@@ -288,6 +293,7 @@ func DefaultHealthSettings() HealthSettings {
 		PostNoTask:     HealthRuleOn{On: true},
 		UploadNoTask:   HealthRuleOn{On: true},
 		GoalSize:       HealthGoalSize{On: true, Limit: 15},
+		AssignLimit:    DefaultAssignLimit,
 		AskReminder:    HealthMentionNudge{On: true, AfterMin: 15},
 		Deviations:     HealthRuleOn{On: true},
 		ActionList:     HealthActionList{StuckWaitMin: 10, OverloadedTasks: 5, OverloadedSleeping: 1, StaleReviewHours: 24, MentionMin: 30},
@@ -315,6 +321,7 @@ func (h HealthSettings) Clamp() HealthSettings {
 	h.HeldNotice.AfterMin = min(max(h.HeldNotice.AfterMin, 5), 1440)
 	h.BusyNoTask.AfterMin = min(max(h.BusyNoTask.AfterMin, 5), 1440)
 	h.GoalSize.Limit = min(max(h.GoalSize.Limit, 5), 500)
+	h.AssignLimit = min(max(h.AssignLimit, 0), 50)
 	h.AskReminder.AfterMin = min(max(h.AskReminder.AfterMin, 5), 1440)
 	h.ActionList = h.ActionList.clamp()
 	h.Landing.Branch = strings.TrimSpace(h.Landing.Branch)

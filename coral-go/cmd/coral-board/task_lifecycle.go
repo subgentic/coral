@@ -215,16 +215,23 @@ func cmdTaskCancel(st *boardState, args []string) {
 // "reassign 5 Orchestrator" used to leave --to empty and silently unassign the
 // task, returning it to the pool every worker can claim from.
 func parseReassignAssignee(args []string) (string, error) {
+	assignee, _, err := parseReassign(args)
+	return assignee, err
+}
+
+// parseReassign is parseReassignAssignee with --force: assign even though the agent has more waiting tasks than the team's limit (#14862).
+func parseReassign(args []string) (string, bool, error) {
 	fs := flag.NewFlagSet("task-reassign", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	assignee := fs.String("to", "", "New assignee (empty = unassigned)")
+	force := fs.Bool("force", false, "Assign past the team's limit of waiting tasks")
 	if err := fs.Parse(args); err != nil {
-		return "", fmt.Errorf("invalid reassign options: %v (usage: task reassign <id> [--to \"Agent Name\"])", err)
+		return "", false, fmt.Errorf("invalid reassign options: %v (usage: task reassign <id> [--to \"Agent Name\"] [--force])", err)
 	}
 	if fs.NArg() > 0 {
-		return "", fmt.Errorf("unexpected argument %q: use --to %q to assign; omit --to only to unassign", fs.Arg(0), fs.Arg(0))
+		return "", false, fmt.Errorf("unexpected argument %q: use --to %q to assign; omit --to only to unassign", fs.Arg(0), fs.Arg(0))
 	}
-	return *assignee, nil
+	return *assignee, *force, nil
 }
 
 func cmdTaskReassign(st *boardState, args []string) {
@@ -239,7 +246,7 @@ func cmdTaskReassign(st *boardState, args []string) {
 		clierr.Exit1()
 	}
 
-	newAssignee, err := parseReassignAssignee(args[1:])
+	newAssignee, force, err := parseReassign(args[1:])
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
@@ -250,6 +257,9 @@ func cmdTaskReassign(st *boardState, args []string) {
 	body := map[string]any{
 		"subscriber_id": subscriberID,
 		"assignee":      *assignee,
+	}
+	if force {
+		body["force"] = true
 	}
 
 	data, status, err := apiCallRaw("POST", fmt.Sprintf("/%s/tasks/%d/reassign", url.PathEscape(st.Project), taskID), body)

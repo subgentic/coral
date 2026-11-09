@@ -108,6 +108,9 @@ func runUpdateTaskOracle(t *testing.T, seed int64, counts map[string]int) {
 			require.NoError(t, err)
 		}
 		h.SetTerminal(term)
+		noLimit := board.DefaultHealthSettings() // the oracle compares the split with what was before #4756, not the assignment limit (#14862), which a seed's many assignments would trip
+		noLimit.AssignLimit = 0
+		require.NoError(t, h.bs.SetHealthSettings(ctx, "p", noLimit))
 		h.isArchivedSession = func(_ context.Context, name string) bool { return name == members[3].session }
 		mux := chi.NewRouter()
 		if i == 0 {

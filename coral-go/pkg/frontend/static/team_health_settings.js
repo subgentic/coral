@@ -20,6 +20,7 @@ export const HEALTH_DEFAULTS = {
     held_notice: { on: true, after_min: 10 },
     busy_no_task: { on: true, after_min: 10 }, post_no_task: { on: true }, upload_no_task: { on: true }, // work done off the books (#7793)
     goal_size: { on: true, limit: 15 }, // a goal with too many tasks (#7808)
+    assign_limit: 2, // the most waiting tasks an agent may have before assigning it another is refused (#14862)
     goals_ready: { on: true, wait_min: 30, nudge: '' }, unowned_tasks: { on: true, wait_min: 15, nudge: '' }, // two more lines of the check (Goal #80, #8975): on unless a team turns them off
     release: { on: false, branch: 'main', tag_pattern: 'v*', wait_min: 1440, nudge: '' }, // the branch is past its newest release tag (Goal #80, #8948): off until a team turns it on
     landing: { on: false, branch: 'main', wait_min: 120, nudge: '' }, // done work that has not landed on the branch (Goal #80, #8947): off until a team turns it on
