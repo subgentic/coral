@@ -10,7 +10,10 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -23,6 +26,8 @@ var procGetExtendedTcpTable = windows.NewLazySystemDLL("iphlpapi.dll").NewProc("
 
 const (
 	tcpTableOwnerPIDListener = 3 // TCP_TABLE_OWNER_PID_LISTENER
+	tcpTableOwnerPIDAll      = 5 // TCP_TABLE_OWNER_PID_ALL
+	tcpStateEstablished      = 5
 	afInet                   = 2
 	afInet6                  = 23
 )
@@ -35,6 +40,8 @@ var (
 	tcpRows      = tcpListeners
 	selfSID      = winuser.CurrentSID
 	fileOwner    = fileOwnerSID
+	// connectionOwnerPID connects to host:port and says which process owns the server end of that connection (connected false: nothing accepted it); a test replaces it.
+	connectionOwnerPID = connectionOwner
 )
 
 // checkListener: the process that would receive a connection to host:port is Coral's (#224 B): its token's user is this user's
@@ -49,6 +56,28 @@ func checkListener(host string, port int) error {
 	pids, err := listenerPIDs(host, port)
 	if err != nil {
 		return fmt.Errorf("coral: can't list what listens on port %d to check it is Coral: %w", port, err)
+	}
+	// The listener table can miss a listener that is there (it showed a new one's row about three times in twenty), so a missing row is not "nothing is there", and rows that pass are not the whole
+	// answer either: a program on 127.0.0.1:<port> takes the connections even when Coral holds 0.0.0.0:<port>, and the table may have missed its row. So the tool connects every time (about a
+	// millisecond), and the owner of the server end of that connection is checked like a listener's. Where nothing accepts the connection and no listener row shows, there is nothing there.
+	pid, connected, cerr := connectionOwnerPID(host, port, connReadWindow)
+	if connected && errors.Is(cerr, errNoConnRow) {
+		// The table missed this one connection's row for the whole window (about one call in twenty here): one fresh connection gets a shorter second window, and then it refuses. A row naming
+		// another process, two rows or a read error refuse at once, with no second try.
+		pid, connected, cerr = connectionOwnerPID(host, port, connRetryWindow)
+	}
+	if !connected && len(pids) == 0 {
+		if cerr != nil {
+			// Not refused but not connected either (a timeout, an unreachable address): it is not known that nothing is there, so the token is not sent.
+			return &ForeignListenerError{Port: port, Why: fmt.Sprintf("Coral couldn't check who runs the program on that port: %v. Check what is listening on port %d, or start Coral.", cerr, port)}
+		}
+		return nil
+	}
+	if connected {
+		if cerr != nil {
+			return &ForeignListenerError{Port: port, Why: fmt.Sprintf("Coral couldn't check who runs the program on that port: %v. Check what is listening on port %d, or start Coral.", cerr, port)}
+		}
+		pids = append(pids, pid)
 	}
 	self := uint32(os.Getpid())
 	for _, pid := range pids {
@@ -315,15 +344,18 @@ func tcpListeners(af uint32) ([]listenRow, error) {
 }
 
 // tcpTable is the listener table of family af, its rows as raw bytes (after the entry count).
-func tcpTable(af uint32) ([]byte, error) {
+func tcpTable(af uint32) ([]byte, error) { return tcpTableOf(af, tcpTableOwnerPIDListener) }
+
+// tcpTableOf is the table of the given class (listeners, or all connections) of family af.
+func tcpTableOf(af, class uint32) ([]byte, error) {
 	var size uint32
-	procGetExtendedTcpTable.Call(0, uintptr(unsafe.Pointer(&size)), 0, uintptr(af), tcpTableOwnerPIDListener, 0)
+	procGetExtendedTcpTable.Call(0, uintptr(unsafe.Pointer(&size)), 0, uintptr(af), uintptr(class), 0)
 	for attempt := 0; attempt < 4; attempt++ {
 		if size == 0 {
 			size = 4096
 		}
 		buf := make([]byte, size)
-		r, _, _ := procGetExtendedTcpTable.Call(uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&size)), 0, uintptr(af), tcpTableOwnerPIDListener, 0)
+		r, _, _ := procGetExtendedTcpTable.Call(uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&size)), 0, uintptr(af), uintptr(class), 0)
 		switch windows.Errno(r) {
 		case 0:
 			n := binary.LittleEndian.Uint32(buf[0:4])
@@ -343,4 +375,113 @@ func tcpTable(af uint32) ([]byte, error) {
 		}
 	}
 	return nil, errors.New("GetExtendedTcpTable: the table kept growing")
+}
+
+// connRow is one row of the TCP table with its owner and both ends.
+type connRow struct {
+	lAddr, rAddr net.IP
+	lPort, rPort int
+	state        uint32
+	pid          uint32
+}
+
+// dialPort makes the connection whose server end is checked; a test replaces it.
+var dialPort = net.DialTimeout
+
+// connRefused says whether a dial failed because nothing accepted it (Windows reports WSAECONNREFUSED, which errors.Is does not match to syscall.ECONNREFUSED).
+func connRefused(err error) bool {
+	return errors.Is(err, windows.WSAECONNREFUSED) || errors.Is(err, syscall.ECONNREFUSED)
+}
+
+// errNoConnRow: the table never showed the row of the connection's server end within the window.
+var errNoConnRow = errors.New("the system's table never showed who owns the connection")
+
+// connReadWindow and connReadGap bound the re-reading of the table for the connection's row: a handful of reads in about two seconds; when the row never showed, checkListener makes one more
+// connection with connRetryWindow, so about three seconds at most.
+var (
+	connReadWindow  = 2 * time.Second
+	connRetryWindow = time.Second
+	connReadGap     = 200 * time.Millisecond
+	tcpConns        = tcpConnections // the table of all connections; a test replaces it
+)
+
+// connectionOwner connects to host:port now and reads the table for the row of the server end of that connection (local end host:port, remote end our own client port, established). connected is false when
+// nothing accepted the connection. A row that never appears, or two, is an error: the owner is not known.
+func connectionOwner(host string, port int, window time.Duration) (pid uint32, connected bool, err error) {
+	h := strings.Trim(host, "[]")
+	if strings.EqualFold(h, "localhost") {
+		h = "127.0.0.1"
+	}
+	conn, derr := dialPort("tcp", net.JoinHostPort(h, strconv.Itoa(port)), time.Second)
+	if derr != nil {
+		if connRefused(derr) {
+			return 0, false, nil // nothing accepted it: nothing is there
+		}
+		return 0, false, derr // a timeout or another failure: whether something is there is not known
+	}
+	defer conn.Close()
+	local, ok := conn.LocalAddr().(*net.TCPAddr)
+	if !ok {
+		return 0, true, errors.New("the connection's own port is not known")
+	}
+	ip := net.ParseIP(h)
+	if ip == nil {
+		return 0, true, errors.New("not an IP address: " + host)
+	}
+	af := uint32(afInet6)
+	if ip4 := ip.To4(); ip4 != nil {
+		ip, af = ip4, afInet
+	}
+	deadline := time.Now().Add(window)
+	for {
+		rows, rerr := tcpConns(af)
+		if rerr != nil {
+			return 0, true, rerr
+		}
+		var pids []uint32
+		for _, r := range rows {
+			if r.state == tcpStateEstablished && r.lPort == port && r.rPort == local.Port && r.lAddr.Equal(ip) && r.rAddr.Equal(local.IP) {
+				pids = append(pids, r.pid)
+			}
+		}
+		switch {
+		case len(pids) == 1:
+			return pids[0], true, nil
+		case len(pids) > 1:
+			return 0, true, errors.New("the table shows two owners for the connection")
+		}
+		if time.Now().After(deadline) {
+			return 0, true, errNoConnRow
+		}
+		time.Sleep(connReadGap)
+	}
+}
+
+// tcpConnections is the table of every TCP connection of family af with its owner.
+func tcpConnections(af uint32) ([]connRow, error) {
+	raw, err := tcpTableOf(af, tcpTableOwnerPIDAll)
+	if err != nil {
+		return nil, err
+	}
+	var rows []connRow
+	if af == afInet {
+		for i := 0; i+24 <= len(raw); i += 24 { // MIB_TCPROW_OWNER_PID: state, localAddr, localPort, remoteAddr, remotePort, pid
+			rows = append(rows, connRow{
+				state: binary.LittleEndian.Uint32(raw[i : i+4]),
+				lAddr: net.IP(append([]byte(nil), raw[i+4:i+8]...)), lPort: int(binary.BigEndian.Uint16(raw[i+8 : i+10])),
+				rAddr: net.IP(append([]byte(nil), raw[i+12:i+16]...)), rPort: int(binary.BigEndian.Uint16(raw[i+16 : i+18])),
+				pid: binary.LittleEndian.Uint32(raw[i+20 : i+24]),
+			})
+		}
+		return rows, nil
+	}
+	for i := 0; i+56 <= len(raw); i += 56 { // MIB_TCP6ROW_OWNER_PID: localAddr[16], scope, localPort, remoteAddr[16], scope, remotePort, state, pid
+		rows = append(rows, connRow{
+			lAddr: net.IP(append([]byte(nil), raw[i:i+16]...)), lPort: int(binary.BigEndian.Uint16(raw[i+20 : i+22])),
+			rAddr: net.IP(append([]byte(nil), raw[i+24:i+40]...)), rPort: int(binary.BigEndian.Uint16(raw[i+44 : i+46])),
+			state: binary.LittleEndian.Uint32(raw[i+48 : i+52]),
+			pid:   binary.LittleEndian.Uint32(raw[i+52 : i+56]),
+		})
+	}
+	return rows, nil
 }

@@ -28,7 +28,9 @@ func listenerIsChild(ctx context.Context, port, child int) (bool, error) {
 		return false, err
 	}
 	if len(pids) == 0 {
-		return false, nil
+		// The table can miss a listener it does list a moment later (on Windows it showed a new listener's row about three times in twenty, and the accepted connection's row about fifteen): with no listener row, who
+		// owns the server end of a connection made now decides, and only that.
+		return connectionOwnerIsChild(ctx, port, child)
 	}
 	for _, p := range pids {
 		if !isDescendant(ctx, p, child) {
@@ -45,7 +47,7 @@ func listenerPIDs(ctx context.Context, port int) ([]int, error) {
 	}
 	p := strconv.Itoa(port)
 	if runtime.GOOS == "windows" {
-		out, err := run(ctx, "netstat", "-ano", "-p", "tcp")
+		out, err := netstatTable(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -60,6 +62,9 @@ func listenerPIDs(ctx context.Context, port int) ([]int, error) {
 	}
 	return parseSS(out), nil
 }
+
+// netstatTable is the system's TCP table as text (Windows); a variable so a test can stand in for a table that misses rows.
+var netstatTable = func(ctx context.Context) ([]byte, error) { return run(ctx, "netstat", "-ano", "-p", "tcp") }
 
 // lsofSaysNone: lsof exits 1 when nothing matches, which is an answer ("no listener"), not a failure.
 func lsofSaysNone(err error) bool {
