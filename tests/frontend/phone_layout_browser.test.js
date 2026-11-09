@@ -52,6 +52,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('phone-bot-with-a-long-name', 'A', 8, { sleeping: false, board_project: '${board}' }); window.__m.add('second-bot', 'B', 5, { sleeping: true }); return true; })()`);
             await settle(900);
             tag = String(w);
+            // The amber 'something waits' dot sits 3 px outside the menu icon's box (#9829); with the icon clipping it the scan saw 'span.material-icons 21>18 menu' whenever an Inbox item waited at that moment (#14933). Force the dot on, so the scan always covers it.
+            await ev(`for (const b of document.querySelectorAll('#top-menu-btn, .agent-bar-menu, .phone-menu-btn')) b.setAttribute('data-waiting', ''); true`);
             await scan('agents list');
             await ev(`window.selectLiveSession('phone-bot-with-a-long-name', 'claude', 'phone-bot-with-a-long-name-id', 'local'); true`); await settle(1800);
             await scan('agent chat');
