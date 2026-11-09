@@ -1,5 +1,5 @@
 // A suite waits for the app's readiness hook through helpers/wait.js's coralReady(ev, step, ...args), never with ev(`window.__coralReady...`) itself (#352): that awaits the hook's promise inside
-// the page with no time limit, so a hook that never resolves runs to the runner's 120 s with nothing saying which step it was, where coralReady fails at 10 s naming the part it waited for.
+// the page with no time limit, so a hook that never resolves runs to the runner's 120 s with nothing saying which step it was, where coralReady fails at its ceiling (30 s) naming the part it waited for.
 // The suites written before this rule are listed in fixtures/ready_wait_known.json with how many such waits each has; they are converted in batches. This check fails when a file has more than
 // its listed number (a new open wait) and when it has fewer (the list must come down with the batch, so it never hides one). `node ready_wait_hygiene.test.js --write` rewrites the list.
 //   node ready_wait_hygiene.test.js
