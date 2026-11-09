@@ -246,7 +246,7 @@ func TestSendToDropboxAgainPutsARemovedArtifactBack(t *testing.T) {
 	assert.Equal(t, true, out["queued"])
 	be.pass()
 	assert.Equal(t, 2, be.inDropbox(ds[0]), "backed up again: the version and its sidecar")
-	be.private[ds[0]] = true // a private mark still keeps it out after a resend
+	be.setPrivate(ds[0], true) // a private mark still keeps it out after a resend
 	code, _ = be.removeCall("remove", ds[0], `{"confirm": true}`, true)
 	require.Equal(t, http.StatusOK, code)
 	_, _ = be.removeCall("resend", ds[0], `{}`, true)

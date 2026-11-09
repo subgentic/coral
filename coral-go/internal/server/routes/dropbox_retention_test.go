@@ -369,7 +369,7 @@ func TestEveryNewSignInStartsWithRetentionOff(t *testing.T) {
 func TestRetentionDeletesNothingFromACopiedDataFolder(t *testing.T) {
 	be, ds := newRetentionEnv(t, 4)
 	be.age(10, ds...)
-	be.machine = "machine-2" // this data folder now runs on another machine: it looks like a copy
+	be.setMachine("machine-2") // this data folder now runs on another machine: it looks like a copy
 	be.retain(1)
 	assert.Empty(t, be.dbx.deleteCalls)
 	assert.Len(t, be.dbx.files, 8)

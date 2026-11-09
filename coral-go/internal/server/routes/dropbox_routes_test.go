@@ -409,7 +409,8 @@ type dropboxEnv struct {
 	h       *CloudHandler
 	dbx     *fakeDropbox
 	machine string
-	host    string // the Host the dashboard was opened at
+	machMu  sync.Mutex // machine is read by the worker and may be changed by a hook in the fake Dropbox's handlers (#14980)
+	host    string     // the Host the dashboard was opened at
 	db      *store.DB
 	body    string // the next call's JSON body ('{}' when empty)
 }
@@ -426,9 +427,16 @@ func newDropboxEnv(t *testing.T) *dropboxEnv {
 	e := &dropboxEnv{t: t, h: h, dbx: newFakeDropbox(t), machine: "machine-1", host: "127.0.0.1:8420", db: db}
 	h.dbx.appKey = func() string { return "appkey" }
 	h.dbx.client = func(k string) *dropbox.Client { return dropbox.NewClientAt(k, e.dbx.srv.URL) }
-	h.dbx.machineID = func() (string, error) { return e.machine, nil }
+	h.dbx.machineID = func() (string, error) { e.machMu.Lock(); defer e.machMu.Unlock(); return e.machine, nil }
 	h.dbx.port = 0
 	return e
+}
+
+// setMachine changes this computer's machine id, under the lock (a hook may do it while the worker reads it).
+func (e *dropboxEnv) setMachine(id string) {
+	e.machMu.Lock()
+	defer e.machMu.Unlock()
+	e.machine = id
 }
 
 func (e *dropboxEnv) call(method, path string, dashboard bool, hdr map[string]string) *httptest.ResponseRecorder {
@@ -592,7 +600,7 @@ func TestACopyOnAnotherMachineLooksLikeACopyUntilTakeOver(t *testing.T) {
 	e := newDropboxEnv(t)
 	require.Contains(t, e.signIn(""), "Connected")
 	assert.Equal(t, false, e.status()["looks_like_copy"])
-	e.machine = "machine-2"
+	e.setMachine("machine-2")
 	assert.Equal(t, true, e.status()["looks_like_copy"], "the data folder was started on another computer")
 	require.Equal(t, http.StatusOK, e.call(http.MethodPost, "/api/dropbox/takeover", true, nil).Code)
 	assert.Equal(t, false, e.status()["looks_like_copy"])

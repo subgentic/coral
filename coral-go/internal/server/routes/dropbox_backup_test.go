@@ -29,6 +29,28 @@ type backupEnv struct {
 	b       *DropboxBackup
 	private map[string]bool
 	privErr error
+	privMu  sync.Mutex // be.private is read by the worker and written by hooks that run in the fake Dropbox's handlers, at once (#14980)
+}
+
+// setPrivate marks (or unmarks) an artifact private, under the lock: a hook in the fake Dropbox runs on its HTTP handler goroutines, several at once.
+func (be *backupEnv) setPrivate(d string, on bool) {
+	be.privMu.Lock()
+	defer be.privMu.Unlock()
+	be.private[d] = on
+}
+
+// setPrivErr makes the private marks unreadable (or readable again), under the lock.
+func (be *backupEnv) setPrivErr(err error) {
+	be.privMu.Lock()
+	defer be.privMu.Unlock()
+	be.privErr = err
+}
+
+// clearPrivate drops every private mark, under the lock.
+func (be *backupEnv) clearPrivate() {
+	be.privMu.Lock()
+	defer be.privMu.Unlock()
+	be.private = map[string]bool{}
 }
 
 func newBackupEnv(t *testing.T) *backupEnv {
@@ -37,7 +59,15 @@ func newBackupEnv(t *testing.T) *backupEnv {
 	require.Contains(t, e.signIn(""), "Connected")
 	be := &backupEnv{dropboxEnv: e, private: map[string]bool{}}
 	be.b = e.h.NewDropboxBackup(store.NewDropboxOutbox(e.db))
-	be.b.private = func(context.Context, []string) (map[string]bool, error) { return be.private, be.privErr }
+	be.b.private = func(context.Context, []string) (map[string]bool, error) { // a copy, taken under the lock: the worker reads while a hook may write
+		be.privMu.Lock()
+		defer be.privMu.Unlock()
+		out := make(map[string]bool, len(be.private))
+		for k, v := range be.private {
+			out[k] = v
+		}
+		return out, be.privErr
+	}
 	be.b.power = func() (bool, bool) { return false, false }
 	return be
 }
@@ -94,7 +124,7 @@ func TestAnUploadIsBackedUpWithItsItemData(t *testing.T) {
 func TestNothingIsSentWhileTheDataFolderLooksLikeACopy(t *testing.T) {
 	be := newBackupEnv(t)
 	be.put("a.md", "text/markdown", "a")
-	be.machine = "machine-2"
+	be.setMachine("machine-2")
 	be.pass()
 	assert.Empty(t, be.dbx.files)
 	assert.Zero(t, be.dbx.finishCalls)
@@ -103,7 +133,7 @@ func TestNothingIsSentWhileTheDataFolderLooksLikeACopy(t *testing.T) {
 func TestTheReadinessIsCheckedAgainBeforeEachCommit(t *testing.T) {
 	be := newBackupEnv(t)
 	be.put("a.md", "text/markdown", "a")
-	be.dbx.onStart = func() { be.machine = "machine-2" } // the data folder becomes a copy mid-pass (Security's change a)
+	be.dbx.onStart = func() { be.setMachine("machine-2") } // the data folder becomes a copy mid-pass (Security's change a)
 	be.pass()
 	assert.Zero(t, be.dbx.finishCalls, "the batch is not committed")
 	assert.Empty(t, be.dbx.files)
@@ -149,11 +179,11 @@ func TestAFileAlreadyThereIsNeverOverwritten(t *testing.T) {
 func TestAPrivateArtifactIsNotSentAndAnUnreadableMarkSendsNothing(t *testing.T) {
 	be := newBackupEnv(t)
 	d := be.put("secret-plan.md", "text/markdown", "private")
-	be.private[d] = true
+	be.setPrivate(d, true)
 	be.pass()
 	assert.Empty(t, be.dbx.files)
-	be.private = map[string]bool{}
-	be.privErr = errors.New("board unreadable")
+	be.clearPrivate()
+	be.setPrivErr(errors.New("board unreadable"))
 	be.put("other.md", "text/markdown", "other")
 	be.pass()
 	assert.Empty(t, be.dbx.files, "a mark that cannot be read means nothing is sent (fail closed)")
@@ -272,7 +302,7 @@ func TestAMarkSetMidPassStopsTheCommitOfThatArtifact(t *testing.T) {
 	be := newBackupEnv(t)
 	d := be.put("now-private.md", "text/markdown", "secret plan")
 	be.put("public.md", "text/markdown", "fine")
-	be.dbx.onStart = func() { be.private[d] = true } // marked while the sessions upload
+	be.dbx.onStart = func() { be.setPrivate(d, true) } // marked while the sessions upload
 	be.pass()
 	for p, b := range be.dbx.files {
 		assert.NotEqual(t, "secret plan", string(b), "the artifact marked mid-pass was committed at %s", p)
@@ -285,7 +315,7 @@ func TestAMarkSetMidPassStopsTheCommitOfThatArtifact(t *testing.T) {
 func TestPrivateRowsAreParkedNotRetried(t *testing.T) {
 	be := newBackupEnv(t)
 	d := be.put("p.md", "text/markdown", "p")
-	be.private[d] = true
+	be.setPrivate(d, true)
 	be.pass()
 	c, err := be.b.outbox.Counts(context.Background())
 	require.NoError(t, err)
@@ -524,7 +554,7 @@ func TestAFailingPrivateReReadBeforeTheCommitCommitsNothing(t *testing.T) {
 	be := newBackupEnv(t)
 	be.put("a.md", "text/markdown", "a")
 	be.put("b.md", "text/markdown", "b")
-	be.dbx.onStart = func() { be.privErr = errors.New("board unreadable") } // the marks become unreadable while the sessions upload
+	be.dbx.onStart = func() { be.setPrivErr(errors.New("board unreadable")) } // the marks become unreadable while the sessions upload
 	be.pass()
 	assert.Empty(t, be.dbx.files, "nothing is committed")
 	assert.Zero(t, be.dbx.finishCalls, "finish_batch is never called")
