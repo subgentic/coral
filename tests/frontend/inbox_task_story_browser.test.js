@@ -2,6 +2,7 @@
 // the newest line; the heading is one button that opens and shuts the task's items (kept in this browser). Files for review AND questions to the Operator take part (an ask carries its goal and task); what has a goal but no task sits
 // directly under the goal; what has no goal stays in No goal (a file) or Other items (a question). Real clicks. 1280 and 390 px. Isolated dev server; /api/team-artifacts and /api/operator-asks are stubbed in the page.
 const assert = require('node:assert/strict');
+const { touchTap } = require('./helpers/touch_tap');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
@@ -54,7 +55,7 @@ const BASE = require('./test_base').BASE;
             await waitFor(`document.querySelectorAll('.dt-group-task').length === 2`, `${at}two task headings`, 10000);
             const heading = n => `[...document.querySelectorAll('.dt-group-task')].find(tr => tr.textContent.includes('Task #${n}'))`;
             const box = n => ev(`(() => { const tr = ${heading(n)}, b = tr.querySelector('.dt-group-story'), t = tr.querySelector('.dt-group-toggle'); b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(), q = t.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, h: Math.round(r.height), w: Math.round(r.width), pressed: b.getAttribute('aria-pressed'), toggleH: Math.round(q.height), sameRow: r.top >= q.top - 1 && r.bottom <= q.bottom + 1, inView: r.right <= innerWidth && r.left >= 0, name: b.getAttribute('aria-label') }; })()`);
-            const tapAt = async p => { if (mobile) await client.Input.synthesizeTapGesture({ x: p.x, y: p.y, gestureSourceType: 'touch' }); else { await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: p.x, y: p.y }); await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: p.x, y: p.y, button: 'left', clickCount: 1 }); await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: p.x, y: p.y, button: 'left', clickCount: 1 }); } };
+            const tapAt = async p => { if (mobile) await touchTap(client, { x: p.x, y: p.y }); else { await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: p.x, y: p.y }); await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: p.x, y: p.y, button: 'left', clickCount: 1 }); await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: p.x, y: p.y, button: 'left', clickCount: 1 }); } };
             // the story is history: shut until asked for, so the items to act on stay where they are
             check(await ev(`document.querySelectorAll('.thread-story').length`) === 0 && await ev(`document.querySelectorAll('.dt-story-row').length`) === 0, `${at}no story is drawn until Story is pressed`);
             let sb = await box(12);

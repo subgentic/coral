@@ -1,5 +1,6 @@
 // U3: the same goal/task fold as Needs you, with readable decisions and personal words.
 const assert=require('node:assert/strict');
+const { touchTap } = require('./helpers/touch_tap');
 const {connect}=require('./agent_view_harness');
 const {coralReady,framesJs}=require('./helpers/wait');
 const BASE=require('./test_base').BASE;
@@ -22,7 +23,7 @@ const BASE=require('./test_base').BASE;
    const headings=await ev(`[...document.querySelectorAll('.activity-folder .dt-group')].map(e=>e.textContent)`);
    assert.equal(headings.filter(t=>t.startsWith('Goal #1')).length,2,'same goal number in two teams never merges');
    assert.ok(headings.some(t=>t.startsWith('Not linked to a goal')),'rows without a recorded goal are honestly labelled');
-   const tap=async(index)=>{await ev(framesJs());const p=await ev(`(()=>{const b=document.querySelectorAll('.activity-folder .dt-group-toggle')[${index}];b.scrollIntoView({block:'center'});const r=b.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2,h:r.height,hit:b.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}})()`);assert.ok(p.h>=44&&p.hit,'on-screen task target '+JSON.stringify(p));if(width===390)await client.Input.synthesizeTapGesture({x:p.x,y:p.y,gestureSourceType:'touch'});else{await client.Input.dispatchMouseEvent({type:'mousePressed',x:p.x,y:p.y,button:'left',clickCount:1});await client.Input.dispatchMouseEvent({type:'mouseReleased',x:p.x,y:p.y,button:'left',clickCount:1});}};
+   const tap=async(index)=>{await ev(framesJs());const p=await ev(`(()=>{const b=document.querySelectorAll('.activity-folder .dt-group-toggle')[${index}];b.scrollIntoView({block:'center'});const r=b.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2,h:r.height,hit:b.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}})()`);assert.ok(p.h>=44&&p.hit,'on-screen task target '+JSON.stringify(p));if(width===390)await touchTap(client, { x:p.x,y:p.y });else{await client.Input.dispatchMouseEvent({type:'mousePressed',x:p.x,y:p.y,button:'left',clickCount:1});await client.Input.dispatchMouseEvent({type:'mouseReleased',x:p.x,y:p.y,button:'left',clickCount:1});}};
    await tap(0);await waitFor(`document.querySelectorAll('.activity-folder tr.dt-row').length>2`,'first task opens');
    assert.ok((await ev(`[...document.querySelectorAll('.activity-folder .dt-group-toggle')].map(b=>b.getAttribute('aria-expanded'))`)).includes('false'),'other team stays shut');
    await tap(1);await waitFor(`document.querySelectorAll('.activity-folder tr.dt-row').length===8`,'both tasks open',5000,`({width:innerWidth,rows:document.querySelectorAll('.activity-folder tr.dt-row').length,heads:[...document.querySelectorAll('.activity-folder .dt-group-toggle')].map(b=>[b.textContent,b.getAttribute('aria-expanded')]),kept:localStorage.getItem('coral-inbox-task-open')})`);

@@ -2,6 +2,7 @@
 // the newest line; the heading is one button that opens and shuts the task's items (kept in this browser). Files for review AND questions to the Operator take part (an ask carries its goal and task); what has a goal but no task sits
 // directly under the goal; what has no goal stays in No goal (a file) or Other items (a question). Real clicks. 1280 and 390 px. Isolated dev server; /api/team-artifacts and /api/operator-asks are stubbed in the page.
 const assert = require('node:assert/strict');
+const { touchTap } = require('./helpers/touch_tap');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
@@ -64,7 +65,7 @@ const BASE = require('./test_base').BASE;
                 const step = () => { const b = find(), r = b.getBoundingClientRect(), key = [r.left, r.top, r.width, r.height].map(v => Math.round(v)).join(','); same = key === last ? same + 1 : 0; last = key; frames++;
                     if (same >= 3 || frames > 90) { const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); resolve({ x: r.left + r.width / 2, y: r.top + r.height / 2, h: Math.round(r.height), w: Math.round(r.width), vw: innerWidth, expanded: b.getAttribute('aria-expanded'), hit: !!hit && (hit === b || b.contains(hit)) }); } else setTimeout(step, 40); /* sleep-ok: a timed poll of the layout, not an animation frame: a hidden page (the Mac) never runs frames */ };
                 setTimeout(step, 40); })`);
-            const tap = async p => { if (mobile) await client.Input.synthesizeTapGesture({ x: p.x, y: p.y, gestureSourceType: 'touch' }); else { await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: p.x, y: p.y }); await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: p.x, y: p.y, button: 'left', clickCount: 1 }); await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: p.x, y: p.y, button: 'left', clickCount: 1 }); } };
+            const tap = async p => { if (mobile) await touchTap(client, { x: p.x, y: p.y }); else { await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: p.x, y: p.y }); await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: p.x, y: p.y, button: 'left', clickCount: 1 }); await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: p.x, y: p.y, button: 'left', clickCount: 1 }); } };
             // ONE real tap on the heading, no retry (#14483): it must take the first time
             const toggleTo = async state => { const q = await head(11); await tap(q); return waitFor(`[...document.querySelectorAll('.dt-group-toggle')].find(x => x.textContent.includes('Task #11')).getAttribute('aria-expanded') === '${state}'`, `${at}the heading is ${state === 'true' ? 'open' : 'shut'} after one tap`, 5000).then(() => true, () => false); };
             // the same tap with the table drawn again between the press and the lift: the heading is a NEW element when the finger is lifted (a poll, a read landing), and the browser sends the click to their common parent
