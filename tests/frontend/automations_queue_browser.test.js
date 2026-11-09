@@ -113,7 +113,7 @@ const STUB = `(() => { const real = window.fetch; window.__queueTickMs = 1000; w
                 await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].find(r => r.textContent.includes('Frontend Dev')).querySelector('.dt-mail-more-toggle').click(); true`);
                 await waitFor(`!!document.querySelector('.dt-mail-menu:not([hidden])')`, at + 'the row menu', 4000);
                 const menuItems = await ev(`[...document.querySelectorAll('.dt-mail-menu:not([hidden]) .menu-item')].map(b => b.textContent.trim() + (b.disabled ? ' (off)' : ''))`);
-                assert.deepEqual(menuItems, ['Move first', 'Move up', 'Move down (off)', 'Kick'], at + 'the menu says what is off (Frontend Dev is last in line by now): ' + JSON.stringify(menuItems));
+                assert.deepEqual(menuItems, ['Show details', 'Move first', 'Move up', 'Move down (off)', 'Kick'], at + 'the menu says what is off (Frontend Dev is last in line by now): ' + JSON.stringify(menuItems));
                 await ev(`[...document.querySelectorAll('.dt-mail-menu:not([hidden]) .menu-item')].find(b => b.textContent.trim() === 'Kick').click(); true`);
                 assert.equal((await calls()).length, 2, at + 'the first press of Kick sends nothing');
                 assert.deepEqual(await ev(`[...document.querySelectorAll('.dt-mail-menu:not([hidden]) .menu-item')].map(b => b.textContent.trim()).slice(-1)`), ['Confirm kick'], at + 'the item says Confirm kick and the menu stays open');
@@ -144,7 +144,7 @@ const STUB = `(() => { const real = window.fetch; window.__queueTickMs = 1000; w
                 await press('QA Engineer', 'Kick');
                 await ev(`[...document.querySelectorAll('.dt-mail-menu:not([hidden]) .menu-item')].find(b => b.textContent.trim() === 'Confirm kick').click(); true`);
             }
-            await waitFor(`${mobile ? "![...document.querySelectorAll('#group-table-view .dt-mail-more-toggle')].length" : "document.querySelectorAll('#group-table-view .queue-act').length === 0"}`, at + 'a 403 takes the buttons away', 8000);
+            await waitFor(`${mobile ? "[...document.querySelectorAll('#group-table-view .dt-mail-menu .menu-item')].every(b => !/Kick|Move/.test(b.textContent))" : "document.querySelectorAll('#group-table-view .queue-act').length === 0"}`, at + 'a 403 takes the buttons away', 8000);
         }
     } finally { await client.close(); }
     console.log('PASS the Queue folder: groups, order, leases, actions, live refresh, 403');

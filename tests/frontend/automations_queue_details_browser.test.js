@@ -54,7 +54,7 @@ const STUB = `(() => { const real = window.fetch; window.__queueTickMs = 1000; w
                 assert.equal(await ev(`${btn}.getAttribute('aria-controls') === (${detailOf('QA Engineer')}).id`), true, at + 'aria-controls names the detail row');
                 await ev(`${btn}.focus(); ${btn}.click(); true`);
                 await waitFor(`${btn}.getAttribute('aria-expanded') === 'true'`, at + 'the chevron says expanded', 5000);
-                assert.equal(await ev(`document.activeElement && document.activeElement.classList.contains('queue-more')`), true, at + 'the keyboard stays on the chevron after the table is drawn again');
+                await waitFor(`document.activeElement && document.activeElement.classList.contains('queue-more')`, at + 'the keyboard is back on the chevron once the table is drawn again', 4000);
             } else {
                 await ev(`(${rowOf('QA Engineer')}).querySelector('.dt-mail-more-toggle').click(); true`);
                 await waitFor(`!!document.querySelector('.dt-mail-menu:not([hidden]) [role=menuitem]')`, at + "the row's menu opens", 5000);
@@ -63,7 +63,7 @@ const STUB = `(() => { const real = window.fetch; window.__queueTickMs = 1000; w
                 await ev(`[...document.querySelectorAll('.dt-mail-menu:not([hidden]) [role=menuitem]')].find(b => b.textContent.trim() === 'Show details').click(); true`);
             }
             await waitFor(`!!(${detailOf('QA Engineer')}) && !(${detailOf('QA Engineer')}).hidden`, at + 'the details open', 5000);
-            const text = await ev(`(${detailOf('QA Engineer')}).textContent.replace(/\\s+/g, ' ')`);
+            const text = await ev(`(${detailOf('QA Engineer')}).innerText.replace(/\\s+/g, ' ')`);
             assert.ok(text.includes(LONG_NOTE), at + 'the whole note, not cut: ' + text.slice(0, 300));
             assert.ok(text.includes('npm --prefix tests/frontend run test:cloud'), at + 'the command: ' + text.slice(0, 300));
             assert.ok(text.includes('<b>not markup</b>'), at + 'a command is text, its tags are shown as typed');
@@ -80,7 +80,7 @@ const STUB = `(() => { const real = window.fetch; window.__queueTickMs = 1000; w
             if (!mobile) await ev(`(${rowOf('Frontend Dev')}).querySelector('button.queue-more').click(); true`);
             else { await ev(`(${rowOf('Frontend Dev')}).querySelector('.dt-mail-more-toggle').click(); true`); await waitFor(`!!document.querySelector('.dt-mail-menu:not([hidden]) [role=menuitem]')`, at + 'the second menu', 5000); await ev(`[...document.querySelectorAll('.dt-mail-menu:not([hidden]) [role=menuitem]')].find(b => b.textContent.trim() === 'Show details').click(); true`); }
             await waitFor(`!!(${detailOf('Frontend Dev')}) && !(${detailOf('Frontend Dev')}).hidden`, at + "the waiting entry's details open", 5000);
-            assert.match(await ev(`(${detailOf('Frontend Dev')}).textContent.replace(/\\s+/g, ' ')`), /Command go test \.\/internal\/server\/routes\/.*Waiting since/, at + 'a waiting entry says what it will run and since when');
+            assert.match(await ev(`(${detailOf('Frontend Dev')}).innerText.replace(/\\s+/g, ' ')`), /Command go test \.\/internal\/server\/routes\/.*Waiting since/, at + 'a waiting entry says what it will run and since when');
 
             // the finished runs: one button under the resource, then each run with how it ended
             assert.equal(await ev(`document.querySelectorAll('${T} tbody tr.dt-row').length`) >= 3, true, at + 'rows are there');
@@ -95,13 +95,13 @@ const STUB = `(() => { const real = window.fetch; window.__queueTickMs = 1000; w
                 await ev(`[...document.querySelectorAll('.dt-mail-menu:not([hidden]) [role=menuitem]')].find(b => /Show finished runs/.test(b.textContent)).click(); true`);
             }
             await waitFor(`/Passed, exit 0/.test(document.querySelector('${T}').textContent)`, at + 'the finished runs are listed', 5000);
-            const all = await ev(`document.querySelector('${T}').textContent.replace(/\\s+/g, ' ')`);
+            const all = await ev(`document.querySelector('${T}').innerText.replace(/\\s+/g, ' ')`);
             for (const word of ['Passed, exit 0', 'Failed, exit 2', 'No result recorded']) assert.ok(all.includes(word), at + `a finished run says "${word}" in words`);
             // a finished run's details: the result, its last line and how long it took
             if (!mobile) await ev(`(${rowOf('Backend Dev')}).querySelector('button.queue-more').click(); true`);
             else { await ev(`(${rowOf('Backend Dev')}).querySelector('.dt-mail-more-toggle').click(); true`); await waitFor(`!!document.querySelector('.dt-mail-menu:not([hidden]) [role=menuitem]')`, at + 'the finished row menu', 5000); await ev(`[...document.querySelectorAll('.dt-mail-menu:not([hidden]) [role=menuitem]')].find(b => b.textContent.trim() === 'Show details').click(); true`); }
             await waitFor(`!!(${detailOf('Backend Dev')}) && !(${detailOf('Backend Dev')}).hidden`, at + "a finished run's details open", 5000);
-            const fin = await ev(`(${detailOf('Backend Dev')}).textContent.replace(/\\s+/g, ' ')`);
+            const fin = await ev(`(${detailOf('Backend Dev')}).innerText.replace(/\\s+/g, ' ')`);
             assert.match(fin, /Result Failed, exit 2/, at + 'the result');
             assert.match(fin, /Last line FAIL internal\/server\/routes 12\.3s/, at + 'the last line');
             assert.match(fin, /Took 5 min/, at + 'how long it took');

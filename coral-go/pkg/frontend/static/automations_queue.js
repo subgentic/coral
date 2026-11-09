@@ -24,11 +24,14 @@ const TICK_MS = (typeof window !== 'undefined' && Number(window.__queueTickMs)) 
 const emit = () => {
     const a = document.activeElement;
     if (a && a.classList && a.classList.contains('queue-act') && !pendingFocus) { const m = /-(\d+)$/.exec((a.closest('tr[data-key]') || { dataset: {} }).dataset.key || ''); if (m) pendingFocus = { id: Number(m[1]), label: a.dataset.act }; }
+    if (a && a.classList && a.classList.contains('queue-more') && !pendingFocus) { const key = (a.closest('tr[data-key]') || { dataset: {} }).dataset.key; if (key) pendingFocus = { key, label: a.dataset.act, expand: a.getAttribute('aria-expanded') }; } // the chevron keeps the keyboard through the table's own redraws (the clock's tick, a poll)
     for (const fn of listeners) fn();
     if (pendingFocus) setTimeout(() => restoreFocus(), 60);
 };
 export const onQueueChanged = fn => { listeners.add(fn); };
 export const queueDenied = () => denied;
+/** Which rows' details and which resources' finished runs are open: part of what decides a redraw (#14857). */
+export const queueOpen = () => [[...openKeys], [...histOpen]];
 /** Changes every half minute: the table's key carries it, so the lease left and the waiting times keep counting between data changes. */
 export const queueTick = () => Math.floor(Date.now() / TICK_MS);
 
@@ -93,7 +96,7 @@ function restoreFocus(tries = 6) {
     const want = pendingFocus; if (!want) return;
     const row = document.querySelector(want.key ? `#group-table-view tr[data-key="${CSS.escape(want.key)}"]` : `#group-table-view tr[data-key$="-${Number(want.id)}"]`);
     const btn = row && (row.querySelector(`.queue-more[data-act="${want.label}"]`) || row.querySelector(`.queue-act[data-act="${want.label}"]:not(:disabled)`) || row.querySelector('.queue-act:not(:disabled)') || row.querySelector('.dt-mail-more-toggle'));
-    if (btn) { pendingFocus = null; btn.focus({ preventScroll: true }); return; }
+    if (btn && !(want.expand != null && btn.getAttribute('aria-expanded') !== want.expand)) { pendingFocus = null; btn.focus({ preventScroll: true }); return; } // a chevron that does not yet say what was asked is the old one: the table is not drawn again yet
     if (tries > 0) setTimeout(() => restoreFocus(tries - 1), 80); else pendingFocus = null;
 }
 async function act(method, path, body, said) {
@@ -215,8 +218,8 @@ const detailName = r => (r.state === 'done' ? `${r.agent}, ${r.resource}, finish
 export function toggleDetails(r) {
     const set = r.state === 'history' ? histOpen : openKeys, key = r.state === 'history' ? r.resource : r.key;
     if (set.has(key)) set.delete(key); else set.add(key);
-    pendingFocus = { key: r.key, label: r.state === 'history' ? 'History' : 'Details' };
-    emit(); restoreFocus();
+    pendingFocus = { key: r.key, label: r.state === 'history' ? 'History' : 'Details', expand: String(set.has(key)) };
+    emit(); // emit() puts the keyboard back on the new button once the table is drawn again (a focus put on the old one here would be lost with it)
     announceNotice(r.state === 'history' ? `${set.has(key) ? 'Showing' : 'Hiding'} the finished runs of ${r.resource}.` : `${set.has(key) ? 'Details shown' : 'Details hidden'}: ${detailName(r)}.`);
 }
 /** The chevron of a row (or the button of a resource's history): a real button, expanded or not, naming the row it opens. */
@@ -242,10 +245,10 @@ export function queueTable(rows, narrowed) {
             detail: { id: detailId, open: r => hasDetail(r) && openKeys.has(r.key), render: r => (hasDetail(r) ? detailNode(r) : document.createTextNode('')) },
             groupBy: groupOf,
             columns: [ // a narrow list drops the note (62 rem), then the task and the time (52): the data_table.css steps are 62, 52, 36, 28 and 16, no other number hides a column
-                { key: 'more', label: 'Details', hideLabel: true, width: '2.75rem', fixed: true, resize: false, cell: detailsCell },
+                { key: 'details', label: 'Details', hideLabel: true, width: '2.75rem', fixed: true, resize: false, cell: detailsCell },
                 { key: 'agent', label: 'Agent', primary: true, width: 'grow', cell: r => (r.state === 'free' ? DT.el('span', 'dt-time', 'All slots free') : r.state === 'history' ? DT.el('span', 'dt-time', `${r.count} finished ${r.count === 1 ? 'run' : 'runs'}`) : agentLink(r.agent, { board: r.project, cls: 'queue-agent' })) },
                 { key: 'state', label: 'State', width: '8.5rem', cell: r => (r.state === 'free' || r.state === 'history' ? '' : (() => { const c = DT.chip(stateWord(r), r.state === 'holding' && !r.stuck ? 'goal-state-task-active' : ''); if (r.stuck) c.title = stuckWords(r) + '. The Orchestrator has been told.'; return c; })()) },
-                { key: 'why', label: 'Note', width: '12rem', dropAt: 62, tone: 'tertiary', cell: r => { if (!r.note) return ''; const n = DT.el('span', '', r.note); n.title = r.note; return n; } },
+                { key: 'why', label: 'Note', width: '12rem', dropAt: 62, tone: 'tertiary', cell: r => { if (!r.note) return ''; const n = DT.el('span', '', r.note); DT.tipIf(n, r.note, () => { const td = n.closest('td'); return !!td && td.scrollWidth > td.clientWidth; }); return n; } },
                 { key: 'task', label: 'Task', width: '5rem', dropAt: 52, cell: taskLink },
                 { key: 'goal', label: 'Goal', width: '9rem', dropAt: 52, cell: goalLink },
                 { key: 'time', label: 'Lease left / waited', width: '9rem', dropAt: 52, tone: 'tertiary', cell: r => (r.state === 'holding' ? leaseWords(r) : r.state === 'waiting' ? waitWords(r) : r.state === 'done' ? `Took ${durWords(r.took_s) || '?'}` : '') },
@@ -253,7 +256,7 @@ export function queueTable(rows, narrowed) {
             ],
             mail: r => ({ lead: { icon: r.state === 'holding' ? 'lock' : r.state === 'waiting' ? 'hourglass_empty' : r.state === 'history' ? 'history' : r.state === 'done' ? (r.exit === 0 ? 'check_circle' : r.exit == null ? 'history' : 'error_outline') : 'check_circle', square: true, name: r.state === 'history' ? 'Finished runs' : stateWord(r) }, title: r.state === 'free' ? `${r.resource}: all slots free` : r.state === 'history' ? `${r.count} finished ${r.count === 1 ? 'run' : 'runs'}` : r.agent,
                 snippet: r.state === 'free' ? '' : r.state === 'history' ? `${r.resource}${r.shown ? ' · shown' : ''}` : `${r.resource}${r.note ? ' · ' + r.note : ''}`, state: stateWord(r), time: r.state === 'holding' ? `${holdWord(r)} \u00b7 ${leaseWords(r)}` : r.state === 'waiting' ? `Place ${r.place} \u00b7 ${waitWords(r)}` : r.state === 'done' ? `${resultWords(r)} \u00b7 took ${durWords(r.took_s) || '?'}` : '',
-                actions: [...(hasDetail(r) || r.state === 'history' ? [{ label: r.state === 'history' ? (r.shown ? 'Hide finished runs' : 'Show finished runs') : openKeys.has(r.key) ? 'Hide details' : 'Show details', title: 'The full note, command, head and result', details: true, run: () => toggleDetails(r) }] : []), ...linkActions(r), ...rowActions(r)].map(a => ({ label: a.label, title: a.title, off: a.off, ...(a.kick ? { confirm: 'Confirm kick', onArm: () => announceNotice(`Press Confirm kick to remove ${r.agent} from ${r.resource}.`) } : {}), run: () => { if (!a.details) noteFocus(a.kick ? neighbour(r)[0] : r.id, a.label); a.run(); } })) }),
+                actions: [...linkActions(r), ...(hasDetail(r) || r.state === 'history' ? [{ label: r.state === 'history' ? (r.shown ? 'Hide finished runs' : 'Show finished runs') : openKeys.has(r.key) ? 'Hide details' : 'Show details', title: 'The full note, command, head and result', details: true, run: () => toggleDetails(r) }] : []), ...rowActions(r)].map(a => ({ label: a.label, title: a.title, off: a.off, ...(a.kick ? { confirm: 'Confirm kick', onArm: () => announceNotice(`Press Confirm kick to remove ${r.agent} from ${r.resource}.`) } : {}), run: () => { if (!a.details) noteFocus(a.kick ? neighbour(r)[0] : r.id, a.label); a.run(); } })) }),
         }).el };
 }
 

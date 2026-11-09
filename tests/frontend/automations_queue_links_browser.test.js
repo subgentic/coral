@@ -41,19 +41,19 @@ const STUB = `(() => { const real = window.fetch; window.__queueTickMs = 1000; w
                 assert.equal(await ev(`${row('Gone Agent')}.querySelector('.queue-agent').tagName`), 'SPAN', at + 'an agent that is gone is text');
                 assert.equal(await ev(`${row('Frontend Dev')}.querySelector('.queue-agent').tagName`), 'SPAN', at + 'an agent that runs only on another computer is text here, never its remote namesake');
                 assert.equal(await ev(`${row('Data Science')}.querySelector('.queue-agent').dataset.agentLink`), 'sess-ds', at + 'the local session, not the remote namesake listed first');
-                const keys = await ev(`(() => { const out = []; for (const b of [${row('Data Science')}.querySelector('.queue-agent'), ${row('Data Science')}.querySelector('td:nth-child(4) button'), ${row('Data Science')}.querySelector('button.queue-goal')]) { b.focus(); out.push(document.activeElement === b && b.tabIndex >= 0 && b.tagName === 'BUTTON'); } return out; })()`);
+                const keys = await ev(`(() => { const out = []; for (const b of [${row('Data Science')}.querySelector('.queue-agent'), ${row('Data Science')}.querySelector('td:nth-child(5) button'), ${row('Data Science')}.querySelector('button.queue-goal')]) { b.focus(); out.push(document.activeElement === b && b.tabIndex >= 0 && b.tagName === 'BUTTON'); } return out; })()`);
                 assert.deepEqual(keys, [true, true, true], at + 'the agent, task and goal links are buttons the keyboard reaches: ' + JSON.stringify(keys));
                 // the task and the goal
                 const seen = await ev(`(() => { const vis = e => !!e && e.getClientRects().length > 0 && e.getBoundingClientRect().width > 0; const r = ${row('Data Science')}, a = r.querySelector('.queue-agent'); return { goal: vis(r.querySelector('button.queue-goal')), head: [...document.querySelectorAll('#group-table-view thead th')].some(h => h.textContent.trim() === 'Goal' && vis(h)), agentWhole: a.scrollWidth <= a.clientWidth + 1 }; })()`);
                 assert.deepEqual(seen, { goal: true, head: true, agentWhole: true }, at + 'the Goal column is on screen at this width and the longest agent name is not cut: ' + JSON.stringify(seen));
-                assert.equal(await ev(`${row('Data Science')}.querySelector('td:nth-child(4) button').textContent`), '#13596', at + 'the task is a link named #id');
+                assert.equal(await ev(`${row('Data Science')}.querySelector('td:nth-child(5) button').textContent`), '#13596', at + 'the task is a link named #id');
                 const goal = await ev(`(() => { const b = ${row('Data Science')}.querySelector('button.queue-goal'); return b && [b.textContent, b.getAttribute('aria-label'), b.title]; })()`);
                 assert.ok(goal && /^#225 Resource queue/.test(goal[0]) && /^Open goal #225/.test(goal[1]), at + 'the goal is "#id title" as a link: ' + JSON.stringify(goal));
                 assert.equal(await ev(`${row('Frontend Dev')}.querySelectorAll('button.queue-goal').length`), 0, at + 'a task with no goal has no goal link');
                 assert.equal(await ev(`${row('Gone Agent')}.querySelectorAll('td button.dt-link, button.queue-goal').length`), 0, at + 'a row with no task has neither link');
                 // the targets
                 await ev(`${row('Data Science')}.querySelector('.queue-agent').click(); true`);
-                await ev(`${row('Data Science')}.querySelector('td:nth-child(4) button').click(); true`);
+                await ev(`${row('Data Science')}.querySelector('td:nth-child(5) button').click(); true`);
                 await ev(`${row('Data Science')}.querySelector('button.queue-goal').click(); true`);
                 await waitFor(`window.__opened.length >= 2`, at + 'the clicks reach their targets: ' + JSON.stringify(await ev('window.__opened')), 6000);
                 const opened = await ev(`window.__opened`);
