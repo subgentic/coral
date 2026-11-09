@@ -162,13 +162,27 @@ func TestAFailedDescriptorFolderReadIsRetriedNotASkip(t *testing.T) {
 		}
 		return real(name)
 	}
-	requireFDCount(t) // the start of a real test: it must not skip because of a transient failure either
+	// the start of a real test: a transient failure must neither skip it nor make the count unreadable. fdCount is asked directly first: a skip is not a failure (#14868, mutant C: a fdCount that tries
+	// once makes requireFDCount skip, and a skipped test passes).
+	if _, ok := fdCount(); !ok {
+		t.Fatal("a folder read that fails for a moment made the count unreadable at the start: fdCount must try again")
+	}
+	mu.Lock()
+	failures = 7
+	mu.Unlock()
+	requireFDCount(t) // and the helper itself must not skip on it either (it would skip the whole test)
 	mu.Lock()
 	failures = 12
 	mu.Unlock()
 	require.Eventually(t, fdsAtMost(1<<20), 20*time.Second, 20*time.Millisecond, "the poll goes on past reads that failed")
+	// (#14868, mutant A) while every read fails the condition is "not yet", never true: a count that could not be read is not a count of 0 (which is at most any limit).
 	mu.Lock()
-	failures = 12
+	failures = 1 << 30
 	mu.Unlock()
-	assert.Greater(t, settledFDs(t), 0, "the settled count survives a failed read too")
+	assert.False(t, fdsAtMost(1<<20)(), "a failed read is not a count: the condition must not be true while reads fail")
+	// (#14868, mutant B) the settled count ignores failed reads: with reads failing for about two seconds, five failed reads in a row must not settle as a count of 0.
+	mu.Lock()
+	failures = 200
+	mu.Unlock()
+	assert.Greater(t, settledFDs(t), 0, "the settled count survives failed reads, and does not take five failures in a row for a count")
 }
