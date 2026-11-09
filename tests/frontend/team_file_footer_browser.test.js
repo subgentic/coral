@@ -59,6 +59,19 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
             await ev(`[...document.querySelectorAll('${PANE} .detail-foot [role=menuitemcheckbox]')].find(b => b.querySelector('.more-item-label').textContent === 'Star').click(); true`); // back to unstarred: the next width starts clean
             await press('Enter', 'Enter', 13); await press('Escape', 'Escape', 27);
             check(`${at}Escape closes the menu and keeps the focus on More`, await ev(`document.querySelector('${PANE} .detail-foot .task-more-btn').getAttribute('aria-expanded') === 'false' && document.activeElement === document.querySelector('${PANE} .detail-foot .task-more-btn')`));
+            // the reverse: a file that is already starred opens as 'Star', checked; pressing it keeps the name and unchecks it (UI Accessibility's MUST on #14972)
+            const hexOf = await ev(`document.querySelector('#team-panel-artifacts [data-artifact-id]').dataset.artifactId`);
+            await ev(`fetch('/api/artifacts/${hexOf}/star', { method: 'PUT' }).then(r => r.status)`);
+            loaded = Page.loadEventFired(); await Page.navigate({ url: BASE + '/' }); await loaded; await coralReady(); // the list is read again: the file is starred on the server now
+            await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'artifacts' }); true`);
+            await waitFor(`!!document.querySelector('#team-panel-artifacts [data-artifact-id]')`, `${at}the file's row again`, 15000);
+            await ev(`document.querySelector('#team-panel-artifacts [data-artifact-id]').click(); true`);
+            await waitFor(`!!document.querySelector('${PANE} .detail-foot .task-more-btn') && document.querySelector('${PANE} .detail-foot').getBoundingClientRect().height > 0`, `${at}the open view of the starred file`, 10000);
+            const starItem = `[...document.querySelectorAll('${PANE} .detail-foot [role=menuitemcheckbox]')].find(b => b.querySelector('.more-item-label').textContent === 'Star')`;
+            check(`${at}an already starred file shows Star, checked`, await ev(`!!(${starItem}) && (${starItem}).getAttribute('aria-checked') === 'true'`));
+            await ev(`(${starItem}).click(); true`);
+            await waitFor(`(${starItem}).getAttribute('aria-checked') === 'false'`, `${at}unstarring turns the check off`, 6000);
+            check(`${at}pressing it keeps the name Star and unchecks it`, await ev(`!!(${starItem}) && (${starItem}).getAttribute('aria-checked') === 'false'`));
         }
     } catch (e) {
         check('no error', false, e.message);
