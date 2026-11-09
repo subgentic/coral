@@ -11,6 +11,7 @@ import { registerGroupSource, openGroupTable, refreshGroupTable } from './sideba
 import { setHidden } from './dom_write.js';
 import { announceNotice } from './notifications.js';
 import { importOnce } from './import_once.js';
+import { isCloud } from './server_base.js';
 import { jobList, onJobsChanged, refreshJobs, selectScheduledJob, openJobId, scheduleOf, nextOf, offWord } from './scheduler.js';
 import { lastWords, lastChip, atWords, whenWords, failureWords, isExample } from './job_words.js';
 import { liveRuns, onLiveRuns, selectLiveJobRun } from './live_jobs.js';
@@ -272,8 +273,9 @@ function folderTable(key) {
     if (key === 'queue') return AQ.queueTable(rows, !!filt.q);
     if (key === 'recent') { AR.ensureRunsPage({ q: filt.q, result: filt.result }); return recentTable(rows, narrowed); } // the page of this search and Result filter (a no-op when it is the one loaded or on its way)
     if (f.attention) return attentionTable(key, rows, narrowed);
+    const hubEmpty = isCloud() && !narrowed && !rows.length; // through the Hub the job and workflow lists are not read (#14820): an empty table must not say none exist (#14822)
     const base = { title: f.label, noun: f.noun, rows, status: key === 'jobs' ? _gone : '',
-        empty: { line: narrowed ? `No ${f.noun[0]} matches the search and filters.` : `No ${f.noun[1]} yet.`, hint: narrowed ? '' : key === 'jobs' ? 'New job schedules one.' : 'Build with agent starts an agent that builds one with you; New workflow opens an empty form. A workflow runs when you press Run, when a job schedules it, or through the API.', ...(narrowed ? {} : firstRun()) } };
+        empty: hubEmpty ? { line: 'Automations run on each computer.', hint: 'Open a computer to see its jobs and workflows.', computers: { label: 'Open a computer' } } : { line: narrowed ? `No ${f.noun[0]} matches the search and filters.` : `No ${f.noun[1]} yet.`, hint: narrowed ? '' : key === 'jobs' ? 'New job schedules one.' : 'Build with agent starts an agent that builds one with you; New workflow opens an empty form. A workflow runs when you press Run, when a job schedules it, or through the API.', ...(narrowed ? {} : firstRun()) } };
     if (key === 'jobs') {
         return { ...base, signature: JSON.stringify([_gone, !!firstRun().cards, rows.map(i => [i.job, lastWords(i.run), nextOf(i.job), runsWords(i)])]),
             node: () => DT.dataTable({
