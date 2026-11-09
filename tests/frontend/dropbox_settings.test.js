@@ -33,7 +33,7 @@ const { JSDOM } = require('jsdom');
           <button id="settings-dropbox-retention-cancel" hidden></button>
         </div>
       </section></body>`, { url: 'http://127.0.0.1:8420/' });
-    for (const k of ['window', 'document']) Object.defineProperty(globalThis, k, { value: dom.window[k], configurable: true, writable: true });
+    for (const k of ['window', 'document', 'navigator']) Object.defineProperty(globalThis, k, { value: dom.window[k], configurable: true, writable: true }); // navigator: the jsdom agent, so the module's stylesheet is not awaited
 
     const calls = [];
     let answers = {};

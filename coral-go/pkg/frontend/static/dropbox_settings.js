@@ -2,6 +2,9 @@
    (never a token) and offers one next step for each state: Connect, Reconnect, Disconnect, Switch to the new account, Take over. Connect opens Dropbox's
    own page in a new tab; Coral then waits for the person's Allow by reading the status again. Every server text is put in with textContent. */
 
+import { loadStyles } from './lazy_styles.js';
+
+await loadStyles('dropbox.css'); // the block's own sheet, not at start (page_weight)
 const STATUS = '/api/dropbox/status';
 const POLL_MS = 2000;
 const POLL_FOR_MS = 5 * 60 * 1000; // a sign-in waits five minutes on the server side too

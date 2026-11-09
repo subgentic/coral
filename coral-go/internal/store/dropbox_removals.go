@@ -132,7 +132,7 @@ func (o *DropboxOutbox) ConfirmHeld(ctx context.Context) (int, error) {
 func (o *DropboxOutbox) DueRemovals(ctx context.Context, now time.Time, limit int) ([]DropboxRemoval, error) {
 	var out []DropboxRemoval
 	err := o.db.SelectContext(ctx, &out, `SELECT digest, name, state, queued_at, due_at, next_try_at, attempts, reason, others, unknown, edited FROM dropbox_removals
-		WHERE state = ? AND due_at <= ? AND next_try_at <= ? ORDER BY due_at, digest LIMIT ?`, DropboxRemovalWaiting, ts(now), ts(now), limit)
+		WHERE state = ? AND due_at <= ? AND next_try_at <= ? ORDER BY due_at, digest, rowid LIMIT ?`, DropboxRemovalWaiting, ts(now), ts(now), limit)
 	return out, err
 }
 
@@ -150,7 +150,7 @@ func (o *DropboxOutbox) Removal(ctx context.Context, digest string) (DropboxRemo
 func (o *DropboxOutbox) Removals(ctx context.Context, limit int) ([]DropboxRemoval, error) {
 	var out []DropboxRemoval
 	err := o.db.SelectContext(ctx, &out, `SELECT digest, name, state, queued_at, due_at, next_try_at, attempts, reason, others, unknown, edited FROM dropbox_removals
-		ORDER BY CASE state WHEN 'held' THEN 0 WHEN 'kept' THEN 1 WHEN 'edited' THEN 2 ELSE 3 END, due_at, digest LIMIT ?`, limit)
+		ORDER BY CASE state WHEN 'held' THEN 0 WHEN 'kept' THEN 1 WHEN 'edited' THEN 2 ELSE 3 END, due_at, digest, rowid LIMIT ?`, limit)
 	return out, err
 }
 
