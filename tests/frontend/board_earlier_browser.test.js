@@ -6,7 +6,6 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-let ackedHere = false; // the notice this run read as seen is taken back at the end, so the suite leaves no setting behind (--fail-on-leak)
 const CDP = require('chrome-remote-interface');
 const BASE = require('./test_base').BASE;
 const { safePaused } = require('./helpers/paused');
@@ -45,7 +44,7 @@ function page(q) {
         await coralReady();
         // This suite is about the board's scrolling, not the launch notice: the notice is read after first paint and, on a profile that has never held its hint (a cold first run, or a phone after a wide window), arrives above the board and moves
         // it down by its height (53 px on a phone) between two position readings (#14932: 'the message that was at the top stays there (313.95 -> 366.95)'). It is read as seen here, and the notice's own layout has its suites.
-        ackedHere = await ev(`(async () => { const d = await fetch('/api/launch-disclosure').then(r => r.ok ? r.json() : null).catch(() => null); if (d && d.seen === false) await fetch('/api/launch-disclosure/ack', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: d.id }) }); try { localStorage.removeItem('coral-launch-notice'); } catch (e) { /* none */ } return !!(d && d.seen === false); })()`);
+        await ev(`(async () => { const d = await fetch('/api/launch-disclosure').then(r => r.ok ? r.json() : null).catch(() => null); if (d && d.seen === false) await fetch('/api/launch-disclosure/ack', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: d.id }) }); try { localStorage.removeItem('coral-launch-notice'); } catch (e) { /* none */ } return true; })()`);
         assert.equal(await ev(`fetch('/api/board/${B}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'scroll-fixture', job_title: 'Scroll fixture' }) }).then(r => r.status)`), 200, 'the isolated board exists before opening its message panel');
         let hold = false, pending = null; // hold: an earlier page's answer waits until released, to see the line while it is out
         safePaused(client, ({ requestId, request }) => {
@@ -108,5 +107,5 @@ function page(q) {
             assert.equal(await ev(`document.activeElement && document.activeElement.dataset.messageId`), '1', 'focus is on the first message');
         }
         console.log(`\nAll earlier-messages checks passed`);
-    } finally { try { if (ackedHere) await ev(`fetch('/api/launch-disclosure/ack', { method: 'DELETE' }).then(r => r.ok)`); } catch { /* the cleanup report names a leak */ } try { await Fetch.disable(); await removeBoards(ev, [B]); } catch { /* the cleanup report names a leak */ } await client.close(); }
+    } finally { try { await Fetch.disable(); await removeBoards(ev, [B]); } catch { /* the cleanup report names a leak */ } await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
