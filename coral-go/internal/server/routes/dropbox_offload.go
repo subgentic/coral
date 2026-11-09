@@ -18,8 +18,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -306,4 +308,22 @@ func (b *DropboxBackup) forgetOwnMarkerLocked(ctx context.Context, cl *dropbox.C
 	if _, merr := cl.Metadata(ctx, access, marker); merr != nil && errors.Is(merr, dropbox.ErrNotFound) {
 		_ = b.outbox.ForgetOffloaded(ctx, digest)
 	}
+}
+
+// refuseWhileOffloaded answers 409 when this Coral keeps files only in Dropbox (or cannot tell): Disconnect (with or without deleting the backup),
+// Switch, Take over and Rekey would leave them with no way back (Security's condition 5 and 3b on d766be37a). It reports whether it refused.
+func (h *CloudHandler) refuseWhileOffloaded(w http.ResponseWriter, r *http.Request) bool {
+	if h.dbx == nil || h.dbx.outbox == nil {
+		return false
+	}
+	n, _, err := h.dbx.outbox.OffloadedTotals(r.Context())
+	if err != nil {
+		writeError(w, http.StatusConflict, "kept_in_dropbox", "Coral could not check whether files are kept only in Dropbox, so nothing was changed. Try again.")
+		return true
+	}
+	if n > 0 {
+		writeError(w, http.StatusConflict, "kept_in_dropbox", fmt.Sprintf("%d %s kept only in Dropbox. Bring them back first (turn off Free up space), then try again.", n, map[bool]string{true: "file is", false: "files are"}[n == 1]))
+		return true
+	}
+	return false
 }

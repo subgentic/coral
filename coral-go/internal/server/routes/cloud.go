@@ -144,6 +144,9 @@ func (h *CloudHandler) Rekey(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, `re-keying discards the Coral Hub connection and the remote servers' API keys: send {"confirm": true}`)
 		return
 	}
+	if h.refuseWhileOffloaded(w, r) { // stage 6b: a re-key discards the Dropbox sign-in, the only way back to files kept only in Dropbox
+		return
+	}
 	rs := h.secrets()
 	if rs == nil {
 		errInternalServer(w, "no store")

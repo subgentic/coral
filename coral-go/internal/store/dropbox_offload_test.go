@@ -224,3 +224,19 @@ func TestTheOffloadSettingIsOffByDefaultAndEveryNewSignInTurnsItOff(t *testing.T
 		require.NoError(t, ds.AddAudit(ctx, DropboxAudit{Kind: k, Count: 3}))
 	}
 }
+
+// Security's 3c on d766be37a. Mutant: retention's due list keeps an offloaded digest (a failed or stale marker listing would then cost the only copy).
+func TestRetentionNeverTakesAnOffloadedDigest(t *testing.T) {
+	ob := NewDropboxOutbox(openTestDB(t))
+	ctx := context.Background()
+	old := offloadNow.Add(-200 * 24 * time.Hour)
+	backedUp(t, ob, "dbid:A", "0123456789abcdef0123456789abcdef", hex64("a"), old)
+	backedUp(t, ob, "dbid:A", "1123456789abcdef0123456789abcdef", hex64("b"), old)
+	require.NoError(t, ob.RecordOffloaded(ctx, DropboxOffloaded{Digest: hex64("a"), AccountID: "dbid:A", Path: "/v1/p", Rev: "r", ContentHash: "h", Size: 1}))
+	rows, err := ob.DueForRetention(ctx, "dbid:A", offloadNow, 100)
+	require.NoError(t, err)
+	for _, r := range rows {
+		assert.NotEqual(t, hex64("a"), r.Digest, "never the only copy")
+	}
+	assert.Len(t, rows, 2, "the other document's version and sidecar are due")
+}

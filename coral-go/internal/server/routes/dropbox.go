@@ -249,6 +249,9 @@ func (h *CloudHandler) DropboxConfirmSwitch(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusNotFound, "not_available", "Dropbox backup is not available in this build")
 		return
 	}
+	if h.refuseWhileOffloaded(w, r) { // stage 6b: never strand files kept only in Dropbox
+		return
+	}
 	d.mu.Lock()
 	p := d.pending
 	d.pending = nil
@@ -275,6 +278,9 @@ func (h *CloudHandler) DropboxDisconnect(w http.ResponseWriter, r *http.Request)
 	d := h.dbx
 	if d == nil {
 		writeError(w, http.StatusNotFound, "not_available", "Dropbox backup is not available in this build")
+		return
+	}
+	if h.refuseWhileOffloaded(w, r) { // stage 6b: never strand files kept only in Dropbox
 		return
 	}
 	// Stage 6a (#14814): {"delete_backup": true, "typed": [...]} deletes the backup in Dropbox first, after its typed confirm; the sign-in is
@@ -326,6 +332,9 @@ func (h *CloudHandler) DropboxTakeOver(w http.ResponseWriter, r *http.Request) {
 	d := h.dbx
 	if d == nil {
 		writeError(w, http.StatusNotFound, "not_available", "Dropbox backup is not available in this build")
+		return
+	}
+	if h.refuseWhileOffloaded(w, r) { // stage 6b: never strand files kept only in Dropbox
 		return
 	}
 	id, err := d.machineID()
