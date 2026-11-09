@@ -1,5 +1,6 @@
 /* Coral's side of the shared Inbox (#5754): the adapter that gives inbox_panel.js its tasks, task text, reply and saved-message read from this Coral's own routes, and the one mounted panel
  * (the Inbox tab's "Tasks for you" and the "Read the whole message" control of a Saved for later item). The component itself is inbox_panel.js; Coral Hub mounts the same file with its own adapter. */
+import { nativeSavedSourceAllowed } from './server_status.js';
 import { state } from './state.js';
 import { importOnce } from './import_once.js';
 import { makeLinkPolicy } from './safe_markdown.js';
@@ -7,9 +8,16 @@ import { openTask, taskHref } from './task_navigation.js';
 import { cleanArtifactName } from './artifact_names.js';
 import { onAccountForgotten } from './local_store.js';
 import { loadSafeMarkdown } from './vendor_loader.js';
-import { keyLabel, splitKey, pathId, serverFetch, boardFetch, identityKey, noteBoardLabels, isCloud } from './server_base.js';
+import { keyLabel, splitKey, pathId, serverFetch, boardFetch, identityKey, noteBoardLabels, isCloud, savedExpandOn, personalInboxSources, personalInboxAllowed, inboxReplyOn, nativeTasks } from './server_base.js';
 import { setInboxCount } from './inbox_tab.js'; // the count on the Tasks tab
 const { mountInbox, clearInboxDrafts, INBOX_CONTRACT } = await importOnce('./inbox_panel.js'); // the component (shared with the hub); this file is the one that is Coral's
+
+const replyContexts = new Map();
+const rememberReply = (project, task) => {
+    const key = `${project}#${task.id}`;
+    replyContexts.set(key, { project, status: task.status, parked_reason: task.parked_reason, parked_until: task.parked_until });
+    if (replyContexts.size > 1000) replyContexts.delete(replyContexts.keys().next().value);
+};
 
 const OPEN_STATUSES = ['pending', 'in_progress', 'review_pending', 'blocked'];
 const FIELDS = 'id,board_id,board_label,title,priority,status,created_by,created_at,updated_at,revision,goal_id,goal_title,artifact_count'; // updated_at and revision are the change stamp the panel keeps a drawn task by (#5803)
@@ -23,13 +31,14 @@ async function json(resp) {
 
 /** The local Inbox spans the same online registered machines as Saved and Board history.
  * IDs are only unique on their source machine; qualify the team before any row is opened. */
-async function inboxRows(path, field) {
-    const servers = [...(isCloud() ? [] : ['local']), ...new Set(state.hub ? (state.servers || []).filter(s => s.id && s.id !== 'local' && s.status === 'online').map(s => s.id) : [])];
+async function inboxRows(path, field, personal = false) {
+    const servers = personal && isCloud() ? personalInboxSources().filter(s => personalInboxAllowed(s.id)).map(s => s.id) : [...(isCloud() ? [] : ['local']), ...new Set(state.hub ? (state.servers || []).filter(s => s.id && s.id !== 'local' && s.status === 'online').map(s => s.id) : [])];
     const results = await Promise.allSettled(servers.map(async server => {
         const data = await json(await serverFetch(server, path));
-        const rows = Array.isArray(data[field]) ? data[field] : [];
+        if (personal && !Array.isArray(data[field])) throw new Error('The task list was not usable.');
+        const rows = Array.isArray(data[field]) ? (personal ? data[field].slice(0, 100) : data[field]) : [];
         noteBoardLabels(rows, 'board_id', server);
-        return rows.map(row => ({ ...row, server, board_id: identityKey(server, row.board_id) }));
+        return rows.filter(row => !personal || (validTask(row) && personalInboxAllowed(server))).map(row => ({ ...row, server, board_id: identityKey(server, row.board_id) }));
     }));
     inboxRows.failed = results.some(result => result.status === 'rejected'); // a read that failed or was refused is told to the caller, which backs off (#13389)
     // Each source is ordered independently; merge by update time, not server order.
@@ -51,6 +60,10 @@ export async function listInboxGoals(finished = false) {
     if (finished) doneCapped = Object.values(rows.reduce((n, d) => (n[d.server] = (n[d.server] || 0) + 1, n), {})).some(n => n >= DONE_PAGE);
     return rows;
 }
+
+const validTask = row => row && Number.isSafeInteger(row.id) && row.id > 0 && typeof row.board_id === 'string' && !!row.board_id.trim() && [...row.board_id].length <= 200 && !/[\u0000-\u001f\u007f-\u009f/\\%?#]/.test(row.board_id) && !row.board_id.includes('..') && !row.board_id.startsWith('.');
+let taskReadFailed = false, tasksCapped = false;
+export const taskReadState = () => ({ failed: taskReadFailed, capped: tasksCapped });
 
 const ARTIFACT_LINK_RE = /coral:\/\/artifacts\/([0-9a-f]{64})(?![0-9a-f])/g;
 const ARTIFACT_LOOKUPS_MAX = 20;
@@ -76,18 +89,26 @@ export async function artifactLinkPolicy(text, server) { // server: the one the 
 export const coralInboxAdapter = {
     contract: INBOX_CONTRACT,
     async listTasks() {
-        const q = new URLSearchParams({ assigned_to: 'Operator', fields: FIELDS, sort: 'updated_at', order: 'desc', limit: '100' });
-        for (const s of OPEN_STATUSES) q.append('status', s);
-        const rows = await inboxRows(`/api/board/tasks?${q}`, 'tasks');
+        const hub = isCloud() && nativeTasks();
+        const q = new URLSearchParams({ ...(hub ? {} : { assigned_to: 'Operator' }), fields: FIELDS + (hub ? ',assigned_to,parked_reason,parked_until' : ''), sort: 'updated_at', order: 'desc', limit: '100' });
+        for (const s of [...OPEN_STATUSES, ...(hub ? ['draft'] : [])]) q.append('status', s);
+        let rows = await inboxRows(`/api/board/tasks?${q}`, 'tasks', hub);
+        taskReadFailed = !!inboxRows.failed;
+        tasksCapped = Object.values(rows.reduce((out, row) => (out[row.server] = (out[row.server] || 0) + 1, out), {})).some(n => n >= 100);
+        if (hub) rows = rows.filter(t => String(t.assigned_to || '').replace(/^@/, '').toLowerCase() === 'operator' || t.status === 'review_pending');
+        for (const task of rows) if (hub) rememberReply(task.board_id, task);
         return rows.map(t => ({ id: t.id, server: t.server, project: t.board_id, board: t.board_label || keyLabel(t.board_id), title: t.title, priority: t.priority, status: t.status,
-            created_by: t.created_by, created_at: t.created_at, updated_at: t.updated_at, revision: t.revision, artifact_count: t.artifact_count,
-            goal: t.goal_id && t.goal_title ? { id: Number(t.goal_id), title: String(t.goal_title) } : null })); // the goal it serves, when the route sends one (#7302)
+            assigned_to: t.assigned_to, parked_reason: t.parked_reason, parked_until: t.parked_until, created_by: t.created_by, created_at: t.created_at, updated_at: t.updated_at, revision: t.revision, artifact_count: t.artifact_count,
+            goal: Number.isSafeInteger(Number(t.goal_id)) && Number(t.goal_id) > 0 && t.goal_title ? { id: Number(t.goal_id), title: String(t.goal_title) } : null })); // the goal it serves, when the route sends one (#7302)
     },
     openGoal(task) { return importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(task.project, task.goal.id)); },
     async getTask(project, id) {
-        return json(await boardFetch(project, `/tasks/${pathId(id)}`));
+        const task = await json(await boardFetch(project, `/tasks/${pathId(id)}`));
+        if (isCloud()) rememberReply(project, { ...task, id: pathId(id) });
+        return task;
     },
     async replyToTask({ project, taskId, content, replyTo }) {
+        if (isCloud() && (!replyContexts.has(`${project}#${taskId}`) || !this.canReply(replyContexts.get(`${project}#${taskId}`)).ok)) throw new Error('Reply is not available for this computer.');
         const d = await json(await boardFetch(project, `/tasks/${pathId(taskId)}/reply`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, ...(Number(replyTo) > 0 ? { reply_to: Number(replyTo) } : {}) }) }));
         return { ok: !!d.ok, notified: d.notified || [], warnings: d.warnings || [] };
     },
@@ -95,10 +116,12 @@ export const coralInboxAdapter = {
         const d = await json(await boardFetch(project, `/messages/all?task_id=${pathId(taskId)}&limit=200`));
         return (Array.isArray(d) ? d : []).map(m => ({ id: m.id, from: m.hub_user || m.subscriber_id || '', mine: m.subscriber_id === 'Operator' && !m.hub_user, content: m.content, created_at: m.created_at }));
     },
-    canReply() { return { ok: true }; }, // the Operator of this computer; a Coral Hub viewer's adapter says why not
+    canReply(task) { return !isCloud() || (inboxReplyOn() && personalInboxAllowed(splitKey(task?.project).server, true) && ['pending', 'in_progress', 'blocked', 'draft'].includes(task?.status) && !task?.parked_reason && !task?.parked_until) ? { ok: true } : { ok: false, reason: 'Reply requires an owned computer in Interact or Launch mode and an available task.' }; }, // the Operator of this computer; a Coral Hub viewer's adapter says why not
     async readSavedMessage(item) {
         // GET /api/saved/{id}/message (Backend, #5753): the redacted, capped text of the stored item's source; reason says why there is none (gone, not_reachable, too_long)
+        if (isCloud() && (!savedExpandOn() || !nativeSavedSourceAllowed(item.server))) throw new Error('This saved message is not available.');
         const d = await json(await serverFetch(item.server, `/api/saved/${pathId(item.id)}/message`));
+        if (isCloud() && !nativeSavedSourceAllowed(item.server)) throw new Error('This saved message is no longer available.');
         return { text: typeof d.text === 'string' ? d.text : '', partial: !!d.partial, reason: typeof d.reason === 'string' ? d.reason : '' };
     },
     taskHref(task) { return taskHref(task.project, task.id); },
@@ -109,7 +132,7 @@ export const coralInboxAdapter = {
 };
 
 let _inbox = null;
-onAccountForgotten(clearInboxDrafts);
+onAccountForgotten(() => { clearInboxDrafts(); replyContexts.clear(); });
 
 /** The mounted panel (made the first time it is asked for, in the Inbox tab's Tasks panel), or null where the page has no such host. */
 function coralInbox() {
@@ -124,4 +147,4 @@ function coralInbox() {
 export function refreshTasks() { const i = coralInbox(); if (i) i.refresh(); }
 
 /** The "Read the whole message" control for a saved item, or null. */
-export function savedExpandFor(item, which, mode) { const i = coralInbox(); return i ? i.savedExpand(item, which, mode) : null; }
+export function savedExpandFor(item, which, mode) { if (!savedExpandOn()) return null; const i = coralInbox(); return i ? i.savedExpand(item, which, mode) : null; }

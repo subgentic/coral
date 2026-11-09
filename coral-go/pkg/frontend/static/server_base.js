@@ -197,6 +197,27 @@ export function serverForSession(name, sessionId) {
 // folder showed up as its raw key, "@<uuid>/folder", instead of the folder name.
 const SERVER_ID_RE = /^(?:[a-z0-9-]{1,32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 
+/** Personal Hub rollups require an explicit ownership assertion from inventory.
+ * An access tier or a connector's owner-stamp support never substitutes for it. */
+export function personalInboxSources() {
+    return (state.servers || []).filter(s => s && typeof s.id === 'string' && s.id !== LOCAL_SERVER && SERVER_ID_RE.test(s.id));
+}
+export function personalInboxAllowed(server, write = false) {
+    if (!isCloud()) return true;
+    const source = personalInboxSources().find(s => s.id === server);
+    return source?.owner === true && source.status === 'online'
+        && (!write || ['interact', 'launch'].includes(source.effective_mode));
+}
+export function personalInboxNotice(noun) {
+    if (!isCloud()) return '';
+    const sources = personalInboxSources();
+    if (!sources.length) return 'Waiting for computer ownership information.';
+    return sources.filter(s => !personalInboxAllowed(s.id)).map(s =>
+        s.owner === false ? `Only this computer's owner sees ${noun} on ${s.label || s.id}.`
+        : s.owner !== true ? `Ownership is not known for ${s.label || s.id}; ${noun} are not shown.`
+        : `${s.label || s.id} is offline; its ${noun} are not shown.`).join(' ');
+}
+
 /** Unpack a key made by identityKey(): {server, name}. */
 export function splitKey(key) {
     const k = String(key ?? '');
@@ -466,6 +487,7 @@ export function decisionNeedsPerson(server) {
 // Explicit account booleans override the existing boot choices independently.
 // Missing/malformed fields and failed reads retain boot behavior for older Hubs.
 // Startup bounds this shared cached read; the Hub still authorizes every write.
+let _tasksNative = false, _savedNative = false, _inboxReply = false, _savedExpand = false;
 let _needsNative = null, _goalPreview = null, _commentWrites = null, _commentSend = null, _accountFlagsInit = null;
 export function initCloudAccountFlags() {
     if (!isCloud()) return Promise.resolve();
@@ -477,6 +499,10 @@ export function initCloudAccountFlags() {
                 new Promise(resolve => { timer = setTimeout(() => resolve(null), 4000); }),
             ]);
             _needsNative = typeof account?.needs_native === 'boolean' ? account.needs_native : null;
+            _tasksNative = account?.tasks_native === true;
+            _savedNative = account?.saved_native === true;
+            _inboxReply = account?.inbox_reply === true;
+            _savedExpand = account?.saved_expand === true;
             _goalPreview = typeof account?.goal_preview === 'boolean' ? account.goal_preview : null;
             _commentWrites = typeof account?.comment_writes === 'boolean' ? account.comment_writes : null; // the Hub routes comment writes to the computer (#14549); absent: not offered, as before
             _commentSend = typeof account?.comment_send === 'boolean' ? account.comment_send : null; // the Hub routes the lock and the send to an agent (#14549)
@@ -508,6 +534,12 @@ export function goalPreviewOn() {
 export function nativeInbox() {
     return isCloud() && bootConfig().inbox === 'native';
 }
+
+/** Independent account-only migrations: missing or malformed flags always keep Hub frames. */
+export const nativeTasks = () => nativeInbox() && _tasksNative;
+export const nativeSaved = () => nativeInbox() && _savedNative;
+export const inboxReplyOn = () => !isCloud() || _inboxReply;
+export const savedExpandOn = () => !isCloud() || _savedExpand;
 
 /** Native Needs you requires native Inbox; an account boolean wins, otherwise boot decides. */
 export function nativeNeeds() {

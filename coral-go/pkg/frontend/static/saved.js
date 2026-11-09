@@ -4,12 +4,13 @@ import { serverMatches } from './inbox_servers.js';
  * on the messages and the Inbox's count are in saved_marks.js. An agent still running opens in its Chat view and pages up to the message; one that has ended
  * opens in Chats (History) at the message; a board opens and jumps to the message as the board's search does. A message that is gone (the transcript no longer has
  * it, the board message was deleted) is marked Gone on its item, which keeps its snippet and can only be removed. */
+import { onAccountForgotten } from './local_store.js';
 import { isPhoneLayout } from './phone_layout.js';
-import { teamLabel } from './server_status.js';
+import { teamLabel, nativeSavedSourceAllowed } from './server_status.js';
 import { whenText } from './when_text.js';
 import { state } from './state.js';
 import { showToast } from './utils.js';
-import { sessionServer, normServer, serverFetch, identityKey, LOCAL_SERVER } from './server_base.js';
+import { sessionServer, normServer, serverFetch, identityKey, LOCAL_SERVER, isCloud, nativeSaved, personalInboxSources, personalInboxAllowed, personalInboxNotice } from './server_base.js';
 import { savedChanged, setSavedCount, setScopedCount, wantAllScope, validSavedItem, savedShowing, savedViewShowing, currentScope } from './saved_marks.js';
 import { withScope, scopeHeading, scopeEmpty, ALL } from './saved_scope.js';
 import { effectiveLiveViewMode, setLiveViewMode, jumpToLiveMessage } from './live_chat.js';
@@ -23,16 +24,21 @@ const { KINDS, KIND_LABEL, SORTS, SORT_LABEL, makeModel: savedModel, clean: clea
 const $ = id => document.getElementById(id);
 let tab = 'open';
 let items = [];
+let sourceItems = [], capped = false;
 let down = []; // the registered servers that did not answer the last read: {id, label}
 let multi = false; // more than one server answered: each item names its server
 const checks = new Map(); // item (uid) -> { state: 'live' | 'ended' | 'board' | 'gone' | 'noopen', why }
 // The search and filters (#4778): the server matches (q, kind, conv, order), so a search covers every saved message, not just the ones shown.
-let filters = loadSavedFilters();
-const setFilters = next => { filters = next; saveSavedFilters(filters); };
+// Native Hub Saved is account-owned state. Keep its filters only in memory so a shared browser
+// never carries one account's team/search choices into the next account.
+const accountScopedSaved = () => isCloud() && nativeSaved();
+let filters = accountScopedSaved() ? { ...cleanSaved({}) } : loadSavedFilters();
+const setFilters = next => { filters = next; if (!accountScopedSaved()) saveSavedFilters(filters); };
 let bar = null;
 let totals = { open: 0, done: 0 };
 let loadSeq = 0; // the read in flight that was asked for last: an answer that comes after a newer ask is dropped, so a slow read of an old filter never overwrites the list of the newer one (#7945)
 let scope = ALL; // where the panel was opened from (#4792): the agent or the team on screen, or everything; the server matches it, and the counts are its own
+onAccountForgotten(() => { ++loadSeq; items = []; sourceItems = []; down = []; capped = false; checks.clear(); convTitles.clear(); totals = { open: 0, done: 0 }; if (accountScopedSaved()) { filters = { ...cleanSaved({}) }; tab = 'open'; } });
 const convTitles = new Map(); // conversation reference -> its title, from every list read: the Conversation filter's options (they must outlast a filter that leaves one)
 /** An item's identity across servers: ids are each server's own. */
 const uid = it => `${it.server}:${it.id}`;
@@ -56,10 +62,45 @@ function ago(iso) {
     return when(iso);
 }
 
+function browserItems() {
+    items = sourceItems.filter(i => nativeSavedSourceAllowed(i.server) && savedKeeps(i, filters) && serverMatches(i, filters)
+        && (!filters.kind || i.kind === filters.kind) && (!filters.conv || i.ref === filters.conv)
+        && (!filters.q || [i.title, i.snippet].some(t => String(t || '').toLowerCase().includes(filters.q.toLowerCase()))))
+        .sort((a, b) => (filters.sort === 'oldest' ? -1 : 1) * (b.saved_at || '').localeCompare(a.saved_at || ''));
+}
+async function loadCloud(mine) {
+    if (!nativeSaved()) return;
+    const sources = personalInboxSources().filter(s => nativeSavedSourceAllowed(s.id));
+    const results = await Promise.all(sources.map(async s => {
+        try {
+            const r = await serverFetch(s.id, '/api/saved?limit=200');
+            if (!r.ok) return { server: s.id, label: s.label, ownerOnly: r.status === 403, failed: true };
+            const d = await r.json();
+            if (!Array.isArray(d.items)) throw new Error('not a saved list');
+            return { server: s.id, d };
+        } catch { return { server: s.id, label: s.label, failed: true }; }
+    }));
+    if (mine !== loadSeq) return;
+    const answered = results.filter(r => !r.failed && nativeSavedSourceAllowed(r.server));
+    down = results.filter(r => r.failed).map(r => ({ id: r.server, label: r.label, ownerOnly: r.ownerOnly }));
+    sourceItems = answered.flatMap(a => a.d.items.slice(0, 200).filter(validSavedItem).map(i => ({ ...i, server: a.server })));
+    capped = answered.some(a => a.d.items.length >= 200 || a.d.has_more || a.d.truncated);
+    multi = personalInboxSources().length > 1;
+    convTitles.clear();
+    for (const i of sourceItems) if (i.ref && !convTitles.has(i.ref)) convTitles.set(i.ref, i.title || i.ref);
+    totals = { open: sourceItems.filter(i => !i.done_at).length, done: sourceItems.filter(i => !!i.done_at).length };
+    browserItems();
+}
+function refilterOrRefresh() {
+    if (!isCloud()) return refresh();
+    browserItems(); render(); return Promise.resolve();
+}
+
 /** This server's saved messages, and in hub mode every online registered server's (#4551), newest saved first. This server failing is an error; a registered server
  *  that does not answer is a line saying so, and its items are left out. Each item is tagged with the server that has it. */
 async function load() {
     const mine = ++loadSeq;
+    if (isCloud()) return loadCloud(mine);
     const here = currentScope();
     if (here.key !== scope.key) { // another agent or team: its own conversations, and a conversation filter of the last one means nothing
         scope = here;
@@ -152,7 +193,7 @@ const savedSpec = () => ({
 function syncBar(shownCount) {
     const host = $('saved-bar');
     if (host) {
-        if (!bar) { bar = buildListBar(savedSpec(), next => { setFilters(cleanSaved(next)); refresh(); }); host.append(bar.node); }
+        if (!bar) { bar = buildListBar(savedSpec(), next => { setFilters(cleanSaved(next)); refilterOrRefresh(); }); host.append(bar.node); }
         syncOneBar(bar, shownCount);
     }
     if (inboxBar) syncOneBar(inboxBar, shownCount);
@@ -350,7 +391,8 @@ let inboxBar = null; // the Filters and Sort bar in the Inbox's Display options:
 export function onSavedRender(fn) { renderListeners.add(fn); }
 /** What the Inbox shows: the tab's items (Open or Done), both totals, the servers that did not answer, and whether a search or filter is on. */
 export function savedView() {
-    return { loading: !_drawn && !_readError, error: _readError, scoped: scope.kind === 'all' ? '' : scopeEmpty(scope, tab), tab, totals: { ...totals }, shown: items.filter(i => (tab === 'done') === !!i.done_at), down: [...down], filtered: savedFiltered(filters), query: filters.q || '' };
+    if (isCloud()) browserItems();
+    return { notice: [personalInboxNotice('saved items'), ...(isCloud() ? personalInboxSources().filter(s => personalInboxAllowed(s.id) && !nativeSavedSourceAllowed(s.id)).map(s => `Saved on ${s.label || s.id} requires Coral 2.0.62 or newer; its version is older or unknown.`) : [])].filter(Boolean).join(' '), capped: isCloud() && capped, browserOnly: isCloud(), loading: !_drawn && !_readError, error: _readError, scoped: scope.kind === 'all' ? '' : scopeEmpty(scope, tab), tab, totals: { ...totals }, shown: items.filter(i => (tab === 'done') === !!i.done_at), down: [...down], filtered: savedFiltered(filters), query: filters.q || '' };
 }
 /** One item's facts for a row or a page: its words, and what it can do. */
 export function savedItemFacts(it) {
@@ -366,12 +408,28 @@ export function setSavedQuery(q) {
     const next = cleanSaved({ ...filters, q });
     if (JSON.stringify(next) === JSON.stringify(filters)) return Promise.resolve();
     setFilters(next);
-    return refresh();
+    return refilterOrRefresh();
 }
 /** Read the list now (the Inbox's Saved group was opened), for the scope the Inbox is (everything). */
-export function loadSaved() { checks.clear(); wire(); return refresh(); }
+let pendingLoad = null;
+export function loadSaved() {
+    if (pendingLoad) return pendingLoad;
+    checks.clear(); wire();
+    const request = refresh();
+    pendingLoad = request;
+    request.finally(() => { if (pendingLoad === request) pendingLoad = null; });
+    return request;
+}
+export function savedInventoryChanged() {
+    if (!isCloud()) return;
+    ++loadSeq; pendingLoad = null; sourceItems = sourceItems.filter(i => nativeSavedSourceAllowed(i.server));
+    totals = { open: sourceItems.filter(i => !i.done_at).length, done: sourceItems.filter(i => !!i.done_at).length };
+    browserItems();
+    if (_drawn) render();
+}
 /** Done or Reopen, Remove, Open: the same actions as the list's buttons (their focus and announcements are the list's own, which the Inbox does not show). */
 export async function savedSetDone(it, done) {
+    if (isCloud()) return false; // Native Hub Saved is read-only; its account gate grants no write permission.
     const r = await serverFetch(it.server, `/api/saved/${it.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ done }) });
     if (!r.ok) { showToast('Could not change the saved message', true); return false; }
     await refresh();
@@ -379,16 +437,17 @@ export async function savedSetDone(it, done) {
     return true;
 }
 export async function savedRemove(it) {
+    if (isCloud()) return false; // Keep this guard even when a stale caller retains an item action.
     const r = await serverFetch(it.server, `/api/saved/${it.id}`, { method: 'DELETE' });
     if (!r.ok && r.status !== 404) { showToast('Could not remove the saved message', true); return false; }
     await refresh();
     savedChanged();
     return true;
 }
-export function savedOpen(it) { return openSavedLink(it); }
+export function savedOpen(it) { if (isCloud()) return; return openSavedLink(it); }
 /** The Inbox's Saved page toolbar (#8602) works on the same filters as the sidebar's Display options: what they are now, a change (cleaned, and the list read again), the spec of the page's bar, and the options that follow the data. */
 export const savedFiltersNow = () => ({ ...filters });
-export function setSavedFilters(next) { setFilters(cleanSaved(next)); return refresh(); }
+export function setSavedFilters(next) { setFilters(cleanSaved(next)); return refilterOrRefresh(); }
 export const savedPageSpec = () => ({
     ...savedSpec(), idp: 'inbox-saved', placeholder: 'Search saved messages',
     fields: [
