@@ -26,7 +26,7 @@ const branchProblem = (value) => {
     const bad = b.length > 100 || b[0] === '-' || b[0] === '/' || b.includes('..') || b.endsWith('/') || b.endsWith('.lock') || !/^[A-Za-z0-9._/-]+$/.test(b);
     return bad ? `"${b.slice(0, 40)}" is not a branch name Coral reads (letters, digits, . _ - /; at most 100 characters).` : '';
 };
-const RULES = ['claim_nudge', 'status_nudge', 'mention_renudge', 'held_notice', 'busy_no_task', 'post_no_task', 'upload_no_task', 'goal_size', 'ask_reminder', 'auto_recommend', 'landing', 'release', 'goals_ready', 'unowned_tasks', 'dialog_timeout'];
+const RULES = ['claim_nudge', 'status_nudge', 'mention_renudge', 'held_notice', 'busy_no_task', 'post_no_task', 'upload_no_task', 'goal_size', 'compact_context', 'ask_reminder', 'auto_recommend', 'landing', 'release', 'goals_ready', 'unowned_tasks', 'dialog_timeout'];
 
 /** The health object as the flat values of the fields. */
 export function healthToValues(h) {
@@ -59,6 +59,7 @@ export function valuesToHealth(v, base) {
     for (const k of ['goals_ready', 'unowned_tasks']) if (h[k] && v[`${k}_on`] !== undefined) h[k] = { ...h[k], on: !!v[`${k}_on`], wait_min: Number.isInteger(v[`${k}_wait_min`]) ? v[`${k}_wait_min`] : h[k].wait_min, nudge: v[`${k}_nudge`] || '' };
     if (h.dialog_timeout && v.dialog_timeout_on !== undefined) h.dialog_timeout = { ...h.dialog_timeout, on: !!v.dialog_timeout_on, after_min: Number.isInteger(v.dialog_timeout_after_min) ? v.dialog_timeout_after_min : h.dialog_timeout.after_min };
     if (h.goal_size && v.goal_size_on !== undefined) h.goal_size = { ...h.goal_size, on: !!v.goal_size_on, limit: v.goal_size_limit };
+    if (h.compact_context && v.compact_context_on !== undefined) h.compact_context = { ...h.compact_context, on: !!v.compact_context_on, threshold_k: Number.isInteger(v.compact_context_threshold_k) ? v.compact_context_threshold_k : h.compact_context.threshold_k, orchestrator: !!v.compact_context_orchestrator };
     return h;
 }
 
@@ -115,6 +116,12 @@ export function healthFields(ctx) {
         { key: 'upload_no_task_on', type: 'toggle', label: 'Tell the orchestrator about an artifact uploaded with no task', help: 'An artifact uploaded by an agent with no task in progress (and not marked as having no task) is named in the next health check, once.' },
         { key: 'goal_size_on', type: 'toggle', label: 'Tell the orchestrator when a goal has too many tasks', help: 'A goal that is not closed and has more tasks than the limit (open and done together) is named in the next health check, and again at each further limit.' },
         { key: 'goal_size_limit', type: 'number', label: 'More than', unit: 'tasks in a goal', min: G_LO, max: G_HI, integer: true, compact: true, disabledWhen: v => !v.goal_size_on },
+        { key: 'health_compact', type: 'heading', label: 'Context size', help: 'Works whether or not the health check is on. Claude agents only.', visibleWhen: v => v.compact_context_on !== undefined },
+        { key: 'compact_context_on', type: 'toggle', label: 'Compact an idle agent’s large context', visibleWhen: v => v.compact_context_on !== undefined,
+            help: 'An agent that is idle at its prompt, with no unread board messages and no dialog open, and whose context is past the size below, is sent the CLI’s own /compact once. It is never interrupted mid-turn. Off unless you turn it on.' },
+        { key: 'compact_context_threshold_k', type: 'number', label: 'Past', unit: 'thousand tokens', help: '50 to 900', min: 50, max: 900, integer: true, compact: true, visibleWhen: v => v.compact_context_on !== undefined, disabledWhen: v => !v.compact_context_on },
+        { key: 'compact_context_orchestrator', type: 'toggle', label: 'Compact the orchestrator too', visibleWhen: v => v.compact_context_on !== undefined, disabledWhen: v => !v.compact_context_on,
+            help: 'The orchestrator holds the most state, so it is left alone unless you say so.' },
         { key: 'health_landing', type: 'heading', label: 'Landing', help: 'Finished work that has not landed. Reads the local branch only, never CI or GitHub.' },
         { key: 'landing_on', type: 'toggle', label: 'Landing alert', help: 'When tasks were finished since the branch last moved and it has stood still for the wait, the next health check says so, again after each further wait.' },
         { key: 'landing_branch', type: 'text', label: 'Branch', placeholder: 'main', help: 'The branch finished work lands on.', disabledWhen: v => !v.landing_on, validate: branchProblem },

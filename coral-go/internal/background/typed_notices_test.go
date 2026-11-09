@@ -57,6 +57,8 @@ func TestEveryTypedSenderIsInTheCensus(t *testing.T) {
 		typedcensus.S("board_health.go", `typedHealth(text), "health check"`, 1, "the monitor's deliver: everything it types goes through typedHealth (census: team health check, health line)"),
 		typedcensus.S("board_health.go", `"health-check:"+project, text)`, 1, "the check, through the monitor's deliver (typedHealth)"),
 		typedcensus.S("board_health_offbooks.go", `"[Coral health] "+detail)`, 1, "a member's line, through the monitor's deliver (typedHealth)"),
+		typedcensus.S("context_compact.go", `c.deliver(ctx, a, compactCommand(a.AgentType))`, 1, "exception (#14849): the CLI's own /compact, one fixed line with nothing from a task, message or transcript in it (TestTheCompactLineIsFixedAndHoldsNothingAShellActsOn); a slash command cannot start with a notice opener, so it is typed only where the CLI is the foreground (deliverCommand's exited-agent and terminal-agent checks)"),
+		typedcensus.S("context_compact.go", `rt.SendInput(ctx, terminalinput.Coral, name, text)`, 1, "deliverCommand's own send: types the fixed compact line, listed above"),
 		typedcensus.S("health_limit.go", `deliver(ctx, a, key, text)`, 1, "sendUnlessBlocked: forwards the text of the callers listed here"),
 		typedcensus.S("health_nudges.go", `board.OneLine(text), "health nudge"`, 1, "the nudges' deliver: forwards the builders below"),
 		typedcensus.S("health_nudges.go", `claimNudgeText(`, 1, "census"),
