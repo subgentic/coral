@@ -231,6 +231,8 @@ function syncSandbox(d, body) {
     const note = body.querySelector('.artifact-linked-notice'), chip = d.querySelector('.artifact-viewer-sandbox');
     chip.hidden = !note;
     if (!note) return;
+    if (note.dataset.sandboxSynced) return; // said once per banner: the first show would otherwise hide its own banner on the second call
+    note.dataset.sandboxSynced = '1';
     note.id = 'artifact-sandbox-note'; chip.setAttribute('aria-controls', note.id); chip.title = note.textContent;
     const seen = browserLocal.get('coral-sandbox-note') === '1';
     note.hidden = seen; chip.setAttribute('aria-expanded', String(!seen));
@@ -415,6 +417,7 @@ export function openArtifactViewer(hex, opts = {}) {
     dl.onclick = isCloud() ? (e) => { e.preventDefault(); if (dl.getAttribute('aria-disabled') === 'true') return; downloadArtifact(url, sanitizeDownloadName(opts.filename || 'artifact')).catch(err => { title.textContent = err.message; }); } : null;
     const body = d.querySelector('.artifact-viewer-body');
     const wasOpen = !d.hidden;
+    if (!d._sandboxWatch) { d._sandboxWatch = true; new MutationObserver(() => { if (body.querySelector('.artifact-linked-notice:not([data-sandbox-synced])')) syncSandbox(d, body); }).observe(body, { childList: true, subtree: true }); } // the banner and the header's Sandboxed chip appear together, not when the whole render ends: before, a slow render showed the banner (or flashed it for a viewer who had seen it) with no chip (#14988)
     if (!d._sandboxRedraw) { d._sandboxRedraw = true; body.addEventListener('coral-preview-redrawn', () => { syncSandbox(d, body); syncScripts(d, body); }); } // scripts turned on or off (#14730) change which banner is there
     if (typeof opts.onClose === 'function') _onClose = opts.onClose;
     else if (!wasOpen) _onClose = null;
