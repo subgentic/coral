@@ -72,8 +72,6 @@ function mark(id) {
     document.dispatchEvent(new CustomEvent('coral:welcome-changed'));
 }
 
-/** Hide every welcome item for good. */
-export function hideAllWelcome() { save({ inbox_welcome: 'off' }); document.dispatchEvent(new CustomEvent('coral:welcome-changed')); }
 export const dismissWelcome = id => mark(id);
 
 /** An item's own action. */
