@@ -277,12 +277,13 @@ const (
 	DropboxAuditPass    = "pass"
 	DropboxAuditEdit    = "edit"    // stage 5a: the Operator's decision on an edit made in Dropbox (reason: promoted or separate)
 	DropboxAuditRemoval = "removal" // stage 6a: an explicit removal (reason: removed, private or delete_all; count: files)
+	DropboxAuditShare   = "share"   // Share via Dropbox (#14944): reason people, team or public (count: people), or stopped (count: shares)
 	dropboxAuditKeep    = 500
 )
 
 // AddAudit writes one audit row and keeps the newest 500.
 func (s *DropboxStore) AddAudit(ctx context.Context, a DropboxAudit) error {
-	if a.Kind != DropboxAuditSetting && a.Kind != DropboxAuditPass && a.Kind != DropboxAuditEdit && a.Kind != DropboxAuditRemoval {
+	if a.Kind != DropboxAuditSetting && a.Kind != DropboxAuditPass && a.Kind != DropboxAuditEdit && a.Kind != DropboxAuditRemoval && a.Kind != DropboxAuditShare {
 		return errors.New("not a Dropbox audit kind")
 	}
 	if a.At == "" {
