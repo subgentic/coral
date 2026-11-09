@@ -79,7 +79,9 @@ func TestSessionsThatEndOnTheirOwnLeaveNoDescriptorsOpen(t *testing.T) {
 	}
 	require.Eventually(t, func() bool { return openFDs(t) <= before+2 }, 2*time.Minute, 100*time.Millisecond,
 		"descriptors after %d sessions ended on their own: %d (before %d)", runs, openFDs(t), before)
-	assert.LessOrEqual(t, openFDs(t), before+2, "open now: %s\nbefore: %s", describeFDs(), beforeNames)
+	// The count is read once more as a settled value, not as one instant: a descriptor another goroutine of the test binary has open for a moment (the descendant sampler's /proc scan, an earlier test's drain) is not a session's, and a leak is a count that stays up (#14828).
+	after := settledFDs(t)
+	assert.LessOrEqual(t, after, before+2, "settled open count after the sessions ended: %d (before %d)\nopen now: %s\nbefore: %s", after, before, describeFDs(), beforeNames)
 }
 
 // Security's #6826 LOW (the exit watcher's own case): the shell exits but a child it left behind keeps the terminal open, so readLoop never sees the end of the output. The descriptor is closed by the watcher after
