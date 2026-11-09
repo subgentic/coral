@@ -712,13 +712,18 @@ func (s *Server) serveIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data := templateData{CoralRoot: s.cfg.CoralRoot, StaticBase: s.staticBase(), ModulePreloads: frontend.StartupModules()}
-	data.BootJSON = testHooksBoot()
+	unseen := s.launchNoticeUnseen(r)
+	data.BootJSON = bootJSON(unseen)
 	if s.bundleBase != "" { // the dashboard starts from one script and one stylesheet; the agent pop-out stays on the original files (#4228)
 		// No per-module hints: under the bundled prefix every module URL is a stub, and hinting 133 stubs would fetch what the bundle replaces.
 		data.StaticBase, data.StylesheetBundle, data.ModulePreloads = s.bundleBase, frontend.BundleStylesheet, nil
 	}
 	render := func(out io.Writer) error { return s.indexTmpl.Execute(out, data) }
-	if err := s.indexPage.serve(w, r, data.CoralRoot+"\x00"+data.StaticBase, render); err != nil {
+	key := data.CoralRoot + "\x00" + data.StaticBase
+	if unseen {
+		key += "\x00launch-unseen" // the page differs while the first-launch notice is unseen, so it is cached apart
+	}
+	if err := s.indexPage.serve(w, r, key, render); err != nil {
 		log.Printf("Error rendering index template: %v", err)
 		http.Error(w, "Template render error", http.StatusInternalServerError)
 	}
@@ -1111,6 +1116,35 @@ func (s *Server) buildHeader(next http.Handler) http.Handler {
 
 // testHooksBoot is the boot data a dev build gives its pages when CORAL_TEST_HOOKS=1 (the dashboard test suites): the page installs window.__coralTest (#5015).
 // Empty everywhere else, so the page takes the template's default and a release build can never ask for the hooks.
+// launchNoticeUnseen is whether this page's reader will be offered the first-launch notice (#14935): a direct request (not the Hub's tunnel) while the current words are not acknowledged. The page says so, so its
+// room is reserved before first paint; the notice itself is still read from /api/launch-disclosure, whose answer decides.
+func (s *Server) launchNoticeUnseen(r *http.Request) bool {
+	if cloud.Tunneled(r) || s.db == nil {
+		return false
+	}
+	st, err := store.NewSessionStore(s.db).GetSettings(r.Context())
+	if err != nil {
+		return false
+	}
+	return !routes.LaunchDisclosureSeen(st)
+}
+
+// bootJSON is the page's boot data: the mode, the test hooks when they are on, and whether the first-launch notice is unseen.
+func bootJSON(launchUnseen bool) template.JS {
+	hooks := testHooksBoot() != ""
+	if !hooks && !launchUnseen {
+		return ""
+	}
+	out := `{"mode":"local"`
+	if hooks {
+		out += `,"testHooks":true`
+	}
+	if launchUnseen {
+		out += `,"launch_unseen":true`
+	}
+	return template.JS(out + `}`)
+}
+
 func testHooksBoot() template.JS {
 	if config.TestHooksEnvHonoured && os.Getenv("CORAL_TEST_HOOKS") == "1" {
 		return template.JS(`{"mode":"local","testHooks":true}`)

@@ -45,6 +45,11 @@ func launchDisclosureState(settings map[string]string) launchDisclosureView {
 	return v
 }
 
+// LaunchDisclosureSeen reports whether the current words were acknowledged: the page the server renders says "unseen" before first paint so the notice's room is reserved (#14935).
+func LaunchDisclosureSeen(settings map[string]string) bool {
+	return launchDisclosureState(settings).Seen
+}
+
 // launchDisclosureRefusal answers a request that may not read or change the acknowledgement: an agent's token, or a Coral Hub sign-in that is not the account this computer is linked to.
 func launchDisclosureRefusal(w http.ResponseWriter, r *http.Request) bool {
 	if agentCaller(r) {
