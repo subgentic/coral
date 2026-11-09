@@ -43,11 +43,12 @@ Coral checks in on a team every few minutes to spot stuck or idle agents. It use
 
 ## Working with a team
 
-The best way to start is to talk to the **Orchestrator** directly. Tell it what you want done and let it divide the work into tasks for the other agents; you do not have to hand out the tasks yourself.
+A team is an Orchestrator and the agents it works with, on one shared board with goals and tasks. The best way to start is to talk to the **Orchestrator** directly. Tell it what you want done and let it divide the work into tasks for the other agents; you do not have to hand out the tasks yourself.
 
 - **Add agents as you go.** Choose **Add agent** on the team's page to bring in another agent, or ask the Orchestrator to start one. An agent can only start agents that can do no more without asking than it can itself.
 - **Let the health monitor keep them on track.** It checks in on the team every few minutes, spots agents that are stuck or idle, and tells the Orchestrator, so the team keeps working toward its goals. It uses a few tokens each time.
 - **Let the team learn.** On the team's **Knowledge** tab, **Distill knowledge** turns what the agents have done into notes that are given to the team's agents when they start or wake, so the team gets better at your project over time.
+- **Sleep and wake.** Put a whole team to sleep from the **⋯** menu beside its name (**Sleep Team**), or one agent from the **⋯** menu on its row (**Sleep**). It stops running and its chat stays; **Wake** starts it again. A sleeping agent cannot be given anything until you wake it.
 - **Say how you want the team to work.** Open **Team settings** from the team's three-dot menu and pick a **Team working mode** (for example, one shared checkout, or a task queue), with extra guidance of your own.
 
 ## Connect a second computer or the Hub
