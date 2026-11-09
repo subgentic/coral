@@ -300,6 +300,13 @@ func TestHowDoIAnswersContinueAFileAndThePermissionModes(t *testing.T) {
 		}
 		assert.GreaterOrEqual(t, named, 2, lead+" names at least two of the CLIs it means something different on")
 	}
+	for lead, want := range map[string]string{"- **Bypass permissions:**": "skips every prompt", "- **Don't ask:**": "Plan"} { // what each is on agy (#14741, Security's assertions)
+		for _, l := range strings.Split(text, "\n") {
+			if strings.HasPrefix(l, lead) {
+				assert.Contains(t, l, want, lead+" says what it does on agy")
+			}
+		}
+	}
 	static := filepath.Join("..", "..", "..", "pkg", "frontend")
 	read := func(rel ...string) string {
 		b, err := os.ReadFile(filepath.Join(append([]string{static}, rel...)...))
