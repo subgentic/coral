@@ -977,7 +977,7 @@ function renderFolderCounts() {
 
 /** Paging controls live outside the rows; each button follows only its computer's cursor. */
 /** "Loading…" is on screen only while the list is empty, so only then does a read's ending change what is drawn (#14841): it is part of the keys of the folder list and of the tables, and a list with rows keeps its draw, and the links in it, as it is (#14524). */
-const loadingEmpty = () => (group === 'needs' && !needsRows().length && !reviewItems().length && reviewPages().some(p => p.loading)) || (group === 'saved' && !saved.savedView().shown.length && savedReviewPages().some(p => p.loading));
+const loadingEmpty = () => (group === 'needs' && !needsRows().length && !reviewItems().length && reviewPages().some(p => p.loading && !p.loaded)) || (group === 'saved' && !saved.savedView().shown.length && savedReviewPages().some(p => p.loading && !p.loaded)); // (a first read only: a page already read that is read again keeps what is drawn, #14906)
 function reviewPagingSignature() {
     return [reviewPages(), savedReviewPages()].map(pages => pages.map(p => [p.server, p.error, p.has_more, p.next_cursor, p.loadedCount, p.total, p.truncated]));
 }
@@ -1057,7 +1057,7 @@ function savedListSpec(where = '') {
             ] }).el };
     if (!files.length) {
         if (dock) return spec;
-        return { ...spec, empty: savedReviewPages().some(p => p.has_more || p.error || p.loading || p.truncated) ? null : spec.empty, signature: JSON.stringify([spec.signature, reviewPagingSignature(), loadingEmpty()]), node: () => { const wrap = DT.el('div', 'saved-files-wrap'); wrap.append(spec.node()); appendReviewPaging(wrap, true); return wrap; } };
+        return { ...spec, empty: savedReviewPages().some(p => p.has_more || p.error || (p.loading && !p.loaded) || p.truncated) ? null : spec.empty, signature: JSON.stringify([spec.signature, reviewPagingSignature(), loadingEmpty()]), node: () => { const wrap = DT.el('div', 'saved-files-wrap'); wrap.append(spec.node()); appendReviewPaging(wrap, true); return wrap; } };
     }
     return { ...spec, count: `${countSavedReviews().complete && savedKnown() ? '' : 'at least '}${rows.length + countSavedReviews().value}`, empty: rows.length ? spec.empty : null, signature: JSON.stringify([spec.signature, reviewPagingSignature(), loadingEmpty(), files.map(a => [a.reviewKey, a.name])]), node: () => { const wrap = DT.el('div', 'saved-files-wrap'), host = DT.el('div', 'saved-files'); wrap.append(host); appendReviewPaging(wrap, true); if (rows.length) wrap.append(DT.el('h3', 'saved-files-title', 'Saved messages'), spec.node()); importOnce('./saved_files.js').then(m => m.fillSavedFiles(host, files, { DT, reviewActions: a => isCloud() ? '' : hoverWrap(a, reviewActions(a, true)), openReview, shown: a => markHidden(a.name, { strict: true }), subtitleOf: a => subOf({ review: a, board_project: splitKey(a.team).name, server: splitKey(a.team).server }, true) })).catch(() => {}); return wrap; } };
 }
@@ -1253,7 +1253,7 @@ export function needsListSpec() {
     const goal = rows.some(goalOf);
     const total = filteredNeeds().length, hidden = allNeeds().length - total, rowsCounted = rows.filter(needsUnread).length, totalCounted = filteredNeeds().filter(needsUnread).length; // what the filters hide is said above the list, with the way to show it (#10399)
     const paging = reviewFilters() ? reviewQueryState() : null;
-    const openPages = paging ? paging.more || paging.loading || paging.failed || paging.error : !reviewPages().length || reviewPages().some(p => p.has_more || p.loading || p.error || p.truncated);
+    const openPages = paging ? paging.more || paging.loading || paging.failed || paging.error : !reviewPages().length || reviewPages().some(p => p.has_more || (p.loading && !p.loaded) || p.error || p.truncated); // (a page already read that is read again is not 'loading' for the empty line: it would blink, #14906)
     const attention = reviewFilters() ? { value: paging?.attentionTotal ?? filteredNeeds().filter(s => s.review && needsUnread(s)).length, complete: Number.isSafeInteger(paging?.attentionTotal) } : reviewAttentionCount();
     const reviewCount = !needsFilters.kind || needsFilters.kind === 'review' ? attention.value : 0;
     const totalAttention = filteredNeeds().filter(s => !s.review && needsUnread(s)).length + reviewCount;
@@ -1742,4 +1742,5 @@ registerActions({
     'inbox-phone-back': () => closePage(true, true),
     'inbox-back': () => { const was = page, g = was ? 'saved' : group; closePage(false); openGroupTable('hub-inbox', g); focusCameFrom(was); }, // the link back to the group's table (on a phone too, as the shared back link did), with the focus on the row it came from
 });
+document.addEventListener('coral:reviews-settled', () => renderInboxNav(true)); // a read that ended with nothing new: the "Loading" it showed goes (#14841); nothing is read (#14906)
 document.addEventListener('coral:asked-dismissed', () => renderInboxNav(true)); // a question asked before Coral restarted leaves the Needs you list (#10368)

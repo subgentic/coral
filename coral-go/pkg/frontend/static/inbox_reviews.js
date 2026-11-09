@@ -440,7 +440,7 @@ export function refreshReviews(force = false, { reuse = false } = {}) {
     freshnessDirty = false;
     pending = Promise.all([reviewPager.refresh({ unchanged }), (!isCloud() || savedActivated ? savedPager.refresh({ unchanged }) : Promise.resolve([])), refreshActiveQuery(unchanged)]).then(([reviews, saved]) => {
         if (started !== revision) return;
-        if (!sourceSetChanged && [...reviews, ...saved].every(result => result === false)) { changed(); return; } // nothing new, but the read that was out has ended: the list redraws (its signature holds the pages' loading state, so a draw that would be the same is skipped) (#14841)
+        if (!sourceSetChanged && [...reviews, ...saved].every(result => result === false)) { if (typeof document !== 'undefined') document.dispatchEvent(new CustomEvent('coral:reviews-settled')); return; } // (its own event, not reviews-changed: the Inbox draws its list again and nothing is READ: the counts, the tab's other reads and an open viewer's file all listen to reviews-changed, and an idle board makes no list read, #14906) nothing new, but the read that was out has ended: the list redraws (its signature holds the pages' loading state, so a draw that would be the same is skipped) (#14841)
         publishPages();
         if (typeof document !== 'undefined') importOnce('./operator_asks.js').then(m => m.refreshReviewAskVisibility()).catch(() => {});
         if (!errors.length) { finishedAt = Date.now(); finishedRev = revision; }
