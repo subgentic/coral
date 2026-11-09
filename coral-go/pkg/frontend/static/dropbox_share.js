@@ -51,13 +51,17 @@ function frame(titleText) {
 }
 
 const btn = (text, cls, onClick) => { const b = mk('button', cls || 'btn', text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
-const sayIt = (say, text) => { say.textContent = text || ''; say.hidden = !text; };
+const sayIt = (say, text) => { if (!text) { say.hidden = true; say.textContent = ''; return; } say.hidden = false; say.textContent = text; }; // shown first, then its words: a screen reader hears the change (UI Accessibility's SHOULD 5)
 
-// busy disables the dialog's buttons while a request runs, and keeps Escape from closing it.
+// busy disables the dialog's buttons while a request runs, and keeps Escape from closing it; when it ends, the control that had the focus (the
+// button pressed, which lost it while disabled) has it again, when it is still there (UI Accessibility's SHOULD 1).
+let busyFocus = null;
 function busy(on) {
     if (!dialog) return;
-    if (on) dialog.dataset.busy = '1'; else delete dialog.dataset.busy;
+    if (on) { dialog.dataset.busy = '1'; busyFocus = dialog.contains(document.activeElement) ? document.activeElement : null; } else delete dialog.dataset.busy;
     for (const b of dialog.querySelectorAll('button, input, textarea')) b.disabled = on;
+    if (!on && busyFocus && busyFocus.isConnected && dialog.contains(busyFocus)) busyFocus.focus();
+    if (!on) busyFocus = null;
 }
 
 const audienceWords = { people: 'Specific people', team: 'People in your team', public: 'Anyone with the link' };
@@ -81,7 +85,7 @@ export async function openShareDialog(opts) {
     const live = Array.isArray(info.shares) ? info.shares.filter(s => s.state === 'live') : [];
     if (live.length) {
         f.body.append(sharesList(live, f));
-        const again = btn('Share it again…', 'btn', () => { f.body.replaceChildren(); again.remove(); form(f, info, (body) => call('POST', INFO + hex, body), `version ${info.version || 1} as it is now`); });
+        const again = btn('Share it again…', 'btn', () => { f.body.replaceChildren(); again.remove(); form(f, info, (body) => call('POST', INFO + hex, body), `version ${info.version || 1} as it is now`); document.getElementById('dropbox-share-name')?.focus(); }); // the Name box has the focus (UI Accessibility's SHOULD 2)
         f.acts.prepend(again);
         return;
     }
@@ -194,9 +198,9 @@ function shared(f, res, a) {
         f.body.append(link);
         const exp = res.expires_at ? new Date(res.expires_at) : null;
         f.body.append(mk('p', 'dropbox-share-who', `${a === 'team' ? 'Anyone in your Dropbox team who has this link' : 'Anyone with this link'} can view and download this file. ${exp && !Number.isNaN(exp.getTime()) ? 'It expires on ' + exp.toLocaleDateString() + '.' : 'It does not expire.'}`));
-        acts.push(btn('Copy link', 'btn btn-primary', async () => { try { await navigator.clipboard.writeText(res.link); sayIt(f.say, ''); f.body.querySelector('.dropbox-share-copied')?.remove(); f.body.append(mk('p', 'settings-hint dropbox-share-copied', 'Copied.')); } catch { link.select(); sayIt(f.say, 'Copy it from the box above.'); } }));
+        acts.push(btn('Copy link', 'btn btn-primary', async () => { try { await navigator.clipboard.writeText(res.link); sayIt(f.say, ''); let ok = f.body.querySelector('.dropbox-share-copied'); if (!ok) { ok = mk('p', 'settings-hint dropbox-share-copied'); ok.setAttribute('role', 'status'); f.body.append(ok); } ok.textContent = ''; ok.textContent = 'Copied.'; } catch { link.select(); sayIt(f.say, 'Copy it from the box above.'); } }));
         if (typeof navigator.share === 'function') acts.push(btn('Share…', 'btn', () => { navigator.share({ url: res.link }).catch(() => {}); }));
-        const open = mk('a', 'btn', 'Open in Dropbox'); open.href = res.link; open.target = '_blank'; open.rel = 'noopener noreferrer'; acts.push(open);
+        const open = mk('a', 'btn', 'Open in Dropbox'); open.href = res.link; open.target = '_blank'; open.rel = 'noopener noreferrer'; open.setAttribute('aria-label', 'Open in Dropbox (opens a new tab)'); open.title = 'Opens a new tab'; acts.push(open); // it says it opens a new tab (SHOULD 4)
     } else {
         f.body.append(mk('p', null, 'Shared. Open Settings to see it.'));
     }
@@ -213,7 +217,7 @@ function sharesList(live, f) {
         const li = mk('li');
         const exp = s.expires_at ? new Date(s.expires_at) : null;
         li.append(mk('b', null, String(s.name || 'A copy')), mk('span', 'settings-hint', ` · ${audienceWords[s.audience] || ''}${s.audience === 'people' ? ` (${Number(s.people || 0)})` : ''}${exp && !Number.isNaN(exp.getTime()) ? ' · expires ' + exp.toLocaleDateString() : ''}`));
-        if (safeLink(s.link)) { const a = mk('a', null, 'Open in Dropbox'); a.href = s.link; a.target = '_blank'; a.rel = 'noopener noreferrer'; li.append(' ', a); }
+        if (safeLink(s.link)) { const a = mk('a', null, 'Open in Dropbox'); a.href = s.link; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.setAttribute('aria-label', `Open ${String(s.name || 'this copy')} in Dropbox (opens a new tab)`); a.title = 'Opens a new tab'; li.append(' ', a); }
         if (s.sign_in_again) li.append(mk('span', 'settings-hint', ' · sign in to Dropbox again to see its link'));
         li.append(' ', btn('Stop sharing', 'btn btn-small', () => stopOne(f, s.id)));
         ul.append(li);
