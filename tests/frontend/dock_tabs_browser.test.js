@@ -144,7 +144,11 @@ const { settle, coralReady } = require('./helpers/wait');
             await key('Tab');
             const next = await seen();
             if (stopsAfter) assert.ok(next.id !== 'body' && next.visible, `${w}: Tab from the panel goes to a visible control (${stopsAfter} follow it): ` + JSON.stringify(next));
-            else assert.equal(next.id, 'body', `${w}: the panel is the last tab stop, so Tab leaves the page: ` + JSON.stringify(next));
+            else {
+                // past the last control the browser either leaves the page (focus on the body) or, once it has left it earlier in the same session, wraps to the page's first stop (the skip link): both leave the panel, neither lands on a hidden control (#15006)
+                const first = await ev(`(() => { const e = [...document.querySelectorAll('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])')].find(e => !e.disabled && e.getBoundingClientRect().width > 0 && getComputedStyle(e).visibility !== 'hidden'); return e === document.activeElement; })()`);
+                assert.ok(next.id === 'body' || first, `${w}: the panel is the last tab stop, so Tab leaves the page or wraps to the first stop: ` + JSON.stringify(next));
+            }
             await ev(`document.getElementById('agentic-panel-branches').focus(); true`);
             await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers: 8 });
             await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers: 8 });
