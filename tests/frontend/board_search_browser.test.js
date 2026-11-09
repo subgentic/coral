@@ -40,8 +40,8 @@ async function run() {
     const { waitFor } = require('./helpers/wait').bind(ev);
 const { removeBoards } = require('./helpers/board_cleanup');
     const settle = (cond, label) => waitFor(cond, label, { timeout: 10000 });
-    // The mark is scrolled into view a moment after it is marked (and later on a loaded runner): a read waits, up to 10 s (a loaded Mac needs it; a missing current match is not 'in view' yet), for the current match to be in view, so a check of "visible" does not race the scroll.
-    const IN_VIEW = `(() => { const c = document.getElementById('mb-messages'); const cur = c && c.querySelector(':scope > .mb-message-current'); if (!cur) return false; const a = cur.getBoundingClientRect(), b = c.getBoundingClientRect(); return a.top >= b.top - 2 && a.bottom <= b.bottom + 2; })()`;
+    // The mark is scrolled into view a moment after it is marked (and later on a loaded runner): a read waits, up to 10 s (a loaded Mac needs it; with hits listed and no current mark yet it is not 'in view'; with no hits there is nothing to wait for), for the current match to be in view, so a check of "visible" does not race the scroll.
+    const IN_VIEW = `(() => { const c = document.getElementById('mb-messages'); const cur = c && c.querySelector(':scope > .mb-message-current'); const r = document.querySelector('#mb-tools .mb-search-results'); if (!cur) return !(r && /^\\d+ of /.test(r.textContent)); const a = cur.getBoundingClientRect(), b = c.getBoundingClientRect(); return a.top >= b.top - 2 && a.bottom <= b.bottom + 2; })()`;
     const snap = async () => { await waitFor(IN_VIEW, 'the current match in view', { timeout: 10000 }).catch(() => {}); return snap0(); };
     const snap0 = () => ev(`(() => { const c = document.getElementById('mb-messages'); const cur = c.querySelector(':scope > .mb-message-current'); const bar = document.getElementById('mb-tools'); const st = bar.querySelector('.mb-search-status');
         const rows = [...c.querySelectorAll(':scope > .mb-message')]; const ids = rows.map(r => r.dataset.messageId);
