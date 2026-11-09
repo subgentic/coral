@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/linktest"
 	"github.com/subgentic/coral/internal/updater/verify"
 )
 
@@ -73,9 +74,6 @@ func TestVerifyPackageRefusesWhatItShould(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(tampered, asset), []byte("tampered"), 0o600))
 	badBundle := packageDir(t, []byte("package"), asset)
 	require.NoError(t, os.WriteFile(filepath.Join(badBundle, "SHA256SUMS.txt.sigstore.json"), []byte("forged"), 0o600))
-	linked := packageDir(t, []byte("package"), asset)
-	require.NoError(t, os.Remove(filepath.Join(linked, asset)))
-	require.NoError(t, os.Symlink(filepath.Join(good, asset), filepath.Join(linked, asset)))
 	empty := t.TempDir()
 
 	for name, c := range map[string]struct {
@@ -84,7 +82,6 @@ func TestVerifyPackageRefusesWhatItShould(t *testing.T) {
 	}{
 		"tampered package":  {[]string{"--tag", "v2.0.10", "--asset", asset, "--dir", tampered}, verify.StagePackage},
 		"forged bundle":     {[]string{"--tag", "v2.0.10", "--asset", asset, "--dir", badBundle}, verify.StageSumsSignature},
-		"a symlink package": {[]string{"--tag", "v2.0.10", "--asset", asset, "--dir", linked}, "package"},
 		"no files":          {[]string{"--tag", "v2.0.10", "--asset", asset, "--dir", empty}, "sums_format"},
 		"a tag that is not": {[]string{"--tag", "main", "--asset", asset, "--dir", good}, "arguments"},
 		"a path in asset":   {[]string{"--tag", "v2.0.10", "--asset", "../" + asset, "--dir", good}, "arguments"},
@@ -99,6 +96,19 @@ func TestVerifyPackageRefusesWhatItShould(t *testing.T) {
 		assert.Equal(t, "failed", o.Result, name)
 		assert.Equal(t, c.stage, o.FailedStage, name+": "+o.Reason)
 	}
+}
+
+// A package that is a link to one elsewhere is refused. Its own test, so where this account can't make a link (Windows without Developer Mode) only this case skips.
+func TestVerifyPackageRefusesASymlinkPackage(t *testing.T) {
+	asset := "coral-linux-amd64-2.0.10.tar.gz"
+	good := packageDir(t, []byte("package"), asset)
+	linked := packageDir(t, []byte("package"), asset)
+	require.NoError(t, os.Remove(filepath.Join(linked, asset)))
+	linktest.Symlink(t, filepath.Join(good, asset), filepath.Join(linked, asset))
+	code, o, _ := runVerify(t, "--tag", "v2.0.10", "--asset", asset, "--dir", linked)
+	assert.Equal(t, 1, code)
+	assert.Equal(t, "failed", o.Result)
+	assert.Equal(t, "package", o.FailedStage, o.Reason)
 }
 
 func TestVerifyPackageFailsWhenTheTrustedRootCannotLoad(t *testing.T) {
