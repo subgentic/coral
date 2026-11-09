@@ -225,3 +225,16 @@ func (p *windowsPTY) TextRefused() (bool, string, error) {
 	rec, adopted, _ := p.agent.snapshot()
 	return textRefusedWithRetry(func() (procSource, error) { return newLiveProcs() }, root, rec, adopted) // a failed read is read again (#470)
 }
+
+// launcherCheck is the test for a cmd under the terminal's root: its command line is exactly Coral's launcher for the CLI this session was launched with (isLauncherCommandLine). nil when
+// no CLI is known, which recognises nothing.
+func (a *winAgent) launcherCheck() func(pid int) bool {
+	cli := a.launchCLI()
+	if cli == "" {
+		return nil
+	}
+	return func(pid int) bool {
+		line, ok := (&liveProcs{}).commandLine(pid)
+		return ok && isLauncherCommandLine(line, cli)
+	}
+}
