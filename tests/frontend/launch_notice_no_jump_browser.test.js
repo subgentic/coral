@@ -35,6 +35,16 @@ const { guardSettings } = require('./helpers/settings_guard');
             await waitFor(`!!document.getElementById('launch-disclosure-banner')`, `${at}the unseen notice`, 10000);
             const hint = await ev(`localStorage.getItem('coral-launch-notice')`);
             check(/^[pd]\|\d+$/.test(hint || ''), `${at}the notice leaves a hint of its kind of screen and its height: ${JSON.stringify(hint)}`);
+            // 1b. a later read with the details OPEN does not store the open height; a read that fails or answers nonsense leaves no empty reserved row (#14925, UI Accessibility's SHOULDs on #14835)
+            await ev(`document.querySelector('#launch-disclosure-banner details').open = true; true`);
+            await ev(`import((window.__coralStatic || '/static/') + 'launch_disclosure.js').then(m => m.refreshLaunchDisclosure()).then(() => true)`);
+            check(await ev(`localStorage.getItem('coral-launch-notice')`) === hint, `${at}a read with the details open leaves the hint as it was (${hint}), not the open height: ${JSON.stringify(await ev(`localStorage.getItem('coral-launch-notice')`))}`);
+            await ev(`document.querySelector('#launch-disclosure-banner details').open = false; true`);
+            for (const [name, stub] of [['a network failure', `Promise.reject(new TypeError('offline'))`], ['an answer that is not a notice', `Promise.resolve(new Response('{"id":""}', { status: 200, headers: { 'Content-Type': 'application/json' } }))`]]) {
+                await ev(`(() => { document.documentElement.setAttribute('data-launch-notice', 'p'); const room = document.createElement('div'); room.id = 'launch-notice-room'; document.body.prepend(room); window.__realFetch = window.fetch; window.fetch = (u, o) => String(u).includes('/api/launch-disclosure') && !String(u).includes('/ack') ? ${stub} : window.__realFetch(u, o); return true; })()`);
+                await ev(`import((window.__coralStatic || '/static/') + 'launch_disclosure.js').then(m => m.refreshLaunchDisclosure()).then(() => { window.fetch = window.__realFetch; return true; })`);
+                check(await ev(`!document.getElementById('launch-notice-room') && !document.documentElement.hasAttribute('data-launch-notice')`), `${at}${name} releases the reserved row`);
+            }
             // 2. a later load while it is unseen: nothing under the banners moves when it arrives
             trackId = (await Page.addScriptToEvaluateOnNewDocument({ source: TRACK })).identifier;
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();

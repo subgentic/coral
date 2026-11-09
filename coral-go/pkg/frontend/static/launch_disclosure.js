@@ -44,7 +44,7 @@ export async function refreshLaunchDisclosure() {
     try {
         const response = await serverFetch('local', '/api/launch-disclosure', { cache: 'no-store' });
         if (!response.ok) { hint.clear(); hint.release(); return; } // older servers and non-owners have no offer: nothing is reserved for it
-        const disclosure = await response.json(); if (generation !== readGeneration || !valid(disclosure)) return;
+        const disclosure = await response.json(); if (generation !== readGeneration) return; if (!valid(disclosure)) { hint.release(); return; } // (an answer that cannot be shown leaves no empty reserved row for the page's life)
         const mode = document.getElementById('settings-permission-mode');
         if (mode) {
             let line = document.getElementById('settings-launch-disclosure');
@@ -53,7 +53,7 @@ export async function refreshLaunchDisclosure() {
         }
         const previous = document.getElementById('launch-disclosure-banner');
         if (disclosure.seen === true) { previous?.remove(); hint.clear(); hint.release(); return; }
-        if (disclosure.seen === false && previous?.dataset.disclosureId === disclosure.id) { hint.set(previous.getBoundingClientRect().height); return; } // already drawn (an earlier read): the hint is kept as it is
+        if (disclosure.seen === false && previous?.dataset.disclosureId === disclosure.id) { if (!previous.querySelector('details[open]')) hint.set(previous.getBoundingClientRect().height); return; } // already drawn (an earlier read): the height is stored only while the details are closed (open, it is far taller than the next load's row)
         if (disclosure.seen !== false) return;
         previous?.remove();
         const banner = document.createElement('div'); banner.id = 'launch-disclosure-banner'; banner.dataset.disclosureId = disclosure.id; banner.className = 'notice notice-info notice-bar notice-compact'; banner.setAttribute('role', 'note');
@@ -79,5 +79,5 @@ export async function refreshLaunchDisclosure() {
         window.dispatchEvent(new Event('coral:launch-disclosure-shown'));
         hint.release(); hint.set(banner.getBoundingClientRect().height); // the notice now holds the room; the next load reserves it from the start
         announceNotice(headline);
-    } catch { /* no unauthenticated or network failure is an acknowledgement */ }
+    } catch { hint.release(); /* no unauthenticated or network failure is an acknowledgement; and the reserved row is not left empty */ }
 }

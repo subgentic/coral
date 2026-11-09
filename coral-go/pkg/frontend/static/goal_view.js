@@ -41,7 +41,8 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     const goalById = gid => current?.id === gid ? current : null;
     const doneOf = rollup => rollup.done, totalOf = rollup => W.allTasksOf(rollup);
     const closeGoal = () => back();
-    const drawPage = () => { if (!disposed && current) drawGoalPageRaw(root); };
+    let menuWait = null; // the observer that holds a draw until the open More menu closes (#14892)
+    const drawPage = () => { if (menuWait) { menuWait.disconnect(); menuWait = null; } if (!disposed && current) drawGoalPageRaw(root); }; // a draw from anywhere (a tab, the menu's closing) ends the wait: it is not left set
     const drawDetail = drawPage;
     const focusDetail = () => (root.querySelector('.goal-main .goals-back') || root.querySelector('.goals-back') || root.querySelector('#goals-detail-title'))?.focus({ preventScroll: true }); // the keyboard starts at the way back, not at the heading: no ring round plain words (#7404)
     const loadGoals = () => refresh ? refresh() : reload();
@@ -527,14 +528,12 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
 
     // A goal that changes under the person (a poll, a task landing) draws the page again; with the header's More menu OPEN that tore the menu down, dropped the keyboard to the page and let the next Escape leave the goal (#14892).
     // The draw waits until the menu closes, once, with the newest data (a menu is open for seconds; the data is a poll old at worst). A tab's own draw is the person's action and is not held.
-    let waitingForMenu = false;
     const drawWhenMenuClosed = () => {
         const open = root.querySelector('.goal-head-actions .task-more-btn[aria-expanded="true"]');
         if (!open) { drawPage(); return; }
-        if (waitingForMenu) return;
-        waitingForMenu = true;
-        const mo = new MutationObserver(() => { if (disposed || !open.isConnected || open.getAttribute('aria-expanded') !== 'true') { mo.disconnect(); waitingForMenu = false; if (!disposed) drawPage(); } });
-        mo.observe(open, { attributes: true, attributeFilter: ['aria-expanded'] });
+        if (menuWait) return;
+        menuWait = new MutationObserver(() => { if (disposed || !open.isConnected || open.getAttribute('aria-expanded') !== 'true') drawPage(); }); // (drawPage ends the wait)
+        menuWait.observe(open, { attributes: true, attributeFilter: ['aria-expanded'] });
     };
     const update = g => { const again = current && current.id === g.id && JSON.stringify(current.rollup) !== JSON.stringify(g.rollup); current = g; drawWhenMenuClosed(); if (again) { artifacts.api?.refresh(); countArtifacts(g.id, true); } }; // the tasks moved: their files may have
     let reading = false, again = false, signature = '', first = true;
@@ -570,6 +569,6 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         window.addEventListener('focus', visibleRefresh);
     }
     return { update, openClose: (g, preset) => openClose(g, preset), refreshTasks: () => loadTasks(id), dispose: () => {
-        disposed = true; narrowQuery?.removeEventListener?.('change', namePane); if (!previewEl.hidden) closeDetailPane(); artifacts.api?.destroy(); comments.api?.destroy(); stop?.(); if (timer) clearInterval(timer); window.removeEventListener('focus', visibleRefresh);
+        disposed = true; menuWait?.disconnect(); narrowQuery?.removeEventListener?.('change', namePane); if (!previewEl.hidden) closeDetailPane(); artifacts.api?.destroy(); comments.api?.destroy(); stop?.(); if (timer) clearInterval(timer); window.removeEventListener('focus', visibleRefresh);
     }, focus: focusDetail };
 }
