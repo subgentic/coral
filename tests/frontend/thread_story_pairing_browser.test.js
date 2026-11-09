@@ -2,6 +2,7 @@
 // under it; the decision is not drawn again on its own. A decision whose ask is not on the page stays on its own and still names its question. Oldest first. Drawn by the real story module (thread_story.js) over the real page,
 // with /api/thread answered by the page. Words are text (hidden characters written out). 1280 and 390 px.
 const assert = require('node:assert/strict');
+const { touchTap } = require('./helpers/touch_tap');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
@@ -36,7 +37,7 @@ const BASE = require('./test_base').BASE;
             assert.ok(firstPage.some(t => /Markdown please/.test(t)) && !firstPage.some(t => /You decided/.test(t) && /Markdown please/.test(t)), `${at}on the first page a decision whose ask is on the earlier page stands on its own: ${JSON.stringify(firstPage)}`);
             await ev(`(() => { const b = document.querySelector('#pair-host .thread-earlier'); b.scrollIntoView({ block: 'center', behavior: 'instant' }); return true; })()`);
             const eb = await ev(`(() => { const b = document.querySelector('#pair-host .thread-earlier'), r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, h: Math.round(r.height) }; })()`);
-            if (mobile) await client.Input.synthesizeTapGesture({ x: eb.x, y: eb.y, gestureSourceType: 'touch' }); else { await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: eb.x, y: eb.y }); await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: eb.x, y: eb.y, button: 'left', clickCount: 1 }); await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: eb.x, y: eb.y, button: 'left', clickCount: 1 }); }
+            if (mobile) await touchTap(client, { x: eb.x, y: eb.y }); else { await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: eb.x, y: eb.y }); await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: eb.x, y: eb.y, button: 'left', clickCount: 1 }); await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: eb.x, y: eb.y, button: 'left', clickCount: 1 }); }
             await waitFor(`document.querySelectorAll('#pair-host .thread-list > li').length >= 8 && !document.querySelector('#pair-host .thread-earlier:not([hidden])')`, `${at}the earlier page is read`, 8000);
             await new Promise(r => setTimeout(r, 300)); // sleep-ok: the list settles
             const out = await ev(`(() => { const lis = [...document.querySelectorAll('#pair-host .thread-list > li')].map(li => ({ text: li.textContent.replace(/\\s+/g, ' ').trim(), paired: li.classList.contains('thread-paired'), decided: [...li.querySelectorAll('.thread-decided')].map(d => d.textContent.replace(/\\s+/g, ' ').trim()), chips: [...li.querySelectorAll('.thread-decision')].map(c => c.textContent.trim()), inside: !!li.querySelector('.thread-decided') })); const r = document.querySelector('#pair-host').getBoundingClientRect(); return { lis, hs: document.documentElement.scrollWidth - document.documentElement.clientWidth, over: document.querySelector('#pair-host').scrollWidth - document.querySelector('#pair-host').clientWidth }; })()`);

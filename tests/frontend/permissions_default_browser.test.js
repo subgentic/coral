@@ -1,5 +1,6 @@
 // Shipped role defaults, one-click narrow role limits, and explicit team choices.
 const assert = require('node:assert/strict');
+const { touchTap, touchScroll } = require('./helpers/touch_tap');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
 const { install: installTeam, openNewTeam, stubModels, T, N } = require('./helpers/new_team');
@@ -43,6 +44,7 @@ const recordTiming=row=>{timings.push(row);if(process.env.CORAL_LAUNCH_TIMING_RE
    await waitFor(`!document.querySelector('#launch-disclosure-banner .launch-disclosure-dismiss')?.disabled`,'failed Dismiss write restores the action');
    await ev(require('./helpers/wait').framesJs(2));
    assert.deepEqual(await ev(`(()=>{const b=document.getElementById('launch-disclosure-banner');return {visible:!!b,collapsed:!b.querySelector('details').open,seen:window.__dismissProbe.calls>0,dismissDisabled:b.querySelector('.launch-disclosure-dismiss').disabled,error:document.querySelector('#toast-host .toast.error .toast-message')?.textContent.includes('Could not record that you have read this')}})()`),{visible:true,collapsed:true,seen:true,dismissDisabled:false,error:true},`${width}: refused acknowledgement leaves the notice collapsed, visible, and reports the error`);
+   await ev(`document.querySelectorAll('#toast-host .toast').forEach(t=>t.remove());true`); // the failed write's error toast (asserted above) is on screen for seconds and, on a phone at 200% text, sits over the notice's acknowledgement: the keyboard check below is about the notice, so it starts with the toast gone (#14786)
    await ev(`window.__dismissProbe.fail=false;document.querySelector('#launch-disclosure-banner .launch-disclosure-dismiss').click();true`);
    await waitFor(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json()).then(d=>d.seen===true)`,'collapsed Dismiss acknowledgement persisted on the real server');
    await ev(`window.fetch=window.__dismissProbe.real;fetch('/api/launch-disclosure/ack',{method:'DELETE'}).then(r=>r.ok)`);
@@ -73,17 +75,17 @@ const recordTiming=row=>{timings.push(row);if(process.env.CORAL_LAUNCH_TIMING_RE
     await ev(`fetch('/api/launch-disclosure/ack',{method:'DELETE'}).then(r=>r.ok)`);
     await ev(`import((window.__coralStatic||'/static/')+'launch_disclosure.js').then(m=>m.refreshLaunchDisclosure())`);
     const point=await ev(`(()=>{const r=document.getElementById('launch-disclosure-banner').getBoundingClientRect();return{x:r.left+30,y:r.top+20}})()`);
-    await client.Input.synthesizeTapGesture({...point,gestureSourceType:'touch'});
+    await touchTap(client, { ...point });
     await waitFor(`document.querySelector('#launch-disclosure-banner summary').getAttribute('aria-expanded')==='true'`,'touch opens notice at 390/200%');
     let ack=await ackPoint();
     for(let i=0;i<16&&!ack.inside;i++){
      const origin=await ev(`(()=>{const r=document.getElementById('launch-disclosure-banner').getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height*0.8}})()`);
-     await client.Input.synthesizeScrollGesture({...origin,yDistance:-160,speed:800,gestureSourceType:'touch'});
+     await touchScroll(client, { ...origin,yDistance:-160 });
      ack=await ackPoint();
     }
     assert.equal(ack.inside,true,'touch scrolling reaches the real acknowledgement at 390/200%');
     assert.equal(await ev(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json()).then(d=>d.seen)`),false,'touch expansion and scrolling do not acknowledge');
-    await client.Input.synthesizeTapGesture({x:ack.x,y:ack.y,gestureSourceType:'touch'});
+    await touchTap(client, { x:ack.x,y:ack.y });
     await waitFor(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json()).then(d=>d.seen===true)`,'real touch acknowledgement persisted');
     await ev(`document.documentElement.style.fontSize='';true`);
    }

@@ -4,6 +4,7 @@
 // (POST .../answer-prompt, with the number and the label), the row says Answered and goes when the agent stops waiting, and the agent is not opened. A question with a multi-select has no buttons. Keyboard (Tab, Enter)
 // and a 44 px target at 390. 1280 and 390 px, isolated dev server; the agents are mocked, the chat reply and the answer are stubbed.
 const assert = require('node:assert/strict');
+const { touchTap } = require('./helpers/touch_tap');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -49,7 +50,7 @@ const PLAN = 'Plan for the Reading List app (task #1) — OK to proceed? 1) Scop
 
             const askRow = who => `[...document.querySelectorAll('#group-table-view tbody tr')].find(tr => tr.querySelector('.inbox-ask-name') && tr.textContent.includes(${JSON.stringify(who)}) && tr.querySelector('.inbox-review-from') && tr.querySelector('.inbox-review-from').textContent.trim() === ${JSON.stringify(who)})`;
             const state = who => ev(`(() => { const tr = ${askRow(who)}; if (!tr) return null; const q = tr.querySelector('.inbox-ask-name'), b = tr.querySelector('.inbox-ask-expand'), r = b && b.getBoundingClientRect(), row = tr.getBoundingClientRect(), next = tr.nextElementSibling && tr.nextElementSibling.getBoundingClientRect(); return { text: q.textContent, len: q.textContent.length, button: b ? { label: b.textContent, expanded: b.getAttribute('aria-expanded'), name: b.getAttribute('aria-label'), h: Math.round(r.height), w: Math.round(r.width), inside: r.left >= row.left - 1 && r.right <= row.right + 1 && r.top >= row.top - 1 && r.bottom <= row.bottom + 1, x: r.left + r.width / 2, y: r.top + r.height / 2 } : null, overlapsNext: !!next && row.bottom > next.top + 1, scroll: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
-            const tap = async p => { if (mobile) await client.Input.synthesizeTapGesture({ x: p.x, y: p.y, gestureSourceType: 'touch' }); else { await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: p.x, y: p.y }); await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: p.x, y: p.y, button: 'left', clickCount: 1 }); await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: p.x, y: p.y, button: 'left', clickCount: 1 }); } };
+            const tap = async p => { if (mobile) await touchTap(client, { x: p.x, y: p.y }); else { await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: p.x, y: p.y }); await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: p.x, y: p.y, button: 'left', clickCount: 1 }); await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: p.x, y: p.y, button: 'left', clickCount: 1 }); } };
             await ev(`${askRow('Designer')}.scrollIntoView({ block: 'center', behavior: 'instant' }); true`);
             await new Promise(r => setTimeout(r, 400)); // sleep-ok: the row settles after the scroll
             const shut = await state('Designer');

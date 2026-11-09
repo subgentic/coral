@@ -5,6 +5,7 @@
 //   - a file row's name and its question line do not touch on a phone card (at least 4 px apart).
 // The Hub (cloud mode) with two computers is the stubbed Hub world (helpers/hub_world.js); the questions, the file and the close answers are stubbed on top. 1280 and 390 px.
 const assert = require('node:assert/strict');
+const { touchTap } = require('./helpers/touch_tap');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { setupHubWorld } = require('./helpers/hub_world');
@@ -44,7 +45,7 @@ const { coralReady } = require('./helpers/wait');
             await snap('rows');
 
             // a person opens the question the way the screen offers it: a touch tap on the visible card at 390, a mouse click on the visible Answer button at 1280 (never a script's click on a button that is off-screen)
-            const tapAt = async (x, y) => { if (mobile) await client.Input.synthesizeTapGesture({ x, y, gestureSourceType: 'touch' }); else { await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x, y }); await client.Input.dispatchMouseEvent({ type: 'mousePressed', x, y, button: 'left', clickCount: 1 }); await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x, y, button: 'left', clickCount: 1 }); } };
+            const tapAt = async (x, y) => { if (mobile) await touchTap(client, { x, y }); else { await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x, y }); await client.Input.dispatchMouseEvent({ type: 'mousePressed', x, y, button: 'left', clickCount: 1 }); await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x, y, button: 'left', clickCount: 1 }); } };
             const openRow = async text => {
                 const target = await ev(`(() => { const row = [...document.querySelectorAll('#group-table-view tbody tr.dt-row')].find(r => ${JSON.stringify(text)} && r.textContent.includes(${JSON.stringify(text)})); if (!row) return null; row.scrollIntoView({ block: 'center' });
                     const el = ${mobile} ? row.querySelector('.inbox-review-name') || row : [...row.querySelectorAll('button')].find(b => /^Answer the question of/.test(b.getAttribute('aria-label') || '')); if (!el) return null; const r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2, hit = document.elementFromPoint(x, y);

@@ -3,6 +3,7 @@
 // title is two lines at most; every target is 44 px; keyboard: the toggle opens the menu on Enter, ArrowDown moves, Escape closes it and gives the focus back. 390 px (100% and 200% text, both themes) and landscape
 // 844x390. At 1280 nothing changed: the four buttons are in the header and Copy for an agent is in the line. Real boards on the isolated dev server.
 const assert = require('node:assert/strict');
+if (process.platform === 'win32') { console.log('goal_head_phone_browser: SKIPPED on Windows for now (#14876); Linux and Mac keep running it'); process.exit(0); }
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -64,6 +65,8 @@ const { coralReady } = require('./helpers/wait');
             await key('ArrowDown', 'ArrowDown', 40);
             assert.equal(await ev(`document.activeElement.textContent.trim()`), 'Move to another team', `${tag}: ArrowDown moves`);
             if (w === 390 && fs16 === 16 && theme === 'light') await shot('goal-phone-menu-390');
+            await ev(require('./helpers/wait').framesJs(4)); // a scroll that the keyboard's own move caused is reported a frame later: it must not close the menu (a short window, landscape at 200% text)
+            assert.equal(await ev(`!document.querySelector('${M} .goal-head-actions .task-more-menu').hidden && document.activeElement.textContent.trim() === 'Move to another team'`), true, `${tag}: the menu is still open, with the keyboard on the item, a few frames after ArrowDown`);
             await key('Escape', 'Escape', 27);
             assert.equal(await ev(`document.activeElement.classList.contains('task-more-btn')`), true, `${tag}: Escape gives the focus back to More`);
             if (w === 390 && fs16 === 16 && theme === 'light') {
@@ -90,6 +93,13 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`!!document.querySelector('${M} .goal-head-actions button')`, 'the done goal page', 15000);
         const pd = await head();
         assert.deepEqual(pd.btns.map(b => b.t), ['Close goal', 'More'], 'a goal that looks done: Close goal is the one button: ' + JSON.stringify(pd));
+        // the page is drawn again when its data lands (a slow machine: after the first look): a More pressed just before that is pressed on a button that is then replaced. Press it once the page has held still for 600 ms.
+        for (let i = 0; ; i++) {
+            await ev(`document.querySelector('${M} .goal-head-actions .task-more-btn').__still = true; true`);
+            await new Promise(r => setTimeout(r, 600)); // sleep-ok: the page's own late redraw is what is waited out
+            if (await ev(`document.querySelector('${M} .goal-head-actions .task-more-btn').__still === true`)) break;
+            assert.ok(i < 20, 'the done goal page never held still');
+        }
         await ev(`document.querySelector('${M} .goal-head-actions .task-more-btn').click(); true`);
         await waitFor(`!document.querySelector('${M} .goal-head-actions .task-more-menu').hidden`, 'More opens', 4000);
         assert.deepEqual((await items()).map(i => i.t), ['Add task', 'Not yet', 'Change driver', 'Move to another team', 'Copy for an agent'], 'and the rest are in More');
