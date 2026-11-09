@@ -15,7 +15,13 @@ export function moreMenu(id, items, { label = 'More actions', wrapClass = 'task-
         b.setAttribute('role', 'menuitem'); if (it.title) b.title = it.title; if (it.ariaLabel) b.setAttribute('aria-label', it.ariaLabel); if (it.className) b.classList.add(...it.className.split(' '));
         menu.append(b);
     }
-    toggle.addEventListener('click', async () => (await importOnce('./menu_button.js')).toggleMenu(toggle));
+    // The menu code loads on first use. Start loading it when the button is built, and, if the page was drawn again while a tap was waiting for it (a goal's tasks arriving), open the menu on the button that is there now:
+    // before, that tap went to a button that was no longer on the page and nothing happened (goal_operator_dialogs 'More opens' timing out on a phone under load, #14955).
+    importOnce('./menu_button.js').catch(() => {});
+    toggle.addEventListener('click', async () => {
+        const m = await importOnce('./menu_button.js');
+        m.toggleMenu(toggle.isConnected ? toggle : (document.getElementById(id) || toggle));
+    });
     wrap.append(toggle, menu);
     return wrap;
 }
