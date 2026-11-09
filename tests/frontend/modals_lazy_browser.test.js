@@ -109,15 +109,25 @@ const BASE = require('./test_base').BASE;
         console.log('   ✓ failed load -> toast, next click retries (?retry=1) and opens');
 
         // 5b. Settings opens without the launch, team and wizard dialogs (#9111: Settings opened 46 files, 299 K, most of them theirs).
+        // Startup's deferred modules (review_counts.js, loaded at idle after the first paint) are not Settings' files. On a slow first run one
+        // landed inside the window and was counted (#14928: 25 of 24). The race is made certain here: startup's idle work is held, and released only
+        // as Settings is asked to open (a slow first run).
+        const lateIdle = await Page.addScriptToEvaluateOnNewDocument({ source: `window.__idleQ = []; window.requestIdleCallback = cb => { window.__idleQ.push(cb); return 0; }; window.__releaseIdle = () => { for (const cb of window.__idleQ.splice(0)) { try { cb({ didTimeout: true, timeRemaining: () => 0 }); } catch (e) {} } };` });
         reqs.length = 0;
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
         await coralReady('startup', 'liveList', 'liveListLoaded', 'settings');
+        await Page.removeScriptToEvaluateOnNewDocument({ identifier: lateIdle.identifier });
+        // Settle startup first: its deferred work runs and its modules load, then the requests go quiet; only then is Settings' own window counted.
+        await ev(`window.__releaseIdle && window.__releaseIdle(); true`);
+        await waitFor(`performance.getEntriesByType('resource').some(e => e.name.includes('/review_counts.js'))`, 'startup deferred review counts', 8000);
+        for (let quiet = 0, last = reqs.length; quiet < 5; ) { await new Promise(r => setTimeout(r, 100)); /* sleep-ok: waiting for the requests to go quiet */ if (reqs.length === last) quiet++; else { quiet = 0; last = reqs.length; } }
         const before = reqs.length;
-        await ev(`window.showSettingsModal(); true`);
+        await ev(`window.__releaseIdle && window.__releaseIdle(); window.showSettingsModal(); true`); // anything still held arrives as Settings opens
         await waitFor(`(() => { const m = document.getElementById('settings-modal'); return m && m.style.display !== 'none'; })()`, 'the settings dialog on a cold page', 5000);
         for (const m of ['modals.js', 'team_dialogs.js', 'launch_dialog.js', 'team_wizard.js', 'launch_core.js', 'board_launches.js', 'persona_io.js', 'inbox_reviews.js', 'review_pages.js', 'inbox_review_state.js']) assert.equal(count(m), 0, 'opening Settings does not request ' + m);
         assert.equal(count('settings_modal.js'), 1); assert.equal(count('settings_dialog.js'), 0, 'the Settings dialog is bundled in its modal family'); assert.equal(count('settings_fields.js'), 0, 'the field schemas share that family too');
         const nStatic = reqs.slice(before).filter(u => /\/static\//.test(u)).length;
+        assert.ok(!reqs.slice(before).some(u => /\/review_counts\.js/.test(u)), 'startup\'s deferred review counts are not counted as Settings\' files (#14928): ' + JSON.stringify(reqs.slice(before).filter(u => /\/static\//.test(u)).map(u => new URL(u).pathname)));
         assert.ok(nStatic <= 24, 'opening Settings loads at most 24 static files (46 before): ' + nStatic + ' ' + JSON.stringify(reqs.slice(before).filter(u => /\/static\//.test(u)).map(u => new URL(u).pathname)));
         await escape();
         console.log('   ✓ Settings opens on its own module, ' + nStatic + ' static files, none of the launch, team or wizard dialogs');
