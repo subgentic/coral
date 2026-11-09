@@ -97,7 +97,7 @@ func TestRequestChangesWithTextIsOneCallThatDecidesCommentsAndTellsTheAgent(t *t
 	require.Len(t, msgs, 1, "one notice, to the uploader")
 	assert.Contains(t, msgs[0], "@Alice ")
 	assert.Contains(t, msgs[0], "Use 5,000 rows per batch.")
-	assert.Contains(t, msgs[0], "untrusted")
+	assert.Contains(t, msgs[0], "The Operator commented on an artifact")
 	// the decision's own Activity row carries the words
 	rows, err := c.h.bs.ListActivity(context.Background(), board.ActivityFilter{Limit: 20})
 	require.NoError(t, err)

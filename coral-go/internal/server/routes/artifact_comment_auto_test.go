@@ -65,8 +65,10 @@ func TestTheOperatorsCommentOnAForReviewUploadReachesTheUploaderOnce(t *testing.
 	m := msgs[0].Content
 	assert.Contains(t, m, "@Dev ")
 	assert.Contains(t, m, "Please use 5,000 rows per batch.")
-	assert.Contains(t, m, "From the Operator")
-	assert.Contains(t, m, "untrusted")
+	assert.Contains(t, m, "The Operator commented on an artifact", "the Operator's own comment is their request (#14855)")
+	assert.Contains(t, m, "--- the Operator's comment ---")
+	assert.NotContains(t, m, "comment (untrusted)", "no doubting the Operator's own words")
+	assert.NotContains(t, m, "written by the owner, not by the Operator")
 	cid := int64(out["id"].(float64))
 	assert.Contains(t, m, fmt.Sprintf("coral-agent artifact reply coral://artifacts/%s %d", cmtDoc, cid), "the reply command, filled in")
 	ask, found, err := rig.ss.GetArtifactAsk(context.Background(), cid, sendSid(1))

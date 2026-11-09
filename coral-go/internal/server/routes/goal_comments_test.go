@@ -46,7 +46,7 @@ func TestTheOperatorsCommentOnAGoalGoesToItsDriverOnceWithTheGoalsContextAndTheD
 	require.Len(t, msgs, 1, "one message, to the Driver only")
 	m := msgs[0].Content
 	cid := int64(out["id"].(float64))
-	for _, want := range []string{"@Dev ", "Please also cover the retries.", "Ship the importer", "Ten nights green", "coral-board goal brief", "From the Operator", "untrusted",
+	for _, want := range []string{"@Dev ", "Please also cover the retries.", "Ship the importer", "Ten nights green", "coral-board goal brief", "The Operator commented on a goal", "(untrusted)",
 		fmt.Sprintf("coral-agent artifact reply coral://goals/team-a/%d %d", mustGoalID(t, key), cid)} {
 		assert.Contains(t, m, want)
 	}
