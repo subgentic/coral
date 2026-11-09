@@ -29,7 +29,8 @@ const (
 	// v2.0.59 facets integration (#13172 merged onto v2.0.58): the facet and review-query code in the Inbox and Needs you (inbox_reviews.js and its neighbours) is 1400 bytes over the v2.0.58 limit; raised by the tree plus 64 KiB, as the standing OK for approved work allows.
 	// v2.0.60 batch (the Inbox paging, version bar, Needs you cards, thumbnails, trust, version-skew fallback and the rest): the tree is 5,972,141 bytes; plus 64 KiB, rounded up. Standing OK for approved work.
 	// Trial-t261 with the row-menu focus follow-up: 6,039,563 bytes plus 64 KiB, rounded up, under the standing policy.
-	staticBudget = 6_106_112
+	// #14744: the Getting Started guide (guide/getting-started.md, 394,556 bytes with its five screenshots) is fetched only when its welcome row is opened; the tree is 6,445,093 bytes, plus 64 KiB, rounded up. The Operator's standing OK for approved work (not the start-CSS cap).
+	staticBudget = 6_511_616
 	// fileBudget is the most one embedded file may hold (the CodeMirror bundle, the largest, is ~1 MB).
 	fileBudget = 1536 << 10
 	// budgetWarnRoom is the room under which the test warns, and budgetPolicyRoom the room a raise leaves.
@@ -355,6 +356,7 @@ var nonWebAllowed = map[string]string{
 	"vendor/fonts/README.md":            "the fonts' licences and sources: the notice that goes with the font files",
 	"vendor/xterm/addon-canvas.LICENSE": "the licence text of a vendored library",
 	".gitkeep":                          "12 bytes: keeps static/ a directory the embed can name in a fresh checkout",
+	"guide/getting-started.md":          "the Getting Started guide (#14744): the welcome list's 'Read the Coral guide' row fetches it from /static/guide/ when it is opened, never at start; it has its screenshots inline, so it is not agent_docs",
 }
 
 // webExt are the extensions of what a browser loads from the static tree.
