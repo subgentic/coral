@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/dropbox"
+	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -524,4 +525,21 @@ func TestARefusedSharingCheckSaysWhy(t *testing.T) {
 	be.dbx.noScope = true
 	_, out = be.share(d, `{"name":"x.md","audience":"public","confirm":true}`)
 	assert.Contains(t, out["error"], "sharing.write and sharing.read")
+}
+
+// The limit census (#15016): a share's 429 is a per-action limit, sent marked (X-Coral-Limit: action) with Retry-After when known, so the
+// dashboard does not take it for an overloaded server. Mutant: writeJSON for a 429.
+func TestAShareLimitIsAMarkedActionLimit(t *testing.T) {
+	rec := httptest.NewRecorder()
+	r := shareRefusal("dropbox_wait", "Dropbox asked Coral to wait")
+	r["retry_after"] = 30
+	writeShareRefusal(rec, http.StatusTooManyRequests, r)
+	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
+	assert.Equal(t, "action", rec.Header().Get(httputil.ActionLimitHeader))
+	assert.Equal(t, "30", rec.Header().Get("Retry-After"))
+	assert.Contains(t, rec.Body.String(), `"code":"dropbox_wait"`)
+	rec = httptest.NewRecorder()
+	writeShareRefusal(rec, http.StatusConflict, shareRefusal("name_taken", "x"))
+	assert.Equal(t, http.StatusConflict, rec.Code)
+	assert.Empty(t, rec.Header().Get(httputil.ActionLimitHeader))
 }

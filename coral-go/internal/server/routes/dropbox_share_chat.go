@@ -297,7 +297,7 @@ func (h *CloudHandler) DropboxShareChat(w http.ResponseWriter, r *http.Request) 
 	src := shareSource{data: page.text, name: name, ext: ".md", team: project, version: 1}
 	res, code, refusal := b.share(ctx, cl, access, account, store.DropboxShareChat, "", src, name, in.Audience, emails, expires)
 	if refusal != nil {
-		writeJSON(w, code, refusal)
+		writeShareRefusal(w, code, refusal)
 		return
 	}
 	delete(res, "version")

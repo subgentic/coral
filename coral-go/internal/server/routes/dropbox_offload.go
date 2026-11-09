@@ -29,6 +29,7 @@ import (
 
 	"github.com/subgentic/coral/internal/cliauth"
 	"github.com/subgentic/coral/internal/dropbox"
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/secfile"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -247,6 +248,9 @@ var (
 // is deleted (read back as gone) and the offload row forgotten, and the fetch is recorded as an open. Nothing changes on any failure. It answers
 // true when the bytes are here (fetched now, or never freed).
 func (b *DropboxBackup) fetchBackLocked(ctx context.Context, digest string) (bool, error) {
+	if !objectNameRe.MatchString(digest) { // its callers check it too (FetchBack, removeDigest's route); the join below needs it here
+		return false, errors.New("not an artifact id")
+	}
 	row, ok, err := b.outbox.Offloaded(ctx, digest)
 	if err != nil {
 		return false, err
@@ -278,7 +282,7 @@ func (b *DropboxBackup) fetchBackLocked(ctx context.Context, digest string) (boo
 	if derr != nil || cerr != nil || n != row.Size || hex.EncodeToString(h.Sum(nil)) != digest {
 		return false, errKeptInDropbox // never other bytes under this digest
 	}
-	if err := os.Rename(tmpPath, obj); err != nil {
+	if err := fsreplace.Rename(tmpPath, obj); err != nil {
 		return false, err
 	}
 	storeFor(b.coralDir).added(row.Size)
@@ -409,6 +413,9 @@ func fetchBudgetCharge(n int64) {
 // fetchOffloaded makes sure a read can go on: true when the bytes are here (or were never freed). For bytes kept only in Dropbox it fetches them
 // back when allowed (a single open by the owner), within the limits, or answers 503 kept_in_dropbox (written here) and returns false.
 func fetchOffloaded(w http.ResponseWriter, coralDir, digest string, allowed bool) bool {
+	if !objectNameRe.MatchString(digest) {
+		return true // not an artifact id: nothing to fetch, and the caller's own not-found answers (it checks the id too)
+	}
 	if _, err := os.Lstat(filepath.Join(coralDir, "artifacts", "objects", digest)); err == nil {
 		return true
 	}
