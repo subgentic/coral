@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/secretbox"
 )
 
 // #14845, Dropbox stage 6b piece 2: the offload pass, against the fake Dropbox. Each test names the mutant it fails against.
@@ -237,8 +238,8 @@ func TestRemovingAnOffloadedArtifactFromDropboxFetchesItBackFirst(t *testing.T) 
 	})
 }
 
-// Security's condition 5 and 3b on d766be37a. Mutants (one per route): the guard dropped from Disconnect (plain or with delete_backup), Switch,
-// Take over or Rekey, any of which would leave the files kept only in Dropbox with no way back.
+// Security's condition 5 and 3b on d766be37a. Mutants (one per route): the guard dropped from Disconnect (plain or with delete_backup), Switch
+// or Take over, any of which would leave the files kept only in Dropbox with no way back.
 func TestNothingStrandsFilesKeptOnlyInDropbox(t *testing.T) {
 	for _, c := range []struct{ name, path, body string }{
 		{"Disconnect", "/api/dropbox/disconnect", `{}`},
@@ -258,17 +259,35 @@ func TestNothingStrandsFilesKeptOnlyInDropbox(t *testing.T) {
 			assert.Equal(t, true, st["connected"], "still connected")
 		})
 	}
-	t.Run("Rekey", func(t *testing.T) {
-		be, d, _ := offloadedEnv(t)
-		req := httptest.NewRequest(http.MethodPost, "/api/cloud/rekey", strings.NewReader(`{"confirm": true}`))
+}
+
+// Security's SHOULD on afb1f3213: Rekey is never refused for files kept only in Dropbox (it answers a leaked key); its confirm names their count,
+// the rows stay, and a sign-in to the same account brings them back while another account is refused. Mutants: Rekey refused outright; the count
+// not asked; the offload rows dropped by the re-key.
+func TestARekeyAsksForTheCountThenKeepsTheWayBack(t *testing.T) {
+	be, d, _ := offloadedEnv(t)
+	require.NoError(t, os.Chmod(secretbox.KeyFilePath(be.h.dbx.dataDir), 0o644)) // the key is refused (others can read it): a re-key is allowed
+	rekey := func(body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/api/cloud/rekey", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		dashboardRequest(req)
 		req.Host = be.host
 		rec := httptest.NewRecorder()
 		be.h.Rekey(rec, req)
-		assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
-		assert.Contains(t, rec.Body.String(), "kept_in_dropbox", "refused for the files kept only in Dropbox, not for another reason")
-		assert.True(t, be.offloaded(d))
-		assert.Equal(t, true, be.status()["connected"], "the Dropbox sign-in is kept")
-	})
+		return rec
+	}
+	rec := rekey(`{"confirm": true}`)
+	require.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), `"kept_in_dropbox":1`)
+	assert.Contains(t, rec.Body.String(), "sign in to the same Dropbox account again")
+	assert.Equal(t, true, be.status()["connected"], "nothing changed yet")
+	rec = rekey(`{"confirm": true, "kept_in_dropbox": 1}`)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.True(t, be.offloaded(d), "the rows stay: the way back is a sign-in")
+	_, err := be.b.FetchBack(context.Background(), d)
+	assert.ErrorIs(t, err, errKeptInDropbox, "no sign-in: cannot be fetched yet")
+	require.Contains(t, be.signIn(""), "Connected")
+	here, err := be.b.FetchBack(context.Background(), d)
+	require.NoError(t, err, "the same account again: fetched back")
+	assert.True(t, here)
 }

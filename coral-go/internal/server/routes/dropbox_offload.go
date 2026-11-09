@@ -327,3 +327,23 @@ func (h *CloudHandler) refuseWhileOffloaded(w http.ResponseWriter, r *http.Reque
 	}
 	return false
 }
+
+// keptInDropboxConfirmed is Rekey's confirm while files are kept only in Dropbox: the request must name their count (kept_in_dropbox), so the
+// Operator has read what the re-key means for them. It answers the count, and false after writing the refusal (409 with the count and the words,
+// or the same when the count cannot be read).
+func (h *CloudHandler) keptInDropboxConfirmed(w http.ResponseWriter, r *http.Request, said *int) (int, bool) {
+	if h.dbx == nil || h.dbx.outbox == nil {
+		return 0, true
+	}
+	n, _, err := h.dbx.outbox.OffloadedTotals(r.Context())
+	if err != nil {
+		writeError(w, http.StatusConflict, "kept_in_dropbox", "Coral could not check whether files are kept only in Dropbox, so nothing was changed. Try again.")
+		return 0, false
+	}
+	if n > 0 && (said == nil || *said != n) {
+		writeJSON(w, http.StatusConflict, map[string]any{"code": "confirm_kept_in_dropbox", "kept_in_dropbox": n,
+			"error": fmt.Sprintf("%d %s kept only in Dropbox. After the re-key, sign in to the same Dropbox account again to bring them back; until you do they cannot be opened. Send the count to go on.", n, map[bool]string{true: "file is", false: "files are"}[n == 1])})
+		return n, false
+	}
+	return n, true
+}
