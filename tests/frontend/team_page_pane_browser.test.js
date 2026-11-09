@@ -40,7 +40,7 @@ const HEX = 'a'.repeat(64);
                 await goTab(ev, settle, 'Artifacts');
                 assert.equal(await paneBox(), null, 'no pane before a row is chosen');
                 await openRow();
-                const p = await ev(`(() => { const a = window.__tp.pane(); if (!a) return null; const names = [...a.querySelectorAll('button, a')].filter(window.__na.vis).map(window.__na.name); const hd = a.querySelector('h2'); return { heading: hd ? window.__na.text(hd) : '', names }; })()`);
+                const p = await ev(`(() => { const a = window.__tp.pane(); if (!a) return null; const names = [...a.querySelectorAll('button, a, .menu-item')].filter(x => x.matches('.menu-item') || window.__na.vis(x)).map(x => x.matches('.menu-item') ? (x.querySelector('.more-item-label') || x).textContent.trim() : window.__na.name(x)); const hd = a.querySelector('h2'); return { heading: hd ? window.__na.text(hd) : '', names }; })()`);
                 assert.ok(p, 'an aside named Details is open');
                 assert.ok(p.heading.includes(ART), `its h2 names the artifact (got ${JSON.stringify(p.heading)})`);
                 for (const n of ['Close details', 'Open', 'Download', 'Copy link']) assert.ok(p.names.some(x => x === n || x.startsWith(n)), `a control named ${n} (got ${JSON.stringify(p.names)})`);

@@ -137,10 +137,10 @@ const { coralReady } = require('./helpers/wait');
         console.log('6. the model in the agent tip and in the header, not in the row');
         await ev(`document.getElementById('acf-t').remove(); window.__m.add('opus-bot', 'A', 3, { sleeping: false }); window.__m.add('sonnet-bot', 'B', 3, { sleeping: false });
             for (const s of T.state.liveSessions) { if (s.name === 'opus-bot') s.model = ${JSON.stringify(OPUS.value)}; if (s.name === 'sonnet-bot') s.model = 'claude-sonnet-4-5-20250929'; }
-            localStorage.setItem('coral-show-agent-type', 'true'); localStorage.setItem('coral-models:v1:local:claude', JSON.stringify({ models: [${JSON.stringify(OPUS)}], fetched_at: null, source: 'account' }));
+            localStorage.setItem('coral-show-agent-type', 'true'); localStorage.setItem('coral-show-model', 'false'); localStorage.setItem('coral-models:v1:local:claude', JSON.stringify({ models: [${JSON.stringify(OPUS)}], fetched_at: null, source: 'account' }));
             T.render.renderLiveSessions(T.state.liveSessions); true`);
         await waitFor(`document.querySelectorAll('#live-sessions-list li[data-session-id]').length >= 2`, 'the two rows', 4000);
-        assert.equal(await ev(`document.querySelectorAll('#live-sessions-list .session-model').length`), 0, 'a row draws no model line (one line a row, #9686)');
+        assert.equal(await ev(`document.querySelectorAll('#live-sessions-list .session-model').length`), 0, 'a row draws no model line when Show model is off (one line a row, #9686; Show model is on by default since #14977: the person turned it off here)');
         const tip = name => ev(`String(window.buildSessionTooltip(T.state.liveSessions.find(s => s.name === ${JSON.stringify(name)}))).replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ')`);
         assert.match(await tip('opus-bot'), /Opus 4\.1/, 'the tip has the display name from the list');
         assert.match(await tip('sonnet-bot'), /Sonnet 4\.5/, 'and a short name from the id when the list has none');

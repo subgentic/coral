@@ -15,7 +15,7 @@
    Neither appears in the Coral Hub itself or in an agent popout. */
 
 import { state } from './state.js';
-import { isCloud } from './server_base.js';
+import { isCloud, isHub } from './server_base.js';
 import { isPopout } from './popout.js';
 import { escapeAttr, escapeHtml, showToast, copyText } from './utils.js';
 import { switchRow } from './switch_row.js';
@@ -251,7 +251,18 @@ function _dismiss(choice) {
     el.hidden = !_available() || hidden;
     const again = document.querySelector('#welcome-screen [data-editions="show-home"]'); // a hidden strip can be shown again, under the cards (#10572)
     if (again) again.hidden = !_available() || !hidden;
-    if (_available() && !hidden) importOnce('./home_own_hub.js').then(m => m.syncOwnHub()).catch(() => {}); // the Run your own hub box's state (#14976)
+    if (_available() && !hidden) _drawOwnHub(); // the Run your own hub box's state (#14976)
+}
+
+/** The Run your own hub box, drawn from what the page already has (the saved setting in the loaded settings, and whether this Coral runs as a hub): nothing is requested at start (the startup module list is pinned). Its buttons load home_own_hub.js, which reads the real state first. */
+function _drawOwnHub() {
+    const box = document.getElementById('editions-home-own');
+    if (!box) return;
+    const saved = String((state.settings || {}).hub_mode).toLowerCase() === 'true', running = isHub(), on = saved || running;
+    const state_ = box.querySelector('#editions-home-own-state');
+    if (state_ && !state_.textContent) state_.textContent = saved && running ? 'On: this Coral is a hub (the Computers tab).' : saved ? 'Saved: this Coral becomes a hub when it restarts. Quit Coral and start it again to apply.' : running ? 'On: Coral was started as a hub.' : '';
+    const show = (name, yes) => { const b = box.querySelector(`[data-editions="${name}"]`); if (b && b.hidden === yes) b.hidden = !yes; }; // (only a change: the start's DOM writes are pinned)
+    show('enable-hub', !on); show('disable-hub', saved); show('manage-hub', on); show('restart-hub', false);
 }
 
 // A server enrolled with the hub's old host (#3546, hub_moved; the header indicator reports the
@@ -293,6 +304,7 @@ document.addEventListener('click', e => {
     else if (action === 'open') { window.hideSettingsModal?.(true); showHubSetup('connect'); }
     else if (action === 'home-hub') showHubSetup('connect');
     else if (action === 'home-own') showHubSetup('own-hub');
+    else if (['enable-hub', 'disable-hub', 'restart-hub', 'manage-hub'].includes(action)) importOnce('./home_own_hub.js').then(m => m.ownHubAction(action, t)).catch(() => showToast('Could not do that. Nothing was changed.', true));
     else if (action === 'hide-home') { _saveSettings({ home_editions_hidden: 'True' }); syncHomeEditions(); }
     else if (action === 'show-home') { _saveSettings({ home_editions_hidden: 'False' }); syncHomeEditions(); }
     else return;

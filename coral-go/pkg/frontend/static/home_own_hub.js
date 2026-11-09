@@ -2,7 +2,6 @@
  * implementation: the same route (GET/PUT /api/system/hub-mode, which answers only the dashboard on this computer, never Coral Hub, never an agent or another local user) and the same restart, through
  * hub_mode_setting.js. Turning it on asks first and says what it does; turning it off is one press. If the state cannot be read (an older server, another computer) the box is what it was: the explainer only. */
 import { importOnce } from './import_once.js';
-import { loadStyles } from './lazy_styles.js';
 
 const root = () => document.getElementById('editions-home-own');
 const q = sel => root()?.querySelector(sel);
@@ -33,7 +32,6 @@ function draw(st, note = '') {
 /** Read the state into the box (called when the home section is shown). */
 export async function syncOwnHub() {
     if (!root()) return;
-    await loadStyles('home_own_hub.css').catch(() => {}); // the box's own rules, before its buttons are shown
     try { const m = await importOnce('./hub_mode_setting.js'); draw(await m.readHubMode()); } catch { draw(null); }
 }
 
@@ -48,18 +46,18 @@ async function change(on, button) {
     finally { button.disabled = false; keepFocus(); }
 }
 
-document.addEventListener('click', async e => {
-    const t = e.target && e.target.closest && e.target.closest('#editions-home-own [data-editions]');
-    if (!t) return;
-    const action = t.dataset.editions;
+/** A press on one of the box's buttons (editions.js hands it over): the real state is read first, so the answer is never from a stale page. */
+export async function ownHubAction(action, t) {
+    await syncOwnHub(); // (the box was drawn from the loaded settings: this is the route's own answer)
+    if (!_st) return; // the state cannot be read here: the box is the explainer only
     if (action === 'enable-hub') {
-        e.preventDefault(); e.stopPropagation();
+        if (_st && (_st.saved || _st.forced)) return; // it is already on: the box now says so
         const { showConfirmModal } = await importOnce('./confirm_dialog.js');
         showConfirmModal('Run as a hub on this computer?', CONFIRM, () => change(true, t), null, { label: 'Enable on this computer', cancelLabel: 'Cancel', danger: false });
-    } else if (action === 'disable-hub') { e.preventDefault(); e.stopPropagation(); change(false, t); }
+    } else if (action === 'disable-hub') change(false, t);
     else if (action === 'restart-hub') {
-        e.preventDefault(); e.stopPropagation(); t.disabled = true;
+        t.disabled = true;
         try { const m = await importOnce('./hub_mode_setting.js'); await m.restartForHubMode(!!(_st && (_st.saved || _st.forced))); document.getElementById('editions-home-own-state').textContent = 'Restarting Coral\u2026'; }
         catch (err) { t.disabled = false; draw(_st, `Could not restart: ${plain(err)}.`); } finally { keepFocus(); }
-    } else if (action === 'manage-hub') { e.preventDefault(); e.stopPropagation(); window.showSettingsModal?.('network'); }
-}, true);
+    } else if (action === 'manage-hub') window.showSettingsModal?.('network');
+}
