@@ -3355,9 +3355,9 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="automations"]) .s
 .inbox-local { box-sizing: border-box; width: 100%; min-height: 100%; padding: 0; display: flex; flex-direction: column; }
 .inbox-local[hidden] { display: none; }
 /* The right sidebar has a Saved tab only where the list is of an agent or a team: never an everything list there (#4811). A page with no other tab loses the sidebar. */
-body[data-saved-scope="all"] #agentic-state #agentic-tab-saved { display: none !important; } /* an id more than the page kinds' own tab rules above */
-body[data-saved-scope="all"] #agentic-state[data-page="other"], body[data-saved-scope="all"] #agentic-state[data-page="chats"] { display: none !important; }
-body[data-saved-scope="all"][data-dock-page="other"] #panel-toggle-btn, body[data-saved-scope="all"][data-dock-page="chats"] #panel-toggle-btn { display: none !important; }
+body[data-saved-scope="all"]:not(.cloud-native-saved) #agentic-state #agentic-tab-saved { display: none !important; } /* an id more than the page kinds' own tab rules above */
+body[data-saved-scope="all"]:not(.cloud-native-saved) #agentic-state[data-page="other"], body[data-saved-scope="all"]:not(.cloud-native-saved) #agentic-state[data-page="chats"] { display: none !important; }
+body[data-saved-scope="all"]:not(.cloud-native-saved)[data-dock-page="other"] #panel-toggle-btn, body[data-saved-scope="all"]:not(.cloud-native-saved)[data-dock-page="chats"] #panel-toggle-btn { display: none !important; }
 /* a padding wrapper, no table of its own (named for what it is, so the table census does not count it, #8070): */
 .saved-list-pad { padding: 8px 12px 12px; } /* the Inbox's Saved table, filtered to the page's scope (inbox_sidebar.js drawDockSaved) */
 

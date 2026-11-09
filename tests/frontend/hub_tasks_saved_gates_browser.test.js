@@ -14,6 +14,10 @@ const {coralReady}=require('./helpers/wait');
     await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await coralReady(ev,'startup','settings');
     const flags=await ev(`import((window.__coralStatic||'/static/')+'server_base.js').then(m=>({tasks:m.nativeTasks?.(),saved:m.nativeSaved?.()}))`);
     assert.deepEqual(flags,{tasks:account.tasks_native===true,saved:account.saved_native===true},width+' strict independent account gates '+JSON.stringify(account));
+    if(account.tasks_native===true&&account.saved_native===true){
+     const reply=await ev(`import((window.__coralStatic||'/static/')+'inbox_coral.js').then(m=>m.coralInboxAdapter.canReply({project:'@m2/alpha',status:'pending'}))`);
+     assert.equal(reply.ok,false,width+' owned Interact still refuses reply when inbox_reply is absent');
+    }
     await ev(`window.switchNavTab('hub-inbox');true`);
     for(const [folder,enabled]of [['tasks',account.tasks_native===true],['saved',account.saved_native===true]]){
      await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.openInboxGroup('${folder}'))`);
@@ -25,7 +29,7 @@ const {coralReady}=require('./helpers/wait');
    }
   }
   // Native data paths use explicit inventory ownership, browser filtering and source identities.
-  await Page.addScriptToEvaluateOnNewDocument({source:`(()=>{localStorage.setItem('coral-saved-filters',JSON.stringify({team:'@previous/board',kind:'board',sort:'oldest'}));const real=window.fetch;window.fetch=(u,o)=>new URL(String(u),location.href).pathname==='/api/account'?Promise.resolve(Response.json({tasks_native:true,saved_native:true,inbox_reply:true,saved_expand:true})):real(u,o)})()`});
+  await Page.addScriptToEvaluateOnNewDocument({source:`(()=>{localStorage.setItem('coral-saved-filters',JSON.stringify({team:'@previous/board',kind:'board',sort:'oldest'}));localStorage.removeItem('coral.inbox.tab');const real=window.fetch;window.fetch=(u,o)=>new URL(String(u),location.href).pathname==='/api/account'?Promise.resolve(Response.json({tasks_native:true,saved_native:true,inbox_reply:true,saved_expand:true})):real(u,o)})()`});
   for(const width of [1280,390,320]){
    await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width!==1280});
    await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await coralReady(ev,'startup','settings');
@@ -75,6 +79,15 @@ const {coralReady}=require('./helpers/wait');
    assert.ok(calls.every(c=>['m1','m2'].includes(c.server)),'no grantee, unknown or offline personal reads');
    assert.ok(calls.filter(c=>c.path==='/api/saved').every(c=>c.query==='?limit=200'),'only the fixed bounded Saved query is sent');
    assert.ok(calls.every(c=>!c.query.includes('private')&&!c.query.includes('snippet')),'filter canaries never enter GET queries');
+   await ev(`import((window.__coralStatic||'/static/')+'saved.js').then(async m=>{await m.setSavedFilters({});await m.setSavedQuery('')})`);
+   await ev(`window.toggleAgenticPanel?.(true);window.switchAgenticTab?.('saved','top');true`);
+   await waitFor(`document.querySelector('#saved-table')?.textContent.includes('Saved m2')`,'native Saved is available in the shared dock');
+   assert.equal(await ev(`document.body.classList.contains('cloud-native-saved')&&!!document.querySelector('#agentic-tab-saved')?.getClientRects().length`),true,width+' strict Saved gate reveals the shared read-only dock tab');
+   for(const folder of ['needs','tasks','goals','chats']){
+    await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.openInboxGroup('${folder}'))`);
+    assert.equal(await ev(`!!document.querySelector('#agentic-tab-saved')?.getClientRects().length`),true,width+' Saved dock stays available under '+folder);
+    assert.equal(await ev(`document.querySelector('#saved-table')?.textContent.includes('Saved m2')`),true,width+' shared Saved rows remain mounted under '+folder);
+   }
    await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.openInboxGroup('tasks'))`);
    await waitFor(`document.querySelector('#group-table-view').textContent.includes('Operator m1')`,'owned tasks return for account-change check');
    await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.setInboxSearch('private task search'))`);
