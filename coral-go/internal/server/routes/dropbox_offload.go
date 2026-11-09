@@ -475,3 +475,124 @@ func operatorFetchCaller(r *http.Request) bool {
 	}
 	return false
 }
+
+// The risk sentence and the warning the Operator confirms before Free up space is turned on (the 6b delta §1). The keychain-protected token of a
+// signed macOS build is not used yet, so the risk sentence is asked on every system.
+const (
+	offloadRiskSentence = "On this computer, your Dropbox access is protected only by your user account. A program that takes it could delete your backup, and with Free up space on, that may be the only copy of older files."
+	offloadWarning      = "Files freed from this computer live only in Dropbox. Editing or deleting them there loses them."
+)
+
+// DropboxSetOffload answers PUT /api/dropbox/offload (stage 6b, #14845): the Operator's "Free up space: keep artifacts older than N days only in
+// Dropbox", on this computer only (never through Coral Hub, never an agent). {days: 0} turns it off; the files kept only in Dropbox are then
+// fetched back over the next passes. To turn it on: without confirm it is a dry run (the count and bytes the next pass may free, and the two
+// sentences); with confirm it needs risk_ok and warning_ok (the Operator ticked both sentences) and a connection, and the audit row records the
+// count the page showed.
+func (h *CloudHandler) DropboxSetOffload(w http.ResponseWriter, r *http.Request) {
+	if h.refuseCloud(w, r, allowDashboard) || !requireJSON(w, r) {
+		return
+	}
+	if !operatorFetchCaller(r) {
+		writeError(w, http.StatusForbidden, "operator_only", "only the Operator can change Free up space, from this computer's dashboard")
+		return
+	}
+	d := h.dbx
+	if d == nil || d.backup == nil {
+		writeError(w, http.StatusNotFound, "not_available", "Dropbox backup is not available in this build")
+		return
+	}
+	var in struct {
+		Days      int   `json:"days"`
+		Confirm   bool  `json:"confirm"`
+		RiskOK    bool  `json:"risk_ok"`
+		WarningOK bool  `json:"warning_ok"`
+		SeenCount int   `json:"seen_count"`
+		SeenBytes int64 `json:"seen_bytes"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<10)
+	if err := decodeJSONStrict(r, &in); err != nil {
+		errBadRequest(w, `free up space is {"days": n, "confirm": true|false, "risk_ok": true, "warning_ok": true}`)
+		return
+	}
+	if in.Days != 0 && (in.Days < store.DropboxOffloadMinDays || in.Days > store.DropboxOffloadMaxDays) {
+		errBadRequest(w, "days is 0 (off) or 30 to 3650")
+		return
+	}
+	ctx := r.Context()
+	old, _, err := d.store.Offload(ctx)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "", "could not read the setting")
+		return
+	}
+	if in.Days > 0 {
+		c, cerr := d.store.Get(ctx)
+		if cerr != nil || !c.Connected {
+			writeError(w, http.StatusConflict, "not_connected", "Connect Dropbox first")
+			return
+		}
+		if !in.Confirm {
+			now := time.Now()
+			cands, perr := d.backup.outbox.OffloadCandidates(ctx, c.AccountID, now.Add(-time.Duration(in.Days)*24*time.Hour), now.Add(-store.DropboxOffloadOpenedFor), 100000)
+			if perr != nil {
+				writeError(w, http.StatusInternalServerError, "", "could not count what Free up space would free")
+				return
+			}
+			var bytes int64
+			for _, x := range cands {
+				bytes += x.Size
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"dry_run": true, "days": in.Days, "count": len(cands), "bytes": bytes, "risk": offloadRiskSentence, "warning": offloadWarning})
+			return
+		}
+		if !in.RiskOK || !in.WarningOK {
+			writeError(w, http.StatusBadRequest, "confirm_required", "Turning Free up space on needs both sentences confirmed")
+			return
+		}
+	}
+	if err := d.store.SetOffload(ctx, in.Days); err != nil {
+		writeError(w, http.StatusInternalServerError, "", "could not save the setting")
+		return
+	}
+	a := store.DropboxAudit{Kind: store.DropboxAuditOffloadSetting, Who: "operator", OldDays: old, NewDays: in.Days}
+	if in.Days > 0 {
+		a.Count, a.Bytes = max(in.SeenCount, 0), max(in.SeenBytes, 0)
+	}
+	_ = d.store.AddAudit(ctx, a)
+	if in.Days == 0 {
+		d.backup.Nudge() // the files kept only in Dropbox start coming back at once
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"days": in.Days})
+}
+
+// BringBack fetches back the files kept only in Dropbox while Free up space is off (turned off by the Operator, or by a new sign-in, a disconnect
+// or a re-key), oldest first, at most 200 and 2 GiB a pass; a full store stops the pass. Each fetch is FetchBack (verified, capped, under the digest
+// lock, the marker removed after). It reports how many came back.
+func (b *DropboxBackup) BringBack(ctx context.Context) int {
+	days, _, err := b.d.store.Offload(ctx)
+	if err != nil || days > 0 || !b.ready(ctx) {
+		return 0
+	}
+	rows, err := b.outbox.OffloadedAll(ctx, offloadPerPass)
+	if err != nil || len(rows) == 0 {
+		return 0
+	}
+	n, bytes := 0, int64(0)
+	for _, row := range rows {
+		if ctx.Err() != nil || bytes+row.Size > offloadBytesPerPass {
+			break
+		}
+		here, ferr := b.FetchBack(ctx, row.Digest)
+		if errors.Is(ferr, errStoreFull) {
+			break
+		}
+		if ferr == nil && here {
+			n++
+			bytes += row.Size
+		}
+	}
+	if n > 0 {
+		noteArtifactsChanged()
+		slog.Info("[dropbox] files brought back from Dropbox", "count", n)
+	}
+	return n
+}
