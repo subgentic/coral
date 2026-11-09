@@ -530,6 +530,11 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Post("/api/dropbox/removals/confirm", s.cloudHandler.DropboxConfirmRemovals)  // let the held removals go
 	r.Post("/api/dropbox/resend/{digest}", s.cloudHandler.DropboxResend)            // stage 6a: send a removed artifact to Dropbox again
 	r.Get("/api/dropbox/artifact/{digest}", s.cloudHandler.DropboxArtifact)         // stage 6a: what the backup holds of one artifact
+	r.Get("/api/dropbox/share/{digest}", s.cloudHandler.DropboxShareInfo)           // Share via Dropbox (#14944): what the dialog needs, the file's shares
+	r.Post("/api/dropbox/share/{digest}", s.cloudHandler.DropboxShare)              // #14944: copy and share (people, team or anyone with the link)
+	r.Post("/api/dropbox/share/stop/{id}", s.cloudHandler.DropboxStopShare)         // #14944: Stop sharing one copy
+	r.Get("/api/dropbox/shares", s.cloudHandler.DropboxShares)                      // #14944: every share, for Settings
+	r.Post("/api/dropbox/shares/stop-all", s.cloudHandler.DropboxStopAllShares)     // #14944: Stop all
 	// The Dropbox backup worker (#14655): one background loop; a pass every five minutes or soon after an upload, only while connected.
 	dbxBackup := s.cloudHandler.NewDropboxBackup(store.NewDropboxOutbox(s.db))
 	if s.boardStore != nil {

@@ -7,6 +7,7 @@ package dropbox
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/url"
 	"strings"
@@ -180,6 +181,15 @@ func (c *Client) SharedLinks(ctx context.Context, access, path string) ([]Link, 
 		}
 	}
 	return links, nil
+}
+
+// CanShare checks, before anything is made, that this sign-in allows sharing: a read of the account's links (sharing/list_shared_links with no
+// path, which needs sharing.read). ErrMissingScope for an older sign-in.
+func (c *Client) CanShare(ctx context.Context, access string) error {
+	var out struct {
+		Links []json.RawMessage `json:"links"`
+	}
+	return sharingError(c.rpc(ctx, access, "sharing/list_shared_links", map[string]any{}, &out))
 }
 
 // RevokeLink revokes a link (sharing/revoke_shared_link). A link Dropbox no longer has is already revoked: nil.

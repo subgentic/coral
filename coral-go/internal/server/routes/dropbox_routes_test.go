@@ -65,6 +65,20 @@ type fakeDropbox struct {
 	listCalls     int
 	failDownloads int  // the next downloads answer 500 (Dropbox's own trouble)
 	markersFail   bool // stage 6a: a marker listing answers 500
+	// Share via Dropbox (#14944).
+	links       map[string][]fakeLink // path -> its shared links
+	members     map[string][]string   // file id -> emails it is shared with
+	basic       bool                  // the account is basic (no link expiry)
+	team        string                // the account's team ('' none)
+	noScope     bool                  // sharing calls answer missing_scope (an older sign-in)
+	copyBadHash bool                  // copy_v2 answers a content hash that is not the bytes'
+	revokeFail  bool                  // revoke_shared_link answers 500
+	membersFail bool                  // add_file_member refuses the member
+	copies      int                   // copy_v2 calls
+}
+
+type fakeLink struct {
+	url, aud, expires string
 }
 
 // edit replaces path's bytes as a person would in Dropbox (a new rev, a new content hash).
@@ -246,7 +260,7 @@ func newFakeDropbox(t *testing.T) *fakeDropbox {
 			f.listCalls++
 			var la map[string]any
 			_ = json.NewDecoder(r.Body).Decode(&la)
-			if lp, _ := la["path"].(string); strings.HasPrefix(lp, "/v1/offloaded/") { // stage 6a: one marker folder, by name
+			if lp, _ := la["path"].(string); strings.HasPrefix(lp, "/v1/offloaded/") || strings.HasPrefix(lp, "/Shared from Coral/") { // one folder, by name
 				if f.markersFail {
 					w.WriteHeader(http.StatusInternalServerError)
 					w.Write([]byte(`{"error_summary":"internal_error/"}`))
@@ -379,6 +393,9 @@ func newFakeDropbox(t *testing.T) *fakeDropbox {
 			}
 			delete(f.jobs, a["async_job_id"])
 			json.NewEncoder(w).Encode(map[string]any{".tag": "complete", "entries": f.applyDeletes(keyed)})
+		case "/2/files/copy_v2", "/2/users/get_current_account", "/2/sharing/add_file_member", "/2/sharing/create_shared_link_with_settings",
+			"/2/sharing/list_shared_links", "/2/sharing/revoke_shared_link", "/2/sharing/unshare_file":
+			f.sharing(w, r)
 		case "/2/users/get_space_usage":
 			if f.noDate {
 				w.Header()["Date"] = nil // net/http adds a Date unless it is set to nil
