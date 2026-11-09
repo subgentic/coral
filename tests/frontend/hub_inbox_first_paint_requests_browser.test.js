@@ -26,7 +26,6 @@ const {setupHubWorld,BASE}=require('./helpers/hub_world');
   await Page.navigate({url:BASE+'/inbox/needs'+(slow?'?slow_inventory=1':'')});await Page.loadEventFired();
   await waitFor(`!!window.__needsPaint`,'first visible Needs you row',20000);
   const report=await ev(`(()=>{const paint=window.__needsPaint,calls=window.__loadCalls.filter(c=>c.start<=paint),sources=[...new Set(calls.map(c=>c.source))];return{paint,calls,peak:window.__loadPeak,bySource:Object.fromEntries(sources.map(source=>{const list=calls.filter(c=>c.source===source);const depths=[];list.forEach((call,i)=>depths.push(1+Math.max(0,...list.slice(0,i).map((prior,j)=>prior.end&&prior.end<=call.start?depths[j]:0))));return[source,{count:list.length,capacityWaves:Math.ceil(list.length/6),observedWaves:Math.max(0,...depths)}]}))}})()`);
-  fs.writeFileSync('/private/tmp/ui14524-first-paint'+(slow?'-slow':'')+'.json',JSON.stringify(report,null,2));
   console.log('Hub first paint requests '+JSON.stringify(report));
   if(slow)assert.ok(await ev(`window.__loadCalls.filter(c=>c.source!=='hub'&&c.path==='/api/operator-asks').every(c=>c.start>=window.__inventoryArrived)`),'slow inventory starts no question source read before computers arrive');
   for(const [source,count] of Object.entries(report.bySource))if(source!=='hub')assert.ok(count.count<=6,source+': at most six remote calls before first Needs you paint, got '+count.count);
