@@ -32,6 +32,7 @@ const RULES = ['claim_nudge', 'status_nudge', 'mention_renudge', 'held_notice', 
 export function healthToValues(h) {
     const v = { on: !!h.on, interval_min: h.interval_min, heartbeat_min: h.heartbeat_min ?? 0, recipient: h.recipient || '', all_clear: !!h.all_clear, default_reviewers: (h.default_reviewers || []).join(', '), auto_delegate_on: !!(h.auto_delegate && h.auto_delegate.on) };
     for (const k of RULES) if (h[k]) for (const [p, val] of Object.entries(h[k])) v[`${k}_${p}`] = val;
+    if (h.assign_limit !== undefined) v.assign_limit = h.assign_limit;
     return v;
 }
 
@@ -45,6 +46,7 @@ export function valuesToHealth(v, base) {
     h.all_clear = !!v.all_clear;
     h.default_reviewers = String(v.default_reviewers || '').split(',').map(s => s.trim()).filter((s, i, a) => s && a.indexOf(s) === i);
     h.auto_delegate = { ...h.auto_delegate, on: !!v.auto_delegate_on };
+    if (h.assign_limit !== undefined && v.assign_limit !== undefined) h.assign_limit = Number.isInteger(v.assign_limit) ? v.assign_limit : h.assign_limit;
     h.claim_nudge = { ...h.claim_nudge, on: !!v.claim_nudge_on, after_min: v.claim_nudge_after_min, nudges: v.claim_nudge_nudges };
     h.status_nudge = { ...h.status_nudge, on: !!v.status_nudge_on, after_min: v.status_nudge_after_min, escalate_after_min: v.status_nudge_escalate_after_min };
     h.mention_renudge = { ...h.mention_renudge, on: !!v.mention_renudge_on, after_min: v.mention_renudge_after_min };
@@ -93,6 +95,7 @@ export function healthFields(ctx) {
         { key: 'auto_delegate_on', type: 'toggle', label: 'Hand reviews to the default reviewers', help: 'When a task is submitted for review and nobody is assigned, Coral delegates it to the default reviewers; with none named, reviews wait for the orchestrator. Works whether or not the health check is on.' },
         { key: 'default_reviewers', type: 'text', label: 'Default reviewers', wide: true, help: `Names of agents on this team, up to ${HEALTH_LIMITS.reviewers}, separated by commas.`, placeholder: `Agent names (up to ${HEALTH_LIMITS.reviewers})`,
             validate: v => (new Set(String(v).split(',').map(s => s.trim()).filter(Boolean)).size > HEALTH_LIMITS.reviewers ? `at most ${HEALTH_LIMITS.reviewers} names.` : '') },
+        { key: 'assign_limit', type: 'number', label: 'Most waiting tasks per agent', unit: 'tasks (0: no limit)', help: 'Assigning a task to an agent that already has more than this many waiting is refused, and the answer names the less loaded agents; the person assigning can use --force.', min: 0, max: 50, integer: true, compact: true, visibleWhen: v => v.assign_limit !== undefined },
         { key: 'health_rules', type: 'heading', label: 'Automatic rules', help: 'Run only while the health check is on.' },
         { key: 'claim_nudge_on', type: 'toggle', label: 'Nudge an idle agent to claim its work', help: 'An agent that is idle with ready work gets a reminder; past the count, the orchestrator is told.' },
         minutes('claim_nudge_after_min', 'After', 'minutes idle', 'claim_nudge_on'),

@@ -52,6 +52,7 @@ func cmdTaskAdd(st *boardState, args []string) {
 	goal := fs.Int64("goal", 0, "The goal of this board the task serves")
 	goalProposal := fs.Int64("goal-proposal", 0, "The number of a goal proposal still waiting for the Operator's approval: this task waits with it")
 	followUp := fs.Int64("follow-up", 0, "Make this a follow-up of that task: it takes the task's goal, reviewers and assignee unless you give your own")
+	force := fs.Bool("force", false, "Assign even though the agent already has more waiting tasks than the team's limit (the refusal names the less loaded agents); who forced it is recorded on the board")
 	self := fs.Bool("self", false, "Make the task for yourself: it is assigned to you and needs --goal; a repeat of an open title returns that task, and at most 5 can be open (#11247)")
 	goalFrom := fs.Int64("goal-from", 0, "Accept this goal request another team sent: the task is made already linked to its goal (write your own title and body; the request text is not copied)")
 	clihelp.ParseFlags(fs, reordered, func() string { return commandUsage(os.Args[1], os.Args[2:]) })
@@ -107,6 +108,9 @@ func cmdTaskAdd(st *boardState, args []string) {
 	}
 	if *assignee != "" {
 		reqBody["assigned_to"] = *assignee
+	}
+	if *force {
+		reqBody["force"] = true
 	}
 	if *goalFrom > 0 {
 		cmdTaskAddFromRequest(st, *goalFrom, title, *taskBody, *priority, *assignee, subscriberID, goalGiven || *blockedBy != "" || *workflow != "" || *outputs != "" || *reviewers != "" || *remindAt != "" || *parent != 0 || *retryOf != 0 || *completionGates != "" || *stage != "" || *instructions != "")

@@ -134,7 +134,8 @@ func TestHealthCheckScenario(t *testing.T) {
 
 	// The Operator shortens the thresholds through the settings API (5 minutes is the floor).
 	hs := board.DefaultHealthSettings()
-	hs.On = true // off by default (#4962)
+	hs.AssignLimit = 0 // the scenario gives members many tasks to age them; the assignment limit (#14862) is not what it tests
+	hs.On = true       // off by default (#4962)
 	hs.IntervalMin = 5
 	hs.ClaimNudge = board.HealthClaimNudge{On: true, AfterMin: 5, Nudges: 2}
 	hs.StatusNudge = board.HealthStatusNudge{On: true, AfterMin: 5, EscalateAfterMin: 5}

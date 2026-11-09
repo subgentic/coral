@@ -676,7 +676,7 @@ exit 0
 Usage: coral-board task <subcommand> [args]
 
 Subcommands:
-  add "title" [--body "details"] [--priority P] [--assignee "Agent Name"] [--remind-at TIME] [--goal ID] [--follow-up ID]
+  add "title" [--body "details"] [--priority P] [--assignee "Agent Name"] [--force] [--remind-at TIME] [--goal ID] [--follow-up ID]
   add "title" --self --goal ID     A task for yourself, any agent may: assigned to you, needs a goal; a repeat of an open title returns that task, at most 5 open
                                    --follow-up ID: the work that came out of task ID: it takes that task's goal, reviewers and assignee unless you give your own,
                                    and ID lists it (task show ID, task detail ID, the goal page's "N follow-ups open")
@@ -701,7 +701,7 @@ Subcommands:
   release-review <id> --reason "slot released pending review" (orchestrator only; for a candidate submitted before v1.4.56)
   complete <id> [--revision N] [--message "note"] [--outcome success|failed] [--candidate-revision REVISION] [--artifacts manifest.json]
   cancel <id> [--message "reason"]
-  reassign <id> [--to "Agent Name"]
+  reassign <id> [--to "Agent Name"] [--force]   An agent with more waiting tasks than the team's limit (2) is refused, with the less loaded agents named; --force assigns anyway and is recorded
   unblock <id> (--blocker ID | --all) Remove one or all prerequisites (orchestrator only)
   release <id> [--keep]            Put work that is not for now back in the queue (unassigned; --keep leaves it yours): use it, not park
   park <id> --reason "why" [--until DATE] [--ask MESSAGE_ID]  Set a task aside for a wait OUTSIDE the team (the Operator, another team):
@@ -746,7 +746,7 @@ exit 0
 Usage: coral-board task <subcommand> [args]
 
 Subcommands:
-  add "title" [--body "details"] [--priority P] [--assignee "Agent Name"] [--remind-at TIME] [--goal ID] [--follow-up ID]
+  add "title" [--body "details"] [--priority P] [--assignee "Agent Name"] [--force] [--remind-at TIME] [--goal ID] [--follow-up ID]
   add "title" --self --goal ID     A task for yourself, any agent may: assigned to you, needs a goal; a repeat of an open title returns that task, at most 5 open
                                    --follow-up ID: the work that came out of task ID: it takes that task's goal, reviewers and assignee unless you give your own,
                                    and ID lists it (task show ID, task detail ID, the goal page's "N follow-ups open")
@@ -771,7 +771,7 @@ Subcommands:
   release-review <id> --reason "slot released pending review" (orchestrator only; for a candidate submitted before v1.4.56)
   complete <id> [--revision N] [--message "note"] [--outcome success|failed] [--candidate-revision REVISION] [--artifacts manifest.json]
   cancel <id> [--message "reason"]
-  reassign <id> [--to "Agent Name"]
+  reassign <id> [--to "Agent Name"] [--force]   An agent with more waiting tasks than the team's limit (2) is refused, with the less loaded agents named; --force assigns anyway and is recorded
   unblock <id> (--blocker ID | --all) Remove one or all prerequisites (orchestrator only)
   release <id> [--keep]            Put work that is not for now back in the queue (unassigned; --keep leaves it yours): use it, not park
   park <id> --reason "why" [--until DATE] [--ask MESSAGE_ID]  Set a task aside for a wait OUTSIDE the team (the Operator, another team):
