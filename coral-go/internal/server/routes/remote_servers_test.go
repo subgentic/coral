@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -48,6 +49,7 @@ func newRSEnv(t *testing.T) *rsEnv {
 	r.Patch("/api/servers/{id}", h.Update)
 	r.Delete("/api/servers/{id}", h.Delete)
 	r.Post("/api/servers/{id}/test", h.Test)
+	r.Post("/api/servers/{id}/reconnect", h.Reconnect)
 	return &rsEnv{h: h, router: r, dir: dir, db: db}
 }
 
@@ -340,4 +342,91 @@ func TestRedactQueryCredentialNames(t *testing.T) {
 	for _, name := range []string{"page", "return_to", "tokens", "keyword", "monkey", "secrets_count"} {
 		assert.False(t, credentialQueryName(name), name)
 	}
+}
+
+// refusedURL is the address of a port nothing listens on.
+func refusedURL(t *testing.T) string {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	u := "http://" + ln.Addr().String()
+	require.NoError(t, ln.Close())
+	return u
+}
+
+// TestCheckRemoteHealth_NamesTheCause: Test says why a server is unreachable, one sentence per
+// cause, and never the URL, the host or the key.
+func TestCheckRemoteHealth_NamesTheCause(t *testing.T) {
+	hang, err := net.Listen("tcp", "127.0.0.1:0") // accepts, never answers
+	require.NoError(t, err)
+	t.Cleanup(func() { hang.Close() })
+	go func() {
+		for {
+			c, err := hang.Accept()
+			if err != nil {
+				return
+			}
+			t.Cleanup(func() { c.Close() })
+		}
+	}()
+	tlsSrv := httptest.NewTLSServer(http.NotFoundHandler()) // a certificate no one trusts
+	t.Cleanup(tlsSrv.Close)
+	plain := httptest.NewServer(http.NotFoundHandler()) // speaks http, asked over https
+	t.Cleanup(plain.Close)
+
+	cases := []struct {
+		name, url string
+		private   bool
+		want      string
+	}{
+		{"refused", refusedURL(t), true, "refused the connection"},
+		{"no such host", "http://no-such-host.invalid:8420", true, "could not be resolved"},
+		{"no such host, private not allowed", "http://no-such-host.invalid:8420", false, "could not be resolved"},
+		{"private address blocked", refusedURL(t), false, "private or reserved"},
+		{"bad certificate", tlsSrv.URL, true, "TLS certificate was not accepted"},
+		{"http server asked over https", "https://" + plain.Listener.Addr().String(), true, "TLS"},
+		{"hang", "http://" + hang.Addr().String(), true, "timed out"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			h := CheckRemoteHealth(context.Background(), c.url, routeSecret, c.private, 300*time.Millisecond)
+			assert.Equal(t, store.RemoteStatusUnreachable, h.Status)
+			assert.Contains(t, h.Err, c.want)
+			assert.NotContains(t, h.Err, routeSecret)
+			assert.NotContains(t, h.Err, "127.0.0.1")
+			assert.NotContains(t, h.Err, "no-such-host")
+		})
+	}
+}
+
+// TestServers_TestShowsTheCauseAndReconnectRestarts: a stored server that refuses connections shows
+// the cause in last_error after Test; Reconnect does the same and tells the hub, Test does not.
+func TestServers_TestShowsTheCauseAndReconnectRestarts(t *testing.T) {
+	e := newRSEnv(t)
+	var restarted []string
+	e.h.SetReconnector(func(id string) { restarted = append(restarted, id) })
+	remote := fakeRemote(t, routeSecret)
+	require.Equal(t, 201, e.do("POST", "/api/servers", map[string]any{
+		"id": "ws", "label": "Workstation", "url": remote.URL, "api_key": routeSecret, "allow_private": true}).Code)
+	// The server goes away: the same URL now refuses.
+	remote.Close()
+
+	var srv store.RemoteServer
+	w := e.do("POST", "/api/servers/ws/test", nil)
+	require.Equal(t, 200, w.Code, w.Body.String())
+	decode(t, w, &srv)
+	assert.Equal(t, store.RemoteStatusUnreachable, srv.Status)
+	require.NotNil(t, srv.LastError)
+	assert.Contains(t, *srv.LastError, "refused the connection")
+	assert.NotContains(t, w.Body.String(), routeSecret)
+	assert.Empty(t, restarted, "Test leaves the workers alone")
+
+	w = e.do("POST", "/api/servers/ws/reconnect", nil)
+	require.Equal(t, 200, w.Code, w.Body.String())
+	decode(t, w, &srv)
+	require.NotNil(t, srv.LastError)
+	assert.Contains(t, *srv.LastError, "refused the connection")
+	assert.Equal(t, []string{"ws"}, restarted)
+	assert.Equal(t, 404, e.do("POST", "/api/servers/nope/reconnect", nil).Code)
+	assert.Equal(t, []string{"ws"}, restarted, "an unknown server restarts nothing")
 }

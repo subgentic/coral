@@ -161,7 +161,7 @@ function pageHtml(s) {
     // One line says what to do; the raw error is behind Details, for support (#3981).
     const act = (s.status === 'key_unreadable' || s.status === 'unauthorized')
         ? statusMeta(s.status).hint
-        : s.status === 'unreachable' ? 'Is Coral running on that machine? Check the URL.' : '';
+        : s.status === 'unreachable' ? (s.last_error || 'Is Coral running on that machine? Check the URL.') : ''; // the hub's own reason (refused, no such host, private address, TLS, timed out) reads better than a guess
     const raw = s.last_error && s.last_error !== act ? s.last_error : '';
     const attention = act
         ? `<div class="servers-row-error" role="status"><span class="servers-row-hint">${escHtml(act)}</span>${raw ? ` <details class="servers-row-detail"><summary>Details</summary>${escHtml(raw)}</details>` : ''}</div>`
@@ -172,6 +172,7 @@ function pageHtml(s) {
         ? `<button type="button" class="btn" data-action="delete-cancel">Cancel</button>
            <button type="button" class="btn btn-danger" data-action="delete-confirm" data-id="${escHtml(s.id)}">Confirm remove</button>`
         : `<button type="button" class="btn" data-action="test" data-id="${escHtml(s.id)}"${busy ? ' disabled aria-busy="true"' : ''}>${busy ? 'Testing...' : 'Test'}</button>
+           <button type="button" class="btn" data-action="reconnect" data-id="${escHtml(s.id)}" title="Check the server now and restart the hub's connection to it"${busy ? ' disabled' : ''}>Reconnect</button>
            <button type="button" class="btn" data-action="edit" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Edit</button>
            <button type="button" class="btn btn-danger servers-remove" data-action="delete" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Remove</button>`;
     return `<section class="servers-page" id="server-row-${escHtml(s.id)}" tabindex="-1" data-id="${escHtml(s.id)}" aria-labelledby="servers-page-name">
@@ -290,22 +291,25 @@ async function onClick(e) {
     if (action === 'delete-cancel') { _confirmDelete = null; return render(); }
     if (action === 'delete-confirm') return doDelete(id);
     if (action === 'test') return doTest(id);
+    if (action === 'reconnect') return doTest(id, 'reconnect');
 }
 
-async function doTest(id) {
+/** Test, or Reconnect (a Test that also restarts the hub's connection to the server): the toast says the status and, when it is not online, the hub's reason. */
+async function doTest(id, verb = 'test') {
+    const failed = verb === 'reconnect' ? 'Reconnect failed: could not reach the hub.' : 'Test failed: could not reach the hub.';
     setBusy(id, true); render();
     try {
-        const resp = await fetch(`/api/servers/${encodeURIComponent(id)}/test`, { method: 'POST' });
+        const resp = await fetch(`/api/servers/${encodeURIComponent(id)}/${verb}`, { method: 'POST' });
         const body = await readBody(resp);
         if (!resp.ok) {
             _loadError = describeServerError(resp.status, body);
         } else {
             _loadError = '';
             const m = statusMeta(body.status);
-            showToast(`${body.label || id}: ${m.label}`, body.status !== 'online');
+            showToast(`${body.label || id}: ${m.label}${body.status !== 'online' && body.last_error ? `. ${body.last_error}` : ''}`, body.status !== 'online');
         }
     } catch {
-        _loadError = 'Test failed: could not reach the hub.';
+        _loadError = failed;
     }
     setBusy(id, false);
     await load();

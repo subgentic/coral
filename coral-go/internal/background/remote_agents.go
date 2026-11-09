@@ -182,6 +182,7 @@ type RemoteAgentHub struct {
 	nextSub int
 	gen     atomic.Uint64   // bumped on every notify, before subscribers are signalled
 	snap    *RemoteSnapshot // built on demand, cleared on every change
+	runCtx  context.Context // Run's context, for Reconnect
 }
 
 // Generation increases whenever subscribers are notified of a change, so a
@@ -203,6 +204,9 @@ func NewRemoteAgentHub(reg RemoteRegistry, resolver proxy.Resolver, cfg RemoteAg
 
 // Run reconciles the registry until ctx ends.
 func (h *RemoteAgentHub) Run(ctx context.Context) {
+	h.mu.Lock()
+	h.runCtx = ctx
+	h.mu.Unlock()
 	h.reconcile(ctx)
 	t := time.NewTicker(h.cfg.RegistryRefresh)
 	defer t.Stop()
@@ -338,4 +342,29 @@ func (h *RemoteAgentHub) notify() {
 func (h *RemoteAgentHub) current(id string) (*remoteState, bool) {
 	st, ok := h.remotes[id]
 	return st, ok
+}
+
+// Reconnect stops a server's poll loop and feed, forgets what they knew (its failure run, its
+// feed state, its idle connections) and starts them again at once, so a server stuck on an old
+// failure is dialled from scratch (the operator's Reconnect). An unknown id is ignored.
+func (h *RemoteAgentHub) Reconnect(id string) {
+	h.mu.Lock()
+	st, ok := h.current(id)
+	if !ok {
+		h.mu.Unlock()
+		return
+	}
+	if st.cancel != nil {
+		st.cancel()
+		st.cancel = nil
+	}
+	st.sessions, st.feedLive, st.noHealth, st.failingSince = nil, false, false, time.Time{}
+	h.snap = nil
+	ctx := h.runCtx
+	h.mu.Unlock()
+	h.logger.Info("remote reconnect requested", "server", id)
+	proxy.CloseIdleConnections()
+	if ctx != nil {
+		h.reconcile(ctx)
+	}
 }

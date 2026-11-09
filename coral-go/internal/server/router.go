@@ -651,10 +651,12 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 		r.Patch("/api/servers/{id}", rsHandler.Update)
 		r.Delete("/api/servers/{id}", rsHandler.Delete)
 		r.Post("/api/servers/{id}/test", rsHandler.Test)
+		r.Post("/api/servers/{id}/reconnect", rsHandler.Reconnect)
 		remoteResolver := routes.NewRemoteResolver(rsHandler.Store())
 		routes.MountRemoteProxy(r, remoteResolver)
 		s.remoteAgents = background.NewRemoteAgentHub(rsHandler.Store(), remoteResolver, remoteAgentHubConfig)
 		rsHandler.SetStatusListener(s.remoteAgents.Refresh) // an edited key shows at once (#3649)
+		rsHandler.SetReconnector(s.remoteAgents.Reconnect)
 		remoteResolver.SetFailureSink(s.remoteAgents)
 		sessHandler.SetRemoteAgents(s.remoteAgents)
 	}

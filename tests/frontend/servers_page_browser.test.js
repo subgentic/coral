@@ -28,8 +28,8 @@ const SERVERS = [
                 const json = (status, body) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }));
                 if (p === '/api/health') return json(200, { status: 'ok', hub: true, version: '1.4.75' });
                 if (p === '/api/servers' && m === 'GET') return json(200, window.__list);
-                const t = p.match(/^\\/api\\/servers\\/([^/]+)(\\/test)?$/);
-                if (t && t[2] && m === 'POST') { window.__calls.push('test ' + t[1]); return json(200, { id: t[1], label: t[1], status: 'online' }); }
+                const t = p.match(/^\\/api\\/servers\\/([^/]+)(\\/test|\\/reconnect)?$/);
+                if (t && t[2] && m === 'POST') { const verb = t[2].slice(1); window.__calls.push(verb + ' ' + t[1]); return json(200, verb === 'reconnect' ? { id: t[1], label: t[1], status: 'unreachable', last_error: 'remote refused the connection: nothing is listening at that address and port' } : { id: t[1], label: t[1], status: 'online' }); }
                 if (t && m === 'DELETE') { window.__calls.push('delete ' + t[1]); window.__list = window.__list.filter(s => s.id !== t[1]); return json(200, {}); }
                 return R(u, o); }; })();` });
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
@@ -111,12 +111,12 @@ const SERVERS = [
             assert.match(p.name, /^LAN box lan/, at + 'the name and id');
             assert.equal(p.back, '← Servers');
             assert.equal(p.focus, 'servers-back', at + 'the focus goes to the way back');
-            assert.deepEqual(p.buttons, ['Test', 'Edit', 'Remove'], at + 'the bar');
+            assert.deepEqual(p.buttons, ['Test', 'Reconnect', 'Edit', 'Remove'], at + 'the bar');
             assert.equal(p.remove, true, at + 'Remove is the danger button');
             assert.equal(p.small, false, at + 'the normal button size');
             assert.ok(p.barBottomGap <= 1, at + 'the bar is at the foot of the page: ' + p.barBottomGap);
             assert.equal(p.facts.URL, 'http://192.168.1.50:8420'); assert.match(p.facts['Last seen'] || '', /\S/, at + 'last seen, as it is not online (#9798: was Last contact)'); assert.equal(p.facts['Last contact'], undefined, at + 'one word for the one fact'); assert.equal(p.facts.Agents, '3 agents'); // the three live sessions seeded for LAN box (one waits for the person, one only by its hook: the Needs you column counts the first)
-            assert.match(p.error || '', /Is Coral running on that machine/, at + 'what to do about it');
+            assert.match(p.error || '', /dial tcp: i\/o timeout/, at + 'the hub\'s own reason for the failure, not a guess');
             assert.match(await ev(`(document.querySelector('.servers-row-warn') || {}).textContent || ''`), /key crosses the network unencrypted/, at + 'the server\'s own page keeps the warning in words (the sentence a narrow row only has as its name and title)');
             assert.equal(p.table, false, at + 'the table is not on the page');
             assert.equal(await ev(`document.getElementById('servers-tab-title').checkVisibility()`), false, at + 'the page has no "Servers" title: its back link says it');
@@ -133,6 +133,13 @@ const SERVERS = [
             await ev(`[...document.querySelectorAll('#servers-form .sv-bar .btn')].find(b => b.textContent.trim() === 'Cancel').click(); true`);
             await waitFor(`!!document.getElementById('servers-page-name') && !document.getElementById('servers-form')`, 'the page again');
             ok(at + 'Test stays on the page; Edit is the form in the page, Cancel returns to the page');
+
+            // 3b. Reconnect posts to /reconnect (never /test), stays on the page and says why the server is still unreachable
+            await ev(`document.querySelector('.servers-page [data-action=reconnect]').click(); true`);
+            await waitFor(`window.__calls.includes('reconnect lan')`, 'the reconnect request');
+            await waitFor(`!!document.getElementById('servers-page-name') && !document.querySelector('[data-action=reconnect][disabled]')`, 'back on the page after the reconnect');
+            assert.match(await ev(`document.body.textContent`), /remote refused the connection: nothing is listening/, at + 'the toast names the cause');
+            ok(at + 'Reconnect restarts the connection and the toast says why it is still unreachable');
 
             // 4. Remove asks in the bar; Cancel keeps it; Confirm removes it and goes back to the table
             await ev(`document.querySelector('.servers-page [data-action=delete]').click(); true`);

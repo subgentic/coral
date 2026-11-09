@@ -208,12 +208,13 @@ var operatorOnlyRoutes = map[string]string{
 	// #3685 (Security's #3670 follow-up): the hub's server registry (each entry holds a remote
 	// Coral's address and API key, and the hub forwards to it), and the board's remote
 	// subscriptions (which remote boards this Coral reads and relays).
-	"POST /api/servers":           "add a remote server",
-	"PATCH /api/servers/{id}":     "change a remote server",
-	"DELETE /api/servers/{id}":    "remove a remote server",
-	"POST /api/servers/{id}/test": "test a remote server",
-	"POST /api/board/remotes":     "subscribe to a remote board",
-	"DELETE /api/board/remotes":   "unsubscribe from a remote board",
+	"POST /api/servers":                "add a remote server",
+	"PATCH /api/servers/{id}":          "change a remote server",
+	"DELETE /api/servers/{id}":         "remove a remote server",
+	"POST /api/servers/{id}/test":      "test a remote server",
+	"POST /api/servers/{id}/reconnect": "reconnect a remote server",
+	"POST /api/board/remotes":          "subscribe to a remote board",
+	"DELETE /api/board/remotes":        "unsubscribe from a remote board",
 	// #4297 (Security's #4295, SHOULD 6 and INFO 2): no agent tool reads the registry or the remote
 	// boards (grep of coral-board, coral-agent and the hooks found none), so reading them is the
 	// Operator's too.
@@ -342,7 +343,7 @@ var operatorOnlyRoutes = map[string]string{
 // hubModeRoutes are entries the router serves only in hub mode (--hub): ValidateGuardedRoutes
 // lets them be absent otherwise.
 var hubModeRoutes = map[string]bool{
-	"GET /api/servers": true, "POST /api/servers": true, "PATCH /api/servers/{id}": true, "DELETE /api/servers/{id}": true, "POST /api/servers/{id}/test": true,
+	"GET /api/servers": true, "POST /api/servers": true, "PATCH /api/servers/{id}": true, "DELETE /api/servers/{id}": true, "POST /api/servers/{id}/test": true, "POST /api/servers/{id}/reconnect": true,
 	"CONNECT /api/remote/{server}/*": true,
 	"DELETE /api/remote/{server}/*":  true,
 	"GET /api/remote/{server}/*":     true,

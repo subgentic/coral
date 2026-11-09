@@ -348,6 +348,7 @@ b POST /api/scheduled/jobs/{jobID}/toggle
 b POST /api/scheduled/runs/{runID}/seen
 b POST /api/scheduled/validate-cron
 b POST /api/servers
+b POST /api/servers/{id}/reconnect
 b POST /api/servers/{id}/test
 b POST /api/sessions/history/{sessionID}/resummarize
 b POST /api/sessions/history/{sessionID}/tags

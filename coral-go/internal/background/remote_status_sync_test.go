@@ -291,3 +291,30 @@ func TestHub_ReportFailureWithoutWorker(t *testing.T) {
 	h := syncHub(reg, time.Second)
 	assert.False(t, h.ReportFailure(context.Background(), "nope", store.RemoteStatusUnreachable, "connect failed"))
 }
+
+// TestHub_ReconnectRestartsTheWorkersAtOnce: the operator's Reconnect stops a server's poll loop and
+// feed and starts them again, so the server is probed again now, not on the poll schedule; an unknown
+// id is ignored; and a server still being polled afterwards keeps its status.
+func TestHub_ReconnectRestartsTheWorkersAtOnce(t *testing.T) {
+	a := newFakeRemote(t, sess("one", "a-1"))
+	a.noFeed = true
+	reg := newRowRegistry()
+	reg.put("a", a.URL)
+	const pollEvery = 30 * time.Second
+	h := NewRemoteAgentHub(reg, rowResolver{reg}, RemoteAgentHubConfig{
+		PollInterval: pollEvery, RequestTimeout: 300 * time.Millisecond,
+		RegistryRefresh: time.Hour, // the registry pass must not be what restarts the worker
+		MinBackoff:      20 * time.Millisecond, MaxBackoff: 100 * time.Millisecond, OfflineGrace: -1,
+	})
+	startHub(t, h)
+	require.Eventually(t, onlineEverywhere(h, reg, "a"), 3*time.Second, 10*time.Millisecond)
+	before, _ := a.counts()
+
+	h.Reconnect("nope") // nothing to restart, nothing panics
+	start := time.Now()
+	h.Reconnect("a")
+	require.Eventually(t, func() bool { n, _ := a.counts(); return n > before }, 2*time.Second, 10*time.Millisecond,
+		"the restarted worker probes the remote again at once")
+	assert.Less(t, time.Since(start), pollEvery, "not the poll schedule")
+	require.Eventually(t, onlineEverywhere(h, reg, "a"), 3*time.Second, 10*time.Millisecond)
+}
