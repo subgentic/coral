@@ -174,9 +174,11 @@ func (b *DropboxBackup) Run(ctx context.Context, every time.Duration) {
 		case <-b.kick:
 		}
 		b.Pass(ctx)
-		b.Retain(ctx)   // stage 4b: at most once an hour, only when the Operator turned it on
-		b.Notice(ctx)   // stage 5a: edits made in Dropbox
-		b.Removals(ctx) // #14814: removals after the Operator's deletes here, once their grace has passed
+		b.Retain(ctx)    // stage 4b: at most once an hour, only when the Operator turned it on
+		b.Notice(ctx)    // stage 5a: edits made in Dropbox
+		b.Removals(ctx)  // #14814: removals after the Operator's deletes here, once their grace has passed
+		b.Offload(ctx)   // stage 6b: Free up space, at most once an hour, only when the Operator turned it on
+		b.BringBack(ctx) // stage 6b: while it is off, the files kept only in Dropbox come back
 	}
 }
 

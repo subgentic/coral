@@ -545,6 +545,7 @@ PUT /api/cloud/redact-tokens never
 PUT /api/custom-models launch
 PUT /api/dropbox/autosync never
 PUT /api/dropbox/filters never
+PUT /api/dropbox/offload never
 PUT /api/dropbox/retention never
 PUT /api/resources/{name} never
 PUT /api/scheduled/jobs/{jobID} never

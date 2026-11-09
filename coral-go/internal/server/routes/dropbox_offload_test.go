@@ -436,3 +436,68 @@ func TestOnlyTheOperatorOrTheHubOwnerMayFetch(t *testing.T) {
 	assert.False(t, be.objectHereNow(d), "nothing fetched")
 	assert.True(t, be.offloaded(d))
 }
+
+func (be *backupEnv) offloadCall(body string, operator bool) (int, map[string]any) {
+	be.t.Helper()
+	req := httptest.NewRequest(http.MethodPut, "/api/dropbox/offload", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	dashboardRequest(req)
+	req.Host = be.host
+	if operator {
+		req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+	}
+	rec := httptest.NewRecorder()
+	be.h.DropboxSetOffload(rec, req)
+	var m map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &m)
+	return rec.Code, m
+}
+
+// The 6b delta §1 and Security's 3d. Mutants: the setting saved without the dry run's confirm, without both sentences, by another caller, or
+// out of range.
+func TestFreeUpSpaceIsTheOperatorsWithItsConfirms(t *testing.T) {
+	be, _ := offloadEnv(t)
+	ctx := context.Background()
+	require.NoError(t, be.h.dbx.store.SetOffload(ctx, 0))
+	code, _ := be.offloadCall(`{"days": 90, "confirm": true, "risk_ok": true, "warning_ok": true}`, false)
+	assert.Equal(t, http.StatusForbidden, code, "not the Operator: refused")
+	code, _ = be.offloadCall(`{"days": 10}`, true)
+	assert.Equal(t, http.StatusBadRequest, code, "30 to 3650 days")
+	code, out := be.offloadCall(`{"days": 90}`, true)
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, true, out["dry_run"])
+	assert.EqualValues(t, 1, out["count"], "the old backed-up file")
+	assert.Contains(t, out["risk"], "protected only by your user account")
+	assert.Contains(t, out["warning"], "live only in Dropbox")
+	days, _, _ := be.h.dbx.store.Offload(ctx)
+	assert.Zero(t, days, "a dry run saves nothing")
+	code, _ = be.offloadCall(`{"days": 90, "confirm": true, "risk_ok": true}`, true)
+	assert.Equal(t, http.StatusBadRequest, code, "both sentences are confirmed")
+	code, _ = be.offloadCall(`{"days": 90, "confirm": true, "risk_ok": true, "warning_ok": true, "seen_count": 1}`, true)
+	require.Equal(t, http.StatusOK, code)
+	days, _, _ = be.h.dbx.store.Offload(ctx)
+	assert.Equal(t, 90, days)
+	a, _ := be.h.dbx.store.Audits(ctx, 1)
+	require.Len(t, a, 1)
+	assert.Equal(t, store.DropboxAuditOffloadSetting, a[0].Kind)
+	assert.Equal(t, 1, a[0].Count)
+	code, _ = be.offloadCall(`{"days": 0}`, true)
+	require.Equal(t, http.StatusOK, code)
+	days, _, _ = be.h.dbx.store.Offload(ctx)
+	assert.Zero(t, days, "turned off")
+}
+
+// The 6b delta §5. Mutants: turning it off leaves the files in Dropbox; a pass brings files back while it is on.
+func TestTurningFreeUpSpaceOffBringsTheFilesBack(t *testing.T) {
+	be, d, orig := offloadedEnv(t)
+	ctx := context.Background()
+	assert.Zero(t, be.b.BringBack(ctx), "while it is on, nothing comes back")
+	require.NoError(t, be.h.dbx.store.SetOffload(ctx, 0))
+	require.Equal(t, 1, be.b.BringBack(ctx))
+	got, err := os.ReadFile(be.objectPath(d))
+	require.NoError(t, err)
+	assert.Equal(t, orig, got)
+	assert.False(t, be.offloaded(d))
+	st := be.status()["offload"].(map[string]any)
+	assert.EqualValues(t, 0, st["kept"], "the status says none are kept only in Dropbox")
+}

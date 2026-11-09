@@ -135,6 +135,10 @@ func (h *CloudHandler) DropboxStatus(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		out["retention"] = ret
+		if days, _, err := d.store.Offload(r.Context()); err == nil && d.backup != nil {
+			n, bytes, _ := d.backup.outbox.OffloadedTotals(r.Context())
+			out["offload"] = map[string]any{"days": days, "kept": n, "kept_bytes": bytes} // stage 6b: Free up space and the files kept only in Dropbox
+		}
 		if on, paused, err := d.store.AutoSync(r.Context()); err == nil {
 			out["autosync"] = map[string]any{"on": on, "paused": paused} // 5a auto-sync (#14714): the switch and why it is paused ('' runs)
 		}
