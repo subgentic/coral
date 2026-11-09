@@ -43,6 +43,19 @@ export async function sha256Hex(html) {
     } catch { return ''; }
 }
 
+/** Does a newer version of this file exist? Trust is per exact version, so a newer one starts untrusted. false when the list cannot be read or the file is in no series (the line is left out, never guessed). */
+export async function newerVersionExists(hex, server, board = '', fetchFn = serverFetch) {
+    if (!HEX_RE.test(hex)) return false;
+    try {
+        const resp = await fetchFn(server, `/api/artifacts/${hex}/versions${board ? `?board=${encodeURIComponent(board)}` : ''}`);
+        if (!resp.ok) return false;
+        const rows = await resp.json();
+        if (!Array.isArray(rows)) return false;
+        const me = rows.find(r => r && r.digest === hex);
+        return !!me && rows.some(r => r && Number(r.version) > Number(me.version));
+    } catch { return false; }
+}
+
 /** The clamped whole number a file may ask for as its height; null for anything else. */
 export function clampHeight(h) {
     return typeof h === 'number' && Number.isFinite(h) ? Math.max(0, Math.min(MAX_HEIGHT, Math.floor(h))) : null;
@@ -52,7 +65,7 @@ export function clampHeight(h) {
 export function drawNote(wrapper, text) {
     const note = bar('artifact-scripts-line', text);
     note.setAttribute('role', 'status');
-    const first = wrapper.querySelector('.artifact-linked-notice');
+    const first = wrapper.querySelector('.artifact-linked-notice, .artifact-scripts-bar');
     if (first) first.after(note); else wrapper.prepend(note);
     return note;
 }

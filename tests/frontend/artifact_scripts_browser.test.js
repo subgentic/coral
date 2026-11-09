@@ -55,7 +55,7 @@ const OTHER = 'cd'.repeat(32);
                         if (window.__trustMode === 'fail' && method === 'GET') return json({ error: 'boom' }, 500);
                         if (method === 'PUT') window.__trust.add(t[1]); if (method === 'DELETE') window.__trust.delete(t[1]);
                         return json({ id: t[1], trusted: window.__trust.has(t[1]) }); }
-                    if (/\\/api\\/artifacts\\/[a-f0-9]{64}\\/(versions|comments)/.test(url)) return json(/comments/.test(url) ? { comments: [], locked: false, you: { kind: 'owner', can_comment: true, can_lock: true }, limits: {} } : []);
+                    if (/\\/api\\/artifacts\\/[a-f0-9]{64}\\/(versions|comments)/.test(url)) return json(/comments/.test(url) ? { comments: [], locked: false, you: { kind: 'owner', can_comment: true, can_lock: true }, limits: {} } : (window.__versions || []));
                     if (/\\/api\\/artifacts\\/[a-f0-9]{64}/.test(url)) return Promise.resolve(new Response(window.__body, { status: 200, headers: { 'Content-Type': 'text/html' } }));
                     return orig(u, o); };
             })()`);
@@ -99,13 +99,22 @@ const OTHER = 'cd'.repeat(32);
             assert.ok(f.barOutside && /Scripts are on/.test(f.bar) && /no web requests, no cookies, no files/.test(f.bar) && !/blocks them/.test(f.bar) && f.off, `${w}: the bar is outside the frame, says Scripts are on and holds Turn off: ` + JSON.stringify(f));
             assert.ok(!f.plainBanner && f.chipHidden, `${w}: the plain banner and its chip are gone while scripts are on: ` + JSON.stringify(f));
             await waitFor(`true`, 'tick', 100);
+            // #14783: the header says Scripts on, the ⋯ menu offers Turn off scripts, and Sandboxed is gone
+            const hd = await ev(`(() => { const d = document.querySelector('#artifact-viewer'), vis = e => !!e && !e.hidden && e.getClientRects().length > 0; return { chip: vis(d.querySelector('.artifact-viewer-scriptson')), chipText: d.querySelector('.artifact-viewer-scriptson').textContent, item: d.querySelector('.artifact-viewer-scripts-item').textContent, itemShown: !d.querySelector('.artifact-viewer-scripts-item').hidden, sandboxed: vis(d.querySelector('.artifact-viewer-sandbox')) }; })()`);
+            assert.ok(hd.chip && hd.chipText === 'Scripts on' && hd.itemShown && hd.item === 'Turn off scripts' && !hd.sandboxed, `${w}: Scripts on chip, Turn off scripts in the menu, no Sandboxed chip: ` + JSON.stringify(hd));
             let ran = null; for (let i = 0; i < 200 && ran !== 'RAN'; i++) { ran = await frameText(true); if (ran !== 'RAN') await sleep(50); }
             assert.equal(ran, 'RAN', `${w}: the file's own script ran in the host's frame`);
             await shot('scripts-on-' + w);
 
             // 4. reopening the same version: trusted, runs; a newer version (another digest) is untrusted
+            // #14783: this version is trusted and a newer one exists: the line says the newer one starts with scripts off
+            await ev(`window.__versions = [{ digest: ${JSON.stringify(HEX)}, version: 1 }, { digest: ${JSON.stringify(OTHER)}, version: 2 }]`);
             await open(); await waitFor(`!!document.querySelector('#artifact-viewer .artifact-scripts-bar')`, `${w}: trusted again on reopen`, 10000);
+            await waitFor(`/newer version of this file exists/.test((document.querySelector('#artifact-viewer .artifact-scripts-line') || {}).textContent || '')`, `${w}: the newer-version line`, 10000);
+            assert.ok(/Scripts are off for it/.test(await text('.artifact-scripts-line')), `${w}: it says the newer version has scripts off`);
+            await shot('scripts-newer-' + w);
             await ev(`window.__body = '<p id="o">newer</p><script>1<\\/script>'`);
+            await ev(`window.__versions = []`);
             await open(OTHER);
             await waitFor(`!!document.querySelector('#artifact-viewer .artifact-scripts-ask')`, `${w}: another digest is offered, not run`, 5000);
             assert.ok(!(await q('.artifact-scripts-bar')), `${w}: a different version has no scripts`);
@@ -120,6 +129,19 @@ const OTHER = 'cd'.repeat(32);
             assert.equal(await ev(`document.querySelector('#artifact-viewer .artifact-viewer-sandbox').hidden`), false, `${w}: the Sandboxed chip is back with the plain banner`);
             assert.equal(await frameText(true), null, `${w}: no host frame is left running`);
 
+            // #14783: the same through the ⋯ menu: Run scripts… opens the one confirmation, and on, Turn off scripts turns them off
+            await ev(`document.querySelector('#artifact-viewer .artifact-viewer-more').click(); true`);
+            assert.equal((await text('.artifact-viewer-scripts-item')).trim(), 'Run scripts…', `${w}: the menu offers Run scripts… while they are off`);
+            await click('.artifact-viewer-scripts-item');
+            assert.ok(await q('.artifact-scripts-sure'), `${w}: the menu item opens the same confirmation`);
+            await click('.artifact-scripts-go');
+            await waitFor(`!!document.querySelector('#artifact-viewer .artifact-scripts-bar')`, `${w}: on through the menu`, 10000);
+            assert.ok(await q('.artifact-viewer-scriptson'), `${w}: the chip shows`);
+            await ev(`document.querySelector('#artifact-viewer .artifact-viewer-more').click(); true`);
+            await click('.artifact-viewer-scripts-item');
+            await waitFor(`!document.querySelector('#artifact-viewer .artifact-scripts-bar') && !!document.querySelector('#artifact-viewer .artifact-scripts-ask')`, `${w}: off through the menu`, 10000);
+            assert.ok(!(await q('.artifact-viewer-scriptson')), `${w}: the chip goes with them`);
+            assert.equal(await ev(`window.__trust.has(${JSON.stringify(HEX)})`), false, `${w}: the menu's Turn off scripts deleted the trust`);
             // 6. fail closed: a trust that cannot be read, even for a digest that IS trusted, leaves scripts off
             await ev(`window.__trust.add(${JSON.stringify(HEX)}); window.__trustMode = 'fail'`);
             await open(); await sleep(600); // sleep-ok: a negative: scripts would be drawn by now
