@@ -19,7 +19,7 @@ const { connect } = require('./agent_view_harness');
         base({ session_id: 'o7', display_name: 'Silent', not_started: true }),
     ];
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: "try { localStorage.setItem('coral-show-model', 'false'); } catch (e) {}" }); // these are the one-line rows: Show model is on by default since #14977 and adds a second line, so the person turns it off here
         for (const [label, w, h, mobile, root, rowH] of [['1280', 1280, 800, false, '#live-sessions-list', [34, 38]], ['390', 390, 844, true, '#mobile-session-list', [72, 100]]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
