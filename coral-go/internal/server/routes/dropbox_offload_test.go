@@ -3,6 +3,8 @@ package routes
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -232,5 +234,41 @@ func TestRemovingAnOffloadedArtifactFromDropboxFetchesItBackFirst(t *testing.T) 
 		assert.False(t, be.markerOf(d))
 		assert.False(t, be.offloaded(d))
 		assert.Zero(t, be.inDropbox(d))
+	})
+}
+
+// Security's condition 5 and 3b on d766be37a. Mutants (one per route): the guard dropped from Disconnect (plain or with delete_backup), Switch,
+// Take over or Rekey, any of which would leave the files kept only in Dropbox with no way back.
+func TestNothingStrandsFilesKeptOnlyInDropbox(t *testing.T) {
+	for _, c := range []struct{ name, path, body string }{
+		{"Disconnect", "/api/dropbox/disconnect", `{}`},
+		{"Disconnect and delete the backup", "/api/dropbox/disconnect", `{"delete_backup": true, "typed": ["delete"]}`},
+		{"Switch", "/api/dropbox/switch", `{}`},
+		{"Take over", "/api/dropbox/takeover", `{}`},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			be, d, _ := offloadedEnv(t)
+			be.body = c.body
+			rec := be.call(http.MethodPost, c.path, true, nil)
+			assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+			assert.Contains(t, rec.Body.String(), "kept_in_dropbox")
+			assert.True(t, be.offloaded(d))
+			assert.Equal(t, 2, be.inDropbox(d), "the only copy stays")
+			st := be.status()
+			assert.Equal(t, true, st["connected"], "still connected")
+		})
+	}
+	t.Run("Rekey", func(t *testing.T) {
+		be, d, _ := offloadedEnv(t)
+		req := httptest.NewRequest(http.MethodPost, "/api/cloud/rekey", strings.NewReader(`{"confirm": true}`))
+		req.Header.Set("Content-Type", "application/json")
+		dashboardRequest(req)
+		req.Host = be.host
+		rec := httptest.NewRecorder()
+		be.h.Rekey(rec, req)
+		assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+		assert.Contains(t, rec.Body.String(), "kept_in_dropbox", "refused for the files kept only in Dropbox, not for another reason")
+		assert.True(t, be.offloaded(d))
+		assert.Equal(t, true, be.status()["connected"], "the Dropbox sign-in is kept")
 	})
 }
