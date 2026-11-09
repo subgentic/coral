@@ -42,6 +42,9 @@ function page(q) {
         await Page.navigate({ url: BASE + '/' });
         await homeLoaded;
         await coralReady();
+        // This suite is about the board's scrolling, not the launch notice: the notice is read after first paint and, on a profile that has never held its hint (a cold first run, or a phone after a wide window), arrives above the board and moves
+        // it down by its height (53 px on a phone) between two position readings (#14932: 'the message that was at the top stays there (313.95 -> 366.95)'). It is read as seen here, and the notice's own layout has its suites.
+        await ev(`(async () => { const d = await fetch('/api/launch-disclosure').then(r => r.ok ? r.json() : null).catch(() => null); if (d && d.seen === false) await fetch('/api/launch-disclosure/ack', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: d.id }) }); try { localStorage.removeItem('coral-launch-notice'); } catch (e) { /* none */ } return true; })()`);
         assert.equal(await ev(`fetch('/api/board/${B}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'scroll-fixture', job_title: 'Scroll fixture' }) }).then(r => r.status)`), 200, 'the isolated board exists before opening its message panel');
         let hold = false, pending = null; // hold: an earlier page's answer waits until released, to see the line while it is out
         safePaused(client, ({ requestId, request }) => {
