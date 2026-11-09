@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -500,4 +501,24 @@ func TestTurningFreeUpSpaceOffBringsTheFilesBack(t *testing.T) {
 	assert.False(t, be.offloaded(d))
 	st := be.status()["offload"].(map[string]any)
 	assert.EqualValues(t, 0, st["kept"], "the status says none are kept only in Dropbox")
+}
+
+// Security's SHOULD on 057d293d3. Mutant: the confirm trusts the page's count (12 confirmed, 12,000 freed).
+func TestAConfirmAboveTheCountSeenIsRefused(t *testing.T) {
+	be := newBackupEnv(t)
+	old := time.Now().Add(-200 * 24 * time.Hour).UTC().Format(time.RFC3339)
+	for i := 0; i < 15; i++ {
+		be.put(fmt.Sprintf("old%d.md", i), "text/markdown", fmt.Sprintf("# old %d\n", i))
+	}
+	be.pass()
+	_, err := be.db.Exec("UPDATE dropbox_outbox SET artifact_at = ?", old)
+	require.NoError(t, err)
+	code, out := be.offloadCall(`{"days": 90, "confirm": true, "risk_ok": true, "warning_ok": true, "seen_count": 2}`, true)
+	assert.Equal(t, http.StatusConflict, code)
+	assert.Equal(t, "changed", out["code"])
+	assert.EqualValues(t, 15, out["count"])
+	days, _, _ := be.h.dbx.store.Offload(context.Background())
+	assert.Zero(t, days, "nothing saved")
+	code, _ = be.offloadCall(`{"days": 90, "confirm": true, "risk_ok": true, "warning_ok": true, "seen_count": 15}`, true)
+	assert.Equal(t, http.StatusOK, code, "the count seen is the count due")
 }

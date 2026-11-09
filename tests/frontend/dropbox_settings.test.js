@@ -24,6 +24,7 @@ const { JSDOM } = require('jsdom');
           <div id="settings-dropbox-counts"></div>
           <input type="checkbox" id="settings-dropbox-autosync"><button id="settings-dropbox-autosync-resume" hidden></button><p id="settings-dropbox-autosync-note"></p>
           <ul id="settings-dropbox-edits" hidden></ul>
+          <input id="settings-dropbox-offload-for" type="number"><button id="settings-dropbox-offload-save"></button><div id="settings-dropbox-offload-confirm" hidden></div><p id="settings-dropbox-offload-kept"></p>
           <div id="settings-dropbox-types"></div>
           <input id="settings-dropbox-age" type="number">
           <button id="settings-dropbox-filters-save"></button>
@@ -527,6 +528,31 @@ const { JSDOM } = require('jsdom');
     sync = calls.filter(x => x.url === '/api/dropbox/autosync').pop();
     assert.deepStrictEqual(JSON.parse(sync.body), { on: false });
     assert.match($('settings-dropbox-autosync-note').textContent, /wait here for you to decide/);
+
+    // Free up space (#14845): the dry run, both sentences before Turn on, the kept count, and off.
+    await status({ app_key_set: true, connected: true, state: 'connected', account_id: 'dbid:AAA', backup: {}, filters: { types: [], max_age_days: 0 }, retention: { days: 0 }, offload: { days: 0, kept: 3, kept_bytes: 3072 } });
+    assert.match($('settings-dropbox-offload-kept').textContent, /3 files are \(.*\) kept only in Dropbox: they are coming back/);
+    answers['/api/dropbox/offload'] = { status: 200, body: { dry_run: true, days: 90, count: 4, bytes: 4096, risk: 'RISK SENTENCE', warning: 'WARNING SENTENCE' } };
+    $('settings-dropbox-offload-for').value = '90';
+    await m.saveOffload();
+    const ob = $('settings-dropbox-offload-confirm');
+    assert.ok(!ob.hidden);
+    assert.match(ob.textContent, /may free about 4 files .* older than 90 days/);
+    assert.match(ob.textContent, /RISK SENTENCE/); assert.match(ob.textContent, /WARNING SENTENCE/);
+    const onBtn = Array.from(ob.querySelectorAll('button')).find(b => b.textContent === 'Turn on');
+    assert.ok(onBtn.disabled, 'Turn on waits for both sentences');
+    $('settings-dropbox-offload-risk').checked = true; $('settings-dropbox-offload-risk').dispatchEvent(new dom.window.Event('change'));
+    assert.ok(onBtn.disabled, 'one is not enough');
+    $('settings-dropbox-offload-warning').checked = true; $('settings-dropbox-offload-warning').dispatchEvent(new dom.window.Event('change'));
+    assert.ok(!onBtn.disabled);
+    answers['/api/dropbox/offload'] = { status: 200, body: { days: 90 } };
+    onBtn.click(); await tick(); await tick();
+    const offSent = calls.filter(x => x.url === '/api/dropbox/offload').pop();
+    assert.deepStrictEqual(JSON.parse(offSent.body), { days: 90, confirm: true, risk_ok: true, warning_ok: true, seen_count: 4, seen_bytes: 4096 });
+    assert.match($('settings-dropbox-note').textContent, /Free up space is on/);
+    $('settings-dropbox-offload-for').value = '10';
+    await m.saveOffload();
+    assert.match($('settings-dropbox-note').textContent, /0 \(off\) or 30 to 3650/, 'a value out of range sends nothing');
 
     // Not connected: nothing about removals.
     await status({ app_key_set: true, connected: false, state: 'disconnected' });

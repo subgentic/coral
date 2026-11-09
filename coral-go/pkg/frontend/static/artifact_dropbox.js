@@ -108,9 +108,10 @@ export function dropboxBlock(hex, server, details) {
         acts.textContent = '';
         if (j.undo) acts.append(button('Undo this edit…', askUndo)); // the newest version is an edit made in Dropbox (#14714)
         state.textContent = j.undo ? 'This version is an edit made in Dropbox.' : '';
+        if (j.kept_in_dropbox) state.textContent = 'Kept only in Dropbox: opening it fetches it back.'; // stage 6b
         if (Number(j.in_dropbox) > 0) {
             const n = Number(j.in_dropbox);
-            state.textContent = `In Dropbox (${n} ${n === 1 ? 'file' : 'files'}, with its details).`;
+            state.textContent = j.kept_in_dropbox ? `Kept only in Dropbox (${n} ${n === 1 ? 'file' : 'files'}): opening it fetches it back.` : `In Dropbox (${n} ${n === 1 ? 'file' : 'files'}, with its details).`;
             acts.append(button('Remove from Dropbox…', () => ask(REMOVE)));
         } else if (j.removed) {
             state.textContent = 'Removed from Dropbox: it stays out of the backup until you send it again.';

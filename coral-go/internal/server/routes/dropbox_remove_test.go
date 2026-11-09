@@ -276,7 +276,7 @@ func TestTheArtifactStateSaysInDropboxThenRemoved(t *testing.T) {
 	assert.NotEqual(t, http.StatusOK, code, "not from outside the dashboard")
 	code, out := get(true)
 	require.Equal(t, http.StatusOK, code)
-	assert.Equal(t, map[string]any{"connected": true, "in_dropbox": float64(2), "removed": false, "undo": false}, out)
+	assert.Equal(t, map[string]any{"connected": true, "in_dropbox": float64(2), "removed": false, "undo": false, "kept_in_dropbox": false}, out)
 	_, err := be.db.ExecContext(context.Background(), "UPDATE dropbox_outbox SET account_id = 'dbid:OLD' WHERE digest = ? AND kind = 'item_data'", ds[0])
 	require.NoError(t, err)
 	_, out = get(true)
