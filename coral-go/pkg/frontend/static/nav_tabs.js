@@ -118,6 +118,18 @@ function menuEntries(viewLabels = new Set(), phoneNav = false, chief = null) {
     const out = phoneNav ? [] : [entry('home', 'Home', { action: 'm-go-home' })]; // the floating nav's Home is one tap away
     const settingsEntry = entry('settings', 'Settings', { action: 'm-close-top-bar-settings-then-show-settings-modal' }); settingsEntry.dataset.accountStart = ''; // where the phone's account button takes the drawer (#12634)
     if (chief && chief.st) out.push(chiefNode(chief)); // Chief (#13167): its answer for the computer shown, when it has already arrived (else it joins the open menu: fillChiefLater)
+    if (isHub()) {
+        out.push(settingsEntry);
+        const account = document.getElementById('cloud-account-menu');
+        const accountLink = account && [...account.querySelectorAll('a.overflow-menu-item')].find(item => item.textContent.trim() === 'Account');
+        if (accountLink) out.push(entry('account_circle', 'Account', { onClick: () => accountLink.click() }));
+        if (!viewLabels.has('Docs')) { const docs = entry('menu_book', 'Docs', { action: 'm-switch-nav-tab' }); docs.dataset.arg = 'docs'; out.push(docs); } // not twice: the views above may already be Docs and Computers (#14785); the position is the same
+        if (!viewLabels.has('Computers')) out.push(entry('dns', 'Computers', { action: 'm-close-top-bar-settings-then-show-servers-modal' }));
+        out.push(entry('code', 'GitHub', { href: 'https://github.com/subgentic/coral' }));
+        const signOut = account && [...account.querySelectorAll('button.overflow-menu-item')].find(item => item.textContent.trim() === 'Sign out');
+        if (signOut) out.push(entry('lock', 'Sign out', { onClick: () => signOut.click() }));
+        return out;
+    }
     out.push(settingsEntry, entry('palette', 'Themes', { action: 'm-close-top-bar-settings-then-show-theme-configurator' }));
     if (!cloud) out.push(entry('system_update', 'Check for updates', { action: 'm-close-top-bar-settings-then-check-for-updates' }));
     if ((isHub() || cloud) && !viewLabels.has('Computers')) out.push(entry('dns', 'Computers', { action: 'm-close-top-bar-settings-then-show-servers-modal' })); // not twice: when the Servers view is one of the views above, two entries are named alike
@@ -149,7 +161,7 @@ function openMenu(btn, focusKey = false) { // focusKey: true (opened by Enter or
     const hamburger = btn.id === 'top-menu-btn' || btn.hasAttribute('data-hamburger'); // the agent row's menu button is the same menu (#11056)
     const all = hamburger || btn.hasAttribute('data-nav-all');
     const phoneNav = document.body.classList.contains('phone-nav-on'); // the bottom bar has Agents, Inbox, Automations and Analytics: the menu does not list them again, and Tasks and Chats are the drawer's own rows (#11400, #11472, #11535)
-    const items = (all ? availableTabs() : _more).filter(t => !(hamburger && phoneNav && (t.arg === 'agents' || t.arg === 'hub-inbox' || t.arg === 'history' || t.arg === 'automations' || t.arg === 'tokens')));
+    const items = (all ? availableTabs() : _more).filter(t => !(hamburger && phoneNav && (t.arg === 'agents' || t.arg === 'hub-inbox' || t.arg === 'history' || t.arg === 'automations' || t.arg === 'tokens')) && !(hamburger && isHub() && (t.label === 'Docs' || t.label === 'Computers'))); // in a Hub's hamburger Docs and Computers are the account section's own entries, once, in its order (#14785)
     if (!items.length) return;
     menu.classList.toggle('nav-all', all);
     menu.classList.toggle('nav-hamburger', hamburger);
