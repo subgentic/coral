@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/naming"
 )
 
 // requireTaskPlanner follows the local board identity model: subscriber_id
@@ -263,7 +264,9 @@ func (h *BoardHandler) announceCreatedTask(project string, task *board.Task) {
 					}
 				} else {
 					idle := h.bs.FindIdleSubscriber(ctx, project, func(sub *board.Subscriber) bool {
-						return h.isArchivedSession != nil && h.isArchivedSession(ctx, sub.SessionName)
+						// A broadcast names no one, so it wakes no one (#14859): a sleeping agent (auto-asleep or put to sleep) is passed over and reads the task on the board when it next wakes.
+						return (h.isArchivedSession != nil && h.isArchivedSession(ctx, sub.SessionName)) ||
+							(h.sessionAsleep != nil && h.sessionAsleep(ctx, naming.SessionIDFromName(sub.SessionName)))
 					})
 					if idle != nil && idle.SessionName != "" {
 						if err := h.sendAutomated(ctx, project, idle.SessionName, taskNudge); err != nil {
