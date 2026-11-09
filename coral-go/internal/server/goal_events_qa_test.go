@@ -118,6 +118,41 @@ func (c *qaConn) first() map[string]any {
 }
 
 // drain collects every frame for d and returns all goal events, whether any frame said gap, and the raw frames.
+// collect waits for the first frame that carries goal events or a gap, as long as it takes (at most 30 s), and then keeps collecting for d. A test that has just written changes must not count a fixed
+// number of feed ticks for that frame to arrive: a machine that is busy can take longer than three ticks to send one (#14858: "70 changes: 0 events, 0 gap frames" in a full run, and each test passes
+// alone). What it must NOT see (nothing repeated on later ticks) is still counted over the fixed window that follows.
+func (c *qaConn) collect(d time.Duration) (events []board.GoalEvent, gaps int, raw []string) {
+	limit := time.After(30 * time.Second)
+	for waiting := true; waiting; {
+		select {
+		case m, ok := <-c.frames:
+			if !ok {
+				return
+			}
+			_, has := m["goal_events"]
+			if has || m["goal_events_gap"] != nil {
+				b, _ := json.Marshal(m)
+				raw = append(raw, string(b))
+				if g, _ := m["goal_events_gap"].(bool); g {
+					gaps++
+				}
+				if arr, ok := m["goal_events"].([]any); ok {
+					bb, _ := json.Marshal(arr)
+					var evs []board.GoalEvent
+					_ = json.Unmarshal(bb, &evs)
+					events = append(events, evs...)
+				}
+				waiting = false
+			}
+		case <-limit:
+			return
+		}
+	}
+	more, g2, raw2 := c.drain(d)
+	return append(events, more...), gaps + g2, append(raw, raw2...)
+}
+
+// drain collects every frame for d and returns all goal events, whether any frame said gap, and the raw frames.
 func (c *qaConn) drain(d time.Duration) (events []board.GoalEvent, gaps int, raw []string) {
 	end := time.After(d)
 	for {
@@ -212,7 +247,7 @@ func TestQA7355ManyChangesInOneTick(t *testing.T) {
 		_, err := e.srv.boardStore.UpdateGoal(ctx, "team-a", g.ID, board.GoalUpdate{Title: sp(fmt.Sprintf("t%d", i))})
 		require.NoError(t, err)
 	}
-	evs, gaps, _ := c.drain(ticks(3))
+	evs, gaps, _ := c.collect(ticks(3))
 	t.Logf("20 changes in a tight loop: %d events, %d gap frames", len(evs), gaps)
 	assert.Len(t, evs, 20)
 	assert.Zero(t, gaps)
@@ -229,7 +264,7 @@ func TestQA7355MoreThanFiftyIsAGap(t *testing.T) {
 	c.first()
 	c.drain(ticks(1.5))
 	e.burst(g.ID, 70, 0)
-	evs, gaps, raw := c.drain(ticks(3))
+	evs, gaps, raw := c.collect(ticks(3))
 	t.Logf("70 changes: %d events, %d gap frames", len(evs), gaps)
 	// The frames that carried goal events are in every message: under -race on a slow machine this test saw 57 events (#8483), and which frame held the extra seven is what the failure has to say.
 	assert.GreaterOrEqual(t, gaps, 1, "more than a frame can hold says gap; frames: %v", raw)
@@ -249,7 +284,7 @@ func TestQA7355PrunedPastIsAGap(t *testing.T) {
 	// the eight changes and the prune to 3 are one transaction: no feed tick can see a half-written or an unpruned state (eight separate writes and a prune straddled a tick on a slow runner, and the
 	// tick that saw them all left nothing to prune past: no gap, #7646)
 	e.burstKeep(g.ID, 8, 0, 3)
-	evs, gaps, _ := c.drain(ticks(3))
+	evs, gaps, _ := c.collect(ticks(3))
 	t.Logf("after prune to 3: %d events, %d gap frames", len(evs), gaps)
 	assert.GreaterOrEqual(t, gaps, 1, "the window does not reach back to what the connection saw")
 	for _, ev := range evs {
