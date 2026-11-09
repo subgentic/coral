@@ -202,6 +202,7 @@ node compact_figure.test.mjs
 node automation_runs.test.mjs
 node analytics_spend_reuse.test.mjs
 node analytics_overview_group.test.mjs
+node drop_at_steps.test.mjs
 node dialog_census.test.mjs
 node chip_census.test.mjs
 node state_label_one_builder.test.mjs
