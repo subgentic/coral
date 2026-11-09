@@ -1,6 +1,6 @@
 // The "incomplete list" notes are gone from under Needs you (#14827, the operator: 'These are not that useful to show'). A computer that cuts its review list short used to say so twice, "This computer returned an
-// incomplete list" and "... incomplete review list". Now: no such words at all; one quiet line, "This list is cut short. Use Filters to narrow it.", only while a filter is not applied (the one case a filter helps); and
-// nothing when the list is not cut, or when a filter is on. 1280 and 390 px; the computer's page is a fixture with truncated: true.
+// incomplete list" and "... incomplete review list". Now: no such words at all; one quiet line, "This list is cut short. Use Filters to narrow it.", while a filter is not applied, and "Narrow the filters further." when one is on and the list is still cut; and
+// nothing when the list is not cut. 1280 and 390 px; the computer's page is a fixture with truncated: true.
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -34,11 +34,11 @@ const { removeBoards } = require('./helpers/board_cleanup');
             check(!g.incomplete, at + 'no "incomplete list" words under Needs you, whichever list it was');
             check(g.cut.length === 1 && g.cut[0] === 'This list is cut short. Use Filters to narrow it.', at + 'a cut list with no filter says so once: ' + JSON.stringify(g.cut));
             await shot(`needs-cut-list-${w}`);
-            // a filter on: nothing (the person is already narrowing it)
+            // a filter on and the list still cut: the same one line, worded for it
             await ev(`(() => { const i = document.getElementById('inbox-search'); i.value = 'plan'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
             await ev(framesJs(8));
             g = await words();
-            check(!g.incomplete && g.cut.length === 0, at + 'with a filter on there is no such line: ' + JSON.stringify(g));
+            check(!g.incomplete && g.cut.length === 1 && g.cut[0] === 'This list is cut short. Narrow the filters further.', at + 'with a filter on and the list still cut, the one line says to narrow it further (UI Accessibility): ' + JSON.stringify(g));
             // a list that is not cut: nothing
             await open(w, mobile, false);
             g = await words();
