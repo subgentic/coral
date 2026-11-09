@@ -33,6 +33,7 @@ type compactHarness struct {
 	finishedAt map[string]time.Time
 	activeTask map[string]bool
 	nextTasks  map[string]int64
+	notes      map[string]string // the handoff note's digest by session id, once the agent has uploaded it
 	mu         sync.Mutex
 	typed      []string // "agent: text"
 	agents     []AgentInfo
@@ -68,6 +69,8 @@ func newCompactHarness(t *testing.T, on bool) *compactHarness {
 	h.c.finished = func(_ context.Context, _, id string) (time.Time, bool) { at, ok := h.finishedAt[id]; return at, ok }
 	h.c.active = func(_ context.Context, _, id string) bool { return h.activeTask[id] }
 	h.nextTasks = map[string]int64{}
+	h.notes = map[string]string{}
+	h.c.handoff = func(sid string, since time.Time) string { return h.notes[sid] }
 	h.c.nextTask = func(_ context.Context, _, id string) int64 { return h.nextTasks[id] }
 	h.c.paused = func(string) bool { return h.paused }
 	h.c.deliver = func(_ context.Context, a AgentInfo, text string) (bool, error) {
@@ -371,4 +374,81 @@ func TestAFailedTaskReadDoesNotCountAsFree(t *testing.T) {
 	h.c.active = h.c.busy
 	require.NoError(t, h.bs.Close()) // every read now fails
 	assert.True(t, h.c.busy(context.Background(), "team", "Dev"), "a failed read is busy")
+}
+
+const digestA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+// Clear plus a handoff note (#14849): the agent is asked for its note, cleared only once the note is stored, then pointed at it.
+func TestAnAgentIsAskedForAHandoffNoteAndClearedOnceItIsStored(t *testing.T) {
+	h := newCompactHarness(t, true)
+	h.setMethod("task", "clear_handoff")
+	h.agent("Dev", "s1", "claude", "Dev", 150000, time.Minute)
+	h.finishedAt["Dev"] = h.now.Add(-2 * time.Minute)
+	h.run(0)
+	assert.Equal(t, []string{"Dev: " + askHandoffText()}, h.sent(), "asked first, not cleared")
+	h.run(time.Minute)
+	h.run(time.Minute)
+	assert.Len(t, h.sent(), 1, "asked once, and not cleared while there is no note")
+	h.sig["s1"] = agentSignal{InTurn: true, Since: h.now}
+	h.notes["s1"] = digestA
+	h.run(time.Minute)
+	assert.Len(t, h.sent(), 1, "the agent is still writing: a turn is not interrupted, even with the note stored")
+	h.sig["s1"] = agentSignal{Since: h.now.Add(-time.Minute)}
+	h.run(time.Second)
+	assert.Equal(t, []string{"Dev: " + askHandoffText(), "Dev: /clear"}, h.sent(), "the note is stored and the agent is idle: cleared")
+	h.run(15 * time.Second)
+	assert.Equal(t, "Dev: "+handoffText(digestA), h.sent()[2], "then pointed at its note")
+	h.run(time.Hour)
+	assert.Len(t, h.sent(), 3, "once")
+}
+
+func TestAnAgentThatWritesNoNoteIsNotClearedAndIsLeftAlone(t *testing.T) {
+	h := newCompactHarness(t, true)
+	h.setMethod("threshold", "clear_handoff")
+	h.agent("Dev", "s1", "claude", "Dev", 400000, time.Minute)
+	h.run(0)
+	h.run(11 * time.Minute)
+	h.run(time.Minute)
+	assert.Equal(t, []string{"Dev: " + askHandoffText()}, h.sent(), "no note in ten minutes: not cleared, and not asked again during the cooldown")
+	h.run(40 * time.Minute)
+	assert.Equal(t, []string{"Dev: " + askHandoffText(), "Dev: " + askHandoffText()}, h.sent(), "the wait was given up, so after the cooldown it is asked again")
+}
+
+func TestNoNoteIsAskedForWhileATaskIsInProgress(t *testing.T) {
+	h := newCompactHarness(t, true)
+	h.setMethod("threshold", "clear_handoff")
+	h.agent("Dev", "s1", "claude", "Dev", 400000, time.Minute)
+	h.activeTask["Dev"] = true
+	h.run(0)
+	h.run(time.Hour)
+	assert.Empty(t, h.sent(), "a task in hand: not asked, not cleared, whatever the context")
+	h.activeTask["Dev"] = false
+	h.run(time.Minute)
+	assert.Equal(t, []string{"Dev: " + askHandoffText()}, h.sent())
+}
+
+func TestTheHandoffLinesAreFixed(t *testing.T) {
+	assert.True(t, strings.HasPrefix(askHandoffText(), "[Coral"))
+	assert.True(t, strings.HasPrefix(handoffText(digestA), "[Coral"))
+	assert.Contains(t, handoffText(digestA), "coral://artifacts/"+digestA)
+	assert.Equal(t, strings.Count(handoffText(digestA), digestA), 2)
+}
+
+// Security's INFO on e192a0c9b: the maps the service shares with a reader are written under its mutex. Run under -race.
+func TestTheServiceIsSafeToReadWhileItRuns(t *testing.T) {
+	h := newCompactHarness(t, true)
+	h.setMethod("task", "clear_next")
+	h.agent("Dev", "s1", "claude", "Dev", 150000, time.Minute)
+	h.finishedAt["Dev"] = h.now.Add(-time.Minute)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 200; i++ {
+			h.c.LastCompacted(naming.SessionName("claude", "s1"))
+		}
+	}()
+	for i := 0; i < 20; i++ {
+		h.run(30 * time.Second)
+	}
+	<-done
 }
