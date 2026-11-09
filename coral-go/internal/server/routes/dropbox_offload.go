@@ -216,10 +216,13 @@ func (b *DropboxBackup) offloadOne(ctx context.Context, cl *dropbox.Client, acce
 	}
 	// Read again just before anything goes (QA Reviewer 2's INFO on 4f3f79b72): a file made private, or named by a task or a session, during the
 	// pass is not freed; either read failing frees nothing.
+	// A refusal here takes back the marker just written (Security's INFO on fda9e55d2): no Coral is told this one keeps the file only in Dropbox.
 	if priv, perr := b.private(ctx, []string{c.Digest}); perr != nil || priv[c.Digest] {
+		b.dropMarker(ctx, cl, access, marker)
 		return 0, false
 	}
 	if refs, rerr := b.references(ctx); rerr != nil || refs[c.Digest] {
+		b.dropMarker(ctx, cl, access, marker)
 		return 0, false
 	}
 	if err := b.outbox.RecordOffloaded(ctx, store.DropboxOffloaded{Digest: c.Digest, AccountID: account, Path: c.Path, Rev: c.Rev, ContentHash: c.ContentHash, Size: st.Size()}); err != nil {
@@ -624,4 +627,12 @@ func (b *DropboxBackup) BringBack(ctx context.Context) int {
 		slog.Info("[dropbox] files brought back from Dropbox", "count", n)
 	}
 	return n
+}
+
+// dropMarker deletes this Coral's marker at its rev (best effort: a stray marker of this Coral only keeps retention and other Corals on the safe
+// side, and the next pass writes or removes it again).
+func (b *DropboxBackup) dropMarker(ctx context.Context, cl *dropbox.Client, access, marker string) {
+	if m, err := cl.Metadata(ctx, access, marker); err == nil {
+		_, _, _ = b.runDelete(ctx, cl, access, []dropbox.Delete{{Path: marker, Rev: m.Rev}})
+	}
 }
