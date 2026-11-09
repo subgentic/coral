@@ -450,7 +450,7 @@ func TestMessageSearchIndexIsCheckedAfterOpen(t *testing.T) {
 	setMessageIndexTuning(func() { messageIndexCheckHook = func() { <-release } })
 	s, err = NewStoreWithKey(path, "")
 	require.NoError(t, err)
-	defer s.Close()
+	defer func() { letGo(); s.Close() }() // the held check is let go first: Close waits for it (#15022)
 	a, b := queryBoth(t, s, MessageQueryParams{Q: []string{"heron"}, Limit: []string{"50"}})
 	require.NotEqual(t, b.Total, a.Total, "just after open the stale index still misses the edited word (the check has not run yet)")
 	letGo() // now the check may run: it does, without anyone asking

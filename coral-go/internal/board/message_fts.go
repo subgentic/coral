@@ -119,7 +119,9 @@ func (s *Store) applyMessageSearchIndexSetting() {
 		return
 	}
 	if s.messageIndexExists(ctx) {
+		s.bg.Add(1)
 		go func() {
+			defer s.bg.Done()
 			defer safego.Recover("board/message_fts:drop")
 			if _, err := s.DisableMessageSearchIndex(context.Background(), false); err != nil {
 				log.Printf("board: dropping the message search index: %v", err)
@@ -200,7 +202,9 @@ func (s *Store) startMessageSearchIndexBuild() {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	s.msgIndexStop.Store(&cancel)
+	s.bg.Add(1)
 	go func() {
+		defer s.bg.Done()
 		defer safego.Recover("board/message_fts:build")
 		if err := s.buildMessageSearchIndex(ctx); err != nil {
 			s.msgIndex.Store(messageIndexOff)
@@ -516,7 +520,9 @@ func (s *Store) startMessageSearchIndexCheck() {
 	if old := s.msgIndexCheckStop.Swap(&cancel); old != nil {
 		(*old)()
 	}
+	s.bg.Add(1)
 	go func() {
+		defer s.bg.Done()
 		defer safego.Recover("board/message_fts:check")
 		delay, _, _, _, _ := messageIndexTuning()
 		select {

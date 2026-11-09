@@ -52,6 +52,7 @@ type Store struct {
 	msgIndex                atomic.Int32   // the message search index's state (message_fts.go): off, building, ready
 	msgIndexStop            atomic.Pointer[context.CancelFunc]
 	msgIndexCheckStop       atomic.Pointer[context.CancelFunc] // the check of a complete index after open (message_fts.go)
+	bg                      sync.WaitGroup                     // the index's background goroutines (build, check, drop): Close waits for them, so none still holds the file when it returns (#15022)
 	msgIndexAnswers         atomic.Int64                       // searches the index answered (tests check it is used)
 }
 
@@ -195,12 +196,23 @@ func newStore(dbPath, key string, schemaDone bool) (*Store, error) {
 }
 
 // Close closes the database connection.
+// closeWaitsForIndex is how long Close waits for the index's goroutines to end after cancelling them.
+var closeWaitsForIndex = 3 * time.Second
+
 func (s *Store) Close() error {
 	if stop := s.msgIndexStop.Swap(nil); stop != nil {
 		(*stop)() // a build in progress ends
 	}
 	if stop := s.msgIndexCheckStop.Swap(nil); stop != nil {
 		(*stop)() // so does a check
+	}
+	// Cancelled is not finished: a build or check in the middle of a statement still holds a connection, and so the file (on Windows a folder with the board in it then cannot be removed, #15022). Wait for them,
+	// for a bounded time: a query ends promptly on its cancelled context, and a Close must never hang on one that does not.
+	done := make(chan struct{})
+	go func() { s.bg.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(closeWaitsForIndex):
 	}
 	// The prepared statements first: each holds its pool connections' statements.
 	firstErr := s.stmts.close()
