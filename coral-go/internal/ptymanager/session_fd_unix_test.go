@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,15 +15,48 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// readFDDir reads the folder of this process's open descriptors; a variable so a test can make a read fail.
+var readFDDir = os.ReadDir
+
+// fdCount is the open descriptor count, and false when no folder of them could be read. It is safe from any goroutine (a require.Eventually condition runs in its own): it never touches *testing.T, so it can
+// neither Skip nor Fatal there. A read of the folder can fail for a moment while descriptors are closing under it, so it tries a few times before it says it cannot (#14828, QA Engineer's find: t.Skip in the
+// poller ended the poll's goroutine, the condition never answered, and the test failed after its two-minute ceiling).
+func fdCount() (int, bool) {
+	for try := 0; try < 5; try++ {
+		for _, dir := range []string{"/dev/fd", "/proc/self/fd"} {
+			if entries, err := readFDDir(dir); err == nil {
+				return len(entries), true
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return 0, false
+}
+
+// requireFDCount skips the test, once and from the test's own goroutine, on a platform where the descriptors cannot be counted at all.
+func requireFDCount(t *testing.T) {
+	t.Helper()
+	if _, ok := fdCount(); !ok {
+		t.Skip("cannot count open descriptors here")
+	}
+}
+
+// openFDs is the count for the test's own goroutine: a count that cannot be read is a failure here, not a skip (the platform was checked at the start).
 func openFDs(t *testing.T) int {
 	t.Helper()
-	for _, dir := range []string{"/dev/fd", "/proc/self/fd"} {
-		if entries, err := os.ReadDir(dir); err == nil {
-			return len(entries)
-		}
+	n, ok := fdCount()
+	if !ok {
+		t.Fatal("the open descriptor count could not be read")
 	}
-	t.Skip("cannot count open descriptors here")
-	return 0
+	return n
+}
+
+// fdsAtMost is a poll condition for require.Eventually: a count that cannot be read now is "not yet", so the poll goes on.
+func fdsAtMost(limit int) func() bool {
+	return func() bool {
+		n, ok := fdCount()
+		return ok && n <= limit
+	}
 }
 
 // describeFDs names what each open descriptor is (the link under /proc/self/fd), so a failed count says which descriptors were open.
@@ -47,7 +81,12 @@ func settledFDs(t *testing.T) int {
 	deadline := time.Now().Add(2 * time.Minute)
 	last, same := -1, 0
 	for time.Now().Before(deadline) {
-		n := openFDs(t)
+		n, ok := fdCount()
+		if !ok {
+			last, same = -1, 0
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
 		if n == last {
 			same++
 		} else {
@@ -66,6 +105,7 @@ func settledFDs(t *testing.T) int {
 // cron). After the exit and the drain the descriptor count is back where it was.
 func TestSessionsThatEndOnTheirOwnLeaveNoDescriptorsOpen(t *testing.T) {
 	canFork(t)
+	requireFDCount(t)
 	backend := NewPTYBackend()
 	defer backend.Close()
 	// one throwaway run first: the first spawn opens a few process-wide descriptors of its own (the guardian, /dev/ptmx's first use)
@@ -77,7 +117,7 @@ func TestSessionsThatEndOnTheirOwnLeaveNoDescriptorsOpen(t *testing.T) {
 	for i := 0; i < runs; i++ {
 		require.NoError(t, backend.Spawn(fmt.Sprintf("fd-%d", i), "test", t.TempDir(), fmt.Sprintf("sid-fd-%d", i), "true", 80, 24))
 	}
-	require.Eventually(t, func() bool { return openFDs(t) <= before+2 }, 2*time.Minute, 100*time.Millisecond,
+	require.Eventually(t, fdsAtMost(before+2), 2*time.Minute, 100*time.Millisecond,
 		"descriptors after %d sessions ended on their own: %d (before %d)", runs, openFDs(t), before)
 	// The count is read once more as a settled value, not as one instant: a descriptor another goroutine of the test binary has open for a moment (the descendant sampler's /proc scan, an earlier test's drain) is not a session's, and a leak is a count that stays up (#14828).
 	after := settledFDs(t)
@@ -90,6 +130,7 @@ func TestSessionsThatEndOnTheirOwnLeaveNoDescriptorsOpen(t *testing.T) {
 // this test pins the outcome there too (Security Reviewer Windows runs it) and documents why the Unix run cannot.
 func TestADescriptorIsFreedWhenTheShellExitsButAChildKeepsTheTerminal(t *testing.T) {
 	canFork(t)
+	requireFDCount(t)
 	backend := NewPTYBackend()
 	defer backend.Close()
 	require.NoError(t, backend.Spawn("fd-warm2", "test", t.TempDir(), "sid-fd-warm2", "true", 80, 24))
@@ -102,6 +143,32 @@ func TestADescriptorIsFreedWhenTheShellExitsButAChildKeepsTheTerminal(t *testing
 	require.NoError(t, backend.Spawn("fd-child", "test", t.TempDir(), "sid-fd-child", command, 80, 24))
 	assert.Greater(t, openFDs(t), before, "the session holds its terminal while it runs")
 	require.NoError(t, os.WriteFile(release, []byte("go"), 0o644))
-	require.Eventually(t, func() bool { return openFDs(t) <= before+1 }, 2*time.Minute, 50*time.Millisecond,
+	require.Eventually(t, fdsAtMost(before+1), 2*time.Minute, 50*time.Millisecond,
 		"descriptors while the left-behind child still runs: %d (before %d)", openFDs(t), before)
+}
+
+// QA Engineer's find on #14828: a folder read that fails for a moment, inside the poll, must be "not yet", never a skip that ends the poll's goroutine and leaves the test to fail after its ceiling.
+func TestAFailedDescriptorFolderReadIsRetriedNotASkip(t *testing.T) {
+	real := readFDDir
+	defer func() { readFDDir = real }()
+	var mu sync.Mutex
+	failures := 7 // more than one fdCount's own tries: the first two polls see nothing
+	readFDDir = func(name string) ([]os.DirEntry, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if failures > 0 {
+			failures--
+			return nil, fmt.Errorf("read %s: transient", name)
+		}
+		return real(name)
+	}
+	requireFDCount(t) // the start of a real test: it must not skip because of a transient failure either
+	mu.Lock()
+	failures = 12
+	mu.Unlock()
+	require.Eventually(t, fdsAtMost(1<<20), 20*time.Second, 20*time.Millisecond, "the poll goes on past reads that failed")
+	mu.Lock()
+	failures = 12
+	mu.Unlock()
+	assert.Greater(t, settledFDs(t), 0, "the settled count survives a failed read too")
 }
