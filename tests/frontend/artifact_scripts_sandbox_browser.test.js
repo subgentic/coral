@@ -63,7 +63,7 @@ const base = require('./test_base').BASE;
     await ev(`(async () => {
         const m = await import((window.__coralStatic||'/static/')+'artifact_scripts.js');
         window.as = m; window.runs = []; window.stray = [];
-        window.addEventListener('message', e => { const r = window.runs.find(x => x.frame.contentWindow === e.source); if (!r) { window.stray.push(e.data && e.data.type); return; } if (e.data && e.data.type === 'coral-artifact-navigated') r.navigated = true; else if (!e.data || !['coral-artifact-host-ready', 'coral-artifact-height'].includes(e.data.type)) r.unexpected = e.data && e.data.type; });
+        window.addEventListener('message', e => { const r = window.runs.find(x => x.frame.contentWindow === e.source); if (r) (r.msgs = r.msgs || []).push(JSON.parse(JSON.stringify(e.data === undefined ? null : e.data))); if (!r) { window.stray.push(e.data && e.data.type); return; } if (e.data && e.data.type === 'coral-artifact-navigated') r.navigated = true; else if (!e.data || !['coral-artifact-host-ready', 'coral-artifact-height'].includes(e.data.type)) r.unexpected = e.data && e.data.type; });
         window.runFile = (name, html, hostUrl, outerSandbox) => {
             const wrapper = document.createElement('div'); document.body.appendChild(wrapper);
             const frame = m.drawScripted(wrapper, { html, name, turnOff() {} });
@@ -86,6 +86,16 @@ const base = require('./test_base').BASE;
   fetch(${JSON.stringify(URLX)}, {mode:'no-cors'}).then(function(){ out.cspFetch = 'allowed'; }, function(){ out.cspFetch = 'blocked'; }).then(done);
 })();`;
     const page = body => `<h1>file</h1><script>${body}</script>`;
+    // an expression evaluated in the HOST document (the page the file's frame lives in), through the debugger: the host is a target of its own
+    const inHost = async (expression) => {
+        const { targetInfos } = await c.Target.getTargets();
+        const host = targetInfos.find(t => t.type === 'iframe' && /\/static\/artifact_host\.html/.test(t.url));
+        if (!host) return null;
+        const { sessionId } = await c.Target.attachToTarget({ targetId: host.targetId, flatten: true });
+        try { const r = await c.send('Runtime.evaluate', { expression, returnByValue: true }, sessionId); return r.result.value; }
+        finally { await c.Target.detachFromTarget({ sessionId }).catch(() => {}); }
+    };
+    const until = async (fn, what) => { for (let i = 0; i < 120; i++) { const v = await fn(); if (v) return v; await sleep(50); } throw new Error('timed out waiting for ' + what); };
     const readProbe = async (hostMatch) => {
         const { targetInfos } = await c.Target.getTargets();
         const host = targetInfos.find(t => t.type === 'iframe' && hostMatch(t.url));
@@ -122,6 +132,29 @@ const base = require('./test_base').BASE;
         const real = await leaksOf('', 'real', '', u => /\/static\/artifact_host\.html/.test(u));
         assert.deepEqual(real, [], 'the real host leaks: ' + JSON.stringify(real));
         assert.deepEqual(hits, [], 'no request left any file: ' + JSON.stringify(hits.slice(0, 5)));
+        // THE HOST'S GUARDS (#14813: each was a mutant that survived; the mutant each test kills is in the task's list)
+        {
+            const CHILD_CSP_WORDS = ["default-src 'none'", "connect-src 'none'", "frame-src 'none'", "form-action 'none'", "base-uri 'none'", "object-src 'none'"];
+            // a file that asks for a huge, fractional height AND adds a field: only ONE whole number, clamped to 20000, reaches the dashboard (kills: the host forwards the file's message whole; the MAX_HEIGHT clamp removed)
+            await ev(`window.runFile('clamp', ${JSON.stringify(page("parent.postMessage({ type: 'coral-artifact-height', height: 99999.7, leak: 'secret', nested: { a: 1 } }, '*');"))}, '', '')`);
+            const msgs = await until(async () => { const m = await ev(`(window.runs[window.runs.length - 1].msgs || []).filter(x => x && x.type === 'coral-artifact-height')`); return m.length ? m : null; }, 'the clamped height');
+            assert.deepEqual(msgs[0], { type: 'coral-artifact-height', height: 20000 }, 'the host relays the file\'s height as exactly one whole number, clamped to 20000, and nothing else of its message');
+            // the file's frame carries its own csp attribute with the full policy (kills: the child's csp attribute removed; the srcdoc's meta alone would hide it)
+            const attr = await until(() => inHost(`(document.querySelector('iframe') || {getAttribute(){return ''}}).getAttribute('csp')`), 'the file frame\'s csp attribute');
+            for (const w of CHILD_CSP_WORDS) assert.ok(attr.includes(w), 'the file frame\'s csp attribute has ' + w + ': ' + attr);
+            assert.equal(await inHost(`document.querySelector('iframe').getAttribute('sandbox')`), 'allow-scripts', 'the file frame is sandboxed with allow-scripts and nothing else');
+            // a second load message is refused: the file is loaded ONCE (kills: !started removed)
+            await ev(`window.runs[window.runs.length - 1].frame.contentWindow.postMessage({ type: 'coral-artifact-load', html: '<p>second</p>' }, '*'); true`);
+            await sleep(600); // sleep-ok: a negative: a second frame would have been added by now
+            assert.equal(await inHost(`document.querySelectorAll('iframe').length`), 1, 'a second coral-artifact-load did not start a second file frame');
+            await ev(`window.clearRuns()`);
+            // an HTML larger than the host's limit is not run at all (kills: no size limit on the HTML in the host)
+            await ev(`window.runFile('huge', '<p>' + 'x'.repeat(2 * 1024 * 1024 + 20000) + '</p>', '', '')`);
+            await until(() => inHost(`document.body ? 'up' : ''`), 'the host for the huge file');
+            await sleep(800); // sleep-ok: a negative: a frame for the huge file would have been added by now
+            assert.equal(await inHost(`document.querySelectorAll('iframe').length`), 0, 'a file over the host\'s limit gets no frame');
+            await ev(`window.clearRuns()`);
+        }
         // a file's height requests: the first is obeyed up to the window's height, the ones that follow at once are ignored (one every 250 ms), whatever number they carry
         {
             await ev(`window.runFile('height', ${JSON.stringify(page("parent.postMessage({ type: 'coral-artifact-height', height: 99999 }, '*'); parent.postMessage({ type: 'coral-artifact-height', height: 130 }, '*');"))}, '', '')`);
