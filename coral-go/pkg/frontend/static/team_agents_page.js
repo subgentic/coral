@@ -35,6 +35,21 @@ const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type 
 // One status per agent (#10603, the Beta tester): an agent that is idle with a task already in progress is working on it, not "Task assigned, idle" beside "#1 in progress".
 const startedTask = (a) => (a.tasks || []).find(t => t.status === 'in_progress');
 const statusWord = (a) => (a.availability === 'task_idle' && startedTask(a) ? `Working on #${Number(startedTask(a).id)}` : WORD[a.availability] || 'No signal yet');
+// Open tasks and Time on current task (#14861, the Operator): the tasks assigned to the agent that are pending, in progress or in review (a link to the Tasks tab filtered to the agent), and how long it has had its task in progress (since the claim; a dash with none).
+const openTasksOf = (a) => Number(a.open_tasks) || 0;
+const claimedAt = (a) => { const t = a.task_since ? Date.parse(a.task_since) : NaN; return Number.isFinite(t) ? t : null; };
+/** "1 h 12 m", "5 m", "2 d 3 h": the time the agent has had its current task, from the claim; '' when it has none. */
+export function onTaskWords(a, now = Date.now()) {
+    const at = claimedAt(a);
+    if (at === null) return '';
+    const mins = Math.max(0, Math.floor((now - at) / 60000));
+    if (mins < 1) return '<1 m';
+    if (mins < 60) return `${mins} m`;
+    const h = Math.floor(mins / 60), m = mins % 60;
+    if (h < 24) return m ? `${h} h ${m} m` : `${h} h`;
+    const d = Math.floor(h / 24), hh = h % 24;
+    return hh ? `${d} d ${hh} h` : `${d} d`;
+}
 const providerOf = (a) => PROVIDER[a.agent_type] || (a.agent_type ? a.agent_type.charAt(0).toUpperCase() + a.agent_type.slice(1) : 'Claude');
 const canRemind = (a) => a.availability !== 'offline' && (a.agent_type !== 'terminal' || a.reminder); // a reminder to an ended agent does nothing (#8271) // a terminal is not an agent: a reminder to it does nothing (UI audit #5589)
 // A task nobody has picked up says what it waits on (#10200): the agent it is for, not just "pending".
@@ -182,6 +197,8 @@ function draw() {
                 cell: ag => { const b = DT.primaryButton('', ''); b.append(DT.avatar(ag.name)); const dot = el('span', `team-agent-dot team-agent-dot-${ag.availability === 'available' || ag.availability === 'busy' ? 'ok' : ag.availability === 'needs_input' ? 'ask' : 'quiet'}`); dot.setAttribute('aria-hidden', 'true'); dot.title = statusWord(ag); b.prepend(dot); b.append(el('span', 'team-agent-state sr-only', `, ${statusWord(ag)}`)); if (ag.availability === 'needs_input' || ag.availability === 'unavailable') { const ask = DT.chip(statusWord(ag), CLASS[ag.availability]); ask.classList.add('team-agent-ask'); ask.setAttribute('aria-hidden', 'true'); b.append(ask); } return b; } }, // the state as a dot by the name where the Status column has given way (a phone); a state that asks something of a person also keeps its word there, as a chip the dot already names for a screen reader (#9713)
             { key: 'status', label: 'Status', line: 2, width: '11rem', dropAt: 28, sort: true, sortValue: statusWord, cell: ag => DT.chip(statusWord(ag), CLASS[ag.availability]) },
             { key: 'doing', label: 'Doing', line: 2, width: '18rem', dropAt: 52, sort: true, sortValue: doingOf, cell: ag => { const t = doingOf(ag), span = el('span', null, t); if (t) span.title = t; return span; } }, // one line a row (Goal #79): the whole line is the tooltip
+            { key: 'open', label: 'Open tasks', line: 2, width: '6rem', dropAt: 32, sort: true, align: 'end', sortValue: openTasksOf, cell: ag => { const n = openTasksOf(ag); if (!n) return '0'; return DT.link(String(n), () => importOnce('./nav.js').then(nav => importOnce('./routes.js').then(r => nav.go(r.keyRoute('team', model.team, 'tasks', null, new URLSearchParams({ agent: ag.name }).toString()))))); } },
+            { key: 'onTask', label: 'Time on task', line: 2, width: '6.75rem', dropAt: 33, sort: true, align: 'end', sortValue: ag => claimedAt(ag) === null ? Infinity : Date.now() - claimedAt(ag), cell: ag => onTaskWords(ag) || '\u2014' },
             { key: 'provider', label: 'Provider', line: 2, width: '6rem', dropAt: 36, tone: 'tertiary', sort: true, sortValue: providerOf, cell: providerOf },
             ...(searchShown ? [{ key: 'search', label: 'Search', line: 2, width: '12rem', dropAt: 44, tone: 'tertiary', cell: ag => searchChip((model.levels.get(ag.name) || {}).level) || '' }] : []), // a column only while some member is above "own": an empty one was drawn, clipped at the right edge of a phone's table as a stray "…" (#11128)
             { key: 'chat', label: 'Chat', line: 1, width: 'calc(6.25rem + 26px)', cell: chatButton },
