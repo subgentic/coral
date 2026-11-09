@@ -50,6 +50,10 @@ type ContextCompact struct {
 	tokens func(ctx context.Context, sessionIDs []string) (map[string]int, error)
 	// unread is each session's unread board messages (board.Store.UnreadForSessions).
 	unread func(ctx context.Context, sessionNames []string) (map[string]board.SessionUnread, error)
+	// finished is when a member last finished a task (board.Store.FinishedTaskAt); active says whether it has one in progress (HasActiveTaskForAssignee).
+	finished func(ctx context.Context, project, subscriberID string) (time.Time, bool)
+	active   func(ctx context.Context, project, subscriberID string) bool
+	started  time.Time // a task finished before the service started is not a trigger: a restart compacts no one for old work
 	// paused says whether a board is paused: nothing is typed on it; nil: none is.
 	paused func(project string) bool
 	// deliver types the command; false when the gate skipped it (a dialog, a draft, a held notice): it is asked again on the next pass.
@@ -70,7 +74,7 @@ type compacted struct {
 
 // NewContextCompact returns the service with its design values.
 func NewContextCompact(bs *board.Store, discover func(context.Context) ([]AgentInfo, error)) *ContextCompact {
-	return &ContextCompact{store: bs, discover: discover, now: time.Now, logger: slog.Default().With("service", "context_compact"), Interval: time.Minute, last: map[string]compacted{}}
+	return &ContextCompact{store: bs, discover: discover, now: time.Now, started: time.Now(), logger: slog.Default().With("service", "context_compact"), Interval: time.Minute, last: map[string]compacted{}}
 }
 
 // Wire gives the service its views of the agents and the way to type through.
@@ -86,6 +90,11 @@ func (c *ContextCompact) Wire(signal func(context.Context, string) (agentSignal,
 // Attach wires the service to the stores and the runtime the other health services use.
 func (c *ContextCompact) Attach(ts *store.TaskStore, usage *store.TokenUsageStore, rt AgentRuntime, paused func(string) bool) {
 	c.Wire(hookSignal(ts), screenLimit(rt), usage.GetLatestTurnContextBySessionIDs, c.store.UnreadForSessions, paused, rt)
+	c.finished = c.store.FinishedTaskAt
+	c.active = func(ctx context.Context, project, id string) bool {
+		busy, err := c.store.HasActiveTaskForAssignee(ctx, project, id, 0)
+		return err != nil || busy // not told: treat it as at work
+	}
 }
 
 // LastCompacted is when a session was last compacted by this service and the context it had then; false when it was not.
@@ -141,7 +150,7 @@ func (c *ContextCompact) runProject(ctx context.Context, project string, hs boar
 	orch, _ := c.store.TeamOrchestrator(ctx, project)
 	now := c.now()
 	var cands []AgentInfo
-	var names, ids []string
+	var names, ids, subIDs []string
 	for _, sub := range subs {
 		a, live := agents[sub.SessionName]
 		if !live || sub.SessionName == "" || compactCommand(a.AgentType) == "" {
@@ -168,6 +177,7 @@ func (c *ContextCompact) runProject(ctx context.Context, project string, hs boar
 		cands = append(cands, a)
 		names = append(names, sub.SessionName)
 		ids = append(ids, a.SessionID)
+		subIDs = append(subIDs, sub.SubscriberID)
 	}
 	if len(cands) == 0 {
 		return
@@ -182,7 +192,13 @@ func (c *ContextCompact) runProject(ctx context.Context, project string, hs boar
 	}
 	for i, a := range cands {
 		n := tok[a.SessionID]
-		if n < hs.ThresholdK*1000 {
+		trigger := hs.Trigger
+		if trigger == "" {
+			trigger = board.CompactTriggerThreshold
+		}
+		due := (trigger != board.CompactTriggerTask && n >= hs.ThresholdK*1000) ||
+			(trigger != board.CompactTriggerThreshold && n >= board.CompactTaskFloorK*1000 && c.finishedAndFree(ctx, project, subIDs[i], names[i]))
+		if !due {
 			continue
 		}
 		if u, ok := unread[names[i]]; !ok || u.Err != nil || u.Unread > 0 {
@@ -201,6 +217,24 @@ func (c *ContextCompact) runProject(ctx context.Context, project string, hs boar
 		c.mu.Unlock()
 		c.logger.Info("compacted an idle agent's context", "project", project, "agent", a.DisplayName, "session", names[i], "context_tokens", n, "threshold_tokens", hs.ThresholdK*1000)
 	}
+}
+
+// finishedAndFree is whether the member finished a task since the service started and since it was last compacted, and has none in progress: its work is done and it is waiting, so what it carries is only weight.
+func (c *ContextCompact) finishedAndFree(ctx context.Context, project, subscriberID, sessionName string) bool {
+	if c.finished == nil || c.active == nil {
+		return false
+	}
+	at, ok := c.finished(ctx, project, subscriberID)
+	if !ok || !at.After(c.started) {
+		return false
+	}
+	c.mu.Lock()
+	prev, did := c.last[sessionName]
+	c.mu.Unlock()
+	if did && !at.After(prev.at) {
+		return false // this finish was answered already
+	}
+	return !c.active(ctx, project, subscriberID)
 }
 
 // deliverCommand types a slash command into an agent through the automated-input gate: as keystrokes, not a paste (a CLI runs a command it is typed, and may take a pasted one as text).
