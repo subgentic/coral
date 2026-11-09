@@ -41,7 +41,7 @@ const { coralReady } = require('./helpers/wait');
         check(d.items[0] === '#Coral' && JSON.stringify(d.items.slice(1, 5)) === JSON.stringify(['Needs you', 'Tasks', 'Saved', 'Chats']), 'the heading, then the Inbox folders: ' + JSON.stringify(d.items.slice(0, 6)));
         check(d.items.includes('~Teams') && d.items.some(t => /beta-team/.test(t)), 'on a hub the teams are the hub\'s list, the other computer\'s too: ' + JSON.stringify(d.items));
         const sep = d.items.indexOf('|');
-        check(sep > 5 && ['Docs', 'Settings', 'Themes'].every(n => d.items.slice(sep).some(t => t.includes(n))) && !d.items.slice(sep).some(t => /Automations|Analytics/.test(t)), 'below a divider, the less-used places: ' + JSON.stringify(d.items.slice(sep)));
+        check(sep > 5 && ['Docs', 'Settings', 'Computers'].every(n => d.items.slice(sep).some(t => t.includes(n))) && !d.items.slice(sep).some(t => /Themes/.test(t)) && !d.items.slice(sep).some(t => /Automations|Analytics/.test(t)), 'below a divider, the less-used places (on a hub: Settings, Account, Docs, Computers, GitHub, Sign out; Themes is the local menu\'s, nav_tabs.js menuEntries, #14785): ' + JSON.stringify(d.items.slice(sep)));
         check(!d.items.some(t => /^(Home|Agents|Inbox)$/.test(t)), 'the tab list is not in it: ' + JSON.stringify(d.items));
         check(d.scrim && d.small === 0, 'a scrim behind it, 44 px rows: ' + JSON.stringify({ scrim: d.scrim, small: d.small }));
         // a tap on the scrim closes it
