@@ -31,6 +31,7 @@ import (
 
 	"github.com/subgentic/coral/internal/cliauth"
 	"github.com/subgentic/coral/internal/dropbox"
+	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -370,7 +371,7 @@ func (h *CloudHandler) DropboxShare(w http.ResponseWriter, r *http.Request) {
 	}
 	res, code, refusal := b.share(ctx, cl, access, account, store.DropboxShareArtifact, digest, src, name, in.Audience, emails, expires)
 	if refusal != nil {
-		writeJSON(w, code, refusal)
+		writeShareRefusal(w, code, refusal)
 		return
 	}
 	if in.Expire && acct.Basic && in.Audience != store.DropboxSharePeople {
@@ -388,6 +389,20 @@ func (b *DropboxBackup) clock() time.Time {
 
 func shareRefusal(code, msg string) map[string]any { return map[string]any{"code": code, "error": msg} }
 
+// writeShareRefusal writes a share route's refusal. A 429 here is always a per-action limit (20 shares an hour, or Dropbox asking Coral to
+// wait), so it goes out with httputil.WriteActionLimit (marked X-Coral-Limit: action, with Retry-After when known): the dashboard must not take
+// it for an overloaded server and pause every poller (the limit census).
+func writeShareRefusal(w http.ResponseWriter, code int, refusal map[string]any) {
+	if code == http.StatusTooManyRequests {
+		retry, _ := refusal["retry_after"].(int)
+		c, _ := refusal["code"].(string)
+		msg, _ := refusal["error"].(string)
+		httputil.WriteActionLimit(w, retry, c, msg)
+		return
+	}
+	writeJSON(w, code, refusal)
+}
+
 // share does the work once the request is checked: reserve the row and a free name, copy (or upload) and verify, then add the people or make the
 // link. Any failure after the copy undoes it (people removed, links revoked, the copy deleted at its rev) before answering.
 func (b *DropboxBackup) share(ctx context.Context, cl *dropbox.Client, access, account, kind, digest string, src shareSource, name, audience string,
@@ -398,7 +413,9 @@ func (b *DropboxBackup) share(ctx context.Context, cl *dropbox.Client, access, a
 		case errors.Is(err, dropbox.ErrMissingScope):
 			return nil, http.StatusForbidden, shareRefusal("sign_in_again", signInAgainText)
 		case errors.As(err, &wait):
-			return nil, http.StatusTooManyRequests, shareRefusal("dropbox_wait", fmt.Sprintf("Dropbox asked Coral to wait %s; nothing was shared. Try again then.", wait.After))
+			r := shareRefusal("dropbox_wait", fmt.Sprintf("Dropbox asked Coral to wait %s; nothing was shared. Try again then.", wait.After))
+			r["retry_after"] = int(wait.After.Seconds())
+			return nil, http.StatusTooManyRequests, r
 		}
 		// The client's errors carry Dropbox's tag only (never a body, token or link): said and logged, so a failure names its cause (#198059).
 		slog.Warn("[dropbox] the sharing check failed", "error", err.Error())
@@ -626,7 +643,7 @@ func (h *CloudHandler) DropboxStopShare(w http.ResponseWriter, r *http.Request) 
 	}
 	n, code, refusal := b.stopShares(ctx, []store.DropboxShare{sh})
 	if refusal != nil {
-		writeJSON(w, code, refusal)
+		writeShareRefusal(w, code, refusal)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"stopped": n})
@@ -655,7 +672,7 @@ func (h *CloudHandler) DropboxStopAllShares(w http.ResponseWriter, r *http.Reque
 	n, code, refusal := b.stopShares(ctx, shares)
 	if refusal != nil {
 		refusal["stopped"] = n
-		writeJSON(w, code, refusal)
+		writeShareRefusal(w, code, refusal)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"stopped": n})
