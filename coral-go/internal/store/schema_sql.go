@@ -665,6 +665,7 @@ CREATE TABLE IF NOT EXISTS dropbox_shares (
     account_id TEXT NOT NULL,
     file_id    TEXT NOT NULL DEFAULT '',
     rev        TEXT NOT NULL DEFAULT '',     -- the copy's rev: it is deleted at this rev
+    content_hash TEXT NOT NULL DEFAULT '',   -- the hash the copy must have: only a file with it is taken for this share's (Security's SHOULD on 8c44ed595)
     state      TEXT NOT NULL,
     created_at TEXT NOT NULL,
     expires_at TEXT NOT NULL DEFAULT ''

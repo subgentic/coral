@@ -413,3 +413,32 @@ func TestABasicAccountGetsNoExpiryAndTheCleanupUndoesAHalfMadeShare(t *testing.T
 	n, _ := be.b.outbox.SharedCount(ctx)
 	assert.Zero(t, n)
 }
+
+// Security's SHOULD on 8c44ed595. Mutant: the cleanup takes any file at a never-copied share's path as its copy and deletes it.
+func TestTheCleanupLeavesAnotherFileAtANeverCopiedSharesPath(t *testing.T) {
+	be, d := newDropboxShareEnv(t)
+	ctx := context.Background()
+	src, err := be.b.shareSourceOf(d)
+	require.NoError(t, err)
+	p := shareRoot + "/Coral/mine.md"
+	_, err = be.b.outbox.ReserveShare(ctx, store.DropboxShare{Path: p, Digest: d, Kind: store.DropboxShareArtifact, Audience: store.DropboxSharePublic,
+		AccountID: "dbid:AAA", Hash: dropbox.ContentHash(src.data)}, time.Now().Add(-time.Hour))
+	require.NoError(t, err)
+	be.dbx.mu.Lock()
+	be.dbx.files[p] = []byte("the person's own file\n")
+	be.dbx.mu.Unlock()
+	be.b.CleanShares(ctx)
+	assert.Equal(t, []string{p}, be.sharedPaths(), "another file at that name is left alone")
+	n, _ := be.b.outbox.SharedCount(ctx)
+	assert.Zero(t, n, "the row is dropped")
+
+	// The same bytes at the path (a crash after the copy, before it was recorded): taken as the copy and deleted.
+	_, err = be.b.outbox.ReserveShare(ctx, store.DropboxShare{Path: p + "2", Digest: d, Kind: store.DropboxShareArtifact, Audience: store.DropboxSharePublic,
+		AccountID: "dbid:AAA", Hash: dropbox.ContentHash(src.data)}, time.Now().Add(-time.Hour))
+	require.NoError(t, err)
+	be.dbx.mu.Lock()
+	be.dbx.files[p+"2"] = src.data
+	be.dbx.mu.Unlock()
+	be.b.CleanShares(ctx)
+	assert.Equal(t, []string{p}, be.sharedPaths(), "the unrecorded copy is deleted")
+}

@@ -44,18 +44,19 @@ type DropboxShare struct {
 	AccountID string `db:"account_id" json:"-"`
 	FileID    string `db:"file_id" json:"-"`
 	Rev       string `db:"rev" json:"-"`
+	Hash      string `db:"content_hash" json:"-"`
 	State     string `db:"state" json:"state"`
 	CreatedAt string `db:"created_at" json:"created_at"`
 	ExpiresAt string `db:"expires_at" json:"expires_at,omitempty"`
 }
 
-const shareCols = "id, path, digest, kind, audience, people, account_id, file_id, rev, state, created_at, expires_at"
+const shareCols = "id, path, digest, kind, audience, people, account_id, file_id, rev, content_hash, state, created_at, expires_at"
 
 // ReserveShare records a share about to be made (preparing), after the hourly bound: every share made in the last hour counts, a stopped one
 // too (it is the creating that is bounded). ErrShareNameTaken when the path is in use.
 func (o *DropboxOutbox) ReserveShare(ctx context.Context, sh DropboxShare, now time.Time) (int64, error) {
-	if sh.Path == "" || sh.AccountID == "" {
-		return 0, errors.New("a share needs a path and an account")
+	if sh.Path == "" || sh.AccountID == "" || sh.Hash == "" {
+		return 0, errors.New("a share needs a path, an account and the content hash its copy must have")
 	}
 	if sh.Kind != DropboxShareArtifact && sh.Kind != DropboxShareChat {
 		return 0, errors.New("not a share kind")
@@ -82,8 +83,8 @@ func (o *DropboxOutbox) ReserveShare(ctx context.Context, sh DropboxShare, now t
 	if taken > 0 {
 		return 0, ErrShareNameTaken
 	}
-	res, err := tx.ExecContext(ctx, `INSERT INTO dropbox_shares (path, digest, kind, audience, people, account_id, state, created_at, expires_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, sh.Path, sh.Digest, sh.Kind, sh.Audience, sh.People, sh.AccountID, DropboxSharePreparing, ts(now), sh.ExpiresAt)
+	res, err := tx.ExecContext(ctx, `INSERT INTO dropbox_shares (path, digest, kind, audience, people, account_id, content_hash, state, created_at, expires_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, sh.Path, sh.Digest, sh.Kind, sh.Audience, sh.People, sh.AccountID, sh.Hash, DropboxSharePreparing, ts(now), sh.ExpiresAt)
 	if err != nil {
 		return 0, err
 	}
