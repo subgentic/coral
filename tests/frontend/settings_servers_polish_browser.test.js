@@ -14,6 +14,7 @@ const { coralReady } = require('./helpers/wait');
         { id: 'm3', label: 'Old Laptop', url: 'http://192.168.1.50:8420', status: 'unreachable', last_seen: new Date(Date.now() - 86400000).toISOString(), last_error: 'dial tcp 192.168.1.50:8420: i/o timeout' },
         { id: 'm4', label: 'epoch', url: 'https://epoch.example.net:8420', status: 'unauthorized', last_seen: new Date().toISOString(), last_error: 'the server rejected the API key' },
         { id: 'm5', label: 'plain', url: 'http://plain.example:8420', status: 'online', last_error: 'warming up' },
+        { id: 'm6', label: 'Refused', url: 'http://192.168.1.60:8420', status: 'unreachable', last_error: 'remote refused the connection: nothing is listening at that address and port (is Coral running there, and is a port forward or tunnel to it up?)' }, // the cause Test names (#14975)
     ];
     try {
         await Page.enable();
@@ -44,12 +45,13 @@ const { coralReady } = require('./helpers/wait');
             await ev(`(async () => { const s = await import((window.__coralStatic || '/static/') + 'state.js'); s.state.hub = true; s.state.servers = ${JSON.stringify(SERVERS)}; const t = await import((window.__coralStatic || '/static/') + 'servers_tab.js'); t.updateServersTabVisibility(); return true; })()`);
             await ev(`window.switchNavTab('servers'); true`);
             await waitFor(`!!document.querySelector('#server-row-m3')`, 'the servers list');
-            const rows = await ev(`(async () => { const until = async f => { for (let i = 0; i < 100 && !f(); i++) await new Promise(r => setTimeout(r, 20)); }; const out = {}; for (const id of ['m3', 'm4', 'm5']) { document.querySelector('#server-row-' + id + ' [data-action=open]').click(); await until(() => document.querySelector('.servers-page')); const r = document.querySelector('.servers-page'); const lines = [...r.querySelectorAll('.servers-row-error')]; out[id] = { lines: lines.map(l => l.firstChild.textContent.trim()), details: [...r.querySelectorAll('details')].map(d => d.textContent.replace('Details', '').trim()), text: r.textContent }; document.getElementById('servers-back').click(); await until(() => document.querySelector('table.servers-table')); } return out; })()`); // a server's page (#7638)
+            const rows = await ev(`(async () => { const until = async f => { for (let i = 0; i < 100 && !f(); i++) await new Promise(r => setTimeout(r, 20)); }; const out = {}; for (const id of ['m3', 'm4', 'm5', 'm6']) { document.querySelector('#server-row-' + id + ' [data-action=open]').click(); await until(() => document.querySelector('.servers-page')); const r = document.querySelector('.servers-page'); const lines = [...r.querySelectorAll('.servers-row-error')]; out[id] = { lines: lines.map(l => l.firstChild.textContent.trim()), details: [...r.querySelectorAll('details')].map(d => d.textContent.replace('Details', '').trim()), text: r.textContent }; document.getElementById('servers-back').click(); await until(() => document.querySelector('table.servers-table')); } return out; })()`); // a server's page (#7638)
             assert.deepEqual(rows.m3.lines, ['Is Coral running on that computer? Check the URL.'], dev + ': one line for an unreachable server');
             assert.deepEqual(rows.m3.details, ['dial tcp 192.168.1.50:8420: i/o timeout'], 'with the raw error behind Details');
             assert.equal(rows.m4.lines.length, 1, dev + ': one line for a rejected key, not the raw text and the hint');
             assert.match(rows.m4.lines[0], /rejected the stored API key/); assert.deepEqual(rows.m4.details, ['the server rejected the API key']);
             assert.deepEqual(rows.m5.lines, ['warming up'], 'an error with no hint is shown as it is'); assert.deepEqual(rows.m5.details, []);
+            assert.deepEqual(rows.m6.lines, [rows.m6.lines[0]], dev + ': one line for a named cause'); assert.match(rows.m6.lines[0], /^remote refused the connection/, 'the hub\'s own reason is the line, not the guess'); assert.deepEqual(rows.m6.details, [], 'nothing repeated behind Details');
             // 4: the Add computer form in the tab looks like the dialogs' forms (#4324): a label above a full-width field, fields stacked and aligned, touch-size on a phone.
             await ev(`document.querySelector('[data-action=add]').click(); true`);
             await waitFor(`!!document.getElementById('servers-form')`, 'the add form');

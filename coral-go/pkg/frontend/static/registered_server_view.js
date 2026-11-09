@@ -199,7 +199,7 @@ function pageHtml(s) {
     // One line says what to do; the raw error is behind Details, for support (#3981).
     const act = (s.status === 'key_unreadable' || s.status === 'unauthorized')
         ? statusMeta(s.status).hint
-        : s.status === 'unreachable' ? (s.last_error || 'Is Coral running on that computer? Check the URL.') : ''; // the hub's own reason (refused, no such host, private address, TLS, timed out) reads better than a guess
+        : s.status === 'unreachable' ? (/^remote /.test(s.last_error || '') ? s.last_error : 'Is Coral running on that computer? Check the URL.') : ''; // the hub's own reason when Test named one (the sentences start with "remote ": refused, no such host, private address, TLS, timed out) reads better than a guess; a raw error stays behind Details
     const raw = s.last_error && s.last_error !== act ? s.last_error : '';
     const attention = act
         ? `<div class="servers-row-error" role="status"><span class="servers-row-hint">${escHtml(act)}</span>${raw ? ` <details class="servers-row-detail"><summary>Details</summary>${escHtml(raw)}</details>` : ''}</div>`
