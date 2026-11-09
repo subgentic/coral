@@ -53,11 +53,18 @@ const { JSDOM } = require('jsdom');
     // Remove: the confirm says it is for every Coral and stays out until sent again; another Coral's marker asks for the typed last 4.
     btn('Remove from Dropbox…').click();
     assert.match(b.block.textContent, /for every Coral that uses this backup.*stays out of the backup until you send it again/);
+    assert.strictEqual(document.activeElement && document.activeElement.textContent, 'Cancel', 'the confirm opens on Cancel: one stray Enter never removes the file for every Coral');
     answers[`/api/dropbox/remove/${hex}`] = { status: 409, body: { code: 'others_offloaded', others: ['a3f2'], unknown: 0 } };
     btn('Remove from Dropbox').click(); await tick(); await tick();
     assert.match(b.block.textContent, /Another Coral keeps this file only in Dropbox \(…a3f2\)/);
     const input = b.block.querySelector('input');
     assert.ok(input, 'a typed confirm');
+    const group = b.block.querySelector('[role=group]');
+    assert.ok(group && group.getAttribute('aria-label'), 'the confirm is a named group (UI Accessibility MUST 2)');
+    const described = (input.getAttribute('aria-describedby') || '').split(/\s+/).map(id => document.getElementById(id)?.textContent || '').join(' ');
+    assert.match(described, /for every Coral that uses this backup/, 'the field is described by what is removed');
+    assert.match(described, /Type the last 4 characters/, 'and by what to type');
+    assert.match(b.block.textContent, /type the characters shown to go on/, 'the status line says the server asks for more');
     input.value = '  a3f2 ';
     answers[`/api/dropbox/remove/${hex}`] = { status: 200, body: { removed: 1, edited: [{ path: `/v1/aaa/${'b'.repeat(32)}/v1-aaaaaaaa.md`, rev: 'r9' }] } };
     btn('Remove from Dropbox').click(); await tick(); await tick();
@@ -82,15 +89,18 @@ const { JSDOM } = require('jsdom');
     // Mark private and remove goes to its own route; a refusal says the shared copy is still there.
     answers[`/api/dropbox/private/${hex}`] = { status: 409, body: { code: 'markers_unreadable', private: true, note: 'It is marked private here; its copy in Dropbox is still there.' } };
     btn('Mark private and remove…').click();
+    assert.strictEqual(document.activeElement && document.activeElement.textContent, 'Cancel', 'Mark private and remove opens on Cancel too');
     btn('Mark private and remove').click(); await tick(); await tick();
     assert.match(b.block.textContent, /its copy in Dropbox is still there/);
 
-    // Cancel changes nothing.
+    // Cancel changes nothing, and gives the keyboard back to the button that opened the confirm.
+    btn('Remove from Dropbox…').focus();
     btn('Remove from Dropbox…').click();
     const before = calls.length;
     btn('Cancel').click();
     assert.strictEqual(calls.length, before);
     assert.match(b.block.textContent, /Nothing changed\./);
+    assert.strictEqual(document.activeElement && document.activeElement.textContent, 'Remove from Dropbox…', 'the keyboard is back on its trigger');
     assert.strictEqual(b.block.querySelector('img'), null);
     console.log('artifact_dropbox.test.js: ok');
 })().catch(e => { console.error(e); process.exit(1); });

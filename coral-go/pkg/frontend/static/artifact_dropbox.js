@@ -18,6 +18,9 @@ export function dropboxBlock(hex, server, details) {
     const state = document.createElement('p'); state.className = 'artifact-private-help';
     const acts = document.createElement('div'); acts.className = 'artifact-dropbox-actions';
     const confirmBox = document.createElement('div'); confirmBox.className = 'artifact-dropbox-confirm'; confirmBox.hidden = true;
+    confirmBox.setAttribute('role', 'group'); confirmBox.setAttribute('aria-label', 'Confirm removing this file from Dropbox'); // a named group (UI Accessibility's MUST 2)
+    const idBase = `dbx-${hex.slice(0, 12)}`;
+    let trigger = null; // the button that opened the confirm: the keyboard goes back to it after Cancel or a decision
     const say = document.createElement('p'); say.className = 'artifact-private-say'; say.setAttribute('role', 'status');
     block.append(title, state, acts, confirmBox, say);
     const button = (text, onClick) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-small'; b.textContent = text; b.addEventListener('click', onClick); return b; };
@@ -31,19 +34,21 @@ export function dropboxBlock(hex, server, details) {
 
     // ask shows the confirm for a removal (or Mark private and remove), and what the server needs next: the typed ids, or Remove anyway.
     const ask = (path, typedNeeded = null, anyway = null) => {
+        if (document.activeElement && acts.contains(document.activeElement)) trigger = document.activeElement;
         confirmBox.textContent = ''; confirmBox.hidden = false;
-        const words = document.createElement('p');
+        const words = document.createElement('p'); words.id = `${idBase}-words`;
         words.textContent = path === PRIVATE
             ? 'Mark it private and remove it from Dropbox for every Coral that uses this backup. Dropbox may keep it for a while in its deleted files. It stays out of the backup until you send it again.'
             : 'Remove it from Dropbox for every Coral that uses this backup. Dropbox may keep it for a while in its deleted files. It stays out of the backup until you send it again.';
         confirmBox.append(words);
         let typed = null;
         if (typedNeeded) {
-            const who = document.createElement('p');
+            const who = document.createElement('p'); who.id = `${idBase}-who`;
             const ids = (typedNeeded.others || []).map(String);
             const extra = Number(typedNeeded.unknown || 0) ? ` and ${Number(typedNeeded.unknown)} marker${Number(typedNeeded.unknown) === 1 ? '' : 's'} Coral cannot read (type unknown)` : '';
             who.textContent = `Another Coral keeps this file only in Dropbox (…${ids.join(', …')})${extra}. Removing it loses it there. Type the last 4 characters of each, separated by spaces:`;
             typed = document.createElement('input'); typed.type = 'text'; typed.className = 'settings-input'; typed.setAttribute('aria-label', 'The last 4 characters of each other Coral');
+            typed.setAttribute('aria-describedby', `${idBase}-words ${idBase}-who`); // a screen reader hears what is removed and what to type (MUST 2)
             confirmBox.append(who, typed);
         }
         if (anyway) {
@@ -58,17 +63,18 @@ export function dropboxBlock(hex, server, details) {
             if (anyway) body.anyway = Object.fromEntries(anyway.map(e => [String(e.path), String(e.rev)]));
             const r = await post(path, body);
             go.disabled = false;
-            if (r.status === 409 && r.body.code === 'others_offloaded') { ask(path, r.body, anyway); say.textContent = typed ? 'Those are not the right characters.' : ''; return; }
+            if (r.status === 409 && r.body.code === 'others_offloaded') { ask(path, r.body, anyway); say.textContent = typed ? 'Those are not the right characters. Nothing was removed.' : 'Another Coral keeps this file only in Dropbox: type the characters shown to go on.'; return; }
             if (r.status !== 200) { say.textContent = String(r.body.note || r.body.error || 'Not removed: Coral could not reach Dropbox. Try again.'); return; }
             const edited = Array.isArray(r.body.edited) ? r.body.edited.filter(e => e && e.path && e.rev) : [];
-            if (edited.length) { ask(path, null, edited); return; }
+            if (edited.length) { ask(path, null, edited); say.textContent = 'A file was edited in Dropbox and kept: Remove anyway, or Cancel.'; return; }
             confirmBox.hidden = true;
             say.textContent = r.body.in_progress ? 'Dropbox is still removing it.' : (path === PRIVATE ? 'Marked private and removed from Dropbox.' : 'Removed from Dropbox.');
             await load(true);
+            const first = acts.querySelector('button'); (first || trigger)?.focus?.(); // the keyboard goes back to the block's own button
         });
-        const cancel = button('Cancel', () => { confirmBox.hidden = true; confirmBox.textContent = ''; say.textContent = 'Nothing changed.'; });
+        const cancel = button('Cancel', () => { confirmBox.hidden = true; confirmBox.textContent = ''; say.textContent = 'Nothing changed.'; trigger?.focus?.(); });
         confirmBox.append(go, cancel);
-        (typed || go).focus?.();
+        (typed || cancel).focus?.(); // a destructive confirm starts on Cancel, or on the field the person must type
     };
 
     let loaded = false;

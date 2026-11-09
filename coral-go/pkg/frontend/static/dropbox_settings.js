@@ -390,11 +390,13 @@ function showDeleteConfirm(info) {
     if (!box) return;
     box.textContent = '';
     box.hidden = false;
+    box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Delete the Dropbox backup'); // a named group (UI Accessibility's MUST 2)
     const files = Number(info.files || 0), foreign = Number(info.foreign || 0);
     const others = Array.isArray(info.others) ? info.others.map(String) : [];
     const unknown = Number(info.unknown || 0);
     const need = ['delete', ...(foreign ? [String(foreign)] : []), ...others, ...(unknown ? ['unknown'] : [])];
     const p = document.createElement('p');
+    p.id = 'settings-dropbox-delete-words';
     p.textContent = `This deletes the Dropbox backup (${files} ${files === 1 ? 'file' : 'files'}) for every Coral that uses it, then disconnects.`
         + (foreign ? ` ${foreign} of them did not come from this computer.` : '')
         + (others.length ? ` Other Corals keep files only in Dropbox (…${others.join(', …')}): they lose them.` : '')
@@ -402,12 +404,13 @@ function showDeleteConfirm(info) {
     const input = document.createElement('input');
     input.type = 'text'; input.className = 'settings-input'; input.id = 'settings-dropbox-delete-typed';
     input.setAttribute('aria-label', 'Type the words shown to delete the backup');
+    input.setAttribute('aria-describedby', 'settings-dropbox-delete-words'); // a screen reader hears what is deleted and the words to type
     const go = document.createElement('button'); go.type = 'button'; go.className = 'btn btn-small'; go.textContent = 'Delete the backup and disconnect';
     const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'btn btn-small'; cancel.textContent = 'Cancel';
     go.addEventListener('click', () => deleteBackupConfirm(input.value));
-    cancel.addEventListener('click', () => { box.hidden = true; box.textContent = ''; note('Nothing changed.'); });
+    cancel.addEventListener('click', () => { box.hidden = true; box.textContent = ''; note('Nothing changed.'); $('settings-dropbox-delete')?.focus?.(); });
     box.append(p, input, go, cancel);
-    input.focus?.();
+    input.focus?.(); // the words must be typed: the field, labelled, has the focus
 }
 
 export async function deleteBackupConfirm(typedText) {
