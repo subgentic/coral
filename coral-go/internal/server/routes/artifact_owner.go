@@ -27,6 +27,7 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // Principal kinds.
@@ -265,7 +266,10 @@ func artifactReadable(r *http.Request, coralDir, id string) bool {
 		return guideMayRead(r.Context(), coralDir, g.Board, []string{id})[id]
 	}
 	if cloud.Tunneled(r) {
-		return true
+		// Through Coral Hub a request reads only as a Hub account: the stream names its user (tunnel.HubUserHeader, a valid Hub user id), as every stream the connector forwards does, and the route's own tier and
+		// refuseNonOwner decide what that account may do. A bare stamp that names no account reads nothing here, so the line holds on its own (Security's #14912). Owner-only would take reads from the grantees and
+		// guests the comment routes serve through the Hub (#7052), so it is the account that is required, not the role.
+		return cloud.TunneledAuthentic(r) && tunnel.ValidHubUser(r.Header.Get(tunnel.HubUserHeader)) // the stamp is the connector's own (a forged one with a user is nothing), and a named account
 	}
 	sid, isAgent := agentSessionOf(r)
 	if !isAgent {
