@@ -522,3 +522,117 @@ func TestAConfirmAboveTheCountSeenIsRefused(t *testing.T) {
 	code, _ = be.offloadCall(`{"days": 90, "confirm": true, "risk_ok": true, "warning_ok": true, "seen_count": 15}`, true)
 	assert.Equal(t, http.StatusOK, code, "the count seen is the count due")
 }
+
+// QA Reviewer 2's gaps and INFOs on 4f3f79b72 (#14921). Each test names the survivor it kills.
+
+// (a) Mutant: the bytes freed without the marker read back.
+func TestNothingIsFreedWhenTheMarkerIsNotReadBack(t *testing.T) {
+	be, d := offloadEnv(t)
+	be.dbx.markerReadFail = true
+	n, _ := be.b.Offload(context.Background())
+	assert.Zero(t, n)
+	assert.True(t, be.objectHereNow(d), "the bytes stay")
+	assert.False(t, be.offloaded(d))
+}
+
+// (d) Mutant: the clock check dropped (a clock set back runs a second pass within the hour, or after a bad clock).
+func TestNothingIsFreedWithTheClockBehindTheLastPass(t *testing.T) {
+	be, d := offloadEnv(t)
+	require.NoError(t, be.h.dbx.store.SetOffloadPass(context.Background(), time.Now().Add(2*time.Hour).UTC().Format(time.RFC3339)))
+	n, _ := be.b.Offload(context.Background())
+	assert.Zero(t, n)
+	assert.True(t, be.objectHereNow(d))
+}
+
+// (e) Mutant: an unreadable offload table read as "not offloaded" (a sweeper would then remove the records of a file kept only in Dropbox).
+func TestAnUnreadableOffloadTableCountsAsKept(t *testing.T) {
+	be, d, _ := offloadedEnv(t)
+	_, err := be.db.Exec("DROP TABLE dropbox_offloaded")
+	require.NoError(t, err)
+	assert.True(t, objectHereOrOffloaded(be.h.dbx.dataDir, d), "fail closed: kept")
+}
+
+// resetFetchLimits puts the process-wide fetch limits back after a test changes them.
+func resetFetchLimits(t *testing.T) {
+	t.Helper()
+	max := fetchBudgetMax
+	t.Cleanup(func() {
+		fetchBudgetMu.Lock()
+		fetchBudgetMax, fetchBudgetN, fetchBudgetAt = max, 0, time.Time{}
+		fetchBudgetMu.Unlock()
+	})
+	fetchBudgetMu.Lock()
+	fetchBudgetN, fetchBudgetAt = 0, time.Now()
+	fetchBudgetMu.Unlock()
+}
+
+// (b) and the INFO. Mutants: the hourly budget not checked; a failed fetch charged to it.
+func TestTheFetchBudgetIsChargedOnlyForAFetchThatWorked(t *testing.T) {
+	resetFetchLimits(t)
+	be, d, orig := offloadedEnv(t)
+	fetchBudgetMu.Lock()
+	fetchBudgetMax = int64(len(orig)) // room for exactly this file
+	fetchBudgetMu.Unlock()
+	be.dbx.mu.Lock()
+	saved := be.dbx.revBytes["r1"]
+	delete(be.dbx.revBytes, "r1") // the first fetch fails at Dropbox
+	be.dbx.mu.Unlock()
+	assert.Equal(t, http.StatusServiceUnavailable, be.readArtifact("/api/artifacts/"+d, d, true).Code)
+	be.dbx.mu.Lock()
+	be.dbx.revBytes["r1"] = saved
+	be.dbx.mu.Unlock()
+	rec := be.readArtifact("/api/artifacts/"+d, d, true)
+	require.Equal(t, http.StatusOK, rec.Code, "the failed fetch spent nothing: the budget still has room")
+	be2, d2, _ := offloadedEnv(t)
+	assert.Equal(t, http.StatusServiceUnavailable, be2.readArtifact("/api/artifacts/"+d2, d2, true).Code, "the hour's budget is spent: no more fetches")
+	assert.False(t, be2.objectHereNow(d2))
+}
+
+// (c) Mutant: the two-at-once limit dropped.
+func TestAtMostTwoFetchesAtOnce(t *testing.T) {
+	resetFetchLimits(t)
+	be, d, _ := offloadedEnv(t)
+	fetchSlots <- struct{}{}
+	fetchSlots <- struct{}{} // two fetches in flight
+	rec := be.readArtifact("/api/artifacts/"+d, d, true)
+	<-fetchSlots
+	<-fetchSlots
+	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
+	assert.Contains(t, rec.Body.String(), "being fetched")
+	assert.False(t, be.objectHereNow(d), "a third waits for a slot: nothing fetched")
+}
+
+// The INFO on private marks and references. Mutant: they are read once a pass only (a file made private, or named by a task, during the pass is
+// freed).
+func TestAFileMadePrivateDuringThePassIsNotFreed(t *testing.T) {
+	for name, set := range map[string]func(be *backupEnv, d string){
+		"made private": func(be *backupEnv, d string) {
+			calls := 0
+			be.b.private = func(context.Context, []string) (map[string]bool, error) {
+				calls++
+				if calls == 1 {
+					return map[string]bool{}, nil // the pass's first read
+				}
+				return map[string]bool{d: true}, nil // marked meanwhile
+			}
+		},
+		"named by a task": func(be *backupEnv, d string) {
+			calls := 0
+			be.b.references = func(context.Context) (map[string]bool, error) {
+				calls++
+				if calls == 1 {
+					return map[string]bool{}, nil
+				}
+				return map[string]bool{d: true}, nil
+			}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			be, d := offloadEnv(t)
+			set(be, d)
+			n, _ := be.b.Offload(context.Background())
+			assert.Zero(t, n)
+			assert.True(t, be.objectHereNow(d))
+		})
+	}
+}

@@ -214,6 +214,14 @@ func (b *DropboxBackup) offloadOne(ctx context.Context, cl *dropbox.Client, acce
 	if _, err := cl.Metadata(ctx, access, marker); err != nil {
 		return 0, false // not read back: nothing goes
 	}
+	// Read again just before anything goes (QA Reviewer 2's INFO on 4f3f79b72): a file made private, or named by a task or a session, during the
+	// pass is not freed; either read failing frees nothing.
+	if priv, perr := b.private(ctx, []string{c.Digest}); perr != nil || priv[c.Digest] {
+		return 0, false
+	}
+	if refs, rerr := b.references(ctx); rerr != nil || refs[c.Digest] {
+		return 0, false
+	}
 	if err := b.outbox.RecordOffloaded(ctx, store.DropboxOffloaded{Digest: c.Digest, AccountID: account, Path: c.Path, Rev: c.Rev, ContentHash: c.ContentHash, Size: st.Size()}); err != nil {
 		return 0, false
 	}
@@ -378,17 +386,21 @@ var (
 	fetchBudgetMax int64 = 2 << 30
 )
 
-func fetchBudget(n int64) bool {
+// fetchBudgetRoom says whether n more bytes fit in this hour's budget; fetchBudgetCharge counts them once the fetch succeeded (QA Reviewer 2's
+// INFO on 4f3f79b72: a failed fetch spends nothing).
+func fetchBudgetRoom(n int64) bool {
 	fetchBudgetMu.Lock()
 	defer fetchBudgetMu.Unlock()
 	if now := time.Now(); now.Sub(fetchBudgetAt) > time.Hour {
 		fetchBudgetAt, fetchBudgetN = now, 0
 	}
-	if fetchBudgetN+n > fetchBudgetMax {
-		return false
-	}
+	return fetchBudgetN+n <= fetchBudgetMax
+}
+
+func fetchBudgetCharge(n int64) {
+	fetchBudgetMu.Lock()
+	defer fetchBudgetMu.Unlock()
 	fetchBudgetN += n
-	return true
 }
 
 // fetchOffloaded makes sure a read can go on: true when the bytes are here (or were never freed). For bytes kept only in Dropbox it fetches them
@@ -416,7 +428,7 @@ func fetchOffloaded(w http.ResponseWriter, coralDir, digest string, allowed bool
 		writeError(w, http.StatusServiceUnavailable, "kept_in_dropbox", "This file is kept only in Dropbox and is being fetched: try again in a moment")
 		return false
 	}
-	if err != nil || !fetchBudget(row.Size) {
+	if err != nil || !fetchBudgetRoom(row.Size) {
 		writeError(w, http.StatusServiceUnavailable, "kept_in_dropbox", "This file is kept in Dropbox and could not be fetched right now")
 		return false
 	}
@@ -424,6 +436,7 @@ func fetchOffloaded(w http.ResponseWriter, coralDir, digest string, allowed bool
 		writeError(w, http.StatusServiceUnavailable, "kept_in_dropbox", "This file is kept in Dropbox and could not be fetched right now")
 		return false
 	}
+	fetchBudgetCharge(row.Size)
 	return true
 }
 
