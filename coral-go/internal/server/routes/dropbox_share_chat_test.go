@@ -158,3 +158,14 @@ func TestAChatIsSharedExactlyAsPreviewed(t *testing.T) {
 	n, _ := be.b.outbox.SharedCount(context.Background())
 	assert.Equal(t, 1, n)
 }
+
+// Security's INFO 6 on 44d03efa3: a key split by a zero-width character must not slip past the redactor and rejoin when the character is dropped.
+// Mutant: redact first, then drop format characters.
+func TestAKeySplitByAnInvisibleCharacterIsStillRedacted(t *testing.T) {
+	k := fakeToken()
+	split := k[:8] + "\u200b" + k[8:]
+	page, err := renderChatPage("t", []*board.Message{chatMsg(1, "A", "key "+split+" here")}, time.Now())
+	require.NoError(t, err)
+	assert.NotContains(t, string(page.text), k, "the rejoined key is redacted")
+	assert.NotContains(t, string(page.text), escapeMarkdown(k))
+}
