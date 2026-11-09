@@ -281,7 +281,18 @@ type HealthCompact struct {
 	On           bool `json:"on"`
 	ThresholdK   int  `json:"threshold_k"`
 	Orchestrator bool `json:"orchestrator"`
+	// Trigger is when it acts: "threshold" (a context past ThresholdK), "task" (an agent that has finished a task and has none in progress, with a context of at least CompactTaskFloorK), or "both".
+	Trigger string `json:"trigger"`
 }
+
+// The triggers of HealthCompact.
+const (
+	CompactTriggerThreshold = "threshold"
+	CompactTriggerTask      = "task"
+	CompactTriggerBoth      = "both"
+	// CompactTaskFloorK: after a finished task a context under this many thousand tokens is left alone, there is nothing to save.
+	CompactTaskFloorK = 50
+)
 
 // CompactThresholdK bounds: below 50k a compaction saves little and costs a request, above 900k the CLI has compacted on its own.
 const (
@@ -305,7 +316,7 @@ func DefaultHealthSettings() HealthSettings {
 		PostNoTask:     HealthRuleOn{On: true},
 		UploadNoTask:   HealthRuleOn{On: true},
 		GoalSize:       HealthGoalSize{On: true, Limit: 15},
-		CompactContext: HealthCompact{On: false, ThresholdK: CompactThresholdDefaultK},
+		CompactContext: HealthCompact{On: false, ThresholdK: CompactThresholdDefaultK, Trigger: CompactTriggerThreshold},
 		AskReminder:    HealthMentionNudge{On: true, AfterMin: 15},
 		Deviations:     HealthRuleOn{On: true},
 		ActionList:     HealthActionList{StuckWaitMin: 10, OverloadedTasks: 5, OverloadedSleeping: 1, StaleReviewHours: 24, MentionMin: 30},
@@ -337,6 +348,11 @@ func (h HealthSettings) Clamp() HealthSettings {
 		h.CompactContext.ThresholdK = CompactThresholdDefaultK // a body that does not carry the setting
 	}
 	h.CompactContext.ThresholdK = min(max(h.CompactContext.ThresholdK, CompactThresholdMinK), CompactThresholdMaxK)
+	switch h.CompactContext.Trigger {
+	case CompactTriggerThreshold, CompactTriggerTask, CompactTriggerBoth:
+	default:
+		h.CompactContext.Trigger = CompactTriggerThreshold // a body that does not carry it, or a word that is none of them
+	}
 	h.AskReminder.AfterMin = min(max(h.AskReminder.AfterMin, 5), 1440)
 	h.ActionList = h.ActionList.clamp()
 	h.Landing.Branch = strings.TrimSpace(h.Landing.Branch)

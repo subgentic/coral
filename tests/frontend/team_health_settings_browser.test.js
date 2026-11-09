@@ -97,7 +97,7 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(await ev(`window.__h('goal_size_limit').disabled`), false);
         // Compacting an idle agent's large context (#14849): off by default, so its size and the orchestrator switch are not live until it is on.
         assert.deepEqual(await ev(`['compact_context_on', 'compact_context_threshold_k', 'compact_context_orchestrator'].map(n => { const e = window.__h(n); return [e.type === 'checkbox' ? e.checked : e.value, e.disabled]; })`), [[false, false], ['200', true], [false, true]], 'off by default at 200 thousand tokens, orchestrator not included');
-        await ev(`{ window.__fire('compact_context_on', true); window.__fire('compact_context_threshold_k', '300'); } true`);
+        await ev(`{ window.__fire('compact_context_on', true); window.__fire('compact_context_threshold_k', '300'); window.__fire('compact_context_trigger', 'both'); } true`);
         assert.equal(await ev(`window.__h('compact_context_threshold_k').disabled || window.__h('compact_context_orchestrator').disabled`), false, 'both are live once it is on');
         await ev(`window.__fire('busy_no_task_on', false); true`);
         assert.equal(await ev(`window.__h('busy_no_task_after_min').disabled`), true, 'a rule that is off disables its minutes');
@@ -111,7 +111,7 @@ const { coralReady } = require('./helpers/wait');
         const stored = (await api('/settings')).body.health;
         assert.equal(stored.interval_min, 15); assert.equal(stored.heartbeat_min, 30, 'the heartbeat is saved with the rest (#11431)'); assert.equal(stored.recipient, 'Dev One'); assert.equal(stored.claim_nudge.on, false);
         assert.deepEqual(stored.default_reviewers, ['Boss', 'Dev One'], 'duplicates dropped');
-        assert.deepEqual(stored.compact_context, { on: true, threshold_k: 300, orchestrator: false }, 'the compaction setting is kept by the server as sent');
+        assert.deepEqual(stored.compact_context, { on: true, threshold_k: 300, orchestrator: false, trigger: 'both' }, 'the compaction setting is kept by the server as sent');
         assert.deepEqual([stored.busy_no_task, stored.post_no_task, stored.upload_no_task, stored.goal_size], [{ on: true, after_min: 25 }, { on: false }, { on: true }, { on: true, limit: 30 }], 'the off-the-books signals and the goal-size line are kept by the server as sent');
         const after = await ev(`(() => ({ interval: window.__h('interval_min').value, rcpt: window.__h('recipient').value, save: document.querySelector('#team-settings-workspace .sv-save').disabled, claimOff: !window.__h('claim_nudge_on').checked }))()`);
         assert.deepEqual(after, { interval: '15', rcpt: 'Dev One', save: true, claimOff: true });

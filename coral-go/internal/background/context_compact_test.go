@@ -28,9 +28,12 @@ type compactHarness struct {
 	skip    bool  // the gate skips the send (a dialog, a draft)
 	failure error // the send fails
 	paused  bool
-	mu      sync.Mutex
-	typed   []string // "agent: text"
-	agents  []AgentInfo
+	// finishedAt is when each member (by id) last finished a task, activeTask whether it has one in progress
+	finishedAt map[string]time.Time
+	activeTask map[string]bool
+	mu         sync.Mutex
+	typed      []string // "agent: text"
+	agents     []AgentInfo
 }
 
 func newCompactHarness(t *testing.T, on bool) *compactHarness {
@@ -57,6 +60,11 @@ func newCompactHarness(t *testing.T, on bool) *compactHarness {
 		}
 		return out, nil
 	}
+	h.c.started = h.now.Add(-time.Hour)
+	h.finishedAt = map[string]time.Time{}
+	h.activeTask = map[string]bool{}
+	h.c.finished = func(_ context.Context, _, id string) (time.Time, bool) { at, ok := h.finishedAt[id]; return at, ok }
+	h.c.active = func(_ context.Context, _, id string) bool { return h.activeTask[id] }
 	h.c.paused = func(string) bool { return h.paused }
 	h.c.deliver = func(_ context.Context, a AgentInfo, text string) (bool, error) {
 		h.mu.Lock()
@@ -203,4 +211,57 @@ func TestTheCompactLineIsFixedAndHoldsNothingAShellActsOn(t *testing.T) {
 		assert.NotContains(t, line, bad)
 	}
 	assert.Equal(t, line, compactCommand("claude"), "the same line every time")
+}
+
+func (h *compactHarness) setTrigger(trigger string) {
+	h.t.Helper()
+	s := board.DefaultHealthSettings()
+	s.CompactContext = board.HealthCompact{On: true, ThresholdK: 200, Trigger: trigger}
+	require.NoError(h.t, h.bs.SetHealthSettings(context.Background(), "team", s))
+}
+
+// After a finished task (#14849): an agent that finished one, has none in progress and carries at least 50k is compacted at once, whatever the threshold.
+func TestAnAgentThatFinishedATaskIsCompactedOnceWhateverTheThreshold(t *testing.T) {
+	h := newCompactHarness(t, true)
+	h.setTrigger("task")
+	h.agent("Dev", "s1", "claude", "Dev", 80000, time.Minute)
+	h.finishedAt["Dev"] = h.now.Add(-2 * time.Minute)
+	h.run(0)
+	assert.Equal(t, []string{compactLine}, h.sent(), "a context far under the threshold, compacted because its task is finished")
+	h.run(40 * time.Minute)
+	assert.Len(t, h.sent(), 1, "the same finish is answered once")
+	h.finishedAt["Dev"] = h.now.Add(-time.Minute)
+	h.run(time.Minute)
+	assert.Len(t, h.sent(), 2, "the next finished task is answered too")
+}
+
+func TestTheAfterTaskTriggerWaitsForAnAgentThatIsDone(t *testing.T) {
+	cases := map[string]func(h *compactHarness){
+		"a task still in progress":                   func(h *compactHarness) { h.activeTask["Dev"] = true },
+		"a finish from before the service started":   func(h *compactHarness) { h.finishedAt["Dev"] = h.now.Add(-5 * time.Hour) },
+		"nothing finished":                           func(h *compactHarness) { delete(h.finishedAt, "Dev") },
+		"a context under the floor, nothing to save": func(h *compactHarness) { h.tokens["s1"] = 30000 },
+		"the threshold trigger alone":                func(h *compactHarness) { h.setTrigger("threshold") },
+	}
+	for name, change := range cases {
+		t.Run(name, func(t *testing.T) {
+			h := newCompactHarness(t, true)
+			h.setTrigger("task")
+			h.agent("Dev", "s1", "claude", "Dev", 80000, time.Minute)
+			h.finishedAt["Dev"] = h.now.Add(-2 * time.Minute)
+			change(h)
+			h.run(0)
+			assert.Empty(t, h.sent())
+		})
+	}
+}
+
+func TestBothTriggersActOnTheirOwn(t *testing.T) {
+	h := newCompactHarness(t, true)
+	h.setTrigger("both")
+	h.agent("Big", "s1", "claude", "Dev", 300000, time.Minute)
+	h.agent("Done", "s2", "claude", "Dev", 90000, time.Minute)
+	h.finishedAt["Done"] = h.now.Add(-time.Minute)
+	h.run(0)
+	assert.ElementsMatch(t, []string{"Big: /compact keep: open tasks, team rules, recent decisions, and what I was last asked", "Done: /compact keep: open tasks, team rules, recent decisions, and what I was last asked"}, h.sent())
 }
