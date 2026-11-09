@@ -437,6 +437,18 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 					if m.Digest != hexID && m.Board == teamBoard && (hasTag(byTag[m.Digest], board.ReviewChangesRequested) || hasTag(byTag[m.Digest], tagForReview)) {
 						if added, aerr := h.bs.AddArtifactTags(r.Context(), teamBoard, hexID, []string{tagForReview}); aerr == nil {
 							tags = added
+							if reviewQuestion == "" { // the question is read only with --tag, so here there is none of its own: the earlier version's still stands (#14969)
+								if qs, qerr := h.bs.ArtifactQuestions(r.Context(), teamBoard); qerr == nil {
+									for i := len(plan.rows) - 1; i >= 0; i-- {
+										if q, ok := qs[plan.rows[i].Digest]; ok && plan.rows[i].Digest != hexID && q.Question != "" {
+											if _, qerr := h.bs.SetArtifactQuestion(r.Context(), teamBoard, hexID, q.Question, sid, time.Now()); qerr != nil {
+												slog.Warn("[artifacts] the question of the earlier version was not carried", "digest", hexID, "error", qerr)
+											}
+											break
+										}
+									}
+								}
+							}
 						} else {
 							slog.Warn("[artifacts] the next version of a file with changes requested was not tagged for review", "digest", hexID, "error", aerr)
 						}
