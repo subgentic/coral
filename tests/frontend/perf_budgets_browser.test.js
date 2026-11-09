@@ -46,7 +46,12 @@ const { framesJs, coralReady } = require('./helpers/wait');
             await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
             await ev(`new Promise(r => setTimeout(r, 600))`); // sleep-ok: the layout change's own lookups (the top tabs) settle before the keys are counted
             await ev(`document.getElementById('command-input').value = ''; document.getElementById('command-input').focus(); true`); await taken();
+            // the notices column exists on a page that has shown a notice (the launch notice, a toast): its menu check used to run, debounced, after the keys (a lookup over the page, 1 or 2 a run, whenever the typing paused 30 ms) (#14907)
+            await ev(`import((window.__coralStatic || '/static/') + 'notifications.js').then(m => { m.showToast('A notice on the page'); return true; })`);
+            await ev(`new Promise(r => setTimeout(r, 300))`); // sleep-ok: the toast's own placing settles before the keys are counted
+            await ev(`document.getElementById('command-input').focus(); true`); await taken();
             for (const ch of 'hello there, a few words to type') { await Input.dispatchKeyEvent({ type: 'keyDown', key: ch, text: ch }); await Input.dispatchKeyEvent({ type: 'keyUp', key: ch }); }
+            await ev(`new Promise(r => setTimeout(r, 200))`); // sleep-ok: a lookup that a key schedules (30 ms after the last one) must have had its turn before the count
             const phoneTyped = (await taken()).filter(s => !/^#[\w-]+$/.test(s));
             const phonePerKey = phoneTyped;
             assert.equal(phonePerKey.length, 0, `on a phone's layout too: typing makes no page-wide lookup per keystroke (${phonePerKey.length}: ${[...new Set(phonePerKey)].join(' | ')})`);

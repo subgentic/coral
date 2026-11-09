@@ -166,18 +166,25 @@ export function noticeColumn() {
 
 // An open menu is never under a banner (#10194): the column is hidden while a menu is open and comes back when it closes. Menus open and close on a click or a key, so that is when it looks.
 let _menuTimer = 0;
-function syncMenuOpen() {
+let _openMenus = []; // the menus found open at the last full look: the follow-up look checks only these, not the whole page (#14907)
+const menuIsOpen = m => m.isConnected && !m.hidden && m.getClientRects().length > 0;
+function syncMenuOpen(full = true) {
     const col = document.getElementById("notices");
     if (!col) return;
-    const open = [...document.querySelectorAll(".menu:not([hidden])")].some(m => m.getClientRects().length > 0);
+    // A full look is a selector over the page: it runs after a click or a key that can open or close a menu, never per typed character. The follow-up while a menu is open asks only the menus already known; when
+    // those have all closed, one full look says whether another is open.
+    if (full || !_openMenus.some(menuIsOpen)) _openMenus = [...document.querySelectorAll(".menu:not([hidden])")].filter(menuIsOpen);
+    const open = _openMenus.length > 0;
     col.style.visibility = open ? "hidden" : "";
     clearTimeout(_menuTimer);
-    if (open) _menuTimer = setTimeout(syncMenuOpen, 300); // while hidden for a menu it looks again, so a menu that closes without a click or a key (a timer, a route change, focus moving away) brings the banners back
+    if (open) _menuTimer = setTimeout(() => syncMenuOpen(false), 300); // while hidden for a menu it looks again, so a menu that closes without a click or a key (a timer, a route change, focus moving away) brings the banners back
 }
+// Typing a character into a text field opens and closes no menu: it must cost nothing on the page (perf_budgets: no page-wide lookup per keystroke, #14907).
+const isTyping = e => e.type === "keydown" && e.key && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && e.target instanceof Element && e.target.closest("input, textarea, select, [contenteditable]:not([contenteditable=false])");
 function watchMenus() {
     if (watchMenus._wired) return;
     watchMenus._wired = true;
-    const later = () => { clearTimeout(_menuTimer); _menuTimer = setTimeout(syncMenuOpen, 30); }; // after the click or key has been handled by the menu's own code
+    const later = e => { if (e && isTyping(e)) return; clearTimeout(_menuTimer); _menuTimer = setTimeout(syncMenuOpen, 30); }; // after the click or key has been handled by the menu's own code
     document.addEventListener("click", later, true);
     document.addEventListener("keydown", later, true);
 }
