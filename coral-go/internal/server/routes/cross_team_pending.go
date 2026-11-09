@@ -110,7 +110,7 @@ func (h *BoardHandler) sweepPending(dir string) {
 		p, ok := readPending(path)
 		// An expired receipt stays: it is the memory of a stored file no board lists, which counts toward the received-files cap and which the
 		// Operator can delete in Settings (#4441). Only a record that is unreadable, or whose object is gone, is removed.
-		if _, err := os.Lstat(filepath.Join(h.coralDir, "artifacts", "objects", p.Rec.ID)); !ok || err != nil {
+		if !ok || !objectHereOrOffloaded(h.coralDir, p.Rec.ID) { // an object kept only in Dropbox is not gone (stage 6b, Security's 3e)
 			_ = os.Remove(path)
 		}
 	}
@@ -148,7 +148,7 @@ func (h *BoardHandler) promotePending(target, src, relayID string, inboundID int
 		if err != nil || now.Sub(at) > receivedPendingFor {
 			continue
 		}
-		if _, err := os.Lstat(filepath.Join(h.coralDir, "artifacts", "objects", p.Rec.ID)); err != nil {
+		if !objectHereOrOffloaded(h.coralDir, p.Rec.ID) { // kept only in Dropbox still lists (stage 6b)
 			continue
 		}
 		p.Rec.MessageID = inboundID

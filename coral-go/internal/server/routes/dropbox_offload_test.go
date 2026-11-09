@@ -2,10 +2,12 @@ package routes
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -290,4 +292,26 @@ func TestARekeyAsksForTheCountThenKeepsTheWayBack(t *testing.T) {
 	here, err := be.b.FetchBack(context.Background(), d)
 	require.NoError(t, err, "the same account again: fetched back")
 	assert.True(t, here)
+}
+
+// Security's 3e. Mutant: the pending-receipt sweeper removes the record of an object kept only in Dropbox (it looks like a missing object).
+func TestASweeperKeepsTheRecordsOfAnOffloadedObject(t *testing.T) {
+	be, d, _ := offloadedEnv(t)
+	require.False(t, be.objectHereNow(d))
+	dir := t.TempDir()
+	write := func(id string) string {
+		b, err := json.Marshal(pendingReceipt{Rec: crossTeamArtifactRecord{ID: id, Name: "x.md"}, Source: "src", RelayID: "1", Arrived: time.Now().UnixNano()})
+		require.NoError(t, err)
+		p := filepath.Join(dir, "src-1-"+id+".json")
+		require.NoError(t, os.WriteFile(p, b, 0o600))
+		return p
+	}
+	kept := write(d)
+	gone := write(strings.Repeat("9", 64)) // an object neither here nor in Dropbox
+	(&BoardHandler{coralDir: be.h.dbx.dataDir}).sweepPending(dir)
+	_, err := os.Stat(kept)
+	assert.NoError(t, err, "the offloaded object's record stays")
+	_, err = os.Stat(gone)
+	assert.True(t, os.IsNotExist(err), "a record whose object is truly gone is still swept")
+	assert.True(t, objectHereOrOffloaded(be.h.dbx.dataDir, d))
 }
