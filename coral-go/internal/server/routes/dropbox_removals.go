@@ -112,7 +112,9 @@ func (b *DropboxBackup) Removals(ctx context.Context) {
 			_, _ = b.outbox.CancelRemoval(ctx, r.Digest)
 			// A delete is not a decision to keep these bytes out (Security's SHOULD 6 on 26b4d8235): the ledger forgets them, so a later upload of the
 			// same bytes is backed up as usual. Only the explicit Remove from Dropbox keeps a file out until Send to Dropbox again.
-			_, _ = b.outbox.Unremove(ctx, r.Digest)
+			if res.Removed > 0 { // only what this job removed: an explicit Remove from Dropbox before it keeps its "stays out" rows (Security's INFO on 5690c313f)
+				_, _ = b.outbox.Unremove(ctx, r.Digest)
+			}
 		}
 	}
 	if removed > 0 {

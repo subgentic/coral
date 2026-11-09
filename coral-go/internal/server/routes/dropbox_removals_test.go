@@ -251,3 +251,21 @@ func TestARunningDeleteJobIsTriedAgainNotReportedDone(t *testing.T) {
 	assert.Equal(t, 40*time.Minute, removalBackoff(2), "the wait doubles")
 	assert.Equal(t, 6*time.Hour, removalBackoff(20), "up to 6 hours")
 }
+
+// Security's INFO on 5690c313f. Mutant: the job forgets the removed rows when it removed nothing itself (an explicit Remove from Dropbox made
+// before the job ran would lose its "stays out until sent again").
+func TestAnExplicitRemoveBeforeTheJobKeepsItsStaysOutRule(t *testing.T) {
+	be, ds := newRemovalEnv(t, 1)
+	ctx := context.Background()
+	code, _ := be.removeCall("remove", ds[0], `{"confirm": true}`, true) // the Operator's explicit Remove from Dropbox
+	require.Equal(t, http.StatusOK, code)
+	_, _, _, err := deleteArtifactFiles(be.h.dbx.dataDir, ds[0])
+	require.NoError(t, err)
+	_, err = be.b.outbox.QueueRemoval(ctx, ds[0], "r0.md", time.Now(), false) // a removal queued anyway (an earlier delete of the same bytes)
+	require.NoError(t, err)
+	be.due()
+	be.b.Removals(ctx)
+	removed, err := be.b.outbox.WasRemoved(ctx, ds[0])
+	require.NoError(t, err)
+	assert.True(t, removed, "the explicit removal still keeps the bytes out until Send to Dropbox again")
+}
