@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -35,19 +36,27 @@ func TestResetPasswordRotatesTheCLIToken(t *testing.T) {
 
 	old, err := cloud.ReadCLIToken(cfg.CoralDir())
 	require.NoError(t, err)
-	status := func(tok string) (int, error) {
-		resp, err := cloud.CLIClient{Base: local.URL, Token: tok}.Do(ctx, http.MethodGet, "/api/sessions/live", nil, nil, 5*time.Second)
+	// status signs one request with tok. retry sends a refused hello again (cliDo) for a token that should sign; the old token's expected refusal is asked once, with no retry.
+	status := func(tok string, retry bool) (int, error) {
+		cli := cloud.CLIClient{Base: local.URL, Token: tok}
+		var resp *http.Response
+		var err error
+		if retry {
+			resp, err = cliDo(t, cli, ctx, http.MethodGet, "/api/sessions/live", nil, nil, 5*time.Second)
+		} else {
+			resp, err = cli.Do(ctx, http.MethodGet, "/api/sessions/live", nil, nil, 5*time.Second)
+		}
 		if err != nil {
 			return 0, err
 		}
 		resp.Body.Close()
 		return resp.StatusCode, nil
 	}
-	code, err := status(old)
+	code, err := status(old, true)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, code, "the token signs before the reset")
 
-	resp, err := cloud.CLIClient{Base: local.URL, Token: old}.Do(ctx, http.MethodPost, "/api/auth/password/reset", []byte(`{"password":"a new one"}`), nil, 30*time.Second)
+	resp, err := cliDo(t, cloud.CLIClient{Base: local.URL, Token: old}, ctx, http.MethodPost, "/api/auth/password/reset", []byte(`{"password":"a new one"}`), nil, 30*time.Second)
 	require.NoError(t, err)
 	resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -55,9 +64,9 @@ func TestResetPasswordRotatesTheCLIToken(t *testing.T) {
 	fresh, err := cloud.ReadCLIToken(cfg.CoralDir())
 	require.NoError(t, err)
 	assert.NotEqual(t, old, fresh, "a new token was written")
-	_, err = status(old)
+	_, err = status(old, false)
 	assert.ErrorIs(t, err, cliauth.ErrNotCoral, "the old token no longer signs")
-	code, err = status(fresh)
+	code, err = status(fresh, true)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, code, "the new token signs")
 
@@ -90,16 +99,30 @@ func TestOlderCLISignatureIsRefusedWithAnUpdateHint(t *testing.T) {
 		req, err := http.NewRequest("GET", local.URL+"/api/sessions/live?limit=5", nil)
 		require.NoError(t, err)
 		req.Header.Set(cliauth.CLIAuthHeader, sig)
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := (&http.Client{Transport: &http.Transport{DisableKeepAlives: true}}).Do(req) // a new connection per request: the owner check is per connection
 		require.NoError(t, err)
 		b, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		return resp.StatusCode, string(b)
 	}
-	code, body := send(cliSignServer(t, local.URL, tok, "GET", "/api/sessions/live", "")) // the old MAC: no query
+	// signed signs path (a new hello each time) and sends the request; a request refused as another user's (the owner check missed its connection under load, #522) is signed and sent again,
+	// within cliHelloWaits. The final answer is the one asserted, and this test never expects other_user.
+	signed := func(path string) (int, string) {
+		code, body := send(cliSignServer(t, local.URL, tok, "GET", path, ""))
+		for _, wait := range cliHelloWaits {
+			if code != http.StatusForbidden || !strings.Contains(body, `"code":"other_user"`) {
+				break
+			}
+			t.Logf("signed request refused (%s); signing and sending it again in %v", strings.TrimSpace(body), wait)
+			time.Sleep(wait)
+			code, body = send(cliSignServer(t, local.URL, tok, "GET", path, ""))
+		}
+		return code, body
+	}
+	code, body := signed("/api/sessions/live") // the old MAC: no query
 	assert.Equal(t, http.StatusUnauthorized, code)
 	assert.Contains(t, body, "cli_signature_required")
 	assert.Contains(t, body, "Use the coral command that came with this Coral")
-	code, _ = send(cliSignServer(t, local.URL, tok, "GET", "/api/sessions/live?limit=5", ""))
+	code, _ = signed("/api/sessions/live?limit=5")
 	assert.Equal(t, http.StatusOK, code, "this version's signature")
 }

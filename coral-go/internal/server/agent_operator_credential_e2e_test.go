@@ -26,7 +26,7 @@ func TestAgentTokenCantReadTheAPIKeyOrDeleteABoard(t *testing.T) {
 	require.NoError(t, err)
 	cli := cliauth.CLIClient{Base: ts.URL, Token: cliTok}
 	asCLI := func(method, path, body string) (int, string) {
-		resp, err := cli.Do(ctx, method, path, []byte(body), nil, 0)
+		resp, err := cliDo(t, cli, ctx, method, path, []byte(body), nil, 0)
 		require.NoError(t, err)
 		defer resp.Body.Close()
 		b, _ := io.ReadAll(resp.Body)

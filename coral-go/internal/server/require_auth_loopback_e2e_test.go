@@ -68,7 +68,7 @@ func requireAuthStrictLocalCase(t *testing.T, strictLocal bool) {
 	// A signed command line (the recovery path, coral open) works.
 	tok, err := cliauth.ReadToken(dir)
 	require.NoError(t, err)
-	cli := &http.Client{Transport: cliauth.Transport{Base: http.DefaultTransport, Token: tok}}
+	cli := cliHTTPClient(t, tok, "")
 	req, _ := http.NewRequest("POST", ts.URL+"/api/system/login-token", bytes.NewBufferString("{}"))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := cli.Do(req)

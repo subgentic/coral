@@ -28,7 +28,7 @@ func TestForeignPageCannotWriteOrOpenSockets(t *testing.T) {
 		if strict { // sign the browser in, as 'coral open' does
 			tok, err := cliauth.ReadToken(dir)
 			require.NoError(t, err)
-			resp, err := cliauth.CLIClient{Base: ts.URL, Token: tok}.Do(context.Background(), http.MethodPost, "/api/system/login-token", []byte("{}"), nil, 0)
+			resp, err := cliDo(t, cliauth.CLIClient{Base: ts.URL, Token: tok}, context.Background(), http.MethodPost, "/api/system/login-token", []byte("{}"), nil, 0)
 			require.NoError(t, err)
 			var link struct {
 				Path string `json:"path"`
@@ -83,7 +83,7 @@ func TestForeignPageCannotWriteOrOpenSockets(t *testing.T) {
 		} else {
 			tok, err := cliauth.ReadToken(dir)
 			require.NoError(t, err)
-			resp, err := cliauth.CLIClient{Base: ts.URL, Token: tok}.Do(context.Background(), http.MethodPut, "/api/settings", []byte("{}"), nil, 0)
+			resp, err := cliDo(t, cliauth.CLIClient{Base: ts.URL, Token: tok}, context.Background(), http.MethodPut, "/api/settings", []byte("{}"), nil, 0)
 			require.NoError(t, err)
 			resp.Body.Close()
 			assert.Equal(t, http.StatusOK, resp.StatusCode, "strict mode: the CLI's write with no Origin")

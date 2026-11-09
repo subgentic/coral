@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -52,11 +53,24 @@ func cliSignServer(t *testing.T, baseURL, token, method, path, body string, auth
 	t.Helper()
 	cn, err := cloud.NewCLINonce()
 	require.NoError(t, err)
-	resp, err := http.Post(baseURL+cloud.CLIHelloPath, "application/json", strings.NewReader(`{"nonce":"`+cn+`"}`))
-	require.NoError(t, err)
-	defer resp.Body.Close()
-	b, _ := io.ReadAll(resp.Body)
-	require.Equal(t, http.StatusOK, resp.StatusCode, string(b))
+	sendHello := func() (int, []byte) {
+		c := &http.Client{Transport: &http.Transport{DisableKeepAlives: true}} // a new connection for every try: the owner check is per connection
+		resp, err := c.Post(baseURL+cloud.CLIHelloPath, "application/json", strings.NewReader(`{"nonce":"`+cn+`"}`))
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, b
+	}
+	code, b := sendHello()
+	for _, wait := range cliHelloWaits { // a hello refused as another user's is sent again (cli_hello_retry_test.go): this helper is for tests whose hello is the user's own
+		if code != http.StatusForbidden || !strings.Contains(string(b), `"code":"other_user"`) {
+			break
+		}
+		t.Logf("command-line hello refused (%s); sending it again in %v", strings.TrimSpace(string(b)), wait)
+		time.Sleep(wait)
+		code, b = sendHello()
+	}
+	require.Equal(t, http.StatusOK, code, string(b))
 	var hello struct {
 		Nonce string `json:"nonce"`
 	}
