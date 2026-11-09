@@ -155,33 +155,35 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/cloud/connect/cancel":                 "cancel connecting to Coral Hub",
 	"POST /api/cloud/disconnect":                     "disconnect from Coral Hub",
 	// Dropbox sign-in (#14609): the Operator's, from this computer's dashboard.
-	"GET /api/dropbox/status":                "read the Dropbox connection",
-	"POST /api/dropbox/connect":              "connect Dropbox",
-	"POST /api/dropbox/disconnect":           "disconnect Dropbox",
-	"POST /api/dropbox/switch":               "switch the Dropbox account",
-	"POST /api/dropbox/takeover":             "take over the Dropbox backup",
-	"PUT /api/dropbox/filters":               "choose what the Dropbox backup sends",
-	"POST /api/dropbox/edits/{doc}/promote":  "use an edit made in Dropbox as the next version",
-	"POST /api/dropbox/edits/{doc}/separate": "keep an edit made in Dropbox as its own file",
-	"POST /api/dropbox/remove/{digest}":      "remove an artifact from Dropbox",
-	"GET /api/dropbox/artifact/{digest}":     "see whether an artifact is in the Dropbox backup",
-	"POST /api/dropbox/resend/{digest}":      "send an artifact removed from Dropbox to Dropbox again",
-	"GET /api/dropbox/removals":              "see the files waiting to be removed from Dropbox",
-	"POST /api/dropbox/removals/cancel":      "keep files in Dropbox that were deleted here",
-	"POST /api/dropbox/removals/confirm":     "let held removals from Dropbox go ahead",
-	"PUT /api/dropbox/retention":             "choose how long Dropbox keeps backed-up files",
-	"PUT /api/dropbox/autosync":              "choose whether edits made in Dropbox become new versions",
-	"POST /api/dropbox/undo/{digest}":        "undo an edit made in Dropbox that became the newest version",
-	"GET /api/dropbox/share/{digest}":        "see how a file is shared through Dropbox",       // #14944
-	"POST /api/dropbox/share/{digest}":       "share a file through Dropbox",                   // #14944
-	"POST /api/dropbox/share/stop/{id}":      "stop sharing a file through Dropbox",            // #14944
-	"GET /api/dropbox/shares":                "see the files shared through Dropbox",           // #14944
-	"POST /api/dropbox/shares/stop-all":      "stop sharing every file shared through Dropbox", // #14944
-	"POST /api/dropbox/check":                "ask the Dropbox backup to check for space again",
-	"POST /api/cloud/redeem":                 "redeem a Coral Hub credential",
-	"POST /api/cloud/rekey":                  "replace the secret key and discard what it sealed", // #3698
-	"GET /api/cloud/owner-label":             "see whether Coral Hub's owner is recorded on this computer",
-	"POST /api/cloud/owner-label/arm":        "confirm who owns this computer on Coral Hub",
+	"GET /api/dropbox/status":                        "read the Dropbox connection",
+	"POST /api/dropbox/connect":                      "connect Dropbox",
+	"POST /api/dropbox/disconnect":                   "disconnect Dropbox",
+	"POST /api/dropbox/switch":                       "switch the Dropbox account",
+	"POST /api/dropbox/takeover":                     "take over the Dropbox backup",
+	"PUT /api/dropbox/filters":                       "choose what the Dropbox backup sends",
+	"POST /api/dropbox/edits/{doc}/promote":          "use an edit made in Dropbox as the next version",
+	"POST /api/dropbox/edits/{doc}/separate":         "keep an edit made in Dropbox as its own file",
+	"POST /api/dropbox/remove/{digest}":              "remove an artifact from Dropbox",
+	"GET /api/dropbox/artifact/{digest}":             "see whether an artifact is in the Dropbox backup",
+	"POST /api/dropbox/resend/{digest}":              "send an artifact removed from Dropbox to Dropbox again",
+	"GET /api/dropbox/removals":                      "see the files waiting to be removed from Dropbox",
+	"POST /api/dropbox/removals/cancel":              "keep files in Dropbox that were deleted here",
+	"POST /api/dropbox/removals/confirm":             "let held removals from Dropbox go ahead",
+	"PUT /api/dropbox/retention":                     "choose how long Dropbox keeps backed-up files",
+	"PUT /api/dropbox/autosync":                      "choose whether edits made in Dropbox become new versions",
+	"POST /api/dropbox/undo/{digest}":                "undo an edit made in Dropbox that became the newest version",
+	"GET /api/dropbox/share/{digest}":                "see how a file is shared through Dropbox",       // #14944
+	"POST /api/dropbox/share/{digest}":               "share a file through Dropbox",                   // #14944
+	"POST /api/dropbox/share/stop/{id}":              "stop sharing a file through Dropbox",            // #14944
+	"GET /api/dropbox/shares":                        "see the files shared through Dropbox",           // #14944
+	"POST /api/dropbox/shares/stop-all":              "stop sharing every file shared through Dropbox", // #14944
+	"POST /api/dropbox/share-chat/{project}/preview": "preview a chat page to share through Dropbox",   // #14944
+	"POST /api/dropbox/share-chat/{project}":         "share a chat page through Dropbox",              // #14944
+	"POST /api/dropbox/check":                        "ask the Dropbox backup to check for space again",
+	"POST /api/cloud/redeem":                         "redeem a Coral Hub credential",
+	"POST /api/cloud/rekey":                          "replace the secret key and discard what it sealed", // #3698
+	"GET /api/cloud/owner-label":                     "see whether Coral Hub's owner is recorded on this computer",
+	"POST /api/cloud/owner-label/arm":                "confirm who owns this computer on Coral Hub",
 	// #3553: the Operator removes an artifact (also refused to anyone but a person, in every mode).
 	"DELETE /api/artifacts/{id}": "delete an artifact",
 	// #5575: the machine-wide list of every artifact (the owner's, here or through Coral Hub): never an agent's.

@@ -364,7 +364,7 @@ func (h *CloudHandler) DropboxShare(w http.ResponseWriter, r *http.Request) {
 	if in.Expire && !acct.Basic && in.Audience != store.DropboxSharePeople {
 		expires = b.clock().Add(shareExpiry).UTC().Truncate(time.Second)
 	}
-	res, code, refusal := b.share(ctx, cl, access, account, digest, src, name, in.Audience, emails, expires)
+	res, code, refusal := b.share(ctx, cl, access, account, store.DropboxShareArtifact, digest, src, name, in.Audience, emails, expires)
 	if refusal != nil {
 		writeJSON(w, code, refusal)
 		return
@@ -383,7 +383,7 @@ func shareRefusal(code, msg string) map[string]any { return map[string]any{"code
 
 // share does the work once the request is checked: reserve the row and a free name, copy (or upload) and verify, then add the people or make the
 // link. Any failure after the copy undoes it (people removed, links revoked, the copy deleted at its rev) before answering.
-func (b *DropboxBackup) share(ctx context.Context, cl *dropbox.Client, access, account, digest string, src shareSource, name, audience string,
+func (b *DropboxBackup) share(ctx context.Context, cl *dropbox.Client, access, account, kind, digest string, src shareSource, name, audience string,
 	emails []string, expires time.Time) (map[string]any, int, map[string]any) {
 	if err := cl.CanShare(ctx, access); err != nil { // an older sign-in is told before anything is made
 		if errors.Is(err, dropbox.ErrMissingScope) {
@@ -400,7 +400,7 @@ func (b *DropboxBackup) share(ctx context.Context, cl *dropbox.Client, access, a
 	for _, n := range names {
 		taken[strings.ToLower(n)] = true
 	}
-	sh := store.DropboxShare{Digest: digest, Kind: store.DropboxShareArtifact, Audience: audience, People: len(emails), AccountID: account, Hash: dropbox.ContentHash(src.data)}
+	sh := store.DropboxShare{Digest: digest, Kind: kind, Audience: audience, People: len(emails), AccountID: account, Hash: dropbox.ContentHash(src.data)}
 	if !expires.IsZero() {
 		sh.ExpiresAt = expires.Format(time.RFC3339)
 	}
