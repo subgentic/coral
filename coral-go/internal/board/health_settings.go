@@ -292,6 +292,8 @@ type HealthCompact struct {
 const (
 	CompactMethodCompact   = "compact"
 	CompactMethodClearNext = "clear_next"
+	// CompactMethodClearHandoff asks the agent to write a handoff note first (an artifact named handoff.md), clears it once the note is stored, and points it at the note.
+	CompactMethodClearHandoff = "clear_handoff"
 )
 
 // The triggers of HealthCompact.
@@ -357,8 +359,8 @@ func (h HealthSettings) Clamp() HealthSettings {
 		h.CompactContext.ThresholdK = CompactThresholdDefaultK // a body that does not carry the setting
 	}
 	h.CompactContext.ThresholdK = min(max(h.CompactContext.ThresholdK, CompactThresholdMinK), CompactThresholdMaxK)
-	if h.CompactContext.Method != CompactMethodClearNext {
-		h.CompactContext.Method = CompactMethodCompact // a body that does not carry it, or a word that is neither
+	if h.CompactContext.Method != CompactMethodClearNext && h.CompactContext.Method != CompactMethodClearHandoff {
+		h.CompactContext.Method = CompactMethodCompact // a body that does not carry it, or a word that is none of them
 	}
 	switch h.CompactContext.Trigger {
 	case CompactTriggerThreshold, CompactTriggerTask, CompactTriggerBoth:

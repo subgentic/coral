@@ -331,7 +331,7 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 	if bh := srv.BoardHandler(); bh != nil {
 		pausedFn = bh.IsPaused
 	}
-	contextCompact.Attach(taskStore, store.NewTokenUsageStore(sessStore.DB()), agentRT, pausedFn)
+	contextCompact.Attach(taskStore, store.NewTokenUsageStore(sessStore.DB()), agentRT, pausedFn, srv.LatestUpload)
 	safeGo(ctx, "context_compact", func() { contextCompact.Run(ctx) })
 
 	// Tasks' one-time reminders (task add --remind-at, #4175 step 3): asked for by a person or

@@ -37,6 +37,23 @@ const (
 	clearGiveUp = 5 * time.Minute
 )
 
+const (
+	// handoffWait is how long an agent is given to write its handoff note: past it the clear is dropped (nothing is lost, the agent was not cleared) and it is left alone for the cooldown.
+	handoffWait = 10 * time.Minute
+	// handoffName is the name of the note's artifact.
+	handoffName = "handoff.md"
+)
+
+// askHandoffText is the one fixed line that asks an agent for its handoff note before it is cleared.
+func askHandoffText() string {
+	return "[Coral] Your context will be cleared to save tokens. First write what you need to continue (the work in hand, what you decided, what is next) into one file and upload it: run 'coral-agent artifact upload FILE --name " + handoffName + " --tag internal' with the name of that file in place of FILE. Then stop and wait."
+}
+
+// handoffText is the line a cleared agent is sent when it has a handoff note: the note's digest is Coral's own (64 hex of its store), the only variable.
+func handoffText(digest string) string {
+	return fmt.Sprintf("[Coral] Your context was cleared to save tokens. Your handoff note is coral://artifacts/%s: run 'coral-agent artifact download coral://artifacts/%s' to read it, then 'coral-board read' for your board, and continue.", digest, digest)
+}
+
 // clearCommand is the command that clears an agent's context, "" for a type with none known to Coral.
 func clearCommand(agentType string) string {
 	if agentType == "claude" {
@@ -87,12 +104,20 @@ type ContextCompact struct {
 
 	Interval time.Duration
 
+	// handoff is the digest of the newest upload this session made after since that is named handoff.md, "" when there is none (server.LatestUpload); nil: the handoff method is unavailable.
+	handoff func(sessionID string, since time.Time) string
 	// nextTask is the number of the next task assigned to a member (board.Store.NextPendingTaskForSubscriber), 0 when there is none.
 	nextTask func(ctx context.Context, project, subscriberID string) int64
 
 	mu      sync.Mutex
-	last    map[string]compacted // by session name
-	pending map[string]bootstrap // a cleared agent waits here for its one line, by session name
+	last    map[string]compacted  // by session name
+	pending map[string]bootstrap  // a cleared agent waits here for its one line, by session name
+	asked   map[string]handoffAsk // an agent that was asked for its handoff note waits here, by session name
+}
+
+// handoffAsk is an agent that was asked to write its handoff note: when, and what it needs to be cleared by.
+type handoffAsk struct {
+	at time.Time
 }
 
 // bootstrap is the line a cleared agent is sent once it has settled.
@@ -108,7 +133,7 @@ type compacted struct {
 
 // NewContextCompact returns the service with its design values.
 func NewContextCompact(bs *board.Store, discover func(context.Context) ([]AgentInfo, error)) *ContextCompact {
-	return &ContextCompact{store: bs, discover: discover, now: time.Now, started: time.Now(), logger: slog.Default().With("service", "context_compact"), Interval: time.Minute, last: map[string]compacted{}, pending: map[string]bootstrap{}}
+	return &ContextCompact{store: bs, discover: discover, now: time.Now, started: time.Now(), logger: slog.Default().With("service", "context_compact"), Interval: time.Minute, last: map[string]compacted{}, pending: map[string]bootstrap{}, asked: map[string]handoffAsk{}}
 }
 
 // Wire gives the service its views of the agents and the way to type through.
@@ -122,7 +147,10 @@ func (c *ContextCompact) Wire(signal func(context.Context, string) (agentSignal,
 }
 
 // Attach wires the service to the stores and the runtime the other health services use.
-func (c *ContextCompact) Attach(ts *store.TaskStore, usage *store.TokenUsageStore, rt AgentRuntime, paused func(string) bool) {
+func (c *ContextCompact) Attach(ts *store.TaskStore, usage *store.TokenUsageStore, rt AgentRuntime, paused func(string) bool, handoff func(sessionID, name string, since time.Time) string) {
+	if handoff != nil {
+		c.handoff = func(sessionID string, since time.Time) string { return handoff(sessionID, handoffName, since) }
+	}
 	c.Wire(hookSignal(ts), screenLimit(rt), usage.GetLatestTurnContextBySessionIDs, c.store.UnreadForSessions, paused, rt)
 	c.finished = c.store.FinishedTaskAt
 	c.nextTask = func(ctx context.Context, project, id string) int64 {
@@ -153,6 +181,7 @@ func (c *ContextCompact) RunOnce(ctx context.Context) {
 		return
 	}
 	c.sendPending(ctx)
+	c.clearAsked(ctx)
 	projects, err := c.store.ListProjects(ctx)
 	if err != nil {
 		return
@@ -243,6 +272,25 @@ func (c *ContextCompact) runProject(ctx context.Context, project string, hs boar
 			continue // messages waiting (or a count that failed): a turn is about to start
 		}
 		command, next := compactCommand(a.AgentType), int64(0)
+		if hs.Method == board.CompactMethodClearHandoff && clearCommand(a.AgentType) != "" && c.handoff != nil {
+			// The agent is asked for its note first; it is cleared by clearAsked once the note is stored. Only an agent with no task in progress, and only once.
+			if c.active == nil || c.active(ctx, project, subIDs[i]) {
+				continue
+			}
+			c.mu.Lock()
+			_, waiting := c.asked[names[i]]
+			c.mu.Unlock()
+			if waiting {
+				continue
+			}
+			if sent, err := c.deliver(ctx, a, askHandoffText()); err == nil && sent {
+				c.mu.Lock()
+				c.asked[names[i]] = handoffAsk{at: now}
+				c.mu.Unlock()
+				c.logger.Info("asked an idle agent for its handoff note", "project", project, "agent", a.DisplayName, "session", names[i], "context_tokens", n)
+			}
+			continue
+		}
 		if hs.Method == board.CompactMethodClearNext && clearCommand(a.AgentType) != "" {
 			// A clear forgets the work in hand: only an agent with no task in progress is cleared, whatever the trigger.
 			if c.active == nil || c.active(ctx, project, subIDs[i]) {
@@ -362,4 +410,69 @@ func (c *ContextCompact) drop(name string) {
 	c.mu.Lock()
 	delete(c.pending, name)
 	c.mu.Unlock()
+}
+
+// clearAsked clears each agent that was asked for its handoff note and has stored it: idle again (the note is written in a turn of its own), the note's artifact there; then it is sent the line that
+// names the note. An agent that has not written one within handoffWait is left as it is (not cleared) and not asked again for the cooldown; a gone agent is forgotten.
+func (c *ContextCompact) clearAsked(ctx context.Context) {
+	c.mu.Lock()
+	if len(c.asked) == 0 {
+		c.mu.Unlock()
+		return
+	}
+	todo := map[string]handoffAsk{}
+	for name, a := range c.asked {
+		todo[name] = a
+	}
+	c.mu.Unlock()
+	if c.handoff == nil {
+		return
+	}
+	live, err := c.discover(ctx)
+	if err != nil {
+		return
+	}
+	agents := map[string]AgentInfo{}
+	for _, a := range live {
+		agents[naming.SessionName(a.AgentType, a.SessionID)] = a
+	}
+	now := c.now()
+	for name, ask := range todo {
+		a, ok := agents[name]
+		if !ok {
+			c.forgetAsk(name, false, now)
+			continue
+		}
+		if now.Sub(ask.at) > handoffWait {
+			c.logger.Info("an agent did not write its handoff note: not cleared", "session", name)
+			c.forgetAsk(name, true, now)
+			continue
+		}
+		sig, known := c.signal(ctx, a.SessionID)
+		if !known || sig.InTurn || sig.NeedsInput || now.Sub(sig.Since) < compactSettle {
+			continue
+		}
+		digest := c.handoff(a.SessionID, ask.at)
+		if digest == "" {
+			continue
+		}
+		if sent, err := c.deliver(ctx, a, clearCommand(a.AgentType)); err == nil && sent {
+			c.mu.Lock()
+			delete(c.asked, name)
+			c.last[name] = compacted{at: now}
+			c.pending[name] = bootstrap{at: now, text: handoffText(digest)}
+			c.mu.Unlock()
+			c.logger.Info("cleared an agent after its handoff note", "session", name, "note", digest[:12])
+		}
+	}
+}
+
+// forgetAsk ends a wait for a note; cooldown keeps the agent from being asked again at once.
+func (c *ContextCompact) forgetAsk(name string, cooldown bool, now time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.asked, name)
+	if cooldown {
+		c.last[name] = compacted{at: now}
+	}
 }
