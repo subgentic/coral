@@ -31,7 +31,11 @@ func TestHubSigninThroughTheRouter(t *testing.T) {
 	srv := mustServer(NewWithKey(cfg, db, stack.backend, stack.terminal, ""))
 	t.Cleanup(srv.Close) // its loops and the board database, which Windows won't remove while open (#3914)
 	require.NotNil(t, srv.hubSignin)
-	local := httptest.NewServer(srv.Router())
+	// As the main server: each connection gets its cached, retried attribution (auth.ConnContext). Without it every "from this computer" check was a
+	// table read of its own, and a connection whose row the table had not caught up with read as not this computer (setup_code_required, 4 in 50 runs).
+	local := httptest.NewUnstartedServer(srv.Router())
+	local.Config.ConnContext = auth.ConnContext
+	local.Start()
 	t.Cleanup(local.Close)
 	noFollow := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	do := func(method, path string, cookie *http.Cookie) *http.Response {

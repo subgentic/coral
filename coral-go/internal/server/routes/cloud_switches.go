@@ -244,8 +244,7 @@ func (h *CloudHandler) refuseSystemSetting(w http.ResponseWriter, r *http.Reques
 		errForbidden(w, where+", not through Coral Hub")
 		return true
 	}
-	if same, supported := h.sameUser(r); supported && !same {
-		writeError(w, http.StatusForbidden, "other_user", where+", as the user Coral runs as")
+	if h.refusePeer(w, r, where+", as the user Coral runs as") {
 		return true
 	}
 	if r.Header.Get(cloud.CLIAuthHeader) == "" && localDashboard(r) {
