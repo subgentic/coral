@@ -46,7 +46,12 @@ const { framesJs, coralReady } = require('./helpers/wait');
             await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
             await ev(`new Promise(r => setTimeout(r, 600))`); // sleep-ok: the layout change's own lookups (the top tabs) settle before the keys are counted
             await ev(`document.getElementById('command-input').value = ''; document.getElementById('command-input').focus(); true`); await taken();
+            // the notices column exists on a page that has shown a notice (the launch notice, a toast): its menu check used to run, debounced, after the keys (a lookup over the page, 1 or 2 a run, whenever the typing paused 30 ms) (#14907)
+            await ev(`import((window.__coralStatic || '/static/') + 'notifications.js').then(m => { m.showToast('A notice on the page'); return true; })`);
+            await ev(`new Promise(r => setTimeout(r, 300))`); // sleep-ok: the toast's own placing settles before the keys are counted
+            await ev(`document.getElementById('command-input').focus(); true`); await taken();
             for (const ch of 'hello there, a few words to type') { await Input.dispatchKeyEvent({ type: 'keyDown', key: ch, text: ch }); await Input.dispatchKeyEvent({ type: 'keyUp', key: ch }); }
+            await ev(`new Promise(r => setTimeout(r, 200))`); // sleep-ok: a lookup that a key schedules (30 ms after the last one) must have had its turn before the count
             const phoneTyped = (await taken()).filter(s => !/^#[\w-]+$/.test(s));
             const phonePerKey = phoneTyped;
             assert.equal(phonePerKey.length, 0, `on a phone's layout too: typing makes no page-wide lookup per keystroke (${phonePerKey.length}: ${[...new Set(phonePerKey)].join(' | ')})`);
@@ -111,6 +116,9 @@ const { framesJs, coralReady } = require('./helpers/wait');
             mo.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
             T.ws.handleCoralMessage({ type: 'coral_diff', changed: [e], removed: [] }); await ${framesJs(3)}; seen.push(...mo.takeRecords().map(r => ({ type: r.type, inList: false, target: 'late' }))); mo.disconnect(); return seen; })()`);
         await feed({ summary: 'budget settled' }); // the first message may still be settling what the last one changed
+        // and the page's own late work (the switched-to agent's changed-files list answering a moment after the switch: 1 run in 25 at CPU x4 saw it inside the next count) is waited out: nothing writes anywhere for 400 ms
+        await ev(`window.__writes = 0; new MutationObserver(rs => { window.__writes += rs.length; }).observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true }); true`);
+        await require('./helpers/wait').waitStable(ev, 'window.__writes', 'the page has stopped writing before a quiet message is counted', 400, { timeout: 10000 });
         const quiet = await feed({ staleness_seconds: 7 });
         assert.deepEqual(quiet, [], 'a message that changes nothing drawn writes nothing to the page: ' + JSON.stringify(quiet));
         const one = await feed({ summary: 'budget step ' + Math.random() });
