@@ -42,7 +42,7 @@ async function setupHubWorld({ client, Page, Emulation, width, height, mobile, i
    const original=window.fetch; window.__remoteRequests=[];
    const computers=window.__computers=[{id:'m1',label:'Laptop',status:'online',online:true,access_mode:'view',local_mode:'launch',effective_mode:'view'},{id:'m2',label:'Desktop',status:'online',online:true,access_mode:'interact',local_mode:'launch',effective_mode:'interact'}];
    const json=x=>Promise.resolve(new Response(JSON.stringify(x),{headers:{'content-type':'application/json'}}));
-   const hubSessions=()=>window.__noComputers?[]:[['m1','Review agent'],['m1','Docs agent'],['m2','Build agent']].map(([server,name],i)=>({session_id:'hub-agent-'+i,name:'hub-agent-'+i,display_name:name,agent_type:'claude',working_directory:'/tmp/hub-agent-'+i,server,sleeping:false,archived:false,status:'idle'}));
+   const hubSessions=()=>window.__noComputers?[]:[['m1','Review agent'],['m1','Docs agent'],['m2','Build agent']].map(([server,name],i)=>({session_id:'hub-agent-'+i,name:'hub-agent-'+i,display_name:name,agent_type:'claude',working_directory:'/tmp/hub-agent-'+i,server,sleeping:false,archived:false,status:'idle'})).map(s=>window.__hubSessionPatch?window.__hubSessionPatch(s):s); // a test may make an agent wait, ask or carry a prompt: set window.__hubSessionPatch = s => ({ ...s, ... })
    if (${JSON.stringify(hubFeed)}) {
     // Keep the real handshake, close and reconnect lifecycle, but use the same
     // Hub inventory as HTTP: this isolated Go server has no remote computers.

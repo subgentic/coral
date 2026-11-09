@@ -307,7 +307,10 @@ function fill(s, cell, withDismiss = true) {
 }
 
 /** Whether a Needs you row offers its agent's answers at all: not a review or a run, not a viewer through the Hub, not a sign-in. */
-const answerable = s => !(s.review || s.autorun || !s.agent_type || !s.session_id || s.waiting_kind === 'login') && !blockedReason(sessionServer(s), 'interact');
+const askable = s => !(s.review || s.autorun || !s.agent_type || !s.session_id || s.waiting_kind === 'login');
+const answerable = s => askable(s) && !blockedReason(sessionServer(s), 'interact');
+/** A question the person could answer but for the Hub's access to that computer (View only): the reason, so a row with no buttons says why (#15010). */
+const viewOnlyWhy = s => (askable(s) ? blockedReason(sessionServer(s), 'interact') : '');
 
 /** The actions of a phone Needs you row's ⋯ menu (#137104): the Dismiss of a wait that is no longer true, offered by the rule the desktop row's button follows. */
 export function rowActions(s) {
@@ -334,14 +337,18 @@ export function answerCell(s, { dismiss = true } = {}) {
         }
         return cell;
     }
-    if (!answerable(s)) { // a sign-in, or a viewer through the Hub: no answers, but the row can still be hidden (#11946)
-        if (!dismiss || !canDismissWait(s, s.waiting_kind)) return '';
+    if (!answerable(s)) { // a sign-in, or a viewer through the Hub: no answers, but the row can still be hidden (#11946); a viewer is told why there are no buttons (#15010)
+        const why = viewOnlyWhy(s), canHide = dismiss && canDismissWait(s, s.waiting_kind);
+        if (!why && !canHide) return '';
         const only = document.createElement('span'); only.className = 'inbox-answers';
-        const d = dismissButton('btn btn-small inbox-dismiss', s);
-        d.setAttribute('aria-label', `Dismiss the wait of ${resolveSessionIdentity(s)}`);
-        d.addEventListener('click', e => { e.stopPropagation(); dismissWait(s, d); });
-        d.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
-        only.append(d);
+        if (why) { const note = document.createElement('span'); note.className = 'inbox-trust-note inbox-answer-why'; note.textContent = 'View only through Coral Hub'; note.title = why; only.append(note); }
+        if (canHide) {
+            const d = dismissButton('btn btn-small inbox-dismiss', s);
+            d.setAttribute('aria-label', `Dismiss the wait of ${resolveSessionIdentity(s)}`);
+            d.addEventListener('click', e => { e.stopPropagation(); dismissWait(s, d); });
+            d.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
+            only.append(d);
+        }
         return only;
     }
     const cell = document.createElement('span');
