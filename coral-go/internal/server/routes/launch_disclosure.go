@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/agent"
+	settingdefs "github.com/subgentic/coral/internal/settings"
 )
 
 // The first-launch disclosure (#14353, Security's MUST 3 on #14333): agents default to Auto, and a different mode may skip prompts; the person is told once, in words the server owns, before a launch from the dashboard's own
@@ -19,8 +20,8 @@ const (
 	LaunchDisclosureText = "Agents default to auto mode. Choose a different permission mode when you launch an agent or set a default in Settings."
 	// PermissionLoweringText is where to lower it, carried in every launch answer.
 	PermissionLoweringText = "To lower it: pass a lower permission mode when you launch (a CLI permission flag, or permission_mode default), or set a default permission mode in Settings."
-	// launchDisclosureAckSetting holds {"id","at"}. It is hidden from GET /api/settings and cannot be written through PUT /api/settings (the registry does not know it).
-	launchDisclosureAckSetting = "launch_disclosure_ack"
+	// launchDisclosureAckSetting holds {"id","at"}. Its opaque Coral setting is hidden from GET /api/settings and cannot be written through PUT /api/settings.
+	launchDisclosureAckSetting = settingdefs.LaunchDisclosureAck
 	launchDisclosureRequired   = "launch_disclosure_required"
 )
 
@@ -38,7 +39,7 @@ func launchDisclosureState(settings map[string]string) launchDisclosureView {
 		ID string `json:"id"`
 		At string `json:"at"`
 	}
-	if raw := settings[launchDisclosureAckSetting]; raw != "" && json.Unmarshal([]byte(raw), &ack) == nil && ack.ID == LaunchDisclosureID {
+	if raw := settingdefs.Raw(settings, launchDisclosureAckSetting); raw != "" && json.Unmarshal([]byte(raw), &ack) == nil && ack.ID == LaunchDisclosureID {
 		v.Seen, v.At = true, ack.At
 	}
 	return v

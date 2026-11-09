@@ -13,6 +13,7 @@ let current = -1;
 let observer = null;
 let refreshTimer = null;
 let loadingOlder = false;
+let noticeResizeObserver = null;
 
 // The live chat's messages, or the past chat's in the Inbox when that is the one on screen (#10533, the Desktop tester: Ctrl/Cmd+F did nothing in a past chat).
 function container() {
@@ -56,11 +57,21 @@ function setFindBtn(on) {
     document.getElementById('chat-find-btn')?.setAttribute('aria-pressed', String(on));
 }
 
+function watchLaunchDisclosure() {
+    const notice = document.getElementById('launch-disclosure-banner');
+    if (notice && noticeResizeObserver) noticeResizeObserver.observe(notice);
+    placeBar();
+}
+
 function placeBar() {
     const c = container();
     if (!c || !bar) return;
     const r = c.getBoundingClientRect();
-    bar.style.top = `${Math.max(r.top + 8, 8)}px`;
+    // The first-launch notice can finish loading after first paint and sits above the chat.
+    // Keep the fixed find controls below it when large text makes both headers tall.
+    const notice = document.getElementById('launch-disclosure-banner');
+    const noticeBottom = notice && getComputedStyle(notice).display !== 'none' ? notice.getBoundingClientRect().bottom + 8 : 8;
+    bar.style.top = `${Math.max(r.top + 8, noticeBottom, 8)}px`;
     bar.style.right = `${Math.max(window.innerWidth - r.right + 20, 8)}px`;
 }
 
@@ -201,6 +212,9 @@ export function toggleChatFind() {
 export function initChatFind() {
     window.toggleChatFind = toggleChatFind;
     window.closeChatFind = closeFind;
+    if (typeof ResizeObserver === 'function') noticeResizeObserver = new ResizeObserver(placeBar);
+    window.addEventListener('coral:launch-disclosure-shown', watchLaunchDisclosure);
+    watchLaunchDisclosure();
     document.addEventListener('keydown', e => {
         if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f' && chatVisible()) {
             // Leave the terminal's own shortcuts alone.

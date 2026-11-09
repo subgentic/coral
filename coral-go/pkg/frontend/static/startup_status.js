@@ -26,6 +26,24 @@ const _settlePollListLoad = () => { if (!_pollListLoadSettled) { _pollListLoadSe
 // then asks once more a little after, so a damaged database is not only in the log.
 const DATABASE_RECHECK_MS = 90_000;
 
+// Load the notice only after the browser has painted the dashboard. Its server-side
+// launch gate is authoritative, so this read is informational rather than a startup prerequisite.
+function afterFirstContentfulPaint(callback) {
+    const hasPainted = () => performance.getEntriesByType('paint').some(entry => entry.name === 'first-contentful-paint');
+    if (hasPainted()) { callback(); return; }
+    if (typeof PerformanceObserver === 'function') {
+        const observer = new PerformanceObserver(list => {
+            if (list.getEntries().some(entry => entry.name === 'first-contentful-paint')) {
+                observer.disconnect();
+                callback();
+            }
+        });
+        observer.observe({ type: 'paint', buffered: true });
+        return;
+    }
+    requestAnimationFrame(() => requestAnimationFrame(callback));
+}
+
 async function recheckDatabases() {
     if (isSignedOut()) return; /* a signed-out page makes no /api request (#12444) */
     try {
@@ -70,7 +88,9 @@ export function pollStartupStatus() {
                 if (data.database_warning) showDatabaseWarning(data.database_warning);
                 else setTimeout(recheckDatabases, DATABASE_RECHECK_MS);
                 dashboardStartupComplete();
-                importOnce('./launch_disclosure.js').then(m => m.refreshLaunchDisclosure()).catch(() => {});
+                afterFirstContentfulPaint(() => {
+                    importOnce('./launch_disclosure.js').then(m => m.refreshLaunchDisclosure()).catch(() => {});
+                });
                 // One question at a time: set a password (#3948, once, while none is set), then Coral Hub sign-in (#3966, once, for a
                 // computer already linked to Coral Hub). The second waits if the first is still open.
                 // On a fresh install the first-launch Connect screen is asked first (#11464): the password waits for its answer, for at most 15 s.
