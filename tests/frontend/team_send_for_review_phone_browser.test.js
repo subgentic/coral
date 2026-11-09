@@ -14,7 +14,8 @@ const { coralReady } = require('./helpers/wait');
     const B = 'srp-' + Date.now().toString(36);
     const api = (method, path, body, headers) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: ${JSON.stringify(headers || { 'Content-Type': 'application/json' })}, body: ${body === undefined ? 'undefined' : typeof body === 'string' ? JSON.stringify(body) : JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }))`);
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
-    const btn = text => `[...document.querySelectorAll('button, [role=menuitem]')].filter(b => b.getClientRects().length && b.textContent.trim() === ${JSON.stringify(text)})`;
+    const btn = text => `[...document.querySelectorAll('button, [role=menuitem]')].filter(b => b.getClientRects().length && ((b.querySelector('.more-item-label') || b).textContent.trim()) === ${JSON.stringify(text)})`;
+    const openMore = () => ev(`(() => { const t = [...document.querySelectorAll('.detail-foot .task-more-btn')].find(x => x.getClientRects().length); if (t && t.getAttribute('aria-expanded') !== 'true') t.click(); return true; })()`); // the file's secondary actions are in its More menu (#14963)
     const sleep = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: a poll of the server's own state
     let sid = null, sname = null; const files = [];
     const tagsOf = async hex => (await api('GET', `/api/board/${B}/artifacts?limit=50`)).body.artifacts.find(a => a.id === hex || (a.uri || '').includes(hex))?.tags || [];
@@ -27,8 +28,9 @@ const { coralReady } = require('./helpers/wait');
     };
     // an action is looked for in the pane that is open (it may redraw in place after a send), then, if it is not there, in the pane opened again from the row
     const showAction = async (text, name) => {
+        await openMore(); // (the sheet's actions are in its More menu)
         const there = await waitFor(`${btn(text)}.length > 0`, `${text} in the open pane`, 3000).then(() => true, () => false);
-        if (!there) { await openSheet(name); await waitFor(`${btn(text)}.length > 0`, `${text} after opening ${name} again`, 10000); }
+        if (!there) { await openSheet(name); await openMore(); await waitFor(`${btn(text)}.length > 0`, `${text} after opening ${name} again`, 10000); }
     };
     const dialogBox = () => ev(`(() => { const d = document.querySelector('dialog.send-review-dialog[open]'); if (!d) return null; const r = d.getBoundingClientRect(), small = [...d.querySelectorAll('button')].filter(b => b.getBoundingClientRect().height < 43.5).map(b => b.textContent), i = d.querySelector('input').getBoundingClientRect();
         return { cx: Math.round((r.left + r.right) / 2), cy: Math.round((r.top + r.bottom) / 2), vw: innerWidth, vh: innerHeight, left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), bottom: Math.round(r.bottom), small, inputRight: Math.round(i.right), docOver: document.documentElement.scrollWidth - innerWidth }; })()`);
@@ -51,9 +53,11 @@ const { coralReady } = require('./helpers/wait');
         await openSheet('plan.txt');
         await showAction('Send for review', 'plan.txt');
         assert.equal((await ev(`${btn('Remove from review')}.length`)), 0, 'a file that is not for review does not offer Remove');
+        await openMore();
         const target = await ev(`Math.round(${btn('Send for review')}[0].getBoundingClientRect().height)`);
         assert.ok(target >= 43.5, 'Send for review is a 44 px touch target: ' + target);
         await shot('send_for_review_phone_sheet');
+        await openMore();
         await ev(`${btn('Send for review')}[0].click(); true`);
         await waitFor(`!!document.querySelector('dialog.send-review-dialog[open] input')`, 'the question dialog', 8000);
         for (const size of ['', '32px']) {
@@ -70,12 +74,14 @@ const { coralReady } = require('./helpers/wait');
         console.log('   ✓');
 
         console.log('2. Send from the phone\'s sheet: the server keeps the tag, and the sheet then offers Remove from review');
+        await openMore();
         await ev(`${btn('Send for review')}[0].click(); true`);
         await waitFor(`!!document.querySelector('dialog.send-review-dialog[open] input')`, 'the question dialog again', 8000);
         await ev(`(() => { const i = document.querySelector('dialog.send-review-dialog[open] input'); i.value = 'Approve this plan?'; document.querySelector('dialog.send-review-dialog[open] .send-review-go').click(); return true; })()`);
         await until(files[0], true, 'plan.txt is for review');
         await waitFor(`!document.querySelector('dialog.send-review-dialog')`, 'the dialog closed after sending', 4000);
         await showAction('Remove from review', 'plan.txt');
+        await openMore();
         assert.equal((await ev(`${btn('Send for review')}.length`)), 0, 'a file that is for review does not offer Send');
         await ev(`${btn('Remove from review')}[0].click(); true`);
         await until(files[0], false, 'plan.txt is out of review');

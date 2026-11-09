@@ -85,13 +85,13 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await until(`!!document.getElementById('agentic-tab-artifacts')`, 'the Artifacts tab');
         await ev(`document.getElementById('agentic-tab-artifacts').click(); true`);
         const row = `[...document.querySelectorAll('#agentic-panel-artifacts tbody tr')].find(r => r.textContent.includes('keep-me.txt'))`;
-        const keep = `[...document.querySelectorAll('#agentic-detail-pane .detail-foot .btn')].find(b => /^(Keep|Kept)$/.test(b.textContent))`; // the sheet's toggle
+        const keep = `[...document.querySelectorAll('#agentic-detail-pane .detail-foot .menu-item')].find(b => /^(Keep|Kept)$/.test((b.querySelector('.more-item-label') || b).textContent))`; // the sheet's toggle
         const openRow = async () => { await until(`!!(${row})`, 'the row'); await ev(`(${row}).querySelector('.artifact-details').click(); true`); }; // the agent's row opens the preview; its sheet (Keep) is the Details link
         await openRow();
         await until(`!!(${keep})`, 'the Keep toggle');
-        const before = await ev(`(${keep}).getAttribute('aria-pressed')`);
+        const before = await ev(`(${keep}).getAttribute('aria-checked')`);
         await ev(`(${keep}).click(); true`);
-        await until(`(${keep}).getAttribute('aria-pressed') === 'true'`, 'kept');
+        await until(`(${keep}).getAttribute('aria-checked') === 'true'`, 'kept');
         const list = await ev(`fetch('/api/system/artifact-store/kept').then(r => r.json())`);
         check('Keep marks it (pressed) and Coral lists it as kept', before === 'false' && (list.kept || []).includes(hex), JSON.stringify({ before, list }));
         loaded = Page.loadEventFired();
@@ -101,10 +101,10 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await until(`!!document.getElementById('agentic-tab-artifacts')`, 'the Artifacts tab again');
         await ev(`document.getElementById('agentic-tab-artifacts').click(); true`);
         await openRow();
-        await until(`!!(${keep}) && (${keep}).getAttribute('aria-pressed') === 'true'`, 'kept after the reload');
-        check('still kept after a reload', (await ev(`(${keep}).getAttribute('aria-pressed')`)) === 'true');
+        await until(`!!(${keep}) && (${keep}).getAttribute('aria-checked') === 'true'`, 'kept after the reload');
+        check('still kept after a reload', (await ev(`(${keep}).getAttribute('aria-checked')`)) === 'true');
         await ev(`(${keep}).click(); true`);
-        await until(`(${keep}).getAttribute('aria-pressed') === 'false'`, 'released');
+        await until(`(${keep}).getAttribute('aria-checked') === 'false'`, 'released');
         const after = await ev(`fetch('/api/system/artifact-store/kept').then(r => r.json())`);
         check('a second click releases it', !(after.kept || []).includes(hex), JSON.stringify(after));
 

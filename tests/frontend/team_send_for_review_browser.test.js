@@ -15,7 +15,8 @@ const { coralReady } = require('./helpers/wait');
     const B = 'sr-' + Date.now().toString(36);
     const api = (method, path, body, headers) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: ${JSON.stringify(headers || { 'Content-Type': 'application/json' })}, body: ${body === undefined ? 'undefined' : typeof body === 'string' ? JSON.stringify(body) : JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }))`);
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
-    const btn = text => `[...document.querySelectorAll('button, [role=menuitem]')].filter(b => b.getClientRects().length && b.textContent.trim() === ${JSON.stringify(text)})`;
+    const btn = text => `[...document.querySelectorAll('button, [role=menuitem]')].filter(b => b.getClientRects().length && ((b.querySelector('.more-item-label') || b).textContent.trim()) === ${JSON.stringify(text)})`;
+    const openMore = () => ev(`(() => { const t = [...document.querySelectorAll('.detail-foot .task-more-btn')].find(x => x.getClientRects().length); if (t && t.getAttribute('aria-expanded') !== 'true') t.click(); return true; })()`); // the file's secondary actions are in its More menu (#14963)
     const sleep = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: a poll of the server's own state
     let sid = null, sname = null, files = [];
     const tagsOf = async hex => (await api('GET', `/api/board/${B}/artifacts?limit=50`)).body.artifacts.find(a => a.id === hex || (a.uri || '').includes(hex))?.tags || [];
@@ -38,8 +39,11 @@ const { coralReady } = require('./helpers/wait');
 
         console.log('1. A file\'s sheet offers Send for review; Cancel in the question sends nothing');
         await openSheet('plan.txt');
+        await openMore();
         await waitFor(`${btn('Send for review')}.length > 0`, 'Send for review in the sheet', 10000);
+        await openMore();
         assert.equal((await ev(`${btn('Remove from review')}.length`)), 0, 'a file that is not for review does not offer Remove');
+        await openMore();
         await ev(`${btn('Send for review')}[0].click(); true`);
         await waitFor(`!!document.querySelector('dialog.send-review-dialog[open] input')`, 'the question dialog', 8000);
         const dlg = await ev(`(() => { const d = document.querySelector('dialog.send-review-dialog[open]'), i = d.querySelector('input'); return { title: d.querySelector('h2').textContent, label: d.querySelector('label').textContent, labelled: d.getAttribute('aria-labelledby') === d.querySelector('h2').id && d.querySelector('label').htmlFor === i.id, focused: document.activeElement === i, max: i.maxLength, described: !!document.getElementById(i.getAttribute('aria-describedby')) }; })()`);
@@ -53,6 +57,7 @@ const { coralReady } = require('./helpers/wait');
         console.log('   ✓');
 
         console.log('2. Send with a question (Enter in the box): the server keeps the tag; the row says so');
+        await openMore();
         await ev(`${btn('Send for review')}[0].click(); true`);
         await waitFor(`!!document.querySelector('dialog.send-review-dialog[open] input')`, 'the question dialog again', 8000);
         await ev(`(() => { const i = document.querySelector('dialog.send-review-dialog[open] input'); i.value = '  Approve   this  plan?  '; i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return true; })()`);
@@ -73,8 +78,11 @@ const { coralReady } = require('./helpers/wait');
 
         console.log('4. A file that is for review offers Remove from review in its sheet, and the tag is gone after it');
         await openSheet('draft.txt');
+        await openMore();
         await waitFor(`${btn('Remove from review')}.length > 0`, 'Remove from review in the sheet', 10000);
+        await openMore();
         assert.equal((await ev(`${btn('Send for review')}.length`)), 0, 'a file that is for review does not offer Send');
+        await openMore();
         await ev(`${btn('Remove from review')}[0].click(); true`);
         await until(files[1], false, 'draft.txt is out of review');
         console.log('   ✓');

@@ -109,27 +109,27 @@ export function createArtifactsList({ inbox = false } = {}) {
         draw();
     }
 
+    const isOn = b => (b.getAttribute('role') === 'menuitemcheckbox' ? b.getAttribute('aria-checked') : b.getAttribute('aria-pressed')) === 'true'; // a toggle is a pressed button, or a checked item in the More menu
+    const setOn = (b, on, label) => { if (b.getAttribute('role') === 'menuitemcheckbox') { b.setAttribute('aria-checked', String(on)); return; } b.setAttribute('aria-pressed', String(on)); b.textContent = label; }; // a menu item keeps its name (Star, Keep) and says its state with aria-checked; a button's name follows its state (#14972)
     async function toggleKeep(hex, name, button) {
-        const on = button.getAttribute('aria-pressed') !== 'true';
+        const on = !isOn(button);
         const r = await serverFetch(server(), `/api/artifacts/${hex}/keep`, { method: on ? 'PUT' : 'DELETE' }).catch(() => null); // on this list's own computer (the page's bare /api is the Hub's through the Hub, #12617)
         if (!r || !r.ok) { showToast(`Couldn't ${on ? 'keep' : 'release'} ${name}.`, true); return; }
         if (on) model.kept.add(hex); else model.kept.delete(hex);
-        button.setAttribute('aria-pressed', String(on));
-        button.textContent = on ? 'Kept' : 'Keep';
-        button.title = on ? 'Kept: Coral\u2019s cleanup never deletes this file (click to release)' : 'Keep: Coral\u2019s cleanup never deletes this file';
+        setOn(button, on, on ? 'Kept' : 'Keep');
+        if (button.getAttribute('role') !== 'menuitemcheckbox') button.title = on ? 'Kept: Coral\u2019s cleanup never deletes this file (click to release)' : 'Keep: Coral\u2019s cleanup never deletes this file';
         say(`${on ? 'Kept' : 'Released'} ${name}`);
     }
 
     // The star is a bookmark on an artifact (#9819): on this computer's store through the dashboard, and the owner's through Coral Hub, so it is offered for any artifact with a stored object.
     async function toggleStar(hex, name, button, item) {
-        const on = button.getAttribute('aria-pressed') !== 'true';
+        const on = !isOn(button);
         const r = await serverFetch(inbox ? serverOf(item) : server(), `/api/artifacts/${hex}/star`, { method: on ? 'PUT' : 'DELETE' }).catch(() => null); // the computer the file is on, not the page's own (#12617)
         if (!r || !r.ok) { showToast(`Couldn't ${on ? 'star' : 'unstar'} ${name}.`, true); return; }
         item.starred = on;
         document.dispatchEvent(new CustomEvent('artifact-star-changed')); // the Inbox's Starred folder reads its artifacts again (#10258)
-        button.setAttribute('aria-pressed', String(on));
-        button.textContent = on ? 'Starred' : 'Star';
-        button.title = on ? 'Starred (click to remove the star)' : 'Star: add it to your Starred list (it can still be cleaned up)';
+        setOn(button, on, on ? 'Starred' : 'Star');
+        if (button.getAttribute('role') !== 'menuitemcheckbox') button.title = on ? 'Starred (click to remove the star)' : 'Star: add it to your Starred list (it can still be cleaned up)';
         say(`${on ? 'Starred' : 'Unstarred'} ${name}`);
     }
 
@@ -562,22 +562,22 @@ export function createArtifactsList({ inbox = false } = {}) {
             else if (hex) actions.push({ label: 'Open', primary: true, run: () => importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(hex, { server: link.server, filename: name, mediaType: item.media_type, fileId: item.file_id, versionLine: item.version_line, board: splitKey(inbox ? item.board_id : model.project).name, ...(item.produced_by ? { uploader: { role: String(item.produced_by), hex, server: link.server, board: splitKey(inbox ? item.board_id : model.project).name, seriesId: String(item.series_id || '') } } : {}), ...(item.goal_id && item.goal_title ? { goal: String(item.goal_title), goalId: String(item.goal_id), goalTeam: inbox ? item.board_id : model.project } : {}) }), () => window.open(link.url, '_blank', 'noopener,noreferrer')) });
             if (link.preview) actions.push(isCloud() ? { label: 'Download', run: () => importOnce('./artifact_download.js').then(m => m.downloadArtifact(link.url, m.sanitizeDownloadName(name))).catch(() => showToast('The artifact could not be downloaded', true)) } : { label: 'Download', href: link.url, download: true });
             else actions.push({ label: 'Open link', primary: true, href: link.url });
-            actions.push({ label: 'Copy link', run: () => { navigator.clipboard?.writeText(hex ? `coral://artifacts/${hex}` : new URL(link.url, location.href).href).then(() => showToast('Link copied'), () => showToast('The link could not be copied', true)); } });
-            if (fileIdOf(item)) actions.push({ label: 'Copy file ID', title: 'The file\'s stable id: pass it to --new-version-of (add @<version> for one version)', run: () => copyFileId(item, showToast) });
-            if (hex) actions.push({ label: item.starred ? 'Starred' : 'Star', title: item.starred ? 'Starred (click to remove the star)' : 'Star: add it to your Starred list (it can still be cleaned up)', pressed: !!item.starred, run: b => toggleStar(hex, name, b, item) });
+            actions.push({ label: 'Copy link', menu: 2, run: () => { navigator.clipboard?.writeText(hex ? `coral://artifacts/${hex}` : new URL(link.url, location.href).href).then(() => showToast('Link copied'), () => showToast('The link could not be copied', true)); } });
+            if (fileIdOf(item)) actions.push({ label: 'Copy file ID', menu: 3, title: 'The file\'s stable id: pass it to --new-version-of (add @<version> for one version)', run: () => copyFileId(item, showToast) });
+            if (hex) actions.push({ label: 'Star', menu: 4, description: 'Adds it to your Starred list', title: item.starred ? 'Starred (click to remove the star)' : 'Star: add it to your Starred list (it can still be cleaned up)', pressed: !!item.starred, run: b => toggleStar(hex, name, b, item) });
             if (hex && (item.tags || []).includes(IGNORED)) actions.push({ label: 'Unignore', title: 'Put it back in Needs you', run: () => importOnce('./artifact_review.js').then(async m => { const out = await m.unignoreRow(inbox ? item.board_id : model.project, { id: hex }); retag(hex, out.tags || (item.tags || []).filter(t => t !== IGNORED).concat(REVIEW)); showToast(`Back in Needs you: ${name}`); }).catch(e => showToast(e.message, true)) });
             if (hex && !isUnverified(item)) { // the Operator's own way to put a file in Needs you, and to take it out (#13152)
                 const inReview = (item.tags || []).includes(REVIEW);
-                actions.push(inReview ? { label: 'Remove from review', title: 'Take it out of Needs you', run: () => changeReview(reviewFiles([item]), true, name).then(r => { if (r) showToast(r.failed ? `Could not remove it from review: ${r.why}` : 'Removed from review', !!r.failed); }) }
-                    : { label: 'Send for review', title: 'Put it in Needs you to approve or ask for changes', run: () => changeReview(reviewFiles([item]), false, name).then(r => { if (r) showToast(r.failed ? `Could not send it for review: ${r.why}` : 'Sent for review: it is in Needs you', !!r.failed); }) });
+                actions.push(inReview ? { label: 'Remove from review', menu: 1, description: 'Takes it out of Needs you', title: 'Take it out of Needs you', run: () => changeReview(reviewFiles([item]), true, name).then(r => { if (r) showToast(r.failed ? `Could not remove it from review: ${r.why}` : 'Removed from review', !!r.failed); }) }
+                    : { label: 'Send for review', menu: 1, description: 'Puts it in Needs you to approve or ask for changes', title: 'Put it in Needs you to approve or ask for changes', run: () => changeReview(reviewFiles([item]), false, name).then(r => { if (r) showToast(r.failed ? `Could not send it for review: ${r.why}` : 'Sent for review: it is in Needs you', !!r.failed); }) });
             }
             if (hex && local()) {
                 const on = model.kept.has(hex);
-                actions.push({ label: on ? 'Kept' : 'Keep', title: on ? 'Kept: Coral\u2019s cleanup never deletes this file (click to release)' : 'Keep: Coral\u2019s cleanup never deletes this file', pressed: on, run: b => toggleKeep(hex, name, b) });
-                actions.push({ label: 'Delete', danger: true, run: () => deleteArtifact(hex, name, sizeText(item.size)) });
+                actions.push({ label: 'Keep', menu: 5, description: 'Coral\u2019s cleanup never deletes it', title: on ? 'Kept: Coral\u2019s cleanup never deletes this file (click to release)' : 'Keep: Coral\u2019s cleanup never deletes this file', pressed: on, run: b => toggleKeep(hex, name, b) });
+                actions.push({ label: 'Delete', menu: 9, danger: true, run: () => deleteArtifact(hex, name, sizeText(item.size)) });
             }
         }
-        const note = hex ? `Star puts it in your Starred list.${hex && local() ? ' Keep stops Coral\u2019s cleanup from deleting the file.' : ''}` : ''; // the two buttons are not the same thing, and their names are close (#10539)
+        const note = ''; // the help line is gone (#14963): Star and Keep say what they do in the More menu, under their names (#10539)
         const editor = hex ? Tags.tagEditor({ project: inbox ? item.board_id : model.project, hex, tags: item.tags, editable: local(), offer: teamTags, onChange: tags => retag(hex, tags) }) : null; // a stored file's tags (#8594)
         const reviewText = hex ? Tags.reviewWords(item.tags, item.review, item.produced_by) : ''; // the review's state in words, with the time of an approval, above the tags (#136584)
         let head = editor;
