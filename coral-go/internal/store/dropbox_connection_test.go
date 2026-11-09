@@ -93,7 +93,7 @@ func TestARekeyDiscardsTheDropboxTokenAndKeepsTheServerID(t *testing.T) {
 	id, err := ds.ServerID(ctx)
 	require.NoError(t, err)
 	require.NoError(t, ds.Save(ctx, "dbid:AAA", fakeRefresh, "fp"))
-	require.NoError(t, os.Chmod(secretbox.KeyFilePath(dir), 0o644)) // the key is refused (other accounts can read it): a re-key is allowed
+	refuseTheKey(t, rs, dir) // a re-key is allowed
 	require.NoError(t, rs.Rekey(ctx))
 	_, err = ds.RefreshToken(ctx)
 	assert.ErrorIs(t, err, ErrNoDropboxConnection, "a re-key discards every sealed secret, the Dropbox token too")
@@ -115,7 +115,7 @@ func TestARekeyTurnsRetentionOff(t *testing.T) {
 	ctx := context.Background()
 	require.NoError(t, ds.Save(ctx, "dbid:AAA", fakeRefresh, "fp"))
 	require.NoError(t, ds.SetRetention(ctx, 9))
-	require.NoError(t, os.Chmod(secretbox.KeyFilePath(dir), 0o644))
+	refuseTheKey(t, rs, dir) // a re-key is allowed
 	require.NoError(t, rs.Rekey(ctx))
 	days, _, err := ds.Retention(ctx)
 	require.NoError(t, err)
@@ -220,4 +220,16 @@ func TestTheBackupFiltersDefaultToEverything(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"md", "png"}, types)
 	assert.Equal(t, 3, days)
+}
+
+// refuseTheKey makes Coral refuse the master key on every system (#14940): a malformed key file
+// is refused (secretbox.ErrKeyInvalid) on Unix and Windows alike, where a mode other accounts can
+// read is a Unix-only refusal (Windows checks the access list, which a chmod does not change). It
+// checks the refusal, so a test using it cannot pass on a re-key that never ran.
+func refuseTheKey(t *testing.T, rs *RemoteServerStore, dir string) {
+	t.Helper()
+	require.NoError(t, os.WriteFile(secretbox.KeyFilePath(dir), []byte("not a key\n"), 0o600))
+	st, err := rs.KeyState(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, "refused", st.State, st.Message)
 }

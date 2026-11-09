@@ -2,13 +2,10 @@ package store
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/subgentic/coral/pkg/secretbox"
 )
 
 // #14714 auto-sync. Mutants: off by default; a pause lifted by anything but Resume; another account's sign-in, a disconnect or a re-key not pausing it.
@@ -35,7 +32,7 @@ func TestAutoSyncIsOnByDefaultAndPausedByAChangeOfSignIn(t *testing.T) {
 	assert.Equal(t, AutoSyncPausedSignIn, paused, "a disconnect pauses it")
 	require.NoError(t, ds.SetAutoSync(ctx, true))
 	require.NoError(t, ds.Save(ctx, "dbid:B", "refresh4", "fp"))
-	require.NoError(t, os.Chmod(secretbox.KeyFilePath(dir), 0o644)) // the key is refused: a re-key is allowed
+	refuseTheKey(t, rs, dir) // a re-key is allowed
 	require.NoError(t, rs.Rekey(ctx))
 	_, paused, _ = ds.AutoSync(ctx)
 	assert.Equal(t, AutoSyncPausedSignIn, paused, "a re-key pauses it")
