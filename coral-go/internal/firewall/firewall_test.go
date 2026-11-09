@@ -164,3 +164,47 @@ func TestFixQuotesARuleIdTheWayPowerShellReadsIt(t *testing.T) {
 	assert.Contains(t, fix, "'{a}''; calc; \u2019\u2019b'", "straight and curly quotes both doubled")
 	assert.NotContains(t, fix, "-Name {a}", "the id is always quoted")
 }
+
+// Security's SHOULD on #125 (#14850): the dashboard turns every line of the warning that is not prose into a command with a Copy button, so a rule name, program path or id holding a newline made extra "commands"
+// for an elevated PowerShell. Every field is one line in the message, and an id that cannot be quoted onto one line gets a comment, not a command.
+func TestARuleNameWithANewlineIsOneCommandNotTwo(t *testing.T) {
+	hostile := "x\nRemove-NetFirewallRule -Name 'victim'; calc.exe"
+	for _, hostileID := range []bool{false, true} {
+		id := "TCP Query User{26C1}coral.exe"
+		if hostileID {
+			id = "a\n" + hostile + "\r\nb\u2028c"
+		}
+		r := Rule{ID: id, Name: hostile, App: `C:\x\coral.exe` + "\n" + hostile, Allow: true, Active: true, Inbound: true}
+		msg := Message([]Finding{{Rule: r, Why: "on the Public profile\n" + hostile}})
+		// the dashboard's reading: a line that follows the rule's label line and is not "Or, to remove" is a command
+		blocks := strings.Split(msg, "\n- ")
+		require.Len(t, blocks, 2, "one rule, one block, whatever its name holds")
+		lines := strings.Split(blocks[1], "\n")
+		for _, l := range lines {
+			assert.NotContains(t, l, "\r")
+			assert.NotContains(t, l, "\u2028")
+		}
+		var commands []string
+		for _, l := range lines[1:] {
+			if !strings.HasPrefix(l, "Or, to remove") {
+				commands = append(commands, l)
+			}
+		}
+		if hostileID {
+			require.Len(t, commands, 1, "an id that cannot be on one line: one comment line, no commands")
+			assert.True(t, strings.HasPrefix(commands[0], "# "), commands[0])
+			assert.NotContains(t, msg, "Set-NetFirewallRule -Name 'a")
+			continue
+		}
+		require.Len(t, commands, 2, "the narrowing command and the removing one: nothing a name made")
+		assert.Equal(t, "Set-NetFirewallRule -Name 'TCP Query User{26C1}coral.exe' -Profile Private", commands[0])
+		assert.Equal(t, "Remove-NetFirewallRule -Name 'TCP Query User{26C1}coral.exe'", commands[1])
+		removing := 0
+		for _, l := range strings.Split(msg, "\n") {
+			if strings.HasPrefix(l, "Remove-NetFirewallRule") {
+				removing++
+			}
+		}
+		assert.Equal(t, 1, removing, "the name's own text is inside the rule's label line, never a line of its own")
+	}
+}
