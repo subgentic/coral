@@ -5,8 +5,10 @@ const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
+const { guardSettings } = require('./helpers/settings_guard');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const guard = await guardSettings(); // the two goal_done settings saved below are put back as found, whatever happens (--fail-on-leak, #14950)
     const team = 'goal-news-' + Date.now().toString(36), failures = [];
     const T = '#group-table-view';
     const STAMPS = Object.fromEntries([1, 2, 3, 4].map(id => [id, new Date(Date.now() - id * 60000).toISOString()])); // fixed once: the same strings in the stub and in the saved read list
@@ -58,8 +60,7 @@ const { coralReady } = require('./helpers/wait');
         }
         assert.equal(failures.length, 0, failures.join('\n'));
     } finally {
-        // the two settings this suite saved go back to empty lists (a setting row cannot be deleted: the runner lists them as rows this suite may add, ALLOWED_SETTING_ROWS)
-        await ev(`fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal_done_read: '[]', goal_done_hidden: '[]' }) }).then(r => r.ok)`).catch(() => {});
+        await guard.restore().catch(() => {}); // the settings are exactly as found: the rows this suite added are deleted again under the runner (#14950)
         await removeBoards(ev, [team]).catch(() => {}); await client.close();
     }
 })().catch(error => { console.error(error); process.exitCode = 1; });

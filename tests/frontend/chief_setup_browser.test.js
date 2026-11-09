@@ -6,10 +6,12 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
+const { guardSettings } = require('./helpers/settings_guard');
 const SID = '11111111-2222-4333-8444-555555555555';
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const guard = await guardSettings(); // the chief_* settings this suite saves are put back as found, whatever happens (--fail-on-leak, #14950)
     const S = `(window.__coralStatic || '/static/')`;
     const STUB = `(() => {
         const real = window.fetch;
@@ -98,5 +100,5 @@ const SID = '11111111-2222-4333-8444-555555555555';
         }
         await api('PUT', '/api/settings', { chief_page: 'false', chief_name: '', chief_avatar: '1', chief_avatar_letter: '', chief_fronts: '', chief_session: '', chief_team: '', chief_actions: 'ask_first' }); // put the Chief settings back (no leaked rows)
         console.log('PASS Settings > Chief: name, avatar, agent, team and page in one screen; /api/chief and the /chief header and chat show it');
-    } finally { await client.close(); }
+    } finally { await guard.restore().catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
