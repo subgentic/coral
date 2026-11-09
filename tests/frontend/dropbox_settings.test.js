@@ -487,7 +487,7 @@ const { JSDOM } = require('jsdom');
     assert.ok(document.getElementById(field.getAttribute('aria-describedby')).textContent.includes('Type the last 4 characters'));
     // The held ones: Remove them / Keep them in Dropbox.
     answers['/api/dropbox/removals/confirm'] = { status: 200, body: { confirmed: 1 } };
-    rmBtn('Remove them from Dropbox').click(); await tick(); await tick();
+    rmBtn('Remove them after 24 hours').click(); await tick(); await tick();
     let c = calls.filter(x => x.url === '/api/dropbox/removals/confirm').pop();
     assert.deepStrictEqual(JSON.parse(c.body), { confirm: true });
     // The typed confirm, trimmed.
@@ -527,6 +527,21 @@ const { JSDOM } = require('jsdom');
     sync = calls.filter(x => x.url === '/api/dropbox/autosync').pop();
     assert.deepStrictEqual(JSON.parse(sync.body), { on: false });
     assert.match($('settings-dropbox-autosync-note').textContent, /wait here for you to decide/);
+
+    // UI Accessibility's 3 to 5 on cee349ca6 (#14886): the rows' buttons say which file; a list action gives the keyboard back to the list; Resume
+    // gives it to the switch.
+    answers['/api/dropbox/removals'] = { status: 200, body: { removals: [{ digest: 'c'.repeat(64), name: 'notes.md', state: 'edited', edited: [{ path: '/v1/x', rev: 'r2' }] }, { digest: 'f'.repeat(64), name: 'plan.md', state: 'kept', reason: 'markers_unreadable' }] } };
+    await m.loadRemovals();
+    const rmb = $('settings-dropbox-removals');
+    const labels = Array.from(rmb.querySelectorAll('button')).map(x => x.getAttribute('aria-label'));
+    assert.ok(labels.includes('Remove anyway: notes.md') && labels.includes('Keep it in Dropbox: notes.md') && labels.includes('Try again: plan.md'), JSON.stringify(labels));
+    answers['/api/dropbox/removals/cancel'] = { status: 200, body: { kept: 1 } };
+    Array.from(rmb.querySelectorAll('button')).find(x => x.getAttribute('aria-label') === 'Keep it in Dropbox: notes.md').click(); await tick(); await tick(); await tick();
+    assert.ok(document.activeElement && (rmb.contains(document.activeElement) || document.activeElement.id === 'settings-dropbox-note'), 'the keyboard is back on the list or the status line, not the page');
+    answers['/api/dropbox/autosync'] = { status: 200, body: { on: true, paused: '' } };
+    $('settings-dropbox-autosync-resume').hidden = false;
+    $('settings-dropbox-autosync-resume').click(); await tick(); await tick(); await tick();
+    assert.strictEqual(document.activeElement && document.activeElement.id, 'settings-dropbox-autosync', 'Resume hides itself: the keyboard is on the switch');
 
     // Not connected: nothing about removals.
     await status({ app_key_set: true, connected: false, state: 'disconnected' });

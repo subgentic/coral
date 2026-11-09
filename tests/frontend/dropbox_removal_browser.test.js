@@ -84,7 +84,7 @@ const S = `(window.__coralStatic || '/static/')`;
                     buttons: Array.from(b.querySelectorAll('button')).map(x => x.textContent) }; })()`);
             check(`${tag}: Settings says a file deleted here leaves Dropbox 24 hours later`, /removes its Dropbox copy 24 hours later/.test(rm.rule || ''), rm.rule);
             check(`${tag}: it lists the held, waiting, kept and edited files, each with its own control`, /wait for your OK|waits for your OK/.test(rm.text) && /will be removed from Dropbox from/.test(rm.text) && /Another Coral keeps it only in Dropbox/.test(rm.text) && /edited in Dropbox/.test(rm.text)
-                && ['Remove them from Dropbox', 'Remove anyway', 'Keep it in Dropbox'].every(t => rm.buttons.includes(t)), JSON.stringify(rm.buttons));
+                && ['Remove them after 24 hours', 'Remove anyway', 'Keep it in Dropbox'].every(t => rm.buttons.includes(t)), JSON.stringify(rm.buttons));
             check(`${tag}: the typed field there is labelled`, !!rm.label, rm.label);
             check(`${tag}: no sideways scroll with the list`, await ev(`document.documentElement.scrollWidth <= innerWidth + 1`));
             await shot(`dropbox-removals-settings-${w}`);

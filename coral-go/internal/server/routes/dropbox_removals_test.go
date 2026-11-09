@@ -273,3 +273,22 @@ func TestAnExplicitRemoveBeforeTheJobKeepsItsStaysOutRule(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, removed, "the explicit removal still keeps the bytes out until Send to Dropbox again")
 }
+
+// QA's survivor (b) on #14814. Mutant: a try that Dropbox failed is dropped instead of retried (the RetryRemoval call removed).
+func TestAFailedRemovalTryIsRetriedNotDropped(t *testing.T) {
+	be, ds := newRemovalEnv(t, 1)
+	require.Equal(t, http.StatusOK, be.operatorDelete(ds[0], true))
+	be.due()
+	be.dbx.failDeletes = 1
+	be.b.Removals(context.Background())
+	r, ok := be.removal(ds[0])
+	require.True(t, ok, "still queued after Dropbox failed the delete")
+	assert.Equal(t, store.DropboxRemovalWaiting, r.State)
+	assert.Equal(t, 1, r.Attempts)
+	assert.Equal(t, 2, be.inDropbox(ds[0]), "nothing removed yet")
+	be.due()
+	be.b.Removals(context.Background())
+	assert.Zero(t, be.inDropbox(ds[0]), "removed on the next try")
+	_, ok = be.removal(ds[0])
+	assert.False(t, ok)
+}
