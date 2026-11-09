@@ -55,17 +55,18 @@ type fakeDropbox struct {
 	deleteCalls [][]string          // the paths of each delete_batch call
 	checkCalls  int
 	// Stage 5a's listing and download side.
-	changes       []map[string]any  // entries list_folder/continue answers after a cursor (an edit, a touch, a delete)
-	revBytes      map[string][]byte // bytes of each rev an edit made
-	pageSize      int               // entries a page (0: all)
-	resetNext     bool              // the next continue answers reset
-	downloads     []string          // revs downloaded
-	lieSize       int64             // download answers this size in Dropbox-API-Result while sending the real bytes
-	extraBytes    []byte            // download appends these to the body (a stream longer than declared)
-	listCalls     int
-	failDownloads int  // the next downloads answer 500 (Dropbox's own trouble)
-	markersFail   bool // stage 6a: a marker listing answers 500
-	probeBad      bool // stage 6b: a probe reads back other bytes than were sent
+	changes        []map[string]any  // entries list_folder/continue answers after a cursor (an edit, a touch, a delete)
+	revBytes       map[string][]byte // bytes of each rev an edit made
+	pageSize       int               // entries a page (0: all)
+	resetNext      bool              // the next continue answers reset
+	downloads      []string          // revs downloaded
+	lieSize        int64             // download answers this size in Dropbox-API-Result while sending the real bytes
+	extraBytes     []byte            // download appends these to the body (a stream longer than declared)
+	listCalls      int
+	failDownloads  int  // the next downloads answer 500 (Dropbox's own trouble)
+	markersFail    bool // stage 6a: a marker listing answers 500
+	probeBad       bool // stage 6b: a probe reads back other bytes than were sent
+	markerReadFail bool // stage 6b: reading a marker back answers not found
 }
 
 // edit replaces path's bytes as a person would in Dropbox (a new rev, a new content hash).
@@ -246,6 +247,11 @@ func newFakeDropbox(t *testing.T) *fakeDropbox {
 		case "/2/files/get_metadata":
 			var a map[string]string
 			json.NewDecoder(r.Body).Decode(&a)
+			if f.markerReadFail && strings.HasPrefix(a["path"], "/v1/offloaded/") { // stage 6b: a marker written but not read back
+				w.WriteHeader(http.StatusConflict)
+				w.Write([]byte(`{"error_summary":"path/not_found/"}`))
+				return
+			}
 			b, ok := f.files[a["path"]]
 			if !ok {
 				w.WriteHeader(http.StatusConflict)
