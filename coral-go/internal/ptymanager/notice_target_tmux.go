@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	OnSessionEnd(tmux.ForgetAgentProc) // what Coral recorded of the session's agent process is not true of a new one
+	OnProcessEnd(tmux.ForgetAgentProc) // what Coral recorded of the session's agent process is not true of a new one
 	registerWatchStopper(tmux.StopAgentWatches)
 }
 
