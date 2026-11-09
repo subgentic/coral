@@ -79,8 +79,8 @@ func (be *backupEnv) removalsCall(method, path, body string, dashboard bool) (in
 	return rec.Code, m
 }
 
-// Conditions 2 and 4. Mutants: no grace (removed at once); the removal not run once due; the outbox rows not marked removed (a later upload of the
-// same bytes would resurrect it); no audit row.
+// Conditions 2 and 4, and SHOULD 6 on 26b4d8235. Mutants: no grace (removed at once); the removal not run once due; the removed rows kept after
+// a delete-driven removal (a later upload of the same bytes would silently not be backed up); no audit row.
 func TestTheOperatorsDeleteRemovesTheDropboxCopyAfterTheGrace(t *testing.T) {
 	be, ds := newRemovalEnv(t, 1)
 	require.Equal(t, http.StatusOK, be.operatorDelete(ds[0], true))
@@ -97,7 +97,11 @@ func TestTheOperatorsDeleteRemovesTheDropboxCopyAfterTheGrace(t *testing.T) {
 	assert.False(t, ok, "a finished removal leaves no row")
 	removed, err := be.b.outbox.WasRemoved(context.Background(), ds[0])
 	require.NoError(t, err)
-	assert.True(t, removed, "the ledger says removed: the same bytes are never sent again on their own")
+	assert.False(t, removed, "a delete is not a decision to keep the bytes out (Security's SHOULD 6)")
+	again := be.put("r0 later.md", "text/markdown", "# removal 0\n") // the same bytes, uploaded after the removal ran
+	require.Equal(t, ds[0], again)
+	be.pass()
+	assert.Equal(t, 2, be.inDropbox(ds[0]), "a later upload of the same bytes is backed up as usual")
 	a, _ := be.h.dbx.store.Audits(context.Background(), 1)
 	require.Len(t, a, 1)
 	assert.Equal(t, "deleted_here", a[0].Reason)
