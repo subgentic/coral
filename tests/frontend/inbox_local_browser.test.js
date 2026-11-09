@@ -192,6 +192,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         await ev(`document.getElementById('nav-tab-hub-inbox').click(); true`);
         await ev(tabBtn('needs'));
         await settle(`/Nothing needs you/.test(document.getElementById('group-table-view').textContent) && document.getElementById('group-table-view').getClientRects().length > 0`, 'the empty line');
+        await settle(`/review artifact, appear here\\. A task assigned to you is under Tasks\\./.test((document.querySelector('#group-table-view .empty-state-hint') || {}).textContent || '')`, 'the hint under the empty line'); // the line is drawn first and the hint a frame later on a loaded machine (1 run in 30): wait for it, bounded, as for the line (#14786)
         check('and says what puts something there (a hint under the line, as Tasks and Saved have)', await ev(`/review artifact, appear here\. A task assigned to you is under Tasks\./.test((document.querySelector('#group-table-view .empty-state-hint') || {}).textContent || '')`), await ev(`(document.querySelector('#group-table-view .empty-state-hint') || {}).textContent || ''`));
         await ev(tabBtn('goals'));
         await settle(`/No open goals/.test(document.getElementById('group-table-view').textContent)`, 'the Goals empty line');

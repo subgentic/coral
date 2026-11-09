@@ -933,7 +933,8 @@ function renderInboxNav(force = false) {
     const here = navCurrent(), sections = folderSections();
     // what the tables show is part of the key too: the folder list is drawn from the counts, but the table on screen is refreshed (refreshGroupTable below) only when a row of it changed
     const needs = needsRows(), tk = taskRows(), sv = saved.savedView().shown.map(saved.savedItemFacts);
-    const key = JSON.stringify([reviewAttentionCount(), reviewPagingSignature(), reviewQueryState(), here, sections, queries.needs, queries.tasks, page && `${page.kind}:${page.project || ''}#${page.id}`,
+    // An empty table's line is decided when its FIRST read ends ("Loading saved items", the error, "Nothing needs you" and its hint), so what that read is doing is part of the key while there is nothing on screen to keep: with rows on screen a later read must not redraw them (#14786, #14524).
+    const key = JSON.stringify([reviewAttentionCount(), reviewPagingSignature(), firstReadOnEmpty(reviewPages(), needs.length > 0), firstReadOnEmpty(savedReviewPages(), sv.length > 0 || savedFiles().length > 0), reviewQueryState(), here, sections, queries.needs, queries.tasks, page && `${page.kind}:${page.project || ''}#${page.id}`,
         needs.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, teamOf(s), askOf(s)]), tk.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count]), sv.map(f => [f.id, f.which, f.saved, f.state]), savedFiles().map(a => a.reviewKey), mutedWords(mutedReviewItems()), dayOldMutedFiles().map(a => a.hex)]); // the quiet Muted line is part of what the table shows: a change that only moves muted files redraws it (#12881)
     if (!force && key === _navKey) return;
     _navKey = key;
@@ -974,6 +975,8 @@ function renderFolderCounts() {
 function reviewPagingSignature() {
     return [reviewPages(), savedReviewPages()].map(pages => pages.map(p => [p.server, p.error, p.has_more, p.next_cursor, p.loadedCount, p.total, p.truncated]));
 }
+/** A first read that is still going while its table has no rows to keep. The paging signature leaves `loading` out on purpose (a later page updates its button in place and must not redraw the rows); this is the other case (#14786). */
+const firstReadOnEmpty = (pages, hasRows) => !hasRows && pages.some(p => !p.loadedCount && p.loading);
 function syncReviewPagingControls() {
     const pages = new Map();
     for (const [stream, items] of [['review', reviewPages()], ['saved', savedReviewPages()]]) {
