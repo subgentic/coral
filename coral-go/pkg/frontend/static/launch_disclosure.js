@@ -68,6 +68,7 @@ export async function refreshLaunchDisclosure() {
         body.append(button); banner.append(section);
         const after = document.getElementById('local-auth-banner') || document.querySelector('header.top-bar');
         if (after) after.after(banner); else document.body.prepend(banner);
+        window.dispatchEvent(new Event('coral:launch-disclosure-shown'));
         announceNotice(headline);
     } catch { /* no unauthenticated or network failure is an acknowledgement */ }
 }

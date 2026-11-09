@@ -72,6 +72,7 @@ const (
 	ArtifactRetentionSeen    = "artifact_retention_seen_days"
 	ArtifactRetentionAckAt   = "artifact_retention_ack_at"
 	ArtifactRetentionLast    = "artifact_retention_last"
+	LaunchDisclosureAck      = "launch_disclosure_ack"
 )
 
 // Prefixes of the families.
@@ -273,6 +274,7 @@ func init() {
 	// Coral's own.
 	coral(TerminalDefaultNotice, "Whether the one line \"Agents now stop when you quit Coral\" is owed (pending) or was shown and dismissed (seen) or is not owed (none): set once, by Coral, at the first start on the built-in terminal default of an install that ran on the old tmux default (#6064).")
 	coral(HistoryImport, "Whether the chats Coral did not start (the Claude Code, Codex and other history already on this computer) are listed: 1 once the person chose Import, 0 once they chose to stop listing them; absent until they choose (#11970, #11990).")
+	coral(LaunchDisclosureAck, "The id and time of the first-launch permission notice acknowledgement; written and read only by Coral, and hidden from dashboard settings.")
 	coral(ArtifactCommentsOwnerID, "The random id the owner's artifact comments are stored under.")
 	coral(ArtifactRetentionEnable, "When Coral saw the retention days change.")
 	coral(ArtifactStoreAutoRaised, "The cap was raised automatically.")
