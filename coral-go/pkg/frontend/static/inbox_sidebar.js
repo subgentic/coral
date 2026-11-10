@@ -185,7 +185,7 @@ const addComputerChip = (s, tr) => {
 };
 const introNode = text => DT.el('span', 'inbox-review-from', text);
 const fromNode = s => {
-    const p = DT.el('span', 'inbox-review-from'), who = String(s.review.produced_by || '').trim(), n = (s.review.earlier || []).length, rest = [versionLineOf(s.review), n ? `${n} earlier version${n === 1 ? '' : 's'}` : ''].filter(Boolean).join(' \u00b7 ');
+    const p = DT.el('span', 'inbox-review-from'), who = String(s.review.produced_by || '').trim(), n = Math.max((s.review.earlier || []).length, (s.review.version || 1) - 1), rest = [versionLineOf(s.review), n ? `${n} earlier version${n === 1 ? '' : 's'}` : ''].filter(Boolean).join(' \u00b7 ');
     if (!who) { p.textContent = [fromOf(s, false), versionLineOf(s.review)].filter(Boolean).join(' \u00b7 '); return p; } // an unknown sender still has its file's version line (#14145)
     p.append('from ', agentLink(who, { board: boardTeamKey(sessionServer(s), s.review.team) }), rest ? ' \u00b7 ' + rest : '');
     return p;
