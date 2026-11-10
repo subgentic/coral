@@ -511,10 +511,12 @@ func (h *BoardHandler) UpdateGoal(w http.ResponseWriter, r *http.Request) {
 // The goal write is done and answered either way: a message that cannot be posted is logged, not made the write's failure.
 func (h *BoardHandler) postGoalLine(r *http.Request, project, actor, content string) {
 	var err error
-	if user := hubOperatorUser(r); cloud.Tunneled(r) && user != "" {
-		_, err = h.bs.PostHubMessage(r.Context(), project, user, HubOperatorPrefix(user)+content, nil, true)
+	// The line quotes a goal's title and words, which agents write: a mention in them must not call anyone (#15284, Security's SHOULD), so it is cleaned and defused here and stored as given.
+	user := hubOperatorUser(r)
+	if cloud.Tunneled(r) && user != "" {
+		_, err = h.bs.PostHubDefusedMessage(r.Context(), project, user, board.DefuseMentions(clitext.Clean(HubOperatorPrefix(user)+content), h.bs.BoardMentionNames(r.Context(), project)), true)
 	} else { // not through the Hub, or a Hub write with no Hub user to name (the guard has one for every write that reaches here): the actor's own post
-		_, err = h.bs.PostMessage(r.Context(), project, actor, content, nil)
+		_, err = h.bs.PostDefusedMessage(r.Context(), project, actor, board.DefuseMentions(clitext.Clean(content), h.bs.BoardMentionNames(r.Context(), project)))
 	}
 	if err != nil {
 		slog.Warn("goal board message not posted", "project", project, "error", err)

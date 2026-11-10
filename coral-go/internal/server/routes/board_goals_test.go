@@ -632,3 +632,31 @@ func TestEditingAGoalSaysWhoOnTheBoard(t *testing.T) {
 	require.Equal(t, 200, code)
 	assert.Len(t, edits(), 1, "the same title again and a blocked_on change say nothing of an edit")
 }
+
+// The goal lines quote a title and words that agents write: an @mention in them calls nobody (#15284, Security's SHOULD): the edit line, the close line and the reopen line.
+func TestGoalLinesDefuseMentions(t *testing.T) {
+	server, h := setupBoardTestServer(t)
+	ctx := context.Background()
+	call := goalCall(t, server.URL)
+	code, g := call("POST", "/api/board/team/goals", map[string]any{"title": "Plan @Orchestrator", "outcome": "A small app", "done_when": "It opens", "subscriber_id": "Operator"})
+	require.Equal(t, http.StatusCreated, code, "%v", g)
+	id := itoa(int64(g["id"].(float64)))
+	code, _ = call("PATCH", "/api/board/team/goals/"+id, map[string]any{"title": "Ping @all and @Orchestrator", "subscriber_id": "Operator"})
+	require.Equal(t, 200, code)
+	code, _ = call("POST", "/api/board/team/goals/"+id+"/close", map[string]any{"reason": "shipped, thanks @Orchestrator", "subscriber_id": "Operator"})
+	require.Equal(t, 200, code)
+	code, _ = call("PATCH", "/api/board/team/goals/"+id, map[string]any{"state": "active", "subscriber_id": "Operator"})
+	require.Equal(t, 200, code)
+	h.WaitBackground()
+	msgs, err := h.bs.ListMessages(ctx, "team", 100, 0, 0)
+	require.NoError(t, err)
+	lines := 0
+	for _, m := range msgs {
+		if !strings.Contains(m.Content, "Goal #"+id) {
+			continue
+		}
+		lines++
+		assert.NotRegexp(t, `@[A-Za-z]`, m.Content, "a goal line quotes no live mention: %q", m.Content)
+	}
+	assert.GreaterOrEqual(t, lines, 3, "the edit, the close and the reopen lines were posted")
+}
