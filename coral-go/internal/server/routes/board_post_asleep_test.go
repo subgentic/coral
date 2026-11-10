@@ -27,19 +27,21 @@ func TestAPostToAnAgentThatWillNotReadItNowTellsTheSender(t *testing.T) {
 	seat("Idle", true, 5)
 	seat("Exited", true, 6)
 	seat("Shelved", true, 7)
+	seat("Killed", false, 8)
 	require.NoError(t, r.ss.SetSessionSleepingFor(ctx, r.sid["Gone"], store.SleepReasonTerminalGone))
 	require.NoError(t, r.ss.SetSessionSleepingFor(ctx, r.sid["Idle"], store.SleepReasonIdle))
 	require.NoError(t, r.ss.SetSessionSleepingFor(ctx, r.sid["Exited"], store.SleepReasonAgentExited))
 	_, err := r.ss.DB().ExecContext(ctx, `UPDATE live_sessions SET is_archived = 1 WHERE session_id = ?`, r.sid["Shelved"])
 	require.NoError(t, err)
+	require.NoError(t, r.ss.UnregisterLiveSession(ctx, r.sid["Killed"])) // a kill removes the session row and leaves the subscription (#15293)
 
 	lookup := MemberRestLookup(r.h.bs, r.ss)
-	for member, want := range map[string]string{"Awake": "", "Napping": restAsleep, "Gone": restTerminalGone, "Idle": "", "Exited": restEnded, "Shelved": restArchived, "Nobody": ""} {
+	for member, want := range map[string]string{"Awake": "", "Napping": restAsleep, "Gone": restTerminalGone, "Idle": "", "Exited": restEnded, "Shelved": restArchived, "Killed": restStopped, "Nobody": ""} {
 		assert.Equal(t, want, lookup(ctx, orchBoard, member), member)
 	}
 
 	h := &BoardHandler{bs: r.h.bs, memberRest: lookup}
-	notes := h.postRestNotes(ctx, orchBoard, "Awake", []string{"Napping", "Gone", "Idle", "Exited", "Shelved", "Awake", "all", "Operator", "Nobody"})
+	notes := h.postRestNotes(ctx, orchBoard, "Awake", []string{"Napping", "Gone", "Idle", "Exited", "Shelved", "Killed", "Awake", "all", "Operator", "Nobody"})
 	got := map[string]string{}
 	for _, n := range notes {
 		got[n["name"].(string)] = n["note"].(string)
@@ -49,6 +51,7 @@ func TestAPostToAnAgentThatWillNotReadItNowTellsTheSender(t *testing.T) {
 		"Gone":    "Gone's terminal is gone; the message waits until it is restarted.",
 		"Exited":  "Exited has ended (its CLI exited); the message waits until it is restarted.",
 		"Shelved": "Shelved is archived; the message waits until it is unarchived and woken.",
+		"Killed":  "Killed has ended (it was stopped); the message waits until it is resumed (Inbox > All chats > Continue this chat).",
 	}, got, "the idle sleeper wakes on delivery, and the poster, all and the Operator are not told about")
 
 	// an Orchestrator with the Operator's wake grant is told it may wake the sleeper
