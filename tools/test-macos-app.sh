@@ -172,6 +172,21 @@ if [ "$SERVER_UP" -eq 1 ]; then
     else
         fail "GET /api/settings returned $HTTP_CODE (expected 200 or 403)"
     fi
+
+    # The availability list (#15071): what tests/release/availability.txt says a release must report, asked the way the dashboard asks (these routes refuse an
+    # API key): sign in with the startup login token from the data folder (a cookie), then a same-origin request. Never printed.
+    LOGIN_TOKEN=$(tr -d '[:space:]' < "$CORAL_HOME/login_token" 2>/dev/null || true)
+    AVAIL_JAR="$SMOKE_ROOT/avail.jar"
+    if [ -z "$LOGIN_TOKEN" ]; then
+        fail "availability list: no login_token in the data folder to sign in with"
+    else
+        curl -s -m 10 -c "$AVAIL_JAR" -o /dev/null "http://localhost:$TEST_PORT/?login_token=$LOGIN_TOKEN"
+        if AVAIL_OUT=$(python3 "$SCRIPT_DIR/../tests/release/availability_check.py" "$SCRIPT_DIR/../tests/release/availability.txt" "http://localhost:$TEST_PORT" "$AVAIL_JAR" 2>&1); then
+            pass "availability list: $AVAIL_OUT"
+        else
+            fail "availability list: $AVAIL_OUT"
+        fi
+    fi
 else
     info "Skipping API checks (server not up)"
 fi

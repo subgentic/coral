@@ -688,6 +688,8 @@ jobs:
           tests/release/verify_no_fake_identity.sh "$APP/Contents/MacOS"
 
       - name: Smoke test Coral.app
+        env:
+          SMOKE_EXPECT_DROPBOX_KEY: "1" # the build's Dropbox app key must reach /api/dropbox/status (#15065, #15071)
         run: |
           chmod +x tools/test-macos-app.sh
           CI=true tools/test-macos-app.sh dist/Coral.app
@@ -742,6 +744,8 @@ jobs:
       # binary that needed an exception (JIT, unsigned memory, library loading) would crash here.
       # The webview is forced on: coral-app is the one most likely to need one (#3659).
       - name: Smoke test the signed Coral.app (hardened runtime, minimal entitlements)
+        env:
+          SMOKE_EXPECT_DROPBOX_KEY: "1" # the build's Dropbox app key must reach /api/dropbox/status (#15065, #15071)
         run: |
           # No signed binary carries a hardened-runtime exception (the tray and the app included).
           for bin in dist/Coral.app/Contents/MacOS/*; do
