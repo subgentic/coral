@@ -239,6 +239,7 @@ export function attachReview(d, { reload }) {
         const pending = waiting && !decisionNeedsPerson(s.server); // a remote of a self-hosted hub: the decision is made on that machine's own dashboard (#11372)
         bar.hidden = !s;
         approve.hidden = changes.hidden = approveNote.hidden = !pending;
+        d.dataset.reviewPending = pending ? '1' : ''; // the comment box says where approving is (#15128)
         approve.textContent = s && s.state === 'changes' ? 'Approve anyway' : 'Approve'; // changes were asked for: Approve is still the Operator's, and says it approves this version as it is
         if (!pending) form.hidden = true;
         bar.hidden = !s || (slotted && form.hidden); // on the header row the strip under it is the change-request form: there only while it is open
