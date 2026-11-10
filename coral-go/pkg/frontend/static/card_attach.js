@@ -3,7 +3,8 @@
  * hint to fetch it first (attachmentsLead, exactly what the message box types), then the text. The card's images are its own: they never join the message box's strip, and they go when the answer is sent. */
 import { state } from './state.js';
 import { escapeAttr, showToast } from './utils.js';
-import { sessionServer } from './server_base.js';
+import { serverFetch, sessionServer } from './server_base.js';
+import { promptOptionsBySession, syncNeedsInputCard, announcePrompt } from './needs_input_card.js';
 import { blockedReason } from './hub_access.js';
 import { prepareImage } from './image_attach.js';
 import { postImage } from './image_composer.js';
@@ -88,3 +89,18 @@ document.addEventListener('change', e => {
     const files = [...(input.files || [])]; input.value = ''; // taken before the input is cleared, so the same photo can be chosen again
     if (files.length) attach(files, input.closest('.cni-text-form'));
 });
+
+/** Check again on a chat card that has no choices because the terminal's options were not read (#15090/#15137, Beta walk 2 finding 4): reads the terminal once more; the options found become the card's choices (the same Yes and No as every other agent's card), none found and the card stays and says so. Loaded on the click (needs_input_card.js). */
+export async function reread(el, last) {
+    const s = last && last.session; if (!s) return;
+    el.disabled = true; el.textContent = 'Checking\u2026';
+    let found = false;
+    try {
+        const resp = await serverFetch(sessionServer(s), `/api/sessions/live/${encodeURIComponent(s.name)}/chat?${new URLSearchParams({ after: '0', limit: '1', session_id: s.session_id, agent_type: s.agent_type || '' })}`);
+        const po = resp.ok ? (await resp.json().catch(() => null) || {}).prompt_options : null;
+        if (po && (po.options || []).length) { found = true; promptOptionsBySession.set(s.session_id, { title: po.title || '', question: po.question || '', kind: po.kind || '', target: po.target || '', only_reject: po.only_reject === true, note: po.note || '', options: po.options || [], review: po.review || [], multi: !!po.multi, submit: po.submit || null }); }
+    } catch { /* said below: nothing was read */ }
+    syncNeedsInputCard(last.container, s);
+    announcePrompt(found ? 'The question is shown again.' : 'Still nothing to answer here. Use the terminal.');
+    const again = document.querySelector('[data-more]'); if (again) { again.disabled = false; again.textContent = 'Check again'; }
+}
