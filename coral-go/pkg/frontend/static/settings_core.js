@@ -269,7 +269,7 @@ onBuilt('top-bar-settings-menu', () => { _loadTierBadge(); });
     return theme;
 }
 
-/** What the theme control shows when no theme is stored: the page follows the system until a theme is picked (theme_init.js, #15234). */
+/** The control with no theme stored: the page follows the system (#15234). */
 export function defaultThemeChoice() { return "system"; }
 
 /** Apply a theme to the document */
@@ -341,7 +341,6 @@ export async function applyCustomThemeByName(name, { remember = true } = {}) {
 
 // Listen for OS theme changes when in "system" mode
 window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
-    let own = null; try { own = browserLocal.get("coral-theme"); } catch (_) {} // a choice this browser kept (dark or light) is not undone by the phone's setting changing
-    const pref = (state.settings && state.settings.theme) || (own === "dark" || own === "light" ? own : defaultThemeChoice());
-    if (pref === "system") applyTheme("system", { remember: false }); // following the system is not a choice to write down
+    const own = browserLocal.get("coral-theme");
+    if (((state.settings && state.settings.theme) || (own !== "dark" && own !== "light" && "system")) === "system") applyTheme("system", { remember: false });
 });
