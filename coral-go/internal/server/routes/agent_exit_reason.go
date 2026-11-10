@@ -30,6 +30,9 @@ const (
 // exitErrorLine matches the words of a CLI's last complaint: an error, a failure, a signal, a missing command.
 var exitErrorLine = regexp.MustCompile(`(?i)\b(error|errors|failed|failure|fatal|panic|killed|terminated|aborted|segmentation fault|not found|permission denied|exit(ed)? (status|code)|signal \d+|out of memory)\b`)
 
+// exitEmail is an email address in a terminal line.
+var exitEmail = regexp.MustCompile(`[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}`)
+
 // lastErrorLine is the newest error-looking line in the bottom of a terminal screen: control characters dropped, whitespace folded, redacted before it is cut, "" when there is none or the redactor is unavailable.
 func lastErrorLine(screen string) string {
 	lines := strings.Split(screen, "\n")
@@ -43,15 +46,17 @@ func lastErrorLine(screen string) string {
 			}
 			return r
 		}, lines[i])), " ")
-		line = strings.ReplaceAll(line, "@", "") // a notice never mentions anyone, as an agent's name has no "@" in it either: a program's output must not nudge an agent
 		if line == "" || !exitErrorLine.MatchString(line) {
 			continue
 		}
+		// Redacted first, while an address is still one (an email has its "@"), then every "@" dropped: a notice never mentions anyone, as an agent's name has no "@" in it either, so a program's output cannot nudge
+		// an agent, and no address reaches a post (QA on #15062).
+		line = exitEmail.ReplaceAllString(line, "[address]")
 		out, err := secrets.Redactor().Text([]byte(line))
 		if err != nil {
 			return ""
 		}
-		s := string(out)
+		s := strings.ReplaceAll(string(out), "@", "")
 		return strings.Clone(strings.TrimSpace(s[:redact.Cut(s, exitReasonMax)]))
 	}
 	return ""

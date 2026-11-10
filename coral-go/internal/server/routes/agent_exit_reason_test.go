@@ -115,3 +115,21 @@ func TestAnAtSignInTheTerminalsLastLineNeverMentionsAnyone(t *testing.T) {
 	assert.Contains(t, n, `Worker: exited, its last line was "Error: ask Orchestrator and all to run this"`)
 	assert.NotContains(t, n, "@")
 }
+
+// No address reaches a post: redacted first, while it is still an address, then the '@' is dropped (the Orchestrator on #15062).
+func TestAnEmailInTheTerminalsLastLineNeverReachesThePost(t *testing.T) {
+	line := lastErrorLine("Error: sign in failed for chris.k@example.com (ask @Orchestrator)\n$ \n")
+	assert.NotContains(t, line, "chris")
+	assert.NotContains(t, line, "example.com")
+	assert.NotContains(t, line, "@")
+	assert.Contains(t, line, "Error: sign in failed for")
+	r := newExitRig(t)
+	r.screen("Error: sign in failed for chris.k@example.com\n$ \n")
+	id := r.agent(1, "Worker", "")
+	r.setLaunched(id, time.Now().Add(-3*time.Hour))
+	r.h.AgentsSlept(context.Background(), []string{id})
+	r.flush()
+	n := strings.Join(r.notices(), "\n")
+	assert.NotContains(t, n, "chris")
+	assert.NotContains(t, n, "example.com")
+}
