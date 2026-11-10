@@ -234,3 +234,71 @@ func TestTheLinkerFlagScannerSeesWrongPaths(t *testing.T) {
 		t.Fatal("the module path is still the old one: this test would bless the old flags")
 	}
 }
+
+// The other direction (#15071, the Tech Lead's audit #15067): a package variable whose comment says a build sets it by linker flag must be one a
+// release stamps. The flags above prove every -X lands on a real variable; this proves no variable waits for a -X nobody wrote, which is how v2.0.63
+// shipped Dropbox with an empty app key. A new "set at build time" variable fails here until it is named in this file with its -X in release.yml.
+var buildTimeComment = regexp.MustCompile(`(?i)(-ldflags|ldflags|set at build time|build-time)`)
+
+// buildStampedVars are the variables a release or a build script is known to stamp, by folder (relative to internal/) then name.
+var buildStampedVars = map[string][]string{
+	"config":        {"Version", "PostHogKey", "DevBase"},
+	"server/routes": {"DropboxDefaultAppKey"},
+}
+
+func TestEveryBuildTimeVariableIsStampedByARelease(t *testing.T) {
+	root := repoRoot(t)
+	internal := filepath.Join(root, "coral-go", "internal")
+	cmd := filepath.Join(root, "coral-go", "cmd")
+	known := map[string]bool{}
+	for dir, names := range buildStampedVars {
+		for _, n := range names {
+			known[filepath.ToSlash(filepath.Join("internal", dir))+"."+n] = true
+		}
+	}
+	found := map[string]bool{}
+	for _, top := range []string{internal, cmd} {
+		_ = filepath.WalkDir(top, func(path string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			fset := token.NewFileSet()
+			f, perr := parser.ParseFile(fset, path, nil, parser.ParseComments)
+			if perr != nil {
+				return nil
+			}
+			dirRel, _ := filepath.Rel(filepath.Join(root, "coral-go"), filepath.Dir(path))
+			dirRel = filepath.ToSlash(dirRel)
+			for _, decl := range f.Decls {
+				gd, ok := decl.(*ast.GenDecl)
+				if !ok || gd.Tok != token.VAR {
+					continue
+				}
+				for _, spec := range gd.Specs {
+					vs := spec.(*ast.ValueSpec)
+					doc := vs.Doc
+					if doc == nil {
+						doc = gd.Doc
+					}
+					if doc == nil || !buildTimeComment.MatchString(doc.Text()) {
+						continue
+					}
+					for _, n := range vs.Names {
+						key := dirRel + "." + n.Name
+						found[key] = true
+						if !known[key] {
+							t.Errorf("%s: %s's comment says a build sets it, but no release stamps it: add its -X to release.yml (all four build sites) and name it in buildStampedVars and otherPackageVars", filepath.ToSlash(path), n.Name)
+						}
+					}
+				}
+			}
+			return nil
+		})
+	}
+	// A floor: a scanner that found nothing must not pass, and a variable on the known list must still be marked as build-time.
+	for key := range known {
+		if !found[key] {
+			t.Errorf("%s is on the stamped list but no variable with a build-time comment was found for it: the comment was lost, or the scan is blind", key)
+		}
+	}
+}
