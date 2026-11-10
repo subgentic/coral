@@ -409,3 +409,41 @@ func TestTheAskerWithdrawsItsOwnQuestionAndNoOneElseButTheOrchestrator(t *testin
 	code, _ = withdraw(99999, "Lead", "")
 	assert.Equal(t, http.StatusNotFound, code)
 }
+
+// #15078 (the Beta walk): an agent asked, then asked again ("ignore my earlier questions"), and the old question stayed in Needs you as if it were current. The older question of an agent that has asked again on
+// the team is marked superseded; the newest is not, another agent's is not, a wait never is, and nothing is closed.
+func TestOperatorAsksMarksAnOlderQuestionOfTheSameAskerSuperseded(t *testing.T) {
+	h, bs := operatorAsksRig(t)
+	ctx := context.Background()
+	for _, who := range []string{"Lead", "Dev", "Operator"} {
+		_, err := bs.Subscribe(ctx, "team", who, who, "", nil, "all")
+		require.NoError(t, err)
+	}
+	ask := func(from, text string) *board.Message {
+		q, err := bs.PostMessage(ctx, "team", from, text, nil)
+		require.NoError(t, err)
+		to, err := bs.AskTargets(ctx, "team", from, q.Content)
+		require.NoError(t, err)
+		require.NoError(t, bs.RecordAsk(ctx, "team", q, to))
+		return q
+	}
+	old1 := ask("Lead", "@Operator which designs do you want?")
+	old2 := ask("Lead", "@Operator and which colour?")
+	other := ask("Dev", "@Operator may I delete the table?")
+	newest := ask("Lead", "@Operator ignore my earlier questions: here is the plan, approve?")
+	_, err := bs.RegisterWait(ctx, "team", "Lead", "claude-x", board.WaitOperator, "", "waiting on you", time.Hour)
+	require.NoError(t, err)
+
+	code, rows, _ := readOperatorAsks(t, h, asPerson)
+	require.Equal(t, http.StatusOK, code)
+	got := map[float64]bool{}
+	for _, r := range rows {
+		if r["kind"] == "ask" {
+			v, _ := r["superseded"].(bool)
+			got[r["id"].(float64)] = v
+		} else {
+			assert.Nil(t, r["superseded"], "a wait is never superseded")
+		}
+	}
+	assert.Equal(t, map[float64]bool{float64(old1.ID): true, float64(old2.ID): true, float64(other.ID): false, float64(newest.ID): false}, got, "only the older questions of the agent that asked again; all four are still listed")
+}
