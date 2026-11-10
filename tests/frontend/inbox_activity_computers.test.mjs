@@ -1,0 +1,76 @@
+// The Activity folder across computers (#15380, A): every online computer's record is read on its own, rows keep their computer and never collide on id, a computer that fails or refuses does not fail the folder, each computer
+// has its own cursor, and forget() clears it all. jsdom, no browser: node inbox_activity_computers.test.mjs
+import assert from 'node:assert';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { JSDOM } from 'jsdom';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const dir = path.resolve(here, '../../coral-go/pkg/frontend/static');
+const dom = new JSDOM('<!doctype html><body><script id="coral-boot" type="application/json">{"mode":"local"}</script></body>', { url: 'http://127.0.0.1:8420/' });
+for (const k of ['window', 'document', 'navigator', 'localStorage', 'location', 'sessionStorage', 'getComputedStyle', 'HTMLElement', 'Node', 'Event', 'CustomEvent', 'MutationObserver', 'AbortController']) {
+    Object.defineProperty(globalThis, k, { value: dom.window[k] ?? globalThis[k], configurable: true, writable: true });
+}
+const asked = [];
+let plan = {};
+const json = (b, status = 200) => new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } });
+globalThis.fetch = async (url) => {
+    const u = new URL(String(url), 'http://127.0.0.1:8420');
+    const m = /^\/api\/remote\/([^/]+)(\/api\/activity)$/.exec(u.pathname);
+    const server = m ? m[1] : u.pathname === '/api/activity' ? 'local' : null;
+    assert.ok(server, `an unexpected request: ${u.pathname}`);
+    const p = plan[server] || {};
+    asked.push({ server, before: u.searchParams.get('before') });
+    if (p.status === 403) return json({ error: 'owner_only' }, 403);
+    if (p.status && p.status !== 200) return json({ error: 'boom' }, p.status);
+    const before = u.searchParams.get('before');
+    const all = p.ids || [];
+    const got = all.filter(a => before == null || a.id < Number(before)).slice(0, Number(u.searchParams.get('limit')));
+    return json({ actions: got.map(a => ({ id: a.id, team: 'team', at: a.at, action: 'approved', item_kind: 'file', item_id: 'x', source: 'local' })), check: p.check || { intact: true, rows: all.length, note: '' } });
+};
+const { state } = await import(pathToFileURL(path.join(dir, 'state.js')).href);
+const AC = await import(pathToFileURL(path.join(dir, 'inbox_activity.js')).href);
+const online = ids => ids.map(id => ({ id, label: id.toUpperCase(), status: 'online' }));
+const reset = (servers, p) => { asked.length = 0; plan = p; state.hub = !!servers; state.servers = servers; AC.forget(); };
+const at = n => new Date(Date.UTC(2026, 10, 10, 12, n)).toISOString();
+const filt = () => AC.filtered({ q: '', team: '', agent: '', goal: '', decision: '', action: '', from: '', order: 'newest' });
+
+// this computer alone: read as it always was (one request, no server on the rows)
+reset(undefined, { local: { ids: [{ id: 1, at: at(1) }] } });
+await AC.refresh();
+assert.deepEqual(asked.map(a => a.server), ['local']);
+assert.equal(AC.total(), 1);
+
+// two computers with the same ids: both are read, rows keep their computer, keys never collide, newest first across them
+reset(online(['srv1', 'srv2']), { local: { ids: [{ id: 1, at: at(5) }] }, srv1: { ids: [{ id: 1, at: at(4) }, { id: 2, at: at(1) }] }, srv2: { ids: [{ id: 1, at: at(3) }] } });
+await AC.refresh();
+assert.deepEqual(asked.map(a => a.server).sort(), ['local', 'srv1', 'srv2']);
+assert.equal(AC.total(), 4, 'ids repeat on each computer: nothing is dropped as a duplicate');
+const rows = filt();
+assert.deepEqual(rows.map(AC.keyOf).sort(), ['1', 'srv1/1', 'srv1/2', 'srv2/1'].sort());
+assert.deepEqual(rows.map(r => r.at), [at(5), at(4), at(3), at(1)], 'merged by time, newest first');
+assert.deepEqual(rows.map(r => r.team).sort(), ['@srv1/team', '@srv1/team', '@srv2/team', 'team'], 'a remote team is qualified by the Hub\'s own id for the computer');
+
+// one computer fails, one is a grantee (403): the folder still shows the rest, and says which could not be read
+reset(online(['srv1', 'srv2', 'srv3']), { local: { ids: [{ id: 1, at: at(5) }] }, srv1: { status: 500 }, srv2: { status: 403 }, srv3: { ids: [{ id: 7, at: at(2) }] } });
+await AC.refresh();
+assert.equal(AC.total(), 2);
+
+// every computer refuses 403: denied, as one computer always was; every one failing: failed
+reset(online(['srv1']), { local: { status: 403 }, srv1: { status: 403 } });
+await AC.refresh();
+assert.equal(AC.total(), 0);
+
+// older actions: each computer has its own cursor (its own smallest id), never another's
+const many = (from, n, t0) => Array.from({ length: n }, (_, i) => ({ id: from - i, at: at(t0 + i) }));
+reset(online(['srv1']), { local: { ids: many(1000, 200, 0) }, srv1: { ids: [{ id: 5000, at: at(1) }] } });
+await AC.refresh();
+assert.equal(AC.total(), 201);
+asked.length = 0;
+await AC.refresh(null, { next: true });
+assert.deepEqual(asked.map(a => `${a.server}:${a.before}`), ['local:801'], 'only the computer with more is asked, with its own cursor');
+
+// forget clears everything
+AC.forget();
+assert.equal(AC.total(), 0);
+console.log('ok inbox_activity_computers');
