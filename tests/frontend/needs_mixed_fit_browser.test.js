@@ -74,12 +74,18 @@ const STUB = `(() => {
             check(r.actionsIn && r.waitingIn, 'Actions (and Waiting when it is shown) stay inside the panel, at ' + width + ' px: ' + JSON.stringify(r));
             check(r.item >= 100, 'the Item column keeps room at ' + width + ' px: ' + JSON.stringify(r));
         }
-        // Font metrics differ across CI and macOS. Reserve less room explicitly so
-        // optional columns must yield here too; Team outranks CLI and Folder. 880 (was 840): the goal row's Actions column is 17rem since #13586 (was 15rem when a review row is listed with it), 32px the others lose.
+        // Font metrics differ across CI and macOS, so no one width says which columns fit: on Linux's wider fonts the select column (44 px, #15015) left no room for Team at 880 px (the gate, #15096) while a Mac still had it.
+        // What the rule says is an order: as the box narrows CLI and Folder go before Team does, and the table does not scroll sideways at 880 px. So the box is narrowed step by step
+        // and at every step Team is shown whenever CLI or Folder is; at 880 px the table fits without a sideways scroll.
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await ev(`document.querySelector('${T} .dt-box').style.maxWidth='880px';true`);await ev(framesJs(12));
-        const tight=await ev(`(()=>{const b=document.querySelector('${T} .dt-box'),t=b.querySelector('table');return {box:b.clientWidth,table:t.getBoundingClientRect().width,scroll:b.scrollWidth>b.clientWidth+1,shown:[...t.querySelectorAll('thead th')].filter(e=>e.getClientRects().length).map(e=>e.dataset.key)};})()`);
-        check(tight.box<=880&&tight.shown.includes('team')&&!tight.scroll&&tight.table<=tight.box+2,'Team stays visible when optional columns yield at 880px: '+JSON.stringify(tight));
+        const steps = [];
+        for (const mw of [960, 920, 880, 860, 840]) {
+            await ev(`document.querySelector('${T} .dt-box').style.maxWidth='${mw}px';true`); await ev(framesJs(12));
+            const tight = await ev(`(()=>{const b=document.querySelector('${T} .dt-box'),t=b.querySelector('table');return {max:${mw},box:b.clientWidth,table:Math.round(t.getBoundingClientRect().width),scroll:b.scrollWidth>b.clientWidth+1,shown:[...t.querySelectorAll('thead th')].filter(e=>e.getClientRects().length).map(e=>e.dataset.key)};})()`);
+            steps.push(tight);
+            check(!(tight.shown.includes('cli') || tight.shown.includes('folder')) || tight.shown.includes('team'), 'Team goes after CLI and Folder (it is shown while either is) at ' + mw + ' px: ' + JSON.stringify(tight));
+            if (mw === 880) check(tight.box <= 880 && !tight.scroll && tight.table <= tight.box + 2, 'the table fits at 880 px with no sideways scroll: ' + JSON.stringify(tight));
+        }
         await shot('mixed-priority-880');
         // Add a real review row so this table declares Goal, and a live agent's
         // goal so that column is nonempty. Exercise ordering, not numeric values.
