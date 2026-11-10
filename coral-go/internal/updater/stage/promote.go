@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -17,11 +18,15 @@ import (
 // their own, named promote-<product tag>-<sequence> (a prerelease, never Latest), and a second promotion (a revocation) is a new such release, never a replacement. The client finds the
 // manifest of the newest promotion by listing the newest releases, never by trusting a name or an order: a candidate counts only if the promote workflow signed it.
 const (
-	// ReleasesList is the newest releases of the repository, newest first (one page).
-	ReleasesList = "https://api.github.com/repos/" + verify.Repo + "/releases?per_page=30"
+	// ReleasesList is the promotion tags of the repository (git's matching refs for "promote-"): a small answer, one line per promotion, whatever the repository's other releases weigh. It was the 30
+	// newest releases (#6393), and when the promotions sorted off that page (their release targeted an old commit) and the page grew past its cap, no promotion was ever found (#15080).
+	ReleasesList = "https://api.github.com/repos/" + verify.Repo + "/git/matching-refs/tags/promote-"
 
-	// maxListBytes caps the list's size: 30 releases are well under it, and a larger answer is refused, not truncated.
-	maxListBytes = 1 << 20
+	// maxListBytes caps one page of the list: a page of 100 refs is about 40 KB, so a larger answer is refused as too large, never truncated.
+	maxListBytes = 512 << 10
+	// refsPerPage and maxRefsPages bound the list: 100 refs a page, at most 5 pages. A promotion is a few a week, so 500 are years.
+	refsPerPage  = 100
+	maxRefsPages = 5
 	// maxPromoteCandidates is how many promotion releases one pass looks at, newest first: junk by anyone with write access costs this many small downloads, no more.
 	maxPromoteCandidates = 10
 )
@@ -31,6 +36,7 @@ var promoteTagRe = regexp.MustCompile(`^promote-(v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{
 
 type listedRelease struct {
 	TagName string `json:"tag_name"`
+	Ref     string `json:"ref"` // a refs listing's entry: refs/tags/<tag>
 	Draft   bool   `json:"draft"`
 	Assets  []struct {
 		Name string `json:"name"`
@@ -229,18 +235,55 @@ func (c *checker) releaseList(ctx context.Context, onlyTag string) ([]listedRele
 			// no promotion among the feed's newest releases: the API's list goes further back (30)
 		}
 	}
-	raw, err := c.cfg.Fetcher.Get(ctx, c.cfg.ReleasesURL, maxListBytes)
-	if err != nil {
-		return nil, err
+	return c.listPromotionTags(ctx)
+}
+
+// listPromotionTags asks the list of promotion tags, a page of 100 at a time and at most maxRefsPages, and returns them newest first (the highest sequence, then the highest product version), so the
+// candidates one pass looks at are the newest and not the first in the alphabet. Each is named by its tag only: the download says whether its assets are there, as for the feed's.
+func (c *checker) listPromotionTags(ctx context.Context) ([]listedRelease, error) {
+	var all []listedRelease
+	for page := 1; page <= maxRefsPages; page++ {
+		sep := "?"
+		if strings.Contains(c.cfg.ReleasesURL, "?") {
+			sep = "&"
+		}
+		raw, err := c.cfg.Fetcher.Get(ctx, fmt.Sprintf("%s%sper_page=%d&page=%d", c.cfg.ReleasesURL, sep, refsPerPage, page), maxListBytes)
+		if err != nil {
+			return nil, err
+		}
+		var got []listedRelease
+		if json.Unmarshal(raw, &got) != nil {
+			return nil, errors.New("the list of promotions is not a list")
+		}
+		for _, r := range got {
+			if r.TagName == "" {
+				r.TagName = strings.TrimPrefix(r.Ref, "refs/tags/")
+			}
+			r.fromFeed = r.Ref != "" // a ref names no assets: the download says whether they are there
+			all = append(all, r)
+		}
+		if len(got) < refsPerPage {
+			break
+		}
 	}
-	var list []listedRelease
-	if json.Unmarshal(raw, &list) != nil {
-		return nil, errors.New("the list of releases is not a list")
+	sort.SliceStable(all, func(i, j int) bool { return promoteNewer(all[i].TagName, all[j].TagName) })
+	return all, nil
+}
+
+// promoteNewer says promotion tag a is newer than b: the higher sequence (the order the promotions were made in, whichever product tag each names: a revocation of 1.4.132 is a promotion of an older tag with
+// a later sequence), then the higher version. A tag that is not a promotion's goes last.
+func promoteNewer(a, b string) bool {
+	am, bm := promoteTagRe.FindStringSubmatch(a), promoteTagRe.FindStringSubmatch(b)
+	if am == nil || bm == nil {
+		return am != nil && bm == nil
 	}
-	if len(list) > 100 {
-		list = list[:100] // a page is 30: anything more is not read
+	as, _ := strconv.ParseInt(am[2], 10, 64)
+	bs, _ := strconv.ParseInt(bm[2], 10, 64)
+	if as != bs {
+		return as > bs
 	}
-	return list, nil
+	cmp, err := verify.CompareVersions(strings.TrimPrefix(am[1], "v"), strings.TrimPrefix(bm[1], "v"))
+	return err == nil && cmp > 0
 }
 
 // noteNewest remembers the highest product release (X.Y.Z, a vX.Y.Z tag that is not a prerelease) among the listed ones: the check records it (recordOutcome).

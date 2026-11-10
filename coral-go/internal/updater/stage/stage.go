@@ -293,6 +293,11 @@ func (c *checker) run(ctx context.Context) Result {
 			log.Printf("[update] GitHub's limit on anonymous requests is on; the next check is after it")
 			return c.failAfter("", KindRateLimit, "manifest", func(inARow int) time.Duration { return rateLimitWait(c.now, se.RetryAt, inARow) })
 		}
+		if errors.Is(err, verify.ErrTooLarge) {
+			log.Printf("[update] the answer that names the promotions is larger than the limit: %v", err)
+			return c.fail("", KindTooLarge, "manifest")
+		}
+		log.Printf("[update] the check for a promotion failed: %v", err) // the reason was dropped before: every failure read as 'network' with nothing in the log (#15080)
 		return c.fail("", KindNetwork, "manifest")
 	}
 	manifest, m := p.manifest, p.m
