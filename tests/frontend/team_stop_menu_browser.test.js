@@ -75,7 +75,7 @@ const BOARD = 'stop-menu-' + Date.now().toString(36);
             // Pause Board says what it does (the board's actions are in More)
             await ev(`document.getElementById('team-page-more').click(); true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the menu opens
             const pause = await ev(`(() => { const b = document.getElementById('mb-pause-btn'), n = document.getElementById('mb-pause-note'); return { btn: b && b.textContent.trim(), note: n && n.textContent.trim(), shown: !!n && n.getClientRects().length > 0, described: b && b.getAttribute('aria-describedby') }; })()`);
-            check(pause.btn === 'Pause Board' && /stop receiving new messages/.test(pause.note || '') && pause.shown && pause.described === 'mb-pause-note', `Pause Board says what it does: ${JSON.stringify(pause)}`);
+            check(pause.btn === 'Pause team' && /stop receiving new messages/.test(pause.note || '') && pause.shown && pause.described === 'mb-pause-note', `Pause team says what it does: ${JSON.stringify(pause)}`);
             if (!mobile) check(await ev(`[...document.querySelectorAll('#team-page-more-menu hr')].every(r => r.getClientRects().length === 0)`), 'a wide More menu has no stray rule (the Stop items are phone-only in it)');
             await shot(`team-more-pause-${w}`);
             await closeDialog();

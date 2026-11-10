@@ -28,14 +28,14 @@ const { coralReady } = require('./helpers/wait');
         await openBoardPage(ev, waitFor, B);
         await waitFor(`document.querySelectorAll('#mb-messages .mb-message').length >= 2`, 'the two messages', 15000);
 
-        console.log('1. Pause Board and Resume Board');
-        assert.equal(await ev(`document.getElementById('mb-pause-btn').textContent`), 'Pause Board');
+        console.log('1. Pause team and Resume team');
+        assert.equal(await ev(`document.getElementById('mb-pause-btn').textContent`), 'Pause team');
         await ev(`import(${S} + 'message_board.js').then(m => m.toggleBoardPause()).then(() => true)`);
-        await waitFor(`document.getElementById('mb-pause-btn').textContent === 'Resume Board'`, 'the button says Resume Board', 8000);
+        await waitFor(`document.getElementById('mb-pause-btn').textContent === 'Resume team'`, 'the button says Resume team', 8000);
         assert.equal(await ev(`document.getElementById('mb-pause-btn').classList.contains('mb-action-danger')`), true, 'a paused board marks its button');
         assert.equal((await api('GET', `/api/board/${B}/paused`)).body.paused, true, 'the server holds the board paused');
         await ev(`import(${S} + 'message_board.js').then(m => m.toggleBoardPause()).then(() => true)`);
-        await waitFor(`document.getElementById('mb-pause-btn').textContent === 'Pause Board'`, 'the button says Pause Board again', 8000);
+        await waitFor(`document.getElementById('mb-pause-btn').textContent === 'Pause team'`, 'the button says Pause team again', 8000);
         assert.equal(await ev(`document.getElementById('mb-pause-btn').classList.contains('mb-action-danger')`), false);
         assert.equal((await api('GET', `/api/board/${B}/paused`)).body.paused, false);
         console.log('   ✓');
@@ -58,7 +58,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`window.__ssState = false; true`); // the mocked wake worked: the computer is awake from here, for any read the page makes next
         // a Sleep or a Wake made from elsewhere reaches the board (the coral:team-sleep-changed listener)
         await ev(`window.fetch = (u, o) => /\\/sleep-status$/.test(String(u && u.url || u)) ? Promise.resolve(new Response(JSON.stringify({ sleeping: false }), { headers: { 'content-type': 'application/json' } })) : window.__realFetch(u, o); document.dispatchEvent(new CustomEvent('coral:team-sleep-changed', { detail: { team: ${JSON.stringify(B)} } })); true`);
-        await waitFor(`document.getElementById('mb-post-input').disabled === false && document.getElementById('mb-pause-btn').textContent === 'Pause Board'`, 'the board follows a Wake made elsewhere', 8000);
+        await waitFor(`document.getElementById('mb-post-input').disabled === false && document.getElementById('mb-pause-btn').textContent === 'Pause team'`, 'the board follows a Wake made elsewhere', 8000);
         await ev(`window.fetch = window.__realFetch; true`);
         await sleep(true);
         await waitFor(`(() => { const e = document.getElementById('mb-sleep-banner'); return !!e && e.checkVisibility(); })()`, 'the sleeping banner is drawn', 15000).catch(async err => { throw new Error(err.message + ' | state: ' + JSON.stringify(await ev(`(() => { const e = document.getElementById('mb-sleep-banner'); const i = document.getElementById('mb-post-input'); return { banner: !!e, display: e && e.style.display, input_disabled: i && i.disabled, placeholder: i && i.placeholder }; })()`))); }); // the state says whether the page read 'not sleeping' (a stale or real answer) or never drew it // #13510: sleep() waits a fixed 600 ms; on the Windows runner the banner was not there yet (shown false, gap 0)

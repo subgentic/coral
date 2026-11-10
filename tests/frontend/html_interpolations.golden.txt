@@ -34,6 +34,7 @@
 1	board_chat.js	count
 1	board_chat.js	externalMessageBadge(m)
 1	board_chat.js	hubUserBadge(m)
+1	board_chat.js	loadedModule('./team_pause.js')?.queuedBadge(m) || ''
 1	board_chat.js	messageAttachmentAttrs(m)
 1	board_chat.js	messageAttachmentsHtml(m)
 1	board_chat.js	parts.actions
@@ -73,6 +74,7 @@
 1	board_window.js	checkbox
 1	board_window.js	externalMessageBadge(m)
 1	board_window.js	hubUserBadge(m)
+1	board_window.js	loadedModule('./team_pause.js')?.queuedBadge(m) || ''
 1	board_window.js	messageAttachmentAttrs(m)
 1	board_window.js	messageAttachmentsHtml(m)
 1	board_window.js	messageTimeHtml(m.created_at)

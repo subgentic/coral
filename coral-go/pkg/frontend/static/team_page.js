@@ -240,7 +240,8 @@ function drawStatus(data) {
     // Just woken from here: how many have reported so far, until all have (or two minutes pass), not only "waiting" (#10052).
     const wakingNow = unknown > 0 && !n && waking;
     if (!unknown) stopWaking(S.team);
-    const text = uncertainAttention ? 'Checking attention status' : asleep ? 'Asleep' : wakingNow ? `Waking the team: ${data.agents.length - unknown} of ${data.agents.length} agents have sent their first message.` : n ? `${n} ${n === 1 ? 'needs' : 'need'} attention` : unknown ? `${unknown === data.agents.length ? 'Waiting for first signal' : `${unknown} of ${data.agents.length} waiting for first signal`}. A signal is an agent's first message.` : 'All well';
+    const tp = state.teamPause, paused = tp?.paused && tp.team === S.team; // the person's Pause (#15331): the header says so, with the way out in the line under it (team_pause.js)
+    const text = paused ? 'Paused' : uncertainAttention ? 'Checking attention status' : asleep ? 'Asleep' : wakingNow ? `Waking the team: ${data.agents.length - unknown} of ${data.agents.length} agents have sent their first message.` : n ? `${n} ${n === 1 ? 'needs' : 'need'} attention` : unknown ? `${unknown === data.agents.length ? 'Waiting for first signal' : `${unknown} of ${data.agents.length} waiting for first signal`}. A signal is an agent's first message.` : 'All well';
     // When agents need attention the visible status is a button to the Agents tab (beside the live region, which keeps saying it and is then only for a screen reader: the button's name is not announced twice); "All well" is plain text.
     const b = $('team-page-health');
     if (b) {
@@ -248,7 +249,7 @@ function drawStatus(data) {
         if (n && !uncertainAttention) { b.replaceChildren(Object.assign(el('span', 'team-status-dot'), {}), document.createTextNode(text)); b.firstChild.setAttribute('aria-hidden', 'true'); b.setAttribute('aria-label', `Team health: ${text}`); }
     }
     if (s.textContent === text) return; // the same words are not said again
-    s.className = `team-page-status ${uncertainAttention || asleep ? 'unknown' : n ? 'needs sr-only' : unknown ? 'unknown' : 'well'}`; // Asleep takes the neutral dot, as waiting does
+    s.className = `team-page-status ${paused || uncertainAttention || asleep ? 'unknown' : n ? 'needs sr-only' : unknown ? 'unknown' : 'well'}`; // Asleep takes the neutral dot, as waiting does
     const dot = el('span', 'team-status-dot'); dot.setAttribute('aria-hidden', 'true');
     s.replaceChildren(dot, document.createTextNode(text));
 }
@@ -281,6 +282,7 @@ async function readCounts() {
         S.counts.needs = count.ownerOnly ? '' : count.complete ? count.value : count.value ? `${count.value}+` : '…'; drawCounts();
     }).catch(() => { if (seq === S.countSeq && team === S.team) { S.counts.needs = '…'; drawCounts(); } });
     const knowledge = S.knowledgeFor === team ? null : (S.knowledgeFor = team, teamFetch(team, n => `/api/teams/detail/${encodeURIComponent(n)}/knowledge`).then(async r => { const data = await r.json(); return r.ok ? data : null; }).catch(() => null)); // the Knowledge tab's count once per team, with the others (the notes are read again when the tab opens)
+    importOnce('./team_pause.js').then(m => m.readTeamPause(team)); // the pause is read on every poll, so a pause made elsewhere (another tab, a restart) shows here too
     const [goals, tasks, avail, kn] = await Promise.allSettled([
         boardFetch(team, '/goals?state=proposed,active,blocked,done,dropped&limit=200').then(async r => { const data = await r.json(); return r.ok ? data : null; }),
         boardFetch(team, '/tasks?counts=1').then(async r => { const data = await r.json(); return r.ok ? data : null; }),
@@ -306,6 +308,7 @@ function syncNeedsCount() {
 }
 document.addEventListener('coral:needs-updated', () => { if (S.team && currentTeamPage()) drawStatus(S.statusData); syncNeedsCount(); });
 document.addEventListener('coral:team-needs-count', e => { if (e.detail?.team === S.team) syncNeedsCount(); });
+document.addEventListener('coral:team-pause-changed', e => { if (e.detail?.team === S.team) drawStatus(S.statusData); });
 document.addEventListener('coral:team-sleep-changed', e => { if (S.team && e.detail && e.detail.team === S.team) readCounts(); });
 function startCounts() {
     readCounts();
@@ -519,6 +522,7 @@ export async function openTeamPage(team, opts = {}) {
     if (changed) { // another team: the tables of the last one go, the moved-in panels and the board's column are drawn again for this one
         for (const t of ['goals', 'tasks', 'artifacts', 'agents', 'knowledge']) { const p = panel(t); p.removeAttribute('data-built'); p.replaceChildren(); }
         drawCounts(); drawStatus(null);
+        $('team-pause-bar')?.toggleAttribute('hidden', true); // the last team's pause line
     }
     backTo = opts.backTo || (changed ? null : backTo);
     $('team-page-back-agent').hidden = !backTo;

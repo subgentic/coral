@@ -1,0 +1,6 @@
+/* The team's pause line under the header (#15331): neutral, with the way out beside it. */
+.team-pause-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 16px; background: var(--bg-secondary); border-bottom: 1px solid var(--border); color: var(--text-primary); font-size: var(--fs-md); }
+.team-pause-bar[hidden] { display: none; }
+.team-pause-text { flex: 1 1 16rem; min-width: 0; overflow-wrap: anywhere; }
+.team-pause-resume { flex: none; }
+.mb-queued { margin-left: 8px; padding: 1px 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-secondary); font-size: var(--fs-sm); white-space: nowrap; }
