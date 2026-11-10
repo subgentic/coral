@@ -258,7 +258,7 @@ func TestSSHArgs(t *testing.T) {
 	if err != nil || strings.Join(a, " ") != "-a -x -T -- me@host-1 cmd" {
 		t.Fatalf("%v %v", a, err)
 	}
-	for _, bad := range []string{"-oProxyCommand=x", "-p", "", "a b", "host;ls", "host$(x)", "a\nb", "h`x`"} {
+	for _, bad := range []string{"-oProxyCommand=x", "-p", "", "a b", "host;ls", "host$(x)", "a\nb", "h`x`", "a@-oFoo", "-a@host", "a@b@-c"} {
 		if _, err := SSHArgs(bad, "cmd"); err == nil {
 			t.Errorf("accepted %q", bad)
 		}

@@ -35,6 +35,11 @@ func CheckDest(d string) error {
 	if !destRe.MatchString(d) {
 		return errors.New("the destination is not a plain ssh host name")
 	}
+	for _, part := range strings.Split(d, "@") { // neither the user nor the host may read as an option, so the rule does not rest on "--" alone
+		if strings.HasPrefix(part, "-") {
+			return errors.New("the destination is not a plain ssh host name")
+		}
+	}
 	return nil
 }
 
