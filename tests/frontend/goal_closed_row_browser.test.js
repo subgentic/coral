@@ -12,6 +12,7 @@ const { coralReady } = require('./helpers/wait');
     const S = `(window.__coralStatic || '/static/')`;
     const api = (method, p, body) => ev(`fetch(${JSON.stringify(p)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body === undefined ? 'undefined' : JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }))`);
     const openNeeds = () => ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
+    const needsCount = () => ev(`import(${S} + 'inbox_tab.js').then(m => m.inboxCountsNow().needs)`);
     const rowTitles = () => ev(`[...document.querySelectorAll('#group-table-view .inbox-welcome-name')].map(e => e.textContent)`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -19,17 +20,21 @@ const { coralReady } = require('./helpers/wait');
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`true`);
         assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'orch', job_title: 'Orchestrator', session_name: B })).status < 300);
+        await openNeeds(); await new Promise(r => setTimeout(r, 1500));
+        const baseline = await needsCount(), baselineBadge = await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`); // the count before any goal is closed
         const mk = async title => { const g = await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title, outcome: 'o', done_when: 'd' }); assert.equal(g.status, 201); assert.equal((await api('PATCH', `/api/board/${B}/goals/${g.body.id}`, { subscriber_id: 'Operator', state: 'active' })).status, 200); return g.body.id; };
         const a = await mk('Closed by the agent'), b = await mk('Closed by the person'), c = await mk('Closed by the agent too');
         assert.equal((await api('POST', `/api/board/${B}/goals/${a}/close`, { subscriber_id: 'orch', state: 'done', reason: 'Code read through' })).status, 200);
         assert.equal((await api('POST', `/api/board/${B}/goals/${b}/close`, { subscriber_id: 'Operator', state: 'done', reason: 'Looks right' })).status, 200);
         assert.equal((await api('POST', `/api/board/${B}/goals/${c}/close`, { subscriber_id: 'orch', state: 'done', reason: 'All tasks done' })).status, 200);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); // a fresh page: it reads the closed goals again
         await openNeeds();
         await waitFor(`[...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.textContent.includes('Goal #${a} closed as done by orch'))`, 'the agent-closed goal has its row', 15000);
         const titles = await rowTitles();
         assert.ok(titles.some(t => t.includes(`Goal #${c} closed as done by orch`)), 'the second agent-closed goal too: ' + JSON.stringify(titles));
         assert.ok(!titles.some(t => t.includes(`Goal #${b} `)), 'a goal the Operator closed has no row: ' + JSON.stringify(titles));
-        assert.ok(await ev(`document.getElementById('nav-tab-hub-inbox-badge').hidden || !/goal/i.test(document.getElementById('nav-tab-hub-inbox-badge').title || '')`), 'listed, not counted');
+        assert.equal(await needsCount(), baseline, 'listed, not counted: the Needs you count is the same with two rows as without them');
+        assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`), baselineBadge, 'the Inbox badge is the same too');
         const press = (goal, label) => ev(`(() => { const tr = [...document.querySelectorAll('#group-table-view tr')].find(r => r.textContent.includes('Goal #${goal} closed as done')); const btn = tr && [...tr.querySelectorAll('button')].find(x => x.textContent === ${JSON.stringify(label)}); if (btn) btn.click(); return !!btn; })()`);
         assert.ok(await press(a, 'Reopen'), 'Reopen is on the row');
         await waitFor(`![...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.textContent.includes('Goal #${a} closed as done'))`, 'Reopen takes the row away', 10000);
