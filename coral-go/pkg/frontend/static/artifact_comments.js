@@ -77,7 +77,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     panel.id = `ac-panel-${++panelSeq}`; // the toggle names it (aria-controls): where the opened comments are
     const toggle = btn('ac-toggle', 'Comments', 'Comments: show the comments'); toggle.hidden = true; toggle.setAttribute('aria-expanded', 'false');
     toggle.setAttribute('aria-controls', panel.id);
-    const selBtn = btn('ac-selbtn', 'Add comment', 'Add comment on the selected text'); selBtn.hidden = true;
+    const selBtn = btn('ac-selbtn', 'Add comment', 'Add comment on the selected text'); selBtn.hidden = true; Object.assign(selBtn.style, { width: 'max-content', whiteSpace: 'nowrap' }); // its width does not depend on where it is put, so it is kept whole inside the dialog (#15231)
     // The width of the comments column, kept per viewer: a separator between the document and the panel, dragged with the pointer or moved with the arrow keys (#15030).
     loadStyles('artifact-comments-resize.css');
     const resizer = el('div', 'ac-resizer'); resizer.setAttribute('role', 'separator'); resizer.setAttribute('aria-orientation', 'vertical'); resizer.tabIndex = 0;
@@ -463,7 +463,9 @@ export function attachComments(dialog, body, host, opts = {}) {
         const s = selectionAnchor();
         selBtn.hidden = !s;
         if (!s) return;
-        const x = Math.min(Math.max(8, s.rect.right - 40), window.innerWidth - 120), y = Math.max(8, Math.min(s.rect.bottom + 6, window.innerHeight - 60));
+        // the button's own width, kept inside the dialog (it was cut at the dialog's right edge, #15231), and below the selection, or above it when there is no room below
+        const box = (dialog.querySelector('.artifact-viewer-content') || dialog).getBoundingClientRect(), wide = selBtn.offsetWidth || 120, tall = selBtn.offsetHeight || 36, lo = Math.max(8, box.left + 8), hi = Math.min(window.innerWidth - 8, box.right - 8) - wide;
+        const x = Math.max(lo, Math.min(s.rect.right - 40, hi)), below = s.rect.bottom + 6, y = below + tall <= Math.min(window.innerHeight, box.bottom) - 8 ? below : Math.max(8, s.rect.top - tall - 6);
         selBtn.style.left = x + 'px'; selBtn.style.top = y + 'px';
     }
     document.addEventListener('selectionchange', () => { if (!shown()) return; clearTimeout(selTimer); selTimer = setTimeout(syncSelButton, 120); });

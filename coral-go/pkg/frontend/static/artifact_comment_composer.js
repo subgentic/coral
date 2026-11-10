@@ -27,8 +27,9 @@ export function createComposer({ st, render, run, ownHex }) {
         const cancel = btn('ac-cancel', 'Cancel'); cancel.addEventListener('click', () => { if (tray) tray.destroy(); st.composing = null; st.error = ''; render(); });
         const send = btn('btn-primary ac-send', editOf ? 'Save' : cm.parentId != null ? 'Reply' : 'Comment'); send.type = 'submit';
         const err = el('p', 'ac-error', st.error); err.setAttribute('role', 'alert'); err.hidden = !st.error;
+        const how = el('p', 'ac-counter ac-sendhint', 'Enter starts a new line. Press Ctrl+Enter (⌘ Enter on a Mac) to send.'); how.id = `ac-sendhint-${Math.random().toString(36).slice(2, 8)}`; ta.setAttribute('aria-describedby', how.id); // Enter is a new line, so the way to send is said (#15231, walk 8 M3)
         const row = el('div', 'ac-composer-row'); row.append(count, ...(tray ? [tray.picker()] : []), cancel, send);
-        box.append(ta, ...(tray ? [tray.node, tray.hint()] : []), err, row);
+        box.append(ta, how, ...(tray ? [tray.node, tray.hint()] : []), err, row);
         if (tray) { tray.attach(box, ta); tray.listen(() => { send.disabled = tray.busy() || tray.failed(); }); send.disabled = tray.busy() || tray.failed(); } // Send waits for a picture still going up, and for a failed one to be removed
         box.addEventListener('submit', (e) => {
             e.preventDefault();
