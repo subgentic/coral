@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"regexp"
 	"strconv"
@@ -21,8 +22,9 @@ const (
 	ReleasesList = "https://api.github.com/repos/" + verify.Repo + "/releases?per_page=30"
 
 	// maxListBytes caps the list's size: a larger answer is refused, not truncated. 30 releases with their notes were 1.26 MB on 2026-11-10 (the old 1 MiB cap refused them, so a check with no
-	// promotion ended "failed" instead of "not promoted", #15414); 4 MiB leaves three times that.
-	maxListBytes = 4 << 20
+	// promotion ended "failed" instead of "not promoted", #15414). The list is now read as a stream and left once it holds what is used (listFromAPI, #15416), so the cap only bounds a list with no
+	// promotion in it, and costs no memory: 16 MiB is more than ten times today's.
+	maxListBytes = 16 << 20
 	// maxPromoteCandidates is how many promotion releases one pass looks at, newest first: junk by anyone with write access costs this many small downloads, no more.
 	maxPromoteCandidates = 10
 )
@@ -230,18 +232,65 @@ func (c *checker) releaseList(ctx context.Context, onlyTag string) ([]listedRele
 			// no promotion among the feed's newest releases: the API's list goes further back (30)
 		}
 	}
-	raw, err := c.cfg.Fetcher.Get(ctx, c.cfg.ReleasesURL, maxListBytes)
-	if err != nil {
-		return nil, err
+	return c.listFromAPI(ctx)
+}
+
+// listFromAPI reads the API's list as it arrives and stops once it holds all it can use: maxPromoteCandidates promotion releases (the list is newest first, so the rest is older) or 100 releases. A list that grows
+// with release notes therefore costs only what is read before that point; a list with no promotion is read to its end, and a body over maxListBytes with no promotion in what was read is still refused, not truncated; one that holds a promotion is used up to the cap (#15416).
+func (c *checker) listFromAPI(ctx context.Context) ([]listedRelease, error) {
+	pr, pw := io.Pipe()
+	copyDone := make(chan error, 1)
+	go func() {
+		err := c.cfg.Fetcher.Copy(ctx, c.cfg.ReleasesURL, pw, maxListBytes)
+		pw.CloseWithError(err) // nil: the reader sees EOF
+		copyDone <- err
+	}()
+	list, stopped, derr := decodeReleases(pr)
+	pr.Close() // an early stop ends the copy: its next write fails
+	cerr := <-copyDone
+	if stopped {
+		return list, nil
 	}
-	var list []listedRelease
-	if json.Unmarshal(raw, &list) != nil {
+	if errors.Is(cerr, verify.ErrTooLarge) {
+		for _, r := range list {
+			if promoteTagRe.MatchString(r.TagName) {
+				return list, nil // the cap was reached after a promotion: the list is newest first, so what is unread is older, and the ones read are all that is looked at
+			}
+		}
+	}
+	if cerr != nil {
+		return nil, cerr // the fetch's own words (a status, too large, ...) rather than the decoder's
+	}
+	if derr != nil {
 		return nil, errors.New("the list of releases is not a list")
 	}
-	if len(list) > 100 {
-		list = list[:100] // a page is 30: anything more is not read
-	}
 	return list, nil
+}
+
+// decodeReleases reads a JSON array of releases one element at a time. stopped is true when it left the rest unread (enough was found).
+func decodeReleases(r io.Reader) (list []listedRelease, stopped bool, err error) {
+	dec := json.NewDecoder(r)
+	if t, err := dec.Token(); err != nil || t != json.Delim('[') {
+		return nil, false, errors.New("not a list")
+	}
+	promos := 0
+	for dec.More() {
+		var rel listedRelease
+		if err := dec.Decode(&rel); err != nil {
+			return list, false, err // what was read before the break is returned with it
+		}
+		list = append(list, rel)
+		if promoteTagRe.MatchString(rel.TagName) {
+			promos++
+		}
+		if promos >= maxPromoteCandidates || len(list) >= 100 {
+			return list, true, nil
+		}
+	}
+	if _, err := dec.Token(); err != nil {
+		return nil, false, err
+	}
+	return list, false, nil
 }
 
 // noteNewest remembers the highest product release (X.Y.Z, a vX.Y.Z tag that is not a prerelease) among the listed ones: the check records it (recordOutcome).
