@@ -414,3 +414,4 @@ node version_skew_reads.test.mjs
 node remove_wait_remote_policy.test.mjs
 node history_label_codex.test.mjs
 node inbox_needs_count.test.mjs
+node inbox_last_seen.test.mjs
