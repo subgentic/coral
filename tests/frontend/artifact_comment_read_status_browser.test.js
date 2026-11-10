@@ -53,7 +53,7 @@ const COMMENTS = [
             // the server's real stamp (#14130, Backend Dev's JSON): six fractional digits and +00:00, not the milliseconds and Z of an ISO string from a browser
             check(l8 && l8.text === 'Read by Writer I, 4 minutes ago' && l8.times.length === 1 && /\.\d{6}\+00:00$/.test(l8.times[0]), `${at}read_at as the server writes it (microseconds, +00:00) is read and shown with its time: ` + JSON.stringify(l8));
             // one comment sent to several agents, each in its own state, in the server's order
-            check(l7 && l7.text === 'Sent to Writer F (already asked); Read by Writer G, 5 minutes ago; Writer H replied' && l7.names.includes('Writer F') && l7.names.includes('Writer G') && l7.names.includes('Writer H'), `${at}one comment sent to three agents says each agent's own state (sent / read with its time / replied): ` + JSON.stringify(l7));
+            check(l7 && l7.text === 'Sent to Writer F (asked about this thread before); Read by Writer G, 5 minutes ago; Writer H replied' && l7.names.includes('Writer F') && l7.names.includes('Writer G') && l7.names.includes('Writer H'), `${at}one comment sent to three agents says each agent's own state (sent / read with its time / replied): ` + JSON.stringify(l7));
             // the three move on independently: F reads it, G replies
             await ev(`const c7 = window.__cs.find(c => c.id === 7); c7.asks[0].read_at = new Date().toISOString(); c7.asks[1].replies = 2; true`);
             await waitFor(`(document.querySelector('#artifact-viewer .ac-card[data-id="7"] .ac-ask-status')?.textContent || '').replace(/\\s+/g, ' ').trim() === 'Read by Writer F, just now; Writer G replied (2 times); Writer H replied'`, `${at}each of the three agents moves on by itself`, 8000);

@@ -12,7 +12,7 @@ assert.match(open, /^<span class="chip chip-tag mb-external-badge mb-ask-badge" 
 const done = askBadge({ ask: { to: ['Dev A'], open: [], answered: true } });
 assert.match(done, /mb-ask-badge is-answered/);
 assert.match(done, />Question · answered<\/span>$/);
-assert.match(done, /every one of them has answered/);
+assert.match(done, /each member it asks has posted since.*file comment/);
 
 assert.equal(askBadge({ content: 'a plain message' }), '', 'a plain message has no badge');
 assert.equal(askBadge(null), '');
