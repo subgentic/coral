@@ -23,7 +23,7 @@ const AGENTS = []; // the operator's table is files for review and questions: no
         const named = k => ths.find(th => th.dataset.key === k);
         const heads = ths.map(th => { const lab = th.querySelector('.dt-sort > span, .dt-head-text'); return { key: th.dataset.key, w: Math.round(r(th).width), label: lab ? lab.textContent : '', cut: !!lab && !th.querySelector('.sr-only') && (lab.getBoundingClientRect().right > r(th).right - 9), handle: !!th.querySelector('.dt-resize') }; });
         const tds = [...box.querySelectorAll('tbody tr:first-child td')].filter(td => td.getClientRects().length), last = tds[tds.length - 1], wait = named('waiting'), act = named('review');
-        return { boxW: Math.round(br.width), tableW: Math.round(r(table).width), scroll: box.scrollWidth > box.clientWidth + 1, heads, itemW: named('agent') ? Math.round(r(named('agent')).width) : 0,
+        return { checkW: (c => c && c.getClientRects().length ? Math.round(r(c).width) : 0)(box.querySelector('thead th.dt-check')), boxW: Math.round(br.width), tableW: Math.round(r(table).width), scroll: box.scrollWidth > box.clientWidth + 1, heads, itemW: named('agent') ? Math.round(r(named('agent')).width) : 0,
             waitingIn: wait ? r(wait).right <= br.right + 1 : null, actionsIn: act ? r(act).right <= br.right + 1 : null, lastIn: last ? r(last).right <= br.right + 1 : null, btnsIn: [...box.querySelectorAll('tbody .inbox-review-actions button')].filter(b => b.getClientRects().length).every(b => r(b).right <= br.right + 1) }; })()`); };
     const handle = key => ev(`(() => { const h = document.querySelector('${T} thead th[data-key="${key}"] .dt-resize'); if (!h) return null; const r = h.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
     const drag = async (key, dx) => { const p = await handle(key); if (!p) return false; const I = client.Input, mv = (type, x, extra = {}) => I.dispatchMouseEvent({ type, x, y: p.y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1, ...extra });
@@ -55,7 +55,7 @@ const AGENTS = []; // the operator's table is files for review and questions: no
             let m = await measure();
             check(!m.scroll && m.waitingIn !== false && m.actionsIn !== false && m.btnsIn, at + 'the kept layout fits the panel: ' + JSON.stringify({ ...m, heads: 0 }));
             const item = m.heads.find(h => h.key === 'agent'), others = m.heads.filter(h => h.key !== 'agent').reduce((n, h) => n + h.w, 0);
-            check(!!item && item.w >= m.boxW - others - 4, at + 'the name column takes what the others leave (no empty middle): ' + JSON.stringify({ item: item && item.w, others, box: m.boxW }));
+            check(!!item && item.w >= m.boxW - others - m.checkW - 4, at + 'the name column takes what the others leave, the selection column included (no empty middle): ' + JSON.stringify({ item: item && item.w, others, check: m.checkW, box: m.boxW }));
             if (kept.agent === 250 && w >= 1280) check(!!item && item.w > 300, at + 'the name column is wider than the 250 px kept for it (it was left at 250 with an empty middle): ' + (item && item.w));
             for (const h of m.heads) check(!h.cut, at + `the ${h.label} header is whole: ` + JSON.stringify(h));
             const pills = await ev(`[...document.querySelectorAll('${T} button.goals-chip, #group-table-view button.goals-chip')].map(b => b.textContent.replace(/\\s+/g, ' ').trim())`);

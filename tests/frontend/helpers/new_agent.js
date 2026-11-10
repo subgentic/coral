@@ -43,7 +43,13 @@ const N = {
 // Open New agent as a person does: the Launch dialog, then the Agent choice if the dialog asks first. Resolves once the dialog is there (or after the wait, so a failing build reports what is missing).
 async function openNewAgent(ev, waitFor) {
     await ev(`(async () => { await window.showLaunchModal(); const c = document.querySelector('#launch-step-chooser [data-arg="agent"]'); if (c && c.getClientRects().length) c.click(); return true; })()`);
+    await passComputerStep(ev, waitFor);
     await waitFor(`!!window.__na.dialog()`, 'the New agent dialog (role=dialog named New agent)', 6000);
+}
+
+/** On a Hub (#15014) New agent and New team open on 'Which computer?': Continue past it, as a person does, when it is up. A suite that checks the step itself opens the dialog without this. */
+async function passComputerStep(ev, waitFor) {
+    await ev(`(async () => { for (let i = 0; i < 60; i++) { const s = document.getElementById('launch-step-computer'); if (s && getComputedStyle(s).display !== 'none') { document.getElementById('launch-computer-go').click(); return true; } if (['launch-step-agent', 'launch-step-team'].some(id => { const e = document.getElementById(id); return e && getComputedStyle(e).display !== 'none'; })) return true; await new Promise(r => setTimeout(r, 50)); } return true; })()`);
 }
 const stepLine = ev => ev(`(() => { const d = window.__na.dialog(); if (!d) return ''; const hits = [...d.querySelectorAll('*')].filter(window.__na.vis).map(e => window.__na.text(e)).filter(t => /^Step \\d of 3: /.test(t)); hits.sort((a, b) => a.length - b.length); return hits[0] || ''; })()`);
 
@@ -71,4 +77,4 @@ const stubCliChecks = (ev, missing = [], unsupported = [], refused = []) => ev(`
         if (url.pathname === '/api/system/cli-check') { const t = url.searchParams.get('type') || 'claude', found = !missing.includes(t) && !refused.includes(t); if (refused.includes(t)) return Promise.resolve(new Response(JSON.stringify({ agent_type: t, found: false, status: 'missing', refused: "in an agent's working folder", install_note: 'Found but not used: ~/.local/bin/agy is in an agent\\'s working folder, so a launch refuses it. Install it somewhere else, or set its path in Settings > CLI paths (the setting cli_path_' + t + ').' }), { status: 200, headers: { 'content-type': 'application/json' } })); if (unsupported.includes(t)) return Promise.resolve(new Response(JSON.stringify({ agent_type: t, found: false, supported: false, message: 'Hermes isn\\'t offered on Windows yet: it has not been tried with Coral there.' }), { status: 200, headers: { 'content-type': 'application/json' } })); return Promise.resolve(new Response(JSON.stringify(found ? { agent_type: t, found: true, status: 'available', probe: 'ok' } : { agent_type: t, found: false, status: 'missing', install_url: 'https://example.invalid/install/' + t }), { status: 200, headers: { 'content-type': 'application/json' } })); }
         return R(u, o); };
     return true; })()`);
-module.exports = { stubModels, stubCliChecks, SOURCE, install, N, openNewAgent, stepLine, scenarios };
+module.exports = { stubModels, stubCliChecks, SOURCE, install, N, openNewAgent, passComputerStep, stepLine, scenarios };
