@@ -15,6 +15,7 @@ import { bs } from './board_state.js';
 import './goals_adapter.js'; // the Goals view (goals_view.js) is lazy and imports only what loads at startup (import_hygiene): its two small helpers load here (#7113)
 import './goal_words.js';
 // The board page's group (bundle_lazy.go): these load with it, and the page's other files import only what loads at startup
+const { keepGap } = await importOnce('./keep_gap.js'); // the box pushes the messages up as it grows (#15401)
 const BX = await importOnce('./board_export.js'); // a part of the board page's group: loaded with it
 const { doExportBoard, toggleMessageSelect, selectAllMessages, selectNoneMessages, cancelSelectMode, exportSelectedAsMarkdown, resetSelection, connectBoard, hideExportBoardModal } = BX;
 const { attachMentionList, loadBoardSubscribers, subscribeDashboard } = await importOnce('./board_members.js');
@@ -79,6 +80,7 @@ export function showBoardInPage(project, host, messageId = null) {
     state.currentBoardServer = splitKey(project).server;
     board.style.display = 'flex'; // display-ok: #mb-board is shown and hidden this way everywhere else in this file
     initGrowingTextarea(document.getElementById('mb-post-input'));
+    keepGap(document.querySelector('.mb-messages-scroll')); // the box pushes the messages up as it grows (#15401)
     attachMentionList();
     if (!hasBoardLabel(project)) {
         boardFetch(project, '').then(r => (r.ok ? r.json() : null)).then(d => {

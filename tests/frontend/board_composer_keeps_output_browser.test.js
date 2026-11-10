@@ -31,9 +31,12 @@ const { coralReady, framesJs } = require('./helpers/wait');
             if (d10 > 2) problems.push(`${at}ten lines typed: the newest message is ${d10} px under the box`);
             await type(0); const back = await dist();
             if (back > 2) problems.push(`${at}box cleared: ${back} px short of the bottom`);
-            await ev(`(async () => { ${C}.scrollTop = Math.max(0, ${C}.scrollHeight - ${C}.clientHeight - 600); ${C}.dispatchEvent(new Event('scroll')); await new Promise(r => setTimeout(r, 300)); return true; })()`); // sleep-ok: the scroll handlers run
-            const top = await ev(`${C}.scrollTop`); await type(10); const top2 = await ev(`${C}.scrollTop`);
-            if (Math.abs(top2 - top) > 2) problems.push(`${at}scrolled up, typing moved the page: ${top} to ${top2}`);
+            for (const away of [120, 600]) {
+                await ev(`(async () => { ${C}.scrollTop = Math.max(0, ${C}.scrollHeight - ${C}.clientHeight - ${away}); ${C}.dispatchEvent(new Event('scroll')); await new Promise(r => setTimeout(r, 300)); return true; })()`); // sleep-ok: the scroll handlers run
+                const up = await dist(); await type(10); const up2 = await dist();
+                if (Math.abs(up2 - up) > 2) problems.push(`${at}${away} px above the bottom, ten lines typed: the text above the box moved from ${up} to ${up2} px above the bottom (the box covered the messages)`);
+                await type(0);
+            }
         }
     } finally { await removeBoards(ev, boards).catch(() => {}); await client.close(); }
     assert.deepEqual(problems, [], 'the Board keeps its newest message in view as the box grows:\n  ' + problems.join('\n  '));

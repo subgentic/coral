@@ -1,6 +1,5 @@
 /* The command box grows with what is typed (moved out of live_chat.js, #5065; no behaviour change). */
 import { DESKTOP_QUERY } from './phone_layout.js';
-import { state } from './state.js';
 import { fitTerminal } from './xterm_renderer.js';
 
 // On desktop the command box grows with its text, like a chat composer
@@ -56,7 +55,9 @@ export function autosizeCommandInput() {
         document.getElementById("command-pane")?.classList.contains("chat-mode")].join("\u0001");
     if (key === _autosizeKey) return;
     _autosizeKey = key;
-    const before = input.offsetHeight;
+    const before = input.offsetHeight, chat = document.getElementById("capture-wrapper")?.classList.contains("chat-mode") && document.getElementById("live-history-messages");
+    const gap = chat ? chat.scrollHeight - chat.scrollTop - chat.clientHeight : 0; // the chat is pushed up as the box grows: the text just above the box stays just above it (#15401)
+    try {
     if (!desktopComposer.matches || !input.offsetParent) {
         input.style.height = "";
         fitPlaceholder(input);
@@ -73,14 +74,8 @@ export function autosizeCommandInput() {
     input.style.height = "0px";
     input.style.height = (input.scrollHeight + borderY(input)) + "px"; // scrollHeight leaves out the border a border-box height includes: without it the box was 2 px short of its text
     if (input.offsetHeight === before) return;
-    if (document.getElementById("capture-wrapper")?.classList.contains("chat-mode")) {
-        // Keep the newest reply in view as the box grows
-        const messages = document.getElementById("live-history-messages");
-        if (messages && state.autoScroll) messages.scrollTop = messages.scrollHeight;
-    } else {
-        // The terminal area changed size; refit xterm to it
-        fitTerminal();
-    }
+    if (!chat) fitTerminal(); // the terminal area changed size; refit xterm to it
+    } finally { if (chat) chat.scrollTop = chat.scrollHeight - chat.clientHeight - gap; }
 }
 
 /** Autosize the command box on typing and on every programmatic value change

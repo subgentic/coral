@@ -38,10 +38,14 @@ const { framesJs } = require('./helpers/wait');
             const typed = await dist(); if (typed > 2) problems.push(`${at}typed key by key: the newest output is ${typed} px under the box`);
             await type(0); const back = await dist();
             if (back > 2) problems.push(`${at}box cleared: ${back} px short of the bottom`);
-            // scrolled up reading: typing does not pull the page to the bottom
-            await ev(`(async () => { ${C}.scrollTop = Math.max(0, ${C}.scrollHeight - ${C}.clientHeight - 600); ${C}.dispatchEvent(new Event('scroll')); await new Promise(r => setTimeout(r, 300)); return true; })()`); // sleep-ok: the scroll handlers run
-            const up = await dist(); await type(10); const up2 = await dist();
-            if (up > 100 && up2 < up - 150 + 0) problems.push(`${at}scrolled up, typing moved the page: ${up} to ${up2}`);
+            // not at the bottom (a little above it, and a long way above it): the box pushes the chat up, the text just above the box stays just above it (#15401: it covered the chat)
+            for (const away of [120, 600]) {
+                await ev(`(async () => { ${C}.scrollTop = Math.max(0, ${C}.scrollHeight - ${C}.clientHeight - ${away}); ${C}.dispatchEvent(new Event('scroll')); await new Promise(r => setTimeout(r, 300)); return true; })()`); // sleep-ok: the scroll handlers run
+                const up = await dist(); await type(10); const up2 = await dist();
+                if (Math.abs(up2 - up) > 2) problems.push(`${at}${away} px above the bottom, ten lines typed: the text above the box moved from ${up} to ${up2} px above the bottom (the box covered the chat)`);
+                await type(0); const up3 = await dist();
+                if (Math.abs(up3 - up) > 2) problems.push(`${at}${away} px above the bottom, the box cleared: ${up} then ${up3}`);
+            }
             // the terminal view: its screen ends above the box as the box grows, and when it is cleared
             await ev(`localStorage.setItem('coral-live-view-mode', 'terminal'); window.selectLiveSession('jl', 'claude', 'jl-id', 'local'); true`);
             await ev(`new Promise(r => setTimeout(r, 1200))`); // sleep-ok: the terminal view mounts

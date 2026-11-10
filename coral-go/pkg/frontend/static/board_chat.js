@@ -144,6 +144,7 @@ export function showBoardChatTab(boardName, agent = null) {
         if (carried) document.getElementById('board-panel-msgs').replaceWith(carried);
 
         initGrowingTextarea(document.getElementById('board-panel-input'));
+        importOnce('./keep_gap.js').then(m => m.keepGap(document.getElementById('board-panel-msgs')));
 
     panel.dataset.board = boardName;
     }
