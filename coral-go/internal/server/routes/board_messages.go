@@ -616,6 +616,14 @@ func (h *BoardHandler) noteCommentReads(ctx context.Context, project, subscriber
 	h.commentReadStamp(ctx, project, naming.SessionIDFromName(sub.SessionName), ids)
 }
 
+// noteMemberReads stamps the comments the messages delivered when the request is a verified member's own (coral-board read --last and --id, which read without moving the cursor, #15034): the person's dashboard
+// reading the board stamps nothing, and a message that delivered a comment to another agent stamps nothing (noteCommentReads).
+func (h *BoardHandler) noteMemberReads(r *http.Request, project string, messages []board.Message) {
+	if name, member := callerActor(r).Member(); member && name != "" {
+		h.noteCommentReads(r.Context(), project, name, messages)
+	}
+}
+
 // ListAllMessages returns all messages (no cursor advancement).
 // GET /api/board/{project}/messages/all
 // Pass ?id=N to fetch a single message by ID (does not advance cursor).
@@ -640,6 +648,7 @@ func (h *BoardHandler) ListAllMessages(w http.ResponseWriter, r *http.Request) {
 			errNotFound(w, "message not found")
 			return
 		}
+		h.noteMemberReads(r, urlParam(r, "project"), []board.Message{*msg}) // coral-board read --id shows a delivered comment: it is read (#15034)
 		writeJSON(w, http.StatusOK, []board.Message{*msg})
 		return
 	}
@@ -689,6 +698,9 @@ func (h *BoardHandler) ListAllMessages(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
+	}
+	if format != "dashboard" {
+		h.noteMemberReads(r, project, messages) // coral-board read --last: the same (#15034)
 	}
 	if format == "dashboard" {
 		total, _ := h.bs.CountMessages(r.Context(), project)

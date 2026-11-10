@@ -23,12 +23,20 @@ func captureLog(t *testing.T) *bytes.Buffer {
 	log.SetOutput(&buf)
 	discoveryMu.Lock()
 	lastDiscovery = ""
+	missesLogged = nil
 	discoveryMu.Unlock()
+	loginMissMu.Lock()
+	loginMissSet = false
+	loginMissMu.Unlock()
 	t.Cleanup(func() {
 		log.SetOutput(old)
 		discoveryMu.Lock()
 		lastDiscovery = ""
+		missesLogged = nil
 		discoveryMu.Unlock()
+		loginMissMu.Lock()
+		loginMissSet = false
+		loginMissMu.Unlock()
 	})
 	return &buf
 }

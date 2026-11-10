@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -99,4 +101,42 @@ func TestTheGoalCommentIsReadWhenItsDriverReadsItsMessage(t *testing.T) {
 	assert.Equal(t, "", rig.readAtOf(path, cid, "Dev"))
 	rig.readsBoard("Dev", msg)
 	assert.NotEmpty(t, rig.readAtOf(path, cid, "Dev"), "the driver's own read of the message that delivered the goal comment stamps read_at")
+}
+
+// #15034: coral-board read --id N and --last N read through /messages/all, which did not stamp: a delivered comment shown that way stayed "not read". A verified member's own read stamps it; the Operator's does not.
+func TestReadByIdAndReadLastStampTheDeliveredComment(t *testing.T) {
+	for _, path := range []string{"id", "last"} {
+		t.Run(path, func(t *testing.T) {
+			rig := newCmtRig(t)
+			rig.agent(1, "Dev", false)
+			rig.uploadedBy(1, "team-a")
+			rig.tag("for review")
+			code, out := rig.commentAs(cmtAsOwner, nil)
+			require.Equal(t, http.StatusCreated, code, fmt.Sprint(out))
+			cid := int64(out["id"].(float64))
+			msg := rig.messageTo("Dev")
+			bh := NewBoardHandler(rig.h.bs)
+			bh.SetCommentReadStamp(rig.h.StampCommentReads)
+			url := "/api/board/team-a/messages/all?limit=5"
+			if path == "id" {
+				url = fmt.Sprintf("/api/board/team-a/messages/all?id=%d", msg.ID)
+			}
+			serve := func(actor Actor) {
+				rec := httptest.NewRecorder()
+				req := httptest.NewRequest(http.MethodGet, url, nil)
+				req = withActor(req, actor)
+				rc := chi.NewRouteContext()
+				rc.URLParams.Add("project", "team-a")
+				req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rc))
+				bh.ListAllMessages(rec, req)
+				require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+			}
+			serve(Actor{Kind: ActorOperator, Name: "Operator"})
+			assert.Equal(t, "", rig.readAtOf(cp(cmtDoc), cid, "Dev"), "the Operator's read stamps nothing")
+			serve(Actor{Kind: ActorToken, Name: naming.SubscriberID("QA", "claude")})
+			assert.Equal(t, "", rig.readAtOf(cp(cmtDoc), cid, "Dev"), "another member's read stamps nothing for the uploader's ask")
+			serve(Actor{Kind: ActorToken, Name: naming.SubscriberID("Dev", "claude")})
+			assert.NotEmpty(t, rig.readAtOf(cp(cmtDoc), cid, "Dev"), "the agent's own coral-board read --%s stamps read_at", path)
+		})
+	}
 }

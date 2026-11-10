@@ -27,8 +27,55 @@ func logDiscovery(format string, a ...any) {
 	if msg == lastDiscovery {
 		return
 	}
+	// A miss is said once until tmux is found again (#15011): with no tmux the poll's several lines (the cached binary, the common places, each login shell) took turns, so "the same as the last line" never held
+	// and every second said all of them again.
+	if isDiscoveryMiss(msg) {
+		if missesLogged[msg] {
+			lastDiscovery = msg
+			return
+		}
+		if missesLogged == nil {
+			missesLogged = map[string]bool{}
+		}
+		missesLogged[msg] = true
+	} else {
+		clear(missesLogged)
+	}
 	lastDiscovery = msg
 	log.Print(msg)
+}
+
+// missesLogged are the miss lines already said since tmux was last found.
+var missesLogged map[string]bool
+
+func isDiscoveryMiss(msg string) bool {
+	return strings.Contains(msg, "failed") || strings.Contains(msg, "not found") || strings.Contains(msg, "not usable") || strings.Contains(msg, "not executable")
+}
+
+// loginShellMissFor is how long a login shell's "no tmux" answer stands (#15011): the lookup starts a login shell (the person's whole profile) for each shell Coral tries, and with no tmux on the computer the
+// status poll asked every second. A tmux in the PATH or a common place is still found at once (those are cheap checks); only the login-shell lookup waits, and a launch is told "tmux is missing" at most that much late.
+const loginShellMissFor = 30 * time.Second
+
+var (
+	loginMissMu  sync.Mutex
+	loginMissAt  time.Time
+	loginNow     = time.Now // a test moves the clock
+	loginMissSet bool
+)
+
+// cachedLoginShellTmux is loginShellTmux with a failed answer remembered for loginShellMissFor.
+func cachedLoginShellTmux() string {
+	loginMissMu.Lock()
+	if loginMissSet && loginNow().Sub(loginMissAt) < loginShellMissFor {
+		loginMissMu.Unlock()
+		return ""
+	}
+	loginMissMu.Unlock()
+	p := loginShellTmux()
+	loginMissMu.Lock()
+	loginMissSet, loginMissAt = p == "", loginNow()
+	loginMissMu.Unlock()
+	return p
 }
 
 // shellName is the shell's file name, not its folder.
@@ -102,7 +149,7 @@ func IsAvailable() (string, bool) {
 			return p, true
 		}
 	}
-	if p := loginShellTmux(); p != "" {
+	if p := cachedLoginShellTmux(); p != "" {
 		logDiscovery("discovery found tmux via login shell: %s", p)
 		return p, true
 	}
@@ -149,7 +196,7 @@ func tmuxFromLoginShell() string {
 		out, err := exec.CommandContext(ctx, shell, "-lc", "command -v tmux").Output()
 		cancel()
 		if err != nil {
-			log.Printf("[tmux] login shell tmux lookup failed: shell=%q err=%v", shell, err)
+			logDiscovery("login shell tmux lookup failed: shell=%q err=%v", shell, err)
 			continue
 		}
 		p := strings.TrimSpace(strings.SplitN(string(out), "\n", 2)[0])
