@@ -122,6 +122,9 @@ const NOT_POPOUT_RELEVANT = new Map(Object.entries({
     'theme-reset': 'theme editor: reverts unsaved colour edits',
     'wf-delete': 'Workflows view (dashboard nav only), after confirm',
     // QA's list: launch, import, save, apply settings (dialogs opened from the top bar, sidebar or views)
+    'm-launch-computer-go': 'launch dialog (a Hub): Continue from Which computer? (#15014); starts nothing',
+    'm-launch-computer-back': 'launch dialog (a Hub): Back from Which computer? to the chooser; starts nothing',
+    'm-launch-computer-change': 'launch dialog (a Hub): Change goes back to Which computer?; starts nothing',
     'm-launch-session': 'launch dialog: starts a new agent',
     'm-launch-team': 'launch dialog: starts a new team',
     'm-import-personas': 'launch dialog: imports persona files into the form',

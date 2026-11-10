@@ -25,6 +25,7 @@ const { _checkPermissionFlag } = await importOnce('./cli_dialogs.js');
 const { _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards } = await importOnce('./team_dialogs.js');
 const { _initAgentPresets } = await importOnce('./persona_io.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
+const { menuMove } = await importOnce('./menu_keys.js'); // the arrows of the Which computer? list use the one menu's key rules
 const { markFieldInvalid, _launchBlocked, _launchOn, _refreshAfterLaunch, _resetDirInputs, _showLaunchStep, _syncMobileLaunchSections, _withServerSettings, hideLaunchModal, setLaunchMore, setLaunchStage, LAUNCH_STAGES, launchStages } = await importOnce('./launch_core.js');
 const { wireRecap, syncRecap } = await importOnce('./launch_recap.js');
 const { offerSuggestion, syncSuggestionLine, usesSuggestion } = await importOnce('./folder_suggestion.js');
@@ -162,7 +163,7 @@ export function showLaunchModal(server, lock = false) {
     launch.member = null; // nor a member's (#7861)
     _serverSettings.clear();
     launch.serverLocked = !!lock && isHub();
-    launch.computerChosen = false; launch.pendingType = null; // a new dialog asks 'Which computer?' again (#15014)
+    launch.computerChosen = server !== undefined && server !== null && server !== ''; launch.pendingType = null; // a new dialog asks 'Which computer?' (#15014), unless a computer was named when it was opened (a computer's own Launch team / Launch agent)
     launch.server = _effectiveServer(coerceSelection(server, isHub(), state.servers));
     if (launch.serverLocked && normServer(server) !== LOCAL_SERVER) launch.server = normServer(server);
     _renderServerPicker();
@@ -269,8 +270,14 @@ function _showComputerStep(type) {
         b.addEventListener('click', () => { _computerPick = o.id; _syncComputerCards(); });
         return b;
     }));
+    if (!list.dataset.keys) { list.dataset.keys = '1'; list.addEventListener('keydown', e => { // a radio group: the arrows move the choice (a disabled card is skipped), by the one menu's key rules
+        const cards = [...list.querySelectorAll('.launch-computer-card:not(:disabled)')]; if (!cards.length) return;
+        const key = e.key === 'ArrowRight' ? 'ArrowDown' : e.key === 'ArrowLeft' ? 'ArrowUp' : e.key;
+        const to = menuMove(key, cards.length, cards.findIndex(c => c.dataset.server === _computerPick)); if (to < 0) return;
+        e.preventDefault(); _computerPick = cards[to].dataset.server; _syncComputerCards(); cards[to].focus();
+    }); }
     _syncComputerCards();
-    _showLaunchStep('computer');
+    _showLaunchStep('pickComputer');
     (list.querySelector('[aria-checked="true"]') || list.querySelector('button:not(:disabled)'))?.focus();
 }
 function _syncComputerCards() {
