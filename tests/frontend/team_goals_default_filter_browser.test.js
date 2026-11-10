@@ -1,4 +1,4 @@
-// The team page's Goals tab opens on Active (#8517, the operator): a fresh Goals tab has the Active pill selected and lists only the active goals (it used to open on All, mostly done goals); every pill keeps its count;
+// The team page's Goals tab opens on Active (#8517, the operator): a fresh Goals tab has the Active pill selected and lists the active goals with the finished ones under them in a Done group (#15305; it used to open on All, mostly done goals); every pill keeps its count;
 // a choice the person makes is remembered as before (All stays All when they go to Tasks and back); "No active goals" says so and offers all of them. The goals are answered by the suite (helpers/goals_stub.js: one goal in
 // each of the five states). 1280 and 390 px; CORAL_SCREENSHOT_DIR keeps a shot of each. Isolated dev server.
 const assert = require('node:assert/strict');
@@ -28,13 +28,13 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
             await ev(`(async () => { const sc = await import((window.__coralStatic || '/static/') + 'settings_core.js'); sc.clearCustomThemeVars(); sc.applyTheme('dark'); return true; })()`);
             await seed(ev, TEAM); if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await ev(GOALS_STUB); await openTeam(ev, waitFor, TEAM).catch(() => {});
-            await S.run(`${label}: a fresh Goals tab has Active selected and lists only the active goal, every pill keeps its count`, async () => {
+            await S.run(`${label}: a fresh Goals tab has Active selected and lists the active goal and the finished one under Done, every pill keeps its count`, async () => {
                 await goTab(ev, settle, 'Goals'); await waitFor(`document.querySelectorAll('${panel} tbody tr').length >= 1`, 'the goals', 10000); await settle(300);
                 const p = await pills();
                 assert.ok(p, 'the state pills are there');
                 assert.deepEqual(p.filter(x => x[1]).map(x => x[0].replace(/\s*\d+$/, '').replace(/\s*\(\d+\)$/, '')), ['Active'], 'Active is the one selected: ' + JSON.stringify(p));
                 assert.deepEqual(p.map(x => x[0].replace(/[^A-Za-z0-9]+/g, ' ').trim()).sort(), ['Active 1', 'All 5', 'Blocked 1', 'Done 1', 'Dropped 1', 'Proposed 1'].sort(), 'the counts stay: ' + JSON.stringify(p));
-                const r = await rows(); assert.equal(r.length, 1, 'only the active goal: ' + JSON.stringify(r)); assert.match(r[0], /Ship the new installer/);
+                const r = await rows(); assert.equal(r.length, 4, 'the active goal, then the finished one under Done (#15305): ' + JSON.stringify(r)); assert.match(r[1], /Ship the new installer/); assert.match(r[2], /Done \(1\)/); assert.match(r[3], /Old cleanup/);
                 await shot(`goals-default-${label}`);
             });
             await S.run(`${label}: a choice the person makes is remembered: All stays All through Tasks and back`, async () => {
