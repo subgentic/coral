@@ -1,7 +1,7 @@
 /* What the sidebar's menus do to a team or a folder's agents: kill all, share, save as a template, sleep (moved out of render.js, #4996; no behaviour change). */
 import { state } from './state.js';
 import { registerDialog } from './modal_chrome.js';
-import { sessionFolderKey, keyLabel, splitKey, inTeam, teamFetch, boardFetch } from './server_base.js';
+import { sessionFolderKey, keyLabel, splitKey, inTeam, teamFetch } from './server_base.js';
 import { browserLocal } from './safe_storage.js';
 import { redrawLiveList } from './list_hooks.js';
 import { showConfirmModal } from './confirm_dialog.js';
@@ -85,89 +85,12 @@ export async function killBoard(boardName) {
     );
 }
 
-function _buildTeamTemplateFromBoard(boardName) {
-    const boardSessions = (state.liveSessions || []).filter(s => inTeam(s, boardName));
-    if (!boardSessions.length) return null;
-
-    const agents = [];
-    for (const s of boardSessions) {
-        const agent = {
-            name: s.display_name || s.board_job_title || s.name,
-            prompt: s.prompt || '',
-        };
-        if (s.agent_type) agent.agent_type = s.agent_type;
-        if (s.model) agent.model = s.model;
-        if (s.thinking) agent.thinking = s.thinking;
-        if (s.live_permission_mode) agent.permission_mode = s.live_permission_mode;
-        if (s.capabilities) agent.capabilities = s.capabilities;
-        agents.push(agent);
-    }
-    return { name: keyLabel(boardName), agents, flags: '' };
-}
-
-async function _attachKnowledgeToTemplate(boardName, tmpl) {
-    try {
-        const resp = await teamFetch(boardName, n => `/api/teams/detail/${encodeURIComponent(n)}/knowledge`);
-        if (!resp.ok) return tmpl;
-        const data = await resp.json();
-        if (!data.exists || !data.agents) return tmpl;
-        const knowledgeMap = {};
-        for (const a of data.agents) {
-            knowledgeMap[a.name.toLowerCase()] = a.content;
-        }
-        for (const agent of tmpl.agents) {
-            const slug = agent.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9_-]/g, '');
-            if (knowledgeMap[slug]) {
-                agent.knowledge = knowledgeMap[slug];
-            }
-        }
-        if (data.index) tmpl.team_knowledge_index = data.index;
-    } catch { /* knowledge is optional */ }
-    return tmpl;
-}
-
-async function _attachWorkingModeToTemplate(boardName, tmpl) {
-    try {
-        const [modeResp, presetsResp] = await Promise.all([
-            boardFetch(boardName, `/working-mode`),
-            boardFetch(boardName, `/working-mode/presets`),
-        ]);
-        if (modeResp.ok) {
-            const mode = await modeResp.json();
-            if ((mode.mode && mode.mode !== 'none') || mode.custom_instructions) {
-                tmpl.working_mode = {
-                    mode: mode.mode || 'none',
-                    dependency_guidance: mode.dependency_guidance || false,
-                    asks_are_tasks: mode.asks_are_tasks || false,
-                    custom_instructions: mode.custom_instructions || '',
-                };
-            }
-        }
-        if (presetsResp.ok) {
-            const data = await presetsResp.json();
-            const customPresets = (data.presets || []).filter(p => !p.builtin || p.overridden);
-            if (customPresets.length > 0) {
-                tmpl.workflow_presets = customPresets.map(p => ({
-                    id: p.id,
-                    name: p.name,
-                    instructions: p.instructions || '',
-                    builtin: p.builtin || false,
-                }));
-            }
-        }
-    } catch { /* working mode is optional */ }
-    return tmpl;
-}
-
 export async function shareAgentTeam(boardName) {
-    let tmpl = _buildTeamTemplateFromBoard(boardName);
+    const tmpl = await (await importOnce('./team_template_build.js')).templateFromBoard(boardName);
     if (!tmpl) {
         showToast("No agents found on this board", "error");
         return;
     }
-
-    tmpl = await _attachKnowledgeToTemplate(boardName, tmpl);
-    tmpl = await _attachWorkingModeToTemplate(boardName, tmpl);
 
     const template = {
         version: 1,
@@ -219,18 +142,15 @@ export async function shareAgentTeam(boardName) {
 }
 
 export function saveTeamFromSidebar(boardName) {
-    showPromptModal('Save team template', 'Template name. Saves: members, models, thinking, permission modes, instructions, working mode, Additional instructions. Not saved: skills.', keyLabel(boardName), async (templateName) => {
-        let tmpl = _buildTeamTemplateFromBoard(boardName);
+    showPromptModal('Save team template', 'Name. Saves: members, models, thinking, modes, instructions. Not skills.', keyLabel(boardName), async (templateName) => {
+        const tmpl = await (await importOnce('./team_template_build.js')).templateFromBoard(boardName);
         if (!tmpl) {
             showToast("No agents found on this board", "error");
             return;
         }
-        tmpl = await _attachKnowledgeToTemplate(boardName, tmpl);
-        tmpl = await _attachWorkingModeToTemplate(boardName, tmpl);
         tmpl.name = templateName;
 
-        // Save to user_settings via the settings API: into the list the server has now (#4423), so a template another
-        // tab saved meanwhile is kept.
+        // into the list the server has now (#4423)
         try {
             const { raw } = await updateSettingList("saved_team_templates", list => upsertByName(list, [tmpl]),
                 { local: parseList(state.settings.saved_team_templates, []) });
