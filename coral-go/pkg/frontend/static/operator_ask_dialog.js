@@ -105,7 +105,7 @@ export function openAskDialog(a, onDone, runners = {}) {
         if (offered && !binary) reading.append(offered);
         if (offered && binary) { offered.classList.add('inbox-ask-yes-no'); offered.replaceChildren(offered.querySelector('.inbox-ask-offers-list')); sendRow.insertBefore(offered, send); }
     };
-    const foot = document.createElement('div'); foot.className = 'inbox-ask-foot'; foot.append(row); // Reply attachments belong with the reply box; the footer holds its final actions
+    const foot = document.createElement('div'); foot.className = 'inbox-ask-foot'; foot.append(row); // Reply attachments belong with the reply box; Close and Dismiss are in the header now
     const reading = document.createElement('div'); reading.className = 'inbox-ask-reading'; reading.tabIndex = -1;
     if (!whole.hidden) reading.append(whole);
     const compose = document.createElement('div'); compose.className = 'inbox-ask-compose';
@@ -114,7 +114,8 @@ export function openAskDialog(a, onDone, runners = {}) {
     compose.append(label, pics, err);
     if (missingCloudSource) dlg.setAttribute('aria-describedby', err.id);
     const contextNote = document.createElement('p'); contextNote.className = 'inbox-ask-sub'; contextNote.textContent = questionContextNote(a); contextNote.hidden = !contextNote.textContent;
-    dlg.append(title, sub, ...(contextNote.hidden ? [] : [contextNote]), ...(links.hidden ? [] : [links]), reading, compose, foot);
+    const head = document.createElement('div'); head.className = 'inbox-ask-head'; head.append(title, foot); // Close and Dismiss beside the title, where a person looks for them (walk 11 H1, M4: nobody found Dismiss at the bottom)
+    dlg.append(head, sub, ...(contextNote.hidden ? [] : [contextNote]), ...(links.hidden ? [] : [links]), reading, compose);
     drawOffers();
     if (!missingCloudSource && !fromAnotherComputer(a)) { // the picture is stored on the question's own team, as a goal's pictures are
         Promise.all([importOnce('./artifact_comment_images.js'), importOnce('./artifact_comments_api.js')]).then(([m, api]) => {

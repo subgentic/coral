@@ -2,7 +2,9 @@
 .inbox-ask-dialog > * { flex-shrink: 0; }
 .inbox-ask-dialog h2 .agent-link { font: inherit; }
 .inbox-ask-sub, .inbox-ask-offers-head, .inbox-ask-label { font-size: var(--fs-md); }
-.inbox-ask-foot { position: sticky; bottom: calc(-1 * var(--space-2xl)); padding: 12px 0; background: var(--bg-secondary); border-top: 1px solid var(--border); }
+.inbox-ask-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.inbox-ask-head h2 { flex: 1 1 auto; min-width: 0; }
+.inbox-ask-foot { flex: none; }
 @media (max-width: 500px) {
     .inbox-ask-sendrow .inbox-ask-send { flex: 1 1 auto; } /* a phone: Send reply fills the row beside Add image, right under the box (#13148) */
 }
@@ -16,11 +18,14 @@
 .inbox-ask-reading > *, .inbox-ask-compose > * { flex-shrink: 0; }
 .inbox-ask-offers-hint { margin: 8px 0 0; color: var(--text-muted); font-size: var(--fs-md); }
 @media (max-width: 999px) {
+    .inbox-ask-dialog { scroll-padding-bottom: 9rem; }
     dialog.inbox-ask-dialog { width: var(--dlg-w-form); }
+    .inbox-ask-compose { display: block; position: sticky; bottom: calc(-1 * var(--space-2xl)); z-index: 1; padding: 8px 0 12px; background: var(--bg-secondary); border-top: 1px solid var(--border); } /* the reply box and Send reply stay on the screen while the question scrolls (walk 11 H1) */
+    .inbox-ask-box { min-height: 0; height: 5.5rem; }
 }
 @media (min-width: 1000px) {
-    dialog.inbox-ask-dialog[open] { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-rows: auto auto auto minmax(0, 1fr) auto; column-gap: 24px; height: 85dvh; max-height: 85dvh; overflow: hidden; }
-    .inbox-ask-dialog > :is(h2, .inbox-ask-sub, .inbox-ask-subjects, .inbox-ask-foot) { grid-column: 1 / -1; }
+    dialog.inbox-ask-dialog[open] { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-rows: auto auto auto minmax(0, 1fr); column-gap: 24px; height: 85dvh; max-height: 85dvh; overflow: hidden; }
+    .inbox-ask-dialog > :is(.inbox-ask-head, .inbox-ask-sub, .inbox-ask-subjects) { grid-column: 1 / -1; }
     .inbox-ask-dialog h2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
     .inbox-ask-dialog h2 .agent-link { display: inline; white-space: normal; overflow: visible; text-overflow: clip; max-width: 100%; }
     .inbox-ask-reading, .inbox-ask-compose { display: block; grid-row: 4; min-width: 0; min-height: 0; overflow: auto; }
@@ -29,7 +34,6 @@
     .inbox-ask-dialog .inbox-ask-text { margin-bottom: 0; }
     .inbox-ask-offers-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); }
     .inbox-ask-offer, .inbox-ask-offer .btn { width: 100%; }
-    .inbox-ask-dialog .inbox-ask-foot { grid-row: 5; position: static; padding-bottom: 0; margin-top: 16px; }
 }
 
 /* Reply attachments stay with their text, before the final dialog actions (#13043). */
