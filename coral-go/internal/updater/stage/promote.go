@@ -270,7 +270,14 @@ func (c *checker) listFromAPI(ctx context.Context) ([]listedRelease, error) {
 // decodeReleases reads a JSON array of releases one element at a time. stopped is true when it left the rest unread (enough was found).
 func decodeReleases(r io.Reader) (list []listedRelease, stopped bool, err error) {
 	dec := json.NewDecoder(r)
-	if t, err := dec.Token(); err != nil || t != json.Delim('[') {
+	t, terr := dec.Token()
+	if terr != nil {
+		return nil, false, terr
+	}
+	if t == nil {
+		return nil, false, nil // null: an empty list, as a decode into a slice has always read it
+	}
+	if t != json.Delim('[') {
 		return nil, false, errors.New("not a list")
 	}
 	promos := 0
