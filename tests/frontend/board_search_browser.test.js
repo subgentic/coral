@@ -94,7 +94,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await click('.mb-search-step[data-step=older]');
         await settle(`document.querySelector('#mb-tools .mb-search-results').textContent.startsWith('2 of ')`, 'the second match');
         await onScreen(); s = await snap();
-        check('the up arrow goes to the next older match (2 of N)', s.current < first && s.curVisible === true && s.focusOnCurrent, JSON.stringify([first, s.current]));
+        check('the up arrow goes to the next older match (2 of N)', s.current < first && s.curVisible === true && s.focusOnCurrent, JSON.stringify([first, s.current, { curVisible: s.curVisible, focusOnCurrent: s.focusOnCurrent }]));
         await click('.mb-search-step[data-step=newer]');
         await settle(`document.querySelector('#mb-tools .mb-search-results').textContent.startsWith('1 of ')`, 'back to the first');
         s = await snap();
