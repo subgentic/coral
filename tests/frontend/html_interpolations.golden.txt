@@ -343,6 +343,7 @@
 1	server_status.js	updateBadgeHtml(e)
 1	session_header_updates.js	_whereBack
 2	session_rows.js	!instructionsOffered(s, isCloud()) ? '' : `<button class="menu-item overflow-menu-item" data-on-click="agent-i
+1	session_rows.js	(isGoneAsleep(s) || isExitedAsleep(s)) ? `<button class="menu-item overflow-menu-item" data-on-click="agent-sl
 1	session_rows.js	MORE_DOTS_SVG
 20	session_rows.js	SVGO.o0
 8	session_rows.js	SVGO.o1
@@ -363,7 +364,6 @@
 1	session_rows.js	dirChip
 1	session_rows.js	dotClass
 1	session_rows.js	hooksMissingChip(s)
-1	session_rows.js	isGoneAsleep(s) ? `<button class="menu-item overflow-menu-item" data-on-click="agent-sleep" data-name="${escap
 2	session_rows.js	label
 1	session_rows.js	nameTail ? `<span class="session-label-tags">${reminderTag}${typeTag}${dirChip}</span>` : `${reminderTag}${typ
 1	session_rows.js	piHooksChip(s)
