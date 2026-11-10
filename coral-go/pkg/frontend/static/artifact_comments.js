@@ -25,6 +25,7 @@ import { storeKey } from './local_store.js';
 import { boardOfPage } from './dock_page.js';
 import { el } from './dom_el.js';
 import { pollEvery } from './overload.js';
+await loadStyles('artifact-comments.css'); // the panel's rules: not at start (page_weight)
 await loadStyles('pictures.css'); // the picture rules load with this module, before anything draws (page_weight: not at start)
 
 const EARLIER_KEY = 'coral-artifact-comments-earlier'; // 'show' or 'hide' the comments made on older versions while the latest is open (#13606): hidden by default, kept per account

@@ -107,7 +107,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await waitFor(rowGone(names.d), at + 'the row approved in the viewer leaves', 15000).catch(() => {});
             await openBy(names.b, 'body', 'after Approve in the viewer, by the body');
             await openBy(names.b, 'name', 'after Approve in the viewer, by the name');
-            { const q = await reveal(`[...document.querySelectorAll('${T} tbody tr')].find(r => /Waiting Agent/.test(r.textContent))${mobile ? '' : ".querySelector('.dt-primary, .inbox-review-name, td')"}`); // on a phone the whole row opens the agent (a tap), and the first cell is the hidden selection check
+            { const q = await reveal(`[...document.querySelectorAll('${T} tbody tr')].find(r => /Waiting Agent/.test(r.textContent))${''}`); // the whole row opens the agent (a tap on a phone, a click on a card, #15162), and the first cell is the selection check
               check(!!q, at + 'the waiting agent row could be reached'); if (q) { await click(q.x, q.y); await waitFor(`window.__opened.length > 0 || !!document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'after the Approves, a click on the waiting agent opens it (its card over the Inbox for a permission, #11837, else the agent)', 4000).catch(() => check(false, at + 'after the Approves, a click on the waiting agent row opened nothing')); } }
         }
     } finally {
