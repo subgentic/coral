@@ -11,10 +11,10 @@ const { coralReady } = require('./helpers/wait');
     const S = `(window.__coralStatic || '/static/')`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        // the first page of the computer's review files answers after 1.5 s with nothing in it and no more; every other call is the real one
+        // the first page of the computer's review files (the Needs list's own read, limit=50: not the sidebar's count of them, limit=1, which asks first, #15105) answers late with nothing in it and no more; every other call is the real one
         await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const real = window.fetch; window.__release = null;
             window.fetch = (u, o) => { const url = new URL(String(u), location.href);
-                if (url.pathname === '/api/team-artifacts' && !window.__lateDone) { window.__lateDone = true; const page = { artifacts: [], has_more: false }; /* no total, no cursor: nothing the paging signature held changes when it lands */
+                if (url.pathname === '/api/team-artifacts' && url.searchParams.get('tag') === 'for review' && url.searchParams.get('limit') === '50' && !window.__lateDone) { window.__lateDone = true; const page = { artifacts: [], has_more: false }; /* no total, no cursor: nothing the paging signature held changes when it lands */
                     return new Promise(res => { window.__release = () => res(new Response(JSON.stringify(page), { status: 200, headers: { 'Content-Type': 'application/json' } })); }); }
                 return real(u, o); }; })();` });
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
