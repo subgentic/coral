@@ -234,8 +234,9 @@ export function attachReview(d, { reload }) {
     const syncSend = () => { submitBtn.disabled = sending || inProgress || tray.busy() || tray.failed(); }; // Send waits for a picture still going up, and for a failed one to be removed
     error.before(tray.picker(), tray.node, tray.hint()); tray.attach(form, text); tray.listen(syncSend);
     const paintApprove = () => {
-        const n = d.dataset.shownVersion, newer = d.dataset.newerVersion;
-        approve.textContent = `${newer && n ? `Approve v${n}` : 'Approve'}${cur && cur.state === 'changes' ? ' anyway' : ''}${newer ? ` (v${newer} is newer)` : ''}`;
+        const n = d.dataset.shownVersion, newer = d.dataset.newerVersion, covers = d.dataset.coversFiles;
+        approve.textContent = `${newer && n ? `Approve v${n}` : 'Approve'}${cur && cur.state === 'changes' ? ' anyway' : ''}${newer ? ` (v${newer} is newer)` : ''}${covers && !newer ? ` (covers ${covers} files)` : ''}`;
+        approve.title = covers ? `One decision covers the ${covers} files in this review: open each from the version list first.` : '';
     };
     d.addEventListener('av-version', () => { if (cur) paintApprove(); });
     const show = (s) => {
