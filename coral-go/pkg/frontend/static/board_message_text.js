@@ -45,7 +45,7 @@ export function askBadge(m) {
     if (!ask || typeof ask !== 'object') return '';
     const open = Array.isArray(ask.open) ? ask.open.map(String) : [];
     const done = ask.answered === true || open.length === 0;
-    const title = done ? 'Answered: each member it asks has posted since, in a reply or a file comment' : `A question: waiting on ${open.join(', ')}`;
+    const title = done ? 'Answered: each member it asks has replied, or it was closed' : `A question: waiting on ${open.join(', ')}`;
     return `<span class="chip chip-tag mb-external-badge mb-ask-badge${done ? ' is-answered' : ''}" title="${escapeAttr(title)}">Question${done ? ' \u00b7 answered' : ''}</span>`;
 }
 

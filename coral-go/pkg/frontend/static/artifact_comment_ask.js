@@ -52,7 +52,7 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
             const link = agentLink(names.get(role) || role, { board: boardTeamKey(st.server, st.board) });
             let state = s.k ? askUi.askState(s.k) : 'sent';
             const newestMine = !!newest && newest.mine, readNewest = !!s.k && !!s.k.readAt && (!newest || !(Date.parse(newest.createdAt) > Date.parse(s.k.readAt)));
-            if (s.k && newestMine && newest !== top && state !== 'sent') state = readNewest || (s.k.seen && !s.k.readAt) ? 'read' : 'unread'; // the newest message is yours: replied or read earlier says nothing of it until the agent has read it
+            if (s.k && newestMine && newest !== top && state !== 'sent') state = readNewest ? 'read' : 'unread'; // the newest message is yours: replied or read earlier says nothing of it until the agent has read it
             if (state === 'replied') p.append(link, ` replied${s.k.replies > 1 ? ` (${s.k.replies} times)` : ''}`);
             else if (state === 'read') {
                 p.append('Read by ', link);
