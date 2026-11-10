@@ -176,7 +176,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             await waitFor(`!!document.querySelector('.ac-composer .ac-input')`, 'the composer', 3000);
             check(`${at}: the composer shows the quote it will be made on`, /write lock on large databases/.test(await ev(`document.querySelector('.ac-composer .ac-quote').textContent`)));
             // #15128: a file waiting for review: the box says where Approve is (a typed reply is delivered, it never approves); a file that is not, says nothing
-            check(`${at}: no Approve hint on a file that is not waiting for review`, !(await ev(`!!document.querySelector('.ac-composer .ac-hint')`)));
+            check(`${at}: no Approve hint on a file that is not waiting for review`, !(await ev(`!!document.querySelector('.ac-composer .ac-hint:not([hidden])')`)));
             for (const waiting of [true, false]) {
                 await click('.ac-composer .ac-cancel');
                 await ev(`document.getElementById('artifact-viewer').dataset.reviewPending = ${waiting ? "'1'" : "''"}; true`);
@@ -184,8 +184,10 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
                 await waitFor(`!document.querySelector('.ac-selbtn').hidden`, 'the Comment button', 3000);
                 await click('.ac-selbtn');
                 await waitFor(`!!document.querySelector('.ac-composer .ac-input')`, 'the composer', 3000);
-                const hint = await ev(`(document.querySelector('.ac-composer .ac-hint') || {}).textContent || ''`);
-                check(`${at}: ${waiting ? 'a file waiting for review says "To approve, use Approve on the file"' : 'after Approve there is no hint'}`, waiting ? /^To approve, use Approve on the file/.test(hint) : hint === '', hint);
+                const hint = await ev(`(document.querySelector('.ac-composer .ac-hint:not([hidden])') || {}).textContent || ''`);
+                check(`${at}: ${waiting ? 'a file waiting for review says only what is always true: writing here does not approve it' : 'after Approve there is no hint'}`, waiting ? hint === 'To approve, use Approve on the file: writing here does not approve it.' : hint === '', hint);
+                const described = await ev(`(() => { const t = document.querySelector('.ac-composer .ac-input'), h = document.querySelector('.ac-composer .ac-hint'); return { by: t.getAttribute('aria-describedby'), id: h && h.id }; })()`);
+                check(`${at}: the box is described by the hint only while it shows (${waiting ? 'waiting' : 'not waiting'})`, waiting ? !!described.id && described.by === described.id : !described.by, JSON.stringify(described));
             }
             await ev(`(() => { const t = document.querySelector('.ac-composer .ac-input'); t.value = 'Is the lock per table or per database?'; t.dispatchEvent(new Event('input')); document.querySelector('.ac-composer').requestSubmit(); return true; })()`);
             await waitFor(`[...document.querySelectorAll('.ac-card')].some(c => /per table or per database/.test(c.textContent))`, 'the new card', 5000);
