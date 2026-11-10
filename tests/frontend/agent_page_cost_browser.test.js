@@ -29,6 +29,8 @@ const { coralReady } = require('./helpers/wait');
         await sleep(14000); // sleep-ok: the measure is the requests made over 14 seconds of silence
         const c1 = await chats('quiet-agent');
         assert.ok(c1 - c0 <= 8, `at most 8 chat reads in 14 s of silence (it was 14): ${c1 - c0}`);
+        // the prefetch starts 2 s after the chat view shows and its file is in the resource timing once the response ends: under a slow CPU that came just after the 14 s above, so it is waited for, bounded (#15052)
+        await waitFor(`performance.getEntriesByType('resource').some(e => /xterm/.test(e.name))`, 'an awake agent still gets the terminal code ahead of time (#4518)', 20000);
         assert.ok(await xterm() > 0, 'an awake agent still gets the terminal code ahead of time (#4518)');
 
         console.log('3. A key press brings the every-second poll back');
