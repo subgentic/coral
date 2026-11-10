@@ -2,6 +2,8 @@
 
 Coral is running. This guide shows you how to find your way around, start your first agent and team, and what else is in the app.
 
+*Screenshots show the dark theme.*
+
 ## Your Inbox
 
 Coral opens on the **Inbox**. Anything an agent needs from you appears here, so you never have to watch a terminal.
