@@ -47,6 +47,11 @@ func reconcileOrphanedSessions(ctx context.Context, db *store.DB, agentRT backgr
 		if ls.IsSleeping == 1 {
 			// Check if a sleeping session is actually alive (e.g. tmux still running
 			// after a server restart). If so, wake it.
+			// An Ended agent (its CLI exited, reason agent_exited) keeps its terminal, left at a shell, so it is "alive" here: waking it made the reconciler find the CLI gone again 25 seconds later and post
+			// another "stopped" notice at every restart (#15062). The reconciler's checkResumed wakes it when its CLI runs again.
+			if ls.SleepReason != nil && *ls.SleepReason == store.SleepReasonAgentExited {
+				continue
+			}
 			if alive[ls.SessionID] {
 				if err := ss.SetSessionSleeping(ctx, ls.SessionID, false); err != nil {
 					log.Printf("[startup] failed to wake recovered session %s: %v", ls.SessionID[:8], err)
