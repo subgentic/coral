@@ -22,7 +22,7 @@ const { coralReady } = require('./helpers/wait');
             const state = () => ev(`(() => { const d = document.getElementById('artifact-viewer'), p = d.querySelector('.ac-panel'), body = d.querySelector('.artifact-viewer-body'), c = d.querySelector('.artifact-viewer-content'), t = d.querySelector('.ac-toggle'); const pb = p.getBoundingClientRect(), cb = c.getBoundingClientRect(), bb = body.getBoundingClientRect(); return { open: p.classList.contains('ac-sheet-open'), expanded: t.getAttribute('aria-expanded'), label: t.textContent, remembered: localStorage.getItem('coral-artifact-comments:text/markdown'), panelVisible: p.getClientRects().length > 0 && !p.hidden && pb.width > 0 && getComputedStyle(p).visibility !== 'hidden', fileFull: Math.round(bb.width) >= Math.round(cb.width) - 100, sheetAtBottom: pb.bottom >= cb.bottom - 2 && pb.top > cb.top + 100 }; })()`);
             await open();
             let s = await state();
-            assert.ok(!s.open && s.expanded === 'false' && /^Comments \(3\)$/.test(s.label) && s.remembered === null, `${w}: with nothing remembered the viewer opens with Comments closed: ` + JSON.stringify(s));
+            assert.ok(!s.open && s.expanded === 'false' && /^Comments \(4\)$/.test(s.label) && s.remembered === null, `${w}: with nothing remembered the viewer opens with Comments closed: ` + JSON.stringify(s));
             if (!mobile) assert.ok(s.fileFull, `${w}: the file has the whole width while Comments is closed: ` + JSON.stringify(s));
             await shot('comments-closed-' + w);
             await ev(`document.querySelector('#artifact-viewer .ac-toggle').click(); true`);
