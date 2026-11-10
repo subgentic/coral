@@ -24,6 +24,10 @@ running ──sleep──▶ sleeping ──wake──▶ running
                   └──delete──▶ (removed)
 ```
 
+### The team's folder
+
+A team works in the folder the Operator chose: your working directory. Build there. If you cannot (a CLI asks whether to trust it and nobody has answered, or you think Coral will not trust a folder under the temp directory), do not move the work to another folder such as the home folder on your own. Ask the Operator first with `coral-board post --ask "@Operator <what is wrong and which folder you propose>"`, and say in the task what folder the work is in. The Operator answers a folder-trust question on the agent's own page.
+
 ### Slot-Based Members
 
 Each team has a fixed set of **member slots** — one per agent defined in the team config. A slot is a persistent position, not a live session:

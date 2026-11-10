@@ -57,6 +57,10 @@ func probeProjectTrust(path, home string) map[string]any {
 	}
 	real, err := foldertrust.Check(path, home, foldertrust.Ticked)
 	if err != nil {
+		if plain := foldertrust.PlainReason(err); plain != "" {
+			// A folder Coral will never trust (home, a top or hidden folder, a shared one): the dialog hides the Trust switch and says why before launch, not in a toast after it (#15091). One plain sentence, no path.
+			return map[string]any{"checked": false, "refused": plain + " Each agent will ask about the folder when it starts. To have Coral trust it for them, pick a project folder inside your home folder instead."}
+		}
 		return unchecked
 	}
 	// Hold the checked directory open. Descendants cannot escape this root, even
