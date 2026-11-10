@@ -203,6 +203,7 @@ const SETTINGS_PRELOAD = `(() => {
         // Two servers whose short names collide are shown by their full label (or a shortest unique form).
         await scene([{ id: 'a', label: 'box.lan', status: 'online' }, { id: 'b', label: 'box.home', status: 'online' }, { id: 'c', label: 'nas.lan', status: 'online' }]);
         await ev(`localStorage.setItem('coral-group-by-server', 'true'); T.render.renderLiveSessions(T.state.liveSessions); true`);
+        await waitFor(`document.querySelectorAll('#live-sessions-list li.server-group-header .server-group-name').length === 3`, 'the three server group headers rendered', 3000); // #15407: step 4 read them with no wait, so a slow render met undefined (trial 42923646822)
         const shown = await ev(`[...document.querySelectorAll('#live-sessions-list li.server-group-header')].map(h => ({ id: h.dataset.serverGroup, name: h.querySelector('.server-group-name').textContent }))`);
         const byId = Object.fromEntries(shown.map(x => [x.id, x.name]));
         assert.equal(new Set(shown.map(x => x.name)).size, shown.length, `colliding short names are told apart (${JSON.stringify(shown)})`);
