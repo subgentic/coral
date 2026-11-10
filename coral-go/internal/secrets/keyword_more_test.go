@@ -199,10 +199,10 @@ func TestRoundFourIsLinearOnAdversarialText(t *testing.T) {
 			if raceEnabled {
 				return // the budget is a time: not read under -race
 			}
-			start := time.Now()
-			_, err := hubRedactor().Text([]byte(mk(small)))
+			text := mk(small)
+			took, err := runWithin(func() error { _, err := hubRedactor().Text([]byte(text)); return err }, Budget) // the fastest of up to three: a stall on a loaded runner is not a slow pass (#15251)
 			require.NoError(t, err, "within the redactor's budget")
-			require.Less(t, time.Since(start), Budget, name)
+			require.Less(t, took, Budget, name)
 		})
 	}
 }

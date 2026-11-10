@@ -130,7 +130,12 @@ if [ "$run_ok" = 1 ]; then
   # SMOKE_EXPECT_DROPBOX_KEY=1 (release.yml only; a rehearsal builds without the key): the build's own Dropbox app key reached the server (#15065)
   dbx=skipped
   if [ "${SMOKE_EXPECT_DROPBOX_KEY:-}" = 1 ]; then
-    dbx=$(curl -s -m 10 -H "Authorization: Bearer $KEY" "http://127.0.0.1:$PORT/api/dropbox/status" | python3 -c 'import sys,json; print("ok" if json.load(sys.stdin).get("app_key_set") is True else "app_key_set not true")' 2>/dev/null || echo "no answer")
+    # GET /api/dropbox/status is a dashboard route: it refuses a Bearer header (local_dashboard_required). Ask it the way the dashboard does: sign in with the
+    # login link the server printed (a cookie), then a same-origin request with no Authorization header.
+    tok=$(grep -o 'login_token=[0-9a-f]*' "$work/server.log" | head -1 | cut -d= -f2)
+    jar="$work/dbx.jar"
+    curl -s -m 10 -c "$jar" -o /dev/null "http://127.0.0.1:$PORT/?login_token=$tok"
+    dbx=$(curl -s -m 10 -b "$jar" -H "Origin: http://127.0.0.1:$PORT" -H "Sec-Fetch-Site: same-origin" "http://127.0.0.1:$PORT/api/dropbox/status" | python3 -c 'import sys,json; print("ok" if json.load(sys.stdin).get("app_key_set") is True else "app_key_set not true")' 2>/dev/null || echo "no answer")
   fi
   listen=$(python3 - "$PORT" <<'PY'
 import sys

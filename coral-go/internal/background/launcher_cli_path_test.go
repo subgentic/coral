@@ -182,6 +182,8 @@ func TestCodexRunsFiredTogetherAreStartedApart(t *testing.T) {
 	agent.SetStartStagger(true)
 	agent.SharedHomeStartGap = 400 * time.Millisecond
 	launch := func(agentType string, n int) []time.Time {
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second) // a launch that waits for a start slot is cut here instead of hanging
+		defer cancel()
 		rt := &stampRecorder{}
 		l := newTestLauncher(t, rt, store.NewSessionStore(setupTestDB(t)), 8450)
 		var wg sync.WaitGroup
@@ -205,9 +207,12 @@ func TestCodexRunsFiredTogetherAreStartedApart(t *testing.T) {
 	for i := 1; i < len(codex); i++ {
 		assert.GreaterOrEqual(t, codex[i].Sub(codex[i-1]), 350*time.Millisecond, "codex start %d follows the previous by at least the gap", i)
 	}
+	// Other agents are not delayed (#15335): no wall-clock bound, which a loaded runner breaks (546 ms against 300 ms on windows-tests). The gap is an hour for this half: a Claude launch that waited for a start
+	// slot would wait it out and be cut by the launch's 30 s limit, however fast or slow the machine is; one that does not wait finishes, and takes no slot from the stagger's record.
+	agent.SharedHomeStartGap = time.Hour
 	claude := launch(at.Claude, 3)
-	require.Len(t, claude, 3)
-	assert.Less(t, claude[2].Sub(claude[0]), 300*time.Millisecond, "other agents are not delayed")
+	require.Len(t, claude, 3, "all three Claude launches finished without waiting for a start slot")
+	assert.Zero(t, agent.ReserveStart(at.Claude), "Claude has no start slot to wait for")
 }
 
 // #11105 (row 12): a scheduled job on Pi runs unattended, so Pi is not left to ask whether to trust the repository's own Pi files (the job would wait on a question nobody answers), and a configured --approve

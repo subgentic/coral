@@ -1,12 +1,14 @@
 package secrets
 
 import (
+	"errors"
 	"runtime"
 	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -57,6 +59,31 @@ func measureLinearUsing(measure func(func(string), string) time.Duration, mk fun
 	return ds, dl, false
 }
 
+// runWithin runs f up to three times and says how fast the fastest run was (and the last error if none succeeded): one run that a loaded shared runner stalls past the budget is not a slow pass, three that are all over it are
+// (the redactor's Budget check once read a single 4.41 s sample against its 3 s, #15251). A run within the budget ends it, so an unloaded machine reads one.
+func runWithin(f func() error, budget time.Duration) (time.Duration, error) {
+	best, lastErr, ran := time.Duration(0), error(nil), false
+	for attempt := 0; attempt < 3; attempt++ {
+		start := time.Now()
+		err := f()
+		d := time.Since(start)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if !ran || d < best {
+			best, ran = d, true
+		}
+		if best < budget {
+			return best, nil
+		}
+	}
+	if !ran {
+		return 0, lastErr
+	}
+	return best, nil
+}
+
 // requireLinear fails when measureLinear says the pass is not linear, or when it takes more than 10 s at all (a floor that only catches a blow-up: a shared
 // runner is several times slower than a laptop).
 func requireLinear(t *testing.T, name string, mk func(n int) string, f func(string), small, large int) {
@@ -104,4 +131,30 @@ func TestTheLinearGuardRefusesAQuadraticPassAndAcceptsALinearOne(t *testing.T) {
 	require.Equal(t, time.Duration(800), ds)
 	require.Equal(t, time.Duration(3_200), dl)
 	require.True(t, ok, "a single pass must pass it")
+}
+
+// #15251: a stall that lands in one timed run (a loaded shared runner) does not fail the budget check; a pass that is over the budget every time does.
+func TestAStalledRunIsNotASlowPassButThreeSlowRunsAre(t *testing.T) {
+	const budget = 20 * time.Millisecond
+	calls := 0
+	d, err := runWithin(func() error {
+		calls++
+		if calls == 1 {
+			time.Sleep(3 * budget) // the stall
+		}
+		return nil
+	}, budget)
+	require.NoError(t, err)
+	assert.Less(t, d, budget, "the second run was within the budget")
+	assert.Equal(t, 2, calls)
+
+	calls = 0
+	d, err = runWithin(func() error { calls++; time.Sleep(3 * budget); return nil }, budget)
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, d, budget, "three slow runs are a slow pass")
+	assert.Equal(t, 3, calls)
+
+	calls = 0
+	_, err = runWithin(func() error { calls++; return errors.New("redactor failed") }, budget)
+	assert.EqualError(t, err, "redactor failed", "an error every time is an error")
 }
