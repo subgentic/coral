@@ -8,7 +8,7 @@ import { JSDOM } from 'jsdom';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dir = path.resolve(here, '../../coral-go/pkg/frontend/static');
 const dom = new JSDOM('<!doctype html><body><script id="coral-boot" type="application/json">{"mode":"local"}</script></body>', { url: 'http://127.0.0.1:8420/' });
-for (const k of ['window', 'document', 'navigator', 'localStorage', 'location', 'sessionStorage', 'getComputedStyle', 'HTMLElement', 'Node', 'Event', 'CustomEvent', 'MutationObserver', 'AbortController']) {
+for (const k of ['window', 'document', 'navigator', 'localStorage', 'location', 'sessionStorage', 'getComputedStyle', 'HTMLElement', 'Element', 'Node', 'Event', 'CustomEvent', 'MutationObserver', 'AbortController']) {
     Object.defineProperty(globalThis, k, { value: dom.window[k] ?? globalThis[k], configurable: true, writable: true });
 }
 const asked = [];
@@ -26,7 +26,7 @@ globalThis.fetch = async (url) => {
     const before = u.searchParams.get('before');
     const all = p.ids || [];
     const got = all.filter(a => before == null || a.id < Number(before)).slice(0, Number(u.searchParams.get('limit')));
-    return json({ actions: got.map(a => ({ id: a.id, team: 'team', at: a.at, action: 'approved', item_kind: 'file', item_id: 'x', source: 'local' })), check: p.check || { intact: true, rows: all.length, note: '' } });
+    return json({ actions: got.map(a => ({ id: a.id, team: 'team', at: a.at, action: 'approved', item_kind: 'file', item_id: a.item_id || 'x', source: 'local' })), check: p.check || { intact: true, rows: all.length, note: '' } });
 };
 const { state } = await import(pathToFileURL(path.join(dir, 'state.js')).href);
 const AC = await import(pathToFileURL(path.join(dir, 'inbox_activity.js')).href);
@@ -77,6 +77,22 @@ assert.equal(AC.total(), 3);
 state.servers = online(['srv1']);
 await AC.refresh(null, { next: true });
 assert.deepEqual(filt().map(AC.keyOf).sort(), ['1', 'srv1/1'], 'srv2 is gone from the list: its rows are not shown');
+
+// a remote file's row opens on ITS computer: the open callback gets the row with its qualified team, which is what the sidebar reads the computer from (Security INFO #15405, #15427)
+const { splitKey } = await import(pathToFileURL(path.join(dir, 'server_base.js')).href);
+const digest = 'ab'.repeat(32);
+reset(online(['srv1']), { local: { ids: [] }, srv1: { ids: [{ id: 9, at: at(4), item_id: digest }] } });
+await AC.refresh();
+const opened = [];
+const table = AC.spec(filt(), { file: r => opened.push(r), goal() {}, question() {}, task() {}, agent() {}, message() {}, chat() {}, workflow() {}, job() {} }).node();
+document.body.append(table);
+const btn = table.querySelector('button.dt-primary');
+assert.ok(btn, 'the row has a button that opens its file');
+btn.click();
+assert.equal(opened.length, 1, 'clicking the remote file row opens it once');
+assert.equal(opened[0].server, 'srv1');
+assert.equal(splitKey(opened[0].team).server, 'srv1', 'the sidebar takes the computer from the team, so it is the row\'s own computer, never this one');
+assert.equal(opened[0].item_id, digest);
 
 // a sign-out clears it all (the page's own event, not only a call)
 document.dispatchEvent(new window.CustomEvent('coral:signed-out'));
