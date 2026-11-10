@@ -49,7 +49,7 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
                     window.__urls.push(u);
                     if (${old} && u.includes('versions=')) return new Response(JSON.stringify({ error: 'unknown parameter versions' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
                     const sid = new URL(u, location.origin).searchParams.get('session_id') || undefined;
-                    const rows = [row('a', 'design.png', ${old} ? {} : { earlier_versions: 2 }), row('b', 'mockup.png', ${old} ? {} : { earlier_versions: 1 }), row('c', 'notes.png', {})];
+                    const rows = [row('a', 'design.png', ${old} ? {} : { earlier_versions: 2 }), row('b', 'mockup.png', ${old} ? {} : { earlier_versions: 1, version: 5, versions: 5 }), row('c', 'notes.png', {})];
                     return new Response(JSON.stringify({ session_id: sid, project: 'design-team', artifacts: rows, total: 3, all: 3, limit: 50, offset: 0, has_more: false }), { headers: { 'Content-Type': 'application/json' } });
                 }
                 if (u.includes('/api/')) return new Response(JSON.stringify({ files: [] }), { headers: { 'Content-Type': 'application/json' } });
@@ -69,7 +69,7 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
         await boot(false);
         const urls = await ev('window.__urls');
         assert.ok(urls.length >= 1 && urls.every(u => /[?&]versions=newest/.test(u)), 'every list read asks for versions=newest: ' + JSON.stringify(urls));
-        assert.deepEqual(await notes(), [['design.png', '2 earlier versions'], ['mockup.png', '1 earlier version'], ['notes.png', '']]);
+        assert.deepEqual(await notes(), [['design.png', '2 earlier versions'], ['mockup.png', '4 earlier versions'], ['notes.png', '']]);
         assert.equal(await ev(`document.querySelector('${ROWS} .team-artifact-badge-received, ${ROWS} .team-artifact-badge-unverified, ${ROWS} .team-artifact-badge-shared')`), null, 'the version note is not an origin badge');
         await shot('versions-desktop');
 
