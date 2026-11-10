@@ -293,7 +293,7 @@ func (h *SessionsHandler) SleepSession(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "sleeping": true})
 }
 
-// SleepGone files agents whose terminal is gone under plain sleeping (#13171): "Sleep all terminal-gone" of the sidebar. They are asleep already, so nothing is stopped and nothing is killed: the reason
+// SleepGone files agents whose terminal is gone, or whose CLI ended (#15068), under plain sleeping (#13171): "Sleep all terminal-gone" of the sidebar. They are asleep already, so nothing is stopped and nothing is killed: the reason
 // "terminal_gone" is cleared, their resume info stays, and a later wake resumes them like any sleeper. The body may name the agents ({"session_ids": [...]}, the ones the person sees); without it every such agent moves.
 // POST /api/sessions/live/sleep-gone
 func (h *SessionsHandler) SleepGone(w http.ResponseWriter, r *http.Request) {

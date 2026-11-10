@@ -135,7 +135,7 @@ function _rowMenuContent(s, sid) {
                 ${SVGO.o0}<path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/></svg>
                 Wake
             </button>
-            ${(isGoneAsleep(s) || isExitedAsleep(s)) ? `<button class="menu-item overflow-menu-item" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="sleep">
+            ${isGoneAsleep(s) || isExitedAsleep(s) ? `<button class="menu-item overflow-menu-item" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="sleep">
                 ${SVGO.o0}<path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/></svg>
                 Sleep
             </button>` : ''}
@@ -287,7 +287,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     // Terminal-gone sleepers already have their restart chip. A sleeping agent is a row like any other (#10062): its one quiet chip says Sleeping (when no other chip owns the row; titled when Coral stopped it), and Wake is on the row at a hover or the keyboard, named for the agent
     const sleepChip = s.sleeping && !isGoneAsleep(s) && !waitingBadge && !heldChip ? ` <span class="chip chip-caps session-state-pill neutral"${s.sleep_reason === 'coral_stopped' ? ' title="Asleep since Coral restarted"' : ''}>Sleeping</span>` : '';
     const wakeBtn = s.sleeping && !isStaleSession(s) ? ` <button type="button" class="btn btn-quiet btn-small" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(s.session_id || '')}" data-mode="wake" aria-label="Wake ${escapeAttr(resolveSessionIdentity(s))}">Wake</button>` : '';
-    // A terminal-gone or ended agent (its CLI exited, #15068) is asleep already: Sleep files it under sleeping (no "Terminal gone" chip; a later Wake resumes it like any sleeper, #13171)
+    // A terminal-gone or ended (#15068) agent is asleep already: Sleep files it under sleeping (no "Terminal gone" chip; a later Wake resumes it like any sleeper, #13171)
     const sleepBtn = (isGoneAsleep(s) || isExitedAsleep(s)) && !isStaleSession(s) ? ` <button type="button" class="btn btn-quiet btn-small" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(s.session_id || '')}" data-mode="sleep" aria-label="Put ${escapeAttr(resolveSessionIdentity(s))} to sleep">Sleep</button>` : '';
     const ctxHigh = s.context_pct !== null && s.context_pct !== undefined && s.context_pct >= 80;
     const isTerminal = s.agent_type === "terminal";
@@ -406,10 +406,10 @@ export function _renderAgentListWithSubgroups(agents, teamDefaultDir, isCompact,
         html += `<li class="sleeping-summary-row folder-more-row" data-on-click="group-more-expand" data-group="${escapeAttr(groupName)}"><button type="button" class="row-btn" aria-expanded="${escapeAttr(String(open))}" aria-label="${escapeAttr(moreName)}"><span class="sleeping-summary-label">${label}</span></button></li>`;
     }
 
-    // Several agents whose terminal is gone: one row files them all under sleeping (#13171); it names how many, and each is a row above with its own Sleep
-    const goneAgents = awake.filter(s => isGoneAsleep(s) && !isStaleSession(s));
+    // Several agents gone or ended: one row files them all under sleeping (#13171, #15068); it names how many, and each is a row above with its own Sleep
+    const goneAgents = awake.filter(s => (isGoneAsleep(s) || isExitedAsleep(s)) && !isStaleSession(s));
     if (goneAgents.length >= 2) {
-        const label = `Sleep ${goneAgents.length} terminal-gone agents`, goneName = `${label} in ${keyLabel(groupName)}`, goneIds = goneAgents.map(s => s.session_id).join(',');
+        const label = `Sleep ${goneAgents.length} ${goneAgents.some(isExitedAsleep) ? 'ended' : 'terminal-gone'} agents`, goneName = `${label} in ${keyLabel(groupName)}`, goneIds = goneAgents.map(s => s.session_id).join(',');
         html += `<li class="sleeping-summary-row sleep-gone-row"><button type="button" class="row-btn" data-on-click="agent-sleep-gone" data-ids="${escapeAttr(goneIds)}" aria-label="${escapeAttr(goneName)}"><span class="sleeping-summary-label">${escapeAttr(label)}</span></button></li>`;
     }
 

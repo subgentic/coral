@@ -71,6 +71,33 @@ const BASE = require('./test_base').BASE;
         assert.equal(after.reason, null, 'it is a plain sleeper, not Ended');
         assert.match(after.summary.replace(/\s+/g, ' '), /5 sleeping agents/, `the sleeping group counts it: ${after.summary}`);
         console.log('   ✓ Sleep files the Ended agent under sleeping, without its Ended chip');
+
+        // two more ended agents: the team's bulk row names them ("Sleep 2 ended agents") and files both with one request naming them
+        await ev(`(() => {
+            window.__m.add('ended-2', 'E', 3, { sleeping: true, sleep_reason: 'agent_exited', board_project: 'end-team' });
+            window.__m.add('ended-3', 'E', 3, { sleeping: true, sleep_reason: 'agent_exited', board_project: 'end-team' });
+            window.__bulk = [];
+            const f = window.fetch;
+            window.fetch = (url, opts = {}) => {
+                if ((opts.method || 'GET') === 'POST' && String(url).endsWith('/api/sessions/live/sleep-gone')) {
+                    const ids = JSON.parse(opts.body).session_ids; window.__bulk.push(ids);
+                    return Promise.resolve(new Response(JSON.stringify({ ok: true, sessions_affected: ids.length }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+                }
+                return f(url, opts);
+            };
+            window.T.render.renderLiveSessions(window.T.state.liveSessions);
+            return true;
+        })()`);
+        await ev(framesJs(2));
+        const bulk = await ev(`(() => { const b = document.querySelector('.sleep-gone-row button'); return b ? { text: b.textContent.trim(), aria: b.getAttribute('aria-label'), ids: b.dataset.ids } : null; })()`);
+        assert.ok(bulk && bulk.text === 'Sleep 2 ended agents', `the bulk row names them: ${JSON.stringify(bulk)}`);
+        assert.deepEqual(bulk.ids.split(',').sort(), ['ended-2-id', 'ended-3-id']);
+        await ev(`document.querySelector('.sleep-gone-row button').click(); true`);
+        await ev(framesJs(3));
+        assert.deepEqual(await ev(`window.__bulk`), [['ended-2-id', 'ended-3-id']], 'one request naming exactly those two');
+        assert.deepEqual(await ev(`['ended-2-id', 'ended-3-id'].map(id => window.T.state.liveSessions.find(x => x.session_id === id).sleep_reason)`), [null, null], 'both are plain sleepers now');
+        assert.equal(await ev(`!!document.querySelector('.sleep-gone-row')`), false, 'the bulk row is gone');
+        console.log('   ✓ the bulk row files several Ended agents with one request');
     } finally {
         await client.close();
     }
