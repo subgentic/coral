@@ -49,7 +49,7 @@ const BASE = require('./test_base').BASE;
         await ev(`(() => {
             const m = window.__m;
             for (const id of Object.keys(m.agents)) delete m.agents[id];
-            m.add('rs', 'O', 3, { sleeping: false, session_id: ${JSON.stringify(id0)} });
+            m.add('rs', 'O', 3, { sleeping: false, session_id: ${JSON.stringify(id0)}, display_name: 'Writer' });
             T.state.liveSessions = Object.values(m.agents).map(a => m.entry(a));
             T.render.renderLiveSessions(T.state.liveSessions);
             window.__srv.restarts = 0; window.__srv.bodies = []; window.__srv.tag = ${JSON.stringify(tag)};
@@ -74,6 +74,8 @@ const BASE = require('./test_base').BASE;
 
         await ev(`document.querySelector('[data-on-click="agent-restart-same"][data-session-id="${id0}"]').click()`);
         await waitFor(`window.__srv.restarts === 1`, 'the restart to be asked', 5000);
+        await waitFor(`/Writer/.test(document.getElementById('notices')?.textContent || '')`, 'the toast names the agent (Writer), not its folder or session id (walk 13 M5)', 5000);
+        assert.ok(!/Restart(ing|ed):? (rs|claude-)/.test(await ev(`document.getElementById('notices').textContent`)), 'and not the folder or a session id');
         const body = await ev(`window.__srv.bodies[0]`);
         assert.equal(body.session_id, id0);
         assert.deepEqual(body, { agent_type: 'claude', session_id: id0 }, 'a same-settings restart asks for nothing but the agent: no prompt, model, thinking, flags, capabilities or mode');

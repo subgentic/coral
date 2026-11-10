@@ -18,7 +18,7 @@ const DT = await importOnce('./data_table.js');
 const { mountAgentReviewSettings } = await importOnce('./agent_review_settings.js');
 let agentsTableState = DT.tableState();
 
-const WORD = { available: 'Free', busy: 'Busy', task_idle: 'Task assigned, idle', queued: 'Queued', waiting: 'Waiting', needs_input: 'Needs input', sleeping: 'Sleeping', archived: 'Archived', offline: 'Ended', unknown: 'No signal yet', unavailable: 'Unavailable' };
+const WORD = { available: 'Free', busy: 'Busy', task_idle: 'Task assigned, idle', queued: 'Queued', waiting: 'Waiting for work', needs_input: 'Needs input', sleeping: 'Sleeping', archived: 'Archived', offline: 'Ended', unknown: 'Not reported', unavailable: 'Unavailable' };
 // The chips: the statuses people look for first; any other status that has agents gets its own chip after them.
 const FIRST = ['available', 'busy', 'queued', 'sleeping', 'offline'];
 const CHIP_WORD = { available: 'Free', task_idle: 'Has a task' }; // an idle agent with a task, started or not: its row says which ("Working on #1" or "Task assigned, idle"), so the filter does not repeat one of the two
@@ -34,7 +34,7 @@ const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type 
 
 // One status per agent (#10603, the Beta tester): an agent that is idle with a task already in progress is working on it, not "Task assigned, idle" beside "#1 in progress".
 const startedTask = (a) => (a.tasks || []).find(t => t.status === 'in_progress');
-const statusWord = (a) => (a.availability === 'task_idle' && startedTask(a) ? `Working on #${Number(startedTask(a).id)}` : WORD[a.availability] || 'No signal yet');
+const statusWord = (a) => (a.availability === 'task_idle' && startedTask(a) ? `Working on #${Number(startedTask(a).id)}` : WORD[a.availability] || 'Not reported');
 // dropAt is one of the steps data_table.css has (62, 52, 36, 28, 20, 16): 32 and 33 had no rule, so those two columns never gave way and a phone's Status chip and row broke (#14903). Open tasks and Time on current task (#14861, the Operator): the tasks assigned to the agent that are pending, in progress or in review (a link to the Tasks tab filtered to the agent), and how long it has had its task in progress (since the claim; a dash with none).
 const openTasksOf = (a) => Number(a.open_tasks) || 0;
 const claimedAt = (a) => { const t = a.task_since ? Date.parse(a.task_since) : NaN; return Number.isFinite(t) ? t : null; };

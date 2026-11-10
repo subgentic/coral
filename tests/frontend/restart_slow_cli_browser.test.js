@@ -86,11 +86,13 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(body.thinking, 'high', 'and a restart keeps it too: ' + JSON.stringify(body));
         s = await noteFor({ model: 'opus-x', thinking: '', thinking_actual: 'max' });
         assert.equal(s.thinking, '', 'no stored level: Default');
-        assert.equal(s.note, 'The agent last ran at Max.', 'no stored level: it does not claim a change');
+        assert.equal(s.note, "The agent last ran at Max, which is the CLI's own default.", 'no stored level: it does not claim a change, and says why Default shows a level');
         s = await noteFor({ model: 'opus-x', thinking: 'max', thinking_actual: 'max' });
         assert.equal(s.note, '', 'the same level: no note');
         s = await noteFor({ model: 'opus-x', thinking: 'high', thinking_actual: '' });
         assert.equal(s.note, '', 'the transcript shows none yet: no note');
+        await noteFor({ model: 'claude-sonnet-5-5', thinking: '', thinking_actual: '' }); // a model the list does not name shows as its name, not its id (walk 13 M7)
+        assert.equal(await ev(`(() => { const o = document.querySelector('#restart-acf .acf-model-select')?.selectedOptions[0] || document.querySelector('#restart-acf select option[data-unlisted]'); return o && o.textContent; })()`), 'Sonnet 5.5', 'the picker says Sonnet 5.5, not claude-sonnet-5-5');
         console.log('   ✓');
 
         console.log('\nPASS restart slow CLI');

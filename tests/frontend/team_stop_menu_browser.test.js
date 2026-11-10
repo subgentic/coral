@@ -71,6 +71,7 @@ const BOARD = 'stop-menu-' + Date.now().toString(36);
             await ev(`T.state.liveSessions = ${JSON.stringify([mk('s1', 'Boss', true), mk('s2', 'Worker', true)])}; T.render.renderLiveSessions(T.state.liveSessions); document.getElementById('${mobile ? 'team-page-more' : 'team-page-stop'}').click(); true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the menu follows the team
             it = await items(host);
             check(it[0] && it[0].text === 'Wake Team' && /^Starts the sleeping agents again$/.test(it[0].hint), `a sleeping team offers Wake Team, and says what it does: ${JSON.stringify(it)}`);
+            if (!mobile) check(await ev(`document.getElementById('team-page-stop').textContent.trim()`) === 'Wake agents', 'a sleeping team is already stopped: its button says Wake agents, not Stop agents (walk 13 M9)');
             await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
             // Pause Board says what it does (the board's actions are in More)
             await ev(`document.getElementById('team-page-more').click(); true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the menu opens

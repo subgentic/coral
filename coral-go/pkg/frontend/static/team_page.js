@@ -147,6 +147,7 @@ function stopItems() {
 function syncStop() {
     const menu = $('team-page-stop-menu'); if (!menu) return;
     const moreMenu = $('team-page-more-menu');
+    $('team-page-stop').textContent = teamAsleep() ? 'Wake agents' : 'Stop agents'; // a sleeping team is already stopped (walk 13 M9)
     for (const [host, cls] of [[menu, 'menu-item'], [moreMenu, 'menu-item team-more-add team-more-stop']]) {
         if (!host) continue;
         for (const old of host.querySelectorAll('[data-stop], .team-more-stop-sep')) old.remove();

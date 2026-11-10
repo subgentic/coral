@@ -1,4 +1,4 @@
-// A new person's first screens say what is going on (#6382, first-run report #6370 items 3, 6, 11): a brand-new agent's composer says "Starting <agent>" in its box and Send says why a message may wait (from the row's own `starting`, #6381), and goes back to its own words once the CLI has written something; the Team view's "?" button has a name and "No signal yet" says what it waits for (a remote agent keeps its own reason); Analytics shows no list of Coral's
+// A new person's first screens say what is going on (#6382, first-run report #6370 items 3, 6, 11): a brand-new agent's composer says "Starting <agent>" in its box and Send says why a message may wait (from the row's own `starting`, #6381), and goes back to its own words once the CLI has written something; the Team view's "?" button has a name and "Not reported" says what it waits for (a remote agent keeps its own reason); Analytics shows no list of Coral's
 // own /api routes until an agent has really used a tool. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
@@ -55,8 +55,8 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`document.querySelectorAll('#team-availability-dialog .availability-agent').length === 2`, 'the Team view', 8000);
         const view = await ev(`(() => { const d = document.getElementById('team-availability-dialog'); const q = d.querySelector('.availability-help summary');
             return { help: q.getAttribute('aria-label'), title: q.getAttribute('title'), note: d.querySelector('.availability-help p').textContent, cards: [...d.querySelectorAll('.availability-agent')].map(c => c.querySelector('p') && c.querySelector('p').textContent) }; })()`);
-        check('the "?" button has a name, and its note explains No signal yet', view.help === 'What these counts mean' && view.title === 'What these counts mean' && /No signal yet means the agent has not sent its first message/.test(view.note), JSON.stringify([view.help, view.note]));
-        check('"No signal yet" says what it waits for; a remote agent keeps its own reason', view.cards[0] === "Waiting for this agent's first message to Coral." && /^Remote agent availability/.test(view.cards[1]), JSON.stringify(view.cards));
+        check('the "?" button has a name, and its note explains Not reported', view.help === 'What these counts mean' && view.title === 'What these counts mean' && /Not reported means the agent has not sent its first message/.test(view.note), JSON.stringify([view.help, view.note]));
+        check('"Not reported" says what it waits for; a remote agent keeps its own reason', view.cards[0] === "Waiting for this agent's first message to Coral." && /^Remote agent availability/.test(view.cards[1]), JSON.stringify(view.cards));
         await ev(`document.querySelector('#team-availability-dialog [data-dialog-close]').click(); true`);
 
         console.log('3. Analytics');

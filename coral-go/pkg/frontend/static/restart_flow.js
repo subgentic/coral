@@ -144,13 +144,11 @@ async function runRestart(config) {
     try {
         // Show restarting overlay instead of session-ended
         const xtermMod = await _getXtermModule();
-        if (xtermMod.setRestarting) xtermMod.setRestarting(true, restartId);
-        showToast(`Restarting ${state.currentSession.name}...`, false, undefined, { group: { key: 'restarting', text: n => `Restarting ${n} agents` } });
-        const replaced = state.currentSession;
+        xtermMod.setRestarting?.(true, restartId);
+        const replaced = state.currentSession, who = replaced.display_name || replaced.name;
+        showToast(`Restarting ${who}`, false, undefined, { group: { key: 'restarting', text: n => `Restarting ${n} agents` } });
         const payload = { agent_type: config.agentType || state.currentSession.agent_type, session_id: state.currentSession.session_id };
-        if (config.flags) {
-            payload.extra_flags = config.flags;
-        }
+        if (config.flags) payload.extra_flags = config.flags;
         if (config.prompt) payload.prompt = config.prompt;
         if (config.model !== undefined) payload.model = config.model;
         if (config.thinking !== undefined) payload.thinking = config.thinking; // only when chosen: a restart keeps the agent's level otherwise (#4969)
@@ -182,33 +180,23 @@ async function runRestart(config) {
             state.currentSession.sleeping = false;
             applySleepingView(false);
             // Update state with the new session_id (tmux session was renamed)
-            if (result.session_id) {
-                state.currentSession.session_id = result.session_id;
-                moveRestarting(restartId, result.session_id); // the restart is now the replacement session's
-            }
-            if (config.agentType) {
-                state.currentSession.agent_type = config.agentType;
-            }
+            if (result.session_id) moveRestarting(restartId, state.currentSession.session_id = result.session_id); // the restart is now the replacement session's
+            if (config.agentType) state.currentSession.agent_type = config.agentType;
             // Restart renames the tmux session and returns its canonical name.
             // Keep the browser target aligned with the replacement session.
             const restartedName = result.session_name || result.agent_name;
             // The terminal reconnects to the replacement tmux session, not the old one (#3469).
             state.currentSession.tmux_session = result.session_name || null;
-            if (restartedName) {
-                state.currentSession.name = restartedName;
-                document.getElementById("session-name").textContent = restartedName;
-            }
+            if (restartedName) document.getElementById("session-name").textContent = state.currentSession.name = restartedName;
             // The replacement session has an independent transcript and count.
             // Drop the old reader generation before the next poll, otherwise an
             // empty/new transcript is queried with the old session's offset.
             resetLiveHistory({ resume: true, keepEarlier: true, forSession: state.currentSession.session_id }); // the conversation so far stays above the new one (#10297)
             showChatView(); // a restart opens in Chat: the earlier conversation and the new session's first words, not a terminal starting up
             // Clear activity data immediately so the UI shows zero for the new session
-            state.currentAgentEvents = [];
-            renderEventTimeline();
-            // Reload events for the new session_id
+            state.currentAgentEvents = []; renderEventTimeline();
             loadAgentEvents(state.currentSession.name, state.currentSession.session_id);
-            showToast(`Restarted: ${state.currentSession.name}`);
+            showToast(`${who} restarted`);
 
             // Reconnect terminal WebSocket to the new session.
             // Poll until the new session is live, then connect.
