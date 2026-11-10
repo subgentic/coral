@@ -37,6 +37,7 @@ const YES = "(()=>{const m=document.getElementById('confirm-modal');if(m&&getCom
                     if (!m[2]) return json({ project: m[1], artifacts: st.items.filter(a => a.team === m[1] && (!u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag')))), has_more: false });
                     const it = st.items.find(a => a.team === m[1] && a.id === m[2]), body = opts.body ? JSON.parse(opts.body) : {};
                     st.calls.push({ team: m[1], route: m[3], id: m[2], body });
+                    if (m[3] === 'review' && body.decision === 'changes') return json({ id: it.id, state: 'changes', changed: true, tags: it.tags, delivered: true, to: 'Security Reviewer', review: { state: 'changes', at: new Date().toISOString() } });
                     if (m[3] === 'review') { it.tags = it.tags.filter(t => t !== 'for review').concat('approved'); return json({ id: it.id, state: 'approved', changed: true, tags: it.tags, delivered: true, to: 'Security Reviewer', review: { state: 'approved', at: new Date().toISOString() } }); }
                     if (st.failTags === m[2]) return json({ error: 'no' }, 500);
                     it.tags = body.tags; return json({ id: it.id, tags: it.tags });
@@ -54,6 +55,33 @@ const YES = "(()=>{const m=document.getElementById('confirm-modal');if(m&&getCom
             check(rows.filter(r => /earlier version/.test(r.text)).length === 1, at + 'only the artifact with earlier versions says so (the two whose fields run together are not versions of one another)');
             check(await ev(`(() => { const c = [...document.querySelectorAll('.view-list-item')].filter(r => /Needs you$/.test((r.querySelector('.view-list-label') || {}).textContent || '')).map(r => (r.querySelector('.view-list-count') || {}).textContent); return c.length > 0 && c.every(x => x === '6'); })()`) || mobile, at + 'the Needs you folder counts six, not nine');
             await shot(`inbox-review-versions-${w}`);
+            if (!mobile) {
+                // "3 earlier versions" is a link: the list of v1 to v4, oldest first, the newest marked, with Open and (the uploader being known) Restore, which asks first (#15285)
+                await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => tr.querySelector('[data-review-artifact="${hex(4)}"]')).querySelector('button.inbox-review-earlier').click(); true`);
+                await waitFor(`!!document.querySelector('.version-list-dialog[open] .version-list-entry')`, at + 'the version list opens', 10000);
+                const items = await ev(`[...document.querySelectorAll('.version-list-dialog[open] .version-list-entry')].map(li => ({ n: li.dataset.version, name: li.querySelector('.version-list-name').textContent, current: li.getAttribute('aria-current') === 'true', who: li.querySelector('.version-list-who').textContent, open: !!li.querySelector('.version-list-open'), restore: !!li.querySelector('.version-list-restore') }))`);
+                check(items.length === 4 && items.map(i => i.n).join() === '1,2,3,4' && items[3].current && /newest/.test(items[3].name) && !items[0].current, at + 'v1 to v4, oldest first, the newest marked: ' + JSON.stringify(items));
+                check(items.every(i => i.open && /Security Reviewer/.test(i.who)) && items.slice(0, 3).every(i => i.restore) && !items[3].restore, at + 'each has Open and who made it; Restore on the older ones only: ' + JSON.stringify(items));
+                await ev(`document.querySelector('.version-list-dialog[open] [data-version="2"] .version-list-restore').click(); true`);
+                await waitFor(`!!document.querySelector('.version-list-restore-confirm')`, at + 'Restore asks first', 5000);
+                check((await ev(`window.__rv.calls.filter(c => c.route === 'review')`)).length === 0, at + 'nothing is sent before the person says yes');
+                await ev(`document.querySelector('.version-list-restore-confirm').click(); true`);
+                await waitFor(`window.__rv.calls.some(c => c.route === 'review')`, at + 'Restore sends the request', 8000);
+                const sent = (await ev(`window.__rv.calls.filter(c => c.route === 'review')`))[0];
+                check(sent.id === hex(4) && sent.body.decision === 'changes' && /v2/.test(JSON.stringify(sent.body)) && JSON.stringify(sent.body).includes(hex(2)), at + 'the uploader is asked to put v2 back, on the newest version: ' + JSON.stringify(sent));
+                check(/Sent to Security Reviewer/.test(await ev(`document.querySelector('.version-list-dialog[open]').textContent`)), at + 'it says "Sent to <agent>"');
+                await ev(`window.__rv.calls = []; document.querySelector('.version-list-dialog[open] .inbox-ask-buttons button').click(); true`);
+                // a file sent again by name, with no series, is version 4 in its line, not "version 1" every time
+                await ev(`(() => { const a = window.__rv.items[3]; a.file_id = 'f'.repeat(32); a.version_line = 'version 1 of design.md (file ' + a.file_id + ')'; return import(${S} + 'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true); })()`);
+                const line = await ev(`import(${S} + 'inbox_reviews.js').then(m => (m.reviewItems().find(a => a.hex === '${hex(4)}') || {}).version_line)`);
+                check(/^version 4 of design\.md/.test(line || ''), at + 'the newest says "version 4", not "version 1": ' + line);
+                // an older version reopened says it is older, with its own state, and does not offer "Approve anyway" (it asked for nothing newer)
+                await ev(`(() => { const a = window.__rv.items[0]; a.tags = ['for review', 'changes requested', 'internal']; return import(${S} + 'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => import(${S} + 'artifact_viewer.js')).then(v => { v.openArtifactViewer('${hex(1)}', { server: '', filename: 'design.md', board: '${team}' }); return true; }); })()`);
+                await waitFor(`/older version/.test((document.querySelector('.artifact-review-state') || {}).textContent || '')`, at + 'an older version says so', 10000);
+                const old = await ev(`({ state: document.querySelector('.artifact-review-state').textContent, approve: (document.querySelector('.artifact-review-approve') || {}).textContent })`);
+                check(/An older version: v4 is newer\. Changes were asked for on this one\./.test(old.state) && old.approve === 'Approve this older version' && !/waiting for a new version/.test(old.state), at + 'its own state, not round 2\'s header: ' + JSON.stringify(old));
+                await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
+            }
             // Approve the newest version of design.md: one review, for the newest; the three before it are settled by the tags route, with the other tags kept
             await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => tr.querySelector('[data-review-artifact="${hex(4)}"]')).querySelector('button[aria-label^="Approve"]').click(); ${YES}`);
             await waitFor(`window.__rv.calls.filter(c => c.route === 'tags').length >= 3`, at + 'the earlier versions are settled', 10000).catch(() => {});
