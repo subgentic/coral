@@ -301,7 +301,7 @@ try {
         $tier = ''
         $st = & $asked '/api/system/status'
         if ($st -and $st.PSObject.Properties['tier_name']) { $tier = [string]$st.tier_name }
-        $bad = @(); $checked = 0
+        $bad = @(); $checked = 0; $dropboxLine = $false
         foreach ($line in (Get-Content -LiteralPath $avail)) {
             $line = ($line -replace '#.*$', '').Trim()
             if (-not $line) { continue }
@@ -309,13 +309,19 @@ try {
             $opts = @{}
             foreach ($o in ($w | Select-Object -Skip 3)) { $kv = $o -split '=', 2; $opts[$kv[0]] = $kv[1] }
             if ($opts.ContainsKey('env') -and [Environment]::GetEnvironmentVariable($opts['env']) -ne '1') { continue }
-            if ($opts.ContainsKey('tier') -and $tier -ne $opts['tier']) { continue }
+            if ($opts.ContainsKey('tier')) {
+                if (-not $tier) { $bad += "$($w[0]) $($w[1]) has tier=$($opts['tier']) but /api/system/status gave no tier_name: not checked"; continue }
+                if ($tier -ne $opts['tier']) { continue }
+            }
             $checked++
+            if ($w[0] -eq '/api/dropbox/status') { $dropboxLine = $true }
             $want = $w[2] | ConvertFrom-Json
             $answer = & $asked $w[0]
             $got = if ($answer -and $answer.PSObject.Properties[$w[1]]) { $answer.($w[1]) } else { '<missing or no answer>' }
             if ($got -ne $want) { $bad += "$($w[0]) $($w[1]) is $got, a release reports $want" }
         }
+        if ($checked -eq 0) { $bad += 'no line of the list was checked' }
+        if ([Environment]::GetEnvironmentVariable('SMOKE_EXPECT_DROPBOX_KEY') -eq '1' -and -not $dropboxLine) { $bad += 'SMOKE_EXPECT_DROPBOX_KEY=1 but no /api/dropbox/status line was checked' }
         if ($bad.Count -eq 0) { Pass "the availability list: $checked checked (tier $tier)" }
         else { Fail "the availability list: $($bad -join '; ')" }
     }
