@@ -1,6 +1,6 @@
 /* Loaded only with the Inbox. Group headings are not documents or tap actions. */
 .inbox-group-review-toggle { display: flex; align-items: center; justify-content: flex-start; gap: 8px; min-height: 44px; margin: 0; font-size: var(--fs-sm); color: var(--text-primary); cursor: pointer; } /* an option of the Filters panel (#14378) */
-.list-bar-menu .inbox-group-review-toggle { grid-column: 1 / -1; } /* one row of the panel's grid; the words sit beside the box (list-bar-kept) */
+.list-bar-menu .inbox-group-review-toggle { grid-column: 1 / -1; max-width: 22rem; } /* a row of the grid, but not 542 px of select at 1920 (#15339, M11) */ /* one row of the panel's grid; the words sit beside the box (list-bar-kept) */
 .inbox-group-review-toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
 .inbox-group-review-toggle:has(:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
 .inbox-review-star-anchor { position: relative; min-width: 0; width: 100%; box-sizing: border-box; padding-inline-end: 52px; }
@@ -9,7 +9,7 @@
 .inbox-pinned-context { display: block; font-size: var(--fs-sm); color: var(--text-secondary); white-space: normal; overflow-wrap: anywhere; }
 .inbox-group-review-toggle[hidden] { display: none; }
 
-.inbox-group-mode { min-width: 0; max-width: 100%; } /* Group by (#14729): the choice after its label */
+.inbox-group-mode { min-width: 0; max-width: 100%; }  /* Group by (#14729): the choice after its label */
 @media (max-width: 760px), (pointer: coarse) { .inbox-group-mode { min-height: var(--control-touch-height, 44px); } }
 .inbox-needs-results .inbox-file-question { padding-inline-end: 52px; } /* the star has its own room at the end of the row: the question and the uploader under the name stop before it (#14968) */
 
@@ -29,3 +29,5 @@
 #group-table-view .gt-toolbar { min-height: 40px; }
 #group-table-view .gt-toolbar.team-toolbar-selecting > :not(.team-tb-selection) { display: none !important; }
 #group-table-view .gt-toolbar.team-toolbar-selecting > .team-tb-selection { flex: 1 1 100%; }
+
+#group-table-view .inbox-needs-results { max-width: 80rem; } /* a line of the table is not the width of a 1920 px screen: Time sat 1400 px from the title (#15339, walk 23 L17) */
