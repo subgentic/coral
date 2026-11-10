@@ -295,8 +295,7 @@ function needsInputHtml(info, session) {
     if (info.kind === "login") return loginCardHtml(info, name, kicker);
 
     const controls = info.readOnly ? { body: "", foot: "" } : answerControlsHtml(info, descriptions, fullLabels); // where the person may not act (a View machine, a read-only Hub) no answer is drawn: it would only fail
-    const reread = !info.readOnly && !onScreen && info.kind !== "startup"; // no choices were read from the terminal: Check again reads it once more (#15090/#15137)
-    const hint = info.readOnly ? `<span class="cni-hint">${escapeHtml(info.readOnly)}</span>` : reread ? `<span class="cni-hint">Answer in the terminal</span>` : "";
+    const hint = info.readOnly ? `<span class="cni-hint">${escapeHtml(info.readOnly)}</span>` : !onScreen && info.kind !== "startup" ? `<span class="cni-hint">Answer in the terminal</span>` : "";
     // A dialog with a heading (Codex's "Hooks need review", #306): the heading is the card's heading, its text a line under it,
     // instead of the two run together as one line.
     let questionHtml = question ? `<div class="cni-question">${escapeHtml(question)}</div>` : "";
@@ -309,7 +308,7 @@ function needsInputHtml(info, session) {
         + context
         + reviewHtml(info)
         + controls.body
-        + `<div class="cni-foot"><button type="button" class="cni-link" data-on-click="terminal-view-open">Open terminal</button>${hint}${!info.readOnly && canDismissWait(session, info.kind) ? `<button type="button" class="cni-link" data-on-click="dismiss-wait" data-session-id="${escapeAttr(session.session_id)}" title="Clear this if the agent is not waiting. Nothing is sent to the agent.">Dismiss</button>` : ""}<span class="cni-foot-spacer"></span>${info.signedOut || reread ? `<button type="button" class="btn cni-recheck" data-on-click="startup-recheck" data-agent="${escapeAttr(info.agent || "claude")}"${reread ? " data-more=1" : ""}>Check again</button>` : ""}${controls.foot}</div>`;
+        + `<div class="cni-foot"><button type="button" class="cni-link" data-on-click="terminal-view-open">Open terminal</button>${hint}${!info.readOnly && canDismissWait(session, info.kind) ? `<button type="button" class="cni-link" data-on-click="dismiss-wait" data-session-id="${escapeAttr(session.session_id)}" title="Clear this if the agent is not waiting. Nothing is sent to the agent.">Dismiss</button>` : ""}<span class="cni-foot-spacer"></span>${info.signedOut ? `<button type="button" class="btn cni-recheck" data-on-click="startup-recheck" data-agent="${escapeAttr(info.agent || "claude")}">Check again</button>` : ""}${controls.foot}</div>`;
 }
 
 // The sign-in card (#3830): the login happens in the agent's terminal (a browser link and a code
@@ -425,7 +424,6 @@ function askCodexSignin() {
 }
 registerActions({
     'startup-recheck': async el => {
-        if (el.dataset.more) return importOnce('./card_attach.js').then(m => m.reread(el, _lastCard));
         const type = el.dataset.agent === "codex" ? "codex" : "claude";
         el.disabled = true; el.textContent = "Checking…";
         const v = await askSignin(type);
@@ -505,7 +503,7 @@ export function syncNeedsInputCard(container, session) {
             if (typing.focused) input.focus();
         }
     }
-    if (el.querySelector(".cni-attach")) { // a card that takes an answer in words has the image strip: its code loads with the first one, not at start (#11403)
+    if (el.querySelector(".cni-attach,.cni-hint")) { // a card that takes an answer in words has the image strip: its code loads with the first one, not at start (#11403)
         if (cardAttach) cardAttach.drawCardImages(el, session.session_id); // images added to the answer stay when the card is drawn again
         else importOnce('./card_attach.js').then(m => { cardAttach = m; if (el.isConnected) m.drawCardImages(el, session.session_id); }).catch(() => {});
     }

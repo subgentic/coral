@@ -31,6 +31,7 @@ export function clearCardImages(sid) {
 
 /** Draw the chips of this agent's card images in every answer box of `card` (the card is drawn again whenever the terminal's screen changes: the chips are kept apart and drawn back). */
 export function drawCardImages(card, sid) {
+    checkAgain(card, sid);
     const s = slot(sid);
     for (const form of card.querySelectorAll('.cni-text-form')) {
         const row = form.querySelector('.cni-attach'); if (!row) continue;
@@ -90,17 +91,26 @@ document.addEventListener('change', e => {
     if (files.length) attach(files, input.closest('.cni-text-form'));
 });
 
-/** Check again on a chat card that has no choices because the terminal's options were not read (#15090/#15137, Beta walk 2 finding 4): reads the terminal once more; the options found become the card's choices (the same Yes and No as every other agent's card), none found and the card stays and says so. Loaded on the click (needs_input_card.js). */
-export async function reread(el, last) {
-    const s = last && last.session; if (!s) return;
-    el.disabled = true; el.textContent = 'Checking\u2026';
-    let found = false;
-    try {
-        const resp = await serverFetch(sessionServer(s), `/api/sessions/live/${encodeURIComponent(s.name)}/chat?${new URLSearchParams({ after: '0', limit: '1', session_id: s.session_id, agent_type: s.agent_type || '' })}`);
-        const po = resp.ok ? (await resp.json().catch(() => null) || {}).prompt_options : null;
-        if (po && (po.options || []).length) { found = true; promptOptionsBySession.set(s.session_id, { title: po.title || '', question: po.question || '', kind: po.kind || '', target: po.target || '', only_reject: po.only_reject === true, note: po.note || '', options: po.options || [], review: po.review || [], multi: !!po.multi, submit: po.submit || null }); }
-    } catch { /* said below: nothing was read */ }
-    syncNeedsInputCard(last.container, s);
-    announcePrompt(found ? 'The question is shown again.' : 'Still nothing to answer here. Use the terminal.');
-    const again = document.querySelector('[data-more]'); if (again) { again.disabled = false; again.textContent = 'Check again'; }
+/** Check again on a chat card that has no choices because the terminal's options were not read (#15090/#15137, Beta walk 2 finding 4: one agent's card stayed "Answer in the terminal" with no Yes while the others'
+ * had theirs). Added here, when the card is drawn, so the start graph has none of it: it reads the chat route once more; the options found become the card's choices (the same Yes and No, exit as every other agent's
+ * card), none found and the card stays and says so. */
+function checkAgain(card, sid) {
+    const hint = card.querySelector('.cni-hint');
+    if (!hint || hint.textContent !== 'Answer in the terminal' || card.querySelector('.cni-reread')) return;
+    const session = (state.liveSessions || []).find(x => x.session_id === sid), container = card.parentElement;
+    if (!session || !container) return;
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'cni-link cni-reread'; b.textContent = 'Check again';
+    b.addEventListener('click', async () => {
+        b.disabled = true; b.textContent = 'Checking\u2026';
+        let found = false;
+        try {
+            const resp = await serverFetch(sessionServer(session), `/api/sessions/live/${encodeURIComponent(session.name)}/chat?${new URLSearchParams({ after: '0', limit: '1', session_id: sid, agent_type: session.agent_type || '' })}`);
+            const po = resp.ok ? (await resp.json().catch(() => null) || {}).prompt_options : null;
+            if (po && (po.options || []).length) { found = true; promptOptionsBySession.set(sid, { title: po.title || '', question: po.question || '', kind: po.kind || '', target: po.target || '', only_reject: po.only_reject === true, note: po.note || '', options: po.options || [], review: po.review || [], multi: !!po.multi, submit: po.submit || null }); }
+        } catch { /* said below: nothing was read */ }
+        syncNeedsInputCard(container, session);
+        announcePrompt(found ? 'The question is shown again.' : 'Still nothing to answer here. Use the terminal.');
+        const again = document.querySelector('.cni-reread'); if (again) { again.disabled = false; again.textContent = 'Check again'; }
+    });
+    hint.after(b);
 }

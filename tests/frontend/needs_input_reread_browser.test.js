@@ -27,17 +27,17 @@ const { coralReady } = require('./helpers/wait');
             NI.pendingToolBySession.clear(); NI.promptOptionsBySession.clear(); NI.loginBySession.clear();
             NI.syncNeedsInputCard(document.getElementById('live-history-messages'), row); return true; })()`);
         await waitFor(`!!document.querySelector('#live-history-messages .chat-needs-input .cni-hint')`, 'a card with no options', 6000);
-        const card = () => ev(`(() => { const c = document.querySelector('#live-history-messages .chat-needs-input'); return c ? { hint: (c.querySelector('.cni-hint') || {}).textContent || '', again: !!c.querySelector('[data-more]'), answers: [...c.querySelectorAll('.cni-answer')].map(b => b.textContent.trim().replace(/^\\d+\\s*/, '')) } : null; })()`);
+        const card = () => ev(`(() => { const c = document.querySelector('#live-history-messages .chat-needs-input'); return c ? { hint: (c.querySelector('.cni-hint') || {}).textContent || '', again: !!c.querySelector('.cni-reread'), answers: [...c.querySelectorAll('.cni-answer')].map(b => b.textContent.trim().replace(/^\\d+\\s*/, '')) } : null; })()`);
         let c = await card();
         check(c && c.hint === 'Answer in the terminal' && c.again && c.answers.length === 0, 'a card with no options says so and has Check again: ' + JSON.stringify(c));
         // nothing on the terminal screen yet: the card stays and says so
-        await ev(`document.querySelector('[data-more]').click(); true`);
+        await ev(`document.querySelector('.cni-reread').click(); true`);
         await waitFor(`window.__reads >= 1`, 'the terminal was read again', 6000);
         await ev(`new Promise(r => setTimeout(r, 300))`); // sleep-ok: the card is drawn again after the read
         c = await card();
         check(c && c.again && c.answers.length === 0, 'with nothing read the card stays with its Check again: ' + JSON.stringify(c));
         // the options are there now: they are the card's choices
-        await ev(`window.__po = ${JSON.stringify(TRUST)}; document.querySelector('[data-more]').click(); true`);
+        await ev(`window.__po = ${JSON.stringify(TRUST)}; document.querySelector('.cni-reread').click(); true`);
         await waitFor(`document.querySelectorAll('#live-history-messages .chat-needs-input .cni-answer').length === 2`, 'the options become the choices', 6000).catch(() => {});
         c = await card();
         check(c && c.answers.some(a => /Yes, I trust this folder/.test(a)) && c.answers.some(a => /No, exit/.test(a)), 'Check again shows Yes and No, exit: ' + JSON.stringify(c));
