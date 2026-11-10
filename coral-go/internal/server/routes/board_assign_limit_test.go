@@ -23,7 +23,7 @@ func readBody(t *testing.T, resp *http.Response) map[string]any {
 	return out
 }
 
-// The Operator's assignment limit (#14862): an agent with more than 3 waiting tasks (2 before #15398) is not given another without --force; the refusal names the less loaded agents, force assigns and says so on the board.
+// The Operator's assignment limit (#14862): an agent with 3 waiting tasks (the limit; 2 before #15398) is not given another is not given another without --force; the refusal names the less loaded agents, force assigns and says so on the board.
 func TestAssigningPastTheLimitIsRefusedWithTheLessLoadedAgentsAndForceOverrides(t *testing.T) {
 	server, handler := setupBoardTestServer(t)
 	registerTaskPlanner(t, handler, "team", "Orchestrator")
@@ -38,9 +38,9 @@ func TestAssigningPastTheLimitIsRefusedWithTheLessLoadedAgentsAndForceOverrides(
 		}
 		return postJSON(t, base+"/tasks", body)
 	}
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 3; i++ {
 		resp := add("Dev A", nil)
-		require.Equal(t, http.StatusCreated, resp.StatusCode, "up to 4 may be given: the refusal is past 3 waiting (the default limit)")
+		require.Equal(t, http.StatusCreated, resp.StatusCode, "up to 3 may be given: the limit is at most 3 waiting")
 		resp.Body.Close()
 	}
 	add("Dev B", nil).Body.Close()
@@ -49,7 +49,7 @@ func TestAssigningPastTheLimitIsRefusedWithTheLessLoadedAgentsAndForceOverrides(
 	out := readBody(t, resp)
 	assert.Equal(t, "assignee_overloaded", out["code"])
 	msg := out["error"].(string)
-	assert.Contains(t, msg, "Dev A has 4 waiting (the limit is 3)")
+	assert.Contains(t, msg, "Dev A has 3 waiting (the limit is 3)")
 	assert.Less(t, strings.Index(msg, "Dev C"), strings.Index(msg, "Dev B"), "the less loaded first: %s", msg)
 	assert.Contains(t, msg, "Dev C (0 waiting, awake, Developer C)")
 	assert.Contains(t, msg, "--force")
@@ -64,7 +64,7 @@ func TestAssigningPastTheLimitIsRefusedWithTheLessLoadedAgentsAndForceOverrides(
 	require.Eventually(t, func() bool {
 		msgs, _ := handler.bs.ListMessages(t.Context(), "team", 50, 0, 0)
 		for _, m := range msgs {
-			if strings.Contains(m.Content, "past the limit (4 waiting) by Orchestrator with --force") && strings.Contains(m.Content, "Dev A") {
+			if strings.Contains(m.Content, "past the limit (3 waiting) by Orchestrator with --force") && strings.Contains(m.Content, "Dev A") {
 				return true
 			}
 		}
@@ -97,7 +97,7 @@ func TestTheLimitIsTheTeamsOwnAndZeroTurnsItOff(t *testing.T) {
 		defer resp.Body.Close()
 		return resp.StatusCode
 	}
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 3; i++ {
 		require.Equal(t, http.StatusCreated, add("Orchestrator"))
 	}
 	require.Equal(t, http.StatusConflict, add("Orchestrator"))
@@ -123,7 +123,7 @@ func TestEditingATasksAssigneePastTheLimitIsRefusedAndForceIsRecorded(t *testing
 	registerTaskPlanner(t, handler, "team", "Orchestrator")
 	base := server.URL + "/api/board/team"
 	subscribeAgents(t, base, "Dev A", "Dev B")
-	for i := 0; i < 4; i++ { // one past the default limit of 3
+	for i := 0; i < 3; i++ { // the default limit: at most 3 waiting
 		resp := postJSON(t, base+"/tasks", map[string]any{"title": "work", "created_by": "Orchestrator", "assigned_to": "Dev A"})
 		require.Equal(t, http.StatusCreated, resp.StatusCode)
 		resp.Body.Close()
@@ -136,7 +136,7 @@ func TestEditingATasksAssigneePastTheLimitIsRefusedAndForceIsRecorded(t *testing
 	require.Equal(t, http.StatusConflict, resp.StatusCode, "an edit of the assignee past the limit is refused")
 	out := readBody(t, resp)
 	assert.Equal(t, "assignee_overloaded", out["code"])
-	assert.Contains(t, out["error"], "Dev A has 4 waiting")
+	assert.Contains(t, out["error"], "Dev A has 3 waiting")
 	task, err := handler.bs.GetTask(t.Context(), "team", id)
 	require.NoError(t, err)
 	assert.Equal(t, "Dev B", *task.AssignedTo, "nothing was changed")
@@ -149,7 +149,7 @@ func TestEditingATasksAssigneePastTheLimitIsRefusedAndForceIsRecorded(t *testing
 	require.Eventually(t, func() bool {
 		msgs, _ := handler.bs.ListMessages(t.Context(), "team", 50, 0, 0)
 		for _, m := range msgs {
-			if strings.Contains(m.Content, "[Task #"+itoa(id)+" assigned to Dev A past the limit (4 waiting) by Orchestrator with --force]") {
+			if strings.Contains(m.Content, "[Task #"+itoa(id)+" assigned to Dev A past the limit (3 waiting) by Orchestrator with --force]") {
 				return true
 			}
 		}
@@ -164,7 +164,7 @@ func TestAnAgentCreatingATaskForItselfOverTheLimitIsNotRefused(t *testing.T) {
 	base := server.URL + "/api/board/team"
 	_, err := handler.bs.Subscribe(t.Context(), "team", "Lead A", "Orchestrator", "claude-lead-a", nil, "all") // a planner with a session of its own: it may create tasks, and be assigned them
 	require.NoError(t, err)
-	for i := 0; i < 4; i++ { // one past the default limit of 3
+	for i := 0; i < 3; i++ { // the default limit: at most 3 waiting
 		resp := postJSON(t, base+"/tasks", map[string]any{"title": "work", "created_by": "Orchestrator", "assigned_to": "Lead A"})
 		require.Equal(t, http.StatusCreated, resp.StatusCode)
 		resp.Body.Close()
@@ -183,7 +183,7 @@ func TestTheRefusalNamesAtMostFiveLessLoadedAgents(t *testing.T) {
 	registerTaskPlanner(t, handler, "team", "Orchestrator")
 	base := server.URL + "/api/board/team"
 	subscribeAgents(t, base, "Dev A", "Dev 1", "Dev 2", "Dev 3", "Dev 4", "Dev 5", "Dev 6", "Dev 7")
-	for i := 0; i < 4; i++ { // one past the default limit of 3
+	for i := 0; i < 3; i++ { // the default limit: at most 3 waiting
 		resp := postJSON(t, base+"/tasks", map[string]any{"title": "work", "created_by": "Orchestrator", "assigned_to": "Dev A"})
 		require.Equal(t, http.StatusCreated, resp.StatusCode)
 		resp.Body.Close()
