@@ -167,6 +167,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
                 } catch (e) { if (ny) ny.disabled = false; showToast(`Not saved: ${e && e.message ? e.message : 'try again'}`, true); }
             } });
         }
+        if (W.isOpenGoal(g) && offersOperatorChanges(sp.server)) act.push({ key: 'edit', cls: 'btn goals-edit', label: 'Edit goal', aria: `Edit goal: ${g.title}`, title: 'Change the title, the description or the done-when; the team reads the change on its board', run: () => importOnce('./goal_editor.js').then(m => m.openGoalEditor({ project: model.project, edit: g, onClose: () => backToAction('.goals-edit'), onSaved: () => loadGoals() })) });
         if (W.isOpenGoal(g) && offersOperatorChanges(sp.server)) { // the Operator's own two changes (#12693): on this computer, and through a Hub (coral-hub's or our own) on a goal's computer that reports a Coral with the routes (#13517; hidden through a Hub before that, #13515)
             act.push({ key: 'driver', cls: 'btn goals-change-driver', label: 'Change driver', aria: `Change driver: ${g.title}`, run: () => importOnce('./goal_operator_dialogs.js').then(m => m.openChangeDriver({ project: model.project, goal: g, onClose: () => backToAction('.goals-change-driver'),
                 onDone: async driver => { say(driver ? `Driver changed to ${driver}` : 'Driver cleared'); showToast(driver ? `Driver changed to ${driver}` : 'Driver cleared'); await loadGoals(); } })) });
@@ -176,7 +177,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         if (W.isOpenGoal(g)) act.push({ key: 'close', cls: 'btn btn-primary goals-close', label: 'Close goal', aria: `Close goal: ${g.title}`, run: () => openClose(g) }); // named for its goal: the Close dialog's own button is just Close goal
         else if (W.isClosedGoal(g)) act.push({ key: 'reopen', cls: 'btn goals-reopen', label: 'Reopen', run: () => reopenGoal(g) });
         const makeBtn = a => { const b = btn(a.cls, a.label, a.run); if (a.aria) b.setAttribute('aria-label', a.aria); if (a.title) b.title = a.title; return b; };
-        if (!phone) { for (const k of ['add', 'notyet', 'driver', 'move', 'close', 'reopen']) { const a = act.find(x => x.key === k); if (a) acts.append(makeBtn(a)); } }
+        if (!phone) { for (const k of ['add', 'notyet', 'edit', 'driver', 'move', 'close', 'reopen']) { const a = act.find(x => x.key === k); if (a) acts.append(makeBtn(a)); } }
         else {
             const primaryKey = act.some(a => a.key === 'reopen') ? 'reopen' : (act.some(a => a.key === 'notyet') ? 'close' : 'add'); // a goal that looks done: Close goal; otherwise the commonest, Add task
             const primary = act.find(a => a.key === primaryKey); if (primary.key === 'add') primary.cls = 'btn btn-primary goals-add-task';

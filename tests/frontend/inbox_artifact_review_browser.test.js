@@ -44,7 +44,7 @@ const { coralReady } = require('./helpers/wait');
                             const id=u.pathname.split('/').at(-2),body=JSON.parse(opts.body),it=window.__reviewItems.find(a=>a.id===id);window.__decisions.push({id,decision:body.decision,note:body.note});
                             if(body.decision==='approve'){it.tags=it.tags.filter(t=>t!=='for review'&&t!=='read'&&t!=='changes requested').concat('approved');it.review={state:'approved',at:new Date().toISOString()};}
                             else{it.tags=[...new Set(it.tags.concat('for review','changes requested'))].filter(t=>t!=='read');}  // the real route takes 'read' off: it is something to read again (artifact_reviews.go)
-                            return json({id,state:body.decision==='approve'?'approved':'changes requested',changed:true,tags:it.tags,review:it.review||null,delivered:body.decision==='approve',to:'Writer'});
+                            return json({id,state:body.decision==='approve'?'approved':'changes requested',changed:true,tags:it.tags,review:it.review||null,delivered:body.decision==='approve'||body.decision==='deny',to:'Writer'});
                         }
                         if(u.pathname.endsWith('/versions'))window.__versionCalls.push(u.pathname);
                         if(u.pathname.startsWith('/api/artifacts/')&&u.pathname.endsWith('/versions')&&window.__twoVersions){const d=u.pathname.split('/')[3],old=(99).toString(16).padStart(64,'0');return json([{digest:old,version:1,versions:2,is_latest:false,name:'Review file 01.txt',size:30,media_type:'text/plain',at:new Date(Date.now()-3600000).toISOString(),uploader:'Writer A',role:'Writer'},{digest:d,version:2,versions:2,is_latest:true,name:'Review file 01.txt',size:30,media_type:'text/plain',at:new Date().toISOString(),uploader:'Writer A',role:'Writer'}]);}
@@ -221,6 +221,17 @@ const { coralReady } = require('./helpers/wait');
                     assert.deepEqual(await ev(`window.__decisions`),[{id:(2).toString(16).padStart(64,'0'),decision:'approve',note:'Almost: fix the heading, no need to show me again.'}],'one approval, carrying the note');
                     await waitFor(`!(${row('Review file 02.txt')})`,'the approved row leaves Needs you');
                     assert.ok(await ev(`!document.querySelector('dialog.inbox-approve-note-dialog')`),'and the dialog is closed');
+                    // #15284 (walk 16 H2): the viewer's Refuse is a final no with a confirm; the toast says it was sent to the agent
+                    await ev(`(${row('Review file 03.txt')}).querySelector('.inbox-review-name').click();true`);
+                    await waitFor(`!!document.querySelector('.artifact-review-refuse:not([hidden])')`,'a pending review offers Refuse',8000);
+                    await ev(`document.querySelector('.artifact-review-refuse').click();true`);
+                    await waitFor(`!!document.querySelector('dialog.inbox-deny-dialog')`,'Refuse asks first',8000);
+                    assert.match(await ev(`document.querySelector('dialog.inbox-deny-dialog h2').textContent`),/^Refuse Review file 03\.txt\?$/,'the confirm names the file');
+                    assert.equal(await ev(`window.__decisions.some(d=>d.decision==='deny')`),false,'nothing is sent before the confirm');
+                    await ev(`document.querySelector('.inbox-deny-confirm').click();true`);
+                    await waitFor(`window.__decisions.some(d=>d.decision==='deny')`,'the refusal was recorded',8000);
+                    await waitFor(`[...document.querySelectorAll('.toast .toast-message')].some(t=>/Refused Review file 03\.txt\. Sent to Writer\./.test(t.textContent))`,'the toast says Sent to the agent',8000);
+                    await ev(`document.querySelector('.artifact-viewer-close').click();true`);
                 }
                 if(dir){for(const theme of ['light','dark']){await ev(`document.documentElement.setAttribute('data-theme','${theme}');true`);fs.writeFileSync(path.join(dir,`inbox-reviewed-${width}-${theme}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}}
                 console.log('PASS review artifacts '+width);

@@ -477,9 +477,11 @@ func (h *BoardHandler) UpdateGoal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var before, beforeState string
-	if body.Driver != nil || body.State != nil {
+	var wasTitle, wasOutcome, wasDoneWhen string
+	if body.Driver != nil || body.State != nil || body.Title != nil || body.Outcome != nil || body.DoneWhen != nil {
 		if cur, err := h.bs.GetGoal(r.Context(), project, id); err == nil {
 			before, beforeState = cur.Driver, cur.State
+			wasTitle, wasOutcome, wasDoneWhen = cur.Title, cur.Outcome, cur.DoneWhen
 		}
 	}
 	g, err := h.bs.UpdateGoal(r.Context(), project, id, board.GoalUpdate{Title: body.Title, Outcome: body.Outcome, DoneWhen: body.DoneWhen, State: body.State, BlockedOn: body.BlockedOn, Driver: body.Driver})
@@ -497,6 +499,9 @@ func (h *BoardHandler) UpdateGoal(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Driver != nil {
 		h.announceGoalDriver(project, actor, g, before)
+	}
+	if line := goalEditedLine(actor, g, wasTitle, wasOutcome, wasDoneWhen); line != "" { // the team reads who changed the goal's words, and the new words (#15284, walk 16 H1)
+		h.postGoalLine(r, project, actor, line)
 	}
 	h.markMadeByOrchestrator(r.Context(), project, g)
 	writeJSON(w, http.StatusOK, g)
@@ -665,4 +670,29 @@ func (h *BoardHandler) markMadeByOrchestrator(ctx context.Context, project strin
 			g.MadeByOrchestrator = true
 		}
 	}
+}
+
+// goalEditedLine is the board line for a change to a goal's title, description (outcome) or done-when: who changed it, which of the three, and the new words (each cut at 300 characters), so the agents working
+// on the goal read the change where they read everything else. "" when none of the three changed (a state or driver change has its own line).
+func goalEditedLine(actor string, g *board.Goal, wasTitle, wasOutcome, wasDoneWhen string) string {
+	var parts []string
+	cut := func(s string) string {
+		if r := []rune(s); len(r) > 300 {
+			return string(r[:300]) + "..."
+		}
+		return s
+	}
+	if g.Title != wasTitle && wasTitle != "" {
+		parts = append(parts, "title: \""+cut(g.Title)+"\"")
+	}
+	if g.Outcome != wasOutcome && wasTitle != "" {
+		parts = append(parts, "description: \""+cut(g.Outcome)+"\"")
+	}
+	if g.DoneWhen != wasDoneWhen && wasTitle != "" {
+		parts = append(parts, "done when: \""+cut(g.DoneWhen)+"\"")
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "Goal #" + strconv.FormatInt(g.ID, 10) + " was edited by " + actor + ". New " + strings.Join(parts, "; ") + ". Read it again with: coral-board goal show " + strconv.FormatInt(g.ID, 10)
 }

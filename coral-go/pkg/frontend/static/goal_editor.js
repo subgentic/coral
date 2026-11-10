@@ -80,11 +80,12 @@ const TOOLS = [
 /** The New goal screen. opts: { project, teams: [{ key, label }], onCreated(project), onClose() }. With more than one team the screen asks which (the one the caller named is chosen). Resolves nothing: it reports through onCreated and onClose. */
 export function openGoalEditor(opts = {}) {
     let project = opts.project;
+    const edit = opts.edit || null; // Edit goal (#15284): the same screen with the goal's words in it; Save changes sends only what changed, and the team reads who changed it on the board
     const dlg = el('dialog', 'dlg-confirm goals-dialog goal-editor'); dlg.setAttribute('aria-labelledby', 'goals-create-title');
     const form = el('form', 'goals-form goal-form'); form.noValidate = true;
 
     // the bar: back, the title, the team and the driver as chips
-    const title = el('h3', null, 'New goal'); title.id = 'goals-create-title';
+    const title = el('h3', null, edit ? 'Edit goal' : 'New goal'); title.id = 'goals-create-title';
     const back = btn('goals-form-back', null, () => dlg.close()); back.setAttribute('aria-label', 'Back'); back.title = 'Back'; const arrow = el('span', 'material-icons', 'arrow_back'); arrow.setAttribute('aria-hidden', 'true'); back.append(arrow);
     const chip = (label, control, id) => { const l = el('label', 'goal-scope'); l.append(el('span', 'goal-scope-lab', label), control); control.id = id; return l; };
     const dr = el('select'); dr.disabled = true; dr.append(new Option('Loading this board\'s agents…', '')); // the board's own agents: the route refuses a name that is not a subscriber
@@ -96,7 +97,7 @@ export function openGoalEditor(opts = {}) {
     const driverHint = 'The agent who looks after this goal';
     const driverChip = chip('Driver', dr, 'goal-new-driver');
     driverChip.title = dr.title = driverHint; dr.setAttribute('aria-description', driverHint);
-    chips.append(driverChip);
+    if (!edit) chips.append(driverChip); // an edit changes the goal's words; Change driver is its own button on the page
     const head = el('div', 'goals-form-head'); head.append(back, title);
 
     // the writing: the title, what should be true (with its toolbar), done when
@@ -160,8 +161,9 @@ export function openGoalEditor(opts = {}) {
         gSummary.dataset.looks = String(a.looks);
     };
     for (const f of [t, desc, d]) f.addEventListener('input', refresh);
-    refresh(); gSummary.textContent = 'Nothing to look at';
-    const go = btn('btn btn-primary', 'Create goal'); go.type = 'submit';
+    if (edit) { t.value = edit.title || ''; desc.value = edit.outcome || ''; d.value = edit.doneWhen || ''; desc.dispatchEvent(new Event('input')); }
+    refresh(); gSummary.textContent = edit ? '' : 'Nothing to look at';
+    const go = btn('btn btn-primary', edit ? 'Save changes' : 'Create goal'); go.type = 'submit';
     const cancel = btn('btn', 'Cancel', () => dlg.close());
     const previewBtn = btn('btn btn-quiet goal-preview-toggle', 'Preview', () => togglePreview()); previewBtn.setAttribute('aria-pressed', 'false'); previewBtn.title = 'See how the goal will read on its page';
     const actions = el('div', 'goals-actions'); actions.append(previewBtn, cancel, go);
@@ -202,7 +204,7 @@ export function openGoalEditor(opts = {}) {
         dr.value = people.length && people[0].orchestrator ? people[0].id : ''; // the Orchestrator drives unless the person says otherwise
         dr.disabled = false;
     }).catch(() => { if (asked !== project) return; dr.replaceChildren(new Option('No driver yet', '')); dr.disabled = false; err.textContent = 'This board\'s agents could not be read, so no driver is set.'; }); };
-    loadDrivers();
+    if (!edit) loadDrivers();
     const uploadImage = async (blob, versionOf) => { // a team route: the picture is stored before the goal exists, on the team the goal is for
         const r = await boardFetch(project, `/goal-images${versionOf ? `?version_of=${encodeURIComponent(versionOf)}` : ''}`, { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob });
         let j = {}; try { j = await r.json(); } catch { /* an answer that is not JSON has no reason */ }
@@ -210,7 +212,8 @@ export function openGoalEditor(opts = {}) {
         return { hex: j.hex, name: String(j.name || ''), contentType: String(j.content_type || blob.type), size: Number(j.size) || blob.size };
     };
     const sync = () => { go.disabled = !!tray && (tray.busy() || tray.failed()); picLab.textContent = tray && tray.items().length ? `Pictures \u00b7 ${tray.items().length}` : 'Pictures'; }; // Create waits for a picture going up, and for a failed one to be removed
-    importOnce('./artifact_comment_images.js').then(m => {
+    if (edit) { picLab.hidden = pics.hidden = true; bar.querySelector('[data-tool="image"]')?.remove(); } // a goal's pictures are set when it is made
+    else importOnce('./artifact_comment_images.js').then(m => {
         if (!dlg.isConnected) return;
         tray = m.createImageTray({ upload: uploadImage }); tray.attach(form, desc); tray.listen(sync);
         const picker = tray.picker(), add = picker.querySelector('button'); add.textContent = 'Drop, paste or choose'; add.classList.add('goal-drop'); add.setAttribute('aria-label', 'Add a picture to this goal');
@@ -223,6 +226,21 @@ export function openGoalEditor(opts = {}) {
         err.textContent = '';
         if (!t.value.trim()) { err.textContent = 'A goal needs a title.'; t.setAttribute('aria-invalid', 'true'); t.focus(); return; }
         t.removeAttribute('aria-invalid'); go.disabled = true;
+        if (edit) { // Edit goal: only the words that changed are sent
+            const body = { subscriber_id: OPERATOR_ID };
+            if (t.value.trim() !== edit.title) body.title = t.value.trim();
+            if (desc.value.trim() !== (edit.outcome || '')) body.outcome = desc.value.trim();
+            if (d.value.trim() !== (edit.doneWhen || '')) body.done_when = d.value.trim();
+            if (Object.keys(body).length === 1) { err.textContent = 'Nothing has changed.'; go.disabled = false; return; }
+            try {
+                const r = await goalWrite(project, 'goal_update', edit.id, `/goals/${edit.id}`, 'PATCH', body);
+                if (!r.ok) throw await failure(r);
+                dlg.close();
+                showToast('Goal saved. The team reads the change on its board.');
+                if (opts.onSaved) await opts.onSaved(project);
+            } catch (ex) { err.textContent = `The goal was not saved: ${W.errorWords(ex && ex.code, ex && ex.message)}`; go.disabled = false; }
+            return;
+        }
         try {
             const r = await goalWrite(project, 'goal_create', 0, '/goals', 'POST', createBody({ title: t.value, description: desc.value, doneWhen: d.value, driver: dr.value, images: tray ? tray.hexes() : [], by: OPERATOR_ID }));
             if (!r.ok) throw await failure(r);
