@@ -139,12 +139,13 @@ jobs:
         working-directory: coral-go
         env:
           POSTHOG_PROJECT_KEY: ${{ vars.POSTHOG_PROJECT_KEY }}
+          DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
           ARCH: ${{ matrix.arch }}
           VERSION: ${{ needs.resolve.outputs.version }}
           BUILD_TAGS: ${{ needs.resolve.outputs.build_tags }}
           COMMANDS: ${{ needs.resolve.outputs.commands }}
         run: |
-          LDFLAGS="-s -w -X github.com/subgentic/coral/internal/config.PostHogKey=${POSTHOG_PROJECT_KEY} -X github.com/subgentic/coral/internal/config.Version=${VERSION}"
+          LDFLAGS="-s -w -X github.com/subgentic/coral/internal/config.PostHogKey=${POSTHOG_PROJECT_KEY} -X github.com/subgentic/coral/internal/config.Version=${VERSION} -X github.com/subgentic/coral/internal/server/routes.DropboxDefaultAppKey=${DROPBOX_APP_KEY}"
           OVERLAY="$(go run ./tools/strip-static)" # the dashboard ships minified (#6208): a fresh owner-only folder; only this step's go build commands read it
           [ -n "$OVERLAY" ] || { echo "strip-static printed no overlay path" >&2; exit 1; }
           trap 'go run ./tools/strip-static -clean "$OVERLAY"' EXIT
@@ -197,6 +198,7 @@ jobs:
         env:
           ARCH: ${{ matrix.arch }}
           VERSION: ${{ needs.resolve.outputs.version }}
+          SMOKE_EXPECT_DROPBOX_KEY: "1" # the build's Dropbox app key must reach /api/dropbox/status (#15065)
         run: tests/release/smoke_linux.sh "dist/coral-linux-${ARCH}-${GITHUB_REF_NAME#v}.tar.gz" --version "$VERSION"
 
       - name: Upload artifact
@@ -239,6 +241,7 @@ jobs:
         working-directory: coral-go
         env:
           POSTHOG_PROJECT_KEY: ${{ vars.POSTHOG_PROJECT_KEY }}
+          DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
           VERSION: ${{ needs.resolve.outputs.version }}
           BUILD_TAGS: ${{ needs.resolve.outputs.build_tags }}
           COMMANDS: ${{ needs.resolve.outputs.commands }}
@@ -253,7 +256,7 @@ jobs:
           $env:GOOS = "windows"
           $env:GOARCH = "amd64"
           $version = $env:VERSION
-          $ldflags = "-s -w -X github.com/subgentic/coral/internal/config.PostHogKey=$env:POSTHOG_PROJECT_KEY -X github.com/subgentic/coral/internal/config.Version=$version"
+          $ldflags = "-s -w -X github.com/subgentic/coral/internal/config.PostHogKey=$env:POSTHOG_PROJECT_KEY -X github.com/subgentic/coral/internal/config.Version=$version -X github.com/subgentic/coral/internal/server/routes.DropboxDefaultAppKey=$env:DROPBOX_APP_KEY"
           $buildTags = $env:BUILD_TAGS
           # The exes' version information (what the taskbar and Task Manager name the app by): this release's version and the tier's product name.
           $product = if (",$buildTags," -like "*,dropboxers,*") { "Coral For Dropbox" } else { "Coral" }
@@ -472,13 +475,14 @@ jobs:
         working-directory: coral-go
         env:
           POSTHOG_PROJECT_KEY: ${{ vars.POSTHOG_PROJECT_KEY }}
+          DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
           VERSION: ${{ needs.resolve.outputs.version }}
           BUILD_TAGS: ${{ needs.resolve.outputs.build_tags }}
           COMMANDS: ${{ needs.resolve.outputs.commands }}
           GUI_COMMANDS: ${{ needs.resolve.outputs.gui_commands }}
         run: |
           set -euo pipefail
-          LDFLAGS="-s -w -X github.com/subgentic/coral/internal/config.PostHogKey=${POSTHOG_PROJECT_KEY} -X github.com/subgentic/coral/internal/config.Version=${VERSION}"
+          LDFLAGS="-s -w -X github.com/subgentic/coral/internal/config.PostHogKey=${POSTHOG_PROJECT_KEY} -X github.com/subgentic/coral/internal/config.Version=${VERSION} -X github.com/subgentic/coral/internal/server/routes.DropboxDefaultAppKey=${DROPBOX_APP_KEY}"
           OVERLAY="$(go run ./tools/strip-static)" # the dashboard ships minified (#6208): a fresh owner-only folder; only this step's go build commands read it
           [ -n "$OVERLAY" ] || { echo "strip-static printed no overlay path" >&2; exit 1; }
           trap 'go run ./tools/strip-static -clean "$OVERLAY"' EXIT
@@ -538,13 +542,14 @@ jobs:
         working-directory: coral-go
         env:
           POSTHOG_PROJECT_KEY: ${{ vars.POSTHOG_PROJECT_KEY }}
+          DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
           VERSION: ${{ needs.resolve.outputs.version }}
           BUILD_TAGS: ${{ needs.resolve.outputs.build_tags }}
           COMMANDS: ${{ needs.resolve.outputs.commands }}
           GUI_COMMANDS: ${{ needs.resolve.outputs.gui_commands }}
         run: |
           set -euo pipefail
-          LDFLAGS="-s -w -X github.com/subgentic/coral/internal/config.PostHogKey=${POSTHOG_PROJECT_KEY} -X github.com/subgentic/coral/internal/config.Version=${VERSION}"
+          LDFLAGS="-s -w -X github.com/subgentic/coral/internal/config.PostHogKey=${POSTHOG_PROJECT_KEY} -X github.com/subgentic/coral/internal/config.Version=${VERSION} -X github.com/subgentic/coral/internal/server/routes.DropboxDefaultAppKey=${DROPBOX_APP_KEY}"
           OVERLAY="$(go run ./tools/strip-static)" # the dashboard ships minified (#6208): a fresh owner-only folder; only this step's go build commands read it
           [ -n "$OVERLAY" ] || { echo "strip-static printed no overlay path" >&2; exit 1; }
           trap 'go run ./tools/strip-static -clean "$OVERLAY"' EXIT

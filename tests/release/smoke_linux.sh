@@ -127,6 +127,11 @@ if [ "$run_ok" = 1 ]; then
   page=$(curl -sL -m 10 -o "$work/page.html" -w '%{http_code}' "http://127.0.0.1:$PORT/")   # / redirects to /agents
   live=$(curl -s -o /dev/null -w '%{http_code}' -m 10 -H "Authorization: Bearer $KEY" "http://127.0.0.1:$PORT/api/sessions/live")
   noauth=$(curl -s -o /dev/null -w '%{http_code}' -m 10 "http://127.0.0.1:$PORT/api/sessions/live")
+  # SMOKE_EXPECT_DROPBOX_KEY=1 (release.yml only; a rehearsal builds without the key): the build's own Dropbox app key reached the server (#15065)
+  dbx=skipped
+  if [ "${SMOKE_EXPECT_DROPBOX_KEY:-}" = 1 ]; then
+    dbx=$(curl -s -m 10 -H "Authorization: Bearer $KEY" "http://127.0.0.1:$PORT/api/dropbox/status" | python3 -c 'import sys,json; print("ok" if json.load(sys.stdin).get("app_key_set") is True else "app_key_set not true")' 2>/dev/null || echo "no answer")
+  fi
   listen=$(python3 - "$PORT" <<'PY'
 import sys
 port = int(sys.argv[1]); out = set()
@@ -141,10 +146,10 @@ for f, loop in (("/proc/net/tcp", {"0100007F"}), ("/proc/net/tcp6", {"0000000000
 print(" ".join(sorted(out)) or "none")
 PY
 )
-  if [ "$health" = 200 ] && [ "$page" = 200 ] && grep -qi "<title>[^<]*coral" "$work/page.html" && [ "$live" = 200 ] && [ "$noauth" = 401 ] && [ "$listen" = loopback ]; then
-    result "3 serve" PASS "health 200, the dashboard page 200 (Coral), the live list 200 with the key and 401 without, listening on loopback only"
+  if [ "$health" = 200 ] && [ "$page" = 200 ] && grep -qi "<title>[^<]*coral" "$work/page.html" && [ "$live" = 200 ] && [ "$noauth" = 401 ] && [ "$listen" = loopback ] && { [ "$dbx" = ok ] || [ "$dbx" = skipped ]; }; then
+    result "3 serve" PASS "health 200, the dashboard page 200 (Coral), the live list 200 with the key and 401 without, listening on loopback only (Dropbox app key: $dbx)"
   else
-    result "3 serve" FAIL "health=$health page=$page (title Coral: $(grep -ci '<title>[^<]*coral' "$work/page.html")) live=$live without a credential=$noauth listening=[$listen]; server log tail: $(tail -3 "$work/server.log" | tr '\n' '|' | cut -c1-300)"
+    result "3 serve" FAIL "health=$health page=$page (title Coral: $(grep -ci '<title>[^<]*coral' "$work/page.html")) live=$live without a credential=$noauth listening=[$listen] dropbox=[$dbx]; server log tail: $(tail -3 "$work/server.log" | tr '\n' '|' | cut -c1-300)"
   fi
 else result "3 serve" FAIL "no package to run (item 1)"; fi
 served=0; [ -n "$srv" ] && [ "${STATES[2]:-}" = PASS ] && served=1
