@@ -22,7 +22,7 @@ const { coralReady } = require('./helpers/wait');
                 if (font) await ev(`document.documentElement.style.fontSize = ${JSON.stringify(font)}; true`);
                 await ev(`document.activeElement && document.activeElement.blur(); import((window.__coralStatic || '/static/') + 'password_ui.js').then(m => { m.showSetPasswordModal({ required: true }); return true; })`);
                 await waitFor(`!!document.getElementById('set-password-modal')`, `${label}: the dialog`, 8000);
-                await new Promise(r => setTimeout(r, 400)); // sleep-ok: the dialog draws
+                await waitFor(`(() => { const m = document.getElementById('set-password-modal'), a = document.activeElement; return !!m && !!a && m.contains(a) && m.getBoundingClientRect().height > 0; })()`, `${label}: the dialog is drawn and has the focus`, 10000); // the dialog's own first focus, not a fixed wait
                 await ev(`(() => { const R = window.fetch; window.fetch = (u, o) => String(u).startsWith('/api/auth/password/set') ? Promise.resolve(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })) : R(u, o); return true; })()`); // the password is not really set on the shared test server
                 // Tab through its stops: each focused field is above the footer
                 const seen = [];
@@ -34,7 +34,7 @@ const { coralReady } = require('./helpers/wait');
                 // #11892: Escape does not close it (a password is always created); setting a password does, and the keyboard goes to the page behind
                 if (closeBy === 'Escape') { await key('Escape'); await new Promise(r => setTimeout(r, 300)); /* sleep-ok: a close would come at once */ check(await ev(`!!document.getElementById('set-password-modal')`), 'Escape: the dialog stays open'); continue; }
                 await ev(`(() => { for (const id of ['set-password-new', 'set-password-confirm']) { const i = document.getElementById(id); i.value = 'a good password'; i.dispatchEvent(new Event('input', { bubbles: true })); } document.getElementById('set-password-form').requestSubmit(); return true; })()`);
-                await new Promise(r => setTimeout(r, 400)); // sleep-ok: the dialog closes
+                await waitFor(`!document.getElementById('set-password-modal') && document.activeElement && document.activeElement !== document.body`, `${closeBy}: the dialog closes and the keyboard goes to the page`, 10000); // under load the close and the focus come late: wait for them, do not guess a time
                 const after = await where();
                 check(!(await ev(`!!document.getElementById('set-password-modal')`)), `${closeBy}: the dialog is closed`);
                 check(!after.body && after.tag !== 'HTML', `${closeBy}: the keyboard is on a control of the page, not the body: ${JSON.stringify(after)}`);
