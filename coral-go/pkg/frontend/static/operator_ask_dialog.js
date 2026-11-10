@@ -138,7 +138,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     send.addEventListener('click', async () => {
         if (sending || picturesBlocked()) return;
         sending = true; err.textContent = ''; sync();
-        try { await replyToAsk(a, replyText()); finish(); }
+        try { await replyToAsk(a, replyText()); finish(); showToast(`Reply sent to ${markHidden(a.asker, { strict: true })}`); } // a file's comment says it was sent, so does a reply to a card (#15141)
         catch (e) { err.textContent = e.message || 'Not sent.'; sending = false; sync(); box.focus(); } // the text stays
     });
     document.body.append(dlg);
