@@ -110,6 +110,7 @@ func (h *BoardHandler) ParkTask(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Reason string `json:"reason"`
 		Until  string `json:"until"`
+		Force  bool   `json:"force"`  // park past the team's limit (#15362)
 		AskID  int64  `json:"ask_id"` // the open question to the Operator that a park waiting on the Operator carries (#11660)
 	}
 	if err := decodeJSON(r, &body); err != nil {
@@ -149,7 +150,7 @@ func (h *BoardHandler) ParkTask(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	task, err := h.bs.ParkTask(r.Context(), project, taskID, reason, until)
+	task, err := h.bs.ParkTaskForce(r.Context(), project, taskID, reason, until, body.Force)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		errNotFound(w, "Task not found")

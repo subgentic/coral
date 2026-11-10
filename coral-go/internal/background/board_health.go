@@ -637,7 +637,7 @@ func healthFacts(items []teamhealth.Item, questions []teamhealth.Question, roste
 // parkStale is how long a park may last before the check names the agent that holds it (#11660): a park is for a wait outside the team, and a day on one is work that is not getting done.
 const parkStale = 24 * time.Hour
 
-// parkItems names each agent that holds a park older than parkStale, or more parks than board.MaxParkedPerAgent (parks made before the cap are reported, never touched). A park made before the time was
+// parkItems names each agent that holds a park older than parkStale, or more parks than the team's park limit (parks made before the cap are reported, never touched). A park made before the time was
 // recorded counts from the task's last change.
 func (m *BoardHealthMonitor) parkItems(ctx context.Context, project string, all []board.Task, now time.Time) []teamhealth.Item {
 	since, err := m.store.ParkedSince(ctx, project)
@@ -670,21 +670,22 @@ func (m *BoardHealthMonitor) parkItems(ctx context.Context, project string, all 
 			h.stale = append(h.stale, t.ID)
 		}
 	}
+	limit := m.store.GetHealthSettings(ctx, project).ParkLimit
 	var items []teamhealth.Item
 	for _, agent := range order {
 		h := byAgent[agent]
-		over := len(h.ids) > board.MaxParkedPerAgent
+		over := len(h.ids) > limit
 		if len(h.stale) == 0 && !over {
 			continue
 		}
 		var problem string
 		switch {
 		case len(h.stale) > 0 && over:
-			problem = fmt.Sprintf("holds %d parked tasks (at most %d), %s parked over 24 h", len(h.ids), board.MaxParkedPerAgent, taskNumbers(h.stale))
+			problem = fmt.Sprintf("holds %d parked tasks (at most %d), %s parked over 24 h", len(h.ids), limit, taskNumbers(h.stale))
 		case len(h.stale) > 0:
 			problem = fmt.Sprintf("has %s parked over 24 h", taskNumbers(h.stale))
 		default:
-			problem = fmt.Sprintf("holds %d parked tasks (at most %d): %s", len(h.ids), board.MaxParkedPerAgent, taskNumbers(h.ids))
+			problem = fmt.Sprintf("holds %d parked tasks (at most %d): %s", len(h.ids), limit, taskNumbers(h.ids))
 		}
 		items = append(items, teamhealth.Item{Rank: 3, Agent: teamhealth.Name(agent), Problem: problem,
 			Suggest: "a park is for a wait outside the team: release what is not for now (coral-board task release <id>), hand in what waits on a reviewer, finish the rest",

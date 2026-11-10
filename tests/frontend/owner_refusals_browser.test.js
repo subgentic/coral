@@ -26,7 +26,7 @@ const CASES = [
     const S = `(window.__coralStatic || '/static/')`;
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' — ' + detail : ''}`); };
-    const HEALTH = { on: false, assign_limit: 2, stale_sweep_hours: 12, interval_min: 10, recipient: '', all_clear: true, default_reviewers: [], auto_delegate: { on: true }, claim_nudge: { on: true, after_min: 10, nudges: 2 }, status_nudge: { on: true, after_min: 20, escalate_after_min: 10 }, mention_renudge: { on: true, after_min: 10 }, held_notice: { on: true, after_min: 10 } };
+    const HEALTH = { on: false, assign_limit: 2, park_limit: 3, stale_sweep_hours: 12, interval_min: 10, recipient: '', all_clear: true, default_reviewers: [], auto_delegate: { on: true }, claim_nudge: { on: true, after_min: 10, nudges: 2 }, status_nudge: { on: true, after_min: 20, escalate_after_min: 10 }, mention_renudge: { on: true, after_min: 10 }, held_notice: { on: true, after_min: 10 } };
     try {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
