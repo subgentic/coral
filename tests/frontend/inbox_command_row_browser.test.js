@@ -208,9 +208,11 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
             }
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             // a request that can only be rejected shows its command too, and no Yes
-            await show(MENU({ only_reject: true, target: ONE }), 1);
+            await show(MENU({ only_reject: true, target: ONE, auto_block_at: new Date(Date.now() + 42000).toISOString() }), 2); // No and Open agent (#15140)
             st = await rowState();
             check(st && st.yes === 0 && st.no === 1 && st.text === ONE, `${at}a reject-only request shows its command and offers no Yes: ` + JSON.stringify(st));
+            const rej = await ev(`(() => { const c = document.querySelector('#group-table-view .inbox-answers'); const n = c.querySelector('.inbox-only-reject'), o = c.querySelector('.inbox-open-agent'); return { note: n && n.textContent, open: o && o.textContent }; })()`);
+            check(rej.open === 'Open agent' && /It can only be rejected here\. Open the agent to read it; Claude Code blocks it on its own at \d/.test(rej.note || ''), `${at}a reject-only row says when Claude Code blocks it itself and is one tap from the agent (#15140): ` + JSON.stringify(rej));
 
             if (!mobile) { // 3) a pointer resting over the list holds the rows
                 await show(MENU({ target: ONE }), 2);
