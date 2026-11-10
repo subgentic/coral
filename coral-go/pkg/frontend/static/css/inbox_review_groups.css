@@ -18,3 +18,10 @@
     .inbox-folder-toolbar .list-bar-search-row.gt-toolbar { flex-wrap: wrap; }
     .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .team-tb-pills { flex: 1 1 100%; order: 5; flex-wrap: wrap; overflow: visible; }
 }
+
+/* Walk 15 M4 (#15259): the Filters panel opens over the list on a computer, it does not push the list down. The filter line sits under the toolbar. */
+.inbox-filter-note { display: flex; align-items: center; gap: 8px; margin: 0 0 var(--space-md); }
+@media (min-width: 768px) {
+    .inbox-folder-toolbar:has(#inbox-needs-team) { position: relative; }
+    .inbox-folder-toolbar:has(#inbox-needs-team) .inbox-filter-pop { position: absolute; top: 100%; right: 0; z-index: 5; width: min(34rem, 100%); box-sizing: border-box; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md, 6px); box-shadow: var(--shadow-md); }
+}

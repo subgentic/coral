@@ -355,14 +355,16 @@ function inboxNeedsToolbar() {
             onPick: key => { needsFilters = { ...needsFilters, kind: key === 'all' ? '' : key }; persistNeedsFilters(); renderInboxNav(true); } },
     });
     // Group by goal is an option of the Filters panel, with the other ways to show the list (#14378, the Operator): not a checkbox always on the page under the header. It is shut with the panel, so it takes no room until asked for.
-    const menu = node.querySelector('.list-bar-menu');
+    const menu = node.querySelector('.list-bar-menu'); menu?.classList.add('inbox-filter-pop');
     if (menu && !menu.querySelector('.inbox-group-review-toggle')) {
         const label = groupModeField('inbox-needs-group-mode', 'inbox-group-review-toggle');
         menu.insertBefore(label, menu.querySelector(':scope > .list-bar-clear-all, :scope > .list-bar-done')); // before the panel's own buttons (a null reference appends)
     }
     const groupToggle = node.querySelector('.inbox-group-review-toggle');
     if (groupToggle) groupToggle.hidden = (!!needsFilters.kind && needsFilters.kind !== 'review') || (!reviewItems().length && needsFilters.kind !== 'review');
+    node.querySelectorAll('.skip-link, .inbox-filter-note').forEach(e => e.remove()); /* the bar is kept between draws: what was added to it last time goes first */
     const skip = DT.el('a', 'skip-link', 'Skip to the list'); skip.href = '#'; skip.addEventListener('click', e => { e.preventDefault(); document.querySelector('#group-table-view tbody tr:not(.dt-group) button, #group-table-view tbody tr:not(.dt-group) a')?.focus(); }); node.prepend(skip); // a keyboard user passes the search and filters (walk 7 M3)
+    if (needsFilters.team && !activeNeedsTeam) { const n = DT.el('p', 'goals-note inbox-filter-note', `Filtered by team: ${needsFilters.team} `), c = DT.el('button', 'btn', 'Clear'); c.type = 'button'; c.setAttribute('aria-label', `Clear the team filter: ${needsFilters.team}`); c.addEventListener('click', () => { needsFilters = { ...needsFilters, team: '', server: '' }; persistNeedsFilters(); renderInboxNav(true); }); n.append(c); node.append(n); } /* a team filter kept from last time says so above the list (walk 15 M2, #15259) */
     return { node, signature: JSON.stringify([groupMode, needsFilters, teams, names, goalNames, counts, completeCount, listedReviews, listedComplete, rows.length, rows.filter(needsUnread).length]) };
 }
 
