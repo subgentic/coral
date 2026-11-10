@@ -25,6 +25,7 @@ import { storeKey } from './local_store.js';
 import { boardOfPage } from './dock_page.js';
 import { el } from './dom_el.js';
 import { pollEvery } from './overload.js';
+await loadStyles('artifact-comments-resize.css'); // the resize handle's rules and the column's width, before the first panel draws: it does not change width when the sheet arrives (#15046)
 await loadStyles('pictures.css'); // the picture rules load with this module, before anything draws (page_weight: not at start)
 
 const EARLIER_KEY = 'coral-artifact-comments-earlier'; // 'show' or 'hide' the comments made on older versions while the latest is open (#13606): hidden by default, kept per account
@@ -79,7 +80,6 @@ export function attachComments(dialog, body, host, opts = {}) {
     toggle.setAttribute('aria-controls', panel.id);
     const selBtn = btn('ac-selbtn', 'Add comment', 'Add comment on the selected text'); selBtn.hidden = true;
     // The width of the comments column, kept per viewer: a separator between the document and the panel, dragged with the pointer or moved with the arrow keys (#15030).
-    loadStyles('artifact-comments-resize.css');
     const resizer = el('div', 'ac-resizer'); resizer.setAttribute('role', 'separator'); resizer.setAttribute('aria-orientation', 'vertical'); resizer.tabIndex = 0;
     resizer.setAttribute('aria-label', 'Resize the comments'); resizer.setAttribute('aria-controls', panel.id); resizer.title = 'Drag, or use the arrow keys, to resize the comments. Double-click to reset.';
     const widthBounds = () => { const room = host.getBoundingClientRect().width || window.innerWidth; return { min: AC_MIN_W, max: Math.max(AC_MIN_W, Math.min(AC_MAX_W, Math.round(room * 0.6))) }; };
@@ -97,7 +97,9 @@ export function attachComments(dialog, body, host, opts = {}) {
         e.preventDefault(); setWidth(next);
     });
     resizer.addEventListener('dblclick', () => setWidth(AC_DEFAULT_W));
-    window.addEventListener('resize', () => { if (host.isConnected && host.style.getPropertyValue('--ac-w')) setWidth(currentWidth(), false); });
+    const onResize = () => { if (!host.isConnected || host.closest('[hidden]')) { window.removeEventListener('resize', onResize); return; } if (host.style.getPropertyValue('--ac-w')) setWidth(currentWidth(), false); }; // a viewer that was closed (or removed) takes its listener away at the next resize; the next open adds its own (#15046)
+    if (host._acOnResize) window.removeEventListener('resize', host._acOnResize); // the same host gets a new panel each time a file opens: one listener for it, not one per open
+    host._acOnResize = onResize; window.addEventListener('resize', onResize);
     setWidth(savedWidth, false);
     host.append(resizer, panel); if (!opts.toggleHost) (dialog.querySelector('.artifact-viewer-actions') || dialog.querySelector('.artifact-viewer-header'))?.prepend(toggle);
     dialog.append(selBtn);

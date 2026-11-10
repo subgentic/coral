@@ -80,6 +80,23 @@ const { coralReady, framesJs } = require('./helpers/wait');
         v = await sepVal();
         check(!v || !v.vis, `no separator on the phone (${JSON.stringify(v)})`);
         check(await ev(`document.documentElement.scrollWidth <= innerWidth + 1`), 'no sideways scroll on the phone');
+        // a tablet (touch, 1024 px): the 8 px handle has a 24 px hit strip around it (#15046)
+        await open(1024, 768, true);
+        const strip = await ev(`(() => { const h = document.querySelector('.artifact-viewer .ac-resizer'), r = h && h.getBoundingClientRect(); if (!r || !r.width) return null; const at = x => document.elementFromPoint(x, r.top + r.height / 2) === h; return { w: Math.round(r.width), left: at(r.left - 6), right: at(r.right + 6), far: at(r.left - 20) }; })()`);
+        check(strip && strip.left && strip.right && !strip.far, `a finger 6 px beside the handle still lands on it (a 24 px strip), 20 px away does not: ${JSON.stringify(strip)}`);
+        // the resize listener of a closed viewer does not accumulate (#15046): three viewers opened and closed, then one resize
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
+        await ev(`(() => { window.__rs = new Set(); const add = window.addEventListener.bind(window), rem = window.removeEventListener.bind(window); window.addEventListener = (t, f, o) => { if (t === 'resize') window.__rs.add(f); return add(t, f, o); }; window.removeEventListener = (t, f, o) => { if (t === 'resize') window.__rs.delete(f); return rem(t, f, o); }; window.__rs0 = window.__rs.size; return true; })()`);
+        await ev(STUB);
+        for (let i = 0; i < 3; i++) {
+            await ev(`import(${S} + 'artifact_viewer.js').then(v => v.openArtifactViewer('${H3}', { filename: 'release-plan.md', board: 'team-a' })).then(() => true)`);
+            await waitFor(`!!document.querySelector('.artifact-viewer:not([hidden])') && !!document.querySelector('.ac-toggle')`, `viewer ${i + 1}`, 8000);
+            await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
+            await waitFor(`!document.querySelector('.artifact-viewer:not([hidden])')`, `viewer ${i + 1} closed`, 6000);
+        }
+        await ev(`window.dispatchEvent(new Event('resize')); true`); await frames(4);
+        const held = await ev(`window.__rs.size - window.__rs0`);
+        check(held <= 1, `after three viewers were opened and closed and one resize, at most one resize listener of theirs is left (${held})`);
     } finally { await client.close(); }
     if (problems.length) { console.error('FAIL\n  ' + problems.join('\n  ')); process.exit(1); }
     console.log('artifact_comments_hover_resize_browser: ok');

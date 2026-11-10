@@ -48,7 +48,9 @@
     .artifact-viewer-header .artifact-viewer-details[aria-expanded="false"] { display: none; }
     .artifact-viewer-chips .av-bar .av-prev, .artifact-viewer-chips .av-bar .av-next { display: none; }
     .artifact-viewer-chips > :is(.artifact-viewer-sandbox, .artifact-review-state, .artifact-viewer-scriptson):not([hidden]) { background: none; padding: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .artifact-viewer-chips > :is(.artifact-viewer-sandbox, .artifact-review-state, .artifact-viewer-scriptson):not([hidden]) + :is(.artifact-viewer-sandbox, .artifact-review-state, .artifact-viewer-scriptson):not([hidden])::before { content: "\00b7"; margin-inline-end: 6px; }
+    .artifact-viewer-chips > .artifact-viewer-sandbox:not([hidden]) { position: relative; padding-inline: 4px; text-decoration: underline dotted; text-underline-offset: 3px; } /* the Sandboxed word is a button: a dotted underline says so, and a 44 px hit area (no taller row) is around it (#15046) */
+    .artifact-viewer-chips > .artifact-viewer-sandbox:not([hidden])::after { content: ""; position: absolute; inset: -15px -6px; }
+    .artifact-viewer-chips > :is(.artifact-viewer-sandbox, .artifact-review-state, .artifact-viewer-scriptson):not([hidden]) ~ :is(.artifact-viewer-sandbox, .artifact-review-state, .artifact-viewer-scriptson):not([hidden])::before { content: "\00b7" / ""; margin-inline-end: 6px; }
 }
 /* the version bar, its list and the compare view (moved from the start CSS: only the viewer draws them, #12223) */
 /* Versions of an artifact (#6472, layout A): the bar under the title, its list, the compare view; and the comment groups of a later version. */
