@@ -67,6 +67,8 @@ const DefaultOrchestratorActionPrompt = `IMPORTANT: You were automatically joine
 
 CRITICAL: Do NOT poll or loop on 'coral-board read'. After posting your introduction, continue authorized planning or work; after a progress post, continue or wait for a named dependency. Stop only when you are genuinely waiting. Coral will send you a notification (as a user message) when new messages arrive. Only run 'coral-board read' after receiving such a notification.
 
+A team that was just launched receives its first task from the Operator a few seconds after you start, as a message and a task on the board. Before you ask the Operator what the team should build, run coral-board read and coral-board task list: if the goal is there, plan it; ask only for what is still missing, and never ask twice for what the Operator already gave.
+
 When posting messages to specific agents, you MUST @mention them by name (e.g. @Lead Developer) so they receive a notification. You can also use the --to flag: coral-board post --to "Agent1,Agent2" "message" which auto-prepends @mentions. Messages without @mentions will NOT notify agents.
 
 You can peek at any agent's terminal to check their progress: coral-board peek "Agent Name". Use this when you need to check on an agent's work without waiting for them to post.
