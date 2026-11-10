@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -25,10 +26,13 @@ const timeout = 5 * time.Second
 // stdinIsTerminal is a variable so a test can stand in for a Coral started from a shell.
 var stdinIsTerminal = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
 
-// Widen appends to this process's PATH the folders its user's login shell has and it has not, unless Coral was started from a terminal (its PATH is then the shell's own) or CORAL_NO_LOGIN_PATH is set.
+// goos is the system Widen runs on, a variable so a test can stand in for another. It widens on macOS only: the reported case is a Finder launch, and a Linux or devserver service keeps the PATH it was given.
+var goos = runtime.GOOS
+
+// Widen appends to this process's PATH the folders its user's login shell has and it has not, on macOS only, and unless Coral was started from a terminal (its PATH is then the shell's own) or CORAL_NO_LOGIN_PATH is set.
 // It never fails a start: a shell that is missing, slow or prints nothing leaves the PATH as it was, with a line in the log. It returns how many folders were added.
 func Widen() int {
-	if os.Getenv(Off) != "" || stdinIsTerminal() {
+	if goos != "darwin" || os.Getenv(Off) != "" || stdinIsTerminal() {
 		return 0
 	}
 	login, err := ask(shellsToTry())

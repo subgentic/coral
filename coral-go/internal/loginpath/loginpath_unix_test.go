@@ -44,8 +44,17 @@ func useShell(t *testing.T, sh string) {
 	t.Cleanup(func() { shellsToTry = old })
 }
 
+// onMac makes Widen run as it does on macOS, the one system it widens on.
+func onMac(t *testing.T, goosName string) {
+	t.Helper()
+	old := goos
+	goos = goosName
+	t.Cleanup(func() { goos = old })
+}
+
 func notFromTerminal(t *testing.T, tty bool) {
 	t.Helper()
+	onMac(t, "darwin")
 	old := stdinIsTerminal
 	stdinIsTerminal = func() bool { return tty }
 	t.Cleanup(func() { stdinIsTerminal = old })
@@ -104,4 +113,18 @@ func TestAShellThatPrintsNothingUsableLeavesThePathAlone(t *testing.T) {
 	withPath(t, "/usr/bin")
 	assert.Zero(t, Widen())
 	assert.Equal(t, "/usr/bin", os.Getenv("PATH"))
+}
+
+// A Linux or devserver service keeps the PATH it was given: nothing is asked of any shell, whatever it would print.
+func TestACoralOnLinuxKeepsThePathItWasGiven(t *testing.T) {
+	useShell(t, fakeShell(t, `printf '%s' '`+beginMark+`/extra/bin`+endMark+`'`))
+	t.Setenv(Off, "")
+	notFromTerminal(t, false)
+	onMac(t, "linux")
+	withPath(t, "/usr/bin")
+	assert.Zero(t, Widen())
+	assert.Equal(t, "/usr/bin", os.Getenv("PATH"))
+	onMac(t, "darwin")
+	assert.Equal(t, 1, Widen(), "the same shell on macOS is asked: the test sees the difference")
+	assert.Equal(t, "/usr/bin:/extra/bin", os.Getenv("PATH"))
 }
