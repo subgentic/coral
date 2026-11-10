@@ -141,6 +141,7 @@ export function attachVersions(dialog, hooks) {
         current.addEventListener('click', () => { setList(!st.listOpen); if (st.listOpen) focusOption(); });
         current.addEventListener('keydown', (e) => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (!st.listOpen) setList(true); focusOption(); } else if (e.key === 'Escape' && st.listOpen) { e.preventDefault(); e.stopPropagation(); closeList(true); } });
         bar.append(prev, current, next);
+        if (!latest) { const newer = btn('av-link av-newer', `v${rows[total - 1].version} is ready: open it`); newer.addEventListener('click', () => choose(rows[total - 1])); bar.append(newer); } // said in the bar, not only inside the closed list (#15217, walk 6: the viewer stayed on 'version 1' with no word that a newer one is ready)
         const pop = el('div', 'av-pop'); pop.hidden = !st.listOpen; // Compare, the newer-version line and the list: opened by the chip
         if (i > 0) {
             const cmp = btn('av-compare', st.comparing ? `Back to v${row.version}` : `Compare with v${rows[i - 1].version}`);
