@@ -110,7 +110,7 @@ function checkAgain(card, sid) {
         } catch { /* said below: nothing was read */ }
         syncNeedsInputCard(container, session);
         announcePrompt(found ? 'The question is shown again.' : 'Still nothing to answer here. Use the terminal.');
-        const again = document.querySelector('.cni-reread'); if (again) { again.disabled = false; again.textContent = 'Check again'; }
+        b.disabled = false; b.textContent = 'Check again';
     });
     hint.after(b);
 }
