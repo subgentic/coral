@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -61,4 +62,15 @@ func TestSaveKnowledgeSaysWhenItRedacted(t *testing.T) {
 	assert.Equal(t, map[string]any{"ok": true, "redacted": true}, save("deploy with "+token))
 	assert.NotContains(t, background.LoadAgentKnowledge(dir, "my-team", "DevOps"), token)
 	assert.Equal(t, map[string]any{"ok": true, "redacted": false}, save("deploy with make"))
+}
+
+// #15272 (Security's INFO): a failed run's error stays on the Knowledge tab, so a key a CLI echoed in it is replaced like the rest of what the status carries.
+func TestAKnowledgeStatusErrorNeverCarriesAKey(t *testing.T) {
+	token := "ghp_" + strings.Repeat("aB3", 12) // built at run time: no key-shaped literal in the repo
+	j := knowledgeJob{TeamName: "t", Status: "failed", Error: "claude CLI failed: exit status 1: bad token " + token,
+		FailedAgents: []background.DistillFailure{{Agent: "Ada", Error: "denied for " + token}}}
+	out := j.status()
+	assert.NotContains(t, out.Error, token)
+	assert.Contains(t, out.Error, redact.Marker)
+	assert.NotContains(t, out.FailedAgents[0].Error, token)
 }
