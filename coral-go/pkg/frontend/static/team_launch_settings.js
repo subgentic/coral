@@ -82,8 +82,8 @@ export function mountTeamLaunchSettings() {
             ] },
             { id: 'workflow', label: 'Workflow', icon: 'account_tree', fields: [
                 { key: 'mode', type: 'select', label: 'Working mode', help: WORKFLOW_HINT, options: [{ value: 'none', label: 'None' }, { value: 'shared_checkout', label: 'Shared checkout' }, { value: 'worktrees', label: 'Worktrees' }, { value: 'task_queue', label: 'Task queue' }] },
-                { key: 'dependency_guidance', type: 'toggle', label: 'Guidance for dependent tasks' },
-                { key: 'asks_are_tasks', type: 'toggle', label: 'Requests for work are tasks', help: ASKS_ARE_TASKS_HINT },
+                { key: 'dependency_guidance', type: 'toggle', label: 'Help with tasks that wait on others' },
+                { key: 'asks_are_tasks', type: 'toggle', label: 'Turn requests for work into tasks', help: ASKS_ARE_TASKS_HINT },
                 approvalField({ custom: false, id: 'team-approval' }),
                 { key: 'require_goal', type: 'toggle', label: 'Require a goal', help: requireGoalSentence, disabledWhen: v => (v.planning_approval === 'auto' ? false : 'The approval choice above needs it: without a goal on every task, an agent could add tasks that skip the gate.') },
             ] },
@@ -125,7 +125,7 @@ export function readTeamLaunchSettings() {
     if (!check.ok) { out.problem = { text: document.querySelector('#team-start-host .sv-error:not([hidden])')?.textContent?.trim() || 'Check the settings of this step.' }; return out; }
     const v = _view.values();
     const wm = { mode: v.mode || 'none', dependency_guidance: !!v.dependency_guidance, asks_are_tasks: !!v.asks_are_tasks, custom_instructions: String(v.custom_instructions || '').trim() };
-    if (wm.mode !== 'none' || wm.dependency_guidance || wm.asks_are_tasks || wm.custom_instructions) out.working_mode = wm; // a new team has Requests for work are tasks on: it is sent unless the person turned it off
+    if (wm.mode !== 'none' || wm.dependency_guidance || wm.asks_are_tasks || wm.custom_instructions) out.working_mode = wm; // a new team has Turn requests for work into tasks on: it is sent unless the person turned it off
     out.save_goal = !!v.save_goal; // the first task's goal (team_dialogs.js): on by default
     const board = {};
     if (v.require_goal) board.require_goal = true;

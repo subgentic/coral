@@ -33,7 +33,7 @@ async function acknowledge(server, disclosure) {
 }
 export async function confirmLaunchDisclosure(server, disclosure) {
     if (!valid(disclosure) || disclosure.seen !== false) { showToast('The launch disclosure could not be read. Nothing was launched.', true); return false; }
-    const accepted = await new Promise(resolve => showConfirmModal('Before starting with full permissions', disclosure.text, () => resolve(true), () => resolve(false), { danger: false, label: 'Continue launch', cancelLabel: 'Cancel' }));
+    const accepted = await new Promise(resolve => showConfirmModal('Before you launch an agent', disclosure.text, () => resolve(true), () => resolve(false), { danger: false, label: 'Continue launch', cancelLabel: 'Cancel' }));
     if (!accepted) return false;
     try { await acknowledge(server, disclosure); return true; }
     catch (error) { showToast(error.message, true); return false; }

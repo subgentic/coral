@@ -15,7 +15,8 @@ const { goalWrite } = await importOnce('./goal_write.js');
 const { _acfServer, _effectiveServer, _settingsFor } = await importOnce('./launch_models.js');
 const { defaultPermissionMode, trackPermissionPick, _getPermissionFlagsForAgentMode, _normalizePermFlagsForAgent, _updatePermModeDescription, _hasPermFlag } = await importOnce('./permission_flags.js');
 const { _findPersona, _getSavedTeamTemplates, _upsertSavedTeamTemplates } = await importOnce('./persona_store.js');
-const { getAgentConfig, renderAgentConfigForm, setAgentConfig, resetProviderChoices } = await importOnce('./agent_config_form.js');
+const { getAgentConfig, renderAgentConfigForm, setAgentConfig, resetProviderChoices, _syncACFModelField } = await importOnce('./agent_config_form.js');
+const { syncModelPicker } = await importOnce('./model_picker.js');
 const { markFieldInvalid, _launchBlocked, _launchOn, _onServerSuffix, _refreshAfterLaunch, _resetDirInputs, _showLaunchStep, hideLaunchModal, showTeamLaunchFailures } = await importOnce('./launch_core.js');
 const { _syncFlagButtons } = await importOnce('./flag_shortcuts.js');
 const { showSettingsModal } = await importOnce('./settings_dialog.js');
@@ -419,6 +420,9 @@ async function _initTeamForm() {
     const banner = document.getElementById('generated-team-banner');
     if (banner) banner.style.display = 'none';
 
+    const allModel = document.getElementById('team-set-all-model'); // a model typed for every worker applies when the field is left (#15312)
+    if (allModel && !allModel.dataset.wired) { allModel.dataset.wired = '1'; allModel.addEventListener('change', () => { if (allModel.value.trim()) _setAllWorkers(''); }); }
+
     // Reset form
     _teamFolderGeneration++;
     document.getElementById("team-board-name").value = "";
@@ -697,22 +701,30 @@ function _pickTeamTemplate(name) {
     _loadTeamTemplate(name);
 }
 
-/** Set all workers to a provider (#7407): every member whose role is not the Orchestrator takes it, and their Model and Thinking go back to the provider's defaults; Mode, role and prompt stay. */
+/** Give one member's form a model the way a person's choice does (#15312): typed into the Model field, kept when the provider is changed back and forth. */
+function _giveModel(containerId, model) {
+    const c = document.getElementById(containerId), input = c?.querySelector('.acf-model');
+    if (!input) return;
+    input.value = model; c.dataset.acfModelDirty = 'true'; c.dataset.acfModelClassifying = 'false';
+    syncModelPicker(c); _syncACFModelField(c);
+}
+
+/** Set all workers to a provider (#7407) and a model (#15312): every member whose role is not the Orchestrator takes the provider, and their Model and Thinking go back to the provider's defaults unless a model is typed in the field beside it, which they take too; Mode, role and prompt stay. With only a model typed, the workers keep their providers and take the model. */
 function _setAllWorkers(type) {
-    const sel = document.getElementById('team-set-all');
-    if (!type) return;
+    const sel = document.getElementById('team-set-all'), modelBox = document.getElementById('team-set-all-model'), model = (modelBox?.value || '').trim();
+    if (!type && !model) return;
     let n = 0;
     for (const row of teamRows()) {
         if (isOrchestrator(rowRole(row))) continue;
-        row.dataset.followsTeamType = '';
-        resetProviderChoices(row.dataset.acfId, type);
+        if (type) { row.dataset.followsTeamType = ''; resetProviderChoices(row.dataset.acfId, type); }
+        if (model) _giveModel(row.dataset.acfId, model);
         n++;
     }
     if (sel) sel.value = '';
-    const label = [...(document.getElementById('team-agent-type')?.options || [])].find(o => o.value === type)?.textContent.replace(/ \(.*\)$/, '') || type;
+    const label = type ? [...(document.getElementById('team-agent-type')?.options || [])].find(o => o.value === type)?.textContent.replace(/ \(.*\)$/, '') || type : '';
     _clearTeamUndo();
     const line = document.getElementById('team-undo');
-    if (line) line.textContent = `Set ${n} ${n === 1 ? 'worker' : 'workers'} to ${label}.`;
+    if (line) line.textContent = `Set ${n} ${n === 1 ? 'worker' : 'workers'} to ${[label, model && `model ${model}`].filter(Boolean).join(', ')}.`;
     _syncTeamMembers();
 }
 

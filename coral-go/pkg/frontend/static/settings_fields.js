@@ -27,9 +27,9 @@ const NOTIFICATIONS_FIELDS = [
     // Why the switch above did not turn on (#10068): a browser that blocks alerts, or a permission box that was dismissed. Filled by settings_fill.js.
     { key: 'desktop_notify_blocked', type: 'notice', render: slot => { const p = document.createElement('p'); p.id = 'settings-desktop-blocked'; p.className = 'sv-help'; p.setAttribute('role', 'status'); p.hidden = true; slot.append(p); } },
     // This browser's own choices about those alerts (not saved on the server); they apply while Desktop alerts is on.
-    { key: 'alert_needs_input', type: 'toggle', id: 'settings-alert-needs-input', label: 'Alert when an agent needs input', disabledWhen: () => alertsOff() },
-    { key: 'alert_reply', type: 'toggle', id: 'settings-alert-reply', label: 'Alert when an agent finishes a reply', disabledWhen: () => alertsOff() },
-    { key: 'alert_sound', type: 'toggle', id: 'settings-alert-sound', label: 'Play a sound with alerts', help: "Your computer's own alert sound.", disabledWhen: () => alertsOff() },
+    { key: 'alert_needs_input', type: 'toggle', id: 'settings-alert-needs-input', label: 'Alert when an agent needs input', help: 'For questions and permission prompts. Needs Desktop alerts.', disabledWhen: () => alertsOff() },
+    { key: 'alert_reply', type: 'toggle', id: 'settings-alert-reply', label: 'Alert when an agent finishes a reply', help: 'When an agent is done. Needs Desktop alerts.', disabledWhen: () => alertsOff() },
+    { key: 'alert_sound', type: 'toggle', id: 'settings-alert-sound', label: 'Play a sound with alerts', help: "Uses the computer's own tone. Needs Desktop alerts.", disabledWhen: () => alertsOff() },
 ];
 
 // Settings > Inbox (#12144): what reaches Needs you. Questions and decisions have no switch: they always reach you. Filled and read by settings_inbox.js.
