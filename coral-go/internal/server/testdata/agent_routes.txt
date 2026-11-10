@@ -321,6 +321,7 @@ b POST /api/auth/password/set
 b POST /api/auth/sessions/sign-out-others
 b POST /api/auto-accept/disable-all
 b POST /api/board/remotes
+a POST /api/board/{project}/agents/{subscriber}/restart
 a POST /api/board/{project}/agents/{subscriber}/sleep
 a POST /api/board/{project}/agents/{subscriber}/wake
 a POST /api/board/{project}/asks/{messageID}/close

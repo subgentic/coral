@@ -211,6 +211,8 @@ type SessionsHandler struct {
 	resumeCache map[string]string
 	// restarting: the sessions with a restart or resume running (beginRestart, #5213).
 	restarting sync.Map
+	// restartQueued: the sessions whose Orchestrator restart waits for their next idle (#15112).
+	restartQueued sync.Map
 	// chatMeta caches the live-session record a chat request needs (#3438).
 	chatMeta    *chatMetaCache
 	resumeKnown map[string]bool

@@ -72,6 +72,7 @@ PATCH /api/board/{project}/goals/{goalID} | (*BoardHandler).UpdateGoal-fm
 PATCH /api/board/{project}/tasks/{taskID} | (*BoardHandler).UpdateTask-fm
 PATCH /api/board/{project}/tasks/{taskID}/amend | (*BoardHandler).AmendTask-fm
 POST /api/board/remotes | (*BoardRemotesHandler).AddSubscription-fm
+POST /api/board/{project}/agents/{subscriber}/restart | (*SessionsHandler).OrchestratorRestart-fm
 POST /api/board/{project}/agents/{subscriber}/sleep | (*SessionsHandler).OrchestratorSleep-fm
 POST /api/board/{project}/agents/{subscriber}/wake | (*SessionsHandler).OrchestratorWake-fm
 POST /api/board/{project}/artifacts/{digest}/edit | (*BoardHandler).SaveArtifactEdit-fm
