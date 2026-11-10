@@ -555,7 +555,7 @@ export function dataTable(cfg) {
         td.setAttribute('role', 'cell'); td.dataset.label = c.label; td.dataset.key = c.key;
         if (cfg.oneLine && c.dropAt) td.setAttribute('data-drop-at', String(c.dropAt));
         if (c.tiny) td.setAttribute('data-tiny', 'hide');
-        td.classList.add(c.line === 1 ? 'dt-line-1' : c.line === 2 ? 'dt-line-2' : 'dt-line-0');
+        td.classList.add(c.line === 1 ? 'dt-line-1' : c.line === 2 ? 'dt-line-2' : c.line === 3 ? 'dt-line-3' : 'dt-line-0');
         if (c.foldLabel) td.setAttribute('data-fold-label', c.label); // the folded row has no header: the column's name is drawn before the figure (data_table.css, as text; foldLabel: true, #11463)
         if (c.when && !c.when(r)) td.classList.add('dt-when-off');
         if (emptyKeys.has(c.key)) { td.classList.add('dt-col-unused'); td.style.display = 'none'; } // display-ok: as in syncEmptyColumns
