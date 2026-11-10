@@ -173,6 +173,8 @@ func DistillTeamKnowledge(ctx context.Context, ss *store.SessionStore, ts *store
 	}
 
 	callTimeout := knowledgeCallTimeoutFromSettings(settings)
+	ctx, stop := context.WithTimeout(ctx, knowledgeRunLimit)
+	defer stop()
 
 	bundle := &KnowledgeBundle{
 		TeamName:  teamName,
@@ -185,6 +187,9 @@ func DistillTeamKnowledge(ctx context.Context, ss *store.SessionStore, ts *store
 		return nil, err
 	}
 	call := func(prompt, content string) (string, error) {
+		if ctx.Err() != nil {
+			return "", fmt.Errorf("distilling took longer than %d minutes and was stopped: %w", int(knowledgeRunLimit/time.Minute), ErrKnowledgeTimeout)
+		}
 		return callClaudeForKnowledge(ctx, claudePath, callTimeout, prompt, content)
 	}
 	return distillAgents(bundle, agents, call, coralDir, progressFn)
@@ -309,6 +314,18 @@ func distillAgentsWith(bundle *KnowledgeBundle, agents []agentMeta, call func(pr
 	// ── Pass 1: Individual agent knowledge extraction ──
 	failed := map[string]bool{}
 	attempted := 0
+	var timedOut error // the first call that ran out of time: every later call is skipped with its error (#15272)
+	inner := call
+	call = func(prompt, content string) (string, error) {
+		if timedOut != nil {
+			return "", timedOut
+		}
+		out, err := inner(prompt, content)
+		if errors.Is(err, ErrKnowledgeTimeout) {
+			timedOut = err
+		}
+		return out, err
+	}
 	for i, a := range agents {
 		if progressFn != nil {
 			progressFn(DistillProgress{Phase: "extracting", Agent: a.name, Total: total, Completed: i})
@@ -420,6 +437,13 @@ func distillAgentsWith(bundle *KnowledgeBundle, agents []agentMeta, call func(pr
 
 	return bundle, nil
 }
+
+// ErrKnowledgeTimeout: a call to the CLI ran out of time (its own limit, or the whole run's). A run makes no further call after one (#15272): a CLI that does not answer once will not answer
+// the next call either, and each would cost its full limit.
+var ErrKnowledgeTimeout = errors.New("the CLI call timed out")
+
+// knowledgeRunLimit is the longest a whole distillation may take; it ends with an error that says so (#15272).
+const knowledgeRunLimit = 10 * time.Minute
 
 // ErrBadKnowledgeTeam: a team name that can't name a knowledge folder (#3518).
 var ErrBadKnowledgeTeam = errors.New("invalid team name for knowledge")
@@ -615,7 +639,7 @@ func callClaudeForKnowledge(ctx context.Context, claudePath string, timeout time
 	if err != nil {
 		detail := strings.TrimSpace(string(out))
 		if callCtx.Err() == context.DeadlineExceeded {
-			return "", fmt.Errorf("claude CLI timed out after %v (may need authentication)", timeout)
+			return "", fmt.Errorf("claude CLI timed out after %v (may need authentication): %w", timeout, ErrKnowledgeTimeout)
 		}
 		if detail != "" {
 			return "", fmt.Errorf("claude CLI failed: %w: %s", err, detail)
