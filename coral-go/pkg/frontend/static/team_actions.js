@@ -97,6 +97,8 @@ function _buildTeamTemplateFromBoard(boardName) {
         };
         if (s.agent_type) agent.agent_type = s.agent_type;
         if (s.model) agent.model = s.model;
+        if (s.thinking) agent.thinking = s.thinking;
+        if (s.live_permission_mode) agent.permission_mode = s.live_permission_mode;
         if (s.capabilities) agent.capabilities = s.capabilities;
         agents.push(agent);
     }
@@ -132,9 +134,9 @@ async function _attachWorkingModeToTemplate(boardName, tmpl) {
         ]);
         if (modeResp.ok) {
             const mode = await modeResp.json();
-            if (mode.mode && mode.mode !== 'none') {
+            if ((mode.mode && mode.mode !== 'none') || mode.custom_instructions) {
                 tmpl.working_mode = {
-                    mode: mode.mode,
+                    mode: mode.mode || 'none',
                     dependency_guidance: mode.dependency_guidance || false,
                     asks_are_tasks: mode.asks_are_tasks || false,
                     custom_instructions: mode.custom_instructions || '',
@@ -217,7 +219,7 @@ export async function shareAgentTeam(boardName) {
 }
 
 export function saveTeamFromSidebar(boardName) {
-    showPromptModal('Save Team Template', 'Template name', keyLabel(boardName), async (templateName) => {
+    showPromptModal('Save team template', 'Template name. Saves: members, models, thinking, permission modes, instructions, working mode, Additional instructions. Not saved: skills.', keyLabel(boardName), async (templateName) => {
         let tmpl = _buildTeamTemplateFromBoard(boardName);
         if (!tmpl) {
             showToast("No agents found on this board", "error");

@@ -73,7 +73,7 @@ for (const template of BUILTIN_TEAM_TEMPLATES) for (const member of template.age
     member.capabilities = { allow: [...SHIPPED_CAPABILITIES], deny: [] };
 }
 
-function _allTemplates() { return [...BUILTIN_TEAM_TEMPLATES, ..._getSavedTeamTemplates()]; }
+function _allTemplates() { return [..._getSavedTeamTemplates(), ...BUILTIN_TEAM_TEMPLATES]; }
 
 /** The choice the dialog opens on (#9906): the default members it fills in (the Orchestrator, the Lead Developer, the QA Engineer). Not a template of its own: team_dialogs.js loads it. */
 const DEFAULT_TEAM_KEY = '__default';
@@ -133,6 +133,7 @@ function resetTeamTemplatePicker() {
 
 let _pendingSaveTemplateAgents = null;
 let _pendingSaveTemplateFlags = '';
+let _pendingSaveTemplateWorking = null;
 
 async function _saveTeamTemplate() {
     // Collect current agents
@@ -149,6 +150,7 @@ async function _saveTeamTemplate() {
             if (config.agentType) entry.agent_type = config.agentType;
             if (config.model) entry.model = config.model;
             if (config.thinking) entry.thinking = config.thinking; // #4969
+            if (config.permissionMode) entry.permission_mode = config.permissionMode;
             if (config.flags) entry.flags = config.flags;
             agents.push(entry);
         }
@@ -157,6 +159,8 @@ async function _saveTeamTemplate() {
 
     _pendingSaveTemplateAgents = agents;
     _pendingSaveTemplateFlags = document.getElementById("team-flags")?.value.trim() || '';
+    try { _pendingSaveTemplateWorking = (await importOnce('./team_launch_settings.js')).readTeamLaunchSettings().working_mode || null; } catch { _pendingSaveTemplateWorking = null; }
+    const kept = document.getElementById('save-template-kept'); if (kept) kept.textContent = 'Saves: members, roles, instructions, models, thinking levels, permission modes, working mode, Additional instructions. Not saved: skills, goal, tasks, notes, chats.';
 
     // Show custom modal instead of prompt()
     const modal = document.getElementById('save-template-modal');
@@ -188,6 +192,7 @@ async function _confirmSaveTemplate() {
     if (!_pendingSaveTemplateAgents) return;
 
     const entry = { name: templateName, agents: _pendingSaveTemplateAgents, flags: _pendingSaveTemplateFlags };
+    if (_pendingSaveTemplateWorking) entry.working_mode = _pendingSaveTemplateWorking;
     try { await _upsertSavedTeamTemplates([entry]); } catch { showToast("Could not save the template", true); return; }
     showToast(`Saved template "${templateName}"`);
     _renderTeamTemplateSelector();

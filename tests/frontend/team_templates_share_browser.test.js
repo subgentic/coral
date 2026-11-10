@@ -2,7 +2,7 @@
 //  1. The template More menu: Import a template (.json) and Export this template (.json); the export is for one of the person's own saved templates (disabled until one is picked, and says so), and downloads the file
 //     Import takes: {"version": 1, "type": "coral-team-templates", "templates": [one]} with its members, roles, instructions, models and flags.
 //  2. A bad file says what is wrong: not a template file, a personas file, no list, no name, no members, a member with no name; a mixed file imports the good ones and says what it skipped.
-//  3. Save this team as a template says what is kept (the members, their roles, instructions, models and flags) and what is not (the goal, tasks, notes and chats).
+//  3. Save this team as a template says what it saves (the members, their roles, instructions, models, thinking levels, permission modes, the working mode and Additional instructions) and what it does not (skills, the goal, tasks, notes and chats; #15311).
 //  4. The team's Export reads "Export the board's messages": it exports the messages, not the team.
 // Drives Chrome over CDP against the isolated dev server.
 const assert = require('node:assert/strict');
@@ -111,8 +111,8 @@ const { coralReady } = require('./helpers/wait');
         await ev(`window._saveTeamTemplate(); true`);
         await waitFor(`getComputedStyle(document.getElementById('save-template-modal')).display !== 'none'`, 'the save dialog');
         const kept = await ev(`document.getElementById('save-template-kept').textContent.trim()`);
-        assert.match(kept, /^Kept: the members, their roles, instructions, models and flags\./);
-        assert.match(kept, /Not kept: the goal, tasks, notes and chats\.$/);
+        assert.match(kept, /^Saves: members, roles, instructions, models, thinking levels, permission modes, working mode, Additional instructions\./);
+        assert.match(kept, /Not saved: skills, goal, tasks, notes, chats\.$/);
         await ev(`window._hideSaveTemplateModal(); window.hideLaunchModal(); true`);
         console.log('\nAll team-template sharing checks passed');
     } finally { await guard.restore().catch(() => {}); await client.close(); }

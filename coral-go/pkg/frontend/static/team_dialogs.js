@@ -522,21 +522,23 @@ function _loadTeamTemplate(name) {
     for (const agent of tmpl.agents) {
         const agentName = agent.name || agent.role || '';
         const agentPrompt = agent.prompt || agent.description || '';
-        const row = _addTeamAgent(agentName, agentPrompt, agent.capabilities, agent.agent_type, agent.model, agent.flags);
+        const row = _addTeamAgent(agentName, agentPrompt, agent.capabilities, agent.agent_type, agent.model, agent.flags, { thinking: agent.thinking });
         if (!tmpl.builtin) row.dataset.permissionExplicit = '1'; // existing saved templates retain their confirm-mode meaning
+        const modeSel = agent.permission_mode && document.getElementById(row.dataset.acfId)?.querySelector('.acf-permission-mode');
+        if (modeSel && [...modeSel.options].some(o => o.value === agent.permission_mode)) { modeSel.value = agent.permission_mode; modeSel.dataset.pickedByPerson = '1'; }
     }
     if (tmpl.flags) {
         const tfEl = document.getElementById("team-flags");
         if (tfEl) { tfEl.value = tmpl.flags; _syncFlagButtons("team-flags"); }
     }
-    setTeamLaunchMode(tmpl.mode || 'none'); // the template's working mode, None when it names none (the built-in Coding Team starts with Task queue, #8919)
+    setTeamLaunchMode(tmpl.mode || tmpl.working_mode?.mode || 'none', tmpl.working_mode); // the template's working mode, None when it names none (the built-in Coding Team starts with Task queue, #8919)
     markTeamTemplate(name);
     _syncTeamMembers();
 }
 
 // reveal: scroll the new row into view. Only for a member the person added; the default members and a template's are added while the dialog opens or fills, and scrolling to the last of them
 // left the Members step opened past its heading and the template picker (#4950). top: put the row first (Add Orchestrator).
-function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultAgentType, defaultModel, defaultFlags, { reveal = false, top = false } = {}) {
+function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultAgentType, defaultModel, defaultFlags, { reveal = false, top = false, thinking = '' } = {}) {
     launch.teamAgentCounter++;
     const idx = launch.teamAgentCounter;
     const acfId = `team-agent-acf-${idx}`;
@@ -570,6 +572,7 @@ function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultA
         model: defaultModel || '',
         capabilities: caps,
     };
+    if (thinking) acfValue.thinking = thinking;
     acfValue.flags = defaultFlags || ''; // a member with no mode of its own starts at Default and follows the saved default Mode (#6397)
     renderAgentConfigForm(acfId, {
         showPreset: false,

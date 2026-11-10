@@ -14,10 +14,11 @@ const ASKS_ARE_TASKS_HINT = 'When an agent needs another agent to do something, 
 const WORKFLOW_HINT = 'Guidance the agents get on how to share the folder. It does not create worktrees.';
 
 let _view = null;
+let _defaultExtra = {};
 let _defaultMode = 'none'; // the working mode a new team starts with: 'none', or the one the chosen team template names (#8919)
 
 // What a new team starts with: nothing from the last team stays.
-const startValues = () => ({ first_task: '', save_goal: true, custom_instructions: '', mode: _defaultMode, dependency_guidance: false, asks_are_tasks: true, planning_approval: NEW_TEAM_APPROVAL, require_goal: true, ...healthToValues(HEALTH_DEFAULTS), cross_team_messaging: true, cross_team_artifacts: true });
+const startValues = () => ({ first_task: '', save_goal: true, custom_instructions: '', mode: _defaultMode, dependency_guidance: false, asks_are_tasks: true, planning_approval: NEW_TEAM_APPROVAL, require_goal: true, ...healthToValues(HEALTH_DEFAULTS), cross_team_messaging: true, cross_team_artifacts: true, ..._defaultExtra });
 
 // The health check's own rows, less who gets it: at launch that is the Orchestrator (a list of one is noise); another recipient is in Team settings.
 const healthRows = () => healthFields({
@@ -69,7 +70,7 @@ export function mountTeamLaunchSettings() {
     const host = document.getElementById('team-start-host');
     if (!host) return;
     if (_view) _view.destroy();
-    _defaultMode = 'none';
+    _defaultMode = 'none'; _defaultExtra = {};
     host.replaceChildren();
     _view = mountSettingsView(host, {
         mode: 'settings', saveBar: false, group: 'start', label: 'Team settings sections', groupLabel: 'Team settings section', groupPickText: 'Jump to a section',
@@ -142,9 +143,10 @@ export function readTeamLaunchSettings() {
 }
 
 /** The working mode a team template names becomes the step's choice (and what it starts with if the step is still loading); the person can change it. */
-export function setTeamLaunchMode(mode) {
+export function setTeamLaunchMode(mode, wm) {
     _defaultMode = mode;
-    if (_view) { _view.set('mode', mode); syncMenuStates(); }
+    _defaultExtra = wm ? { custom_instructions: wm.custom_instructions || '', dependency_guidance: !!wm.dependency_guidance, asks_are_tasks: wm.asks_are_tasks !== false } : {};
+    if (_view) { _view.set('mode', mode); for (const [k, v] of Object.entries(_defaultExtra)) _view.set(k, v); syncMenuStates(); }
 }
 
 /** Apply the held board settings to the launched team. Returns '' when it worked (or there was nothing), else a sentence for the toast. */
