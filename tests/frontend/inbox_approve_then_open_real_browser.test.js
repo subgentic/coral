@@ -85,6 +85,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             };
             await openBy(names.d, 'name', 'before any Approve (marks it read)');
             // an agent waiting beside the files (a stood-in row of the live list; the app's own opening of it is counted)
+            await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: 4, y: 4 }); // the pointer is off the list: one resting on it holds a new row back until Show (#15339, walk 23 M9)
             await ev(`window.__opened = []; window.selectLiveSession = (...a) => { window.__opened.push(a[2]); return Promise.resolve(); }; T.state.liveSessions = [{ name: 'wa', session_id: '00000001-0000-4000-8000-0000000000aa', agent_type: 'claude', server: 'local', status: 'idle', display_name: 'Waiting Agent', working_directory: '/repo/a', waiting_for_input: true, waiting_kind: 'permission', waiting_since: new Date(Date.now() - 300000).toISOString(), sleeping: false }]; import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return true; })`);
             await waitFor(`!![...document.querySelectorAll('${T} tbody tr')].find(r => /Waiting Agent/.test(r.textContent))`, at + 'the waiting agent row', 8000);
             await press(names.a, 'Approve');

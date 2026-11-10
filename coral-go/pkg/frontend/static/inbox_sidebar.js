@@ -1362,7 +1362,7 @@ wrap.append(DT.el('span', 'sr-only', `${earlierWords(s.review) ? `, ${earlierWor
 matchMedia(PHONE_QUERY).addEventListener('change', () => { if (document.body.getAttribute('data-nav-tab') === 'hub-inbox') renderInboxNav(true); }); // a window that becomes a phone's (or stops being) draws Needs you's rows as that layout's (#15162)
 registerGroupSource('hub-inbox', {
     holdRedraw: true, // not redrawn under a held pointer (#12636): a row answered elsewhere would move the one under the finger
-    newCount: () => needsListSpec().rows.filter(r => !drawnNeedsKeys.has(`${sessionServer(r)}:${r.session_id}`)).length, // rows that arrived while a pointer rested on the list (#15339, walk 23 M9)
+    newCount: () => document.querySelector('.inbox-needs-results') ? needsListSpec().rows.filter(r => !drawnNeedsKeys.has(`${sessionServer(r)}:${r.session_id}`)).length : undefined, // rows that arrived while a pointer rested on the list (#15339, walk 23 M9)
     signature: () => JSON.stringify([state.hub, state.servers]),
     toolbar: key => hubFrame(key) ? null : key === 'needs' ? inboxNeedsToolbar() : key === 'tasks' ? inboxTaskToolbar() : key === 'goals' ? inboxGoalsToolbar() : key === 'saved' ? inboxSavedToolbar() : key === 'activity' ? inboxActivityToolbar() : CH.CHAT_KEY.test(key) ? inboxChatsToolbar(key) : key === 'artifacts' ? IA.artifactsToolbar(() => renderFolderCounts()) : ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
     keys: () => GROUPS.map(g => g.key),

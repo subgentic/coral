@@ -266,15 +266,13 @@ if (typeof document !== 'undefined') {
     document.addEventListener('coral:action-start', e => { if (e.detail && open) e.detail.table = open; }); // the table on screen when the action began
     document.addEventListener('coral:action-result', e => { const t = e.detail && e.detail.table; if (!t || t !== open) return; actedRefresh = true; try { refreshGroupTable(t.kind); } finally { actedRefresh = false; } }); // only that table, still on screen
 }
-function showHeldNote() {
+function showHeldNote(n) {
     const host = document.getElementById('group-table-view');
-    if (!host) return;
-    const n = sources.get(open?.kind)?.newCount?.() || 0;
     let p = host.querySelector('.group-table-held');
-    if (!p) { p = document.createElement('p'); p.className = 'item-meta group-table-held'; p.setAttribute('role', 'status'); host.append(p); } // under the table, sticky at the bottom of the view: a line above it would itself move the rows it is meant to hold still
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-small btn-quiet'; b.textContent = 'Show';
-    b.addEventListener('click', () => { const k = deferredKind; deferredKind = null; hoverHeldSince = null; p.remove(); if (k) { actedRefresh = true; try { refreshGroupTable(k); } finally { actedRefresh = false; } } }); // the person asked for it: drawn at once, though the pointer rests on the list
-    p.replaceChildren(`${n ? `${n} new` : 'Changes'} waiting. `, b); // the rows stay where they are until the person says so or the pointer leaves the list (#15339, walk 23 M9)
+    if (!p) { p = document.createElement('p'); p.className = 'item-meta group-table-held'; p.setAttribute('role', 'status'); host.append(p); }
+    const b = document.createElement('button'); b.className = 'btn btn-small btn-quiet'; b.textContent = 'Show';
+    b.onclick = () => { const k = deferredKind; deferredKind = null; hoverHeldSince = null; p.remove(); actedRefresh = true; try { refreshGroupTable(k); } finally { actedRefresh = false; } };
+    p.replaceChildren(`${n || 'Some'} new waiting. `, b);
 }
 function leaveList() { hoverOver = false; const k = deferredKind, had = hoverHeldSince !== null; hoverHeldSince = null; document.querySelectorAll('.group-table-held').forEach(n => n.remove()); if (k && had && !holding()) { deferredKind = null; setTimeout(() => refreshGroupTable(k), 0); } }
 if (typeof document !== 'undefined') {
@@ -288,7 +286,7 @@ export function refreshGroupTable(kind) {
     const src = sources.get(kind);
     if (open && open.kind === kind) {
         if (src?.holdRedraw && holding()) { deferredKind = kind; if (actedRefresh) actedDeferred = true; flushLater(); return; } // the person's own result keeps being theirs while the press hold lets go of it (#14483)
-        if (src?.holdRedraw && hoverOver && !actedRefresh) { if (hoverHeldSince === null) hoverHeldSince = Date.now(); deferredKind = kind; showHeldNote(); return; } // a pointer resting on the list: the rows stay where they are, and the line says how many are waiting
+        if (src?.holdRedraw && hoverOver && !actedRefresh) { if (hoverHeldSince === null) hoverHeldSince = Date.now(); const n = src.newCount?.(), cap = n == null ? 1e4 : 2e3; if (n || Date.now() - hoverHeldSince < cap) { deferredKind = kind; showHeldNote(n); if (!n) setTimeout(() => { const k = deferredKind; if (k && !holding()) { deferredKind = null; refreshGroupTable(k); } }, cap + 100); return; } hoverHeldSince = null; }
         const host = document.getElementById('group-table-view');
         if (!host || host.style.display === 'none') { open = null; return; }
         if (drawTable()) return;
