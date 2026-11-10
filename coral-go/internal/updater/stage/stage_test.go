@@ -284,6 +284,13 @@ func TestNothingNewerOrNothingPromoted(t *testing.T) {
 	assert.Empty(t, e.stagedVersions())
 	assert.Empty(t, res.NextAttempt, "not promoted yet is neutral: no back-off, nothing in the state")
 
+	// the API's list with long release notes (1.26 MB for 30 releases on 2026-11-10) and no promotion is "not promoted", not a failed fetch (#15414)
+	e = newEnv(t, "1.4.125")
+	e.rel.list = `[{"tag_name":"v1.4.130","draft":false,"prerelease":false,"body":"` + strings.Repeat("n", 1300000) + `","assets":[{"name":"SHA256SUMS.txt"}]}]`
+	res = e.check()
+	assert.Equal(t, ResultNotPromoted, res.Result, "%+v", res)
+	assert.Empty(t, res.NextAttempt)
+
 	// a promotion listed with its files whose manifest answers 404 is one the download host doesn't serve yet: a network failure that backs off, not "not promoted" (Security's #337)
 	e = newEnv(t, "1.4.125")
 	e.rel.status["promote.json"] = 404
