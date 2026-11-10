@@ -117,6 +117,7 @@ function _build() {
                     <button type="button" class="menu-item artifact-viewer-markup-item" role="menuitem" hidden>Mark up</button>
                     <button type="button" class="menu-item artifact-viewer-copyid-item" role="menuitem" title="The id that stays the same across versions" hidden>Copy file ID</button>
                     <button type="button" class="menu-item artifact-viewer-copy-id" role="menuitem" title="The id of this version only">Copy version ID</button>
+                    <button type="button" class="menu-item artifact-viewer-agent-item" role="menuitem" title="Copies a line to paste to an agent: this file and where in the docs to read">Copy for an agent</button>
                     <button type="button" class="menu-item artifact-viewer-scripts-item" role="menuitem" hidden>Run scripts…</button>
                     <a class="menu-item artifact-viewer-newtab" role="menuitem" target="_blank" rel="noopener noreferrer" hidden>Open in new tab</a>
                     <button type="button" class="menu-item artifact-viewer-dropbox-share" role="menuitem" hidden>Share via Dropbox…</button>
@@ -150,6 +151,7 @@ function _build() {
     d.querySelector('.artifact-viewer-fullscreen').addEventListener('click', () => setFullScreen(d, !d.classList.contains('av-fullscreen'), true));
     const more = d.querySelector('.artifact-viewer-more'), menu = d.querySelector('.artifact-viewer-menu');
     more.addEventListener('click', async (e) => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(more); });
+    d.querySelector('.artifact-viewer-agent-item').addEventListener('click', () => { const hex = _hex, name = d.querySelector('.artifact-viewer-title')?.firstChild?.textContent || ''; importOnce('./agent_doc_map.js').then(m => navigator.clipboard.writeText(m.agentCopyText('artifact', `Artifact${name ? ` \u201c${name.trim()}\u201d` : ''}: coral://artifacts/${hex}`))).then(() => showToast('Copied: paste it to an agent'), () => showToast('Could not copy', true)); }); // the robot's line (#15063): the viewer's header has no room for one more icon, so it is in the menu
     d.querySelector('.artifact-viewer-copy-id').addEventListener('click', () => { const hex = _hex; importOnce('./artifact_clipboard.js').then(m => m.copyArtifactId(hex)).catch(() => showToast('Could not copy the version ID', true)); });
     menu.addEventListener('click', async () => { (await importOnce('./menu_button.js')).closeMenus(); }); // a choice closes the menu
     // Mark up (#12367, the operator: "I don't see any way to markup the image in the window"): for a picture, the comment composer's drawing tool opens on the file's own image, and Done starts a comment on the file with the marked copy attached; the file itself is not changed

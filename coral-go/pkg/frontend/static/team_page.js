@@ -21,6 +21,7 @@ import { isPhoneLayout } from './phone_layout.js';
 const { revealInStrip } = await importOnce('./strip_reveal.js'); // a part of the team page's group: loaded with it
 const { closeDetailPane } = await importOnce('./detail_pane.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 const { el } = await importOnce('./team_table.js');
+const { agentCopyButton } = await importOnce('./agent_copy_button.js'); // the robot beside the team's name (#15063)
 const { quietFocus } = await importOnce('./quiet_focus.js');
 
 const PHONE_MORE = ['knowledge', 'messages', 'branches']; // (the last three of TEAM_TABS: the row is the others, in the operator's order, #8791) // the tabs a phone puts behind its More menu (CSS hides their tabs under 761 px)
@@ -218,6 +219,8 @@ function drawHeader() {
         if (computer) h.append(el('span', 'team-page-machine', ` on ${computer.label || computer.id}`));
     }
     document.title = `${keyLabel(S.team)} · Coral`;
+    document.getElementById('team-page-agent-copy')?.remove(); // the team may have changed: its line is drawn again
+    const robot = agentCopyButton('board', () => `Team \u201c${keyLabel(S.team)}\u201d, its board: run coral-board read`, { className: 'team-page-agent-copy' }); robot.id = 'team-page-agent-copy'; h.after(robot);
 }
 
 function drawStatus(data) {
