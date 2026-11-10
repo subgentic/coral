@@ -307,3 +307,20 @@ func TestAReviewOfAReplacedVersionSaysANewerVersionReplacedIt(t *testing.T) {
 		assert.Contains(t, msg, "Open the newest version", "%s: and what to do", decision)
 	}
 }
+
+// #15172 (walk 5 M9 follow-up): a review decision's notice to the uploader is Coral's, as the comment messages are (#15155): posted under the person's name the board showed it as 'You'. The text says who decided.
+func TestAReviewNoticeIsPostedAsCoralNotAsThePerson(t *testing.T) {
+	e := newReviewEnv(t, true)
+	e.tag(t, `["for review", "read"]`)
+	code, out := e.approve(t)
+	require.Equal(t, http.StatusOK, code, out)
+	msgs, err := e.h.bs.ListMessages(context.Background(), "alpha", 100, 0, 0)
+	require.NoError(t, err)
+	var from []string
+	for _, m := range msgs {
+		if strings.Contains(m.Content, "The operator approved your artifact") {
+			from = append(from, m.SubscriberID)
+		}
+	}
+	assert.Equal(t, []string{board.CoralSender}, from, "one notice, posted as Coral")
+}

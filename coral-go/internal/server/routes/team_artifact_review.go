@@ -309,7 +309,7 @@ func (h *BoardHandler) postReviewNotice(ctx context.Context, project, msg string
 	if h.reviewPost != nil {
 		return h.reviewPost(ctx, project, msg)
 	}
-	_, err := h.bs.PostDefusedMessage(ctx, project, board.OperatorName, msg)
+	_, err := h.bs.PostSystemDefusedMessage(ctx, project, board.CoralSender, msg, nil) // Coral's, not the person's name (#15172: it showed as 'You'); the text says who decided
 	return err
 }
 
