@@ -3,7 +3,6 @@
 package loginpath
 
 import (
-	"bytes"
 	"context"
 	"log"
 	"os"
@@ -15,6 +14,8 @@ import (
 	"time"
 
 	"golang.org/x/term"
+
+	"github.com/subgentic/coral/internal/logsafe"
 )
 
 // Off is the environment variable that turns the widening off.
@@ -37,7 +38,7 @@ func Widen() int {
 	}
 	login, err := ask(shellsToTry())
 	if err != nil {
-		log.Printf("[startup] the login shell's PATH was not read: %v", err)
+		log.Printf("[startup] the login shell's PATH was not read: %s", logsafe.HomeInText(err.Error()))
 		return 0
 	}
 	merged, added := Merge(os.Getenv("PATH"), login, string(os.PathListSeparator))
@@ -92,14 +93,37 @@ func run(shell string) (string, error) {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, shell, "-ilc", `printf '%s%s%s' '`+beginMark+`' "$PATH" '`+endMark+`'`)
 	cmd.Stdin = nil // /dev/null
-	var out bytes.Buffer
-	cmd.Stdout = &out
+	out := &tailWriter{max: tailCap}
+	cmd.Stdout = out
 	cmd.Stderr = nil
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}                                // an interactive shell asks for a terminal's foreground: in a group of its own it never takes this process's
 	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) } // the group it was started in: a profile's children go with it
 	cmd.WaitDelay = time.Second
-	if err := cmd.Run(); err != nil && out.Len() == 0 {
+	if err := cmd.Run(); err != nil && out.n == 0 {
 		return "", err
 	}
-	return parse(out.String()), nil
+	return parse(string(out.buf)), nil
+}
+
+// tailCap is the most of a shell's output that is kept: the PATH is printed last, after whatever the profile wrote, so the end is what matters, and a profile that prints without end never holds more than this.
+const tailCap = 2*maxPath + 256
+
+// tailWriter keeps the last max bytes written to it, and counts what was written.
+type tailWriter struct {
+	buf []byte
+	max int
+	n   int64
+}
+
+func (w *tailWriter) Write(p []byte) (int, error) {
+	w.n += int64(len(p))
+	if len(p) >= w.max {
+		w.buf = append(w.buf[:0], p[len(p)-w.max:]...)
+		return len(p), nil
+	}
+	if over := len(w.buf) + len(p) - w.max; over > 0 {
+		w.buf = append(w.buf[:0], w.buf[over:]...)
+	}
+	w.buf = append(w.buf, p...)
+	return len(p), nil
 }

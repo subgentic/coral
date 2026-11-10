@@ -128,3 +128,28 @@ func TestACoralOnLinuxKeepsThePathItWasGiven(t *testing.T) {
 	assert.Equal(t, 1, Widen(), "the same shell on macOS is asked: the test sees the difference")
 	assert.Equal(t, "/usr/bin:/extra/bin", os.Getenv("PATH"))
 }
+
+// Security's SHOULD 5 on #15072: the shell's output is held to a cap, whatever the profile prints.
+func TestAShellOutputIsHeldToTheCapWhateverItPrints(t *testing.T) {
+	w := &tailWriter{max: tailCap}
+	chunk := []byte(strings.Repeat("x", 4096))
+	for i := 0; i < 26000; i++ { // 100 MB
+		_, _ = w.Write(chunk)
+	}
+	_, _ = w.Write([]byte(beginMark + "/a/bin:/b/bin" + endMark))
+	assert.LessOrEqual(t, len(w.buf), 64<<10, "a few times the PATH limit, whatever was written")
+	assert.GreaterOrEqual(t, w.n, int64(100<<20))
+	assert.Equal(t, "/a/bin:/b/bin", parse(string(w.buf)), "the PATH printed last is still found")
+}
+
+// A profile that prints without end for the whole time it is given is read through the capped writer (the cap itself is pinned above), and the pass ends at the timeout with the PATH as it was.
+func TestAProfileThatPrintsWithoutEndIsGivenUpOnAtTheTimeout(t *testing.T) {
+	useShell(t, fakeShell(t, `while :; do echo xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx; done`))
+	t.Setenv(Off, "")
+	notFromTerminal(t, false)
+	withPath(t, "/usr/bin")
+	start := time.Now()
+	assert.Zero(t, Widen())
+	assert.Less(t, time.Since(start), timeout+3*time.Second)
+	assert.Equal(t, "/usr/bin", os.Getenv("PATH"))
+}
