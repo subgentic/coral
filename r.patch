@@ -1,0 +1,15 @@
+diff --git a/coral-go/internal/auth/routes.go b/coral-go/internal/auth/routes.go
+index 29e3caf37..e960dd9e5 100644
+--- a/coral-go/internal/auth/routes.go
++++ b/coral-go/internal/auth/routes.go
+@@ -78,6 +78,10 @@ func (ar *Routes) AuthPage(w http.ResponseWriter, r *http.Request) {
+ 	h.Set("X-Frame-Options", "DENY")
+ 	h.Set("Referrer-Policy", "no-referrer")
+ 	set, local, strict := ar.PageState(r)
++	if !set && ar.signedIn(r) { // a browser that is signed in and has no password yet is asked for one by the dashboard's own box, never by this page as well (#15237, Security's design on #15227); it goes where it was going
++		http.Redirect(w, r, SafeReturnTo(r.URL.Query().Get("return_to")), http.StatusSeeOther)
++		return
++	}
+ 	signedOut := set && ar.ks.wasSignedOutByOthers(ar.ks.extractSessionCookie(r)) && !ar.signedIn(r) // told why only to the browser whose session another browser ended (#10431)
+ 	if !ar.signedIn(r) {                                                                             // the funnel (#7455): which page a browser with no session reached; nothing of the request is sent
+ 		tracking.TrackSigninPageShown(signinPageKind(set, local))
