@@ -25,3 +25,7 @@
     .inbox-folder-toolbar:has(#inbox-needs-team) { position: relative; }
     .inbox-folder-toolbar:has(#inbox-needs-team) .inbox-filter-pop { position: absolute; top: 100%; right: 0; z-index: 5; width: min(34rem, 100%); box-sizing: border-box; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md, 6px); box-shadow: var(--shadow-md); }
 }
+/* Ticking a row does not move the list (#15339, walk 23 H3): the Needs toolbar keeps one line's height, and while rows are selected the bar takes that whole line (the filters, chips and sort wait behind it) instead of wrapping under them and pushing the rows down. */
+#group-table-view .gt-toolbar { min-height: 40px; }
+#group-table-view .gt-toolbar.team-toolbar-selecting > :not(.team-tb-selection) { display: none !important; }
+#group-table-view .gt-toolbar.team-toolbar-selecting > .team-tb-selection { flex: 1 1 100%; }
