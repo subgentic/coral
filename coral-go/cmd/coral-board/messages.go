@@ -345,6 +345,9 @@ func cmdPost() {
 				}
 			}
 		}
+		if note, _ := result["not_in_needs_you"].(string); note != "" { // a post that waits on the Operator without --ask (#15304)
+			fmt.Printf("  Note: %s\n", clitext.Clean(note))
+		}
 		if a, ok := result["ask"].(map[string]any); ok {
 			fmt.Printf("  A question to %s: open until each has answered (they answer with  coral-board post --reply-to %.0f \"...\"  or a post that @mentions you).\n", joinAnyStrings(a["to"]), id)
 		}

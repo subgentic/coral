@@ -249,6 +249,9 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 			if rest := h.postRestNotes(r.Context(), project, msg.SubscriberID, notified); len(rest) > 0 {
 				out["asleep"] = rest // who will not read it now, and why (#13189)
 			}
+			if notInNeedsYou(msg, humanInputCaller(r)) {
+				out["not_in_needs_you"] = notInNeedsYouNote // said at once: a post that waits on the Operator without --ask is not in their Needs you (#15304)
+			}
 			writeJSON(w, http.StatusOK, out)
 			return
 		}

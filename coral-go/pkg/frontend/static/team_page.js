@@ -240,7 +240,9 @@ function drawStatus(data) {
     // Just woken from here: how many have reported so far, until all have (or two minutes pass), not only "waiting" (#10052).
     const wakingNow = unknown > 0 && !n && waking;
     if (!unknown) stopWaking(S.team);
-    const text = uncertainAttention ? 'Checking attention status' : asleep ? 'Asleep' : wakingNow ? `Waking the team: ${data.agents.length - unknown} of ${data.agents.length} agents have sent their first message.` : n ? `${n} ${n === 1 ? 'needs' : 'need'} attention` : unknown ? `${unknown === data.agents.length ? 'Waiting for first signal' : `${unknown} of ${data.agents.length} waiting for first signal`}. A signal is an agent's first message.` : 'All well';
+    // every task done, none open, nobody working and nothing needs the person: not the same as "All well" while the team is still at it (walk 21 H2, #15304)
+    const finished = !n && !unknown && S.counts.tasks === 0 && S.tasksDone > 0 && data.agents.every(a => a.availability !== 'busy' && a.availability !== 'needs_input' && a.availability !== 'waiting');
+    const text = uncertainAttention ? 'Checking attention status' : asleep ? 'Asleep' : wakingNow ? `Waking the team: ${data.agents.length - unknown} of ${data.agents.length} agents have sent their first message.` : n ? `${n} ${n === 1 ? 'needs' : 'need'} attention` : unknown ? `${unknown === data.agents.length ? 'Waiting for first signal' : `${unknown} of ${data.agents.length} waiting for first signal`}. A signal is an agent's first message.` : finished ? 'Finished: your turn' : 'All well';
     // When agents need attention the visible status is a button to the Agents tab (beside the live region, which keeps saying it and is then only for a screen reader: the button's name is not announced twice); "All well" is plain text.
     const b = $('team-page-health');
     if (b) {
@@ -291,6 +293,7 @@ async function readCounts() {
     const g = goals.value;
     if (g) S.counts.goals = (Array.isArray(g) ? g : g.goals || []).length;
     const t = tasks.value;
+    if (t && Number.isFinite(t.total_completed)) S.tasksDone = t.total_completed; // for the header's Finished state (#15304)
     if (t && Number.isFinite(t.total_open)) S.counts.tasks = (state.teamTasksOpen && state.teamTasksOpen.team === String(team) && Number.isFinite(state.teamTasksOpen.n) ? state.teamTasksOpen.n : t.total_open); // the list's own Open count when it has been read, so the tab and the list agree (#12248)
     if (avail.value && Array.isArray(avail.value.agents)) S.counts.agents = avail.value.agents.filter(a => a.availability !== 'archived').length; // as the sidebar group counts them (#10164)
     const k = kn.value;
@@ -510,7 +513,7 @@ export async function openTeamPage(team, opts = {}) {
     S.noGoal = tab === 'tasks' && !!opts.noGoal;
     S.tasksQuery = tab === 'tasks' ? opts.query || '' : '';
     const changed = S.team !== team;
-    if (changed) { S.team = team; S.counts = {}; S.item = null; S.knowledgeFor = ''; }
+    if (changed) { S.team = team; S.counts = {}; S.tasksDone = 0; S.item = null; S.knowledgeFor = ''; }
     state.selectedTeam = team; // the team on screen (the sidebar marks its row; the panels moved in read it)
     state.boardPageProject = team;
     state.currentBoardServer = splitKey(team).server;
