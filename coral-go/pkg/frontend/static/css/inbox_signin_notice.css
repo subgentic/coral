@@ -1,0 +1,7 @@
+/* The Inbox's "Claude isn't signed in" notice (inbox_signin_notice.js, #15093). Lazy: loaded with the notice. The look is the one notice (.notice-warn). */
+.inbox-signin-notice { display: flex; align-items: flex-start; gap: var(--space-sm); margin: 0 0 var(--space-md); }
+.inbox-signin-body { display: flex; flex-direction: column; gap: var(--space-sm); min-width: 0; }
+.inbox-signin-body p { margin: 0; }
+.inbox-signin-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); }
+.inbox-signin-said { color: var(--text-secondary); min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .inbox-signin-actions .btn { flex: 1 1 100%; justify-content: center; min-height: 44px; } }
