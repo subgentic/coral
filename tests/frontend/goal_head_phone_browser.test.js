@@ -44,7 +44,7 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`!!document.querySelector('${M} #goals-detail-title') && !!document.querySelector('${M} .goal-head-actions button')`, `${tag}: the goal page`, 15000);
             let p = await head();
             if (!phone) {
-                assert.deepEqual(p.btns.map(b => b.t), ['Add task', 'Change driver', 'Move to another team', 'Close goal'], `${tag}: desktop keeps its four buttons ${JSON.stringify(p)}`);
+                assert.deepEqual(p.btns.map(b => b.t), ['Add task', 'Change driver', 'Move to another team', 'Mark done'], `${tag}: desktop keeps its four buttons ${JSON.stringify(p)}`);
                 assert.equal(await ev(`!!document.querySelector('${M} .goals-detail-line .goal-copy-agent')`), true, `${tag}: Copy for an agent stays in the line on a desktop`);
                 continue;
             }
@@ -59,7 +59,7 @@ const { coralReady } = require('./helpers/wait');
             await key('Enter', 'Enter', 13);
             await waitFor(`!document.querySelector('${M} .goal-head-actions .task-more-menu').hidden`, `${tag}: More opens on Enter`, 4000);
             const open = await items();
-            assert.deepEqual(open.map(i => i.t), ['Change driver', 'Move to another team', 'Copy for an agent', 'Close goal'], `${tag}: the menu holds the rest: ${JSON.stringify(open)}`);
+            assert.deepEqual(open.map(i => i.t), ['Change driver', 'Move to another team', 'Copy for an agent', 'Mark done'], `${tag}: the menu holds the rest: ${JSON.stringify(open)}`);
             assert.ok(open.every(i => i.vis && i.h >= 43.5), `${tag}: menu items are 44 px: ${JSON.stringify(open)}`);
             assert.equal(await ev(`document.activeElement.textContent.trim()`), 'Change driver', `${tag}: the first item has focus`);
             await key('ArrowDown', 'ArrowDown', 40);
@@ -92,7 +92,7 @@ const { coralReady } = require('./helpers/wait');
         await load(`/inbox/goals/${board}/${doneId}`, 16, 'light');
         await waitFor(`!!document.querySelector('${M} .goal-head-actions button')`, 'the done goal page', 15000);
         const pd = await head();
-        assert.deepEqual(pd.btns.map(b => b.t), ['Close goal', 'More'], 'a goal that looks done: Close goal is the one button: ' + JSON.stringify(pd));
+        assert.deepEqual(pd.btns.map(b => b.t), ['Mark done', 'More'], 'a goal that looks done: Mark done is the one button: ' + JSON.stringify(pd));
         // the page is drawn again when its data lands (a slow machine: after the first look): a More pressed just before that is pressed on a button that is then replaced. Press it once the page has held still for 600 ms.
         for (let i = 0; ; i++) {
             await ev(`document.querySelector('${M} .goal-head-actions .task-more-btn').__still = true; true`);
