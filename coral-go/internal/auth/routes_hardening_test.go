@@ -39,6 +39,8 @@ func TestValidateKeyRoute_OnlyFailuresAreRateLimited(t *testing.T) {
 func TestLogout(t *testing.T) {
 	ks := newTestKeyStore(t)
 	ar := NewRoutes(ks)
+	signedOut := 0
+	ar.SetOnSignOut(func() { signedOut++ }) // #15404: a Hub drops its merged Needs you at a sign-out
 	mux := http.NewServeMux()
 	mux.HandleFunc("/auth/logout", ar.Logout)
 	mux.HandleFunc("/api/sessions", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
@@ -65,6 +67,7 @@ func TestLogout(t *testing.T) {
 
 	w := do("POST", "/auth/logout", mine, "http://coral.lan:8420")
 	require.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, 1, signedOut, "the accepted sign-out ran it once; the cross-origin refusal did not")
 	var cleared *http.Cookie
 	for _, c := range w.Result().Cookies() {
 		if isSessionCookieName(c.Name) {

@@ -180,3 +180,28 @@ func TestNonHubNeedsYouIsUnchanged(t *testing.T) {
 	require.Equal(t, http.StatusOK, code)
 	assert.NotContains(t, out, "machines")
 }
+
+// #15404: a goal title with a secret is redacted before the Hub passes it on; a cancelled first caller's failure is not kept for the next reader.
+func TestHubNeedsYouRedactsTitlesAndDoesNotKeepACancelledReader(t *testing.T) {
+	token := "ghp_" + strings.Repeat("aB3dE5gH7j", 4)
+	fleet := &fakeFleet{answers: map[string]func(http.ResponseWriter, *http.Request){
+		"lab": okJSON(`{"counts":{"question":1},"items":[{"kind":"question","line":"ok?","team":"t","id":"ask:5","at":"2026-11-10T12:01:00Z","goal_title":"deploy with ` + token + `","task_title":"use ` + token + `"}]}`),
+	}}
+	h := hubRig(t, fleet, store.RemoteServer{ID: "lab", Label: "Lab", Status: "online"})
+	_, out := readNeedsYou(t, h, "", asDashSession)
+	for _, it := range needsYouItems(out) {
+		for _, f := range []string{"goal_title", "task_title"} {
+			s, _ := it[f].(string)
+			assert.NotContains(t, s, token, f)
+		}
+	}
+	h.needsYouRemotes.Forget()
+	calls := fleet.calls.Load()
+	_, _ = readNeedsYou(t, h, "", func(r *http.Request) *http.Request {
+		ctx, cancel := context.WithCancel(r.Context())
+		cancel()
+		return asDashSession(r.WithContext(ctx))
+	})
+	readNeedsYou(t, h, "", asDashSession)
+	assert.EqualValues(t, 1, fleet.calls.Load()-calls, "the cancelled reader's answer was not kept (it asked no computer): the next reader asked the computer itself")
+}

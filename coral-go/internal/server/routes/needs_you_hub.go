@@ -143,7 +143,11 @@ func nonNegInt(n json.Number, max int64) int64 {
 
 // needsYouTitle is a goal or task title as one cleaned, cut line.
 func needsYouTitle(s string) string {
-	s = strings.Join(strings.Fields(clitext.CleanName(s)), " ")
+	red, ok := redactComment(s) // secrets out BEFORE the cut, as needsYouLine does; with no redactor nothing is sent (#15404)
+	if !ok {
+		return needsYouWithheld
+	}
+	s = strings.Join(strings.Fields(clitext.CleanName(red)), " ")
 	if r := []rune(s); len(r) > needsYouLineMax {
 		return strings.TrimSpace(string(r[:needsYouLineMax-1])) + "…"
 	}
@@ -275,6 +279,9 @@ func (nr *NeedsYouRemotes) mergedNeeds(r *http.Request, kind string) hubNeedsMer
 	}
 	nr.mu.Unlock()
 	out := nr.merge(r, kind)
+	if r.Context().Err() != nil {
+		return out // the first caller went away: the computers it did not get to were cut, not down, so its answer is not kept for the next reader (#15404)
+	}
 	nr.mu.Lock()
 	if nr.cache == nil {
 		nr.cache = map[string]hubNeedsCached{}

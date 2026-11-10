@@ -865,6 +865,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 		s.remoteAgents = background.NewRemoteAgentHub(rsHandler.Store(), remoteResolver, remoteAgentHubConfig)
 		rsHandler.SetStatusListener(s.remoteAgents.Refresh) // an edited key shows at once (#3649)
 		rsHandler.SetOnDelete(func(id string) { remoteResolver.Forget(id); s.hubNeedsRemotes.Forget() })
+		s.authRoutes.SetOnSignOut(s.hubNeedsRemotes.Forget) // a signed-out owner leaves no merged answer behind (#15404)
 		prov.SetOnRemoved(remoteResolver.Forget)
 		prov.SetStatusListener(s.remoteAgents.Refresh) // a server the setup registered shows at once
 		rsHandler.SetReconnector(s.remoteAgents.Reconnect)

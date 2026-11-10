@@ -70,6 +70,18 @@ asked.length = 0;
 await AC.refresh(null, { next: true });
 assert.deepEqual(asked.map(a => `${a.server}:${a.before}`), ['local:801'], 'only the computer with more is asked, with its own cursor');
 
+// a computer that leaves the list takes its actions along, even for a page of older ones (#15404)
+reset(online(['srv1', 'srv2']), { local: { ids: [{ id: 1, at: at(1) }] }, srv1: { ids: [{ id: 1, at: at(2) }] }, srv2: { ids: [{ id: 1, at: at(3) }] } });
+await AC.refresh();
+assert.equal(AC.total(), 3);
+state.servers = online(['srv1']);
+await AC.refresh(null, { next: true });
+assert.deepEqual(filt().map(AC.keyOf).sort(), ['1', 'srv1/1'], 'srv2 is gone from the list: its rows are not shown');
+
+// a sign-out clears it all (the page's own event, not only a call)
+document.dispatchEvent(new window.CustomEvent('coral:signed-out'));
+assert.equal(AC.total(), 0, 'coral:signed-out forgets');
+
 // forget clears everything
 AC.forget();
 assert.equal(AC.total(), 0);

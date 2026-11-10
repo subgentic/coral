@@ -29,7 +29,9 @@ type Routes struct {
 	// the server rotates its command-line token, since a reset means "don't trust what was
 	// out there").
 	afterReset func()
-	peerUser   func(*http.Request) (same, supported bool)
+	// onSignOut runs after a sign-out (POST /auth/logout): what the server kept for that person (a Hub's merged Needs you, #15404) is dropped.
+	onSignOut func()
+	peerUser  func(*http.Request) (same, supported bool)
 	// hub is Sign in with Coral Hub (#3966), nil when the server has none.
 	hub *HubSignin
 	// isOperator: the identity layer decided this request is the Operator's (the dashboard
@@ -150,6 +152,9 @@ func (ar *Routes) Logout(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	ar.ks.signOut(w, r)
+	if ar.onSignOut != nil {
+		ar.onSignOut()
+	}
 	httputil.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
@@ -208,3 +213,6 @@ func (ar *Routes) AuthStatus(w http.ResponseWriter, r *http.Request) {
 		"strict_local_auth": ar.strictLocal,
 	})
 }
+
+// SetOnSignOut sets what runs after a sign-out (#15404).
+func (ar *Routes) SetOnSignOut(f func()) { ar.onSignOut = f }

@@ -60,6 +60,11 @@ export function refresh(done, { next = false } = {}) {
     if (done) onChange = done;
     if (loading) return loading;
     const sources = sourcesNow();
+    if (sources) { // a computer that left the list takes what was read from it along (#15404)
+        const live = new Set(sources), gone = id => !live.has(id);
+        rows = rows.filter(r => !gone(r.server || LOCAL_SERVER));
+        for (const m of [cursors, moreBy, checks]) for (const id of Object.keys(m)) if (gone(id)) delete m[id];
+    }
     if (!sources) { // this computer alone
         const q = new URLSearchParams({ limit: String(PAGE) });
         if (next && rows.length) q.set('before', String(Math.min(...rows.map(r => r.id))));
@@ -112,6 +117,7 @@ export function refresh(done, { next = false } = {}) {
 
 /** Forget what was read from computers (sign-out, a computer removed): nothing is kept past that, and none of it is ever written to storage. */
 export function forget() { rows = []; check = null; loaded = false; more = false; failed = false; denied = false; cursors = {}; moreBy = {}; checks = {}; unread = []; }
+document.addEventListener('coral:signed-out', forget); // a signed-out page keeps no computer's actions (#15404)
 
 /** Team ids that appear in the record, with the names the page shows them by. */
 export const teams = () => [...new Set(rows.map(r => r.team))].sort((a, b) => teamLabel(a).localeCompare(teamLabel(b)));
