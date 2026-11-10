@@ -33,6 +33,15 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await ev(`document.querySelector('#artifact-viewer .av-current').getAttribute('aria-haspopup')`), 'listbox');
             assert.equal(await ev(`document.querySelector('#artifact-viewer .av-next').getAttribute('aria-disabled')`), 'true', `${at}: no newer version`);
             assert.equal(await q('#artifact-viewer .av-compare'), 'Compare with v2');
+            // the newest version shows what changed since the one before without opening the list (walk 8 H2): a visible button, on the bar, that starts the same compare
+            assert.equal(await ev(`document.querySelector('#artifact-viewer .av-since')?.getAttribute('aria-label')`), 'Changes since v2', `${at}: a visible Changes since button on the newest version`);
+            assert.ok(await ev(vis('#artifact-viewer .av-since')), `${at}: it is on the bar, not inside the closed list`);
+            await ev(`document.querySelector('#artifact-viewer .av-since').click(); true`);
+            await waitFor(`document.querySelector('#artifact-viewer .av-current').textContent.includes('comparing')`, `${at}: the button starts the compare`, 6000);
+            assert.equal(await ev(`!!document.querySelector('#artifact-viewer .av-since')`), false, `${at}: and it goes while comparing (the list's Back to v3 returns)`);
+            await ev(`document.querySelector('#artifact-viewer .av-current').click(); true`); await waitFor(vis('#artifact-viewer .av-list'), `${at}: the list opens`, 3000);
+            await ev(`document.querySelector('#artifact-viewer .av-compare').click(); true`);
+            await waitFor(`!document.querySelector('#artifact-viewer .av-current').textContent.includes('comparing') && !!document.querySelector('#artifact-viewer .av-since')`, `${at}: back to v3 and the button is back`, 6000);
             assert.equal(await ev(vis('#artifact-viewer .av-notice')), false, `${at}: the newest has no "newer" line`);
             if (mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('#artifact-viewer .av-bar .btn')].filter(b => b.getClientRects().length && b.getBoundingClientRect().height < 43.5).length`), 0, `${at}: 44 px targets (the shown ones: Compare is in the closed list)`);
 
