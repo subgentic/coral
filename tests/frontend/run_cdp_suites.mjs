@@ -177,6 +177,8 @@ const keep = flag('--keep');
 const prodTier = flag('--prod-tier');
 const strictOnly = flag('--strict') || prodTier;
 const PROD_TIER_EXTRA = ['settings_dialog_save_flow_browser.test.js'];
+// Left out of the prod-tier shard, each with its reason (printed at the start of the shard): they need what a default build does not have.
+const PROD_TIER_SKIPPED = { 'agent_state.test.js': 'drives the list through window._coralSetLiveSessions, a test hook the default build does not expose (trial 42922281825)' };
 const STRICT_SUITES = [
   'phone_landscape_fold_browser.test.js', // folding must preserve the real authenticated disclosure gate
   'permissions_default_browser.test.js', // the real disclosure gate requires a dashboard sign-in cookie
@@ -205,7 +207,7 @@ const MAIN_BACKEND = process.env.CORAL_BACKEND || 'default';
 // strict phase, sequences and end-of-run checks. There a full run adds no tmux phase, --sequences runs on the default backend, and --tmux is refused.
 const NO_TMUX_HERE = process.platform === 'win32';
 if (tmuxOnly && NO_TMUX_HERE) { console.error('--tmux: Coral has no tmux backend on Windows, so there is nothing to run'); process.exit(2); }
-const tmuxShard = !NO_TMUX_HERE && (tmuxOnly || (!flag('--no-tmux') && !only && !stress && !flag('--sequences') && !part));
+const tmuxShard = !NO_TMUX_HERE && !prodTier && (tmuxOnly || (!flag('--no-tmux') && !only && !stress && !flag('--sequences') && !part));
 const strictShard = strictOnly || (!flag('--no-strict') && !tmuxOnly && !only && !stress && !flag('--sequences') && !part);
 // The live Coral's default ports: 8450 on Windows, 8420 elsewhere. Both are refused, the same list as Go's testguard (defaultPorts).
 const PROD_PORTS = [8420, 8450];
@@ -665,7 +667,7 @@ for (const t of TMUX_SUITES) if (!suites.cdp.includes(t)) { console.error(`TMUX_
 // Longest first, from the durations of a previous run (suite_durations.json; update_suite_durations.mjs writes it): shards take the next
 // suite from one queue, and a long suite left to the end of an alphabetical queue would leave the other shards idle (#3916).
 const suiteDurations = loadDurations(path.join(here, 'suite_durations.json'));
-let tests = sequencesOnly ? [] : (strictOnly ? (prodTier ? [...STRICT_SUITES, ...PROD_TIER_EXTRA] : STRICT_SUITES) : tmuxOnly ? TMUX_SUITES : [...suites.cdp, ...suites.server].filter(f => MAIN_BACKEND !== 'default' || !TMUX_ONLY_SUITES.includes(f)))
+let tests = sequencesOnly ? [] : (strictOnly ? (prodTier ? [...STRICT_SUITES, ...PROD_TIER_EXTRA].filter(f => !(f in PROD_TIER_SKIPPED)) : STRICT_SUITES) : tmuxOnly ? TMUX_SUITES : [...suites.cdp, ...suites.server].filter(f => MAIN_BACKEND !== 'default' || !TMUX_ONLY_SUITES.includes(f)))
   .filter(f => !only || only.split(',').some(o => f.includes(o))).sort();
 // Suites known to fail on Windows only (windows_known_reds.json, each with its reason) are left out there; every entry must still be a CDP suite.
 const windowsReds = JSON.parse(fs.readFileSync(path.join(here, 'windows_known_reds.json'), 'utf8'));
@@ -685,6 +687,7 @@ if (shuffleSeed) { // mulberry32: the same seed gives the same order, so a failu
 }
 if (Object.keys(suiteDurations).length) console.log(`queue: longest first (${tests.filter(t => typeof suiteDurations[t] === 'number').length} of ${tests.length} suites have a recorded duration in suite_durations.json)`);
 // The strict phase's results are named 'strict: <suite>' (the default-mode run of a suite is separate).
+if (prodTier) for (const [n, why] of Object.entries(PROD_TIER_SKIPPED)) console.log(`skipped in the prod-tier shard: ${n}: ${why}`);
 let phase = strictOnly ? 'strict: ' : tmuxOnly ? 'tmux: ' : '';
 const sequences = stress || strictOnly || tmuxOnly || part || (only && !sequencesOnly) ? [] : SEQUENCES;
 for (const t of sequences.flat()) if (!suites.cdp.includes(t)) { console.error(`SEQUENCES names ${t}, which is not a CDP suite`); process.exit(2); }
