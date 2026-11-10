@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/subgentic/coral/internal/procguard"
 	"github.com/subgentic/coral/internal/safego"
 	"io"
 	"os"
@@ -120,7 +121,7 @@ func Serve(ctx context.Context, in io.Reader, out, errw io.Writer, cfg Config) i
 		once.Do(func() {
 			why.Store(reason)
 			if cmd.Process != nil {
-				_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) // the whole group: the command's background children too
+				_ = procguard.Kill(-cmd.Process.Pid, syscall.SIGKILL) // the whole group: the command's background children too
 			}
 		})
 	}
