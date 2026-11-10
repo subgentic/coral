@@ -33,7 +33,19 @@ while IFS=$'\t' read -r component version url sha; do
     [[ "$component" == \#* || -z "$component" ]] && continue
     archive="$sources/${url##*/}"
     if [ ! -f "$archive" ]; then
-        curl --fail --location --silent --show-error --retry 2 --connect-timeout 10 --max-time 120 "$url" -o "$archive"
+        # Our own pinned release first (#14725), then upstream. The sha256 check below decides
+        # what is accepted, whichever host answered. Every URL tried is printed.
+        fetched=0
+        for candidate in "${CORAL_TMUX_MIRROR:-https://github.com/subgentic/coral/releases/download/bundled-tmux-sources-1}/${url##*/}" "$url"; do
+            echo "Fetching $component $version from $candidate" >&2
+            if curl --fail --location --proto '=https' --proto-redir '=https' --no-progress-meter --show-error --retry 2 --connect-timeout 10 --max-time 120 "$candidate" -o "$archive"; then
+                fetched=1
+                break
+            fi
+            echo "Fetch failed: $candidate" >&2
+            rm -f "$archive"
+        done
+        [ "$fetched" = 1 ] || { echo "Could not fetch $component $version from any host" >&2; exit 1; }
     fi
     actual="$(shasum -a 256 "$archive" | cut -d ' ' -f 1)"
     [ "$actual" = "$sha" ] || { echo "Checksum mismatch: $archive" >&2; exit 1; }
