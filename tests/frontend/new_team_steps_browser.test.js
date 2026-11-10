@@ -120,7 +120,7 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
             const roles = await ev(`window.__nt.roles(window.__nt.dlg(${N.team}))`);
             const info = await ev(`window.__nt.rows(window.__nt.dlg(${N.team})).map(b => ({ n: [...b.closest('.team-agent-row').querySelectorAll('button')].filter(window.__na.vis).length, popup: b.getAttribute('aria-haspopup') }))`);
             assert.ok(info.every(i => i.n === 1 && !i.popup), `one button each: ${JSON.stringify(info)}`);
-            const removeShown = async role => { await ev(`window.__nt.rows(window.__nt.dlg(${N.team})).find(b => window.__na.name(b) === 'Edit ' + ${JSON.stringify(role)}).click(); true`); await settle(400); const shown = await ev(`document.getElementById('launch-agent-remove').getClientRects().length > 0`); await ev(`document.getElementById('launch-agent-cancel').click(); true`); await settle(300); return shown; };
+            const removeShown = async role => { await ev(`window.__nt.rows(window.__nt.dlg(${N.team})).find(b => window.__na.name(b) === 'Edit ' + ${JSON.stringify(role)}).click(); true`); await settle(400); const shown = await ev(`(() => { const b = document.getElementById('launch-agent-remove'); return b.getClientRects().length > 0 && getComputedStyle(b).visibility !== 'hidden'; })()`); await ev(`document.getElementById('launch-agent-cancel').click(); true`); await settle(300); return shown; };
             assert.equal(await removeShown(roles[0]), false, 'the Orchestrator cannot be removed');
             assert.equal(await removeShown(roles[roles.length - 1]), true, 'the last member has Remove from team in Edit member');
         });

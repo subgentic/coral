@@ -28,7 +28,7 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`[...document.querySelectorAll('#team-agents-list > *')].every(r => r.querySelector('.team-agent-edit-btn'))`), true, 'each member has its Edit button (Remove is in the Edit member dialog, #10836)');
         await shot('new-team-default-members');
         // the Lead Developer and the QA Engineer are removable; the Orchestrator has no Remove (the team's gate: new_team_steps), it is renamed or the team starts without by Back
-        const editHasRemove = async n => { await ev(`document.querySelectorAll('#team-agents-list > *')[${n}].querySelector('.team-agent-edit-btn').click(); true`); await settle(400); return ev(`document.getElementById('launch-agent-remove').getClientRects().length > 0`); };
+        const editHasRemove = async n => { await ev(`document.querySelectorAll('#team-agents-list > *')[${n}].querySelector('.team-agent-edit-btn').click(); true`); await settle(400); return ev(`(() => { const b = document.getElementById('launch-agent-remove'); return b.getClientRects().length > 0 && getComputedStyle(b).visibility !== 'hidden'; })()`); };
         const cancelEdit = async () => { await ev(`document.getElementById('launch-agent-cancel').click(); true`); await settle(300); };
         assert.equal(await editHasRemove(0), false, 'the Orchestrator has no Remove, as before'); await cancelEdit();
         assert.equal(await editHasRemove(1), true, 'the Lead Developer can be removed (Remove from team, in the Edit member dialog)');
