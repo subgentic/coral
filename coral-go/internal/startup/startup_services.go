@@ -285,6 +285,18 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 	contextCompact := background.NewContextCompact(srv.BoardStore(), discoverFn)
 	boardNotifier.SetNudgeHoldFn(contextCompact.HoldNudge) // a compaction that is due goes in before a nudge starts a turn (#15066)
 	if bh := srv.BoardHandler(); bh != nil {
+		bh.SetContextResetStatus(func(name string) (routes.ContextResetLine, bool) { // Team settings' line under each agent (#15066)
+			var l routes.ContextResetLine
+			at, tokens, did := contextCompact.LastCompacted(name)
+			st, said := contextCompact.Status(name)
+			if did {
+				l.LastCompactedAt, l.LastTokens = at, tokens
+			}
+			if said {
+				l.Text, l.TextAt = st.Text, st.At
+			}
+			return l, did || said
+		})
 		boardNotifier.SetIsPausedFn(bh.IsPaused)
 		boardNotifier.SetSleepingFn(func(ctx context.Context, sessionID string) bool {
 			ls, err := sessStore.GetLiveSession(ctx, sessionID)
