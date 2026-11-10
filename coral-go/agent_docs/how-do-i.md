@@ -41,7 +41,7 @@ New agents use it unless you choose a model when you launch them.
 
 1. Open the **Inbox**, then **All chats**, and find the chat (the answer above, Find an old chat, says how).
 2. Press **Continue this chat**: the round play button at the end of the chat's row, or the **Continue this chat** button on the chat's own page. The chat opens first.
-3. The **Resume session** dialog asks which **Working Directory** to start in. It fills in the folder the chat ran in, and says so under the box. Keep it, or press **Browse** to pick another folder and **Use this folder**: the dialog warns that the files the chat was using may not be found there. **Resume in** picks how much the agent may do without asking (the last answer on this page lists each one): the chat keeps what it ran with, the note under the folder says which, and you can pick another or the saved default. If the chat belonged to a team, **Rejoin board** puts the agent back on its message board.
+3. The **Resume session** dialog asks which **Working directory** to start in. It fills in the folder the chat ran in, and says so under the box. Keep it, or press **Browse** to pick another folder and **Use this folder**: the dialog warns that the files the chat was using may not be found there. **Resume in** picks how much the agent may do without asking (the last answer on this page lists each one): the chat keeps what it ran with, the note under the folder says which, and you can pick another or the saved default. If the chat belonged to a team, **Rejoin board** puts the agent back on its message board.
 4. Press **Resume**. A live agent starts in that folder and picks the conversation up where it stopped; the old chat stays as it was.
 
 ## Get an agent to put something in front of you
@@ -85,7 +85,7 @@ Agents put what needs you (a decision, an approval, a file to look at) in your *
 - **Sleep a whole team:** open the **⋯** menu beside the team's name and choose **Sleep Team**. Its agents stop running; their chats stay. **Wake Team** (the same place) starts them again.
 - **Pause one agent:** open the **⋯** menu on its row and choose **Sleep**. It stops running and its chat stays; **Wake** (the same place) starts it again.
 - **Put one away:** choose **Archive**. It leaves the list and its chat is kept; **Unarchive** brings it back.
-- **Stop one for good:** choose **Kill Session**. The agent ends now and its running work is lost.
+- **Stop one for good:** choose **Kill session**. The agent ends now and its running work is lost.
 - **Stop a reply that is still running:** while the agent is working and the message box is empty, the **Esc** button beside the box turns red and says **Stop**: press it, or press **Escape** in the empty message box. On a phone the round Send button becomes a red square named **Stop the agent**. The agent stops what it is doing and its chat stays.
 
 ## Next

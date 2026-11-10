@@ -27,4 +27,5 @@ export function dropKilledRows(rows) {
     if (state.currentSession && gone.has(state.currentSession.session_id + '@' + sessionServer(state.currentSession))) stopCaptureRefresh();
     state.liveSessions = (state.liveSessions || []).filter(s => !gone.has(s.session_id + '@' + sessionServer(s)));
     redrawLiveList();
+    dispatchEvent(new Event('kill')); // an open Agents tab reads its rows again: a killed agent stops reading Busy (walk 17 M5)
 }

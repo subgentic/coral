@@ -41,7 +41,7 @@ export function killSessionDirect(name, agentType, sessionId) {
         if (result.changes_artifact_error) {
             showToast(`Killed, but changes.diff could not be saved: ${result.changes_artifact_error}`, true);
         } else {
-            showToast(`Killed and saved changes.diff: ${who}`);
+            showToast(who + ' ended');
         }
         showWorktreeNotice(result.worktree, 'agent'); // what became of its worktree, if it had one (#6707); a kept one stays on screen with its path (#6818)
         // The row goes at once: the agent's chat stays in History. A killed agent is not listed again.
