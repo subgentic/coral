@@ -434,7 +434,7 @@ export function needsBulkActions() {
     const setReadOf = (s, read) => s.goalDone ? (read ? markGoalDoneRead : markGoalDoneUnread)(goalTeamHere(s.goalDone), s.goalDone) : setReviewRead(s.review, read, { click: true });
     const tell = async (text, announce = text, opts) => { const { showToast, announceNotice } = await importOnce('./notifications.js'); showToast(text, false, undefined, opts); announceNotice(announce); };
     const each = async (rows, fn) => { let ok = 0; const bad = []; for (const s of rows) { try { await fn(s); ok++; } catch (e) { bad.push(e && e.message ? e.message : 'not saved'); } } return { ok, bad }; };
-    const words = (verb, r, total) => r.bad.length ? `${verb} ${r.ok} of ${total}: ${r.bad[0]}` : `${verb} ${r.ok}`;
+    const words = (verb, r, total) => r.bad.length ? `${verb} ${r.ok} of ${total}: ${[...new Set(r.bad)].slice(0, 2).join('; ')}${new Set(r.bad).size > 2 ? `; and ${new Set(r.bad).size - 2} more` : ''}` : `${verb} ${r.ok}`;
     const done = () => { needsTable?.clear(); };
     const unopened = rows => rows.filter(s => s.review && !isRead(s.review)).length;
     return [
@@ -447,7 +447,7 @@ export function needsBulkActions() {
                 else if (s.welcome && s.welcome.dismiss) dismissWelcome(s.welcome.id);
                 else if (s.autorun) markSeen(s.autorun);
                 else if (s.goalDone) undo.push(await hideGoalDone(goalTeamHere(s.goalDone), s.goalDone, 'ignore'));
-                else throw new Error(`${needsName(s)} cannot be dismissed`);
+                else throw new Error(s.welcome ? `${needsName(s)}: use ${s.welcome.go || 'its button'}` : `${needsName(s)} cannot be dismissed`); /* it names the row it skipped and what to press instead (#15339, walk 23 H4) */
             });
             asks.refreshOperatorAsks(true); syncGoalDoneCount(); done();
             tell(words('Dismissed', r, rows.length), `${words('Dismissed', r, rows.length)}.${undo.length ? ' Undo is in the notice.' : ''}`, undo.length ? { action: { label: 'Undo', onClick: async () => { for (const f of undo) { try { await f(); } catch { /* it stays ignored */ } } asks.refreshOperatorAsks(true); reviewsChangedOnServer(); refreshReviews(true); syncGoalDoneCount(); renderInboxNav(true); tell('Back in Needs you'); } } } : undefined); // one after the other: goals share one hidden list that each undo rewrites (#12328)
