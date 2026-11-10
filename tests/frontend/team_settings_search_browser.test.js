@@ -61,6 +61,17 @@ const { coralReady } = require('./helpers/wait');
         await Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
         const jumped = await ev(`({ sec: ${root}.querySelector('.settings-pane:not([hidden])').dataset.section, hit: !!${root}.querySelector('.sv-row[data-key=landing_on][data-match]'), v: ${root}.querySelector('.tsg-search-input').value })`);
         assert.ok(jumped.sec === 'health' && jumped.hit && jumped.v === '', 'Enter jumps to the section and marks the row: ' + JSON.stringify(jumped));
+        const said = await ev(`({ status: ${root}.querySelector('.tsg-search-status').textContent, inRow: !!document.activeElement.closest('.sv-row[data-key=landing_on]'), live: ${root}.querySelector('.tsg-search-status').getAttribute('role') })`);
+        assert.ok(/^Opened Health check: Landing alert$/.test(said.status) && said.inRow && said.live === 'status', 'Enter moves the focus to the row\'s control and the status says where: ' + JSON.stringify(said));
+
+        console.log('6. A stylesheet that cannot load leaves the settings showing, ungrouped');
+        await client.Network.enable(); await client.Network.setBlockedURLs({ urls: ['*team_settings_groups.css*'] });
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'settings');
+        await ev(`import(${S} + 'team_settings_page.js').then(m => m.showTeamSettingsPage(${JSON.stringify(TEAM)}, { page: (document.getElementById('pin-host') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'pin-host' }))) })); true`);
+        await waitFor(`!!document.querySelector('#team-settings-workspace .sv[data-ready]')`, 'the Team settings with the groups stylesheet blocked', 15000);
+        const bare = await ev(`({ rows: ${root}.querySelectorAll('.sv-row[data-key]').length, bigs: ${root}.querySelectorAll('.tsg-big-h').length, search: !!${root}.querySelector('.tsg-search-input') })`);
+        assert.ok(bare.rows > 10 && bare.bigs > 0 && bare.search, 'the settings still show, with their groups and search, when the sheet is blocked: ' + JSON.stringify(bare));
+        await client.Network.setBlockedURLs({ urls: [] });
         console.log('PASS team settings grouping and search');
     } finally { await removeBoards(ev, [TEAM]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

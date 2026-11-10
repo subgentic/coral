@@ -31,7 +31,8 @@ export function searchBox(root, opts) {
     input.addEventListener('input', apply);
     input.addEventListener('keydown', e => {
         if (e.key === 'Escape' && input.value) { e.preventDefault(); e.stopPropagation(); clear(); }
-        else if (e.key === 'Enter' && first) { e.preventDefault(); const row = first.row, id = row.closest('.settings-pane')?.dataset.section; clear(); if (id) shellEl.querySelector(`.settings-tab[data-section="${id}"]`)?.click(); row.scrollIntoView({ block: 'center' }); row.setAttribute('data-match', '1'); setTimeout(() => row.removeAttribute('data-match'), 3000); }
+        // Enter: the first match's section opens, its control has the focus and the status says where it is (#15058)
+        else if (e.key === 'Enter' && first) { e.preventDefault(); const row = first.row, id = row.closest('.settings-pane')?.dataset.section; const pane = row.closest('.settings-pane'), label = row.querySelector('.sv-label')?.textContent || ''; clear(); if (id) shellEl.querySelector(`.settings-tab[data-section="${id}"]`)?.click(); row.scrollIntoView({ block: 'center' }); row.setAttribute('data-match', '1'); setTimeout(() => row.removeAttribute('data-match'), 3000); row.querySelector('input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])')?.focus({ preventScroll: true }); status.hidden = false; status.textContent = `Opened ${pane?.dataset.title || 'the section'}: ${label}`; }
     });
     shellEl.querySelector('.settings-tabs')?.addEventListener('click', () => { if (input.value) clear(); });
     return box;
