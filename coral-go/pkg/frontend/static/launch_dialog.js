@@ -25,7 +25,6 @@ const { _checkPermissionFlag } = await importOnce('./cli_dialogs.js');
 const { _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards } = await importOnce('./team_dialogs.js');
 const { _initAgentPresets } = await importOnce('./persona_io.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
-const { menuMove } = await importOnce('./menu_keys.js'); // the arrows of the Which computer? list use the one menu's key rules
 const { markFieldInvalid, _launchBlocked, _launchOn, _refreshAfterLaunch, _resetDirInputs, _showLaunchStep, _syncMobileLaunchSections, _withServerSettings, hideLaunchModal, setLaunchMore, setLaunchStage, LAUNCH_STAGES, launchStages } = await importOnce('./launch_core.js');
 const { wireRecap, syncRecap } = await importOnce('./launch_recap.js');
 const { offerSuggestion, syncSuggestionLine, usesSuggestion } = await importOnce('./folder_suggestion.js');
@@ -163,6 +162,7 @@ export function showLaunchModal(server, lock = false) {
     launch.member = null; // nor a member's (#7861)
     _serverSettings.clear();
     launch.serverLocked = !!lock && isHub();
+    _hideComputerStep();
     launch.computerChosen = server !== undefined && server !== null && server !== ''; launch.pendingType = null; // a new dialog asks 'Which computer?' (#15014), unless a computer was named when it was opened (a computer's own Launch team / Launch agent)
     launch.server = _effectiveServer(coerceSelection(server, isHub(), state.servers));
     if (launch.serverLocked && normServer(server) !== LOCAL_SERVER) launch.server = normServer(server);
@@ -250,53 +250,33 @@ function _needsComputerStep(type) {
     return (type === 'agent' || type === 'team') && isHub() && !launch.serverLocked && !launch.member && !launch.addTo && !launch.computerChosen && pickerVisible(true, state.servers);
 }
 
-let _computerPick = '';
 function _showComputerStep(type) {
-    loadStyles('launch_computer.css').catch(() => {});
+    loadStyles('provider_cards.css').catch(() => {});
     const list = document.getElementById('launch-computer-list'), go = document.getElementById('launch-computer-go');
     if (!list || !go) return;
     document.getElementById('launch-computer-sub').textContent = type === 'team' ? 'The team will launch on it and use its folders.' : 'The agent will run on it and use its folders.';
-    const opts = pickerOptions(state.servers).map(o => ({ ...o, name: o.label.replace(/ \([^)]*\)$/, ''), why: o.reason }));
-    if (type === 'team') opts.push({ id: TEAM_ADDRESS, name: 'Another computer\u2019s address\u2026', why: '', disabled: false, other: true });
-    const usable = opts.filter(o => !o.disabled);
-    _computerPick = usable.some(o => o.id === launch.server) ? launch.server : (usable[0] ? usable[0].id : '');
-    list.replaceChildren(...opts.map(o => {
-        const b = document.createElement('button'); b.type = 'button'; b.className = 'launch-computer-card'; b.dataset.server = o.id; b.setAttribute('role', 'radio'); b.disabled = !!o.disabled;
-        const dot = document.createElement('span'); dot.className = 'launch-computer-dot'; dot.dataset.state = o.disabled ? 'off' : 'on'; dot.setAttribute('aria-hidden', 'true');
-        const text = document.createElement('span'); text.className = 'launch-computer-text';
-        const name = document.createElement('strong'); name.textContent = o.name;
-        const small = document.createElement('small'); small.textContent = o.other ? 'Type the address of a computer that is not in the list' : (o.disabled ? `Offline: ${o.why}` : (o.id === LOCAL_SERVER ? 'The hub, this computer \u00b7 Online' : 'Online'));
-        text.append(name, small); b.append(dot, text);
-        b.addEventListener('click', () => { _computerPick = o.id; _syncComputerCards(); });
-        return b;
-    }));
-    if (!list.dataset.keys) { list.dataset.keys = '1'; list.addEventListener('keydown', e => { // a radio group: the arrows move the choice (a disabled card is skipped), by the one menu's key rules
-        const cards = [...list.querySelectorAll('.launch-computer-card:not(:disabled)')]; if (!cards.length) return;
-        const key = e.key === 'ArrowRight' ? 'ArrowDown' : e.key === 'ArrowLeft' ? 'ArrowUp' : e.key;
-        const to = menuMove(key, cards.length, cards.findIndex(c => c.dataset.server === _computerPick)); if (to < 0) return;
-        e.preventDefault(); _computerPick = cards[to].dataset.server; _syncComputerCards(); cards[to].focus();
-    }); }
-    _syncComputerCards();
-    _showLaunchStep('pickComputer');
-    (list.querySelector('[aria-checked="true"]') || list.querySelector('button:not(:disabled)'))?.focus();
+    const opts = pickerOptions(state.servers).map(o => ({ ...o, name: o.label.replace(/ \([^)]*\)$/, '') }));
+    if (type === 'team') opts.push({ id: TEAM_ADDRESS, name: 'Another computer\u2019s address\u2026', other: true });
+    const pick = opts.find(o => !o.disabled && o.id === launch.server) || opts.find(o => !o.disabled);
+    list.innerHTML = opts.map(o => `<label class="launch-computer-card"><span class="launch-computer-dot" data-state="${o.disabled ? 'off' : 'on'}" aria-hidden="true"></span><span class="launch-computer-text"><strong>${escapeHtml(o.name)}</strong><small>${escapeHtml(o.other ? 'Type the address of a computer that is not in the list' : o.disabled ? `Offline: ${o.reason}` : o.id === LOCAL_SERVER ? 'The hub, this computer \u00b7 Online' : 'Online')}</small></span><input type="radio" name="launch-computer" value="${escapeAttr(o.id)}"${o.disabled ? ' disabled' : ''}${o === pick ? ' checked' : ''}></label>`).join(''); // real radios: the arrows, the disabled ones skipped and the state are the browser's own
+    go.disabled = !pick;
+    _showLaunchStep('pickComputer'); document.getElementById('launch-step-computer').style.display = 'flex'; document.getElementById('launch-modal')?.setAttribute('aria-labelledby', 'launch-computer-title'); // display-ok: a step of the launch modal, shown here, hidden by _hideComputerStep
+    (list.querySelector('input:checked') || list.querySelector('input:not(:disabled)'))?.focus();
 }
-function _syncComputerCards() {
-    const list = document.getElementById('launch-computer-list'), go = document.getElementById('launch-computer-go');
-    for (const b of list?.querySelectorAll('.launch-computer-card') || []) { const on = b.dataset.server === _computerPick; b.setAttribute('aria-checked', String(on)); b.classList.toggle('is-picked', on); b.tabIndex = on ? 0 : -1; }
-    if (go) go.disabled = !_computerPick;
-}
+const _hideComputerStep = () => { document.getElementById('launch-step-computer').style.display = 'none'; }; // display-ok: a step of the launch modal
 async function _computerGo() {
-    const type = launch.pendingType; if (!type || !_computerPick) return;
-    const wantAddress = _computerPick === TEAM_ADDRESS;
-    launch.computerChosen = true;
-    if (!wantAddress) await _onLaunchServerChange(_computerPick, { force: true });
+    const type = launch.pendingType, pick = document.querySelector('#launch-computer-list input:checked')?.value; if (!type || !pick) return;
+    const wantAddress = pick === TEAM_ADDRESS;
+    launch.computerChosen = true; _hideComputerStep();
+    if (!wantAddress) await _onLaunchServerChange(pick, { force: true });
     _selectLaunchType(type);
     if (wantAddress) await _onLaunchServerChange(TEAM_ADDRESS);
     _renderServerPicker();
 }
-function _computerBack() { launch.pendingType = null; launch.mode = null; _showLaunchStep('chooser'); }
+function _computerBack() { launch.pendingType = null; launch.mode = null; _hideComputerStep(); _showLaunchStep('chooser'); }
 function _computerChange() { const type = launch.mode; if (type !== 'agent' && type !== 'team') return; launch.computerChosen = false; launch.mode = null; launch.pendingType = type; _showComputerStep(type); }
-window._launchComputerGo = _computerGo; window._launchComputerBack = _computerBack; window._launchComputerChange = _computerChange;
+const _computerActs = { go: _computerGo, back: _computerBack, change: _computerChange };
+document.getElementById('launch-modal')?.addEventListener('click', e => { const b = e.target.closest?.('[data-launch-computer]'); if (b) { e.preventDefault(); _computerActs[b.dataset.launchComputer]?.(); } }); // the step's own buttons (no entry in the start's action map)
 /** Show the address field when the Machine is "Another computer's address..." (the field is in step 1, in its own slot); nothing typed there survives another choice. */
 function _syncTeamAddress(on) {
     launch.teamAddress = !!on;
