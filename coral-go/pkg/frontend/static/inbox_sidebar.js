@@ -46,6 +46,7 @@ import { importOnce } from './import_once.js';
 import { markHidden } from './visible_marks.js';
 import { onInboxHooks, setInboxCount, askOf, updateInboxTab } from './inbox_tab.js';
 const { coralInboxAdapter, savedExpandFor, listInboxGoals, goalsReadFailed, doneGoalsCapped, taskReadState } = await importOnce('./inbox_coral.js');
+const { closedGoalRows } = await importOnce('./goal_closed_items.js'); // 'Goal closed as done by <agent>' with Reopen: listed, not counted (#15257)
 const { agentLink } = await importOnce('./agent_link.js'); // an agent's name is one shared helper everywhere (#12168)
 const { openedFrom, backLabelFor } = await importOnce('./inbox_back_label.js'); // the Back words of the Inbox's task and goal screens (#8861)
 const saved = await importOnce('./saved.js');
@@ -249,6 +250,8 @@ const proposalRows = () => proposalItems().map(p => ({ proposal: p, session_id: 
 /** An active goal whose tasks are all done (#11825): ONE row of Needs you, "Goal #N looks done: <title>" with its Done-when line; Close goal, Not yet and Dismiss. Each computer keeps its own goal identity and actions. */
 const goalTeamHere = g => { const k = splitKey(g.board_id); return k.name ? identityKey(k.server, k.name) : ''; };
 const goalDoneRows = () => doneGoals(goals, goalTeamHere).map(g => ({ goalDone: g, session_id: `goal_done:${goalTeamHere(g)}:${g.id}`, display_name: `Goal #${g.id}`, board_project: splitKey(goalTeamHere(g)).name, server: splitKey(goalTeamHere(g)).server, waiting_kind: 'goal_done', waiting_summary: (g.done_when || g.doneWhen) ? `Done when: ${markedText(g.done_when || g.doneWhen)}` : 'Every task is done.', waiting_since: quietEndsAt(g) ? new Date(quietEndsAt(g)).toISOString() : (g.looks_done_at || g.updated_at) })); // since the row appeared: its last task's completion (#12081) plus the quiet period (#12161), not since the goal was made or edited
+let closedGoals = [], closedReadAt = 0; // goals closed as done lately, read at most once a minute apart from the open goals (#15257)
+const closedByAgentRows = () => closedGoalRows(closedGoals, goalTeamHere, { reopen: async g => { try { const r = await (await importOnce('./goal_write.js')).goalWrite(g.board_id, 'goal_update', g.id, `/goals/${g.id}`, 'PATCH', { subscriber_id: OPERATOR_ID, state: 'active' }); if (!r.ok) throw new Error(`HTTP ${r.status}`); closedGoals = closedGoals.filter(x => !(x.id === g.id && x.board_id === g.board_id)); sayLive(`Reopened goal #${g.id}. The team read it on the board.`); showToast(`Goal #${g.id} reopened. The team read it on the board.`); refreshGoals(true); renderInboxNav(true); } catch (e) { showToast(`Not reopened: ${e && e.message || 'try again'}`, true); } }, dismissed: () => renderInboxNav(true) });
 const goalDoneLine = g => `Goal #${g.id} looks done: ${markedText(g.title)}`;
 /** A question an agent asked the Operator (post --ask, wait --operator, #11417): a row of Needs you, opened whole in a dialog with a Reply box. */
 const askRows = () => operatorAsks().map(a => ({ operatorAsk: a, session_id: askKey(a), display_name: a.asker, board_project: a.board, board_label: a.board_label || '', server: a.server || '', waiting_kind: 'ask', waiting_summary: askLine(a), waiting_since: a.at }));
@@ -269,7 +272,7 @@ function askBlockers() { // loaded once, when a row carries the field; the table
 let answered = ''; // what an answer given here went through as, for five minutes: the row is gone and the list says so (#10720)
 const answeredRows = new Map(); // `${server}:${session_id}` -> { began, at }: a row answered here, waiting for the agent to stop waiting (#14408)
 document.addEventListener('coral:inbox-answered', e => { answered = e.detail.said; setTimeout(() => { answered = ''; }, 3e5); if (e.detail.began && e.detail.session_id) answeredRows.set(`${e.detail.server || ''}:${e.detail.session_id}`, { began: e.detail.began, at: Date.now() }); });
-const everyNeed = () => [...waitingSessions(), ...reviewRows(), ...runRows(), ...proposalRows(), ...goalDoneRows(), ...skillRows(), ...askRows(), ...recordRows(), ...welcomeRows()]; // the welcome items of a new install come last: real work first (#11443)
+const everyNeed = () => [...waitingSessions(), ...reviewRows(), ...runRows(), ...proposalRows(), ...goalDoneRows(), ...skillRows(), ...askRows(), ...recordRows(), ...closedByAgentRows(), ...welcomeRows()]; // the welcome items of a new install come last: real work first (#11443)
 let activeNeedsTeam = '';
 let teamNeedsMount = null;
 const forNeedsTeam = (row, team) => !!row.board_project && boardTeamKey(sessionServer(row), row.board_project) === team;
@@ -441,7 +444,7 @@ function needsBulkActions() {
             const r = await each(rows, async s => {
                 if (s.review) { await ignoreRow(s.review.team, s.review); undo.push(() => unignoreRow(s.review.team, s.review)); }
                 else if (s.operatorAsk && s.operatorAsk.kind === 'ask') { await asks.closeAsk(s.operatorAsk); undo.push(() => asks.reopenAsk(s.operatorAsk)); }
-                else if (s.welcome && s.welcome.dismiss) dismissWelcome(s.welcome.id);
+                else if (s.welcome && s.welcome.dismiss) (s.welcome.onDismiss ? s.welcome.onDismiss() : dismissWelcome(s.welcome.id));
                 else if (s.autorun) markSeen(s.autorun);
                 else if (s.goalDone) undo.push(await hideGoalDone(goalTeamHere(s.goalDone), s.goalDone, 'ignore'));
                 else throw new Error('that one cannot be dismissed');
@@ -596,10 +599,10 @@ function welcomeActions(w) {
     const box = DT.el('div', 'inbox-review-actions inbox-welcome-actions');
     const go = DT.el('button', 'btn btn-small btn-primary', w.go); go.type = 'button';
     go.classList.add('inbox-main-action'); go.setAttribute('aria-label', `${w.go}: ${w.title}`);
-    go.addEventListener('click', () => runWelcome(w.id));
+    go.addEventListener('click', () => (w.run ? w.run() : runWelcome(w.id)));
     box.append(go);
     if (w.dismiss) {
-        const ignore = () => { dismissWelcome(w.id); sayLive(`Dismissed: ${w.title}.`); };
+        const ignore = () => { (w.onDismiss ? w.onDismiss() : dismissWelcome(w.id)); sayLive(`Dismissed: ${w.title}.`); };
         if (isPhoneLayout()) box.append(moreMenu([{ label: 'Dismiss', title: 'Take it out of Needs you; nobody is told', run: ignore }], w.title)); // no Dismiss button on a phone row: the menu, or a swipe (#11642)
         else {
             const no = DT.el('button', 'btn btn-small btn-quiet', 'Dismiss'); no.type = 'button';
@@ -786,6 +789,10 @@ function refreshGoals(force = true) {
 }
 async function readGoals() {
     let ok = true, followWithDone = false;
+    if (!isCloud() && Date.now() - closedReadAt > 60000) { // the goals an agent closed lately, for their row; its own read, before the main one so a failure here never marks that read failed
+        closedReadAt = Date.now();
+        try { closedGoals = (await listInboxGoals(true)).filter(g => String(g.state || '').toLowerCase() === 'done' && g.closed_by); } catch { /* the rows stay as they were */ }
+    }
     try {
         const wantsDone = goalFilters.state === 'done', finished = wantsDone && openAt > 0 && Date.now() - openAt < 60000, read = await listInboxGoals(finished); ok = !goalsReadFailed();
         if (ok && finished) doneKnown = true;
