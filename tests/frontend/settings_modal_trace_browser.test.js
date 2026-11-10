@@ -124,6 +124,7 @@ const SCEN = [
             console.log('golden written: ' + Object.keys(hashes).length + ' scenarios');
             return;
         }
+        if (process.platform === 'win32') console.log('GOLDEN-DUMP-BEGIN ' + JSON.stringify({ about: 'what showSettingsModal filled in, scenario by scenario, for settings_modal_trace_browser.test.js: sha256 of every control, list, status line and request, and a readable line', hashes, lines }, null, 1).replace(/\n/g, '\nGOLDEN-DUMP ') + ' GOLDEN-DUMP-END'); // DIAGNOSTIC ONLY: never merged (DevOps, v2.0.64 Windows golden)
         const want = JSON.parse(fs.readFileSync(GOLDEN, 'utf8'));
         assert.deepEqual(Object.keys(hashes), Object.keys(want.hashes), 'the same scenarios');
         for (const k of Object.keys(want.hashes)) if (hashes[k] !== want.hashes[k]) assert.fail(`${k}: changed.\n  now:  ${lines[k]}\n  was:  ${want.lines[k]}\n  controls now: ${trace[k].controls.map(c => c[0] + ':' + c[1]).join(' ')}`);
