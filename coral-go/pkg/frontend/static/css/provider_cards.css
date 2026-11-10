@@ -58,3 +58,18 @@
 .provider-panel .acf-model-refresh-text { display: none; }
 @media (min-width: 768px) and (pointer: fine) { .provider-panel .acf-model-refresh { width: auto; padding: 0 10px; gap: 6px; } .provider-panel .acf-model-refresh-text { display: inline; font-size: var(--fs-sm); } }
 .acf-agent-pick { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; background: none; border: 0; overflow: visible; } .acf-agent-pick .launch-agent-opt { border-right: 1px solid var(--control-border); } .acf-agent-pick .launch-agent-missing { white-space: nowrap; } /* Restart: six providers wrap to a second row; "not installed" is never squeezed or broken (#12253) */
+/* The Hub's first step of New agent and New team, 'Which computer?' (#15014): drawn by launch_dialog.js, which loads this when the step is shown (not in the start stylesheet). */
+.launch-computer-sub { margin: 0 0 12px; color: var(--text-secondary); font-size: var(--fs-base); }
+.launch-computer-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.launch-computer-card { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: var(--card-pad); border: var(--card-border); border-radius: var(--card-radius); background: var(--card-fill); color: var(--text-primary); font: inherit; text-align: left; cursor: pointer; }
+.launch-computer-card:hover:not(:has(input:disabled)) { background: var(--bg-hover); }
+.launch-computer-card:has(input:checked) { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.launch-computer-card:has(input:disabled) { opacity: .6; cursor: not-allowed; }
+.launch-computer-card:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.launch-computer-text { display: flex; flex-direction: column; min-width: 0; }
+.launch-computer-text small { color: var(--text-secondary); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.launch-computer-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--success); }
+.launch-computer-dot[data-state="off"] { background: var(--text-muted); }
+.launch-computer-chip { color: var(--text-secondary); }
+.launch-computer-chip .btn { margin: 0; }
+.launch-computer-card input { margin-left: auto; flex: none; }
