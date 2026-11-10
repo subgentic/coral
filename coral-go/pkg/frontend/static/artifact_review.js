@@ -226,7 +226,7 @@ export function attachReview(d, { reload }) {
     // Both are bound to THE FILE they were made for (#14263, QA Reviewer 2's surviving mutants on #14187): another file opened in this form never reuses this one's recorded decision or its comment, whatever else is or is not cleared on open.
     const fileKey = x => JSON.stringify([x.team, x.server || '', x.hex]);
     let legacyDecision = null, legacyComment = null;
-    let armed = false; // Approve on a series of several files, some never opened, asks once more (#15254)
+    let armed = false, armedAt = 0; // Approve on a series of several files, some never opened, asks once more (#15254)
     let cur = null, gen = 0, sending = false, done = false, inProgress = false, progressTimer = null;
     const progress = $('.artifact-review-pending');
     const clearProgress = () => { clearTimeout(progressTimer); progressTimer = null; inProgress = false; progress.hidden = true; };
@@ -272,7 +272,8 @@ export function attachReview(d, { reload }) {
     });
     approve.addEventListener('click', async () => {
         if (!cur) return;
-        if (!armed && d.dataset.coversFiles && Number(d.dataset.unopenedFiles) > 0) { armed = true; paintApprove(); return; } // covers several files and some were never opened: say so, and ask again
+        if (!armed && d.dataset.coversFiles && Number(d.dataset.unopenedFiles) > 0) { armed = true; armedAt = Date.now(); paintApprove(); return; } // covers several files and some were never opened: say so, and ask again
+        if (armed && Date.now() - armedAt < 600) return; // a double click is one press: it cannot answer the question it has not shown yet (Security's INFO on #15254)
         armed = false;
         approve.disabled = true;
         try { const out = await approveRow(cur.team, cur.row); sayApproved(cur.row.name || 'the artifact', out); show({ ...cur, state: 'approved', at: out.review?.at || new Date().toISOString() }); }

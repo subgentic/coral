@@ -43,6 +43,11 @@ const { coralReady } = require('./helpers/wait');
         await ev(`document.querySelector('.artifact-review-approve').click(); true`);
         assert.equal(await ev(`document.querySelector('.artifact-review-approve').textContent`), '1 of 3 files not opened: approve all?', 'README.md and app.js were shown above; style.css never was');
         assert.equal(await ev(`window.__approved = false, !!document.querySelector('.artifact-review-approve') && /Approved/.test(document.querySelector('.artifact-review-state')?.textContent || '')`), false, 'the first press approved nothing');
+        await ev(`document.querySelector('.artifact-review-approve').click(); true`); // a second click inside ~600 ms (a double click) is ignored: still asking, nothing approved
+        await new Promise(r => setTimeout(r, 150));
+        assert.equal(await ev(`document.querySelector('.artifact-review-approve').textContent`), '1 of 3 files not opened: approve all?', 'a double click does not answer the question');
+        assert.equal(await ev(`/Approved/.test(document.querySelector('.artifact-review-state')?.textContent || '')`), false, 'a double click approved nothing');
+        await new Promise(r => setTimeout(r, 700));
         await ev(`document.querySelector('.artifact-review-approve').click(); true`);
         await waitFor(`/Approved/.test(document.querySelector('.artifact-review-state')?.textContent || '')`, 'the second press approves', 12000);
         console.log('PASS a series of several files names each file and says one decision covers them all');
