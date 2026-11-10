@@ -635,7 +635,14 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 	if extra, ok := lv.extras[sid]; ok {
 		contextModel = extra.Model
 	}
-	addContextUsage(entry, contextModel, d.latestTurnCtx[sid])
+	turnContext := d.latestTurnCtx[sid]
+	if turnContext > 0 && !skipExpensive && h.jsonl != nil {
+		// A /compact or /clear after the newest model turn writes no usage of its own: the old number is not the context any more (#15055).
+		if reset := h.jsonl.ContextReset(sid, agent.WorkingDir, agent.AgentType); reset.Reset {
+			turnContext = reset.PostTokens // 0: unknown until the next turn
+		}
+	}
+	addContextUsage(entry, contextModel, turnContext)
 	return entry
 }
 
