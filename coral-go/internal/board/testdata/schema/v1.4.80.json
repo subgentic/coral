@@ -313,6 +313,12 @@
       "type": "index"
     },
     {
+      "name": "sqlite_autoindex_artifact_task_files_1",
+      "sql": null,
+      "tbl_name": "artifact_task_files",
+      "type": "index"
+    },
+    {
       "name": "sqlite_autoindex_board_goal_images_1",
       "sql": null,
       "tbl_name": "board_goal_images",
@@ -490,6 +496,12 @@
       "name": "artifact_task_chains",
       "sql": "CREATE TABLE artifact_task_chains (\n\t\tboard_id  TEXT NOT NULL,\n\t\troot_task INTEGER NOT NULL,\n\t\thex       TEXT NOT NULL,\n\t\tset_at    TEXT NOT NULL,\n\t\tPRIMARY KEY (board_id, root_task)\n\t)",
       "tbl_name": "artifact_task_chains",
+      "type": "table"
+    },
+    {
+      "name": "artifact_task_files",
+      "sql": "CREATE TABLE artifact_task_files (\n\t\tboard_id TEXT NOT NULL,\n\t\ttask     INTEGER NOT NULL,\n\t\tname     TEXT NOT NULL,\n\t\thex      TEXT NOT NULL,\n\t\tset_at   TEXT NOT NULL,\n\t\tPRIMARY KEY (board_id, task, name)\n\t)",
+      "tbl_name": "artifact_task_files",
       "type": "table"
     },
     {
@@ -1498,6 +1510,98 @@
             }
           ],
           "name": "sqlite_autoindex_artifact_task_chains_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
+    "artifact_task_files": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "board_id",
+          "notnull": 1,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "task",
+          "notnull": 1,
+          "pk": 2,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "name",
+          "notnull": 1,
+          "pk": 3,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "hex",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "set_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "task",
+              "seqno": 1
+            },
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "name",
+              "seqno": 2
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 3
+            }
+          ],
+          "name": "sqlite_autoindex_artifact_task_files_1",
           "origin": "pk",
           "partial": 0,
           "seq": 0,
