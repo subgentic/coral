@@ -1983,29 +1983,6 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .overflow-menu-version { padding: 4px 14px 6px; font-size: var(--fs-sm); color: var(--text-muted); user-select: text; }
 #coral-version-row[hidden] { display: none; }
 
-.overflow-menu-tier {
-    padding: 6px 14px;
-    font-size: var(--fs-sm);
-    font-weight: var(--fw-strong);
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: var(--ls-caps);
-}
-
-.overflow-menu-tier .tier-label {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: var(--radius-sm);
-    font-size: var(--fs-sm);
-    font-weight: var(--fw-strong);
-    letter-spacing: var(--ls-caps);
-}
-
-.overflow-menu-tier .tier-pro {
-    background: rgba(var(--accent-rgb), 0.15);
-    color: var(--accent);
-}
-
 /* ── Resume Modal Items ────────────────────────────────────── */
 
 /* ── Launch Type Chooser ──────────────────────────────────── */
@@ -2788,15 +2765,6 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     font-size: var(--fs-base);
     color: var(--text-secondary);
     margin-top: 8px;
-}
-
-.tier-branding {
-    text-align: center;
-    font-size: var(--fs-base);
-    color: var(--text-muted);
-    margin-top: 16px;
-    padding-top: 12px;
-    border-top: 1px solid var(--border);
 }
 
 /* ── Misc Extracted Inline Styles ──────────────────────────── */

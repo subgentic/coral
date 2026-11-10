@@ -60,7 +60,7 @@ func TestNoReleasedProgramLinksTheRehearsalOrAFakeSigstore(t *testing.T) {
 	type job struct{ goos, tags, prog string }
 	var jobs []job
 	for _, goos := range []string{"linux", "darwin", "windows"} {
-		for _, tags := range []string{"fts5", "fts5,dev", "fts5,beta", "fts5,dropboxers"} {
+		for _, tags := range []string{"fts5", "fts5,dev", "fts5,staging"} {
 			for _, prog := range programs {
 				if _, err := os.Stat(filepath.Join(root, "cmd", prog)); err != nil {
 					continue

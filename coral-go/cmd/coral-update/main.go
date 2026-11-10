@@ -115,7 +115,7 @@ func run(args []string, getenv func(string) string, stdout io.Writer) int {
 		fmt.Fprintln(os.Stderr, "usage: coral-update check|apply|status [--json]")
 		return 2
 	}
-	// Only a prod release build updates itself: a dev, beta or dropboxers build, a build with no version, and an install turned off say so.
+	// Only a prod release build updates itself: a dev build, a build with no version, and an install turned off say so.
 	if !config.TierChecksForUpdates || config.Version == "" || getenv("CORAL_AUTO_UPDATE") == "off" {
 		out := output{Result: "off"}
 		if args[0] == "apply" { // the server quit for this run if a click sent it: Coral is started again
