@@ -7,7 +7,7 @@ import { needsYou, askedRow } from './asked_before_restart.js';
 import { unrecordedItem, recordAllAgents } from './waiting.js';
 import { welcomeRows, runWelcome, dismissWelcome } from './welcome_items.js';
 import { incompleteNote, readGaps } from './needs_incomplete.js';
-import { loadPendingSkills, skillRows, skillLine, skillName, skillCount, openSkill } from './needs_skills.js';
+import { loadPendingSkills, skillRows, skillLine, skillName, openSkill } from './needs_skills.js';
 import { doneGoals, nextQuietEnd, quietEndsAt, hideGoalDone, setGoalDoneCount, isGoalDoneRead, markGoalDoneRead, markGoalDoneUnread, SETTING as GOAL_DONE_SETTING } from './goal_done.js';
 /* The dashboard's own Inbox on the shared sidebar (#7472), loaded the first time the Inbox tab is shown (inbox_tab.js keeps the badge and the counts, which are always there).
  *
@@ -44,7 +44,7 @@ import { syncDisplayPanels } from './display_panel.js';
 import { onViewShown } from './view_switch.js';
 import { importOnce } from './import_once.js';
 import { markHidden } from './visible_marks.js';
-import { onInboxHooks, setInboxCount, askOf, updateInboxTab } from './inbox_tab.js';
+import { onInboxHooks, setInboxCount, askOf, updateInboxTab, needsCount } from './inbox_tab.js';
 const { coralInboxAdapter, savedExpandFor, listInboxGoals, goalsReadFailed, doneGoalsCapped, taskReadState } = await importOnce('./inbox_coral.js');
 const { agentLink } = await importOnce('./agent_link.js'); // an agent's name is one shared helper everywhere (#12168)
 const { openedFrom, backLabelFor } = await importOnce('./inbox_back_label.js'); // the Back words of the Inbox's task and goal screens (#8861)
@@ -852,7 +852,7 @@ const savedKnown = () => { const v = saved.savedView(); return !isCloud() || (!v
 /** The number beside a folder. Needs you counts what the Inbox badge counts (an alarm: an agent, a review, a run, a proposal, a question); the welcome items are listed but are not alarms, so they are not in either (#11622). */
 /** The goals agents proposed that wait for the Operator (a row in Needs you): the Goals folder counts them, it said 0 while one waited (#11894). */
 const goalProposals = () => pendingProposals().filter(p => p.kind === 'goal');
-const countOf = key => key === 'needs' ? waitingSessions().length + unreadReviewCount() + failedUnread().length + pendingProposals().length + goalDoneRows().filter(needsUnread).length + skillCount() + operatorAsks().length + recordRows().length : key === 'tasks' ? (isCloud() && (personalInboxNotice('tasks') || taskReadState().failed || taskReadState().capped) ? `at least ${taskRows().length}` : taskRows().length) : key === 'goals' ? goals.filter(g => String(g.state || '').toLowerCase() !== 'done').length + goalProposals().length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? `${countSavedReviews().complete && savedKnown() ? '' : 'at least '}${savedCounts().open + countSavedReviews().value}` : undefined;
+const countOf = key => key === 'needs' ? needsCount(unreadReviewCount()) : key === 'tasks' ? (isCloud() && (personalInboxNotice('tasks') || taskReadState().failed || taskReadState().capped) ? `at least ${taskRows().length}` : taskRows().length) : key === 'goals' ? goals.filter(g => String(g.state || '').toLowerCase() !== 'done').length + goalProposals().length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? `${countSavedReviews().complete && savedKnown() ? '' : 'at least '}${savedCounts().open + countSavedReviews().value}` : undefined;
 /** The folders of the Inbox (#7785, the mailbox mock): one view list, a name and a count each. Needs you, Tasks and Saved open their table in the centre; */
 const FOLDER_ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved: 'saved-bookmark', artifacts: 'inventory_2', activity: 'checklist',
     chats: 'chat_bubble_outline', [BOARDS_FOLDER]: 'forum', 'chats-notes': 'edit_note', 'chats-starred': 'star', 'chats-active': 'bolt', 'chats-archived': 'folder' }; // UI/UX's existing subset choices (#8866); tagged folders keep their colour dot
