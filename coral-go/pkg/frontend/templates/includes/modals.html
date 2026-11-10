@@ -528,6 +528,7 @@
                             <input type="text" id="resume-dir" placeholder="/path/to/project" data-coral-root="{{ .CoralRoot }}" value="{{ .CoralRoot }}">
                             <button class="btn" data-on-click="m-toggle-browser" data-browser="resume-dir resume-dir-browser resume-browser-list resume-browser-current-path">Browse</button>
                         </div>
+                        <p class="settings-hint">It continues the same chat. Its saved changes stay in the folder.</p>
                         <p id="resume-dir-note" class="settings-hint" hidden></p>
                         <p id="resume-mode-note" class="settings-hint" hidden></p>
                         <div class="form-row" id="resume-mode-row" hidden><label class="form-label" for="resume-mode">Resume in</label><select id="resume-mode" class="settings-select" data-on-change="resume-mode-changed"></select></div><!-- the mode the chat ran in, which it resumes in (resume_dialog.js, #10487) --><!-- where the session ran, and a warning when the folder is changed or gone (resume_dialog.js, #10291) -->

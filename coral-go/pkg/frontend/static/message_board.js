@@ -112,6 +112,11 @@ export function showBoardInPage(project, host, messageId = null) {
 /** On the team page the composer is "Message the team" and its button "Send" (UI/UX's design); they are put back when the column goes home (the hidden holder in the board view). */
 function nameComposerForPage(on) {
     const box = document.getElementById('mb-post-input'), send = document.querySelector('#mb-board .mb-post-send-btn');
+    const board = document.getElementById('mb-board'), had = document.getElementById('mb-skip-composer');
+    if (on && board && box && !had) { // the first stop after the tabs: 50 Tabs of messages stood between a keyboard and the box (walk 17 M10). It shows only when it has the focus.
+        const skip = document.createElement('button'); skip.type = 'button'; skip.id = 'mb-skip-composer'; skip.className = 'skip-link'; skip.textContent = 'Skip to Message the team';
+        skip.addEventListener('click', () => box.focus()); board.prepend(skip);
+    } else if (!on && had) had.remove();
     for (const [e, name] of [[box, 'Message the team'], [send, 'Send']]) {
         if (!e) continue;
         if (on) { if (e.dataset.boardLabel === undefined) e.dataset.boardLabel = e.getAttribute('aria-label') || ''; e.setAttribute('aria-label', name); }

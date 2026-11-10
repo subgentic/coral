@@ -46,7 +46,7 @@ function showOfferBanner() {
     banner.id = 'alerts-offer-banner'; banner.className = 'notice notice-info notice-bar alerts-offer-banner'; banner.setAttribute('role', 'status');
     const text = document.createElement('div'); text.className = 'alerts-offer-text'; text.textContent = window.matchMedia?.('(max-width: 600px)').matches ? OFFER_SHORT : OFFER;
     const on = document.createElement('button'); on.type = 'button'; on.className = 'btn btn-small'; on.textContent = 'Turn on alerts';
-    const off = document.createElement('button'); off.type = 'button'; off.className = 'btn btn-quiet btn-icon btn-small'; off.setAttribute('aria-label', 'Not now'); off.title = 'Not now'; off.textContent = '\u00d7';
+    const off = document.createElement('button'); off.type = 'button'; off.className = 'btn btn-quiet btn-icon btn-small'; off.setAttribute('aria-label', 'Close'); off.title = 'Close'; off.textContent = '\u00d7';
     off.addEventListener('click', () => banner.remove());
     on.addEventListener('click', async () => {
         banner.remove();
