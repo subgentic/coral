@@ -434,6 +434,7 @@ body.panel-dragging .sidebar {
     top: calc(100% + 6px);
     right: 0;
     z-index: 1000;
+    transform: translateZ(0); /* its own composited layer: the native Mac app (WKWebView) painted a table's sticky header over it (#15047) */
 } /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
 
 .sidebar-section h2 {
