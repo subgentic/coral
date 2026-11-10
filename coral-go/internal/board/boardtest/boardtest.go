@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/subgentic/coral/internal/board"
 )
@@ -32,15 +33,40 @@ func templateImage() ([]byte, error) {
 			err = fmt.Errorf("boardtest: migrate template: %w", e)
 			return
 		}
+		// With FTS5 the open starts the message index's build in the background (and, on a slow runner, Close cancelled it mid-write, leaving a write-ahead log that failed the check below, #15040): let it finish
+		// first, so nothing is writing when the template is closed.
+		settle := func(st *board.Store) {
+			for deadline := time.Now().Add(60 * time.Second); st.MessageSearchIndexState() == "building" && time.Now().Before(deadline); {
+				time.Sleep(5 * time.Millisecond)
+			}
+		}
+		settle(s)
 		if e := s.Close(); e != nil { // the last connection closing checkpoints the write-ahead log into the file
 			err = fmt.Errorf("boardtest: close template: %w", e)
 			return
 		}
-		if _, e := os.Stat(path + "-wal"); e == nil {
-			if fi, _ := os.Stat(path + "-wal"); fi != nil && fi.Size() > 0 {
-				err = fmt.Errorf("boardtest: the template still has a write-ahead log")
+		walSize := func() int64 {
+			if fi, e := os.Stat(path + "-wal"); e == nil {
+				return fi.Size()
+			}
+			return 0
+		}
+		// A log still there is checkpointed into the file by opening the board once more and closing it: the last connection closing does it. A few tries, then the check says so.
+		for try := 0; try < 5 && walSize() > 0; try++ {
+			again, e := board.NewStoreWithKey(path, "")
+			if e != nil {
+				err = fmt.Errorf("boardtest: reopen template: %w", e)
 				return
 			}
+			settle(again)
+			if e := again.Close(); e != nil {
+				err = fmt.Errorf("boardtest: close template: %w", e)
+				return
+			}
+		}
+		if walSize() > 0 {
+			err = fmt.Errorf("boardtest: the template still has a write-ahead log")
+			return
 		}
 		image, err = os.ReadFile(path)
 	})
