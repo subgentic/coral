@@ -347,6 +347,8 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             await shot(`comments-390-open-${theme}`);
             const p1 = await rect('.ac-panel');
             check(`${at}: the sheet opens inside the screen (${p1.t}..${p1.b} of 844), its content scrolls, nothing sideways`, p1.b <= 844 + 1 && p1.t > 100 && (await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`)) === 0, JSON.stringify(p1));
+            const foot = await rect('.artifact-viewer-foot'); // #15165: the footer holds Approve and Request changes (and Close): the open sheet ends above it, never over it
+            check(`${at}: the open sheet does not cover the viewer's footer (sheet bottom ${p1.b}, footer top ${foot && foot.t})`, !!foot && foot.h > 0 && p1.b <= foot.t + 1, JSON.stringify({ p1, foot }));
             const tiny = await ev(`[...document.querySelectorAll('.ac-panel button')].filter(b => b.getClientRects().length).map(b => { const r = b.getBoundingClientRect(); return [b.textContent, Math.round(r.height)]; }).filter(x => x[1] < 44)`);
             check(`${at}: every button in the sheet is 44 px tall`, tiny.length === 0, JSON.stringify(tiny));
             await ev(`document.querySelector('.ac-sheet-close').click(); true`);
