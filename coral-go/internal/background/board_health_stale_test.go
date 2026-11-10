@@ -182,3 +182,31 @@ func TestTheStaleSweepTextHasNoParentheses(t *testing.T) {
 	assert.NotContains(t, text, "(")
 	assert.NotContains(t, text, ")")
 }
+
+// A sweep that could not be delivered does not restart the clock (#15354, QA's SHOULD on #14863): it is tried again at the next scan, not a whole period later; once delivered, the period counts from it.
+func TestAFailedStaleSweepIsRetriedAtTheNextScanNotAPeriodLater(t *testing.T) {
+	h := staleHarness(t, 12)
+	ctx := context.Background()
+	_, err := h.s.CreateTask(ctx, "team", "An old pending task", "", "medium", "Orchestrator", "Dev")
+	require.NoError(t, err)
+	start := h.now
+	h.m.scan(ctx) // the first look starts the clock
+	good := h.m.deliver
+	failing := true
+	h.m.deliver = func(ctx context.Context, a AgentInfo, key, text string) error {
+		if failing {
+			return context.DeadlineExceeded
+		}
+		return good(ctx, a, key, text)
+	}
+	h.now = start.Add(4 * 24 * time.Hour) // due
+	h.m.scan(ctx)
+	assert.Empty(t, h.sweeps(), "the delivery failed")
+	failing = false
+	h.now = start.Add(4*24*time.Hour + 10*time.Minute) // the next scan, far short of another period
+	h.m.scan(ctx)
+	assert.Len(t, h.sweeps(), 1, "retried at the next scan")
+	h.now = start.Add(4*24*time.Hour + 20*time.Minute)
+	h.m.scan(ctx)
+	assert.Len(t, h.sweeps(), 1, "and once delivered, not again within the period")
+}
