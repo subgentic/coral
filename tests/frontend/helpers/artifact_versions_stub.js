@@ -37,4 +37,6 @@ const STUB = `(() => {
     };
     return true; })()`;
 
-module.exports = { H1, H2, H3, T, STUB, FILE, lineOf };
+// the header says the version and the name only (#15142): the file id is in Details and Copy file ID
+const headOf = n => `version ${n} of release-plan.md`;
+module.exports = { H1, H2, H3, T, STUB, FILE, lineOf, headOf };

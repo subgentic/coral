@@ -336,7 +336,7 @@ function paintLine(d) {
     const L = shownLine();
     const text = L ? versionLineOf({ file_id: L.fileId, version_line: L.versionLine }) : ''; // hidden characters of the name are written out by versionLineOf
     const head = d.querySelector('.artifact-viewer-versionline');
-    head.textContent = text; head.hidden = !text; // the full line is in Details too; no tooltip repeating the text (title_repeats_census)
+    head.textContent = text; head.hidden = !text; // the file id is in Details, not here (#15142); no tooltip repeating the text (title_repeats_census)
     const copyItem = d.querySelector('.artifact-viewer-copyid-item'); // Copy file ID is always reachable from the ⋯ menu: a file id and line never add a Details button of their own (#14178: it joined row one on a phone)
     copyItem.hidden = !text; copyItem.dataset.fileId = text ? L.fileId : '';
     if (!text) { if (_lineChip) _lineChip.hidden = true; return; }
@@ -351,7 +351,7 @@ function paintLine(d) {
         else _details.add(wrap);
         _lineChip = chip;
     }
-    _lineChip.dataset.fileId = L.fileId; _lineChip.firstChild.textContent = text; _lineChip.hidden = false;
+    _lineChip.dataset.fileId = L.fileId; _lineChip.firstChild.textContent = markHidden(L.versionLine.slice(0, 300), { strict: true }); _lineChip.hidden = false;
 }
 /** Open the artifact `hex` (64 lowercase hex). opts: { server, filename, mediaType }. */
 /** The viewer's name when it is cut: a button that opens it whole, only while it is cut or open (#13979). */
