@@ -175,7 +175,8 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
                 check(open.open && open.scrolls && open.h < open.vh && open.yes === 0 && /scroll to the end/.test(open.sentence), `${at}${what}: Show all opens a box that scrolls inside, Yes still locked: ` + JSON.stringify(open));
                 await shot(`command-open-${what.replace(/\W+/g, '-')}-${w}`);
                 await ev(`(() => { const b = document.querySelector('#group-table-view .inbox-cmd-block'); b.scrollTop = b.scrollHeight; return true; })()`);
-                await new Promise(r => setTimeout(r, 400)); // sleep-ok: the scroll event reaches the row
+                // the Yes the command gate turns on ignores clicks for 400 ms (#14302): wait until it is on the row AND armed, not for a time that is the same 400 ms (#15133, the sleep ended inside that window on a slow runner)
+                await waitFor(`(() => { const y = [...document.querySelectorAll('#group-table-view .inbox-answers button')].find(x => x.textContent === 'Yes' && !x.hidden && x.getClientRects().length > 0); return !!y && !y.classList.contains('inbox-arming'); })()`, `${at}${what}: the unlocked Yes is on the row and armed`, 5000);
                 const end = await ev(`(() => { const c = document.querySelector('#group-table-view .inbox-answers'); return { yes: [...c.querySelectorAll('button')].filter(x => x.textContent === 'Yes' && !x.hidden && x.getClientRects().length > 0).length, sentence: c.querySelector('.inbox-yes-note').textContent }; })()`);
                 check(end.yes === 1 && /Yes lets it run this once/.test(end.sentence), `${at}${what}: at the end of the command Yes is on the row: ` + JSON.stringify(end));
                 // and Yes now sends the answer for the whole command's ask
@@ -217,6 +218,7 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
                 const top0 = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr'); r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { top: Math.round(b.top), x: Math.round(b.left + 120), y: Math.round(b.top + b.height / 2), rows: document.querySelectorAll('#group-table-view tbody tr').length }; })()`);
                 await Input.dispatchMouseEvent({ type: 'mouseMoved', x: top0.x, y: top0.y });
                 await new Promise(r => setTimeout(r, 300)); // sleep-ok: the pointer events reach the page
+                await ev(`window.__heldAtDraw = null; new MutationObserver(() => { if (window.__heldAtDraw === null && document.querySelectorAll('#group-table-view tbody tr').length === ${top0.rows + 1}) window.__heldAtDraw = !!document.querySelector('#group-table-view .group-table-held'); }).observe(document.getElementById('group-table-view'), { childList: true, subtree: true }); true`); // the note is read in the task that draws the row: a later refresh with the pointer still resting holds again and shows it again (#15133)
                 await ev(`window.__m.add('qa2', 'B', 5, { sleeping: false, board_project: 'team-a', session_id: 'qa2-id' }); window.__ws += 1; true`);
                 await ev(`window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, ...window.__m.entry(window.__m.agents[s.session_id]) })); true`);
                 await refresh();
@@ -229,7 +231,7 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
                 await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === ${top0.rows + 1}`, `${at}the waiting agent's row is drawn although the pointer still rests on the list`, 8000);
                 const took = Date.now() - t0 + 900;
                 check(took <= 3600, `${at}a row that needs the person waits about 2 s at most under a resting pointer (took ${took} ms)`);
-                check(!(await ev(`!!document.querySelector('#group-table-view .group-table-held')`)), `${at}the 'new items wait' line goes when the row is drawn`);
+                check((await ev(`window.__heldAtDraw`)) === false, `${at}the 'new items wait' line goes when the row is drawn`);
                 // QA's #14173 SHOULD: a change that is NOT a new waiting agent keeps the longer hold: still held at 3 s (the urgent cap is 2 s), drawn by about 10 s
                 await ev(`window.__sum = 'Notification: Claude needs a different permission'; true`); await refresh();
                 await new Promise(r => setTimeout(r, 3200)); // sleep-ok: past the 2 s cap of a waiting agent
