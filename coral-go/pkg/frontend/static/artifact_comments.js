@@ -462,7 +462,9 @@ export function attachComments(dialog, body, host, opts = {}) {
         const s = selectionAnchor();
         selBtn.hidden = !s;
         if (!s) return;
-        const x = Math.min(Math.max(8, s.rect.right - 40), window.innerWidth - 120), y = Math.max(8, Math.min(s.rect.bottom + 6, window.innerHeight - 60));
+        let x = Math.min(Math.max(8, s.rect.right - 40), window.innerWidth - 120), y = Math.max(8, Math.min(s.rect.bottom + 6, window.innerHeight - 60));
+        const foot = window.matchMedia?.('(pointer: coarse)').matches && dialog.querySelector('.artifact-viewer-foot'); // a touch screen (walk 11 M3): not over the lines under the selection, but above the bar, on the right
+        if (foot) { const h = selBtn.offsetHeight || 44, w = selBtn.offsetWidth || 110, t = foot.getBoundingClientRect().top - h - 8; x = window.innerWidth - w - 12; y = s.rect.bottom + 6 > t - 4 ? Math.max(8, s.rect.top - h - 6) : t; }
         selBtn.style.left = x + 'px'; selBtn.style.top = y + 'px';
     }
     document.addEventListener('selectionchange', () => { if (!shown()) return; clearTimeout(selTimer); selTimer = setTimeout(syncSelButton, 120); });

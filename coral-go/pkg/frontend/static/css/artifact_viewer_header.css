@@ -32,6 +32,9 @@
     .artifact-viewer-title { order: 0; flex: 1 1 0; min-width: 120px; padding-bottom: 0; } /* the name keeps room to read: at 320 px Comments wraps to the next row (#12226 review) */
     .artifact-viewer-header:has(.artifact-viewer-title.is-open) > .artifact-viewer-title { flex: 1 0 100%; } /* an opened name takes the whole header width: the buttons wrap to the next row instead of leaving it a narrow column (#13989) */
     .artifact-viewer-header > .ac-toggle { order: 1; flex: none; }
+    .artifact-viewer-header:has(> .artifact-viewer-details:not([hidden])) > .artifact-viewer-morewrap { order: 1; } /* Details shows (a goal, a task, who can read): row one is the name and the ⋯ button, row two Details and Comments side by side, then the chips; no orphan button on a row of its own (walk 11 M1) */
+    .artifact-viewer-header:has(> .artifact-viewer-details:not([hidden])) > :is(.artifact-viewer-details, .ac-toggle) { order: 2; flex: 1 1 40%; min-width: 120px; }
+    .artifact-viewer-header:has(> .artifact-viewer-details:not([hidden])) > .artifact-viewer-title:not(.is-open) { flex: 1 1 calc(100% - 52px); } /* the name fills row one beside the ⋯ button, so the two buttons below it cannot slip in beside it */
     .artifact-viewer-morewrap { order: 2; }
     .artifact-viewer-chips { order: 3; flex: 1 0 100%; max-width: 100%; gap: 4px; flex-wrap: wrap; }
     .artifact-viewer-actions { display: none; }
@@ -68,6 +71,7 @@
 .av-count { margin: 0; flex: 1 1 auto; color: var(--text-secondary); font-size: var(--fs-md); }
 .av-seg { flex-wrap: wrap; }
 .av-seg .btn { white-space: normal; }
+.artifact-viewer-text { white-space: pre-wrap; overflow-wrap: anywhere; } /* a code line wraps, a long name or path in it too: it was cut at the right edge on a phone (walk 11 M2) */
 .av-line { padding: 2px 8px 2px 11px; margin: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .av-line ins, .av-line del { text-decoration: none; }
 .av-add { background: color-mix(in srgb, var(--success) 18%, transparent); border-left: 3px solid var(--success); padding-left: 8px; }
