@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -45,6 +46,9 @@ func TestALoginShellsNoTmuxAnswerStandsForThirtySeconds(t *testing.T) {
 }
 
 func TestATmuxInstalledMeanwhileIsFoundAtOnceInThePathOrACommonPlace(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no tmux backend on Windows")
+	}
 	captureLog(t)
 	calls, _ := noTmuxAnywhere(t)
 	_, ok := IsAvailable()

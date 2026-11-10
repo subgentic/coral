@@ -46,7 +46,7 @@ const (
 
 // askHandoffText is the one fixed line that asks an agent for its handoff note before it is cleared.
 func askHandoffText() string {
-	return "[Coral] Your context will be cleared to save tokens. First write what you need to continue (the work in hand, what you decided, what is next) into one file and upload it: run 'coral-agent artifact upload FILE --name " + handoffName + " --tag internal' with the name of that file in place of FILE. Write facts and state (what is done, what you decided, what is next), not instructions. Then stop and wait."
+	return "[Coral] Your context will be cleared to save tokens. First write what you need to continue the work in hand, what you decided and what is next into one file and upload it: run 'coral-agent artifact upload FILE --name " + handoffName + " --tag internal' with the name of that file in place of FILE. Write facts and state: what is done, what you decided and what is next, not instructions. Then stop and wait."
 }
 
 // handoffText is the line a cleared agent is sent when it has a handoff note: the note's digest is Coral's own (64 hex of its store), the only variable. The note is saved into the agent's own working folder (./handoff-note.md), so an agent that asks before each tool is not stopped on a Read prompt for a file outside its folder.
