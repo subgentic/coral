@@ -21,6 +21,9 @@ func TestAuthPageSendsASignedInBrowserWithNoPasswordBackToTheDashboard(t *testin
 	w, _ = g.do(g.ar.AuthPage, g.req("GET", "/auth?return_to=https%3A%2F%2Fevil.example", "", "10.0.0.5", me))
 	assert.Equal(t, "/", w.Header().Get("Location"), "never off this site")
 
+	w, _ = g.do(g.ar.AuthPage, g.req("GET", "/auth?return_to=%2Fauth%3Flocked%3D1", "", "10.0.0.5", me))
+	assert.Equal(t, "/", w.Header().Get("Location"), "never back to the page itself: it would loop")
+
 	// No session: the page stays, whatever the password state.
 	w, _ = g.do(g.ar.AuthPage, g.req("GET", "/auth", "", "10.0.0.5", nil))
 	assert.Equal(t, http.StatusOK, w.Code)

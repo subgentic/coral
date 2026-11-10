@@ -79,7 +79,11 @@ func (ar *Routes) AuthPage(w http.ResponseWriter, r *http.Request) {
 	h.Set("Referrer-Policy", "no-referrer")
 	set, local, strict := ar.PageState(r)
 	if !set && ar.signedIn(r) { // a browser that is signed in and has no password yet is asked for one by the dashboard's own box, never by this page as well (#15237, Security's design on #15227); it goes where it was going
-		http.Redirect(w, r, SafeReturnTo(r.URL.Query().Get("return_to")), http.StatusSeeOther)
+		to := SafeReturnTo(r.URL.Query().Get("return_to"))
+		if to == "/auth" || strings.HasPrefix(to, "/auth/") || strings.HasPrefix(to, "/auth?") {
+			to = "/" // never back to this page: that would loop
+		}
+		http.Redirect(w, r, to, http.StatusSeeOther)
 		return
 	}
 	signedOut := set && ar.ks.wasSignedOutByOthers(ar.ks.extractSessionCookie(r)) && !ar.signedIn(r) // told why only to the browser whose session another browser ended (#10431)
