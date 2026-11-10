@@ -1,0 +1,14 @@
+/* Team settings: grouping and search (#15058). Loaded by team_settings_page.js, so none of it is in the start stylesheet; its classes are tsg-*, written by settings_search.js. */
+.tsg-sub { margin-top: 10px; } /* a sub-heading stands apart from the rows above it */
+.tsg-big { margin-top: 22px; padding-top: 14px; border-top: 2px solid var(--border); } /* a large heading groups several concepts under a heavy rule */
+.settings-pane-sub + .tsg-big { margin-top: 0; border-top: 0; padding-top: 0; }
+.tsg-big-h { margin: 0; font-size: var(--fs-lg); }
+.tsg-dep { margin-left: 14px; padding-left: 12px; border-left: 2px solid var(--border); } /* a setting that hangs on a toggle sits under it with a rail */
+.tsg-dep[data-disabled] { opacity: .6; } /* and dims with it when the toggle is off */
+.tsg-search { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; max-width: 860px; }
+.tsg-search-status { margin: 0; color: var(--text-secondary); }
+.tsg-search-status[hidden] { display: none; }
+[data-match] { background: var(--bg-hover); border-radius: var(--radius-sm); outline: 1px solid var(--accent-dim); outline-offset: -1px; }
+.tsg-searching [data-nomatch], .tsg-searching .tsg-sub, .tsg-searching .tsg-big { display: none; } /* a search shows the rows that match, each section named above them */
+.tsg-searching .settings-pane:not([data-hit]) { display: none !important; }
+.tsg-searching .settings-pane[hidden][data-hit] { display: block; }
