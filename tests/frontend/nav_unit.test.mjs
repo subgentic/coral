@@ -37,7 +37,7 @@ assert.deepEqual(nav.startRoute({ pathname: '/', search: '?q=battle&page=2&page_
 assert.deepEqual(nav.startRoute({ pathname: '/', search: '?view=x&q=battle&type=agent&page=2&page_size=50', hash: '#history' }), { view: 'chats', query: 'page=2&type=agent&q=battle' }, 'a legacy Chats hash keeps its filters');
 assert.deepEqual(nav.startRoute({ pathname: '/', search: '?q=battle', hash: '#session/abc' }), { view: 'chats', id: 'abc' }, 'a chat link has no list filters');
 assert.deepEqual(nav.startRoute({ pathname: '/', search: '', hash: '#board/..' }), { view: 'agents' }, 'a dot-named board link goes home');
-assert.deepEqual(nav.startRoute({ pathname: '/nope', search: '', hash: '' }), { view: 'agents' });
+assert.deepEqual(nav.startRoute({ pathname: '/nope', search: '', hash: '' }), { view: 'agents', bad: '/nope' }); // an address that names nothing falls back to Agents and says what it was (#15295)
 assert.deepEqual(nav.startRoute({ pathname: '/', search: '', hash: '#chat/..%2F..%2Fapi' }), { view: 'agents' }, 'a bad legacy id goes home');
 
 // Before startNav() nothing is written: the pop-out (/agent/<id>) never starts it, and the views

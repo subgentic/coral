@@ -1,0 +1,6 @@
+/* The not-found view (#15295): themed like every page, lazy with its module. */
+.not-found { flex: 1; min-width: 0; padding: 24px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; background: var(--bg-primary); color: var(--text-primary); }
+.not-found[hidden] { display: none; }
+.not-found-title { margin: 0; font-size: var(--fs-xl); }
+.not-found-detail { margin: 0; color: var(--text-secondary); max-width: 40rem; overflow-wrap: anywhere; }
+@media (max-width: 760px) { .not-found { padding-left: 16px; padding-right: 16px; } }
