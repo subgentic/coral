@@ -1,8 +1,9 @@
 import { fetchAllBoardMessages, fetchAllHistory, fetchAllLiveChat, fetchProjects } from './board_fetch.js';
 import { emptyState } from './dom_write.js';
 import { escapeAttr, escapeHtml, showView, OPERATOR_ID, showToast } from './utils.js';
-import { keyLabel, splitKey, hasBoardLabel, boardFetch, noteBoardLabel, inTeam } from './server_base.js';
 import { importOnce } from './import_once.js';
+import { killLiveTeam, dropKilledRows } from './kill_live.js';
+import { keyLabel, splitKey, hasBoardLabel, boardFetch, noteBoardLabel, inTeam } from './server_base.js';
 import { agentWords, deleteTeamWords } from './agent_words.js';
 import { state } from './state.js';
 import { initGrowingTextarea } from './growing_textarea.js';
@@ -231,7 +232,7 @@ function syncBoardDeleteButton(project) {
     btn.disabled = !!blocked;
     btn.setAttribute('aria-disabled', blocked ? 'true' : 'false');
     btn.title = blocked || '';
-    btn.textContent = blocked ? 'Delete (needs Launch)' : 'Delete';
+    btn.textContent = blocked ? 'Remove team (needs Launch)' : 'Remove team';
 }
 document.addEventListener('coral:server-access-loaded', () => syncBoardDeleteButton(bs.currentProject));
 
@@ -240,36 +241,37 @@ function runningAgentsOn(project) {
     return (state.liveSessions || []).filter(a => inTeam(a, project) && !a.sleeping && !a.archived).map(a => agentWords(a, a.display_name || a.name).role);
 }
 
-export function deleteMessageBoardProject() { deleteTeam(bs.currentProject); }
+export function deleteMessageBoardProject() { deleteTeam(state.selectedTeam || bs.currentProject); } // the team on the page, not the last board the Messages tab loaded (#15277: on any other tab that was none, or another team)
 
-/** Delete team: the in-page dialog (which agents still run, or the words that say what goes), then the DELETE. From the team page's More menu and from the sidebar's team menu (#10318). */
+/** Remove team: the in-page dialog (what goes, what stays, which agents run), then the DELETE; with agents running its button is "Stop agents and remove", which stops them and then removes the team. A toast says it is done. From the team page's More menu and from the sidebar's team menu (#10318, #15277). */
 export function deleteTeam(project) {
     const blocked = project ? launchBlockedReason(splitKey(project).server) : '';
     if (blocked) { showToast(blocked, true); return; }
     if (!project) return;
-    // A board with agents running is not deleted (#5043): they would stay live in a group named with the raw board id. Said here, before asking; the server
-    // says it again for an agent this page's list does not show yet.
     const running = runningAgentsOn(project);
-    if (running.length) { // a real dialog, not a toast that is gone before it is read (#10139): which agents, and the way out; the server says it again for one this list does not show yet
-        window.showConfirmModal('Delete team', deleteTeamWords(keyLabel(project), running), () => { window.openTeamPage?.(project); }, undefined, { label: 'Show its agents', cancelLabel: 'Close', danger: false });
-        return;
-    }
-    window.showConfirmModal('Delete team', deleteTeamWords(keyLabel(project)), async () => {
+    const label = keyLabel(project);
+    window.showConfirmModal('Remove team', deleteTeamWords(label, running), async () => {
         try {
+            if (running.length) { // a board with agents running is not deleted (#5043): they are stopped first, here, so the team is not left half there
+                const { ok, answer } = await killLiveTeam(project);
+                if (!ok) { showToast((answer && answer.error) || 'Could not stop the agents, so the team was not removed.', true); return; }
+                dropKilledRows((state.liveSessions || []).filter(a => inTeam(a, project)));
+            }
             const resp = await boardFetch(project, ``, { method: 'DELETE' });
             if (!resp.ok) {
                 const out = await resp.json().catch(() => ({}));
-                showToast(out.error || 'The board was not deleted.', true);
+                showToast(out.error || 'The team was not removed.', true);
                 return;
             }
-            if (document.getElementById('team-page-view')?.getClientRects().length) { window.exitTeamPage?.({ force: true }); window.switchNavTab?.('agents'); } // deleted from its team page: back to Agents, not the board list
+            showToast(`Removed team "${label}". Its agents' chats stay in History and its folder is untouched.`);
+            if (document.getElementById('team-page-view')?.getClientRects().length) { window.exitTeamPage?.({ force: true }); window.switchNavTab?.('agents'); } // removed from its team page: back to Agents, not the board list
             else if (document.getElementById('messageboard-view')?.getClientRects().length) showMessageBoardProjects();
-            // deleted from the sidebar's team menu: the page stays where it is; the live feed takes the group away
+            // removed from the sidebar's team menu: the page stays where it is; the live feed takes the group away
         } catch (e) {
-            console.error('Failed to delete project:', e);
-            showToast('Could not reach Coral to delete the board.', true);
+            console.error('Failed to remove team:', e);
+            showToast('Could not reach Coral to remove the team.', true);
         }
-    }, undefined, { label: 'Delete team', danger: true });
+    }, undefined, { label: running.length ? 'Stop agents and remove' : 'Remove team', danger: true });
 }
 
 // ── Polling ──────────────────────────────────────────────────────────────

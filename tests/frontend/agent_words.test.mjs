@@ -37,12 +37,12 @@ assert.match(whatStaysReset([claude, hermes]), /old chats stay in History/i); as
 
 // team delete: what is lost, what stays, and that the folder is untouched
 const d = deleteTeamWords('alpha');
-assert.match(d, /Delete team "alpha"\?/); for (const lost of ['messages', 'tasks', 'goals', 'members', 'reminders', 'waits', 'presets', 'settings', 'artifact tags', 'health data']) assert.match(d, new RegExp('\\b' + lost + '\\b', 'i'), 'what the delete removes is listed: ' + lost); assert.match(d, /cannot be undone/i);
-assert.match(d, /chats stay in History/i); assert.match(d, /files in the team's folder are not touched/i);
+assert.match(d, /Remove team "alpha"\?/); for (const lost of ['messages', 'tasks', 'goals', 'members', 'reminders', 'waits', 'presets', 'settings', 'artifact tags', 'health data']) assert.match(d, new RegExp('\\b' + lost + '\\b', 'i'), 'what the delete removes is listed: ' + lost); assert.match(d, /cannot be undone/i);
+assert.match(d, /chats stay in History/i); assert.match(d, /files in the team's folder and the logs are not touched/i);
 // agents still running: said in a dialog, with the way out
 const r = deleteTeamWords('alpha', ['QA Engineer', 'Lead Developer']);
-assert.match(r, /alpha still has 2 agents running: QA Engineer, Lead Developer/); assert.match(r, /kill them or move them/i); assert.match(r, /nothing was deleted/i);
-assert.match(deleteTeamWords('alpha', ['QA Engineer']), /still has 1 agent running: QA Engineer/);
+assert.match(r, /2 agents are running on it: QA Engineer, Lead Developer/); assert.match(r, /Stop agents and remove stops them first/); assert.match(r, /cannot be undone/i); assert.doesNotMatch(d, /running/);
+assert.match(deleteTeamWords('alpha', ['QA Engineer']), /1 agent is running on it: QA Engineer/);
 assert.match(deleteTeamWords('alpha', ['a', 'b', 'c', 'd', 'e', 'f']), /a, b, c, d, e and 1 more/);
 
 // unpin

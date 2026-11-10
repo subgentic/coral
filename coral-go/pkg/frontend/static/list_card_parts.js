@@ -25,19 +25,19 @@ export function killAllItem(boardName) {
                 </button>`;
 }
 
-/** The team menu's "Delete team" (#10318): the in-page dialog of the team page's Delete, from the sidebar too. Through the Coral Hub it needs Launch on the team's machine, as Kill All does. */
+/** The team menu's "Remove team" (#10318, #15277): the in-page dialog of the team page's Delete, from the sidebar too. Through the Coral Hub it needs Launch on the team's machine, as Kill All does. */
 export function deleteTeamItem(boardName) {
     const icon = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M5 4.5l.5 8.5h5l.5-8.5"/></svg>';
     const blocked = launchBlockedReason(splitKey(boardName).server);
     if (blocked) {
         return `<button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger overflow-menu-blocked" disabled aria-disabled="true" title="${escapeAttr(blocked)}">
                     ${icon}
-                    Delete team <span class="overflow-menu-note">needs Launch</span>
+                    Remove team <span class="overflow-menu-note">needs Launch</span>
                 </button>`;
     }
     return `<button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="team-delete" data-board="${escapeAttr(boardName)}">
                     ${icon}
-                    Delete team
+                    Remove team
                 </button>`;
 }
 

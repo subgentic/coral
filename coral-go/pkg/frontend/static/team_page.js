@@ -5,7 +5,7 @@ import { openTask } from './task_navigation.js';
  * and Agents, Knowledge and Settings are today's panels of the right dock moved in, until their own builds (stage 3 of #7453). Lazy: loaded by openTeamPage (lazy_panels.js). */
 import { state } from './state.js';
 import { needsYou } from './asked_before_restart.js';
-import { keyLabel, splitKey, boardFetch, teamFetch, isCloud, teamWorkDir, inTeam } from './server_base.js';
+import { keyLabel, splitKey, boardFetch, teamFetch, isCloud, teamWorkDir, inTeam, hasBoardLabel } from './server_base.js';
 const { wakingSince, stopWaking } = await importOnce('./team_waking.js'); // lazy like this file (the Wake action loads it too)
 import { showView } from './utils.js';
 import { note, go } from './nav.js';
@@ -511,6 +511,7 @@ export async function openTeamPage(team, opts = {}) {
     S.tasksQuery = tab === 'tasks' ? opts.query || '' : '';
     const changed = S.team !== team;
     if (changed) { S.team = team; S.counts = {}; S.item = null; S.knowledgeFor = ''; }
+    if (!hasBoardLabel(team)) importOnce('./board_fetch.js').then(m => m.fetchProjects()).then(() => S.team === team && drawHeader(), () => {});
     state.selectedTeam = team; // the team on screen (the sidebar marks its row; the panels moved in read it)
     state.boardPageProject = team;
     state.currentBoardServer = splitKey(team).server;
