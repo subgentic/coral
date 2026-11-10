@@ -376,6 +376,17 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 			}
 		}
 	}
+	if taskID == 0 && plan != nil && len(plan.rows) > 0 { // a new version keeps its file's task link, and so its Goal link (#15156, walk 5 L16): an upload that names no task (an agent with none open, or a revision after Request changes) is still the same deliverable
+		newest := plan.rows[0]
+		for _, m := range plan.rows {
+			if m.N > newest.N {
+				newest = m
+			}
+		}
+		if rec, ok := readUploadRecord(coralDir, newest.Session, newest.Digest); ok && rec.TaskID > 0 {
+			taskID = rec.TaskID
+		}
+	}
 	meta, fresh, err := storeArtifactFile(coralDir, sid, name, mediaType, tmpPath, hexID, size, stamp, taskID)
 	if errors.Is(err, errStoreFull) {
 		b, _, max := st.size()
