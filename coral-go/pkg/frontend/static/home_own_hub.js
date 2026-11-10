@@ -21,6 +21,7 @@ function draw(st, note = '') {
         else if (st.restart_required) text = (st.saved ? 'Saved: this Coral becomes a hub when it restarts.' : 'Saved: this Coral stops being a hub when it restarts.') + (st.can_restart ? '' : ' Quit Coral and start it again to apply.');
         else if (st.running) text = 'On: this Coral is a hub (the Computers tab).';
     }
+    if (!st && !note) text = 'Not available on this Coral.'; // an older server, or another computer: the route answers nothing here (the box says so, it does not just lose its buttons)
     state.textContent = [note, text].filter(Boolean).join(' ');
     const show = (name, yes) => { const b = act(name); if (b) b.hidden = !yes; };
     show('enable-hub', !!st && !on);
@@ -49,7 +50,7 @@ async function change(on, button) {
 /** A press on one of the box's buttons (editions.js hands it over): the real state is read first, so the answer is never from a stale page. */
 export async function ownHubAction(action, t) {
     await syncOwnHub(); // (the box was drawn from the loaded settings: this is the route's own answer)
-    if (!_st) return; // the state cannot be read here: the box is the explainer only
+    if (!_st) return; // the state cannot be read here: the box says 'Not available on this Coral.' and is the explainer only
     if (action === 'enable-hub') {
         if (_st && (_st.saved || _st.forced)) return; // it is already on: the box now says so
         const { showConfirmModal } = await importOnce('./confirm_dialog.js');
