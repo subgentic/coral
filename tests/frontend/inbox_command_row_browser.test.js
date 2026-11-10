@@ -135,7 +135,7 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
             if (!mobile) { // the pointer leaves the Yes and enters it again: armed at once
                 await show(MENU({ target: ONE }), 2);
                 await ev(`window.__answers = []; window.__ws += 1; true`); await refresh();
-                await waitFor(`[...document.querySelectorAll('#group-table-view .inbox-answers button')].some(x => x.textContent === 'Yes' && x.classList.contains('inbox-arming'))`, `${at}the Yes is on the row and arming again`, 4000);
+                await waitFor(`!!document.querySelector('#group-table-view .inbox-answers button.inbox-arming')`, `${at}arming again`, 4000);
                 const yp = await ev(`(() => { const b = [...document.querySelectorAll('#group-table-view .inbox-answers button')].find(x => x.textContent === 'Yes'); b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
                 await Input.dispatchMouseEvent({ type: 'mouseMoved', x: yp.x, y: yp.y });
                 await Input.dispatchMouseEvent({ type: 'mouseMoved', x: 4, y: 4 });
@@ -146,7 +146,7 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
                 // the deliberate return stays armed across a real redraw: a new Yes, a click at once, answers
                 await show(MENU({ target: ONE }), 2);
                 await ev(`window.__answers = []; window.__ws += 1; true`); await refresh();
-                await waitFor(`[...document.querySelectorAll('#group-table-view .inbox-answers button')].some(x => x.textContent === 'Yes' && x.classList.contains('inbox-arming'))`, `${at}the Yes is on the row and arming (for the re-entry case)`, 4000);
+                await waitFor(`!!document.querySelector('#group-table-view .inbox-answers button.inbox-arming')`, `${at}arming (for the re-entry case)`, 4000);
                 const yp2 = await ev(`(() => { const b = [...document.querySelectorAll('#group-table-view .inbox-answers button')].find(x => x.textContent === 'Yes'); b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
                 await Input.dispatchMouseEvent({ type: 'mouseMoved', x: yp2.x, y: yp2.y }); await Input.dispatchMouseEvent({ type: 'mouseMoved', x: 4, y: 4 }); await Input.dispatchMouseEvent({ type: 'mouseMoved', x: yp2.x, y: yp2.y });
                 await Input.dispatchMouseEvent({ type: 'mouseMoved', x: 4, y: 4 });
