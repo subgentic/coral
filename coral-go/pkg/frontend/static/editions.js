@@ -133,6 +133,7 @@ export async function showHubSetup(step = 'connect') {
     delete m.dataset.focused;
     m.style.display = 'flex';
     if (step !== 'own-hub') _panel = _cc.mountCloudConnect(m.querySelector('.editions-cloud'), { onState: _onState });
+    else importOnce('./home_own_hub.js').then(h => h.mountOwnHubPanel()).catch(() => {});
     (m.querySelector('[data-editions-focus]:not([hidden])') || m.querySelector('button:not([hidden])'))?.focus();
 }
 
@@ -186,12 +187,13 @@ const OWN_HUB_COMMANDS = 'coral --hub';
 function _ownHubHtml() {
     return `<div class="modal-content dlg-form editions-content">
         <h2 id="editions-title" class="editions-title">Run your own hub</h2>
-        <p class="editions-sub">One dashboard for the agents on all your computers. Free and self-hosted.</p>
+        <p class="editions-sub">Turn this Coral into a hub and connect remote computers running Coral, for one unified view of all your agents. Self-hosted.</p>
         <ol class="editions-steps">
-            <li>On the computer you'll use as the hub, start Coral with <code>coral --hub</code>.</li>
+            <li>On the computer you'll use as the hub, turn on the switch below (or start Coral with <code>coral --hub</code>).</li>
             <li>On each other computer, start Coral, turn on <strong>Remote access</strong> in Settings &rsaquo; Network and Hub (it says what that allows, and that it is unencrypted unless TLS is set up), and copy its API key.</li>
             <li>In the hub's <strong>Computers</strong> tab, add each computer with its address and key.</li>
         </ol>
+        <div id="editions-own-slot"></div>
         <div class="cloud-command-row editions-commands"><code>${escapeHtml(OWN_HUB_COMMANDS)}</code><button type="button" class="btn btn-small" data-editions="copy-own" aria-label="Copy the hub command">Copy</button></div>
         <a class="editions-guide" href="${escapeAttr(OWN_HUB_GUIDE_URL)}" target="_blank" rel="noopener">Read the guide<span class="material-icons" aria-hidden="true">open_in_new</span></a>
         <div class="modal-actions editions-actions">
@@ -298,7 +300,6 @@ document.addEventListener('click', e => {
     else if (action === 'open') { window.hideSettingsModal?.(true); showHubSetup('connect'); }
     else if (action === 'home-hub') showHubSetup('connect');
     else if (action === 'home-own') showHubSetup('own-hub');
-    else if (['enable-hub', 'disable-hub', 'restart-hub', 'manage-hub'].includes(action)) importOnce('./home_own_hub.js').then(m => m.ownHubAction(action, t)).catch(() => showToast('Could not do that. Nothing was changed.', true));
     else if (action === 'hide-home') { _saveSettings({ home_editions_hidden: 'True' }); syncHomeEditions(); }
     else if (action === 'show-home') { _saveSettings({ home_editions_hidden: 'False' }); syncHomeEditions(); }
     else return;

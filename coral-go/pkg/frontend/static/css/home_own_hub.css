@@ -1,0 +1,6 @@
+/* The Run your own hub panel's switch (#15061); loaded by home_own_hub.js when the panel opens, so none of it is in the start stylesheet. */
+.own-hub-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 14px 0 0; padding: 10px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.own-hub-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; color: var(--text-primary); }
+.own-hub-state { color: var(--text-secondary); font-size: var(--fs-base); font-weight: var(--fw-regular); }
+.own-hub-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.own-hub-actions .btn[hidden] { display: none; }
