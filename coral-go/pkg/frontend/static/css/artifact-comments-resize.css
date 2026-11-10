@@ -1,0 +1,11 @@
+/* The comments column's resize handle and the width it sets (#15030), loaded with the first comments panel (artifact_comments.js), not at start. */
+.ac-resizer { display: none; flex: 0 0 8px; align-self: stretch; margin: 0 -4px; position: relative; z-index: 2; cursor: col-resize; touch-action: none; }
+.ac-resizer::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; transition: background-color 0.12s; }
+.ac-resizer:hover::after, .ac-resizer.is-dragging::after { background: var(--accent); }
+.ac-resizer:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.ac-resizer:focus-visible::after { background: var(--accent); }
+@media (min-width: 768px) and (min-height: 501px), (min-width: 768px) and (pointer: fine), (min-width: 951px) { .artifact-viewer-main:has(> .ac-panel.ac-sheet-open) > .ac-resizer { display: block; } }
+@container pv (min-width: 720px) { .preview-main:has(> .ac-panel.ac-sheet-open) > .ac-resizer { display: block; } }
+@media (prefers-reduced-motion: reduce) { .ac-resizer::after { transition: none; } }
+@media (min-width: 768px) and (min-height: 501px), (min-width: 768px) and (pointer: fine), (min-width: 951px) { .artifact-viewer-main > .ac-panel { flex: 0 0 var(--ac-w, 340px); width: var(--ac-w, 340px); } }
+@container pv (min-width: 720px) { .preview-main > .ac-panel { flex: 0 0 var(--ac-w, 340px); width: var(--ac-w, 340px); } }
