@@ -30,7 +30,7 @@ const TEAM = `qa-taskcount-${Date.now() % 100000}`;
             await ev(`document.dispatchEvent(new CustomEvent('coral:team-sleep-changed', { detail: { team: ${JSON.stringify(TEAM)} } })); true`);
             await settle(2500);
             const r = await ev(`(() => { const tab = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === 'Tasks'); const n = s => Number((String(s).match(/(\\d[\\d,]*)\\s*$/) || [])[1]);
-                const open = window.__tp.chips(/Show tasks that are/).find(c => /^Open\\b/.test(c.name)); return { tab: n(window.__tp.find('[role=tab]', /^Tasks\\b/) ? window.__tp.find('[role=tab]', /^Tasks\\b/).textContent : tab.textContent), open: open ? n(open.name) : null, chips: window.__tp.chips(/Show tasks that are/).map(c => c.name) }; })()`);
+                const open = window.__tp.chips(/Show tasks that are/).find(c => /^Open\\b/.test(c.name)); return { tab: n(window.__tp.find('[role=tab]', /^Tasks\\b/) ? window.__tp.find('[role=tab]', /^Tasks\\b/).textContent : tab.textContent), open: open ? (open.name.match(/\\d+/g) || []).reduce((x, y) => x + Number(y), 0) : null, chips: window.__tp.chips(/Show tasks that are/).map(c => c.name) }; })()`);
             assert.ok(r.open != null && Number.isFinite(r.tab), at + 'both counts are there: ' + JSON.stringify(r));
             assert.equal(r.tab, r.open, at + 'the Tasks tab says what the list\'s Open pill says: ' + JSON.stringify(r));
         }

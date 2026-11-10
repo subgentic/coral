@@ -352,7 +352,7 @@ function inboxNeedsToolbar() {
         filters: needsFilters,
         options: { team: { values: teams, labels: {} }, agent: { values: names, labels: {} }, goal: { values: goalNames, labels: {} } },
         pills: { label: 'Show agents waiting on', current: needsFilters.kind || 'all',
-            items: [{ key: 'all', label: 'All', count: attention !== null && attention !== undefined ? pillCount(rows.filter(s => !s.review && needsUnread(s)).length + attention, rows.filter(s => !s.review).length + listedReviews) : said(rows.filter(needsUnread).length, rows.length) }, ...NF.KINDS.filter(kindShown).map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: k === 'review' && attention !== null && attention !== undefined ? pillCount(attention, listedReviews) : said(counts[i], listed[i]) }))],
+            items: [{ key: 'all', label: 'All', count: attention !== null && attention !== undefined ? pillCount(rows.filter(s => !s.review && needsUnread(s)).length + attention, rows.filter(s => !s.review && !s.welcome).length + listedReviews) : said(rows.filter(needsUnread).length, rows.filter(s => !s.welcome).length) }, ...NF.KINDS.filter(kindShown).map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: k === 'review' && attention !== null && attention !== undefined ? pillCount(attention, listedReviews) : said(counts[i], listed[i]) }))],
             onPick: key => { needsFilters = { ...needsFilters, kind: key === 'all' ? '' : key }; persistNeedsFilters(); renderInboxNav(true); } },
     });
     // Group by goal is an option of the Filters panel, with the other ways to show the list (#14378, the Operator): not a checkbox always on the page under the header. It is shut with the panel, so it takes no room until asked for.
@@ -1296,11 +1296,12 @@ export function needsListSpec() {
     const name = DT.primaryButton(markTitle(s.review.name), `Open ${markTitle(s.review.name)}`);
     name.classList.add('inbox-review-name'); name.dataset.reviewArtifact = s.review.id;
     const reasons = reviewChangeLabels(s.review);
+    if (isRead(s.review)) reasons.push('read'); // #15243
     if (waitingOnAgent(s.review)) reasons.unshift(`Changes requested · waiting on ${markHidden(s.review.produced_by || 'the agent', { strict: true })}`);
     for (const text of reasons) { if (isPhoneLayout() && hasNewVersion(s.review) && text.startsWith('New version')) continue; const reason = DT.el('span', 'inbox-review-reason', ` · ${text}`); if (/^\d+ new comments?$/.test(text)) reason.classList.add('inbox-new-comments'); name.append(reason); }
     name.setAttribute('aria-label', [`Open ${markTitle(s.review.name)}`, ...(versionOf(s.review) > 1 && !hasNewVersion(s.review) ? [`version ${versionOf(s.review)}`] : []), ...reasons].join(', '));
     const wrap = DT.el('span', 'inbox-review-item inbox-agent-first'), sender = agentLink(markHidden(s.review.produced_by, { strict: true }).trim() || 'sender unknown', { board: boardTeamKey(sessionServer(s), s.review.team), cls: 'inbox-review-from' });
-    const readWords = `${isRead(s.review) ? ', read' : ', unread'}${waitingOnAgent(s.review) && !(s.review.new_comments > 0) ? ', waiting on agent, not counted' : ''}`;
+    const readWords = `${isRead(s.review) ? '' : ', unread'}${waitingOnAgent(s.review) && !(s.review.new_comments > 0) ? ', waiting on agent, not counted' : ''}`;
     if (isPhoneLayout()) {
 const tags = DT.el('span', 'inbox-review-tags');
 if (versionOf(s.review) > 1) { const version = DT.el('span', 'inbox-review-version', `v${versionOf(s.review)}`); version.title = hasNewVersion(s.review) ? `New version v${versionOf(s.review)}` : `Version ${versionOf(s.review)}`; version.setAttribute('aria-hidden', 'true'); tags.append(version); }

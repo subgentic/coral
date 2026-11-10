@@ -37,7 +37,7 @@ const B = 'done-today-' + Date.now().toString(36);
             assert.ok(!rows.some(r => r.includes('Cancelled a moment ago')), `${w}: a task cancelled today is not in the default view: ${JSON.stringify(rows)}`);
             assert.ok(rows.some(r => r.includes('Finished a moment ago')), `${w}: the task finished today is in the default view, not behind Show all`);
             const open = await pill('open');
-            assert.match(open.text, /Open\s*3/, `${w}: the Open count is what the table under it shows: ${JSON.stringify(open)}`);
+            assert.match(open.text, /Open\s*2, finished today 1/, `${w}: the Open pill says what it holds, the open ones and the one finished today, which the table under it shows (#15243): ${JSON.stringify(open)}`);
             await ev(`[...document.querySelectorAll('#team-panel-tasks button')].find(b => b.dataset.filter === 'done').click(); true`);
             await waitFor(`document.querySelectorAll('#team-panel-tasks tbody tr.dt-row').length === 2`, `${w}: the Done view`, 5000);
             rows = await titles();

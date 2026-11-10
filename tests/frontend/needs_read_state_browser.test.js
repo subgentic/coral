@@ -41,7 +41,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                     const lum = c => { const [r, g, b] = rgba(c).slice(0, 3).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
                     const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
                     const info = n => { const tr = [...document.querySelectorAll('${T} tbody tr')].find(r => r.textContent.includes('plan-' + n + '.md')), name = tr.querySelector('.inbox-review-name'), td = name.closest('td'), cs = getComputedStyle(name), tcs = getComputedStyle(td);
-                        return { weight: Number(cs.fontWeight), bg: plain(name), bgLum: lum(plain(name)), color: cs.color, contrast: contrast(cs.color, plain(name)), text: (tr.querySelector('.inbox-review-item .sr-only') || {}).textContent || '', pill: [...tr.querySelectorAll('.dt-tag')].some(t => t.textContent.trim() === 'read'), cls: tr.className }; };
+                        return { visible: name.textContent.trim(), weight: Number(cs.fontWeight), bg: plain(name), bgLum: lum(plain(name)), color: cs.color, contrast: contrast(cs.color, plain(name)), text: ((tr.querySelector('.inbox-review-item .sr-only') || {}).textContent || '') + ' ' + name.textContent + ' ' + (name.getAttribute('aria-label') || ''), pill: [...tr.querySelectorAll('.dt-tag')].some(t => t.textContent.trim() === 'read'), cls: tr.className }; };
                     return { unread: info(1), read: info(2) }; })()`);
                 await shot(`needs-read-state-${w}-${theme}${theme === 'auto' ? '-os-' + os : ''}`);
                 check(!m.read.pill && !m.unread.pill, at + 'there is no "read" pill');
@@ -50,6 +50,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 check(m.read.color !== m.unread.color, at + `a read row's text is muted: ${m.read.color} / ${m.unread.color}`);
                 check(m.read.contrast >= 4.5 && m.unread.contrast >= 4.5, at + `contrast is at least 4.5:1: ${m.unread.contrast.toFixed(2)} / ${m.read.contrast.toFixed(2)}`);
                 check(/unread/.test(m.unread.text) && /read/.test(m.read.text) && !/unread/.test(m.read.text), at + 'a screen reader still hears unread and read');
+                check(/ · read$/.test(m.read.visible) && !/ · read/.test(m.unread.visible), at + `a read row says 'read' beside its name, an unread one does not (#15243): ${m.read.visible} / ${m.unread.visible}`);
             }
             await removeBoards(ev, [team]).catch(() => {});
         }

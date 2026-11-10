@@ -223,7 +223,8 @@ const counts = () => {
         if (model.totalOpen != null && model.totalDone != null) c.all = model.totalOpen + model.totalDone;
         if (model.totalDone != null) c.done = model.totalDone;
     }
-    c.open = c.all - c.done + rowsNow().filter(doneToday).length; // Open and the tasks finished today
+    c.today = rowsNow().filter(doneToday).length;
+    c.open = c.all - c.done + c.today; // Open and the tasks finished today
     return c;
 };
 
@@ -242,7 +243,7 @@ function draw() {
     // The one toolbar line (#7717): the list bar's own row holds the search, the state pills (one compact select when they do not fit), the Filters icon and + Task at the right.
     if (PHONE.matches) bar.node.querySelector('.list-bar-search-row')?.classList.add('phone-list-bar');
     Toolbar.adopt(bar.node.querySelector('.list-bar-search-row'), {
-        pills: { label: 'Show tasks that are', current: model.filter, items: FILTERS.map(([key, label]) => ({ key, label, count: c[key] })),
+        pills: { label: 'Show tasks that are', current: model.filter, items: FILTERS.map(([key, label]) => ({ key, label, count: key === 'open' && c.today ? `${c.open - c.today}, finished today ${c.today}` : c[key] })), // Open says what it holds when it includes the tasks finished today (#15243, #10604)
             onPick: key => { model.filter = key; if (key === 'open' || key === 'all') browserLocal.set(HIDE_KEY, key === 'open' ? 'true' : 'false'); say(`${FILTERS.find(f => f[0] === key)[1]}: ${c[key]} tasks`); draw(); } },
         chips: TF.chips(model.filters).filter(c => c.key !== 'q').map(c => ({ label: c.label, aria: `Remove the filter: ${c.label}`, onRemove: () => { say(`Removed the filter: ${c.label}`); setFilters(TF.without(model.filters, c.key)); } })),
         action: newTask,
