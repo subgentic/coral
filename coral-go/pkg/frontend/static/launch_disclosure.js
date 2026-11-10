@@ -44,7 +44,7 @@ export async function refreshLaunchDisclosure() {
     try {
         const response = await serverFetch('local', '/api/launch-disclosure', { cache: 'no-store' });
         if (!response.ok) { hint.clear(); hint.release(); return; } // older servers and non-owners have no offer: nothing is reserved for it
-        const disclosure = await response.json(); if (generation !== readGeneration || !valid(disclosure)) return;
+        const disclosure = await response.json(); if (generation !== readGeneration) return; if (!valid(disclosure)) { hint.release(); return; }
         const mode = document.getElementById('settings-permission-mode');
         if (mode) {
             let line = document.getElementById('settings-launch-disclosure');
@@ -79,5 +79,5 @@ export async function refreshLaunchDisclosure() {
         window.dispatchEvent(new Event('coral:launch-disclosure-shown'));
         hint.release(); hint.set(banner.getBoundingClientRect().height); // the notice now holds the room; the next load reserves it from the start
         announceNotice(headline);
-    } catch { /* no unauthenticated or network failure is an acknowledgement */ }
+    } catch { hint.release(); /* no unauthenticated or network failure is an acknowledgement; the room that was reserved for it is given back */ }
 }

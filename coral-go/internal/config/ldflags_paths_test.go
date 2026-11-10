@@ -46,10 +46,13 @@ func repoRoot(t *testing.T) string {
 }
 
 // stringVars are the package-level string variables of this package: the only things a -X flag into it may set.
-func stringVars(t *testing.T) map[string]bool {
+func stringVars(t *testing.T) map[string]bool { return stringVarsIn(t, ".") }
+
+// stringVarsIn is stringVars for the package in one folder.
+func stringVarsIn(t *testing.T, dir string) map[string]bool {
 	t.Helper()
 	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, ".", func(fi fs.FileInfo) bool { return !strings.HasSuffix(fi.Name(), "_test.go") }, 0)
+	pkgs, err := parser.ParseDir(fset, dir, func(fi fs.FileInfo) bool { return !strings.HasSuffix(fi.Name(), "_test.go") }, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,6 +69,15 @@ func stringVars(t *testing.T) map[string]bool {
 					if id, ok := vs.Type.(*ast.Ident); ok && id.Name == "string" {
 						for _, n := range vs.Names {
 							out[n.Name] = true
+						}
+					} else if vs.Type == nil {
+						// var X = "literal": untyped, a string all the same, and the linker sets it
+						for i, n := range vs.Names {
+							if i < len(vs.Values) {
+								if lit, ok := vs.Values[i].(*ast.BasicLit); ok && lit.Kind == token.STRING {
+									out[n.Name] = true
+								}
+							}
 						}
 					}
 				}
@@ -112,6 +124,15 @@ var mainVarAllowed = map[string]string{
 	"tests/release/update_rehearsal.sh": "version", // the updater test rig's unhealthy-coral stand-in (internal/updater/testrig/cmd/unhealthy-coral)
 }
 
+// Build variables of OTHER packages a release stamps on purpose, by import path (relative to this module's internal/) then folder: each flag into one
+// must name one of the listed variables, and the variable must exist as a string in that folder's package (#15065, the Dropbox app key).
+var otherPackageVars = map[string]struct {
+	dir  string
+	vars []string
+}{
+	"server/routes": {dir: "../server/routes", vars: []string{"DropboxDefaultAppKey"}},
+}
+
 func TestEveryLinkerFlagNamesThisPackageAndARealVariable(t *testing.T) {
 	root := repoRoot(t)
 	want := thisPackage()
@@ -122,6 +143,7 @@ func TestEveryLinkerFlagNamesThisPackageAndARealVariable(t *testing.T) {
 		}
 	}
 	perFile := map[string]int{}
+	perOther := map[string]int{}
 	for _, f := range buildFiles(t, root) {
 		b, err := os.ReadFile(f)
 		if err != nil {
@@ -139,6 +161,8 @@ func TestEveryLinkerFlagNamesThisPackageAndARealVariable(t *testing.T) {
 				if mainVarAllowed[rel] != name {
 					t.Errorf("%s: -X main.%s sets a variable of whatever program is built (cmd/coral has none): use %s.%s", rel, name, want, name)
 				}
+			case otherPackageFlag(t, want, pkg, name):
+				perOther[rel]++
 			case pkg != want:
 				t.Errorf("%s: -X %s.%s names a package that is not %s: the linker ignores it silently and the build comes out with an empty %s", rel, pkg, name, want, name)
 			case !vars[name]:
@@ -165,6 +189,32 @@ func TestEveryLinkerFlagNamesThisPackageAndARealVariable(t *testing.T) {
 	if got := perFile[".github/workflows/release.yml"]; got < 8 {
 		t.Errorf("release.yml sets %d flags into config, want at least 8 (PostHogKey and Version in four builds)", got)
 	}
+	if got := perOther[".github/workflows/release.yml"]; got < 4 {
+		t.Errorf("release.yml sets %d Dropbox app key flags, want 4 (Linux, Windows, macOS arm64 and amd64)", got)
+	}
+}
+
+// otherPackageFlag says whether "-X pkg.name" is one of the allowed variables of another package, and fails the test when that variable is gone.
+func otherPackageFlag(t *testing.T, want, pkg, name string) bool {
+	t.Helper()
+	module := strings.TrimSuffix(want, "/internal/config")
+	for suffix, o := range otherPackageVars {
+		if pkg != module+"/internal/"+suffix {
+			continue
+		}
+		listed := false
+		for _, v := range o.vars {
+			listed = listed || v == name
+		}
+		if !listed {
+			return false
+		}
+		if !stringVarsIn(t, o.dir)[name] {
+			t.Errorf("-X %s.%s names a variable that does not exist (or is not a string) in %s", pkg, name, o.dir)
+		}
+		return true
+	}
+	return false
 }
 
 // The scanner itself: a stale path and a missing variable are found, a right one is not.

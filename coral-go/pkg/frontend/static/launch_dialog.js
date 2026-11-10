@@ -17,6 +17,7 @@ const { _checkAgentCLI } = await importOnce('./cli_check.js');
 import { checkTmuxForLaunch } from './prerequisites.js';
 import { reportLaunchDialogOpened } from './dashboard_analytics.js';
 import { sectionFocus } from './section_dialog.js';
+import { loadStyles } from './lazy_styles.js';
 import { showTeamAddress } from './team_form.js';
 import { agentForm as folderForm, setAgentNameMode } from './agent_form.js';
 const { _syncACFModelField, getAgentConfig, renderAgentConfigForm, cliWarningOf } = await importOnce('./agent_config_form.js');
@@ -84,6 +85,7 @@ function _selectLaunchType(type) {
         _showLaunchStep("chooser");
         return;
     }
+    if (_needsComputerStep(type)) { launch.pendingType = type; _showComputerStep(type); return; } // on a Hub the computer is the first step (#15014)
     launch.mode = type;
     if (type === "agent") setLaunchMore(false); // New Agent always opens on step 1, the folder (#7391)
     wireEnterAdvances(document.getElementById('launch-step-agent')); wireEnterAdvances(document.getElementById('launch-step-team')); // Enter in a single-line field is Next, and Launch on the last step (#11289)
@@ -160,6 +162,8 @@ export function showLaunchModal(server, lock = false) {
     launch.member = null; // nor a member's (#7861)
     _serverSettings.clear();
     launch.serverLocked = !!lock && isHub();
+    _hideComputerStep();
+    launch.computerChosen = server !== undefined && server !== null && server !== ''; launch.pendingType = null; // a new dialog asks 'Which computer?' (#15014), unless a computer was named when it was opened (a computer's own Launch team / Launch agent)
     launch.server = _effectiveServer(coerceSelection(server, isHub(), state.servers));
     if (launch.serverLocked && normServer(server) !== LOCAL_SERVER) launch.server = normServer(server);
     _renderServerPicker();
@@ -222,6 +226,10 @@ function _renderServerPicker() {
     const locked = launch.serverLocked;
     const show = isHub() && (locked ? current !== LOCAL_SERVER : pickerVisible(true, state.servers));
     if (!show) { row.style.display = 'none'; return; }
+    const chip = document.getElementById('launch-computer-chip'), label = row.querySelector('label');
+    const chosen = launch.computerChosen && !locked && (launch.mode === 'agent' || launch.mode === 'team'); // the step answered it: the row is a chip with Change, not a drop-down (#15014)
+    if (chip) { chip.hidden = !chosen; if (chosen) document.getElementById('launch-computer-chip-name').textContent = launch.teamAddress ? 'another computer' : serverLabel(current, state.servers); }
+    if (label) label.hidden = chosen; sel.hidden = chosen;
     let opts = pickerOptions(state.servers);
     if (!opts.some(o => o.id === current)) opts = [...opts, { id: current, label: current, disabled: false }];
     sel.innerHTML = opts.map(o =>
@@ -234,6 +242,41 @@ function _renderServerPicker() {
 }
 
 const TEAM_ADDRESS = '__address__';
+
+// ── The Hub's first step: Which computer? (#15014) ───────────────────────
+
+/** On a Hub (self-hosted or Coral Hub) New agent and New team open on 'Which computer?': not for a locked launch (from inside a computer), a team member or Add agent, once answered, or where there is no choice to make. */
+function _needsComputerStep(type) {
+    return (type === 'agent' || type === 'team') && isHub() && !launch.serverLocked && !launch.member && !launch.addTo && !launch.computerChosen && pickerVisible(true, state.servers);
+}
+
+function _showComputerStep(type) {
+    loadStyles('provider_cards.css').catch(() => {});
+    const list = document.getElementById('launch-computer-list'), go = document.getElementById('launch-computer-go');
+    if (!list || !go) return;
+    document.getElementById('launch-computer-sub').textContent = type === 'team' ? 'The team will launch on it and use its folders.' : 'The agent will run on it and use its folders.';
+    const opts = pickerOptions(state.servers).map(o => ({ ...o, name: o.label.replace(/ \([^)]*\)$/, '') }));
+    if (type === 'team') opts.push({ id: TEAM_ADDRESS, name: 'Another computer\u2019s address\u2026', other: true });
+    const pick = opts.find(o => !o.disabled && o.id === launch.server) || opts.find(o => !o.disabled);
+    list.innerHTML = opts.map(o => `<label class="launch-computer-card"><span class="launch-computer-dot" data-state="${o.disabled ? 'off' : 'on'}" aria-hidden="true"></span><span class="launch-computer-text"><strong>${escapeHtml(o.name)}</strong><small>${escapeHtml(o.other ? 'Type the address of a computer that is not in the list' : o.disabled ? `Offline: ${o.reason}` : o.id === LOCAL_SERVER ? 'The hub, this computer \u00b7 Online' : 'Online')}</small></span><input type="radio" name="launch-computer" value="${escapeAttr(o.id)}"${o.disabled ? ' disabled' : ''}${o === pick ? ' checked' : ''}></label>`).join(''); // real radios: the arrows, the disabled ones skipped and the state are the browser's own
+    go.disabled = !pick;
+    _showLaunchStep('pickComputer'); document.getElementById('launch-step-computer').style.display = 'flex'; document.getElementById('launch-modal')?.setAttribute('aria-labelledby', 'launch-computer-title'); // display-ok: a step of the launch modal, shown here, hidden by _hideComputerStep
+    (list.querySelector('input:checked') || list.querySelector('input:not(:disabled)'))?.focus();
+}
+const _hideComputerStep = () => { document.getElementById('launch-step-computer').style.display = 'none'; }; // display-ok: a step of the launch modal
+async function _computerGo() {
+    const type = launch.pendingType, pick = document.querySelector('#launch-computer-list input:checked')?.value; if (!type || !pick) return;
+    const wantAddress = pick === TEAM_ADDRESS;
+    launch.computerChosen = true; _hideComputerStep();
+    if (!wantAddress) await _onLaunchServerChange(pick, { force: true });
+    _selectLaunchType(type);
+    if (wantAddress) await _onLaunchServerChange(TEAM_ADDRESS);
+    _renderServerPicker();
+}
+function _computerBack() { launch.pendingType = null; launch.mode = null; _hideComputerStep(); _showLaunchStep('chooser'); }
+function _computerChange() { const type = launch.mode; if (type !== 'agent' && type !== 'team') return; launch.computerChosen = false; launch.mode = null; launch.pendingType = type; _showComputerStep(type); }
+const _computerActs = { go: _computerGo, back: _computerBack, change: _computerChange };
+document.getElementById('launch-modal')?.addEventListener('click', e => { const b = e.target.closest?.('[data-launch-computer]'); if (b) { e.preventDefault(); _computerActs[b.dataset.launchComputer]?.(); } }); // the step's own buttons (no entry in the start's action map)
 /** Show the address field when the Machine is "Another computer's address..." (the field is in step 1, in its own slot); nothing typed there survives another choice. */
 function _syncTeamAddress(on) {
     launch.teamAddress = !!on;

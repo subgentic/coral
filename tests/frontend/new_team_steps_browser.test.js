@@ -67,17 +67,18 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
             await t.type('input', N.teamName, ''); await t.type('input', N.folder, '/work/payments-app'); s = await state(); assert.match(s.live, /Team name is required/);
             await t.click('button', N.next); assert.match(await stepLine(ev), /^Step 1 of 3/, 'Next does not advance');
         });
-        await S.run('step 1: a machine select named "Computer" with several machines, "Another computer\'s address..." as its last entry, and choosing it reveals the address field', async () => {
+        await S.run('on a Hub New team opens on Which computer? with several machines; "Another computer\'s address..." is its last card and choosing it reveals the address field; with this computer alone there is no step', async () => {
             await ev(`window.hideLaunchModal && window.hideLaunchModal(); T.state.hub = true; T.state.cloud = false; T.state.serversKnown = true; T.state.servers = [{ id: 'm1', label: 'build-server', status: 'online', version: '1.4.6', last_seen: new Date().toISOString() }]; true`);
-            await openNewTeam(ev, waitFor);
-            assert.ok(await t.has('select', N.machine), 'a select named exactly Machine');
-            const opts = await ev(`[...window.__nt.find(window.__nt.dlg(${N.team}), 'select', ${N.machine}).options].map(o => o.textContent.trim())`);
-            assert.match(opts[opts.length - 1], /^Another computer's address/, `the last entry is Another computer's address... (${JSON.stringify(opts)})`);
-            assert.ok(!(await t.has('input', N.address)), 'the address field is not shown until chosen');
-            await t.pick(N.machine, /^Another computer/); await settle(200);
+            await ev(`(async () => { await window.showLaunchModal(); const c = document.querySelector('#launch-step-chooser [data-arg="team"]'); if (c && c.getClientRects().length) c.click(); return true; })()`);
+            await waitFor(`(() => { const s = document.getElementById('launch-step-computer'); return !!s && getComputedStyle(s).display !== 'none' && document.querySelectorAll('#launch-computer-list input[type=radio]').length >= 2; })()`, 'the Which computer? step', 6000);
+            const names = await ev(`[...document.querySelectorAll('#launch-computer-list .launch-computer-card strong')].map(e => e.textContent.trim())`);
+            assert.match(names[names.length - 1], /^Another computer.s address/, `the last card is Another computer's address... (${JSON.stringify(names)})`);
+            await ev(`document.querySelector('#launch-computer-list input[value="__address__"]').click(); document.getElementById('launch-computer-go').click(); true`);
+            await waitFor(`!!window.__nt.dlg(${N.team})`, 'the New team dialog after Continue', 6000); await settle(300);
             assert.ok(await t.has('input', N.address), 'the address field after choosing it');
             await ev(`window.hideLaunchModal(); T.state.servers = []; T.state.hub = false; T.state.cloud = false; true`);
             await openNewTeam(ev, waitFor); assert.ok(!(await t.has('select', N.machine)), 'no Machine select with this computer alone');
+            assert.ok(await ev(`getComputedStyle(document.getElementById('launch-step-computer')).display === 'none'`), 'and no Which computer? step with this computer alone');
         });
         await S.run('step 1: "Launch in a git worktree" with a Base branch appears only for a git folder', async () => {
             await reopen();

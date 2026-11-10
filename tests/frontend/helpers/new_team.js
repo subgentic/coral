@@ -29,6 +29,7 @@ const stepLine = ev => ev(`(() => { const d = window.__nt.dlg(${N.team}); if (!d
 // Open New team as a person does: the Launch dialog, then the Team choice.
 async function openNewTeam(ev, waitFor) {
     await ev(`(async () => { await window.showLaunchModal(); const c = document.querySelector('#launch-step-chooser [data-arg="team"]'); if (c && c.getClientRects().length) c.click(); return true; })()`);
+    await require('./new_agent').passComputerStep(ev, waitFor);
     await waitFor(`!!window.__nt.dlg(${N.team})`, 'the New team dialog (role=dialog named New team)', 6000);
 }
 // The steps of the flow, the same in every suite: T(ev, waitFor) gives click(sel, rx), type(sel, rx, value), pick(select, text) and to(step, opts) that fills what each step needs and presses Next.

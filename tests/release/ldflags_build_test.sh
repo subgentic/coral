@@ -13,6 +13,7 @@ trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/home" "$work/data"
 fail=0
 VER=9.9.9-ldtest; KEY=phc_ldtest_key_0123456789; BASE=v9.9.8-ldtest
+DBX=ldtest-dropbox-app-id
 
 run_version() { env -i PATH="$PATH" HOME="$work/home" CORAL_DATA_DIR="$work/data" CORAL_TELEMETRY_DISABLED=1 "$1" --version; }
 build() { (cd "$root/coral-go" && CGO_ENABLED=0 go build -tags fts5 -ldflags "$1" -o "$2" ./cmd/coral); }
@@ -26,6 +27,7 @@ flags_of() {
       Version) out="$out -X $w=$VER" ;;
       PostHogKey) out="$out -X $w=$KEY" ;;
       DevBase) out="$out -X $w=$BASE" ;;
+      DropboxDefaultAppKey) out="$out -X $w=$DBX" ;;
       # this function runs in a command substitution: a variable set here is lost with its subshell, so the failure is a file the end of the script reads
       *) echo "FAIL: $f: -X $w sets an unknown variable" >&2; : > "$work/unknown-variable" ;;
     esac
@@ -33,8 +35,8 @@ flags_of() {
   echo "$out"
 }
 
-# initialised "go tool nm" type of config.<var> in a binary built without -s: D when a flag set it, B when none did
-nm_type() { go tool nm "$1" | awk -v v="/internal/config.$2" 'index($3, v) && substr($3, length($3) - length(v) + 1) == v {print $2}'; }
+# initialised "go tool nm" type of <package>.<var> (config.Version, server/routes.DropboxDefaultAppKey) in a binary built without -s: D when a flag set it, B when none did
+nm_type() { go tool nm "$1" | awk -v v="/internal/$2" 'index($3, v) && substr($3, length($3) - length(v) + 1) == v {print $2}'; }
 
 check() {
   local f="$1" want_key="$2" flags bin w var t
@@ -47,7 +49,7 @@ check() {
     if [ "$v" = "coral $VER" ]; then echo "ok: $f: --version is $VER"; else echo "FAIL: $f: --version printed [$v], want [coral $VER]: the Version flag did not take effect"; fail=1; fi
   fi
   for w in $(echo "$flags" | grep -o -- '-X [^ =]*' | sed 's/^-X //'); do
-    var=${w##*.}; t=$(nm_type "$bin" "$var")
+    var=${w##*.}; t=$(nm_type "$bin" "${w#*/internal/}")
     if [ "$t" = D ]; then echo "ok: $f: $var is set in the binary"; else echo "FAIL: $f: $var is not set in the binary (nm type [$t]): its -X flag did not take effect"; fail=1; fi
   done
   if [ "$want_key" = key ] && ! echo "$flags" | grep -q PostHogKey; then echo "FAIL: $f: no PostHogKey flag"; fail=1; fi
@@ -56,13 +58,15 @@ check() {
 # Intentional live build-contract checks: fixture flags could pass while the
 # actual release silently drops its version or telemetry stamp.
 check .github/workflows/release.yml key
+# the Dropbox app key (#15065) must be stamped on every release build: Linux, Windows, macOS arm64 and macOS amd64
+[ "$(grep -c 'routes.DropboxDefaultAppKey' "$root/.github/workflows/release.yml")" = 4 ] && echo "ok: release.yml stamps DropboxDefaultAppKey at its 4 build sites" || { echo "FAIL: release.yml does not stamp DropboxDefaultAppKey at exactly 4 build sites"; fail=1; }
 check .github/workflows/linux-runner-dryrun.yml nokey
 check installers/build-macos.sh key
 check installers/build-linux.sh nokey
 check tools/build_windows.ps1 nokey
 if grep -q 'config.DevBase' "$root/coral-go/Makefile"; then
   flags=$(flags_of "$root/coral-go/Makefile"); build "$flags" "$work/coral-make"
-  t=$(nm_type "$work/coral-make" DevBase)
+  t=$(nm_type "$work/coral-make" config.DevBase)
   if [ "$t" = D ]; then echo "ok: Makefile: DevBase is set in the binary"; else echo "FAIL: Makefile: DevBase is not set in the binary (nm type [$t])"; fail=1; fi
 fi
 

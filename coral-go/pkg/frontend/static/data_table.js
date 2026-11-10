@@ -682,7 +682,7 @@ export function dataTable(cfg) {
             if (a.danger || a.askWhen?.(chosen().length, chosen())) { st.confirming = i; drawBar(); bar.querySelector('.dt-bar-keep')?.focus(); return; } // askWhen(n, rows): an action that asks only for some selections (Approve of several files), in the same Keep / confirm step, not red
             a.run(chosen(), new Set(st.selected));
         };
-        const more = [];
+        const more = [], whys = []; // whys: why an action is off, in words (the button's title and one line in the bar, #15015)
         actions.forEach((a, i) => {
             if (st.confirming >= 0) return; // while one asks, the others wait
             if (a.hidden?.(chosen())) return; // an action that makes no sense for what is selected is not offered, not shown dimmed (#12401: Changes on a goal)
@@ -690,7 +690,9 @@ export function dataTable(cfg) {
             const action = icons && a.icon ? button('btn btn-quiet btn-icon dt-bar-action dt-bar-icon', '', press(a, i)) : button(`btn btn-small dt-bar-action${a.danger ? ' dt-danger' : ''}`, a.label, press(a, i));
             if (icons && a.icon) { action.append(a.icon()); action.setAttribute('aria-label', a.label); action.title = a.label; }
             action.disabled = !!a.disabled?.(chosen()); bar.append(action);
+            const why = action.disabled ? a.why?.(chosen()) : ''; if (why) { action.title = `${a.label} is off: ${why}`; whys.push(`${a.label} is off: ${why}`); }
         });
+        if (whys.length) { const line = el('span', 'dt-bar-count dt-bar-why', whys.join(' ')); line.setAttribute('role', 'status'); bar.append(line); } // the reason is text on the bar too, not only a tip (a touch screen has none)
         if (more.length) { // the rest of the actions behind one three-dot button (menu_button.js: arrow keys, Escape, a tap elsewhere closes)
             const id = `dt-bar-more-${n}`, wrap = el('span', 'dt-bar-more'), toggle = button('btn btn-quiet btn-icon ic-more dt-bar-more-toggle', '', async e => { e.stopPropagation(); const m = await importOnce('./menu_button.js'), live = toggle.isConnected ? toggle : bar.querySelector('.dt-bar-more-toggle'); if (live) m.toggleMenu(live); }); // the module loads on the first tap: a refresh that redrew the bar meanwhile replaced this button, so the menu opens on the one now in the bar (v2.0.24: More did nothing after two swipes)
             toggle.id = id; toggle.setAttribute('aria-haspopup', 'menu'); toggle.setAttribute('aria-expanded', 'false'); toggle.setAttribute('aria-controls', `${id}-menu`); toggle.setAttribute('aria-label', 'More actions'); toggle.title = 'More actions';
@@ -763,5 +765,6 @@ export function dataTable(cfg) {
     }
     if (typeof ResizeObserver === 'function') new ResizeObserver(() => applyWidths()).observe(box); // every column is laid out again whenever the box changes (the elastic column takes what the others leave)
     mailQuery?.addEventListener?.('change', () => { box.classList.toggle('dt-mail-on', mailOn()); drawBody(); cfg.onModeChange?.(); }); // the window crosses the phone's width: the rows are drawn again in the other form; a list whose selection exists on a phone only (selectable is decided when the spec is drawn) asks its owner to draw the table again
+    if (sel) box.addEventListener('keydown', e => { if (e.key === 'Escape' && st.selected.size && !e.defaultPrevented && !e.target.closest('input:not(.check), textarea, [role=menu]')) { e.preventDefault(); clear(); } }); // Escape leaves the selection (#15015); a menu, a field or a dialog keeps its own Escape
     return { el: box, bar, selectButton, selection: () => new Set(st.selected), clear, state: st };
 }

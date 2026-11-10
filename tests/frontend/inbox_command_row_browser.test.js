@@ -175,7 +175,8 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
                 check(open.open && open.scrolls && open.h < open.vh && open.yes === 0 && /scroll to the end/.test(open.sentence), `${at}${what}: Show all opens a box that scrolls inside, Yes still locked: ` + JSON.stringify(open));
                 await shot(`command-open-${what.replace(/\W+/g, '-')}-${w}`);
                 await ev(`(() => { const b = document.querySelector('#group-table-view .inbox-cmd-block'); b.scrollTop = b.scrollHeight; return true; })()`);
-                await new Promise(r => setTimeout(r, 400)); // sleep-ok: the scroll event reaches the row
+                // the Yes the command gate turns on ignores clicks for 400 ms (#14302): wait until it is on the row AND armed, not for a time that is the same 400 ms (#15133, the sleep ended inside that window on a slow runner)
+                await waitFor(`(() => { const y = [...document.querySelectorAll('#group-table-view .inbox-answers button')].find(x => x.textContent === 'Yes' && !x.hidden && x.getClientRects().length > 0); return !!y && !y.classList.contains('inbox-arming'); })()`, `${at}${what}: the unlocked Yes is on the row and armed`, 5000);
                 const end = await ev(`(() => { const c = document.querySelector('#group-table-view .inbox-answers'); return { yes: [...c.querySelectorAll('button')].filter(x => x.textContent === 'Yes' && !x.hidden && x.getClientRects().length > 0).length, sentence: c.querySelector('.inbox-yes-note').textContent }; })()`);
                 check(end.yes === 1 && /Yes lets it run this once/.test(end.sentence), `${at}${what}: at the end of the command Yes is on the row: ` + JSON.stringify(end));
                 // and Yes now sends the answer for the whole command's ask

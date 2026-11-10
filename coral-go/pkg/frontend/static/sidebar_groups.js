@@ -183,7 +183,10 @@ function drawTable() {
     const toolbarFocus = bar?.node?.contains(a) ? a : null;
     const toolbarCaret = toolbarFocus && typeof toolbarFocus.selectionStart === 'number' ? [toolbarFocus.selectionStart, toolbarFocus.selectionEnd] : null;
     const folderPage = bar?.node && tables[0] && tables[0].noun ? tables[0] : null;
-    const drawn = html + (src.signature?.() || '') + (folderPage ? `|head:${folderPage.title}:${folderPage.count === undefined ? folderPage.rows.length : folderPage.count}` : '') + (bar?.signature || '') + tables.map(x => (x.node ? `|${x.signature || ''}` : '')).join('') + (lead ? `|${lead.signature}` : ''); // a table with its own rows says what they are (signature): the same rows are not drawn again
+    // The count in a toolbar page's head (folderHead) and the status line under it are written in place (below), not part of what decides a redraw (#14877): a count that lands late (the review pages' total from null to 0, a completeness flag) changes only those words,
+    // and drawing the table again for it replaced a link the person might be clicking.
+    const compare = html.replace(/(class="item-meta group-table-status" role="status">)[^<]*/g, '$1');
+    const drawn = compare + (src.signature?.() || '') + (folderPage ? `|head:${folderPage.title}` : '') + (bar?.signature || '') + tables.map(x => (x.node ? `|${x.signature || ''}` : '')).join('') + (lead ? `|${lead.signature}` : ''); // a table with its own rows says what they are (signature): the same rows are not drawn again
     // A row the keyboard is on keeps it across a redraw (the Inbox's "waiting 4 min" moves on every 30 seconds while the table is the only list, #7004): it is found again by its class and data attributes
     const focusTargets = '.group-chip, .dt-primary, .dt-quiet, .inbox-answer, a.inbox-ask-subject-link';
     const held = host.contains(a) && a.matches(focusTargets) ? { cls: a.className, data: JSON.stringify(a.dataset), href: a.getAttribute('href'), row: a.closest('tbody tr') ? [...a.closest('tbody').children].indexOf(a.closest('tr')) : -1 } : null;
@@ -200,6 +203,14 @@ function drawTable() {
         let k = 0;
         for (const x of tables) if (x.node && (x.rows.length || !x.empty)) slots[k++]?.replaceWith(x.node());
         for (const x of tables) { const f = x.foot && x.foot(); if (f) host.querySelector('.vl-panel') ? host.querySelector('.vl-panel').append(f) : host.append(f); } // a line under the page that is not part of the table (Needs you's alerts offer, #11837); a phone's panel holds the page
+    }
+    if (host.dataset.drawn === drawn) { // nothing to draw again: the head's count and the status line follow in place
+        if (folderPage && bar?.node && host.contains(bar.node)) { // the head's count span only: a page may add its own to the head (the Artifacts page's), and drawing the head again would take it away
+            const head = bar.node.querySelector(':scope .inbox-folder-head'), n = folderPage.count === undefined ? folderPage.rows.length : folderPage.count, c = head && head.querySelector('.session-group-count');
+            if (!head) folderHead(bar.node, folderPage);
+            else if (n != null && c) { if (c.textContent !== String(n)) c.textContent = String(n); head.dataset.words = `${folderPage.title}|${n}`; }
+        }
+        host.querySelectorAll('.group-table-status').forEach((p, i) => { const t = tables[i]; if (t && t.status && p.textContent !== t.status) p.textContent = t.status; });
     }
     // Replacing rows temporarily empties the scroller and clamps its position.
     // Keep the current folder's place through every refresh, including count-only updates.

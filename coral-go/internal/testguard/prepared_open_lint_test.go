@@ -14,16 +14,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// board.NewStorePrepared and store.OpenPrepared open a database file WITHOUT running the schema step (and so none of the migrations that follow it): they are for a test that
+// board.NewStorePrepared, store.OpenPrepared and board.UseDatabasePrepared open a database file WITHOUT running the schema step (and so none of the migrations that follow it): they are for a test that
 // starts from a copy of a database this build just migrated (boardtest, storetest, #5444). A production caller would open an older database and silently skip its migrations,
-// so no non-test file may name either one except the two test-support packages that make the copies. This reads every non-test .go file of the module (both names, called or
+// so no non-test file may name any of them except the two test-support packages that make the copies (and the one early return of initAgentTaskEngine that only a prepared open reaches). This reads every non-test .go file of the module (both names, called or
 // only referenced) and fails with the file and line.
-var preparedOpeners = map[string]bool{"NewStorePrepared": true, "OpenPrepared": true}
+var preparedOpeners = map[string]bool{"NewStorePrepared": true, "OpenPrepared": true, "UseDatabasePrepared": true}
 
 // preparedAllowed are the files that may use them: the test-support packages (and the two definitions, which are declarations, not uses).
 var preparedAllowed = map[string]bool{
 	"internal/board/boardtest/boardtest.go": true,
 	"internal/store/storetest/storetest.go": true,
+	// the one production use of UseDatabasePrepared: OpenPrepared's own early return in initAgentTaskEngine, which only a prepared open reaches (#14893, Security's SHOULD)
+	"internal/store/task_workflows.go": true,
 }
 
 func TestNoProductionCodeOpensADatabaseWithoutItsSchemaStep(t *testing.T) {

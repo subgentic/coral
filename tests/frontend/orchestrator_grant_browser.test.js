@@ -60,7 +60,10 @@ const SEAT = '0b7c2e4a-5d1f-4c8e-9a36-2f4d8e1b7c90';
             const au = await auditRegion(ev, [P], { focus: [`${P} input[name=og_enabled]`] });
             check(`${theme}: readable (4.5:1) with a focus ring (${au.checked} checked)`, au.fails.length === 0, JSON.stringify(au.fails.slice(0, 2)));
 
+            // the team's Orchestrator is the seat offered when none was ever saved (#14998); the switch stays off
+            check(`${theme}: the seat shows the team's Orchestrator (Boss) with nothing saved, and the switch is off`, (await ev(`${q('select[name=og_seat]')}.value`)) === SEAT && !(await ev(`${q('input[name=og_enabled]')}.checked`)));
             // on, no seat: refused in the form, nothing sent
+            await ev(`(() => { const s = ${q('select[name=og_seat]')}; s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             await ev(`${q('input[name=og_enabled]')}.click(); true`); await settle(100);
             await ev(`document.querySelector('#team-settings-workspace .sv-save').click(); true`); await settle(250);
             check(`${theme}: on with no seat is refused in the form and sends nothing`, (await ev(`window.__og.puts.length`)) === 0 && /Pick the agent/.test(await ev(`document.querySelector('${P}').textContent`)));

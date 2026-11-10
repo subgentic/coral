@@ -28,6 +28,7 @@ import { pollEvery } from './overload.js';
 await loadStyles('pictures.css'); // the picture rules load with this module, before anything draws (page_weight: not at start)
 
 const EARLIER_KEY = 'coral-artifact-comments-earlier'; // 'show' or 'hide' the comments made on older versions while the latest is open (#13606): hidden by default, kept per account
+const AC_WIDTH_KEY = 'coral-artifact-comments-width', AC_DEFAULT_W = 340, AC_MIN_W = 260, AC_MAX_W = 640; // the comments column's width, kept per viewer (#15030)
 const OPEN_KEY = 'coral-artifact-comments-open'; // default for the docked preview; the viewer supplies a key for each file type
 
 /** The team the artifact is opened from, as the bare board name the comments routes take: the team's page (where a board opens, #8129), or the open agent's own team; none otherwise (#5182). The viewer and the docked preview pane (#5311) both ask. */
@@ -71,13 +72,34 @@ function avatar(c) {
 let panelSeq = 0; // one id per panel (the viewer's and the docked pane's)
 export function attachComments(dialog, body, host, opts = {}) {
     const sourcePolicy = data => opts.readOnly?.() ? { ...data, canComment: false, canLock: false, reason: 'Open this file from its original team to write comments.', comments: data.comments.map(c => ({ ...c, can: { reply: false, edit: false, delete: false, resolve: false } })) } : data;
-    const st = { lifetime: 0, video: null, videoTime: null, groupOpen: {}, series: false, hex: null, server: undefined, board: undefined, source: '', text: false, whole: false, data: null, showResolved: false, active: null, composing: null, busy: false, error: '', ranges: new Map(), orphan: new Set(), gone: false };
+    const st = { undelivered: new Map(), lifetime: 0, video: null, videoTime: null, groupOpen: {}, series: false, hex: null, server: undefined, board: undefined, source: '', text: false, whole: false, data: null, showResolved: false, active: null, composing: null, busy: false, error: '', ranges: new Map(), orphan: new Set(), gone: false };
     const panel = el('aside', 'pane pane-aside ac-panel'); panel.setAttribute('aria-label', 'Comments'); panel.hidden = true;
     panel.id = `ac-panel-${++panelSeq}`; // the toggle names it (aria-controls): where the opened comments are
     const toggle = btn('ac-toggle', 'Comments', 'Comments: show the comments'); toggle.hidden = true; toggle.setAttribute('aria-expanded', 'false');
     toggle.setAttribute('aria-controls', panel.id);
     const selBtn = btn('ac-selbtn', 'Add comment', 'Add comment on the selected text'); selBtn.hidden = true;
-    host.append(panel); if (!opts.toggleHost) (dialog.querySelector('.artifact-viewer-actions') || dialog.querySelector('.artifact-viewer-header'))?.prepend(toggle);
+    // The width of the comments column, kept per viewer: a separator between the document and the panel, dragged with the pointer or moved with the arrow keys (#15030).
+    loadStyles('artifact-comments-resize.css');
+    const resizer = el('div', 'ac-resizer'); resizer.setAttribute('role', 'separator'); resizer.setAttribute('aria-orientation', 'vertical'); resizer.tabIndex = 0;
+    resizer.setAttribute('aria-label', 'Resize the comments'); resizer.setAttribute('aria-controls', panel.id); resizer.title = 'Drag, or use the arrow keys, to resize the comments. Double-click to reset.';
+    const widthBounds = () => { const room = host.getBoundingClientRect().width || window.innerWidth; return { min: AC_MIN_W, max: Math.max(AC_MIN_W, Math.min(AC_MAX_W, Math.round(room * 0.6))) }; };
+    const setWidth = (px, keep = true) => { const { min, max } = widthBounds(), w = Math.max(min, Math.min(max, Math.round(px))); host.style.setProperty('--ac-w', w + 'px'); resizer.setAttribute('aria-valuemin', String(min)); resizer.setAttribute('aria-valuemax', String(max)); resizer.setAttribute('aria-valuenow', String(w)); resizer.setAttribute('aria-valuetext', `${w} pixels wide`); if (keep) browserLocal.set(AC_WIDTH_KEY, String(w)); return w; };
+    const savedWidth = Number(browserLocal.get(AC_WIDTH_KEY)) || AC_DEFAULT_W;
+    const currentWidth = () => Math.round(panel.getBoundingClientRect().width) || Number(browserLocal.get(AC_WIDTH_KEY)) || AC_DEFAULT_W;
+    resizer.addEventListener('pointerdown', (e) => { if (e.button !== 0) return; e.preventDefault(); resizer.setPointerCapture?.(e.pointerId); resizer.classList.add('is-dragging'); resizer.focus({ preventScroll: true }); });
+    resizer.addEventListener('pointermove', (e) => { if (!resizer.classList.contains('is-dragging')) return; setWidth(host.getBoundingClientRect().right - e.clientX, false); });
+    const endDrag = (e) => { if (!resizer.classList.contains('is-dragging')) return; resizer.classList.remove('is-dragging'); resizer.releasePointerCapture?.(e.pointerId); setWidth(currentWidth()); };
+    resizer.addEventListener('pointerup', endDrag); resizer.addEventListener('pointercancel', endDrag);
+    resizer.addEventListener('keydown', (e) => {
+        const step = e.shiftKey ? 64 : 16, { min, max } = widthBounds(), w = currentWidth();
+        const next = e.key === 'ArrowLeft' ? w + step : e.key === 'ArrowRight' ? w - step : e.key === 'Home' ? min : e.key === 'End' ? max : null; // the handle is the panel's left edge: left makes the comments wider
+        if (next === null) return;
+        e.preventDefault(); setWidth(next);
+    });
+    resizer.addEventListener('dblclick', () => setWidth(AC_DEFAULT_W));
+    window.addEventListener('resize', () => { if (host.isConnected && host.style.getPropertyValue('--ac-w')) setWidth(currentWidth(), false); });
+    setWidth(savedWidth, false);
+    host.append(resizer, panel); if (!opts.toggleHost) (dialog.querySelector('.artifact-viewer-actions') || dialog.querySelector('.artifact-viewer-header'))?.prepend(toggle);
     dialog.append(selBtn);
     // A live region for what the panel does (a comment posted, resolved, the one stepped to): outside the panel, which is out of the accessibility tree while the phone's sheet is shut.
     const live = el('div', 'ac-live'); live.setAttribute('role', 'status'); live.setAttribute('aria-live', 'polite'); live.setAttribute('aria-atomic', 'true');

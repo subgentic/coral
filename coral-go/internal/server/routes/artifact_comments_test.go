@@ -201,8 +201,9 @@ func TestArtifactCommentsOwnerLifecycle(t *testing.T) {
 	code, rep := rig.do("POST", cp(cmtDoc), cmtAsOwner, map[string]any{"body": "Agreed.", "parent_id": id})
 	require.Equal(t, 201, code, fmt.Sprint(rep))
 	rid := int64(rep["id"].(float64))
-	code, _ = rig.do("POST", cp(cmtDoc), cmtAsOwner, map[string]any{"body": "to a reply", "parent_id": rid})
-	assert.Equal(t, 400, code, "a reply to a reply")
+	code, again := rig.do("POST", cp(cmtDoc), cmtAsOwner, map[string]any{"body": "to a reply", "parent_id": rid})
+	require.Equal(t, 201, code, "the Operator may answer a reply: it joins the thread's first comment, one level (#15034)")
+	assert.Equal(t, float64(id), again["parent_id"])
 
 	// Edit own, resolve and reopen, then delete.
 	code, ed := rig.do("PATCH", fmt.Sprintf("%s/%d", cp(cmtDoc), id), cmtAsOwner, map[string]any{"body": "Edited."})
@@ -224,7 +225,7 @@ func TestArtifactCommentsOwnerLifecycle(t *testing.T) {
 	assert.Equal(t, 200, code)
 	_, after := rig.do("GET", cp(cmtDoc), cmtAsOwner, nil)
 	list = after["comments"].([]any)
-	require.Len(t, list, 2, "the deleted first comment stays as a tombstone for its reply")
+	require.Len(t, list, 3, "the deleted first comment stays as a tombstone for its replies")
 	assert.Equal(t, true, list[0].(map[string]any)["deleted"])
 	assert.Equal(t, "", list[0].(map[string]any)["body"])
 	code, _ = rig.do("PATCH", fmt.Sprintf("%s/%d", cp(cmtDoc), id), cmtAsOwner, map[string]any{"body": "again"})

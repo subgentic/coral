@@ -32,6 +32,7 @@ const RULES = ['claim_nudge', 'status_nudge', 'mention_renudge', 'held_notice', 
 export function healthToValues(h) {
     const v = { on: !!h.on, interval_min: h.interval_min, heartbeat_min: h.heartbeat_min ?? 0, recipient: h.recipient || '', all_clear: !!h.all_clear, default_reviewers: (h.default_reviewers || []).join(', '), auto_delegate_on: !!(h.auto_delegate && h.auto_delegate.on) };
     for (const k of RULES) if (h[k]) for (const [p, val] of Object.entries(h[k])) v[`${k}_${p}`] = val;
+    if (h.assign_limit !== undefined) v.assign_limit = h.assign_limit;
     return v;
 }
 
@@ -45,6 +46,7 @@ export function valuesToHealth(v, base) {
     h.all_clear = !!v.all_clear;
     h.default_reviewers = String(v.default_reviewers || '').split(',').map(s => s.trim()).filter((s, i, a) => s && a.indexOf(s) === i);
     h.auto_delegate = { ...h.auto_delegate, on: !!v.auto_delegate_on };
+    if (h.assign_limit !== undefined && v.assign_limit !== undefined) h.assign_limit = Number.isInteger(v.assign_limit) ? v.assign_limit : h.assign_limit;
     h.claim_nudge = { ...h.claim_nudge, on: !!v.claim_nudge_on, after_min: v.claim_nudge_after_min, nudges: v.claim_nudge_nudges };
     h.status_nudge = { ...h.status_nudge, on: !!v.status_nudge_on, after_min: v.status_nudge_after_min, escalate_after_min: v.status_nudge_escalate_after_min };
     h.mention_renudge = { ...h.mention_renudge, on: !!v.mention_renudge_on, after_min: v.mention_renudge_after_min };
@@ -59,7 +61,7 @@ export function valuesToHealth(v, base) {
     for (const k of ['goals_ready', 'unowned_tasks']) if (h[k] && v[`${k}_on`] !== undefined) h[k] = { ...h[k], on: !!v[`${k}_on`], wait_min: Number.isInteger(v[`${k}_wait_min`]) ? v[`${k}_wait_min`] : h[k].wait_min, nudge: v[`${k}_nudge`] || '' };
     if (h.dialog_timeout && v.dialog_timeout_on !== undefined) h.dialog_timeout = { ...h.dialog_timeout, on: !!v.dialog_timeout_on, after_min: Number.isInteger(v.dialog_timeout_after_min) ? v.dialog_timeout_after_min : h.dialog_timeout.after_min };
     if (h.goal_size && v.goal_size_on !== undefined) h.goal_size = { ...h.goal_size, on: !!v.goal_size_on, limit: v.goal_size_limit };
-    if (h.compact_context && v.compact_context_on !== undefined) h.compact_context = { ...h.compact_context, on: !!v.compact_context_on, threshold_k: Number.isInteger(v.compact_context_threshold_k) ? v.compact_context_threshold_k : h.compact_context.threshold_k, orchestrator: !!v.compact_context_orchestrator, trigger: v.compact_context_trigger || h.compact_context.trigger || 'threshold' };
+    if (h.compact_context && v.compact_context_on !== undefined) h.compact_context = { ...h.compact_context, on: !!v.compact_context_on, threshold_k: Number.isInteger(v.compact_context_threshold_k) ? v.compact_context_threshold_k : h.compact_context.threshold_k, orchestrator: !!v.compact_context_orchestrator, trigger: v.compact_context_trigger || h.compact_context.trigger || 'threshold', method: v.compact_context_method || h.compact_context.method || 'compact' };
     return h;
 }
 
@@ -93,6 +95,7 @@ export function healthFields(ctx) {
         { key: 'auto_delegate_on', type: 'toggle', label: 'Hand reviews to the default reviewers', help: 'When a task is submitted for review and nobody is assigned, Coral delegates it to the default reviewers; with none named, reviews wait for the orchestrator. Works whether or not the health check is on.' },
         { key: 'default_reviewers', type: 'text', label: 'Default reviewers', wide: true, help: `Names of agents on this team, up to ${HEALTH_LIMITS.reviewers}, separated by commas.`, placeholder: `Agent names (up to ${HEALTH_LIMITS.reviewers})`,
             validate: v => (new Set(String(v).split(',').map(s => s.trim()).filter(Boolean)).size > HEALTH_LIMITS.reviewers ? `at most ${HEALTH_LIMITS.reviewers} names.` : '') },
+        { key: 'assign_limit', type: 'number', label: 'Most waiting tasks per agent', unit: 'tasks (0: no limit)', help: 'Assigning a task to an agent that already has more than this many waiting is refused, and the answer names the less loaded agents; the person assigning can use --force.', min: 0, max: 50, integer: true, compact: true, visibleWhen: v => v.assign_limit !== undefined },
         { key: 'health_rules', type: 'heading', label: 'Automatic rules', help: 'Run only while the health check is on.' },
         { key: 'claim_nudge_on', type: 'toggle', label: 'Nudge an idle agent to claim its work', help: 'An agent that is idle with ready work gets a reminder; past the count, the orchestrator is told.' },
         minutes('claim_nudge_after_min', 'After', 'minutes idle', 'claim_nudge_on'),
@@ -123,6 +126,9 @@ export function healthFields(ctx) {
         { key: 'compact_context_trigger', type: 'select', label: 'When', visibleWhen: v => v.compact_context_on !== undefined, disabledWhen: v => !v.compact_context_on,
             help: 'Past the size above, after an agent finishes a task and has none in progress (and its context is at least 50 thousand tokens), or either.',
             options: async () => [{ value: 'threshold', label: 'When the context is large' }, { value: 'task', label: 'After a finished task' }, { value: 'both', label: 'Either' }] },
+        { key: 'compact_context_method', type: 'select', label: 'What it does', visibleWhen: v => v.compact_context_on !== undefined, disabledWhen: v => !v.compact_context_on,
+            help: 'Compact keeps a summary of the work. The two Clear options end the whole conversation of an agent that is idle and has no task in progress, including a conversation you are having with it: it starts empty and is told to read its board (and its next task, or the note it wrote for itself). The handoff notes are kept as artifacts of the agent (an internal file named handoff.md).',
+            options: async () => [{ value: 'compact', label: 'Compact (keep a summary)' }, { value: 'clear_next', label: 'Clear, then the next task' }, { value: 'clear_handoff', label: 'Ask for a handoff note, clear, then the note' }] },
         { key: 'compact_context_orchestrator', type: 'toggle', label: 'Compact the orchestrator too', visibleWhen: v => v.compact_context_on !== undefined, disabledWhen: v => !v.compact_context_on,
             help: 'The orchestrator holds the most state, so it is left alone unless you say so.' },
         { key: 'health_landing', type: 'heading', label: 'Landing', help: 'Finished work that has not landed. Reads the local branch only, never CI or GitHub.' },

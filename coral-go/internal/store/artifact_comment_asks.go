@@ -132,6 +132,12 @@ func (s *SessionStore) ReserveAskReply(ctx context.Context, commentID int64, age
 	return ErrAskReplyCap
 }
 
+// ResetAskReplies gives the agent a fresh reply budget in a thread (#15034): the cap is per Operator turn, so each new comment of the Operator's that reaches the agent starts its count again. Only an open ask; a
+// closed or expired one stays as it is.
+func (s *SessionStore) ResetAskReplies(ctx context.Context, commentID int64, agentSession string) {
+	_, _ = s.db.ExecContext(ctx, `UPDATE artifact_comment_asks SET replies = 0 WHERE comment_id = ? AND agent_session = ? AND closed_at IS NULL`, commentID, agentSession)
+}
+
 // ReleaseAskReply gives back a reply ReserveAskReply counted that was not stored.
 func (s *SessionStore) ReleaseAskReply(ctx context.Context, commentID int64, agentSession string) {
 	_, _ = s.db.ExecContext(ctx, `UPDATE artifact_comment_asks SET replies = replies - 1 WHERE comment_id = ? AND agent_session = ? AND replies > 0`, commentID, agentSession)
@@ -273,8 +279,9 @@ func (s *SessionStore) CreateUploaderReply(ctx context.Context, c ArtifactCommen
 	}
 	uploaderReplyMu.Lock()
 	defer uploaderReplyMu.Unlock()
+	// Per Operator turn (#15034): only the replies since the thread's last comment that is not an agent's count.
 	var inThread int
-	if err := s.db.GetContext(ctx, &inThread, `SELECT COUNT(*) FROM artifact_comments WHERE parent_id = ? AND author_kind = 'agent' AND author_subject = ? AND deleted_at IS NULL`, *c.ParentID, c.AuthorSubject); err != nil {
+	if err := s.db.GetContext(ctx, &inThread, `SELECT COUNT(*) FROM artifact_comments WHERE parent_id = ? AND author_kind = 'agent' AND author_subject = ? AND deleted_at IS NULL AND id > (SELECT COALESCE(MAX(id), 0) FROM artifact_comments WHERE (id = ? OR parent_id = ?) AND author_kind != 'agent' AND deleted_at IS NULL)`, *c.ParentID, c.AuthorSubject, *c.ParentID, *c.ParentID); err != nil {
 		return ArtifactComment{}, err
 	}
 	if inThread >= MaxAskReplies {

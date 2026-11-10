@@ -9,6 +9,17 @@
                 <label for="launch-server" class="form-label form-label-nowrap">Computer</label>
                 <select id="launch-server" class="form-control-grow" data-on-change="m-on-launch-server-change"></select>
                 <span id="launch-server-note" class="text-muted-sm"></span>
+                <span id="launch-computer-chip" class="chip launch-computer-chip" hidden>On <strong id="launch-computer-chip-name"></strong> <button type="button" class="btn btn-link btn-small" data-launch-computer="change">Change</button></span>
+            </div>
+            <!-- Hub only: the first step of New agent and New team (#15014) -->
+            <div id="launch-step-computer" class="launch-modal-step" style="display:none">
+                <h3 id="launch-computer-title">Which computer?</h3>
+                <p id="launch-computer-sub" class="launch-computer-sub"></p>
+                <div id="launch-computer-list" class="launch-computer-list" role="radiogroup" aria-labelledby="launch-computer-title"></div>
+                <div class="modal-actions">
+                    <button type="button" class="btn" data-launch-computer="back">Back</button>
+                    <button type="button" class="btn btn-primary" id="launch-computer-go" data-launch-computer="go" disabled>Continue</button>
+                </div>
             </div>
             <!-- Step 1: Session type chooser -->
             <div id="launch-step-chooser" class="launch-modal-step">

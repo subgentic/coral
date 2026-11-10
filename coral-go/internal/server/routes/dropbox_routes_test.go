@@ -740,3 +740,40 @@ func TestOpenOn127AnswersTheEnvelopeTheSettingsPageReads(t *testing.T) {
 	assert.Equal(t, "open_on_127", body["code"])
 	assert.Equal(t, "Open Coral at http://127.0.0.1:8420 to connect Dropbox", body["error"])
 }
+
+// #15065 (the Operator, v2.0.63): a release build said Dropbox was not available, because the release workflow never set the app key a build
+// ships with. The key a build sets (-ldflags -X ...DropboxDefaultAppKey, from the DROPBOX_APP_KEY repo secret) must reach the status with no
+// CORAL_DROPBOX_APP_KEY in the environment; with neither, the status says there is none. Mutant: appKey reads only the environment.
+func TestTheAppKeyABuildSetsIsTheOneDropboxUses(t *testing.T) {
+	t.Setenv("CORAL_DROPBOX_APP_KEY", "")
+	status := func() map[string]any {
+		dir := t.TempDir()
+		db, err := storetest.Open(t, filepath.Join(dir, "c.db"))
+		require.NoError(t, err)
+		t.Cleanup(func() { db.Close() })
+		h := NewCloudHandler(store.NewSessionStore(db), dir)
+		h.SetPeerCheck(func(*http.Request) (bool, bool) { return true, true })
+		h.SetDropbox(store.NewDropboxStore(db, store.NewRemoteServerStore(db, dir)), dir)
+		req := httptest.NewRequest(http.MethodGet, "/api/dropbox/status", nil)
+		dashboardRequest(req)
+		rec := httptest.NewRecorder()
+		h.DropboxStatus(rec, req)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		var st map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &st))
+		return st
+	}
+	old := DropboxDefaultAppKey
+	t.Cleanup(func() { DropboxDefaultAppKey = old })
+
+	DropboxDefaultAppKey = "" // a build without it (a fork, a pull request)
+	assert.Equal(t, false, status()["app_key_set"], "no key: Settings says Dropbox is not available in this build")
+
+	DropboxDefaultAppKey = "test-app-key" // what -ldflags -X sets in a release build
+	assert.Equal(t, true, status()["app_key_set"], "the build's key is used: Settings offers Connect")
+
+	t.Setenv("CORAL_DROPBOX_APP_KEY", "zyxwvutsrqponml")
+	h := &CloudHandler{}
+	h.SetDropbox(nil, t.TempDir())
+	assert.Equal(t, "zyxwvutsrqponml", h.dbx.appKey(), "the environment still overrides it")
+}

@@ -22,8 +22,8 @@ const { coralReady } = require('./helpers/wait');
         const g = await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title: 'Keep my place', outcome: 'o', done_when: 'd' }); assert.equal(g.status, 201, JSON.stringify(g));
         const G = g.body.id;
         assert.equal((await api('PATCH', `/api/board/${B}/goals/${G}`, { subscriber_id: 'Operator', state: 'active' })).status, 200);
-        for (let i = 0; i < 30; i++) assert.ok((await api('POST', `/api/board/${B}/tasks`, { title: `Pending task ${i}`, body: 'x', assigned_to: 'be', created_by: 'orch', priority: 'medium', goal_id: G })).status < 300);
-        const t = await api('POST', `/api/board/${B}/tasks`, { title: 'Makes the files', body: 'x', assigned_to: 'be', created_by: 'orch', priority: 'medium', goal_id: G }); assert.ok(t.status < 300, JSON.stringify(t));
+        for (let i = 0; i < 30; i++) assert.ok((await api('POST', `/api/board/${B}/tasks`, { title: `Pending task ${i}`, body: 'x', assigned_to: 'be', created_by: 'orch', priority: 'medium', goal_id: G, force: true })).status < 300) // 30 waiting tasks for one agent: past the assignment limit (#14862), so forced;
+        const t = await api('POST', `/api/board/${B}/tasks`, { title: 'Makes the files', body: 'x', assigned_to: 'be', created_by: 'orch', priority: 'medium', goal_id: G, force: true }); assert.ok(t.status < 300, JSON.stringify(t));
         assert.ok((await api('POST', `/api/board/${B}/tasks/claim`, { subscriber_id: 'be', task_id: t.body.id })).status < 300);
         const r = await api('POST', `/api/board/${B}/tasks/${t.body.id}/complete`, { subscriber_id: 'be', message: 'done', outcome: 'success', artifacts: Array.from({ length: 30 }, (_, i) => ({ name: `file-${String(i).padStart(2, '0')}.txt`, content: 'c' + i })) }); assert.ok(r.status < 300, JSON.stringify(r));
 

@@ -1,5 +1,101 @@
 # Release Notes
 
+## v2.0.64 — Context reset that can clear an agent, planning defaults for new teams, multi-select in Needs you, and a Which computer? step on a Hub
+
+### Changes
+
+#### What you will notice first
+
+- **Context reset can clear an idle agent,** not only compact it: clear plus the next task, or clear plus a short handoff note the agent reads once. After a /clear Coral follows the agent's new transcript (#14894, #14849).
+- **A new team starts on Fully autonomous planning approval with Require a goal on:** its goals and tasks need no approval, and a task without a goal is refused. A team's stored choice is kept (#14997).
+- **Orchestrator access offers the team's Orchestrator as the seat** when none was saved before (#14998).
+- **An agent with more than 2 waiting tasks is not given another** unless it is forced (#14862).
+- **An agent's row menu shows both Restart items up front,** with a divider before them (#14996).
+- **On a Hub, New agent and New team start with a "Which computer?" step:** the computers as cards with their state; offline ones are listed but off, with the reason (#15014).
+- **Select several Needs you items and dismiss them at once on a desktop too;** an action that is off says why (#15015).
+- **Comment threads no longer go silent:** an agent can answer each of your replies, not just a fixed number (#15034).
+- **A document's comments no longer jump on hover,** and the comments column can be resized (#15030).
+- **A Hub-mode question on a view-only computer says why it has no buttons** (#15010).
+- **The Needs you table's counts are written in place** when they arrive late (#14877).
+
+#### Fixed
+
+- **Dropbox: the release build's own Dropbox app key reaches Settings again** (the v2.0.63 sign-in bug) (#15065).
+- **Board search keeps the current match in view** when the layout shifts (#14881).
+- **The launch notice no longer moves the page** on a profile's first load (#14935).
+- **The account menu is no longer painted over by a table's sticky header** in the Mac app (#15047).
+- **With no tmux installed, Coral checks for it at most every 30 s** instead of every second (#15011).
+- **Codex: background rollouts with no person-written turn no longer show up in History as chats** (#15012).
+- **The home "Run your own hub" box says "Not available on this Coral"** where it cannot read the hub state (#15026).
+- **Security: file reads over a Hub tunnel must name a Hub account** (#14913).
+
+#### Through Coral Hub
+
+- **No route was added, removed or changed.** Two Board settings keys were added: `health.assign_limit` and `health.compact_context.method`.
+
+#### Known issues
+
+- **Check for updates in Coral 2.0.60 and earlier may miss newer releases.** Download the installer for your system from the [Coral releases page on GitHub](https://github.com/subgentic/coral/releases) and install it over this one. The fix is planned for v2.0.65.
+- **Coming in v2.0.65:** the Needs you card rows, the phone viewer header, the "Review and trust" folder-trust button, tier removal, and the walk 4 to 8 fixes.
+- Carried from v2.0.63: macOS may ask once more after tmux restarts (#12836); Windows in-app update does not work from 2.0.0 through 2.0.6; a Coral of 2.0.5 or earlier on macOS cannot update in-app; OpenCode on Windows is not fully tested; Hermes agents are experimental.
+
+#### For developers and releases
+
+- **Provenance:** this release is cut from the v2.0.64 line (`lead-v2064b`), whose gated head is `2fc2d33d9`. It is not a descendant of `main`'s newest commit, so the v2.0.61, v2.0.62 and v2.0.63 release notes sections are added to this file here; the tag commit is merged into `main` right after.
+- **Gate:** go-tests (both tag sets) and go-race (push) passed on the tagged code, and the Linux browser gate passed 1737 of 1737 first time with no retry, plus 20 of 20 runs of `inbox_command_row_browser`. Windows tests, the cloud tests (including the secret scan) and go-race full passed first time on `4edbdc964`, which differs from the tagged code only in three lines of one browser test.
+- **Test-only fixes after the first gates:** the Needs you table suite checks the column order instead of one width, and the inbox command-row suite waits for its Yes to unlock.
+
+#### For Coral Hub
+
+### Tunnel routes, v2.0.63 to 2fc2d33d95cb5c9b90228126568fb6d74412cd67
+
+No route was added, removed or changed.
+
+### Board settings keys (BoardSettings, HealthSettings included), v2.0.63 to 2fc2d33d95cb5c9b90228126568fb6d74412cd67
+
+Added (2)
+
+- `health.assign_limit`: int
+- `health.compact_context.method`: string
+
+### What Coral Hub compiles in or embeds, v2.0.63 to 2fc2d33d95cb5c9b90228126568fb6d74412cd67
+
+`pkg/frontend`: 27 files the Hub embeds changed (+227, -53)
+
+- `coral-go/pkg/frontend/static/artifact_comment_ask.js`: +2, -1
+- `coral-go/pkg/frontend/static/artifact_comment_composer.js`: +2, -1
+- `coral-go/pkg/frontend/static/artifact_comments.js`: +24, -2
+- `coral-go/pkg/frontend/static/artifact_comments_api.js`: +3, -2
+- `coral-go/pkg/frontend/static/board_window.js`: +22, -0
+- `coral-go/pkg/frontend/static/css/artifact-comments-resize.css`: +11, -0
+- `coral-go/pkg/frontend/static/css/artifact-comments.css`: +2, -2
+- `coral-go/pkg/frontend/static/css/layout.css`: +1, -0
+- `coral-go/pkg/frontend/static/css/provider_cards.css`: +15, -0
+- `coral-go/pkg/frontend/static/data_table.js`: +4, -1
+- `coral-go/pkg/frontend/static/editions.js`: +2, -8
+- `coral-go/pkg/frontend/static/history_label.js`: +4, -0
+- `coral-go/pkg/frontend/static/home_own_hub.js`: +2, -1
+- `coral-go/pkg/frontend/static/inbox_answer.js`: +15, -8
+- `coral-go/pkg/frontend/static/inbox_sidebar.js`: +2, -2
+- `coral-go/pkg/frontend/static/launch_dialog.js`: +43, -0
+- `coral-go/pkg/frontend/static/launch_disclosure.js`: +2, -2
+- `coral-go/pkg/frontend/static/orchestrator_grant_words.js`: +12, -0
+- `coral-go/pkg/frontend/static/session_rows.js`: +9, -8
+- `coral-go/pkg/frontend/static/sidebar_groups.js`: +12, -1
+- `coral-go/pkg/frontend/static/team_approval_presets.js`: +2, -2
+- `coral-go/pkg/frontend/static/team_health_fields.js`: +7, -1
+- `coral-go/pkg/frontend/static/team_health_settings.js`: +2, -1
+- `coral-go/pkg/frontend/static/team_orchestrator_grant.js`: +3, -2
+- `coral-go/pkg/frontend/static/theme_init.js`: +8, -3
+- `coral-go/pkg/frontend/templates/includes/modals.html`: +11, -0
+- `coral-go/pkg/frontend/templates/index.html`: +5, -5
+
+Unchanged: `pkg/hubproxy`, `pkg/hubowner`, `pkg/redact`, `pkg/tunnel`, `agent_docs`.
+
+### Coral packages compiled into the Hub through its imports, v2.0.63 to 2fc2d33d95cb5c9b90228126568fb6d74412cd67
+
+Unchanged: `internal/fsreplace`, `internal/httputil`, `internal/logsafe`, `internal/safego`, `internal/secfile`, `internal/secrets`, `pkg/redact/betterleaks`.
+
 ## v2.0.63 — Share via Dropbox, Free up space, a Branches tab on the team page, and a self-hosted Hub that says why it is unreachable
 
 ### Changes
