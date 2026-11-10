@@ -139,7 +139,7 @@ function stopItems() {
     const why = none ? 'No agent of this team is running' : '';
     return [
         { key: 'sleep', label: asleep ? 'Wake Team' : 'Sleep Team', hint: asleep ? 'Starts the sleeping agents again' : 'Stops every agent for now; Wake Team starts them again', why, run: () => window.toggleTeamSleep?.(S.team, asleep ? 'wake' : 'sleep') },
-        { key: 'reset', label: 'Reset Team', hint: 'Each agent starts again from its first instructions, in a new chat', danger: true, why, run: () => window.resetTeam?.(S.team) },
+        { key: 'reset', label: 'Reset Team (clear context)', hint: 'Clears every agent\'s context; each starts in a new chat', why, run: () => window.resetTeam?.(S.team) },
         { key: 'kill', label: 'Kill All', hint: 'Ends every agent now; their chats stay in History', danger: true, why, run: () => window.killBoard?.(S.team) },
     ];
 }

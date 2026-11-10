@@ -41,14 +41,14 @@ const BOARD = 'stop-menu-' + Date.now().toString(36);
             await ev(`document.getElementById('${mobile ? 'team-page-more' : 'team-page-stop'}').click(); true`);
             await new Promise(r => setTimeout(r, 300)); // sleep-ok: the menu opens
             let it = await items(host);
-            check(JSON.stringify(it.map(i => i.text)) === JSON.stringify(['Sleep Team', 'Reset Team', 'Kill All']), `the items are the sidebar row's own words: ${JSON.stringify(it)}`);
-            check(/^Stops every agent for now; Wake Team starts them again$/.test(it[0].hint) && /^Each agent starts again from its first instructions, in a new chat$/.test(it[1].hint) && /^Ends every agent now; their chats stay in History$/.test(it[2].hint), `each item says in one line what it does (#10357): ${JSON.stringify(it.map(i => i.hint))}`);
+            check(JSON.stringify(it.map(i => i.text)) === JSON.stringify(['Sleep Team', 'Reset Team (clear context)', 'Kill All']), `the items are the sidebar row's own words: ${JSON.stringify(it)}`);
+            check(/^Stops every agent for now; Wake Team starts them again$/.test(it[0].hint) && /^Clears every agent's context; each starts in a new chat$/.test(it[1].hint) && /^Ends every agent now; their chats stay in History$/.test(it[2].hint), `each item says in one line what it does (#10357): ${JSON.stringify(it.map(i => i.hint))}`);
             check(it.every(i => i.shown) && (!mobile || it.every(i => i.h >= 44)), `shown (44 px on a phone): ${JSON.stringify(it)}`);
-            check(it[0] && !it[0].danger && it[1].danger && it[2].danger, 'Reset Team and Kill All are the danger items, Sleep Team is not');
+            check(it[0] && !it[0].danger && !it[1].danger && it[2].danger, 'Kill All is the danger item; Sleep Team and Reset Team (clear context) are not red at rest (#15373)');
             check(await ev(`document.querySelectorAll('${host} hr.overflow-menu-divider').length >= 1`), 'the danger items are set apart by a rule');
             await shot(`team-stop-menu-${w}`);
             const separation=await ev(`(()=>{const host=document.querySelector('${host}'),reset=host.querySelector('[data-stop="reset"]'),kill=host.querySelector('[data-stop="kill"]');return{gap:kill.getBoundingClientRect().top-reset.getBoundingClientRect().bottom,resetRule:parseFloat(getComputedStyle(reset).borderTopWidth),killRule:parseFloat(getComputedStyle(kill).borderTopWidth)}})()`);
-            check(separation.gap>=8&&separation.resetRule>=1&&separation.killRule>=1,`destructive actions have space and a visible boundary: ${JSON.stringify(separation)}`);
+            check(separation.gap>=8&&separation.killRule>=1,`destructive actions have space and a visible boundary: ${JSON.stringify(separation)}`);
             if(mobile){
                 const deletion=await ev(`(()=>{const b=document.querySelector('#team-page-more-menu #mb-delete-btn');return{margin:parseFloat(getComputedStyle(b).marginTop),rule:parseFloat(getComputedStyle(b).borderTopWidth),height:b.getBoundingClientRect().height}})()`);
                 check(deletion.margin>=8&&deletion.rule>=1&&deletion.height>=44,`Delete team is separated and retains its phone target: ${JSON.stringify(deletion)}`);
@@ -83,7 +83,7 @@ const BOARD = 'stop-menu-' + Date.now().toString(36);
             const trigger=mobile?'#mobile-session-list .group-kebab-btn':'#live-sessions-list .group-kebab-btn';
             await waitFor(`!!document.querySelector('${trigger}')?.getClientRects().length`,'team sidebar menu trigger');
             await ev(`document.querySelector('${trigger}').click();true`);
-            const sidebar=await ev(`(()=>{const host=document.querySelector('${trigger}').nextElementSibling;host.scrollTop=host.scrollHeight;const buttons=[...host.querySelectorAll('[data-on-click="team-reset"],[data-on-click="team-kill"],[data-on-click="team-delete"]')];return{n:buttons.length,heights:buttons.map(b=>b.getBoundingClientRect().height),gaps:buttons.slice(1).map((b,i)=>b.getBoundingClientRect().top-buttons[i].getBoundingClientRect().bottom)}})()`);
+            const sidebar=await ev(`(()=>{const host=document.querySelector('${trigger}').nextElementSibling;host.scrollTop=host.scrollHeight;const buttons=[...host.querySelectorAll('[data-on-click="team-kill"],[data-on-click="team-delete"]')];return{n:buttons.length,heights:buttons.map(b=>b.getBoundingClientRect().height),gaps:buttons.slice(1).map((b,i)=>b.getBoundingClientRect().top-buttons[i].getBoundingClientRect().bottom)}})()`);
             await shot(`team-sidebar-destructive-${w}`);
             check(sidebar.n>=2&&sidebar.gaps.every(g=>g>=8)&&(!mobile||sidebar.heights.every(h=>h>=44)),`sidebar destructive actions are separated with phone targets: ${JSON.stringify(sidebar)}`);
         }

@@ -503,7 +503,7 @@ dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-
 .team-task-page .task-jump-role { color: var(--text-secondary); }
 @media (pointer: coarse), (max-width: 767px) { .team-task-page .task-jump-btn { min-height: var(--control-touch-height, 44px); } }
 /* Give each destructive team action its own boundary; the menu still scrolls on phones. */
-:is(#team-page-stop-menu, #team-page-more-menu) > :is([data-stop="reset"], [data-stop="kill"], #mb-delete-btn) {
+:is(#team-page-stop-menu, #team-page-more-menu) > :is([data-stop="kill"], #mb-delete-btn) {
     margin-top: 12px;
     border-top: 1px solid var(--border);
 }
