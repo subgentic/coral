@@ -92,7 +92,7 @@ function fill(container, agentType, data) {
     container._thinkingLevels = data && Array.isArray(data.thinking) ? data.thinking : [];   // the levels the server passes this type's CLI (#4969)
     syncThinking(container);
     if (!input || !wrap || !select) return;
-    const models = (data && Array.isArray(data.models) ? data.models : []).filter(m => m && typeof m.value === 'string' && m.value);
+    const models = (data && Array.isArray(data.models) ? data.models : []).filter(m => m && typeof m.value === 'string' && m.value && !/^default( \(recommended\))?$/i.test(m.display_name || m.value)); // the list's own "Default (recommended)" is the first option already: not a second one (#15143)
     container._modelList = models;
     if (!models.length) { wrap.hidden = true; input.hidden = false; return; }   // no list: the text box, as before
     select.innerHTML = `<option value="">Default</option>`

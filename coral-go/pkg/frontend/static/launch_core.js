@@ -41,7 +41,7 @@ export function setLaunchStage(stage) {
     if (modal) { modal.setAttribute('data-agent-stage', stage); modal.toggleAttribute('data-all-optional', stage === 'persona' && !launch.member); }
     const n = stages.indexOf(stage) + 1, total = stages.length;
     const allOptional = stage === 'persona' && !launch.member; // a member's role is required: its step is not "all optional"
-    const sub = `Step ${n} of ${total}: ${STAGE_NAMES[stage]}${allOptional ? ', all optional' : ''}`; // the folder is said once, in the footer's recap (#10835)
+    const sub = launch.member ? STAGE_NAMES[stage] : `Step ${n} of ${total}: ${STAGE_NAMES[stage]}${allOptional ? ', all optional' : ''}`; // a member dialog is one step of the team wizard (3 steps): it names its page and never counts its own two (#15143) // the folder is said once, in the footer's recap (#10835)
     const subEl = document.getElementById("launch-stage-sub");
     if (subEl) subEl.textContent = sub;
     const back = document.getElementById("launch-agent-back"), next = document.getElementById("launch-agent-next"), go = document.getElementById("launch-agent-go"), save = document.getElementById("launch-agent-save");
