@@ -43,6 +43,7 @@ func lastErrorLine(screen string) string {
 			}
 			return r
 		}, lines[i])), " ")
+		line = strings.ReplaceAll(line, "@", "") // a notice never mentions anyone, as an agent's name has no "@" in it either: a program's output must not nudge an agent
 		if line == "" || !exitErrorLine.MatchString(line) {
 			continue
 		}

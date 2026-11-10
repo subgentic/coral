@@ -101,3 +101,17 @@ func TestLastErrorLineIsShortRedactedAndOneLine(t *testing.T) {
 	assert.LessOrEqual(t, len(lastErrorLine(long)), exitReasonMax)
 	assert.Equal(t, "zsh: killed coral", lastErrorLine("\x1b\x07zsh:   killed   coral\n"))
 }
+
+// A program's output can say "@Orchestrator": the notice never mentions anyone (QA's probe on #15062).
+func TestAnAtSignInTheTerminalsLastLineNeverMentionsAnyone(t *testing.T) {
+	assert.Equal(t, "Error: ask Orchestrator and all to run this", lastErrorLine("Error: ask @Orchestrator and @all to run this\n$ \n"))
+	r := newExitRig(t)
+	r.screen("Error: ask @Orchestrator and @all to run this\n$ \n")
+	id := r.agent(1, "Worker", "")
+	r.setLaunched(id, time.Now().Add(-3*time.Hour))
+	r.h.AgentsSlept(context.Background(), []string{id})
+	r.flush()
+	n := strings.Join(r.notices(), "\n")
+	assert.Contains(t, n, `Worker: exited, its last line was "Error: ask Orchestrator and all to run this"`)
+	assert.NotContains(t, n, "@")
+}
