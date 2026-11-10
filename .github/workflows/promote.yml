@@ -162,6 +162,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PROMOTE_TAG: ${{ inputs.tag }}
+          PROMOTE_SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
         run: |
           set -euo pipefail
           # This repository's releases are immutable: a published release takes no new asset and its tag can never move, so a promotion is never added to the
@@ -171,11 +172,15 @@ jobs:
           seq="$(jq -r .sequence promote.json)"
           [[ "$seq" =~ ^[0-9]+$ ]] || { echo "the manifest's sequence is not a number"; exit 1; }
           name="promote-${PROMOTE_TAG}-${seq}"
+          # The release is created at the promoted tag's own commit, not at this workflow's (the promote branch's) tip: GitHub lists releases by the date of the commit they are
+          # created at, so a promotion at the old promote tip sorted onto page 3 of the list and out of the feed's newest 10, where the updater could not find it (#15080).
+          # The sha is the one validate read from the repository for this tag (never an input).
+          [[ "$PROMOTE_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "the promoted tag's commit is not known"; exit 1; }
           if gh release view "$name" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
             echo "a release named ${name} already exists: nothing is replaced"
             exit 1
           fi
-          gh release create "$name" --repo "${GITHUB_REPOSITORY}" --draft --prerelease --latest=false --target "${GITHUB_SHA}" --title "$name" \
+          gh release create "$name" --repo "${GITHUB_REPOSITORY}" --draft --prerelease --latest=false --target "${PROMOTE_SOURCE_SHA}" --title "$name" \
             --notes "Promotion of ${PROMOTE_TAG}, sequence ${seq}. Not a product release: it holds only promote.json and its Sigstore bundle."
           gh release upload "$name" promote.json promote.json.sigstore.json --repo "${GITHUB_REPOSITORY}"
           gh release edit "$name" --repo "${GITHUB_REPOSITORY}" --draft=false --latest=false
