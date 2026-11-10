@@ -50,11 +50,12 @@ func (t *Task) Parked(now time.Time) bool {
 // ParkTask parks a task with a reason (already cleaned) until until (zero: until unparked). A task that is not parked yet and has an owner who already holds the team's park limit of parked tasks is refused (*ErrParkCap)
 // unless force; changing the reason or the end of a task that is parked already is never refused, whatever the owner holds.
 func (s *Store) ParkTask(ctx context.Context, project string, id int64, reason string, until time.Time) (*Task, error) {
-	return s.ParkTaskForce(ctx, project, id, reason, until, false)
+	t, _, err := s.ParkTaskForce(ctx, project, id, reason, until, false)
+	return t, err
 }
 
-// ParkTaskForce is ParkTask with the limit overridable (--force).
-func (s *Store) ParkTaskForce(ctx context.Context, project string, id int64, reason string, until time.Time, force bool) (*Task, error) {
+// ParkTaskForce is ParkTask with the limit overridable (--force). forcedPast is the number of parks the agent already held when a forced park went past the limit (0: it did not), for the board line that tells the Operator.
+func (s *Store) ParkTaskForce(ctx context.Context, project string, id int64, reason string, until time.Time, force bool) (*Task, int, error) {
 	limit := s.GetHealthSettings(ctx, project).ParkLimit
 	var end any
 	if !until.IsZero() {
@@ -62,7 +63,7 @@ func (s *Store) ParkTaskForce(ctx context.Context, project string, id int64, rea
 	}
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer tx.Rollback()
 	var cur struct {
@@ -72,30 +73,35 @@ func (s *Store) ParkTaskForce(ctx context.Context, project string, id int64, rea
 	}
 	if err := tx.GetContext(ctx, &cur, `SELECT status, assigned_to, `+parkedSQL+` AS parked FROM board_tasks WHERE board_id = ? AND id = ?`, project, id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, sql.ErrNoRows
+			return nil, 0, sql.ErrNoRows
 		}
-		return nil, err
+		return nil, 0, err
 	}
 	if cur.Status == "completed" || cur.Status == "cancelled" {
-		return nil, fmt.Errorf("%w: #%d is %s", ErrNotParkable, id, cur.Status)
+		return nil, 0, fmt.Errorf("%w: #%d is %s", ErrNotParkable, id, cur.Status)
 	}
-	if !force && !cur.Parked && cur.Assignee != nil && *cur.Assignee != "" {
+	forcedPast := 0
+	if !cur.Parked && cur.Assignee != nil && *cur.Assignee != "" {
 		var held int
 		if err := tx.GetContext(ctx, &held, `SELECT COUNT(*) FROM board_tasks WHERE board_id = ? AND id != ? AND LOWER(assigned_to) = LOWER(?) AND status NOT IN ('completed', 'cancelled') AND `+parkedSQL, project, id, *cur.Assignee); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		if held >= limit {
-			return nil, &ErrParkCap{Assignee: *cur.Assignee, Held: held, Limit: limit}
+			if !force {
+				return nil, 0, &ErrParkCap{Assignee: *cur.Assignee, Held: held, Limit: limit}
+			}
+			forcedPast = held
 		}
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE board_tasks SET parked_reason = ?, parked_until = ?, parked_at = CASE WHEN `+parkedSQL+` THEN COALESCE(parked_at, ?) ELSE ? END
 		WHERE board_id = ? AND id = ?`, reason, end, nowUTC(), nowUTC(), project, id); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if err := tx.Commit(); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return s.GetTask(ctx, project, id)
+	task, err := s.GetTask(ctx, project, id)
+	return task, forcedPast, err
 }
 
 // ErrNotReleasable is a task that cannot go back to the queue: it is finished, awaiting review, or not there.

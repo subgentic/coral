@@ -319,7 +319,7 @@ const (
 )
 
 // DefaultAssignLimit is the waiting tasks an agent may have before a new assignment to it is refused (#14862).
-const DefaultAssignLimit = 2
+const DefaultAssignLimit = 3 // was 2; the Operator: "default it to 3" (#15398). A team that saved its own value keeps it
 
 // DefaultParkLimit is the parked tasks one agent may hold before a new park is refused (#15362; it was a fixed 2, #11660). ParkLimitMax bounds the setting.
 const (
