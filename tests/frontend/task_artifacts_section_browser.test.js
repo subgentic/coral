@@ -25,7 +25,7 @@ const STUB = `(() => { const real = window.fetch; window.__reqs = []; window.__a
         await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.__artifacts = ${JSON.stringify(reply)}; true`);
         await openBoardTasksTab({ ev, waitFor }, B);
-        await waitFor(`document.querySelectorAll('#agentic-panel-tasks .board-task-item:not(.board-task-header)').length === 1`, 'the task', 12000);
+        await waitFor(`document.querySelectorAll('#agentic-panel-tasks .board-task-item:not(.board-task-header)').length === 1`, 'the task', 45000); // the agent's list stays empty until its subscriber id arrives (a poll tick, 10 s each, on a loaded run)
         await ev(`document.querySelector('#agentic-panel-tasks .board-task-item:not(.board-task-header)').click(); true`);
         await waitFor(`!!document.querySelector('#preview-pane #team-task-title') && /Write the report/.test(document.querySelector('#team-task-title').textContent)`, 'the task page', 12000);
     };
