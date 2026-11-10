@@ -3,6 +3,7 @@
 import { importOnce } from './import_once.js';
 import { fetchSkewed, VERSIONS_KEYS } from './query_skew.js';
 import { markHidden } from './visible_marks.js';
+import { splitKey } from './server_base.js';
 const { loadStyles } = await importOnce('./lazy_styles.js');
 
 const shown = t => markHidden(String(t || ''), { strict: true }).trim();
@@ -16,12 +17,12 @@ export async function versionsOf({ hex, server, board, current, earlier }) {
             const d = await r.json();
             if (Array.isArray(d) && d.length > 1) {
                 const rows = d.slice().sort((a, b) => a.version - b.version);
-                return rows.map((v, i) => ({ n: v.version, hex: v.digest, at: v.at, who: v.edited_in_dropbox ? 'Edited in Dropbox' : v.role || v.uploader || '', current: i === rows.length - 1 }));
+                return rows.map((v, i) => ({ n: v.version, hex: v.digest, at: v.at, who: v.edited_in_dropbox ? 'Edited in Dropbox' : v.role || v.uploader || '', you: v.role === 'operator' || v.source === 'edit', current: i === rows.length - 1 }));
             }
         }
     } catch { /* no series: the row's own older uploads below */ }
     const all = [...(earlier || []), current].filter(Boolean).sort((a, b) => String(a.created_at || a.at || '').localeCompare(String(b.created_at || b.at || '')));
-    return all.map((v, i) => ({ n: i + 1, hex: v.hex, at: v.created_at || v.at || '', who: v.produced_by || v.role || '', current: i === all.length - 1 }));
+    return all.map((v, i) => ({ n: i + 1, hex: v.hex, at: v.created_at || v.at || '', who: v.produced_by || v.role || '', you: v.role === 'operator', current: i === all.length - 1 }));
 }
 
 /** Open the list. opts: { hex, server, board, name, current, earlier, open(version), restore?(version) } where restore resolves when the uploader was asked. */
@@ -36,7 +37,7 @@ export async function openVersionList(opts) {
     const finish = () => { dlg.close(); dlg.remove(); };
     const confirmRestore = (v, li) => {
         const sure = document.createElement('div'); sure.className = 'version-list-confirm';
-        const q = document.createElement('p'); q.textContent = `Ask ${shown(v.who) || 'the uploader'} to put v${v.n} back as the newest version? Nothing is changed until they do it.`;
+        const q = document.createElement('p'); q.textContent = `Ask ${v.you ? 'the uploader' : shown(v.who) || 'the uploader'} to put v${v.n} back as the newest version? Nothing is changed until they do it.`;
         const yes = document.createElement('button'); yes.type = 'button'; yes.className = 'btn btn-primary version-list-restore-confirm'; yes.textContent = 'Ask to restore';
         const no = document.createElement('button'); no.type = 'button'; no.className = 'btn'; no.textContent = 'Cancel';
         no.addEventListener('click', () => sure.remove());
@@ -50,7 +51,7 @@ export async function openVersionList(opts) {
     for (const v of versions) {
         const li = document.createElement('li'); li.className = 'version-list-entry'; li.dataset.version = String(v.n); if (v.current) li.setAttribute('aria-current', 'true');
         const name = document.createElement('span'); name.className = 'version-list-name'; name.textContent = `v${v.n}${v.current ? ' (newest)' : ''}`;
-        const who = document.createElement('span'); who.className = 'version-list-who'; who.textContent = [when(v.at), shown(v.who)].filter(Boolean).join(' · ');
+        const who = document.createElement('span'); who.className = 'version-list-who'; who.textContent = [when(v.at), v.you ? 'You' : shown(v.who) ? `${shown(v.who)}, an agent` : ''].filter(Boolean).join(' · '); // who made it: you (an edit in the dashboard) or an agent (#15329)
         const actions = document.createElement('span'); actions.className = 'version-list-actions';
         const open = document.createElement('button'); open.type = 'button'; open.className = 'btn btn-small version-list-open'; open.textContent = 'Open'; open.setAttribute('aria-label', `Open v${v.n}`);
         open.addEventListener('click', () => { finish(); opts.open(v); });
@@ -68,4 +69,26 @@ export async function openVersionList(opts) {
     dlg.append(title, list, status, buttons);
     document.body.append(dlg); dlg.showModal(); (list.querySelector('.version-list-open') || close).focus();
     return dlg;
+}
+
+// the review bar's lazy half (#15285, #15329): the newer version of a file, and the file view's own Approve
+/** A newer version of this file than this one (#15285, #15329): one in Needs you, else the newest of the file's series, so an older file says so whether or not the newest is still waiting. { n, hex } or null. */
+export async function newerOf(team, hex) {
+    const m = await importOnce('./inbox_reviews.js'), top = m.reviewItems().find(a => a.team === team && a.hex !== hex && (a.earlier || []).some(e => e.hex === hex));
+    if (top) return { n: Number(top.version) > 1 ? Number(top.version) : (top.earlier || []).length + 1, hex: top.hex };
+    try {
+        const k = splitKey(team);
+        const { response, dropped } = await fetchSkewed(k.server, `/api/artifacts/${hex}/versions`, k.name ? { board: k.name } : {}, { kind: 'versions', keys: VERSIONS_KEYS, retry: false });
+        if (!dropped.length && response.ok) {
+            const list = await response.json();
+            if (Array.isArray(list) && list.length > 1) { const last = list.reduce((a, b) => (b.version > a.version ? b : a)); if (last.digest !== hex) return { n: last.version, hex: last.digest }; }
+        }
+    } catch { /* no series: no newer version to name */ }
+    return null;
+}
+
+/** The file view's own Approve (walk 22 M7, #15329): the version shown is approved as it is; retag(hex, tags) updates the row. */
+export async function approveFromFile(team, item, hex, name, retag) {
+    const out = await (await importOnce('./artifact_review.js')).approveRow(team, { ...item, id: hex, hex, team, name });
+    retag(hex, (item.tags || []).filter(t => t !== 'for review').concat('approved')); (await importOnce('./artifact_review.js')).sayApproved(name, out);
 }

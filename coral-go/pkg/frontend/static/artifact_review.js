@@ -20,8 +20,7 @@ export async function reviewStateOf(team, hex) {
     const tags = row.tags || [];
     if (!['approved', 'for review', 'reviewed'].some(t => tags.includes(t))) return null;
     const state = tags.includes('approved') ? 'approved' : tags.includes('for review') ? (tags.includes('changes requested') ? 'changes' : 'pending') : 'reviewed';
-    const m = await importOnce('./inbox_reviews.js'), top = m.reviewItems().find(a => a.team === team && a.hex !== hex && (a.earlier || []).some(e => e.hex === hex)); // a newer version of this file is in Needs you: this one is an older one (#15285)
-    return { row, state, at: row.review?.at || '', newer: top ? { n: Number(top.version) > 1 ? Number(top.version) : (top.earlier || []).length + 1, hex: top.hex } : null };
+    return { row, state, at: row.review?.at || '', newer: await (await importOnce('./artifact_version_list.js')).newerOf(team, hex) };
 }
 
 /** Ask the uploader to put an older version back as the newest (#15285): the words go to them as a change request on the newest version; the series keeps one entry per set of bytes, so the agent does the upload. */
@@ -218,6 +217,7 @@ export function attachReview(d, { reload }) {
     // the review's controls are on the viewer's one header row (#12223): its status beside the version chip, Approve and Request changes at the right, Approve with a note in the ⋯ menu
     const mk = (tag, cls, text, attrs = {}) => { const e = document.createElement(tag); e.className = cls; if (text) e.textContent = text; for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (tag === 'button') e.type = 'button'; return e; };
     const stateEl = mk('span', 'chip artifact-review-state', '', { role: 'status' }), approve = mk('button', 'btn btn-primary artifact-review-approve', 'Approve'), changes = mk('button', 'btn artifact-review-changes', 'Request changes', { 'aria-expanded': 'false' });
+    const newest = mk('button', 'btn btn-small artifact-review-newest', ''); newest.hidden = true; let newerHex = ''; newest.addEventListener('click', () => { if (newerHex) reload(newerHex); }); // an older file opens the newest in one click (#15329)
     const approveNote = mk('button', 'menu-item artifact-review-note', 'Approve with a note', { role: 'menuitem' });
     // Send for review / Remove from review (#13152): the Operator's own way to put this file in Needs you, or take it out, in the ⋯ menu (artifact_send_review.js)
     const sendItem = mk('button', 'menu-item artifact-review-send', 'Send for review', { role: 'menuitem' }); sendItem.hidden = true;
@@ -226,7 +226,7 @@ export function attachReview(d, { reload }) {
     const syncSendItem = () => { sendItem.hidden = !sendCtx || decisionNeedsPerson(sendCtx.server); if (sendCtx) sendItem.textContent = sendCtx.inReview ? 'Remove from review' : 'Send for review'; };
     const slotted = !!d.querySelector('.artifact-viewer-chips'); // the controls are on the header row; without it (a bare viewer) they stay in this bar
     stateEl.hidden = approve.hidden = changes.hidden = approveNote.hidden = true;
-    (d.querySelector('.artifact-viewer-chips') || bar).append(stateEl); (d.querySelector('.artifact-viewer-actions') || bar).append(approve, changes); (d.querySelector('.artifact-viewer-menu') || bar).prepend(approveNote);
+    (d.querySelector('.artifact-viewer-chips') || bar).append(stateEl, newest); (d.querySelector('.artifact-viewer-actions') || bar).append(approve, changes); (d.querySelector('.artifact-viewer-menu') || bar).prepend(approveNote);
     const $ = s => bar.querySelector(s);
     const form = $('.artifact-review-form'), text = $('#artifact-review-text'), error = $('.artifact-review-error');
     // Keep confirmed legacy writes while this form is open: an explicit delivery
@@ -251,8 +251,9 @@ export function attachReview(d, { reload }) {
         approve.textContent = s && s.newer ? 'Approve this older version' : s && s.state === 'changes' ? 'Approve anyway' : 'Approve'; // changes were asked for: Approve is still the Operator's, and says it approves this version as it is
         if (!pending) form.hidden = true;
         bar.hidden = !s || (slotted && form.hidden); // on the header row the strip under it is the change-request form: there only while it is open
-        stateEl.textContent = !s ? '' : s.newer && s.state !== 'approved' ? `An older version: v${s.newer.n} is newer.${s.state === 'changes' ? ' Changes were asked for on this one.' : ''}` : s.state === 'approved' ? `Approved${s.at ? ' ' + timeWords(s.at) : ''}` : s.state === 'reviewed' ? 'Reviewed' : s.state === 'changes' ? `Changes requested${s.row.produced_by ? `: waiting for a new version from ${shown(s.row.produced_by)}` : ''}. Approving now approves this version as it is.` : waiting && !pending ? 'Waiting for your review. Approve it on that computer\'s own dashboard.' : 'Waiting for your review';
+        stateEl.textContent = !s ? '' : s.newer && s.state !== 'approved' ? `An older version: v${s.newer.n} is newer.${s.state === 'changes' ? ' Changes were asked for on this one.' : ''}` : s.state === 'approved' && s.newer ? `Approved${s.at ? ' ' + timeWords(s.at) : ''}. An older version: v${s.newer.n} is newer.` : s.state === 'approved' ? `Approved${s.at ? ' ' + timeWords(s.at) : ''}` : s.state === 'reviewed' ? 'Reviewed' : s.state === 'changes' ? `Changes requested${s.row.produced_by ? `: waiting for a new version from ${shown(s.row.produced_by)}` : ''}. Approving now approves this version as it is.` : waiting && !pending ? 'Waiting for your review. Approve it on that computer\'s own dashboard.' : 'Waiting for your review';
         stateEl.hidden = !stateEl.textContent; // no status, no chip
+        newerHex = s && s.newer ? s.newer.hex : ''; newest.hidden = !newerHex; if (newerHex) newest.textContent = `Open v${s.newer.n}`;
     };
     const openForm = (on) => { form.hidden = !on; bar.hidden = !cur || (slotted && !on); changes.setAttribute('aria-expanded', String(on)); if (on) { error.textContent = ''; text.focus(); } };
     changes.addEventListener('click', () => openForm(form.hidden));

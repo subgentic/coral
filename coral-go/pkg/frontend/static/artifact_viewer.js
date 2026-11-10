@@ -207,7 +207,7 @@ function _build() {
         sheetOpen: () => _comments.sheetOpen(),
         setSheet: (open) => _comments.setSheet(open),
     });
-    _review = attachReview(d, { reload: () => openArtifactViewer(_hex, { ..._lastOpts, switched: true }) });
+    _review = attachReview(d, { reload: hex => openArtifactViewer(hex || _hex, { ..._lastOpts, switched: true }) });
     // On a phone Approve and Request changes sit in the bottom bar with Close, and Comments sits by the ⋯ button (two thin rows above the file, #12226); on a computer they are on the header row
     const phone = matchMedia('(max-width: 768px)'), dock = () => {
         const q = x => d.querySelector(x), foot = q('.artifact-viewer-foot'), actions = q('.artifact-viewer-actions'), chips = q('.artifact-viewer-chips');
