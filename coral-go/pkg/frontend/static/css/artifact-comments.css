@@ -147,10 +147,6 @@
 .detail-details > .detail-chips, .detail-details > .detail-facts { flex: 1 1 100%; min-width: 0; max-width: 100%; margin: 0; } /* a long goal or task cuts inside the panel with an ellipsis (its whole words in the title), never a sideways scroll */
 .detail-details > .artifact-readers { flex: 1 1 11rem; min-width: 0; margin: 0; }
 .detail-details > .artifact-private { flex: 0 1 12.5rem; min-width: 0; padding-top: 0; }
-.detail-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 6px; } /* the goal and the task behind Details: chips in one wrapped row, each one line, the whole words in its title (#12725) */
-.detail-chip { display: inline-block; max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: top; }
-.detail-chip .detail-chip-link { padding: 0; min-height: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
-@media (pointer: coarse) { .detail-chips > .artifact-viewer-goal { min-height: var(--control-touch-height, 44px); display: inline-flex; align-items: center; } } /* open, Details is at most a quarter of the window and scrolls inside itself: the file keeps the rest (#12725) */
 .artifact-viewer-readers[hidden] { display: none; }
 .artifact-readers { font-size: var(--fs-sm, 0.8125rem); margin: 8px 0 0; }
 .artifact-readers-head { margin: 0; font-size: var(--fs-sm, 0.8125rem); font-weight: var(--fw-strong); color: var(--text-secondary); } /* shown directly inside Details (#7796): a small heading, not a second disclosure */

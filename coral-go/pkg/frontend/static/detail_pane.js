@@ -92,7 +92,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     const main = el('div', 'pane-body detail-body');
     if (facts.length) {
         const dl = el('div', 'detail-facts detail-chips'); // chips in one wrapped row, as the viewer's (#12725): "Goal: X", "Task: Y"
-        for (const [k, v] of facts) { if (v == null || v === '') continue; const c = el('span', 'chip detail-chip'); c.append(`${k}: `); if (v instanceof Node) c.append(v); else { c.append(String(v)); c.title = `${k}: ${v}`; } dl.append(c); } // a value is text, or a node (the Task fact is the link the Task column is)
+        for (const [k, v] of facts) { if (v == null || v === '') continue; const c = el('span', 'chip detail-chip'); c.append(`${k}: `); if (v instanceof Node) { if (v.classList) v.classList.add('detail-chip-link'); c.append(v); } else { c.append(String(v)); c.title = `${k}: ${v}`; } dl.append(c); } // a value is text, or a node (the Task fact is the link the Task column is)
         if (dl.children.length) more.add(dl);
     }
     const doc = el('div', 'detail-doc');

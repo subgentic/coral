@@ -23,7 +23,7 @@ import { state } from './state.js';
 import { showToast } from './notifications.js';
 const { resolveArtifactSource, loadArtifactInventory } = await importOnce('./artifact_source.js');
 
-await loadStyles('artifact_viewer_header.css'); // the one-row header's rules load with the viewer, not at start (page_weight)
+await loadStyles('detail_more.css'); await loadStyles('artifact_viewer_header.css'); // the one-row header's rules load with the viewer, not at start (page_weight)
 const { readersAllowed, readersBlock } = await importOnce('./artifact_readers.js'); // lazy: its failure is retried
 const { privateBlock } = await importOnce('./artifact_private.js'); // the owner's Private switch, beside it (#11457)
 const { dropboxBlock } = await importOnce('./artifact_dropbox.js'); // its place in the Dropbox backup (#14814): this computer's Operator only

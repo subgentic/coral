@@ -5,3 +5,9 @@
 .detail-more .more-item-desc { color: var(--text-secondary); font-size: var(--fs-sm); white-space: normal; text-align: left; }
 .detail-more .menu-sep { margin: 4px 0; border: 0; border-top: 1px solid var(--border); }
 @media (max-width: 767px), (pointer: coarse) { .detail-foot .detail-more { flex: 1 1 auto; margin-right: 0; } .detail-foot .detail-more .task-more-btn { flex: 1; } } /* a phone's bar: three equal buttons, More the first (#14963) */
+
+/* The facts and the goal and task chips (moved from the start sheet, #15273): they wrap, whole, and never cut a name with an ellipsis. */
+.detail-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 6px; } /* the goal and the task behind Details: chips in one wrapped row, each one line, the whole words in its title (#12725) */
+.detail-chip { display: inline-block; max-width: 100%; min-width: 0; overflow: visible; overflow-wrap: anywhere; white-space: normal; vertical-align: top; }
+.detail-chip .detail-chip-link { padding: 0; min-height: 0; max-width: 100%; overflow: visible; text-align: left; white-space: normal; vertical-align: bottom; overflow-wrap: anywhere; }
+@media (pointer: coarse) { .detail-chips > .artifact-viewer-goal { min-height: var(--control-touch-height, 44px); display: inline-flex; align-items: center; } } /* open, Details is at most a quarter of the window and scrolls inside itself: the file keeps the rest (#12725) */

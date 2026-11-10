@@ -161,6 +161,7 @@ const { coralReady } = require('./helpers/wait');
                     assert.match(await ev(`document.querySelector('.artifact-review-state').textContent`),/Waiting for your review/);
                     await ev(`document.querySelector('.artifact-review-changes').click();true`);
                     await waitFor(`document.activeElement&&document.activeElement.id==='artifact-review-text'`,'the change request box has the focus',4000);
+                    assert.match(await ev(`document.querySelector('.artifact-review-form label').textContent`),/^What should change\? Writer [AB], who uploaded this file, will get it\.$/,'the box names who gets the request (walk 17 M13)');
                     await ev(`(()=>{const t=document.getElementById('artifact-review-text');t.value='Please add the totals row';const f=document.querySelector('.artifact-review-form');f.requestSubmit();f.requestSubmit();return true;})()`); // a second tap while the first request is on its way (a phone: Mobile Beta Tester)
                     await waitFor(`window.__decisions.some(d=>d.decision==='changes')`,'the change request was recorded',8000);
                     const sent=await ev(`window.__comments`);
