@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"strings"
 
 	"github.com/subgentic/coral/internal/board"
 )
@@ -23,4 +24,32 @@ func (h *SessionsHandler) chainFileOpen(ctx context.Context, boardID, hex string
 		}
 	}
 	return true
+}
+
+// changesRequestedFileNamed is the stored file of this board that the Operator asked changes on, that the same uploader made, with this name, newest request first: the file a revised upload of that name is the next
+// version of (#15115). "" when there is none (the file was decided or replaced, was made by another agent, or has another name).
+func (h *SessionsHandler) changesRequestedFileNamed(ctx context.Context, coralDir, boardID, uploader, name string) string {
+	if strings.TrimSpace(uploader) == "" || strings.TrimSpace(name) == "" {
+		return ""
+	}
+	reviews, err := h.bs.ArtifactReviews(ctx, boardID)
+	if err != nil {
+		return ""
+	}
+	best, bestAt := "", ""
+	for hex, rv := range reviews {
+		if rv.State != board.ReviewChangesRequested || (best != "" && rv.At <= bestAt) {
+			continue
+		}
+		if !h.chainFileOpen(ctx, boardID, hex) {
+			continue
+		}
+		for _, rec := range recordsOfDigest(coralDir, hex) {
+			if rec.rec.Board == boardID && isAgentUploadRecord(rec.rec) && strings.EqualFold(strings.TrimSpace(rec.rec.Uploader), strings.TrimSpace(uploader)) && rec.rec.Name == name {
+				best, bestAt = hex, rv.At
+				break
+			}
+		}
+	}
+	return best
 }

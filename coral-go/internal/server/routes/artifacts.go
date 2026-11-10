@@ -295,6 +295,13 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 			}
 		}
 	}
+	if forReviewUpload := hasTag(board.CleanArtifactTags(r.URL.Query()["tag"]), tagForReview); forReviewUpload && ref == "" && h.bs != nil && chainBoard != "" {
+		// A revision of a file the Operator asked changes on (#15115): with no task to join it by (an agent with none, two, or only finished tasks), it is still the file's next version, by the same uploader and the
+		// same name, never a new 'version 1' that leaves the thread behind. Only a file waiting on its uploader counts; one that was decided or replaced is done.
+		if hex := h.changesRequestedFileNamed(r.Context(), coralDir, chainBoard, chainUploader, name); hex != "" {
+			ref, autoChain = "coral://artifacts/"+hex, true
+		}
+	}
 	if ref != "" {
 		callerBoard, _, _ := uploaderOf(sid)
 		var perr error
