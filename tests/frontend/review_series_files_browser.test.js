@@ -37,6 +37,14 @@ const { coralReady } = require('./helpers/wait');
         await openV(h1, '');
         await waitFor(`/is newer/.test(document.querySelector('.av-notice')?.textContent || '')`, 'the older file says the newest covers it', 12000);
         assert.match(await ev(`document.querySelector('.av-notice').textContent`), /README\.md \(v3\) is newer, and one decision on it covers all 3 files/);
+        // #15254: Approve on the newest asks once when files of the series were never opened, and says how many (app.js and README.md were shown earlier in this test, so one is left); a second press approves
+        await close(); await openV(h3, '');
+        await waitFor(`!!document.querySelector('.artifact-review-approve') && !document.querySelector('.artifact-review-approve').hidden`, 'the review bar again', 12000);
+        await ev(`document.querySelector('.artifact-review-approve').click(); true`);
+        assert.equal(await ev(`document.querySelector('.artifact-review-approve').textContent`), '1 of 3 files not opened: approve all?', 'README.md and app.js were shown above; style.css never was');
+        assert.equal(await ev(`window.__approved = false, !!document.querySelector('.artifact-review-approve') && /Approved/.test(document.querySelector('.artifact-review-state')?.textContent || '')`), false, 'the first press approved nothing');
+        await ev(`document.querySelector('.artifact-review-approve').click(); true`);
+        await waitFor(`/Approved/.test(document.querySelector('.artifact-review-state')?.textContent || '')`, 'the second press approves', 12000);
         console.log('PASS a series of several files names each file and says one decision covers them all');
     } finally {
         if (sid) await ev(`fetch('/api/sessions/live/${encodeURIComponent(sname || '')}/kill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent_type: 'terminal', session_id: ${JSON.stringify(sid)} }) }).then(() => true)`).catch(() => {});

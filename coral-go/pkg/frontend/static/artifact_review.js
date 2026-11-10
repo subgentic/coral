@@ -226,6 +226,7 @@ export function attachReview(d, { reload }) {
     // Both are bound to THE FILE they were made for (#14263, QA Reviewer 2's surviving mutants on #14187): another file opened in this form never reuses this one's recorded decision or its comment, whatever else is or is not cleared on open.
     const fileKey = x => JSON.stringify([x.team, x.server || '', x.hex]);
     let legacyDecision = null, legacyComment = null;
+    let armed = false; // Approve on a series of several files, some never opened, asks once more (#15254)
     let cur = null, gen = 0, sending = false, done = false, inProgress = false, progressTimer = null;
     const progress = $('.artifact-review-pending');
     const clearProgress = () => { clearTimeout(progressTimer); progressTimer = null; inProgress = false; progress.hidden = true; };
@@ -234,13 +235,15 @@ export function attachReview(d, { reload }) {
     const syncSend = () => { submitBtn.disabled = sending || inProgress || tray.busy() || tray.failed(); }; // Send waits for a picture still going up, and for a failed one to be removed
     error.before(tray.picker(), tray.node, tray.hint()); tray.attach(form, text); tray.listen(syncSend);
     const paintApprove = () => {
-        const n = d.dataset.shownVersion, newer = d.dataset.newerVersion, covers = d.dataset.coversFiles;
+        const n = d.dataset.shownVersion, newer = d.dataset.newerVersion, covers = d.dataset.coversFiles, unopened = d.dataset.unopenedFiles;
+        if (armed && covers && Number(unopened) > 0) { approve.textContent = `${unopened} of ${covers} files not opened: approve all?`; approve.title = 'Press again to approve every file in this review, or open the others first.'; return; }
+        armed = false;
         approve.textContent = `${newer && n ? `Approve v${n}` : 'Approve'}${cur && cur.state === 'changes' ? ' anyway' : ''}${newer ? ` (v${newer} is newer)` : ''}${covers && !newer ? ` (covers ${covers} files)` : ''}`;
         approve.title = covers ? `One decision covers the ${covers} files in this review: open each from the version list first.` : '';
     };
-    d.addEventListener('av-version', () => { if (cur) paintApprove(); });
+    d.addEventListener('av-version', () => { armed = false; if (cur) paintApprove(); }); // another version shown: the question is asked again
     const show = (s) => {
-        cur = s;
+        cur = s; armed = false;
         const waiting = !!s && (s.state === 'pending' || s.state === 'changes');
         const pending = waiting && !decisionNeedsPerson(s.server); // a remote of a self-hosted hub: the decision is made on that machine's own dashboard (#11372)
         bar.hidden = !s;
@@ -269,6 +272,8 @@ export function attachReview(d, { reload }) {
     });
     approve.addEventListener('click', async () => {
         if (!cur) return;
+        if (!armed && d.dataset.coversFiles && Number(d.dataset.unopenedFiles) > 0) { armed = true; paintApprove(); return; } // covers several files and some were never opened: say so, and ask again
+        armed = false;
         approve.disabled = true;
         try { const out = await approveRow(cur.team, cur.row); sayApproved(cur.row.name || 'the artifact', out); show({ ...cur, state: 'approved', at: out.review?.at || new Date().toISOString() }); }
         catch (e) { showToast(e.message, true); } finally { approve.disabled = false; }
