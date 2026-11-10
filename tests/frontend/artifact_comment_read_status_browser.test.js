@@ -18,6 +18,7 @@ const COMMENTS = [
     { id: 6, parent_id: null, anchor: { whole: true }, body: 'An older server: seen, no read_at key at all.', asks: [ASK('Writer E', { seen: true })] },
     { id: 8, parent_id: null, anchor: { whole: true }, body: 'Backend Dev\'s real format: microseconds and +00:00.', asks: [ASK('Writer I', { seen: true, read_at: new Date(Date.now() - 4 * 60000).toISOString().replace(/\.(\d{3})Z$/, '.$1456+00:00') })] },
     { id: 7, parent_id: null, anchor: { whole: true }, body: 'One comment, three agents, three states.', asks: [ASK('Writer F'), ASK('Writer G', { seen: true, read_at: ago(5 * 60000) }), ASK('Writer H', { seen: true, replies: 1, read_at: ago(8 * 60000) })] },
+    { id: 10, parent_id: null, anchor: { whole: true }, body: 'Reopened after its ask ran out (#15239).', asks: [ASK('Writer K', { open: false, seen: true, read_at: ago(40 * 60000) })] },
     { id: 9, parent_id: null, anchor: { whole: true }, body: 'The agent used all its replies this turn (#15034).', asks: [ASK('Writer J', { seen: true, replies: 5, limit_reached: true, read_at: ago(6 * 60000) })] },
 ].map(c => ({ ...c, author: { kind: 'owner', issuer: 'local', subject: 'Operator' }, created_at: ago(20 * 60000) }));
 
@@ -57,6 +58,8 @@ const COMMENTS = [
             // the three move on independently: F reads it, G replies
             await ev(`const c7 = window.__cs.find(c => c.id === 7); c7.asks[0].read_at = new Date().toISOString(); c7.asks[1].replies = 2; true`);
             await waitFor(`(document.querySelector('#artifact-viewer .ac-card[data-id="7"] .ac-ask-status')?.textContent || '').replace(/\\s+/g, ' ').trim() === 'Read by Writer F, just now; Writer G replied (2 times); Writer H replied'`, `${at}each of the three agents moves on by itself`, 8000);
+            const l10 = await line(10);
+            check(l10 && /^Read by Writer K, /.test(l10.text) && !/Not sent/.test(l10.text), `${at}a comment whose ask has run out still says where the agent has it, not "Not sent to an agent yet" (#15239): ` + JSON.stringify(l10));
             const l9 = await line(9);
             check(l9 && l9.text === 'Writer J replied (5 times). The agent has reached its reply limit here', `${at}an agent out of replies is said so, in the thread (#15034): ` + JSON.stringify(l9));
             // the Operator's reply that reached no agent says why under the thread (#15034), from the answer to its creation
