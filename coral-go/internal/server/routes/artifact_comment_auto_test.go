@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/board"
+
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/tunnel"
@@ -453,4 +455,24 @@ func TestAnAskOnAnotherBoardIsNotDeliveredTo(t *testing.T) {
 	for _, m := range rig.operatorMessages() {
 		assert.NotContains(t, m.Content, "@QA ")
 	}
+}
+
+// #15155 (walk 5 M9): the automatic board message 'The Operator commented on an artifact: please read it and reply...' is Coral's, not the person's: it was posted under their name (shown as 'You').
+func TestTheAutomaticMessageForAnOperatorCommentIsPostedAsCoralNotAsThePerson(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	rig.uploadedBy(1, "team-a")
+	rig.tag("for review")
+	code, out := rig.commentAs(cmtAsOwner, nil)
+	require.Equal(t, http.StatusCreated, code, fmt.Sprint(out))
+
+	msgs, err := rig.h.bs.ListMessages(context.Background(), "team-a", 100, 0, 0)
+	require.NoError(t, err)
+	var from []string
+	for _, m := range msgs {
+		if strings.Contains(m.Content, "The Operator commented on an artifact") {
+			from = append(from, m.SubscriberID)
+		}
+	}
+	assert.Equal(t, []string{board.CoralSender}, from, "one message, posted as Coral")
 }

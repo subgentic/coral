@@ -174,7 +174,7 @@ func (h *SessionsHandler) deliverGoalComment(r *http.Request, caller commentCall
 		context += ". " + note
 	}
 	msg := sendMessageOf(sendOnGoal, title, sendAuthorOperator, context, sendReplyCommand(id, rootID), text, snippet, names, commentPictureLinks(c.ImagesJSON)...)
-	posted, err := h.bs.PostDefusedMessage(ctx, team, board.OperatorName, msg)
+	posted, err := h.postCommentMessage(ctx, team, msg)
 	if err != nil {
 		slog.Warn("[goal comments] message not posted", "board", team, "error", err)
 		_ = h.ss.CloseArtifactAsk(ctx, rootID, sessionID, time.Now())

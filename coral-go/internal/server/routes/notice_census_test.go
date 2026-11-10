@@ -82,7 +82,7 @@ func TestEveryServerPostThatQuotesStoredTextIsDefused(t *testing.T) {
 					case "PostSystemMessage":
 						found[pkg+"/"+filepath.Base(f)+" "+fd.Name.Name]++
 					case "PostSystemDefusedMessage":
-						if fd.Name.Name != "postNotice" {
+						if fd.Name.Name != "postNotice" && fd.Name.Name != "postCommentMessage" { // postCommentMessage: the Operator-comment messages, already defused by sendMessage (#15155)
 							defusedOutsidePostNotice = append(defusedOutsidePostNotice, pkg+"/"+filepath.Base(f)+" "+fd.Name.Name)
 						}
 					}

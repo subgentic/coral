@@ -79,7 +79,7 @@ func (e *reviewEnv) messages(t *testing.T) []string {
 	require.NoError(t, err)
 	var out []string
 	for _, m := range msgs {
-		if m.SubscriberID == board.OperatorName {
+		if m.SubscriberID == board.OperatorName || m.SubscriberID == board.CoralSender { // the notice and the automatic comment message, which is Coral's (#15155)
 			out = append(out, m.Content)
 		}
 	}
