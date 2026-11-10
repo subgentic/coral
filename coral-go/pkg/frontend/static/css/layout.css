@@ -158,18 +158,16 @@
 /* ── Sidebar ───────────────────────────────────────────────── */
 
 .sidebar {
-    width: 320px;
-    min-width: 200px;
+    width: clamp(18rem,25vw,320px);
     max-width: 50vw;
     background: var(--bg-secondary);
-    border-right: none;
     overflow-y: auto;
     scrollbar-gutter: stable; /* a list that scrolls does not move the header's parts left of where a short one has them (#7443) */
     /* The pinned New Agent footer covers the bottom of the scroll area: a row the keyboard focuses at that edge is scrolled clear of it (#6159). */
     scroll-padding-bottom: 8rem; /* the footer with Chief's reserved row (44 px more than the 5rem it needed before) */
     display: flex;
     flex-direction: column;
-    flex-shrink: 0;
+    flex: none;
 }
 
 body.panel-dragging .sidebar {
