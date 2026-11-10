@@ -103,6 +103,7 @@ func (h *SessionsHandler) deliverOperatorComment(r *http.Request, caller comment
 			reason = firstReason(reason, "failed")
 			continue
 		}
+		h.ss.ResetAskReplies(ctx, rootID, t.sessionID) // a new turn of the Operator's: the agent has its replies again (#15034)
 		msg := sendMessage(title, sendAuthorOperator, h.sendVersionLine(id, b), sendReplyCommand(id, rootID), text, snippet, names, commentPictureLinks(c.ImagesJSON)...)
 		posted, err := h.bs.PostDefusedMessage(ctx, b, board.OperatorName, msg)
 		if err != nil {

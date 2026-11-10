@@ -18,6 +18,7 @@ const COMMENTS = [
     { id: 6, parent_id: null, anchor: { whole: true }, body: 'An older server: seen, no read_at key at all.', asks: [ASK('Writer E', { seen: true })] },
     { id: 8, parent_id: null, anchor: { whole: true }, body: 'Backend Dev\'s real format: microseconds and +00:00.', asks: [ASK('Writer I', { seen: true, read_at: new Date(Date.now() - 4 * 60000).toISOString().replace(/\.(\d{3})Z$/, '.$1456+00:00') })] },
     { id: 7, parent_id: null, anchor: { whole: true }, body: 'One comment, three agents, three states.', asks: [ASK('Writer F'), ASK('Writer G', { seen: true, read_at: ago(5 * 60000) }), ASK('Writer H', { seen: true, replies: 1, read_at: ago(8 * 60000) })] },
+    { id: 9, parent_id: null, anchor: { whole: true }, body: 'The agent used all its replies this turn (#15034).', asks: [ASK('Writer J', { seen: true, replies: 5, limit_reached: true, read_at: ago(6 * 60000) })] },
 ].map(c => ({ ...c, author: { kind: 'owner', issuer: 'local', subject: 'Operator' }, created_at: ago(20 * 60000) }));
 
 (async () => {
@@ -39,7 +40,7 @@ const COMMENTS = [
             await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'plan.md', board: 'ask-team' }); return true; })()`);
             await waitFor(`!!document.querySelector('.ac-toggle')`, `${at}the comments toggle`, 8000);
             await ev(`(() => { const t = document.querySelector('.ac-toggle'); if (t && t.getAttribute('aria-expanded') !== 'true') t.click(); return true; })()`);
-            await waitFor(`document.querySelectorAll('#artifact-viewer .ac-card').length >= 8`, `${at}the eight comments`, 8000);
+            await waitFor(`document.querySelectorAll('#artifact-viewer .ac-card').length >= 9`, `${at}the nine comments`, 8000);
             const line = id => ev(`(() => { const p = document.querySelector('#artifact-viewer .ac-card[data-id="${id}"] .ac-ask-status'); return p && { text: p.textContent.replace(/\\s+/g, ' ').trim(), names: [...p.children].map(e => e.textContent.trim()), times: [...p.querySelectorAll('[title]')].map(e => e.title).filter(t => /^\\d{4}-\\d\\d-\\d\\dT/.test(t)) }; })()`);
             const [l1, l2, l3, l4, l5, l6, l7, l8] = [await line(1), await line(2), await line(3), await line(4), await line(5), await line(6), await line(7), await line(8)];
             check(l1 && /^Sent to Writer A\b/.test(l1.text) && !/\bread\b|\breplied\b/i.test(l1.text), `${at}an ask with no sign yet says Sent to the agent: ` + JSON.stringify(l1));
@@ -56,6 +57,14 @@ const COMMENTS = [
             // the three move on independently: F reads it, G replies
             await ev(`const c7 = window.__cs.find(c => c.id === 7); c7.asks[0].read_at = new Date().toISOString(); c7.asks[1].replies = 2; true`);
             await waitFor(`(document.querySelector('#artifact-viewer .ac-card[data-id="7"] .ac-ask-status')?.textContent || '').replace(/\\s+/g, ' ').trim() === 'Read by Writer F, just now; Writer G replied (2 times); Writer H replied'`, `${at}each of the three agents moves on by itself`, 8000);
+            const l9 = await line(9);
+            check(l9 && l9.text === 'Writer J replied (5 times). The agent has reached its reply limit here', `${at}an agent out of replies is said so, in the thread (#15034): ` + JSON.stringify(l9));
+            // the Operator's reply that reached no agent says why under the thread (#15034), from the answer to its creation
+            await ev(`(() => { const real = window.fetch; window.fetch = (u, o = {}) => { const url = String(u), m = (o.method || 'GET').toUpperCase(); if (url.includes('/api/artifacts/${HEX}/comments') && m === 'POST') { const c = { id: 30, parent_id: 4, anchor: null, body: 'hello', author: { kind: 'owner', issuer: 'local', subject: 'Operator' }, created_at: new Date().toISOString(), deleted: false, mine: true, not_delivered: 'the board is paused', asks: [] }; return Promise.resolve(new Response(JSON.stringify(c), { status: 201, headers: { 'Content-Type': 'application/json' } })); } return real(u, o); }; return true; })()`);
+            await ev(`document.querySelector('#artifact-viewer .ac-card[data-id="4"] .ac-replybox').click(); true`);
+            await waitFor(`!!document.querySelector('#artifact-viewer .ac-card[data-id="4"] textarea.ac-input')`, `${at}the reply box opens`, 4000);
+            await ev(`(() => { const ta = document.querySelector('#artifact-viewer .ac-card[data-id="4"] textarea.ac-input'); ta.value = 'hello'; ta.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#artifact-viewer .ac-card[data-id="4"] .ac-send').click(); return true; })()`);
+            await waitFor(`(document.querySelector('#artifact-viewer .ac-card[data-id="4"] .ac-ask-status')?.textContent || '').trim() === 'Not delivered: the board is paused'`, `${at}the thread says why the reply went to no agent`, 8000);
             check(l1.names.includes('Writer A') && l2.names.includes('Writer B') && l3.names.includes('Writer C'), `${at}each agent's name is its own element (the link to its chat, or its label when it is not running): ` + JSON.stringify([l1.names, l2.names, l3.names]));
             // the line moves on by itself while the panel is open: the agent reads the comment, the next poll draws it
             await ev(`window.__cs[0].asks[0].read_at = new Date().toISOString(); true`);
