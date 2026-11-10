@@ -12,3 +12,9 @@
 .inbox-group-mode { min-width: 0; max-width: 100%; } /* Group by (#14729): the choice after its label */
 @media (max-width: 760px), (pointer: coarse) { .inbox-group-mode { min-height: var(--control-touch-height, 44px); } }
 .inbox-needs-results .inbox-file-question { padding-inline-end: 52px; } /* the star has its own room at the end of the row: the question and the uploader under the name stop before it (#14968) */
+
+/* A tablet's Needs you (#15259, walk 13): the chips wrap onto their own line under the title and search instead of running off the right edge cut mid-chip. */
+@media (min-width: 768px) and (max-width: 999px) {
+    .inbox-folder-toolbar .list-bar-search-row.gt-toolbar { flex-wrap: wrap; }
+    .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .team-tb-pills { flex: 1 1 100%; order: 5; flex-wrap: wrap; overflow: visible; }
+}

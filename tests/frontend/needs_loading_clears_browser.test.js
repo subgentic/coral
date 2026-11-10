@@ -1,6 +1,6 @@
 // "Loading review files…" under Needs you goes when the read ends (#14841, the flake in inbox_scan_servers_late, #14786's cause): the list's drawing is kept while its signature is the same, and the signature of the paging
 // controls left out whether a computer's page was still LOADING, so a page that finished with nothing to add (no rows, no more, the same counts) left the "Loading" line on screen for good. The computer's first page here
-// answers late and empty; the line must say Loading while it is out and Nothing needs you once it is back, whatever else did or did not change. 1280 and 390.
+// answers late and empty; the line must say Loading while it is out and You are all caught up once it is back, whatever else did or did not change. 1280 and 390.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;

@@ -1,5 +1,5 @@
 // probe
-// exists, a computer or the Hub is connected), read or dismissed; they are not in the Inbox badge; each is dismissed one at a time (no Hide all, #14742); an empty Needs you says "Nothing needs you" with a way to Agents; an install
+// exists, a computer or the Hub is connected), read or dismissed; they are not in the Inbox badge; each is dismissed one at a time (no Hide all, #14742); an empty Needs you says "You are all caught up" with a way to Agents; an install
 // without the setting never sees them. At 1280 and 390 px, through agent_view_harness.js against the isolated dev server (the settings the page keeps are put in its state; the PUTs are answered here).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
