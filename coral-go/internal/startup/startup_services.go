@@ -282,6 +282,8 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 	// Board notifier
 	boardNotifier := background.NewBoardNotifier(srv.BoardStore(), agentRT, time.Duration(cfg.BoardNotifierIntervalS)*time.Second)
 	boardNotifier.SetDiscoverFn(discoverFn)
+	contextCompact := background.NewContextCompact(srv.BoardStore(), discoverFn)
+	boardNotifier.SetNudgeHoldFn(contextCompact.HoldNudge) // a compaction that is due goes in before a nudge starts a turn (#15066)
 	if bh := srv.BoardHandler(); bh != nil {
 		boardNotifier.SetIsPausedFn(bh.IsPaused)
 		boardNotifier.SetSleepingFn(func(ctx context.Context, sessionID string) bool {
@@ -325,8 +327,7 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 		safeGo(ctx, "health_nudges", func() { healthNudges.Run(ctx) })
 	}
 
-	// A large context is compacted at a quiet moment, for the teams that turned it on (off by default, #14849).
-	contextCompact := background.NewContextCompact(srv.BoardStore(), discoverFn)
+	// A large context is compacted at a quiet moment, for every team that has not turned it off (on by default since #15066, #14849).
 	var pausedFn func(string) bool
 	if bh := srv.BoardHandler(); bh != nil {
 		pausedFn = bh.IsPaused

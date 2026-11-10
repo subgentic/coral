@@ -43,6 +43,13 @@ CREATE TABLE IF NOT EXISTS keep_full_access (
 	source     TEXT NOT NULL DEFAULT 'local' -- 'local' (the dashboard, the command line, the API key) or 'hub' (the Hub owner, through the tunnel): a choice the hub made ends with the hub's switch, as a hub-enabled auto-accept does (#14193)
 );
 
+-- When Coral last sent an agent a /compact or /clear (#15066): the context reading of a turn recorded at or before it is no longer the agent's context, so the card shows none and the compaction's cooldown reads "no reading" as not due,
+-- also after a restart. The agent's next model turn is recorded later and fills the reading again.
+CREATE TABLE IF NOT EXISTS context_resets (
+	session_id TEXT PRIMARY KEY,
+	reset_at   TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS auto_sleep_state (
 	session_id TEXT PRIMARY KEY,
 	off        INTEGER NOT NULL DEFAULT 0,

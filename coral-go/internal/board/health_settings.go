@@ -34,7 +34,7 @@ type HealthSettings struct {
 	UploadNoTask HealthRuleOn       `json:"upload_no_task"`
 	// GoalSize tells the orchestrator when a goal has more than Limit tasks (#7808, goal #21 part 6), counting its open and its done ones: once per crossing, and again at each further Limit.
 	GoalSize HealthGoalSize `json:"goal_size"`
-	// CompactContext types the CLI's own /compact to a member that is idle at its prompt with a context past ThresholdK thousand tokens (#14849): off by default, for Claude agents only. Orchestrator: the team's
+	// CompactContext types the CLI's own /compact to a member that is idle at its prompt with a context past ThresholdK thousand tokens (#14849): on by default since #15066 (a team that saved it off keeps off), for Claude agents only. Orchestrator: the team's
 	// orchestrator is compacted too (off: it holds the most state, so it is left alone until the Operator says otherwise).
 	CompactContext HealthCompact `json:"compact_context"`
 	// AssignLimit is how many waiting (pending) tasks an agent may have before assigning it another is refused with the other agents by load (#14862, the Operator's assignment limit); --force overrides. 0: no limit.
@@ -309,7 +309,7 @@ const (
 
 // CompactThresholdK bounds: below 50k a compaction saves little and costs a request, above 900k the CLI has compacted on its own.
 const (
-	CompactThresholdDefaultK = 200
+	CompactThresholdDefaultK = 225
 	CompactThresholdMinK     = 50
 	CompactThresholdMaxK     = 900
 )
@@ -332,7 +332,7 @@ func DefaultHealthSettings() HealthSettings {
 		PostNoTask:     HealthRuleOn{On: true},
 		UploadNoTask:   HealthRuleOn{On: true},
 		GoalSize:       HealthGoalSize{On: true, Limit: 15},
-		CompactContext: HealthCompact{On: false, ThresholdK: CompactThresholdDefaultK, Trigger: CompactTriggerThreshold, Method: CompactMethodCompact},
+		CompactContext: HealthCompact{On: true, ThresholdK: CompactThresholdDefaultK, Orchestrator: true, Trigger: CompactTriggerThreshold, Method: CompactMethodCompact}, // ON for a team that has not set it (the Operator, #15066): a team that stored it off keeps off
 		AssignLimit:    DefaultAssignLimit,
 		AskReminder:    HealthMentionNudge{On: true, AfterMin: 15},
 		Deviations:     HealthRuleOn{On: true},

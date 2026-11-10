@@ -10,15 +10,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCompactContextIsOffByDefaultWithA200kThresholdAndIsClamped(t *testing.T) {
+func TestCompactContextIsOnByDefaultWithA225kThresholdAndIsClamped(t *testing.T) {
 	d := DefaultHealthSettings().CompactContext
-	assert.False(t, d.On)
-	assert.Equal(t, 200, d.ThresholdK)
-	assert.False(t, d.Orchestrator)
+	assert.True(t, d.On, "on for a team that has not set it (#15066)")
+	assert.Equal(t, 225, d.ThresholdK)
+	assert.True(t, d.Orchestrator)
+	assert.Equal(t, "compact", d.Method)
 	assert.Equal(t, "threshold", d.Trigger)
 	h := DefaultHealthSettings()
 	h.CompactContext.ThresholdK = 0
-	assert.Equal(t, 200, h.Clamp().CompactContext.ThresholdK, "a body that does not carry it is the default")
+	assert.Equal(t, 225, h.Clamp().CompactContext.ThresholdK, "a body that does not carry it is the default")
 	h.CompactContext.ThresholdK = 10
 	assert.Equal(t, 50, h.Clamp().CompactContext.ThresholdK)
 	h.CompactContext.ThresholdK = 5000
@@ -44,7 +45,31 @@ func TestCompactContextIsStoredPerTeam(t *testing.T) {
 	h.CompactContext.Method = "wipe"
 	require.NoError(t, s.SetHealthSettings(ctx, "a", h))
 	assert.Equal(t, "compact", s.GetHealthSettings(ctx, "a").CompactContext.Method, "a word that is neither is the default")
-	assert.False(t, s.GetHealthSettings(ctx, "b").CompactContext.On, "another team keeps the default")
+	assert.True(t, s.GetHealthSettings(ctx, "b").CompactContext.On, "another team keeps the default")
+}
+
+// #15066: the compaction is on for a team that never saved the setting, and a team that saved it off keeps it off. Upgrade-safe: a body saved before the setting existed carries no compact_context, which is "never saved".
+func TestCompactContextIsOnUnlessTheTeamSavedItOff(t *testing.T) {
+	s, err := NewStoreWithKey(filepath.Join(t.TempDir(), "b.db"), "")
+	require.NoError(t, err)
+	defer s.Close()
+	ctx := context.Background()
+	assert.Equal(t, HealthCompact{On: true, ThresholdK: 225, Orchestrator: true, Trigger: "threshold", Method: "compact"}, s.GetHealthSettings(ctx, "never").CompactContext)
+
+	require.NoError(t, s.SetBoardSetting(ctx, "older", settingHealth, `{"on":true,"interval_min":10}`)) // saved before the setting existed
+	assert.True(t, s.GetHealthSettings(ctx, "older").CompactContext.On, "a team that never saved this setting gets the default")
+
+	off := DefaultHealthSettings()
+	off.CompactContext.On = false
+	require.NoError(t, s.SetHealthSettings(ctx, "off", off))
+	assert.False(t, s.GetHealthSettings(ctx, "off").CompactContext.On, "a team that saved it off keeps it off")
+
+	noOrch := DefaultHealthSettings()
+	noOrch.CompactContext.Orchestrator = false
+	require.NoError(t, s.SetHealthSettings(ctx, "noorch", noOrch))
+	got := s.GetHealthSettings(ctx, "noorch").CompactContext
+	assert.True(t, got.On)
+	assert.False(t, got.Orchestrator, "a saved value is kept")
 }
 
 // The after-task trigger's question (#14849): when a member last finished a task, by completing it or by submitting it for review.
