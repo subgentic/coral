@@ -114,3 +114,32 @@ func TestTheDefaultPromptsTellAnAgentToTagWithAOneLineQuestion(t *testing.T) {
 		t.Errorf("the upload help no longer says the question is required: %q", help+helpErr)
 	}
 }
+
+// #15116 (Beta walk 3, N2 and N16): a plan came as a plain question (a reply box only), its later file said "(approved)" and "Waiting for your review", and no built file was shared until asked. Every default prompt and
+// the docs now say: a plan the person must approve is uploaded for review with a question, and a finished deliverable is shared unprompted.
+func TestAPlanAndADeliverableAreFilesForReviewNotPlainQuestions(t *testing.T) {
+	wants := []string{
+		`A plan the person must approve is a file, not a plain question: upload it with --tag "for review" and a one-line question, so their Needs you shows Approve and Request changes, and wait for that verdict`,
+		"A finished deliverable (the built app, a report, screenshots) is shared the same way when it is done, without being asked",
+	}
+	srv := realDocsServer(t)
+	for _, topic := range []string{"board", "artifacts"} {
+		code, out, errOut := runAgentWithToken(t, srv.URL, "docs", topic)
+		if code != 0 {
+			t.Fatalf("docs %s: exit %d: %s", topic, code, errOut)
+		}
+		flat := strings.Join(strings.Fields(out), " ")
+		for _, w := range wants {
+			if !strings.Contains(flat, w) {
+				t.Errorf("docs %s lacks %q", topic, w)
+			}
+		}
+	}
+	for name, prompt := range map[string]string{"orchestrator system": agent.DefaultOrchestratorSystemPrompt, "worker system": agent.DefaultWorkerSystemPrompt, "orchestrator action": agent.DefaultOrchestratorActionPrompt, "worker action": agent.DefaultWorkerActionPrompt} {
+		for _, w := range wants {
+			if !strings.Contains(prompt, w) {
+				t.Errorf("%s default prompt lacks %q", name, w)
+			}
+		}
+	}
+}
