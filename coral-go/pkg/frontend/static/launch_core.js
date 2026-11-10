@@ -64,10 +64,10 @@ export function setLaunchMore(open) { setLaunchStage(open ? 'agent' : 'folder');
 document.addEventListener("sd-more-open", e => { if (e.target.closest && e.target.closest("#launch-step-agent")) setLaunchStage('agent'); });
 
 function _showLaunchStep(step) {
-    document.getElementById("launch-modal")?.setAttribute('aria-labelledby', step === 'agent' ? 'launch-agent-title-text' : step === 'team' ? 'launch-team-title-text' : step === 'computer' ? 'launch-computer-title' : 'launch-title'); // the three steps are "New agent" or "New team"; the chooser keeps its own title
+    document.getElementById("launch-modal")?.setAttribute('aria-labelledby', step === 'agent' ? 'launch-agent-title-text' : step === 'team' ? 'launch-team-title-text' : step === 'pickComputer' ? 'launch-computer-title' : 'launch-title'); // the three steps are "New agent" or "New team"; the chooser keeps its own title
     if (step !== 'team') document.getElementById("launch-modal")?.removeAttribute('data-team-stage');
     document.getElementById("launch-step-chooser").style.display = step === "chooser" ? "flex" : "none";
-    { const c = document.getElementById("launch-step-computer"); if (c) c.style.display = step === "computer" ? "flex" : "none"; } // the Hub's first step (#15014)
+    { const c = document.getElementById("launch-step-computer"); if (c) c.style.display = step === "pickComputer" ? "flex" : "none"; } // the Hub's first step (#15014) // display-ok: a step of the launch modal, shown and hidden by style.display like its other four
     document.getElementById("launch-step-agent").style.display = step === "agent" ? "flex" : "none";
     document.getElementById("launch-step-terminal").style.display = step === "terminal" ? "flex" : "none";
     document.getElementById("launch-step-team").style.display = step === "team" ? "flex" : "none";

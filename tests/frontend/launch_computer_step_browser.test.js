@@ -37,10 +37,10 @@ const BASE = require('./test_base').BASE;
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
-            await waitFor(`document.body.classList.contains('cloud-mode') && !!document.querySelector('[data-on-click^="m-show-launch-modal"]')`, `${at}the hub dashboard`, { timeout: 15000 });
+            await waitFor(`document.body.classList.contains('cloud-mode') && typeof window.showLaunchModal === 'function'`, `${at}the hub dashboard`, { timeout: 15000 });
             for (const type of ['agent', 'team']) {
                 const tag = `${at}New ${type}: `;
-                await ev(`document.querySelector('[data-on-click^="m-show-launch-modal"]').click(); true`);
+                await ev(`window.showLaunchModal(); true`);
                 await waitFor(`!!document.getElementById('launch-modal') && getComputedStyle(document.getElementById('launch-modal')).display !== 'none'`, `${tag}the launch dialog`, { timeout: 8000 });
                 await waitFor(`!!(window.state || true) && !!window._selectLaunchType`, `${tag}the dialog is wired`, { timeout: 8000 });
                 await waitFor(`(() => { const s = document.getElementById('launch-server'); return !!s && s.options.length > 0 || true; })()`, `${tag}ready`, { timeout: 4000 });
@@ -52,6 +52,13 @@ const BASE = require('./test_base').BASE;
                 check(names.includes('Box B') && names.includes('Laptop') && (type !== 'team' || names.some(n => /Another computer/.test(n))), `${tag}the computers are cards (the team also has an address card): ${JSON.stringify(names)}`);
                 const laptop = step.cards.find(c => c.name === 'Laptop'), box = step.cards.find(c => c.name === 'Box B');
                 check(laptop && laptop.disabled && /Offline/.test(laptop.small) && box && !box.disabled && box.checked === 'true' && !step.go && !step.over && step.small === 0, `${tag}the offline one is disabled with its reason, the online one is picked and Continue is on, 44 px cards, nothing wide: ${JSON.stringify(step)}`);
+                if (type === 'team') { // the arrows move the choice among the enabled cards (the offline one is skipped)
+                    await ev(`document.querySelector('#launch-computer-list .launch-computer-card[aria-checked="true"]').focus(); true`);
+                    await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 });
+                    const moved = await ev(`(() => { const c = document.querySelector('#launch-computer-list .launch-computer-card[aria-checked="true"]'); return c ? c.querySelector('strong').textContent : ''; })()`);
+                    check(/Another computer/.test(moved), `${tag}ArrowDown moves the choice to the next enabled card, skipping the offline one: ${moved}`);
+                    await ev(`document.querySelector('#launch-computer-list .launch-computer-card[data-server="box-b"]').click(); true`);
+                }
                 await ev(`document.getElementById('launch-computer-go').click(); true`);
                 await waitFor(`getComputedStyle(document.getElementById('launch-step-${type}')).display !== 'none' && getComputedStyle(document.getElementById('launch-step-computer')).display === 'none'`, `${tag}Continue opens the form`, { timeout: 8000 });
                 const chip = await ev(`(() => { const c = document.getElementById('launch-computer-chip'); return { shown: !c.hidden, text: c.textContent.replace(/\s+/g, ' ').trim(), selectHidden: document.getElementById('launch-server').hidden }; })()`);
