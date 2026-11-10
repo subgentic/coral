@@ -69,6 +69,17 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
             assert.equal(s.tip, s.value, 'the whole path is the tooltip');
             assert.match(s.label, /^Folder for this team/, 'the field is named for what it is: ' + s.label);
         });
+        await S.run('New team: the suggested folder and its line follow the name the person types (#15079)', async () => {
+            await ev(`window.hideLaunchModal && window.hideLaunchModal(); true`);
+            await clearRecents();
+            await ev(`(async () => { await window.showLaunchModal(); window._selectLaunchType('team'); return true; })()`);
+            await waitFor(`!!document.getElementById('launch-team-dir') && document.getElementById('launch-team-dir').getClientRects().length > 0`, 'New team step 1', 8000);
+            await ev(`(() => { const n = document.getElementById('team-board-name'); n.focus(); return true; })()`);
+            await client.Input.insertText({ text: 'build-an-app' });
+            await waitFor(`/build-an-app$/.test(document.getElementById('launch-team-dir').value)`, 'the folder takes the typed name', 4000).catch(() => {});
+            const t = await ev(`({ value: document.getElementById('launch-team-dir').value, line: document.getElementById('launch-team-dir-suggest').textContent, hidden: document.getElementById('launch-team-dir-suggest').hidden })`);
+            assert.ok(/[\\/]Coral[\\/]build-an-app$/.test(t.value) && /Coral\/build-an-app|build-an-app/.test(t.line) && !/first-team/.test(t.line), 'the folder and its line name the typed team: ' + JSON.stringify(t));
+        });
         // #13510: on the Windows runner the note held "D:\\a\\_temp\\coral-cdp-...": a backslash path has no place to break, so at 390 px and 200% text it ran past the dialog and was cut
         // (phone_targets_census_b failed its first attempt on it). The note wraps anywhere in a long path. Checked with a path of that shape on any computer.
         await S.run('New team: a long Windows path in the note wraps inside the dialog (390 px, 200% text)', async () => {

@@ -70,5 +70,7 @@ registerActions({
     'team-template-filter': el => teamDialogs._renderTeamTemplateSelector(textOf(el.value, 200) || ''), // textOf('') is null: an emptied search lists every template again (#6411)
     'team-template-select': el => teamDialogs._pickTeamTemplate(textOf(el.value, 200) || ''), // textOf('') is null: Blank team
     'team-set-all': el => teamDialogs._setAllWorkers(textOf(el.value, 40) || ''),
+    'team-set-all-model': el => teamDialogs._setAllModel(textOf(el.value, 120) || ''),
+    'team-set-all-models': () => teamDialogs._fillAllModels(),
     'team-add-orchestrator': () => teamDialogs._addOrchestrator(),
 });

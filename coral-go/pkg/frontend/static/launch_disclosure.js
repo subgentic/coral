@@ -12,7 +12,7 @@ const hint = {
     clear() { browserLocal.remove(HINT_KEY); },
     release() { document.getElementById('launch-notice-room')?.remove(); document.documentElement.removeAttribute('data-launch-notice'); }, // the notice fills the room, or there is none to fill
 };
-const headline = 'Agents default to auto mode.';
+const headline = 'Agents default to auto mode: they can act without asking you; protections vary by agent.';
 function disclosureSection(id, title, disclosure) {
     const section = document.createElement('details'); section.className = 'disclosure';
     const summary = document.createElement('summary');
@@ -33,7 +33,7 @@ async function acknowledge(server, disclosure) {
 }
 export async function confirmLaunchDisclosure(server, disclosure) {
     if (!valid(disclosure) || disclosure.seen !== false) { showToast('The launch disclosure could not be read. Nothing was launched.', true); return false; }
-    const accepted = await new Promise(resolve => showConfirmModal('Before starting with full permissions', disclosure.text, () => resolve(true), () => resolve(false), { danger: false, label: 'Continue launch', cancelLabel: 'Cancel' }));
+    const accepted = await new Promise(resolve => showConfirmModal('Before starting in auto mode', disclosure.text, () => resolve(true), () => resolve(false), { danger: false, label: 'Continue launch', cancelLabel: 'Cancel' }));
     if (!accepted) return false;
     try { await acknowledge(server, disclosure); return true; }
     catch (error) { showToast(error.message, true); return false; }
