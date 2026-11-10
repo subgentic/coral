@@ -254,15 +254,9 @@ function _dismiss(choice) {
     if (_available() && !hidden) _drawOwnHub(); // the Run your own hub box's state (#14976)
 }
 
-/** The Run your own hub box, drawn from what the page already has (the saved setting in the loaded settings, and whether this Coral runs as a hub): nothing is requested at start (the startup module list is pinned). Its buttons load home_own_hub.js, which reads the real state first. */
+/** The Run your own hub box: off (the usual case) it is its markup, Enable and How it works, and nothing is requested at start (the startup module list and DOM writes are pinned); where hub mode is saved or running the module that draws its state is loaded (#14976, #15035). */
 function _drawOwnHub() {
-    const box = document.getElementById('editions-home-own');
-    if (!box) return;
-    const saved = String((state.settings || {}).hub_mode).toLowerCase() === 'true', running = isHub(), on = saved || running;
-    const state_ = box.querySelector('#editions-home-own-state');
-    if (state_ && !state_.textContent) state_.textContent = saved && running ? 'On: this Coral is a hub (the Computers tab).' : saved ? 'Saved: this Coral becomes a hub when it restarts. Quit Coral and start it again to apply.' : running ? 'On: Coral was started as a hub.' : '';
-    const show = (name, yes) => { const b = box.querySelector(`[data-editions="${name}"]`); if (b && b.hidden === yes) b.hidden = !yes; }; // (only a change: the start's DOM writes are pinned)
-    show('enable-hub', !on); show('disable-hub', saved); show('manage-hub', on); show('restart-hub', false);
+    if (document.getElementById('editions-home-own') && (String((state.settings || {}).hub_mode).toLowerCase() === 'true' || isHub())) importOnce('./home_own_hub.js').then(m => m.syncOwnHub()).catch(() => {});
 }
 
 // A server enrolled with the hub's old host (#3546, hub_moved; the header indicator reports the
