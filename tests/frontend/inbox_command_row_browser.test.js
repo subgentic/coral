@@ -222,7 +222,7 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
                 await refresh();
                 await new Promise(r => setTimeout(r, 900)); // sleep-ok: the table would have redrawn by now
                 const held = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr').getBoundingClientRect(); return { top: Math.round(r.top), rows: document.querySelectorAll('#group-table-view tbody tr').length, note: (document.querySelector('#group-table-view .group-table-held') || {}).textContent || '' }; })()`);
-                check(held.top === top0.top && held.rows === top0.rows && /New items are waiting/.test(held.note), `${at}with the pointer on the list the rows did not move and the table says new items wait: before ` + JSON.stringify(top0) + ' after ' + JSON.stringify(held));
+                check(held.top === top0.top && held.rows === top0.rows && /The list has changed/.test(held.note), `${at}with the pointer on the list the rows did not move and the table says new items wait: before ` + JSON.stringify(top0) + ' after ' + JSON.stringify(held));
                 await shot(`hover-held-${w}`);
                 // a WAITING AGENT is a row that needs the person: held about 2 s at most, so it is drawn with the pointer still where it was (QA Reviewer 2's MUST on #14173)
                 const t0 = Date.now();
@@ -233,7 +233,7 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
                 // QA's #14173 SHOULD: a change that is NOT a new waiting agent keeps the longer hold: still held at 3 s (the urgent cap is 2 s), drawn by about 10 s
                 await ev(`window.__sum = 'Notification: Claude needs a different permission'; true`); await refresh();
                 await new Promise(r => setTimeout(r, 3200)); // sleep-ok: past the 2 s cap of a waiting agent
-                check(!(await ev(`document.querySelector('#group-table-view tbody').textContent.includes('a different permission')`)) && /New items are waiting/.test(await ev(`(document.querySelector('#group-table-view .group-table-held') || {}).textContent || ''`)), `${at}a change that is not a waiting agent is still held at 3 s`);
+                check(!(await ev(`document.querySelector('#group-table-view tbody').textContent.includes('a different permission')`)) && /The list has changed/.test(await ev(`(document.querySelector('#group-table-view .group-table-held') || {}).textContent || ''`)), `${at}a change that is not a waiting agent is still held at 3 s`);
                 await waitFor(`document.querySelector('#group-table-view tbody').textContent.includes('a different permission')`, `${at}and drawn by about 10 s`, 12000);
                 await ev(`window.__sum = undefined; true`);
                 await ev(`window.__sum = undefined; true`);
