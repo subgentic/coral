@@ -881,9 +881,6 @@ func (s *Store) CompleteTask(ctx context.Context, project string, taskID int64, 
 	return s.CompleteTaskWithArtifacts(ctx, project, taskID, subscriberID, message, "success", nil)
 }
 
-// ErrReviewTaskReassign: a review task is not reassigned; its reviewers are changed on the task under review.
-var ErrReviewTaskReassign = errors.New("a review task cannot be reassigned")
-
 // ErrTaskReassignRefused: the task is in a state that cannot be reassigned (finished, or a candidate under review). The routes answer 409 with the reason, which says what to do instead (#12869).
 var ErrTaskReassignRefused = errors.New("this task cannot be reassigned")
 
@@ -896,10 +893,9 @@ func (e *NotAssigneeError) Error() string { return e.Msg }
 // Works on pending, in_progress, or blocked tasks, preserving blocked status.
 // If assignee is empty, the task becomes unassigned.
 func (s *Store) ReassignTask(ctx context.Context, project string, taskID int64, assignee string) (*Task, error) {
-	// A review task's reviewer is a place in the reviewed task's round: giving the task to someone else would leave the round naming the old reviewer, and the new one would be refused
-	// ("no open review") when they gave their verdict. Reviewers change through the reviewed task (#5191).
+	// A review task's reviewer is a place in the reviewed task's round: it moves together with the round's name for it, so it has its own path (#14866; it was refused before, #5191).
 	if w, err := loadWorkflow(ctx, s.db, taskID); err == nil && w.ReviewOf > 0 {
-		return nil, fmt.Errorf("%w: #%d is the review of #%d: change its reviewers with: coral-board task review %d --to \"Name,Name\"", ErrReviewTaskReassign, taskID, w.ReviewOf, w.ReviewOf)
+		return s.reassignReviewTask(ctx, project, taskID, w.ReviewOf, assignee)
 	}
 	var assignPtr *string
 	if assignee != "" {

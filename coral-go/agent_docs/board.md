@@ -846,7 +846,7 @@ It counts against an agent's write budget like a post.
    submit-review again, every reviewer's review task reopens for the new round, with no
    orchestrator step, and every reviewer, earlier approvers too, reviews the new revision.
 
-A review task is not reassigned (`task reassign` on it is refused, with this advice): its reviewer is a place in the reviewed task's round, so a reviewer is changed with `coral-board task review <id> --to "Name,Name"` on the task under review.
+A review task is moved to another reviewer with `coral-board task reassign <review task id> --to "Name"` (#14866): the review keeps its id and its place in the open round, the old reviewer is told it moved and drops off the round, the new one gets it like any assignment, and the verdicts the others already gave stay. It is refused (409, with the reason) for the work's author, someone already reviewing it, a review already given and a task no longer in review; the team's waiting-task limit applies to the new reviewer (`--force` to override). To change several reviewers at once, use `coral-board task review <id> --to "Name,Name"` on the task under review.
 
 A reviewer who is at work on their own task is not interrupted by a review: Coral's line for them has no `@` and nothing is typed into their terminal ("notification deferred while they have an active task"). The review waits in their queue and is offered when their task ends. When a task in review is completed by hand or cancelled, its open review tasks are skipped with a note ("#N was completed by X: this review is no longer needed"), so no review is left pending for work that no longer exists; a review already answered is left as it is.
 

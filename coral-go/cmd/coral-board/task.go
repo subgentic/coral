@@ -159,6 +159,7 @@ Subcommands:
   complete <id> [--revision N] [--message "note"] [--outcome success|failed] [--candidate-revision REVISION] [--artifacts manifest.json]
   cancel <id> [--message "reason"]
   reassign <id> [--to "Agent Name"] [--force]   An agent with more waiting tasks than the team's limit (2) is refused, with the less loaded agents named; --force assigns anyway and is recorded
+                                   A review task moves to another reviewer the same way: the round follows, the old reviewer is told, the others' verdicts stay
   unblock <id> (--blocker ID | --all) Remove one or all prerequisites (orchestrator only)
   release <id> [--keep]            Put work that is not for now back in the queue (unassigned; --keep leaves it yours): use it, not park
   park <id> --reason "why" [--until DATE] [--ask MESSAGE_ID]  Set a task aside for a wait OUTSIDE the team (the Operator, another team):
