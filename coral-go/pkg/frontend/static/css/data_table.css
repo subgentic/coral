@@ -183,7 +183,6 @@
 .dt-box.dt-fold-column.dt-folded tr::before { content: ""; order: 2; flex-basis: 100%; height: 0; }
 .dt-box.dt-fold-column.dt-folded td.dt-line-2:is(.dt-grow,.dt-line-grow) { flex: 1 1 100%; min-width: 0; } /* a growing second line takes its whole line: a chat's title and snippet are not cut at the width of their own text */
 .dt-box.dt-fold-column.dt-folded td.dt-line-2 { order: 3; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); }
-.dt-box.dt-fold-column.dt-folded td.dt-line-3 { order: 4; flex: 1 1 100%; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; padding-top: 8px; } /* the row's buttons along its bottom (#15120, the Operator's bottom-row layout): after both lines */
 .dt-box.dt-fold-labeled.dt-folded tr { flex-direction: column; align-items: stretch; row-gap: 2px; }
 .dt-box.dt-fold-labeled.dt-folded td { display: flex; gap: 6px; white-space: normal; }
 .dt-box.dt-fold-labeled.dt-folded td.dt-tone-primary { order: -2; }
@@ -745,4 +744,3 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
     .inbox-needs-results tr:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-item.inbox-agent-first .inbox-review-version { grid-area: pill; align-self: baseline; margin-inline-end: 48px; } /* the pill stops short of the dots' corner */
     .inbox-needs-results tr:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-version { border: 1px solid var(--border); border-radius: 999px; padding: 0 7px; font-size: var(--fs-sm); line-height: 18px; color: var(--text-secondary); }
 }
-.artifact-sheet-review { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 6px 8px; } /* Approve and Request changes under the review line (#15120, walk 3 N4) */

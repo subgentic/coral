@@ -239,7 +239,7 @@ export function dataTable(cfg) {
     const foldThreshold = () => typeof foldAt === 'function' ? foldAt() : foldAt; // a numeric callback can follow the viewport while a table stays mounted
     if (sel && sel.contextKey !== undefined && st.ctx !== String(sel.contextKey)) { st.selected.clear(); st.rowCache?.clear(); st.confirming = -1; st.choices = null; st.anchor = null; st.ctx = String(sel.contextKey); }
     const hasContent = cfg.columns.some(c => c.width === 'content');
-    const box = el('div', `dt-box${cfg.compact ? ' dt-compact' : ''}${foldAt === 'fit' ? ' dt-fit' : ''}${hasContent ? ' dt-has-content' : ''}${cfg.bare ? ' dt-bare' : ''}${cfg.scroll ? ' dt-scroll' : ''} ${foldKind === 'labeled' ? 'dt-fold-labeled' : foldKind === 'always' ? 'dt-fold-column' : foldKind === 'none' ? 'dt-fold-none' : 'dt-fold-column'}`);
+    const box = el('div', `dt-box${cfg.compact ? ' dt-compact' : ''}${foldAt === 'fit' ? ' dt-fit' : ''}${hasContent ? ' dt-has-content' : ''}${cfg.bare ? ' dt-bare' : ''}${cfg.scroll ? ' dt-scroll' : ''}${cfg.fold === 'always' ? ' dt-fold-always' : ''} ${foldKind === 'labeled' ? 'dt-fold-labeled' : foldKind === 'always' ? 'dt-fold-column' : foldKind === 'none' ? 'dt-fold-none' : 'dt-fold-column'}`);
     if (cfg.oneLine) box.classList.add('dt-one-line');
     if (cfg.wrapMail) box.classList.add('dt-wrap-mail'); // a phone's mail row says its title and its second line whole (they wrap) instead of ending in an ellipsis (Activity, #14423)
     if (cfg.oneLine && cfg.wrapNames) box.classList.add('dt-wrap-names'); // a narrow list wraps a long name at its words (hyphens too) instead of cutting it mid-word with an ellipsis (#10275)

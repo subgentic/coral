@@ -38,7 +38,7 @@ const { coralReady } = require('./helpers/wait');
                 check(`${at}no separate Computer line under the card's text`, r.rows.every(x => x.serverCellText === ''), JSON.stringify(r.rows.map(x => x.serverCellText)));
                 check(`${at}nothing is wider than the screen`, r.wide <= 0 && r.rows.every(x => x.right <= w + 1), String(r.wide));
             } else {
-                check(`${at}the wide table keeps its Computer column, and no chip`, r.rows.every(x => x.chip === null) && r.rows[0].headers.some(t => /^Computer/.test(t)), JSON.stringify(r.rows[0].headers));
+                check(`${at}a computer's wide card names its computer in its words, no chip (#15162: no table header any more)`, r.rows.every(x => x.chip === null && /Laptop|Desktop/.test(x.serverCellText)), JSON.stringify(r.rows.map(x => x.serverCellText)));
             }
 
             // B: only waiting agents (no question, no skill, no file): the one-line mail rows of a phone
@@ -61,7 +61,7 @@ const { coralReady } = require('./helpers/wait');
             if (mobile) {
                 check(`${at}(B) two agents of one name: each row's chip says which computer`, JSON.stringify(b.rows.map(x => x.chip).sort()) === JSON.stringify(['Desktop', 'Laptop']) && b.rows.every(x => x.name === 'Backend Dev'), JSON.stringify(b.rows));
                 check(`${at}(B) the chip is on the name's line, nothing wider than the screen`, b.rows.every(x => x.sameLine) && b.wide <= 0, JSON.stringify([b.rows.map(x => x.sameLine), b.wide]));
-            } else check(`${at}(B) the wide table keeps its Computer column`, b.headers.some(t => /^Computer/.test(t)) && b.rows.every(x => x.chip === null), JSON.stringify(b.headers));
+            } else check(`${at}(B) each wide card says which computer (no chip, no table header, #15162)`, JSON.stringify(await ev(`[...document.querySelectorAll('#group-table-view tbody tr.dt-row')].map(tr => (tr.innerText.match(/Laptop|Desktop/) || [''])[0]).sort()`)) === JSON.stringify(['Desktop', 'Laptop']) && b.rows.every(x => x.chip === null), JSON.stringify(b.rows));
         }
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

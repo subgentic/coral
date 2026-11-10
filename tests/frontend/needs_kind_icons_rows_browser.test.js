@@ -40,7 +40,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 return { kind: icon.dataset.kind, center: Math.abs((i.top + i.bottom - r.top - r.bottom) / 2), right: i.right, textLeft: Math.min(...texts.map(e => e.getBoundingClientRect().left)) };
             }).filter(Boolean))()`);
             for (const r of geometry) {
-                check(width < 768 ? r.center >= 0 : r.center <= 2, width + (width < 768 ? 'px: a phone row has the icon in one spot, top left, not centred (#13911): ' : 'px: icon centered on full row: ') + JSON.stringify(r));
+                check(r.center >= 0, width + 'px: the icon is in one spot, top left of the card, not centred (#13911, and a computer\'s rows are cards too, #15162): ' + JSON.stringify(r));
                 check(r.textLeft >= r.right + 4, width + 'px: excerpt clears icon column: ' + JSON.stringify(r));
             }
             if ([390, 1280].includes(width) && process.env.CORAL_SCREENSHOT_DIR) {
@@ -64,6 +64,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         }
         // a phone (#13144, the Orchestrator's 12:07): the words of a row never lie over one another, in both themes. Every element that carries its own text is a box; no two boxes of one row intersect.
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
+        await waitFor(`!document.querySelector('${T} .dt-fold-always')`, 'Needs you draws the phone\'s rows once the window is a phone (a computer\'s are cards, #15162)', 8000);
         await ev(`document.documentElement.style.fontSize = '100%'; true`);
         // the same rows are as tall at 390 with the icon as without it: a review row's file name stays on its first line (#13144, UI Reviewer)
         await ev(framesJs(6));
