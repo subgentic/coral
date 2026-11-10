@@ -121,7 +121,7 @@ func Serve(ctx context.Context, in io.Reader, out, errw io.Writer, cfg Config) i
 		once.Do(func() {
 			why.Store(reason)
 			if cmd.Process != nil {
-				_ = procguard.Kill(-cmd.Process.Pid, syscall.SIGKILL) // the whole group: the command's background children too
+				_ = procguard.KillGroupOrPid(cmd.Process.Pid, cmd.Process.Pid, syscall.SIGKILL) // the whole group: the command's background children too
 			}
 		})
 	}

@@ -110,9 +110,9 @@ func (p *unixPTY) Terminate() error {
 	pgid, err := syscall.Getpgid(p.cmd.Process.Pid)
 	if err == nil && pgid > 0 {
 		logSignal(-pgid, syscall.SIGHUP)
-		_ = procguard.Kill(-pgid, syscall.SIGHUP)
+		_ = procguard.KillGroupOrPid(pgid, p.cmd.Process.Pid, syscall.SIGHUP)
 		logSignal(-pgid, syscall.SIGTERM)
-		err = procguard.Kill(-pgid, syscall.SIGTERM)
+		err = procguard.KillGroupOrPid(pgid, p.cmd.Process.Pid, syscall.SIGTERM)
 	} else {
 		_ = procguard.Kill(p.cmd.Process.Pid, syscall.SIGHUP)
 		err = procguard.Kill(p.cmd.Process.Pid, syscall.SIGTERM)
@@ -130,7 +130,7 @@ func (p *unixPTY) ForceKill() error {
 	pgid, err := syscall.Getpgid(p.cmd.Process.Pid)
 	if err == nil && pgid > 0 {
 		logSignal(-pgid, syscall.SIGKILL)
-		return procguard.Kill(-pgid, syscall.SIGKILL)
+		return procguard.KillGroupOrPid(pgid, p.cmd.Process.Pid, syscall.SIGKILL)
 	}
 	return procguard.Kill(p.cmd.Process.Pid, syscall.SIGKILL)
 }

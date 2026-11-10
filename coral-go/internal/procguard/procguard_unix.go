@@ -63,3 +63,14 @@ func Kill(target int, sig syscall.Signal) error {
 	}
 	return syscall.Kill(target, sig)
 }
+
+// KillGroupOrPid signals the process group pgid; when the guard refuses the group (it is Coral's own, or its parent shell's: a child that was never given a group of its own sits in it), the child
+// itself, pid, is signalled instead, so a refused group never leaves the child running (Security's INFO 6 on #15011). The pid goes through the guard too. The group's refusal is not an error to
+// the caller (the child was reached); errors.Is(err, ErrSelf) is for a pid that was refused as well, and the caller must not retry it.
+func KillGroupOrPid(pgid, pid int, sig syscall.Signal) error {
+	err := Kill(-pgid, sig)
+	if errors.Is(err, ErrSelf) {
+		return Kill(pid, sig)
+	}
+	return err
+}

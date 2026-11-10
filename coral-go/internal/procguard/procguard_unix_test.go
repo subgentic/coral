@@ -67,3 +67,26 @@ func TestAFakedRecordedGroupEqualToCoralsOwnIsRefusedAndNothingIsSignalled(t *te
 		t.Fatal("a group that is not Coral's was not signalled")
 	}
 }
+
+// Security's INFO 6: when the group is refused (it is Coral's own, as a child with no group of its own sits in it), the child itself is still signalled, and a pid that is Coral's own is refused as well.
+func TestARefusedGroupStillSignalsTheChildItself(t *testing.T) {
+	cmd := exec.Command("sleep", "60")
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	require.NoError(t, cmd.Start())
+	done := make(chan struct{})
+	go func() { _ = cmd.Wait(); close(done) }()
+	t.Cleanup(func() { _ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); <-done })
+	pid := cmd.Process.Pid
+
+	fake(t, os.Getpid(), pid, os.Getppid(), 1) // the child's group is, as far as the guard knows, Coral's own
+	require.NoError(t, KillGroupOrPid(pid, pid, syscall.SIGKILL))
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the group was refused and the child was left running")
+	}
+
+	// Refused for the group and for the pid (the pid is Coral's own): an error the caller can see, nothing sent.
+	err := KillGroupOrPid(pid, os.Getpid(), syscall.SIGUSR2)
+	assert.True(t, errors.Is(err, ErrSelf), "%v", err)
+}

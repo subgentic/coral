@@ -4,6 +4,7 @@ package background
 
 import (
 	"context"
+	"errors"
 	"github.com/subgentic/coral/internal/procguard"
 	"log/slog"
 	"os/exec"
@@ -45,7 +46,9 @@ func killChildProcess(cmd *exec.Cmd) {
 		pgid = cmd.Process.Pid
 	}
 	slog.Info("[background] signalling a step's process group", "pgid", pgid, "signal", "SIGTERM")
-	_ = procguard.Kill(-pgid, syscall.SIGTERM)
+	if err := procguard.KillGroupOrPid(pgid, cmd.Process.Pid, syscall.SIGTERM); errors.Is(err, procguard.ErrSelf) {
+		return // refused for the group and for the child: no escalation, nothing more to say (Security's INFO 5)
+	}
 	ended := make(chan struct{})
 	killEscalationsMu.Lock()
 	killEscalations[ended] = struct{}{}
@@ -65,7 +68,7 @@ func killChildProcess(cmd *exec.Cmd) {
 		}
 		if err := syscall.Kill(-pgid, 0); err == nil {
 			slog.Info("[background] signalling a step's process group", "pgid", pgid, "signal", "SIGKILL")
-			_ = procguard.Kill(-pgid, syscall.SIGKILL)
+			_ = procguard.KillGroupOrPid(pgid, cmd.Process.Pid, syscall.SIGKILL)
 		}
 	}()
 }
