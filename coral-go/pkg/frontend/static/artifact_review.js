@@ -233,13 +233,18 @@ export function attachReview(d, { reload }) {
     const tray = imgs.createImageTray({ upload: (blob, versionOf) => uploadCommentImage(cur.hex, cur.server, blob, versionOf, cur.name) });
     const syncSend = () => { submitBtn.disabled = sending || inProgress || tray.busy() || tray.failed(); }; // Send waits for a picture still going up, and for a failed one to be removed
     error.before(tray.picker(), tray.node, tray.hint()); tray.attach(form, text); tray.listen(syncSend);
+    const paintApprove = () => {
+        const n = d.dataset.shownVersion, newer = d.dataset.newerVersion;
+        approve.textContent = `${newer && n ? `Approve v${n}` : 'Approve'}${cur && cur.state === 'changes' ? ' anyway' : ''}${newer ? ` (v${newer} is newer)` : ''}`;
+    };
+    d.addEventListener('av-version', () => { if (cur) paintApprove(); });
     const show = (s) => {
         cur = s;
         const waiting = !!s && (s.state === 'pending' || s.state === 'changes');
         const pending = waiting && !decisionNeedsPerson(s.server); // a remote of a self-hosted hub: the decision is made on that machine's own dashboard (#11372)
         bar.hidden = !s;
         approve.hidden = changes.hidden = approveNote.hidden = !pending;
-        approve.textContent = s && s.state === 'changes' ? 'Approve anyway' : 'Approve'; // changes were asked for: Approve is still the Operator's, and says it approves this version as it is
+        paintApprove(); // changes were asked for: Approve is still the Operator's, and says it approves this version as it is; with a newer version in the series it names the one it approves (#15197)
         if (!pending) form.hidden = true;
         bar.hidden = !s || (slotted && form.hidden); // on the header row the strip under it is the change-request form: there only while it is open
         stateEl.textContent = !s ? '' : s.state === 'approved' ? `Approved${s.at ? ' ' + timeWords(s.at) : ''}` : s.state === 'reviewed' ? 'Reviewed' : s.state === 'changes' ? `Changes requested${s.row.produced_by ? `: waiting for a new version from ${shown(s.row.produced_by)}` : ''}. Approving now approves this version as it is.` : waiting && !pending ? 'Waiting for your review. Approve it on that computer\'s own dashboard.' : 'Waiting for your review';
