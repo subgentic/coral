@@ -9,7 +9,6 @@ import { fetchSystemStatus } from './system_status.js';
 import { updateTerminalTheme, applySettingsFont } from './xterm_renderer.js';
 import { browserLocal } from './safe_storage.js';
 import { onBuilt } from './lazy_dom.js';
-import { isCloud } from './server_base.js';
 // What Save sends: only the fields the person changed (here so the module is loaded at startup, import_hygiene).
 export { changedSettings } from './settings_diff.js';
 export { savedWords } from './settings_saved_words.js'; // the Save toast's words, here for the same reason
@@ -270,8 +269,8 @@ onBuilt('top-bar-settings-menu', () => { _loadTierBadge(); });
     return theme;
 }
 
-/** What the theme control shows when no theme is stored: this computer starts dark, the Cloud Hub follows the system (theme_init.js). */
-export function defaultThemeChoice() { return isCloud() ? "system" : "dark"; }
+/** What the theme control shows when no theme is stored: the page follows the system until a theme is picked (theme_init.js, #15234). */
+export function defaultThemeChoice() { return "system"; }
 
 /** Apply a theme to the document */
 export function applyTheme(theme, { remember = true } = {}) {
@@ -342,6 +341,7 @@ export async function applyCustomThemeByName(name, { remember = true } = {}) {
 
 // Listen for OS theme changes when in "system" mode
 window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
-    const pref = (state.settings && state.settings.theme) || "dark";
-    if (pref === "system") applyTheme("system");
+    let own = null; try { own = browserLocal.get("coral-theme"); } catch (_) {} // a choice this browser kept (dark or light) is not undone by the phone's setting changing
+    const pref = (state.settings && state.settings.theme) || (own === "dark" || own === "light" ? own : defaultThemeChoice());
+    if (pref === "system") applyTheme("system", { remember: false }); // following the system is not a choice to write down
 });

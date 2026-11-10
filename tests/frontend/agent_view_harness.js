@@ -18,6 +18,8 @@ async function connect(opts = {}) {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const t = ${theme}, f = ${font}; try { if (t) localStorage.setItem('coral-theme', t); } catch (e) {} if (f) { const put = () => { if (document.documentElement) document.documentElement.style.setProperty('font-size', f, 'important'); }; /* the element's own style: a page's CSP (the Hub's) blocks an injected style element */ if (document.documentElement) put(); else new MutationObserver((m, o) => { if (document.documentElement) { put(); o.disconnect(); } }).observe(document, { childList: true }); document.addEventListener('DOMContentLoaded', put); } })();` });
     }
+    // A page with no chosen theme follows the system's light or dark (#15234); the suites were written when it opened dark, so the browser they drive says dark unless one asks otherwise (theme_first_start_browser sets its own).
+    try { await Emulation.setEmulatedMedia({ media: '', features: [{ name: 'prefers-color-scheme', value: 'dark' }] }); } catch { /* a target that cannot emulate keeps its own */ }
     // Static files that failed to load (#3466): a module the page couldn't fetch fails every later
     // import() of it too, so a "Failed to fetch dynamically imported module" says nothing about why.
     // Record each /static/ request that failed or answered >= 400, and add them to that error.
