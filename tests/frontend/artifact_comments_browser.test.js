@@ -166,7 +166,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             const vis = await ev(`(() => { const a = document.querySelector('.ac-card[data-id="4"] .ac-actions'); return getComputedStyle(a).opacity; })()`);
             check(`${at}: Edit and Delete of a card that is not current, hovered or focused are out of sight (opacity ${vis}) but in the page`, vis === '0' && (await ev(`!!document.querySelector('.ac-card[data-id="4"] .ac-actions .ac-act')`)));
             const gap0 = await ev(`document.querySelector('.ac-card[data-id="4"] .ac-actions').getBoundingClientRect().height`);
-            check(`${at}: and at rest they take no room under the comment (${gap0} px)`, gap0 === 0);
+            check(`${at}: and at rest they keep their room under the comment, so nothing moves when the pointer arrives (${gap0} px, #15030)`, gap0 > 0);
             await ev(`document.querySelector('.ac-card[data-id="4"] .ac-actions .ac-act').focus(); true`);
             check(`${at}: and focus on one shows them`, (await ev(`getComputedStyle(document.querySelector('.ac-card[data-id="4"] .ac-actions')).opacity`)) === '1' && (await ev(`document.querySelector('.ac-card[data-id="4"] .ac-actions').getBoundingClientRect().height`)) >= 20);
             // a selection -> Comment button -> composer -> post
