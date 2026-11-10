@@ -59,6 +59,21 @@ const GOALS = [
             await waitFor(`window.__goalReads > ${reads0}`, `${label}: the list is read again`, 10000);
             assert.equal(await ev(`!!document.querySelector('dialog.goals-dialog[open]')`), false, `${label}: the form closes`);
         }
+        // walk 4 F1: with no team at all, New goal did nothing (an editor with no team, a dead Team chip). It now says so and offers Start a team, and opens no goal form.
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'settings');
+        await ev(`(() => { const R = window.fetch; window.fetch = (u, o) => { const url = String(u), json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+            if (/\\/api\\/goals(\\?|$)/.test(url)) return json({ goals: [] });
+            if (/\\/api\\/board\\/projects/.test(url)) return json([]);
+            return R(u, o); }; return true; })()`);
+        await ev(`window.switchNavTab('hub-inbox'); true`);
+        await waitFor(`document.querySelectorAll('.view-list-item').length > 3`, 'the folders', 10000);
+        await ev(`document.querySelector('.view-list-item[data-key="goals"]').click(); true`);
+        await waitFor(`!!document.querySelector('.inbox-folder-toolbar .goals-new')`, 'New goal with no team', 10000);
+        await ev(`document.querySelector('.inbox-folder-toolbar .goals-new').click(); true`);
+        await waitFor(`(() => { const e = document.getElementById('confirm-modal'); return !!e && getComputedStyle(e).display !== 'none'; })()`, 'the no-team explanation', 8000);
+        const none = await ev(`(() => { const m = document.getElementById('confirm-modal'); const bs = [...m.querySelectorAll('.modal-actions .btn')].filter(b => b.getClientRects().length); return { title: document.getElementById('confirm-modal-title').textContent, buttons: bs.map(b => b.textContent), form: !!document.querySelector('dialog.goal-editor[open]') }; })()`);
+        assert.ok(none.title === 'No team to give a goal to' && none.buttons.join() === 'Cancel,Start a team' && !none.form, `no team: it explains and offers Start a team, and opens no goal form: ${JSON.stringify(none)}`);
         console.log('\nPASS the Inbox Goals folder has New goal');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
