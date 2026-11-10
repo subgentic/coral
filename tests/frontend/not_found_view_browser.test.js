@@ -23,6 +23,7 @@ const TEAM = 'nf-' + Date.now().toString(36);
             const cases = [
                 [`/team/${TEAM}/goals/99`, /That goal was not found: #99/, 'Back to Goals', /\/team\/.+\/goals$/],
                 [`/team/${TEAM}/tasks/99`, /That task was not found: #99/, 'Back to Tasks', /\/team\/.+\/tasks$/],
+                [`/team/${TEAM}/goals/%E0%A4`, /That goal was not found: %E0%A4/, 'Back to Goals', /\/team\/.+\/goals$/],
                 [`/team/${TEAM}/artifacts/zzz`, /That file was not found: zzz/, 'Back to Artifacts', /\/team\/.+\/artifacts$/],
             ];
             for (const [path, title, back, backPath] of cases) {

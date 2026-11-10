@@ -31,10 +31,13 @@ export async function showNotFound({ what = 'page', id = '', back = { view: 'age
     view.hidden = false; button.focus();
 }
 
+/** What the address named, as text: percent-decoded, or as written when it is not valid (a lone % must not stop the view, Security's SHOULD on #15295). */
+const decoded = t => { if (!t) return ''; try { return decodeURIComponent(t).slice(0, 60); } catch { return t.slice(0, 60); } };
+
 /** The not-found view for an address that did not parse: what it named comes from its path words (/team/<id>/artifacts/zzz is a file of that team), and the way back is that team's list when there is one. */
 export function lost(pathname) {
     const parts = String(pathname || '').split('/').filter(Boolean), head = parts[0] === 'board' ? 'team' : parts[0];
     const tab = parts[2] || '', what = head === 'team' ? (parts.length > 2 ? KINDS[tab] || 'page' : 'team') : KINDS[head] || 'page';
     const back = head === 'team' && parts[1] && /^[\w.@-]+$/.test(parts[1]) && ['goals', 'tasks', 'artifacts'].includes(tab) ? { view: 'team', id: parts[1], sub: tab } : { view: 'agents' };
-    return showNotFound({ what, id: parts[head === 'team' ? 3 : 1] ? decodeURIComponent(parts[head === 'team' ? 3 : 1]).slice(0, 60) : '', back, backLabel: back.view === 'team' ? `Back to ${LISTS[what] || 'the team'}` : '' });
+    return showNotFound({ what, id: decoded(parts[head === 'team' ? 3 : 1]), back, backLabel: back.view === 'team' ? `Back to ${LISTS[what] || 'the team'}` : '' });
 }
