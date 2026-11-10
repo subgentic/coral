@@ -48,6 +48,7 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
         rows.forEach(([role, s], i) => {
             if (i) p.append('; ');
             const link = agentLink(names.get(role) || role, { board: boardTeamKey(st.server, st.board) }), state = s.k ? askUi.askState(s.k) : 'sent';
+            if (link.tagName === 'BUTTON' && s.k && s.k.replies > 0) link.tabIndex = -1; // its reply in this thread has the one Tab stop for the agent; this one stays a click (#15174: Open Orchestrator twice in a row)
             if (state === 'replied') p.append(link, ` replied${s.k.replies > 1 ? ` (${s.k.replies} times)` : ''}`);
             else if (state === 'read') {
                 p.append('Read by ', link);
