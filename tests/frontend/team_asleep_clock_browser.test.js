@@ -18,9 +18,10 @@ const { coralReady } = require('./helpers/wait');
         const c = await ev(`(() => { const m = document.createElement('div'); m.className = 'menu'; m.innerHTML = '<button class="menu-item">Sleep team</button><button class="menu-item menu-item-danger">Kill all</button>'; document.body.append(m);
             const a = getComputedStyle(m.children[0]).color, b = getComputedStyle(m.children[1]).color; m.remove();
             const rules = [...document.styleSheets].flatMap(s => { try { return [...s.cssRules]; } catch { return []; } }).flatMap(x => x.cssRules ? [...x.cssRules, x] : [x]).filter(x => x.selectorText && /\\.menu-item-danger/.test(x.selectorText));
-            return { a, b, hover: rules.some(x => /:hover/.test(x.selectorText) && /error-text/.test(x.style.color || x.cssText)) }; })()`);
+            return { a, b, hover: rules.some(x => /:hover/.test(x.selectorText) && /error-text/.test(x.style.color || x.cssText)), focus: rules.some(x => /:focus-visible/.test(x.selectorText) && /error-text/.test(x.style.color || x.cssText)) }; })()`);
         assert.equal(c.a, c.b, 'a danger item is the menu\'s own colour at rest: ' + JSON.stringify(c));
         assert.ok(c.hover, 'and it turns red under the pointer: ' + JSON.stringify(c));
+        assert.ok(c.focus, 'and under the keyboard focus, so a keyboard user sees the danger too: ' + JSON.stringify(c));
         console.log('team_asleep_clock: ok');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
