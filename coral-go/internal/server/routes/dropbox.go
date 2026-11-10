@@ -26,7 +26,9 @@ import (
 	"github.com/subgentic/coral/internal/store"
 )
 
-// DropboxDefaultAppKey is the app key a build ships with (set by -ldflags, empty otherwise); CORAL_DROPBOX_APP_KEY overrides it. It is not a secret.
+// DropboxDefaultAppKey is the app key a build ships with: the release workflow sets it by -ldflags -X from the DROPBOX_APP_KEY repo secret
+// (#15065: v2.0.63 shipped without it and said Dropbox was not available). Empty in a build without it (a fork, a pull request, a local build),
+// which then says so. CORAL_DROPBOX_APP_KEY overrides it.
 var DropboxDefaultAppKey = ""
 
 // DropboxCallbackPort is the port the one-shot listener uses; the app's registered redirect names it.
