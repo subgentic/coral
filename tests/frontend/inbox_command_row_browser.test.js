@@ -218,6 +218,8 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
                 const top0 = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr'); r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { top: Math.round(b.top), x: Math.round(b.left + 120), y: Math.round(b.top + b.height / 2), rows: document.querySelectorAll('#group-table-view tbody tr').length }; })()`);
                 await Input.dispatchMouseEvent({ type: 'mouseMoved', x: top0.x, y: top0.y });
                 await new Promise(r => setTimeout(r, 300)); // sleep-ok: the pointer events reach the page
+                // the note is read in the task that draws the waiting agent's row: a later refresh while the pointer still rests is held again and shows the note again (60 to 130 ms after the draw under load, #15180), which a read after the wait sees
+                await ev(`window.__heldAtDraw = null; new MutationObserver(() => { if (window.__heldAtDraw === null && document.querySelectorAll('#group-table-view tbody tr').length === ${top0.rows + 1}) window.__heldAtDraw = !!document.querySelector('#group-table-view .group-table-held'); }).observe(document.getElementById('group-table-view'), { childList: true, subtree: true }); true`);
                 await ev(`window.__m.add('qa2', 'B', 5, { sleeping: false, board_project: 'team-a', session_id: 'qa2-id' }); window.__ws += 1; true`);
                 await ev(`window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, ...window.__m.entry(window.__m.agents[s.session_id]) })); true`);
                 await refresh();
@@ -230,7 +232,7 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
                 await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === ${top0.rows + 1}`, `${at}the waiting agent's row is drawn although the pointer still rests on the list`, 8000);
                 const took = Date.now() - t0 + 900;
                 check(took <= 3600, `${at}a row that needs the person waits about 2 s at most under a resting pointer (took ${took} ms)`);
-                check(!(await ev(`!!document.querySelector('#group-table-view .group-table-held')`)), `${at}the 'new items wait' line goes when the row is drawn`);
+                check((await ev(`window.__heldAtDraw`)) === false, `${at}the 'new items wait' line goes when the row is drawn (it was read when the row was drawn: ` + (await ev(`String(window.__heldAtDraw)`)) + ')');
                 // QA's #14173 SHOULD: a change that is NOT a new waiting agent keeps the longer hold: still held at 3 s (the urgent cap is 2 s), drawn by about 10 s
                 await ev(`window.__sum = 'Notification: Claude needs a different permission'; true`); await refresh();
                 await new Promise(r => setTimeout(r, 3200)); // sleep-ok: past the 2 s cap of a waiting agent
