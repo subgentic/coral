@@ -1,6 +1,7 @@
 // The comment composer: the form that writes a new comment, a reply or an edit (split out of attachComments, #8379).
 import { importOnce } from './import_once.js';
 import { el } from './dom_el.js';
+import { showToast } from './utils.js';
 const api = await importOnce('./artifact_comments_api.js');
 const imgs = await importOnce('./artifact_comment_images.js'); // pictures in a comment (#11651)
 
@@ -35,7 +36,7 @@ export function createComposer({ st, render, run, ownHex }) {
             if (!text && !pictures.length) { st.error = 'Write something first.'; err.textContent = st.error; err.hidden = false; return; }
             send.disabled = true;
             if (editOf) run(() => api.editComment(ownHex(editOf), st.server, editOf.id, text), 'Comment saved');
-            else run(async () => { const c = await api.createComment(cm.hex || st.hex, st.server, { body: text, anchor: cm.anchor, parentId: cm.parentId, board: st.board, images: pictures, atS: cm.atS, endS: cm.endS }); if (tray) tray.destroy(); st.active = c.id; st.scrollCard = true; return c.sentTo; }, cm.parentId != null ? 'Reply posted' : 'Comment posted');
+            else run(async () => { const c = await api.createComment(cm.hex || st.hex, st.server, { body: text, anchor: cm.anchor, parentId: cm.parentId, board: st.board, images: pictures, atS: cm.atS, endS: cm.endS }); if (tray) tray.destroy(); st.active = c.id; st.scrollCard = true; if (c.notDelivered && !c.sentTo) { st.undelivered.set(cm.parentId != null ? cm.parentId : c.id, c.notDelivered); showToast(`Not delivered: ${c.notDelivered}`, true); } else st.undelivered.delete(cm.parentId != null ? cm.parentId : c.id); return c.sentTo; }, cm.parentId != null ? 'Reply posted' : 'Comment posted');
         });
         ta.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); cancel.click(); } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) box.requestSubmit(); });
         return box;

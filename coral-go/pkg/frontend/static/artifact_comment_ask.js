@@ -44,7 +44,7 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
     /** The line under a comment that says where an agent has it (#14129): Sent to A, then Read by A (with the time the server saw its own read call return the comment), then A replied; at rest, and again as soon as a send answers (#12112: it kept saying "Not sent to an agent yet" beside "Asked just now"). Each name as written, a button to the agent's chat (#12168). */
     const fillStatus = (p, id) => {
         const rows = [...statusNow(id)]; p.replaceChildren();
-        if (!rows.length) { p.textContent = 'Not sent to an agent yet'; return; }
+        if (!rows.length) { p.textContent = st.undelivered && st.undelivered.get(id) ? `Not delivered: ${st.undelivered.get(id)}` : 'Not sent to an agent yet'; return; } // why it went nowhere (#15034)
         rows.forEach(([role, s], i) => {
             if (i) p.append('; ');
             const link = agentLink(names.get(role) || role, { board: boardTeamKey(st.server, st.board) }), state = s.k ? askUi.askState(s.k) : 'sent';
@@ -54,6 +54,7 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
                 if (s.k.readAt) { const t = document.createElement('span'); t.textContent = `, ${ago(s.k.readAt)}`; t.title = s.k.readAt; p.append(t); }
             } else p.append('Sent to ', link, ` (${s.words.replace(/^./, c => c.toLowerCase())})`);
             if (s.k && s.k.nudged && state !== 'sent') p.append(', reminded');
+            if (s.k && s.k.limitReached) p.append('. The agent has reached its reply limit here'); // until the Operator writes again (#15034)
         });
     };
     const statusWords = id => { const p = document.createElement('p'); fillStatus(p, id); return p.textContent; };

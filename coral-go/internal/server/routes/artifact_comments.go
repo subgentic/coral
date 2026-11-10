@@ -122,23 +122,25 @@ func commentRefuse(w http.ResponseWriter, status int, code, msg string) {
 
 // commentView is one comment as the client sees it. Mine and the can* flags are for the UI only (the server decides again on every write).
 type commentView struct {
-	AtS        *float64       `json:"at_s,omitempty"`
-	EndS       *float64       `json:"end_s,omitempty"`
-	SentTo     string         `json:"sent_to,omitempty"` // the agent the Operator's comment was sent to on its own (#11420): set only on the answer to the comment's creation
-	ID         int64          `json:"id"`
-	ArtifactID string         `json:"artifact_id"`
-	Board      string         `json:"board"`
-	ParentID   *int64         `json:"parent_id"`
-	Anchor     *commentAnchor `json:"anchor"`
-	Body       string         `json:"body"`
-	Author     commentAuthor  `json:"author"`
-	CreatedAt  string         `json:"created_at"`
-	EditedAt   *string        `json:"edited_at"`
-	ResolvedBy *commentAuthor `json:"resolved_by"`
-	ResolvedAt *string        `json:"resolved_at"`
-	Deleted    bool           `json:"deleted"`
-	Mine       bool           `json:"mine"`
-	Can        commentCan     `json:"can"`
+	AtS    *float64 `json:"at_s,omitempty"`
+	EndS   *float64 `json:"end_s,omitempty"`
+	SentTo string   `json:"sent_to,omitempty"` // the agent the Operator's comment was sent to on its own (#11420): set only on the answer to the comment's creation
+	// NotDelivered: why the Operator's comment reached no agent when it should have (#15034): the board is paused, the agent asleep, a rate limit, a failure. Set only on the answer to the comment's creation; the comment stands.
+	NotDelivered string         `json:"not_delivered,omitempty"`
+	ID           int64          `json:"id"`
+	ArtifactID   string         `json:"artifact_id"`
+	Board        string         `json:"board"`
+	ParentID     *int64         `json:"parent_id"`
+	Anchor       *commentAnchor `json:"anchor"`
+	Body         string         `json:"body"`
+	Author       commentAuthor  `json:"author"`
+	CreatedAt    string         `json:"created_at"`
+	EditedAt     *string        `json:"edited_at"`
+	ResolvedBy   *commentAuthor `json:"resolved_by"`
+	ResolvedAt   *string        `json:"resolved_at"`
+	Deleted      bool           `json:"deleted"`
+	Mine         bool           `json:"mine"`
+	Can          commentCan     `json:"can"`
 	// With ?series=1 only (#6459): the version the comment was written on, and for a comment of an EARLIER version, where its text stands in the version being read.
 	Version       *int           `json:"version,omitempty"`
 	FromVersion   *int           `json:"from_version,omitempty"`
@@ -155,6 +157,8 @@ type commentAskView struct {
 	Agent   string `json:"agent"`
 	Open    bool   `json:"open"`
 	Replies int    `json:"replies"`
+	// LimitReached: the agent has left all the replies it may until the Operator writes again (#15034): the thread says "The agent has reached its reply limit here".
+	LimitReached bool `json:"limit_reached,omitempty"`
 	// Seen: the agent has read the artifact's threads or replied (#11722): the thread says "seen by <agent>". Nudged: Coral reminded it to answer in the thread.
 	Seen   bool `json:"seen"`
 	Nudged bool `json:"nudged"`
@@ -724,6 +728,11 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 	if !h.commentRate(w, caller) {
 		return
 	}
+	if in.ParentID != nil && caller.Kind == commentCallerOwner { // the Operator may answer anywhere in a thread: a reply to a reply belongs to the thread's first comment (#15034)
+		if p, found, perr := h.ss.GetArtifactComment(r.Context(), id, *in.ParentID); perr == nil && found && p.ParentID != nil {
+			in.ParentID = p.ParentID
+		}
+	}
 	c, err := h.ss.CreateArtifactComment(r.Context(), store.ArtifactComment{AtS: in.AtS, EndS: in.EndS, ArtifactID: id, Board: in.Board, ParentID: in.ParentID, AnchorJSON: anchorJSON, Body: body,
 		AuthorIssuer: caller.Issuer, AuthorSubject: caller.Subject, AuthorName: caller.Name, AuthorKind: caller.Kind, ImagesJSON: imagesJSON})
 	switch {
@@ -746,6 +755,8 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 		if _, isGuide := guideOf(r); !isGuide && (in.NotifyAgent == nil || *in.NotifyAgent) {
 			if d := h.deliverOperatorComment(r, caller, c, id, in.Board); d.To != "" {
 				view.SentTo = d.To
+			} else if words := notDeliveredWords(d.Reason); words != "" {
+				view.NotDelivered = words
 			}
 		}
 		writeJSON(w, http.StatusCreated, view)
@@ -970,7 +981,7 @@ func (h *SessionsHandler) attachAsks(ctx context.Context, views []commentView) {
 		}
 		byComment := map[int64][]commentAskView{}
 		for _, a := range asks {
-			byComment[a.CommentID] = append(byComment[a.CommentID], commentAskView{Agent: a.AgentName, Open: a.OpenAt(now), Replies: a.Replies, Seen: a.SeenAt != nil, Nudged: a.NudgedAt != nil, ReadAt: a.ReadStamp()})
+			byComment[a.CommentID] = append(byComment[a.CommentID], commentAskView{Agent: a.AgentName, Open: a.OpenAt(now), Replies: a.Replies, LimitReached: a.OpenAt(now) && a.Replies >= store.MaxAskReplies, Seen: a.SeenAt != nil, Nudged: a.NudgedAt != nil, ReadAt: a.ReadStamp()})
 		}
 		for _, i := range idx {
 			views[i].Asks = byComment[views[i].ID]
@@ -1016,3 +1027,22 @@ func redactCommentViews(views []commentView) bool {
 
 // validCommentBoard is whether a comment's board is one a comment may be made on: a team's key, or the reserved key of the files of agents on no team, whose review rows the Operator comments on too (#13532).
 func validCommentBoard(b string) bool { return commentBoardRe.MatchString(b) || b == noTeamBoardID }
+
+// notDeliveredWords is the Operator's sentence for why a comment did not reach an agent (autoDelivery.Reason), "" for a reason that is nothing to say (the comment was not the Operator's, or no agent was meant).
+func notDeliveredWords(reason string) string {
+	switch reason {
+	case "board_paused":
+		return "the board is paused"
+	case "asleep_or_gone":
+		return "the agent is asleep or gone"
+	case "rate_limited":
+		return "too many comments sent in a short time: wait a moment"
+	case "redaction_unavailable":
+		return "the text could not be checked for secrets"
+	case "failed":
+		return "Coral could not send it"
+	case "ambiguous_uploader":
+		return "two agents sent this file: send it to one of them"
+	}
+	return ""
+}
