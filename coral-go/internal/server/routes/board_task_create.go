@@ -92,6 +92,7 @@ func (h *BoardHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		RemindAt       string             `json:"remind_at,omitempty"`        // RFC 3339: a one-time reminder (#4175 step 3)
 		GoalID         *int64             `json:"goal_id,omitempty"`          // a goal of this board the task works toward (#7087)
 		GoalProposalID *int64             `json:"goal_proposal_id,omitempty"` // the pending goal proposal this task is for: it waits for that goal (#11389)
+		Force          bool               `json:"force,omitempty"`            // assign past the team's limit of waiting tasks (#14862); who forced it is recorded on the board
 		Self           bool               `json:"self,omitempty"`             // a task the caller makes for ITSELF (#11247): any member may, with a goal, one per title, at most maxOpenSelfTasks open
 	}
 	if err := decodeJSON(r, &body); err != nil {
@@ -202,6 +203,13 @@ func (h *BoardHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	if h.refuseArchivedAssignee(w, r.Context(), project, body.AssignedTo) {
 		return
 	}
+	forcedPast := 0
+	if !body.Self && !board.SameIdentity(createdBy, body.AssignedTo) { // a task for oneself is one's own plan, not an assignment to the agent (#14862)
+		var refused bool
+		if refused, forcedPast = h.refuseOverloaded(w, r, project, body.AssignedTo, "", body.Force); refused {
+			return
+		}
+	}
 	if hold, ok := h.needsApproval(r, project, board.ProposalTask); !ok {
 		errInternalServer(w, "could not read the board's settings")
 		return
@@ -228,6 +236,7 @@ func (h *BoardHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	noteActivity(r, board.ActTaskCreate, "task", strconv.FormatInt(task.ID, 10), project, task.Title, "") // the new task's number, so the row opens it (#13621)
+	h.noteForcedAssignment(r, project, task.ID, body.AssignedTo, verifiedName(r, createdBy), forcedPast)
 	writeJSON(w, http.StatusCreated, task)
 }
 

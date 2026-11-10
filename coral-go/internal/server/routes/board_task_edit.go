@@ -55,12 +55,26 @@ func (h *BoardHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, task)
 		return
 	}
+	forcedPast := 0
+	if edit.AssignedTo != nil {
+		current := ""
+		if t, err := h.bs.GetTask(r.Context(), project, taskID); err == nil && t != nil && t.AssignedTo != nil {
+			current = *t.AssignedTo
+		}
+		var refused bool
+		if refused, forcedPast = h.refuseOverloaded(w, r, project, *edit.AssignedTo, current, edit.Force); refused {
+			return
+		}
+	}
 	before, task, prevStatus, err := h.applyTaskEdit(r.Context(), project, taskID, &edit)
 	if err != nil {
 		errBadRequest(w, err.Error())
 		return
 	}
 	_ = h.bs.TouchTask(r.Context(), project, taskID)
+	if edit.AssignedTo != nil {
+		h.noteForcedAssignment(r, project, taskID, *edit.AssignedTo, edit.SubscriberID, forcedPast)
+	}
 	reassigned := edit.AssignedTo != nil
 	h.goBG(func() {
 		h.announceTaskEdit(context.Background(), project, reassigned, before, task, prevStatus)
@@ -83,6 +97,7 @@ type taskEdit struct {
 	BlockedBy      json.RawMessage `json:"blocked_by,omitempty"`
 	RemoveBlocker  *int64          `json:"remove_blocker,omitempty"`
 	ClearBlockers  bool            `json:"clear_blockers,omitempty"`
+	Force          bool            `json:"force,omitempty"` // an assignee past the team's limit of waiting tasks (#14862)
 }
 
 func (e *taskEdit) removesBlockers() bool { return e.RemoveBlocker != nil || e.ClearBlockers }
@@ -282,6 +297,7 @@ func (h *BoardHandler) ReassignTask(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		SubscriberID string `json:"subscriber_id"`
 		Assignee     string `json:"assignee"`
+		Force        bool   `json:"force,omitempty"` // assign past the team's limit of waiting tasks (#14862)
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -296,6 +312,14 @@ func (h *BoardHandler) ReassignTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.refuseArchivedAssignee(w, r.Context(), project, body.Assignee) {
+		return
+	}
+	current := ""
+	if t, err := h.bs.GetTask(r.Context(), project, taskID); err == nil && t != nil && t.AssignedTo != nil {
+		current = *t.AssignedTo
+	}
+	refused, forcedPast := h.refuseOverloaded(w, r, project, body.Assignee, current, body.Force)
+	if refused {
 		return
 	}
 	task, err := h.bs.ReassignTask(r.Context(), project, taskID, body.Assignee)
@@ -315,6 +339,7 @@ func (h *BoardHandler) ReassignTask(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, err.Error())
 		return
 	}
+	h.noteForcedAssignment(r, project, task.ID, body.Assignee, body.SubscriberID, forcedPast)
 	h.goBG(func() {
 		ctx := context.Background()
 		notification := h.buildAssignmentNotification(ctx, project, task, body.Assignee, true)
