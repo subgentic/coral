@@ -16,10 +16,12 @@ import (
 
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/jsonl"
 	"github.com/subgentic/coral/internal/ptr"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/sessionstate"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/transcriptlink"
 )
 
 // ── Tasks ───────────────────────────────────────────────────────────────
@@ -578,6 +580,9 @@ func (h *SessionsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 	if hasToken {
 		h.remindClaudeArtifact(r.Context(), owner, body.EventType, body.ToolName, body.ToolUseID, body.DetailJSON)
 	}
+	if hasToken && body.EventType == "session_reset" {
+		h.noteTranscriptAlias(r.Context(), body.SessionID, body.DetailJSON)
+	}
 	if hasToken && body.EventType == "session_end" {
 		// The agent's process ended (Claude's SessionEnd): nothing held for it may be
 		// typed into whatever runs in that terminal next (#3481). Not on SessionStart:
@@ -816,4 +821,22 @@ func sessionEndReason(detail any) string {
 	d, _ := detail.(map[string]any)
 	r, _ := d["reason"].(string)
 	return r
+}
+
+// noteTranscriptAlias: after a /clear the hook says the CLI's new session id (detail claude_session_id): the transcript of the agent is that file from now on (#14849). Only the agent's own, token-verified
+// event gets here, and an id that is another session of Coral's is refused: an agent cannot point its own chat at a different agent's transcript.
+func (h *SessionsHandler) noteTranscriptAlias(ctx context.Context, sessionID string, detail any) {
+	d, _ := detail.(map[string]any)
+	id, _ := d["claude_session_id"].(string)
+	id = strings.ToLower(strings.TrimSpace(id))
+	if id == "" || id == sessionID || !transcriptlink.IsSessionID(id) {
+		return
+	}
+	if ls, err := h.ss.GetLiveSession(ctx, id); err == nil && ls != nil {
+		return // another agent's session
+	}
+	if h.ts.SessionSentEvents(ctx, id) {
+		return // a session of Coral's that has ended: still not this agent's transcript
+	}
+	jsonl.SetTranscriptAlias(sessionID, id, time.Now())
 }

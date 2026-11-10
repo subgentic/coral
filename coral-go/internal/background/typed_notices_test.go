@@ -33,6 +33,10 @@ func TestTypedNoticeCensus(t *testing.T) {
 		typedcensus.C("team health check, roster form", typedHealthCheck("[Coral health check] 08:00Z · 3 agents"), typedHealthCheck("[Coral health check] 08:00Z · "+h)),
 		typedcensus.C("health line to a member", typedHealthLine("you have 2 tasks off the books"), typedHealthLine(h)),
 		typedcensus.C("the monitor's deliver, a check", typedHealth("Since 08:00: fine."), typedHealth(composed)),
+		typedcensus.C("context cleared, next task", clearedText(12), clearedText(12)), // a fixed template with a task number only (#14849)
+		typedcensus.C("context cleared, no next task", clearedText(0), clearedText(0)),
+		typedcensus.C("context cleared, handoff asked", askHandoffText(), askHandoffText()),
+		typedcensus.C("context cleared, handoff note", handoffText("a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90"), handoffText("a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90")), // the digest is Coral's own, 64 hex
 		typedcensus.C("the monitor's deliver, a member's line", typedHealth("[Coral health] 2 tasks off the books"), typedHealth("[Coral health] "+h)),
 	}
 	typedcensus.Run(t, cases)
@@ -57,7 +61,10 @@ func TestEveryTypedSenderIsInTheCensus(t *testing.T) {
 		typedcensus.S("board_health.go", `typedHealth(text), "health check"`, 1, "the monitor's deliver: everything it types goes through typedHealth (census: team health check, health line)"),
 		typedcensus.S("board_health.go", `"health-check:"+project, text)`, 1, "the check, through the monitor's deliver (typedHealth)"),
 		typedcensus.S("board_health_offbooks.go", `"[Coral health] "+detail)`, 1, "a member's line, through the monitor's deliver (typedHealth)"),
-		typedcensus.S("context_compact.go", `c.deliver(ctx, a, compactCommand(a.AgentType))`, 1, "exception (#14849): the CLI's own /compact, one fixed line with nothing from a task, message or transcript in it (TestTheCompactLineIsFixedAndHoldsNothingAShellActsOn); a slash command cannot start with a notice opener, so it is typed only where the CLI is the foreground (deliverCommand's exited-agent and terminal-agent checks)"),
+		typedcensus.S("context_compact.go", `c.deliver(ctx, a, command)`, 1, "exception (#14849): the CLI's own /compact or /clear, one fixed line with nothing from a task, message or transcript in it (TestTheCompactLineIsFixedAndHoldsNothingAShellActsOn); a slash command cannot start with a notice opener, so it is typed only where the CLI is the foreground (deliverCommand's exited-agent and terminal-agent checks)"),
+		typedcensus.S("context_compact.go", `c.deliver(ctx, a, askHandoffText())`, 1, "the one fixed line that asks an agent for its handoff note: askHandoffText, in the census (context cleared, handoff asked)"),
+		typedcensus.S("context_compact.go", `c.deliver(ctx, a, clearCommand(a.AgentType))`, 1, "the /clear of an agent whose handoff note is stored: the CLI's own command, one fixed line (see the compact exception above)"),
+		typedcensus.S("context_compact.go", `c.deliver(ctx, a, p.text)`, 1, "the cleared agent's one line: clearedText, in the census (context cleared)"),
 		typedcensus.S("context_compact.go", `rt.SendInput(ctx, terminalinput.Coral, name, text)`, 1, "deliverCommand's own send: types the fixed compact line, listed above"),
 		typedcensus.S("health_limit.go", `deliver(ctx, a, key, text)`, 1, "sendUnlessBlocked: forwards the text of the callers listed here"),
 		typedcensus.S("health_nudges.go", `board.OneLine(text), "health nudge"`, 1, "the nudges' deliver: forwards the builders below"),

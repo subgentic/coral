@@ -37,7 +37,13 @@ func TestCompactContextIsStoredPerTeam(t *testing.T) {
 	h := DefaultHealthSettings()
 	h.CompactContext = HealthCompact{On: true, ThresholdK: 300, Orchestrator: true, Trigger: "task"}
 	require.NoError(t, s.SetHealthSettings(ctx, "a", h))
-	assert.Equal(t, HealthCompact{On: true, ThresholdK: 300, Orchestrator: true, Trigger: "task"}, s.GetHealthSettings(ctx, "a").CompactContext)
+	assert.Equal(t, HealthCompact{On: true, ThresholdK: 300, Orchestrator: true, Trigger: "task", Method: "compact"}, s.GetHealthSettings(ctx, "a").CompactContext, "a method that was not set is compact")
+	h.CompactContext.Method = "clear_next"
+	require.NoError(t, s.SetHealthSettings(ctx, "a", h))
+	assert.Equal(t, "clear_next", s.GetHealthSettings(ctx, "a").CompactContext.Method)
+	h.CompactContext.Method = "wipe"
+	require.NoError(t, s.SetHealthSettings(ctx, "a", h))
+	assert.Equal(t, "compact", s.GetHealthSettings(ctx, "a").CompactContext.Method, "a word that is neither is the default")
 	assert.False(t, s.GetHealthSettings(ctx, "b").CompactContext.On, "another team keeps the default")
 }
 

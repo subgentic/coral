@@ -399,6 +399,11 @@ func (s *Server) SetGoalGenerator(g *background.GoalGenerator) {
 	}
 }
 
+// LatestUpload is the digest of the newest artifact the agent session uploaded under name at or after since ("" none): the handoff note the context reset waits for (#14849).
+func (s *Server) LatestUpload(sessionID, name string, since time.Time) string {
+	return routes.LatestUploadNamed(s.cfg.CoralDir(), sessionID, name, since)
+}
+
 // BoardHandler returns the board handler (used by notifier and sleep/wake).
 func (s *Server) BoardHandler() *routes.BoardHandler {
 	return s.boardHandler

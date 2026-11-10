@@ -125,6 +125,12 @@ func safeGo(ctx context.Context, name string, fn func()) {
 func startBackgroundServices(ctx context.Context, db *store.DB, cfg *config.Config, srv *server.Server, agentRT background.AgentRuntime) (*background.WorkflowRunner, *background.JobScheduler) {
 	gitStore := store.NewGitStore(db)
 	taskStore := store.NewTaskStore(db)
+	// An agent that was cleared keeps reading its new transcript across a restart (#14849).
+	if aliases, err := taskStore.TranscriptAliases(ctx); err == nil {
+		for session, alias := range aliases {
+			jsonl.SetTranscriptAlias(session, alias.ID, alias.At)
+		}
+	}
 	sessStore := store.NewSessionStore(db)
 	schedStore := store.NewScheduleStore(db)
 	rbStore := store.NewRemoteBoardStore(db)
@@ -325,7 +331,7 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 	if bh := srv.BoardHandler(); bh != nil {
 		pausedFn = bh.IsPaused
 	}
-	contextCompact.Attach(taskStore, store.NewTokenUsageStore(sessStore.DB()), agentRT, pausedFn)
+	contextCompact.Attach(taskStore, store.NewTokenUsageStore(sessStore.DB()), agentRT, pausedFn, srv.LatestUpload)
 	safeGo(ctx, "context_compact", func() { contextCompact.Run(ctx) })
 
 	// Tasks' one-time reminders (task add --remind-at, #4175 step 3): asked for by a person or

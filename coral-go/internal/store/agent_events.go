@@ -526,3 +526,37 @@ func (s *TaskStore) ClearAgentEvents(ctx context.Context, agentName string, sess
 		args...)
 	return err
 }
+
+// TranscriptAlias is the transcript a session was moved to by a /clear and when that was told.
+type TranscriptAlias struct {
+	ID string
+	At time.Time
+}
+
+// TranscriptAliases is the transcript each session was moved to by a /clear: the newest session_reset event of each that told the CLI's new session id (#14849), so a Coral restart keeps following the new file.
+func (s *TaskStore) TranscriptAliases(ctx context.Context) (map[string]TranscriptAlias, error) {
+	var rows []struct {
+		SessionID string `db:"session_id"`
+		Alias     string `db:"alias"`
+		CreatedAt string `db:"created_at"`
+	}
+	if err := s.reader().SelectContext(ctx, &rows, `SELECT session_id, json_extract(detail_json, '$.claude_session_id') AS alias, created_at FROM agent_events
+		WHERE event_type = 'session_reset' AND json_extract(detail_json, '$.claude_session_id') IS NOT NULL ORDER BY id`); err != nil {
+		return nil, err
+	}
+	out := map[string]TranscriptAlias{}
+	for _, r := range rows {
+		at, _ := time.Parse(time.RFC3339Nano, r.CreatedAt)
+		out[r.SessionID] = TranscriptAlias{ID: r.Alias, At: at} // the newest wins
+	}
+	return out, nil
+}
+
+// SessionSentEvents reports whether an agent session of this id ever sent an event: an id Coral knows as a session of its own, live or ended.
+func (s *TaskStore) SessionSentEvents(ctx context.Context, sessionID string) bool {
+	var n int
+	if err := s.reader().GetContext(ctx, &n, `SELECT 1 FROM agent_events WHERE session_id = ? LIMIT 1`, sessionID); err != nil {
+		return false
+	}
+	return n == 1
+}
