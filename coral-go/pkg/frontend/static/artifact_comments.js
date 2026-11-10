@@ -12,6 +12,7 @@ const markBidi = bidi ? bidi.markBidi : el => el, bidiWritten = bidi ? bidi.bidi
 const nameOf = c => c.authorName || c.authorId || 'unknown', nameSaid = c => bidiWritten(nameOf(c)); // nameSaid: for a label or a tooltip, where a mark cannot be drawn
 const { linkArtifactRefsIn } = await importOnce('./artifact_refs.js'); // a coral://artifacts/<hex> in a comment is a link (#11416)
 const { createAsk } = await importOnce('./artifact_comment_ask.js');
+await loadStyles('artifact_passage.css'); // the focus of the document and of a passage chosen by keyboard (#15173): not in the start CSS (page_weight)
 const { createComposer } = await importOnce('./artifact_comment_composer.js');
 const { createHighlights } = await importOnce('./artifact_comment_highlights.js');
 import { showToast } from './utils.js';
@@ -204,6 +205,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (target) { if (!target.matches('button, textarea, a')) target.tabIndex = -1; target.focus({ preventScroll: true }); }
     }
     function render() {
+        syncPassageStop();
         const kept = focusKey();
         panel.replaceChildren();
         const show = (st.text || st.whole) && !st.gone && !!st.data;
@@ -277,7 +279,7 @@ export function attachComments(dialog, body, host, opts = {}) {
             d.addEventListener('toggle', () => { st.groupOpen[g] = d.open; });
             li.append(d); wrap.append(li);
         }
-        if (!shownAll.length && !opts.compact) wrap.append(el('p', 'empty-state empty-state-tight', !d.canComment ? 'No open comments.' : st.text ? 'No open comments. Select some text to add one.' : opts.words?.empty || 'No open comments. Use the button below to comment on the whole document.'));
+        if (!shownAll.length && !opts.compact) wrap.append(el('p', 'empty-state empty-state-tight', !d.canComment ? 'No open comments.' : st.text ? 'No open comments. Select some text to add one, or Tab to the document and press Enter to choose a passage.' : opts.words?.empty || 'No open comments. Use the button below to comment on the whole document.'));
         panel.append(wrap);
         const sendable = list.map(t => t.c).filter(c => canAsk(c) && !d.locked);
         if (st.video && sendable.length) { const sendAll = btn('ac-send-open', `Send ${plural(sendable.length, 'open comment')} to an agent`); sendAll.addEventListener('click', () => openMany(sendable)); panel.append(sendAll); }
@@ -450,7 +452,9 @@ export function attachComments(dialog, body, host, opts = {}) {
     function selectionAnchor() {
         const sel = window.getSelection();
         if (!st.text || !st.data || !st.data.canComment || st.data.locked || !sel || sel.isCollapsed || !sel.rangeCount) return null; // a document that is not text takes whole-document comments only
-        const r = sel.getRangeAt(0);
+        return anchorOf(sel.getRangeAt(0));
+    }
+    function anchorOf(r) { // the anchor of a range of the document: a selection's, or a passage chosen by keyboard (#15173)
         if (!body.contains(r.commonAncestorContainer)) return null;
         const before = document.createRange(); before.setStart(body, 0); before.setEnd(r.startContainer, r.startOffset);
         const after = document.createRange(); after.setStart(r.endContainer, r.endOffset); after.setEnd(body, body.childNodes.length);
@@ -475,6 +479,43 @@ export function attachComments(dialog, body, host, opts = {}) {
         userSet(true); render(); // the new comment opens the panel
         panel.querySelector('.ac-input')?.focus();
     });
+
+    // ── a passage by keyboard (#15173, Beta walk 7 H1: a document cannot be selected from the keyboard, so there was no way to comment on a passage)
+    // Tab reaches the document; Enter or C there starts choosing a passage (a paragraph, list item, heading, quote, code block or table row); Up and Down move, Enter or C comments on it, Escape goes back to the document.
+    const PASSAGES = 'p, li, h1, h2, h3, h4, h5, h6, pre, blockquote, tr, dt, dd';
+    const passages = () => [...body.querySelectorAll(PASSAGES)].filter(b => !b.querySelector(PASSAGES) && b.textContent.trim() && b.getClientRects().length);
+    const canPassage = () => shown() && st.text && st.data && st.data.canComment && !st.data.locked && !st.composing;
+    body.addEventListener('keydown', (e) => {
+        if (e.altKey || e.ctrlKey || e.metaKey || !canPassage()) return;
+        const onBody = e.target === body, at = onBody ? -1 : passages().indexOf(e.target.closest(PASSAGES));
+        if (!onBody && at < 0) return;
+        const key = e.key === 'c' || e.key === 'C' ? 'c' : e.key;
+        if (onBody && (key === 'Enter' || key === 'c')) {
+            const list = passages(), top = body.getBoundingClientRect().top, first = list.find(b => b.getBoundingClientRect().bottom > top) || list[0];
+            if (!first) return;
+            e.preventDefault(); list.forEach(b => { b.tabIndex = -1; }); first.focus();
+            announce('Choosing a passage to comment on. Up and Down move, Enter comments on it, Escape leaves.');
+            return;
+        }
+        if (onBody) return;
+        const list = passages();
+        if (key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End') {
+            e.preventDefault();
+            const to = key === 'Home' ? 0 : key === 'End' ? list.length - 1 : Math.min(list.length - 1, Math.max(0, at + (key === 'ArrowDown' ? 1 : -1)));
+            list[to].tabIndex = -1; list[to].focus(); list[to].scrollIntoView({ block: 'nearest' });
+        } else if (key === 'Escape') { e.preventDefault(); e.stopPropagation(); body.focus(); }
+        else if (key === 'Enter' || key === 'c') {
+            const r = document.createRange(); r.selectNodeContents(list[at]);
+            const s = anchorOf(r); if (!s) return;
+            e.preventDefault(); st.composing = { anchor: s.anchor }; st.error = ''; userSet(true); render();
+            panel.querySelector('.ac-input')?.focus();
+        }
+    });
+    function syncPassageStop() { // the document is a tab stop while a person can comment on a text in it
+        const on = !!(st.text && st.data && st.data.canComment && !st.data.locked);
+        if (on) { body.tabIndex = 0; body.setAttribute('role', 'group'); body.setAttribute('aria-label', 'Document: press Enter to choose a passage to comment on'); }
+        else if (body.getAttribute('aria-label') === 'Document: press Enter to choose a passage to comment on') { body.removeAttribute('tabindex'); body.removeAttribute('role'); body.removeAttribute('aria-label'); }
+    }
 
     // ── the phone's sheet
     let sheetOverlay = 0; // the sheet's entry in overlay_history.js while it is open on a phone (#5219)
