@@ -37,7 +37,7 @@ const startedTask = (a) => (a.tasks || []).find(t => t.status === 'in_progress')
 const statusWord = (a) => (a.availability === 'task_idle' && startedTask(a) ? `Working on #${Number(startedTask(a).id)}` : WORD[a.availability] || 'Not reported');
 // dropAt is one of the steps data_table.css has (62, 52, 36, 28, 20, 16): 32 and 33 had no rule, so those two columns never gave way and a phone's Status chip and row broke (#14903). Open tasks and Time on current task (#14861, the Operator): the tasks assigned to the agent that are pending, in progress or in review (a link to the Tasks tab filtered to the agent), and how long it has had its task in progress (since the claim; a dash with none).
 const openTasksOf = (a) => Number(a.open_tasks) || 0;
-const claimedAt = (a) => { const t = a.task_since ? Date.parse(a.task_since) : NaN; return Number.isFinite(t) ? t : null; };
+const claimedAt = (a) => { const t = a.task_since && a.availability !== 'sleeping' ? Date.parse(a.task_since) : NaN; return Number.isFinite(t) ? t : null; }; // a sleeping agent shows no running clock: a dash, not a time that keeps counting (walk 16 M10)
 /** "1 h 12 m", "5 m", "2 d 3 h": the time the agent has had its current task, from the claim; '' when it has none. */
 export function onTaskWords(a, now = Date.now()) {
     const at = claimedAt(a);
@@ -219,7 +219,7 @@ function watch() {
     pollEvery(refresh, 15000);
     window.addEventListener('focus', refresh);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
-    // Sleep Team or Wake Team: the rows say so now, not at the next poll (#12335).
+    // Sleep team or Wake team: the rows say so now, not at the next poll (#12335).
     document.addEventListener('coral:team-sleep-changed', e => { if (e.detail && e.detail.team === model.team && root && root.isConnected) load(); });
 }
 

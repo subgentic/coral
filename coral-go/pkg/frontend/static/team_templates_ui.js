@@ -1,4 +1,4 @@
-/* The Agent Team form's templates (moved out of team_dialogs.js as it was, #5174; no behaviour change): the built-in templates, the template selector and Save as Template. */
+/* The Agent Team form's templates (moved out of team_dialogs.js as it was, #5174; no behaviour change): the built-in templates, the template selector and Save as template. */
 import { importOnce } from './import_once.js';
 import { showToast } from './utils.js';
 const { _getSavedTeamTemplates, _upsertSavedTeamTemplates } = await importOnce('./persona_store.js');

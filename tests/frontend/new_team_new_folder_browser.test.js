@@ -94,9 +94,9 @@ const { coralReady } = require('./helpers/wait');
             // A confirmation’s position may vary with the viewport; its visible button must be clickable at each width.
             await ev(`(async()=>{window.__confirmed=0;window.showConfirmModal('Kill all agents','Kill all 3 agents? Their chats stay in History.',()=>window.__confirmed++,undefined,{label:'Kill all',danger:true});return true;})()`);
             const point=await ev(`(()=>{const b=document.getElementById('confirm-modal-yes'),r=b.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2,visible:r.width>0&&r.height>0&&r.top>=0&&r.bottom<=innerHeight};})()`);
-            check(`${tag}: Kill All confirmation is reachable`,point.visible);
+            check(`${tag}: Kill all confirmation is reachable`,point.visible);
             await client.Input.dispatchMouseEvent({type:'mousePressed',x:point.x,y:point.y,button:'left',clickCount:1});await client.Input.dispatchMouseEvent({type:'mouseReleased',x:point.x,y:point.y,button:'left',clickCount:1});
-            check(`${tag}: a click on the visible Kill All button confirms once`,await ev('window.__confirmed===1'));
+            check(`${tag}: a click on the visible Kill all button confirms once`,await ev('window.__confirmed===1'));
 
             // a new folder inside one that exists: the line says so at step 1, and Launch asks for it
             await open('/work/planner-shop');

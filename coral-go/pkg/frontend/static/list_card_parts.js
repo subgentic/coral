@@ -1,4 +1,4 @@
-/* Pieces the agent list's team and folder cards share: the pin item, the icons, a row's name with its server, the team's accent, Kill All and the health icon (moved out of render.js, #4996; no behaviour change). */
+/* Pieces the agent list's team and folder cards share: the pin item, the icons, a row's name with its server, the team's accent, Kill all and the health icon (moved out of render.js, #4996; no behaviour change). */
 import { launchBlockedReason } from './hub_access.js';
 import { splitKey, LOCAL_SERVER, keyLabel, isCloud } from './server_base.js';
 import { escapeAttr, escapeHtml } from './utils.js';
@@ -8,7 +8,7 @@ import { isGroupedByServer, isServerShownOnRows } from './session_rows.js';
 import { _getBoardColor } from './board_accents.js';
 import { SVGO } from './svg_open.js';
 
-// The team menu's "Kill All". Through the Coral Hub, killing a whole team needs Launch on its
+// The team menu's "Kill all". Through the Coral Hub, killing a whole team needs Launch on its
 // machine (#3433): below that it is shown disabled with the reason (#3443).
 export function killAllItem(boardName) {
     const icon = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>';
@@ -16,16 +16,16 @@ export function killAllItem(boardName) {
     if (blocked) {
         return `<button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger overflow-menu-blocked" disabled aria-disabled="true" title="${escapeAttr(blocked)}">
                     ${icon}
-                    Kill All <span class="overflow-menu-note">needs Launch</span>
+                    Kill all <span class="overflow-menu-note">needs Launch</span>
                 </button>`;
     }
     return `<button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="team-kill" data-board="${escapeAttr(boardName)}">
                     ${icon}
-                    Kill All
+                    Kill all
                 </button>`;
 }
 
-/** The team menu's "Delete team" (#10318): the in-page dialog of the team page's Delete, from the sidebar too. Through the Coral Hub it needs Launch on the team's machine, as Kill All does. */
+/** The team menu's "Delete team" (#10318): the in-page dialog of the team page's Delete, from the sidebar too. Through the Coral Hub it needs Launch on the team's machine, as Kill all does. */
 export function deleteTeamItem(boardName) {
     const icon = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M5 4.5l.5 8.5h5l.5-8.5"/></svg>';
     const blocked = launchBlockedReason(splitKey(boardName).server);

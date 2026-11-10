@@ -241,7 +241,7 @@ export function saveTeamFromSidebar(boardName) {
     });
 }
 
-/** Wake Team found members that were ended (Kill All, or their own exit) and says so: ask once to resume them all, each in its own folder with its earlier chat, on the team's own computer. */
+/** Wake team found members that were ended (Kill all, or their own exit) and says so: ask once to resume them all, each in its own folder with its earlier chat, on the team's own computer. */
 async function offerResumeEnded(boardName, ended) {
     if (!Array.isArray(ended) || !ended.length) return;
     const { endedSessionOf, resumeEndedAgents, resumeEndedWords, resumeEndedQuestion } = await importOnce('./resume_ended.js');
@@ -267,10 +267,10 @@ export function toggleTeamSleep(boardName, action) {
         try {
             const resp = await teamFetch(boardName, n => `/api/sessions/live/team/${encodeURIComponent(n)}/${action}`, { method: 'POST' });
             const data = await resp.json().catch(() => ({}));
-            // The route answers 200 with ok: false when it did nothing (no sessions on that board): that is a refusal to say, not a team that is awake (#12417: Sleep Team "did nothing" and said nothing).
+            // The route answers 200 with ok: false when it did nothing (no sessions on that board): that is a refusal to say, not a team that is awake (#12417: Sleep team "did nothing" and said nothing).
             if (!resp.ok || data.ok === false) {
                 showToast(data.error || data.message || `Could not ${action} the team (HTTP ${resp.status})`, true);
-                if (action === 'wake') offerResumeEnded(boardName, data.ended); // members Kill All ended: one click brings them back (#14208)
+                if (action === 'wake') offerResumeEnded(boardName, data.ended); // members Kill all ended: one click brings them back (#14208)
                 return;
             }
             const sleeping = !!data.sleeping;
@@ -289,7 +289,7 @@ export function toggleTeamSleep(boardName, action) {
         }
     };
     if (action === 'sleep') {
-        showConfirmModal('Sleep team', `Put all agents on "${keyLabel(boardName)}" to sleep? Their chats stay, and Wake Team starts them again.`, doIt, undefined, { danger: false, label: 'Sleep team' });
+        showConfirmModal('Sleep team', `Put all agents on "${keyLabel(boardName)}" to sleep? Their chats stay, and Wake team starts them again.`, doIt, undefined, { danger: false, label: 'Sleep team' });
     } else {
         doIt();
     }

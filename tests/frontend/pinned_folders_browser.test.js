@@ -2,7 +2,7 @@
 // tab's left folder list, empty allowed, and stays when its last agent ends.
 //  - Open folder on the home page and in the +New chooser opens a dialog; a folder that doesn't
 //    exist is refused with the reason, an existing one is pinned and listed with no agents.
-//  - The entry's menu launches into it (Add Terminal here), has Unpin folder, and no Kill All
+//  - The entry's menu launches into it (Add Terminal here), has Unpin folder, and no Kill all
 //    while it is empty. Any other folder's menu has Pin folder: pinned, it stays when its last
 //    agent is killed.
 //  - Pins live on the server (a reload keeps them); a search hides an empty pin unless its name
@@ -75,8 +75,8 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await until(`getComputedStyle(document.getElementById('open-folder-modal')).display === 'none' && !!${HDR('qa-pinned')}`, 'the pinned folder in the list');
         let g = await groupInfo('qa-pinned');
         check('Enter pins it: the folder is listed with no agents under it', !!g && g.items.length === 0, JSON.stringify(g));
-        check('its menu launches into it, has Unpin folder, and no Kill All while empty',
-            !!g && ['Add Agent', 'Add Custom Agent', 'Add Terminal', 'Unpin folder'].every(x => g.menu.includes(x)) && !g.menu.includes('Kill All'), JSON.stringify(g && g.menu));
+        check('its menu launches into it, has Unpin folder, and no Kill all while empty',
+            !!g && ['Add Agent', 'Add Custom Agent', 'Add Terminal', 'Unpin folder'].every(x => g.menu.includes(x)) && !g.menu.includes('Kill all'), JSON.stringify(g && g.menu));
         const looks = await ev(`(() => { const a = ${HDR('qa-pinned')}; return { cls: a.className, icon: !!a.querySelector('.folder-group-icon') }; })()`);
         check('it looks like any folder entry (same header and folder icon)', looks.cls === 'session-group-header' && looks.icon, JSON.stringify(looks));
 
@@ -121,7 +121,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         const launched = (sessions || []).find(s => s.working_directory === pinDir);
         check('the launched terminal runs in the pinned folder', !!launched, JSON.stringify((sessions || []).map(s => s.working_directory)));
         g = await groupInfo('qa-pinned');
-        check('with an agent in it, the entry keeps Unpin folder and gets Kill All', !!g && g.menu.includes('Unpin folder') && g.menu.includes('Kill All'), JSON.stringify(g && g.menu));
+        check('with an agent in it, the entry keeps Unpin folder and gets Kill all', !!g && g.menu.includes('Unpin folder') && g.menu.includes('Kill all'), JSON.stringify(g && g.menu));
         if (launched) await api('POST', `/api/sessions/live/${encodeURIComponent(launched.name)}/kill`, { session_id: launched.session_id, agent_type: 'terminal' });
 
         // ── Pin from an existing folder's menu; it stays when its agent ends ─

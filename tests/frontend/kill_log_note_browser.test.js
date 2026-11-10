@@ -1,5 +1,5 @@
 // #4399 (from Security's #4371 table): every Kill confirmation says what happens to the agent's terminal log, that it is kept and where (#4437: Kill
-// keeps it on both backends): Kill Session (the agent header and the sidebar row), Kill All Agents (a folder group), Kill Team and Reset Team (which
+// keeps it on both backends): Kill session (the agent header and the sidebar row), Kill all Agents (a folder group), Kill Team and Reset team (which
 // kills and restarts its agents). Cancel sends no kill. The code fact: neither tmux Client.KillSession nor the pty backend's kill removes the log.
 // KILL_NOTE_SHOT=<dir> saves a screenshot of each confirmation. Drives Chrome over CDP through agent_view_harness.js; run_cdp_suites.mjs finds CDP suites by that name.
 const assert = require('node:assert/strict');
@@ -42,17 +42,17 @@ const NOTE_RESET = 'Their terminal logs are kept.'; // Reset says it in plain wo
             console.log(`   ✓ ${label}: ${d.message}`);
         };
         console.log('Every Kill confirmation says what happens to the terminal log');
-        await asked('Kill Session (sidebar row)', `T.render.killSessionDirect('repo', 'claude', 's1')`, 'Kill session');
-        await asked('Kill Session (agent header)', `T.state.currentSession = { type: 'live', name: 'repo', session_id: 's1', agent_type: 'claude' }; (await import((window.__coralStatic || '/static/') + 'controls.js')).killSession()`, 'Kill session');
-        await asked('Kill All Agents (folder)', `T.render.killGroup('repo')`, 'Kill all agents', NOTE_MANY, 'Kill all 2 agents in');
+        await asked('Kill session (sidebar row)', `T.render.killSessionDirect('repo', 'claude', 's1')`, 'Kill session');
+        await asked('Kill session (agent header)', `T.state.currentSession = { type: 'live', name: 'repo', session_id: 's1', agent_type: 'claude' }; (await import((window.__coralStatic || '/static/') + 'controls.js')).killSession()`, 'Kill session');
+        await asked('Kill all Agents (folder)', `T.render.killGroup('repo')`, 'Kill all agents', NOTE_MANY, 'Kill all 2 agents in');
         await asked('Kill Team (one agent)', `T.render.killBoard('team-k')`, 'Kill team', NOTE, 'Kill the 1 agent in "team-k"');
-        await asked('Reset Team', `window.resetTeam('team-k')`, 'Reset team', NOTE_RESET);
+        await asked('Reset team', `window.resetTeam('team-k')`, 'Reset team', NOTE_RESET);
         assert.ok(!(await ev(`document.getElementById('confirm-modal-message').textContent`)).includes('logs folder'), 'Reset does not name the logs folder of the data folder');
-        // Sleep Team says what Reset says: the chats stay (#10549, the Desktop tester)
+        // Sleep team says what Reset says: the chats stay (#10549, the Desktop tester)
         await ev(`window.toggleTeamSleep('team-k', 'sleep'); true`);
-        await waitFor(open, 'the Sleep Team confirmation', 8000);
+        await waitFor(open, 'the Sleep team confirmation', 8000);
         const sleepWords = await ev(`document.getElementById('confirm-modal-message').textContent`);
-        assert.ok(/chats stay/i.test(sleepWords) && /Wake Team/.test(sleepWords), 'Sleep Team says the chats stay and that Wake Team starts them again: ' + sleepWords);
+        assert.ok(/chats stay/i.test(sleepWords) && /Wake team/.test(sleepWords), 'Sleep team says the chats stay and that Wake team starts them again: ' + sleepWords);
         await ev(`document.querySelector('#confirm-modal .btn:not(#confirm-modal-yes)').click(); true`);
         console.log('PASS');
     } catch (e) {

@@ -18,7 +18,7 @@ import { isHomeFolderAsk, askHomeFolder } from './home_folder_ask.js';
 // (#4437: tmux's KillSession no longer removes it), in <data dir>/logs.
 export const KILL_LOG_NOTE = "Its terminal log is kept, in the logs folder of Coral's data folder.";
 
-// The same for a confirmation about several agents (Kill All Agents, Kill Team, Reset Team: Reset kills each agent and
+// The same for a confirmation about several agents (Kill all Agents, Kill Team, Reset team: Reset kills each agent and
 // starts it again under a new session id, so the old logs stay as they are).
 export const KILL_LOG_NOTE_MANY = "Their terminal logs are kept, in the logs folder of Coral's data folder.";
 

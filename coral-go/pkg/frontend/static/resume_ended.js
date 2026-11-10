@@ -1,5 +1,5 @@
-/* Resume an agent that was ended (Kill All, or its own exit) from its earlier chat (#14172, #14208). The agent has no live row any more, so the way back is History's Resume: the chat's resume-info
- * (its folder, name, mode and resume id), then the launch route with resume_session_id on the same board. Used by the inbox's Restart on a question and by Wake Team's offer to resume the
+/* Resume an agent that was ended (Kill all, or its own exit) from its earlier chat (#14172, #14208). The agent has no live row any more, so the way back is History's Resume: the chat's resume-info
+ * (its folder, name, mode and resume id), then the launch route with resume_session_id on the same board. Used by the inbox's Restart on a question and by Wake team's offer to resume the
  * members it found ended. Rejects in words, starting nothing, when the folder is gone, unknown, or the chat cannot be read. Plain text only: names and paths go through markHidden. */
 import { importOnce } from './import_once.js';
 import { markHidden } from './visible_marks.js';
@@ -58,7 +58,7 @@ export function resumeEndedWords(team, result) {
     return parts.join(' ') || `Nothing to resume in "${team}".`;
 }
 
-/** The question before a resume of the ended members Wake Team named. */
+/** The question before a resume of the ended members Wake team named. */
 export function resumeEndedQuestion(team, names) {
     const list = names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
     return `${list} ${names.length === 1 ? 'was' : 'were'} ended in "${team}", so Wake does not apply. Resume ${names.length === 1 ? 'it' : 'them'}? Each starts again in its own folder with its earlier chat; a resume does not bring back its role's capabilities or Keep Full access. Agents you ended one at a time are listed too.`;

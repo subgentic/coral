@@ -1,4 +1,4 @@
-// Wake Team and the agents Kill All ended (#14208, the live reproduction): the route answers ok false naming them with an `ended` list; the dashboard says so in a toast and asks once to resume them all;
+// Wake team and the agents Kill all ended (#14208, the live reproduction): the route answers ok false naming them with an `ended` list; the dashboard says so in a toast and asks once to resume them all;
 // Cancel starts nothing; Confirm resumes each in its own folder on the team's board (the History Resume's two calls) and says who is back. A member that did not start is named, never marked awake.
 // A team woken with a failed start says "only partly awake". Drives Chrome over CDP through agent_view_harness.js against the isolated dev server; only the wake, resume-info and launch calls are answered by the test.
 const assert = require('node:assert/strict');
@@ -29,7 +29,7 @@ const { coralReady } = require('./helpers/wait');
         const confirmText = () => ev(`({ title: document.getElementById('confirm-modal-title').textContent, message: document.getElementById('confirm-modal-message').textContent, yes: document.getElementById('confirm-modal-yes').textContent })`);
         const launches = () => ev(`window.__calls.filter(c => c.path === '/api/sessions/launch').map(c => c.body)`);
 
-        console.log('Wake Team found members Kill All ended: the toast says so and one question offers to resume them');
+        console.log('Wake team found members Kill all ended: the toast says so and one question offers to resume them');
         await ev(`window.__wake = { ok: false, sleeping: false, sessions_relaunched: 0, failed: null, error: 'Lead, Dev and QA were ended, not asleep, so Wake does not apply. Resume them to bring the team back.',
             ended: [{ session_id: 'sid-lead', agent_type: 'claude', name: 'Lead' }, { session_id: 'sid-dev', agent_type: 'claude', name: 'Dev' }, { session_id: 'sid-qa', agent_type: 'claude', name: 'QA' }] }; window.toggleTeamSleep('b-crew', 'wake'); true`);
         await waitFor(`!!document.querySelector('.toast .toast-message') && getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the toast and the question');

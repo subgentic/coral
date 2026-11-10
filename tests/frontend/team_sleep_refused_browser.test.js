@@ -1,4 +1,4 @@
-// Sleep Team that the server refuses must say so (#12417, Beta Tester: "Sleep Team did nothing on 3 mock agents: confirmed in the dialog, the menu still said Sleep Team, the rows stayed idle, no Wake button"). The route
+// Sleep team that the server refuses must say so (#12417, Beta Tester: "Sleep team did nothing on 3 mock agents: confirmed in the dialog, the menu still said Sleep team, the rows stayed idle, no Wake button"). The route
 // answers 200 with {ok: false, error} when it did nothing (no sessions on that board), and toggleTeamSleep read only `sleeping` from the answer: a refusal became "Team is awake", the rows were set awake and nothing
 // said why. A refusal now shows its words, as an error, and changes no row; an answer that did sleep the team still says so.
 const assert = require('node:assert/strict');

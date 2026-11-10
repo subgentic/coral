@@ -1,4 +1,4 @@
-/* The one kill call and the one row-drop the four kill paths share (#6892, R1 of #6877): the sidebar's Kill Session (agent_actions.js), the agent view's (controls.js), a folder's Kill All and a team's Kill Team
+/* The one kill call and the one row-drop the four kill paths share (#6892, R1 of #6877): the sidebar's Kill session (agent_actions.js), the agent view's (controls.js), a folder's Kill all and a team's Kill Team
  * (team_actions.js) each wrote their own fetch and follow-up and had drifted. Each caller keeps its confirmation words and its own change of view. */
 import { state } from './state.js';
 import { serverFetch, sessionServer, teamFetch } from './server_base.js';

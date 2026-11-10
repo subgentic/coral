@@ -1,5 +1,5 @@
 // #15258 (walk 13 H1): on a tablet (820 x 1180, touch) the sidebar agent's ... menu was cut at the sidebar's edge ("Slee", "Kill S"). Its labels are whole and the menu is inside the window;
-// Kill Session is not one tap under Move Down (a gap the height of a divider and more).
+// Kill session is not one tap under Move Down (a gap the height of a divider and more).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -24,9 +24,9 @@ const { coralReady } = require('./helpers/wait');
         for (const it of m.items) if (it.cut) problems.push(`"${it.t}" is cut off (its text is wider than its box)`);
         if (m.r > m.vw || m.l < 0 || m.b > m.vh || m.t < 0) problems.push(`the menu is inside the window: ${JSON.stringify([m.l, m.t, m.r, m.b, m.vw, m.vh])}`);
         if (m.clips && (m.l < m.sl - 0.5 || m.r > m.sr + 0.5 || m.t < m.st - 0.5 || m.b > m.sb + 0.5)) problems.push(`the sidebar clips what is outside it, so the menu is inside the sidebar: menu ${JSON.stringify([m.l, m.t, m.r, m.b].map(Math.round))}, sidebar ${JSON.stringify([m.sl, m.st, m.sr, m.sb].map(Math.round))}`);
-        const down = m.items.find(i => /^Move Down/.test(i.t)), kill = m.items.find(i => /^Kill Session/.test(i.t));
-        if (!down || !kill) problems.push('Move Down and Kill Session are in the menu: ' + JSON.stringify(m.items.map(i => i.t)));
-        else if (kill.top - down.bottom < 12) problems.push(`Kill Session is at least 12 px from Move Down (${Math.round(kill.top - down.bottom)} px)`);
+        const down = m.items.find(i => /^Move Down/.test(i.t)), kill = m.items.find(i => /^Kill session/.test(i.t));
+        if (!down || !kill) problems.push('Move Down and Kill session are in the menu: ' + JSON.stringify(m.items.map(i => i.t)));
+        else if (kill.top - down.bottom < 12) problems.push(`Kill session is at least 12 px from Move Down (${Math.round(kill.top - down.bottom)} px)`);
         { // the Settings (gear) menu: whole, in the window, and it does not start with a divider
             await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
             await ev(`document.querySelector('[aria-controls="top-bar-settings-menu"]').click(); true`);
@@ -37,5 +37,5 @@ const { coralReady } = require('./helpers/wait');
         }
     } finally { await client.close(); }
     assert.deepEqual(problems, [], 'the tablet agent row menu:\n  ' + problems.join('\n  '));
-    console.log('PASS the agent row menu is whole at 820 px and Kill Session is set apart');
+    console.log('PASS the agent row menu is whole at 820 px and Kill session is set apart');
 })().catch(e => { console.error(e); process.exit(1); });

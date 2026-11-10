@@ -62,7 +62,7 @@ const { settle, coralReady } = require('./helpers/wait');
             const r = await oneRow(w);
             assert.ok(r.headerH <= rowH + 1 && r.kidsBottom <= r.headerH + 1, `${w} px at 100% text: one header row (rows end at ${r.kidsBottom}, header ${r.headerH}, one row is ${rowH}) with the name ${r.w}px wide`);
             assert.ok(r.w >= 48, `${w} px at 100% text: the name has room (${r.w}px; the menu, back, the Chat/Terminal switch and the more button take the rest of a 320 px row, the one-row header, #11056)`);
-            assert.equal(await ev(`getComputedStyle(document.getElementById('terminal-open-window-link')).display`), 'none', `${w} px: Open Agent Tab is not in a phone's header (a pop-out tab is of little use there)`);
+            assert.equal(await ev(`getComputedStyle(document.getElementById('terminal-open-window-link')).display`), 'none', `${w} px: Open agent tab is not in a phone's header (a pop-out tab is of little use there)`);
             assert.equal(r.branchShown, false, `${w} px at 100% text: the branch is left out of the header (it is in the Details card behind the more button, the one-row header, #11056)`);
             assert.ok(r.over <= 0, `${w} px: no sideways scroll`);
         }
