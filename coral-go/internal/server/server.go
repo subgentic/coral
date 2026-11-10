@@ -87,6 +87,7 @@ type Server struct {
 	touches         *operatortouch.Recorder // the Operator's touches of agents, shared by the handlers that record them (#11225)
 	sysHandler      *routes.SystemHandler   // the update notice's source is set where the updater is built (registerCloud, #9726)
 	remoteAgents    *background.RemoteAgentHub
+	hubNeedsRemotes *routes.NeedsYouRemotes // a Hub's reading of its computers' Needs you (#15380); nil off hub mode
 	goalMetrics     *routes.GoalMetricsHandler
 	systemHandler   *routes.SystemHandler
 	workflowHandler *routes.WorkflowHandler

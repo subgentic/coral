@@ -50,6 +50,7 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 	boardHandler.SetChangeWords(sessHandler.ChangeRequestWords)
 	boardHandler.SetMemberRestLookup(routes.MemberRestLookup(s.boardStore, store.NewSessionStore(s.db))) // a post to an agent that will not read it now says so (#13189)
 	boardHandler.SetNeedsYouAgents(sessHandler.NeedsYouAgents)
+	boardHandler.SetNeedsYouRemotes(s.hubNeedsRemotes)
 	boardHandler.SetCommentReadStamp(sessHandler.StampCommentReads)                    // the Operator's comment says when the asked agent read it (#14130)
 	boardHandler.SetIdleWaker(sessHandler.WakeIdleForDelivery)                         // any typed delivery to an auto-asleep agent wakes it first (#12111)
 	boardHandler.SetNeedsYouSkills(routes.NewSkillsHandler(s.db, s.cfg).NeedsYouItems) // the skills that wait for the Operator are items of Needs you (#12139)
