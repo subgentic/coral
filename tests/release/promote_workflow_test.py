@@ -49,7 +49,7 @@ def publish_problems(wf):
     edit = t.find('gh release edit "$name"')
     if not (0 <= view < create < upload < edit):
         out.append("the order is not: refuse an existing release, create, upload, publish")
-    for need in ("--draft", "--prerelease", "--latest=false", '--target "${GITHUB_SHA}"'):
+    for need in ("--draft", "--prerelease", "--latest=false", '--target "${PROMOTE_SOURCE_SHA}"'):
         if need not in t[create:upload if upload > create else len(t)]:
             out.append("create lacks " + need)
     if "--draft=false" not in t[edit:] or "--latest=false" not in t[edit:]:
@@ -202,7 +202,8 @@ class Workflow(unittest.TestCase):
             "a name without the tag": WF.replace('name="promote-${PROMOTE_TAG}-${seq}"', 'name="promote-${seq}"', 1),
             "an existing release is not refused": WF.replace('if gh release view "$name"', 'if false && gh release view "$name"', 1),
             "the sequence is not checked": WF.replace('[[ "$seq" =~ ^[0-9]+$ ]]', "true", 1),
-            "pinned to no commit": WF.replace('--target "${GITHUB_SHA}"', "", 1),
+            "pinned to no commit": WF.replace('--target "${PROMOTE_SOURCE_SHA}"', "", 1),
+            "pinned to the workflow's own commit": WF.replace('--target "${PROMOTE_SOURCE_SHA}"', '--target "${GITHUB_SHA}"', 1),
         }
         for name, text in mutants.items():
             self.assertNotEqual(text, WF, name)
