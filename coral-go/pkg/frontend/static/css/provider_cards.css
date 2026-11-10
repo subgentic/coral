@@ -73,3 +73,5 @@
 .launch-computer-chip { color: var(--text-secondary); }
 .launch-computer-chip .btn { margin: 0; }
 .launch-computer-card input { margin-left: auto; flex: none; }
+/* A short window (200% zoom on a laptop, 720 x 450, #15303): Edit member's buttons stay on one row (the phone rule above gives Remove a row of its own and Move up and Move down half each), so the footer is one row, not three. */
+@media (max-height: 520px) { #launch-agent-remove, #launch-agent-move-up, #launch-agent-move-down { flex: 0 0 auto; } }
