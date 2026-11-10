@@ -201,3 +201,12 @@
 /* Another person's words (#14113): each piece of comment text is its own isolate, so it cannot reorder what stands beside it; a bidirectional control in it is shown as a mark naming its code point, not applied. The mark is left to right and an isolate too. */
 [data-bidi~="isolate"] { unicode-bidi: isolate; }
 .bidi-mark { unicode-bidi: isolate; direction: ltr; display: inline-block; padding: 0 .25em; border: 1px dashed var(--border); border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--text-secondary); font-family: var(--font-mono, ui-monospace, monospace); font-size: var(--fs-sm); line-height: var(--lh-label); white-space: nowrap; }
+/* Forced colours (#5711): these rules live HERE, after the card rules above: this sheet loads with the viewer, after the start sheets, so a rule left in forced-colors.css lost to them at equal specificity (#15162's stylesheet move). */
+@media (forced-colors: active) {
+    /* Comments (#5711): the current card is raised by a shadow and the hovered one is tinted, both gone here, and each avatar is a coloured circle whose initials are all that is left.
+       The current card gets a Highlight border and an inner outline, the hovered one a Highlight border, and the avatar a ring. */
+    .ac-card { transition: none; } /* the state is a system colour: it changes at once, not over 120 ms */
+    .ac-card.ac-active { border-color: Highlight; outline: 2px solid Highlight; outline-offset: -2px; }
+    .ac-card.ac-hover { border-color: Highlight; }
+    .ac-avatar { box-sizing: border-box; border: 1px solid CanvasText; }
+}
