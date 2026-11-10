@@ -424,7 +424,7 @@ function moreMenu(items, label) {
 
 let needsTable = null; // the Needs you table on screen: a bulk action clears its selection when it is done
 /** A phone's Needs you selection (#11671, the operator's Gmail-style rows): long-press a row to select it, tap to add more, and the bar that takes the toolbar's line acts on all of them, one request per item through the same routes as a row's own buttons (no bulk route). An action that does not fit every selected row is off. */
-function needsBulkActions() {
+export function needsBulkActions() {
     const reviews = rows => rows.length > 0 && rows.every(s => s.review && !decisionNeedsPerson(splitKey(s.review.team).server));
     const markable = rows => rows.length > 0 && rows.every(s => s.goalDone || (s.review && !decisionNeedsPerson(splitKey(s.review.team).server))); // a file and a goal that looks done are read and unread the same way (#12029)
     const readOf = s => s.goalDone ? isGoalDoneRead(goalTeamHere(s.goalDone), s.goalDone) : isRead(s.review);
@@ -435,7 +435,7 @@ function needsBulkActions() {
     const done = () => { needsTable?.clear(); };
     const unopened = rows => rows.filter(s => s.review && !isRead(s.review)).length;
     return [
-        { label: 'Approve', hidden: rows => rows.length > 0 && rows.every(s => s.goalDone), icon: () => { const i = DT.el('span', 'material-icons', 'check'); i.setAttribute('aria-hidden', 'true'); return i; }, disabled: rows => !reviews(rows), askWhen: (n, rows) => n > 1 || unopened(rows) > 0, confirm: (n, rows) => { const m = unopened(rows || []); return n === 1 ? 'Approve this file? It is not opened yet.' : `Approve ${n} files?${m ? ` ${m} of them ${m === 1 ? 'is' : 'are'} not opened yet.` : ''}`; }, /* several files, or one nobody opened (#12059, #11999) */ run: async rows => { const { approveRow } = await importOnce('./artifact_review.js'); const r = await each(rows, s => approveRow(s.review.team, s.review)); done(); tell(words('Approved', r, rows.length)); } },
+        { label: 'Approve', hidden: rows => !reviews(rows), icon: () => { const i = DT.el('span', 'material-icons', 'check'); i.setAttribute('aria-hidden', 'true'); return i; }, disabled: rows => !reviews(rows), askWhen: (n, rows) => n > 1 || unopened(rows) > 0, confirm: (n, rows) => { const m = unopened(rows || []); return n === 1 ? 'Approve this file? It is not opened yet.' : `Approve ${n} files?${m ? ` ${m} of them ${m === 1 ? 'is' : 'are'} not opened yet.` : ''}`; }, /* several files, or one nobody opened (#12059, #11999) */ run: async rows => { const { approveRow } = await importOnce('./artifact_review.js'); const r = await each(rows, s => approveRow(s.review.team, s.review)); done(); tell(words('Approved', r, rows.length)); } },
         { label: 'Dismiss', icon: () => { const i = DT.el('span', 'material-icons', 'block'); i.setAttribute('aria-hidden', 'true'); return i; }, disabled: rows => rows.some(s => s.proposal), why: rows => rows.some(s => s.proposal) ? 'a proposal is approved or rejected, not dismissed.' : '', /* a proposal is approved or rejected, not ignored (selecting one is for later actions) */ run: async rows => {
             const { ignoreRow, unignoreRow } = await importOnce('./artifact_review.js'), asks = await importOnce('./ask_ignore.js'), undo = [];
             const r = await each(rows, async s => {
@@ -444,7 +444,7 @@ function needsBulkActions() {
                 else if (s.welcome && s.welcome.dismiss) dismissWelcome(s.welcome.id);
                 else if (s.autorun) markSeen(s.autorun);
                 else if (s.goalDone) undo.push(await hideGoalDone(goalTeamHere(s.goalDone), s.goalDone, 'ignore'));
-                else throw new Error('that one cannot be dismissed');
+                else throw new Error(`${needsName(s)} cannot be dismissed`); // which one (walk 3 N6)
             });
             asks.refreshOperatorAsks(true); syncGoalDoneCount(); done();
             tell(words('Dismissed', r, rows.length), `${words('Dismissed', r, rows.length)}.${undo.length ? ' Undo is in the notice.' : ''}`, undo.length ? { action: { label: 'Undo', onClick: async () => { for (const f of undo) { try { await f(); } catch { /* it stays ignored */ } } asks.refreshOperatorAsks(true); reviewsChangedOnServer(); refreshReviews(true); syncGoalDoneCount(); renderInboxNav(true); tell('Back in Needs you'); } } } : undefined); // one after the other: goals share one hidden list that each undo rewrites (#12328)
@@ -455,10 +455,10 @@ function needsBulkActions() {
             syncGoalDoneCount(); done();
             tell(words('Hidden until a task is added:', r, rows.length), `${words('Hidden until a task is added:', r, rows.length)}.${undo.length ? ' Undo is in the notice.' : ''}`, undo.length ? { action: { label: 'Undo', onClick: async () => { for (const f of undo) { try { await f(); } catch { /* it stays hidden */ } } syncGoalDoneCount(); renderInboxNav(true); } } } : undefined); // one after the other: each undo rewrites the hidden list, and two at once keep only the last write (#12328)
         } },
-        { label: 'Save for later', hidden: rows => rows.length > 0 && rows.every(s => s.goalDone), icon: bookmarkIcon, disabled: rows => !reviews(rows), run: async rows => { const { saveRow } = await importOnce('./artifact_review.js'); const r = await each(rows, s => saveRow(s.review.team, s.review)); done(); tell(words('Saved', r, rows.length)); } },
-        { label: 'Changes', hidden: rows => rows.length > 0 && rows.every(s => s.goalDone), more: true, disabled: rows => !(rows.length === 1 && reviews(rows)), run: rows => { done(); openReview(rows[0].review, { requestChanges: true }); } }, // a change request is words for one file: with several selected it is off,
-        { label: 'Mark read', more: true, disabled: rows => !markable(rows) || rows.every(readOf), run: async rows => { const r = await each(rows.filter(s => !readOf(s)), s => setReadOf(s, true)); syncGoalDoneCount(); done(); tell(words('Marked read', r, r.ok + r.bad.length)); } },
-        { label: 'Mark unread', more: true, disabled: rows => !markable(rows) || !rows.some(readOf), run: async rows => { const r = await each(rows.filter(readOf), s => setReadOf(s, false)); syncGoalDoneCount(); done(); tell(words('Marked unread', r, r.ok + r.bad.length)); } },
+        { label: 'Save for later', hidden: rows => !reviews(rows), icon: bookmarkIcon, disabled: rows => !reviews(rows), run: async rows => { const { saveRow } = await importOnce('./artifact_review.js'); const r = await each(rows, s => saveRow(s.review.team, s.review)); done(); tell(words('Saved', r, rows.length)); } },
+        { label: 'Changes', hidden: rows => !reviews(rows), more: true, disabled: rows => !(rows.length === 1 && reviews(rows)), run: rows => { done(); openReview(rows[0].review, { requestChanges: true }); } }, // a change request is words for one file: with several selected it is off,
+        { label: 'Mark read', more: true, hidden: rows => !markable(rows), disabled: rows => !markable(rows) || rows.every(readOf), run: async rows => { const r = await each(rows.filter(s => !readOf(s)), s => setReadOf(s, true)); syncGoalDoneCount(); done(); tell(words('Marked read', r, r.ok + r.bad.length)); } },
+        { label: 'Mark unread', more: true, hidden: rows => !markable(rows), disabled: rows => !markable(rows) || !rows.some(readOf), run: async rows => { const r = await each(rows.filter(readOf), s => setReadOf(s, false)); syncGoalDoneCount(); done(); tell(words('Marked unread', r, r.ok + r.bad.length)); } },
     ];
 }
 

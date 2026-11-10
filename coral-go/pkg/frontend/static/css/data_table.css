@@ -744,3 +744,4 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
     .inbox-needs-results tr:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-item.inbox-agent-first .inbox-review-version { grid-area: pill; align-self: baseline; margin-inline-end: 48px; } /* the pill stops short of the dots' corner */
     .inbox-needs-results tr:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-version { border: 1px solid var(--border); border-radius: 999px; padding: 0 7px; font-size: var(--fs-sm); line-height: 18px; color: var(--text-secondary); }
 }
+.artifact-sheet-review { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 6px 8px; } /* Approve and Request changes under the review line (#15120, walk 3 N4) */

@@ -206,7 +206,7 @@ export function attachReview(d, { reload }) {
             <button type="submit" class="btn btn-primary">Send request</button>
             <button type="button" class="btn artifact-review-cancel">Cancel</button>
         </form>`;
-    (d.querySelector('.artifact-viewer-from') || d.querySelector('.artifact-viewer-header')).after(bar); // the change-request form, after who sent it, which sits under the name (#11456)
+    d.querySelector('.artifact-viewer-header').after(bar); // the change-request form, under the header (not a box inside its row, which squeezed the name to 'RE…', walk 3 N21)
     // the review's controls are on the viewer's one header row (#12223): its status beside the version chip, Approve and Request changes at the right, Approve with a note in the ⋯ menu
     const mk = (tag, cls, text, attrs = {}) => { const e = document.createElement(tag); e.className = cls; if (text) e.textContent = text; for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (tag === 'button') e.type = 'button'; return e; };
     const stateEl = mk('span', 'chip artifact-review-state', '', { role: 'status' }), approve = mk('button', 'btn btn-primary artifact-review-approve', 'Approve'), changes = mk('button', 'btn artifact-review-changes', 'Request changes', { 'aria-expanded': 'false' });

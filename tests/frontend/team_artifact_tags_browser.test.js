@@ -234,6 +234,13 @@ const { coralReady } = require('./helpers/wait');
         await ev(`[...document.querySelectorAll('.detail-actions button, .detail-pane button')].find(b => b.textContent.trim() === 'Open')?.click(); true`);
         await waitFor(`/^Approved .+/.test(document.querySelector('.artifact-review-state')?.textContent || '')`, 'the viewer opened by the sheet\'s Open button says Approved with its time', 10000);
         await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
+        // review from the list (#15120, walk 3 N4): a file waiting for review has Approve and Request changes in its sheet; Approve there is the same decision as the viewer's
+        await put(files[2], ['for review']); await reload(); await sheet('log.txt');
+        await waitFor(`document.querySelectorAll('.detail-head .artifact-sheet-review button').length === 2`, 'Approve and Request changes in the sheet of a file waiting for review', 10000);
+        assert.deepEqual(await ev(`[...document.querySelectorAll('.detail-head .artifact-sheet-review button')].map(b => b.textContent)`), ['Approve', 'Request changes']);
+        await ev(`window.__decisions = []; const f0 = window.fetch; window.fetch = (u, o = {}) => { if (/\\/review$/.test(String(u)) && o.body) window.__decisions.push({ path: String(u), body: JSON.parse(o.body) }); return f0(u, o); }; document.querySelector('.detail-head .artifact-sheet-review button.btn-primary').click(); true`);
+        await waitFor(`/^Approved/.test(document.querySelector('.detail-head .artifact-review-line')?.textContent || '') && !document.querySelector('.detail-head .artifact-sheet-review')`, 'the sheet says Approved and drops its buttons', 10000);
+        assert.ok(await ev(`window.__decisions.some(d => d.path.endsWith('/artifacts/${files[2]}/review') && d.body.decision === 'approve')`), 'Approve in the sheet sent the approve decision for that file: ' + await ev(`JSON.stringify(window.__decisions)`));
         const v1 = await api('POST', `/api/agent/artifacts?session_id=${sid}&tag=for+review&question=Approve+the+series%3F`, 'version one of the series ' + Date.now(), { 'X-Artifact-Name': 'spec.md', 'X-Artifact-Media-Type': 'text/markdown' });
         assert.equal(v1.status, 201, JSON.stringify(v1)); const h1 = /[a-f0-9]{64}/.exec(v1.body.uri)[0];
         const v2 = await api('POST', `/api/agent/artifacts?session_id=${sid}&tag=for+review&question=Approve+the+series%3F`, 'version two of the series ' + Date.now(), { 'X-Artifact-Name': 'spec.md', 'X-Artifact-Media-Type': 'text/markdown', 'X-Artifact-New-Version-Of': 'coral://artifacts/' + h1 });
