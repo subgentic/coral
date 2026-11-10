@@ -571,6 +571,13 @@ export function createArtifactsList({ inbox = false } = {}) {
                 actions.push(inReview ? { label: 'Remove from review', menu: 1, description: 'Takes it out of Needs you', title: 'Take it out of Needs you', run: () => changeReview(reviewFiles([item]), true, name).then(r => { if (r) showToast(r.failed ? `Could not remove it from review: ${r.why}` : 'Removed from review', !!r.failed); }) }
                     : { label: 'Send for review', menu: 1, description: 'Puts it in Needs you to approve or ask for changes', title: 'Put it in Needs you to approve or ask for changes', run: () => changeReview(reviewFiles([item]), false, name).then(r => { if (r) showToast(r.failed ? `Could not send it for review: ${r.why}` : 'Sent for review: it is in Needs you', !!r.failed); }) });
             }
+            if (hex && !isUnverified(item) && (item.tags || []).includes(REVIEW)) { // the panel says 'Waiting for your review': the decision is here too, not only in the viewer and Needs you (#15338, walk 23)
+                const asked = (item.tags || []).includes('changes requested');
+                actions.push({ label: asked ? 'Approve anyway' : 'Approve', primary: true, title: asked ? 'Approve this version as it is' : 'Approve it: it leaves Needs you and the agent is told', run: () => importOnce('./artifact_review.js').then(async m => {
+                    const out = await m.approveRow(inbox ? item.board_id : model.project, { id: hex, hex, name, team: inbox ? item.board_id : model.project, series_id: item.series_id, version: item.version });
+                    m.sayApproved(name, out); const tags = (item.tags || []).filter(t => t !== REVIEW && t !== 'changes requested' && t !== 'read').concat('approved'); retag(hex, tags); openArtifactSheet({ ...item, tags, review: { state: 'approved', at: out.review?.at || new Date().toISOString() } }, opener, { focus: false }); // the panel says Approved at once
+                }).catch(e => showToast(e.message, true)) });
+            }
             if (hex && local()) {
                 const on = model.kept.has(hex);
                 actions.push({ label: 'Keep', menu: 5, description: 'Coral\u2019s cleanup never deletes it', title: on ? 'Kept: Coral\u2019s cleanup never deletes this file (click to release)' : 'Keep: Coral\u2019s cleanup never deletes this file', pressed: on, run: b => toggleKeep(hex, name, b) });
