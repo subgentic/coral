@@ -1,6 +1,6 @@
 // A laptop at browser zoom (#15271, walk 14): a 1366x768 screen at 125%, 150%, 175% and 200% is a window of 1093x614, 911x512, 781x439 and 683x384 CSS px. The New team dialog (its three steps) and the member
-// editor keep their title and their button row inside the window at each; the sidebar (from 1024 px up; below it is the phone drawer) takes no more than a quarter of the narrow ones (320 px is its width from 1334 px up); the reply page's Send reply and its
-// choices stay inside the dialog. Real zoom is a smaller window at a higher device scale, not a CSS zoom.
+// editor keep their title and their button row inside the window at each; the sidebar (from 1024 px up; below it is the phone drawer) takes no more than a quarter of the narrow ones (320 px is its width from 1334 px up). (The reply page's Send reply was not
+// reproduced at real zoom and is not pinned here.) Real zoom is a smaller window at a higher device scale, not a CSS zoom.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
