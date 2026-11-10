@@ -19,6 +19,8 @@
 #   6 ask         the same swap, started the way a person starts it (#6297): the real server of N with a stand-in coral-update beside it (status passes through to the real one, apply
 #                 runs the rehearsal program), a staged update, and the server's relaunch control. Not the person (an API key, an agent's token, no credential) is refused and nothing
 #                 starts; the person (a request signed with the data folder's command-line token) starts it; the server ends, N+1 answers /api/health, the board message is kept
+#   7 push        a release SENT (#15379): the real push code into the real coral-update's receive, then the real apply: the server of N is replaced as in item 1
+#   8 push unhealthy   a pushed release that does not stay up: rolled back
 #
 # Output: one table; exit status 0 only when no item FAILs. Processes are stopped by pid this script recorded or found under its own install folders; the
 # work folder is removed by its own path (--keep leaves it). Linux only; needs go, curl, python3, tar. Nothing is sent anywhere.
@@ -86,6 +88,7 @@ pack() { tar czf "$2" -C "$1" .; } # as build-linux.sh makes its tarball
   CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=$N1" -o "$work/pkg/nunh/coral" ./internal/updater/testrig/cmd/unhealthy-coral &&
   CGO_ENABLED=0 go build -o "$work/bin/rehearsal-update" ./internal/updater/testrig/cmd/rehearsal-update &&
   CGO_ENABLED=0 go build -o "$work/bin/person-call" ./internal/updater/testrig/cmd/person-call &&
+  CGO_ENABLED=0 go build -o "$work/bin/rehearsal-push" ./internal/updater/testrig/cmd/rehearsal-push &&
   pack "$work/pkg/n" "$work/pkg/n.tar.gz" && pack "$work/pkg/n1" "$work/pkg/n1.tar.gz" && pack "$work/pkg/nbad" "$work/pkg/nbad.tar.gz" && pack "$work/pkg/nunh" "$work/pkg/nunh.tar.gz"
 } > "$work/build.log" 2>&1
 if [ $? -ne 0 ]; then echo "update_rehearsal: the build failed:" >&2; tail -20 "$work/build.log" >&2; exit 2; fi
@@ -123,6 +126,20 @@ count_servers() { c=0; for d in /proc/[0-9]*; do exe=$(readlink "$d/exe" 2>/dev/
 run_rehearsal() { # PACKAGE VERSION [extra flags...]: runs it, waits for "ready", ends the server as the real server ends itself, waits for the end
   pkg=$1; ver=$2; shift 2
   "${CENV[@]}" "$work/bin/rehearsal-update" --data-dir "$dd" --install "$inst" --parent "$srv" --installed "$N" --package "$pkg" --version "$ver" "$@" > "$s/rehearsal.out" 2> "$s/rehearsal.err" &
+  rpid=$!; PIDS+=("$rpid")
+  for _ in $(seq 1 600); do
+    grep -q '"step":"ready"' "$s/rehearsal.out" 2>/dev/null && break
+    kill -0 "$rpid" 2>/dev/null || break
+    sleep 0.2
+  done
+  if grep -q '"step":"ready"' "$s/rehearsal.out" 2>/dev/null; then kill -TERM "$srv" 2>/dev/null; wait "$srv" 2>/dev/null; fi
+  for _ in $(seq 1 1500); do kill -0 "$rpid" 2>/dev/null || break; sleep 0.2; done
+  wait "$rpid" 2>/dev/null
+  rrc=$?
+}
+run_push() { # PACKAGE VERSION [extra flags...]: the same, with the release SENT first (#15391): the real push code into the real coral-update's receive, then the real apply
+  pkg=$1; ver=$2; shift 2
+  "${CENV[@]}" "$work/bin/rehearsal-push" --data-dir "$dd" --install "$inst" --parent "$srv" --installed "$N" --package "$pkg" --version "$ver" "$@" > "$s/rehearsal.out" 2> "$s/rehearsal.err" &
   rpid=$!; PIDS+=("$rpid")
   for _ in $(seq 1 600); do
     grep -q '"step":"ready"' "$s/rehearsal.out" 2>/dev/null && break
@@ -295,6 +312,42 @@ SHIM
   fi
   fi
 else result "6 ask" FAIL "the world of N did not come up"; fi
+sweep
+
+# ---- 7 push ------------------------------------------------------------------------------------------------------------
+# #15379: a release sent to a computer with no internet. The sender stages it (fake GitHub, fake Sigstore), push.Run carries it through the real stream into the REAL coral-update's "receive" in the install
+# (run in the remote's own data folder through a stand-in for ssh: no key or host is used), and the real apply verifies what was received, swaps, starts, checks health. The relaunch route (404 in a shipping
+# build) and the ssh hop are the two parts this cannot run; the push stops at "staged" and the apply is started the way item 1 starts it.
+if setup push; then
+  before_pid=$srv
+  run_push "$work/pkg/n1.tar.gz" "$N1"
+  pu=$(step_of push); pr=$(printf '%s' "$pu" | jget result); prem=$(printf '%s' "$pu" | jget remote)
+  ap=$(step_of apply | jget result)
+  if waitfor_version "$N1" 90; then v=$N1; else v=$(health_version); fi
+  alive=no; kill -0 "$before_pid" 2>/dev/null && alive=yes
+  iv=$(installed_version); nsrv=$(count_servers); mb=$(message_back)
+  leftover=$(ls "$dd/updates/staging" 2>/dev/null | grep -c partial)
+  if [ "$pr" = staged ] && [ "$prem" = "$N" ] && [ "$ap" = relaunched ] && [ "$v" = "$N1" ] && [ "$alive" = no ] && [ "$iv" = "$N1" ] && [ "$nsrv" = 1 ] && [ "$mb" -ge 1 ] && [ "$leftover" = 0 ]; then
+    result "7 push" PASS "$N -> $N1: sent through the real receive (remote said $prem), the real apply verified and relaunched; /api/health says $N1; the old process is gone; the install says $N1; one server runs; the board message is still there; no partial folder left"
+  else
+    result "7 push" FAIL "push=[$pr] remote=[$prem] apply=[$ap] health=[$v] old process alive=$alive install=[$iv] servers=$nsrv message back=$mb partial=$leftover; rehearsal: $(tail -c 400 "$s/rehearsal.out" | tr '\n' ' ') $(tail -c 300 "$s/rehearsal.err" | tr '\n' ' ')"
+  fi
+else result "7 push" FAIL "the world of N did not come up"; fi
+sweep
+
+# ---- 8 push unhealthy --------------------------------------------------------------------------------------------------
+# the rollback case of a pushed release: it passes every check, does not stay up, and the install is N again
+if setup pushunh; then
+  run_push "$work/pkg/nunh.tar.gz" "$N1" --health-for 15s
+  pr=$(step_of push | jget result); ap=$(step_of apply); ar=$(printf '%s' "$ap" | jget result)
+  iv=$(installed_version)
+  if waitfor_version "$N" 60; then v=$N; else v=$(health_version); fi
+  if [ "$pr" = staged ] && [ "$ar" = failed_rolled_back ] && [ "$iv" = "$N" ] && [ "$v" = "$N" ]; then
+    result "8 push unhealthy" PASS "a pushed $N1 that does not stay up: rolled back; the install says $N and the server of $N answers /api/health again"
+  else
+    result "8 push unhealthy" FAIL "push=[$pr] apply=[$ar] install=[$iv] health=[$v]; rehearsal: $(tail -c 300 "$s/rehearsal.out" | tr '\n' ' ')"
+  fi
+else result "8 push unhealthy" FAIL "the world of N did not come up"; fi
 sweep
 
 # ---- the table ---------------------------------------------------------------------------------------------------------
