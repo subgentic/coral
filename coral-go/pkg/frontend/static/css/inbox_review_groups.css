@@ -16,7 +16,7 @@
 /* A tablet's Needs you (#15259, walk 13): the chips wrap onto their own line under the title and search instead of running off the right edge cut mid-chip. */
 @media (min-width: 768px) and (max-width: 999px) {
     .inbox-folder-toolbar .list-bar-search-row.gt-toolbar { flex-wrap: wrap; }
-    .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .team-tb-pills { flex: 1 1 100%; order: 5; flex-wrap: wrap; overflow: visible; }
+    .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .team-tb-pills { flex: 0 1 auto; min-width: 0; flex-wrap: wrap; overflow: visible; } /* the chips go to their own line only when they do not fit beside the search (#15366: at 900 px a row that fits stays one line) */
 }
 
 /* Walk 15 M4 (#15259): the Filters panel opens over the list on a computer, it does not push the list down. The filter line sits under the toolbar. */
