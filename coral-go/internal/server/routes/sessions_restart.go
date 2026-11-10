@@ -350,6 +350,10 @@ func (p *restartPlan) restartSettings() {
 			p.displayName = p.subscription.JobTitle
 		}
 	}
+	if p.model == "" && p.req.Model == nil && p.stored != nil {
+		p.model = modelOfFlags(storedFlags) // an agent started with its model on the command line (no model column) keeps it (#15114)
+		p.contextWindow = max(p.contextWindow, proxy.LookupContextWindow(p.model))
+	}
 	// Request body overrides stored values (user edited in modal)
 	if p.req.Prompt != "" {
 		p.prompt = p.req.Prompt
@@ -710,4 +714,26 @@ func (h *SessionsHandler) restartRecord(ctx context.Context, p *restartPlan) {
 	if p.subscription == nil && p.board != "" {
 		h.setupBoardAndPrompt(p.newSessionID, p.newSessionName, p.agentType, p.board, p.displayName)
 	}
+}
+
+// modelOfFlags is the model a stored command line was started with (--model X, -m X, --model=X, -m=X), "" when it names none or the value is not a model id. The last one wins, as it does for the CLI.
+func modelOfFlags(flags []string) string {
+	model := ""
+	for i := 0; i < len(flags); i++ {
+		f := flags[i]
+		switch {
+		case (f == "--model" || f == "-m") && i+1 < len(flags):
+			i++
+			model = flags[i]
+		case strings.HasPrefix(f, "--model="):
+			model = strings.TrimPrefix(f, "--model=")
+		case strings.HasPrefix(f, "-m="):
+			model = strings.TrimPrefix(f, "-m=")
+		}
+	}
+	model = strings.TrimSpace(model)
+	if !agentmodels.ValidModelValue(model) {
+		return ""
+	}
+	return model
 }
