@@ -64,8 +64,10 @@ const path = require('node:path');
             check(/Not saved: disk full\.(?!\.)/.test(refused) && !/\.\./.test(refused), `${at}one full stop after the refusal: ${JSON.stringify(refused)}`);
             await ev(`window.__hub.fail = false; true`);
             // an unreadable state: the explainer only
-            await ev(`window.__hub.unreadable = true; import((window.__coralStatic || '/static/') + 'home_own_hub.js').then(m => m.syncOwnHub()).then(() => true)`);
-            check(await ev(`document.querySelector('#editions-home-own [data-editions=enable-hub]').hidden === true && !!document.querySelector('#editions-home-own [data-editions=home-own]')`), `${at}where the state cannot be read there is no Enable, only the explainer`);
+            await ev(`window.__hub.unreadable = true; document.querySelector('#editions-home-own [data-editions=enable-hub]').click(); true`); // pressing Enable where the route answers nothing (an older server)
+            await waitFor(`document.querySelector('#editions-home-own [data-editions=enable-hub]').hidden === true`, `${at}where the state cannot be read Enable goes`, 6000);
+            const na = await ev(`({ text: document.getElementById('editions-home-own-state').textContent, how: !!document.querySelector('#editions-home-own [data-editions=home-own]:not([hidden])'), confirm: getComputedStyle(document.getElementById('confirm-modal')).display !== 'none' })`);
+            check(/Not available on this Coral/.test(na.text) && na.how && !na.confirm, `${at}it says 'Not available on this Coral' (not just losing its buttons), keeps How it works and asks nothing: ${JSON.stringify(na)}`);
             await ev(`window.__hub.unreadable = false; true`);
         }
     } finally { await client.close(); }
