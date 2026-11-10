@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/dbcrypt"
+	"github.com/subgentic/coral/internal/safego"
 
 	"github.com/jmoiron/sqlx"
 	_ "modernc.org/sqlite"
@@ -209,7 +210,7 @@ func (s *Store) Close() error {
 	// Cancelled is not finished: a build or check in the middle of a statement still holds a connection, and so the file (on Windows a folder with the board in it then cannot be removed, #15022). Wait for them,
 	// for a bounded time: a query ends promptly on its cancelled context, and a Close must never hang on one that does not.
 	done := make(chan struct{})
-	go func() { s.bg.Wait(); close(done) }()
+	go func() { defer safego.Recover("board/store:close waits for the index"); s.bg.Wait(); close(done) }()
 	select {
 	case <-done:
 	case <-time.After(closeWaitsForIndex):
