@@ -8,6 +8,7 @@ import { needsYou } from './asked_before_restart.js';
 import { keyLabel, splitKey, boardFetch, teamFetch, isCloud, teamWorkDir, inTeam } from './server_base.js';
 const { wakingSince, stopWaking } = await importOnce('./team_waking.js'); // lazy like this file (the Wake action loads it too)
 import { showView } from './utils.js';
+import { loadStyles } from './lazy_styles.js';
 import { note, go } from './nav.js';
 import { keyRoute, parse, TEAM_TABS } from './routes.js';
 import { importOnce } from './import_once.js';
@@ -254,6 +255,15 @@ function drawStatus(data) {
     s.replaceChildren(dot, document.createTextNode(text));
 }
 
+/** A phone's bar says what waits for the person: the team's Needs you count beside the title (the strip scrolls so the Needs you tab may be off the left edge, #8149 keeps the open tab whole), and a tap opens that tab (#15185). Drawn only for a number; a desktop's CSS hides it. */
+function syncBarNeeds() {
+    const head = $('team-page-head'), n = String(S.counts.needs ?? ''), shown = /^[1-9]/.test(n); let b = $('team-page-bar-needs');
+    if (!head || (!shown && !b)) return;
+    if (!shown) { b.remove(); head.classList.remove('has-needs'); return; }
+    if (!b) { loadStyles('team_bar_needs.css'); b = el('button', 'team-bar-needs'); b.id = 'team-page-bar-needs'; b.type = 'button'; b.addEventListener('click', () => goTab('needs', { user: true, focus: true })); head.append(b); head.classList.add('has-needs'); }
+    b.textContent = n; b.setAttribute('aria-label', `Needs you: ${n} waiting. Open the Needs you tab`); b.title = `Needs you: ${n}`;
+}
+
 function drawCounts() {
     let widened = false;
     for (const t of TEAM_TABS) {
@@ -266,6 +276,7 @@ function drawCounts() {
         // a space between the word and its count, so the tab is read "Goals 2"
         label.textContent = text ? `${LABEL[t]} ` : LABEL[t];
     }
+    syncBarNeeds();
     // the counts widen the tabs: when one changed, the selected tab is brought wholly into view again (its own count arrives after it was scrolled to, #8149), then the edges are drawn
     // a count arrives on a poll: the strip moves sideways, a page scrolled down stays (#12357)
     queueMicrotask(() => { if (widened) revealInStrip($('team-tabs'), $(`team-tab-${S.tab}`)); drawTabEdges(); });
