@@ -62,7 +62,7 @@ func (s *Store) ensureGoalsSchema(ctx context.Context) error {
 			return err
 		}
 	}
-	for _, ddl := range []string{"ALTER TABLE board_tasks ADD COLUMN goal_id INTEGER", "ALTER TABLE boards ADD COLUMN board_uid TEXT", "ALTER TABLE board_goals ADD COLUMN orchestrator_told_at TEXT"} {
+	for _, ddl := range []string{"ALTER TABLE board_tasks ADD COLUMN goal_id INTEGER", "ALTER TABLE boards ADD COLUMN board_uid TEXT", "ALTER TABLE board_goals ADD COLUMN orchestrator_told_at TEXT", "ALTER TABLE board_goals ADD COLUMN closed_by TEXT NOT NULL DEFAULT ''"} {
 		if _, err := s.db.ExecContext(ctx, ddl); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return err
 		}

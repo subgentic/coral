@@ -492,6 +492,9 @@ func (h *BoardHandler) UpdateGoal(w http.ResponseWriter, r *http.Request) {
 	if beforeState == board.GoalProposed && g.State == board.GoalActive {
 		h.announceGoalToOrchestrator(project, actor, g) // a proposed goal was not told; it is when it becomes one the team works on (#11866)
 	}
+	if (beforeState == board.GoalDone || beforeState == board.GoalDropped) && g.State != beforeState && !g.Closed() { // reopened (#15244): the team reads it on the board, as it reads a close
+		h.postGoalLine(r, project, actor, "Goal #"+strconv.FormatInt(g.ID, 10)+" \""+g.Title+"\" is reopened: it is open again and its tasks carry on")
+	}
 	if body.Driver != nil {
 		h.announceGoalDriver(project, actor, g, before)
 	}
@@ -537,7 +540,7 @@ func (h *BoardHandler) CloseGoal(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	g, open, err := h.bs.CloseGoal(r.Context(), project, id, body.Reason, body.State)
+	g, open, err := h.bs.CloseGoalBy(r.Context(), project, id, body.Reason, body.State, actor)
 	if err != nil {
 		if !goalError(w, err) {
 			errInternalServer(w, err.Error())

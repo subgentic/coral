@@ -11,6 +11,7 @@ import { isPhoneLayout } from './phone_layout.js';
 const { agentLink } = await importOnce('./agent_link.js'); // an agent's name is one shared helper (#12182)
 import { foldWayBack } from './way_back.js';
 import * as W from './goal_words.js';
+const C = await importOnce('./goal_closed_words.js'); // who closed a goal, and what Close and Reopen do (#15244): loads with the goal page
 import { onGoalsSeq } from './goals_feed.js';
 import { looksDone, hiddenList, hideGoalDone } from './goal_done.js';
 import { pollEvery } from './overload.js';
@@ -196,6 +197,9 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         copyBtn.title = 'Copies a line to paste to an agent: it runs coral-board goal brief for this goal';
         if (!phone) line.append(copyBtn); // on a phone it is in the header's More menu (#13119)
         main.append(line);
+        const closedLine = C.closedByLine(g); // who closed it, so a goal an agent closed is not mistaken for one the person closed (#15244)
+        if (closedLine) { const c = el('p', `goals-note goals-closed-by${g.closedBy && g.closedBy !== 'Operator' ? ' goals-closed-by-agent' : ''}`, closedLine); c.setAttribute('role', 'note'); main.append(c); }
+        if (looksDone(g) && !W.isClosedGoal(g)) main.append(el('p', 'goals-note goals-looks-done', C.looksDoneText));
         if (g.movedOpen) main.append(el('p', 'goals-note', `${g.movedOpen} moved task${g.movedOpen === 1 ? ' is' : 's are'} unfinished or cannot be checked here. Check “Done when” before closing this goal.`));
         const waitNote = el('p', 'goals-note goal-reviews-waiting'); waitNote.hidden = true; main.append(waitNote); // files for review on this goal that were never answered (Beta #11837 G): said while any wait, whatever the goal's state
         paintWaiting(g, waitNote);
@@ -467,7 +471,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         try {
             const r = await goalWrite(model.project, 'goal_update', g.id, `/goals/${g.id}`, 'PATCH', { subscriber_id: OPERATOR_ID, state: 'active' });
             if (!r.ok) throw await failure(r);
-            say(W.reopenedText);
+            say(C.reopenedText); showToast(C.reopenedText);
             await loadGoals();
         } catch (ex) { say(`Not reopened: ${W.errorWords(ex && ex.code, ex && ex.message)}`); }
         focusDetail();
@@ -487,6 +491,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
             const w = W.closeWarning(g.rollup); warn.append(el('strong', null, w.head), document.createTextNode(w.text));
             dlg.setAttribute('aria-describedby', warn.id); parts.push(warn);
         }
+        parts.push(el('p', 'goals-note goals-close-effect', C.closeEffectText));
         const choose = preset || (open === 0 && total > 0 ? 'done' : ''); // with tasks open nothing is chosen for the person: one Enter must not drop the goal (#10717)
         const fs = el('fieldset', 'goals-radios'); fs.append(el('legend', null, 'Close it as'));
         const radio = (value, label) => { const l = el('label', 'goals-radio'); const r = el('input'); r.type = 'radio'; r.name = 'goal-close-state'; r.value = value; r.checked = choose === value; l.append(r, el('span', null, label)); return l; };
