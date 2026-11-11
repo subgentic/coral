@@ -65,6 +65,8 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
         console.log('   ✓');
 
         console.log('3. Resolve and Reopen, the count, and a reload');
+        // the card is on screen: wait for the button the next line presses (#15567: a click on a card whose Resolve was not drawn yet threw 'null.click')
+        await waitFor(`!!document.querySelector('#team-panel-goals .goal-comments .ac-resolve')`, 'the Resolve button on the thread', 8000);
         await ev(`document.querySelector('#team-panel-goals .goal-comments .ac-resolve').click(); true`);
         await waitFor(`(document.querySelector('#team-panel-goals #goal-tab-comments .goal-tab-count').textContent || '').trim() === '0'`, 'the count down to 0', 8000);
         await ev(`document.querySelector('#team-panel-goals .goal-comments .ac-showresolved').click(); true`);
