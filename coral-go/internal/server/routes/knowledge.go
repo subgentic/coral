@@ -21,6 +21,7 @@ import (
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/safego"
+	"github.com/subgentic/coral/pkg/redact"
 )
 
 // knowledgeJobs tracks distillation runs: the running one, or the last one to finish, per
@@ -72,8 +73,9 @@ var (
 	knowledgeEmailRe   = regexp.MustCompile(`[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}`)
 )
 
-// knowledgeText makes an error or name safe to show: one line, no file paths, bounded.
+// knowledgeText makes an error or name safe to show: one line, no file paths, no secrets, bounded.
 func knowledgeText(s string, max int) string {
+	s = string(redact.Tokens([]byte(s))) // a CLI's output can echo a key: the tab keeps the failure on screen (#15272, Security's INFO)
 	s = knowledgeEmailRe.ReplaceAllString(s, "<email>")
 	s = knowledgeWinPathRe.ReplaceAllString(s, "${1}<path>")
 	s = knowledgePathRe.ReplaceAllString(s, "${1}<path>")

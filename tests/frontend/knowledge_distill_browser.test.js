@@ -115,6 +115,13 @@ const BUNDLE = { exists: true, index: '# Team alpha\\n\\nWhat the team knows.', 
         await until(`/Distilling…/.test((document.getElementById('team-panel-knowledge') || {}).textContent || '')`, 'the run on return');
         check('back on the Knowledge tab: the run in progress is shown (Distilling…, off)', /Distilling…/.test(await panelText()) && (await ev(`document.querySelector('#team-panel-knowledge .team-distill').disabled`)));
         check('coming back started no second run', (await ev('window.__posts')) === 1);
+        // #15272: a run says how long it has gone and what it is doing, so a stuck one can be told from a slow one.
+        await until(`/Started just now: reading lead \\(3 of 4\\)/.test(document.getElementById('team-panel-knowledge').textContent)`, 'the progress line');
+        check('a running run says when it started and what it is reading (#15272)', /Started just now: reading lead \(3 of 4\)\. It stops by itself after 10 minutes\./.test(await panelText()), (await panelText()).slice(0, 200));
+        await ev(`window.__distill.started_at = new Date(Date.now() - 4 * 60000 - 5000).toISOString(); true`);
+        await until(`/Started 4 min ago/.test(document.getElementById('team-panel-knowledge').textContent)`, 'minutes since the start');
+        check('and how many minutes ago', /Started 4 min ago/.test(await panelText()));
+        await ev(`window.__distill.started_at = new Date().toISOString(); true`);
 
         // ── It completes while you are elsewhere ──
         await leave();
@@ -143,6 +150,8 @@ const BUNDLE = { exists: true, index: '# Team alpha\\n\\nWhat the team knows.', 
         await ev(`window.__distill = { team_name: 'alpha', status: 'failed', error: 'claude exited 1', finished_at: '2026-10-14T06:10:00Z' }; true`);
         await until(`[...document.querySelectorAll('.toast .toast-message')].some(t => /Knowledge distillation for alpha failed: claude exited 1/.test(t.textContent))`, 'the failure toast');
         check('a failure toast too', (await toasts()).some(t => /Knowledge distillation for alpha failed: claude exited 1/.test(t)), JSON.stringify(await toasts()));
+        await until(`/The last distilling failed: claude exited 1/.test(document.getElementById('team-panel-knowledge').textContent)`, 'the failure on the tab');
+        check('the failure stays on the Knowledge tab, with its error, after the toast is gone (#15272)', /The last distilling failed: claude exited 1/.test(await panelText()) && (await ev(`!!document.querySelector('#team-panel-knowledge .team-distill-failed[role=alert]')`)));
 
         // ── A failure with no knowledge yet: the empty page and Distill again ──
         await ev(`window.__bundle = { exists: false }; true`);
