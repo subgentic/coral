@@ -175,17 +175,17 @@ func TestAuthPageFirstRunDetails(t *testing.T) {
 // the computer with coral open, or create a password here with the setup code. Strict local auth is untouched: this is words, and the page still takes nothing it did not before.
 func TestAuthPageSaysHowToGetInWhenThereIsNoPasswordYet(t *testing.T) {
 	remote := AuthPage(PageState{}) // another device, no password
-	for _, want := range []string{`id="how-in"`, "Sign in from the computer", "coral open", "coral setup-code", "On the computer that runs Coral", "create a password", "coral open --print", "127.0.0.1", "works once, for 10 minutes", "do not post it where others can read it"} {
+	for _, want := range []string{`class="how"`, "Other ways in", "coral open", "coral setup-code", "On the computer that runs Coral", "coral open --print", "127.0.0.1", "works once, for 10 minutes", "do not post it where others can read it"} {
 		assert.Contains(t, remote, want, "another device: "+want)
 	}
 	locked := AuthPage(PageState{Local: true, Locked: true}) // a browser on this computer sent here by a locked page
-	assert.Contains(t, locked, `id="how-in"`)
+	assert.Contains(t, locked, `class="how"`)
 	assert.Contains(t, locked, "coral open")
 	assert.NotContains(t, locked, "coral setup-code", "this computer needs no setup code")
 	assert.NotContains(t, locked, "coral open --print", "a browser on this computer needs no link carried to a phone")
-	assert.NotContains(t, AuthPage(PageState{Local: true}), `id="how-in"`, "a browser on this computer that was not locked out sees the plain page")
-	assert.NotContains(t, AuthPage(PageState{PasswordSet: true, Local: true, Locked: true}), `id="how-in"`, "with a password the sign-in form is the way in")
-	assert.NotContains(t, AuthPage(PageState{PasswordSet: true}), `id="how-in"`)
+	assert.NotContains(t, AuthPage(PageState{Local: true}), `class="how"`, "a browser on this computer that was not locked out sees the plain page")
+	assert.NotContains(t, AuthPage(PageState{PasswordSet: true, Local: true, Locked: true}), `class="how"`, "with a password the sign-in form is the way in")
+	assert.NotContains(t, AuthPage(PageState{PasswordSet: true}), `class="how"`)
 }
 
 // The route turns ?locked=1 into the flag and nothing else of the address reaches the page (#10094): a made-up value is not echoed, and the status stays 200 as for every state.
@@ -204,12 +204,12 @@ func TestAuthRouteLockedFlagOnlyChangesTheWords(t *testing.T) {
 	}
 	code, locked := get("/auth?locked=1&return_to=%2Fapi%2Fx%3Ftoken%3Dsecret-in-the-address")
 	assert.Equal(t, 200, code)
-	assert.Contains(t, locked, `id="how-in"`)
+	assert.Contains(t, locked, `class="how"`)
 	assert.NotContains(t, locked, "secret-in-the-address", "the address is never echoed")
 	_, plain := get("/auth")
-	assert.NotContains(t, plain, `id="how-in"`, "this computer, not sent here by a lock: the plain page")
+	assert.NotContains(t, plain, `class="how"`, "this computer, not sent here by a lock: the plain page")
 	_, odd := get("/auth?locked=%3Cscript%3E")
-	assert.NotContains(t, odd, `id="how-in"`, "only locked=1 is the flag")
+	assert.NotContains(t, odd, `class="how"`, "only locked=1 is the flag")
 	assert.NotContains(t, odd, "<script>alert")
 }
 
@@ -270,11 +270,11 @@ func TestAuthRouteShowsTheLineOnlyWhenTheCheckIsLost(t *testing.T) {
 func TestCreatePasswordPageLeadsWithTheFormAndFoldsTheOtherWays(t *testing.T) {
 	for name, s := range map[string]PageState{"remote setup": {}, "locked local setup": {Local: true, Locked: true}} {
 		page := AuthPage(s)
-		form, ways := strings.Index(page, `<form id="create-form"`), strings.Index(page, `id="how-in"`)
-		assert.True(t, form > 0 && ways > form, "%s: the form comes before the other ways to sign in", name)
-		assert.Contains(t, page, `<details class="howin" id="how-in">`, name)
-		assert.NotContains(t, page, `<details class="howin" id="how-in" open`, "%s: folded", name)
-		assert.Contains(t, page, "<summary>Sign in from the computer</summary>", name)
+		form, ways := strings.Index(page, `<form id="create-form"`), strings.Index(page, `id="other-ways"`)
+		assert.True(t, form > 0 && ways > form, "%s: the form comes before the other ways in", name)
+		assert.Contains(t, page, `<details class="otherways" id="other-ways">`, name)
+		assert.NotContains(t, page, `id="other-ways" open`, "%s: folded", name)
+		assert.Contains(t, page, "<summary>Other ways in</summary>", name)
 		assert.Contains(t, page, "coral open", "%s: the way in stays on the page", name)
 	}
 }
@@ -315,19 +315,36 @@ func TestCreatePasswordPageIsOneClearPath(t *testing.T) {
 	assert.Contains(t, AuthPage(PageState{PasswordSet: true, Local: true, LocalOpen: true}), `btn btn-primary wide" id="local-open"`)
 }
 
-// #15241 (walk 11 L1): a tool that looks a field up by its label found none, because the label only wrapped its input.
-// Each field label also names its input with for=, so "Password" finds the password field.
-func TestAuthPageLabelsNameTheirFields(t *testing.T) {
-	re := regexp.MustCompile(`<label class="pw-field"([^>]*)>`)
-	for _, s := range []PageState{{PasswordSet: true, Local: true, Strict: true}, {}, {Local: true, LocalOpen: true}, {PasswordSet: true, Local: true, HubSignin: "ready", HubURL: "https://app.coralhub.dev"}} {
-		p := AuthPage(s)
-		labels := re.FindAllStringSubmatch(p, -1)
-		assert.NotEmpty(t, labels)
-		for _, m := range labels {
-			f := regexp.MustCompile(`for="([^"]+)"`).FindStringSubmatch(m[1])
-			if assert.NotNil(t, f, "a field label has for=: "+m[0]) {
-				assert.Contains(t, p, `id="`+f[1]+`"`, "for= names an input on the page")
+// #15355 (Security's design on #15351, walk 6 M13): the Create a password page has ONE fold, "Other ways in" (it had two, "Other ways to sign in" and "Other ways in"). In it, in order: sign in from the computer
+// (the commands, no link or code printed), Coral Hub, the API key. The same-computer button appears once.
+func TestCreatePasswordPageHasOneFoldInOneOrder(t *testing.T) {
+	for name, s := range map[string]PageState{
+		"remote":       {},
+		"locked":       {Local: true, Locked: true, LocalOpen: true},
+		"local":        {Local: true, LocalOpen: true},
+		"hub-unpaired": {HubSignin: "unpaired"},
+		"hub-ready":    {Local: true, LocalOpen: true, Locked: true, HubSignin: "ready", HubURL: "https://app.coralhub.dev"},
+	} {
+		page := AuthPage(s)
+		start := strings.Index(page, `<section id="panel-create"`)
+		create := page[start : start+strings.Index(page[start:], "</section>")]
+		assert.Equal(t, 1, strings.Count(create, "<details"), "%s: one fold on the create page", name)
+		if s.LocalOpen {
+			assert.Equal(t, 1, strings.Count(create, `id="local-open-form"`), "%s: Open Coral on this computer once", name)
+		}
+		if s.Locked || !s.Local {
+			how, key := strings.Index(create, `class="how"`), strings.Index(create, `id="show-key"`)
+			require.True(t, how > 0, "%s: the commands to sign in from the computer are in the fold", name)
+			assert.Less(t, how, key, "%s: sign in from the computer comes before the API key", name)
+			if i := strings.Index(create, `id="hub-btn"`); i > 0 {
+				assert.Less(t, how, i, "%s: and before Coral Hub", name)
+				assert.Less(t, i, key, "%s: Coral Hub comes before the API key", name)
+			}
+			if i := strings.Index(create, `id="local-open-form"`); i > 0 {
+				assert.Less(t, how, i, "%s: the commands come first", name)
 			}
 		}
+		assert.NotContains(t, create, "Other ways to sign in", "%s: the second fold is gone", name)
+		assert.NotContains(t, create, "login_token", "%s: no link or token is printed", name)
 	}
 }

@@ -28,3 +28,15 @@ func TestAuthPageSendsASignedInBrowserWithNoPasswordBackToTheDashboard(t *testin
 	w, _ = g.do(g.ar.AuthPage, g.req("GET", "/auth", "", "10.0.0.5", nil))
 	assert.Equal(t, http.StatusOK, w.Code)
 }
+
+// #15355 (Security's design on #15351, point 1): after "Set password" in the dashboard's box the same browser stays signed in (nothing signs it out, no cookie changes, no page loads).
+func TestSettingTheFirstPasswordFromTheDashboardKeepsTheSession(t *testing.T) {
+	g := newPwRig(t)
+	tok, err := g.ks.NewSession(g.req("GET", "/", "", "10.0.0.5", nil), SessionByLink, false)
+	require.NoError(t, err)
+	me := &http.Cookie{Name: g.ks.cookieBase, Value: tok}
+	w, _ := g.do(g.ar.SetPassword, g.req("POST", "/api/auth/password/set", `{"password":"a-first-password-1"}`, "10.0.0.5", me))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.True(t, g.ks.ValidateSession(tok), "the session the person set the password with is still good")
+	assert.Empty(t, w.Result().Cookies(), "no new session and no cookie change: nothing signs the browser out")
+}
