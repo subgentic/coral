@@ -25,52 +25,40 @@ func openFDs(t *testing.T) int {
 	return 0
 }
 
-// settledFDs is the open descriptor count once it has stopped changing: the same value on five reads in a row, 100 ms apart. After a session ended and was drained its descriptors go in the order the
-// exit watcher and the reader run them, which on a loaded machine takes longer than a fixed sleep (#7163); a count that has held still is what "the earlier session is gone" means. The ceiling only
-// ends a count that never settles.
-func settledFDs(t *testing.T) int {
-	t.Helper()
-	deadline := time.Now().Add(2 * time.Minute)
-	last, same := -1, 0
-	for time.Now().Before(deadline) {
-		n := openFDs(t)
-		if n == last {
-			same++
-		} else {
-			last, same = n, 0
-		}
-		if same >= 5 {
-			return n
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	t.Fatalf("the open descriptor count never settled (last %d)", last)
-	return last
-}
-
 // #6821 (Codex Test #6796): a session whose process ends on its own left its PTY master open until something killed it, one descriptor per scheduled run that ended naturally (about 144 a day for a 10-minute
-// cron). After the exit and the drain the descriptor count is back where it was.
+// cron). After the exit and the drain every one of those sessions' terminals is closed. It watches each session's own PTY master, not the process's descriptor count, which moves with whatever else the
+// package's goroutines open and close (#15681, as #15679).
 func TestSessionsThatEndOnTheirOwnLeaveNoDescriptorsOpen(t *testing.T) {
 	canFork(t)
 	backend := NewPTYBackend()
 	defer backend.Close()
-	// one throwaway run first: the first spawn opens a few process-wide descriptors of its own (the guardian, /dev/ptmx's first use)
-	require.NoError(t, backend.Spawn("fd-warm", "test", t.TempDir(), "sid-fd-warm", "true", 80, 24))
-	before := settledFDs(t)
 
-	const runs = 12
-	for i := 0; i < runs; i++ {
-		require.NoError(t, backend.Spawn(fmt.Sprintf("fd-%d", i), "test", t.TempDir(), fmt.Sprintf("sid-fd-%d", i), "true", 80, 24))
+	// descriptors of the process's own that stay open for the whole test, as another test's or goroutine's would: a whole-process count could not tell them from a terminal left open
+	for i := 0; i < 6; i++ {
+		f, err := os.Open(os.DevNull)
+		require.NoError(t, err)
+		defer f.Close()
 	}
-	require.Eventually(t, func() bool { return openFDs(t) <= before+2 }, 2*time.Minute, 100*time.Millisecond,
-		"descriptors after %d sessions ended on their own: %d (before %d)", runs, openFDs(t), before)
-	assert.LessOrEqual(t, openFDs(t), before+2)
+	const runs = 12
+	var terminals []*os.File
+	for i := 0; i < runs; i++ {
+		name := fmt.Sprintf("fd-%d", i)
+		require.NoError(t, backend.Spawn(name, "test", t.TempDir(), fmt.Sprintf("sid-fd-%d", i), "true", 80, 24))
+		terminals = append(terminals, ownTerminal(t, backend, name))
+	}
+	open := func() int {
+		n := 0
+		for _, f := range terminals {
+			if isOpen(f) {
+				n++
+			}
+		}
+		return n
+	}
+	require.Eventually(t, func() bool { return open() == 0 }, 2*time.Minute, 100*time.Millisecond,
+		"terminals still open after %d sessions ended on their own: %d", runs, open())
 }
 
-// Security's #6826 LOW (the exit watcher's own case): the shell exits but a child it left behind keeps the terminal open, so readLoop never sees the end of the output. The descriptor is closed by the watcher after
-// the drain, while that child is still running. On Unix this does not tell the watcher's close from readLoop's (removing the watcher's alone still passes): the guardian ends what the shell left behind (its group and the
-// processes carrying its run tag) as the shell exits, so the output ends and readLoop frees the descriptor first. The case the watcher exists for is Windows, whose pseudo console's pipe only ends when it is closed:
-// this test pins the outcome there too (Security Reviewer Windows runs it) and documents why the Unix run cannot.
 // ownTerminal is the session's own PTY master: the one descriptor this test is about. Counting every descriptor of the process instead moves with whatever else the package's goroutines and earlier tests
 // open and close (an earlier session's kill finishing during the test read "12 is not greater than 12" under load, #15679).
 func ownTerminal(t *testing.T, b *PTYBackend, name string) *os.File {
