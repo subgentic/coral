@@ -40,3 +40,14 @@ func CodexHooksReviewOnScreen(screen string) bool {
 	return strings.Contains(text, "new or changed") && strings.Contains(text, "hook") &&
 		(strings.Contains(text, "trust all and continue") || strings.Contains(text, "review hooks") || strings.Contains(text, "hooks need review"))
 }
+
+// CodexRateLimitNoticeOnScreen reports whether Codex's "Approaching rate limits" notice is open ("Switch to <model> for lower credit usage? 1. Switch to <model> 2. Keep current model 3. Keep current model
+// (never show again)", #15485). Codex draws it after its hooks have started, on an idle agent, so no event says so and Coral's send is held behind it: the screen is what tells. Found by its stable words and its
+// three numbered rows, as the answer path does (routes.rateLimitNotice): any other menu is not it. It never answers: the choice is the person's (a switch changes the model, the third stops the reminder for good).
+func CodexRateLimitNoticeOnScreen(screen string) bool {
+	if open, _ := PromptOnScreen(screen); !open {
+		return false
+	}
+	text := strings.ToLower(strings.Join(strings.Fields(strings.Join(tailLines(screenText(screen), 25), " ")), " "))
+	return strings.Contains(text, "approaching rate limits") && strings.Contains(text, "1. switch to ") && strings.Contains(text, "2. keep current model") && strings.Contains(text, "3. keep current model (never show again)")
+}

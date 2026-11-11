@@ -65,3 +65,42 @@ func (h *SessionsHandler) agentScreen(ctx context.Context, name, agentType, sess
 }
 
 var errNoScreen = errors.New("this terminal has no screen to read")
+
+// rateLimitNoticeState is the question of Codex's "Approaching rate limits" notice when it is open on an agent that has already sent events (#15485), or "". The notice is drawn after the hooks start, so the
+// no-event startup read never sees it, and nothing else says the agent is held behind it: Coral's sends are skipped ("a prompt is open") and no Needs you row asked the person. Read through the same
+// per-agent cache, under its own key (a startup read and this one ask different things of the same screen).
+func (h *SessionsHandler) rateLimitNoticeState(name, agentType, sessionID string) string {
+	if sessionID == "" || name == "" || agentType != "codex" {
+		return ""
+	}
+	stamp := ""
+	if stamper, _ := h.backend.(ptymanager.OutputStamper); stamper != nil {
+		if st, ok := stamper.OutputStamp(agentType, sessionID); ok {
+			stamp = st
+		}
+	}
+	on, _ := h.startupScreens.read(promptReadKey(sessionID, name, agentType)+rateLimitReadSuffix, stamp, time.Now(), func() (bool, string) {
+		ctx, cancel := context.WithTimeout(context.Background(), loginScreenTimeout)
+		defer cancel()
+		screen, err := h.agentScreen(ctx, name, agentType, sessionID, stamp)
+		if err != nil || !ptymanager.CodexRateLimitNoticeOnScreen(screen) {
+			return false, ""
+		}
+		return true, ""
+	})
+	if !on {
+		return ""
+	}
+	return rateLimitNoticeSummary
+}
+
+const (
+	rateLimitReadSuffix    = "|ratelimit"
+	rateLimitNoticeSummary = "Approaching rate limits: Codex asks whether to switch to a cheaper model"
+)
+
+// forgetPromptReads drops the cached screen reads of a session's startup-style prompts: the prompt was answered, the next state reads what replaced it.
+func (h *SessionsHandler) forgetPromptReads(sessionID, name, agentType string) {
+	h.startupScreens.forget(promptReadKey(sessionID, name, agentType))
+	h.startupScreens.forget(promptReadKey(sessionID, name, agentType) + rateLimitReadSuffix)
+}
