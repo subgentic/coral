@@ -22,7 +22,7 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`document.querySelectorAll('#team-panel-tasks .dt-table tbody tr').length >= 5`, 'the tasks', 15000);
         };
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); // the page first: the board is made through its own fetch
-        for (const [id, jt] of [['orch', 'Orchestrator'], ['dev', 'Developer']]) assert.equal((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: jt, session_name: id + '-s' })).status, 200);
+        for (const [id, jt] of [['orch', 'Orchestrator'], ['dev', 'Developer']]) assert.equal((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: jt })).status, 200);
         const g = await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title: 'One row everywhere', outcome: 'x', done_when: 'y' }); assert.equal(g.status, 201);
         const goal = g.body.id;
         const mk = async (title, assigned, priority) => (await api('POST', `/api/board/${B}/tasks`, { title, body: 'Text of ' + title, created_by: 'orch', priority, goal_id: goal, ...(assigned ? { assigned_to: assigned } : {}) })).body;

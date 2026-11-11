@@ -25,7 +25,7 @@ const hex = n => n.toString(16).padStart(64, '0');
             await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: false });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             if (width === 1280) {
-                assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-' + team })).status < 300);
+                assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator' })).status < 300);
                 const g = await api('POST', '/goals', { subscriber_id: 'Operator', title: 'Ship the pilot', done_when: 'it is shipped' }); assert.equal(g.status, 201);
                 const gid = g.json.id || g.json.goal.id;
                 const t = await api('POST', '/tasks', { subscriber_id: 'Operator', title: 'Task A', goal_id: gid, assigned_to: 'Boss', created_by: 'Operator', priority: 'medium' });

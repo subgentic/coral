@@ -99,7 +99,7 @@ module.exports.run = GROUP => (async () => {
         const seed = async () => {
             if (seeded) return; seeded = true;
             await ev(`fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal_done_quiet_minutes: '0' }) }).then(r => r.status)`); // a goal that looks done is quiet for 15 minutes before it is an item of Needs you: not here (the guard puts the setting back)
-            assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-' + B })).status < 300);
+            assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator' })).status < 300);
             for (const [t, dw] of [['Goal that looks done, one', 'The operator can see it'], ['Goal that looks done, two', 'Every task is done.']]) {
                 const g = await api('POST', '/goals', { subscriber_id: 'Operator', title: t, done_when: dw }); assert.equal(g.status, 201, JSON.stringify(g)); const gid = g.json.id || g.json.goal.id;
                 const task = await api('POST', '/tasks', { subscriber_id: 'Operator', title: 'Task', goal_id: gid, assigned_to: 'Boss', created_by: 'Operator', priority: 'medium' }); const tid = task.json.id || task.json.task.id;
