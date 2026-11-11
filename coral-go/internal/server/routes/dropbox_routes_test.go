@@ -65,6 +65,7 @@ type fakeDropbox struct {
 	listCalls      int
 	failDownloads  int  // the next downloads answer 500 (Dropbox's own trouble)
 	markersFail    bool // stage 6a: a marker listing answers 500
+	failDeletes    int  // the next delete_batch calls answer 500
 	probeBad       bool // stage 6b: a probe reads back other bytes than were sent
 	markerReadFail bool // stage 6b: reading a marker back answers not found
 	// Share via Dropbox (#14944).
@@ -380,6 +381,12 @@ func newFakeDropbox(t *testing.T) *fakeDropbox {
 			w.Write(b)
 			w.Write(f.extraBytes)
 		case "/2/files/delete_batch":
+			if f.failDeletes > 0 { // Dropbox's own trouble on a delete (QA's survivor b on #14814)
+				f.failDeletes--
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(`{"error_summary":"internal_error/"}`))
+				return
+			}
 			var a struct {
 				Entries []struct {
 					Path      string `json:"path"`
