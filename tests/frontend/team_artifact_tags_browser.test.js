@@ -261,10 +261,24 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`document.querySelector('.detail-head .artifact-review-line')?.textContent === 'Waiting for your review'`, 'the panel says it is waiting', 10000);
         const approveBtn = `[...document.querySelectorAll('.detail-actions button, .detail-pane button')].find(b => b.textContent.trim() === 'Approve')`;
         assert.equal(await ev(`!!${approveBtn}`), true, 'a file waiting for review has Approve in its side panel');
+        // one Approve, not two side by side (#15627): the header's, beside Request changes
+        const approves = await ev(`[...document.querySelectorAll('.detail-actions button, .detail-pane button')].filter(b => /^Approve/.test(b.textContent.trim())).map(b => ({ text: b.textContent.trim(), inReview: !!b.closest('.artifact-sheet-review'), next: b.nextElementSibling?.textContent.trim() }))`);
+        assert.deepEqual(approves, [{ text: 'Approve', inReview: true, next: 'Request changes' }], 'a waiting file shows one Approve, beside Request changes: ' + JSON.stringify(approves));
         await ev(`${approveBtn}.click(); true`);
         await waitFor(`/^Approved/.test(document.querySelector('.detail-head .artifact-review-line')?.textContent || '')`, 'the panel says Approved after the click', 10000);
         assert.ok((await tagsOf(hw)).includes('approved') && !(await tagsOf(hw)).includes('for review'), 'the server has it approved');
         assert.equal(await ev(`!!${approveBtn}`), false, 'an approved file offers no Approve');
+        console.log('   ✓');
+
+        console.log('10. After changes were asked for, the one Approve is "Approve anyway" in the actions bar (#15627)');
+        const asked = await api('POST', `/api/agent/artifacts?session_id=${sid}&tag=for+review&question=Is+it+right%3F`, 'a file with changes asked ' + Date.now(), { 'X-Artifact-Name': 'asked.md', 'X-Artifact-Media-Type': 'text/markdown' });
+        assert.equal(asked.status, 201, JSON.stringify(asked)); const ha = /[a-f0-9]{64}/.exec(asked.body.uri)[0];
+        assert.equal((await api('PUT', `/api/board/${B}/artifacts/${ha}/tags`, { tags: ['for review', 'changes requested'] })).status, 200);
+        await reload();
+        await sheet('asked.md');
+        await waitFor(`!!document.querySelector('.detail-head .artifact-review-line') && document.querySelector('.detail-head .artifact-review-line').textContent !== 'Waiting for your review'`, 'the panel says changes were asked', 10000);
+        const anyway = await ev(`[...document.querySelectorAll('.detail-actions button, .detail-pane button')].filter(b => /^Approve/.test(b.textContent.trim())).map(b => b.textContent.trim())`);
+        assert.deepEqual(anyway, ['Approve anyway'], 'one Approve after changes were asked: ' + JSON.stringify(anyway));
         console.log('   ✓');
 
         console.log('PASS artifact tags: chips and Add tag in the sheet, row chips, the For review pill and Tag filter, Tag and Untag in the selection bar');
