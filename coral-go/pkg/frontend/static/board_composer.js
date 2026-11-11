@@ -52,7 +52,7 @@ export async function postBoardMessage() {
         // A recipient that will not read it now (asleep, terminal gone, ended, archived) is said at once, in the server's words (#13189)
         const sent = await resp.json().catch(() => null);
         const resting = sent && Array.isArray(sent.asleep) ? sent.asleep.map(a => (a && typeof a.note === 'string' ? a.note : '')).filter(Boolean) : [];
-        if (resting.length) showToast(resting.slice(0, 3).join(' ') + (resting.length > 3 ? ` (and ${resting.length - 3} more)` : ''));
+        showToast(resting.length ? resting.slice(0, 3).join(' ') + (resting.length > 3 ? ` (and ${resting.length - 3} more)` : '') : 'Sent'); // a send is always answered: the server's words for a recipient that will read it later, else 'Sent' (#15287)
         // Fetch new messages since our last known total
         await _pollNewMessages();
         const list = document.getElementById('mb-messages'); if (list) list.scrollTop = list.scrollHeight; // the person's own message is the newest, and in view (#10088)

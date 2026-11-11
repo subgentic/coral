@@ -1,6 +1,6 @@
 // The team page's Artifacts tab preview can be widened and maximised (#9410, the operator: "the side artifact preview cannot be expanded"): the pane wears the same handle as the Inbox Artifacts preview, the
 // Knowledge entries and a goal's task (detail_pane.js, dock_resize.js): a separator that is dragged wider, kept (coral-detail-width) and applied when another artifact opens, moved with the keys (Home the
-// narrowest, End the widest the page allows, which is the pane maximised), and put back by a double click. 1280 px, an artifact list stubbed in the page, isolated dev server; drives Chrome over CDP.
+// narrowest, End the widest the page allows, which is the pane maximised), and put back by a double click. 1600 px (the pane is beside the page from 1500 px; below it is a sheet, #15287), an artifact list stubbed in the page, isolated dev server; drives Chrome over CDP.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, openTeam, goTab, scenarios } = require('./helpers/team_page');
@@ -31,7 +31,7 @@ const A = 'a'.repeat(64), B = 'b'.repeat(64);
     const openRow = async rx => { assert.ok(await ev(`(() => { const b = [...document.querySelectorAll('#team-panel-artifacts tbody .dt-primary')].find(x => ${rx}.test(x.textContent)); if (!b) return false; b.focus(); b.click(); return true; })()`), `no row ${rx}: ` + await ev(`(document.querySelector('#team-panel-artifacts') || document.body).innerText.slice(0, 300) + ' | ' + document.querySelectorAll('#team-panel-artifacts tbody tr').length`)); await settle(300); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+        await Emulation.setDeviceMetricsOverride({ width: 1600, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
         await ev(`localStorage.removeItem('coral-detail-width'); true`);
         await seed(ev, TEAM); await stub(); await openTeam(ev, waitFor, TEAM); await goTab(ev, settle, 'Artifacts'); await waitFor(`document.querySelectorAll('#team-panel-artifacts tbody tr').length >= 2`, 'the two artifacts', 10000);

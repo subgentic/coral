@@ -34,3 +34,5 @@
 #group-table-view .gt-toolbar.team-toolbar-selecting > .team-tb-selection { flex: 1 1 100%; }
 
 #group-table-view .inbox-needs-results { max-width: 80rem; } /* a line of the table is not the width of a 1920 px screen: Time sat 1400 px from the title (#15339, walk 23 L17) */
+
+.inbox-wait-long { color: var(--warning-text); } /* a question waiting 5 minutes or more reads in amber (#15297) */
