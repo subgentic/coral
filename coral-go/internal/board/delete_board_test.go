@@ -27,6 +27,7 @@ var boardOwnedRows = []struct{ table, col string }{
 	{"artifact_review_sent", "board_id"}, // #13231: when a file was sent for review
 	{"artifact_kinds", "board_id"},       // #12144: the kind of a file for review
 	{"artifact_task_chains", "board_id"}, // #12144: the latest file for review of a task chain
+	{"artifact_task_files", "board_id"},  // #15159: a task's open file of each name
 }
 
 // Audit trails: what the Hub's operators did and what the health rules did are a record of what happened, not part of the board, so they stay.
@@ -124,7 +125,8 @@ func fillBoard(t *testing.T, s *Store, project string) (taskIDs []int64) {
 	require.NoError(t, err)
 	_, err = s.SetArtifactKind(ctx, project, strings.Repeat("a", 64), KindRelease, "sess-1", time.Now()) // and the kind of its file (#12144)
 	require.NoError(t, err)
-	require.NoError(t, s.SetChainFile(ctx, project, first.ID, strings.Repeat("a", 64), time.Now())) // and the latest file of a task chain (#12144)
+	require.NoError(t, s.SetChainFile(ctx, project, first.ID, strings.Repeat("a", 64), time.Now()))                   // and the latest file of a task chain (#12144)
+	require.NoError(t, s.SetChainNamedFile(ctx, project, first.ID, "README.md", strings.Repeat("a", 64), time.Now())) // and its open file of a name (#15159)
 	return []int64{first.ID, second.ID}
 }
 

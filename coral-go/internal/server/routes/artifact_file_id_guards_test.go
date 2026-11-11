@@ -15,8 +15,10 @@ import (
 
 // #14214, QA's four guards on #14145 commit 1: each is a rule a code comment promises, and each has a test that fails against its own mutant.
 
-// (1) The server's own join of a task chain is one file per chain, not per file name (#12144): it never refuses on a name. Only an upload that NAMED its file (--new-version-of) is checked.
-func TestATaskChainJoinNeverRefusesOnAFileName(t *testing.T) {
+// (1) The server's own join of a task line is one open file per NAME per task (#15159, walk 5 M8: index.html uploaded after README.md became README's 'version N' with README's file id; this was "one file per
+// chain, not per file name", #12144). A plain upload under another name is another file with its own series; a file renamed between versions joins only when the agent says so (--new-version-of with the rename
+// header). An upload that NAMED its file is still checked: a name change without the rename header is refused.
+func TestATaskLineJoinIsByFileNameAndNeverRefusesAnUploadThatNamedNoFile(t *testing.T) {
 	k := newKindRig(t)
 	ctx := t.Context()
 	root, err := k.h.bs.CreateTask(ctx, "alpha", "OPERATOR the plan", "", "medium", "lead", "Backend")
@@ -25,13 +27,13 @@ func TestATaskChainJoinNeverRefusesOnAFileName(t *testing.T) {
 	require.Equal(t, 201, code, out)
 	sid := fmt.Sprint(out["file_id"]) // a first upload has no series yet: its file id is the one the series will have
 	require.Regexp(t, fileIDRe, sid)
-	// the same agent's next upload for the task, under ANOTHER name, and with no --new-version-of: it joins the chain's file, as before the name rule
-	code, out = k.post("s1&tag=for+review&question=Does+it+work%3F", "plan, version two", map[string]string{"X-Artifact-Task": strconv.FormatInt(root.ID, 10), "X-Artifact-Name": "plan-renamed.md"})
-	assert.Equal(t, http.StatusCreated, code, "a chain join is never refused for a name: %v", out)
-	assert.EqualValues(t, 2, out["version"], "it joined the chain's file")
-	assert.Equal(t, sid, fmt.Sprint(out["series_id"]))
+	// the same agent's next upload for the task, under ANOTHER name, and with no --new-version-of: another file, never refused, never a version of the plan
+	code, out = k.post("s1&tag=for+review&question=Does+it+work%3F", "another file", map[string]string{"X-Artifact-Task": strconv.FormatInt(root.ID, 10), "X-Artifact-Name": "plan-renamed.md"})
+	assert.Equal(t, http.StatusCreated, code, "a plain upload under another name is never refused: %v", out)
+	assert.NotEqual(t, sid, fmt.Sprint(out["series_id"]), "another name is not the plan's next version")
+	assert.NotEqualValues(t, 2, out["version"])
 	// the same name change on an upload that NAMED its file is refused (the rule is for the agent's own word, not for the server's join)
-	code, out = k.post("s1&tag=for+review&question=Does+it+work%3F", "plan, version three", map[string]string{"X-Artifact-Task": strconv.FormatInt(root.ID, 10), "X-Artifact-Name": "yet-another.md", "X-Artifact-New-Version-Of": sid + "@2"})
+	code, out = k.post("s1&tag=for+review&question=Does+it+work%3F", "plan, version three", map[string]string{"X-Artifact-Task": strconv.FormatInt(root.ID, 10), "X-Artifact-Name": "yet-another.md", "X-Artifact-New-Version-Of": sid + "@1"})
 	assert.Equal(t, http.StatusBadRequest, code, "%v", out)
 	assert.Equal(t, "name_differs", out["code"])
 }

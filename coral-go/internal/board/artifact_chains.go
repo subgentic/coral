@@ -22,7 +22,55 @@ func (s *Store) ensureArtifactChainsSchema(ctx context.Context) error {
 		set_at    TEXT NOT NULL,
 		PRIMARY KEY (board_id, root_task)
 	)`)
+	if err != nil {
+		return err
+	}
+	// One open file per NAME per task (#15159, walk 5 M8): README.md and index.html uploaded for one task are two files, each with its own versions. The chain table above still says the task's newest file.
+	_, err = s.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS artifact_task_files (
+		board_id TEXT NOT NULL,
+		task     INTEGER NOT NULL,
+		name     TEXT NOT NULL,
+		hex      TEXT NOT NULL,
+		set_at   TEXT NOT NULL,
+		PRIMARY KEY (board_id, task, name)
+	)`)
 	return err
+}
+
+// SetChainNamedFile remembers hex as the newest file called name that the task made for review.
+func (s *Store) SetChainNamedFile(ctx context.Context, boardID string, task int64, name, hex string, at time.Time) error {
+	if name == "" {
+		return nil
+	}
+	_, err := s.db.ExecContext(ctx, `INSERT INTO artifact_task_files (board_id, task, name, hex, set_at) VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(board_id, task, name) DO UPDATE SET hex = excluded.hex, set_at = excluded.set_at`, boardID, task, name, hex, at.UTC().Format(time.RFC3339))
+	return err
+}
+
+// ChainNamedFilesNear are the files called name remembered for the task itself and for each of its follow-up parents (nearest first), as ChainFilesNear is for the newest file of each.
+func (s *Store) ChainNamedFilesNear(ctx context.Context, boardID string, taskID int64, name string) []ChainEntry {
+	var out []ChainEntry
+	if name == "" {
+		return out
+	}
+	cur := taskID
+	for i := 0; i < maxChainDepth && cur > 0; i++ {
+		var hex string
+		if err := s.reader().GetContext(ctx, &hex, `SELECT hex FROM artifact_task_files WHERE board_id = ? AND task = ? AND name = ?`, boardID, cur, name); err == nil && hex != "" {
+			out = append(out, ChainEntry{Task: cur, Hex: hex})
+		}
+		var parent int64
+		err := s.reader().GetContext(ctx, &parent, `SELECT COALESCE(w.lst_parent, 0) FROM task_workflows w JOIN board_tasks t ON t.id = w.task_id WHERE t.board_id = ? AND w.task_id = ?`, boardID, cur)
+		if err != nil || parent <= 0 || parent == cur {
+			break
+		}
+		var onBoard int
+		if err := s.reader().GetContext(ctx, &onBoard, `SELECT COUNT(*) FROM board_tasks WHERE board_id = ? AND id = ?`, boardID, parent); err != nil || onBoard == 0 {
+			break
+		}
+		cur = parent
+	}
+	return out
 }
 
 // RootTask is the root of the chain a task of the board belongs to: the task itself, or the top of its follow-up parents (at most maxChainDepth steps, and never off the board). A task that cannot be read is its
