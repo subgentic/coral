@@ -31,6 +31,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         check(await banner(), 'a dismissed offer comes back when the first item has waited 5 minutes');
         check((await ev(`document.getElementById('alerts-offer-banner').textContent`)).includes('Turn on alerts'), 'it is the same offer, with its button');
         await shot('alerts-reoffer-1280');
+        check((await ev(`document.querySelector('#alerts-offer-banner button[aria-label="Not now"]').textContent`)) === '\u00d7', 'the dismiss button shows its x (not blank)');
         await ev(`document.querySelector('#alerts-offer-banner button[aria-label="Not now"]').click(); true`);
         await setWaiting(7); await setWaiting(30);
         check(!(await banner()), 'after a second dismissal it does not come back (never more than once)');
