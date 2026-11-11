@@ -139,7 +139,6 @@ jobs:
         working-directory: coral-go
         env:
           POSTHOG_PROJECT_KEY: ${{ vars.POSTHOG_PROJECT_KEY }}
-          DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
           ARCH: ${{ matrix.arch }}
           VERSION: ${{ needs.resolve.outputs.version }}
           BUILD_TAGS: ${{ needs.resolve.outputs.build_tags }}
@@ -147,7 +146,7 @@ jobs:
         run: |
           # A prod-tier build (the tags are exactly fts5) with no analytics key would send no install events and the release would still be green (#15071).
           [ "$BUILD_TAGS" != "fts5" ] || [ -n "$POSTHOG_PROJECT_KEY" ] || { echo "::error::vars.POSTHOG_PROJECT_KEY is empty: a prod-tier build would send no install events"; exit 1; }
-          LDFLAGS="-s -w -X github.com/subgentic/coral/internal/config.PostHogKey=${POSTHOG_PROJECT_KEY} -X github.com/subgentic/coral/internal/config.Version=${VERSION} -X github.com/subgentic/coral/internal/server/routes.DropboxDefaultAppKey=${DROPBOX_APP_KEY}"
+          LDFLAGS="-s -w -X github.com/subgentic/coral/internal/config.PostHogKey=${POSTHOG_PROJECT_KEY} -X github.com/subgentic/coral/internal/config.Version=${VERSION}"
           OVERLAY="$(go run ./tools/strip-static)" # the dashboard ships minified (#6208): a fresh owner-only folder; only this step's go build commands read it
           [ -n "$OVERLAY" ] || { echo "strip-static printed no overlay path" >&2; exit 1; }
           trap 'go run ./tools/strip-static -clean "$OVERLAY"' EXIT
@@ -200,7 +199,6 @@ jobs:
         env:
           ARCH: ${{ matrix.arch }}
           VERSION: ${{ needs.resolve.outputs.version }}
-          SMOKE_EXPECT_DROPBOX_KEY: "1" # the build's Dropbox app key must reach /api/dropbox/status (#15065)
         run: tests/release/smoke_linux.sh "dist/coral-linux-${ARCH}-${GITHUB_REF_NAME#v}.tar.gz" --version "$VERSION"
 
       - name: Upload artifact
@@ -243,7 +241,6 @@ jobs:
         working-directory: coral-go
         env:
           POSTHOG_PROJECT_KEY: ${{ vars.POSTHOG_PROJECT_KEY }}
-          DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
           VERSION: ${{ needs.resolve.outputs.version }}
           BUILD_TAGS: ${{ needs.resolve.outputs.build_tags }}
           COMMANDS: ${{ needs.resolve.outputs.commands }}
@@ -260,7 +257,7 @@ jobs:
           $version = $env:VERSION
           # A prod-tier build (the tags are exactly fts5) with no analytics key would send no install events and the release would still be green (#15071).
           if ($env:BUILD_TAGS -eq 'fts5' -and -not $env:POSTHOG_PROJECT_KEY) { throw 'vars.POSTHOG_PROJECT_KEY is empty: a prod-tier build would send no install events' }
-          $ldflags = "-s -w -X github.com/subgentic/coral/internal/config.PostHogKey=$env:POSTHOG_PROJECT_KEY -X github.com/subgentic/coral/internal/config.Version=$version -X github.com/subgentic/coral/internal/server/routes.DropboxDefaultAppKey=$env:DROPBOX_APP_KEY"
+          $ldflags = "-s -w -X github.com/subgentic/coral/internal/config.PostHogKey=$env:POSTHOG_PROJECT_KEY -X github.com/subgentic/coral/internal/config.Version=$version"
           $buildTags = $env:BUILD_TAGS
           # The exes' version information (what the taskbar and Task Manager name the app by): this release's version and the tier's product name.
           $product = if (",$buildTags," -like "*,dropboxers,*") { "Coral For Dropbox" } else { "Coral" }
@@ -432,7 +429,6 @@ jobs:
         env:
           RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
           BUILD_TAGS: ${{ needs.resolve.outputs.build_tags }}
-          SMOKE_EXPECT_DROPBOX_KEY: "1" # the build's Dropbox app key must reach /api/dropbox/status (#15065, as in the Linux smoke)
         run: |
           Push-Location coral-go
           $standin = Join-Path $env:RUNNER_TEMP 'standin\claude.exe'
@@ -480,7 +476,6 @@ jobs:
         working-directory: coral-go
         env:
           POSTHOG_PROJECT_KEY: ${{ vars.POSTHOG_PROJECT_KEY }}
-          DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
           VERSION: ${{ needs.resolve.outputs.version }}
           BUILD_TAGS: ${{ needs.resolve.outputs.build_tags }}
           COMMANDS: ${{ needs.resolve.outputs.commands }}
@@ -489,7 +484,7 @@ jobs:
           set -euo pipefail
           # A prod-tier build (the tags are exactly fts5) with no analytics key would send no install events and the release would still be green (#15071).
           [ "$BUILD_TAGS" != "fts5" ] || [ -n "$POSTHOG_PROJECT_KEY" ] || { echo "::error::vars.POSTHOG_PROJECT_KEY is empty: a prod-tier build would send no install events"; exit 1; }
-          LDFLAGS="-s -w -X github.com/subgentic/coral/internal/config.PostHogKey=${POSTHOG_PROJECT_KEY} -X github.com/subgentic/coral/internal/config.Version=${VERSION} -X github.com/subgentic/coral/internal/server/routes.DropboxDefaultAppKey=${DROPBOX_APP_KEY}"
+          LDFLAGS="-s -w -X github.com/subgentic/coral/internal/config.PostHogKey=${POSTHOG_PROJECT_KEY} -X github.com/subgentic/coral/internal/config.Version=${VERSION}"
           OVERLAY="$(go run ./tools/strip-static)" # the dashboard ships minified (#6208): a fresh owner-only folder; only this step's go build commands read it
           [ -n "$OVERLAY" ] || { echo "strip-static printed no overlay path" >&2; exit 1; }
           trap 'go run ./tools/strip-static -clean "$OVERLAY"' EXIT
@@ -549,7 +544,6 @@ jobs:
         working-directory: coral-go
         env:
           POSTHOG_PROJECT_KEY: ${{ vars.POSTHOG_PROJECT_KEY }}
-          DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
           VERSION: ${{ needs.resolve.outputs.version }}
           BUILD_TAGS: ${{ needs.resolve.outputs.build_tags }}
           COMMANDS: ${{ needs.resolve.outputs.commands }}
@@ -558,7 +552,7 @@ jobs:
           set -euo pipefail
           # A prod-tier build (the tags are exactly fts5) with no analytics key would send no install events and the release would still be green (#15071).
           [ "$BUILD_TAGS" != "fts5" ] || [ -n "$POSTHOG_PROJECT_KEY" ] || { echo "::error::vars.POSTHOG_PROJECT_KEY is empty: a prod-tier build would send no install events"; exit 1; }
-          LDFLAGS="-s -w -X github.com/subgentic/coral/internal/config.PostHogKey=${POSTHOG_PROJECT_KEY} -X github.com/subgentic/coral/internal/config.Version=${VERSION} -X github.com/subgentic/coral/internal/server/routes.DropboxDefaultAppKey=${DROPBOX_APP_KEY}"
+          LDFLAGS="-s -w -X github.com/subgentic/coral/internal/config.PostHogKey=${POSTHOG_PROJECT_KEY} -X github.com/subgentic/coral/internal/config.Version=${VERSION}"
           OVERLAY="$(go run ./tools/strip-static)" # the dashboard ships minified (#6208): a fresh owner-only folder; only this step's go build commands read it
           [ -n "$OVERLAY" ] || { echo "strip-static printed no overlay path" >&2; exit 1; }
           trap 'go run ./tools/strip-static -clean "$OVERLAY"' EXIT
@@ -689,7 +683,6 @@ jobs:
 
       - name: Smoke test Coral.app
         env:
-          SMOKE_EXPECT_DROPBOX_KEY: "1" # the build's Dropbox app key must reach /api/dropbox/status (#15065, #15071)
         run: |
           chmod +x tools/test-macos-app.sh
           CI=true tools/test-macos-app.sh dist/Coral.app
@@ -745,7 +738,6 @@ jobs:
       # The webview is forced on: coral-app is the one most likely to need one (#3659).
       - name: Smoke test the signed Coral.app (hardened runtime, minimal entitlements)
         env:
-          SMOKE_EXPECT_DROPBOX_KEY: "1" # the build's Dropbox app key must reach /api/dropbox/status (#15065, #15071)
         run: |
           # No signed binary carries a hardened-runtime exception (the tray and the app included).
           for bin in dist/Coral.app/Contents/MacOS/*; do

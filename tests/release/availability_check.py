@@ -28,6 +28,6 @@ for line in open(lst):
     except Exception as e: got = "no answer (%s)" % type(e).__name__
     if got != want: bad.append("%s %s is %s, a release reports %s" % (ep, field, json.dumps(got), json.dumps(want)))
 if checked == 0: bad.append("no line of the list was checked")
-if os.environ.get("SMOKE_EXPECT_DROPBOX_KEY") == "1" and not dropbox_line: bad.append("SMOKE_EXPECT_DROPBOX_KEY=1 but no /api/dropbox/status line was checked")
+if not dropbox_line: bad.append("no /api/dropbox/status line was checked: a release says in availability.txt that it ships no Dropbox app key")
 print("ok %d checked (tier %s)" % (checked, tier or "unknown") if not bad else "; ".join(bad))
 sys.exit(0 if not bad else 1)
