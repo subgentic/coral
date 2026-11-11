@@ -3,6 +3,7 @@
 // than the screen, every control 44 px, the viewer's title readable and its sheet header on one row, a comment composer not under the keyboard (the visual viewport shrinks; a fake one drives mobile.js), and the back
 // gesture closing the overlays from the top: the comments sheet, then the viewer, then the preview's full screen. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const assert = require('node:assert/strict');
+const { quietLaunchNotice } = require('./helpers/launch_notice');
 const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
@@ -76,7 +77,7 @@ const LONG = 'worktree-agent-a1b2c3d4e5f60718/feature/calm-the-dashboard-remove-
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 2, mobile: true });
         await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: theme }] });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await quietLaunchNotice(Page, ev, BASE + '/');
         await ev(`localStorage.clear(); true`);
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await require('./helpers/wait').coralReady(ev);

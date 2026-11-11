@@ -420,7 +420,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     });
     // A hidden panel is out of reach at every width; an open sheet also removes the document behind it from Tab and screen readers.
     const footEl = dialog.querySelector('.artifact-viewer-foot'); // the viewer's footer (Approve, Request changes, Close): a phone's sheet ends above it, never over it (#15165)
-    const footRoom = () => { panel.style.bottom = footEl && phone.matches && sheet() && panel.classList.contains('ac-sheet-open') ? `${Math.max(0, Math.round((panel.offsetParent || dialog).getBoundingClientRect().bottom - footEl.getBoundingClientRect().top))}px` : ''; }; // an inline bottom (from the footer's top to the viewer's bottom: its padding and the safe area count): the start CSS has no room for a rule
+    const footRoom = () => { panel.style.bottom = footEl && phone.matches && sheet() && panel.classList.contains('ac-sheet-open') ? `${Math.max(0, Math.round((panel.offsetParent || dialog).getBoundingClientRect().bottom - footEl.getBoundingClientRect().top))}px` : ''; panel.style.setProperty('--ac-foot', panel.style.bottom || '0px'); }; // the sheet's height limit leaves the same room (--ac-foot: with the keyboard up the sheet was as tall as the viewer and its header went above the screen); an inline bottom (from the footer's top to the viewer's bottom: its padding and the safe area count): the start CSS has no room for a rule
     if (footEl && typeof ResizeObserver === 'function') new ResizeObserver(footRoom).observe(footEl); // the review buttons arrive after the viewer opens
     function syncInert() {
         footRoom();

@@ -92,10 +92,12 @@ function fill(container, agentType, data) {
     container._thinkingLevels = data && Array.isArray(data.thinking) ? data.thinking : [];   // the levels the server passes this type's CLI (#4969)
     syncThinking(container);
     if (!input || !wrap || !select) return;
-    const models = (data && Array.isArray(data.models) ? data.models : []).filter(m => m && typeof m.value === 'string' && m.value && !/^default( \(recommended\))?$/i.test(m.display_name || m.value)); // the list's own "Default (recommended)" is the first option already: not a second one (#15143)
+    const listed = (data && Array.isArray(data.models) ? data.models : []).filter(m => m && typeof m.value === 'string' && m.value);
+    const named = listed.find(m => m.value === 'default' && m.display_name); // the CLI lists its own default ('Default (recommended)'): that is the one Default entry, not a second beside it (#15079); read before the filter below drops it from the list (the two merged changes #15143 and #15079 had the filter first, so the name was never found)
+    const models = listed.filter(m => !/^default( \(recommended\))?$/i.test(m.display_name || m.value)); // the list's own "Default (recommended)" is the first option already: not a second one (#15143)
     container._modelList = models;
     if (!models.length) { wrap.hidden = true; input.hidden = false; return; }   // no list: the text box, as before
-    const named = models.find(m => m.value === 'default' && m.display_name); container._defaultNamed = !!named; // the CLI lists its own default ('Default (recommended)'): that is the one Default entry, not a second beside it (#15079)
+    container._defaultNamed = !!named;
     select.innerHTML = `<option value="">${named ? escapeHtml(named.display_name) : 'Default'}</option>`
         + modelOptions(named ? models.filter(m => m !== named) : models, data && data.groups)
         + `<option value="${escapeAttr(OTHER)}">Other…</option>`
