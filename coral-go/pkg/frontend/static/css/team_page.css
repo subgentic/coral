@@ -508,3 +508,6 @@ dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-
     margin-top: 12px;
     border-top: 1px solid var(--border);
 }
+
+/* The Artifacts tab's files strip: its space is held, unseen, until the real strip replaces it, so the table does not jump down (#15618). */
+.team-files-strip-reserve { visibility: hidden; }

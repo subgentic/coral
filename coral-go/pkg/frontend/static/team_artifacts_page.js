@@ -409,7 +409,10 @@ export function createArtifactsList({ inbox = false } = {}) {
         status.setAttribute('role', model.error ? 'alert' : 'status');
         body.append(status);
         if (!inbox && !model.scope && !model.error && !model.loading && model.items.length) { // where the team's files are and one zip of them (#15154): a newcomer can run the app the team built
-            const strip = el('div', 'team-files-strip-host'); body.append(strip);
+            const strip = el('div', 'team-files-strip-host team-files-strip-reserve'); body.append(strip);
+            // the strip's space is held before its module and the folder answer arrive: the same three parts, drawn but not seen, so the table under it does not move (#15618)
+            strip.setAttribute('aria-hidden', 'true'); strip.append(el('div', 'team-files-strip-ghost', ''));
+            strip.firstChild.append(el('p', 'goals-note', 'The team works in the folder . The app runs from there: open index.html in that folder.'), el('button', 'btn btn-small', 'Copy path'), el('button', 'btn btn-small', 'Download all (zip)'));
             importOnce('./artifact_team_files.js').then(m => m.fillStrip(strip, { project: model.project, hasMore: () => model.hasMore, files: () => model.items.map(it => ({ it, link: linkOf(it) })).filter(x => x.link?.preview).map(x => ({ url: x.link.url, name: readableName(x.it) })) })).catch(() => {});
         }
         if (inbox && !model.error && (model.partial || (model.versionless && model.versionless.length))) body.append(partialLine());
