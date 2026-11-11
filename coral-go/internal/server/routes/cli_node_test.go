@@ -34,6 +34,7 @@ func npmCodex(t *testing.T, withNode bool) (link string) {
 	if _, err := exec.LookPath("node"); err == nil {
 		t.Skip("system node installed")
 	}
+	require.NoError(t, os.Chmod(home, 0o755)) // t.TempDir is group-writable under umask 002 (epoch), and Coral then refuses the node beside the script (#15481)
 	linkDir, prefix := filepath.Join(home, ".local", "bin"), filepath.Join(home, "prefix", "bin")
 	for _, d := range []string{linkDir, prefix} {
 		require.NoError(t, os.MkdirAll(d, 0o755))
