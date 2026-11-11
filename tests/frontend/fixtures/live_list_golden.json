@@ -2,83 +2,83 @@
  "about": "sha256 of the list markup for each scenario of live_list_golden_browser.test.js; the full text of two is kept to read a change against",
  "hashes": {
   "desktop: team first": {
-   "sha256": "a574f78eca27486f3fb8430927c95a73a9d77ec2575edc4baea547ca75b6d41f",
+   "sha256": "e3d78745988a22674c7fc3689a13d64491c5c23dab2b1505a63342a7536bc281",
    "length": 66188
   },
   "desktop: folder first": {
-   "sha256": "a0c83665baedac65a0a017044cd5aeedd1bd0da573269990d900a33da514a126",
+   "sha256": "cf9660ab87d343744b81437d012c82476c450c5e5bc2acfba9044bddca4d73a8",
    "length": 127350
   },
   "desktop: team first, sleeping and archived open": {
-   "sha256": "1843524ffc19c6ee5cf7e769c80334d66f5e4a9cb46c27ede0c736170af5bb02",
+   "sha256": "603cdb75c4c307b2f56faa314d65ddf198cca4791c207f81a6424ba24881457d",
    "length": 68181
   },
   "desktop: team first, a team and a folder collapsed": {
-   "sha256": "1e71ef5c398d26649afef9c30511a689cab6d31bb5b590dbb468ca6756a9f919",
+   "sha256": "2169a5f64ab5aa8313200d5d712a882813a3caeb1431c15b18d69459f6865caf",
    "length": 64317
   },
   "desktop: folder first, a folder collapsed": {
-   "sha256": "d1c134f5b7a4bee0a884d7ef21be2db6bedf9b79507d0a10563fbb1c1d1c16b1",
+   "sha256": "0468bf61f5e7fd411235ff81bf2c408a83dd9437ec52b998762fb5aacd1c72a2",
    "length": 125460
   },
   "desktop: hub, servers shown": {
-   "sha256": "9f8980538e59adcc2701ef54151813e91d86193dc7ae6b0abfc55d467fce326d",
+   "sha256": "ebf5ba963933203e5c0031620e2ce58c3fc8244535b9446e1ef36dc15f20a32b",
    "length": 94832
   },
   "desktop: hub, grouped by server": {
-   "sha256": "0d0049ecc3c033bc5f7e5bddc6aa41251b889ded810faeb4d8f12c5c8f027922",
+   "sha256": "6fd442f3ec992c96daa3e08ff1c7044e267c87bd214ec52b7f126d5361bb1247",
    "length": 110731
   },
   "desktop: hub, grouped by server, folder first": {
-   "sha256": "f545edb021208d352184ef56fd36bb2bc540b5d18333b4a45484732fb92d736a",
+   "sha256": "7131fb0a96ebecc974543e01e248e52a887ee6a9f5b102e946c39c904a2eb8ca",
    "length": 176992
   },
   "desktop: a search": {
-   "sha256": "4374199cf5ebf505a912850eb719f3f8e78da93b3d0bbffc6fa81f7ba5df3a3d",
+   "sha256": "69057ebf6509480554784d99bad45ff455bc009c8b4dbd1e7736db2a51a16807",
    "length": 28381
   },
   "desktop: a search with no match": {
-   "sha256": "2ef6fb7310f504cfa277aa594217afb00a4caed38b6f7f2085381fd04121b733",
+   "sha256": "fceea76a134c344c205d6a1d84d210cdc4bbbda0a8d2a1bbe61c02eae62b0c36",
    "length": 28440
   },
   "phone: team first": {
-   "sha256": "a574f78eca27486f3fb8430927c95a73a9d77ec2575edc4baea547ca75b6d41f",
+   "sha256": "e3d78745988a22674c7fc3689a13d64491c5c23dab2b1505a63342a7536bc281",
    "length": 66188
   },
   "phone: folder first": {
-   "sha256": "a0c83665baedac65a0a017044cd5aeedd1bd0da573269990d900a33da514a126",
+   "sha256": "cf9660ab87d343744b81437d012c82476c450c5e5bc2acfba9044bddca4d73a8",
    "length": 127350
   },
   "phone: team first, sleeping and archived open": {
-   "sha256": "1843524ffc19c6ee5cf7e769c80334d66f5e4a9cb46c27ede0c736170af5bb02",
+   "sha256": "603cdb75c4c307b2f56faa314d65ddf198cca4791c207f81a6424ba24881457d",
    "length": 68181
   },
   "phone: team first, a team and a folder collapsed": {
-   "sha256": "1e71ef5c398d26649afef9c30511a689cab6d31bb5b590dbb468ca6756a9f919",
+   "sha256": "2169a5f64ab5aa8313200d5d712a882813a3caeb1431c15b18d69459f6865caf",
    "length": 64317
   },
   "phone: folder first, a folder collapsed": {
-   "sha256": "d1c134f5b7a4bee0a884d7ef21be2db6bedf9b79507d0a10563fbb1c1d1c16b1",
+   "sha256": "0468bf61f5e7fd411235ff81bf2c408a83dd9437ec52b998762fb5aacd1c72a2",
    "length": 125460
   },
   "phone: hub, servers shown": {
-   "sha256": "9f8980538e59adcc2701ef54151813e91d86193dc7ae6b0abfc55d467fce326d",
+   "sha256": "ebf5ba963933203e5c0031620e2ce58c3fc8244535b9446e1ef36dc15f20a32b",
    "length": 94832
   },
   "phone: hub, grouped by server": {
-   "sha256": "0d0049ecc3c033bc5f7e5bddc6aa41251b889ded810faeb4d8f12c5c8f027922",
+   "sha256": "6fd442f3ec992c96daa3e08ff1c7044e267c87bd214ec52b7f126d5361bb1247",
    "length": 110731
   },
   "phone: hub, grouped by server, folder first": {
-   "sha256": "f545edb021208d352184ef56fd36bb2bc540b5d18333b4a45484732fb92d736a",
+   "sha256": "7131fb0a96ebecc974543e01e248e52a887ee6a9f5b102e946c39c904a2eb8ca",
    "length": 176992
   },
   "phone: a search": {
-   "sha256": "4374199cf5ebf505a912850eb719f3f8e78da93b3d0bbffc6fa81f7ba5df3a3d",
+   "sha256": "69057ebf6509480554784d99bad45ff455bc009c8b4dbd1e7736db2a51a16807",
    "length": 28381
   },
   "phone: a search with no match": {
-   "sha256": "2ef6fb7310f504cfa277aa594217afb00a4caed38b6f7f2085381fd04121b733",
+   "sha256": "fceea76a134c344c205d6a1d84d210cdc4bbbda0a8d2a1bbe61c02eae62b0c36",
    "length": 28440
   }
  },
