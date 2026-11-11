@@ -25,6 +25,25 @@ func openFDs(t *testing.T) int {
 	return 0
 }
 
+// ownTerminal is the session's own PTY master: the one descriptor this test is about. Counting every descriptor of the process instead moves with whatever else the package's goroutines and earlier tests
+// open and close (an earlier session's kill finishing during the test read "12 is not greater than 12" under load, #15679).
+func ownTerminal(t *testing.T, b *PTYBackend, name string) *os.File {
+	t.Helper()
+	b.mu.RLock()
+	s := b.sessions[name]
+	b.mu.RUnlock()
+	require.NotNil(t, s, "session %q", name)
+	p, ok := s.proc.(*unixPTY)
+	require.True(t, ok, "a Unix session's process handle is its PTY")
+	return p.ptyFile
+}
+
+// isOpen: the descriptor is still held (fstat on it works); a descriptor Coral closed answers os.ErrClosed.
+func isOpen(f *os.File) bool {
+	_, err := f.Stat()
+	return !errors.Is(err, os.ErrClosed)
+}
+
 // #6821 (Codex Test #6796): a session whose process ends on its own left its PTY master open until something killed it, one descriptor per scheduled run that ended naturally (about 144 a day for a 10-minute
 // cron). After the exit and the drain every one of those sessions' terminals is closed. It watches each session's own PTY master, not the process's descriptor count, which moves with whatever else the
 // package's goroutines open and close (#15681, as #15679).
@@ -57,25 +76,6 @@ func TestSessionsThatEndOnTheirOwnLeaveNoDescriptorsOpen(t *testing.T) {
 	}
 	require.Eventually(t, func() bool { return open() == 0 }, 2*time.Minute, 100*time.Millisecond,
 		"terminals still open after %d sessions ended on their own: %d", runs, open())
-}
-
-// ownTerminal is the session's own PTY master: the one descriptor this test is about. Counting every descriptor of the process instead moves with whatever else the package's goroutines and earlier tests
-// open and close (an earlier session's kill finishing during the test read "12 is not greater than 12" under load, #15679).
-func ownTerminal(t *testing.T, b *PTYBackend, name string) *os.File {
-	t.Helper()
-	b.mu.RLock()
-	s := b.sessions[name]
-	b.mu.RUnlock()
-	require.NotNil(t, s, "session %q", name)
-	p, ok := s.proc.(*unixPTY)
-	require.True(t, ok, "a Unix session's process handle is its PTY")
-	return p.ptyFile
-}
-
-// isOpen: the descriptor is still held (fstat on it works); a descriptor Coral closed answers os.ErrClosed.
-func isOpen(f *os.File) bool {
-	_, err := f.Stat()
-	return !errors.Is(err, os.ErrClosed)
 }
 
 // Security's #6826 LOW (the exit watcher's own case): the shell exits but a child it left behind keeps the terminal open, so readLoop never sees the end of the output. The descriptor is closed by the watcher after
