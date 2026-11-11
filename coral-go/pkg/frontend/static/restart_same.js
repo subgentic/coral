@@ -7,5 +7,5 @@ import { restartSameSettings as restart } from './restart_flow.js';
 export function restartSameSettings() {
     const cur = state.currentSession, row = cur && (state.liveSessions || []).find(s => s.session_id === cur.session_id);
     if (!row || !row.working) return restart();
-    showConfirmModal('Restart agent', `${cur.name} is working right now. Restarting stops what it is doing; the conversation is kept and resumes.`, () => restart(), undefined, { label: 'Restart', danger: true });
+    showConfirmModal('Restart agent', `${cur.name} is working right now. Restarting stops what it is doing and starts a new conversation; the old chat stays above.`, () => restart(), undefined, { label: 'Restart', danger: true });
 }

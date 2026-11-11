@@ -77,7 +77,7 @@ const BASE = require('./test_base').BASE;
         await ev(`document.querySelector('[data-on-click="agent-restart-same"][data-session-id="${id0}"]').click()`);
         await waitFor(`document.getElementById('confirm-modal').style.display === 'flex'`, 'a working agent is asked before it restarts', 5000);
         const ask = await ev(`({ title: document.getElementById('confirm-modal-title').textContent, text: document.getElementById('confirm-modal-message').textContent, yes: document.getElementById('confirm-modal-yes').textContent.trim() })`);
-        assert.equal(ask.title, 'Restart agent'); assert.match(ask.text, /is working right now/); assert.equal(ask.yes, 'Restart');
+        assert.equal(ask.title, 'Restart agent'); assert.match(ask.text, /is working right now\. Restarting stops what it is doing and starts a new conversation; the old chat stays above\./); assert.equal(ask.yes, 'Restart');
         await ev(`document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)').click()`);
         assert.equal(await ev(`window.__srv.restarts`), 0, 'Cancel restarts nothing');
         await ev(`document.querySelector('[data-on-click="agent-restart-same"][data-session-id="${id0}"]').click()`);
