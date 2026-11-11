@@ -81,18 +81,16 @@ func (p *TokenPoller) pollHermesSession(ctx context.Context, ls *store.LiveSessi
 	if row.InputTokens <= 0 && row.OutputTokens <= 0 {
 		return
 	}
-	var haveIn, haveOut int
+	var haveIn, haveOut, haveCR, haveCW int
 	if u, err := p.usageStore.GetSessionUsage(ctx, ls.SessionID); err == nil && u != nil {
-		haveIn, haveOut = u.InputTokens, u.OutputTokens
+		haveIn, haveOut, haveCR, haveCW = u.InputTokens, u.OutputTokens, int(u.CacheReadTokens), int(u.CacheWriteTokens)
 	}
-	in, out := int(row.InputTokens)-haveIn, int(row.OutputTokens)-haveOut
-	if in < 0 { // a total that went down (Hermes started the session over): never a negative row
-		in = 0
-	}
-	if out < 0 {
-		out = 0
-	}
-	if in == 0 && out == 0 {
+	// The growth of each total, never negative (a total that went down is Hermes starting the session over). The calls the growth holds make the size of one request (store: GetLatestTurnContextBySessionIDs).
+	grow := func(now int64, have int) int { return max(0, int(now)-have) }
+	in, out := grow(row.InputTokens, haveIn), grow(row.OutputTokens, haveOut)
+	cr, cw := grow(row.CacheReadTokens, haveCR), grow(row.CacheWriteTokens, haveCW)
+	calls := grow(row.APICalls, p.usageStore.RecordedCalls(ctx, ls.SessionID))
+	if in == 0 && out == 0 && cr == 0 && cw == 0 {
 		return
 	}
 	agentName := ""
@@ -104,17 +102,20 @@ func (p *TokenPoller) pollHermesSession(ctx context.Context, ls *store.LiveSessi
 		started = time.Unix(int64(row.StartedAt), 0).UTC().Format(store.ISOFormat)
 	}
 	rec := &store.TokenUsage{
-		SessionID:      ls.SessionID,
-		AgentName:      agentName,
-		AgentType:      at.Hermes,
-		TeamID:         ls.TeamID,
-		BoardName:      ls.BoardName,
-		InputTokens:    in,
-		OutputTokens:   out,
-		TotalTokens:    in + out,
-		SessionStartAt: started,
-		Source:         "jsonl", // the source the per-session views prefer over the proxy's, as Pi's and Codex's file-read rows are (store.sourceDedup): Hermes's own record of its calls
-		Model:          hermesRecordModel(row.Model),
+		SessionID:        ls.SessionID,
+		AgentName:        agentName,
+		AgentType:        at.Hermes,
+		TeamID:           ls.TeamID,
+		BoardName:        ls.BoardName,
+		InputTokens:      in,
+		OutputTokens:     out,
+		CacheReadTokens:  cr,
+		CacheWriteTokens: cw,
+		NumTurns:         calls,
+		TotalTokens:      in + out,
+		SessionStartAt:   started,
+		Source:           "jsonl", // the source the per-session views prefer over the proxy's, as Pi's and Codex's file-read rows are (store.sourceDedup): Hermes's own record of its calls
+		Model:            hermesRecordModel(row.Model),
 	}
 	if err := p.usageStore.RecordUsage(ctx, rec); err != nil {
 		p.logger.Error("failed to record Hermes usage", "session_id", ls.SessionID, "error", err)

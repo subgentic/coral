@@ -122,3 +122,51 @@ func TestHermesRecordModelUsesTheChipsAllowList(t *testing.T) {
 	}
 	assert.Equal(t, strings.Repeat("x", 120), hermesRecordModel(strings.Repeat("x", 120)), "exactly the cap is a model")
 }
+
+// #15508: the poll also records the growth of the cached tokens and of the calls the session row counts (cache_read_tokens, cache_write_tokens, api_call_count), so the size of a request can be told: the
+// growth of what the calls carried over the calls it holds.
+func TestPollHermesSessionRecordsCacheAndCallGrowthSoTheContextIsKnown(t *testing.T) {
+	dbase := setupTestDB(t)
+	const sid = "00000000-0000-4000-8000-000000015508"
+	hermesID := "local-" + strings.Repeat("e2", 32)
+	dir := t.TempDir()
+	ss, ls := registerForPoll(t, dbase, sid, "hermes")
+	usage := store.NewTokenUsageStore(dbase)
+	poller := NewTokenPoller(ss, usage, time.Hour)
+	poller.SetHermesDataDir(dir)
+	home := agent.HermesAgentHome(dir, "", sid)
+	require.NoError(t, os.MkdirAll(home, 0o700))
+	w, err := sql.Open("sqlite", "file:"+filepath.Join(home, "state.db")+"?_pragma=journal_mode(wal)")
+	require.NoError(t, err)
+	w.SetMaxOpenConns(1)
+	t.Cleanup(func() { w.Close() })
+	_, err = w.Exec(`CREATE TABLE sessions (id TEXT PRIMARY KEY, source TEXT, model TEXT, started_at REAL, ended_at REAL, message_count INTEGER, input_tokens INTEGER, output_tokens INTEGER, cache_read_tokens INTEGER, cache_write_tokens INTEGER, api_call_count INTEGER, cwd TEXT, title TEXT, last_activity_at REAL);
+CREATE TABLE messages (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT, role TEXT, content TEXT, tool_calls TEXT, tool_name TEXT, tool_call_id TEXT, timestamp REAL, finish_reason TEXT, active INTEGER DEFAULT 1);`)
+	require.NoError(t, err)
+	require.NoError(t, transcriptlink.BindHermes(dir, sid, hermesID))
+	ctx := context.Background()
+	context1 := func() int {
+		got, err := usage.GetLatestTurnContextBySessionIDs(ctx, []string{sid})
+		require.NoError(t, err)
+		return got[sid]
+	}
+
+	_, err = w.Exec(`INSERT INTO sessions (id, model, started_at, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, api_call_count) VALUES (?, 'some-model', 1788000000, 1000, 200, 3000, 0, 2)`, hermesID)
+	require.NoError(t, err)
+	poller.pollHermesSession(ctx, ls)
+	assert.Equal(t, 2000, context1(), "two calls carried 4,000 in all: 2,000 each")
+
+	_, err = w.Exec(`UPDATE sessions SET input_tokens = 1300, output_tokens = 260, cache_read_tokens = 3900, api_call_count = 3 WHERE id = ?`, hermesID)
+	require.NoError(t, err)
+	poller.pollHermesSession(ctx, ls)
+	assert.Equal(t, 1200, context1(), "one new call: what the growth carried")
+
+	// A server restart reads the same totals and records nothing again: the context stays.
+	again := NewTokenPoller(ss, usage, time.Hour)
+	again.SetHermesDataDir(dir)
+	again.pollHermesSession(ctx, ls)
+	assert.Equal(t, 1200, context1())
+	u, err := usage.GetSessionUsage(ctx, sid)
+	require.NoError(t, err)
+	assert.Equal(t, []int{1300, 260, 3900}, []int{u.InputTokens, u.OutputTokens, u.CacheReadTokens}, "the totals are the session row's")
+}
