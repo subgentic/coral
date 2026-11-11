@@ -49,7 +49,7 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
                     window.__urls.push(u);
                     if (${old} && u.includes('versions=')) return new Response(JSON.stringify({ error: 'unknown parameter versions' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
                     const sid = new URL(u, location.origin).searchParams.get('session_id') || undefined;
-                    const rows = [row('a', 'design.png', ${old} ? {} : { earlier_versions: 2 }), row('b', 'mockup.png', ${old} ? {} : { earlier_versions: 1, version: 5, versions: 5 }), row('c', 'notes.png', {})];
+                    const rows = [row('a', 'design.png', ${old} ? {} : { earlier_versions: 2 }), row('b', 'mockup.png', ${old} ? {} : { earlier_versions: 1, version: 5, versions: 5 }), row('c', 'notes.png', {}), row('d', 'spec.png', ${old} ? {} : { earlier_versions: 3, version: 2, versions: 2 })]; /* spec.png: the list holds more older rows than the version number says (#15323): 3, the larger, not 1 */
                     return new Response(JSON.stringify({ session_id: sid, project: 'design-team', artifacts: rows, total: 3, all: 3, limit: 50, offset: 0, has_more: false }), { headers: { 'Content-Type': 'application/json' } });
                 }
                 if (u.includes('/api/')) return new Response(JSON.stringify({ files: [] }), { headers: { 'Content-Type': 'application/json' } });
@@ -58,7 +58,7 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
             files.initFileSearch(); files.syncFilesViewerSession();
         })()`);
         await ev(`localStorage.removeItem('coral-agentic-tab-top'); document.getElementById('agentic-tab-artifacts').click()`);
-        await until(`document.querySelectorAll('${ROWS}').length === 3`);
+        await until(`document.querySelectorAll('${ROWS}').length === 4`);
     };
     const notes = () => ev(`[...document.querySelectorAll('${ROWS}')].map(r => [r.querySelector('.dt-primary').textContent, (r.querySelector('.team-artifact-badge') || {}).textContent || ''])`);
     try {
@@ -69,7 +69,7 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
         await boot(false);
         const urls = await ev('window.__urls');
         assert.ok(urls.length >= 1 && urls.every(u => /[?&]versions=newest/.test(u)), 'every list read asks for versions=newest: ' + JSON.stringify(urls));
-        assert.deepEqual(await notes(), [['design.png', '2 earlier versions'], ['mockup.png', '4 earlier versions'], ['notes.png', '']]);
+        assert.deepEqual(await notes(), [['design.png', '2 earlier versions'], ['mockup.png', '4 earlier versions'], ['notes.png', ''], ['spec.png', '3 earlier versions']]);
         assert.equal(await ev(`document.querySelector('${ROWS} .team-artifact-badge-received, ${ROWS} .team-artifact-badge-unverified, ${ROWS} .team-artifact-badge-shared')`), null, 'the version note is not an origin badge');
         await shot('versions-desktop');
 
@@ -78,7 +78,7 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
         const old = await ev('window.__urls');
         assert.ok(/versions=newest/.test(old[0]), 'asked with it first: ' + JSON.stringify(old));
         assert.ok(old.some(u => !/versions=/.test(u)), 'and a read without it follows: ' + JSON.stringify(old)); // (two loads may start together: each asks with it, then without)
-        assert.deepEqual(await notes(), [['design.png', ''], ['mockup.png', ''], ['notes.png', '']]);
+        assert.deepEqual(await notes(), [['design.png', ''], ['mockup.png', ''], ['notes.png', ''], ['spec.png', '']]);
         console.log('PASS');
     } catch (e) {
         console.error(e && e.stack || e);

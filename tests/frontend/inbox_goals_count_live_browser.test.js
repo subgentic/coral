@@ -24,7 +24,17 @@ const { FOLDER_ROWS } = require('./helpers/folder_rows');
         const brief = (open, seq) => ev(`import((window.__coralStatic || '/static/') + 'goals_feed.js').then(m => { m.publishGoalsBrief({ [${JSON.stringify(team)}]: { open: ${open}, seq: ${seq} } }); return true; })`);
         await brief(1, 1); // the frame the page saw while the goal was open
         await post(`/goals/${made.id}/close`, { state: 'done', reason: 'finished', subscriber_id: 'Operator' }); // closed from outside the page, as an agent or another browser would
-        await brief(0, 2); // and the next frame, its counter moved
+        const stillOne = async why => assert.ok((await ev(FOLDER_ROWS)).some(w => /^Goals1$/.test(w)), `${why}: Goals still counts the goal, nothing was read: ` + JSON.stringify(await ev(FOLDER_ROWS)));
+        const quiet = () => new Promise(r => setTimeout(r, 1500)); // sleep-ok: past the 300 ms the read waits after a counter move, to show that none came
+        // the counter moves while the tab is hidden: a hidden page reads nothing (#15229 guard; #15323)
+        await ev(`Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); true`);
+        await brief(0, 2); await quiet(); await stillOne('hidden page');
+        // while the Inbox is paused (signed out, or Coral overloaded: every poller waits), the same
+        await ev(`Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); true`);
+        const paused = on => ev(`import((window.__coralStatic || '/static/') + 'overload.js').then(m => { m.setSignedOut(${on}); return true; })`);
+        await paused(true); await brief(0, 3); await quiet(); await stillOne('paused Inbox');
+        await paused(false); // visible and live again: the next move of the counter reads
+        await brief(0, 4); // and the next frame, its counter moved
         await waitFor(`(${FOLDER_ROWS}).some(w => /^Goals0?$/.test(w))`, 'Goals drops the closed goal within 8 s, not on its next poll: ' + JSON.stringify(await ev(FOLDER_ROWS)), 8000);
         console.log('PASS the Goals count follows a closed goal at once');
     } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
