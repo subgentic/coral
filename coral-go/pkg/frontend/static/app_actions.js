@@ -432,17 +432,16 @@ document.addEventListener('keydown', e => {
 document.addEventListener('keydown', e => {
     const menu = e.target.closest?.('.sidebar-kebab-menu');
     if (!menu) return;
+    if (e.key === 'Tab') { closeSidebarKebabs({ restoreFocus: true }); return; } // Tab closes the menu and goes on from its button (#15445)
     const items = [...menu.querySelectorAll('.overflow-menu-item')].filter(i => i.getClientRects().length > 0); // the items that are shown: a team menu's More group is hidden until it is opened, and a hidden item cannot take the focus (End and Down stopped on it)
-    const at = items.indexOf(document.activeElement);
-    const to = menuMove(e.key, items.length, at);
+    const to = menuMove(e.key, items.length, items.indexOf(document.activeElement));
     if (to >= 0) { e.preventDefault(); items[to].focus(); }
 }, true);
 
 document.addEventListener('focusout', e => {
     const wrap = e.target.closest?.('.sidebar-kebab-wrapper');
     if (!wrap || !document.hasFocus()) return;
-    const to = e.relatedTarget;
-    if (to && wrap.contains(to)) return;
+    if (wrap.contains(e.relatedTarget)) return; // a move to another control of the same wrapper (contains(null) is false)
     const menu = wrap.querySelector('.sidebar-kebab-menu');
     if (menu && menu.style.display !== 'none') closeSidebarKebabs();
 });
