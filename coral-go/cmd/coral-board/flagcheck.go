@@ -42,6 +42,8 @@ func checkKnownFlags(args []string) error {
 		spec = clihelp.FlagSpec{Positional: 1}
 	case "wake", "sleep":
 		spec = clihelp.FlagSpec{Values: []string{"--board"}, Positional: 1}
+	case "restart":
+		spec = clihelp.FlagSpec{Bools: []string{"--when-idle"}, Values: []string{"--board"}, Positional: 1}
 	case "settings":
 		spec = clihelp.FlagSpec{Positional: 3}
 	case "status":

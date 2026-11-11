@@ -152,6 +152,8 @@ func main() {
 		cmdWakeSleep(false)
 	case "sleep":
 		cmdWakeSleep(true)
+	case "restart":
+		cmdRestart()
 	case "settings":
 		cmdSettings()
 	default:
@@ -276,6 +278,9 @@ Commands:
   sleep <member> [--board <project>]
                                The Orchestrator only, with the Operator's grant: put an
                                awake agent of this board to sleep
+  restart <member> [--board <project>] [--when-idle]
+                               The Orchestrator only, with the Operator's grant: restart an
+                               agent of this board as a fresh session with its launch settings
   settings set <key> <value>   The Operator only: save one Coral setting (the server
                                checks the key and value). Not for an agent's terminal
   wait [--from <agent>] [--task <id>] [--commit <hash>] [--operator <question>]

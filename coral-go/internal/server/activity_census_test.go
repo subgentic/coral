@@ -119,6 +119,7 @@ var activityNotAnInboxAction = map[string]string{
 	"POST /api/auth/sessions/sign-out-others":                              "sign-in and sessions",
 	"POST /api/auto-accept/disable-all":                                    "settings",
 	"POST /api/board/remotes":                                              "computers on the board",
+	"POST /api/board/{project}/agents/{subscriber}/restart":                "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/agents/{subscriber}/sleep":                  "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/agents/{subscriber}/wake":                   "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle": "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
