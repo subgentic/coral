@@ -143,3 +143,47 @@ func TestATeamFileNeedsAPersonAndATeamWithAnAgent(t *testing.T) {
 	resp.Body.Close()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode, "a team with no agent has nowhere to keep the file")
 }
+
+// #15356: a team file is kept under the session of the team's first agent. Taking that agent off the team must not take the team's file off the list.
+func TestATeamFileStaysListedWhenTheAgentHoldingItIsRemoved(t *testing.T) {
+	e := newShareEnv(t, true)
+	code, out := e.teamUpload(t, "brief.md", "# the brief", "")
+	require.Equal(t, http.StatusCreated, code, out)
+	id, _ := out["id"].(string)
+	require.NotEmpty(t, id)
+
+	listed := func() bool {
+		list := getTeamArtifacts(t, e.srv, "/api/board/alpha/artifacts", http.StatusOK)
+		for _, a := range list.Artifacts {
+			if a.ID == id {
+				return true
+			}
+		}
+		return false
+	}
+	require.True(t, listed(), "before the removal the team's list shows the file")
+
+	ok, err := e.h.bs.Unsubscribe(context.Background(), "alpha", "Alice")
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	assert.True(t, listed(), "after the agent that holds the file is removed, the team's list still shows it")
+}
+
+// #15356: the same agent name coming back under a NEW session (a replaced or relaunched agent) overwrites the subscriber's session; the team's file, kept under the old one, must still be listed.
+func TestATeamFileStaysListedWhenTheHoldingAgentComesBackUnderANewSession(t *testing.T) {
+	e := newShareEnv(t, true)
+	code, out := e.teamUpload(t, "brief.md", "# the brief", "")
+	require.Equal(t, http.StatusCreated, code, out)
+	id, _ := out["id"].(string)
+	require.NotEmpty(t, id)
+
+	subscribeSession(t, e.h, "alpha", "Alice", "99999999-aaaa-0000-0000-000000000009")
+
+	list := getTeamArtifacts(t, e.srv, "/api/board/alpha/artifacts", http.StatusOK)
+	var found bool
+	for _, a := range list.Artifacts {
+		found = found || a.ID == id
+	}
+	assert.True(t, found, "the team's file is still listed after its holder came back under a new session")
+}
