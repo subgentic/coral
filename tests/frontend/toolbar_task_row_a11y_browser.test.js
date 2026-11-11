@@ -65,7 +65,7 @@ const TEAM = `qa-tbr-${Date.now() % 100000}`;
         await open(390, 844, true);
         await S.run('390 px: a task in the Tasks tab is a 44 px row with one button named for the task, in the folded table', async () => {
             await goTab(ev, settle, 'Tasks'); await settle(800);
-            const rows = await ev(`[...document.querySelectorAll('[role=tabpanel]:not([hidden]) .dt-table tbody tr')].map(r => { const b = r.querySelector('.dt-primary'); const q = r.getBoundingClientRect(); return { n: r.querySelectorAll('.dt-primary').length, name: b.getAttribute('aria-label'), h: Math.round(q.height), w: Math.round(q.width) }; })`); // the row is the touch target (a tap on it opens the task), the title button the keyboard's
+            const rows = await ev(`[...document.querySelectorAll('[role=tabpanel]:not([hidden]) .dt-table tbody tr:not(.dt-group)')].map(r => { const b = r.querySelector('.dt-primary'); const q = r.getBoundingClientRect(); return { n: r.querySelectorAll('.dt-primary').length, name: b.getAttribute('aria-label'), h: Math.round(q.height), w: Math.round(q.width) }; })`); // the row is the touch target (a tap on it opens the task), the title button the keyboard's
             assert.ok(rows.length >= 3, 'the table has rows: ' + JSON.stringify(rows));
             for (const r of rows) assert.ok(r.n === 1 && r.h >= 44 && /^(Open task )?#\d+[: ] ?.+/.test(r.name), JSON.stringify(r));
             await shot('tasks-phone');

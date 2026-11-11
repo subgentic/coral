@@ -260,7 +260,9 @@ function draw() {
         } else {
             const row = bar.node.querySelector('.list-bar-search-row');
             const phone = PHONE.matches;
-            const t = TV.tasksTable('team', shown, { ctx: rowCtx(), label: `Tasks, ${shown.length}`, open: (task) => hooks.openTask?.(task), state: model.dt,
+            const goalKey = t => String(t.goal_id || 0), byGoal = new Set(shown.map(goalKey)).size > 1; // tasks of more than one goal: a group per goal, so goal 1's finished tasks are not mixed with goal 2's new one (#15305, walk 18 M8)
+            if (byGoal && !model.dt.sort) shown.sort((a, b) => (Number(a.goal_id || 1e12) - Number(b.goal_id || 1e12)));
+            const t = TV.tasksTable('team', shown, { ctx: rowCtx(), label: `Tasks, ${shown.length}`, ...(byGoal ? { groupBy: task => ({ key: goalKey(task), label: task.goal_id ? goalTitle(model.project, task.goal_id) || `Goal ${task.goal_id}` : noGoalLabel }) } : {}), open: (task) => hooks.openTask?.(task), state: model.dt,
                 ...(phone ? { bare: true, sortBar: false, mail: task => ({ lead: { icon: 'checklist', square: true, name: bucket(task) }, title: task.title, ask: [task.assigned_to, task.goal_id ? goalTitle(model.project, task.goal_id) : ''].filter(Boolean).join(' \u00b7 '), state: taskStatusWord(task.status, task.review_requested, isParked(task)), time: taskStatusWord(task.status, task.review_requested, isParked(task)), data: { taskId: String(task.id) } }) } : {}), // a phone: the shared form, edge-to-edge two-line rows (#12230)
                 selectable: { contextKey: model.project, actions: TB.taskBulkActions(model.project, () => { model.dt.selected.clear(); loadTasks(); }), onChange: (keys) => Toolbar.mountSelection(row, keys.size ? t.bar : null), ...(phone ? { longPress: true, iconBar: true, clearLabel: 'Cancel' } : {}) } }); // the selection bar takes the toolbar's line while tasks are selected
             Toolbar.mountSelection(row, model.dt.selected.size ? t.bar : null);

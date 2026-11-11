@@ -31,7 +31,7 @@ const S = `(window.__coralStatic || '/static/')`;
         await ev(`window.switchNavTab('agents'); window.openTeamPage(${JSON.stringify(board)}, { tab: 'goals' }); true`); // the goals are the team page's Goals tab (#8129: the board's Goals face is gone)
         const rows = () => texts('#team-panel-goals .dt-table tbody tr');
         // the tab opens on Active (#8517): one goal; All lists the three, the closed one too (the list asks for every state)
-        await waitFor(`document.querySelectorAll('#team-panel-goals .dt-table tbody tr').length === 1`, 'the one active goal the tab opens on', 10000);
+        await waitFor(`document.querySelectorAll('#team-panel-goals .dt-table tbody tr:not(.dt-group)').length === 2`, 'the one active goal the tab opens on, and the finished one under Done (#15305)', 10000);
         await ev(`[...document.querySelectorAll('#team-panel-goals .goals-chip')].find(c => /^All\\b/.test(c.textContent.trim())).click(); true`);
         await waitFor(`document.querySelectorAll('#team-panel-goals .dt-table tbody tr').length === 3`, 'three goals (the closed one too: the list asks for every state)', 10000);
         assert.deepEqual(await texts('#team-panel-goals .goals-chip'), ['All 3', 'Active 1', 'Blocked 0', 'Proposed 1', 'Done 1', 'Dropped 0']);
