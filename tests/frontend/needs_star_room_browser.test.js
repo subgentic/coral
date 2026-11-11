@@ -27,7 +27,7 @@ const BASE = require('./test_base').BASE;
             await ev(`new Promise(r => setTimeout(r, 400))`); // sleep-ok: the row's layout settles after its fonts and the table's width
             const over = await ev(`(() => { const hit = (a, b) => a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1;
                 return [...document.querySelectorAll('.inbox-needs-results .inbox-review-star')].map(star => { const sr = star.getBoundingClientRect(), row = star.closest('tr'), out = [];
-                    const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT); let n; while ((n = walker.nextNode())) { if (!n.textContent.trim() || star.contains(n)) continue; const range = document.createRange(); range.selectNodeContents(n); for (const r of range.getClientRects()) if (r.width && hit(r, sr)) out.push(n.textContent.trim().slice(0, 30) + ' in ' + n.parentElement.className); }
+                    const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT); let n; while ((n = walker.nextNode())) { if (!n.textContent.trim() || star.contains(n) || n.parentElement.closest('.sr-only')) continue; /* text hidden for sighted people is not under anything (#15540) */ const range = document.createRange(); range.selectNodeContents(n); for (const r of range.getClientRects()) if (r.width && hit(r, sr)) out.push(n.textContent.trim().slice(0, 30) + ' in ' + n.parentElement.className); }
                     return { star: [Math.round(sr.left), Math.round(sr.top), Math.round(sr.right), Math.round(sr.bottom)], under: out }; }); })()`);
             if (!over.length || over.some(o => o.under.length)) problems.push(`${at}text runs under the star: ${JSON.stringify(over)}`);
         }

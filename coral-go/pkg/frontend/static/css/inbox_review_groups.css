@@ -30,7 +30,7 @@
 }
 /* Ticking a row does not move the list (#15339, walk 23 H3): the Needs toolbar keeps one line's height, and while rows are selected the bar takes that whole line (the filters, chips and sort wait behind it) instead of wrapping under them and pushing the rows down. */
 #group-table-view .gt-toolbar { min-height: 40px; }
-#group-table-view .gt-toolbar.team-toolbar-selecting > :not(.team-tb-selection) { display: none !important; }
+#group-table-view .gt-toolbar.team-toolbar-selecting:not(.tb-low) > :not(.team-tb-selection) { display: none !important; }
 #group-table-view .gt-toolbar.team-toolbar-selecting > .team-tb-selection { flex: 1 1 100%; }
 
 #group-table-view .inbox-needs-results { max-width: 80rem; } /* a line of the table is not the width of a 1920 px screen: Time sat 1400 px from the title (#15339, walk 23 L17) */
@@ -48,3 +48,15 @@
     .sidebar-rail-folder .view-list-icon svg { width: 16px; height: 16px; }
     .sidebar-rail-badge { position: absolute; top: -2px; right: -2px; background: var(--rail-badge-unread); color: var(--rail-badge-text); }
 }
+/* The Operator's Needs you (#15540): title, search and filters stay while rows are selected, and the actions are ONE line below them, the count first; the line is where the list's count stood, so ticking a row moves nothing (#15339). The checkbox, the kind icon and the star are one line at the top of every row, whatever its height. */
+#group-table-view .gt-toolbar.tb-low { flex-wrap: wrap; }
+#group-table-view .gt-toolbar.tb-low > .team-tb-selection { order: 10; flex: 1 1 100%; min-height: 40px; flex-wrap: nowrap; overflow-x: auto; }
+#group-table-view .gt-toolbar.tb-low > .list-bar-count { display: none; }
+@media (min-width: 768px) { #group-table-view .inbox-folder-toolbar:not(:has(.team-toolbar-selecting)) { padding-bottom: 52px; } } /* the actions' line (40 px and the row's 8 px gap) is kept while nothing is selected, so ticking a row moves no row (#15339) */
+/* #15540: icon and star share a line at the row's top on a computer; a phone card keeps its star at the end of the button row (#15658) */
+@media (min-width: 768px) {
+    #group-table-view .inbox-needs-results  .inbox-review-star-anchor { position: static; }
+    #group-table-view .inbox-needs-results  .inbox-kind-row .inbox-review-item > .inbox-review-star { inset: 4px auto auto auto; inset-inline-end: 8px; }
+}
+@media (max-width: 767px) { #group-table-view .list-bar-bar:has(> .tb-low) { top: calc(-1 * var(--sel-up, 0px) - var(--space-2xl)); } } /* the bar sticks (data_table.css) with its head, search and filters scrolled off above: only the actions line stays at the top of the screen (#15632; --sel-up is that line's offset in the bar, set by mountSelection) */
+@media (max-width: 767px) { #group-table-view .gt-toolbar.tb-low > :not(.btn-icon, .inbox-folder-head, .list-bar-count, .team-tb-selection) { display: revert; } #group-table-view .gt-toolbar.tb-low > .btn-icon { display: inline-flex; } #group-table-view .gt-toolbar.tb-low > .inbox-folder-head { display: flex; } } /* the phone's selecting row keeps its head, search and icons (#15540) */

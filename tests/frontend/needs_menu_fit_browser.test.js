@@ -39,7 +39,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const ms = `document.getElementById('main-stage')`;
             await waitFor(`document.querySelectorAll('${T} .inbox-answer').length === 2`, at+'prompt choices');
             await shot(`answers-${w}-${font}`);
-            const clipped = await ev(`(() => { const bad=[]; for(const b of document.querySelectorAll('${T} .inbox-answer')) { const r=b.getBoundingClientRect(); for(let e=b.parentElement;e;e=e.parentElement){const c=getComputedStyle(e),q=e.getBoundingClientRect();if(/hidden|clip|auto|scroll/.test(c.overflowX) && (r.left<q.left-1 || r.right>q.right+1))bad.push(b.textContent+' clipped by '+e.className);if(/hidden|clip|auto|scroll/.test(c.overflowY) && (r.top<q.top-1 || r.bottom>q.bottom+1))bad.push(b.textContent+' vertically clipped by '+e.className);} } return bad; })()`);
+            const clipped = await ev(`(() => { const bad=[]; for(const b of document.querySelectorAll('${T} .inbox-answer')) { b.scrollIntoView({block:'center'}); /* a choice below the fold is scrolled to, not clipped (the list sits 52 px lower since #15540) */ const r=b.getBoundingClientRect(); for(let e=b.parentElement;e;e=e.parentElement){const c=getComputedStyle(e),q=e.getBoundingClientRect();if(/hidden|clip|auto|scroll/.test(c.overflowX) && (r.left<q.left-1 || r.right>q.right+1))bad.push(b.textContent+' clipped by '+e.className);if(/hidden|clip|auto|scroll/.test(c.overflowY) && (r.top<q.top-1 || r.bottom>q.bottom+1))bad.push(b.textContent+' vertically clipped by '+e.className);} } return bad; })()`);
             failures.push(...clipped.map(x=>at+x));
 
             assert.ok(await ev(`${ms}.scrollWidth <= ${ms}.clientWidth`), `${w}: the main stage fits its window before the menu opens`);
