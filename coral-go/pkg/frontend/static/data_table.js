@@ -239,7 +239,7 @@ export function dataTable(cfg) {
     const foldThreshold = () => typeof foldAt === 'function' ? foldAt() : foldAt; // a numeric callback can follow the viewport while a table stays mounted
     if (sel && sel.contextKey !== undefined && st.ctx !== String(sel.contextKey)) { st.selected.clear(); st.rowCache?.clear(); st.confirming = -1; st.choices = null; st.anchor = null; st.ctx = String(sel.contextKey); }
     const hasContent = cfg.columns.some(c => c.width === 'content');
-    const box = el('div', `dt-box${cfg.compact ? ' dt-compact' : ''}${foldAt === 'fit' ? ' dt-fit' : ''}${hasContent ? ' dt-has-content' : ''}${cfg.bare ? ' dt-bare' : ''}${cfg.scroll ? ' dt-scroll' : ''} ${foldKind === 'labeled' ? 'dt-fold-labeled' : foldKind === 'always' ? 'dt-fold-column' : foldKind === 'none' ? 'dt-fold-none' : 'dt-fold-column'}`);
+    const box = el('div', `dt-box${cfg.compact ? ' dt-compact' : ''}${foldAt === 'fit' ? ' dt-fit' : ''}${hasContent ? ' dt-has-content' : ''}${cfg.bare ? ' dt-bare' : ''}${cfg.scroll ? ' dt-scroll' : ''}${cfg.fold === 'always' ? ' dt-fold-always' : ''} ${foldKind === 'labeled' ? 'dt-fold-labeled' : foldKind === 'always' ? 'dt-fold-column' : foldKind === 'none' ? 'dt-fold-none' : 'dt-fold-column'}`);
     if (cfg.oneLine) box.classList.add('dt-one-line');
     if (cfg.wrapMail) box.classList.add('dt-wrap-mail'); // a phone's mail row says its title and its second line whole (they wrap) instead of ending in an ellipsis (Activity, #14423)
     if (cfg.oneLine && cfg.wrapNames) box.classList.add('dt-wrap-names'); // a narrow list wraps a long name at its words (hyphens too) instead of cutting it mid-word with an ellipsis (#10275)
@@ -555,7 +555,7 @@ export function dataTable(cfg) {
         td.setAttribute('role', 'cell'); td.dataset.label = c.label; td.dataset.key = c.key;
         if (cfg.oneLine && c.dropAt) td.setAttribute('data-drop-at', String(c.dropAt));
         if (c.tiny) td.setAttribute('data-tiny', 'hide');
-        td.classList.add(c.line === 1 ? 'dt-line-1' : c.line === 2 ? 'dt-line-2' : 'dt-line-0');
+        td.classList.add(c.line === 1 ? 'dt-line-1' : c.line === 2 ? 'dt-line-2' : c.line === 3 ? 'dt-line-3' : 'dt-line-0');
         if (c.foldLabel) td.setAttribute('data-fold-label', c.label); // the folded row has no header: the column's name is drawn before the figure (data_table.css, as text; foldLabel: true, #11463)
         if (c.when && !c.when(r)) td.classList.add('dt-when-off');
         if (emptyKeys.has(c.key)) { td.classList.add('dt-col-unused'); td.style.display = 'none'; } // display-ok: as in syncEmptyColumns

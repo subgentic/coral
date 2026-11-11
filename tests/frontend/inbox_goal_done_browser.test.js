@@ -72,7 +72,7 @@ const B = 'goal-done-' + Date.now().toString(36);
                     border: cs && parseFloat(cs.borderTopWidth), text: cs && ratio(cs.color, bg), edge: cs && ratio(cs.borderTopColor, bg), rowH: Math.round(tr_.height), fits: box.scrollWidth <= box.clientWidth + 1 }; })()`);
             assert.ok(g.n >= 3 && g.names.slice(0, 3).join() === 'Mark done,Not yet,Dismiss', `${theme}: the three buttons (an unread row has no three dots on a desktop: its menu is only Mark unread, for a row already read): ` + JSON.stringify(g));
             assert.ok(Math.max(...g.centres) - Math.min(...g.centres) <= 1, `${theme}: the buttons (and the three dots, when the row has them) are on one line (same centre): ` + JSON.stringify(g));
-            assert.ok(g.tdAlign === 'middle' && Math.abs(g.centres[0] - g.rowCentre) <= 2, `${theme}: the actions are centred on the row, not at its top: ` + JSON.stringify(g));
+            assert.ok(g.centres[0] > g.rowCentre && g.centres[0] < g.rowCentre + g.rowH / 2, `${theme}: the actions are on the row's bottom line, under its text (#15162): ` + JSON.stringify(g));
             assert.ok(g.border >= 1 && g.edge >= 3 && g.text >= 4.5, `${theme}: Dismiss has an outline (3:1) and words at 4.5:1: ` + JSON.stringify(g));
             assert.ok(g.fits, `${theme}: nothing is cut off in the actions cell: ` + JSON.stringify(g));
         }

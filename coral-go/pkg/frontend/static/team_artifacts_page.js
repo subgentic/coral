@@ -589,6 +589,17 @@ export function createArtifactsList({ inbox = false } = {}) {
             head = document.createElement('div'); head.className = 'artifact-sheet-head';
             const line = document.createElement('span'); line.className = 'artifact-review-line'; line.setAttribute('role', 'status'); line.textContent = reviewText;
             head.append(line, editor);
+            if (reviewText === 'Waiting for your review' && local()) { // review from the list, in two clicks (walk 3 N4): Approve here; Request changes opens the viewer's form
+                const team = inbox ? item.board_id : model.project, row = { ...item, id: hex, hex, team, name }, acts = document.createElement('div'); acts.className = 'artifact-sheet-review'; acts.setAttribute('role', 'group'); acts.setAttribute('aria-label', 'Review this file');
+                const approve = document.createElement('button'); approve.type = 'button'; approve.className = 'btn btn-primary'; approve.textContent = 'Approve';
+                approve.addEventListener('click', async () => {
+                    approve.disabled = true;
+                    try { const R = await importOnce('./artifact_review.js'); R.sayApproved(name, await R.approveRow(team, row)); line.textContent = 'Approved just now'; acts.remove(); refreshQuiet(); } catch (e) { showToast(e.message, true); approve.disabled = false; }
+                });
+                const changes = document.createElement('button'); changes.type = 'button'; changes.className = 'btn'; changes.textContent = 'Request changes';
+                changes.addEventListener('click', () => { const open = actions.find(x => x.label === 'Open'); open?.run(); const t0 = Date.now(), tick = () => { const b = document.querySelector('#artifact-viewer .artifact-review-changes:not([hidden])'); if (b) b.click(); else if (Date.now() - t0 < 4000) setTimeout(tick, 100); }; tick(); }); // sleep-ok: waits for the viewer to draw its own button
+                acts.append(approve, changes); head.append(acts);
+            }
         }
         const dropped = ['team', 'goal'].filter(k => { const th = root?.querySelector(`th[data-key="${k}"]`); return !!th && getComputedStyle(th).display === 'none'; }).length; // a narrow box drops the row's Team and Task columns: their facts are behind Details, and the button says how many
         openDetailPane({
