@@ -76,7 +76,7 @@ const { coralReady } = require('./helpers/wait');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await sleep(false);
         const awake = await ev(`({ input: document.getElementById('mb-post-input').disabled, placeholder: document.getElementById('mb-post-input').placeholder, send: document.querySelector('#mb-board .btn-primary').disabled, opacity: document.querySelector('#mb-board .btn-primary').style.opacity })`);
-        assert.deepEqual(awake, { input: false, placeholder: 'Message the team...', send: false, opacity: '' });
+        assert.deepEqual(awake, { input: false, placeholder: 'Message the team (the Orchestrator reads every post)', send: false, opacity: '' });
         await ev(`window.__ssState = null; true`); // the stand-in passes everything through again
         console.log('   ✓');
 
