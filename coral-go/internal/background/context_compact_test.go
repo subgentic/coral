@@ -565,3 +565,19 @@ func TestAnAgentThatIsNotACandidateSaysWhyOnce(t *testing.T) {
 		})
 	}
 }
+
+// #15506: a gate that stops a large agent (busy, a dialog, a usage limit) is said in the log once; a small agent that is busy is not worth a line.
+func TestAGateThatStopsALargeAgentIsSaidInTheLog(t *testing.T) {
+	h := newCompactHarness(t, true)
+	var buf strings.Builder
+	h.c.logger = slog.New(slog.NewTextHandler(&buf, nil))
+	h.agent("Big", "s1", "agy", "Dev", 400000, time.Minute)
+	h.sig["s1"] = agentSignal{NeedsInput: true, Since: h.now.Add(-time.Hour)}
+	h.agent("Small", "s2", "agy", "Dev", 50000, time.Minute)
+	h.sig["s2"] = agentSignal{InTurn: true, Since: h.now.Add(-time.Hour)}
+	h.run(0)
+	h.run(time.Minute)
+	assert.Empty(t, h.sent())
+	assert.Equal(t, 1, strings.Count(buf.String(), "busy or waiting for input (its context is over the threshold)"), buf.String())
+	assert.NotContains(t, buf.String(), "agent=Small")
+}

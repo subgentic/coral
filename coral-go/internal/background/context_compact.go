@@ -252,16 +252,6 @@ func (c *ContextCompact) skipOnce(project string, a AgentInfo, name, reason stri
 	}
 }
 
-// skipIfDue is skip for the checks that come before the context is read: it speaks only for an agent that was due at the last pass.
-func (c *ContextCompact) skipIfDue(project string, a AgentInfo, name, reason string) {
-	c.mu.Lock()
-	_, due := c.dueSince[name]
-	c.mu.Unlock()
-	if due {
-		c.skip(project, a, name, reason)
-	}
-}
-
 // confirm settles a typed command: the agent started a turn after it (the CLI took it), or two minutes passed and it did not.
 func (c *ContextCompact) confirm(project string, a AgentInfo, name string, sig agentSignal, now time.Time) {
 	c.mu.Lock()
@@ -343,6 +333,11 @@ func (c *ContextCompact) runProject(ctx context.Context, project string, hs boar
 	}
 	var cands []AgentInfo
 	var names, ids, subIDs []string
+	type gated struct {
+		a            AgentInfo
+		name, reason string
+	}
+	var held []gated // agents stopped by a gate before their context was read: said in the log once their context turns out to be over the threshold
 	for _, sub := range subs {
 		a, live := agents[sub.SessionName]
 		if !live || sub.SessionName == "" {
@@ -367,7 +362,7 @@ func (c *ContextCompact) runProject(ctx context.Context, project string, hs boar
 		}
 		c.confirm(project, a, sub.SessionName, sig, now)
 		if sig.InTurn || sig.NeedsInput || now.Sub(sig.Since) < compactSettle {
-			c.skipIfDue(project, a, sub.SessionName, "the agent is busy or waiting for input")
+			held = append(held, gated{a, sub.SessionName, "the agent is busy or waiting for input"})
 			continue
 		}
 		c.mu.Lock()
@@ -384,7 +379,7 @@ func (c *ContextCompact) runProject(ctx context.Context, project string, hs boar
 		}
 		if c.limit != nil {
 			if _, blocked := c.limit(ctx, a); blocked {
-				c.skipIfDue(project, a, sub.SessionName, "a usage limit stops the agent")
+				held = append(held, gated{a, sub.SessionName, "a usage limit stops the agent"})
 				continue
 			}
 		}
@@ -392,6 +387,19 @@ func (c *ContextCompact) runProject(ctx context.Context, project string, hs boar
 		names = append(names, sub.SessionName)
 		ids = append(ids, a.SessionID)
 		subIDs = append(subIDs, sub.SubscriberID)
+	}
+	if len(held) > 0 {
+		hid := make([]string, len(held))
+		for i, g := range held {
+			hid[i] = g.a.SessionID
+		}
+		if ht, err := c.tokens(ctx, hid); err == nil {
+			for _, g := range held {
+				if ht[g.a.SessionID] >= hs.ThresholdK*1000 {
+					c.skipOnce(project, g.a, g.name, g.reason+" (its context is over the threshold)")
+				}
+			}
+		}
 	}
 	if len(cands) == 0 {
 		return
