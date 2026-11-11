@@ -30,8 +30,13 @@ export function pointerLine(topic, section = '') {
 }
 
 /** What a robot button copies: the subject's own line(s) (its command), then where in the docs to read. `key` is a DOC_POINTERS entry, or { topic, section } (the Docs viewer: the page being read). */
+/** The subject as one clean line: the names in it (an agent's, a team's, a file's) come from other people and agents, so control characters and line breaks become spaces, runs of space collapse, and a very long one is cut (#15668). */
+export function cleanSubject(subject) {
+    const t = String(subject || '').replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, ' ').replace(/ {2,}/g, ' ').trim();
+    return t.length > 500 ? t.slice(0, 499).trimEnd() + '\u2026' : t;
+}
 export function agentCopyText(key, subject = '') {
-    const p = typeof key === 'string' ? DOC_POINTERS[key] : key;
-    if (!p) return String(subject || '');
-    return [String(subject || '').trim(), pointerLine(p.topic, p.section)].filter(Boolean).join('\n');
+    const p = typeof key === 'string' ? DOC_POINTERS[key] : key, line = cleanSubject(subject);
+    if (!p) return line;
+    return [line, pointerLine(p.topic, p.section)].filter(Boolean).join('\n');
 }
