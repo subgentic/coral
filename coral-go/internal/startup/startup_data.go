@@ -177,7 +177,7 @@ func openDatabases(ctx context.Context, cfg *config.Config, boardPath, dbKey str
 // max mode), then sets up what agents need before anything can launch one: per-session tokens (#3387), the agent
 // tools, the launch temp folder and the session-state sweep, and removes stale files (an orphaned proxy CA, launch
 // scripts a shell never sourced, older than a day: #4361).
-func prepareWithDatabase(ctx context.Context, db *store.DB, cfg *config.Config, opts Options) error {
+func prepareWithDatabase(ctx context.Context, db *store.DB, cfg *config.Config, opts Options, sweeps *[]<-chan struct{}) error {
 	applyPrivacySettings(ctx, db, cfg, opts.RemoteAccess, opts.RemoteAccessPrompt)
 	applyHubModeSetting(ctx, db, cfg)
 	if err := applyCloudMaxMode(ctx, db, cfg); err != nil {
@@ -187,8 +187,7 @@ func prepareWithDatabase(ctx context.Context, db *store.DB, cfg *config.Config, 
 	setupSessionTokens(db, cfg.CoralDir())
 	setupAgentTools(cfg.CoralDir())
 	removeOrphanProxyCA(cfg.CoralDir())
-	setupLaunchTempDir(db, cfg.CoralDir())
-	setupSessionStateSweep(db, cfg.CoralDir())
+	*sweeps = append(*sweeps, setupLaunchTempDir(db, cfg.CoralDir()), setupSessionStateSweep(db, cfg.CoralDir())) // background: a start that stops waits for them (#15536)
 	if dir := agent.LaunchTempDir(); dir != os.TempDir() {
 		if n := cmdhandoff.SweepIn(dir); n > 0 {
 			log.Printf("[startup] removed %d launch script(s) older than a day from %s", n, logsafe.Path(dir))
