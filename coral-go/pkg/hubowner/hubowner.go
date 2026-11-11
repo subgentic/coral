@@ -46,10 +46,10 @@ const Skew = 30 * time.Second
 // secretBytes is the length of a secret, hex-encoded in its file and on the wire between the hub and the human act.
 const secretBytes = 32
 
-// RoutesVersion is the generation of the allowlist below: 1 is the first eight routes, 2 (#13694) adds every Operator click that writes an Activity row and the decisions that need a person, 3 (#13757) the Markdown editor's save and the model switch, 4 (#13802) Send to agent with the diff, 5 (#13834) the done-state of a "Goal looks done" row, 6 (#13910) the Operator's opened version of a file, 7 (#15380) the Hub's read of a computer's Needs you, 8 (#15697) pause and resume of an agent's notices, 9 (#15708) the person-only reads of audit group 4. A remote says in
+// RoutesVersion is the generation of the allowlist below: 1 is the first eight routes, 2 (#13694) adds every Operator click that writes an Activity row and the decisions that need a person, 3 (#13757) the Markdown editor's save and the model switch, 4 (#13802) Send to agent with the diff, 5 (#13834) the done-state of a "Goal looks done" row, 6 (#13910) the Operator's opened version of a file, 7 (#15380) the Hub's read of a computer's Needs you, 8 (#15697) pause and resume of an agent's notices, 9 (#15708) the person-only reads of audit group 4, 10 (#15713) the manager's private mark on an artifact. A remote says in
 // its health answer which generation it accepts; a hub stamps a route only when the remote's generation is at least the route's (a stamp on a route an older remote does not list is refused 403, where an
 // unstamped call still goes through as a key caller). The remote still checks every stamp against its own list, so a wrong number gets a 403 and never more power.
-const RoutesVersion = 9
+const RoutesVersion = 10
 
 type route struct {
 	pattern string
@@ -152,6 +152,8 @@ var routes = []route{
 	{"GET /api/system/terminal-logs", 9},
 	{"GET /api/thread", 9},
 	{"GET /api/threads", 9},
+	// Generation 10 (#15713, Security: exactly one route, the first write of audit group 4): the owner marks an artifact private to the manager, or clears the mark, from the Hub. Reason: the owner manages who reads their files (a guide never reads a private one) and has no other way to do it on a remote computer. A body of one boolean (capped at 1 KB by the route); the remote checks the artifact itself.
+	{"PUT /api/artifacts/{id}/private", 10},
 }
 
 // MustBeSigned reports whether a request is one whose words are the person's own and become automation on the remote when no stamp goes with it: the owner's message to an agent (#13456) and, since

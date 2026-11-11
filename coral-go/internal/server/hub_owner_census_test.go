@@ -50,6 +50,7 @@ var neverStamped = []string{
 
 // stampedAnyway: routes that are not an Activity row of their own but are on the list on purpose (tier B, Security's answer on #13694): a person's decision gated like the Activity ones.
 var stampedAnyway = map[string]string{
+	"PUT /api/artifacts/{id}/private":                                      "the owner marks an artifact private to the manager, or clears it, from the Hub (#15713, Security: generation 10, exactly this route, the first write of audit group 4): the owner manages who reads their files and has no other way to do it on a remote computer; one boolean, person-gated, so it must carry the stamp or it answers 403 through the Hub",
 	"POST /api/sessions/live/{name}/notices/pause":                         "pause an agent's notices from the Hub (#15697, Security: generation 8, exactly these two): the Operator's own control, a tiny body, nothing that runs or changes code or settings; person-gated, so it must carry the stamp or it answers 403 through the Hub",
 	"POST /api/sessions/live/{name}/notices/resume":                        "resume them (#15697): the other half of the pause",
 	"POST /api/sessions/live/{name}/model":                                 "the chat box's model and thinking-level switch (#13761, Security): a person's choice on their own agent, person-gated, so it must carry the stamp or it answers 403 through the Hub; it types only a validated value",
