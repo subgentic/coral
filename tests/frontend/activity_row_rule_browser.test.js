@@ -14,7 +14,7 @@ const LONG = 'Not now: the build is red, the release notes are not written and I
             await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: width === 390 });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
-            await ev(`(() => { const at = n => new Date(Date.now() - n * 60000).toISOString(), base = { actor: 'operator', team: 'coral-hub', source: 'local', version: '', hint: '', surface: '' };
+            await ev(`(() => { const now = Date.now(), at = n => new Date(now - n * 60000).toISOString(), /* one reading of the clock: rows that share a time share it exactly, so the order between them is the table's, not a millisecond's (#15446) */ base = { actor: 'operator', team: 'coral-hub', source: 'local', version: '', hint: '', surface: '' };
                 window.__rows = [
                     { id: 9, action: 'dismiss', item_kind: 'question', item_id: '5', title: '', note: 'Dismissed by the operator', at: at(6), ...base },
                     { id: 8, action: 'answer', item_kind: 'question', item_id: '6', title: 'Orchestrator', note: '@Orchestrator 1 is fine for now', at: at(6), ...base },
