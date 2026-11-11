@@ -160,7 +160,7 @@ async function connect(opts = {}) {
                         const limit = Number(p.get('limit')) > 0 ? Number(p.get('limit')) : 100;
                         const end = p.has('before') ? Math.min(Number(p.get('before')), all.length) : Math.max(all.length - Number(p.get('offset') || 0), 0);
                         const start = Math.max(end - limit, 0);
-                        return resolve(json({ messages: all.slice(start, end), total: all.length, has_more: start > 0, start }));
+                        return resolve(json({ messages: all.slice(start, end), total: all.length, has_more: start > 0, start, ...(a.restarted && !p.has('before') && !Number(p.get('offset') || 0) ? { restarted: true } : {}) })); // restarted: the server's mark that the session began by a Restart (#15517)
                     }
                     if (kind === 'wake') {
                         if (mock.wakeResult === 'network') return reject(new TypeError('Failed to fetch'));

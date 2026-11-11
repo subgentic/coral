@@ -96,7 +96,7 @@ function _historyParams(session) {
 function _renderHistoryReply(container, session, data) {
     if (data.messages && data.messages.length > 0) {
         if (!initialLoadDone) {
-            clearMessages(container);
+            clearMessages(container, data);
             noteIndexes(data.messages, data.start);
             // Initial load — render all and add "Load More" button if needed
             for (const msg of data.messages) {
@@ -124,7 +124,7 @@ function _renderHistoryReply(container, session, data) {
         }
         historyMessageCount = data.total;
     } else if (!initialLoadDone) {
-        clearMessages(container);
+        clearMessages(container, data);
         historyHasMore = false;
         initialLoadDone = true;
         shownFor = session.session_id;
@@ -503,21 +503,24 @@ function setMessagesHtml(container, html) {
 }
 
 /** Empties the current session's messages and leaves what an earlier session of this agent said. */
-function clearMessages(container) {
-    for (const n of [...container.childNodes]) if (!(n.classList && n.classList.contains('chat-earlier'))) n.remove();
+function clearMessages(container, data) {
+    for (const n of [...container.childNodes]) if (!n.matches?.('.chat-earlier')) n.remove();
+    if (data?.restarted && !container.firstChild) container.innerHTML = RESTART_LINE;
 }
+
+const RESTART_LINE = '<div class="chat-earlier-line">New conversation: context cleared, instructions sent again</div>';
 
 /** A restart gives the agent a new transcript: what the chat showed stays above, as a quiet block with a line saying so, and is never reloaded or matched against the new messages. */
 function freezeEarlier(container) {
     let earlier = container.querySelector(':scope > .chat-earlier');
-    const old = [...container.childNodes].filter(n => n !== earlier && !(n.classList && (n.classList.contains('load-more-btn') || n.classList.contains('loading-indicator') || n.classList.contains('chat-load-error'))));
+    const old = [...container.childNodes].filter(n => n !== earlier && !n.matches?.('.load-more-btn,.loading-indicator,.chat-load-error'));
     if (!old.length && !earlier) return;
-    if (!earlier) { earlier = document.createElement('div'); earlier.className = 'chat-earlier'; earlier.setAttribute('role', 'group'); earlier.setAttribute('aria-label', 'Earlier conversation'); }
+    if (!earlier) { container.insertAdjacentHTML('afterbegin', '<div class="chat-earlier" role="group" aria-label="Earlier conversation"></div>'); earlier = container.firstChild; }
     for (const n of old) {
         if (n.nodeType === 1) { n.removeAttribute('data-msg-key'); n.querySelectorAll('[data-msg-key]').forEach(e => e.removeAttribute('data-msg-key')); }
         earlier.appendChild(n);
     }
-    earlier.insertAdjacentHTML('beforeend', '<div class="chat-earlier-line">New conversation: context cleared, instructions sent again</div>');
+    earlier.insertAdjacentHTML('beforeend', RESTART_LINE);
     clearMessages(container);
     container.prepend(earlier);
 }

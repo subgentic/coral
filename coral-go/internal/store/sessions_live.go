@@ -820,3 +820,18 @@ func (s *SessionStore) SetLivePermissionModeIfEmpty(ctx context.Context, session
 	_, err := s.db.ExecContext(ctx, "UPDATE live_sessions SET permission_mode = ? WHERE session_id = ? AND (permission_mode IS NULL OR permission_mode = '')", mode, sessionID)
 	return err
 }
+
+// MarkRestarted records that session newID began by a Restart of oldID (#15517). A Wake or a Resume is not one: the conversation goes on.
+func (s *SessionStore) MarkRestarted(ctx context.Context, newID, oldID string) error {
+	if newID == "" {
+		return nil
+	}
+	_, err := s.db.ExecContext(ctx, `INSERT OR REPLACE INTO session_restarts (session_id, from_session_id, at) VALUES (?, ?, ?)`, newID, oldID, nowUTC())
+	return err
+}
+
+// BeganByRestart reports whether session id began by a Restart.
+func (s *SessionStore) BeganByRestart(ctx context.Context, id string) bool {
+	var n int
+	return id != "" && s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM session_restarts WHERE session_id = ?`, id) == nil && n > 0
+}

@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -68,4 +69,28 @@ func TestResumeStartsInTheFolderTheSessionWorkedIn(t *testing.T) {
 	p, fail := handler.resumeResolve(ctx, name, &resumeRequest{SessionID: convID, AgentType: "claude", CurrentSessionID: liveID})
 	require.Nil(t, fail)
 	assert.Equal(t, worked, p.workdir, "the resume starts where the session worked, not where its terminal is")
+}
+
+// A restart begins a new conversation and its session says so (#15517): the chat draws its "New conversation" line from that after a reload. The session it replaced, a wake and a
+// resume (the same conversation going on) have no such mark.
+func TestARestartedSessionIsMarkedAndTheOldOneIsNot(t *testing.T) {
+	server, _, term, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	const oldID = "restart-marker-old"
+	oldName := naming.SessionName("claude", oldID)
+	term.addSession(oldName, t.TempDir())
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: oldID, AgentType: "claude", AgentName: "x", WorkingDir: t.TempDir()}))
+	assert.False(t, ss.BeganByRestart(ctx, oldID), "a session nobody restarted")
+
+	resp, err := http.Post(server.URL+"/api/sessions/live/"+oldName+"/restart", "application/json", strings.NewReader(`{"session_id":"`+oldID+`","agent_type":"claude"}`))
+	require.NoError(t, err)
+	var out struct {
+		SessionID string `json:"session_id"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+	resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.NotEmpty(t, out.SessionID)
+	assert.True(t, ss.BeganByRestart(ctx, out.SessionID), "the new session began by a restart")
+	assert.False(t, ss.BeganByRestart(ctx, oldID), "the one it replaced did not")
 }

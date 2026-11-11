@@ -227,6 +227,14 @@ CREATE INDEX IF NOT EXISTS idx_session_index_last_ts
 CREATE VIRTUAL TABLE IF NOT EXISTS session_fts
 	USING fts5(session_id, body, tokenize='porter');
 
+-- A session that began by a Restart (#15517): the new session and the one it replaced. The chat draws its 'New conversation' line from this, so the line is still there after a reload; a Wake or a Resume
+-- (the same conversation going on) never has a row.
+CREATE TABLE IF NOT EXISTS session_restarts (
+	session_id      TEXT PRIMARY KEY,
+	from_session_id TEXT NOT NULL,
+	at              TEXT NOT NULL
+);
+
 -- The Skills Store (#12020, goal #191): one row per version of a skill (the zip is an artifact, named here by its digest), its parsed fields, and where it stands with the Operator. A removed skill keeps
 -- a tombstone (no text) so a pinned agent is told it was removed. skills_fts holds only approved skills; skills_log records who published, approved, rejected or removed which digest.
 CREATE TABLE IF NOT EXISTS skills (

@@ -270,6 +270,9 @@ func (h *SessionsHandler) Chat(w http.ResponseWriter, r *http.Request) {
 			"needs_login":  needsLogin,
 			"login_reason": nilIf(!needsLogin || loginReason == "", loginReason),
 		}
+		if h.ss.BeganByRestart(r.Context(), id) {
+			reply["restarted"] = true // the chat draws the "New conversation" line from this, so a reload keeps it (#15517)
+		}
 		h.addNeedsInput(r, reply, name, agentType, sessionID)
 		httputil.WriteJSONCompressed(w, r, http.StatusOK, reply)
 		return
