@@ -60,7 +60,16 @@ export function mountGoalArtifactsList(host, { team, goalId, onOpen = () => {}, 
         host.replaceChildren();
         if (st.ownerOnly) { host.append(el('p', 'goals-note', 'Artifacts are for the account this computer is linked to.')); return; }
         if (!st.loadedOnce) { host.append(el('p', 'goals-note', st.failed ? 'The artifacts could not be read.' : 'Loading…')); return; }
-        if (!st.items.length) { host.append(el('p', 'goals-note', 'No artifacts yet. An agent shares a file when it finishes a task with one.')); return; }
+        if (!st.items.length) {
+            const p = el('p', 'goals-note', 'No artifacts yet. An agent shares a file when it finishes a task with one.'); host.append(p);
+            if (st.teamTotal > 0) { // the team has files, none on a task of this goal (an upload made with no task, or another goal's): say so and where they are (#15244, walk 12 M7)
+                p.classList.add('goal-artifacts-elsewhere'); p.append(` This team has ${st.teamTotal} ${st.teamTotal === 1 ? 'file' : 'files'} in all. `);
+                const b = el('button', 'btn btn-quiet btn-small', 'Open all Artifacts'); b.type = 'button';
+                b.addEventListener('click', async () => { window.switchNavTab?.('hub-inbox'); await (await importOnce('./inbox_tab.js')).selectInboxTab('artifacts'); });
+                p.append(b);
+            }
+            return;
+        }
         const rows = orderByGroup(st.items, 'task'); // a task's files together; the newest task first, as the server sorts
         const table = artifactTable({
             label: `Artifacts of this goal, ${rows.length}`, bare: true, compact: true, fold: 'none', rows, rowKey: itemKey, rowName: readableName, state: st.tableState, sortBar: false,
@@ -83,6 +92,10 @@ export function mountGoalArtifactsList(host, { team, goalId, onOpen = () => {}, 
             st.cursor = typeof data.next_cursor === 'string' ? data.next_cursor : '';
             if (Number.isFinite(Number(data.total))) st.total = Number(data.total);
             st.loadedOnce = true; st.failed = false;
+            if (!more && !st.items.length && st.teamTotal === undefined) { // nothing on this goal: does the team hold files at all?
+                st.teamTotal = 0;
+                try { const r = await boardFetch(team, '/artifacts?limit=1'); if (r.ok) { const d = await r.json(); st.teamTotal = Number.isFinite(Number(d.total)) ? Number(d.total) : (d.artifacts || []).length; } } catch { /* the plain line stays */ }
+            }
             onCount(st.total);
         } catch (e) {
             if (e && e.message === 'owner_only') { st.ownerOnly = true; st.items = []; st.cursor = ''; st.total = 0; onCount(0); } else if (!st.loadedOnce) st.failed = true;

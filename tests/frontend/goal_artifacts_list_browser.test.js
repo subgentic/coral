@@ -71,7 +71,9 @@ const { coralReady } = require('./helpers/wait');
         const empty = await goal('Nothing yet');
         await mount(empty);
         await waitFor(`/No artifacts yet/.test(document.getElementById('ga-host').textContent)`, 'the empty line', 10000);
-        assert.equal(await ev(`document.querySelector('#ga-host .goals-note').textContent`), 'No artifacts yet. An agent shares a file when it finishes a task with one.');
+        const emptyLine = await ev(`document.querySelector('#ga-host .goals-note').textContent`);
+        assert.ok(emptyLine.startsWith('No artifacts yet. An agent shares a file when it finishes a task with one.'), emptyLine);
+        assert.match(emptyLine, /This team has 1 file in all\. Open all Artifacts$/, 'the team holds the file of another goal, and the line says so (#15244)');
         console.log('   ✓');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
