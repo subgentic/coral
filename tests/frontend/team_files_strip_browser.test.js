@@ -10,6 +10,7 @@ const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
+const { safePaused } = require('./helpers/paused');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -30,6 +31,14 @@ const { coralReady } = require('./helpers/wait');
         await up('README.md', '# Flashcards\nOpen index.html', 'text/markdown');
         // the folder of the team's record, and every file the page saves is kept here instead of going to a download
         await ev(`window.__saved = []; window.__blobs = new Map(); const mk = URL.createObjectURL; URL.createObjectURL = b => { const u = mk.call(URL, b); window.__blobs.set(u, b); return u; }; (() => { const R = window.fetch; window.fetch = (u, o) => String(u).includes('/api/teams/detail/') ? new Promise(res => setTimeout(() => res(new Response(JSON.stringify({ working_dir: '/Users/me/Coral/${B}' }), { status: 200, headers: { 'Content-Type': 'application/json' } })), window.__detailDelay || 0)) : R(u, o); const click = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { if (this.download && /^blob:/.test(this.href)) { const a = this, blob = window.__blobs.get(a.href); blob.arrayBuffer().then(b => { window.__saved.push({ name: a.download, b64: btoa(String.fromCharCode(...new Uint8Array(b))) }); }); return; } return click.call(this); }; window.__copied = []; navigator.clipboard.writeText = async t => { window.__copied.push(t); }; })(); true`); // sleep-ok: the team record answer is held on purpose, to see the page before it comes
+        // the strip's module fails to load (#15624): the held space goes with it, the table moves up once and nothing is left hidden above it
+        await client.Fetch.enable({ patterns: [{ urlPattern: '*artifact_team_files.js', requestStage: 'Request' }] });
+        safePaused(client, p => client.Fetch.failRequest({ requestId: p.requestId, errorReason: 'Failed' }));
+        await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'artifacts' }); true`);
+        await waitFor(`document.querySelectorAll('#team-panel-artifacts [data-artifact-id]').length === 3`, 'the three files with the strip module failing', 15000);
+        await waitFor(`!document.querySelector('#team-panel-artifacts .team-files-strip-host')`, 'the failed strip removes its placeholder', 8000);
+        assert.equal(await ev(`document.querySelectorAll('#team-panel-artifacts .team-files-strip, #team-panel-artifacts .team-files-strip-reserve').length`), 0, 'no strip and no reserved gap after the failure');
+        await client.Fetch.disable();
         await ev(`window.__detailDelay = 1500; window.openTeamPage(${JSON.stringify(B)}, { tab: 'artifacts' }); true`);
         await waitFor(`document.querySelectorAll('#team-panel-artifacts [data-artifact-id]').length === 3`, 'the three files', 15000);
         // the strip loads late (its module, then the team's record): the table must not move when it arrives (#15618, the table sat 70 px lower after it, and team_bulk's long press missed)
