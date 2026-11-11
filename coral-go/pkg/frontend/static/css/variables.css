@@ -204,7 +204,7 @@
     --sv-label-color: var(--text-primary);
     --sv-help-size: var(--fs-base);                  /* 12px */
     --sv-help-weight: 400;
-    --sv-help-color: var(--text-muted);              /* tertiary */
+    --sv-help-color: var(--text-secondary);          /* a hint under a setting is read, not skimmed (#15246: the muted grey was faint on the dark panels) */
     --sv-value-color: var(--text-secondary);         /* a read-only value */
     --sv-row-gap: var(--space-2xl);                  /* between the text column and the control column */
     --sv-row-pad-y: 10px;

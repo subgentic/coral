@@ -45,9 +45,9 @@ const open = [
         assert.equal(await ev(`(() => { const row = document.querySelector('#board-task-list tbody tr'); const primary = row.cells[1].querySelector('.dt-primary'); return row.querySelectorAll('.dt-primary').length === 1 && row.dataset.taskId === '5' && !row.querySelector('.dt-id') && primary?.textContent === 'Draft'; })()`), true,
             'the second cell has one primary action, with the ID retained in row data and omitted visually');
 
-        console.log('Who is circles, as on the Tasks tab (#8507): the person solid, the reviewers outlined (two, then +N), the whole named and shown on hover, no name beside them');
+        console.log('Who is circles, as on the Tasks tab (#8507): the person solid, the reviewers outlined (two, then +N), the whole named and shown on hover, the person name beside the circle (#15246)');
         const who = await ev(`(() => { const row = [...document.querySelectorAll('#board-task-list tbody tr')].find(r => r.dataset.taskId === '3'); const c = row.querySelector('td[data-key="who"]'), i = c.querySelector('[role=img]'); return { label: i && i.getAttribute('aria-label'), title: i && i.title, solid: c.querySelectorAll('.dt-avatar:not(.dt-avatar-review)').length, outlined: c.querySelectorAll('.dt-avatar-review').length, more: (c.querySelector('.dt-avatars-more') || {}).textContent, words: !!c.querySelector('.dt-person-name, .board-task-assignee'), w: Math.round(c.getBoundingClientRect().width) }; })()`);
-        assert.deepEqual({ ...who, w: undefined }, { label: 'Dev, review by QA, UX, Sec', title: 'Dev, review by QA, UX, Sec', solid: 1, outlined: 2, more: '+1', words: false, w: undefined }, JSON.stringify(who));
+        assert.deepEqual({ ...who, w: undefined }, { label: 'Dev, review by QA, UX, Sec', title: 'Dev, review by QA, UX, Sec', solid: 1, outlined: 2, more: '+1', words: true, w: undefined }, JSON.stringify(who));
         assert.ok(who.w <= 110, `the column is as narrow as its circles (${who.w} px)`);
         console.log('  ok');
 

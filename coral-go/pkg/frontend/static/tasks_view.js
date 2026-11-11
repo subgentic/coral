@@ -27,7 +27,13 @@ const STATE_RANK = { 'In progress': 0, 'In review': 1, 'Blocked': 2, 'Waiting': 
 const PRIORITY_RANK = { high: 0, medium: 1, low: 2 };
 
 /** The Who cell: the person as circles named in words (DT.avatars), or "Nobody yet" in words when no one has the task. The dock's list draws the same one (#8507). */
-export const whoCell = (t) => (doerOf(t) ? DT.avatars([{ name: doerOf(t) }, ...reviewersOf(t).map(name => ({ name, review: true }))], whoWords(t)) : whoText(t));
+export const whoCell = (t) => {
+    if (!doerOf(t)) return whoText(t);
+    const w = DT.avatars([{ name: doerOf(t) }, ...reviewersOf(t).map(name => ({ name, review: true }))], whoWords(t));
+    const name = DT.el('span', 'dt-person-name', doerOf(t)); name.setAttribute('aria-hidden', 'true'); // the person's name beside the circle (#15246: a coloured letter alone does not say who); the cell is still one image named in words
+    w.firstChild.after(name);
+    return w;
+};
 
 /** The "3 files" button of a task row: a paperclip-like page icon and the count, named "3 artifacts, open"; it opens the task as its row does, then scrolls to the task page's Artifacts. */
 function filesButton(t, row) {
@@ -57,7 +63,7 @@ export function taskColumns(ctx, keys = ['state', 'task', 'who', 'goal', 'priori
         state: { key: 'state', label: 'State', min: 9, cell: (t) => DT.el('span', `dt-state ${statusClass(taskWord(t))}`, taskWord(t)), sort: true, sortValue: (t) => STATE_RANK[taskWord(t)] ?? 9, line: 1 }, // the state is its word in the state's colour (the Operator, #11189): no pill, no dot, no fill
         task: { key: 'task', label: 'Task', primary: true, width: 'grow', min: 24, share: 2, sort: true, sortValue: (t) => t.title, line: 1,
             cell: (t) => { const c = DT.el('span', 'dt-title-cell'); const b = DT.primaryButton(t.title, ctx.hideTaskId ? `Open task #${t.id}: ${t.title}, ${taskWord(t)}` : `Open task #${t.id}: ${t.title}`); b.dataset.taskId = String(t.id); if (ctx.hideTaskId) c.title = `Task #${t.id}`; else c.append(DT.el('span', 'dt-id', `#${t.id}`)); c.append(b); return c; } }, // a goal's column does not lead with the number (#8784): it is the row's hover title and the button's name; its button's name also ends with the state a sighted row shows as a chip, as the dock's rows do (#8952)
-        who: { key: 'who', label: 'Who', sort: true, sortValue: (t) => doerOf(t) || '', line: 1, width: '6rem', max: 12, cell: (t) => whoCell(t) },
+        who: { key: 'who', label: 'Who', sort: true, sortValue: (t) => doerOf(t) || '', line: 1, width: '8rem', max: 16, cell: (t) => whoCell(t) },
         goal: { key: 'goal', label: 'Goal', min: 16, share: 1, drop: 4, sort: true, sortValue: (t) => (t.goal_id ? ctx.goalTitleOf(t.goal_id) : ''), line: 0,
             cell: (t) => { if (!t.goal_id) return ctx.noGoal || 'No goal'; const l = DT.link(ctx.goalTitleOf(t.goal_id), () => ctx.openGoal?.(t.goal_id)); l.dataset.goalLink = String(t.goal_id); return l; } },
         team: { key: 'team', label: 'Team', max: 26, drop: 1, sort: true, sortValue: (t) => (ctx.teamOf ? ctx.teamOf(t) : t.board || ''), line: 0, cell: (t) => (ctx.teamOf ? ctx.teamOf(t) : t.board || '') },

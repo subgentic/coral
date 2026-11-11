@@ -107,7 +107,7 @@ export function mountTeamLaunchSettings() {
         if (!sw) return;
         if (!state.isConnected) (sw.closest('.sv-row') || sw.parentNode).after(state);
         sw.setAttribute('aria-describedby', state.id);
-        state.textContent = !sw.checked ? "Off: the first task will not be saved as a goal." : task && task.value.trim() ? "On: the first task will also be the team's goal." : "On: a first task, once you write one, will also be the team's goal.";
+        state.textContent = !sw.checked ? "Off: the task goes to the Orchestrator only; no goal is made." : task && task.value.trim() ? "On: the task also becomes a goal on the Goals tab." : "On: whatever you write above will also become a goal on the Goals tab.";
     };
     host.addEventListener('input', syncGoalState); host.addEventListener('change', syncGoalState);
     _view.ready.then(syncGoalState);

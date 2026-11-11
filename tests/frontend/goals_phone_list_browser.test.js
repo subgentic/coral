@@ -38,7 +38,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
                 check(!!two.ask && two.stacked && /^The outcome of /.test(two.ask), at + 'a row is two lines: the goal, then its one-line outcome: ' + JSON.stringify(two));
                 check(/^Active/.test(two.side), at + 'and the state (and the task count, when it has tasks) is on the right: ' + JSON.stringify(two.side));
                 const note = await ev(`(() => { const n = document.querySelector('${P} .goals-require'); return n ? { text: n.textContent.trim(), title: n.title, h: Math.round(n.getBoundingClientRect().height) } : null; })()`);
-                check(!!note && /^info\s*Goal required here$/.test(note.text) && /refused on this board/.test(note.title) && note.h <= 24, at + 'the notice is one quiet line, the sentence on its tooltip: ' + JSON.stringify(note));
+                check(!!note && /^info\s*Goal required here$/.test(note.text) && /needs a goal/.test(note.title) && note.h <= 24, at + 'the notice is one quiet line, the sentence on its tooltip: ' + JSON.stringify(note));
                 check(m.selectVisible && !m.pillsVisible, at + 'the filter is folded into one control: ' + JSON.stringify([m.selectVisible, m.pillsVisible]));
                 // a tap opens the goal (the same open as before the redesign: a programmatic click on the row's button too)
                 const tapAt = await ev(`(() => { const r = document.querySelector('${P} tbody tr .dt-mail-title').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);

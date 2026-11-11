@@ -3339,7 +3339,7 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="automations"]) .s
 .acf-model-refresh .material-icons { font-size: var(--fs-xl); }
 .acf-model-refresh:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-primary); }
 .acf-model-refresh:disabled { opacity: .5; cursor: progress; }
-.acf-model-id { display: block; margin-top: 2px; font-family: var(--font-mono); font-size: var(--fs-sm, 11px); font-weight: var(--fw-regular); color: var(--text-muted); overflow-wrap: anywhere; }
+.acf-model-id { display: block; margin-top: 2px; font-family: var(--font-mono); font-size: var(--fs-base, 12px); font-weight: var(--fw-regular); color: var(--text-secondary); overflow-wrap: anywhere; }
 .acf-model-id:empty { display: none; }
 .acf-model-note { display: block; margin-top: 2px; font-size: var(--fs-sm, 11px); font-weight: var(--fw-regular); color: var(--text-secondary); }
 .acf-model-note:empty { display: none; }

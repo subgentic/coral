@@ -69,7 +69,14 @@ function effortGroups(models) {
     return out;
 }
 
-const optionHtml = m => `<option value="${escapeAttr(m.value)}">${escapeHtml((m.display_name || m.value) + (m.custom === true ? ' (custom)' : ''))}</option>`;
+// What the CLI calls a model, with its version (#15246): "Sonnet" is "Sonnet 5.5" when its description starts with that, and the CLI's own "Default (recommended)" entry (a second Default beside this list's first) is named by the model it is.
+export function modelName(m) {
+    const name = m.display_name || m.value, lead = String(m.description || '').split(' \u00b7 ')[0].trim();
+    if (!lead || lead.length > 24 || !/\d/.test(lead)) return name;
+    if (m.value === 'default') return lead + ' (recommended)';
+    return lead.toLowerCase().startsWith(name.toLowerCase()) && lead.length > name.length ? lead : name;
+}
+const optionHtml = m => `<option value="${escapeAttr(m.value)}">${escapeHtml(modelName(m) + (m.custom === true ? ' (custom)' : ''))}</option>`;
 
 /** The model options: a list whose models name a provider (Pi's) is one group of choices per provider, the ones the CLI is signed in to first (the server's `groups` order); any other list is flat (#11338). */
 function modelOptions(models, groups) {

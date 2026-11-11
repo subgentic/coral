@@ -89,7 +89,7 @@ export const errorWords = (code, sentence) => ERRORS[code] || String(sentence ||
 export const closedWithOpenText = (n) => `Closed with ${plural(n, 'task', 'tasks')} still open. They stay open until someone finishes or moves them.`;
 
 /** The note under the header when the board refuses tasks without a goal. */
-export const requireGoalNote = 'Tasks without a goal are refused on this board (require a goal is on).';
+export const requireGoalNote = 'Every task on this board needs a goal.';
 /** The line that says the other boards are elsewhere, drawn only while the Hub is connected. */
 export const otherBoardsNote = 'Other boards and computers: in Coral Hub';
 

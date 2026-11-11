@@ -82,11 +82,11 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
             task.value = 'Build a thing'; task.dispatchEvent(new Event('input', { bubbles: true })); out.withTask = st();
             sw.click(); out.off = st(); out.read = m.readTeamLaunchSettings().save_goal;
             sw.click(); out.backOn = st(); out.readOn = m.readTeamLaunchSettings().save_goal; document.getElementById('team-start-host').remove(); return out; })()`);
-        check(/^On: a first task/.test(gs.empty || ''), `the switch starts on and says so before a task is written: ${JSON.stringify(gs.empty)}`);
+        check(/^On: whatever you write above/.test(gs.empty || ''), `the switch starts on and says so before a task is written: ${JSON.stringify(gs.empty)}`);
         check(gs.described === 'team-goal-state', `the switch is described by that line: ${gs.described}`);
-        check(/^On: the first task will also be the team's goal/.test(gs.withTask || ''), `with a task written: ${JSON.stringify(gs.withTask)}`);
-        check(/^Off: the first task will not be saved as a goal/.test(gs.off || '') && gs.read === false, `clicked once it says Off and sends no goal: ${JSON.stringify([gs.off, gs.read])}`);
-        check(/^On: the first task will also/.test(gs.backOn || '') && gs.readOn === true, `clicked again it says On: ${JSON.stringify([gs.backOn, gs.readOn])}`);
+        check(/^On: the task also becomes a goal/.test(gs.withTask || ''), `with a task written: ${JSON.stringify(gs.withTask)}`);
+        check(/^Off: the task goes to the Orchestrator only/.test(gs.off || '') && gs.read === false, `clicked once it says Off and sends no goal: ${JSON.stringify([gs.off, gs.read])}`);
+        check(/^On: the task also becomes a goal/.test(gs.backOn || '') && gs.readOn === true, `clicked again it says On: ${JSON.stringify([gs.backOn, gs.readOn])}`);
         // (6) New Agent says Claude is not signed in, with how (#11336): a notice under the provider, Launch stays on, nothing for another provider
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
