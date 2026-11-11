@@ -104,6 +104,12 @@ const { JSDOM } = require('jsdom');
     assert.match($('settings-dropbox-key-note').textContent, /old account is disconnected/);
     assert.ok(!shown('settings-dropbox-key-confirm'));
 
+    // Saved while the environment's key wins (Security's SHOULD on #15648): the account stays, and the note says which key is in use.
+    answers['/api/dropbox/app-key'] = { status: 200, body: { saved: true, disconnected: false, env_wins: true } };
+    $('settings-dropbox-key-input').value = 'envwins12345678';
+    await m.saveAppKey();
+    assert.match($('settings-dropbox-key-note').textContent, /CORAL_DROPBOX_APP_KEY is still the one in use/);
+
     // A key from the environment: no field, one sentence.
     await status({ app_key_set: true, connected: false, state: 'disconnected', app_key_from_env: true });
     assert.ok(!$('settings-dropbox-key-input').offsetParent && $('settings-dropbox-key-input').hidden, 'the field is hidden');

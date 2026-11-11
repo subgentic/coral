@@ -393,7 +393,7 @@ export async function saveAppKey(confirm = false) {
     }
     if (!res.ok) { keyNote(keyErrors[String(res.body.code || '')] || String(res.body.error || "Couldn't save the key. Try again.")); return; }
     await loadDropbox();
-    keyNote(res.body.disconnected ? 'Key saved. The old account is disconnected: connect again.' : (key ? 'Key saved.' : 'Key removed.'));
+    keyNote(res.body.disconnected ? 'Key saved. The old account is disconnected: connect again.' : res.body.env_wins ? 'Key saved. The key from CORAL_DROPBOX_APP_KEY is still the one in use.' : (key ? 'Key saved.' : 'Key removed.'));
 }
 
 let lastStatus = null; // the last status shown, so a saved filter updates the summary without another read

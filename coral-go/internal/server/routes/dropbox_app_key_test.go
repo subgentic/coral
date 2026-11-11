@@ -191,3 +191,39 @@ func TestTheAppKeyIsNeverLogged(t *testing.T) {
 	assert.NotContains(t, buf.String(), keyOne)
 	assert.NotContains(t, buf.String(), keyTwo)
 }
+
+// Security's SHOULD on #15648: with CORAL_DROPBOX_APP_KEY set, the key in use is the environment's whatever is saved, so changing the saved key must not disconnect
+// the account (and needs no confirm). Failing-first: it answered 409 confirm_disconnect, and with the confirm it disconnected and revoked.
+func TestSavingAKeyWhileTheEnvironmentKeyWinsKeepsTheAccountConnected(t *testing.T) {
+	e := newKeyEnv(t)
+	t.Setenv("CORAL_DROPBOX_APP_KEY", keyOne)
+	require.Contains(t, e.signIn(""), "Connected")
+	rec := e.putKey(keyTwo, false)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), `"env_wins":true`)
+	assert.Equal(t, 0, e.dbx.revoked, "the sign-in was not ended at Dropbox")
+	st := e.status()
+	assert.Equal(t, true, st["connected"], "still connected")
+	assert.Equal(t, keyTwo, st["app_key"], "the saved key is kept for when the environment's is gone")
+	assert.Equal(t, keyOne, e.h.dbx.appKey(), "the environment's key is still the one in use")
+}
+
+// Security's INFO on #15648: the status carries the saved key (a public client id, for Settings' field), so the route stays the Operator's: refused to an agent token,
+// to a request through the tunnel (Coral Hub), and a refused answer never holds the key.
+func TestTheStatusWithTheSavedKeyIsClosedToAgentsAndTheHub(t *testing.T) {
+	e := newKeyEnv(t)
+	require.Equal(t, http.StatusOK, e.putKey(keyOne, false).Code)
+	require.Contains(t, e.status()["app_key"], keyOne, "the Operator's own read has it")
+	for name, hdr := range map[string]map[string]string{
+		"an agent token":    {"Authorization": "Bearer agent-token-" + "0123456789"},
+		"a session token":   {"X-Coral-Session-Token": "agent-token-" + "0123456789"},
+		"through Coral Hub": {tunnel.ViaHeader: "1"},
+	} {
+		rec := e.call(http.MethodGet, "/api/dropbox/status", name == "through Coral Hub", hdr)
+		assert.Equal(t, http.StatusForbidden, rec.Code, name)
+		assert.NotContains(t, rec.Body.String(), keyOne, name)
+	}
+	rec := e.call(http.MethodGet, "/api/dropbox/status", false, nil)
+	assert.Equal(t, http.StatusForbidden, rec.Code, "no dashboard (a script)")
+	assert.NotContains(t, rec.Body.String(), keyOne)
+}

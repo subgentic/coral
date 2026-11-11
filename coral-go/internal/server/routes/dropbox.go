@@ -452,6 +452,17 @@ func (h *CloudHandler) DropboxSetAppKey(w http.ResponseWriter, r *http.Request) 
 		writeJSON(w, http.StatusOK, map[string]any{"saved": true, "disconnected": false})
 		return
 	}
+	if os.Getenv("CORAL_DROPBOX_APP_KEY") != "" {
+		// The environment's key is the one in use and wins over the saved one (Security's SHOULD on #15648): saving changes nothing the sign-in depends on, so the
+		// account stays connected and there is nothing to confirm. The saved key is used when the environment's is gone.
+		if err := d.store.SetAppKey(ctx, key); err != nil {
+			writeError(w, http.StatusInternalServerError, "", "could not save the Dropbox app key")
+			return
+		}
+		slog.Info("[dropbox] the app key was changed in Settings", "removed", key == "", "disconnected", false, "env_wins", true) // never the key itself
+		writeJSON(w, http.StatusOK, map[string]any{"saved": true, "disconnected": false, "env_wins": true})
+		return
+	}
 	c, err := d.store.Get(ctx)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "", "could not read the Dropbox connection")
