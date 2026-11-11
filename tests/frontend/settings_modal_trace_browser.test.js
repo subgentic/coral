@@ -118,10 +118,11 @@ const SCEN = [
             hashes[name] = sha(JSON.stringify(s));
             lines[name] = `${s.controls.length} controls | notice ${s.notice} | version ${s.version} | apiKey ${s.apiKey} | hidden rows ${s.hiddenRows} | fetches ${[...new Set(s.fetches)].sort().join(' ; ')} | values ${s.controls.filter(c => c[2] !== '' && c[2] !== false).slice(0, 12).map(c => c[0] + '=' + c[2]).join(', ')}`;
         }
-        if (process.env.CORAL_UPDATE_GOLDEN) {
+        if (process.env.CORAL_UPDATE_GOLDEN || process.platform === 'win32') { // DIAGNOSTIC (#15689), never merged: print what would be written, then fail
             fs.mkdirSync(path.dirname(GOLDEN), { recursive: true });
             fs.writeFileSync(GOLDEN, JSON.stringify({ about: 'what showSettingsModal filled in, scenario by scenario, for settings_modal_trace_browser.test.js: sha256 of every control, list, status line and request, and a readable line', hashes, lines }, null, 1) + '\n');
             console.log('golden written: ' + Object.keys(hashes).length + ' scenarios');
+            if (process.platform === 'win32') { console.error('GOLDEN_BEGIN\n' + fs.readFileSync(GOLDEN, 'utf8') + 'GOLDEN_END'); process.exit(1); }
             return;
         }
         const want = JSON.parse(fs.readFileSync(GOLDEN, 'utf8'));
