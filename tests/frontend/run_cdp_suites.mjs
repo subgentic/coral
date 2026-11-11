@@ -1112,8 +1112,14 @@ try {
     console.error('FAIL (#4354): a real CLI on PATH was invoked (a mock cli_path was bypassed):\n' + fs.readFileSync(STUB_MARKER, 'utf8').replace(/^/gm, '    '));
     sandboxOk = false;
   }
+  // ~/.claude/projects is shared by every Claude session on the machine, so a new entry is not by itself this run's: another agent starting in a new folder makes one (#15105). Claude names an entry after its
+  // working folder (every character that is not a letter or digit becomes '-'), and everything this run starts works under its own folder (tmp), so only a new entry named for tmp is this run's leak.
+  const encode = p => p.replace(/[^A-Za-z0-9]/g, '-');
+  const mine = [...new Set([tmp, (() => { try { return fs.realpathSync(tmp); } catch { return tmp; } })()].map(encode))];
   const added = (() => { try { return fs.readdirSync(REAL_CLAUDE_PROJECTS).filter(n => !claudeBaseline.has(n)); } catch { return []; } })();
-  if (added.length) { console.error('FAIL (#4354): new entries under the real ~/.claude/projects:\n    ' + added.join('\n    ')); sandboxOk = false; }
+  const leaked = added.filter(n => mine.some(m => n.includes(m)));
+  if (leaked.length) { console.error('FAIL (#4354): new entries under the real ~/.claude/projects, named for this run\'s folder:\n    ' + leaked.join('\n    ')); sandboxOk = false; }
+  else if (added.length) console.log(`note (#4354): ${added.length} new entr${added.length === 1 ? 'y' : 'ies'} under ~/.claude/projects, none named for this run's folder (another Claude session on this machine)`);
   const reached = profileLeaks(path.basename(tmp), runStart);
   if (reached.length) { console.error('FAIL (#375): the operator\'s profile names this run\'s folder:\n    ' + reached.join('\n    ')); sandboxOk = false; }
 } catch (e) { console.error(`#4354 sandbox check error: ${e.message}`); sandboxOk = false; }
