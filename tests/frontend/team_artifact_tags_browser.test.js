@@ -71,6 +71,10 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`[...document.querySelectorAll('#team-panel-artifacts .artifact-tags-row')].some(r => r.textContent === 'for review')`, 'the row chip', 8000);
         await waitFor(`!!document.querySelector('#team-panel-artifacts .team-tb-pills') && /For review 1/.test(document.querySelector('#team-panel-artifacts .team-tb-pills').textContent)`, 'the pill', 8000);
         await shot('artifact-tags-row-and-pill');
+        // the review mark stays when the Tags column drops at a narrower width (walk 9 H1): the name cell carries a For review chip
+        await Emulation.setDeviceMetricsOverride({ width: 820, height: 900, deviceScaleFactor: 1, mobile: false });
+        await waitFor(`![...document.querySelectorAll('#team-panel-artifacts .artifact-tags-row')].some(r => r.getClientRects().length) && [...document.querySelectorAll('#team-panel-artifacts .dt-title-cell .dt-tag')].some(t => t.textContent === 'For review' && t.getClientRects().length)`, 'a For review mark on the name when the Tags column is gone', 8000);
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         // The review's state in words in the sheet (Mobile Beta Tester, live: an approved artifact showed only its tag chip): the sheet of the file tagged for review says so, above its tags
         await ev(`document.querySelector('.detail-head .detail-close, .detail-head [aria-label^="Close"]')?.click(); [...document.querySelectorAll('#team-panel-artifacts [data-artifact-id]')].find(b => b.textContent === 'plan.txt').click(); true`);
         await waitFor(`document.querySelector('.detail-head .artifact-review-line')?.textContent === 'Waiting for your review'`, 'the review line in the sheet of a file tagged for review', 10000);

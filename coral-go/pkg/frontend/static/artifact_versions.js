@@ -141,6 +141,7 @@ export function attachVersions(dialog, hooks) {
         current.addEventListener('click', () => { setList(!st.listOpen); if (st.listOpen) focusOption(); });
         current.addEventListener('keydown', (e) => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (!st.listOpen) setList(true); focusOption(); } else if (e.key === 'Escape' && st.listOpen) { e.preventDefault(); e.stopPropagation(); closeList(true); } });
         bar.append(prev, current, next);
+        if (i > 0 && latest && !st.comparing) { const since = btn('av-since', 'Changes', `Changes since v${rows[i - 1].version}`); since.title = `Changes since v${rows[i - 1].version}`; since.addEventListener('click', () => startCompare()); bar.append(since); } // a new version after a round of changes: the reviewer sees what changed without opening the list (walk 8 H2)
         const pop = el('div', 'av-pop'); pop.hidden = !st.listOpen; // Compare, the newer-version line and the list: opened by the chip
         if (i > 0) {
             const cmp = btn('av-compare', st.comparing ? `Back to v${row.version}` : `Compare with v${rows[i - 1].version}`);
