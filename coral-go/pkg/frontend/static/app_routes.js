@@ -104,7 +104,7 @@ function registerRouteHandlers() {
         await liveListReady;
         if (opts && opts.restored && await teamIsMissing(routeKey(r))) return goneQuietly(); // the team the person left was deleted: Home, no "No team named" page (#10057)
         if (leftBehind(opts, r)) return; // the page module is loaded by now: what is left is synchronous up to the page's first read
-        switchNavTab('agents', { fromHistory: true });
+        switchNavTab('agents', { fromHistory: true, noMark: true }); // a team page is no page of the top bar (#15449): not marked, not even for a moment (start_tab_current)
         await applyTeamRoute(routeKey(r), r.sub || 'goals', r.item || 0, r.query || ''); // the team page (#7453); /team/<name> is its Goals tab
     });
 
@@ -126,7 +126,7 @@ function registerRouteHandlers() {
 
     route('board', async r => { // the old board page is gone (#8061): /board/<team> opens the team page's Messages tab, in its place in the history
         await liveListReady;
-        switchNavTab('agents', { fromHistory: true });
+        switchNavTab('agents', { fromHistory: true, noMark: true }); // a team page is no page of the top bar (#15449): not marked, not even for a moment (start_tab_current)
         if (await teamIsMissing(routeKey(r))) { await applyTeamRoute(routeKey(r), 'goals', 0, ''); return; } // a stale or mistyped link: the team page's own "No team named" state; opening the Messages tab of a team that is not there would subscribe the viewer and so create the board (#11624)
         await openTeamPage(routeKey(r), { tab: 'messages', replace: true });
     });
