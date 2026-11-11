@@ -64,6 +64,7 @@ function registerRouteHandlers() {
         else if (isPhoneLayout()) showView('live-session-view'); // the phone's Agents tab showed the list
         if (r.sub) switchAgenticTab(r.sub, 'top');
         if (r.terminal) showTerminalView(); // /agents/<session>?view=terminal (coral-hub, #6752): the terminal for this visit; the saved Chat/Terminal choice is left as it was
+        if (opts.startup && START_SEARCH.includes('open=')) importOnce('./open_link.js').then(m => m.restore(START_SEARCH)).catch(() => {}); // /agents/<session>?open=<file>[&thread=<id>] (#15253): the file or artifact that was open
     });
 
     route('skills', async r => { switchNavTab('skills', { fromHistory: true, skillId: r.id, skillFolder: r.folder }); }); // the Skills tab; /skills/<id> opens that skill's view
