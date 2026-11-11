@@ -138,3 +138,4 @@
     .artifact-viewer-header { flex-wrap: wrap; row-gap: 6px; }
     .artifact-viewer-header > .artifact-viewer-title { flex: 1 0 100%; }
 }
+@media (max-width: 768px) { .artifact-review-form > .artifact-review-cancel { order: 3; } .artifact-review-form > .btn { padding-inline: 10px; } .artifact-review > .artifact-review-form { padding-inline: 0; } .artifact-review-form textarea { min-height: 3.25em; } } /* #15545: on a phone the request and the approval are side by side, Cancel is under them */
