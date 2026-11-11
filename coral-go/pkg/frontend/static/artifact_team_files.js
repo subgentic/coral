@@ -95,5 +95,7 @@ export async function fillStrip(host, { project, files, hasMore }) {
         finally { all.disabled = false; }
     });
     row.append(all);
+    if (host.offsetHeight) host.style.minHeight = host.offsetHeight + 'px'; // a team with no folder has a shorter strip: it still holds the reserved height
+    host.classList.remove('team-files-strip-reserve'); host.removeAttribute('aria-hidden');
     host.replaceChildren(row);
 }
