@@ -39,6 +39,7 @@ const ALWAYS = 'Allow always: do not ask again for ls *, git status* and 2 more 
             const at = `${w}: `;
             const CLEAN = 'git status && ' + 'echo ok; '.repeat(40);              // ~400 clean bytes
             const NOTE = 'This request is longer than the 4000 bytes shown, so it cannot be allowed from here. Read it in the terminal, or reject it.';
+            const UNREAD = "This request is longer than the 4000 bytes shown, so Coral could not read it in full. Coral cannot answer it here: answer it in the agent's terminal.";
             const YNA = ['Yes', "Yes, and don't ask again for this command", 'No'];
             const names = r => r.buttons.map(b => b.label);
             // 1. Claude: a clean request keeps all its answers; only_reject keeps "No" alone (the first version kept only a label that starts "Reject": Claude's refusal is "No")
@@ -49,8 +50,8 @@ const ALWAYS = 'Allow always: do not ask again for ls *, git status* and 2 more 
             // 2. Pi: the same, with Reject
             r = await card('pi', { command: 'x'.repeat(4000), only_reject: true, note: NOTE }, ['Allow', 'Reject']);
             assert.deepEqual(names(r), ['Reject'], at + 'Pi: Reject alone');
-            // 2b. #15501: a request Coral did not read in full (unreadable) has no answer at all, not even No, no half of the request, and says so; Open terminal is the main button
-            for (const [agent, input, screen] of [['claude', { command: 'x'.repeat(4000), only_reject: true, unreadable: true, note: NOTE }, undefined], ['pi', { command: 'x'.repeat(4000), only_reject: true, unreadable: true, note: NOTE }, undefined], ['codex', null, { target: 'echo start', only_reject: true, unreadable: true, note: NOTE }]]) {
+            // 2b. #15501: a request Coral did not read in full (unreadable) has no answer at all, not even No, no half of the request, and says so
+            for (const [agent, input, screen] of [['claude', { command: 'x'.repeat(4000), only_reject: true, unreadable: true, note: UNREAD }, undefined], ['pi', { command: 'x'.repeat(4000), only_reject: true, unreadable: true, note: UNREAD }, undefined], ['codex', null, { target: 'echo start', only_reject: true, unreadable: true, note: UNREAD }]]) {
                 r = await card(agent, input, agent === 'pi' ? ['Allow', 'Reject'] : YNA, screen);
                 assert.deepEqual(names(r), [], at + agent + ': unreadable: no answer, not even No or Reject: ' + JSON.stringify(names(r)));
                 assert.match(r.text, /could not read this request in full/, at + agent + ': the card says Coral could not read it'); assert.match(r.text, /agent.s terminal/, at + agent + ': and where to answer it');
