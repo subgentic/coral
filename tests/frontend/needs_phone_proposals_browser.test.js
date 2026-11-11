@@ -68,7 +68,7 @@ const STUB = `(() => {
         await ev(`[...document.querySelectorAll('dialog[open] .proposal-buttons button')].find(b => b.textContent === 'Close').click(); true`);
         await waitFor(`!document.querySelector('dialog[open]')`, 'the card closes', 4000);
         // (5) a long press selects the goal row, it does not open its card
-        const pt = await ev(`(() => { const r = (${rowOf('/Ship the beta/')}).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+        const pt = await ev(`(() => { const row = ${rowOf('/Ship the beta/')}; row.scrollIntoView({ block: 'center' }); const r = row.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
         const touch = (type, x, y) => client.Input.dispatchTouchEvent({ type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
         await touch('touchStart', pt.x, pt.y); await ev(`new Promise(r => setTimeout(r, 900))`); await touch('touchEnd', pt.x, pt.y); await ev(framesJs(6)); // sleep-ok: the press is held
         const sel = await ev(`({ dialog: !!document.querySelector('dialog[open]'), selected: ${rowOf('/Ship the beta/')}.classList.contains('dt-selected'), bar: !!document.querySelector('.dt-select-bar, .dt-bar [class*=selected], .gt-toolbar .dt-bar') })`);

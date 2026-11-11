@@ -30,9 +30,27 @@
 }
 /* Ticking a row does not move the list (#15339, walk 23 H3): the Needs toolbar keeps one line's height, and while rows are selected the bar takes that whole line (the filters, chips and sort wait behind it) instead of wrapping under them and pushing the rows down. */
 #group-table-view .gt-toolbar { min-height: 40px; }
-#group-table-view .gt-toolbar.team-toolbar-selecting > :not(.team-tb-selection) { display: none !important; }
+#group-table-view .gt-toolbar.team-toolbar-selecting:not(.tb-low) > :not(.team-tb-selection) { display: none !important; }
 #group-table-view .gt-toolbar.team-toolbar-selecting > .team-tb-selection { flex: 1 1 100%; }
 
 #group-table-view .inbox-needs-results { max-width: 80rem; } /* a line of the table is not the width of a 1920 px screen: Time sat 1400 px from the title (#15339, walk 23 L17) */
 
 .inbox-wait-long { color: var(--warning-text); } /* a question waiting 5 minutes or more reads in amber (#15297) */
+
+/* The Operator's Needs you (#15540): title, search and filters stay while rows are selected, and the actions are ONE line below them, the count first; the line is where the list's count stood, so ticking a row moves nothing (#15339). The checkbox, the kind icon and the star are one line at the top of every row, whatever its height. */
+#group-table-view .gt-toolbar.tb-low { flex-wrap: wrap; }
+#group-table-view .gt-toolbar.tb-low > .team-tb-selection { order: 10; flex: 1 1 100%; min-height: 40px; flex-wrap: nowrap; overflow-x: auto; }
+#group-table-view .gt-toolbar.tb-low > .list-bar-count { display: none; }
+#group-table-view .inbox-folder-toolbar:not(:has(.team-toolbar-selecting)) { padding-bottom: 52px; } /* the actions' line (40 px and the row's 8 px gap) is kept while nothing is selected, so ticking a row moves no row (#15339) */
+/* #15540: icon and star share a line at the row's top */
+#group-table-view .inbox-needs-results  .inbox-review-star-anchor { position: static; }
+#group-table-view .inbox-needs-results  .inbox-kind-row .inbox-review-item > .inbox-review-star { inset: 4px auto auto auto; inset-inline-end: 8px; }
+@media (max-width: 767px) { #group-table-view .inbox-needs-results  .inbox-kind-row:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-item > .inbox-review-star { inset: 0 auto auto auto; inset-inline-end: 52px; } #group-table-view .inbox-needs-results .inbox-kind-row:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-item.inbox-agent-first > .inbox-review-wait { margin-inline-end: 90px; } #group-table-view .inbox-needs-results  .inbox-kind-row .inbox-review-item.inbox-agent-first { row-gap: 6px; } }
+/* #15540: under 361 px the star stays at the button row */
+@media (max-width: 360px) {
+    #group-table-view .inbox-needs-results .inbox-kind-row:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-item.inbox-agent-first > .inbox-review-star { inset: auto 12px 12px auto; }
+    #group-table-view .inbox-needs-results .inbox-kind-row:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-item.inbox-agent-first > .inbox-review-wait { margin-inline-end: 46px; }
+    #group-table-view .inbox-needs-results .inbox-kind-row .inbox-review-item.inbox-agent-first { row-gap: 2px; }
+}
+@media (max-width: 767px) { #group-table-view .list-bar-bar:has(> .tb-low) { position: static; } } /* the bar below the head is not a sticky top row (#15540) */
+@media (max-width: 767px) { #group-table-view .gt-toolbar.tb-low > :not(.btn-icon, .inbox-folder-head, .list-bar-count, .team-tb-selection) { display: revert; } #group-table-view .gt-toolbar.tb-low > .btn-icon { display: inline-flex; } #group-table-view .gt-toolbar.tb-low > .inbox-folder-head { display: flex; } } /* the phone's selecting row keeps its head, search and icons (#15540) */
