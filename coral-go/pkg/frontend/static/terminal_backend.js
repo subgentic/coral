@@ -13,6 +13,7 @@ import { isSignedOut, pollEvery } from './overload.js';
 import { showConfirmModal } from './render.js';
 import { state } from './state.js';
 import { browserSession } from './safe_storage.js';
+import { importOnce } from './import_once.js';
 
 let _status = null; // GET /api/system/terminal-backend
 let _autoWakeShown = null; // the auto-wake values as the dialog opened (#3636)
@@ -169,27 +170,9 @@ export async function applyTerminalBackendChange() {
     if (!st || !st.choice || st.forced || isCloud()) return true;
     const want = picked();
     if (!want || want === nextBackend(st)) return true;
-    if (want === 'pty' && st.running === 'tmux') {
-        const n = st.running_agents || 0;
-        const ok = await confirmWith('Switch to pty?',
-            (n ? `Switching to pty ends the ${n} running agent${n === 1 ? '' : 's'}. Coral puts them to sleep first, then restarts on pty. `
-                + 'Wake them from the dashboard afterwards: they resume their conversation, but a tool that is running now is not continued. '
-                : 'No agents are running. Coral restarts on pty now. ')
-            + 'After this, agents end whenever Coral restarts or upgrades.',
-            n ? `Sleep ${n} agent${n === 1 ? '' : 's'} and restart on pty` : 'Restart on pty', { danger: n > 0 });
-        if (!ok) return false;
-        if (n) {
-            const r = await post('/api/sessions/live/sleep-all');
-            if (!r.ok) { showToast('Could not put the agents to sleep: nothing changed', true); return false; }
-        }
-        return saveAndRestart('pty');
-    }
-    if (want === 'tmux' && st.running === 'pty') {
-        const ok = await confirmWith('Switch to tmux?',
-            "Agents will keep running across Coral restarts after this. Any agent will be able to reach other agents' terminals. "
-            + 'Coral restarts on tmux now; your sleeping agents wake as usual.', 'Restart on tmux', { danger: false });
-        if (!ok) return false;
-        return saveAndRestart('tmux');
+    if (want !== st.running && (want === 'pty' || want === 'tmux')) { // the wording of the two switches loads only when one is asked for (#15253: bytes back from the start path)
+        const m = await importOnce('./terminal_backend_switch.js');
+        return m.switchBackend(st, want, { confirmWith, post, saveAndRestart });
     }
     // Going back to the backend this run already uses: just save it.
     return saveAndRestart(want);

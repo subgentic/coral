@@ -418,8 +418,10 @@ export function attachComments(dialog, body, host, opts = {}) {
     if (opts.observe && typeof ResizeObserver === 'function') new ResizeObserver(() => { syncInert(); syncToggle(); paintToggle(); }).observe(opts.observe); // the pane's width decides whether the panel is a sheet
 
     // ── a card or a highlight is made current, and the other follows
+    const syncThread = id => importOnce('./open_link.js').then(m => m.keepThread(id)).catch(() => {}); // the address names the thread on show (#15253)
     function activate(id, fromCard) {
         st.active = id; st.scrollCard = !fromCard;
+        syncThread(id);
         paint(false);
         const r = st.ranges.get(id);
         if (fromCard && r) (r.startContainer.parentElement || body).scrollIntoView({ block: 'center', behavior: scrollBehavior() });
@@ -436,7 +438,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     body.addEventListener('click', (e) => {
         if (!st.data || !st.ranges.size) return;
         const id = rangeIdAt(e.clientX, e.clientY);
-        if (id != null && window.getSelection().isCollapsed) { st.active = id; st.scrollCard = true; paint(false); userSet(true); } // a commented passage opens the panel at its thread
+        if (id != null && window.getSelection().isCollapsed) { st.active = id; st.scrollCard = true; paint(false); userSet(true); syncThread(id); } // a commented passage opens the panel at its thread
     });
     let hoverFrame = 0;
     body.addEventListener('mousemove', (e) => {
@@ -518,7 +520,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         sheetOpen: () => isOpen(), setSheet: (open) => setSheet(open),
         /** A new artifact is on show. */
         // The computer whose artifact it is: the caller's, else the one on show (the rule renderArtifact reads the content by); a bare /api/ route is the hub's own and 404s there (#6245).
-        open(hex, server, board, series = false) { liveStart(); st.lifetime++; resetAsk(); st.video?.close(); st.video = null; st.videoTime = null; dialog.classList.remove('avc-video'); st.series = !!series; region(false); { const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } } forget(); st.hex = hex; st.server = server || contextServer(); st.board = board; st.data = null; st.active = null; st.composing = null; st.error = ''; st.text = false; st.whole = false; st.gone = false; st.filter = 'open'; st.visibilitySet = false; render(); setSheet(false); },
+        open(hex, server, board, series = false) { liveStart(); st.lifetime++; resetAsk(); st.video?.close(); st.video = null; st.videoTime = null; dialog.classList.remove('avc-video'); st.series = !!series; region(false); { const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } } forget(); st.hex = hex; st.server = server || contextServer(); st.board = board; st.data = null; st.active = null; st.composing = null; st.error = ''; st.text = false; st.whole = false; st.gone = false; st.filter = 'open'; st.visibilitySet = false; render(); setSheet(false); importOnce('./open_link.js').then(m => { const id = m.takeThread('coral://artifacts/' + hex); if (id != null) this.showThread(id); }).catch(() => {}); },
         /** The document was drawn: `text` says whether it is text the comments apply to. */
         /** The document drawn is not text the comments can point into (HTML in its frame, a picture, a PDF, a table, a video, a download): the panel is there for a comment on the whole document. */
         /** Mark up in the viewer (#12367): the marked copy of the picture on show starts a comment on the whole file, in the tray with the text box ready, and the panel (a phone's sheet) opens on it. Resolves false when this person cannot comment here. */
