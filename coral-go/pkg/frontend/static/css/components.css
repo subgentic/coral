@@ -3153,7 +3153,6 @@ button.terminal-gone-header { margin: 0 4px 0 0; font-size: var(--fs-sm); line-h
     padding: var(--space-lg);
     min-height: 120px;
 }
-.artifact-viewer-text { white-space: pre-wrap; }
 /* A picture opens in a box that fills the viewer (#10312, #11702): the body is at least most of the dialog, the box takes all of it whatever the picture's shape (a wide one no longer gets a strip as high as the file), the picture sits in the middle at its own size up to the box, and zooming pans inside the box. */
 .artifact-viewer.is-image .artifact-viewer-body { min-height: min(70vh, 640px); display: flex; padding: var(--space-md); }
 .artifact-viewer.is-image .image-panes, .artifact-viewer.is-image .image-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }

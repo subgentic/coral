@@ -50,6 +50,13 @@ type availableAgent struct {
 	Reminder                bool                  `json:"reminder,omitempty"`
 	ReminderIntervalSeconds int                   `json:"reminder_interval_seconds,omitempty"`
 	Activity                string                `json:"activity,omitempty"`
+	// EndedSession is the session a Resume of an ended agent starts from (#15294): only on an offline row whose agent was ended here and not started again.
+	EndedSession *endedSessionRef `json:"ended_session,omitempty"`
+}
+
+type endedSessionRef struct {
+	SessionID string `json:"session_id"`
+	AgentType string `json:"agent_type"`
 }
 
 var statusActivityANSI = regexp.MustCompile(`\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\))`)
@@ -140,9 +147,23 @@ func (h *SessionsHandler) teamAvailabilityUncached(w http.ResponseWriter, r *htt
 		}
 		agents = append(agents, h.liveAgentStatus(ctx, snap, name, s, sub, subscribed, includeActivity))
 	}
+	var ended []store.EndedSession
+	if h.ss != nil {
+		ended, _ = h.ss.EndedSessionsOnBoard(ctx, name) // the agents of this team that were ended and not started again: their rows can offer Resume (#15294)
+	}
 	for _, sub := range snap.subs {
 		if !seen[sub.SubscriberID] && !board.IsOperatorName(sub.SubscriberID) { // the person is not an agent: no card, no offline count, no reminder (#6382)
-			agents = append(agents, h.offlineSubscriberStatus(snap, name, sub))
+			a := h.offlineSubscriberStatus(snap, name, sub)
+			if a.Availability == "offline" {
+				for _, e := range ended {
+					if e.Name == sub.SubscriberID {
+						a.EndedSession = &endedSessionRef{SessionID: e.SessionID, AgentType: e.AgentType}
+						a.Reason = "Ended. Resume it to bring it back."
+						break
+					}
+				}
+			}
+			agents = append(agents, a)
 		}
 	}
 	sort.Slice(agents, func(i, j int) bool {
@@ -311,7 +332,7 @@ func (h *SessionsHandler) liveAgentStatus(ctx context.Context, snap *boardStatus
 
 // offlineSubscriberStatus is the status of a subscriber with no session here: offline, remote (unknown), or waiting.
 func (h *SessionsHandler) offlineSubscriberStatus(snap *boardStatusSnapshot, name string, sub board.Subscriber) availableAgent {
-	a := availableAgent{SubscriberID: sub.SubscriberID, Name: sub.SubscriberID, Role: sub.JobTitle, Availability: "offline", Reason: "No registered local session", Tasks: []availabilityTask{}}
+	a := availableAgent{SubscriberID: sub.SubscriberID, Name: sub.SubscriberID, Role: sub.JobTitle, Availability: "offline", Reason: "Not running", Tasks: []availabilityTask{}}
 	if h.boardHandler != nil {
 		a.ReminderIntervalSeconds, a.Reminder = h.boardHandler.SubscriberReminderInterval(name, sub.SubscriberID)
 	}

@@ -1,5 +1,5 @@
-// What cannot be undone is a last group of its own in the agent row's menu and the team's menu (#10282, Mobile pass 20: Kill Session sat under Move Down, Reset Team and Kill All at the foot, one slip from a thumb reaching
-// for something else): a divider with at least 12 px above it, and only danger items after it; at 1280 and 390. Their confirms already name what is lost (Kill session, Reset team, Kill All, Delete team): asked of the
+// What cannot be undone is a last group of its own in the agent row's menu and the team's menu (#10282, Mobile pass 20: Kill session sat under Move Down, Reset team and Kill all at the foot, one slip from a thumb reaching
+// for something else): a divider with at least 12 px above it, and only danger items after it; at 1280 and 390. Their confirms already name what is lost (Kill session, Reset team, Kill all, Delete team): asked of the
 // real dialogs elsewhere (actions_sidebar). The agents are mocked (agent_view_harness), the menus are the real ones.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -32,11 +32,11 @@ const { coralReady } = require('./helpers/wait');
                 return m;
             };
             const agent = await check('the agent row menu', `document.querySelector('.session-group-item [data-on-click="kebab-toggle"]').click(); true`);
-            assert.ok(agent.danger.some(x => /Kill Session/.test(x)), `${w}: Kill Session is in it: ${JSON.stringify(agent.danger)}`);
+            assert.ok(agent.danger.some(x => /Kill session/.test(x)), `${w}: Kill session is in it: ${JSON.stringify(agent.danger)}`);
             await shot(`menu-agent-${w}`);
             await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); document.body.click(); true`);
             const team = await check('the team menu', `document.querySelector('.session-team-group [data-on-click="kebab-toggle"], .board-card-header [data-on-click="kebab-toggle"]').click(); true`);
-            assert.ok(team.danger.some(x => /Kill All/.test(x)), `${w}: Kill All is in it: ${JSON.stringify(team.danger)}`);
+            assert.ok(team.danger.some(x => /Kill all/.test(x)), `${w}: Kill all is in it: ${JSON.stringify(team.danger)}`);
             await shot(`menu-team-${w}`);
         }
         console.log('\nPASS the destructive items are a separated last group with room above, in the agent and team menus');

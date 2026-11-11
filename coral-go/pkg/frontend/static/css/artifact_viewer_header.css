@@ -77,6 +77,7 @@
 .av-count { margin: 0; flex: 1 1 auto; color: var(--text-secondary); font-size: var(--fs-md); }
 .av-seg { flex-wrap: wrap; }
 .av-seg .btn { white-space: normal; }
+.artifact-viewer-text { white-space: pre-wrap; overflow-wrap: anywhere; } /* a code line wraps, a long name or path in it too: it was cut at the right edge on a phone (walk 11 M2) */
 .av-line { padding: 2px 8px 2px 11px; margin: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .av-line ins, .av-line del { text-decoration: none; }
 .av-add { background: color-mix(in srgb, var(--success) 18%, transparent); border-left: 3px solid var(--success); padding-left: 8px; }

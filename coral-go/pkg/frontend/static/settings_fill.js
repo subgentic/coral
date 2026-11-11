@@ -353,7 +353,7 @@ export function _fillTerminalAndBrowserPrefs(s) {
         }
     }
 
-    // Check for Updates (stored in localStorage, defaults to on)
+    // Check for updates (stored in localStorage, defaults to on)
     const updateCheck = document.getElementById("settings-check-updates");
     if (updateCheck) updateCheck.checked = browserLocal.get("coral-update-check-enabled") !== "false";
 

@@ -515,3 +515,39 @@ func TestAWaitWhoseSessionIsGoneIsOfflineNotWaiting(t *testing.T) {
 	require.Equal(t, "offline", result.Agents[0].Availability, "its session is gone: nobody is there to need anything")
 	require.Equal(t, 0, result.Summary["waiting"])
 }
+
+// #15294 (walk 17): an ended agent's row says in plain words that it is not running and carries the session to resume, so the Agents tab can offer Resume on it
+// (the way back was Inbox, All chats, a hover-only Continue). A member that never had a session has the words and no session.
+func TestAnEndedAgentsRowCarriesTheSessionToResume(t *testing.T) {
+	_, h, _, _ := setupSessionsTestServer(t)
+	ctx := context.Background()
+	team := "resume-team"
+	n := "Lead"
+	require.NoError(t, h.ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: "lead-sid", AgentType: "claude", AgentName: "proj", DisplayName: &n, WorkingDir: "/tmp/p", BoardName: &team}))
+	_, err := h.bs.Subscribe(ctx, team, "Lead", "Developer", "claude-lead-sid", nil, "all")
+	require.NoError(t, err)
+	_, err = h.bs.Subscribe(ctx, team, "Ghost", "QA", "claude-ghost-sid", nil, "all")
+	require.NoError(t, err)
+	require.NoError(t, h.ss.UnregisterLiveSession(ctx, "lead-sid")) // Kill session
+	router := chi.NewRouter()
+	router.Get("/api/teams/detail/{name}/availability", h.TeamAvailability)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, httptest.NewRequest("GET", "/api/teams/detail/resume-team/availability", nil))
+	require.Equal(t, 200, w.Code)
+	var result struct {
+		Agents []availableAgent `json:"agents"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
+	by := map[string]availableAgent{}
+	for _, a := range result.Agents {
+		by[a.Name] = a
+	}
+	require.Equal(t, "offline", by["Lead"].Availability)
+	require.NotNil(t, by["Lead"].EndedSession, "the ended agent names the session a Resume starts from")
+	require.Equal(t, "lead-sid", by["Lead"].EndedSession.SessionID)
+	require.Equal(t, "claude", by["Lead"].EndedSession.AgentType)
+	require.Nil(t, by["Ghost"].EndedSession, "a member with no session of its own has nothing to resume")
+	for _, a := range by {
+		require.NotContains(t, a.Reason, "registered local session", "no jargon in the status line")
+	}
+}

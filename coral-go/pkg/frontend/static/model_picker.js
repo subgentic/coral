@@ -4,7 +4,7 @@
  * (.acf-model) remains the form's value: the picker writes it and reads it, so everything that reads the form is unchanged. */
 import { serverFetch } from './server_base.js';
 import { showToast, escapeAttr, escapeHtml } from './utils.js';
-import { readModelsCache, writeModelsCache, clearModelsCache } from './model_labels.js';
+import { readModelsCache, writeModelsCache, clearModelsCache, modelName } from './model_labels.js';
 import { familyOf, addCustomModel, addModelForm, probeCanAdd, peekCanAdd } from './custom_model_add.js';
 import { importOnce } from './import_once.js';
 const { _acfServer } = await importOnce('./launch_models.js');
@@ -127,7 +127,7 @@ export function syncModelPicker(container, fromCode = true) {
     const unlisted = !listed && v !== '' && !container._otherChosen;
     if (unlisted) {
         const opt = document.createElement('option');
-        opt.value = v; opt.textContent = v; opt.dataset.unlisted = '1';
+        opt.value = v; opt.textContent = modelName('claude', v) || v; opt.title = v; opt.dataset.unlisted = '1'; // the name the rest of the app uses ("Sonnet 5.5"), the id on hover (walk 13 M7)
         select.insertBefore(opt, select.querySelector(`option[value="${OTHER}"]`));
     }
     const known = listed || unlisted;
@@ -296,7 +296,7 @@ function thinkingParts(container) {
 /** What the agent last ran at when that is not the level the form holds (a restart keeps the stored one): "The agent last ran at Max (changed inside the CLI)." */
 function ranNote(r) {
     if (!r || !r.actual || r.actual === (r.stored || '')) return '';
-    return `The agent last ran at ${LEVEL_NAMES[r.actual] || r.actual}${r.stored ? ' (changed inside the CLI)' : ''}.`;
+    return `The agent last ran at ${LEVEL_NAMES[r.actual] || r.actual}${r.stored ? ' (changed inside the CLI)' : ', which is the CLI\'s own default'}.`;
 }
 
 /** Tell the form what the agent's transcript shows it running at, beside the level it was given (setThinking): the two can differ after a change made inside the CLI. */

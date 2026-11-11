@@ -127,9 +127,9 @@ function _rowMenuContent(s, sid) {
             </button>
 `;
     const _sleepingMenu = `
-            <a class="menu-item overflow-menu-item overflow-menu-open-window" href="/agent/${escapeAttr(sid)}" target="_blank" rel="noopener noreferrer" aria-label="Open Agent Tab" data-on-click="kebab-close">
+            <a class="menu-item overflow-menu-item overflow-menu-open-window" href="/agent/${escapeAttr(sid)}" target="_blank" rel="noopener noreferrer" aria-label="Open agent tab" data-on-click="kebab-close">
                 ${SVGO.o0}<path d="M9 2h5v5"/><path d="M14 2L7 9"/><path d="M12 9v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h4"/></svg>
-                Open Agent Tab
+                Open agent tab
             </a>
             <button class="menu-item overflow-menu-item" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="wake">
                 ${SVGO.o0}<path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/></svg>
@@ -174,9 +174,9 @@ ${_archiveItem}            <button class="menu-item overflow-menu-item" data-on-
             <button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="agent-kill" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 ${SVGO.o1}${_mk1}`;
     const _awakeMenu = `
-            <a class="menu-item overflow-menu-item overflow-menu-open-window" href="/agent/${escapeAttr(sid)}" target="_blank" rel="noopener noreferrer" aria-label="Open Agent Tab" data-on-click="kebab-close">
+            <a class="menu-item overflow-menu-item overflow-menu-open-window" href="/agent/${escapeAttr(sid)}" target="_blank" rel="noopener noreferrer" aria-label="Open agent tab" data-on-click="kebab-close">
                 ${SVGO.o0}<path d="M9 2h5v5"/><path d="M14 2L7 9"/><path d="M12 9v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h4"/></svg>
-                Open Agent Tab
+                Open agent tab
             </a>
             <button class="menu-item overflow-menu-item" data-on-click="agent-rename" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 ${SVGO.o1}<path d="M11.5 1.5l3 3L5 14H2v-3z"/></svg>
@@ -234,13 +234,13 @@ ${['codex', 'claude', 'agy'].includes(s.agent_type) && typeof s.keep_full_access
             <hr class="overflow-menu-divider overflow-menu-divider-danger">
             <button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="agent-kill" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 ${SVGO.o1}<line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
-                Kill Session
+                Kill session
             </button>`;
     // Archived: no Restart, Rename or reordering (#3030).
     const _archivedMenu = `
-            <a class="menu-item overflow-menu-item overflow-menu-open-window" href="/agent/${escapeAttr(sid)}" target="_blank" rel="noopener noreferrer" aria-label="Open Agent Tab" data-on-click="kebab-close">
+            <a class="menu-item overflow-menu-item overflow-menu-open-window" href="/agent/${escapeAttr(sid)}" target="_blank" rel="noopener noreferrer" aria-label="Open agent tab" data-on-click="kebab-close">
                 ${SVGO.o0}<path d="M9 2h5v5"/><path d="M14 2L7 9"/><path d="M12 9v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h4"/></svg>
-                Open Agent Tab
+                Open agent tab
             </a>
             <button class="menu-item overflow-menu-item" data-on-click="agent-archive" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="unarchive">
                 ${SVGO.o0}<rect x="2" y="3" width="12" height="3" rx="0.5"/><path d="M3 6v7h10V6"/><path d="M8 12V8M6 10l2-2 2 2"/></svg>

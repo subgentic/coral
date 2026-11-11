@@ -13,7 +13,7 @@ import { localFirst } from './server_status.js';
 import { killAllItem, deleteTeamItem, teamHealthBtn, _rowNameWithServer, _rowServerLine, _boardAccentStyle, _pinMenuItem, FOLDER_GROUP_ICON } from './list_card_parts.js';
 import { _pinMatchesFilter } from './list_filter_match.js';
 import { SVGO } from './svg_open.js';
-const _mk0 = "<line x1=\"4\" y1=\"4\" x2=\"12\" y2=\"12\"/><line x1=\"12\" y1=\"4\" x2=\"4\" y2=\"12\"/></svg>\n                    Kill All\n                </button>";
+const _mk0 = "<line x1=\"4\" y1=\"4\" x2=\"12\" y2=\"12\"/><line x1=\"12\" y1=\"4\" x2=\"4\" y2=\"12\"/></svg>\n                    Kill all\n                </button>";
 const _mk1 = "<rect x=\"2\" y=\"3\" width=\"12\" height=\"10\" rx=\"1.5\"/><polyline points=\"5 7 7 9 5 11\"/><line x1=\"9\" y1=\"11\" x2=\"11\" y2=\"11\"/></svg>\n                    <span class=\"menu-item-text\">Add Terminal<span class=\"menu-item-hint\">Opens a shell in this folder</span></span>\n                </button>\n                <hr class=\"overflow-menu-divider\">\n                ";
 const _mk2 = "<path d=\"M8 13V3\"/><path d=\"M4 9l4 4 4-4\"/></svg>\n                    Move Down\n                </button>\n                ";
 const _mk3 = "<rect x=\"5.5\" y=\"5.5\" width=\"8\" height=\"8\" rx=\"1.5\"/><path d=\"M5.5 10.5h-1a1.5 1.5 0 0 1-1.5-1.5v-5a1.5 1.5 0 0 1 1.5-1.5h5a1.5 1.5 0 0 1 1.5 1.5v1\"/></svg></button>";
@@ -27,7 +27,7 @@ function _renderTeamCard(boardName, boardSessions) {
         const boardWorkDir = pickTeamFolder('', boardSessions);
         const boardIsSleeping = boardSessions.every(s => s.sleeping);
         const boardSleepIcon = boardIsSleeping ? ' <span class="agent-icon" title="Team is sleeping">🌙</span>' : '';
-        const sleepLabel = boardIsSleeping ? 'Wake Team' : 'Sleep Team';
+        const sleepLabel = boardIsSleeping ? 'Wake team' : 'Sleep team';
         const sleepAction = boardIsSleeping ? 'wake' : 'sleep';
         const bKebab = `<div class="sidebar-kebab-wrapper group-kebab">
             <button class="btn btn-quiet btn-icon btn-xs sidebar-kebab-btn group-kebab-btn" data-coral-hook="sidebar-kebab-button" data-on-click="kebab-toggle" title="Group actions" aria-label="More actions for ${escapeAttr(keyLabel(boardName))}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('team', boardName))}">${MORE_DOTS_SVG}</button>
@@ -44,7 +44,7 @@ function _renderTeamCard(boardName, boardSessions) {
                 </button>
                 <button class="menu-item overflow-menu-item" data-on-click="team-save" data-board="${escapeAttr(boardName)}">
                     ${SVGO.o0}<path d="M3 3h8l2 2v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M6 3v3h4V3"/><rect x="5" y="9" width="6" height="3"/></svg>
-                    Save as Template
+                    Save as template
                 </button>
                 <button class="menu-item overflow-menu-item" type="button" data-on-click="team-menu-more" aria-expanded="false" aria-controls="${escapeAttr(kebabId('team', boardName))}-more">More</button>
                 <div id="${escapeAttr(kebabId('team', boardName))}-more" class="team-menu-more" role="group" aria-label="More for ${escapeAttr(keyLabel(boardName))}" hidden>
@@ -81,7 +81,7 @@ function _renderTeamCard(boardName, boardSessions) {
                 <hr class="overflow-menu-divider overflow-menu-divider-danger">
                 <button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="team-reset" data-board="${escapeAttr(boardName)}">
                     ${SVGO.o0}<path d="M1 8a7 7 0 0 1 12.9-3.8"/><path d="M15 8a7 7 0 0 1-12.9 3.8"/><polyline points="13 1 14 4.2 10.5 4.2"/><polyline points="3 15 2 11.8 5.5 11.8"/></svg>
-                    Reset Team
+                    Reset team
                 </button>
                 ${killAllItem(boardName)}
                 ${deleteTeamItem(boardName)}
@@ -123,7 +123,7 @@ function _renderWorkflowCard(wfName, wfSessions) {
                 </button>` : ''}
                 <button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="group-kill" data-group="wf:${escapeAttr(wfName)}">
                     ${SVGO.o1}<line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
-                    Kill All
+                    Kill all
                 </button>
             </div>
         </div>`;
@@ -256,7 +256,7 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
                 const boardWorkDir = pickTeamFolder('', boardSessions);
                 const boardIsSleeping = boardSessions.some(s => s.sleeping);
                 const boardSleepIcon = boardIsSleeping ? ' <span class="agent-icon" title="Team is sleeping">🌙</span>' : '';
-                const sleepLabel = boardIsSleeping ? 'Wake Team' : 'Sleep Team';
+                const sleepLabel = boardIsSleeping ? 'Wake team' : 'Sleep team';
                 const sleepAction = boardIsSleeping ? 'wake' : 'sleep';
                 const bKebab = `<div class="sidebar-kebab-wrapper group-kebab">
                     <button class="btn btn-quiet btn-icon btn-xs sidebar-kebab-btn group-kebab-btn" data-coral-hook="sidebar-kebab-button" data-on-click="kebab-toggle" title="Group actions" aria-label="More actions for ${escapeAttr(keyLabel(boardName))}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('team', boardName))}">${MORE_DOTS_SVG}</button>
@@ -273,7 +273,7 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
                         </button>
                         <button class="menu-item overflow-menu-item" data-on-click="team-save" data-board="${escapeAttr(boardName)}">
                             ${SVGO.o0}<path d="M3 3h8l2 2v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M6 3v3h4V3"/><rect x="5" y="9" width="6" height="3"/></svg>
-                            Save as Template
+                            Save as template
                         </button>
                 <button class="menu-item overflow-menu-item" type="button" data-on-click="team-menu-more" aria-expanded="false" aria-controls="${escapeAttr(kebabId('team', boardName))}-more">More</button>
                 <div id="${escapeAttr(kebabId('team', boardName))}-more" class="team-menu-more" role="group" aria-label="More for ${escapeAttr(keyLabel(boardName))}" hidden>

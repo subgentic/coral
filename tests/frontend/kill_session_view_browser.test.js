@@ -1,5 +1,5 @@
-// The agent view's own Kill Session (#6892, R1 of #6877): the four kill paths (the sidebar's, the agent view's, a folder's Kill All, a team's Kill Team) shared the same fetch and follow-up written four times, and had
-// drifted. This drives the agent view's Kill Session end to end (controls.js killSession, through the confirmation): the request names the open agent, its row goes at once, the welcome screen shows, the capture refresh
+// The agent view's own Kill session (#6892, R1 of #6877): the four kill paths (the sidebar's, the agent view's, a folder's Kill all, a team's Kill Team) shared the same fetch and follow-up written four times, and had
+// drifted. This drives the agent view's Kill session end to end (controls.js killSession, through the confirmation): the request names the open agent, its row goes at once, the welcome screen shows, the capture refresh
 // stops, a kept worktree is said; and the two latent differences that one shared drop removes: a session id the page knows on two servers drops only the server that was killed (the agent view dropped both), and killing
 // the open agent from the sidebar stops its capture refresh (the sidebar's kill left it polling a dead agent). Drives Chrome over CDP through agent_view_harness.js; the kill answer is the page's fetch.
 const assert = require('node:assert/strict');
@@ -33,7 +33,7 @@ const { coralReady } = require('./helpers/wait');
     // a kept worktree is a compact bar (#6943): "Worktree kept" and its Details; the why, the path and the branch are behind Details, which this opens
     const keptBar = async path => { await ev(`(() => { const d = document.querySelector('#worktree-dock .worktree-dock-details'); if (d && d.getAttribute('aria-expanded') !== 'true') d.click(); return true; })()`); await sleep(250); /* sleep-ok: the details open */ const t = await ev(`document.getElementById('worktree-dock').innerText`); return /kept/i.test(t) && t.includes(path); };
     try {
-        // 1. the agent view's Kill Session
+        // 1. the agent view's Kill session
         await open([row(1), row(2)]);
         await select('sid-1');
         await ev(`window.__killAnswer = { ok: true, worktree: { state: 'kept', path: '/tmp/wt/agent-1', branch: 'coral-team/x', reason: 'it has uncommitted changes' } }; import(${S} + 'controls.js').then(m => m.killSession()); true`);

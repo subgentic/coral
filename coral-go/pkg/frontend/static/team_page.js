@@ -133,22 +133,23 @@ let moreOpen = false;
 /** The team's settings, in a popout over the page (#8853): the header's Settings button and its phone More item. */
 function openSettings() { importOnce('./team_settings_modal.js').then(m => m.openTeamSettings(S.team)).catch(e => console.error('team settings', e)); }
 
-/** Stopping a team: one menu, the same words and the same actions as the team's row in the sidebar (Sleep Team or Wake Team, Reset Team, Kill All; the last two apart, each asks first). A wide header has the Stop button; a phone's has the same items in More (#10008, Beta Tester and Mobile tester). */
+/** Stopping a team: one menu, the same words and the same actions as the team's row in the sidebar (Sleep team or Wake team, Reset team, Kill all; the last two apart, each asks first). A wide header has the Stop button; a phone's has the same items in More (#10008, Beta Tester and Mobile tester). */
 const teamAsleep = () => { const m = (state.liveSessions || []).filter(s => inTeam(s, S.team)); return m.length > 0 && m.every(s => s.sleeping); };
 function stopItems() {
     const asleep = teamAsleep();
     const none = !(state.liveSessions || []).some(s => inTeam(s, S.team)); // a team with no live agent has nothing to put to sleep, reset or kill: say so, do not offer a button that does nothing (#10187)
     const why = none ? 'No agent of this team is running' : '';
     return [
-        { key: 'sleep', label: asleep ? 'Wake Team' : 'Sleep Team', hint: asleep ? 'Starts the sleeping agents again' : 'Stops every agent for now; Wake Team starts them again', why, run: () => window.toggleTeamSleep?.(S.team, asleep ? 'wake' : 'sleep') },
-        { key: 'reset', label: 'Reset Team', hint: 'Each agent starts again from its first instructions, in a new chat', danger: true, why, run: () => window.resetTeam?.(S.team) },
-        { key: 'kill', label: 'Kill All', hint: 'Ends every agent now; their chats stay in History', danger: true, why, run: () => window.killBoard?.(S.team) },
+        { key: 'sleep', label: asleep ? 'Wake team' : 'Sleep team', hint: asleep ? 'Starts the sleeping agents again' : 'Stops every agent for now; Wake team starts them again', why, run: () => window.toggleTeamSleep?.(S.team, asleep ? 'wake' : 'sleep') },
+        { key: 'reset', label: 'Reset team', hint: 'Each agent starts again from its first instructions, in a new chat', danger: true, why, run: () => window.resetTeam?.(S.team) },
+        { key: 'kill', label: 'Kill all', hint: 'Ends every agent now; their chats stay in History', danger: true, why, run: () => window.killBoard?.(S.team) },
     ];
 }
 /** The items in the Stop menu and in a phone's More (labels follow the team: asleep or not). */
 function syncStop() {
     const menu = $('team-page-stop-menu'); if (!menu) return;
     const moreMenu = $('team-page-more-menu');
+    $('team-page-stop').textContent = teamAsleep() ? 'Wake agents' : 'Stop agents'; // a sleeping team is already stopped (walk 13 M9)
     for (const [host, cls] of [[menu, 'menu-item'], [moreMenu, 'menu-item team-more-add team-more-stop']]) {
         if (!host) continue;
         for (const old of host.querySelectorAll('[data-stop], .team-more-stop-sep')) old.remove();
@@ -188,7 +189,7 @@ const BOARD_ACTIONS = ['mb-select-btn', 'mb-export-btn', 'mb-pause-btn', 'mb-del
 function adoptBoardActions() {
     const menu = $('team-page-more-menu'); if (!menu) return;
     for (const id of BOARD_ACTIONS) { const b = $(id); if (b && b.parentElement !== menu) { b.dataset.home = b.parentElement ? b.parentElement.id : ''; menu.append(b); } }
-    const pause = $('mb-pause-btn'); // what Pause Board does, in words under it (Mobile tester, #10008): a title is no help on a phone
+    const pause = $('mb-pause-btn'); // what Pause board does, in words under it (Mobile tester, #10008): a title is no help on a phone
     if (pause && !$('mb-pause-note')) { const n = el('span', 'menu-note', /^Resume/.test(pause.textContent) ? 'Agents get messages again when you resume.' : 'Agents stop receiving new messages until you resume.'); n.id = 'mb-pause-note'; pause.after(n); pause.setAttribute('aria-describedby', 'mb-pause-note'); }
     for (const id of BOARD_ACTIONS) { const b = $(id); if (b) b.style.display = ''; } // display-ok: the holder's markup hides these with an inline display:none, which message_board.js clears the same way
     const sel = $('mb-select-btn'); if (sel) sel.hidden = S.tab !== 'messages'; // selecting messages is the Messages tab's

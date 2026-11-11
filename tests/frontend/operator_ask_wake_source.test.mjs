@@ -13,7 +13,7 @@ test('remote wake refusal keeps the source computer reason',async()=>{state.live
 test('another computer with the same session ID is never a fallback wake target',async()=>{state.liveSessions=[agent('local')];mock('/api/remote/m1');await assert.rejects(wakeMember({server:'m1',board:'team a'},name),/not running on this computer/);assert.equal(calls.length,3,'the member read, the server\'s own list (#14420), then the earlier chat read (#14172), all on the question\'s own computer');assert.ok(calls.every(c=>c.url.startsWith('/api/remote/m1/')),'nothing went to this computer or to a wake: '+JSON.stringify(calls));});
 test('a refused member read reports the read failure, not false non-membership',async()=>{calls=[];globalThis.fetch=window.fetch=async url=>{calls.push(String(url));return Response.json({error:'Denied'},{status:403});};await assert.rejects(wakeMember({server:'m1',board:'team a'},name),/Could not read this team's members \(HTTP 403\)/);assert.deepEqual(calls,['/api/remote/m1/api/board/team%20a/subscribers']);});
 
-// #14172: an agent Kill All (or its own exit) ended has no live row. Restart from the question resumes its chat in its own folder, on the question's computer, the way History's Resume does it.
+// #14172: an agent Kill all (or its own exit) ended has no live row. Restart from the question resumes its chat in its own folder, on the question's computer, the way History's Resume does it.
 test('an ended agent is resumed from its chat in its own folder, joined to the question\'s team', async () => {
     state.liveSessions = []; calls = [];
     const sent = [];

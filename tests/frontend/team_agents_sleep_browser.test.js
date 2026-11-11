@@ -1,4 +1,4 @@
-// After Sleep Team the Agents tab says Sleeping at once, not at the next 15 s poll (#12335, Beta Tester: the table said Free/Waiting while the sidebar said Sleeping).
+// After Sleep team the Agents tab says Sleeping at once, not at the next 15 s poll (#12335, Beta Tester: the table said Free/Waiting while the sidebar said Sleeping).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, openTeam } = require('./helpers/team_page');
@@ -28,6 +28,6 @@ const TEAM = `qa-sleep-${Date.now() % 100000}`;
         const t0 = Date.now();
         await waitFor(`/Sleeping/.test(document.querySelector('.team-agents-body').textContent)`, 'the table says Sleeping', { timeout: 20000 });
         assert.ok(Date.now() - t0 < 4000, 'the table said Sleeping at once, not at the 15 s poll: ' + (Date.now() - t0) + ' ms');
-        console.log('PASS the Agents table follows Sleep Team at once');
+        console.log('PASS the Agents table follows Sleep team at once');
     } finally { await removeBoards(ev, [TEAM]).catch(() => { }); await client.close(); }
 })().catch(e => { console.error(e && e.message || e); process.exit(1); });

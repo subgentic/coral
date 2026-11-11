@@ -32,8 +32,8 @@ function updatePauseButton(say = true) {
     window.__coral?._setBoardChatPaused?.(bs.isPaused, say); // the team panel's Board tab says it in its ... menu and its banner (#13585)
     const btn = document.getElementById('mb-pause-btn');
     if (!btn) return;
-    // A sleeping team's board is paused by the sleep: one name for the way out, Wake Team, here and in the Sleep item (#12335).
-    btn.textContent = isSleeping ? 'Wake Team' : bs.isPaused ? 'Resume Board' : 'Pause Board';
+    // A sleeping team's board is paused by the sleep: one name for the way out, Wake team, here and in the Sleep item (#12335).
+    btn.textContent = isSleeping ? 'Wake team' : bs.isPaused ? 'Resume board' : 'Pause board';
     const note = document.getElementById('mb-pause-note'); if (note) note.textContent = isSleeping ? 'Starts every agent again; the board takes messages again.' : bs.isPaused ? 'Agents get messages again when you resume.' : 'Agents stop receiving new messages until you resume.'; // what it does (#10008)
     btn.classList.toggle('mb-action-danger', bs.isPaused);
 }
@@ -98,21 +98,21 @@ export async function loadSleepState(project) {
 function updateSleepUI() {
     const btn = document.getElementById('mb-sleep-btn');
     if (btn) {
-        btn.textContent = isSleeping ? 'Wake Team' : 'Sleep Team';
+        btn.textContent = isSleeping ? 'Wake team' : 'Sleep team';
         btn.classList.toggle('btn-warning', isSleeping);
     }
     const banner = document.getElementById('mb-sleep-banner');
     if (banner) {
         banner.style.display = isSleeping ? '' : 'none';
         const text = banner.querySelector('.mb-sleep-text');
-        if (text) text.textContent = 'This team is sleeping. Messages are paused until you use Wake Team (Actions menu or the Sleep button).';
+        if (text) text.textContent = 'This team is sleeping. Messages are paused until you use Wake team (Actions menu or the Sleep button).';
     }
     updatePauseButton(false); // Repainting sleep controls is not a pause change.
     const input = document.getElementById('mb-post-input');
     const sendBtn = document.querySelector('#mb-board .btn-primary');
     if (input) {
         input.disabled = isSleeping;
-        input.placeholder = isSleeping ? 'Team is sleeping. Wake Team to send messages' : 'Message the team...';
+        input.placeholder = isSleeping ? 'Team is sleeping. Wake team to send messages' : 'Message the team...';
     }
     if (sendBtn) {
         sendBtn.disabled = isSleeping;
@@ -120,7 +120,7 @@ function updateSleepUI() {
     }
 }
 
-// Sleep Team or Wake Team from anywhere (the Agents tab, the card, the page): the board follows (#12335).
+// Sleep team or Wake team from anywhere (the Agents tab, the card, the page): the board follows (#12335).
 document.addEventListener('coral:team-sleep-changed', e => {
     if (!bs.currentProject || !e.detail || e.detail.team !== bs.currentProject) return;
     loadSleepState(bs.currentProject);

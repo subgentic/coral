@@ -1,4 +1,4 @@
-// The team Agents tab says an archived agent is archived (#8194): the server's availability "archived" had no word, so the row's status chip said "No signal yet" (and its filter chip was the raw key,
+// The team Agents tab says an archived agent is archived (#8194): the server's availability "archived" had no word, so the row's status chip said "Not reported" (and its filter chip was the raw key,
 // lower case, beside "Sleeping"). The board's /status answer is stubbed with a free, a sleeping and an archived agent. 1280 px, through the real team page.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -30,7 +30,7 @@ const TEAM = `qa-archived-${Date.now() % 100000}`;
         const r = await ev(`(() => ({ chips: [...document.querySelectorAll('.goals-chip')].map(c => c.textContent.replace(/\\s+/g, ' ').trim()), shelved: [...document.querySelectorAll('tr.dt-row')].filter(x => /Shelved/.test(x.innerText)).map(x => x.innerText.replace(/\\s+/g, ' '))[0] }))()`);
         assert.ok(r.chips.some(c => /^Archived\b/.test(c)) && !r.chips.some(c => /^archived\b/.test(c)), 'the filter chip says Archived: ' + JSON.stringify(r.chips));
         assert.match(r.shelved, /Archived/, 'the archived agent\'s status says Archived: ' + r.shelved);
-        assert.doesNotMatch(r.shelved, /No signal yet/, 'and not "No signal yet": ' + r.shelved);
+        assert.doesNotMatch(r.shelved, /Not reported/, 'and not "Not reported": ' + r.shelved);
         console.log('PASS the Agents tab says Archived for an archived agent, on its row and its chip');
     } finally { await removeBoards(ev, [TEAM]).catch(() => { }); await client.close(); }
 })().catch(e => { console.error('FAIL', e); process.exit(1); });

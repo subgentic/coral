@@ -21,13 +21,13 @@ const BASE = require('./test_base').BASE;
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
 
-        console.log('1. A version from the server: shown at the very bottom, below Check for Updates');
+        console.log('1. A version from the server: shown at the very bottom, below Check for updates');
         await load('1.4.88');
         await waitFor(`!document.getElementById('coral-version-row').hidden`, 'the version line');
         const shown = await ev(`document.getElementById('coral-version').textContent`);
         assert.equal(shown, 'Coral v1.4.88');
-        const order = await ev(`(() => { const m = document.getElementById('top-bar-settings-menu'); const kids = [...m.children].filter(e => e.getClientRects().length); const last = kids[kids.length - 1]; const upd = [...m.querySelectorAll('button')].find(b => /Check for Updates/.test(b.textContent)); return { lastIsVersion: last.id === 'coral-version-row', below: document.getElementById('coral-version').getBoundingClientRect().top >= upd.getBoundingClientRect().bottom }; })()`);
-        assert.deepEqual(order, { lastIsVersion: true, below: true }, 'last in the menu, below Check for Updates');
+        const order = await ev(`(() => { const m = document.getElementById('top-bar-settings-menu'); const kids = [...m.children].filter(e => e.getClientRects().length); const last = kids[kids.length - 1]; const upd = [...m.querySelectorAll('button')].find(b => /Check for updates/.test(b.textContent)); return { lastIsVersion: last.id === 'coral-version-row', below: document.getElementById('coral-version').getBoundingClientRect().top >= upd.getBoundingClientRect().bottom }; })()`);
+        assert.deepEqual(order, { lastIsVersion: true, below: true }, 'last in the menu, below Check for updates');
         console.log('   ✓ ' + shown);
 
         console.log('1b. The server\'s own answer, unchanged: the line is its version, or absent when it reports none (a dev build)');

@@ -1,6 +1,6 @@
 // Through Coral Hub a board link is the team page's Board tab, never the old board page (#8407, goal #38): /board/@m1/<team> (the address the Hub's Board tab used to open) redirects to
 // /team/@m1/<team>/board in place, and the Board tab there is the shared board table: Table by default, the Table | Chat switch under the search, the board's rows, and none of the old page's
-// parts (Members, Pause Board, its own header). Stubbed two-computer Hub (helpers/hub_world.js) at desktop and phone width; shots with CORAL_SCREENSHOT_DIR.
+// parts (Members, Pause board, its own header). Stubbed two-computer Hub (helpers/hub_world.js) at desktop and phone width; shots with CORAL_SCREENSHOT_DIR.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
@@ -22,12 +22,12 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`document.querySelectorAll('#mb-messages .mb-message, #mb-messages tr').length >= 3`, 'the board rows', 15000);
             const page = await ev(`(() => { const vis = e => !!e && e.checkVisibility();
                 return { team: vis(document.getElementById('team-page-view')), board: vis(document.querySelector('#team-panel-messages #mb-board')), switchLabels: [...document.querySelectorAll('.mb-table-tools button')].filter(vis).map(b => b.textContent.trim()),
-                    view: document.getElementById('mb-messages').getAttribute('data-view'), oldHeader: vis(document.getElementById('messageboard-title')), members: /\\bMembers\\b/.test(document.getElementById('team-page-view').innerText), pause: /Pause Board/.test(document.getElementById('team-page-view').innerText),
+                    view: document.getElementById('mb-messages').getAttribute('data-view'), oldHeader: vis(document.getElementById('messageboard-title')), members: /\\bMembers\\b/.test(document.getElementById('team-page-view').innerText), pause: /Pause board/.test(document.getElementById('team-page-view').innerText),
                     machine: document.getElementById('team-page-title').textContent.includes('Laptop'), wide: document.documentElement.scrollWidth <= innerWidth }; })()`);
             assert.equal(page.team, true, 'the team page is on screen'); assert.equal(page.board, true, 'the board is the Messages tab\'s');
             assert.deepEqual(page.switchLabels.filter(l => l === 'Table' || l === 'Chat'), ['Table', 'Chat'], 'the Table | Chat switch is there');
             assert.equal(page.view, 'table', 'Table is the default');
-            assert.equal(page.oldHeader, false, 'no old board header'); assert.equal(page.members, false, 'no Members'); assert.equal(page.pause, false, 'no Pause Board button');
+            assert.equal(page.oldHeader, false, 'no old board header'); assert.equal(page.members, false, 'no Members'); assert.equal(page.pause, false, 'no Pause board button');
             assert.equal(page.machine, true, 'the computer is named'); assert.equal(page.wide, true, 'no sideways scroll');
             assert.deepEqual(await ev(`window.__cspViolations`), [], 'no CSP violation');
             await shot(`hub-board-${w}`);

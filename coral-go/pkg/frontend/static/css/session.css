@@ -1126,9 +1126,9 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
     margin-left: auto;
 }
 .terminal-header-actions > .terminal-header-btn { flex-shrink: 0; }
-/* A phone (#4081): the 44 px buttons (the toggle, Find, Open Agent Tab, side panel) need the width, so the name gives way first
+/* A phone (#4081): the 44 px buttons (the toggle, Find, Open agent tab, side panel) need the width, so the name gives way first
    instead of pushing the last buttons off the screen at 320 to 414 px. */
-/* The view toggle moved into the actions (#9836), so at 200% text a header in a pane under 1000 px was wider than its pane (Find and Open Agent Tab ran off the right edge at 1024, #9899): the buttons go to a second row at any width, as on a phone below, only when even 3.5em of name cannot fit beside them. */
+/* The view toggle moved into the actions (#9836), so at 200% text a header in a pane under 1000 px was wider than its pane (Find and Open agent tab ran off the right edge at 1024, #9899): the buttons go to a second row at any width, as on a phone below, only when even 3.5em of name cannot fit beside them. */
 body .terminal-header { flex-wrap: wrap; height: auto; min-height: 36px; row-gap: 2px; }
 @media (max-width: 480px) {
     /* #4327: at 200% text the buttons go to a second row instead of squeezing the name out (it was "al…", and gone with a branch beside it): the
@@ -1703,7 +1703,7 @@ button.server-update-badge { background: transparent; font: inherit; cursor: poi
 @media (pointer: coarse) { .composer-queued-text[role=button] { min-height: 44px; display: inline-flex; align-items: center; } }
 @media (pointer: coarse) { .composer-queued-cancel { min-height: 44px; min-width: 44px; display: inline-flex; align-items: center; } }
 
-/* A small phone (up to 400 px): the header's 44 px targets (the view toggle, Find, Open Agent Tab, the side panel) left the agent name 46 px at 320 and 35 px at 370 beside the branch (#6756). The header's side padding is 2 px and the branch is cut to 3 em
+/* A small phone (up to 400 px): the header's 44 px targets (the view toggle, Find, Open agent tab, the side panel) left the agent name 46 px at 320 and 35 px at 370 beside the branch (#6756). The header's side padding is 2 px and the branch is cut to 3 em
    (a hint; the name is what the header is for): the name has 54 px at 320 and more where the branch shows, and the buttons keep their gaps. The targets stay 44 px. */
 @media (max-width: 400px) {
     html body .terminal-header { padding-left: 6px; padding-right: 6px; } /* both ends 6 px from the screen edge, where an OS edge swipe (the side panel's on the right, iOS back on the left) wins at 0 to 2 px (#6777, #6790) */
@@ -1713,7 +1713,7 @@ button.server-update-badge { background: transparent; font: inherit; cursor: poi
     html body .terminal-header-actions > .terminal-branch { max-width: 3em; }
 }
 
-/* A phone has little use for a pop-out browser tab, and the link took 44 px the agent name needs (#6756): Open Agent Tab is not in the phone layout's header (the phone query of phone_layout.js); Find and the side panel stay. */
+/* A phone has little use for a pop-out browser tab, and the link took 44 px the agent name needs (#6756): Open agent tab is not in the phone layout's header (the phone query of phone_layout.js); Find and the side panel stay. */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     html body #terminal-open-window-link { display: none !important; }
 }

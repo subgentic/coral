@@ -55,15 +55,15 @@ const BASE = require('./test_base').BASE;
         t = await stop({ ok: true, sessions_killed: 1 });
         check('an answer with no worktree says nothing about one', !t.some(x => /worktree/.test(x.text)), JSON.stringify(t));
 
-        console.log('Kill Session (one agent) and a branch kept');
+        console.log('Kill session (one agent) and a branch kept');
         const seedOne = withWt => ev(`localStorage.clear(); T.state.liveSessions = []; window.__m.agents = {};
             window.__m.add('solo', 'K', 3, { sleeping: false, session_id: 'o1' });
             T.state.liveSessions.forEach(s => { s.branch = 'coral-team/solo'; s.git_state = ${withWt ? '{ is_worktree: true }' : 'null'}; });
             T.render.renderLiveSessions(T.state.liveSessions); true`);
-        const askOne = async () => { await ev(`T.render.killSessionDirect('solo', 'claude', 'o1'); true`); await waitFor(open, 'the Kill Session confirmation', 8000); return ev(`document.getElementById('confirm-modal-message').textContent`); };
+        const askOne = async () => { await ev(`T.render.killSessionDirect('solo', 'claude', 'o1'); true`); await waitFor(open, 'the Kill session confirmation', 8000); return ev(`document.getElementById('confirm-modal-message').textContent`); };
         await seedOne(true);
         const o1 = await askOne();
-        check('Kill Session of an agent on a worktree says the same sentence, before the log note', o1.includes('Its worktree (branch coral-team/solo) is removed if it has no unsaved changes; otherwise it is kept.') && o1.indexOf('worktree') < o1.indexOf('terminal log'), o1);
+        check('Kill session of an agent on a worktree says the same sentence, before the log note', o1.includes('Its worktree (branch coral-team/solo) is removed if it has no unsaved changes; otherwise it is kept.') && o1.indexOf('worktree') < o1.indexOf('terminal log'), o1);
         await cancel();
         await seedOne(false);
         check('and an agent that is not on one says nothing about it', !/worktree/i.test(await askOne()));

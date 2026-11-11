@@ -1,4 +1,4 @@
-// resume_ended.js (#14172, #14208): the words and the one-after-another resume of the members Wake Team found ended. Plain text only; a start that fails does not stop the rest.
+// resume_ended.js (#14172, #14208): the words and the one-after-another resume of the members Wake team found ended. Plain text only; a start that fails does not stop the rest.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { installDom, importUi } from './helpers/jsdom_env.mjs';
