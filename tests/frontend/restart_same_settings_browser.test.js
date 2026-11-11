@@ -96,7 +96,7 @@ const BASE = require('./test_base').BASE;
         const earlier = await ev(`(() => { const e = document.querySelector('#live-history-messages > .chat-earlier'); return e && { text: e.textContent, before: !!(e.compareDocumentPosition(document.querySelector('#live-history-messages .message-text:not(.chat-earlier *)')) & Node.DOCUMENT_POSITION_FOLLOWING) }; })()`);
         assert.ok(earlier, 'the earlier conversation is a block of its own');
         assert.match(earlier.text, /O0 lorem/);
-        assert.match(earlier.text, /Restarted: a new conversation starts here/);
+        assert.match(earlier.text, /New conversation: context cleared, instructions sent again/);
         assert.ok(earlier.before, 'it sits above the new conversation');
 
         // The draft is gone, from the box and from the saved drafts (the old session's and the new one's).
