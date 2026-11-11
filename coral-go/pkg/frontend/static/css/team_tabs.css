@@ -1,4 +1,4 @@
 .team-tabs .team-tab-count:empty { display: inline-block; visibility: hidden; } /* an empty count keeps a one-digit pill's room, so a count arriving moves no tab (#15494 M4) */
 .team-tabs .team-tab-count:empty::before { content: '0'; }
-.team-tabs .team-tab-count { font-variant-numeric: tabular-nums; } /* every digit one width: the room kept for 0 is the room of 1 to 9 */
+.team-tabs .team-tab-count { font-variant-numeric: tabular-nums; box-sizing: border-box; min-width: 2.1em; text-align: center; } /* one glyph, whichever: the room kept for 0 is also the room of 1 to 9 and of the '…' a count shows while it loads (it was 1.6 px wider, so the tabs after Needs moved 2 px when the number came: walk21_part2 M4, 6 of 10 runs) */ /* every digit one width: the room kept for 0 is the room of 1 to 9 */
 .team-tabs .tab { transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease; } /* not 'all': a tab's weight, and so its width, does not animate, so the strip is scrolled to the pressed tab's final place, not to where it started (#15494) */
