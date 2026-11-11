@@ -241,6 +241,19 @@ const askUnder = a => questionContextNote(a) || 'Needs your answer'; // the row'
 /** The number the row's "version N" says: the server's, when the artifact is in a series it recorded, else the older versions of the same file and uploader that this row stands for, and itself (#12081: a second upload by name, with no series, said only "1 earlier version"). */
 const versionOf = r => Number(r.version) > 1 ? Number(r.version) : (r.earlier || []).length ? r.earlier.length + 1 : 0;
 const earlierWords = r => { const n = Math.max((r.earlier || []).length, (r.version || 1) - 1); return n ? `${n} earlier version${n === 1 ? '' : 's'}` : ''; };
+/** "3 earlier versions" as a link: it opens the list of the file's versions (#15285), with Open and Restore; lazy, so the start bundle holds only this line. */
+const earlierLink = s => {
+    const b = DT.el('button', 'inbox-review-earlier default-notice-link', earlierWords(s.review)); b.type = 'button'; b.title = 'See every version of this file';
+    b.addEventListener('click', e => {
+        e.stopPropagation(); const r = s.review, server = sessionServer(s);
+        Promise.all([importOnce('./artifact_version_list.js'), importOnce('./artifact_review.js')]).then(([list, review]) => list.openVersionList({
+            hex: r.hex, server, board: splitKey(r.team).name, name: r.name, current: r, earlier: r.earlier,
+            open: v => importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(v.hex, { server, filename: r.name, board: splitKey(r.team).name })),
+            restore: r.produced_by ? v => review.askToRestore(r.team, r, v) : null,
+        })).catch(() => showToast('The versions could not be listed', true));
+    });
+    return b;
+};
 const needsName = s => s.skillReview ? skillName(s.skillReview) : s.goalDone ? `Goal #${s.goalDone.id}` : s.proposal ? markedText(s.proposal.proposer) : s.review ? s.review.produced_by || 'Unknown agent' : s.autorun ? s.autorun.name : s.operatorAsk ? s.operatorAsk.asker : s.welcome ? s.welcome.title : s.unrecorded ? s.display_name : resolveSessionIdentity(s);
 // With a filter on, the file rows are what the computers answer for it (#13162, Stage 1): the first 50 matches of each team with Show more; until the answer is in, the rows of the whole list the page already holds, matched as before.
 const reviewFilters = () => { const f = NF.clean(activeNeedsTeam ? { ...needsFilters, team: splitKey(activeNeedsTeam).name, server: splitKey(activeNeedsTeam).server } : needsFilters); return reviewQueryKey(f) ? f : null; };
@@ -1319,7 +1332,7 @@ wrap.append(sender, name); if (tags.childNodes.length) wrap.append(tags);
 wrap.append(DT.el('span', 'sr-only', `${earlierWords(s.review) ? `, ${earlierWords(s.review)}` : ''}${readWords}`), ...waitMark(s)); return wrap;
     }
     const ver = DT.el('span', 'inbox-review-version', versionOf(s.review) > 1 ? ` · version ${versionOf(s.review)}` : ''); ver.hidden = !(versionOf(s.review) > 1);
-    wrap.append(sender, name, ver, ...(earlierWords(s.review) ? [DT.el('span', 'inbox-review-earlier', earlierWords(s.review))] : []), DT.el('span', 'sr-only', readWords), ...waitMark(s)); return wrap;
+    wrap.append(sender, name, ver, ...(earlierWords(s.review) ? [earlierLink(s)] : []), DT.el('span', 'sr-only', readWords), ...waitMark(s)); return wrap;
 } if (isPhoneLayout()) { const f = DT.primaryButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); f.classList.add('inbox-review-from'); Object.assign(f.dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); const row = phoneRow(s, f, agentAskWords(s), [], true); if (agentAskIsLong(s)) row.append(...agentAskControls(s)); return row; }
   const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; })(s)) },
                 ...(rows.some(s => s.proposal) && !oneLineNeeds ? [{ key: 'asks', label: rows.some(x => x.proposal) ? 'What was asked' : 'Waiting for', ...(rows.some(x => x.proposal) ? (rows.some(s => s.review || s.operatorAsk) ? { lineGrow: true, min: 18, share: 1 } : { lineGrow: true, min: 22, share: 4 }) : { width: 'content', max: 20, drop: 2 }), line: 2, cell: s => {

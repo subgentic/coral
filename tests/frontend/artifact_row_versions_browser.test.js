@@ -22,6 +22,7 @@ const LONG_GOAL = 'Build a small reading list web app that works offline and can
             { ...base, id: ${JSON.stringify(HEX2)}, name: 'style.css', created_at: new Date(Date.now() - 180000).toISOString(), uri: 'coral://artifacts/${HEX2}', file_id: 'f2bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', version_line: 'version 1 of style.css (file f2bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)' }];
         window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); const m = String((o && o.method) || 'GET').toUpperCase();
             if (m === 'GET' && /^\\/api\\/board\\/[^/]+\\/artifacts$/.test(url.pathname)) return j({ project: ${JSON.stringify(TEAM)}, artifacts: items, has_more: false, total: 2 });
+            if (m === 'GET' && url.pathname === '/api/artifacts/${HEX1}/versions') return j([{ version: 1, digest: ${JSON.stringify(HEX2)}, at: new Date(Date.now() - 180000).toISOString(), uploader: 'Lead Developer', name: 'style.css', media_type: 'text/css' }, { version: 2, digest: ${JSON.stringify(HEX1)}, at: new Date(Date.now() - 60000).toISOString(), uploader: 'Lead Developer', name: 'style.css', media_type: 'text/css', is_latest: true }]);
             return R(u, o); };
         return true; })()`);
     try {
@@ -46,6 +47,13 @@ const LONG_GOAL = 'Build a small reading list web app that works offline and can
         assert.ok(task && goal && ver, 'Task, Goal and Version are facts: ' + JSON.stringify(chips));
         for (const c of [task, goal, ver]) assert.equal(c.cut, false, 'no fact is cut with an ellipsis: ' + JSON.stringify(c));
         assert.ok(task.text.includes('cream background') && goal.text.includes('reading list web app'), 'the whole words are there: ' + JSON.stringify([task.text, goal.text]));
+        // the "2 versions" action lists v1 and v2 (#15285)
+        const found = await ev(`(() => { const b = [...document.querySelectorAll('#detail-pane button, #detail-pane [role=menuitem]')].find(x => /^2 versions$/.test(x.textContent.trim())); if (!b) return false; b.click(); return true; })()`);
+        assert.ok(found, 'Details has a "2 versions" action');
+        await waitFor(`document.querySelectorAll('.version-list-dialog[open] .version-list-entry').length === 2`, 'the version list has v1 and v2', 8000);
+        const names = await ev(`[...document.querySelectorAll('.version-list-dialog[open] .version-list-name')].map(n => n.textContent)`);
+        assert.deepEqual(names, ['v1', 'v2 (newest)'], 'oldest first, the newest marked: ' + JSON.stringify(names));
+        await ev(`document.querySelector('.version-list-dialog[open] .inbox-ask-buttons button').click(); true`);
         console.log('PASS two style.css rows: v2 on the newest, names whole, Task, Goal and Version whole in Details at 125%');
     } finally { await removeBoards(ev, [TEAM]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

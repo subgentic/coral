@@ -55,7 +55,9 @@ function collapseVersions(list) {
         // A bounded newest-version page carries authoritative older digests rather than those rows.
         // Keep that history on the collapsed row too, including Saved's sender/version line.
         for (const hex of a.earlier_digests || []) if (/^[a-f0-9]{64}$/.test(hex) && hex !== a.hex && !older.has(hex)) older.set(hex, { ...a, id: hex, hex, version: 0, reviewKey: `${a.team}:${hex}`, earlier: undefined, earlier_digests: undefined });
-        return older.size ? { ...a, earlier: [...older.values()] } : a;
+        if (!older.size) return a;
+        const n = older.size + 1, line = typeof a.version_line === 'string' && !a.series_id ? a.version_line.replace(/^version (\d+)/, (w, v) => (Number(v) < n ? `version ${n}` : w)) : a.version_line; // a file sent again by name, with no series, is version 2, 3 ... of the rows this one stands for, not 'version 1' every time (#15285)
+        return { ...a, earlier: [...older.values()], ...(line !== undefined ? { version_line: line } : {}) };
     }); // the list's own order: oldest newest-version first
 }
 export const reviewItems = () => {
