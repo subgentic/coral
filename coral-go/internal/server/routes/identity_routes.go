@@ -300,6 +300,7 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/servers/provision/{plan}/connect":    "connect to a computer to set a server up",
 	"POST /api/servers/provision/{plan}/forget-key": "forget the saved host key of a computer whose key changed",
 	"POST /api/servers/provision/{plan}/run":        "set a server up over SSH",
+	"POST /api/servers/provision/{plan}/upload":     "upload a release package for a server set-up or upgrade",
 	"GET /api/servers/provision/{plan}":             "read how a server setup is going",
 	"DELETE /api/servers/provision/{plan}":          "cancel a server setup",
 	"POST /api/board/remotes":                       "subscribe to a remote board",
@@ -467,7 +468,7 @@ var operatorOnlyRoutes = map[string]string{
 // lets them be absent otherwise.
 var hubModeRoutes = map[string]bool{
 	"GET /api/servers": true, "POST /api/servers": true, "PATCH /api/servers/{id}": true, "DELETE /api/servers/{id}": true, "POST /api/servers/{id}/test": true, "POST /api/servers/{id}/reconnect": true, "POST /api/servers/{id}/owner-secret": true,
-	"GET /api/servers/provision/options": true, "GET /api/servers/provision": true, "POST /api/servers/provision/plan": true, "POST /api/servers/provision/{plan}/connect": true, "POST /api/servers/provision/{plan}/forget-key": true, "POST /api/servers/provision/{plan}/run": true,
+	"GET /api/servers/provision/options": true, "GET /api/servers/provision": true, "POST /api/servers/provision/plan": true, "POST /api/servers/provision/{plan}/connect": true, "POST /api/servers/provision/{plan}/forget-key": true, "POST /api/servers/provision/{plan}/run": true, "POST /api/servers/provision/{plan}/upload": true,
 	"GET /api/servers/provision/{plan}": true, "DELETE /api/servers/provision/{plan}": true,
 	"CONNECT /api/remote/{server}/*": true,
 	"DELETE /api/remote/{server}/*":  true,

@@ -850,11 +850,13 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 		r.Post("/api/servers/{id}/owner-secret", rsHandler.OwnerSecret)
 		// Set a Coral server up on another computer over SSH (#11370): hub mode only, the Operator's.
 		prov := routes.NewProvisioner(rsHandler.Store())
+		prov.SetUploadDir(filepath.Join(s.cfg.CoralDir(), "provision-uploads")) // an uploaded package is held here until its run ends (#15691)
 		r.Get("/api/servers/provision/options", prov.Options)
 		r.Get("/api/servers/provision", prov.List)
 		r.Post("/api/servers/provision/plan", prov.Plan)
 		r.Post("/api/servers/provision/{plan}/connect", prov.Connect)
 		r.Post("/api/servers/provision/{plan}/run", prov.Run)
+		r.Post("/api/servers/provision/{plan}/upload", prov.Upload) // the package (or the signed sums) for a set up or an upgrade, from the browser (#15691)
 		r.Get("/api/servers/provision/{plan}", prov.Status)
 		r.Post("/api/servers/provision/{plan}/forget-key", prov.ForgetKey)
 		r.Delete("/api/servers/provision/{plan}", prov.Cancel)

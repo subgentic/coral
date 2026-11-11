@@ -408,6 +408,7 @@ b POST /api/servers/provision/plan
 b POST /api/servers/provision/{plan}/connect
 b POST /api/servers/provision/{plan}/forget-key
 b POST /api/servers/provision/{plan}/run
+b POST /api/servers/provision/{plan}/upload
 b POST /api/servers/{id}/owner-secret
 b POST /api/sessions/history/{sessionID}/resummarize
 b POST /api/sessions/history/{sessionID}/tags

@@ -112,6 +112,7 @@ exit 0
 	r.Post("/api/servers/provision/plan", pr.Plan)
 	r.Post("/api/servers/provision/{plan}/connect", pr.Connect)
 	r.Post("/api/servers/provision/{plan}/run", pr.Run)
+	r.Post("/api/servers/provision/{plan}/upload", pr.Upload)
 	r.Get("/api/servers/provision/options", pr.Options)
 	r.Get("/api/servers/provision", pr.List)
 	r.Get("/api/servers/provision/{plan}", pr.Status)

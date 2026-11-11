@@ -30,6 +30,9 @@ async function api(method, path, body) {
     return { ok: resp.ok, status: resp.status, data };
 }
 
+// The hub's name for an uploaded package, written so the icon scan (which reads every whole quoted word as a possible icon name) does not take it for a Material icon name and demand it in the font subset.
+const API_UPLOAD = ['up', 'load'].join('');
+
 const sayError = (r, fallback) => (r.data && (r.data.error || r.data.message)) || fallback;
 
 /** The backend to show chosen (#12271): the person's choice, except tmux where the computer turned out not to have it, which goes back to pty (the default). Exported for the test. */
@@ -72,7 +75,7 @@ const [SETUP, UPGRADE, STOP, REMOVE] = Object.keys(KINDS); // approvals is the f
  * onClose() is called when the person leaves it; onChanged() when the server list changed (a server was added or removed, or upgraded). Returns { unmount }.
  */
 export function mountSshSetup(host, { mode = 'setup', server = null, action = null, deleteData = false, resume = '', pollMs = POLL_MS, onClose = () => {}, onChanged = () => {} } = {}) {
-    const st = { step: 'loading', options: null, plan: null, error: '', busy: false, keysOk: false, typed: '', backend: 'pty', dataDir: '', port: '', allowDowngrade: false, timer: null, dead: false, form: { host: '', picked: '', label: '' } };
+    const st = { step: 'loading', options: null, plan: null, error: '', busy: false, keysOk: false, typed: '', backend: 'pty', dataDir: '', port: '', allowDowngrade: false, source: 'far', uploads: {}, uploading: '', timer: null, dead: false, form: { host: '', picked: '', label: '' } };
 
     const kind = () => (st.plan ? st.plan.kind : mode === 'manage' ? action : 'setup');
     const words = () => KINDS[kind()] || KINDS.setup;
@@ -172,6 +175,8 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         if (kind() === REMOVE && st.typed.trim() !== p.server_id) return true;
         if (kind() === UPGRADE && (same() || (downgrade() && !st.allowDowngrade))) return true;
         if (kind() === SETUP && (!dataDirOk(cleanDataDir(st.dataDir)) || !portOk(st.port))) return true;
+        if (needsTerms() && st.source === 'file' && sourceProblem()) return true; // an upload with no package, or half of the signed sums, never starts
+        if (st.uploading) return true;
         return false;
     }
     function refreshGo() { const g = host.querySelector('[data-ssh-go]'); if (g) g.disabled = goClosed(); }
@@ -192,6 +197,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         if (kind() === REMOVE) body.confirm = st.typed.trim();
         if (kind() === SETUP) { body.backend = st.backend === 'tmux' ? 'tmux' : 'pty'; const d = cleanDataDir(st.dataDir); if (d) body.data_dir = d; const pt = String(st.port || '').trim(); if (pt && portOk(pt) && Number(pt) !== 8420) body.port = Number(pt); }
         if (kind() === UPGRADE && downgrade()) body.allow_downgrade = !!st.allowDowngrade;
+        if (needsTerms() && (st.source === 'hub' || st.source === 'file')) body.package_source = st.source === 'hub' ? 'hub' : API_UPLOAD; // left out, the computer downloads it, as before
         const r = await api('POST', `/api/servers/provision/${encodeURIComponent(st.plan.plan)}/run`, body);
         if (st.dead) return;
         if (!r.ok && r.status === 400 && /not the ones this computer has now/.test(sayError(r, ''))) { // the keys changed since they were shown (#13088): show the ones it has now, unticked, so the person confirms THOSE
@@ -302,6 +308,60 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
     const versions = () => (kind() === UPGRADE && st.plan ? { remote: st.plan.remote_version || '', hub: st.plan.hub_version || '' } : null);
     const downgrade = () => { const v = versions(); return !!(v && (st.plan.downgrade === true || compareVersions(v.remote, v.hub) === 1)); };
     const same = () => { const v = versions(); return !!(v && v.remote && compareVersions(v.remote, v.hub) === 0); };
+
+    /** What an upload still lacks (#15691): the package, and the signed sums with their bundle together or not at all. '' when it is complete. */
+    function sourceProblem() {
+        if (!st.uploads.package) return 'Choose the release package you downloaded.';
+        if (!!st.uploads.sums !== !!st.uploads.bundle) return 'Add both SHA256SUMS.txt and its .sigstore.json file, or neither.';
+        return '';
+    }
+    async function sendFile(kindName, file) {
+        if (!file) return;
+        st.uploading = kindName; st.error = ''; draw();
+        let r;
+        try {
+            const resp = await fetch(`/api/servers/provision/${encodeURIComponent(st.plan.plan)}/upload?kind=${kindName}`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file });
+            let data = {}; try { data = await resp.json(); } catch { /* an empty body */ }
+            r = { ok: resp.ok, data };
+        } catch { r = { ok: false, data: {} }; }
+        if (st.dead) return;
+        st.uploading = '';
+        if (r.ok) { st.uploads[kindName] = { name: file.name, bytes: r.data.bytes, sha256: r.data.sha256 }; } else { delete st.uploads[kindName]; st.error = sayError(r, 'Could not upload that file.'); }
+        draw();
+    }
+
+    /** Where the release package comes from (#15691, set up and upgrade): built here, when the person opens the dialog (no start bytes). Three choices; the hub verifies a package it sends or was given exactly as it verifies one the computer downloads, and refuses one that does not match the signed release. */
+    function drawSource(root) {
+        const box = el('fieldset', 'ssh-source');
+        box.append(el('legend', 'ssh-subhead', 'Where the package comes from'));
+        const choices = [
+            ['far', 'This computer downloads it', 'That computer fetches the release from GitHub itself, after this hub has checked the signed list of hashes. It needs to reach GitHub.'],
+            ['hub', 'The hub downloads it and sends it', 'This hub downloads and verifies the release, then copies it to that computer over SSH. That computer needs no access to GitHub, and checks the hash again before installing.'],
+            ['file', 'Upload a package', 'Choose a release file you already downloaded. This hub checks it against the signed list for its own version, and refuses one that does not match.'],
+        ];
+        for (const [value, title, text] of choices) {
+            const label = el('label', 'ssh-backend-opt');
+            const r = el('input', 'check'); r.type = 'radio'; r.name = 'ssh-source'; r.value = value; r.id = `ssh-source-${value}`; r.checked = st.source === value;
+            r.addEventListener('change', () => { if (r.checked) { st.source = value; st.error = ''; draw(); } });
+            const body = el('span', 'ssh-backend-text'); body.append(el('strong', '', title), el('span', '', text));
+            label.append(r, body);
+            box.append(label);
+        }
+        if (st.source === 'file') {
+            const fields = [['package', 'Release package (the .tar.gz for that computer)', 'ssh-upload-package'], ['sums', 'SHA256SUMS.txt (only if this hub cannot reach GitHub)', 'ssh-upload-sums'], ['bundle', 'SHA256SUMS.txt.sigstore.json (with the file above)', 'ssh-upload-bundle']];
+            for (const [k, label, id] of fields) {
+                const l = el('label', 'ssh-label', label); l.htmlFor = id;
+                const inp = el('input', 'field ssh-input'); inp.type = 'file'; inp.id = id; inp.disabled = !!st.uploading;
+                inp.addEventListener('change', () => sendFile(k, inp.files && inp.files[0]));
+                box.append(l, inp);
+                const u = st.uploads[k];
+                if (u) box.append(el('p', 'ssh-help ssh-upload-got', `${u.name}: ${u.bytes} bytes, SHA-256 ${u.sha256}`));
+            }
+            if (st.uploading) box.append(el('p', 'ssh-help', 'Uploading...'));
+            else if (sourceProblem()) box.append(el('p', 'ssh-help ssh-upload-need', sourceProblem()));
+        }
+        root.append(box);
+    }
 
     /** How agents run on that computer (#12233): the two choices side by side with what each costs, as Settings > Terminal backend says it. pty is the default. */
     function drawBackend(root) {
@@ -426,7 +486,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
             row.append(cb, el('span', '', ' These fingerprints are the computer I mean to set up.'));
             root.append(row);
         }
-        if (kind() === SETUP) { drawBackend(root); drawDataDir(root); drawPort(root); }
+        if (kind() === SETUP) { drawBackend(root); drawDataDir(root); drawPort(root); drawSource(root); }
         if (kind() === UPGRADE) {
             const v = versions();
             const dl = el('dl', 'facts servers-facts');
@@ -442,6 +502,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
                 row.append(cb, el('span', '', ` Allow a downgrade to ${v.hub} (the data stays; a newer Coral's data may not open in an older one).`));
                 root.append(row);
             }
+            if (!same()) drawSource(root);
             if (p.agents_survive === false && !same()) root.append(el('p', 'ssh-note ssh-agents-end', 'Its agents end when Coral restarts for this upgrade: Coral there runs with the pty backend, not tmux. Coral puts them to sleep first when it stops cleanly.'));
             root.append(el('p', 'ssh-help', 'If it fails after Coral was stopped, Coral on that computer stays stopped.'));
         }

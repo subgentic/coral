@@ -117,7 +117,7 @@ var shellNeverFiles = map[string]shellNever{
 	"server_base.js":            {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
 	"server_controller.js":      {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"server_owner_secret.js":    {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
-	"server_ssh_setup.js":       {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 7},
+	"server_ssh_setup.js":       {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 8},
 	"sessions.js":               {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"settings_codex_hooks.js":   {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
 	"settings_core.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 3},
