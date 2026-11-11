@@ -249,7 +249,7 @@ function drawStatus(data) {
     // Just woken from here: how many have reported so far, until all have (or two minutes pass), not only "waiting" (#10052).
     const wakingNow = unknown > 0 && !n && waking;
     if (!unknown) stopWaking(S.team);
-    const text = uncertainAttention ? 'Checking attention status' : asleep ? 'Asleep' : wakingNow ? `Waking the team: ${data.agents.length - unknown} of ${data.agents.length} agents have sent their first message.` : shown ? `${shown} ${shown === 1 ? 'needs' : 'need'} attention` : unknown ? `${unknown === data.agents.length ? 'Waiting for first signal' : `${unknown} of ${data.agents.length} waiting for first signal`}. A signal is an agent's first message.` : 'All well';
+    const text = uncertainAttention ? 'Checking attention status' : asleep ? 'Asleep' : wakingNow ? `Waking the team: ${data.agents.length - unknown} of ${data.agents.length} agents have sent their first message.` : shown ? `${shown} ${shown === 1 ? 'needs' : 'need'} attention` : unknown ? (unknown === data.agents.length ? 'No agent has sent a first message yet' : `${unknown} of ${data.agents.length} agents have not sent a first message yet`) : 'All well';
     // When agents need attention the visible status is a button to the Agents tab (beside the live region, which keeps saying it and is then only for a screen reader: the button's name is not announced twice); "All well" is plain text.
     const b = $('team-page-health');
     if (b) {

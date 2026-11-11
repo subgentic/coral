@@ -28,7 +28,7 @@ const TEAM = `qa-hdr-${Date.now() % 100000}`;
             const at = `${w}: `;
             const st = await ev(`(() => { const e = document.getElementById('team-page-status'); return { text: e.textContent.trim(), cutX: e.scrollWidth > e.clientWidth + 1, cutY: e.scrollHeight > e.clientHeight + 1, ellipsis: getComputedStyle(e).textOverflow === 'ellipsis' && getComputedStyle(e).whiteSpace === 'nowrap' }; })()`);
             await shot(`team-header-${w}`);
-            assert.match(st.text, /2 of 3 waiting for first signal\. A signal is an agent's first message\./, at + 'the status says it: ' + JSON.stringify(st));
+            assert.match(st.text, /2 of 3 agents have not sent a first message yet/, at + 'the status says it: ' + JSON.stringify(st));
             assert.ok(!st.cutX && !st.cutY && !st.ellipsis, at + 'the whole line is shown, not cut: ' + JSON.stringify(st));
             const clipped = () => ev(`(() => { const s = document.getElementById('team-tabs'), sr = s.getBoundingClientRect(); return { scrollLeft: Math.round(s.scrollLeft), clipped: [...s.querySelectorAll('[role=tab]')].filter(t => t.getClientRects().length).map(t => { const r = t.getBoundingClientRect(); return { name: t.textContent.trim(), left: r.left < sr.left - 1 && r.right > sr.left + 1 }; }).filter(t => t.left).map(t => t.name) }; })()`);
             for (const tab of ['agents', 'tasks', 'artifacts', 'agents']) {

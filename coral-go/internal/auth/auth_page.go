@@ -219,7 +219,7 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen
     <p class="note">{{if not .Local}}A password keeps other people and other devices out of Coral when it is opened in a web browser. {{end}}Your password manager can save it. Forgot it later? Run coral reset-password in a terminal on this computer.</p>
 {{if or .Locked (not .Local)}}
     <details class="howin" id="how-in">
-      <summary>Other ways to sign in</summary>
+      <summary>Sign in from the computer</summary>
 {{if .Local}}
       <p><b>Sign in from this computer.</b> Open the Coral app on this computer, or, in a terminal there, run <b>coral open</b>: either opens Coral signed in. Coral then asks you to create a password.</p>
       <p><b>Or create a password below</b> to open Coral in this browser.</p>
