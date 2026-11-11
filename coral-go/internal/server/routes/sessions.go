@@ -415,7 +415,7 @@ func defaultModelForRole(settings map[string]string, agentType, requestModel str
 func NewSessionsHandler(db *store.DB, cfg *config.Config, backend ptymanager.TerminalBackend, terminal ptymanager.SessionTerminal, bs *board.Store) *SessionsHandler {
 	bindArtifactRevisions(cfg.CoralDir(), bs)
 	reader := jsonl.NewSessionReader()
-	return &SessionsHandler{
+	h := &SessionsHandler{
 		currentDir:      background.NewCurrentDirFinder(reader.CurrentDirectory),
 		autoWake:        autoWaker{sleep: background.SleepCtx, now: time.Now},
 		exits:           exitWatch{after: defaultAfter},
@@ -446,6 +446,10 @@ func NewSessionsHandler(db *store.DB, cfg *config.Config, backend ptymanager.Ter
 		chatMeta:          newChatMetaCache(),
 		resumeKnown:       make(map[string]bool),
 	}
+	if bs != nil { // a file another team just shared moves the Inbox count now, not at the feed's next 5 s tick (#15645)
+		bs.OnArtifactsChanged(h.kickWS)
+	}
+	return h
 }
 
 func cloneLogStatus(value map[string]any) map[string]any {
