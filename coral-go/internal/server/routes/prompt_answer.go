@@ -198,7 +198,7 @@ func parsePromptScreenFor(agentType, capture string) (promptScreen, bool) {
 	if !rv.Allowed() {
 		s.OnlyReject, s.Note = true, rv.Note()
 	} else if s.commandOpenMissing {
-		s.OnlyReject, s.Note = true, "The top of this request is not on the screen, so it cannot be read whole. It can only be rejected here: read it in the terminal."
+		s.OnlyReject, s.Note = true, "The top of this request is not on the screen, so Coral could not read it in full. Coral cannot answer it here: answer it in the agent's terminal."
 	}
 	return s, true
 }

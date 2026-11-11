@@ -208,10 +208,10 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
                 check(rs && ((rs.yes === 1) === !rs.clipped), `${at}after resizing to ${rw}: Yes is on the row exactly when the block is not clipped: ` + JSON.stringify(rs));
             }
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
-            // a request that can only be rejected shows its command too, and no Yes
+            // a request Coral could not read in full has no Yes and no No (#15501)
             await show(MENU({ only_reject: true, target: ONE }), 1);
-            st = await rowState();
-            check(st && st.yes === 0 && st.no === 1 && st.text === ONE, `${at}a reject-only request shows its command and offers no Yes: ` + JSON.stringify(st));
+            st = await ev(`(() => { const c = document.querySelector('#group-table-view .inbox-answers'); return { answers: [...c.querySelectorAll('button.inbox-answer')].map(b => b.textContent), open: !!c.querySelector('button.inbox-open-agent.btn-primary'), block: !!c.querySelector('.inbox-cmd-block') }; })()`);
+            check(st && st.answers.length === 0 && st.open && !st.block, `${at}a reject-only request offers neither Yes nor No, no half of the command, and Open agent: ` + JSON.stringify(st));
 
             if (!mobile) { // 3) a pointer resting over the list holds the rows
                 await show(MENU({ target: ONE }), 2);

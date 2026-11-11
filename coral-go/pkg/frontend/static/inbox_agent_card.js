@@ -1,7 +1,7 @@
 /* An agent's permission card, in a dialog over the Inbox (#11837, moment 3): a Needs you row for an agent that waits on a permission (the folder-trust card every new agent opens with) used to send the person to the Agents tab,
  * out of the Inbox on the very first step. Open now shows what the agent asks, the lines it wants to run, and the card's own choices as buttons, answered through the same route as the chat card (POST .../answer-prompt: the
  * server re-reads the terminal and sends the choice only if it is still on screen under that label, and for the ask the dialog was drawn for: ask_id). This is the full card, so the choices that last ("trust this folder",
- * "don't ask again") are here, unlike on a row (inbox_answer.js leaves those to Open, which is this). A request that can only be rejected (only_reject) offers the No form alone. A card with no one choice to take (a
+ * "don't ask again") are here, unlike on a row (inbox_answer.js leaves those to Open, which is this). A request Coral could not read in full (only_reject) offers no answer, only Open agent (#15501). A card with no one choice to take (a
  * multi-select, a review step, a text answer) says so and has Open agent. Everything the agent or the CLI wrote is set as text. */
 import { serverFetch, sessionServer } from './server_base.js';
 import { importOnce } from './import_once.js';
@@ -12,7 +12,6 @@ import { loadStyles } from './lazy_styles.js';
 await loadStyles('permission_card_dialog.css'); // the card's own layout (#13169): not the Operator question dialog's grid
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
-const REJECT_FORM = /^(?:no|deny|reject|cancel)\b/i;
 
 /** Whether the row can open its card here: a permission this computer's person may answer (not a login, not a viewer through the Hub). */
 export const canOpenCard = s => s.waiting_kind === 'permission' && !!s.agent_type && !!s.session_id && !blockedReason(sessionServer(s), 'interact');
@@ -25,7 +24,7 @@ async function readCard(s) {
     const po = reply.prompt_options;
     if (!po) return null;
     const onlyReject = !!po.only_reject || !!(reply.pending && reply.pending.input && reply.pending.input.only_reject === true);
-    const options = (po.options || []).filter(o => (o.action || 'select') === 'select' && o.label && Number.isInteger(Number(o.n)) && (!onlyReject || REJECT_FORM.test(String(o.label).trim())));
+    const options = (po.options || []).filter(o => (o.action || 'select') === 'select' && o.label && Number.isInteger(Number(o.n)) && !onlyReject);
     return { title: String(po.title || ''), question: String(po.question || ''), target: String(po.target || ''), ask: String(po.ask_id || ''), options, single: !po.multi && !(po.review || []).length, onlyReject, note: String(po.note || '') };
 }
 
@@ -50,6 +49,11 @@ export function openAgentCard(s) {
 
     const draw = card => {
         body.replaceChildren(); err.textContent = '';
+        open.className = card && card.onlyReject ? 'btn btn-primary' : 'btn';
+        if (card && card.onlyReject) { // Coral did not read this request in full: no choice, not even No, and no half of the request (#15501); the terminal is the way on
+            body.append(el('p', null, 'Coral could not read this request in full, so it cannot be answered here.'), el('p', null, 'Answer it in the agent\u2019s terminal. Nothing is sent until you do.'));
+            return;
+        }
         if (!card) { body.append(el('p', null, 'This card could not be read. It may have been answered. Open the agent to look.')); return; }
         if (card.title) title.textContent = `${who}: ${card.title}`;
         const q = card.title && card.question.startsWith(card.title) ? card.question.slice(card.title.length).trim() : card.question; // the question begins with the title: the heading says it once
@@ -57,7 +61,6 @@ export function openAgentCard(s) {
         if (card.target) { const t = el('pre', 'inbox-ask-text', card.target); t.setAttribute('aria-label', 'What it wants to run'); t.tabIndex = 0; body.append(t); }
         if (card.note) body.append(el('p', 'inbox-ask-sub', card.note));
         if (!card.single || !card.options.length) { body.append(el('p', null, 'This one cannot be answered with one choice here. Open the agent to answer it.')); return; }
-        if (card.onlyReject) body.append(el('p', 'inbox-only-reject', 'It can only be rejected here: what it wants to run is cut or hidden, or too long to read in full.'));
         const list = el('div', 'inbox-ask-offers-list');
         for (const o of card.options) {
             const b = el('button', 'btn', String(o.label)); b.type = 'button'; b.dataset.n = String(Number(o.n));

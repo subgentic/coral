@@ -1,5 +1,4 @@
-// A request that can only be rejected (it was cut, holds a hidden character or is not text, #11399) has no Allow anywhere, and the Inbox row is one of those places: it offers the Reject form of the card's
-// answers only (No, Reject, Deny, Cancel), says in words that it can only be rejected here, and sends nothing for an Allow even if the card changes under a stale row. The server refuses an Allow too (409
+// A request that can only be rejected (it was cut, holds a hidden character or is not text, #11399) has no Allow anywhere, and the Inbox row is one of those places: it offers no answer at all (#15501, the Operator: not even No), says Coral could not read it in full and that it is answered in the agent's terminal, shows Open agent as the main button, and sends nothing for an Allow even if the card changes under a stale row. The server refuses an Allow too (409
 // only_reject); this is the row not offering it. The chat reply and the answer route are stubbed.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -43,41 +42,24 @@ const ALLOW_ONLY = ['Yes', 'Yes, proceed'];
         assert.deepEqual(await labels(), ['Yes', 'No']);
         assert.equal(await note(), '', 'an ordinary row says nothing about rejecting');
 
-        // 1. only_reject on the screen agents' prompt_options: the No alone, and the words
-        await set(CLAUDE, 'screen'); await draw('claude');
-        await waitFor(`window.__cell.querySelectorAll('button.inbox-answer').length === 1`, 'only the No', 5000);
-        assert.deepEqual(await labels(), ['No'], 'no Yes on a row that can only be rejected');
-        assert.match(await note(), /can only be rejected/i);
-        assert.match(await note(), /open/i, 'and says where to read it');
-
+        const openBtn = () => ev(`(() => { const b = window.__cell.querySelector('button.inbox-open-agent'); return b ? { text: b.textContent, primary: b.classList.contains('btn-primary') } : null; })()`);
+        const unread = async (why) => { // #15501: a request Coral did not read in full has no answer at all, not even the No: it says so and Open agent is the way on
+            await waitFor(`/could not read this request in full/i.test(window.__cell.textContent)`, why, 5000);
+            assert.deepEqual(await labels(), [], why + ': no answer button, not even No');
+            assert.match(await note(), /answer it in the agent.s terminal/i, why + ': says where to answer it');
+            assert.deepEqual(await openBtn(), { text: 'Open agent', primary: true }, why + ': Open agent is the main button');
+            assert.ok(!/can only be rejected/i.test(await ev(`window.__cell.textContent`)), why + ': the old wording is gone');
+        };
+        // 1. only_reject on the screen agents' prompt_options
+        await set(CLAUDE, 'screen'); await draw('claude'); await unread('screen only_reject');
         // 2. only_reject on the pending tool (Claude, Pi, opencode): the same
-        await set(CLAUDE, 'pending'); await draw('claude');
-        await waitFor(`window.__cell.querySelectorAll('button.inbox-answer').length === 1`, 'only the No (pending)', 5000);
-        assert.deepEqual(await labels(), ['No']);
-        assert.match(await note(), /can only be rejected/i);
-
-        // 3. Codex's own words: the one No, not the "don't ask again" Yes nor the proceed
-        await set(CODEX, 'screen'); await draw('codex');
-        await waitFor(`window.__cell.querySelectorAll('button.inbox-answer').length === 1`, 'only the No (codex)', 5000);
-        assert.deepEqual(await labels(), ['No, and tell Codex what to do differently (esc)']);
-
-        // 4. opencode's card is already Reject alone
-        await set(REJECT_ONLY, 'pending'); await draw('opencode');
-        await waitFor(`window.__cell.querySelectorAll('button.inbox-answer').length === 1`, 'Reject (opencode)', 5000);
-        assert.deepEqual(await labels(), ['Reject']);
-
-        // 5. no Reject form at all: no buttons, but the words are there and Open stays
-        await set(ALLOW_ONLY, 'screen'); await draw('claude');
-        await waitFor(`/can only be rejected/i.test(window.__cell.textContent)`, 'the words without any button', 5000);
-        assert.deepEqual(await labels(), [], 'an Allow is never a button on such a row');
-
-        // 6. the No is sent, with the ask id
-        await ev(`window.__posts = []; true`); await set(CLAUDE, 'screen'); await draw('claude');
-        await waitFor(`window.__cell.querySelectorAll('button.inbox-answer').length === 1`, 'the No again', 5000);
-        await ev(`window.__cell.querySelector('button.inbox-answer').click(); true`);
-        await waitFor(`window.__posts.length === 1`, 'the No is sent', 5000);
-        assert.equal(await ev(`window.__posts[0].label`), 'No');
-        assert.equal(await ev(`window.__posts[0].ask_id`), 'ask-1');
+        await set(CLAUDE, 'pending'); await draw('claude'); await unread('pending only_reject');
+        // 3. Codex's own words: no No, no Yes
+        await set(CODEX, 'screen'); await draw('codex'); await unread('codex');
+        // 4. opencode's card is Reject alone: still no button
+        await set(REJECT_ONLY, 'pending'); await draw('opencode'); await unread('opencode');
+        // 5. no Reject form at all: the same
+        await set(ALLOW_ONLY, 'screen'); await draw('claude'); await unread('allow only');
 
         // 7. a stale row: drawn when the request was ordinary (Yes and No), then the request turns out to be Reject-only: a click on Yes sends nothing and says the question changed
         await ev(`window.__posts = []; true`); await set(CLAUDE, 'none'); await draw('claude');
@@ -86,12 +68,11 @@ const ALLOW_ONLY = ['Yes', 'Yes, proceed'];
         await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); window.__cell.querySelector('button.inbox-answer').click(); true`); // the first button is Yes
         await waitFor(`[...document.querySelectorAll('.toast .toast-message')].some(e => /That question changed; look at it again/.test(e.textContent))`, 'the stale Yes says the question changed', 5000);
         assert.deepEqual(await ev(`window.__posts`), [], 'a stale Yes on a request that turned Reject-only sends nothing');
-        // 8. on a phone the No and the words fit the row: nothing sideways
+        // 8. on a phone the words and Open agent fit the row: nothing sideways
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-        await set(CLAUDE, 'screen'); await draw('claude');
-        await waitFor(`window.__cell.querySelectorAll('button.inbox-answer').length === 1`, 'the No on a phone', 5000);
-        const fit = await ev(`(() => { const c = window.__cell, b = c.querySelector('button.inbox-answer').getBoundingClientRect(), n = c.querySelector('.inbox-only-reject').getBoundingClientRect(); return { pageFits: document.documentElement.scrollWidth <= innerWidth, noFits: b.right <= innerWidth && b.left >= 0, noteFits: n.right <= innerWidth + 1 && n.left >= 0, touch: b.height >= 40 }; })()`);
-        assert.deepEqual(fit, { pageFits: true, noFits: true, noteFits: true, touch: true }, 'phone: ' + JSON.stringify(fit));
-        console.log('PASS Inbox row: a request that can only be rejected has no Allow, offers the No form and says so, a stale Yes sends nothing');
+        await set(CLAUDE, 'screen'); await draw('claude'); await unread('phone');
+        const fit = await ev(`(() => { const c = window.__cell, b = c.querySelector('button.inbox-open-agent').getBoundingClientRect(), n = c.querySelector('.inbox-only-reject').getBoundingClientRect(); return { pageFits: document.documentElement.scrollWidth <= innerWidth, openFits: b.right <= innerWidth && b.left >= 0, noteFits: n.right <= innerWidth + 1 && n.left >= 0, touch: b.height >= 40 }; })()`);
+        assert.deepEqual(fit, { pageFits: true, openFits: true, noteFits: true, touch: true }, 'phone: ' + JSON.stringify(fit));
+        console.log('PASS Inbox row: a request that can only be rejected has no Allow, has no answer, says so and opens the agent, a stale Yes sends nothing');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

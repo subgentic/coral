@@ -26,6 +26,9 @@ const LASTING = /don.?t ask|install|always|never|allow all|all edits|session|con
 const ONE_TIME = /^(?:(?:yes|allow|approve)(?:,? (?:once|this once|proceed|continue|run command))?|(?:no|deny|reject)(?:,? (?:cancel|and tell \w+ what to do differently))?)$/i;
 const PERMISSION_WORDS = /^(yes|allow|approve)\b/i, SCOPE = /project|director|folder|repositor|\ball\b|\bfrom\b|\/|~/i;
 const KEY_HINT = /\s*\((?:[a-z]|esc|enter|tab|shift\+tab|ctrl\+[a-z])\)$/i; // only a key in brackets is a hint: any other bracket ("(always)", "(all projects)") stays in the label, so the full match fails
+/** What a row says of a request Coral could not read in full (#15501): no answer is drawn, the terminal is the way on. */
+const UNREAD_ROW = 'Coral could not read this request in full. Answer it in the agent\u2019s terminal.';
+
 // The answers of a request that can only be rejected: the No form of each CLI's words (the server accepts only these, 409 only_reject, for the rest).
 const REJECT_FORM = /^(?:no|deny|reject|cancel)\b/i;
 const wholeLabel = label => label.trim().replace(KEY_HINT, '').replace(/[.!\s]+$/, '');
@@ -82,6 +85,7 @@ async function readAsk(s) {
     const po = reply.prompt_options;
     const onlyReject = !!(po && po.only_reject) || !!(reply.pending && reply.pending.input && reply.pending.input.only_reject === true);
     const none = { ask: '', picks: [], onlyReject };
+    if (onlyReject) return none; // a request Coral did not read in full: no answer of any kind on a row, even the No (#15501); the row says so and Open agent is the way on
     if (!po || po.multi) return none;
     if ((po.review || []).length) { // the last step of a multi-question dialog, "Ready to submit your answers?": the row can take it, since a Submit sends only what the person already chose (#11981)
         const submit = (po.options || []).find(o => (o.action || 'select') === 'select' && /^submit\b/i.test(String(o.label || '')) && Number.isInteger(Number(o.n)));
@@ -285,12 +289,12 @@ function fill(s, cell, withDismiss = true) {
         if (held) { const more = document.createElement('span'); more.className = 'inbox-only-reject'; more.textContent = trustWhy ? `No Yes here: ${trustWhy} Open the agent to answer.` : 'More choices: open the agent.'; cell.append(more); } // some of the question's choices are left to Open: said, so these do not read as all of them
         if (onlyReject) { // said in words, set as text: the full request is under Open
             const note = document.createElement('span');
-            note.className = 'inbox-only-reject';
-            note.textContent = 'It can only be rejected here. Open the agent to read it.';
+            note.className = 'inbox-only-reject inbox-unread';
+            note.textContent = UNREAD_ROW;
             cell.append(note);
         }
-        if (!picks.length && !held && !onlyReject) { // nothing here can be answered (Claude's 'Is this a project you trust?' is such a prompt): the way on is the agent's own chat, one click away; nothing is typed for the person (#12346)
-            const o = document.createElement('button'); o.type = 'button'; o.className = 'btn btn-small inbox-open-agent'; o.textContent = 'Open agent';
+        if (!picks.length && !held) { // nothing here can be answered (Claude's 'Is this a project you trust?' is such a prompt): the way on is the agent's own chat, one click away; nothing is typed for the person (#12346)
+            const o = document.createElement('button'); o.type = 'button'; o.className = onlyReject ? 'btn btn-primary btn-small inbox-open-agent' : 'btn btn-small inbox-open-agent'; o.textContent = 'Open agent';
             o.setAttribute('aria-label', `Open ${resolveSessionIdentity(s)} to answer`);
             o.addEventListener('click', e => { e.stopPropagation(); openAgent(s); });
             o.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });

@@ -1,6 +1,6 @@
 // A permission card opens over the Inbox (#11837, moment 3): the first thing every new agent asks is "Do you trust the files in this folder?", and its Needs you row used to send the person to the Agents tab. Open now
 // shows the card in a dialog: what it asks, the lines it wants to run, and its own choices as buttons, including the one that lasts ("Yes, I trust this folder": the row never offers that one). A choice is answered through
-// the chat card's route with the ask's id; a card that changed between the dialog and the click sends nothing; a request that can only be rejected offers the No form alone; a card with no single choice says so.
+// the chat card's route with the ask's id; a card that changed between the dialog and the click sends nothing; a request Coral could not read in full offers no answer, only Open agent; a card with no single choice says so.
 // The agent's chat and answer-prompt routes are page stubs. 1280 and 390 px.
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
@@ -59,10 +59,10 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await waitFor(`/changed/.test((document.querySelector('dialog.inbox-ask-dialog[open] .inbox-ask-error') || {}).textContent || '')`, at + 'a changed card is said', 6000).catch(() => {});
             check((await ev(`window.__posts.length`)) === 0 && /changed/.test((await dialog() || {}).err || ''), at + 'a card that changed sends nothing and says so: ' + JSON.stringify(await dialog()));
             await closeDialog();
-            // only the No form when the request can only be rejected
+            // no answer at all when Coral could not read the request in full (#15501)
             await setCard({ ...TRUST, only_reject: true });
             await openRow(); d = await dialog();
-            check(!!d && d.buttons.join('|') === 'No, exit' && /can only be rejected/.test(d.text), at + 'a request that can only be rejected offers the No form alone: ' + JSON.stringify(d));
+            check(!!d && d.buttons.length === 0 && /could not read this request in full/.test(d.text) && !/can only be rejected/.test(d.text), at + 'a request Coral could not read offers no answer, even No, and says so (#15501): ' + JSON.stringify(d));
             await closeDialog();
             // no single choice (a multi-select): no buttons, a way to the agent
             await setCard({ ...TRUST, multi: true });

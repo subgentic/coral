@@ -45,10 +45,10 @@ const ALWAYS = 'Allow always: do not ask again for ls *, git status* and 2 more 
             let r = await card('claude', { command: CLEAN }, YNA);
             assert.equal(r.target, CLEAN, at + 'a clean request is shown whole'); assert.deepEqual(names(r).sort(), [...YNA].sort(), at + 'and keeps every answer');
             r = await card('claude', { command: 'echo start <U+202E>gnirts', only_reject: true, note: NOTE }, YNA);
-            assert.deepEqual(names(r), ['No'], at + 'only_reject: "No" alone, not nothing: ' + JSON.stringify(names(r))); assert.ok(r.text.includes(NOTE), at + 'with the words that say why');
+            assert.deepEqual(names(r), [], at + 'only_reject: no answer at all, not even No (#15501): ' + JSON.stringify(names(r))); assert.match(r.text, /could not read this request in full/, at + 'it says Coral could not read it'); assert.match(r.text, /agent.s terminal/, at + 'and where to answer it'); assert.equal(r.target, null, at + 'no half of the request is drawn');
             // 2. Pi: the same, with Reject
             r = await card('pi', { command: 'x'.repeat(4000), only_reject: true, note: NOTE }, ['Allow', 'Reject']);
-            assert.deepEqual(names(r), ['Reject'], at + 'Pi: Reject alone');
+            assert.deepEqual(names(r), [], at + 'Pi: no answer either');
             // 3. a hidden character that reaches the card (an older server, or a field the server did not review) is written out, never drawn raw
             r = await card('claude', { command: 'echo ok \u202e rm' }, YNA);
             assert.ok(!r.target.includes('\u202e') && r.target.includes('<U+202E>'), at + 'written out: ' + JSON.stringify(r.target));
@@ -57,18 +57,18 @@ const ALWAYS = 'Allow always: do not ask again for ls *, git status* and 2 more 
                 r = await card(agent, null, YNA, { target: CLEAN });
                 assert.equal(r.target, CLEAN, at + agent + ': the lines above the question are the request on the card'); assert.deepEqual(names(r).sort(), [...YNA].sort(), at + agent + ': a clean one keeps every answer');
                 r = await card(agent, null, YNA, { target: 'echo <U+202E>gnirts', only_reject: true, note: NOTE });
-                assert.deepEqual(names(r), ['No'], at + agent + ': only_reject: No alone'); assert.ok(r.text.includes(NOTE), at + agent + ': the note is on the card');
-                assert.equal(r.target, 'echo <U+202E>gnirts', at + agent + ': the marker the server wrote is shown as written');
+                assert.deepEqual(names(r), [], at + agent + ': only_reject: no answer'); assert.match(r.text, /could not read this request in full/, at + agent + ': the card says so');
+                assert.equal(r.target, null, at + agent + ': no half of the request is drawn');
             }
             // 4b. the refusal is kept by the option's KIND (the server's parse), the words only where it has none: every wording the captured screens have, and the ones UX/UX Engineer asked for
             for (const word of ['No (recommended)', 'No, cancel', 'No, and tell Codex what to do differently (esc)', 'Reject', 'Deny', "Don't allow", 'Don\u2019t allow', 'Decline', 'Disallow', 'Not now']) {
                 r = await card('claude', { command: 'x'.repeat(4000), only_reject: true, note: NOTE }, ['Yes', "Yes, and don't ask again", word]);
-                assert.deepEqual(names(r), [word], at + `"${word}" is a refusal and is kept alone: ` + JSON.stringify(names(r)));
+                assert.deepEqual(names(r), [], at + `"${word}" is not offered either: ` + JSON.stringify(names(r)));
             }
             r = await card('codex', null, ['Yes', 'None of the above', 'Nothing', 'Skip', 'Skip all approvals this session'], { only_reject: true, note: NOTE });
             assert.deepEqual(names(r), [], at + '"None" and "Nothing" are not refusals');
             r = await card('claude', { command: 'x', only_reject: true, note: NOTE }, [{ label: 'No, allow it', kind: 'allow_once' }, { label: 'Stop here', kind: 'reject' }, { label: 'No, and always', kind: 'allow_always' }]);
-            assert.deepEqual(names(r), ['Stop here'], at + 'the kind decides over the words: ' + JSON.stringify(names(r)));
+            assert.deepEqual(names(r), [], at + 'no answer, whatever the kinds: ' + JSON.stringify(names(r)));
             // 4c. in a request no character is left alone: a zero-width joiner inside a word is written out (a chat bubble keeps it for emoji)
             r = await card('claude', { command: 'git\u200dstatus' }, YNA);
             assert.equal(r.target, 'git<U+200D>status', at + 'strict: ' + JSON.stringify(r.target));
@@ -79,6 +79,6 @@ const ALWAYS = 'Allow always: do not ask again for ls *, git status* and 2 more 
             assert.equal(r.target, null, at + 'no request text, no box');
             await shot(`permission-card-${w}`);
         }
-        console.log('PASS permission cards: the whole request or only the refusing answers, for every agent type');
+        console.log('PASS permission cards: the whole request, or no answer at all when Coral could not read it, for every agent type');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

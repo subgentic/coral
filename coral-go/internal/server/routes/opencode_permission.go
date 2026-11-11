@@ -160,7 +160,7 @@ func (h *SessionsHandler) answerOpencodePermission(w http.ResponseWriter, r *htt
 			return
 		}
 		if errors.Is(err, opencode.ErrPermissionRefused) {
-			errConflict(w, "That request can only be rejected here. Read it in the terminal.")
+			errConflict(w, "Coral could not read that request in full. Answer it in the agent's terminal.")
 			return
 		}
 		writeError(w, http.StatusBadGateway, "", "opencode could not take the answer. Answer it in the terminal.")

@@ -49,8 +49,8 @@ const ALWAYS = 'Allow always: do not ask again for ls *, git status* and 2 more 
             // 3. only_reject: the note's words and Reject alone, whatever the answers list says
             const NOTE = 'This request is longer than the 4000 bytes shown, so it cannot be allowed from here. Read it in the terminal, or reject it.';
             r = await card({ command: LONG.slice(0, 4000), only_reject: true, note: NOTE }, ['Allow once', ALWAYS, 'Reject']);
-            assert.ok(r.text.includes(NOTE), at + 'the note is on the card');
-            assert.deepEqual(r.buttons.map(b => b.label), ['Reject'], at + `Reject alone: ${JSON.stringify(r.buttons.map(b => b.label))}`);
+            assert.match(r.text, /could not read this request in full/, at + 'the card says Coral could not read it (#15501)');
+            assert.deepEqual(r.buttons.map(b => b.label), [], at + `no answer, not even Reject: ${JSON.stringify(r.buttons.map(b => b.label))}`);
             await shot(`opencode-only-reject-${w}`);
             // 4. a clean 400-byte request: three answers, the patterns and "and N more patterns", the Allow always label whole
             r = await card({ command: CLEAN, patterns: ['ls *', 'git status*'], more_patterns: 'and 2 more patterns' }, ['Allow once', ALWAYS, 'Reject']);
@@ -61,6 +61,6 @@ const ALWAYS = 'Allow always: do not ask again for ls *, git status* and 2 more 
             assert.ok(r.text.includes('ls *') && r.text.includes('and 2 more patterns'), at + 'the patterns and the count of the rest are on the card');
             await shot(`opencode-clean-${w}`);
         }
-        console.log('PASS opencode permission card: the whole request, Reject alone when it must be, the scope of Allow always');
+        console.log('PASS opencode permission card: the whole request, no answer when Coral could not read it, the scope of Allow always');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
