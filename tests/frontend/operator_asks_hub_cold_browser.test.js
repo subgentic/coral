@@ -36,7 +36,7 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await ev(`import((window.__coralStatic || '/static/') + 'needs_incomplete.js').then(m => m.incompleteNote())`), '', `${width}px cold Needs has no false gap`);
             const emptyWords = await ev(`document.getElementById('group-table-view').innerText`);
             assert.match(emptyWords, /Loading Needs you/, `${width}px cold Needs says it is loading`);
-            assert.doesNotMatch(emptyWords, /Nothing needs you/, `${width}px cold Needs does not claim to be empty`);
+            assert.doesNotMatch(emptyWords, /You are all caught up/, `${width}px cold Needs does not claim to be empty`);
             await ev(`import((window.__coralStatic || '/static/') + 'operator_ask_dialog.js').then(m => m.openAskDialog({ board: 'team-a', asker: 'Writer', kind: 'ask', id: 19, at: new Date().toISOString(), text: 'May I continue?' })).then(() => true)`);
             const dialogState = await ev(`(() => { const d = document.querySelector('.inbox-ask-dialog'), box = d?.querySelector('textarea'), send = d?.querySelector('.inbox-ask-send'), alert = d?.querySelector('[role=alert]'); return { open: !!d?.open, readOnly: !!box?.readOnly, sendDisabled: !!send?.disabled, alert: alert?.textContent || '', described: d?.getAttribute('aria-describedby') === alert?.id }; })()`);
             assert.equal(dialogState.open, true, `${width}px serverless ask dialog opened`);

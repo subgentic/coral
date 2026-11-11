@@ -1,4 +1,4 @@
-// #13304: through a Hub the list of its computers arrives a moment after the page loads. A Needs you scan that started before it covered no computer, said 'Nothing needs you', and did not look again for 30 s (QA Engineer measured no rows in 30 s on the v2.0.46 build through a local Hub, against 1.0 s on the computer itself).
+// #13304: through a Hub the list of its computers arrives a moment after the page loads. A Needs you scan that started before it covered no computer, said 'You are all caught up', and did not look again for 30 s (QA Engineer measured no rows in 30 s on the v2.0.46 build through a local Hub, against 1.0 s on the computer itself).
 // The page here is a hub whose list of computers is empty when Needs you is opened and gets one computer a moment later: its rows must appear without waiting out 30 s.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -29,7 +29,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`(async () => { const { state } = await import(${S} + 'state.js'); state.hub = true; state.servers = []; state.serversKnown = false; return true; })()`);
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-        await waitFor(`/Nothing needs you/.test(document.getElementById('group-table-view').innerText)`, 'the scan that found no computer says so', 8000);
+        await waitFor(`/You are all caught up/.test(document.getElementById('group-table-view').innerText)`, 'the scan that found no computer says so', 8000);
         // the list arrives (the live list's answer or the feed's frame, which both call updateServersTabVisibility)
         await ev(`(async () => { const { state } = await import(${S} + 'state.js'); state.servers = [{ id: 'box-2', label: 'box-2', status: 'online' }]; state.serversKnown = true; const T = await import(${S} + 'servers_tab.js'); T.updateServersTabVisibility(); return true; })()`);
         await waitFor(`/remote-report/.test(document.getElementById('group-table-view').innerText)`, 'the computer that arrived late is read at once, not after 30 s', 6000);

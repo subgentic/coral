@@ -1,4 +1,4 @@
-// An empty Needs you stays what it says while a background read runs (#14906, inbox_local's Linux retry-pass: the hint under 'Nothing needs you' was there, gone and there again within a few ms): once the page has been read, a refresh of
+// An empty Needs you stays what it says while a background read runs (#14906, inbox_local's Linux retry-pass: the hint under 'You are all caught up' was there, gone and there again within a few ms): once the page has been read, a refresh of
 // it (the poll, a computer's list arriving, an Inbox redraw) is not 'loading' as far as the empty line goes. The line and its hint are drawn again only if their words change; a first read, a source that has not answered yet,
 // still says Loading. Nothing waits here: the answer of a second read is held for 600 ms and the line and its hint must be the very same nodes the whole time. 1280 and 390 px.
 const assert = require('node:assert/strict');
@@ -20,7 +20,7 @@ const { coralReady } = require('./helpers/wait');
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`/Nothing needs you/.test(document.getElementById('group-table-view').innerText) && !!document.querySelector('#group-table-view .empty-state-hint')`, `${at}the empty Needs you with its hint`, 15000);
+            await waitFor(`/You are all caught up/.test(document.getElementById('group-table-view').innerText) && !!document.querySelector('#group-table-view .empty-state-hint')`, `${at}the empty Needs you with its hint`, 15000);
             await ev(`(() => { const g = document.getElementById('group-table-view'); window.__line = g.querySelector('.empty-state-line'); window.__hint = g.querySelector('.empty-state-hint'); window.__gone = []; window.__artDelay = 600;
                 new MutationObserver(() => { const l = g.querySelector('.empty-state-line'), hi = g.querySelector('.empty-state-hint'); if (l !== window.__line || hi !== window.__hint) window.__gone.push([Math.round(performance.now()), l === window.__line ? 'line same' : l ? 'line NEW' : 'line NONE', hi === window.__hint ? 'hint same' : hi ? 'hint NEW' : 'hint NONE']); }).observe(g, { childList: true, subtree: true });
                 import(${S} + 'inbox_reviews.js').then(m => m.refreshReviews(true)); return true; })()`);
