@@ -53,8 +53,8 @@ func TestHubTermsFirstLeavesALocalAcceptanceAlone(t *testing.T) {
 	assert.Zero(t, code)
 }
 
-// isolatedTermsStart is the isolated folder, environment and configuration of a start that leaves its Terms to a Hub that is not there.
-func isolatedTermsStart(t *testing.T) *config.Config {
+// isolatedNoHubTermsStart is the isolated folder, environment and configuration of a start that leaves its Terms to a Hub that is not there.
+func isolatedNoHubTermsStart(t *testing.T) *config.Config {
 	t.Helper()
 	iso := t.TempDir()
 	for _, k := range []string{"TMPDIR", "TMP", "TEMP"} {
@@ -89,7 +89,7 @@ func TestStartLeavingTheTermsToTheHubServesNothingWhenTheyAreNotConfirmed(t *tes
 	eulaAcceptedHere = func() bool { return false }
 	promptTerms = func() bool { return false } // nobody at a terminal
 
-	cfg := isolatedTermsStart(t)
+	cfg := isolatedNoHubTermsStart(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	rs, err := Start(ctx, cfg, Options{BackendType: "pty"})
@@ -144,7 +144,7 @@ func TestAStartThatStopsAtTheTermsWaitsForItsBackgroundSweeps(t *testing.T) {
 		time.Sleep(300 * time.Millisecond)
 		left.Add(1)
 	}
-	cfg := isolatedTermsStart(t)
+	cfg := isolatedNoHubTermsStart(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	_, err := Start(ctx, cfg, Options{BackendType: "pty"})
