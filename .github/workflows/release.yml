@@ -913,6 +913,8 @@ jobs:
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --draft --verify-tag --title "$TAG" --generate-notes "${PRE[@]}"
           fi
+          # install.sh (#14097) is published too, so it must exist before anything is: a checkout without it stops the step with nothing uploaded.
+          [ -f install.sh ] || { echo "::error::install.sh is missing from the checkout"; exit 1; }
           # Publish install packages only; native macOS slices are build inputs.
           # Linux and the macOS DMG are always built, so a missing package is an
           # error. The Windows packages are built and signed on every tag, so
@@ -933,6 +935,8 @@ jobs:
           # /releases/latest/download/<name> never goes stale. They are copies, not separate
           # builds: the same file, listed in SHA256SUMS.txt under both names, with the same
           # Sigstore bundle where the versioned file has one.
+          # install.sh (#14097, checked above) is a release asset too, so the public install line is .../releases/latest/download/install.sh and what a reader runs is the file this
+          # release built from, listed in SHA256SUMS.txt (so the cosign bundle covers it), never main's copy. It is required: a checkout without it stops the step.
           mkdir -p stable
           STABLE=()
           stable_copy() {  # stable_copy "<versioned file>" <stable name>
@@ -944,12 +948,13 @@ jobs:
           stable_copy artifacts/coral-macos-dmg/*.dmg Coral.dmg
           if [ "${#MSI[@]}" -gt 0 ]; then stable_copy "${MSI[0]}" Coral-x64.msi; fi
           stable_copy artifacts/coral-windows-portable/*.zip Coral-x64-portable.zip
+          stable_copy install.sh install.sh
           gh release upload "$TAG" "${STABLE[@]}" --clobber
           # Checksums for every published package, under both names. Linux has no OS-level code
           # signing, so users verify the tarball against this file.
           (cd artifacts && sha256sum coral-linux-amd64/*.tar.gz coral-linux-arm64/*.tar.gz coral-macos-dmg/*.dmg \
             "${MSI_SUM[@]}" coral-windows-portable/*.zip | sed 's#  [^ ]*/#  #') > SHA256SUMS.txt
-          (cd stable && sha256sum coral-linux-amd64.tar.gz coral-linux-arm64.tar.gz Coral.dmg "${MSI_STABLE[@]}" Coral-x64-portable.zip) >> SHA256SUMS.txt
+          (cd stable && sha256sum coral-linux-amd64.tar.gz coral-linux-arm64.tar.gz Coral.dmg "${MSI_STABLE[@]}" Coral-x64-portable.zip install.sh) >> SHA256SUMS.txt
           cat SHA256SUMS.txt
           gh release upload "$TAG" SHA256SUMS.txt --clobber
           # Keyless signatures (Sigstore bundles: certificate, signature and
