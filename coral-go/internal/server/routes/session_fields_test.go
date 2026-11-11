@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -345,4 +347,44 @@ func TestFeedRowsAreTheListRows(t *testing.T) {
 	require.Len(t, list, 3)
 	assert.Equal(t, list, feed)
 	assert.Equal(t, "claude-sonnet-4-5", feed[0]["model"], "the fields the feed's own builder left out are there")
+}
+
+// #15055: a /compact or /clear writes no usage row, so the card kept the pre-reset percentage (QA Engineer: 29% of 1.0M while /context said 4%). With a reset after the newest model turn the row
+// publishes the size after a compaction when the CLI wrote it, else null (unknown); a turn after the reset puts the number back.
+func TestSessionFields_ContextAfterCompactOrClear(t *testing.T) {
+	const turn = `{"type":"assistant","message":{"content":[{"type":"text","text":"ok"}],"usage":{"input_tokens":40000}}}`
+	cases := []struct {
+		name  string
+		lines []string
+		want  any // context_pct as JSON decodes it: nil, or a float
+	}{
+		{"before any reset", []string{turn}, float64(20)},
+		{"compact without a post size", []string{turn, `{"type":"system","subtype":"compact_boundary","compactMetadata":{"preTokens":40000}}`}, nil},
+		{"compact with a post size", []string{turn, `{"type":"system","subtype":"compact_boundary","compactMetadata":{"preTokens":40000,"postTokens":10000}}`}, float64(5)},
+		{"clear", []string{turn, `{"type":"user","message":{"content":"<command-name>/clear</command-name>"}}`}, nil},
+		{"a turn after the compact", []string{turn, `{"type":"system","subtype":"compact_boundary","compactMetadata":{"preTokens":40000}}`, turn}, float64(20)},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			dir := t.TempDir()
+			t.Setenv("CLAUDE_PROJECTS_DIR", dir)
+			h, sid := sessionFieldsFixture(t)
+			require.NoError(t, os.MkdirAll(filepath.Join(dir, "proj"), 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "proj", sid+".jsonl"), []byte(strings.Join(c.lines, "\n")+"\n"), 0o644))
+
+			w := httptest.NewRecorder()
+			h.List(w, httptest.NewRequest("GET", "/api/sessions/live", nil))
+			require.Equal(t, 200, w.Code)
+			var list []map[string]any
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &list))
+			for _, e := range list {
+				if e["session_id"] == sid {
+					assert.Equal(t, c.want, e["context_pct"])
+					assert.Equal(t, float64(200000), e["context_window"], "the window is still known")
+					return
+				}
+			}
+			t.Fatalf("session %s not in list", sid)
+		})
+	}
 }
