@@ -250,6 +250,9 @@ export function attachReview(d, { reload }) {
         approve.title = covers ? `One decision covers the ${covers} files in this review: open each from the version list first.` : '';
     };
     d.addEventListener('av-version', () => { armed = false; if (cur) paintApprove(); }); // another version shown: the question is asked again
+    let deciding = false;
+    const syncHold = () => { approve.disabled = approveNote.disabled = deciding || !!d.dataset.contentPending; }; // the new version's content has not rendered: the old text must not sit under 'Approve v2' (#15636)
+    d.addEventListener('av-content', syncHold);
     const show = (s) => {
         cur = s; armed = false;
         form.querySelector('label').textContent = s && s.row.produced_by ? `What should change? ${shown(s.row.produced_by)}, who uploaded this file, will get it.` : 'What should change?'; // the box says who gets the request (walk 17 M13)
@@ -259,6 +262,7 @@ export function attachReview(d, { reload }) {
         approve.hidden = changes.hidden = approveNote.hidden = refuse.hidden = !pending;
         d.dataset.reviewPending = pending ? '1' : ''; // the comment box says where approving is (#15128)
         for (const h of d.querySelectorAll('.ac-hint')) { h.hidden = !pending; const t = h.parentNode.querySelector('textarea'); if (t) { const how = t.dataset.sendhint || ''; if (pending || how) t.setAttribute('aria-describedby', pending ? `${h.id} ${how}`.trim() : how); else t.removeAttribute('aria-describedby'); } } // a box that is open follows the file's state, not the state it was drawn in
+        syncHold();
         paintApprove(); // changes were asked for: Approve is still the Operator's, and says it approves this version as it is; with a newer version in the series it names the one it approves (#15197)
         if (!pending) form.hidden = true;
         bar.hidden = !s || (slotted && form.hidden); // on the header row the strip under it is the change-request form: there only while it is open
@@ -288,9 +292,9 @@ export function attachReview(d, { reload }) {
         if (!armed && d.dataset.coversFiles && Number(d.dataset.unopenedFiles) > 0) { armed = true; armedAt = Date.now(); paintApprove(); return; } // covers several files and some were never opened: say so, and ask again
         if (armed && Date.now() - armedAt < 600) return; // a double click is one press: it cannot answer the question it has not shown yet (Security's INFO on #15254)
         armed = false;
-        approve.disabled = true;
+        deciding = true; syncHold();
         try { const out = await approveRow(cur.team, cur.row); sayApproved(cur.row.name || 'the artifact', out); show({ ...cur, state: 'approved', at: out.review?.at || new Date().toISOString() }); }
-        catch (e) { showToast(e.message, true); } finally { approve.disabled = false; }
+        catch (e) { showToast(e.message, true); } finally { deciding = false; syncHold(); }
     });
     sendItem.addEventListener('click', async () => {
         const c = sendCtx; if (!c) return;
