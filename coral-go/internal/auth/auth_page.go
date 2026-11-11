@@ -130,10 +130,6 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen
   .code { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--bg-primary); border: 1px solid var(--border-light); border-radius: 8px; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.875rem; margin: 0 0 16px; }
   ol.steps { margin: 0 0 18px 18px; padding: 0; font-size: 0.875rem; line-height: 1.6; }
   ol.steps li { margin-bottom: 8px; }
-  .howin { background: var(--bg-primary); border: 1px solid var(--border-light); border-radius: 8px; padding: 12px; margin: 0 0 20px; font-size: 0.8125rem; line-height: 1.5; color: var(--text-secondary); }
-  .howin b { color: var(--text-primary); }
-  .howin summary { cursor: pointer; font-weight: 600; color: var(--text-primary); }
-  .howin p { margin: 6px 0 0; }
   .note { font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5; margin: 14px 0 0; }
   .panel[hidden], .err[hidden], .lock[hidden], .warn[hidden] { display: none; }
   .or { display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 0.75rem; margin: 18px 0; }
@@ -149,6 +145,8 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen
   .otherways { margin: 18px 0 0; font-size: 0.8125rem; color: var(--text-secondary); }
   .otherways > summary { cursor: pointer; font-weight: 500; color: var(--text-secondary); padding: 4px 0; }
   .otherways[open] > summary { margin-bottom: 8px; }
+  .otherways .how { margin: 0 0 12px; line-height: 1.5; }
+  .otherways .how b { color: var(--text-primary); }
   .otherways .local-open { margin: 0 0 12px; }
   .otherways .btn.wide { flex: none; width: 100%; }
   .pw-strength .pw-meter { height: 4px; margin: 0 0 4px; }
@@ -217,20 +215,15 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen
       <div class="btnrow"><button type="submit" disabled data-needs-script id="submit" class="btn btn-primary wide">Create password and open Coral</button></div>
     </form>
     <p class="note">{{if not .Local}}A password keeps other people and other devices out of Coral when it is opened in a web browser. {{end}}Your password manager can save it. Forgot it later? Run coral reset-password in a terminal on this computer.</p>
-{{if or .Locked (not .Local)}}
-    <details class="howin" id="how-in">
-      <summary>Other ways to sign in</summary>
-{{if .Local}}
-      <p><b>Sign in from this computer.</b> Open the Coral app on this computer, or, in a terminal there, run <b>coral open</b>: either opens Coral signed in. Coral then asks you to create a password.</p>
-      <p><b>Or create a password below</b> to open Coral in this browser.</p>
-{{else}}
-      <p><b>Sign in on the computer.</b> On the computer that runs Coral, run <b>coral open</b>: it opens Coral there, signed in. To sign in on this device instead, run <b>coral open --print</b>, put the computer's network address in place of <b>127.0.0.1</b> in the link (Coral Mobile shows it) and open the link here: it works once, for 10 minutes, so do not post it where others can read it.</p>
-      <p><b>Or create a password here.</b> Enter the setup code (run <b>coral setup-code</b> on that computer), then choose a password.</p>
-{{end}}
-    </details>
-{{end}}
     <details class="otherways" id="other-ways">
       <summary>Other ways in</summary>
+{{if or .Locked (not .Local)}}
+{{if .Local}}
+      <p class="how"><b>Sign in from this computer.</b> Open the Coral app on this computer, or, in a terminal there, run <b>coral open</b>: either opens Coral signed in. Coral then asks you to create a password.</p>
+{{else}}
+      <p class="how"><b>Sign in on the computer.</b> On the computer that runs Coral, run <b>coral open</b>: it opens Coral there, signed in. To sign in on this device instead, run <b>coral open --print</b>, put the computer's network address in place of <b>127.0.0.1</b> in the link (Coral Mobile shows it) and open the link here: it works once, for 10 minutes, so do not post it where others can read it.</p>
+{{end}}
+{{end}}
 {{template "localopen" .}}{{template "hubquiet" .}}
       <div class="linkrow linkcol">{{if eq .HubSignin "unpaired"}}<button type="button" class="link" id="hub-link-open">Link this computer to Coral Hub and sign in</button>{{end}}<button type="button" class="link" id="show-key">Use an API key instead</button></div>
     </details>
