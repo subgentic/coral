@@ -62,6 +62,7 @@ func TestTeamArtifactsCarryTheGoalOfTheirTaskAndFilterByIt(t *testing.T) {
 	}
 	require.NotNil(t, byName["docs.md"].GoalID)
 	assert.Equal(t, g2.ID, *byName["docs.md"].GoalID)
+	assert.Equal(t, "Tidy the docs", byName["docs.md"].GoalTitle, "goal 2's file names goal 2, not goal 1 (#15412)")
 	assert.Nil(t, byName["loose.md"].GoalID, "a task with no goal has none on its rows")
 	assert.Empty(t, byName["loose.md"].GoalTitle)
 	_ = t2
