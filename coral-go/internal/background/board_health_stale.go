@@ -221,13 +221,17 @@ func (m *BoardHealthMonitor) sweepProject(ctx context.Context, project string, b
 	}
 	in.Parked = func(t board.Task) bool { return t.Parked(tick) }
 	text, n := staleSweepText(in)
-	m.mu.Lock()
-	m.lastSweep[project] = tick // asked either way: nothing stale means nothing is sent until the next period
-	m.mu.Unlock()
-	if n == 0 {
+	if n == 0 { // nothing stale means nothing is sent until the next period
+		m.mu.Lock()
+		m.lastSweep[project] = tick
+		m.mu.Unlock()
 		return
 	}
 	if err := sendUnlessBlocked(ctx, m.limit, m.deliver, agent, "stale-sweep:"+project, text); err != nil {
-		m.logger.Warn("stale-task sweep delivery failed", "project", project, "error", err)
+		m.logger.Warn("stale-task sweep delivery failed: it is tried again at the next scan", "project", project, "error", err) // the clock is not restarted: a failed or blocked delivery is retried next tick, not a whole period later (#15354, QA's SHOULD on #14863)
+		return
 	}
+	m.mu.Lock()
+	m.lastSweep[project] = tick
+	m.mu.Unlock()
 }
