@@ -56,9 +56,11 @@ function wireAgentCopy(st) {
     const SECTIONS = { workflow: ['Workflow', 'settings_workflow'], health: ['Health check', 'settings_health'], messaging: ['Messaging', 'settings_messaging'], orchestrator: ['Orchestrator access', 'settings_orchestrator'], guides: ['Guides', 'settings_guides'] };
     for (const pane of st.page.querySelectorAll('.settings-pane[data-section]')) {
         const [label, key] = SECTIONS[pane.dataset.section] || [];
-        if (!key || pane.querySelector(':scope > .agent-copy')) continue;
-        const b = agentCopyButton(key, () => `Team \u201c${splitKey(st.team).name}\u201d, settings: ${label}.`, { className: 'agent-copy-corner' });
-        pane.querySelector(':scope > .settings-pane-title')?.after(b);
+        const title = pane.querySelector(':scope > .settings-pane-title');
+        if (!key || !title || pane.querySelector('.agent-copy')) continue;
+        const b = agentCopyButton(key, () => `Team \u201c${splitKey(st.team).name}\u201d, settings: ${label}.`);
+        const row = document.createElement('div'); row.className = 'agent-copy-hrow'; // the heading and its robot share a line, centred on each other
+        title.replaceWith(row); row.append(title, b);
     }
 }
 
