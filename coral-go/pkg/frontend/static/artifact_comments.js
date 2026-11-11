@@ -144,6 +144,8 @@ export function attachComments(dialog, body, host, opts = {}) {
     const stampRange = c => `${st.videoTime?.(c.atS) || ''}${c.endS != null ? '–' + st.videoTime?.(c.endS) : ''}`;
     const groupOf = (c) => (c.fromVersion == null || c.carried === 'found') ? 'main' : c.carried === 'ambiguous' ? 'look' : c.resolved || st.video ? 'earlier' : 'main';
     const ownHex = (c) => c.artifactId || st.hex; // a carried comment's replies, resolving and edits go to the version it was written on
+    // the box takes focus and is shown whole, Save/Cancel (or Comment/Reply) with it: it was cut at the bottom of the panel (#15239, walk 10 M12)
+    const focusComposer = () => { const ta = panel.querySelector('.ac-input'); if (!ta) return; ta.focus({ preventScroll: true }); (ta.closest('.ac-composer') || ta).scrollIntoView({ block: 'nearest' }); };
     const openCount = () => threads().filter(t => !t.c.deleted && !t.c.resolved && groupOf(t.c) !== 'earlier').length;
     async function refresh() {
         if (!st.hex || (!st.text && !st.whole)) return;
@@ -219,7 +221,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         const list = threads();
         st.video?.update(list.map(t => t.c).filter(c => st.showResolved || !c.resolved), st.active, !!st.data?.canComment && !st.data?.locked);
         const head = el('div', 'ac-head');
-        const h = el('h3', 'ac-title', 'Comments'); h.append(el('span', 'ac-count', String(openCount())));
+        const h = el('h3', 'ac-title', 'Comments'); h.append(el('span', 'ac-count', `${openCount()} open`));
         opts.onCanWrite?.(!!(st.data && st.data.canComment && !st.data.locked)); // the viewer shows Mark up only to someone who can comment (#12394)
         opts.onCount?.(openCount()); // a goal's Comments tab says how many are open (#11955)
         opts.onState?.({ composing: !!(st.composing && st.composing.anchor), count: openCount() }); // a file's diff (#13528): its icon says the count, and closes an empty thread whose composer was cancelled
@@ -288,7 +290,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (st.video && sendable.length) { const sendAll = btn('ac-send-open', `Send ${plural(sendable.length, 'open comment')} to an agent`); sendAll.addEventListener('click', () => openMany(sendable)); panel.append(sendAll); }
         if (st.composing && st.composing.anchor) panel.append(composer());
         else if (d.canComment && !d.locked && !opts.compact) {
-            const whole = btn('ac-whole', st.video ? 'Comment at playhead' : opts.words?.whole || 'Comment on the whole document'); whole.addEventListener('click', () => { const time = st.video?.current(); st.composing = { anchor: opts.wholeAnchor ? opts.wholeAnchor() : { whole: true }, ...time, ...(time ? { timeLabel: stampRange(time) } : {}) }; st.error = ''; render(); focusInput(); });
+            const whole = btn('ac-whole', st.video ? 'Comment at playhead' : opts.words?.whole || 'Comment on the whole document'); whole.addEventListener('click', () => { const time = st.video?.current(); st.composing = { anchor: opts.wholeAnchor ? opts.wholeAnchor() : { whole: true }, ...time, ...(time ? { timeLabel: stampRange(time) } : {}) }; st.error = ''; render(); focusComposer(); });
             panel.append(whole);
         }
         const act = panel.querySelector('.ac-card.ac-active'); if (act && st.scrollCard) { st.scrollCard = false; act.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() }); }
@@ -308,7 +310,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (KIND[c.authorKind]) m.append(el('span', 'ac-kind', KIND[c.authorKind]));
         const dot = el('span', 'ac-dot', '·'); dot.setAttribute('aria-hidden', 'true'); m.append(dot);
         const time = el('span', 'ac-time', ago(c.createdAt)); time.title = c.createdAt; m.append(time);
-        if (c.editedAt) m.append(el('span', 'chip ac-pill', 'edited'));
+        if (c.editedAt && !c.deleted) m.append(el('span', 'chip ac-pill', 'edited')); // a deleted comment's words are gone: it is not 'edited' any more (#15239, walk 10 M10)
         let resolveBtn = null;
         if (top) {
             const a = c.anchor || {};
@@ -360,7 +362,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         // The reply box at the foot of the card, where Docs has it; it opens the composer in place.
         if (!c.deleted && c.can.reply && !(st.composing && st.composing.parentId === c.id)) {
             const rb = btn('ac-replybox', 'Reply…', `Reply to the comment by ${nameSaid(c)}`);
-            rb.addEventListener('click', () => { st.composing = { parentId: c.id, hex: ownHex(c) }; st.error = ''; render(); focusInput(); });
+            rb.addEventListener('click', () => { st.composing = { parentId: c.id, hex: ownHex(c) }; st.error = ''; render(); focusComposer(); });
             li.append(rb);
         }
         if (st.composing && st.composing.parentId === c.id) li.append(composer());
@@ -373,8 +375,8 @@ export function attachComments(dialog, body, host, opts = {}) {
         const row = el('div', 'ac-actions');
         if (c.deleted) return row;
         const who = nameSaid(c);
-        if (c.can.edit) row.append(act('Edit', `Edit the comment by ${who}`, () => { st.composing = { editId: c.id }; st.error = ''; render(); focusInput(); }));
-        if (c.can.delete) row.append(act('Delete', `Delete the comment by ${who}`, () => confirmThen('Delete this comment?', () => run(() => api.deleteComment(ownHex(c), st.server, c.id), 'Comment deleted'))));
+        if (c.can.edit) row.append(act('Edit', `Edit the comment by ${who}`, () => { st.composing = { editId: c.id }; st.error = ''; render(); focusComposer(); }));
+        if (c.can.delete) row.append(act('Delete', `Delete the comment by ${who}`, () => confirmThen(`Delete this comment?${(() => { const read = [...new Set((c.asks || []).filter(k => k.agent && (k.seen || k.readAt || k.replies)).map(k => k.agent))]; return read.length ? ` ${read.join(' and ')} already read it, and keeps what it read.` : ''; })()}`, () => run(() => api.deleteComment(ownHex(c), st.server, c.id), 'Comment deleted'))));
         // Send to agent (#6357, #6456): the owner, on this computer, for a thread of this board that is open; never through Coral Hub
         if (top && canAsk(c)) { const b = act('Send to agent', () => openAsk(c)); b.classList.add('ac-ask-open'); b.setAttribute('aria-label', `Send the comment by ${nameSaid(c)} to an agent`); b.setAttribute('aria-expanded', String(!!st.ask && st.ask.id === c.id)); row.append(b); }
         // not an .ac-act: it writes nothing, so a read-only viewer has it too
@@ -488,7 +490,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         st.composing = { anchor: s.anchor }; st.error = ''; selBtn.hidden = true;
         window.getSelection().removeAllRanges();
         userSet(true); render(); // the new comment opens the panel
-        focusInput();
+        focusComposer();
     });
 
     // ── a passage by keyboard (#15173, Beta walk 7 H1: a document cannot be selected from the keyboard, so there was no way to comment on a passage)
@@ -578,7 +580,7 @@ export function attachComments(dialog, body, host, opts = {}) {
             if (!st.hex || !st.data || !st.data.canComment || st.data.locked) return false;
             if (!st.composing || st.composing.editId) st.composing = { anchor: { whole: true } }; // a comment already being written keeps its words and takes the picture too
             st.error = ''; setSheet(true); render();
-            const cm = st.composing; focusInput();
+            const cm = st.composing; focusComposer();
             if (cm.tray) cm.tray.add([new File([blob], name || 'marked-picture.png', { type: blob.type })]);
             return true;
         },
@@ -587,7 +589,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         /** A comment on an anchor the caller made (the lines selected in an agent's diff, #12536): the composer opens on it, in the panel. Resolves false when this person cannot comment here. */
         composeOn(anchor) {
             if (!st.hex || !st.data || !st.data.canComment || st.data.locked) return false;
-            st.composing = { anchor }; st.error = ''; setSheet(true); render(); focusInput();
+            st.composing = { anchor }; st.error = ''; setSheet(true); render(); focusComposer();
             return true;
         },
         async docWhole() {
@@ -599,7 +601,7 @@ export function attachComments(dialog, body, host, opts = {}) {
                     if (lifetime !== st.lifetime || hex !== st.hex || !video.isConnected || st.video) return;
                     st.videoTime = m.videoTime;
                     st.video = m.attachVideoComments(video, {
-                        onComment: time => { if (!st.data?.canComment || st.data.locked) return; st.composing = { anchor: { whole: true }, ...time, timeLabel: stampRange(time) }; st.error = ''; setSheet(true); render(); focusInput(); },
+                        onComment: time => { if (!st.data?.canComment || st.data.locked) return; st.composing = { anchor: { whole: true }, ...time, timeLabel: stampRange(time) }; st.error = ''; setSheet(true); render(); focusComposer(); },
                         onActivate: id => { activate(id, false); setSheet(true); },
                     });
                     dialog.classList.add('avc-video'); region(true); setSheet(true);

@@ -40,6 +40,7 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
         const c = st.data && st.data.comments.find(x => x.id === id);
         for (const k of (c && c.asks) || []) if (k.open && k.agent) { m.set(k.agent.toLowerCase(), { k, words: askUi.askedWords(k) }); names.set(k.agent.toLowerCase(), k.agent); }
         for (const [role, words] of askedOf(id)) { const cur = m.get(role); if (!cur || askUi.askState(cur.k) === 'sent') m.set(role, { k: cur ? cur.k : null, words }); }
+        if (!m.size) for (const k of (c && c.asks) || []) if (k.agent) { m.set(k.agent.toLowerCase(), { k, words: askUi.askedWords(k) }); names.set(k.agent.toLowerCase(), k.agent); } // nobody has it open: asks that ran out (the thread was resolved and reopened, or the window passed) still say it was sent, never "Not sent to an agent yet" for a comment that was (#15239, walk 10 M9)
         return m;
     }
     /** The line under a comment that says where an agent has it (#14129): Sent to A, then Read by A (with the time the server saw its own read call return the comment), then A replied; at rest, and again as soon as a send answers (#12112: it kept saying "Not sent to an agent yet" beside "Asked just now"). Each name as written, a button to the agent's chat (#12168). */

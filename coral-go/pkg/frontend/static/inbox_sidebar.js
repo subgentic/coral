@@ -1216,7 +1216,7 @@ export function showTeamNeeds(host, team, { onCount = () => {} } = {}) {
             if (!toolbarHost.contains(toolbar.node)) toolbarHost.replaceChildren(toolbar.node);
             const restoreFocus = rememberFocus(body);
             const focused = document.activeElement, href = focused?.getAttribute('href'), key = focused?.closest('tr')?.dataset.key;
-            const list = spec.node();
+            const list = !spec.rows?.length && spec.empty ? (() => { const box = DT.el('div', 'empty-state'); box.append(DT.el('p', 'empty-state-line', spec.empty.line)); if (spec.empty.hint) box.append(DT.el('p', 'empty-state-hint', spec.empty.hint)); return box; })() : spec.node(); // nothing waiting: a sentence, as the Inbox says it (#15239, walk 10 M15), not a bare header
             body.replaceChildren(list);
             const foot = spec.foot?.(); if (foot) body.append(foot);
             if (href) [...body.querySelectorAll('a[href]')].find(link => link.getAttribute('href') === href && link.closest('tr')?.dataset.key === key)?.focus({ preventScroll: true });
@@ -1253,7 +1253,7 @@ export function needsListSpec() {
     const goal = rows.some(goalOf);
     const total = filteredNeeds().length, hidden = allNeeds().length - total, rowsCounted = rows.filter(needsUnread).length, totalCounted = filteredNeeds().filter(needsUnread).length; // what the filters hide is said above the list, with the way to show it (#10399)
     const paging = reviewFilters() ? reviewQueryState() : null;
-    const openPages = paging ? paging.more || paging.loading || paging.failed || paging.error : !reviewPages().length || reviewPages().some(p => p.has_more || (p.loading && !p.loaded) || p.error || p.truncated); // (a page already read that is read again is not 'loading' for the empty line: it would blink, #14906)
+    const openPages = paging ? paging.more || paging.loading || paging.failed || paging.error : activeNeedsTeam && teamReviewTotals.get(activeNeedsTeam)?.complete && !reviewPages().some(p => p.has_more || p.error || p.truncated) ? false : !reviewPages().length || reviewPages().some(p => p.has_more || (p.loading && !p.loaded) || p.error || p.truncated); // (a page already read that is read again is not 'loading' for the empty line: it would blink, #14906)
     const attention = reviewFilters() ? { value: paging?.attentionTotal ?? filteredNeeds().filter(s => s.review && needsUnread(s)).length, complete: Number.isSafeInteger(paging?.attentionTotal) } : reviewAttentionCount();
     const reviewCount = !needsFilters.kind || needsFilters.kind === 'review' ? attention.value : 0;
     const totalAttention = filteredNeeds().filter(s => !s.review && needsUnread(s)).length + reviewCount;
