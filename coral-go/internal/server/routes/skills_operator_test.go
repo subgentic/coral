@@ -341,3 +341,25 @@ func TestWhichRowsHoldAnExampleSkillsName(t *testing.T) {
 		assert.Equal(t, 0, exampleCount(e), "and the example is not made beside it")
 	})
 }
+
+// Which teams use a skill (#15383): the list and the skill's own page name the teams whose live agents have it attached or loaded; a skill nobody uses names none.
+func TestTheOperatorSeesWhichTeamsUseEachSkill(t *testing.T) {
+	e := newSkillsEnv(t)
+	used, _ := e.publish(map[string]string{"SKILL.md": skillMD}, store.PublisherOperator)
+	idle, _ := e.publish(map[string]string{"SKILL.md": scriptedMD, "scripts/check.sh": "#!/bin/sh\necho hi\n"}, store.PublisherOperator)
+	team := "alpha"
+	sid := "11111111-1111-4111-8111-111111111111"
+	require.NoError(t, e.ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentName: "Backend Dev", AgentType: "claude", WorkingDir: "/x", BoardName: &team}))
+	require.NoError(t, e.ss.AttachSkills(context.Background(), sid, []store.SkillRow{*used}))
+
+	_, out := e.call("GET", "/api/skills", "", "operator")
+	byID := map[string]map[string]any{}
+	for _, s := range out["skills"].([]any) {
+		m := s.(map[string]any)
+		byID[m["id"].(string)] = m
+	}
+	assert.Equal(t, []any{"alpha"}, byID[used.ID]["used_by"])
+	assert.Equal(t, []any{}, byID[idle.ID]["used_by"], "a list, never null")
+	_, out = e.call("GET", "/api/skills/"+used.ID, "", "operator")
+	assert.Equal(t, []any{"alpha"}, out["skill"].(map[string]any)["used_by"])
+}

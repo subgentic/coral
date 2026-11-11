@@ -46,6 +46,8 @@ async function loadList() {
 
 // ── the folders (#12997, the Operator: 'Skills can be Imported, Agent Created, Coral Skills') ──
 // A skill's source is on its record (publisher_kind: operator = imported, agent = agent created, coral = Coral's own).
+/** The teams that use a skill, as one line ("alpha, beta"); '' when none (an older Coral sends no list). */
+function usedBy(r) { return Array.isArray(r.used_by) ? r.used_by.join(', ') : ''; }
 const KIND_OF = { imported: 'operator', 'agent-created': 'agent', 'coral-skills': 'coral' };
 const FOLDER_LABEL = { '': 'All skills', imported: 'Imported', 'agent-created': 'Agent created', 'coral-skills': 'Coral skills' };
 const inFolder = (r, f) => !f || r.publisher_kind === KIND_OF[f];
@@ -111,6 +113,7 @@ function drawList() {
         { key: 'name', label: 'Name', primary: true, width: 'grow', sort: true, sortValue: r => r.name.toLowerCase(), line: 1, cell: r => r.name },
         { key: 'description', label: 'Description', width: '16rem', line: 2, cell: r => r.description, narrowHide: true },
         { key: 'by', label: 'Published by', width: '10rem', sort: true, sortValue: publisher, cell: publisher },
+        { key: 'usedBy', label: 'Used by', width: '9rem', sort: true, sortValue: usedBy, cell: r => usedBy(r) || '-', narrowHide: true }, // the teams whose agents have it attached or loaded (#15383)
         { key: 'version', label: 'Version', width: '10rem', align: 'end', sort: 'number', sortValue: r => r.version, cell: r => {
             const cell = el('span', '', `v${r.version}`), pending = r.pendingVersion;
             if (pending && pending.id !== r.id) {
@@ -166,7 +169,7 @@ function drawDetail() {
     const title = el('div', 'skills-head'); title.append(el('h2', '', `${s.name} · version ${s.version}`), DT.chip(statusWord, (STATUS[s.status] || [])[1]));
     page.append(title);
     const meta = el('div', 'skills-meta');
-    meta.append(el('span', '', `Published by ${publisher(s)}`), el('span', '', `Digest ${short(s.digest)}`), el('span', '', `${files.length} file${files.length === 1 ? '' : 's'}`));
+    meta.append(el('span', '', `Published by ${publisher(s)}`), el('span', 'skills-used-by', usedBy(s) ? `Used by ${usedBy(s)}` : 'Not used by a team yet'), el('span', '', `Digest ${short(s.digest)}`), el('span', '', `${files.length} file${files.length === 1 ? '' : 's'}`));
     page.append(meta, el('p', 'skills-note', s.description));
     const versions = skillVersions(everyRow, s);
     if (versions.length > 1) {
