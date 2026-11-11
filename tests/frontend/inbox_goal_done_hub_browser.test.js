@@ -58,8 +58,9 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(new Set(keys).size,2,'source-qualified goal row identities');
             assert.deepEqual(await ev('window.__bareSettingsReads'), [], 'Hub goal refresh must use per-computer done_state and never read Hub settings');
             if (process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true}); fs.writeFileSync(process.env.CORAL_SCREENSHOT_DIR+'/hub-goals-'+width+'.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64')); }
-            const action = async label => {
-                if (width >= 760) { await ev(`(${row('m2')}).querySelector('button[aria-label^="${label}"]').click();true`); return; }
+            const action = async aria => {
+                const label = aria === 'Mark goal' ? 'Mark done' : aria; // the row's button is named 'Mark goal N done: ...', the phone's menu item 'Mark done'
+                if (width >= 760) { await ev(`(${row('m2')}).querySelector('button[aria-label^="${aria}"]').click();true`); return; }
                 const point = await ev(`(()=>{const r=(${row('m2')});r.scrollIntoView({block:'center'});const b=r.getBoundingClientRect();return{x:b.left+b.width*.35,y:b.top+b.height*.5};})()`);
                 await client.Input.dispatchTouchEvent({type:'touchStart',touchPoints:[{...point,id:1}]});
                 await new Promise(resolve=>setTimeout(resolve,700)); // sleep-ok: a long press is a held finger
@@ -95,7 +96,7 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`window.__goalWrites.some(w=>w.source==='m2'&&w.body.state==='read')`,'opening marks source read');
             await reloadNeeds(); await waitFor(`(${row('m2')})?.classList.contains('dt-read')`,'source read survives reload');
             assert.equal(await ev(`(${row('m1')}).classList.contains('dt-read')`),false,'other computer stays unread');
-            await action('Close goal'); await waitFor(`!!document.querySelector('dialog.goals-close-dialog[open]')`,'remote close dialog');
+            await action('Mark goal'); await waitFor(`!!document.querySelector('dialog.goals-close-dialog[open]')`,'remote close dialog');
             await ev(`document.querySelector('dialog.goals-close-dialog form').requestSubmit();true`);
             await waitFor(`window.__goalWrites.some(w=>w.source==='m2'&&w.path.endsWith('/close'))`,'Close goal uses Desktop');
             assert.equal(await ev(`window.__remoteDone.m2.state`),'done'); assert.equal(await ev(`window.__remoteDone.m1.state`),'active');

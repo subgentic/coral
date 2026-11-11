@@ -43,7 +43,7 @@ const { coralReady } = require('./helpers/wait');
                 assert.equal(p.bar, false, at + 'there is no bar at the bottom of the page');
                 assert.equal(await ev(`!!document.querySelector('${mount} .goal-head-actions .goals-not-yet')`), false, at + 'a goal with an open task has no Not yet: its item is not in Needs you (#12248)');
                 if (!mobile) assert.ok(p.order && p.primary, at + 'Add task first, Close goal the primary after it: ' + JSON.stringify(p)); // a phone keeps one button, Add task, and Close goal is in More (#13119, goal_head_phone_browser)
-                assert.equal(p.label, `Close goal: ${TITLE}`, at + 'Close goal is still named for its goal');
+                assert.equal(p.label, `Mark done: ${TITLE}`, at + 'Mark done is still named for its goal');
                 if (!mobile) assert.ok(p.closeRight >= p.headRight - 2 && p.closeRight <= p.vw, at + 'the buttons end at the right edge of the header: ' + JSON.stringify(p));
                 assert.ok(!p.clipped && !p.sideways, at + 'nothing is clipped or scrolls sideways: ' + JSON.stringify(p));
                 assert.ok(p.headBottom <= p.listTop, at + 'the header is above the goal\'s tasks: ' + JSON.stringify(p));
@@ -63,6 +63,8 @@ const { coralReady } = require('./helpers/wait');
             const strip = await ev(`(() => { const p = document.querySelector('#inbox-page'); return { box: !!p.querySelector('.goals-alldone, [aria-label="All tasks done"]'), words: /Is that true|Close as done/.test(p.textContent), notYet: [...p.querySelectorAll('.goal-head-actions .goals-not-yet')].map(b => b.textContent.trim()) }; })()`);
             // the old all-done box stays gone; the header now offers Not yet beside Close goal, as the goal's item in Needs you does (#12248)
             assert.deepEqual(strip, { box: false, words: false, notYet: ['Not yet'] }, `${width} px: a goal with all its tasks done has no all-done box, and Not yet is in the header: ${JSON.stringify(strip)}`);
+            // #15166 (walk 6): an active goal with every task done SAYS so, in words, and the button reads Mark done
+            assert.match(await ev(`(document.querySelector('#inbox-page .goal-done-note') || {}).textContent || ''`), /^All tasks are done\./, `${width} px: the goal says all its tasks are done`);
             await shot(`goal-head-alldone-${width}`);
         }
         // a closed goal: Reopen takes Close goal's place
@@ -73,6 +75,8 @@ const { coralReady } = require('./helpers/wait');
         await ev(`document.querySelector('.goals-close-dialog input[value="dropped"]').click(); document.getElementById('goal-close-reason').value = 'Not needed'; document.querySelector('.goals-close-dialog button[type="submit"]').click(); true`);
         await waitFor(`!!document.querySelector('#inbox-page .goal-back-row .goals-reopen')`, 'Reopen is in the header');
         assert.equal(await ev(`!!document.querySelector('#inbox-page .goals-pinbar')`), false, 'a closed goal has no bottom bar either');
+        const chip = await ev(`(() => { const c = document.querySelector('#inbox-page .goals-detail-line [class*="goal-state-"]'); return c ? { text: c.textContent.trim(), w: Math.round(c.getBoundingClientRect().width) } : null; })()`);
+        assert.ok(chip && chip.text === 'Dropped' && chip.w > 24, 'a closed goal says its state in words on the page (#15166): ' + JSON.stringify(chip));
         console.log('goal_head_actions_browser: ok');
     } finally { await removeBoards(ev, [board]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

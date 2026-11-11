@@ -14,8 +14,14 @@ const { agentCopyText } = await importOnce('./agent_doc_map.js');
 import { foldWayBack } from './way_back.js';
 import * as W from './goal_words.js';
 import { onGoalsSeq } from './goals_feed.js';
-import { looksDone, hiddenList, hideGoalDone } from './goal_done.js';
+import { looksDone, hiddenList, hideGoalDone, quietEndsAt } from './goal_done.js';
 import { pollEvery } from './overload.js';
+/** What an active goal with every task done says on its page (#15166, walk 6): that it is, and when it reaches Needs you, after the quiet period (#12161). '' for any other goal. */
+const doneNote = g => {
+    if (!looksDone(g)) return '';
+    const min = Math.ceil((quietEndsAt(g) - Date.now()) / 60000);
+    return min > 0 ? `All tasks are done. It reaches Needs you in about ${min} min.` : 'All tasks are done.';
+};
 const { linkedText } = await importOnce('./artifact_refs.js');
 const { renderGoalText } = await importOnce('./goal_text.js'); // the description is Markdown-lite (#12724)
 const CHECKLIST = /^\s*[-*+]\s+\[[ xX]\]\s/m;
@@ -33,6 +39,7 @@ const { el } = DT;
 const TV = await importOnce('./tasks_view.js');
 await loadStyles('pictures.css'); // the picture rules load with this module, before anything draws (page_weight: not at start)
 await loadStyles('goal_close.css'); // the Close dialog's phone card (not at start: page_weight, #15163)
+await loadStyles('goal_page.css'); // the page's own few rules (#15166)
 const PAGE = 50;
 
 /** Mount one goal; each mount owns its task pages, search and phone screen. */
@@ -175,7 +182,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
             act.push({ key: 'move', cls: 'btn goals-move', label: 'Move to another team', aria: `Move to another team: ${g.title}`, run: () => importOnce('./goal_operator_dialogs.js').then(m => m.openMoveGoal({ project: model.project, goal: g, openTasks: W.openTasksOf(g.rollup), onClose: () => backToAction('.goals-move'),
                 onMoved: async (out, label) => { showToast(`Goal given to ${label} as goal #${out.goal.id}`); closeGoal(); await loadGoals(); } })) });
         }
-        if (W.isOpenGoal(g)) act.push({ key: 'close', cls: 'btn btn-primary goals-close', label: 'Close goal', aria: `Close goal: ${g.title}`, run: () => openClose(g) }); // named for its goal: the Close dialog's own button is just Close goal
+        if (W.isOpenGoal(g)) act.push({ key: 'close', cls: 'btn btn-primary goals-close', label: 'Mark done', aria: `Mark done: ${g.title}`, run: () => openClose(g) }); // named for its goal (#15166: the button says Mark done, as the task asks; its dialog is still the Close dialog)
         else if (W.isClosedGoal(g)) act.push({ key: 'reopen', cls: 'btn goals-reopen', label: 'Reopen', run: () => reopenGoal(g) });
         const makeBtn = a => { const b = btn(a.cls, a.label, a.run); if (a.aria) b.setAttribute('aria-label', a.aria); if (a.title) b.title = a.title; return b; };
         if (!phone) { for (const k of ['add', 'notyet', 'driver', 'move', 'close', 'reopen']) { const a = act.find(x => x.key === k); if (a) acts.append(makeBtn(a)); } }
@@ -198,6 +205,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         const copyBtn = agentCopyButton('goal', () => W.agentBriefLine(g), { className: 'goal-copy-agent' }); // the robot: copies the goal's line and where in the docs to read (#15063)
         if (!phone) line.append(copyBtn); // on a phone it is in the header's More menu (#13119)
         main.append(line);
+        const doneWords = doneNote(g); if (doneWords) main.append(el('p', 'goals-note goal-done-note', doneWords)); // an active goal with every task done says so, and when it reaches Needs you (#15166)
         if (g.movedOpen) main.append(el('p', 'goals-note', `${g.movedOpen} moved task${g.movedOpen === 1 ? ' is' : 's are'} unfinished or cannot be checked here. Check “Done when” before closing this goal.`));
         const waitNote = el('p', 'goals-note goal-reviews-waiting'); waitNote.hidden = true; main.append(waitNote); // files for review on this goal that were never answered (Beta #11837 G): said while any wait, whatever the goal's state
         paintWaiting(g, waitNote);

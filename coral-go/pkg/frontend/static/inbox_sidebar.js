@@ -451,7 +451,7 @@ function needsBulkActions() {
             asks.refreshOperatorAsks(true); syncGoalDoneCount(); done();
             tell(words('Dismissed', r, rows.length), `${words('Dismissed', r, rows.length)}.${undo.length ? ' Undo is in the notice.' : ''}`, undo.length ? { action: { label: 'Undo', onClick: async () => { for (const f of undo) { try { await f(); } catch { /* it stays ignored */ } } asks.refreshOperatorAsks(true); reviewsChangedOnServer(); refreshReviews(true); syncGoalDoneCount(); renderInboxNav(true); tell('Back in Needs you'); } } } : undefined); // one after the other: goals share one hidden list that each undo rewrites (#12328)
         } },
-        { label: 'Close goal', hidden: rows => rows.length > 0 && !rows.some(s => s.goalDone), more: true, disabled: rows => !(rows.length === 1 && rows[0].goalDone), run: rows => { done(); openGoalDone(rows[0].goalDone, true); } }, // a goal that looks done: its two answers are in the bar's menu on a phone, where the row has no buttons; a ninth icon made the bar wider than a 360 px toolbar (#12328)
+        { label: 'Mark done', hidden: rows => rows.length > 0 && !rows.some(s => s.goalDone), more: true, disabled: rows => !(rows.length === 1 && rows[0].goalDone), run: rows => { done(); openGoalDone(rows[0].goalDone, true); } }, // a goal that looks done: its two answers are in the bar's menu on a phone, where the row has no buttons; a ninth icon made the bar wider than a 360 px toolbar (#12328)
         { label: 'Not yet', hidden: rows => rows.length > 0 && !rows.some(s => s.goalDone), more: true, disabled: rows => !(rows.length > 0 && rows.every(s => s.goalDone)), run: async rows => {
             const undo = [], r = await each(rows, async s => { undo.push(await hideGoalDone(goalTeamHere(s.goalDone), s.goalDone, 'not-yet')); });
             syncGoalDoneCount(); done();
@@ -581,7 +581,7 @@ function goalDoneActions(g) {
         renderInboxNav(true);
     };
     const btn = (label, aria, cls, run) => { const b = DT.el('button', `btn btn-small ${cls}`, label); b.type = 'button'; b.setAttribute('aria-label', aria); b.addEventListener('click', e => { e.stopPropagation(); run(); }); return b; };
-    box.append(btn('Close goal', `Close goal ${g.id}: ${title}`, 'btn-primary inbox-main-action', () => openGoalDone(g, true)), btn('Not yet', `Not yet for goal ${g.id}: ${title}`, '', () => hide('not-yet', 'Hidden until a task is added')));
+    box.append(btn('Mark done', `Mark goal ${g.id} done: ${title}`, 'btn-primary inbox-main-action', () => openGoalDone(g, true)), btn('Not yet', `Not yet for goal ${g.id}: ${title}`, '', () => hide('not-yet', 'Hidden until a task is added')));
     const menu = [];
     if (isPhoneLayout()) menu.push({ label: 'Dismiss', title: 'Take it out of Needs you; nobody is told', run: () => hide('ignore', 'Dismissed') });
     else box.append(btn('Dismiss', `Dismiss goal ${g.id}: ${title}`, 'btn-quiet', () => hide('ignore', 'Dismissed')));
