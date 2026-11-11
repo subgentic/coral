@@ -42,6 +42,10 @@ function _renderTeamCard(boardName, boardSessions) {
                     ${SVGO.o0}<path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/></svg>
                     ${sleepLabel}
                 </button>
+                <button class="menu-item overflow-menu-item" data-on-click="team-reset" data-board="${escapeAttr(boardName)}">
+                    ${SVGO.o0}<path d="M1 8a7 7 0 0 1 12.9-3.8"/><path d="M15 8a7 7 0 0 1-12.9 3.8"/><polyline points="13 1 14 4.2 10.5 4.2"/><polyline points="3 15 2 11.8 5.5 11.8"/></svg>
+                    Reset team (clear context)
+                </button>
                 <button class="menu-item overflow-menu-item" data-on-click="team-save" data-board="${escapeAttr(boardName)}">
                     ${SVGO.o0}<path d="M3 3h8l2 2v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M6 3v3h4V3"/><rect x="5" y="9" width="6" height="3"/></svg>
                     Save as template
@@ -79,10 +83,6 @@ function _renderTeamCard(boardName, boardSessions) {
                 </button>
                 </div>
                 <hr class="overflow-menu-divider overflow-menu-divider-danger">
-                <button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="team-reset" data-board="${escapeAttr(boardName)}">
-                    ${SVGO.o0}<path d="M1 8a7 7 0 0 1 12.9-3.8"/><path d="M15 8a7 7 0 0 1-12.9 3.8"/><polyline points="13 1 14 4.2 10.5 4.2"/><polyline points="3 15 2 11.8 5.5 11.8"/></svg>
-                    Reset team
-                </button>
                 ${killAllItem(boardName)}
                 ${deleteTeamItem(boardName)}
             </div>

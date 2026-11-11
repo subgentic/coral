@@ -44,7 +44,7 @@ const SESSIONS = [
         await run('a team card: its name, the team menu in its order, the Orchestrator first among its agents', async () => {
             const c = await ev(`(${CARD})(document.querySelector('li.session-team-group'))`);
             assert.equal(c.head.replace(/\s*\d+$/, ''), 'alpha', JSON.stringify(c));
-            assert.deepEqual(c.actions.map(a => a.split(':')[0]), ['team-working-mode', 'team-add-agent', 'team-sleep', 'team-save', 'team-menu-more', 'team-availability', 'team-add-terminal', 'team-distill', 'team-share', 'team-accent', 'team-tokens', 'group-move', 'group-move', 'team-reset', 'team-kill', 'team-delete'], JSON.stringify(c.actions));
+            assert.deepEqual(c.actions.map(a => a.split(':')[0]), ['team-working-mode', 'team-add-agent', 'team-sleep', 'team-reset', 'team-save', 'team-menu-more', 'team-availability', 'team-add-terminal', 'team-distill', 'team-share', 'team-accent', 'team-tokens', 'group-move', 'group-move', 'team-kill', 'team-delete'], JSON.stringify(c.actions));
             assert.ok(c.actions.includes('team-add-agent:alpha:/tmp/alpha') && c.actions.includes('team-sleep:alpha:sleep') && c.actions.includes('group-move:alpha:up') && c.actions.includes('group-move:alpha:down'), 'each action names the team it acts on: ' + JSON.stringify(c.actions));
             assert.ok(c.labels.includes('Sleep team') && !c.labels.includes('Wake team'), 'an awake team offers Sleep team: ' + c.labels);
             const names = await ev(`[...document.querySelector('li.session-team-group').querySelectorAll('.board-card-agents > li.session-group-item')].map(li => li.getAttribute('aria-label'))`);
@@ -94,11 +94,11 @@ const SESSIONS = [
             assert.equal(await ev(`document.querySelector('li.session-team-group .group-chevron').getAttribute('aria-expanded')`), 'true', 'the card stayed open');
             await ev(`document.body.click(); true`);
         });
-        await run('the team menu shows the six a person uses and keeps the rest under More (#10549): Team settings, Add Agent, Sleep team, Save as template, Reset team, Kill all (the danger group is last, after More, #10282), and Delete team (#10318); More opens the rest and the menu stays open', async () => {
+        await run('the team menu shows the six a person uses and keeps the rest under More (#10549): Team settings, Add Agent, Sleep team, Reset team (clear context, near the top: #15373), Save as template, Kill all (the danger group is last, after More, #10282), and Delete team (#10318); More opens the rest and the menu stays open', async () => {
             const btn = `document.querySelector('li.session-team-group .group-kebab-btn')`;
             await ev(`${btn}.click(); true`); await waitFor(`${btn}.getAttribute('aria-expanded') === 'true'`, 'the menu open');
             const shown = () => ev(`[...document.getElementById(${btn}.getAttribute('aria-controls')).querySelectorAll('.overflow-menu-item')].filter(b => b.getClientRects().length).map(b => { const c = b.cloneNode(true); c.querySelectorAll('.material-icons, svg').forEach(i => i.remove()); return c.textContent.replace(/\\s+/g, ' ').trim(); })`);
-            const six = ['Team settings', 'Add Agent', 'Sleep team', 'Save as template', 'More', 'Reset team', 'Kill all', 'Remove team']; // the six, More, then the danger group last (#10282) with Remove team (#10318, #15277)
+            const six = ['Team settings', 'Add Agent', 'Sleep team', 'Reset team (clear context)', 'Save as template', 'More', 'Kill all', 'Delete team']; // the six, More, then the danger group last (#10282) with Delete team (#10318)
             assert.deepEqual(await shown(), six, 'six and More: ' + JSON.stringify(await shown()));
             const more = `document.querySelector('li.session-team-group [data-on-click="team-menu-more"]')`;
             assert.equal(await ev(`${more}.getAttribute('aria-expanded')`), 'false', 'More starts closed');

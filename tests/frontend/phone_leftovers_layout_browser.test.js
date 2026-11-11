@@ -47,10 +47,10 @@ const TEAM = `plo-${Date.now() % 100000}`;
         await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: 1, y: 1 });
         await ev(`document.getElementById('team-page-more').click(); true`);
         await waitFor(`!document.getElementById('team-page-more-menu').hidden`, 'the Actions menu', 6000);
-        const rowsBox = await ev(`[...document.querySelectorAll('#team-page-more-menu > button')].filter(b => b.getClientRects().length).map(b => { const c = getComputedStyle(b); return { destructive: b.matches('#mb-delete-btn, [data-stop=reset], [data-stop=kill]'), text: b.textContent.trim().slice(0, 24), border: c.borderTopWidth, bg: c.backgroundColor, live: b.matches(':hover, :focus-visible') }; })`); // live: the row the pointer or the keyboard focus is on (opening the menu focuses its first item, and Chrome shows that focus on Windows when a script opened it) has the menu's hover fill by design; the others are plain
+        const rowsBox = await ev(`[...document.querySelectorAll('#team-page-more-menu > button')].filter(b => b.getClientRects().length).map(b => { const c = getComputedStyle(b); return { destructive: b.matches('#mb-delete-btn, [data-stop=kill]'), text: b.textContent.trim().slice(0, 24), border: c.borderTopWidth, bg: c.backgroundColor, live: b.matches(':hover, :focus-visible') }; })`); // live: the row the pointer or the keyboard focus is on (opening the menu focuses its first item, and Chrome shows that focus on Windows when a script opened it) has the menu's hover fill by design; the others are plain
         assert.ok(rowsBox.length >= 5, 'the menu has its rows: ' + JSON.stringify(rowsBox));
         assert.ok(rowsBox.every(r => r.border === (r.destructive ? '1px' : '0px') && (r.bg === 'rgba(0, 0, 0, 0)' || r.live)), 'only destructive Actions rows have dividers; none are boxed (except the active hover/focus fill): ' + JSON.stringify(rowsBox));
-        assert.equal(rowsBox.filter(r => r.destructive).length, 3, 'Delete, Reset team and Kill all carry dividers');
+        assert.equal(rowsBox.filter(r => r.destructive).length, 2, 'Delete and Kill all carry dividers (Reset team is not red at rest, #15373)');
         assert.ok(rowsBox.filter(r => r.bg !== 'rgba(0, 0, 0, 0)').length <= 1, 'at most one row has a fill (the one in use), none is left stuck: ' + JSON.stringify(rowsBox));
         console.log('PASS phone leftovers: day buttons, Edit member footer, Actions menu rows');
     } finally { await removeBoards(ev, [TEAM]).catch(() => {}); try { await client.close(); } catch (e) {} }
