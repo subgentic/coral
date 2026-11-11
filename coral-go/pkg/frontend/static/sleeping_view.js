@@ -59,7 +59,7 @@ export function applySleepingView(sleeping, { manageInput = true, archived } = {
     const endedText = `${who} has ended`;
     if (ended && cur && state.lastSendAt && state.lastSendAt.has(cur.session_id)) importOnce('./pending_messages.js').then(m => m.markUnanswered(cur.session_id)).catch(() => {});
     const hint = document.getElementById('sleeping-composer-hint');
-    if (hint) { const words = ended ? 'Wake continues this conversation; Restart starts a fresh session with new settings.' : ''; if (hint.textContent !== words) hint.textContent = words; hint.hidden = !ended; }
+    if (hint) hint.hidden = !ended; // its words are in the template
     if (text) {
         const next = archived ? 'This agent is archived' : failedStart ? `${who} ${startFailedSentence(row)}` : gone ? "This agent's terminal is gone" : ended ? endedText : 'This agent is sleeping';
         if (text.textContent !== next) text.textContent = next; // a status line: written only when it changes, so it is announced once

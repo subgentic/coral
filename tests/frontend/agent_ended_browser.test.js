@@ -35,7 +35,7 @@ const BASE = require('./test_base').BASE;
         c = await composer('ended-a-id');
         assert.match(c.text, /has ended$/, 'a message was sent and nothing came back: it still says who has ended, by the name the row shows, not the folder (#10439): ' + c.text);
         assert.doesNotMatch(c.text, /stopped before answering/, 'the bar says it has ended');
-        assert.match(await ev(`document.getElementById('sleeping-composer-hint').textContent`), /^Wake continues this conversation; Restart starts a fresh session/, 'one line on what Wake and Restart each do');
+        assert.match(await ev(`document.getElementById('sleeping-composer-hint').textContent`), /^Wake continues the conversation\. Restart starts a fresh conversation; the instructions are sent again\./, 'one line on what Wake and Restart each do');
         // the message it never answered stays, marked; the Working clock stops, and does not come back with Wake
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'pending_messages.js'); m.addPendingMessage('ended-a-id', 'please answer me', Date.now() - 5000); return true; })()`);
         c = await composer('ended-a-id');

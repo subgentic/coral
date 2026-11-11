@@ -517,8 +517,7 @@ function freezeEarlier(container) {
         if (n.nodeType === 1) { n.removeAttribute('data-msg-key'); n.querySelectorAll('[data-msg-key]').forEach(e => e.removeAttribute('data-msg-key')); }
         earlier.appendChild(n);
     }
-    const line = document.createElement('div'); line.className = 'chat-earlier-line'; line.textContent = 'Restarted: a new conversation starts here';
-    earlier.appendChild(line);
+    earlier.insertAdjacentHTML('beforeend', '<div class="chat-earlier-line">New conversation: context cleared, instructions sent again</div>');
     clearMessages(container);
     container.prepend(earlier);
 }
