@@ -16,7 +16,7 @@ assert.deepEqual(parseOpen(q({ open: uri, thread: 'abc' })), { path: uri, thread
 for (const t of ['0', '012', '-1', '1.5', '1e3', ' 1', '1'.repeat(17), '']) assert.equal(parseOpen(q({ open: uri, thread: t })).thread, null, 'not a thread: ' + JSON.stringify(t));
 
 const bad = [
-    '', '?x=1', q({ open: '' }), q({ open: ' x ' }), q({ open: 'a\nb' }), q({ open: 'a\u0000b' }), q({ open: 'a‮b' }), q({ open: 'a​b' }), q({ open: 'x'.repeat(1025) }),
+    '', '?x=1', q({ open: '' }), q({ open: ' x ' }), q({ open: 'a\nb' }), q({ open: 'a\u0000b' }), q({ open: 'a\u202eb' }), q({ open: 'a\u200bb' }), q({ open: 'x'.repeat(1025) }),
     q({ open: 'javascript:alert(1)' }), q({ open: 'data:text/html,x' }), q({ open: 'https://example.com/x' }), q({ open: 'file:///etc/passwd' }),
     q({ open: 'coral://artifacts/zz' }), q({ open: 'coral://artifacts/' + hex + '0' }), q({ open: 'coral://other/' + hex }), q({ open: 'coral://artifacts/' + hex + '/x' }),
 ];

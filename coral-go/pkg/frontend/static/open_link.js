@@ -10,7 +10,7 @@ import { importOnce } from './import_once.js';
 
 const ARTIFACT = /^coral:\/\/artifacts\/[0-9a-f]{64}$/i;
 // eslint-disable-next-line no-control-regex
-const BAD = /[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁠-⁤﻿]/;
+const BAD = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]/;
 const THREAD = /^[1-9][0-9]{0,15}$/;
 let pending = null; // { uri, id }: a thread to show once that artifact's comments have loaded
 
