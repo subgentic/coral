@@ -41,7 +41,8 @@ const BASE = require('./test_base').BASE;
             await ask();
             await ev(`document.getElementById('confirm-modal-yes').click(); true`);
             const wantsWords = !!(answer.worktree && answer.worktree.state && answer.worktree.state !== 'none');
-            if (wantsWords) await waitFor(`!!(document.getElementById('notice-live').textContent.trim() || document.getElementById('notice-alert').textContent.trim())`, 'the stop to be said', 4000);
+            // the generic "Stopped the N agent" status can come first (a slow runner): wait for the worktree's own words, not for any toast
+            if (wantsWords) await waitFor(`/worktree/i.test(document.getElementById('notice-live').textContent + ' ' + document.getElementById('notice-alert').textContent)`, 'the worktree answer to be said', 8000);
             await sleep(900); // sleep-ok: whatever else the toast says (or its delayed alert) lands within this
             // what a screen reader is told: a toast says its words in the polite status or, for an error, the alert region that are in the page (notifications.js)
             return ev(`[...[['notice-live', 'status'], ['notice-alert', 'alert']].map(([id, role]) => ({ text: ((document.getElementById(id) || {}).textContent || '').trim(), role })), ...[...document.querySelectorAll('.toast')].map(t => ({ text: (t.querySelector('.toast-message') || t).textContent.trim(), role: 'visible' }))].filter(x => x.text)`);
