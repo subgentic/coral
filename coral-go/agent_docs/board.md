@@ -779,6 +779,14 @@ and evidence; a canceled, failed, reassigned, or review-pending row is not a
 successful completion. See the capability map in [Task queue flow](task-workflows.md#orchestrator-capability-map)
 for the authorized backend-only late-edit path and current product gaps.
 
+### Steering a team that is already working
+
+**When the person tells you to stop or switch (#15332).** An agent told by the person, in its terminal or on the board, to stop or to do something else leaves its task true at once, so the task list and everyone reading it match what is happening: post on the task (`coral-board post --task <id> "stopped: <what the person said>"`) and to the Orchestrator in the same minute, and then put the task where it belongs: `coral-board task release <id>` if it goes back to the queue (add `--keep` if you will come back to it), `coral-board task cancel <id> --message "..."` if the work is dropped. Never leave a task "In progress" that nobody is working on: the person and the Orchestrator read that status as real work.
+
+**Who reads a message (#15332).** The team's message box on its page and `coral-board post` go to the board: the Orchestrator reads every post and decides who acts on it; others see it only if it @mentions them (or is sent to them with `coral-board send`). The box says so.
+
+**A requirement that arrives after a task is done (#15332).** A task that is completed or cancelled is not edited. The Orchestrator makes a new task for the added requirement (`coral-board task add "..." --follow-up <id>` takes the old task's goal and reviewers), or reassigns the work if the old task was never really finished, and says which on the board ("the new requirement is #N, a follow-up of #M"), so the person can see why finished work is open again. It does not quietly amend a finished task.
+
 ### Replying to a task
 
 ```

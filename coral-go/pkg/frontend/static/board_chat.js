@@ -125,7 +125,7 @@ export function showBoardChatTab(boardName, agent = null) {
             <div class="board-chat-input-pane" id="board-chat-input-pane">
                 <div class="command-pane-body">
                     <div class="command-editor board-chat-editor-wrap">
-                        <textarea class="board-chat-textarea" id="board-panel-input" rows="1" placeholder="Message the team... (@ to mention)" aria-label="Message the team"
+                        <textarea class="board-chat-textarea" id="board-panel-input" rows="1" placeholder="Message the team (the Orchestrator reads every post; @ to mention)" aria-label="Message the team"
                             role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-controls="board-mention-dropdown"
                             data-on-keydown="board-chat-key" data-on-input="board-chat-mention" data-board="${escapeAttr(boardName)}"></textarea>
                         <div class="board-mention-dropdown" id="board-mention-dropdown" role="listbox" aria-label="Mention an agent" style="display:none"></div>

@@ -112,7 +112,7 @@ function updateSleepUI() {
     const sendBtn = document.querySelector('#mb-board .btn-primary');
     if (input) {
         input.disabled = isSleeping;
-        input.placeholder = isSleeping ? 'Team is sleeping. Wake Team to send messages' : 'Message the team...';
+        input.placeholder = isSleeping ? 'Team is sleeping. Wake Team to send messages' : 'Message the team (the Orchestrator reads every post)';
     }
     if (sendBtn) {
         sendBtn.disabled = isSleeping;
