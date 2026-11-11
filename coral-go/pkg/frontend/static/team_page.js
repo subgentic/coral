@@ -19,6 +19,8 @@ import { setPreviewSession } from './preview_pane.js';
 import { renderLiveSessions } from './render.js';
 import { watchScrollCue } from './scroll_cue.js';
 import { isPhoneLayout } from './phone_layout.js';
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('team_tabs.css'); // the tab strip's steady widths (count room, no width animation): not at start (page_weight), loaded with the page before the strip is built (#15494)
 const { revealInStrip } = await importOnce('./strip_reveal.js'); // a part of the team page's group: loaded with it
 const { closeDetailPane } = await importOnce('./detail_pane.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 const { el } = await importOnce('./team_table.js');
@@ -283,7 +285,7 @@ function drawCounts() {
         const n = S.counts[t];
         const text = n ? String(n) : ''; // no badge at zero or unknown: one rule for every tab
         if (c.textContent !== text) { c.textContent = text; widened = true; }
-        c.hidden = !text;
+        // the pill is never hidden: an empty one keeps the room of a one-digit count (css), so a count arriving moves no tab (#15494 M4)
         const label = $(`team-tab-${t}`).querySelector('.team-tab-label');
         // a space between the word and its count, so the tab is read "Goals 2"
         label.textContent = text ? `${LABEL[t]} ` : LABEL[t];

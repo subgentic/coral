@@ -420,7 +420,7 @@
     --topbar-border: rgba(201, 205, 211, 0.8);
 
     /* Terminal (xterm) */
-    --xterm-background:          #c8ccd2;
+    --xterm-background:          #e3e6ea;
     --xterm-foreground:          #1f2328;
     --xterm-cursor:              #1f2328;
     --xterm-selection-background:#a8c8f0;

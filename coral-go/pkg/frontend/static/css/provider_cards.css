@@ -33,6 +33,7 @@
 .provider-card-body .seg-group { display: none; }
 .provider-card-body select.seg-source { display: block; width: 100%; max-width: none; min-height: var(--control-touch-height, 44px); }
 .provider-card-body .acf-model-select { width: 100%; min-width: 0; }
+.provider-card-body .provider-think-hint { flex: 1 0 100%; margin: 0; } /* the hint goes under the select, which fills the row like Model's; beside it the hint took 393 px and the select shrank to 82, cutting 'Default' at 960 (#15494 M7) */
 /* The agents this computer cannot use yet: one list, one row per CLI, three aligned columns (name, status chip, action) on a grid the rows share (subgrid); a phone puts the action under the name and chip (#12364) */
 .provider-missing { display: block; margin: 12px 0 0; padding: 0 4px; color: var(--text-secondary); font-size: var(--fs-sm); }
 .provider-missing-title { margin: 0 0 4px; font-size: inherit; font-weight: var(--fw-regular); color: inherit; text-transform: none; letter-spacing: 0; }
