@@ -316,8 +316,7 @@ export async function selectLiveSession(name, agentType, sessionId, server, opts
 
     syncFilesViewerSession();
     refreshAgentUI();
-    importOnce('./robot.js'); // the robot on the agent page (#15152)
-    if (document.getElementById('agentic-panel-branches')?.classList.contains('active')) importOnce('./branches_tab.js').then(m => m.loadBranches()).catch(() => {}); // the open Branches tab follows the agent
+    importOnce('./robot.js').then(m => m.onAgent()).catch(() => {}); // what a lazy part does when an agent opens: the robot on its page (#15152) and the open Branches tab following the agent
     // A sleeping agent keeps its transcript readable; the composer offers Wake
     // instead of sending. The popout corrects this from its resolver below.
     applySleepingView(!!(agentData && agentData.sleeping), { manageInput: !isPopout(), archived: !!(agentData && agentData.archived) });
