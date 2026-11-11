@@ -1,6 +1,6 @@
 /* The robot "Copy for an agent" button (#15063): one square, 32 px (44 px on a phone), the same on every screen. Loaded by agent_copy_button.js. */
-.agent-copy { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 32px; height: 32px; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-md); background: none; color: var(--text-secondary); cursor: pointer; }
-.agent-copy:hover, .agent-copy:focus-visible { color: var(--text-primary); background: var(--bg-hover); border-color: var(--border-light); }
+.agent-copy { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 32px; height: 32px; padding: 0; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: none; color: var(--text-secondary); cursor: pointer; }
+.agent-copy:hover, .agent-copy:focus-visible { color: var(--text-primary); background: var(--bg-hover); border-color: var(--control-border); }
 .agent-copy .material-icons { font-size: var(--icon-size); }
 @media (pointer: coarse), (max-width: 1024px) { .agent-copy { width: 44px; height: 44px; } }
 .agent-copy-hrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; } /* a Team settings section's heading with its robot (team_settings_page.js) */
