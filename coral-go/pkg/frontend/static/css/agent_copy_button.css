@@ -22,3 +22,6 @@
     .team-page-head.has-needs > .team-page-agent-copy { grid-column: 4; }
     .team-page-head.has-needs:has(> .team-page-agent-copy) .team-page-actions { grid-column: 5; }
 }
+.agent-copy[hidden] { display: none; } /* the class's display would otherwise show a hidden robot */
+.agent-copy-hrow:has(> [hidden]:not(.agent-copy)) { display: none; } /* a title that is hidden (the Computers page on a machine's page) takes its robot with it */
+.agent-copy-hrow > .servers-tab-title { flex: 1 1 auto; min-width: 0; }

@@ -277,7 +277,10 @@ function wireModeRow(st) {
         const preset = st.presets.find(p => p.id === st.modeSelect().value);
         modeDesc.textContent = (preset && preset.id === 'none') ? 'No extra guidance.' : ((preset && preset.description) || '');
         modeDesc.hidden = !modeDesc.textContent;
+        mergeRobot.hidden = st.modeSelect().value !== 'merge_queue'; // the Merge queue mode: where in the docs an agent reads how it works (#15152)
     }
+    const mergeRobot = agentCopyButton('merge_queue', () => `Team \u201c${splitKey(st.team).name}\u201d, Working mode: Merge queue (run coral-board queue to see what is waiting to land).`);
+    modeDesc.after(mergeRobot); mergeRobot.hidden = true;
     st.modeSelect().addEventListener('change', syncModeDescription);
 
     st.syncModeDescription = syncModeDescription; // the load and the preset editor redraw the line
