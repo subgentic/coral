@@ -23,12 +23,12 @@ const { coralReady } = require('./helpers/wait');
         assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'Count QA', job_title: 'Backend Dev', session_name: sname })).status < 300);
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await waitFor(`!!document.querySelector('.view-list-item[data-key="artifacts"]')`, 'the Artifacts folder', 10000);
-        // The baseline is the server's own total, not the sidebar text: a file another run left behind can still be in the sidebar when the folder opens and drop out a moment later, which made the number to wait for one too high (#15630: Linux repeats failed 3 of 10 with the folder at 1 and the server's total at 1)
+        // The file is named and written per run: the repeat job runs this suite ten times on one server, and a README.md with the same name and text as the last run's added no row, so the server's total stayed at 1 and the wait for 2 timed out (#15630, Linux repeats). The baseline is the server's own total, read before the upload
         const serverAll = async () => (await api('GET', '/api/team-artifacts?limit=1&versions=newest&offset=0')).body.all;
         const before = await serverAll();
         // What the page asked for after the upload, kept for the failure message: the count follows the revision feed or, for a team the page is not showing, the 20 s safety read (artifact count poll in inbox_artifacts.js), so a miss needs to say which of them did not run (#15630: it timed out once at 60 s on Windows and passed on a fresh browser)
         await ev(`window.__rq = []; window.__t0 = Date.now(); { const f = window.fetch; window.fetch = function (u, o) { const s = String((u && u.url) || u); if (/artifact|\\/status/.test(s)) window.__rq.push(((Date.now() - window.__t0) / 1000).toFixed(1) + 's ' + ((o && o.method) || 'GET') + ' ' + s.slice(0, 90)); return f.apply(this, arguments); }; } true`);
-        const up = await api('POST', `/api/agent/artifacts?session_id=${sid}&tag=for+review&question=Approve+the+README%3F`, '# Flashcards\nOpen index.html', { 'X-Artifact-Name': 'README.md', 'X-Artifact-Media-Type': 'text/markdown' });
+        const up = await api('POST', `/api/agent/artifacts?session_id=${sid}&tag=for+review&question=Approve+the+README%3F`, `# Flashcards ${B}\nOpen index.html`, { 'X-Artifact-Name': `README-${B}.md`, 'X-Artifact-Media-Type': 'text/markdown' });
         assert.equal(up.status, 201, JSON.stringify(up));
         try {
             await waitFor(`fetch('/api/team-artifacts?limit=1&versions=newest&offset=0').then(r => r.json()).then(j => { const m = /(\\d+)\\s*$/.exec(((document.querySelector('.view-list-item[data-key="artifacts"]') || {}).textContent || '').trim()); return j.all >= ${before + 1} && !!m && Number(m[1]) === j.all; })`, `the folder counts the README in review (the server's total was ${before} before the upload)`, 60000);
