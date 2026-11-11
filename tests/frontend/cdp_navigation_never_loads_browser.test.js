@@ -44,6 +44,9 @@ const heard = (p, ms) => Promise.race([p.then(() => true), sleep(ms).then(() => 
         const end = await Promise.race([Page.loadEventFired().then(() => 'a load came', e => e.message), sleep(6000).then(() => 'still waiting after 6 s')]); // sleep-ok: the bound of the race, not a wait: the rejection answers it first
         check('a wait for a page that never loads rejects at the limit, naming the page', /^\[cdp\] load timeout: no load event for http:\/\/127\.0\.0\.1:\d+\/\?5 within 2000 ms/.test(end) && Date.now() - t0 >= 1900, end);
 
+        // 4b. the ceiling grows with a throttled run's load (#15409): 30 s unthrottled or at x2, 60 s at x4, 90 s at x6 and beyond; a missing or odd rate is 30 s
+        { const f = require('./helpers/keep_page_visible').loadLimitFor; const got = [undefined, '', 'x', 0, 1, 2, 4, 6, 8, 100].map(f); check('the load ceiling follows the throttle: 30 s to x2, 60 s at x4, 90 s from x6', JSON.stringify(got) === JSON.stringify([30000, 30000, 30000, 30000, 30000, 30000, 60000, 90000, 90000, 90000]), JSON.stringify(got)); }
+
         // 5-7. the browser going away, or the suite leaving, is not a pass (#352, QA and Security on #168): a child suite with the preload waits on its own tab for a page that never loads.
         // With the preload's disconnect handler and exit check taken out, cases 5 and 6 exit 0.
         const child = async (mode, url, { closeTab = false } = {}) => {
