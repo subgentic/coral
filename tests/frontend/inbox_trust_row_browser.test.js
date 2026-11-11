@@ -128,7 +128,17 @@ const MENU = (extra = {}) => ({ question: 'Quick safety check: Is this a project
                 await ev(`window.__po = ${JSON.stringify(po)}; window.__ws += 1; window.__waiting = true; window.__answers = []; true`); await refresh();
                 await waitFor(`document.querySelectorAll('#group-table-view tbody .dt-primary').length === 1`, `${at}${name}: the row`, 8000);
                 await new Promise(r => setTimeout(r, 600)); // sleep-ok: the choices are read once the row is drawn
-                const got = await rowButtons();
+                const all = await rowButtons(), got = all.filter(l => l !== 'Review and trust'); // #15090: a held trust menu has a Review and trust button that opens the card with Yes (the row itself still has no Yes, #14110)
+                const heldMenu = ['no offer', 'no folder', 'no offer, with the reason (#14572)', 'a hidden character in the folder'].includes(name);
+                check(all.includes('Review and trust') === heldMenu, `${at}${name}: Review and trust is on a held trust row and nowhere else: ` + JSON.stringify(all));
+                if (name === 'no offer, with the reason (#14572)') {
+                    await ev(`[...document.querySelectorAll('#group-table-view .inbox-answers button')].find(b => b.textContent === 'Review and trust').click(); true`);
+                    await waitFor(`!!document.querySelector('dialog.inbox-card-dialog[open]')`, `${at}Review and trust opens the card`, 6000);
+                    await waitFor(`[...document.querySelectorAll('dialog.inbox-card-dialog button')].some(b => b.textContent === 'Yes, I trust this folder')`, `${at}the card offers Yes, I trust this folder`, 6000);
+                    check(await ev(`[...document.querySelectorAll('dialog.inbox-card-dialog button')].some(b => b.textContent === 'No, exit')`), `${at}the card offers No, exit too`);
+                    await ev(`[...document.querySelectorAll('dialog.inbox-card-dialog button')].find(b => b.textContent === 'Close').click(); true`);
+                    await waitFor(`!document.querySelector('dialog.inbox-card-dialog')`, `${at}the card closes`, 4000);
+                }
                 check(!got.some(l => /trust/i.test(l)) && (expect === 0 ? JSON.stringify(got) === JSON.stringify(['Open agent']) : got.length === expect), `${at}${name}: no Yes on the row (${expect ? expect + ' choice' : 'only Open agent'}): ` + JSON.stringify(got));
                 if (name === 'no offer' || name === 'no folder' || name === 'a hidden character in the folder') check(JSON.stringify(got) === JSON.stringify(['No, exit']) && /open the agent/i.test(await ev(`document.querySelector('#group-table-view .inbox-answers').textContent`)), `${at}${name}: No only, the rest is left to Open: ` + JSON.stringify(got));
                 if (name === 'no offer, with the reason (#14572)') check((await ev(`document.querySelector('#group-table-view .inbox-only-reject')?.textContent || ''`)).includes(`No Yes here: ${WHY} Open the agent to answer.`), `${at}${name}: the row says why there is no Yes`);

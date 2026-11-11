@@ -503,7 +503,7 @@ export function syncNeedsInputCard(container, session) {
             if (typing.focused) input.focus();
         }
     }
-    if (el.querySelector(".cni-attach")) { // a card that takes an answer in words has the image strip: its code loads with the first one, not at start (#11403)
+    if (el.querySelector(".cni-attach,.cni-hint")) { // a card that takes an answer in words has the image strip: its code loads with the first one, not at start (#11403)
         if (cardAttach) cardAttach.drawCardImages(el, session.session_id); // images added to the answer stay when the card is drawn again
         else importOnce('./card_attach.js').then(m => { cardAttach = m; if (el.isConnected) m.drawCardImages(el, session.session_id); }).catch(() => {});
     }

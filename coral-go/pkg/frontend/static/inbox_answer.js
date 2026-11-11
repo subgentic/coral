@@ -283,7 +283,10 @@ function fill(s, cell, withDismiss = true) {
             cell.append(b);
         }
         gate?.apply();
-        if (held) { const more = document.createElement('span'); more.className = 'inbox-only-reject'; more.textContent = trustWhy ? `No Yes here: ${trustWhy} Open the agent to answer.` : 'More choices: open the agent.'; cell.append(more); } // some of the question's choices are left to Open: said, so these do not read as all of them
+        if (held) { const more = document.createElement('span'); more.className = 'inbox-only-reject'; more.textContent = trustWhy ? `No Yes here: ${trustWhy} Open the agent to answer.` : 'More choices: open the agent.'; cell.append(more);
+            if (typeof trustWhy === 'string') { const r = document.createElement('button'); r.type = 'button'; r.className = 'btn btn-small inbox-review-trust'; r.textContent = 'Review and trust'; r.setAttribute('aria-label', `Review and trust the folder of ${resolveSessionIdentity(s)}`); // the full card in a dialog over the Inbox, with Yes, I trust this folder (#15090; the row keeps #14110's rule)
+                r.addEventListener('click', e => { e.stopPropagation(); importOnce('./inbox_agent_card.js').then(m => (m.canOpenCard(s) ? m.openAgentCard(s) : openAgent(s))); });
+                r.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }); cell.append(r); } } // some of the question's choices are left to Open: said, so these do not read as all of them
         if (onlyReject) { // said in words, set as text: the full request is under Open; with the time Claude Code's own timer blocks it, and one tap to the agent
             const note = document.createElement('span');
             note.className = 'inbox-only-reject';
