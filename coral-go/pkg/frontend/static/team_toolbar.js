@@ -74,4 +74,6 @@ export function mountSelection(row, node) {
     const slot = el('span', 'team-tb-selection'); slot.append(node);
     const wrap = row.querySelector(':scope > .list-bar-search-wrap');
     if (wrap) wrap.after(slot); else row.prepend(slot);
+    const bar = row.classList.contains('tb-low') && row.parentElement;
+    if (bar) new ResizeObserver(() => bar.style.setProperty('--sel-up', Math.round(slot.getBoundingClientRect().top - bar.getBoundingClientRect().top) + 'px')).observe(bar); // a phone keeps only this line stuck at the top while the list scrolls (#15632)
 }
