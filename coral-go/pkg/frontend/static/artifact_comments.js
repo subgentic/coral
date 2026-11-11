@@ -73,6 +73,7 @@ let panelSeq = 0; // one id per panel (the viewer's and the docked pane's)
 export function attachComments(dialog, body, host, opts = {}) {
     const sourcePolicy = data => opts.readOnly?.() ? { ...data, canComment: false, canLock: false, reason: 'Open this file from its original team to write comments.', comments: data.comments.map(c => ({ ...c, can: { reply: false, edit: false, delete: false, resolve: false } })) } : data;
     const st = { undelivered: new Map(), lifetime: 0, video: null, videoTime: null, groupOpen: {}, series: false, hex: null, server: undefined, board: undefined, source: '', text: false, whole: false, data: null, showResolved: false, active: null, composing: null, busy: false, error: '', ranges: new Map(), orphan: new Set(), gone: false };
+    st.hintOn = opts.hintOn; st.hint = opts.hint; // a line under the writing box (the viewer's: where Approve is, for a file waiting for review, #15128)
     const panel = el('aside', 'pane pane-aside ac-panel'); panel.setAttribute('aria-label', 'Comments'); panel.hidden = true;
     panel.id = `ac-panel-${++panelSeq}`; // the toggle names it (aria-controls): where the opened comments are
     const toggle = btn('ac-toggle', 'Comments', 'Comments: show the comments'); toggle.hidden = true; toggle.setAttribute('aria-expanded', 'false');
