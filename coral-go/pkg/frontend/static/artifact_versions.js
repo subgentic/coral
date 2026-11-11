@@ -4,7 +4,7 @@ const { artifactThumbnail, thumbnailPath } = await importOnce('./artifact_thumbn
  * every version (a listbox, newest first), and "Compare with v2". Compare draws the text's lines that were added and removed since the version before (Changes) or the two versions side by side. All
  * text is set with textContent. The server's list is GET /api/artifacts/{digest}/versions (an artifact in no series is a 404: no bar). A switch and a compare are said once in a polite line. */
 import { serverUrl, artifactPath } from './server_base.js';
-import { fetchSkewed, VERSIONS_KEYS } from './query_skew.js';
+const { readVersions } = await importOnce('./versions_read.js');
 import { el } from './dom_el.js';
 import { pollEvery } from './overload.js';
 
@@ -88,7 +88,7 @@ export function attachVersions(dialog, hooks) {
         try {
             // The version bar asks for its own team's series: bytes two teams hold are two series, and the route will not guess between them (#13999, #14015). A direct link with no team asks without one.
             // A computer on an older release refuses ?board= (its versions route takes no query): there is no bar then. Asked again without the team, its answer would be that computer's guess at a series, and a hidden bar is honest where a guess is not (#14317, Security's INFO 4).
-            const { response: r, dropped } = await fetchSkewed(server, `/api/artifacts/${hex}/versions`, board ? { board } : {}, { kind: 'versions', keys: VERSIONS_KEYS, retry: false });
+            const { response: r, dropped } = await readVersions(server, hex, board);
             if (dropped.length) return { rows: null, ambiguous: false };
             if (r.status === 409) { const d = await r.json().catch(() => ({})); return { rows: null, ambiguous: !!(d && d.code === 'ambiguous_series') }; } // no bar, a quiet note
             if (!r.ok) return { rows: null, ambiguous: false };

@@ -42,7 +42,7 @@ const { coralReady } = require('./helpers/wait');
             const dock = () => ev(`(() => { const d = document.getElementById('worktree-dock'); if (!d || d.hidden) return null; const q = s => d.querySelector(s);
                 return { title: (q('.worktree-dock-title') || {}).textContent, buttons: [...d.querySelectorAll('.worktree-dock-line button')].map(b => b.classList.contains('ic-close') ? '×' : b.textContent), x: (q('.worktree-dock-dismiss') || {}).getAttribute && q('.worktree-dock-dismiss').getAttribute('aria-label'), error: d.classList.contains('error'),
                     items: [...d.querySelectorAll('.worktree-dock-item')].map(i => ({ text: i.querySelector('.worktree-dock-text').textContent, copy: !!i.querySelector('.worktree-dock-copy') })), focus: document.activeElement && document.activeElement.textContent,
-                    live: ((document.getElementById('notice-live') || {}).textContent || '').trim(), alert: ((document.getElementById('notice-alert') || {}).textContent || '').trim(), toasts: [...document.querySelectorAll('.toast')].map(t => t.textContent) }; })()`);
+                    live: ((document.getElementById('notice-live') || {}).textContent || '').trim(), alert: ((document.getElementById('notice-alert') || {}).textContent || '').trim(), toasts: [...document.querySelectorAll('.toast')].map(t => t.textContent).filter(t => !/^Stopped /.test(t)) }; })()`); // 'no toast' is about the worktree: the team's own stop confirmation (#15277: 'Stopped the 1 agent in ...') is its own line and is not counted here
             const DOCK_UP = `!!document.querySelector('#worktree-dock:not([hidden])')`;
 
             console.log(`${tag}: a kept worktree`);
