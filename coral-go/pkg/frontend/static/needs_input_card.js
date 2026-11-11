@@ -219,7 +219,8 @@ function needsInputHtml(info, session) {
     // reported (Claude, Pi, opencode: input.only_reject) or the prompt read from the screen (Codex, agy, Gemini: screen.only_reject). The server refuses an Allow for it as well (#11399).
     const refuses = o => o.kind === "reject" || (o.kind !== "allow_once" && o.kind !== "allow_always" && REFUSAL_WORDS.test(String(o.label || ""))); // the server's parsed kind decides; the words only where it has none
     const onlyReject = info.kind === "permission" && (inp.only_reject === true || (info.screen && info.screen.only_reject === true));
-    if (onlyReject && info.screen) info = { ...info, screen: { ...info.screen, options: (info.screen.options || []).filter(refuses) } };
+    const unreadable = onlyReject && (inp.unreadable === true || !!(info.screen && info.screen.unreadable === true)); // Coral did not read the request in full: no answer, not even No (#15501); one read whole that only hides a character keeps its No (#15140)
+    if (onlyReject && info.screen) info = { ...info, screen: { ...info.screen, options: unreadable ? [] : (info.screen.options || []).filter(refuses) } };
     const onlyRejectNote = typeof inp.note === "string" && inp.note ? inp.note : (info.screen && typeof info.screen.note === "string" ? info.screen.note : "");
     const screen = info.screen || {};
     const onScreen = (screen.options || []).length > 0;
@@ -272,11 +273,12 @@ function needsInputHtml(info, session) {
         const more = typeof inp.more_patterns === "string" ? inp.more_patterns : ""; // "and 2 more patterns": the count of the ones the server did not list (opencode, #11395)
         const screenTarget = info.screen && typeof info.screen.target === "string" ? info.screen.target : ""; // the lines above the screen's question, where the CLI shows what it asks (Codex, agy, Gemini send no tool input)
         const target = markHidden(inp.command || inp.file_path || inp.path || inp.url || inp.query || inp.pattern || patterns.join("\n") || screenTarget || "", { strict: true });
-        if (onlyReject && onlyRejectNote) context += `<div class="cni-context-text cni-note" role="note">${escapeHtml(onlyRejectNote)}</div>`; // why only Reject is offered, in the server's words
-        if (inp.description && inp.command) context += `<div class="cni-context-text">${escapeHtml(inp.description)}</div>`;
+        if (unreadable) { question = "Coral could not read this request in full"; context = `<div class="cni-context-text cni-note" role="note">It cannot be answered here. Answer it in the agent\u2019s terminal. Nothing is sent until you do.</div>`; } // no half of the request drawn as if it were the request
+        else if (onlyReject && onlyRejectNote) context += `<div class="cni-context-text cni-note" role="note">${escapeHtml(onlyRejectNote)}</div>`; // why only Reject is offered, in the server's words
+        if (unreadable) { /* said above */ } else if (inp.description && inp.command) context += `<div class="cni-context-text">${escapeHtml(inp.description)}</div>`;
         // The whole request, as text, wrapped, in a box that scrolls (a keyboard can scroll it once it is long enough to): a command cut short or hidden off to the side is one the person cannot judge (#11395).
-        if (target) context += `<pre class="cni-target"${target.length > 160 ? ` tabindex="0" role="region" aria-label="The whole request, scrollable"` : ""}><code>${escapeHtml(target)}</code></pre>`;
-        if (patterns.length && target !== patterns.join("\n")) context += `<div class="cni-context-text cni-patterns">Covers: ${escapeHtml(patterns.join(", "))}${more ? " " + escapeHtml(more) : ""}</div>`;
+        if (target && !unreadable) context += `<pre class="cni-target"${target.length > 160 ? ` tabindex="0" role="region" aria-label="The whole request, scrollable"` : ""}><code>${escapeHtml(target)}</code></pre>`;
+        if (unreadable) { /* said above */ } else if (patterns.length && target !== patterns.join("\n")) context += `<div class="cni-context-text cni-patterns">Covers: ${escapeHtml(patterns.join(", "))}${more ? " " + escapeHtml(more) : ""}</div>`;
         else if (more) context += `<div class="cni-context-text cni-patterns">${escapeHtml(more)}</div>`;
         else if (info.summary && info.summary !== question) context += `<div class="cni-context-text cni-ask">${escapeHtml(info.summary)}</div>`; // what is asked, from the event, as the Inbox row says it (#10141)
     } else if (info.kind === "prompt") {
@@ -295,7 +297,7 @@ function needsInputHtml(info, session) {
     if (info.kind === "login") return loginCardHtml(info, name, kicker);
 
     const controls = info.readOnly ? { body: "", foot: "" } : answerControlsHtml(info, descriptions, fullLabels); // where the person may not act (a View machine, a read-only Hub) no answer is drawn: it would only fail
-    const hint = info.readOnly ? `<span class="cni-hint">${escapeHtml(info.readOnly)}</span>` : !onScreen && info.kind !== "startup" ? `<span class="cni-hint">Answer in the terminal</span>` : "";
+    const hint = unreadable ? "" : info.readOnly ? `<span class="cni-hint">${escapeHtml(info.readOnly)}</span>` : !onScreen && info.kind !== "startup" ? `<span class="cni-hint">Answer in the terminal</span>` : "";
     // A dialog with a heading (Codex's "Hooks need review", #306): the heading is the card's heading, its text a line under it,
     // instead of the two run together as one line.
     let questionHtml = question ? `<div class="cni-question">${escapeHtml(question)}</div>` : "";
@@ -308,7 +310,7 @@ function needsInputHtml(info, session) {
         + context
         + reviewHtml(info)
         + controls.body
-        + `<div class="cni-foot"><button type="button" class="cni-link" data-on-click="terminal-view-open">Open terminal</button>${hint}${!info.readOnly && canDismissWait(session, info.kind) ? `<button type="button" class="cni-link" data-on-click="dismiss-wait" data-session-id="${escapeAttr(session.session_id)}" title="Clear this if the agent is not waiting. Nothing is sent to the agent.">Dismiss</button>` : ""}<span class="cni-foot-spacer"></span>${info.signedOut ? `<button type="button" class="btn cni-recheck" data-on-click="startup-recheck" data-agent="${escapeAttr(info.agent || "claude")}">Check again</button>` : ""}${controls.foot}</div>`;
+        + `<div class="cni-foot"><button type="button" class="${unreadable ? "btn btn-primary" : "cni-link"}" data-on-click="terminal-view-open">Open terminal</button>${hint}${!info.readOnly && canDismissWait(session, info.kind) ? `<button type="button" class="cni-link" data-on-click="dismiss-wait" data-session-id="${escapeAttr(session.session_id)}" title="Clear this if the agent is not waiting. Nothing is sent to the agent.">Dismiss</button>` : ""}<span class="cni-foot-spacer"></span>${info.signedOut ? `<button type="button" class="btn cni-recheck" data-on-click="startup-recheck" data-agent="${escapeAttr(info.agent || "claude")}">Check again</button>` : ""}${controls.foot}</div>`;
 }
 
 // The sign-in card (#3830): the login happens in the agent's terminal (a browser link and a code

@@ -257,7 +257,7 @@ func applyHermesCommand(s *promptScreen, stored string) {
 		s.context = command
 		s.Target = rv.Shown
 		if !rv.Allowed() {
-			s.OnlyReject, s.Note = true, rv.Note()
+			s.OnlyReject, s.Note, s.Unreadable = true, rv.Note(), rv.Cut
 		}
 		s.AskID = askID(*s)
 	}
@@ -269,7 +269,7 @@ func applyHermesCommand(s *promptScreen, stored string) {
 			judge(stored)
 			return
 		}
-		s.OnlyReject, s.Note = true, "Hermes cut this command short on its screen and Coral could not read the whole of it, so it can only be rejected here: read it in the terminal."
+		s.OnlyReject, s.Unreadable, s.Note = true, true, "Hermes cut this command short on its screen and Coral could not read the whole of it, so it cannot be answered here: answer it in the agent's terminal."
 		s.AskID = askID(*s)
 		return
 	}

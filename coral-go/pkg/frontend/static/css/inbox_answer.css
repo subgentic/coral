@@ -22,3 +22,5 @@
 
 /* A Yes that has just been drawn waits 400 ms for a click (#14302): it shows it is not ready yet. */
 .inbox-answer.inbox-arming { opacity: .6; cursor: progress; }
+/* A request Coral could not read in full (#15501): its row says so and has Open agent as the main button, on a phone too (the phone's rule hides a cell with no answer button; this cell is the answer). */
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .inbox-answers.inbox-answers:has(.inbox-unread) { display: inline-flex; } .inbox-answers .inbox-open-agent { min-height: var(--control-touch-height, 44px); flex: 1 1 auto; } }

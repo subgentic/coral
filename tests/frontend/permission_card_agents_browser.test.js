@@ -49,6 +49,13 @@ const ALWAYS = 'Allow always: do not ask again for ls *, git status* and 2 more 
             // 2. Pi: the same, with Reject
             r = await card('pi', { command: 'x'.repeat(4000), only_reject: true, note: NOTE }, ['Allow', 'Reject']);
             assert.deepEqual(names(r), ['Reject'], at + 'Pi: Reject alone');
+            // 2b. #15501: a request Coral did not read in full (unreadable) has no answer at all, not even No, no half of the request, and says so; Open terminal is the main button
+            for (const [agent, input, screen] of [['claude', { command: 'x'.repeat(4000), only_reject: true, unreadable: true, note: NOTE }, undefined], ['pi', { command: 'x'.repeat(4000), only_reject: true, unreadable: true, note: NOTE }, undefined], ['codex', null, { target: 'echo start', only_reject: true, unreadable: true, note: NOTE }]]) {
+                r = await card(agent, input, agent === 'pi' ? ['Allow', 'Reject'] : YNA, screen);
+                assert.deepEqual(names(r), [], at + agent + ': unreadable: no answer, not even No or Reject: ' + JSON.stringify(names(r)));
+                assert.match(r.text, /could not read this request in full/, at + agent + ': the card says Coral could not read it'); assert.match(r.text, /agent.s terminal/, at + agent + ': and where to answer it');
+                assert.equal(r.target, null, at + agent + ': no half of the request is drawn');
+            }
             // 3. a hidden character that reaches the card (an older server, or a field the server did not review) is written out, never drawn raw
             r = await card('claude', { command: 'echo ok \u202e rm' }, YNA);
             assert.ok(!r.target.includes('\u202e') && r.target.includes('<U+202E>'), at + 'written out: ' + JSON.stringify(r.target));

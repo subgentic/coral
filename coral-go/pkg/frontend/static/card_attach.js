@@ -106,7 +106,7 @@ function checkAgain(card, sid) {
         try {
             const resp = await serverFetch(sessionServer(session), `/api/sessions/live/${encodeURIComponent(session.name)}/chat?${new URLSearchParams({ after: '0', limit: '1', session_id: sid, agent_type: session.agent_type || '' })}`);
             const po = resp.ok ? (await resp.json().catch(() => null) || {}).prompt_options : null;
-            if (po && (po.options || []).length) { found = true; promptOptionsBySession.set(sid, { title: po.title || '', question: po.question || '', kind: po.kind || '', target: po.target || '', only_reject: po.only_reject === true, note: po.note || '', options: po.options || [], review: po.review || [], multi: !!po.multi, submit: po.submit || null }); }
+            if (po && (po.options || []).length) { found = true; promptOptionsBySession.set(sid, { title: po.title || '', question: po.question || '', kind: po.kind || '', target: po.target || '', only_reject: po.only_reject === true, unreadable: po.unreadable === true, note: po.note || '', options: po.options || [], review: po.review || [], multi: !!po.multi, submit: po.submit || null }); }
         } catch { /* said below: nothing was read */ }
         syncNeedsInputCard(container, session);
         announcePrompt(found ? 'The question is shown again.' : 'Still nothing to answer here. Use the terminal.');

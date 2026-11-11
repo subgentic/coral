@@ -26,7 +26,8 @@ async function readCard(s) {
     if (!po) return null;
     const onlyReject = !!po.only_reject || !!(reply.pending && reply.pending.input && reply.pending.input.only_reject === true);
     const options = (po.options || []).filter(o => (o.action || 'select') === 'select' && o.label && Number.isInteger(Number(o.n)) && (!onlyReject || REJECT_FORM.test(String(o.label).trim())));
-    return { title: String(po.title || ''), question: String(po.question || ''), target: String(po.target || ''), ask: String(po.ask_id || ''), options, single: !po.multi && !(po.review || []).length, onlyReject, note: String(po.note || '') };
+    const unreadable = !!po.unreadable || !!(reply.pending && reply.pending.input && reply.pending.input.unreadable === true); // not read in full: no answer, not even No (#15501)
+    return { title: String(po.title || ''), question: String(po.question || ''), target: String(po.target || ''), ask: String(po.ask_id || ''), options: unreadable ? [] : options, single: !po.multi && !(po.review || []).length, onlyReject, unreadable, note: String(po.note || '') };
 }
 
 const openAgent = s => { window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id)).catch(() => {}); };
@@ -50,6 +51,11 @@ export function openAgentCard(s) {
 
     const draw = card => {
         body.replaceChildren(); err.textContent = '';
+        open.className = card && card.unreadable ? 'btn btn-primary' : 'btn';
+        if (card && card.unreadable) { // Coral did not read this request in full: no choice, not even No, and no half of the request (#15501); the terminal is the way on. One read whole that only hides a character keeps its No (#15140)
+            body.append(el('p', null, 'Coral could not read this request in full, so it cannot be answered here.'), el('p', null, 'Answer it in the agent\u2019s terminal. Nothing is sent until you do.'));
+            return;
+        }
         if (!card) { body.append(el('p', null, 'This card could not be read. It may have been answered. Open the agent to look.')); return; }
         if (card.title) title.textContent = `${who}: ${card.title}`;
         const q = card.title && card.question.startsWith(card.title) ? card.question.slice(card.title.length).trim() : card.question; // the question begins with the title: the heading says it once
