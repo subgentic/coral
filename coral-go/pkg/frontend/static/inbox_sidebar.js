@@ -446,7 +446,7 @@ function needsBulkActions() {
                 else if (s.welcome && s.welcome.dismiss) dismissWelcome(s.welcome.id);
                 else if (s.autorun) markSeen(s.autorun);
                 else if (s.goalDone) undo.push(await hideGoalDone(goalTeamHere(s.goalDone), s.goalDone, 'ignore'));
-                else throw new Error('that one cannot be dismissed');
+                else throw new Error(`${needsName(s)} cannot be dismissed`);
             });
             asks.refreshOperatorAsks(true); syncGoalDoneCount(); done();
             tell(words('Dismissed', r, rows.length), `${words('Dismissed', r, rows.length)}.${undo.length ? ' Undo is in the notice.' : ''}`, undo.length ? { action: { label: 'Undo', onClick: async () => { for (const f of undo) { try { await f(); } catch { /* it stays ignored */ } } asks.refreshOperatorAsks(true); reviewsChangedOnServer(); refreshReviews(true); syncGoalDoneCount(); renderInboxNav(true); tell('Back in Needs you'); } } } : undefined); // one after the other: goals share one hidden list that each undo rewrites (#12328)
