@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -58,7 +59,8 @@ func TestReceiveRoundTrip(t *testing.T) {
 	if len(entries) != 1 || entries[0].Name() != "1.2.3" {
 		t.Fatalf("staging holds %v", entries)
 	}
-	if fi, _ := os.Stat(filepath.Join(root, "1.2.3", testAsset)); fi.Mode().Perm() != 0o600 {
+	// Windows has no Unix permission bits (a file reports -rw-rw-rw-), so the 0600 check is for the platforms that have them.
+	if fi, _ := os.Stat(filepath.Join(root, "1.2.3", testAsset)); runtime.GOOS != "windows" && fi.Mode().Perm() != 0o600 {
 		t.Fatalf("mode %v", fi.Mode())
 	}
 }
