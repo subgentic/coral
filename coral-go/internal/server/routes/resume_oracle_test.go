@@ -158,7 +158,7 @@ var resumeOutcomes = map[string]int{
 // Restart's step: a live tmux pane whose respawn or rename fails is refused (the old Resume typed the command into
 // it anyway), and a tmux terminal's title is set. Those are checked as the new rule, not compared.
 func TestResumeAgreesWithBefore4809(t *testing.T) {
-	t.Parallel() // its own handler and store, no shared state: it ran alone among thousands, one after another (#15686)
+	// serial: swaps the process-wide slog and log writers (parallel, they could be left silenced); its 600 seeds still run in parallel inside (#15704)
 	prevOut := log.Writer()
 	log.SetOutput(&bytes.Buffer{})
 	t.Cleanup(func() { log.SetOutput(prevOut) })

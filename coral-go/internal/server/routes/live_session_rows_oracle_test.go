@@ -80,7 +80,7 @@ func lsrRows(t *testing.T, h *SessionsHandler, old, full bool) string {
 }
 
 func TestLiveSessionRowsAgreesWithBefore4713(t *testing.T) {
-	t.Parallel() // its own handler and store, no shared state: it ran alone among thousands, one after another (#15686)
+	// serial: swaps the process-wide logger (parallel, two such tests could leave it silenced) (#15704)
 	prev := slog.Default()
 	slog.SetDefault(slog.New(slog.NewTextHandler(nopLog{}, nil)))
 	t.Cleanup(func() { slog.SetDefault(prev) })
