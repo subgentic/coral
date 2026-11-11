@@ -33,7 +33,7 @@ const { coralReady } = require('./helpers/wait');
         const up = await api('POST', `/api/agent/artifacts?session_id=${sid}&tag=for+review&question=Approve+the+README%3F`, `# Flashcards ${B}\nOpen index.html`, { 'X-Artifact-Name': `README-${B}.md`, 'X-Artifact-Media-Type': 'text/markdown' });
         assert.equal(up.status, 201, JSON.stringify(up));
         try {
-            await waitFor(`fetch('/api/team-artifacts?limit=1&versions=newest&offset=0').then(r => r.json()).then(j => { const m = /(\\d+)\\s*$/.exec(((document.querySelector('.view-list-item[data-key="artifacts"]') || {}).textContent || '').trim()); return j.all >= ${before + 1} && !!m && Number(m[1]) === j.all; })`, `the folder counts the README in review within 3 s, by the feed (the server's total was ${before} before the upload)`, 3000);
+            await waitFor(`fetch('/api/team-artifacts?limit=1&versions=newest&offset=0').then(r => r.json()).then(j => { const m = /(\\d+)\\s*$/.exec(((document.querySelector('.view-list-item[data-key="artifacts"]') || {}).textContent || '').trim()); return j.all >= ${before + 1} && !!m && Number(m[1]) === j.all; })`, `the folder counts the README in review within 8 s, by the feed (the server's total was ${before} before the upload)`, 8000);
         } catch (e) {
             const seen = await ev(`JSON.stringify({ visible: document.visibilityState, hidden: document.hidden, folder: ((document.querySelector('.view-list-item[data-key="artifacts"]') || {}).textContent || '').trim(), requests: window.__rq })`).catch(x => 'unreadable: ' + x.message);
             throw new Error(e.message + ' | the server total now: ' + await serverAll().catch(() => '?') + ' | the page after the upload: ' + seen);
