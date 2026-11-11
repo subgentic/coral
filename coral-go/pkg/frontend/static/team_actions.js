@@ -75,6 +75,7 @@ export async function killBoard(boardName) {
                 const { ok, answer } = await killLiveTeam(boardName);
                 if (!ok) showToast((answer && answer.error) || 'Could not stop the team', true);
                 else if (answer && answer.worktree && answer.worktree.state && answer.worktree.state !== 'none') worktree = answer.worktree;
+                if (ok) showToast(`Stopped ${killCount(boardSessions.length).agents} in "${keyLabel(boardName)}". The team stays; Remove team is on its page.`);
             } catch (e) {
                 console.error(`Failed to kill team ${boardName}:`, e);
                 showToast('Could not stop the team', true);

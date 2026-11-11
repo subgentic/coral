@@ -96,7 +96,7 @@ const HUB_PRELOAD = `(() => {
         await ev(`(async () => { (await import((window.__coralStatic || '/static/') + 'message_board.js')).selectBoardProject(${JSON.stringify(team)}); return true; })()`);
         await waitFor(`document.getElementById('mb-delete-btn').disabled === true`, 'Delete disabled', 5000);
         const del = await ev(`(() => { const b = document.getElementById('mb-delete-btn'); return { text: b.textContent, title: b.title }; })()`);
-        assert.equal(del.text, 'Delete (needs Launch)');
+        assert.equal(del.text, 'Remove team (needs Launch)');
         assert.match(del.title, /^Blocked: Box One needs Launch/);
         await ev(`(async () => { (await import((window.__coralStatic || '/static/') + 'message_board.js')).deleteMessageBoardProject(); return true; })()`);
         await waitFor(`[...document.querySelectorAll('.toast .toast-message')].some(t => /needs Launch/.test(t.textContent))`, 'the reason as a toast', 3000);
@@ -109,7 +109,7 @@ const HUB_PRELOAD = `(() => {
         k = await killAll();
         assert.equal(k.text, 'Kill All'); assert.equal(k.onclick, true);
         await ev(`(async () => { (await import((window.__coralStatic || '/static/') + 'message_board.js')).selectBoardProject(${JSON.stringify(team)}); return true; })()`);
-        await waitFor(`document.getElementById('mb-delete-btn').disabled === false && document.getElementById('mb-delete-btn').textContent === 'Delete'`, 'Delete enabled', 5000);
+        await waitFor(`document.getElementById('mb-delete-btn').disabled === false && document.getElementById('mb-delete-btn').textContent === 'Remove team'`, 'Remove team enabled', 5000);
         console.log('   ✓ Kill All and Delete enabled');
 
         console.log('4. A local dashboard is unchanged');

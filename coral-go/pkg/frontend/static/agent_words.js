@@ -42,14 +42,12 @@ export const WHAT_STAYS_SLEEP = 'It stops running; its chat and files stay, and 
 /** What an archive leaves alone, and the way back. */
 export const WHAT_STAYS_ARCHIVE = 'Its chat history and files stay; Unarchive brings it back.';
 
-/** The Delete team dialog's words (and, with the names of agents still running on it, the dialog that says why it cannot be deleted yet). */
+/** The Remove team dialog's words (#15277): what goes, what stays, and (with the names of agents still running on it) that they are stopped first by "Stop agents and remove". */
 export function deleteTeamWords(team, running = []) {
     const name = oneLine(team);
-    if (running.length) {
-        const shown = running.length > 5 ? `${running.slice(0, 5).join(', ')} and ${running.length - 5} more` : running.join(', ');
-        return `${name} still has ${running.length} agent${running.length === 1 ? '' : 's'} running: ${shown}. Kill them or move them to another team first, then delete the team. Nothing was deleted.`;
-    }
-    return `Delete team "${name}"? This deletes its messages, tasks, goals, members, reminders, waits, presets, settings, artifact tags and health data for good. The agents' chats stay in History, and the files in the team's folder are not touched. This cannot be undone.`;
+    const shown = running.length > 5 ? `${running.slice(0, 5).join(', ')} and ${running.length - 5} more` : running.join(', ');
+    const live = running.length ? ` ${running.length} agent${running.length === 1 ? ' is' : 's are'} running on it: ${shown}. Stop agents and remove stops them first.` : '';
+    return `Remove team "${name}"?${live} This removes the team's messages, tasks, goals, members, reminders, waits, presets, settings, artifact tags and health data for good. The agents' chats stay in History, and the files in the team's folder and the logs are not touched. This cannot be undone.`;
 }
 
 /** The toast after a folder is taken off the list: what it did and did not do. */
