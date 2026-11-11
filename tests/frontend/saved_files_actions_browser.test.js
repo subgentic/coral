@@ -1,5 +1,5 @@
 // The Saved folder's "Files for review" rows have the same actions as a Needs you row (#11799, the operator: they had Approve, Changes and Deny but no Dismiss): Approve, a Request changes icon and the three dots in their fixed slots (Dismiss and Deny are in the dots, #12231), the three dots with
-// "Move to Needs you"; with a mouse the buttons show at the row's hover (Needs you's rule, #11669), a phone has Deny and Dismiss in the dots. Dismiss takes the file out of Saved with a toast and Undo, and Undo brings it back
+// "Move to Needs you"; with a mouse the buttons are always shown (Needs you's rule: #11669 had them at the row's hover, #15120 put them on the bottom line), a phone has Deny and Dismiss in the dots. Dismiss takes the file out of Saved with a toast and Undo, and Undo brings it back
 // (decisions 'ignore' and 'unignore', nothing else is posted). The server's tags are modelled in the page. 1440 and 390. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -47,7 +47,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const shape = await ev(`(() => { const box = document.querySelector('.saved-files tbody tr .inbox-review-actions'), names = [...box.querySelectorAll('button')].map(b => (b.getAttribute('data-slot') || b.getAttribute('aria-label'))); return { slots: [...box.children].map(c => c.getAttribute('data-slot')).filter(Boolean), hover: !!box.closest('.inbox-actions-hover'), opacity: Number(getComputedStyle(box).opacity), names }; })()`);
             check(JSON.stringify(shape.slots) === JSON.stringify(mobile ? ['approve', 'changes', 'dots'] : ['approve', 'changes', 'dots'] /* option B (#12231): Deny and Dismiss are in the dots on every width */), at + 'the buttons are in Needs you\'s slots: ' + JSON.stringify(shape.slots));
             if (!mobile) {
-                check(shape.hover && shape.opacity === 0, at + 'with a mouse the buttons show only at the row\'s hover (Needs you\'s rule): ' + JSON.stringify([shape.hover, shape.opacity]));
+                check(!shape.hover && shape.opacity === 1, at + 'with a mouse the buttons are always shown, not only at the row\'s hover (Needs you\'s rule since #15120, #15162): ' + JSON.stringify([shape.hover, shape.opacity]));
                 const at1 = await ev(`(() => { const r = document.querySelector('.saved-files tbody tr').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
                 await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: at1.x, y: at1.y }); await ev(framesJs(3));
                 check(await ev(`Number(getComputedStyle(document.querySelector('.saved-files tbody tr .inbox-review-actions')).opacity) === 1`), at + 'the buttons show while the row is hovered');
