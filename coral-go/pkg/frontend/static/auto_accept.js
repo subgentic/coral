@@ -316,7 +316,7 @@ export function noteAutoAcceptPauses(sessions) {
     const item = document.getElementById('stop-all-auto-accept');
     if (!item) return;
     const n = (state.liveSessions || []).filter(s => s.auto_accept).length;
-    item.hidden = n === 0;
+    item.hidden = item.nextElementSibling.hidden = n === 0; // the rule under it goes with it: nothing above Themes, no divider (#15258)
     item.title = n ? `Turn auto-accept off for all ${n} agent${n === 1 ? '' : 's'}` : '';
 }
 onBuilt('top-bar-settings-menu', syncStopAll);
