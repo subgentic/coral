@@ -43,13 +43,13 @@ const { removeBoards } = require('./helpers/board_cleanup');
             check(geo.length >= 4, at + 'four rows: ' + JSON.stringify(geo));
             const heights = new Set(geo.map(g => g.h));
             for (const g of geo) {
-                for (const k of ['check', 'icon', 'star']) if (g[k] != null) check(g[k] <= 40, at + `the ${k} is in the row's top band (centre ${g[k]} px below its top, row ${g.h} px): ` + JSON.stringify(g));
-                const ys = ['check', 'icon', 'star'].map(k => g[k]).filter(v => v != null);
+                for (const k of (w >= 768 ? ['check', 'icon', 'star'] : ['check', 'icon'])) if (g[k] != null) check(g[k] <= 40, at + `the ${k} is in the row's top band (centre ${g[k]} px below its top, row ${g.h} px): ` + JSON.stringify(g));
+                const ys = (w >= 768 ? ['check', 'icon', 'star'] : ['check', 'icon']).map(k => g[k]).filter(v => v != null);
                 check(Math.max(...ys) - Math.min(...ys) <= 4, at + 'the checkbox, icon and star share one line: ' + JSON.stringify(g));
             }
             const icons = geo.map(g => g.icon).filter(v => v != null);
             check(Math.max(...icons) - Math.min(...icons) <= 1, at + 'the icon is at the same place on rows of different heights (' + [...heights].join(', ') + '): ' + JSON.stringify(geo));
-            const stars = geo.map(g => g.star).filter(v => v != null);
+            const stars = w >= 768 ? geo.map(g => g.star).filter(v => v != null) : []; // a phone card keeps its star at the end of the button row (#15658)
             check(stars.length === 0 || Math.max(...stars) - Math.min(...stars) <= 1, at + 'the star is at the same place on every row: ' + JSON.stringify(geo));
             // the selection actions: one row below the title, the search and the filters
             const lay = await ev(`(() => { const r = e => e && e.getClientRects().length ? e.getBoundingClientRect() : null; const row = document.querySelector('${T} .list-bar-search-row, ${T} .gt-toolbar'); const sel = row && row.querySelector('.team-tb-selection'); const kids = row ? [...row.children].filter(r) : [];

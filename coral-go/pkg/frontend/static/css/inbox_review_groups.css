@@ -41,16 +41,11 @@
 #group-table-view .gt-toolbar.tb-low { flex-wrap: wrap; }
 #group-table-view .gt-toolbar.tb-low > .team-tb-selection { order: 10; flex: 1 1 100%; min-height: 40px; flex-wrap: nowrap; overflow-x: auto; }
 #group-table-view .gt-toolbar.tb-low > .list-bar-count { display: none; }
-#group-table-view .inbox-folder-toolbar:not(:has(.team-toolbar-selecting)) { padding-bottom: 52px; } /* the actions' line (40 px and the row's 8 px gap) is kept while nothing is selected, so ticking a row moves no row (#15339) */
-/* #15540: icon and star share a line at the row's top */
-#group-table-view .inbox-needs-results  .inbox-review-star-anchor { position: static; }
-#group-table-view .inbox-needs-results  .inbox-kind-row .inbox-review-item > .inbox-review-star { inset: 4px auto auto auto; inset-inline-end: 8px; }
-@media (max-width: 767px) { #group-table-view .inbox-needs-results  .inbox-kind-row:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-item > .inbox-review-star { inset: 0 auto auto auto; inset-inline-end: 52px; } #group-table-view .inbox-needs-results .inbox-kind-row:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-item.inbox-agent-first > .inbox-review-wait { margin-inline-end: 90px; } #group-table-view .inbox-needs-results  .inbox-kind-row .inbox-review-item.inbox-agent-first { row-gap: 6px; } }
-/* #15540: under 361 px the star stays at the button row */
-@media (max-width: 360px) {
-    #group-table-view .inbox-needs-results .inbox-kind-row:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-item.inbox-agent-first > .inbox-review-star { inset: auto 12px 12px auto; }
-    #group-table-view .inbox-needs-results .inbox-kind-row:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-item.inbox-agent-first > .inbox-review-wait { margin-inline-end: 46px; }
-    #group-table-view .inbox-needs-results .inbox-kind-row .inbox-review-item.inbox-agent-first { row-gap: 2px; }
+@media (min-width: 768px) { #group-table-view .inbox-folder-toolbar:not(:has(.team-toolbar-selecting)) { padding-bottom: 52px; } } /* the actions' line (40 px and the row's 8 px gap) is kept while nothing is selected, so ticking a row moves no row (#15339) */
+/* #15540: icon and star share a line at the row's top on a computer; a phone card keeps its star at the end of the button row (#15658) */
+@media (min-width: 768px) {
+    #group-table-view .inbox-needs-results  .inbox-review-star-anchor { position: static; }
+    #group-table-view .inbox-needs-results  .inbox-kind-row .inbox-review-item > .inbox-review-star { inset: 4px auto auto auto; inset-inline-end: 8px; }
 }
 @media (max-width: 767px) { #group-table-view .list-bar-bar:has(> .tb-low) { top: calc(-1 * var(--sel-up, 0px) - var(--space-2xl)); } } /* the bar sticks (data_table.css) with its head, search and filters scrolled off above: only the actions line stays at the top of the screen (#15632; --sel-up is that line's offset in the bar, set by mountSelection) */
 @media (max-width: 767px) { #group-table-view .gt-toolbar.tb-low > :not(.btn-icon, .inbox-folder-head, .list-bar-count, .team-tb-selection) { display: revert; } #group-table-view .gt-toolbar.tb-low > .btn-icon { display: inline-flex; } #group-table-view .gt-toolbar.tb-low > .inbox-folder-head { display: flex; } } /* the phone's selecting row keeps its head, search and icons (#15540) */
