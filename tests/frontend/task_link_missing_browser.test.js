@@ -1,4 +1,4 @@
-// #15198 (walk 9 L5): a "Task #N" link on the board whose task cannot be read (deleted, or not this team's) used to open nothing useful (an empty "Task details" box for a newcomer). It says so, in the place the task would be, with a way back.
+// #15198 (walk 9 L5): a "Task #N" link on the board whose task cannot be read (deleted, or not this team's) used to open nothing useful (an empty "Task details" box for a newcomer). It says so with a way back: since #15295 the one themed not-found view ("That task was not found: #77"), no longer a note in the task's own panel.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -20,7 +20,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`document.querySelector('#mb-messages .mb-queue-run .mb-queue-task').dataset.taskId = '77'; document.querySelector('#mb-messages .mb-queue-run .mb-queue-task').click(); true`); // the line's task is one that cannot be read (deleted, or not this team's)
         await waitFor(`location.pathname === ${JSON.stringify(`/team/${board}/tasks/77`)}`, 'the task route', 10000);
         await new Promise(r => setTimeout(r, 1500)); // sleep-ok: a read that fails has nothing to wait for; a short pause shows what the page settles on
-        const seen = await ev(`({ modal: [...document.querySelectorAll('dialog[open], .modal')].filter(m => getComputedStyle(m).display !== 'none' && m.offsetHeight).map(m => m.id + ':' + m.textContent.trim().slice(0, 80)), item: (document.getElementById('team-panel-item') || {}).hidden === false ? document.getElementById('team-panel-item').textContent.trim().slice(0, 200) : null, tab: location.pathname })`);
+        const seen = await ev(`({ modal: [...document.querySelectorAll('dialog[open], .modal')].filter(m => getComputedStyle(m).display !== 'none' && m.offsetHeight).map(m => m.id + ':' + m.textContent.trim().slice(0, 80)), item: (() => { const v = document.getElementById('not-found-view'); return v && !v.hidden ? v.querySelector('.not-found-title').textContent.trim() : null; })(), tab: location.pathname })`);
         console.log(JSON.stringify(seen));
         assert.ok(seen.item && /Task #?77|no longer|could not|not found/i.test(seen.item) && /77/.test(seen.item), 'the place says which task it could not show: ' + JSON.stringify(seen));
         assert.deepEqual(seen.modal, [], 'no empty dialog: ' + JSON.stringify(seen.modal));
