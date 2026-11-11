@@ -710,7 +710,7 @@ Subcommands:
   release-review <id> --reason "slot released pending review" (orchestrator only; for a candidate submitted before v1.4.56)
   complete <id> [--revision N] [--message "note"] [--outcome success|failed] [--candidate-revision REVISION] [--artifacts manifest.json]
   cancel <id> [--message "reason"]
-  reassign <id> [--to "Agent Name"] [--force]   An agent with more waiting tasks than the team's limit (2) is refused, with the less loaded agents named; --force assigns anyway and is recorded
+  reassign <id> [--to "Agent Name"] [--force]   An agent that already has the team's limit of waiting tasks (3 by default) is refused, with the less loaded agents named; --force assigns anyway and is recorded
                                    A review task moves to another reviewer the same way: the round follows, the old reviewer is told, the others' verdicts stay
   unblock <id> (--blocker ID | --all) Remove one or all prerequisites (orchestrator only)
   release <id> [--keep]            Put work that is not for now back in the queue (unassigned; --keep leaves it yours): use it, not park
@@ -781,7 +781,7 @@ Subcommands:
   release-review <id> --reason "slot released pending review" (orchestrator only; for a candidate submitted before v1.4.56)
   complete <id> [--revision N] [--message "note"] [--outcome success|failed] [--candidate-revision REVISION] [--artifacts manifest.json]
   cancel <id> [--message "reason"]
-  reassign <id> [--to "Agent Name"] [--force]   An agent with more waiting tasks than the team's limit (2) is refused, with the less loaded agents named; --force assigns anyway and is recorded
+  reassign <id> [--to "Agent Name"] [--force]   An agent that already has the team's limit of waiting tasks (3 by default) is refused, with the less loaded agents named; --force assigns anyway and is recorded
                                    A review task moves to another reviewer the same way: the round follows, the old reviewer is told, the others' verdicts stay
   unblock <id> (--blocker ID | --all) Remove one or all prerequisites (orchestrator only)
   release <id> [--keep]            Put work that is not for now back in the queue (unassigned; --keep leaves it yours): use it, not park

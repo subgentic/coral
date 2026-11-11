@@ -165,9 +165,13 @@ func TestTheParkLimitIsATeamSettingThatDefaultsToThree(t *testing.T) {
 	got, _ := s.GetTask(ctx, "team", ids[3])
 	assert.Nil(t, got.ParkedReason, "refused: nothing changed")
 
-	forced, err := s.ParkTaskForce(ctx, "team", ids[3], "the Operator asked", time.Time{}, true)
+	forced, past, err := s.ParkTaskForce(ctx, "team", ids[3], "the Operator asked", time.Time{}, true)
 	require.NoError(t, err, "--force parks past the limit")
 	assert.NotNil(t, forced.ParkedReason)
+	assert.Equal(t, 3, past, "a forced park past the limit says how many were held, for the board line")
+	_, within, err := s.ParkTaskForce(ctx, "team", ids[3], "a new reason", time.Time{}, true)
+	require.NoError(t, err)
+	assert.Zero(t, within, "changing the reason of a parked task is not going past the limit")
 	for _, id := range ids[:3] {
 		task, _ := s.GetTask(ctx, "team", id)
 		assert.True(t, task.Parked(time.Now()), "parks already held are left as they are")

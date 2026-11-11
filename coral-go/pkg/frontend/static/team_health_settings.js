@@ -21,7 +21,7 @@ export const HEALTH_DEFAULTS = {
     busy_no_task: { on: true, after_min: 10 }, post_no_task: { on: true }, upload_no_task: { on: true }, // work done off the books (#7793)
     goal_size: { on: true, limit: 15 }, // a goal with too many tasks (#7808)
     compact_context: { on: true, threshold_k: 225, orchestrator: true, trigger: 'threshold', method: 'compact' }, // an idle agent's large context is compacted (#14849)
-    assign_limit: 2, // the most waiting tasks an agent may have before assigning it another is refused (#14862)
+    assign_limit: 3, // the most waiting tasks an agent may have before assigning it another is refused (#14862)
     park_limit: 3, // the most parked tasks an agent may hold before parking another is refused (#15362)
     stale_sweep_hours: 12, // the stale-task sweep to the orchestrator, every this many hours, 0 off (#14863)
     goals_ready: { on: true, wait_min: 30, nudge: '' }, unowned_tasks: { on: true, wait_min: 15, nudge: '' }, // two more lines of the check (Goal #80, #8975): on unless a team turns them off

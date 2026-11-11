@@ -1314,7 +1314,7 @@ task's assignee, an orchestrator or the Operator may release). A wait on a revie
 slot: a park whose reason says review, reviewer or QA, or names a member who reviews, is refused (**400**
 `park_reviewer`). A park that waits on the Operator must carry their Inbox question: post it with
 `coral-board post --ask "@Operator ..."` and park with `--ask <that message's id>` (**400** `park_needs_ask`). An agent
-holds at most the team's **park limit** of parked tasks (`park_limit` in the team's Settings, 3 by default, 1 to 20): one more is refused (**409** `park_cap`, naming the agent, the count and the limit: release one to the queue or finish one, or park anyway with `coral-board task park <id> --reason "..." --force`, body `"force": true`);
+holds at most the team's **park limit** of parked tasks (`park_limit` in the team's Settings, 3 by default, 1 to 20): one more is refused (**409** `park_cap`, naming the agent, the count and the limit: release one to the queue or finish one, or park anyway with `coral-board task park <id> --reason "..." --force`, body `"force": true`; a forced park past the limit says so on the board line: "(forced past the limit: N already parked)");
 changing the reason of a task that is parked already is never refused. Parks made before the cap are left as they
 are. The orchestrator's health check names an agent that holds a park older than 24 hours, or more parks than the cap.
 
