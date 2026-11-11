@@ -59,22 +59,9 @@ func (h *SessionsHandler) Kill(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Snapshot the checkout before unregistering the session or removing an
-	// owned worktree. A snapshot failure is reported but does not make agents
-	// in non-git directories impossible to terminate.
-	changesArtifact := ""
-	artifactError := ""
-	if body.SessionID != "" && body.AgentType != at.Terminal {
-		artifactCtx, cancel := context.WithTimeout(bgCtx, 30*time.Second)
-		if path, err := h.persistSessionChanges(artifactCtx, body.SessionID, sessionWorkdir); errors.Is(err, errNoGitCheckout) {
-			slog.Info("no changes artifact: the session's folder isn't a git checkout", "session_id", body.SessionID)
-		} else if err != nil {
-			artifactError = changesArtifactProblem
-			slog.Warn("persist session changes artifact failed", "session_id", body.SessionID, "error", err)
-		} else {
-			changesArtifact = path
-		}
-		cancel()
+	snapshotDir := sessionWorkdir
+	if snapshotDir == "" && body.SessionID != "" && body.AgentType != at.Terminal {
+		snapshotDir = h.resolveGitRoot(bgCtx, "", "", body.SessionID)
 	}
 
 	// Mark the team member as stopped (if this session belongs to a team)
@@ -93,6 +80,27 @@ func (h *SessionsHandler) Kill(w http.ResponseWriter, r *http.Request) {
 		if err := h.ss.UnregisterLiveSession(bgCtx, body.SessionID); err != nil {
 			log.Printf("[kill] failed to unregister session %s: %v", body.SessionID, err)
 		}
+	}
+
+	h.kickWS() // the list drops the row now, not when the terminal and the worktree are done (#15370)
+
+	// Snapshot the checkout before removing an owned worktree. A snapshot failure
+	// is reported but does not make agents in non-git directories impossible to
+	// terminate. It runs after the row is gone (#15370): a diff of a big checkout takes seconds, and the
+	// person's list should not wait for it. Its folder is read first, from the row, which is gone by then.
+	changesArtifact := ""
+	artifactError := ""
+	if body.SessionID != "" && body.AgentType != at.Terminal {
+		artifactCtx, cancel := context.WithTimeout(bgCtx, 30*time.Second)
+		if path, err := h.persistSessionChanges(artifactCtx, body.SessionID, snapshotDir); errors.Is(err, errNoGitCheckout) {
+			slog.Info("no changes artifact: the session's folder isn't a git checkout", "session_id", body.SessionID)
+		} else if err != nil {
+			artifactError = changesArtifactProblem
+			slog.Warn("persist session changes artifact failed", "session_id", body.SessionID, "error", err)
+		} else {
+			changesArtifact = path
+		}
+		cancel()
 	}
 
 	// Clear board pause state if no sleeping sessions remain.
