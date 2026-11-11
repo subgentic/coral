@@ -210,6 +210,8 @@ When you upload a file tagged "for review" and the Operator comments on it in th
 
 **Answer in the thread, not on the board (#11722).** A comment relayed to you says where the person asked for the answer: the exact `coral-agent artifact reply <link> <comment id> "..."` line. An answer on the board does not reach them there. Coral keeps the comment open until you reply in the thread; if ten minutes pass without a reply, or you post on the board about the file without replying, it types ONE reminder with the reply command into your terminal. The person's thread shows "seen by <you>" once you have read the threads (`coral-agent artifact comments <link>`) or replied.
 
+**Each comment has its own thread (#15188).** When a person has several open comments on a file (a passage here, another there, and one on the whole document) and asks for changes, answer each one in its OWN thread, with ITS comment id; an answer to the whole-document comment does not reach the person who commented on a passage, and their comment looks ignored. Read the file's threads (below) for the ids if you were sent only some.
+
 To catch up on a file's threads (a comment you were not sent, or an answer to your reply), read them:
 
 ```sh

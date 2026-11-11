@@ -137,11 +137,12 @@ export function attachComments(dialog, body, host, opts = {}) {
     // the list, the marks on the text and the marks on a video's timeline all come from threads(). A toggle in the head says how many are hidden and how many of those are unresolved.
     const isEarlier = c => c.fromVersion != null;
     const earlierShown = () => browserLocal.get(storeKey(EARLIER_KEY)) === 'show';
-    const threads = () => allThreads().filter(t => earlierShown() || !isEarlier(t.c));
+    const hiddenEarlier = c => isEarlier(c) && (c.resolved || !!st.video); // only the RESOLVED comments of earlier versions are folded away: one that still needs an answer is carried onto the latest version, marked 'from vN', until it is resolved (#15188, walk 8)
+    const threads = () => allThreads().filter(t => earlierShown() || !hiddenEarlier(t.c));
     // A comment of an EARLIER version of the series (read with series=1) is `found` in this one (pinned on its text like any), `ambiguous` (the text is here more than once: never pinned to a guess) or gone
     // (`gone`, `unchecked`): the last two are listed apart and are about the older version's text, so nothing on this one's text marks them (#6472).
     const stampRange = c => `${st.videoTime?.(c.atS) || ''}${c.endS != null ? '–' + st.videoTime?.(c.endS) : ''}`;
-    const groupOf = (c) => (c.fromVersion == null || c.carried === 'found') ? 'main' : c.carried === 'ambiguous' ? 'look' : 'earlier';
+    const groupOf = (c) => (c.fromVersion == null || c.carried === 'found') ? 'main' : c.carried === 'ambiguous' ? 'look' : c.resolved || st.video ? 'earlier' : 'main';
     const ownHex = (c) => c.artifactId || st.hex; // a carried comment's replies, resolving and edits go to the version it was written on
     const openCount = () => threads().filter(t => !t.c.deleted && !t.c.resolved && groupOf(t.c) !== 'earlier').length;
     async function refresh() {
@@ -224,10 +225,10 @@ export function attachComments(dialog, body, host, opts = {}) {
         opts.onState?.({ composing: !!(st.composing && st.composing.anchor), count: openCount() }); // a file's diff (#13528): its icon says the count, and closes an empty thread whose composer was cancelled
         head.append(h);
         // Comments of earlier versions: hidden unless chosen, with how many (and how many of those still need an answer) so they stay findable (#13606).
-        const earlierAll = allThreads().filter(t => isEarlier(t.c) && !t.c.deleted);
+        const earlierAll = allThreads().filter(t => hiddenEarlier(t.c) && !t.c.deleted);
         if (earlierAll.length) {
-            const open = earlierAll.filter(t => !t.c.resolved).length, on = earlierShown();
-            const words = `${earlierAll.length} from earlier versions${open ? ` (${open} unresolved)` : ''}`;
+            const open = earlierAll.filter(t => !t.c.resolved).length, on = earlierShown(); // only a video still folds away unresolved ones too
+            const words = open ? `${earlierAll.length} from earlier versions (${open} unresolved)` : `${earlierAll.length} resolved from earlier versions`;
             const eb = btn('ac-showearlier', on ? 'Hide earlier versions' : `Show ${words}`); eb.setAttribute('aria-pressed', String(on)); eb.dataset.focusId = 'showearlier';
             eb.title = on ? `Hide the ${words}` : `${words} are hidden while the latest version is open`;
             eb.addEventListener('click', () => { browserLocal.set(storeKey(EARLIER_KEY), on ? 'hide' : 'show'); render(); paint(); });
@@ -330,7 +331,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         else main.append(m);
         main.append(editing(c) || (c.deleted ? el('p', 'ac-body ac-deleted', 'Comment deleted') : markBidi(linkArtifactRefsIn(el('p', 'ac-body', c.body), { server: st.server })))); // another person's words: their bidirectional controls are shown, not applied, and the text is its own isolate (#14113)
         if (!c.deleted && c.images && c.images.length && !editing(c)) main.append(pictures(c));
-        if (top && c.fromVersion != null && groupOf(c) !== 'main') main.append(el('p', 'ac-from ac-from-note', groupOf(c) === 'look' ? `From v${c.fromVersion}. The quote is in this version more than once, so it is not pinned to either.` : `On v${c.fromVersion}. Its text is not in this version.`));
+        if (top && c.fromVersion != null && c.carried !== 'found') main.append(el('p', 'ac-from ac-from-note', groupOf(c) === 'look' ? `From v${c.fromVersion}. The quote is in this version more than once, so it is not pinned to either.` : `On v${c.fromVersion}. Its text is not in this version.`));
         main.append(actions(c, top));
         if (top && canAsk(c)) { const sp = el('p', 'ac-note ac-ask-status'); fillStatus(sp, c.id); main.append(sp); } // does the agent have it? said at rest, under the comment: the actions row is hidden until hover
         e.append(main);
@@ -355,6 +356,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         li.append(entry(c, true));
         for (const r of replies) li.append(entry(r, false));
         if (st.ask && st.ask.id === c.id) li.append(askBlock());
+        if (c.fromVersion != null && !c.deleted && c.can.reply) li.append(el('p', 'ac-note ac-from-note ac-old-thread', `This thread is on v${c.fromVersion}, an earlier version. A reply goes to it there, not to the latest version.`)); // a reply on an old version's thread is said, not silent (#15188, walk 8)
         // The reply box at the foot of the card, where Docs has it; it opens the composer in place.
         if (!c.deleted && c.can.reply && !(st.composing && st.composing.parentId === c.id)) {
             const rb = btn('ac-replybox', 'Reply…', `Reply to the comment by ${nameSaid(c)}`);

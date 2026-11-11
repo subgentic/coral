@@ -64,11 +64,14 @@ const { coralReady } = require('./helpers/wait');
 
             console.log(`${at}: the comments of a later version: carried, ambiguous, gone`);
             if (mobile) await ev(`document.querySelector('#artifact-viewer .ac-toggle').click(); true`);
-            // #13606: the comments made on older versions are hidden while the latest is open, with how many and how many still need an answer; a toggle brings them back, and the choice is kept
+            // #13606, #15188: the RESOLVED comments made on older versions are hidden while the latest is open, with how many; a toggle brings them back, and the choice is kept. One that still needs an answer is carried onto the latest version, marked from vN
             await waitFor(`!!document.querySelector('#artifact-viewer .ac-showearlier')`, `${at}: the earlier-versions toggle`, 6000);
             const toggleText = await ev(`document.querySelector('#artifact-viewer .ac-showearlier').textContent`);
-            assert.equal(toggleText, 'Show 3 from earlier versions (3 unresolved)', `${at}: the toggle says how many are hidden and how many still need an answer`);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#artifact-viewer .ac-card')].map(c => c.dataset.id)`), ['10'], `${at}: only this version's own comment is listed while the earlier ones are hidden`);
+            assert.equal(toggleText, 'Show 1 resolved from earlier versions', `${at}: the toggle says how many resolved ones are hidden`);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#artifact-viewer .ac-card')].map(c => c.dataset.id)`), ['10', '1', '3', '2'], `${at}: this version's own comment and the earlier versions' unresolved ones are listed (the resolved one is hidden): #15188`);
+            assert.match(await ev(`document.querySelector('#artifact-viewer .ac-list > .ac-card[data-id="3"] .ac-from').textContent`), /^from v1$/, `${at}: an unresolved comment whose text is gone is carried, marked from v1`);
+            assert.match(await ev(`document.querySelector('#artifact-viewer .ac-list > .ac-card[data-id="3"] .ac-from-note').textContent`), /Its text is not in this version/, `${at}: and says its text is not in this version`);
+            assert.match(await ev(`document.querySelector('#artifact-viewer .ac-list > .ac-card[data-id="3"] .ac-old-thread').textContent`), /This thread is on v1, an earlier version\. A reply goes to it there/, `${at}: and warns, before a reply, that the thread is on an earlier version`);
             assert.equal(await ev(`document.querySelector('#artifact-viewer .ac-showearlier').getAttribute('aria-pressed')`), 'false');
             if (process.env.CORAL_SCREENSHOT_DIR) { require('node:fs').mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); require('node:fs').writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/doc-earlier-hidden-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
             await ev(`(() => { const p = document.querySelector('#artifact-viewer .ac-panel'); if (!p.classList.contains('ac-sheet-open')) document.querySelector('#artifact-viewer .ac-toggle').click(); return true; })()`); // a closed panel is inert and cannot hold focus
@@ -85,9 +88,11 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await ev(`document.querySelector('#artifact-viewer .ac-group[data-group="look"] summary').textContent`), 'Needs a look (1)');
             assert.equal(await ev(`document.querySelector('#artifact-viewer .ac-group[data-group="look"]').open`), true);
             assert.match(await ev(`document.querySelector('#artifact-viewer .ac-group[data-group="look"] .ac-pill').textContent`), /text appears twice/);
+            await ev(`document.querySelector('#artifact-viewer .ac-showresolved').click(); true`); // a resolved comment is behind Show resolved, as on the version it was written on
+            await waitFor(`!!document.querySelector('#artifact-viewer .ac-group[data-group="earlier"]')`, `${at}: the resolved earlier comment, with resolved shown`, 4000);
             assert.equal(await ev(`document.querySelector('#artifact-viewer .ac-group[data-group="earlier"] summary').textContent`), 'From earlier versions (1)');
             assert.equal(await ev(`document.querySelector('#artifact-viewer .ac-group[data-group="earlier"]').open`), false, `${at}: the gone group is closed`);
-            assert.match(await ev(`document.querySelector('#artifact-viewer .ac-group[data-group="earlier"] .ac-card[data-id="3"]').textContent`), /text no longer present/);
+            assert.match(await ev(`document.querySelector('#artifact-viewer .ac-group[data-group="earlier"] .ac-card[data-id="4"]').textContent`), /text no longer present/);
             await ev(`document.querySelector('#artifact-viewer .ac-card[data-id="1"] .ac-resolve').click(); true`);
             await waitFor(`window.__posts.length === 1`, `${at}: Resolve is sent`, 4000);
             assert.match(await ev(`window.__posts[0]`), new RegExp(`/api/artifacts/${H2}/comments/1/resolve$`), `${at}: to the version the comment was written on, not the one on show`);
