@@ -17,7 +17,7 @@ export async function _pollNewMessages() {
     const project = bs.currentProject;
     // Wait for the initial page (an after_id=0 poll would fetch the oldest
     // page), and never run two polls at once.
-    if (!project || bs.isPaused || bs._loadedProject !== project || _pollInFlight) return;
+    if (!project || bs._loadedProject !== project || _pollInFlight) return;
     _pollInFlight = true;
     try {
         // What follows the newest message shown.

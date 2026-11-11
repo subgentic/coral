@@ -1,5 +1,5 @@
 /* The board's windowed message list: loading a page, loading the earlier ones, rendering, prepending, trimming and the header (moved out of message_board.js, #8399; no behaviour change). */
-import { importOnce } from './import_once.js';
+import { importOnce, loadedModule } from './import_once.js';
 import { fetchMessages, PAGE_SIZE, mergeMessages } from './board_fetch.js';
 import { isBusyStatus, busyRetryingText, machineOf, afterPause } from './overload.js';
 import { isCloud, keyLabel, splitKey } from './server_base.js';
@@ -178,7 +178,7 @@ function renderBoardItem(item, prev) {
                 ${checkbox}
                 <span class="mb-agent-name">${m.icon ? escapeHtml(m.icon) + ' ' : ''}${escapeHtml(authorLabel(m, agent, bs.currentProject || ''))}</span>
                 ${externalMessageBadge(m)}${hubUserBadge(m)}${askBadge(m)}
-                ${messageTimeHtml(m.created_at)}
+                ${messageTimeHtml(m.created_at)}${loadedModule('./team_pause.js')?.queuedBadge(m) || ''}
                 ${BOARD_SAVE_BUTTON(bs.currentProject || '', keyLabel(bs.currentProject || ''), String(m.created_at || ''), String(m.job_title || m.subscriber_id || ''))}
                 <button class="btn btn-quiet btn-icon btn-xs mb-delete-msg-btn" data-on-click="mb-msg-delete" data-msg-id="${Number(m.id)}" title="Delete message" aria-label="${escapeAttr(deleteLabel)}"><span class="material-icons" aria-hidden="true">delete</span></button>
                 <button type="button" class="mb-msg-more ic-more" data-on-click="mb-msg-more" aria-haspopup="dialog" title="Message actions" aria-label="${escapeAttr(moreLabel)}"></button>

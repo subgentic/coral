@@ -156,5 +156,14 @@ func (h *BoardHandler) ResumeBoard(w http.ResponseWriter, r *http.Request) {
 // GET /api/board/{project}/paused
 func (h *BoardHandler) GetPaused(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
-	writeJSON(w, http.StatusOK, map[string]any{"paused": h.isPaused(project)})
+	out := map[string]any{"paused": h.isPaused(project)}
+	if out["paused"] == true && h.bs != nil {
+		if at := h.bs.BoardPausedAt(r.Context(), project); at != "" {
+			out["since"] = at // when the pause began (#15331): the team page says "Paused since 14:05"
+		}
+		h.mu.RLock()
+		out["by_sleep"] = h.sleepPaused[project] // a team's sleep paused it: the page says Asleep, not Paused
+		h.mu.RUnlock()
+	}
+	writeJSON(w, http.StatusOK, out)
 }

@@ -4,6 +4,7 @@ import { build, keyRoute } from './routes.js';
 import { showToast } from './utils.js';
 import { boardFetch, pathId, teamFetch } from './server_base.js';
 import { bs } from './board_state.js';
+import { state } from './state.js';
 const { renderMessages } = await importOnce('./board_window.js'); // a part of the board page's group: loaded with it
 
 let isSleeping = false;
@@ -33,25 +34,15 @@ function updatePauseButton(say = true) {
     const btn = document.getElementById('mb-pause-btn');
     if (!btn) return;
     // A sleeping team's board is paused by the sleep: one name for the way out, Wake team, here and in the Sleep item (#12335).
-    btn.textContent = isSleeping ? 'Wake team' : bs.isPaused ? 'Resume board' : 'Pause board';
+    btn.textContent = isSleeping ? 'Wake team' : bs.isPaused ? 'Resume team' : 'Pause team';
     const note = document.getElementById('mb-pause-note'); if (note) note.textContent = isSleeping ? 'Starts every agent again; the board takes messages again.' : bs.isPaused ? 'Agents get messages again when you resume.' : 'Agents stop receiving new messages until you resume.'; // what it does (#10008)
     btn.classList.toggle('mb-action-danger', bs.isPaused);
 }
 
+// One pause for the page and the Board column (#15331): team_pause.js reads the team's state first, wakes a team the sleep paused, and says what it did.
 export async function toggleBoardPause() {
-    if (!bs.currentProject) return;
-    if (isSleeping) { (await importOnce('./team_actions.js')).toggleTeamSleep(bs.currentProject, 'wake'); return; }
-    const action = bs.isPaused ? 'resume' : 'pause';
-    try {
-        const resp = await boardFetch(bs.currentProject, `/${action}`, {
-            method: 'POST',
-        });
-        const data = await resp.json();
-        bs.isPaused = !!data.paused;
-        updatePauseButton();
-    } catch (e) {
-        console.error('Failed to toggle pause:', e);
-    }
+    if (isSleeping) { const t = bs.currentProject || state.boardPageProject; if (t) (await importOnce('./team_actions.js')).toggleTeamSleep(t, 'wake'); return; }
+    await (await importOnce('./team_pause.js')).toggleTeamPause(); // awaited: a caller that waits sees it said
 }
 
 // The × on a message asks first: a deleted message is gone for every reader. The wording names the

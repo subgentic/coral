@@ -22,13 +22,13 @@ func TestPausedByIsStoredAndRemovedWithThePause(t *testing.T) {
 	got, err := s.PausedBoardsBy(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{"b": PausedBySleep}, got)
-	assert.Equal(t, 2, rows())
+	assert.Equal(t, 3, rows(), "paused, paused_by and paused_at (#15331)")
 
 	require.NoError(t, s.SetBoardPaused(ctx, "b", true)) // a person's
 	got, err = s.PausedBoardsBy(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{"b": ""}, got)
-	assert.Equal(t, 1, rows(), "a person's pause has no paused_by row")
+	assert.Equal(t, 2, rows(), "a person's pause has no paused_by row (paused and paused_at only)")
 	names, err := s.PausedBoards(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"b"}, names)

@@ -152,6 +152,9 @@ const settingPaused = "paused"
 // person's Pause has no row, so a pause stored before this key existed counts as a person's and survives auto-wake.
 const settingPausedBy = "paused_by"
 
+// settingPausedAt is when a board was paused (RFC 3339, UTC, #15331): the team page says "Paused since 14:05".
+const settingPausedAt = "paused_at"
+
 // PausedBySleep is settingPausedBy's value for a pause that sleep (or Coral's restart, with agents left sleeping) put there.
 const PausedBySleep = "sleep"
 
@@ -169,7 +172,7 @@ func (s *Store) SetBoardPausedBy(ctx context.Context, project string, paused boo
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM board_settings WHERE project = ? AND key IN (?, ?)`, project, settingPaused, settingPausedBy); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM board_settings WHERE project = ? AND key IN (?, ?, ?)`, project, settingPaused, settingPausedBy, settingPausedAt); err != nil {
 		return err
 	}
 	if paused {
@@ -181,8 +184,20 @@ func (s *Store) SetBoardPausedBy(ctx context.Context, project string, paused boo
 				return err
 			}
 		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO board_settings (project, key, value) VALUES (?, ?, ?)`, project, settingPausedAt, time.Now().UTC().Format(time.RFC3339)); err != nil {
+			return err
+		}
 	}
 	return tx.Commit()
+}
+
+// BoardPausedAt is when a board's pause began, or "" for a board not paused (or paused before the time was kept).
+func (s *Store) BoardPausedAt(ctx context.Context, project string) string {
+	var at string
+	if err := s.db.GetContext(ctx, &at, `SELECT value FROM board_settings WHERE project = ? AND key = ?`, project, settingPausedAt); err != nil {
+		return ""
+	}
+	return at
 }
 
 // PausedBoards lists the boards stored as paused.
