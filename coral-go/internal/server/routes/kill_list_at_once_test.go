@@ -3,6 +3,8 @@ package routes
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"testing"
 	"time"
@@ -10,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -63,5 +66,45 @@ func TestAKilledAgentLeavesTheListBeforeItsTerminalIsDone(t *testing.T) {
 		assert.Equal(t, http.StatusOK, code)
 	case <-time.After(5 * time.Second):
 		t.Fatal("the kill never answered")
+	}
+}
+
+// errKillTerminal answers every KillSession with err.
+type errKillTerminal struct {
+	*mockSessionTerminal
+	err error
+}
+
+func (e *errKillTerminal) KillSession(context.Context, string, string, string) error { return e.err }
+
+// #15431 (Security's INFO on #15370): the row is out of the list before the terminal is ended, so a terminal that would not end must not be answered "ok": the person is told, and the orphan sweep ends it. A terminal that
+// is already gone is not a failure.
+func TestAKillWhoseTerminalWillNotEndSaysSoAndOneAlreadyGoneIsOk(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		err    error
+		status int
+		ok     bool
+	}{{"will not end", errors.New("kill-session failed: exit 1"), http.StatusInternalServerError, false}, {"already gone", ptymanager.ErrTerminalGone, http.StatusOK, true}} {
+		t.Run(c.name, func(t *testing.T) {
+			server, h, terminal, ss := setupSessionsTestServer(t)
+			const sid = "00000000-0000-0000-0000-000000015431"
+			require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "repo", WorkingDir: "/tmp/test"}))
+			terminal.addSession("claude-"+sid, "/tmp/test")
+			h.terminal = &errKillTerminal{mockSessionTerminal: terminal, err: c.err}
+			resp, err := http.Post(server.URL+"/api/sessions/live/claude-"+sid+"/kill", "application/json", bytes.NewBufferString(`{"agent_type":"claude","session_id":"`+sid+`"}`))
+			require.NoError(t, err)
+			defer resp.Body.Close()
+			var out map[string]any
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+			assert.Equal(t, c.status, resp.StatusCode)
+			assert.Equal(t, c.ok, out["ok"])
+			if !c.ok {
+				assert.Contains(t, out["error"], "Kill failed")
+				assert.NotContains(t, out["error"], "exit 1", "the raw error is logged, not shown")
+			} else {
+				assert.NotContains(t, out, "error")
+			}
+		})
 	}
 }
