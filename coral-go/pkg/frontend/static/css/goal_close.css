@@ -1,0 +1,6 @@
+/* The Close goal dialog on a phone is a card (#15163, Beta walk 6 H1): the goal forms are full-screen sheets with a bar and a body, and this dialog has neither, so its text sat on the screen's edge. Loaded with goal_view.js, after goals.css, so it wins at the same weight. */
+@media (max-width: 767px) {
+    dialog.goals-close-dialog { --dlg-max: calc(100vw - 24px); height: auto; max-height: calc(100dvh - 24px); margin: auto; border-radius: var(--dlg-radius); }
+    dialog.goals-close-dialog[open] { display: block; padding: 16px; }
+    dialog.goals-close-dialog .goals-form { gap: 10px; }
+}

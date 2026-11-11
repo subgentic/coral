@@ -9,7 +9,7 @@ import { keyLabel, splitKey, boardFetch, teamFetch, isCloud, teamWorkDir, inTeam
 const { wakingSince, stopWaking } = await importOnce('./team_waking.js'); // lazy like this file (the Wake action loads it too)
 import { showView } from './utils.js';
 import { note, go } from './nav.js';
-import { keyRoute, TEAM_TABS } from './routes.js';
+import { keyRoute, parse, TEAM_TABS } from './routes.js';
 import { importOnce } from './import_once.js';
 import { refreshTeamAvailability } from './team_availability.js';
 import { pollEvery } from './overload.js';
@@ -78,7 +78,7 @@ function buildOnce() {
     $('team-page-health').addEventListener('click', () => { goTab('needs', { user: true }); });
     $('team-page-missing-back')?.addEventListener('click', () => { go({ view: 'agents' }); });
     $('team-page-back-agent')?.addEventListener('click', backToAgent);
-    $('team-page-bar-back')?.addEventListener('click', () => { if (backTo) backToAgent(); else go({ view: 'agents' }); }); // a phone's bar arrow: back to the agent it came from, else to the agent list (#11239)
+    $('team-page-bar-back')?.addEventListener('click', () => { if (backTo) backToAgent(); else go(cameFrom ? (u => parse(u.pathname, u.search))(new URL(cameFrom, location.origin)) : { view: 'agents' }); }); // a phone's bar arrow: back to the agent it came from, else to the agent list (#11239)
     $('team-page-add-agent').addEventListener('click', () => { window.showAddAgentToBoard?.(S.team, teamDir()); });
     $('team-page-settings').addEventListener('click', () => { openSettings(); });
     buildMore();
@@ -203,6 +203,7 @@ function releaseBoardActions() {
 export const refreshTeamHeader = () => { if (S.team) drawHeader(); };
 
 let backTo = null; // the agent whose dock's Board tab opened this page (#10703)
+let cameFrom = ''; // the address the person came into this team from, for the phone bar's arrow (#15163)
 async function backToAgent() {
     const to = backTo; backTo = null; $('team-page-back-agent').hidden = true;
     await window.selectLiveSession(to.name, to.agent_type, to.session_id || '', to.server);
@@ -514,6 +515,10 @@ export async function openTeamPage(team, opts = {}) {
     S.tasksQuery = tab === 'tasks' ? opts.query || '' : '';
     const changed = S.team !== team;
     if (changed) { S.team = team; S.counts = {}; S.item = null; S.knowledgeFor = ''; }
+    if (changed) { // where the person came from: the page before this one (this address when a click opens it, the one before it in history when the router did), for the phone bar's arrow (#15163)
+        const here = location.pathname + location.search, was = here.startsWith('/team/') ? history.state?.prev : here;
+        cameFrom = typeof was === 'string' && was.startsWith('/') && !was.startsWith('/team/') ? was : '';
+    }
     state.selectedTeam = team; // the team on screen (the sidebar marks its row; the panels moved in read it)
     state.boardPageProject = team;
     state.currentBoardServer = splitKey(team).server;

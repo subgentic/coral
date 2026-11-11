@@ -32,6 +32,7 @@ const DT = await importOnce('./data_table.js');
 const { el } = DT;
 const TV = await importOnce('./tasks_view.js');
 await loadStyles('pictures.css'); // the picture rules load with this module, before anything draws (page_weight: not at start)
+await loadStyles('goal_close.css'); // the Close dialog's phone card (not at start: page_weight, #15163)
 const PAGE = 50;
 
 /** Mount one goal; each mount owns its task pages, search and phone screen. */
