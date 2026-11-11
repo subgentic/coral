@@ -105,7 +105,7 @@ func (h *SessionsHandler) deliverOperatorComment(r *http.Request, caller comment
 		}
 		h.ss.ResetAskReplies(ctx, rootID, t.sessionID) // a new turn of the Operator's: the agent has its replies again (#15034)
 		msg := sendMessage(title, sendAuthorOperator, h.sendVersionLine(id, b), sendReplyCommand(id, rootID), text, snippet, names, commentPictureLinks(c.ImagesJSON)...)
-		posted, err := h.bs.PostDefusedMessage(ctx, b, board.OperatorName, msg)
+		posted, err := h.postCommentMessage(ctx, b, msg)
 		if err != nil {
 			slog.Warn("[artifact comments] message not posted", "board", b, "error", err)
 			reason = firstReason(reason, "failed")
@@ -212,4 +212,10 @@ func (h *SessionsHandler) operatorComment(r *http.Request, caller commentCaller)
 		return caller.ViaHub && cloud.TunneledAuthentic(r) && !isCommentTeamIssuer(caller.Issuer)
 	}
 	return !caller.ViaHub && humanInputCaller(r)
+}
+
+// postCommentMessage posts the automatic message that tells an agent about the Operator's comment, as Coral and not under the person's name (#15155: the board showed it as 'You'). The text was cleaned and defused by
+// sendMessage (cleanSendText), so it is stored as given; the message says who commented. The one place the comment messages are posted (the notice census allows it).
+func (h *SessionsHandler) postCommentMessage(ctx context.Context, project, msg string) (*board.Message, error) {
+	return h.bs.PostSystemDefusedMessage(ctx, project, board.CoralSender, msg, nil)
 }

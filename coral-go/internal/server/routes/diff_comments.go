@@ -305,7 +305,7 @@ func (h *SessionsHandler) deliverDiffComment(r *http.Request, caller commentCall
 	}
 	where := fmt.Sprintf("%s, lines %s on %s of your changes (%s)", cleanSendText(anchor.Path), lines, side, diffLink(team, sid, hash))
 	msg := sendMessageOf(sendOnDiff, title, sendAuthorOperator, where, sendReplyCommand(id, rootID), text, snippet, names, commentPictureLinks(c.ImagesJSON)...)
-	if _, err := h.bs.PostDefusedMessage(ctx, team, board.OperatorName, msg); err != nil {
+	if _, err := h.postCommentMessage(ctx, team, msg); err != nil {
 		slog.Warn("[diff comments] message not posted", "board", team, "error", err)
 		_ = h.ss.CloseArtifactAsk(ctx, rootID, sid, time.Now())
 		return autoDelivery{Reason: "failed"}

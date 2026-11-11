@@ -48,7 +48,7 @@ func (rig *cmtRig) operatorMessages() []board.Message {
 	require.NoError(rig.t, err)
 	var out []board.Message
 	for _, m := range msgs {
-		if m.SubscriberID == board.OperatorName {
+		if m.SubscriberID == board.OperatorName || m.SubscriberID == board.CoralSender { // the person's own sends, and the automatic one, which Coral posts (#15155)
 			out = append(out, m)
 		}
 	}

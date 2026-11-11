@@ -7,6 +7,7 @@ import { state } from './state.js';
 const api = await importOnce('./artifact_comments_api.js');
 const askUi = await importOnce('./artifact_comment_send.js');
 const { agentLink } = await importOnce('./agent_link.js');
+const { liveAgentOf } = await importOnce('./agent_live.js');
 
 /** The ask state and actions of one comments panel: `st` is the panel's state (`st.ask` is the open picker), the rest are its draw and announce hooks. */
 export function createAsk({ st, panel, render, announce, refresh, ownHex, uploaderHint, ago = () => '' }) {
@@ -58,7 +59,15 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
                 p.append('Read by ', link);
                 if (s.k.readAt) { const t = document.createElement('span'); t.textContent = `, ${ago(s.k.readAt)}`; t.title = s.k.readAt; p.append(t); }
             } else if (state === 'unread') p.append('Sent to ', link, `, not read yet${s.k.replies > 0 ? ` (it replied ${s.k.replies === 1 ? 'once' : `${s.k.replies} times`} before)` : ''}`);
-            else p.append('Sent to ', link, sentWords(s.words));
+            else {
+                const who = names.get(role) || role, asleep = !!(liveAgentOf(who, { board: boardTeamKey(st.server, st.board) }) || {}).sleeping; // an agent asleep has it, unread, until it wakes (#15155)
+                p.append('Sent to ', link, asleep ? ' (asleep: delivered when it wakes)' : sentWords(s.words));
+                if (asleep) {
+                    const wake = document.createElement('button'); wake.type = 'button'; wake.className = 'dt-link ac-wake'; wake.textContent = 'Wake'; wake.setAttribute('aria-label', `Wake ${who}`);
+                    wake.addEventListener('click', async () => { wake.disabled = true; try { await (await importOnce('./operator_asks.js')).wakeMember({ server: st.server, board: st.board }, who); announce(`Waking ${who}`); } catch (e) { announce(String((e && e.message) || e)); } wake.disabled = false; redrawStatus(id); });
+                    p.append(' ', wake);
+                }
+            }
             if (s.k && s.k.nudged && state !== 'sent') p.append(', reminded');
             if (s.k && s.k.limitReached) p.append('. The agent has reached its reply limit here'); // until the Operator writes again (#15034)
         });

@@ -36,6 +36,8 @@ const { coralReady } = require('./helpers/wait');
         check(/Antigravity account/.test(agy.source), 'the source line names the CLI: ' + agy.source);
         check(/Low effort is part of this model's name.*Thinking/.test(agy.noteLow || ''), 'choosing a variant says the level is the Thinking setting too: ' + agy.noteLow);
         check(agy.notePlain === '' || agy.notePlain === undefined, 'a model with no level says nothing about effort: ' + agy.notePlain);
+        const dup = await run('claude', { source: 'account', models: [{ value: 'default', display_name: 'Default (recommended)' }, { value: 'opus', display_name: 'Opus' }] });
+        check(dup.loose.filter(t => /^Default/.test(t)).length === 1 && dup.loose.includes('Opus'), 'one Default, not a second "Default (recommended)" from the list (#15143): ' + JSON.stringify(dup.loose));
         const builtin = await run('agy', { source: 'builtin', models: [{ value: 'claude-sonnet-5-5', display_name: 'Claude Sonnet 5.5' }] });
         check(/Coral's own list: Antigravity did not list its models/.test(builtin.source) && builtin.groups.length === 0, 'Coral\'s short list says so and groups nothing: ' + JSON.stringify(builtin));
         const claude = await run('claude', { source: 'account', models: [{ value: 'claude-opus-5-5', display_name: 'Claude Opus 5.5' }] });
