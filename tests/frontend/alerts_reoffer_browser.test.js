@@ -37,7 +37,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await load({ 'coral-alerts-offered': '1', 'coral-alerts-reoffered': '1' }); await setWaiting(40);
         check(!(await banner()), 'a browser that had its second offer gets none: ' + await ev(`localStorage.getItem('coral-alerts-reoffered')`));
         // not to a browser that was never offered, that has alerts on, or that blocks them
-        await load({}); await setWaiting(10); check(!(await banner()), 'a browser that was never offered is left to the first offer');
+        await load({}); await setWaiting(10); check(await banner() && (await ev(`localStorage.getItem('coral-alerts-reoffered')`)) == null, 'a browser that was never offered gets the first offer at its first question (#15297), not the second one');
         await load({ 'coral-alerts-offered': '1', 'coral-desktop-notify': '1', '__perm': 'granted' }); await setWaiting(10); check(!(await banner()), 'alerts already on: no offer');
         await load({ 'coral-alerts-offered': '1', '__perm': 'denied' }); await setWaiting(10); check(!(await banner()), 'the browser blocks alerts: no offer');
         // a hidden tab is not offered: it comes when the person is back, once

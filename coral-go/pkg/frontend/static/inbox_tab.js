@@ -37,11 +37,10 @@ export function waitingCount() {
 }
 
 /** Something has waited for the person 5 minutes with alerts still off: the offer comes back once (alerts_offer.js decides whether this browser may be offered again). */
+function oldestWaiting() { return Math.min(...[...(state.liveSessions || []).filter(needsYou).map(s => Date.parse(s.waiting_since)), ...operatorAsks().map(a => Date.parse(a.at)), ...unreadReviewItems().map(a => Date.parse(a.created_at))].filter(Number.isFinite)); } // Infinity when nothing waits
 function offerAlertsAgainIfWaited(n) {
     if (n <= 0 || document.hidden) return;
-    const at = [...(state.liveSessions || []).filter(needsYou).map(s => Date.parse(s.waiting_since)), ...operatorAsks().map(a => Date.parse(a.at)), ...unreadReviewItems().map(a => Date.parse(a.created_at))].filter(Number.isFinite);
-    if (!at.length) return;
-    const oldest = Math.min(...at);
+    const oldest = oldestWaiting();
     if (Date.now() - oldest >= 5 * 60 * 1000) importOnce('./alerts_offer.js').then(m => m.offerAlertsAgain(oldest));
 }
 /** The background tab's title carries the same number as the badge (#11837). attention.js loads as soon as something waits (a tab that goes to the background after an item arrived must show it), not before: a page with nothing waiting adds neither the module nor a listener at start. The listener for the tab coming back (the alerts offer, #11893) is registered the first time something waits. */
@@ -49,7 +48,7 @@ let attentionReady = false, comebackHooked = false;
 function tellAttention(n) {
     if (n > 0 && !comebackHooked) { comebackHooked = true; document.addEventListener('visibilitychange', () => { if (!document.hidden) updateInboxTab(); }); }
     if (n <= 0 && !attentionReady) return;
-    importOnce('./attention.js').then(m => { attentionReady = true; m.setAttentionTotal(n); });
+    importOnce('./attention.js').then(m => { attentionReady = true; m.setAttentionTotal(n, oldestWaiting()); });
 }
 
 // The files waiting for the Operator are counted by each computer after the first paint, at idle (#13172): the badge shows them without the Inbox having been opened and without reading a page of any team. The module is loaded then, not at startup.

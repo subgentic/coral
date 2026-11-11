@@ -3,17 +3,20 @@
  * nothing at all while the tab is visible (the page's own toasts and rows cover that). The count is cleared when the person comes back.
  * It carries a number, never a name or text. */
 import { notifyAttention } from './desktop_notify.js';
+import { importOnce } from './import_once.js';
 
 export const KIND_NEEDS_INPUT = 'needs_input';
 export const KIND_REPLY = 'finished';
 
 const PREFIX = /^\(\d{1,3}\+?\) /;
+const LONG_WAIT_MS = 5 * 60 * 1000;
+let waitedLong = false, longTimer = 0; // the oldest thing waiting has waited 5 minutes: the title carries the count even while the tab is on screen (#15297)
 let count = 0, total = 0; // count: what arrived while the tab was hidden; total: what is waiting for the person now (the Inbox's number), kept up to date by the page
 
 function paint() {
     if (typeof document === 'undefined') return;
     const bare = document.title.replace(PREFIX, '');
-    const n = document.hidden ? Math.max(count, total) : 0; // in the background the title carries what still waits, not only what arrived: a question that came while the person was away stays counted until it is answered (#11837)
+    const n = document.hidden ? Math.max(count, total) : waitedLong ? total : 0; // in the background the title carries what still waits, not only what arrived: a question that came while the person was away stays counted until it is answered (#11837)
     document.title = n > 0 ? `(${n > 99 ? '99+' : n}) ${bare}` : bare;
 }
 
@@ -27,10 +30,15 @@ export function noteAttention(kind, who = {}) {
 }
 
 /** The Inbox's number of things waiting for the person (the tab badge's): in the title while the tab is in the background. */
-export function setAttentionTotal(n) {
-    if (total === n) return;
+export function setAttentionTotal(n, oldestMs) {
+    clearTimeout(longTimer); waitedLong = false;
+    if (n > 0 && Number.isFinite(oldestMs)) { // a question left unanswered 5 minutes is in the title ("(1) Needs you") on screen too, with no sound and no strip (#15297, walk 17 H4)
+        const left = oldestMs + LONG_WAIT_MS - Date.now();
+        if (left <= 0) waitedLong = true; else longTimer = setTimeout(() => { waitedLong = true; paint(); }, left);
+    }
     total = n;
     paint();
+    if (n > 0 && !document.hidden) importOnce('./alerts_offer.js').then(m => m.offerAlertsAfterLaunch()).catch(() => {}); // the first question is the other moment alerts make sense (#15297): offered once per browser, nothing if already asked, on or blocked
 }
 
 /** The person is back: the count goes. */
