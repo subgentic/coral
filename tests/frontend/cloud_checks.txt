@@ -254,6 +254,7 @@ node card_census.test.mjs
 node form_row_census.test.mjs
 node toolbar_census.test.mjs
 node menu_census.test.mjs
+node kill_action_name.test.mjs
 node font_literal_census.test.mjs
 node team_link_dialog_unit.test.mjs
 node team_link_dialog_calls.test.mjs
