@@ -18,7 +18,7 @@ const { coralReady } = require('./helpers/wait');
         await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`(() => { const original = window.fetch; window.__reads = 0; window.__po = null;
             window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin);
-                if (u.pathname === '/api/sessions/live/coral-go/chat') { window.__reads++; return Promise.resolve(new Response(JSON.stringify({ prompt_options: window.__po }), { status: 200, headers: { 'Content-Type': 'application/json' } })); }
+                if (u.pathname === '/api/sessions/live/coral-go/chat') { const own = u.searchParams.get('limit') === '1' && u.searchParams.get('after') === '0'; if (own) window.__reads++; return Promise.resolve(new Response(JSON.stringify({ prompt_options: own ? window.__po : null }), { status: 200, headers: { 'Content-Type': 'application/json' } })); }
                 return original(url, opts); }; return true; })()`);
         await ev(`T.state.liveSessions = ${JSON.stringify([base])}; T.render.renderLiveSessions(T.state.liveSessions); window.selectLiveSession('coral-go', 'claude', 'o1'); true`);
         await waitFor(`!!document.getElementById('live-history-messages')`, 'the chat', 10000);
