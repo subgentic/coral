@@ -421,7 +421,9 @@ function _syncViewedSession(data) {
             // placeholder resolve the same name as the sidebar. `s` is
             // already merged onto the previous snapshot, so omitted
             // fields are preserved and explicit values win.
+            const subId = state.currentSession.board_subscriber_id;
             state.currentSession.board_subscriber_id = s.board_subscriber_id || null;
+            if (subId !== state.currentSession.board_subscriber_id) document.dispatchEvent(new CustomEvent('coral:subscriber'));
             state.currentSession.board_is_orchestrator = s.board_is_orchestrator ?? null;
             state.currentSession.display_name = s.display_name || null;
             state.currentSession.auto_name = s.auto_name || null;

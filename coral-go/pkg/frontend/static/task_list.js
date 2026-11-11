@@ -57,6 +57,9 @@ let _boardTaskPollInFlight = null;
 // Live cost cache: taskID → { cost_usd, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, request_count }
 export let _liveCosts = {};
 
+// An agent's tasks are scoped by its subscriber id (agentTaskScope): when it arrives or changes the list is loaded at once, not on the next poll tick, which left the Tasks tab empty for up to 10 s (#15375).
+document.addEventListener('coral:subscriber', () => { if (_boardTaskPollTimer) _boardTaskPollTick(true); });
+
 export function startBoardTaskPoll() {
     stopBoardTaskPoll();
     // Load agent tasks + board tasks immediately, then poll board tasks every 10s
