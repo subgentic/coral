@@ -124,6 +124,7 @@ async function freshServer(standIn) {
         await waitFor(`document.getElementById('confirm-modal')?.getClientRects().length>0 && document.getElementById('confirm-modal-message')?.textContent===${JSON.stringify(disclosure.text)}`, 'the full server disclosure before launching', {timeout:10000});
         assert.equal(await ev(`fetch('/api/sessions/live').then(r=>r.json()).then(l=>(Array.isArray(l)?l:l.sessions||[]).length)`), 0, 'nothing launches before acknowledgement');
         assert.equal(await ev(`document.getElementById('confirm-modal-yes').textContent.trim()`), 'Continue launch');
+        assert.equal(await ev(`document.getElementById('confirm-modal-title').textContent.trim()`), 'Before starting: agents default to auto mode', 'the title says auto mode, as the body does (#15141, walk 4 F10), not full permissions');
         await ev(`document.getElementById('confirm-modal-yes').click();true`);
         await waitFor(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json()).then(d=>d.seen===true)`, 'explicit acknowledgement persisted');
         // Older optional permission questions, if offered, still need their own answer.
