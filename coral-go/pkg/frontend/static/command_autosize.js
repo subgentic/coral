@@ -1,6 +1,6 @@
 /* The command box grows with what is typed (moved out of live_chat.js, #5065; no behaviour change). */
 import { DESKTOP_QUERY } from './phone_layout.js';
-import { state } from './state.js';
+import { importOnce } from './import_once.js';
 import { fitTerminal } from './xterm_renderer.js';
 
 // On desktop the command box grows with its text, like a chat composer
@@ -35,7 +35,7 @@ function fitPlaceholder(input) {
     if (scale < 1) input.style.setProperty("--ph-scale", String(scale));
     const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
     const probe = document.createElement("div");
-    probe.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;overflow-wrap:normal;box-sizing:content-box;width:${input.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)}px;font:${cs.font};line-height:${cs.lineHeight};letter-spacing:${cs.letterSpacing};font-size:calc(${cs.fontSize} * ${scale})`;
+    probe.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;overflow-wrap:normal;box-sizing:content-box;width:${room}px;font:${cs.font};line-height:${cs.lineHeight};letter-spacing:${cs.letterSpacing};font-size:calc(${cs.fontSize} * ${scale})`;
     probe.textContent = input.placeholder;
     document.body.appendChild(probe);
     const need = Math.min(probe.getBoundingClientRect().height + pad, window.innerHeight * 0.4);
@@ -56,7 +56,8 @@ export function autosizeCommandInput() {
         document.getElementById("command-pane")?.classList.contains("chat-mode")].join("\u0001");
     if (key === _autosizeKey) return;
     _autosizeKey = key;
-    const before = input.offsetHeight;
+    const before = input.offsetHeight, chat = document.getElementById("capture-wrapper")?.classList.contains("chat-mode") && document.getElementById("live-history-messages");
+    chat && importOnce('./keep_gap.js'); // the chat is pushed up as the box grows, so the text above it stays above it (#15401)
     if (!desktopComposer.matches || !input.offsetParent) {
         input.style.height = "";
         fitPlaceholder(input);
@@ -73,14 +74,7 @@ export function autosizeCommandInput() {
     input.style.height = "0px";
     input.style.height = (input.scrollHeight + borderY(input)) + "px"; // scrollHeight leaves out the border a border-box height includes: without it the box was 2 px short of its text
     if (input.offsetHeight === before) return;
-    if (document.getElementById("capture-wrapper")?.classList.contains("chat-mode")) {
-        // Keep the newest reply in view as the box grows
-        const messages = document.getElementById("live-history-messages");
-        if (messages && state.autoScroll) messages.scrollTop = messages.scrollHeight;
-    } else {
-        // The terminal area changed size; refit xterm to it
-        fitTerminal();
-    }
+    if (!chat) fitTerminal(); // the terminal area changed size; refit xterm to it
 }
 
 /** Autosize the command box on typing and on every programmatic value change
