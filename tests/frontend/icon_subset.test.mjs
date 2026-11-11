@@ -22,6 +22,9 @@ assert.ok(subset.size < 400, `the subset is ${subset.size} icons: the full set i
 // the scanner itself: the places an icon name is written, and what is not a name
 assert.deepEqual([...candidates(`<span class="material-icons">close</span> el.textContent = 'arrow_back'; icon: "folder_open"; x = 'not a name'`)].sort(), ['arrow_back', 'close', 'folder_open']);
 assert.ok(candidates('<i class="material-icons"> add </i>').has('add'), 'element text with spaces');
+// #15691: a setting's value named by a source key is not an icon's text, but the same word as an icon still is
+assert.ok(!candidates(`body.package_source = 'upload'; if (st.source === 'upload') {} x = { source: 'upload', title: 'T' }`).has('upload'), 'a package source is not an icon');
+assert.ok(candidates(`el.textContent = 'upload'; icon: 'upload'`).has('upload'), 'an icon named upload still counts');
 const modelFile = '/repo/static/artifact_markdown_model.js';
 const lexerChecks = "type === 'list'; x.type === 'list'";
 assert.equal(candidates(lexerChecks, modelFile).has('list'), false, 'only the model lexer comparisons are excluded');

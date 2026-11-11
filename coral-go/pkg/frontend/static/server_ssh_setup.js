@@ -30,9 +30,6 @@ async function api(method, path, body) {
     return { ok: resp.ok, status: resp.status, data };
 }
 
-// The hub's name for an uploaded package, written so the icon scan (which reads every whole quoted word as a possible icon name) does not take it for a Material icon name and demand it in the font subset.
-const API_UPLOAD = ['up', 'load'].join('');
-
 const sayError = (r, fallback) => (r.data && (r.data.error || r.data.message)) || fallback;
 
 /** The backend to show chosen (#12271): the person's choice, except tmux where the computer turned out not to have it, which goes back to pty (the default). Exported for the test. */
@@ -175,7 +172,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         if (kind() === REMOVE && st.typed.trim() !== p.server_id) return true;
         if (kind() === UPGRADE && (same() || (downgrade() && !st.allowDowngrade))) return true;
         if (kind() === SETUP && (!dataDirOk(cleanDataDir(st.dataDir)) || !portOk(st.port))) return true;
-        if (needsTerms() && st.source === 'file' && sourceProblem()) return true; // an upload with no package, or half of the signed sums, never starts
+        if (needsTerms() && st.source === 'upload' && sourceProblem()) return true; // an upload with no package, or half of the signed sums, never starts
         if (st.uploading) return true;
         return false;
     }
@@ -197,7 +194,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         if (kind() === REMOVE) body.confirm = st.typed.trim();
         if (kind() === SETUP) { body.backend = st.backend === 'tmux' ? 'tmux' : 'pty'; const d = cleanDataDir(st.dataDir); if (d) body.data_dir = d; const pt = String(st.port || '').trim(); if (pt && portOk(pt) && Number(pt) !== 8420) body.port = Number(pt); }
         if (kind() === UPGRADE && downgrade()) body.allow_downgrade = !!st.allowDowngrade;
-        if (needsTerms() && (st.source === 'hub' || st.source === 'file')) body.package_source = st.source === 'hub' ? 'hub' : API_UPLOAD; // left out, the computer downloads it, as before
+        if (needsTerms() && (st.source === 'hub' || st.source === 'upload')) body.package_source = st.source; // left out, the computer downloads it, as before
         const r = await api('POST', `/api/servers/provision/${encodeURIComponent(st.plan.plan)}/run`, body);
         if (st.dead) return;
         if (!r.ok && r.status === 400 && /not the ones this computer has now/.test(sayError(r, ''))) { // the keys changed since they were shown (#13088): show the ones it has now, unticked, so the person confirms THOSE
@@ -335,11 +332,11 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         const box = el('fieldset', 'ssh-source');
         box.append(el('legend', 'ssh-subhead', 'Where the package comes from'));
         const choices = [
-            ['far', 'This computer downloads it', 'That computer fetches the release from GitHub itself, after this hub has checked the signed list of hashes. It needs to reach GitHub.'],
-            ['hub', 'The hub downloads it and sends it', 'This hub downloads and verifies the release, then copies it to that computer over SSH. That computer needs no access to GitHub, and checks the hash again before installing.'],
-            ['file', 'Upload a package', 'Choose a release file you already downloaded. This hub checks it against the signed list for its own version, and refuses one that does not match.'],
+            { source: 'far', title: 'This computer downloads it', text: 'That computer fetches the release from GitHub itself, after this hub has checked the signed list of hashes. It needs to reach GitHub.' },
+            { source: 'hub', title: 'The hub downloads it and sends it', text: 'This hub downloads and verifies the release, then copies it to that computer over SSH. That computer needs no access to GitHub, and checks the hash again before installing.' },
+            { source: 'upload', title: 'Upload a package', text: 'Choose a release file you already downloaded. This hub checks it against the signed list for its own version, and refuses one that does not match.' },
         ];
-        for (const [value, title, text] of choices) {
+        for (const { source: value, title, text } of choices) {
             const label = el('label', 'ssh-backend-opt');
             const r = el('input', 'check'); r.type = 'radio'; r.name = 'ssh-source'; r.value = value; r.id = `ssh-source-${value}`; r.checked = st.source === value;
             r.addEventListener('change', () => { if (r.checked) { st.source = value; st.error = ''; draw(); } });
@@ -347,7 +344,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
             label.append(r, body);
             box.append(label);
         }
-        if (st.source === 'file') {
+        if (st.source === 'upload') {
             const fields = [['package', 'Release package (the .tar.gz for that computer)', 'ssh-upload-package'], ['sums', 'SHA256SUMS.txt (only if this hub cannot reach GitHub)', 'ssh-upload-sums'], ['bundle', 'SHA256SUMS.txt.sigstore.json (with the file above)', 'ssh-upload-bundle']];
             for (const [k, label, id] of fields) {
                 const l = el('label', 'ssh-label', label); l.htmlFor = id;

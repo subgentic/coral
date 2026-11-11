@@ -560,7 +560,7 @@ for (const field of ['dataDir', 'port']) {
     await until(() => btn(h2, 'Connect'), 'the plan');
     btn(h2, 'Connect').click();
     await until(() => btn(h2, 'Upgrade to v2.0.2'), 'the confirm');
-    $(h2, '#ssh-source-file').click();
+    $(h2, '#ssh-source-upload').click();
     await until(() => $(h2, '#ssh-upload-package'), 'the pickers');
     assert.equal(btn(h2, 'Upgrade to v2.0.2').disabled, true, 'no package chosen: closed');
     assert.match(h2.textContent, /Choose the release package/);
@@ -591,7 +591,7 @@ for (const field of ['dataDir', 'port']) {
     await until(() => btn(h3, 'Connect'), 'the plan');
     btn(h3, 'Connect').click();
     await until(() => btn(h3, 'Upgrade to v2.0.2'), 'the confirm');
-    $(h3, '#ssh-source-file').click();
+    $(h3, '#ssh-source-upload').click();
     await until(() => $(h3, '#ssh-upload-package'), 'the pickers');
     pick(h3, '#ssh-upload-package', 'pkg');
     await until(() => /too big/.test(h3.textContent), 'the refusal');
