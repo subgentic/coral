@@ -22,7 +22,7 @@ const { coralReady } = require('./helpers/wait');
     };
     const tap = sel => tapSel(ev, sel);
     try {
-        await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false });
+        await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false, hubPages: true }); // the Inbox and Artifacts frames are the Hub's own pages: a stand-in here, not the dashboard framed in itself (which now answers an address it does not know with the not-found view, #15295)
         const run = async tag => {
             const ACCOUNT = tag === 'phone' ? '#top-phone-menu' : '[aria-label="Account menu"]'; // under 640 px the account is an entry of the hamburger's menu (#9021): the hamburger is the opener
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
