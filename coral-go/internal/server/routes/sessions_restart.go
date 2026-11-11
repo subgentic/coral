@@ -112,6 +112,9 @@ func (h *SessionsHandler) Restart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	plan.restartSettings()
+	if req.Prompt != "" && plan.stored != nil {
+		plan.prompt = withRestartSkillNote(plan.prompt, h.skillNoteForRestart(ctx, plan.stored.SessionID)) // new Instructions replaced the prompt the launch note was in (#15484)
+	}
 	if plan.stored != nil {
 		h.modelSwitches.end(plan.stored.SessionID, "The agent was restarted before the change was confirmed.") // #6219
 		h.stopOpencode(plan.stored.SessionID)                                                                  // the restarted agent has a new id and a new server
