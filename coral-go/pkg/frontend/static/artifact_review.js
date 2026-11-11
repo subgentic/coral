@@ -133,16 +133,16 @@ export function sayIgnored(team, row, out) {
 export function sayDenied(name, out) { showToast(`Denied ${shown(name)}. ${fromWords(out)}${earlierFailure(out)}`.trim()); }
 
 /** The Deny dialog: "Deny this?" with an optional reason (500 characters); the agent is told it was declined. Red text, never a red fill. onDone runs after the deny went through. */
-export function openDenyDialog(team, row, onDone) {
+export function openDenyDialog(team, row, onDone, { refuse = false } = {}) { // refuse: the viewer's Refuse button (#15284): the same final no, worded as a plan's refusal, and the toast says Sent to <agent>
     const dlg = document.createElement('dialog');
     dlg.className = 'modal-content dlg-form inbox-deny-dialog'; dlg.setAttribute('aria-labelledby', 'inbox-deny-title');
-    const title = document.createElement('h2'); title.id = 'inbox-deny-title'; title.textContent = `Deny ${shown(row.name)}?`;
-    const sub = document.createElement('p'); sub.textContent = 'This is a final no: the agent is told it was denied and should not send it again, in any wording. To ask for a new version, use Changes instead.';
+    const title = document.createElement('h2'); title.id = 'inbox-deny-title'; title.textContent = `${refuse ? 'Refuse' : 'Deny'} ${shown(row.name)}?`;
+    const sub = document.createElement('p'); sub.textContent = refuse ? 'This is a final no: the agent is told to stop this and not send it again, in any wording. To ask for a smaller or different one, use Request changes instead.' : 'This is a final no: the agent is told it was denied and should not send it again, in any wording. To ask for a new version, use Changes instead.';
     const label = document.createElement('label'); label.textContent = 'Reason (optional, the agent sees it)';
     const box = document.createElement('textarea'); box.className = 'field'; box.rows = 3; box.maxLength = 500; label.append(box);
     const err = document.createElement('p'); err.className = 'inbox-ask-error'; err.setAttribute('role', 'alert');
     const row2 = document.createElement('div'); row2.className = 'inbox-ask-buttons';
-    const go = document.createElement('button'); go.type = 'button'; go.className = 'btn inbox-deny-confirm'; go.textContent = 'Deny';
+    const go = document.createElement('button'); go.type = 'button'; go.className = 'btn inbox-deny-confirm'; go.textContent = refuse ? 'Refuse' : 'Deny';
     const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'btn'; cancel.textContent = 'Cancel';
     row2.append(go, cancel); dlg.append(title, sub, label, err, row2);
     const finish = () => { dlg.close(); dlg.remove(); };
@@ -150,7 +150,7 @@ export function openDenyDialog(team, row, onDone) {
     dlg.addEventListener('cancel', e => { e.preventDefault(); finish(); });
     go.addEventListener('click', async () => {
         err.textContent = ''; go.disabled = true;
-        try { const out = await denyRow(team, row, box.value.replace(/\s+/g, ' ').trim()); finish(); sayDenied(row.name, out); announceNotice(`Denied ${shown(row.name)}.`); onDone?.(); }
+        try { const out = await denyRow(team, row, box.value.replace(/\s+/g, ' ').trim()); finish(); if (refuse) { showToast(`Refused ${shown(row.name)}. ${out.delivered ? `Sent to ${out.to}.${out.asleep ? ' It is asleep: it will see this when it wakes.' : ''}` : fromWords(out)}`.trim()); announceNotice(`Refused ${shown(row.name)}.`); } else { sayDenied(row.name, out); announceNotice(`Denied ${shown(row.name)}.`); } onDone?.(); }
         catch (e) { err.textContent = e.message || 'Not saved.'; go.disabled = false; box.focus(); }
     });
     document.body.append(dlg); dlg.showModal(); box.focus();
@@ -209,7 +209,7 @@ export function attachReview(d, { reload }) {
     d.querySelector('.artifact-viewer-header').after(bar); // the change-request form, under the header (not a box inside its row, which squeezed the name to 'RE…', walk 3 N21)
     // the review's controls are on the viewer's one header row (#12223): its status beside the version chip, Approve and Request changes at the right, Approve with a note in the ⋯ menu
     const mk = (tag, cls, text, attrs = {}) => { const e = document.createElement(tag); e.className = cls; if (text) e.textContent = text; for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (tag === 'button') e.type = 'button'; return e; };
-    const stateEl = mk('span', 'chip artifact-review-state', '', { role: 'status' }), approve = mk('button', 'btn btn-primary artifact-review-approve', 'Approve'), changes = mk('button', 'btn artifact-review-changes', 'Request changes', { 'aria-expanded': 'false' });
+    const stateEl = mk('span', 'chip artifact-review-state', '', { role: 'status' }), approve = mk('button', 'btn btn-primary artifact-review-approve', 'Approve'), changes = mk('button', 'btn artifact-review-changes', 'Request changes', { 'aria-expanded': 'false' }), refuse = mk('button', 'btn artifact-review-refuse', 'Refuse', { title: 'A final no: the agent is told to stop this and not send it again' });
     const approveNote = mk('button', 'menu-item artifact-review-note', 'Approve with a note', { role: 'menuitem' });
     // Send for review / Remove from review (#13152): the Operator's own way to put this file in Needs you, or take it out, in the ⋯ menu (artifact_send_review.js)
     const sendItem = mk('button', 'menu-item artifact-review-send', 'Send for review', { role: 'menuitem' }); sendItem.hidden = true;
@@ -217,8 +217,8 @@ export function attachReview(d, { reload }) {
     let sendCtx = null; // { team, hex, server, filename, inReview } of the open file
     const syncSendItem = () => { sendItem.hidden = !sendCtx || decisionNeedsPerson(sendCtx.server); if (sendCtx) sendItem.textContent = sendCtx.inReview ? 'Remove from review' : 'Send for review'; };
     const slotted = !!d.querySelector('.artifact-viewer-chips'); // the controls are on the header row; without it (a bare viewer) they stay in this bar
-    stateEl.hidden = approve.hidden = changes.hidden = approveNote.hidden = true;
-    (d.querySelector('.artifact-viewer-chips') || bar).append(stateEl); (d.querySelector('.artifact-viewer-actions') || bar).append(approve, changes); (d.querySelector('.artifact-viewer-menu') || bar).prepend(approveNote);
+    stateEl.hidden = approve.hidden = changes.hidden = approveNote.hidden = refuse.hidden = true;
+    (d.querySelector('.artifact-viewer-chips') || bar).append(stateEl); (d.querySelector('.artifact-viewer-actions') || bar).append(approve, changes, refuse); (d.querySelector('.artifact-viewer-menu') || bar).prepend(approveNote);
     const $ = s => bar.querySelector(s);
     const form = $('.artifact-review-form'), text = $('#artifact-review-text'), error = $('.artifact-review-error');
     // Keep confirmed legacy writes while this form is open: an explicit delivery
@@ -248,17 +248,18 @@ export function attachReview(d, { reload }) {
         const waiting = !!s && (s.state === 'pending' || s.state === 'changes');
         const pending = waiting && !decisionNeedsPerson(s.server); // a remote of a self-hosted hub: the decision is made on that machine's own dashboard (#11372)
         bar.hidden = !s;
-        approve.hidden = changes.hidden = approveNote.hidden = !pending;
+        approve.hidden = changes.hidden = approveNote.hidden = refuse.hidden = !pending;
         d.dataset.reviewPending = pending ? '1' : ''; // the comment box says where approving is (#15128)
         for (const h of d.querySelectorAll('.ac-hint')) { h.hidden = !pending; const t = h.parentNode.querySelector('textarea'); if (t) { const how = t.dataset.sendhint || ''; if (pending || how) t.setAttribute('aria-describedby', pending ? `${h.id} ${how}`.trim() : how); else t.removeAttribute('aria-describedby'); } } // a box that is open follows the file's state, not the state it was drawn in
         paintApprove(); // changes were asked for: Approve is still the Operator's, and says it approves this version as it is; with a newer version in the series it names the one it approves (#15197)
         if (!pending) form.hidden = true;
         bar.hidden = !s || (slotted && form.hidden); // on the header row the strip under it is the change-request form: there only while it is open
-        stateEl.textContent = !s ? '' : s.state === 'approved' ? `Approved${s.at ? ' ' + timeWords(s.at) : ''}` : s.state === 'reviewed' ? 'Reviewed' : s.state === 'changes' ? `Changes requested${s.row.produced_by ? `: waiting for a new version from ${shown(s.row.produced_by)}` : ''}. Approving now approves this version as it is.` : waiting && !pending ? 'Waiting for your review. Approve it on that computer\'s own dashboard.' : 'Waiting for your review';
+        stateEl.textContent = !s ? '' : s.state === 'approved' ? `Approved${s.at ? ' ' + timeWords(s.at) : ''}` : s.state === 'reviewed' ? 'Reviewed' : s.state === 'denied' ? 'Refused' : s.state === 'changes' ? `Changes requested${s.row.produced_by ? `: waiting for a new version from ${shown(s.row.produced_by)}` : ''}. Approving now approves this version as it is.` : waiting && !pending ? 'Waiting for your review. Approve it on that computer\'s own dashboard.' : 'Waiting for your review';
         stateEl.hidden = !stateEl.textContent; // no status, no chip
     };
     const openForm = (on) => { form.hidden = !on; bar.hidden = !cur || (slotted && !on); changes.setAttribute('aria-expanded', String(on)); if (on) { error.textContent = ''; text.focus(); } };
     changes.addEventListener('click', () => openForm(form.hidden));
+    refuse.addEventListener('click', () => { if (cur) openDenyDialog(cur.team, cur.row, () => show({ ...cur, state: 'denied', at: new Date().toISOString() }), { refuse: true }); });
     $('.artifact-review-cancel').addEventListener('click', () => { openForm(false); changes.focus(); });
     document.addEventListener('coral:review-approved', e => { if (cur && cur.team === e.detail.team && cur.row.id === e.detail.id && cur.state !== 'approved') show({ ...cur, state: 'approved', at: e.detail.at }); });
     // The file may be settled while its viewer is open (a link opens from the rows the Inbox has, up to a scan old; #13128): when the Inbox's list is read again and no longer holds the pending file, the file's own state

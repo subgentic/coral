@@ -56,6 +56,16 @@ func (s *Store) PostHubMessageForTask(ctx context.Context, project, hubUser, con
 	return s.postMessage(ctx, project, sender, content, targetGroupID, origin, hubUser, false, taskID)
 }
 
+// PostHubDefusedMessage is PostHubMessage for content the caller has already cleaned (clitext.Clean) and defused (DefuseMentions): stored as given, as PostDefusedMessage does. Only server code
+// calls it, with text it built itself.
+func (s *Store) PostHubDefusedMessage(ctx context.Context, project, hubUser, content string, asOperator bool) (*Message, error) {
+	sender, origin := hubUser, OriginHubUser
+	if asOperator {
+		sender, origin = "Operator", OriginHubOperator
+	}
+	return s.insertMessage(ctx, project, sender, content, nil, origin, hubUser, false, nil)
+}
+
 // PostMessageForTask is PostMessageWithOrigin for a reply to a task (taskID, #5463); nil for a plain post.
 func (s *Store) PostMessageForTask(ctx context.Context, project, subscriberID, content string, targetGroupID *string, origin string, taskID *int64) (*Message, error) {
 	return s.postMessage(ctx, project, subscriberID, content, targetGroupID, origin, "", false, taskID)

@@ -477,9 +477,11 @@ func (h *BoardHandler) UpdateGoal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var before, beforeState string
-	if body.Driver != nil || body.State != nil {
+	var wasTitle, wasOutcome, wasDoneWhen string
+	if body.Driver != nil || body.State != nil || body.Title != nil || body.Outcome != nil || body.DoneWhen != nil {
 		if cur, err := h.bs.GetGoal(r.Context(), project, id); err == nil {
 			before, beforeState = cur.Driver, cur.State
+			wasTitle, wasOutcome, wasDoneWhen = cur.Title, cur.Outcome, cur.DoneWhen
 		}
 	}
 	g, err := h.bs.UpdateGoal(r.Context(), project, id, board.GoalUpdate{Title: body.Title, Outcome: body.Outcome, DoneWhen: body.DoneWhen, State: body.State, BlockedOn: body.BlockedOn, Driver: body.Driver})
@@ -498,6 +500,9 @@ func (h *BoardHandler) UpdateGoal(w http.ResponseWriter, r *http.Request) {
 	if body.Driver != nil {
 		h.announceGoalDriver(project, actor, g, before)
 	}
+	if line := goalEditedLine(actor, g, wasTitle, wasOutcome, wasDoneWhen); line != "" { // the team reads who changed the goal's words, and the new words (#15284, walk 16 H1)
+		h.postGoalLine(r, project, actor, line)
+	}
 	h.markMadeByOrchestrator(r.Context(), project, g)
 	writeJSON(w, http.StatusOK, g)
 }
@@ -506,10 +511,12 @@ func (h *BoardHandler) UpdateGoal(w http.ResponseWriter, r *http.Request) {
 // The goal write is done and answered either way: a message that cannot be posted is logged, not made the write's failure.
 func (h *BoardHandler) postGoalLine(r *http.Request, project, actor, content string) {
 	var err error
-	if user := hubOperatorUser(r); cloud.Tunneled(r) && user != "" {
-		_, err = h.bs.PostHubMessage(r.Context(), project, user, HubOperatorPrefix(user)+content, nil, true)
+	// The line quotes a goal's title and words, which agents write: a mention in them must not call anyone (#15284, Security's SHOULD), so it is cleaned and defused here and stored as given.
+	user := hubOperatorUser(r)
+	if cloud.Tunneled(r) && user != "" {
+		_, err = h.bs.PostHubDefusedMessage(r.Context(), project, user, board.DefuseMentions(clitext.Clean(HubOperatorPrefix(user)+content), h.bs.BoardMentionNames(r.Context(), project)), true)
 	} else { // not through the Hub, or a Hub write with no Hub user to name (the guard has one for every write that reaches here): the actor's own post
-		_, err = h.bs.PostMessage(r.Context(), project, actor, content, nil)
+		_, err = h.bs.PostDefusedMessage(r.Context(), project, actor, board.DefuseMentions(clitext.Clean(content), h.bs.BoardMentionNames(r.Context(), project)))
 	}
 	if err != nil {
 		slog.Warn("goal board message not posted", "project", project, "error", err)
@@ -665,4 +672,29 @@ func (h *BoardHandler) markMadeByOrchestrator(ctx context.Context, project strin
 			g.MadeByOrchestrator = true
 		}
 	}
+}
+
+// goalEditedLine is the board line for a change to a goal's title, description (outcome) or done-when: who changed it, which of the three, and the new words (each cut at 300 characters), so the agents working
+// on the goal read the change where they read everything else. "" when none of the three changed (a state or driver change has its own line).
+func goalEditedLine(actor string, g *board.Goal, wasTitle, wasOutcome, wasDoneWhen string) string {
+	var parts []string
+	cut := func(s string) string {
+		if r := []rune(s); len(r) > 300 {
+			return string(r[:300]) + "..."
+		}
+		return s
+	}
+	if g.Title != wasTitle && wasTitle != "" {
+		parts = append(parts, "title: \""+cut(g.Title)+"\"")
+	}
+	if g.Outcome != wasOutcome && wasTitle != "" {
+		parts = append(parts, "description: \""+cut(g.Outcome)+"\"")
+	}
+	if g.DoneWhen != wasDoneWhen && wasTitle != "" {
+		parts = append(parts, "done when: \""+cut(g.DoneWhen)+"\"")
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "Goal #" + strconv.FormatInt(g.ID, 10) + " was edited by " + actor + ". New " + strings.Join(parts, "; ") + ". Read it again with: coral-board goal show " + strconv.FormatInt(g.ID, 10)
 }
