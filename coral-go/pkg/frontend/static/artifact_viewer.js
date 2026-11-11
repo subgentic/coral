@@ -208,6 +208,7 @@ function _build() {
         body: () => d.querySelector('.artifact-viewer-body'),
         show: (row) => openArtifactViewer(row.digest, { ..._lastOpts, filename: row.name || _lastOpts.filename, mediaType: row.media_type, switched: true }),
         reload: () => openArtifactViewer(_hex, { ..._lastOpts, switched: false }),
+        wantLatest: () => { const w = !!_lastOpts.openLatest; if (w) _lastOpts = { ..._lastOpts, openLatest: false }; return w; }, // a Needs you row opens the NEWEST version of its file, once (#15197: a row opened v1 though v2 existed)
         line: (row) => { _barLine = row && row.file_id && row.version_line ? { hex: row.digest, fileId: row.file_id, versionLine: row.version_line } : null; if (_dialog) paintLine(_dialog); },
         sheetOpen: () => _comments.sheetOpen(),
         setSheet: (open) => _comments.setSheet(open),

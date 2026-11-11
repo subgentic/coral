@@ -126,12 +126,15 @@ export function attachVersions(dialog, hooks) {
         bar.replaceChildren();
         const i = cur();
         bar.hidden = !st.rows || i < 0;
+        if (bar.hidden) { dialog.dataset.shownVersion = dialog.dataset.newerVersion = ''; dialog.dispatchEvent(new CustomEvent('av-version')); }
         note.hidden = !st.ambiguous || !bar.hidden; note.textContent = note.hidden ? '' : 'Held by more than one team: open it from a team to see its versions.';
         hooks.version?.(bar.hidden ? 0 : st.rows[i].version);
         hooks.line?.(bar.hidden ? null : st.rows[i]); // the file id and line of the version SHOWN, from the server's list (#14178): a switch or a save never keeps another version's
         dialog.classList.toggle('av-has-versions', !bar.hidden);
         if (bar.hidden) return;
         const rows = st.rows, row = rows[i], total = rows.length, latest = i === total - 1;
+        if (!latest && hooks.wantLatest?.()) { choose(rows[total - 1]); return; } // opened from Needs you: the newest version, not the one the row was made for
+        dialog.dataset.shownVersion = String(row.version); dialog.dataset.newerVersion = latest ? '' : String(rows[total - 1].version); dialog.dispatchEvent(new CustomEvent('av-version')); // the review bar names the version it approves (#15197)
         const prev = btn('av-prev av-icon', '◀', 'Previous version'); prev.setAttribute('aria-disabled', String(i === 0));
         prev.addEventListener('click', () => stepTo(-1));
         const next = btn('av-next av-icon', '▶', 'Next version'); next.setAttribute('aria-disabled', String(latest));
