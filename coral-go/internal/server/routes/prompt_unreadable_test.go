@@ -30,7 +30,7 @@ func TestARequestCoralDidNotReadInFullIsUnreadableAndOneReadWholeThatHidesIsOnly
 	assert.True(t, s.Unreadable, "longer than a card shows")
 
 	// read whole, with a character that hides what it does: reject only, and the No stays
-	hidden := "\n" + strings.Repeat("─", 60) + "\n  echo ok‮\n  Print a line\n" + strings.Repeat("─", 60) + "\n Do you want to proceed?\n ❯ 1. Yes\n   2. No\n"
+	hidden := "\n" + strings.Repeat("─", 60) + "\n  echo ok\u202e\n  Print a line\n" + strings.Repeat("─", 60) + "\n Do you want to proceed?\n ❯ 1. Yes\n   2. No\n"
 	s, ok = parsePromptScreen(hidden)
 	require.True(t, ok)
 	assert.True(t, s.OnlyReject, "a hidden character: only a reject is offered")
