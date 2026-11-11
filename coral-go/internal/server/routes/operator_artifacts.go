@@ -306,6 +306,7 @@ func (h *BoardHandler) UploadOperatorArtifact(w http.ResponseWriter, r *http.Req
 	}
 	h.bs.NoteArtifactsChanged(project)
 	if team {
+		noteTeamFileHolder(coralDir, project, sessionID) // the team's list reads this session even after its agent is replaced or removed (#15356)
 		rememberOperatorShare(project, teamShareKey, hexID, name, time.Now())
 	} else {
 		rememberOperatorShare(project, sessionID, hexID, name, time.Now())

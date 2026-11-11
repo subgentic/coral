@@ -384,7 +384,13 @@ func (h *BoardHandler) buildProjectArtifactItems(r *http.Request, project, sessi
 			items = h.uploads.merge(items, h.coralDir, map[string]string{sessionFilter: ""})
 		}
 	} else {
-		items = h.uploads.merge(items, h.coralDir, teamUploadSessions(tasks, subscribers))
+		sessions := teamUploadSessions(tasks, subscribers)
+		for _, sid := range readTeamFileHolders(h.coralDir, project) { // a session that holds the team's own files stays read whoever is subscribed now (#15356)
+			if _, ok := sessions[sid]; !ok {
+				sessions[sid] = ""
+			}
+		}
+		items = h.uploads.merge(items, h.coralDir, sessions)
 		items = h.mergeCrossTeamRows(items, project)
 	}
 	h.linkUploadTasks(r.Context(), project, items)
