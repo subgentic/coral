@@ -358,6 +358,10 @@ func (s *SessionStore) ReplaceLiveSession(ctx context.Context, oldSessionID stri
 		if err := revokeSessionTokensTx(ctx, tx, oldSessionID); err != nil {
 			return err
 		}
+		// The skills attached to the old session are the new one's, pinned as they were (#15484): its launch note names them and `coral-agent skills list` is what is attached to the session asking.
+		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO skills_attached (session_id, skill_id, name, version, digest, attached_at) SELECT ?, skill_id, name, version, digest, attached_at FROM skills_attached WHERE session_id = ?`, newSession.SessionID, oldSessionID); err != nil {
+			return err
+		}
 		// Carry forward flags, prompt, board from old session if not set
 		var old LiveSession
 		err := tx.GetContext(ctx, &old,
