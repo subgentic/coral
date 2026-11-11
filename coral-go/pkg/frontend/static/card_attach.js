@@ -4,7 +4,7 @@
 import { state } from './state.js';
 import { escapeAttr, showToast } from './utils.js';
 import { serverFetch, sessionServer } from './server_base.js';
-import { promptOptionsBySession, syncNeedsInputCard, announcePrompt } from './needs_input_card.js';
+import { promptOptionsBySession, pendingToolBySession, syncNeedsInputCard, announcePrompt } from './needs_input_card.js';
 import { blockedReason } from './hub_access.js';
 import { prepareImage } from './image_attach.js';
 import { postImage } from './image_composer.js';
@@ -30,7 +30,22 @@ export function clearCardImages(sid) {
 }
 
 /** Draw the chips of this agent's card images in every answer box of `card` (the card is drawn again whenever the terminal's screen changes: the chips are kept apart and drawn back). */
+// A permission request Coral did not read in full (#15501): the card offers no answer of any kind, not even No, and none of the half it read drawn as if it were the request.
+// It lives here, loaded with the card's image strip, so the start path holds none of it (#15665; a card with a note loads this file). The server decides (unreadable); a request
+// read whole that only hides a character keeps its No (#15140) and is left as drawn.
+function unreadableCard(card, sid) {
+    const pt = pendingToolBySession.get(sid);
+    const po = promptOptionsBySession.get(sid);
+    if (!((pt && pt.input && pt.input.unreadable === true) || (po && po.po && po.po.unreadable === true))) return;
+    card.querySelectorAll(".cni-answer,.cni-options,.cni-standing,.cni-target,.cni-patterns,.cni-hint,.cni-context-text:not(.cni-note),.cni-review,.cni-text-form,.cni-submit").forEach(n => n.remove());
+    const q = card.querySelector(".cni-question");
+    if (q) q.textContent = "Coral could not read this request in full";
+    const open = card.querySelector('[data-on-click="terminal-view-open"]');
+    if (open) open.className = "btn btn-primary";
+}
+
 export function drawCardImages(card, sid) {
+    unreadableCard(card, sid);
     checkAgain(card, sid);
     const s = slot(sid);
     for (const form of card.querySelectorAll('.cni-text-form')) {
@@ -106,7 +121,7 @@ function checkAgain(card, sid) {
         try {
             const resp = await serverFetch(sessionServer(session), `/api/sessions/live/${encodeURIComponent(session.name)}/chat?${new URLSearchParams({ after: '0', limit: '1', session_id: sid, agent_type: session.agent_type || '' })}`);
             const po = resp.ok ? (await resp.json().catch(() => null) || {}).prompt_options : null;
-            if (po && (po.options || []).length) { found = true; promptOptionsBySession.set(sid, { title: po.title || '', question: po.question || '', kind: po.kind || '', target: po.target || '', only_reject: po.only_reject === true, note: po.note || '', options: po.options || [], review: po.review || [], multi: !!po.multi, submit: po.submit || null }); }
+            if (po && (po.options || []).length) { found = true; promptOptionsBySession.set(sid, { title: po.title || '', question: po.question || '', kind: po.kind || '', target: po.target || '', po, note: po.note || '', options: po.options || [], review: po.review || [], multi: !!po.multi, submit: po.submit || null }); }
         } catch { /* said below: nothing was read */ }
         syncNeedsInputCard(container, session);
         announcePrompt(found ? 'The question is shown again.' : 'Still nothing to answer here. Use the terminal.');

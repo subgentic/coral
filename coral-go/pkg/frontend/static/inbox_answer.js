@@ -28,6 +28,8 @@ const PERMISSION_WORDS = /^(yes|allow|approve)\b/i, SCOPE = /project|director|fo
 const KEY_HINT = /\s*\((?:[a-z]|esc|enter|tab|shift\+tab|ctrl\+[a-z])\)$/i; // only a key in brackets is a hint: any other bracket ("(always)", "(all projects)") stays in the label, so the full match fails
 // The answers of a request that can only be rejected: the No form of each CLI's words (the server accepts only these, 409 only_reject, for the rest).
 const REJECT_FORM = /^(?:no|deny|reject|cancel)\b/i;
+/** What a row says of a request Coral did not read in full (#15501): no answer is drawn, not even No; the terminal is the way on. A request read whole that only hides a character keeps its No (#15140). */
+const UNREAD_ROW = 'Coral could not read this request in full. Answer it in the agent\u2019s terminal.';
 const wholeLabel = label => label.trim().replace(KEY_HINT, '').replace(/[.!\s]+$/, '');
 const plainlyOneTime = (label, permission) => permission ? ONE_TIME.test(wholeLabel(label)) : !LASTING.test(label) && !SCOPE.test(label); // a question card's own choices (Red, Blue) pass the words that mark a lasting or wide one
 const read = new Map(); // server:session:waiting_since -> the choices, read once per ask
@@ -81,7 +83,9 @@ async function readAsk(s) {
     const reply = await resp.json().catch(() => null) || {};
     const po = reply.prompt_options;
     const onlyReject = !!(po && po.only_reject) || !!(reply.pending && reply.pending.input && reply.pending.input.only_reject === true);
-    const none = { ask: '', picks: [], onlyReject };
+    const unreadable = !!(po && po.unreadable) || !!(reply.pending && reply.pending.input && reply.pending.input.unreadable === true);
+    const none = { ask: '', picks: [], onlyReject, unreadable };
+    if (unreadable) return none; // not read in full: no answer of any kind on a row, and none of the request drawn as if it were the request (#15501)
     if (!po || po.multi) return none;
     if ((po.review || []).length) { // the last step of a multi-question dialog, "Ready to submit your answers?": the row can take it, since a Submit sends only what the person already chose (#11981)
         const submit = (po.options || []).find(o => (o.action || 'select') === 'select' && /^submit\b/i.test(String(o.label || '')) && Number.isInteger(Number(o.n)));
@@ -231,10 +235,10 @@ const lastRead = new Map(); // `server:session` -> the last question read for th
 function fill(s, cell, withDismiss = true) {
     const key = askKey(s), who = `${sessionServer(s)}:${s.session_id}`;
     const fresh = read.has(key);
-    if (!fresh) read.set(key, readAsk(s).catch(() => ({ ask: '', picks: [], onlyReject: false })).then(r => { lastRead.set(who, r); return r; }));
+    if (!fresh) read.set(key, readAsk(s).catch(() => ({ ask: '', picks: [], onlyReject: false, unreadable: false })).then(r => { lastRead.set(who, r); return r; }));
     const stale = fresh ? null : lastRead.get(who);
     const paint = r => { const sig = key + JSON.stringify(r); if (cell._sig === sig && cell._sigEl?.parentNode === cell) return; draw(r); cell._sig = sig; cell._sigEl = cell.firstChild; }; // the same reading for the same card leaves the choices as they are: a press on a Yes is not lost to a drawing under it (#15309)
-    const draw = ({ ask, picks, onlyReject, held, trustWhy, step, stepFull, question, later, lines, trust, rateLimit, browser, target, targetNote, autoBlockAt }) => {
+    const draw = ({ ask, picks, onlyReject, unreadable, held, trustWhy, step, stepFull, question, later, lines, trust, rateLimit, browser, target, targetNote, autoBlockAt }) => {
         cell._cmdObserver?.disconnect(); cell._cmdObserver = null; // the earlier block's observer goes with the block (#14173)
         cell.replaceChildren();
         const said = norm => String(norm || '').replace(/[?\s]+$/, '');
@@ -294,11 +298,11 @@ function fill(s, cell, withDismiss = true) {
                 r.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }); cell.append(r); } } // some of the question's choices are left to Open: said, so these do not read as all of them
         if (onlyReject) { // said in words, set as text: the full request is under Open; with the time Claude Code's own timer blocks it, and one tap to the agent
             const note = document.createElement('span');
-            note.className = 'inbox-only-reject';
+            note.className = unreadable ? 'inbox-only-reject inbox-unread' : 'inbox-only-reject';
             const t = autoBlockAt ? new Date(autoBlockAt) : null, at = t && !Number.isNaN(t.getTime()) ? t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : '';
-            note.textContent = `It can only be rejected here. Open the agent to read it${at ? `; Claude Code blocks it on its own at ${at}` : ''}.`;
-            const o = document.createElement('button'); o.type = 'button'; o.className = 'btn btn-small inbox-open-agent'; o.textContent = 'Open agent';
-            o.setAttribute('aria-label', `Open ${resolveSessionIdentity(s)} to read the request`);
+            note.textContent = unreadable ? UNREAD_ROW : `It can only be rejected here. Open the agent to read it${at ? `; Claude Code blocks it on its own at ${at}` : ''}.`;
+            const o = document.createElement('button'); o.type = 'button'; o.className = unreadable ? 'btn btn-primary btn-small inbox-open-agent' : 'btn btn-small inbox-open-agent'; o.textContent = 'Open agent';
+            o.setAttribute('aria-label', `Open ${resolveSessionIdentity(s)} to ${unreadable ? 'answer' : 'read the request'}`);
             o.addEventListener('click', e => { e.stopPropagation(); openAgent(s); });
             o.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
             cell.append(note, o);

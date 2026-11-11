@@ -26,6 +26,8 @@ const ALLOW_ONLY = ['Yes', 'Yes, proceed'];
                     const po = { question: 'Do you want to proceed?', ask_id: window.__ask, options: window.__opts.map((label, i) => ({ n: i + 1, label, action: 'select' })) };
                     const reply = { messages: [], total: 0, prompt_options: po };
                     if (window.__flag === 'screen') po.only_reject = true;
+                    if (window.__flag === 'screen-unread') { po.only_reject = true; po.unreadable = true; }
+                    if (window.__flag === 'pending-unread') reply.pending = { tool_use_id: 't1', tool_name: 'bash', input: { command: 'ls', only_reject: true, unreadable: true, note: 'Coral cannot answer it here.' } };
                     if (window.__flag === 'pending') reply.pending = { tool_use_id: 't1', tool_name: 'bash', input: { command: 'ls', only_reject: true, note: 'This request holds characters that can hide what it does.' } };
                     return Promise.resolve(new Response(JSON.stringify(reply), { headers: { 'content-type': 'application/json' } }));
                 }
@@ -78,6 +80,17 @@ const ALLOW_ONLY = ['Yes', 'Yes, proceed'];
         await waitFor(`window.__posts.length === 1`, 'the No is sent', 5000);
         assert.equal(await ev(`window.__posts[0].label`), 'No');
         assert.equal(await ev(`window.__posts[0].ask_id`), 'ask-1');
+
+        // 6b. #15501, beside the No above (#15140): a request Coral did not read in full (unreadable) has no answer at all, not even No, says so, and Open agent is the main button
+        const openBtn = () => ev(`(() => { const b = window.__cell.querySelector('button.inbox-open-agent'); return b ? { text: b.textContent, primary: b.classList.contains('btn-primary') } : null; })()`);
+        for (const [why, opts, flag, agent] of [['screen unreadable', CLAUDE, 'screen-unread', 'claude'], ['pending unreadable', CLAUDE, 'pending-unread', 'claude'], ['codex unreadable', CODEX, 'screen-unread', 'codex'], ['opencode unreadable', REJECT_ONLY, 'pending-unread', 'opencode']]) {
+            await set(opts, flag); await draw(agent);
+            await waitFor(`/could not read this request in full/i.test(window.__cell.textContent)`, why, 5000);
+            assert.deepEqual(await labels(), [], why + ': no answer button, not even No');
+            assert.match(await note(), /answer it in the agent.s terminal/i, why + ': says where to answer it');
+            assert.deepEqual(await openBtn(), { text: 'Open agent', primary: true }, why + ': Open agent is the main button');
+            assert.ok(!/can only be rejected/i.test(await ev(`window.__cell.textContent`)), why + ': the reject-only wording is gone');
+        }
 
         // 7. a stale row: drawn when the request was ordinary (Yes and No), then the request turns out to be Reject-only: a click on Yes sends nothing and says the question changed
         await ev(`window.__posts = []; true`); await set(CLAUDE, 'none'); await draw('claude');

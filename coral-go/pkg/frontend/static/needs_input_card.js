@@ -218,7 +218,7 @@ function needsInputHtml(info, session) {
     // A request the server says can only be rejected here (longer than a card shows, or holding characters that hide what it does) offers the refusing answers alone, for every agent: the pending tool the hook
     // reported (Claude, Pi, opencode: input.only_reject) or the prompt read from the screen (Codex, agy, Gemini: screen.only_reject). The server refuses an Allow for it as well (#11399).
     const refuses = o => o.kind === "reject" || (o.kind !== "allow_once" && o.kind !== "allow_always" && REFUSAL_WORDS.test(String(o.label || ""))); // the server's parsed kind decides; the words only where it has none
-    const onlyReject = info.kind === "permission" && (inp.only_reject === true || (info.screen && info.screen.only_reject === true));
+    const onlyReject = info.kind === "permission" && (inp.only_reject === true || info.screen?.po?.only_reject === true);
     if (onlyReject && info.screen) info = { ...info, screen: { ...info.screen, options: (info.screen.options || []).filter(refuses) } };
     const onlyRejectNote = typeof inp.note === "string" && inp.note ? inp.note : (info.screen && typeof info.screen.note === "string" ? info.screen.note : "");
     const screen = info.screen || {};
@@ -503,7 +503,7 @@ export function syncNeedsInputCard(container, session) {
             if (typing.focused) input.focus();
         }
     }
-    if (el.querySelector(".cni-attach,.cni-hint")) { // a card that takes an answer in words has the image strip: its code loads with the first one, not at start (#11403)
+    if (el.querySelector(".cni-attach,.cni-hint,.cni-note")) { // a card that takes an answer in words has the image strip: its code loads with the first one, not at start (#11403)
         if (cardAttach) cardAttach.drawCardImages(el, session.session_id); // images added to the answer stay when the card is drawn again
         else importOnce('./card_attach.js').then(m => { cardAttach = m; if (el.isConnected) m.drawCardImages(el, session.session_id); }).catch(() => {});
     }

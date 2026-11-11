@@ -32,9 +32,9 @@ func (r Review) Allowed() bool { return !r.Cut && !r.Hidden }
 func (r Review) Note() string {
 	switch {
 	case r.Cut && r.Hidden:
-		return fmt.Sprintf("This request is longer than the %d bytes shown and holds characters that can hide what it does (marked <U+....> below). It can only be rejected here: read it in the terminal.", MaxBytes)
+		return fmt.Sprintf("This request is longer than the %d bytes shown and holds characters that can hide what it does (marked <U+....> below). Coral cannot answer it here: answer it in the agent's terminal.", MaxBytes)
 	case r.Cut:
-		return fmt.Sprintf("This request is longer than the %d bytes shown, so it cannot be allowed from here. Read it in the terminal, or reject it.", MaxBytes)
+		return fmt.Sprintf("This request is longer than the %d bytes shown, so Coral could not read it in full. Coral cannot answer it here: answer it in the agent's terminal.", MaxBytes)
 	case r.Hidden:
 		return "This request holds characters that can hide what it does (marked <U+....> below). It can only be rejected here: read it in the terminal."
 	}
