@@ -39,6 +39,8 @@ type HealthSettings struct {
 	CompactContext HealthCompact `json:"compact_context"`
 	// AssignLimit is how many waiting (pending) tasks an agent may have before assigning it another is refused with the other agents by load (#14862, the Operator's assignment limit); --force overrides. 0: no limit.
 	AssignLimit int `json:"assign_limit"`
+	// StaleSweepHours: every this many hours the health monitor types one message to the orchestrator listing stale tasks and the commands to act on them (#14863, the Operator); 0 is off. Coral changes nothing itself.
+	StaleSweepHours int `json:"stale_sweep_hours"`
 	// AskReminder reminds a member, once, of a question (post --ask, asks.go) that @mentions them and that they have not answered for AfterMin (#7794). It runs for a team whether or not the
 	// orchestrator's check is on: a reminder to one agent costs the team nothing.
 	AskReminder HealthMentionNudge `json:"ask_reminder"`
@@ -317,32 +319,36 @@ const (
 // DefaultAssignLimit is the waiting tasks an agent may have before a new assignment to it is refused (#14862).
 const DefaultAssignLimit = 2
 
+// DefaultStaleSweepHours is how often the stale-task sweep goes to the orchestrator (#14863).
+const DefaultStaleSweepHours = 12
+
 // DefaultHealthSettings are the design's values. The check is ON for a team that has not set it (the operator, 2026-11-07: "turn health check on for teams by default", #14091, which reverses #4962's off-by-default):
 // a team that stored OFF keeps off, and the migration that kept the older teams on stays as it is. The rules and numbers below are what it uses; its cost is bounded (a check goes out only when something changed,
 // and the heartbeat is off: see TestANewTeamsFirstHourOfHealthChecksIsFew).
 func DefaultHealthSettings() HealthSettings {
 	return HealthSettings{
 		On: true, IntervalMin: 10, AllClear: true, HeartbeatMin: 0,
-		AutoDelegate:   HealthRuleOn{On: true},
-		ClaimNudge:     HealthClaimNudge{On: true, AfterMin: 10, Nudges: 2},
-		StatusNudge:    HealthStatusNudge{On: true, AfterMin: 20, EscalateAfterMin: 10},
-		MentionRenudge: HealthMentionNudge{On: true, AfterMin: 10},
-		HeldNotice:     HealthMentionNudge{On: true, AfterMin: 10},
-		BusyNoTask:     HealthMentionNudge{On: true, AfterMin: 10},
-		PostNoTask:     HealthRuleOn{On: true},
-		UploadNoTask:   HealthRuleOn{On: true},
-		GoalSize:       HealthGoalSize{On: true, Limit: 15},
-		CompactContext: HealthCompact{On: true, ThresholdK: CompactThresholdDefaultK, Orchestrator: true, Trigger: CompactTriggerThreshold, Method: CompactMethodCompact}, // ON for a team that has not set it (the Operator, #15066): a team that stored it off keeps off
-		AssignLimit:    DefaultAssignLimit,
-		AskReminder:    HealthMentionNudge{On: true, AfterMin: 15},
-		Deviations:     HealthRuleOn{On: true},
-		ActionList:     HealthActionList{StuckWaitMin: 10, OverloadedTasks: 5, OverloadedSleeping: 1, StaleReviewHours: 24, MentionMin: 30},
-		Landing:        HealthLanding{On: false, Branch: "main", WaitMin: 120},
-		Release:        HealthRelease{On: false, Branch: "main", TagPattern: "v*", WaitMin: 1440},
-		GoalsReady:     HealthWaitCheck{On: true, WaitMin: GoalsReadyWaitMin},
-		UnownedTasks:   HealthWaitCheck{On: true, WaitMin: UnownedTasksWaitMin},
-		DialogTimeout:  HealthDialogTimeout{On: false, AfterMin: DialogTimeoutDefault},
-		AutoRecommend:  HealthAutoRecommend{On: false, GraceMin: AutoRecommendGraceDefault},
+		AutoDelegate:    HealthRuleOn{On: true},
+		ClaimNudge:      HealthClaimNudge{On: true, AfterMin: 10, Nudges: 2},
+		StatusNudge:     HealthStatusNudge{On: true, AfterMin: 20, EscalateAfterMin: 10},
+		MentionRenudge:  HealthMentionNudge{On: true, AfterMin: 10},
+		HeldNotice:      HealthMentionNudge{On: true, AfterMin: 10},
+		BusyNoTask:      HealthMentionNudge{On: true, AfterMin: 10},
+		PostNoTask:      HealthRuleOn{On: true},
+		UploadNoTask:    HealthRuleOn{On: true},
+		GoalSize:        HealthGoalSize{On: true, Limit: 15},
+		CompactContext:  HealthCompact{On: true, ThresholdK: CompactThresholdDefaultK, Orchestrator: true, Trigger: CompactTriggerThreshold, Method: CompactMethodCompact}, // ON for a team that has not set it (the Operator, #15066): a team that stored it off keeps off
+		AssignLimit:     DefaultAssignLimit,
+		StaleSweepHours: DefaultStaleSweepHours,
+		AskReminder:     HealthMentionNudge{On: true, AfterMin: 15},
+		Deviations:      HealthRuleOn{On: true},
+		ActionList:      HealthActionList{StuckWaitMin: 10, OverloadedTasks: 5, OverloadedSleeping: 1, StaleReviewHours: 24, MentionMin: 30},
+		Landing:         HealthLanding{On: false, Branch: "main", WaitMin: 120},
+		Release:         HealthRelease{On: false, Branch: "main", TagPattern: "v*", WaitMin: 1440},
+		GoalsReady:      HealthWaitCheck{On: true, WaitMin: GoalsReadyWaitMin},
+		UnownedTasks:    HealthWaitCheck{On: true, WaitMin: UnownedTasksWaitMin},
+		DialogTimeout:   HealthDialogTimeout{On: false, AfterMin: DialogTimeoutDefault},
+		AutoRecommend:   HealthAutoRecommend{On: false, GraceMin: AutoRecommendGraceDefault},
 	}
 }
 
@@ -374,6 +380,7 @@ func (h HealthSettings) Clamp() HealthSettings {
 		h.CompactContext.Trigger = CompactTriggerThreshold // a body that does not carry it, or a word that is none of them
 	}
 	h.AssignLimit = min(max(h.AssignLimit, 0), 50)
+	h.StaleSweepHours = min(max(h.StaleSweepHours, 0), 720) // 0 is off
 	h.AskReminder.AfterMin = min(max(h.AskReminder.AfterMin, 5), 1440)
 	h.ActionList = h.ActionList.clamp()
 	h.Landing.Branch = strings.TrimSpace(h.Landing.Branch)

@@ -50,6 +50,7 @@ type BoardHealthMonitor struct {
 
 	mu         sync.Mutex
 	lastCheck  map[string]time.Time       // per board: when a check last went out
+	lastSweep  map[string]time.Time       // per board: when the stale-task sweep was last looked at (board_health_stale.go)
 	lastEval   map[string]time.Time       // per board: when the check was last looked at (it goes out only when something changed or the heartbeat is due, #11431)
 	lastPrint  map[string]map[string]bool // per board: the facts the last look found, so the same findings are not said again until the heartbeat
 	landing    *LandingWatch              // the landing alert's view of the repositories (git_poller.go feeds it); nil: the alert has nothing to read
@@ -62,7 +63,7 @@ func NewBoardHealthMonitor(store *board.Store, interval time.Duration) *BoardHea
 		interval = 10 * time.Minute
 	}
 	reader := jsonl.NewSessionReader()
-	return &BoardHealthMonitor{store: store, interval: interval, idleAfter: 30 * time.Minute, logger: slog.Default(), now: time.Now, lastMessage: reader.LastMessage, lastCheck: map[string]time.Time{}, lastEval: map[string]time.Time{}, lastPrint: map[string]map[string]bool{}}
+	return &BoardHealthMonitor{store: store, interval: interval, idleAfter: 30 * time.Minute, logger: slog.Default(), now: time.Now, lastMessage: reader.LastMessage, lastCheck: map[string]time.Time{}, lastSweep: map[string]time.Time{}, lastEval: map[string]time.Time{}, lastPrint: map[string]map[string]bool{}}
 }
 
 // SetAgents gives the check its view of the agents (hook events, discovery) and the gate to type
@@ -115,6 +116,7 @@ func (m *BoardHealthMonitor) scan(ctx context.Context) {
 	}
 	for _, p := range projects {
 		m.checkProject(ctx, p.Project, bySession, tick)
+		m.sweepProject(ctx, p.Project, bySession, tick) // the stale-task sweep, on its own period (#14863)
 	}
 }
 

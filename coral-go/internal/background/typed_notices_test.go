@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/typedcensus"
 )
 
@@ -33,7 +34,8 @@ func TestTypedNoticeCensus(t *testing.T) {
 		typedcensus.C("team health check, roster form", typedHealthCheck("[Coral health check] 08:00Z · 3 agents"), typedHealthCheck("[Coral health check] 08:00Z · "+h)),
 		typedcensus.C("health line to a member", typedHealthLine("you have 2 tasks off the books"), typedHealthLine(h)),
 		typedcensus.C("the monitor's deliver, a check", typedHealth("Since 08:00: fine."), typedHealth(composed)),
-		typedcensus.C("context cleared, next task", clearedText(12), clearedText(12)), // a fixed template with a task number only (#14849)
+		typedcensus.C("stale-task sweep", typedHealth(staleSample("a task title")), typedHealth(staleSample(h))), // the sweep's text, a task title in it (#14863)
+		typedcensus.C("context cleared, next task", clearedText(12), clearedText(12)),                            // a fixed template with a task number only (#14849)
 		typedcensus.C("context cleared, no next task", clearedText(0), clearedText(0)),
 		typedcensus.C("context cleared, handoff asked", askHandoffText(), askHandoffText()),
 		typedcensus.C("context cleared, handoff note", handoffText("a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90"), handoffText("a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90")), // the digest is Coral's own, 64 hex
@@ -60,6 +62,7 @@ func TestEveryTypedSenderIsInTheCensus(t *testing.T) {
 		typedcensus.S("agent_exited.go", `text, what, requireInputBox, mention, nil)`, 1, "deliverAutomated: forwards the text of the callers listed here"),
 		typedcensus.S("board_health.go", `typedHealth(text), "health check"`, 1, "the monitor's deliver: everything it types goes through typedHealth (census: team health check, health line)"),
 		typedcensus.S("board_health.go", `"health-check:"+project, text)`, 1, "the check, through the monitor's deliver (typedHealth)"),
+		typedcensus.S("board_health_stale.go", `"stale-sweep:"+project, text)`, 1, "the stale-task sweep (#14863), through the monitor's deliver (typedHealth); its task titles come through teamhealth.ShownText (census: stale-task sweep)"),
 		typedcensus.S("board_health_offbooks.go", `"[Coral health] "+detail)`, 1, "a member's line, through the monitor's deliver (typedHealth)"),
 		typedcensus.S("context_compact.go", `c.deliver(ctx, a, command)`, 1, "exception (#14849): the CLI's own /compact or /clear, one fixed line with nothing from a task, message or transcript in it (TestTheCompactLineIsFixedAndHoldsNothingAShellActsOn); a slash command cannot start with a notice opener, so it is typed only where the CLI is the foreground (deliverCommand's exited-agent and terminal-agent checks)"),
 		typedcensus.S("context_compact.go", `c.deliver(ctx, a, askHandoffText())`, 1, "the one fixed line that asks an agent for its handoff note: askHandoffText, in the census (context cleared, handoff asked)"),
@@ -80,4 +83,13 @@ func TestEveryTypedSenderIsInTheCensus(t *testing.T) {
 		typedcensus.S("notifier.go", `text, what, requireInputBox, mention, wanted)`, 1, "deliverNudge: forwards nudgeText (census: board nudge)"),
 		typedcensus.S("remote_poller.go", `board.OneLine(nudge), "remote board nudge"`, 1, "fixed text with a count, the same sentence as nudgeText's (census: board nudge)"),
 	})
+}
+
+// staleSample is a stale-task sweep with one task whose title is title, for the census.
+func staleSample(title string) string {
+	now := time.Date(2026, 10, 29, 9, 0, 0, 0, time.UTC)
+	who := "Dev"
+	text, _ := staleSweepText(staleInput{Now: now, Title: func(s string) string { return s },
+		Open: []board.Task{{ID: 12, Title: title, Status: "pending", AssignedTo: &who, CreatedAt: now.Add(-5 * 24 * time.Hour).Format(time.RFC3339)}}})
+	return text
 }
