@@ -30,8 +30,13 @@ func TestASpawnedProcessIsItsOwnResponsibleProcess(t *testing.T) {
 	plain := exec.Command("sleep", "30")
 	require.NoError(t, plain.Start())
 	defer func() { _ = plain.Process.Kill(); _, _ = plain.Process.Wait() }()
-	assert.Equal(t, responsibleOf(t, os.Getpid()), responsibleOf(t, plain.Process.Pid), "the ordinary start keeps Coral's responsible process (the premise of the fix)")
-	assert.NotEqual(t, plain.Process.Pid, responsibleOf(t, plain.Process.Pid))
+	// The premise (a child keeps its parent's responsible process) holds in a tree macOS launched with one set: Coral.app, a launchd job, Terminal. It cannot be shown in a tree
+	// whose root was disclaimed (a Coral agent's shell, whose tmux Spawn started): nothing is set there, so every process answers with itself, the ordinary child as well (#15535).
+	if got := responsibleOf(t, plain.Process.Pid); got == plain.Process.Pid {
+		t.Logf("no responsible process is inherited in this process tree (the child answers with itself): the premise is not shown here, the spawn checks below still are")
+	} else {
+		assert.Equal(t, responsibleOf(t, os.Getpid()), got, "the ordinary start keeps Coral's responsible process (the premise of the fix)")
+	}
 
 	sleep, err := exec.LookPath("sleep")
 	require.NoError(t, err)
