@@ -29,10 +29,11 @@ export function createComposer({ st, render, run, ownHex }) {
         const cancel = btn('ac-cancel', 'Cancel'); cancel.addEventListener('click', () => { if (tray) tray.destroy(); st.composing = null; st.error = ''; render(); });
         const send = btn('btn-primary ac-send', editOf ? 'Save' : cm.parentId != null ? 'Reply' : 'Comment'); send.type = 'submit';
         const err = el('p', 'ac-error', st.error); err.setAttribute('role', 'alert'); err.hidden = !st.error;
+        const how = el('p', 'ac-counter ac-sendhint', 'Enter starts a new line. Press Ctrl+Enter (⌘ Enter on a Mac) to send.'); how.id = `ac-sendhint-${Math.random().toString(36).slice(2, 8)}`; ta.setAttribute('aria-describedby', how.id); ta.dataset.sendhint = how.id; // Enter is a new line, so the way to send is said (#15231, walk 8 M3)
         const row = el('div', 'ac-composer-row'); row.append(count, ...(tray ? [tray.picker()] : []), cancel, send);
         const hint = editOf ? '' : st.hint?.() || '', hintEl = hint ? el('p', 'ac-note ac-hint', hint) : null; // always drawn with its line; shown while the file waits for review (the review bar toggles it with the file's state, #15128)
-        if (hintEl) { hintEl.id = `ac-hint-${++hintSeq}`; const on = !!st.hintOn?.(); hintEl.hidden = !on; if (on) ta.setAttribute('aria-describedby', hintEl.id); } // a screen reader hears it where the person types
-        box.append(ta, ...(hintEl ? [hintEl] : []), ...(tray ? [tray.node, tray.hint()] : []), err, row);
+        if (hintEl) { hintEl.id = `ac-hint-${++hintSeq}`; const on = !!st.hintOn?.(); hintEl.hidden = !on; if (on) ta.setAttribute('aria-describedby', `${hintEl.id} ${how.id}`); } // a screen reader hears it where the person types
+        box.append(ta, ...(hintEl ? [hintEl] : []), how, ...(tray ? [tray.node, tray.hint()] : []), err, row);
         if (tray) { tray.attach(box, ta); tray.listen(() => { send.disabled = tray.busy() || tray.failed(); }); send.disabled = tray.busy() || tray.failed(); } // Send waits for a picture still going up, and for a failed one to be removed
         box.addEventListener('submit', (e) => {
             e.preventDefault();

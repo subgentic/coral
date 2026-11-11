@@ -245,7 +245,7 @@ export function attachReview(d, { reload }) {
         bar.hidden = !s;
         approve.hidden = changes.hidden = approveNote.hidden = !pending;
         d.dataset.reviewPending = pending ? '1' : ''; // the comment box says where approving is (#15128)
-        for (const h of d.querySelectorAll('.ac-hint')) { h.hidden = !pending; const t = h.parentNode.querySelector('textarea'); if (t) { if (pending) t.setAttribute('aria-describedby', h.id); else t.removeAttribute('aria-describedby'); } } // a box that is open follows the file's state, not the state it was drawn in
+        for (const h of d.querySelectorAll('.ac-hint')) { h.hidden = !pending; const t = h.parentNode.querySelector('textarea'); if (t) { const how = t.dataset.sendhint || ''; if (pending || how) t.setAttribute('aria-describedby', pending ? `${h.id} ${how}`.trim() : how); else t.removeAttribute('aria-describedby'); } } // a box that is open follows the file's state, not the state it was drawn in
         paintApprove(); // changes were asked for: Approve is still the Operator's, and says it approves this version as it is; with a newer version in the series it names the one it approves (#15197)
         if (!pending) form.hidden = true;
         bar.hidden = !s || (slotted && form.hidden); // on the header row the strip under it is the change-request form: there only while it is open
