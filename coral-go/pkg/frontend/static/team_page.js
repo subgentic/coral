@@ -19,7 +19,6 @@ import { setPreviewSession } from './preview_pane.js';
 import { renderLiveSessions } from './render.js';
 import { watchScrollCue } from './scroll_cue.js';
 import { isPhoneLayout } from './phone_layout.js';
-import { loadStyles } from './lazy_styles.js';
 await loadStyles('team_tabs.css'); // the tab strip's steady widths (count room, no width animation): not at start (page_weight), loaded with the page before the strip is built (#15494)
 const { revealInStrip } = await importOnce('./strip_reveal.js'); // a part of the team page's group: loaded with it
 const { closeDetailPane } = await importOnce('./detail_pane.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried

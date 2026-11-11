@@ -101,7 +101,7 @@ func TestHeaderKeyRuleFindsNothingInTheRepositorysOwnText(t *testing.T) {
 	})
 	for _, f := range found {
 		assert.True(t, strings.Contains(f, "page_secrets_test.go") || strings.Contains(f, "header_key_test.go") || strings.Contains(f, "keyword_gate_test.go") ||
-			strings.Contains(f, "artifact_comments_test.go"), "an unexpected header key in ordinary text: %s", f)
+			strings.Contains(f, "artifact_comments_test.go") || strings.Contains(f, "dropbox_app_key_test.go"), "an unexpected header key in ordinary text: %s", f)
 	}
 }
 
