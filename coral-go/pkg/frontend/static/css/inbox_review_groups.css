@@ -11,4 +11,7 @@
 
 .inbox-group-mode { min-width: 0; max-width: 100%; } /* Group by (#14729): the choice after its label */
 @media (max-width: 760px), (pointer: coarse) { .inbox-group-mode { min-height: var(--control-touch-height, 44px); } }
-.inbox-needs-results .inbox-file-question { padding-inline-end: 52px; } /* the star has its own room at the end of the row: the question and the uploader under the name stop before it (#14968) */
+@media (max-width: 760px) { .inbox-needs-results .inbox-file-question { padding-inline-end: 52px; } } /* a phone: the question and the uploader under the name stop before the star (#14968) */
+@media (min-width: 761px) { /* a wider row: every line after the name line in the item's cell stops before the star, whatever the line is (#15084, the Operator: the star still sat on the text in the Mac app; #14968 padded one class of line, the file question, and a context line or an agent's question ran under the star). The name line has its own 52 px (the anchor's padding) */
+    .inbox-needs-results .inbox-review-star-anchor ~ :not(.inbox-kind-column) { padding-inline-end: 52px; box-sizing: border-box; }
+}
