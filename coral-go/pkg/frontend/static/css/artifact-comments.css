@@ -68,8 +68,9 @@
 .ac-panel .ac-replybox:hover { border-color: var(--text-muted); color: var(--text-secondary); }
 .ac-composer { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .ac-input { width: 100%; resize: vertical; }
-.ac-composer-row { display: flex; align-items: center; gap: 8px; }
+.ac-composer-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; } /* count, the picture button, Cancel and Send: in a narrow panel they wrap rather than run past its edge, where Send could not be reached (#15592) */
 .ac-counter { flex: 1; white-space: nowrap; color: var(--text-muted); font-size: var(--fs-sm, 0.8125rem); }
+.ac-counter.ac-sendhint { flex: none; margin: 0; white-space: normal; overflow-wrap: anywhere; } /* the sentence that says how to send is text under the box: it wraps in the panel, where the count's one line runs on and pushed Send off screen (#15592) */
 .ac-error { margin: 0; color: var(--error-text, var(--error)); font-size: var(--fs-sm, 0.8125rem); }
 .ac-error[hidden] { display: none; }
 .ac-selbtn { position: fixed; z-index: 120; }

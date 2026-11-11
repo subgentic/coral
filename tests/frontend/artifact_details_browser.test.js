@@ -122,12 +122,12 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
                 if (mobile) {
                     for (const touch of [true, false]) {
                         await Emulation.setTouchEmulationEnabled({ enabled: touch }); await settle(150); await openMore();
-                        const sz = await ev(`(() => { const r = document.querySelector('#artifact-viewer .details-toggle').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })()`);
-                        assert.ok(sz[0] >= 44 && sz[1] >= 44, `${touch ? 'touch' : 'mouse'}: the viewer's Details button is 44 px: ${JSON.stringify(sz)}`);
+                        const sz = await ev(`(() => { const r = document.querySelector('#artifact-viewer .artifact-viewer-details-item').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })()`); // the phone's Details is the ⋯ menu's item; the header button shows only while it is open (#15033)
+                        assert.ok(sz[0] >= 44 && sz[1] >= 44, `${touch ? 'touch' : 'mouse'}: the viewer's Details menu item is 44 px: ${JSON.stringify(sz)}`);
                     }
                     await Emulation.setTouchEmulationEnabled({ enabled: true });
                 }
-                await openMore(); await ev(`${toggle('#artifact-viewer')}.focus(); true`); await key('Enter', 'Enter', 13, '\r'); await settle(200);
+                await openMore(); await ev(mobile ? `document.querySelector('#artifact-viewer .artifact-viewer-details-item').focus(); true` : `${toggle('#artifact-viewer')}.focus(); true`); await key('Enter', 'Enter', 13, '\r'); await settle(200); // a phone opens Details from the ⋯ menu's item (#15033); the header button shows once it is open
                 assert.equal(await ev(`document.querySelector('#artifact-viewer .artifact-viewer-readers').hidden`), false, 'Enter opens it');
                 assert.ok(await ev(`window.__na.text(document.querySelector('#artifact-viewer .artifact-viewer-readers')).includes('Who can read this')`), 'Who can read this is inside');
                 await waitFor(`document.querySelectorAll('#artifact-viewer .artifact-readers-body p').length >= 3`, 'the readers answer in the viewer', 8000);
