@@ -49,7 +49,7 @@ const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'mod
         await S.run('step 3 working mode and health: the request carries working_mode {mode, dependency_guidance, custom_instructions} and no health_monitor (on is the default, #14091)', async () => {
             await install_stub(200); await fresh(); await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250); await t.click('button', N.next); await t.step(3);
             await tab('Start'); await t.type('textarea', /^Additional instructions/i, 'Keep the diff small.', N.team); await t.type('textarea', /^What should the team work on/i, 'Look at the build.', N.team);
-            await tab('Workflow'); assert.ok(await t.pick(/^Working mode$/i, /Worktrees/i), 'a Working mode choice Worktrees'); assert.ok(await check(/^Guidance for dependent tasks$/i, true), 'the Guidance for dependent tasks switch');
+            await tab('Workflow'); assert.ok(await t.pick(/^Working mode$/i, /Worktrees/i), 'a Working mode choice Worktrees'); assert.ok(await check(/^Help with tasks that wait on others$/i, true), 'the Help with tasks that wait on others switch');
             await tab('Health check'); assert.ok(await check(/^Send health check/i, true), 'the Send health check switch');
             await t.click('button', N.launch); await waitFor(`window.__qa.launch.length === 1`, 'the launch request', 6000);
             const q = (await sent()).launch[0];
@@ -106,7 +106,7 @@ const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'mod
         });
         await S.run('step 3 Workflow: Requests for work are tasks is on for a new team and turning it off leaves it out of the request (#7792)', async () => {
             await install_stub(200); await fresh(); await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250); await t.click('button', N.next); await t.step(3);
-            await tab('Workflow'); assert.ok(await check(/^Requests for work are tasks/i, false), 'the Requests for work are tasks switch, turned off');
+            await tab('Workflow'); assert.ok(await check(/^Turn requests for work into tasks/i, false), 'the Turn requests for work into tasks switch, turned off');
             await t.click('button', N.launch); await waitFor(`window.__qa.launch.length === 1`, 'the launch request', 6000);
             const q = (await sent()).launch[0];
             assert.ok(!q.working_mode || !q.working_mode.asks_are_tasks, 'off: the request does not turn it on');
