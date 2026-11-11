@@ -45,18 +45,26 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
     const fillStatus = (p, id) => {
         const rows = [...statusNow(id)]; p.replaceChildren();
         if (!rows.length) { p.textContent = st.undelivered && st.undelivered.get(id) ? `Not delivered: ${st.undelivered.get(id)}` : 'Not sent to an agent yet'; return; } // why it went nowhere (#15034)
+        const all = (st.data && st.data.comments) || [], top = all.find(x => x.id === id);
+        const newest = [top, ...all.filter(x => x.parentId === id && !x.deleted)].filter(Boolean).reduce((a, x) => (!a || Date.parse(x.createdAt) >= Date.parse(a.createdAt) ? x : a), null); // the newest message of the thread (#15119): a read mark says whether THIS was read, not an older one
         rows.forEach(([role, s], i) => {
             if (i) p.append('; ');
-            const link = agentLink(names.get(role) || role, { board: boardTeamKey(st.server, st.board) }), state = s.k ? askUi.askState(s.k) : 'sent';
+            const link = agentLink(names.get(role) || role, { board: boardTeamKey(st.server, st.board) });
+            let state = s.k ? askUi.askState(s.k) : 'sent';
+            const newestMine = !!newest && newest.mine, readNewest = !!s.k && !!s.k.readAt && (!newest || !(Date.parse(newest.createdAt) > Date.parse(s.k.readAt)));
+            if (s.k && newestMine && newest !== top && state !== 'sent') state = readNewest ? 'read' : 'unread'; // the newest message is yours: replied or read earlier says nothing of it until the agent has read it
             if (state === 'replied') p.append(link, ` replied${s.k.replies > 1 ? ` (${s.k.replies} times)` : ''}`);
             else if (state === 'read') {
                 p.append('Read by ', link);
                 if (s.k.readAt) { const t = document.createElement('span'); t.textContent = `, ${ago(s.k.readAt)}`; t.title = s.k.readAt; p.append(t); }
-            } else p.append('Sent to ', link, ` (${s.words.replace(/^./, c => c.toLowerCase())})`);
+            } else if (state === 'unread') p.append('Sent to ', link, `, not read yet${s.k.replies > 0 ? ` (it replied ${s.k.replies === 1 ? 'once' : `${s.k.replies} times`} before)` : ''}`);
+            else p.append('Sent to ', link, sentWords(s.words));
             if (s.k && s.k.nudged && state !== 'sent') p.append(', reminded');
             if (s.k && s.k.limitReached) p.append('. The agent has reached its reply limit here'); // until the Operator writes again (#15034)
         });
     };
+    /** The words after "Sent to A": a first ask says nothing more; one that was asked before says so plainly, not "(already asked)" (#15119). */
+    const sentWords = words => { const w = String(words || '').replace(/^./, c => c.toLowerCase()); return !w ? '' : w.startsWith('already asked') ? ` (asked about this thread before${w.slice('already asked'.length)})` : ` (${w})`; };
     const statusWords = id => { const p = document.createElement('p'); fillStatus(p, id); return p.textContent; };
     const redrawStatus = id => { const p = panel.querySelector(`.ac-card[data-id="${id}"] .ac-ask-status`); if (p) fillStatus(p, id); };
     function askBlock() {

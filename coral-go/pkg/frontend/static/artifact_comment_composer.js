@@ -21,8 +21,9 @@ export function createComposer({ st, render, run, ownHex }) {
         if (cm.anchor) { const a = cm.anchor; const q = el('blockquote', 'ac-quote', cm.atS != null ? `Video: ${cm.timeLabel || cm.atS + ' seconds'}` : a.whole ? 'The whole document' : a.quote); box.append(q); }
         const ta = el('textarea', 'field ac-input'); ta.rows = 3; ta.maxLength = BODY_MAX; ta.value = cm.draft != null ? cm.draft : (editOf ? editOf.body : ''); // what was typed wins over the saved text once typing started, so a redraw (a reply that arrived) keeps an edit's words (#13299)
         ta.setAttribute('aria-label', editOf ? 'Edit your comment' : cm.parentId != null ? 'Your reply' : 'Your comment'); ta.placeholder = cm.parentId != null ? 'Write a reply…' : 'Add a comment…';
-        const count = el('span', 'ac-counter', `${ta.value.length} / ${BODY_MAX}`);
-        ta.addEventListener('input', () => { count.textContent = `${ta.value.length} / ${BODY_MAX}`; cm.draft = ta.value; });
+        const sends = /Mac/.test(navigator.platform) ? '⌘ Return' : 'Ctrl+Enter', words = () => `${ta.value.length} / ${BODY_MAX}${matchMedia('(pointer: coarse)').matches ? '' : ` · ${sends} sends`}`; // Enter adds a line: the shortcut is said beside the count (#15119)
+        const count = el('span', 'ac-counter', words());
+        ta.addEventListener('input', () => { count.textContent = words(); cm.draft = ta.value; });
         const tray = editOf ? null : (cm.tray || (cm.tray = imgs.createImageTray({ upload: (blob, versionOf) => api.uploadCommentImage(cm.hex || st.hex, st.server, blob, versionOf, st.board) }))); // a new comment or reply can carry pictures; an edit keeps the ones it has
         const cancel = btn('ac-cancel', 'Cancel'); cancel.addEventListener('click', () => { if (tray) tray.destroy(); st.composing = null; st.error = ''; render(); });
         const send = btn('btn-primary ac-send', editOf ? 'Save' : cm.parentId != null ? 'Reply' : 'Comment'); send.type = 'submit';

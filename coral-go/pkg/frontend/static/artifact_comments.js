@@ -111,10 +111,11 @@ export function attachComments(dialog, body, host, opts = {}) {
     const phone = window.matchMedia(PHONE_QUERY);
     const sheet = opts.sheet || (() => phone.matches); // the panel is a bottom sheet over the document
     const isOpen = () => panel.classList.contains('ac-sheet-open');
+    const focusInput = () => { const i = panel.querySelector('.ac-input'); i?.focus(); i?.scrollIntoView({ block: 'nearest' }); }; // the box that opened is where the person looks: a long thread no longer leaves it below the fold (#15119)
     const preferenceKey = () => opts.preferenceKey ? opts.preferenceKey() : OPEN_KEY;
     const remember = (open) => { const key = preferenceKey(); if (key) browserLocal.set(key, open ? 'open' : 'closed'); };
     const remembered = () => { const key = preferenceKey(), choice = key ? browserLocal.get(key) : null; return choice === 'open' ? true : choice === 'closed' ? false : null; };
-    const syncOn = () => dialog.classList.toggle('ac-on', !!st.shownNow && (phone.matches || isOpen()));
+    const syncOn = () => dialog.classList.toggle('ac-on', !!st.shownNow && (phone.matches || isOpen() || !!st.data?.comments?.length)); // the width the dialog has WITH the column, open or shut: opening the comments no longer widens it under the pointer (#15119)
     const shown = opts.shown || (() => !dialog.hidden);
     // Available on both the side column and the bottom sheet; never reserve a
     // column the person cannot hide.
@@ -150,7 +151,7 @@ export function attachComments(dialog, body, host, opts = {}) {
             st.data = data; st.gone = false;
             if (!st.visibilitySet) {
                 st.visibilitySet = true;
-                setSheet(opts.initialOpen ?? remembered() ?? (st.video ? true : opts.toggleHost ? !phone.matches && !sheet() && openCount() > 0 : false)); // a docked pane too narrow for the column (it would be a sheet over the document) starts closed too (#14846: it opened over the file and froze it); the viewer: closed until the person opens it, and then as they left it, so the file has the whole width (#12225); the docked preview keeps opening when there are comments
+                setSheet(opts.initialOpen ?? remembered() ?? (st.video ? true : false)); /* no remembered choice: shut, whatever the file has (it opened for one file and not the next, #15119) */ // a docked pane too narrow for the column (it would be a sheet over the document) starts closed too (#14846: it opened over the file and froze it); the viewer: closed until the person opens it, and then as they left it, so the file has the whole width (#12225); the docked preview keeps opening when there are comments
             }
         } catch (e) {
             if (hex !== st.hex || gen !== ctxGen) return;
@@ -283,7 +284,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (st.video && sendable.length) { const sendAll = btn('ac-send-open', `Send ${plural(sendable.length, 'open comment')} to an agent`); sendAll.addEventListener('click', () => openMany(sendable)); panel.append(sendAll); }
         if (st.composing && st.composing.anchor) panel.append(composer());
         else if (d.canComment && !d.locked && !opts.compact) {
-            const whole = btn('ac-whole', st.video ? 'Comment at playhead' : opts.words?.whole || 'Comment on the whole document'); whole.addEventListener('click', () => { const time = st.video?.current(); st.composing = { anchor: opts.wholeAnchor ? opts.wholeAnchor() : { whole: true }, ...time, ...(time ? { timeLabel: stampRange(time) } : {}) }; st.error = ''; render(); panel.querySelector('.ac-input')?.focus(); });
+            const whole = btn('ac-whole', st.video ? 'Comment at playhead' : opts.words?.whole || 'Comment on the whole document'); whole.addEventListener('click', () => { const time = st.video?.current(); st.composing = { anchor: opts.wholeAnchor ? opts.wholeAnchor() : { whole: true }, ...time, ...(time ? { timeLabel: stampRange(time) } : {}) }; st.error = ''; render(); focusInput(); });
             panel.append(whole);
         }
         const act = panel.querySelector('.ac-card.ac-active'); if (act && st.scrollCard) { st.scrollCard = false; act.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() }); }
@@ -308,7 +309,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (top) {
             const a = c.anchor || {};
             if (st.video && c.atS != null) { const seek = btn('ac-video-time', stampRange(c), `Seek to ${stampRange(c)}`); seek.addEventListener('click', () => { st.video.seek(c.atS); activate(c.id, true); }); m.append(seek); }
-            if (a.start_line) m.append(el('span', 'ac-lines', a.end_line && a.end_line !== a.start_line ? `lines ${a.start_line}-${a.end_line}` : `line ${a.start_line}`));
+            if (a.start_line) m.append(el('span', 'ac-lines', a.end_line && a.end_line !== a.start_line ? `In the file, lines ${a.start_line} to ${a.end_line}` : `In the file, line ${a.start_line}`));
             if (c.resolved) m.append(el('span', 'chip ac-pill ac-pill-resolved', 'resolved'));
             if (c.fromVersion != null) {
                 const g = groupOf(c);
@@ -354,7 +355,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         // The reply box at the foot of the card, where Docs has it; it opens the composer in place.
         if (!c.deleted && c.can.reply && !(st.composing && st.composing.parentId === c.id)) {
             const rb = btn('ac-replybox', 'Reply…', `Reply to the comment by ${nameSaid(c)}`);
-            rb.addEventListener('click', () => { st.composing = { parentId: c.id, hex: ownHex(c) }; st.error = ''; render(); panel.querySelector('.ac-input')?.focus(); });
+            rb.addEventListener('click', () => { st.composing = { parentId: c.id, hex: ownHex(c) }; st.error = ''; render(); focusInput(); });
             li.append(rb);
         }
         if (st.composing && st.composing.parentId === c.id) li.append(composer());
@@ -367,7 +368,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         const row = el('div', 'ac-actions');
         if (c.deleted) return row;
         const who = nameSaid(c);
-        if (c.can.edit) row.append(act('Edit', `Edit the comment by ${who}`, () => { st.composing = { editId: c.id }; st.error = ''; render(); panel.querySelector('.ac-input')?.focus(); }));
+        if (c.can.edit) row.append(act('Edit', `Edit the comment by ${who}`, () => { st.composing = { editId: c.id }; st.error = ''; render(); focusInput(); }));
         if (c.can.delete) row.append(act('Delete', `Delete the comment by ${who}`, () => confirmThen('Delete this comment?', () => run(() => api.deleteComment(ownHex(c), st.server, c.id), 'Comment deleted'))));
         // Send to agent (#6357, #6456): the owner, on this computer, for a thread of this board that is open; never through Coral Hub
         if (top && canAsk(c)) { const b = act('Send to agent', () => openAsk(c)); b.classList.add('ac-ask-open'); b.setAttribute('aria-label', `Send the comment by ${nameSaid(c)} to an agent`); b.setAttribute('aria-expanded', String(!!st.ask && st.ask.id === c.id)); row.append(b); }
@@ -473,7 +474,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         st.composing = { anchor: s.anchor }; st.error = ''; selBtn.hidden = true;
         window.getSelection().removeAllRanges();
         userSet(true); render(); // the new comment opens the panel
-        panel.querySelector('.ac-input')?.focus();
+        focusInput();
     });
 
     // ── the phone's sheet
@@ -526,7 +527,7 @@ export function attachComments(dialog, body, host, opts = {}) {
             if (!st.hex || !st.data || !st.data.canComment || st.data.locked) return false;
             if (!st.composing || st.composing.editId) st.composing = { anchor: { whole: true } }; // a comment already being written keeps its words and takes the picture too
             st.error = ''; setSheet(true); render();
-            const cm = st.composing; panel.querySelector('.ac-input')?.focus();
+            const cm = st.composing; focusInput();
             if (cm.tray) cm.tray.add([new File([blob], name || 'marked-picture.png', { type: blob.type })]);
             return true;
         },
@@ -535,7 +536,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         /** A comment on an anchor the caller made (the lines selected in an agent's diff, #12536): the composer opens on it, in the panel. Resolves false when this person cannot comment here. */
         composeOn(anchor) {
             if (!st.hex || !st.data || !st.data.canComment || st.data.locked) return false;
-            st.composing = { anchor }; st.error = ''; setSheet(true); render(); panel.querySelector('.ac-input')?.focus();
+            st.composing = { anchor }; st.error = ''; setSheet(true); render(); focusInput();
             return true;
         },
         async docWhole() {
@@ -547,7 +548,7 @@ export function attachComments(dialog, body, host, opts = {}) {
                     if (lifetime !== st.lifetime || hex !== st.hex || !video.isConnected || st.video) return;
                     st.videoTime = m.videoTime;
                     st.video = m.attachVideoComments(video, {
-                        onComment: time => { if (!st.data?.canComment || st.data.locked) return; st.composing = { anchor: { whole: true }, ...time, timeLabel: stampRange(time) }; st.error = ''; setSheet(true); render(); panel.querySelector('.ac-input')?.focus(); },
+                        onComment: time => { if (!st.data?.canComment || st.data.locked) return; st.composing = { anchor: { whole: true }, ...time, timeLabel: stampRange(time) }; st.error = ''; setSheet(true); render(); focusInput(); },
                         onActivate: id => { activate(id, false); setSheet(true); },
                     });
                     dialog.classList.add('avc-video'); region(true); setSheet(true);
