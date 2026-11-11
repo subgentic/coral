@@ -314,6 +314,7 @@ export async function selectDoc(name, { noteRoute = true, focusHeading = false }
         wrapTables(content);
         focusableCode(content);
         titleRow(content);
+        importOnce('./docs_agent_copy.js').then(m => m.addDocRobots(content, name)).catch(() => {}); // the robot beside each heading (#15063)
     } else {
         // Fallback: pre-formatted text
         content.innerHTML = '<pre style="white-space:pre-wrap">' + esc(doc.content) + '</pre>';
