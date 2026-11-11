@@ -6,6 +6,7 @@ import (
 
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/naming"
+	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
 
 	"github.com/subgentic/coral/internal/sessionstate"
@@ -93,6 +94,11 @@ func (h *SessionsHandler) applyTranscriptState(input *SessionStateInput, events 
 	// No event at all, from hooks or the transcript: the CLI may still be on a prompt it draws at launch (#4543).
 	if len(input.Events) == 0 && !input.NeedsLogin && !input.Archived && !input.Sleeping {
 		input.StartupPrompt, input.StartupSummary = h.startupPromptState(name, agentType, sessionID)
+	} else if agentType == at.Codex && !input.NeedsLogin && !input.Archived && !input.Sleeping && !turnOpenIn(input.Events) {
+		// Codex's rate-limit notice comes after its hooks, on an idle agent: the screen says the agent is held behind it (#15485).
+		if summary := h.rateLimitNoticeState(name, agentType, sessionID); summary != "" {
+			input.StartupPrompt, input.StartupSummary = ptymanager.StartupPrompt, summary
+		}
 	}
 }
 
@@ -130,4 +136,16 @@ func mergeTranscriptTurnEvent(input *SessionStateInput, events []store.AgentEven
 	// model/tool operation can be silent while the turn remains in progress.
 	input.StalenessSeconds = 0
 	input.NotStarted = false
+}
+
+// turnOpenIn reports whether the latest state event leaves a turn or a request open (a working agent's screen is not read for a notice).
+func turnOpenIn(events []sessionstate.Event) bool {
+	if len(events) == 0 {
+		return false
+	}
+	switch events[len(events)-1].Type {
+	case "prompt_submit", "turn_activity", "tool_use", "permission_request", "notification":
+		return true
+	}
+	return false
 }

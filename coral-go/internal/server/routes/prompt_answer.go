@@ -1044,7 +1044,7 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	h.hints.forget(body.SessionID) // the prompt was answered: the next poll reads what replaced it
-	h.startupScreens.forget(promptReadKey(body.SessionID, name, body.AgentType))
+	h.forgetPromptReads(body.SessionID, name, body.AgentType)
 	cleared, err := h.confirmAnswer(r.Context(), name, body.AgentType, body.SessionID, screen, body.N, action)
 	if err != nil {
 		writeTerminalError(w, err)
@@ -1316,7 +1316,7 @@ func (h *SessionsHandler) submitMulti(w http.ResponseWriter, r *http.Request, na
 		writeTerminalError(w, err)
 		return
 	}
-	h.startupScreens.forget(promptReadKey(sessionID, name, agentType))
+	h.forgetPromptReads(sessionID, name, agentType)
 	cleared, err := h.confirmAnswer(r.Context(), name, agentType, sessionID, before, 0, "arrows")
 	if err != nil {
 		writeTerminalError(w, err)

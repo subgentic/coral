@@ -108,10 +108,8 @@ func TestStartupPromptsHoldTheSession(t *testing.T) {
 		_, err := h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: name, SessionID: &sid, EventType: "stop", Summary: "stop"})
 		require.NoError(t, err)
 		mock.outputs[name] = codexHookTrust(t, "tmux_open.txt")
-		before := len(mock.captures)
 		st := h.deriveSingleSessionState(ctx, sid, 0)
-		assert.NotEqual(t, "startup", st.WaitingKind)
-		assert.Equal(t, before, len(mock.captures), "no screen read once the agent's events say what it does")
+		assert.NotEqual(t, "startup", st.WaitingKind, "a startup prompt is never taken from an agent whose events say what it does; its idle screen is read only for Codex's rate-limit notice (rate_limit_state_test.go)")
 	})
 }
 
