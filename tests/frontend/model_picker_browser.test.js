@@ -7,6 +7,7 @@
 //   - the real model is shown by its display name from the list, else from the id: in the agent's hover tip and in the agent page's Details disclosure (#apd-model, #9837: the header does not carry it), never in the row (a row is one line, #9686).
 // Run against an isolated dev server.
 const assert = require('node:assert/strict');
+const { quietLaunchNotice } = require('./helpers/launch_notice');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
 
@@ -21,7 +22,7 @@ const { coralReady } = require('./helpers/wait');
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
+        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await quietLaunchNotice(Page, ev, process.env.CORAL_TEST_URL + '/'); await install();
         await coralReady(ev);
         // Nothing cached by an earlier suite: the first scene seeds its own cache, the others must start from none.
         await ev(`(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('coral-models:v1:')) localStorage.removeItem(k); return true; })()`);

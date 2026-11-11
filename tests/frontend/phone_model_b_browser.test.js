@@ -8,6 +8,7 @@ const { install: installTP, seed, openTeam, goTab } = require('./helpers/team_pa
 const { removeBoards } = require('./helpers/board_cleanup');
 const { DATA_WORLD } = require('./helpers/census_world');
 const BASE = require('./test_base').BASE;
+const { quietLaunchNotice } = require('./helpers/launch_notice');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -19,7 +20,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, fs, theme] of [[390, 16, 'light'], [390, 16, 'dark'], [390, 32, 'light'], [320, 16, 'dark']]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await quietLaunchNotice(Page, ev, BASE + '/'); await install();
             await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`document.documentElement.style.fontSize = '${fs}px'; document.documentElement.setAttribute('data-theme', '${theme}'); true`);
             await installTP(ev); await seed(ev, TEAM); await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
@@ -63,7 +64,7 @@ const BASE = require('./test_base').BASE;
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         const BACKS = '.group-table-back, .inbox-phone-back, .wf-phone-back, .sched-back, .docs-phone-back, .cost-phone-back, .back-link, .goals-back, .mobile-history-back, .team-bar-back';
         const detail = async (name, view, setup, goes) => {
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await quietLaunchNotice(Page, ev, BASE + '/'); await install(); await coralReady(ev);
             await setup(); await settle(500);
             const g = await ev(`(() => { const vis = e => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[hidden]');
                 const v = document.querySelector(${JSON.stringify(view)}); const backs = [...document.querySelectorAll(${JSON.stringify(BACKS)})].filter(vis).filter(e => v.contains(e) || e.closest('#team-page-view'));

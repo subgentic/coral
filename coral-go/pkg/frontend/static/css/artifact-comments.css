@@ -99,8 +99,10 @@
     .ac-panel > .ac-composer { position: sticky; bottom: calc(-1 * var(--space-md)); background: var(--bg-secondary); padding: 6px 0 calc(var(--space-md)); margin-bottom: calc(-1 * var(--space-md)); z-index: 1; }
     /* with the keyboard up there is little height: the sheet may use all of the viewer, and the header folds to one row (the filters and the close button; the title is the sheet's own name and
        the filters already say what is shown), so the sticky header and the sticky composer never overlap */
-    body.keyboard-open .ac-panel { max-height: 100%; }
+    body.keyboard-open .ac-panel { max-height: calc(100% - var(--ac-foot, 0px)); }
     body.keyboard-open .ac-title { display: none; }
+    body.keyboard-open .ac-panel > .ac-composer { gap: 4px; padding-bottom: 4px; } /* with the keyboard up the composer is the box and its buttons: the two help lines under it (how to send, how to add a picture) are left out so the header and Show resolved stay on screen at 320 px (phone_pass_browser) */
+    body.keyboard-open .ac-panel > .ac-composer :is(.ac-sendhint, .ac-images-hint) { display: none; }
     body.keyboard-open .ac-showresolved, body.keyboard-open .ac-showearlier { order: 1; flex: 1 1 0; }
     body.keyboard-open .ac-sheet-close { order: 2; }
     .ac-panel .ac-showresolved, .ac-panel .ac-showearlier, .ac-panel .ac-replybox, .ac-panel .ac-resolve, .ac-panel .ac-act, .ac-panel .ac-jump, .ac-whole, .ac-lock, .ac-cancel, .ac-send, .ac-add-image, .ac-thumb-remove, .ac-thumb-markup, .ac-ask-label, .ac-ask-go { min-height: 44px; }
