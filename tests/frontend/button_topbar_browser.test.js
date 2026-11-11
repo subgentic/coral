@@ -18,7 +18,7 @@ const { coralReady } = require('./helpers/wait');
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             if (w < 640) { await ev(`window.switchNavTab('hub-inbox'); true`); await new Promise(r => setTimeout(r, 500)); } // sleep-ok: the Inbox draws over a frame; the Agents page has no top bar under 601 px (#11096)
             const m = await ev(`(() => { const info = sel => [...document.querySelectorAll(sel)].map(b => { const cs = getComputedStyle(b), r = b.getBoundingClientRect(); return { cls: b.className, shown: b.getClientRects().length > 0, w: Math.round(r.width), h: Math.round(r.height), bg: cs.backgroundColor, border: cs.borderTopWidth }; });
-                return { bar: info('.top-bar-actions .top-bar-btn:not(.hub-indicator)'), rail: info('.sidebar-rail-btn'), menu: info('#top-phone-menu') /* a phone's ☰ is the shared bar's (phone_bar.js, #11236) */ }; })()`);
+                return { bar: info('.top-bar-actions .top-bar-btn:not(.hub-indicator)'), rail: info('.sidebar-rail-btn:not(.sidebar-rail-folder)'), menu: info('#top-phone-menu') /* a phone's ☰ is the shared bar's (phone_bar.js, #11236) */ }; })()`);
             for (const b of m.bar.concat(m.rail)) assert.ok(/\bbtn\b/.test(b.cls) && /\bbtn-quiet\b/.test(b.cls) && /\bbtn-icon\b/.test(b.cls), `${at}an icon button of the family: ${b.cls}`);
             assert.ok(m.bar.length >= 3 && m.rail.length === 3, `${at}the buttons are on the page: ${m.bar.length} + ${m.rail.length}`);
             for (const b of m.bar.filter(x => x.shown)) assert.ok(b.w >= 30 && b.w <= 34 && b.h >= 30 && b.h <= 34, `${at}a 32 px quiet square: ${b.w}x${b.h}`);
@@ -26,7 +26,7 @@ const { coralReady } = require('./helpers/wait');
             if (mobile) { assert.ok(m.menu[0].shown && m.menu[0].h >= 44, `${at}the menu button is a 44 px target: ${m.menu[0].h}`); assert.equal(m.menu[0].border, '1px', `${at}and has the family's border`); }
             if (!mobile) { // the collapsed rail
                 await ev(`document.querySelector('.layout')?.classList.add('sidebar-collapsed'); true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the rail's layout settles
-                const rail = await ev(`[...document.querySelectorAll('.sidebar-rail-btn')].filter(b => b.getClientRects().length).map(b => { const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })`);
+                const rail = await ev(`[...document.querySelectorAll('.sidebar-rail-btn:not(.sidebar-rail-folder)')].filter(b => b.getClientRects().length).map(b => { const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })`);
                 assert.ok(rail.length === 3 && rail.every(([a, b]) => a >= 30 && a <= 34 && b >= 30 && b <= 34), `${at}the rail's three buttons are 32 px squares: ${JSON.stringify(rail)}`);
             }
             for (const t of ['dark', 'light']) { await theme(t); await new Promise(r => setTimeout(r, 450)); await shot(`btn-topbar-${t}-${w}`); } // sleep-ok: the theme's colour transition settles
