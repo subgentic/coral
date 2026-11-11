@@ -114,7 +114,7 @@ function nameComposerForPage(on) {
     const box = document.getElementById('mb-post-input'), send = document.querySelector('#mb-board .mb-post-send-btn');
     const board = document.getElementById('mb-board'), had = document.getElementById('mb-skip-composer');
     if (on && board && box && !had) { // the first stop after the tabs: 50 Tabs of messages stood between a keyboard and the box (walk 17 M10). It shows only when it has the focus.
-        const skip = document.createElement('button'); skip.type = 'button'; skip.id = 'mb-skip-composer'; skip.className = 'skip-link'; skip.textContent = 'Skip to Message the team';
+        const skip = document.createElement('button'); skip.type = 'button'; skip.id = 'mb-skip-composer'; skip.className = 'skip-link'; skip.textContent = 'Skip to Message the team'; skip.style.minHeight = '44px'; skip.style.fontSize = 'var(--fs-base)'; // a 44 px target that grows with the text (#15522); lazy, so no start CSS
         skip.addEventListener('click', () => box.focus()); board.prepend(skip);
     } else if (!on && had) had.remove();
     for (const [e, name] of [[box, 'Message the team'], [send, 'Send']]) {
