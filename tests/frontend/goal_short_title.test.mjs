@@ -1,8 +1,8 @@
 // A goal's short name (#15245, beta walk 12 H3/M6): the first clause of the title, at most 60 characters cut at a word, with the number agents write in front.
 import assert from 'node:assert/strict';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
-const { shortTitle } = await import(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'coral-go', 'pkg', 'frontend', 'static', 'goal_short.js'));
+const { shortTitle } = await import(pathToFileURL(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'coral-go', 'pkg', 'frontend', 'static', 'goal_short.js')).href); // a file:// URL: a bare d:\\ path is refused on Windows
 assert.equal(shortTitle('Build a todo app. It should add, edit and remove items and keep them in a file.'), 'Build a todo app');
 assert.equal(shortTitle('Ship the beta: every tester finishes an app'), 'Ship the beta');
 assert.equal(shortTitle('Make onboarding calmer - fewer steps'), 'Make onboarding calmer');
