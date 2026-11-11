@@ -36,6 +36,9 @@ function ensureDialog(opener) {
         document.body.appendChild(dialog);
         document.addEventListener('coral:route-changed', close); // another screen: the dialog does not stay over it (#198059)
         window.addEventListener('popstate', close);
+        // Escape closes THIS dialog and stops there: it is a native <dialog>, not a .modal, so the page-wide Escape (modal_chrome) skipped it, closed the review dialog under it
+        // and its preventDefault kept the native close from happening (the Operator, v2.0.64: Escape took the file's review dialog away and left the share dialog on the screen).
+        dialog.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } });
     }
     if (dialog.open) dialog.close();
     delete dialog.dataset.busy;
