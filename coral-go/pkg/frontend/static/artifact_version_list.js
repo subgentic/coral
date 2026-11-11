@@ -86,9 +86,3 @@ export async function newerOf(team, hex) {
     } catch { /* no series: no newer version to name */ }
     return null;
 }
-
-/** The file view's own Approve (walk 22 M7, #15329): the version shown is approved as it is; retag(hex, tags) updates the row. */
-export async function approveFromFile(team, item, hex, name, retag) {
-    const out = await (await importOnce('./artifact_review.js')).approveRow(team, { ...item, id: hex, hex, team, name });
-    retag(hex, (item.tags || []).filter(t => t !== 'for review').concat('approved')); (await importOnce('./artifact_review.js')).sayApproved(name, out);
-}
