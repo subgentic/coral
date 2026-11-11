@@ -429,14 +429,6 @@ document.addEventListener('keydown', e => {
     open.parentElement.querySelector('[data-on-click="cmd-send-menu"]')?.focus();
 });
 
-document.addEventListener('keydown', e => {
-    const menu = e.target.closest?.('.sidebar-kebab-menu');
-    if (!menu) return;
-    const items = [...menu.querySelectorAll('.overflow-menu-item')].filter(i => i.getClientRects().length > 0); // the items that are shown: a team menu's More group is hidden until it is opened, and a hidden item cannot take the focus (End and Down stopped on it)
-    const at = items.indexOf(document.activeElement);
-    const to = menuMove(e.key, items.length, at);
-    if (to >= 0) { e.preventDefault(); items[to].focus(); }
-}, true);
 
 document.addEventListener('focusout', e => {
     const wrap = e.target.closest?.('.sidebar-kebab-wrapper');

@@ -6,3 +6,4 @@ dialog.send-review-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 .send-review-dialog label { display: block; margin: 8px 0 4px; }
 .send-review-dialog input { display: block; width: 100%; box-sizing: border-box; }
 .send-review-dialog .inbox-ask-sub { margin: 0 0 8px; }
+.send-review-dialog .send-review-note:empty { display: none; }
