@@ -352,3 +352,16 @@ f1918eaa64f6fb1d4809c1af5c794b77007b439e:coral-go/internal/machinelaunch/diag_te
 # triaged after the list above (#13976): QA's redaction-test fixture const changesSecret = "ghp_..." in team_artifact_changes_test.go is an invented test input, not a real token (commit b66ae65b7, in v2.0.59's batch).
 # One fingerprint; it holds its commit id, so it is used only while that commit keeps its id.
 b66ae65b77d17091e8407d437ed8da01cb192097:coral-go/internal/server/routes/team_artifact_changes_test.go:github-pat:268
+
+# a made-up test key in the #15272 test (ghp_ plus a repeating pattern), no real credential
+b96e6cb521d6cea52098d74ec4ee875d62080c27:coral-go/internal/server/routes/knowledge_redact_test.go:github-pat:68
+# a TRIAL ONLY dry-run commit that never lands on main; Dropbox smoke check value, not a credential
+71c713f323b1061310a6094be08f8cb35a73de23:.github/workflows/linux-runner-dryrun.yml:dropbox-api-token:56
+# release.yml stamping test: a dummy Dropbox app key value, Security read it on #15534
+9c35005674c60fb803564218a5d20949954ec6d7:tests/release/ldflags_build_test.sh:generic-api-key:15
+# release.yml stamping test: a dummy Dropbox app key value, Security read it on #15534
+3142a2c8707e246592e81a34debf101c7beafb9e:tests/release/ldflags_build_test.sh:generic-api-key:15
+# a dummy Dropbox app key in the #15065 test, Security read it on #15534
+ac25224cc16381ec01c8536f84facd9319190d41:coral-go/internal/server/routes/dropbox_routes_test.go:dropbox-api-token:772
+# a dummy Dropbox app key in the #15065 test, Security read it on #15534
+5df59e193908a04c49f040e3079c4cb5dabde7c9:coral-go/internal/server/routes/dropbox_routes_test.go:dropbox-api-token:772
