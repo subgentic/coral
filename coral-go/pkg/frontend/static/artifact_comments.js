@@ -411,7 +411,11 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (e.key === ']') { e.preventDefault(); step(1); } else if (e.key === '[') { e.preventDefault(); step(-1); }
     });
     // A hidden panel is out of reach at every width; an open sheet also removes the document behind it from Tab and screen readers.
+    const footEl = dialog.querySelector('.artifact-viewer-foot'); // the viewer's footer (Approve, Request changes, Close): a phone's sheet ends above it, never over it (#15165)
+    const footRoom = () => { panel.style.bottom = footEl && phone.matches && sheet() && panel.classList.contains('ac-sheet-open') ? `${Math.max(0, Math.round((panel.offsetParent || dialog).getBoundingClientRect().bottom - footEl.getBoundingClientRect().top))}px` : ''; }; // an inline bottom (from the footer's top to the viewer's bottom: its padding and the safe area count): the start CSS has no room for a rule
+    if (footEl && typeof ResizeObserver === 'function') new ResizeObserver(footRoom).observe(footEl); // the review buttons arrive after the viewer opens
     function syncInert() {
+        footRoom();
         const open = panel.classList.contains('ac-sheet-open');
         panel.inert = !st.shownNow || !open;
         body.inert = !!st.shownNow && sheet() && open && !st.video && phone.matches; // only a phone's sheet is modal: a docked pane's open sheet leaves the file above it to scroll (#14846)
