@@ -8,6 +8,7 @@ const { coralReady } = require('./helpers/wait');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const problems = [];
+    const S = `(window.__coralStatic || '/static/')`;
     const check = (label, cond, detail) => { if (!cond) problems.push(`${label}${detail !== undefined ? ': ' + detail : ''}`); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -67,6 +68,17 @@ const { coralReady } = require('./helpers/wait');
             const p = await ev(`window.__posts[1]`);
             check(at + 'Request changes says so and carries the words', /Changes requested:\s+add tests/.test(p.content) && p.reply_to === 51, JSON.stringify(p));
             await waitFor(`[...document.querySelectorAll('.toast')].some(x => /Sent: Request changes/.test(x.textContent))`, at + 'a toast says it');
+            // the task left review after the list was read: Approve is refused, says why, and the buttons go (#15111)
+            await closeDlg().catch(() => {});
+            await ev(`window.__asks.push({ board: 'team', board_label: 'Sprout', kind: 'ask', id: 53, asker: 'Qa', text: '@Operator the build is ready: approve?', at: new Date().toISOString(), task_id: 11, task_title: 'Ship it', task_in_review: true }); import(${S} + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => true)`);
+            await waitFor(`!!document.querySelector('button[aria-label="Answer the question of Qa"]')`, at + 'the Qa question', 8000);
+            await ev(`document.querySelector('button[aria-label="Answer the question of Qa"]').click(); true`);
+            await waitFor(`!![...document.querySelectorAll('dialog.inbox-ask-dialog[open] .inbox-ask-review button')].find(b => b.textContent === 'Approve')`, at + 'Approve is offered while the task is in review', 4000);
+            await ev(`window.__asks.find(x => x.id === 53).task_in_review = false; true`); // the task moved on after the list was read
+            const before = await ev(`window.__posts.length`);
+            await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog[open] .inbox-ask-review button')].find(b => b.textContent === 'Approve').click(); true`);
+            await waitFor(`/no longer waiting for review/.test((document.querySelector('dialog.inbox-ask-dialog[open] .inbox-ask-error') || {}).textContent || '')`, at + 'Approve says the task left review', 4000).catch(() => {});
+            check(at + 'a task that left review: nothing sent, the reason said, Approve and Request changes gone, Send reply still there', (await ev(`window.__posts.length`)) === before && /no longer waiting for review/.test(await ev(`document.querySelector('dialog.inbox-ask-dialog[open] .inbox-ask-error').textContent`)) && (await ev(`document.querySelectorAll('dialog.inbox-ask-dialog[open] .inbox-ask-review button').length`)) === 0 && (await ev(`!!document.querySelector('dialog.inbox-ask-dialog[open] .inbox-ask-send')`)), JSON.stringify(await btns()));
         }
     } finally { await client.close(); }
     if (problems.length) { console.error(problems.join('\n')); process.exit(1); }

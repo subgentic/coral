@@ -7,7 +7,7 @@ import { whenText } from './when_text.js';
 import { loadStyles } from './lazy_styles.js';
 import { showToast } from './notifications.js';
 import { importOnce } from './import_once.js';
-import { askParts, askSubjects, fromAnotherComputer, buttonsOffered, noteButtonsOwnerOnly, yesNoButtons, buttonWords, claimButton, settleButton, wakeMember, refreshOperatorAsks, replyToAsk, forgetAsk, questionContextNote } from './operator_asks.js';
+import { askParts, askSubjects, fromAnotherComputer, buttonsOffered, noteButtonsOwnerOnly, yesNoButtons, buttonWords, claimButton, settleButton, wakeMember, refreshOperatorAsks, operatorAsks, askKey, replyToAsk, forgetAsk, questionContextNote } from './operator_asks.js';
 await loadStyles('operator_ask_dialog.css');
 
 const isReply = action => /^reply$/.test(action);
@@ -111,6 +111,9 @@ export function openAskDialog(a, onDone, runners = {}) {
                 const draft = replyText();
                 if (!text && !draft) { err.textContent = 'Write what to change in the box first.'; box.focus(); return; }
                 sending = true; err.textContent = ''; sync();
+                await refreshOperatorAsks(true); // the task may have left review since the list was read: asked again now, and the two buttons go if it has (#15111)
+                const now = operatorAsks().find(x => askKey(x) === askKey(a));
+                if (now && now.task_in_review !== true) { a.task_in_review = false; sending = false; drawOffers(); sync(); err.textContent = 'That task is no longer waiting for review, so Approve and Request changes are off. You can still reply.'; return; }
                 try { await replyToAsk(a, text ? (draft ? `${text}\n\n${draft}` : text) : `Changes requested:\n\n${draft}`); finish(); showToast(`Sent: ${word}`); }
                 catch (e) { err.textContent = e.message || 'Not sent.'; sending = false; sync(); }
             }); choices.push(b); return b; };
