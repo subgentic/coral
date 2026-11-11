@@ -32,9 +32,14 @@ const RECORDER = `(() => { const real = window.fetch; window.__reads = { goals: 
         for (const which of ['goals', 'proposals']) assert.equal(await ev(`window.__reads.${which}.max`), 1, `${which}: never two reads at once, whoever asks`);
 
         // (4) one read per gap: thirty live updates inside one gap are one read of each list
-        await wait(2200); const g0 = await n('goals'), p0 = await n('proposals'); await tick(30); await wait(300); // sleep-ok: the gap between reads is time itself
-        assert.equal(await n('goals') - g0, 1, 'thirty live updates in one gap are one goals read');
-        assert.equal(await n('proposals') - p0, 1, 'and one proposals read');
+        await wait(2200); const g0 = await n('goals'), p0 = await n('proposals'); const t4 = Date.now(); await tick(30); await wait(300); // sleep-ok: the gap between reads is time itself
+        // read from the recorder's own timestamps: a stalled page makes the window longer, and a second read a whole gap later is correct, so the bound is one read per gap of the window
+        const win = Date.now() - t4;
+        for (const [w, base, what] of [['goals', g0, 'goals read'], ['proposals', p0, 'proposals read']]) {
+            const at = (await ev(`window.__reads.${w}.at`)).slice(base);
+            assert.ok(at.length >= 1 && at.length <= 1 + Math.floor(win / 1900), `thirty live updates in one gap are one ${what} (${at.length} in ${win} ms)`);
+            for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 1900, `${w}: two reads are a gap apart: ${JSON.stringify(at)}`);
+        }
 
         // (1) hidden: none, for both
         await ev(`Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); true`);
