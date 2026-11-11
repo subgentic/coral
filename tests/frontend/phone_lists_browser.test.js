@@ -15,7 +15,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
-        await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-' + B });
+        await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator' });
         for (const t of ['Build the thing', 'Fix the bug', 'Write docs']) check((await api('POST', '/tasks', { subscriber_id: 'Operator', title: t, created_by: 'Operator', priority: 'medium', assigned_to: 'Boss' })).status < 300, 'made task ' + t);
         for (const tab of ['tasks', 'artifacts']) for (const [w, mobile] of [[390, true], [430, true], [1280, false]]) {
             const at = `${tab} ${w} px: `, P = `#team-panel-${tab}`;

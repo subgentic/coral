@@ -51,7 +51,7 @@ const { pinnedBarProbe } = require('./helpers/pinned_bar');
         const made = await ev(`(async () => {
             const call = async (method, path, body) => { const r = await fetch('/api/board/${BOARD}' + path, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
                 if (!r.ok) throw new Error(path + ': ' + r.status + ' ' + await r.text()); return r.json().catch(() => ({})); };
-            await call('POST', '/subscribe', { subscriber_id: 'Worker', job_title: 'Worker', session_name: 'claude-worker-3645' });
+            await call('POST', '/subscribe', { subscriber_id: 'Worker', job_title: 'Worker' });
             const dep = await call('POST', '/tasks', { title: 'the dependency', body: 'b', created_by: 'Operator' });
             const open = await call('POST', '/tasks', { title: 'open task', body: 'see coral://artifacts/${'a'.repeat(64)}', created_by: 'Operator', blocked_by: [dep.id] });
             const draft = await call('POST', '/tasks', { title: 'a draft', body: 'b', created_by: 'Operator', draft: true });

@@ -29,7 +29,7 @@ const { coralReady } = require('./helpers/wait');
   await Emulation.setDeviceMetricsOverride({width:1280,height:900,deviceScaleFactor:1,mobile:false});
   await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();
   await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
-  for (const [id,title] of [['Lead','Orchestrator'],['WorkerA','Backend'],['WorkerB','Reviewer'],['WorkerC','QA']]) assert.equal((await api('POST',`/api/board/${B}/subscribe`,{subscriber_id:id,job_title:title,session_name:id+'-session'})).status,200);
+  for (const [id,title] of [['Lead','Orchestrator'],['WorkerA','Backend'],['WorkerB','Reviewer'],['WorkerC','QA']]) assert.equal((await api('POST',`/api/board/${B}/subscribe`,{subscriber_id:id,job_title:title})).status,200);
   const mk = async(title,id)=>{const r=await api('POST',`/api/board/${B}/tasks`,{title,assigned_to:id,created_by:'Operator'});assert.equal(r.status,201);return r.body.id;};
   await mk('Alpha owned','WorkerA');
   const done=await mk('Alpha finished','WorkerA');assert.equal((await api('POST',`/api/board/${B}/tasks/${done}/complete`,{subscriber_id:'WorkerA',message:'done'})).status,200);

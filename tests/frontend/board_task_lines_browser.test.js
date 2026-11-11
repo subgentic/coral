@@ -18,7 +18,7 @@ const B = 'task-lines-' + Date.now().toString(36);
             await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             if (!mobile) {
-                assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-' + B })).status < 300);
+                assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator' })).status < 300);
                 assert.ok((await api('POST', '/messages', { subscriber_id: 'Boss', content: 'hello board' })).status < 300);
                 const t = await api('POST', '/tasks', { subscriber_id: 'Operator', title: 'Do a thing', assigned_to: 'Boss', created_by: 'Operator', priority: 'medium' }); assert.ok(t.status < 300);
                 const id = taskId = t.json.id || t.json.task.id;

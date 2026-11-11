@@ -16,7 +16,7 @@ const B = 'done-today-' + Date.now().toString(36);
             await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             if (!mobile) {
-                assert.ok((await post('/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-' + B })).status < 300);
+                assert.ok((await post('/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator' })).status < 300);
                 for (const title of ['Still open one', 'Still open two']) assert.ok((await post('/tasks', { title, body: 'x', created_by: 'Boss', priority: 'medium' })).status < 300);
                 const t = await post('/tasks', { title: 'Finished a moment ago', body: 'x', created_by: 'Boss', priority: 'medium', assigned_to: 'Boss' });
                 assert.ok(t.status < 300); const id = t.body.id || t.body.task.id;

@@ -18,7 +18,7 @@ const S = `(window.__coralStatic || '/static/')`;
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
-        for (const [id, jt] of [['orch', 'Orchestrator'], ['fe', 'Frontend Dev'], ['qa', 'QA Engineer']]) await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: jt, session_name: id + '-s' });
+        for (const [id, jt] of [['orch', 'Orchestrator'], ['fe', 'Frontend Dev'], ['qa', 'QA Engineer']]) await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: jt });
         const mk = async (title, assigned, priority) => { const r = await api('POST', `/api/board/${B}/tasks`, { title, body: 'Details for ' + title, assigned_to: assigned, created_by: 'orch', priority }); assert.ok(r.status < 300, JSON.stringify(r)); return r.body.id || r.body.task.id; };
         const t1 = await mk('Build the Goals view', 'fe', 'high'), t2 = await mk('Review the Goals view', 'qa', 'medium'); await mk('Write the agent doc text', 'orch', 'low'); const t4 = await mk('Fix the flaky suite', 'fe', 'medium');
         const claim = (who, t) => api('POST', `/api/board/${B}/tasks/claim`, { subscriber_id: who, task_id: t });

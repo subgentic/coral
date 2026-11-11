@@ -18,7 +18,7 @@ const SHARED = 'coral://artifacts/' + 'c'.repeat(64);
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
-        for (const [sid, jt] of [['orch', 'Orchestrator'], ['be', 'Backend Dev']]) assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: sid, job_title: jt, session_name: sid + '-s' })).status < 300);
+        for (const [sid, jt] of [['orch', 'Orchestrator'], ['be', 'Backend Dev']]) assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: sid, job_title: jt })).status < 300);
         const ids = [];
         for (const title of ['Write the report', 'A task with nothing attached', 'Draw the diagram']) { const m = await api('POST', `/api/board/${B}/tasks`, { title, body: 'x', assigned_to: 'be', created_by: 'orch', priority: 'high' }); assert.ok(m.status < 300, JSON.stringify(m)); ids.push(m.body.id); }
         // the report references three files, one of them also the diagram's: the team's list (and so the count) has it under the newest task, the diagram

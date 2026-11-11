@@ -17,7 +17,7 @@ const B = 'goal-ready-' + Date.now().toString(36);
             await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             if (w === 1280) {
-                assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-' + B })).status < 300);
+                assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator' })).status < 300);
                 const gDone = await api('POST', '/goals', { subscriber_id: 'Operator', title: 'Ship the pilot', done_when: 'it is shipped' }); assert.equal(gDone.status, 201);
                 const gLong = await api('POST', '/goals', { subscriber_id: 'Operator', title: 'A long goal title that has to wrap on a phone', done_when: 'it is done' }); assert.equal(gLong.status, 201);
                 const gOpen = await api('POST', '/goals', { subscriber_id: 'Operator', title: 'Keep going' }); assert.equal(gOpen.status, 201);

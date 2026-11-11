@@ -24,8 +24,8 @@ const { coralReady } = require('./helpers/wait');
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         const mk = async (title, assigned) => { const r = await api('POST', `/api/board/${B}/tasks`, { title, body: 'Details for ' + title, assigned_to: assigned, created_by: 'orch', priority: 'medium' }); assert.ok(r.status < 300, JSON.stringify(r)); return r.body.id || r.body.task.id; };
-        await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'orch', job_title: 'Orchestrator', session_name: 'orch-s' }); // only an orchestrator makes shared tasks
-        for (const id of ['jta-dev', 'jta-sleepy', 'jta-qa']) await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: id, session_name: id + '-s' });
+        await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'orch', job_title: 'Orchestrator' }); // only an orchestrator makes shared tasks
+        for (const id of ['jta-dev', 'jta-sleepy', 'jta-qa']) await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: id });
         const run = await mk('Build the jump', 'jta-dev'), sleepy = await mk('Sleeping builder', 'jta-sleepy'), gone = await mk('Builder that ended', 'jta-gone'), rev = await mk('Under review', 'jta-dev'), rev2 = await mk('Reviewer gone', 'jta-dev'), nobody = await mk('Nobody yet', '');
         assert.ok([run, sleepy, gone, rev, rev2].every(Number.isInteger), 'the tasks were made: ' + JSON.stringify([run, sleepy, gone, rev, rev2]));
         const add = (name, o) => ev(`window.__m.add(${JSON.stringify(name)}, 'B', 1, ${JSON.stringify({ board_project: B, board_is_orchestrator: false, board_subscriber_id: name, ...o })}); true`);

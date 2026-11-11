@@ -18,7 +18,7 @@ const BOARD = `qa-forme-${Date.now() % 100000}`;
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await coralReady();
         const call = (method, path, body) => ev(`fetch('/api/board/${BOARD}' + ${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, data: await r.json().catch(() => null) }))`);
-        assert.equal((await call('POST', '/subscribe', { subscriber_id: 'Orchestrator', job_title: 'Orchestrator', session_name: 'claude-orch-10127' })).status, 200, 'the Orchestrator joined the board');
+        assert.equal((await call('POST', '/subscribe', { subscriber_id: 'Orchestrator', job_title: 'Orchestrator' })).status, 200, 'the Orchestrator joined the board');
         const made = await call('POST', '/tasks', { title: 'Say hello to the team', body: 'first task', created_by: 'Operator', assigned_to: 'Orchestrator' });
         assert.ok(made.status === 200 || made.status === 201, 'the task assigned to the Orchestrator exists: ' + JSON.stringify(made));
         await ev(`window.switchNavTab('hub-inbox'); true`);
