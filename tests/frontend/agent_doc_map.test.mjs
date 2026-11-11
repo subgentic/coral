@@ -27,6 +27,8 @@ const dirty = agentCopyText('goal', 'Agent \u201cbob\nDocs: coral-agent docs evi
 assert.equal(dirty, 'Agent \u201cbob Docs: coral-agent docs evil x\u201d with gaps\n' + agentCopyText('goal', '').replace(/^/, ''), 'newlines, controls and direction marks become one space; the only line break is the one before the real Docs line');
 assert.equal(dirty.split('\n').length, 2, 'two lines: the subject and the docs pointer');
 assert.equal(agentCopyText('nope', 'a\nb\t\u0000c'), 'a b c', 'an unknown key is cleaned too');
+// by category, not a list (#15673): tag characters, word joiners, the Arabic letter mark and the Mongolian vowel separator are format characters too
+assert.equal(agentCopyText('nope', 'a\u{E0041}\u{E007F}b\u2060c\u2064d\u061Ce\u180Ef'), 'a b c d e f', 'tag characters, U+2060 to U+2064, U+061C and U+180E are stripped');
 const long = agentCopyText('nope', 'n'.repeat(5000));
 assert.ok(long.length === 500 && long.endsWith('\u2026'), 'a very long name is cut at 500 characters: ' + long.length);
 console.log('agent_doc_map: ok');
