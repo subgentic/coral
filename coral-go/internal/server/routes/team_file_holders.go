@@ -61,3 +61,18 @@ func readTeamFileHolders(coralDir, board string) []string {
 	}
 	return out
 }
+
+// forgetTeamFileHolders removes a deleted team's record (#15463): a board made again under the same name starts empty, and the folder does not grow with boards that are gone. The files themselves stay in the
+// store, as a deleted board's other files do.
+func forgetTeamFileHolders(coralDir, board string) {
+	p := teamHoldersPath(coralDir, board)
+	if p == "" {
+		return
+	}
+	teamHoldersMu.Lock()
+	defer teamHoldersMu.Unlock()
+	_ = os.Remove(p)
+}
+
+// removedAgentName is the name a row shows when its holding session is only on the team's record and no record of the file names who made it: the agent was removed from the team.
+const removedAgentName = "removed agent"

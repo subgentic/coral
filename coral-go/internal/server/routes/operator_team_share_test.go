@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -186,4 +188,64 @@ func TestATeamFileStaysListedWhenTheHoldingAgentComesBackUnderANewSession(t *tes
 		found = found || a.ID == id
 	}
 	assert.True(t, found, "the team's file is still listed after its holder came back under a new session")
+}
+
+// #15463 (1): the team's record of who holds its files goes when the board is deleted.
+func TestTheTeamFileRecordGoesWhenTheBoardIsDeleted(t *testing.T) {
+	e := newShareEnv(t, true)
+	code, out := e.teamUpload(t, "brief.md", "# the brief", "")
+	require.Equal(t, http.StatusCreated, code, out)
+	require.Equal(t, []string{sessAlice}, readTeamFileHolders(e.coralDir, "alpha"), "the upload recorded its holder")
+	rec := teamHoldersPath(e.coralDir, "alpha")
+	_, err := os.Stat(rec)
+	require.NoError(t, err)
+
+	forgetTeamFileHolders(e.coralDir, "alpha") // what DeleteBoard calls once the board is gone
+	_, err = os.Stat(rec)
+	assert.True(t, os.IsNotExist(err), "the record is removed with the board")
+	assert.Empty(t, readTeamFileHolders(e.coralDir, "alpha"))
+	forgetTeamFileHolders(e.coralDir, "alpha") // a second time, or a board with none: nothing to say
+}
+
+// #15463 (2): a row from a session that is only on the team's record (its agent came back under a new session) names who made the file, or says the agent was removed.
+func TestARowFromARecordedSessionNamesItsMakerOrSaysRemoved(t *testing.T) {
+	e := newShareEnv(t, true)
+	code, out := e.teamUpload(t, "brief.md", "# the brief", "")
+	require.Equal(t, http.StatusCreated, code, out)
+	id, _ := out["id"].(string)
+	subscribeSession(t, e.h, "alpha", "Alice", "99999999-aaaa-0000-0000-000000000009")
+
+	list := getTeamArtifacts(t, e.srv, "/api/board/alpha/artifacts", http.StatusOK)
+	var row *teamArtifact
+	for i := range list.Artifacts {
+		if list.Artifacts[i].ID == id {
+			row = &list.Artifacts[i]
+		}
+	}
+	require.NotNil(t, row, "the file is listed")
+	require.NotNil(t, row.ProducedBy, "the row has a maker, not an empty name")
+	assert.NotEmpty(t, *row.ProducedBy)
+
+	// a record that names no one: an old record, or an upload whose session could not be placed
+	up := filepath.Join(uploadsDir(e.coralDir, sessAlice), id+".json")
+	data, err := os.ReadFile(up)
+	require.NoError(t, err)
+	var rec map[string]any
+	require.NoError(t, json.Unmarshal(data, &rec))
+	delete(rec, "uploader")
+	delete(rec, "source") // not an Operator share any more either: a plain upload of a removed agent
+	delete(rec, "uploaded_by")
+	data, _ = json.Marshal(rec)
+	require.NoError(t, os.WriteFile(up, data, 0o600))
+	e.h.bs.NoteArtifactsChanged("alpha")
+	list = getTeamArtifacts(t, e.srv, "/api/board/alpha/artifacts", http.StatusOK)
+	row = nil
+	for i := range list.Artifacts {
+		if list.Artifacts[i].ID == id {
+			row = &list.Artifacts[i]
+		}
+	}
+	require.NotNil(t, row)
+	require.NotNil(t, row.ProducedBy)
+	assert.Equal(t, removedAgentName, *row.ProducedBy)
 }

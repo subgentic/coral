@@ -385,12 +385,23 @@ func (h *BoardHandler) buildProjectArtifactItems(r *http.Request, project, sessi
 		}
 	} else {
 		sessions := teamUploadSessions(tasks, subscribers)
+		holderOnly := map[string]bool{}
 		for _, sid := range readTeamFileHolders(h.coralDir, project) { // a session that holds the team's own files stays read whoever is subscribed now (#15356)
 			if _, ok := sessions[sid]; !ok {
 				sessions[sid] = ""
+				holderOnly[sid] = true
 			}
 		}
 		items = h.uploads.merge(items, h.coralDir, sessions)
+		for i := range items { // a row from such a session names who made the file, or says the agent was removed (#15463)
+			if it := &items[i]; it.SessionID != nil && holderOnly[*it.SessionID] && it.ProducedBy == nil {
+				name := removedAgentName
+				if it.Uploader != "" {
+					name = it.Uploader
+				}
+				it.ProducedBy = &name
+			}
+		}
 		items = h.mergeCrossTeamRows(items, project)
 	}
 	h.linkUploadTasks(r.Context(), project, items)
