@@ -57,8 +57,11 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await ev(`(() => { const s = document.getElementById('theme-load-select'); s.value = 'base:light'; document.querySelector('[data-on-click="theme-load"]').click(); return true; })()`);
         await waitFor(`document.getElementById('theme-save-base').value === 'light'`, 'Light loaded', 6000).catch(() => {});
         check(await val(bgVar) === lightBg, `Load > Light fills the Light colours: ${await val(bgVar)} vs ${lightBg}`);
+        // Load > Light already made the page light (useTheme applies the base before its settings PUT returns), so data-theme says nothing about the save: it is finished when the configurator closes, after both PUTs (#15565: the old wait returned at once and the theme was read before it was stored).
+        // The theme's PUT is held for 600 ms here so that race happens on every run, not one in a few hundred.
+        await ev(`(() => { const f = window.fetch; window.fetch = (u, o) => (o && o.method === 'PUT' && String(u).includes('/api/themes/')) ? new Promise(r => setTimeout(r, 600)).then(() => f(u, o)) : f(u, o); return true; })()`); // sleep-ok: the PUT is held on purpose so the race shows every run
         await ev(`document.getElementById('theme-save-name').value = ${JSON.stringify(NAME)}; document.querySelector('[data-on-click="theme-save"]').click(); true`);
-        await waitFor(`document.documentElement.getAttribute('data-theme') === 'light'`, 'the page is light after Save and apply', 8000).catch(() => {});
+        await waitFor(`document.getElementById('theme-configurator-modal').style.display === 'none' && document.documentElement.getAttribute('data-theme') === 'light'`, 'the page is light and the configurator closed after Save and apply', 8000);
         const saved = await ev(`fetch('/api/themes/${NAME}').then(r => r.json()).then(d => ({ base: d.theme && d.theme.base, bg: d.theme && d.theme.variables && d.theme.variables[${JSON.stringify(bgVar)}] }))`);
         check(saved.base === 'light' && saved.bg && saved.bg.toLowerCase() === lightBg.toLowerCase(), 'the saved theme is Based on Light with the Light colours: ' + JSON.stringify({ saved, lightBg }));
         check(await ev(`document.documentElement.getAttribute('data-theme')`) === 'light', 'the page is on the light base after Save and apply');
