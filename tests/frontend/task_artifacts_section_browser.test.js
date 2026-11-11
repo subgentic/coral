@@ -60,7 +60,7 @@ const STUB = `(() => { const real = window.fetch; window.__reqs = []; window.__a
         console.log('the agent\'s subscriber id arrives after its Tasks tab is open (#15375): its tasks load at once, not on the next 10 s poll');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await ev(`import((window.__coralStatic || '/static/') + 'task_list.js').then(m => { m.boardTaskPollHooks.intervalMs = 600000; })`); // no poll tick can rescue the load: only the id's arrival can
-        await openBoardTasksTab({ ev, waitFor }, B, 'late-agent');
+        await openBoardTasksTab({ ev, waitFor }, B, 'late-agent', { board_is_orchestrator: false }); // a worker: only a worker's dock is scoped by its subscriber id (the harness's default agent is an orchestrator, whose Tasks tab is the whole board and has no id to wait for) (#15608)
         const setId = id => ev(`(async () => { const st = await import((window.__coralStatic || '/static/') + 'state.js'); st.state.liveSessions = st.state.liveSessions.map(x => x.name === 'late-agent' ? { ...x, board_subscriber_id: ${JSON.stringify(id)} } : x); document.dispatchEvent(new CustomEvent('coral:display-hint-expired')); })()`);
         await setId(''); // the mock agent starts with an id; a real one has none until the board knows it
         await waitFor(`document.querySelectorAll('#agentic-panel-tasks .board-task-item:not(.board-task-header)').length === 0`, 'no tasks without an id', 4000);

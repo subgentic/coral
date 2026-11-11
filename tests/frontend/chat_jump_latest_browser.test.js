@@ -13,6 +13,8 @@ const BASE = require('./test_base').BASE;
 
 (async () => {
     const { client, Page, Emulation, Runtime, ev, waitFor, PRELOAD, install } = await connect();
+    // setEmulatedMedia replaces the whole feature list the harness set, so the dark scheme is named in each call: left out, Chrome follows the machine (dark on a Mac set to dark, light on a CI runner) and the circle is the light theme's grey (#15608).
+    const DARK = { name: 'prefers-color-scheme', value: 'dark' };
     const S = `(window.__coralStatic || '/static/')`;
     const C = `document.getElementById('live-history-messages')`;
     const BTN = `document.querySelector('#chat-jump-latest button')`;
@@ -40,7 +42,7 @@ const BASE = require('./test_base').BASE;
             await Emulation.setDeviceMetricsOverride({ width: v.width, height: v.height, deviceScaleFactor: 1, mobile: v.mobile });
             await Emulation.setTouchEmulationEnabled({ enabled: v.coarse, maxTouchPoints: v.coarse ? 5 : 1 });
             // Motion on, so the jump is the smooth scroll and its watch (the reduced-motion jump, at once, is checked at the end).
-            await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }, ...(v.coarse ? [{ name: 'pointer', value: 'coarse' }, { name: 'hover', value: 'none' }] : [{ name: 'pointer', value: 'fine' }, { name: 'hover', value: 'hover' }])] });
+            await Emulation.setEmulatedMedia({ features: [DARK, { name: 'prefers-reduced-motion', value: 'no-preference' }, ...(v.coarse ? [{ name: 'pointer', value: 'coarse' }, { name: 'hover', value: 'none' }] : [{ name: 'pointer', value: 'fine' }, { name: 'hover', value: 'hover' }])] });
             await Page.navigate({ url: BASE });
             await Page.loadEventFired();
             await install();
@@ -189,7 +191,7 @@ const BASE = require('./test_base').BASE;
                 await ev(`(async () => { (await import(${S} + 'live_chat.js')).setLiveViewMode('chat'); return true; })()`);
 
                 console.log(`${v.name}: with reduced motion the jump is at once`);
-                await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-reduced-motion', value: 'reduce' }, { name: 'pointer', value: 'fine' }, { name: 'hover', value: 'hover' }] });
+                await Emulation.setEmulatedMedia({ features: [DARK, { name: 'prefers-reduced-motion', value: 'reduce' }, { name: 'pointer', value: 'fine' }, { name: 'hover', value: 'hover' }] });
                 await waitFor(`${C}.scrollHeight > ${C}.clientHeight * 3`, `${v.name}: the other agent's chat is long enough`);
                 await scrollTo(`c.scrollHeight - c.clientHeight * 2.5`);
                 await ev(`(() => { const c = ${C}; c.scrollTo = () => { window.__jlSmooth = true; }; window.__jlSmooth = false; return true; })()`);
