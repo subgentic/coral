@@ -11,9 +11,6 @@ on:
   schedule:
     - cron: "17 6 * * *"
   workflow_dispatch:
-  push:
-    branches:
-      - devops-update-canary   # the proof run for this file (#15080): removed once it has been green on this branch
 
 concurrency:
   group: update-canary
