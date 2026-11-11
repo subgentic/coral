@@ -107,12 +107,27 @@ func run(args []string, getenv func(string) string, stdout io.Writer) int {
 	if len(args) > 0 && args[0] == "verify-sums" { // the same check with no package: the signed hash a far computer must see after it downloads the release itself (#12217)
 		return runVerifySums(args[1:], stdout)
 	}
+	// The update of a Coral with no internet (#15379): push runs here, receive and relaunch run on the remote (push.go, relaunch.go).
+	if len(args) > 0 && args[0] == "push" {
+		return runPush(args[1:], getenv, os.Stdin, stdout)
+	}
+	if len(args) > 0 && args[0] == "receive" {
+		return runReceive(args[1:], os.Stdin, stdout, getenv)
+	}
+	if len(args) > 0 && args[0] == "relaunch" {
+		if getenv("CORAL_AUTO_UPDATE") == "off" {
+			print(stdout, output{Result: "off"})
+			return 1
+		}
+		_, port, _ := relaunchArgs(args[1:])
+		return runRelaunch(args[1:], defaultRelaunchEnv(port), stdout)
+	}
 	// status only reads the updater's own files: no network, and it answers when the feature is off.
 	if (len(args) == 1 && args[0] == "status") || (len(args) == 2 && args[0] == "status" && args[1] == "--json") {
 		return runStatus(args, getenv, stdout)
 	}
 	if len(args) != 1 || (args[0] != "check" && args[0] != "apply") {
-		fmt.Fprintln(os.Stderr, "usage: coral-update check|apply|status [--json]")
+		fmt.Fprintln(os.Stderr, "usage: coral-update check|apply|status [--json]|push|receive|relaunch")
 		return 2
 	}
 	// Only a prod release build updates itself: a dev build, a build with no version, and an install turned off say so.
