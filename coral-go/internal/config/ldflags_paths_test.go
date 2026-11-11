@@ -129,9 +129,7 @@ var mainVarAllowed = map[string]string{
 var otherPackageVars = map[string]struct {
 	dir  string
 	vars []string
-}{
-	"server/routes": {dir: "../server/routes", vars: []string{"DropboxDefaultAppKey"}},
-}
+}{}
 
 func TestEveryLinkerFlagNamesThisPackageAndARealVariable(t *testing.T) {
 	root := repoRoot(t)
@@ -189,9 +187,6 @@ func TestEveryLinkerFlagNamesThisPackageAndARealVariable(t *testing.T) {
 	if got := perFile[".github/workflows/release.yml"]; got < 8 {
 		t.Errorf("release.yml sets %d flags into config, want at least 8 (PostHogKey and Version in four builds)", got)
 	}
-	if got := perOther[".github/workflows/release.yml"]; got < 4 {
-		t.Errorf("release.yml sets %d Dropbox app key flags, want 4 (Linux, Windows, macOS arm64 and amd64)", got)
-	}
 }
 
 // otherPackageFlag says whether "-X pkg.name" is one of the allowed variables of another package, and fails the test when that variable is gone.
@@ -242,8 +237,7 @@ var buildTimeComment = regexp.MustCompile(`(?i)(-ldflags|ldflags|set at build ti
 
 // buildStampedVars are the variables a release or a build script is known to stamp, by folder (relative to internal/) then name.
 var buildStampedVars = map[string][]string{
-	"config":        {"Version", "PostHogKey", "DevBase"},
-	"server/routes": {"DropboxDefaultAppKey"},
+	"config": {"Version", "PostHogKey", "DevBase"},
 }
 
 func TestEveryBuildTimeVariableIsStampedByARelease(t *testing.T) {

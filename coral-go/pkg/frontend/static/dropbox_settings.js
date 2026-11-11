@@ -307,6 +307,11 @@ function render(st) {
     hideAll();
     lastStatus = st;
     renderBackup(st);
+    if (st && st.paused_no_key) { // signed in with the key an earlier build shipped, and this build has none (#15641): paused, not broken; the files are safe here, Disconnect clears the sign-in
+        setStatus('Dropbox backup is paused: this build has no Dropbox app key. Your files are safe on this computer.');
+        show('settings-dropbox-disconnect', true);
+        return;
+    }
     if (!st || !st.app_key_set) {
         setStatus("Dropbox backup isn't available in this build.");
         return;

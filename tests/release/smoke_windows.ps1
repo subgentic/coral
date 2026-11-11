@@ -321,7 +321,7 @@ try {
             if ($got -ne $want) { $bad += "$($w[0]) $($w[1]) is $got, a release reports $want" }
         }
         if ($checked -eq 0) { $bad += 'no line of the list was checked' }
-        if ([Environment]::GetEnvironmentVariable('SMOKE_EXPECT_DROPBOX_KEY') -eq '1' -and -not $dropboxLine) { $bad += 'SMOKE_EXPECT_DROPBOX_KEY=1 but no /api/dropbox/status line was checked' }
+        if (-not $dropboxLine) { $bad += 'no /api/dropbox/status line was checked: a release says in availability.txt that it ships no Dropbox app key' }
         if ($bad.Count -eq 0) { Pass "the availability list: $checked checked (tier $tier)" }
         else { Fail "the availability list: $($bad -join '; ')" }
     }

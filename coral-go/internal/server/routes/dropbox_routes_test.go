@@ -748,39 +748,47 @@ func TestOpenOn127AnswersTheEnvelopeTheSettingsPageReads(t *testing.T) {
 	assert.Equal(t, "Open Coral at http://127.0.0.1:8420 to connect Dropbox", body["error"])
 }
 
-// #15065 (the Operator, v2.0.63): a release build said Dropbox was not available, because the release workflow never set the app key a build
-// ships with. The key a build sets (-ldflags -X ...DropboxDefaultAppKey, from the DROPBOX_APP_KEY repo secret) must reach the status with no
-// CORAL_DROPBOX_APP_KEY in the environment; with neither, the status says there is none. Mutant: appKey reads only the environment.
-func TestTheAppKeyABuildSetsIsTheOneDropboxUses(t *testing.T) {
+// #15641 (the Operator, 2026-11-11): Coral ships no Dropbox app key. The only key is the one a person supplies (CORAL_DROPBOX_APP_KEY); with none, the status says so.
+// (This replaces #15065's TestTheAppKeyABuildSetsIsTheOneDropboxUses, which pinned a key stamped by the release workflow.)
+func TestNoDropboxAppKeyIsBuiltIn(t *testing.T) {
 	t.Setenv("CORAL_DROPBOX_APP_KEY", "")
-	status := func() map[string]any {
-		dir := t.TempDir()
-		db, err := storetest.Open(t, filepath.Join(dir, "c.db"))
-		require.NoError(t, err)
-		t.Cleanup(func() { db.Close() })
-		h := NewCloudHandler(store.NewSessionStore(db), dir)
-		h.SetPeerCheck(func(*http.Request) (bool, bool) { return true, true })
-		h.SetDropbox(store.NewDropboxStore(db, store.NewRemoteServerStore(db, dir)), dir)
-		req := httptest.NewRequest(http.MethodGet, "/api/dropbox/status", nil)
-		dashboardRequest(req)
-		rec := httptest.NewRecorder()
-		h.DropboxStatus(rec, req)
-		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-		var st map[string]any
-		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &st))
-		return st
-	}
-	old := DropboxDefaultAppKey
-	t.Cleanup(func() { DropboxDefaultAppKey = old })
-
-	DropboxDefaultAppKey = "" // a build without it (a fork, a pull request)
-	assert.Equal(t, false, status()["app_key_set"], "no key: Settings says Dropbox is not available in this build")
-
-	DropboxDefaultAppKey = "test-app-key" // what -ldflags -X sets in a release build
-	assert.Equal(t, true, status()["app_key_set"], "the build's key is used: Settings offers Connect")
+	dir := t.TempDir()
+	db, err := storetest.Open(t, filepath.Join(dir, "c.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	h := NewCloudHandler(store.NewSessionStore(db), dir)
+	h.SetDropbox(store.NewDropboxStore(db, store.NewRemoteServerStore(db, dir)), dir)
+	assert.Equal(t, "", h.dbx.appKey(), "a build carries no key of its own")
 
 	t.Setenv("CORAL_DROPBOX_APP_KEY", "zyxwvutsrqponml")
-	h := &CloudHandler{}
-	h.SetDropbox(nil, t.TempDir())
-	assert.Equal(t, "zyxwvutsrqponml", h.dbx.appKey(), "the environment still overrides it")
+	assert.Equal(t, "zyxwvutsrqponml", h.dbx.appKey(), "the environment's key still works")
+}
+
+// #15641: a v2.0.64 install is connected to Dropbox with the key that build shipped; this build has none. The server starts, the backup does not run (and does not
+// loop or call Dropbox), and Settings is told why: paused_no_key. Failing-first: the status had no such field.
+func TestAConnectedInstallWithNoAppKeyIsPausedNotBroken(t *testing.T) {
+	e := newDropboxEnv(t)
+	require.Contains(t, e.signIn(""), "Connected")
+	e.h.dbx.appKey = func() string { return "" } // this build: no key
+	st := e.status()
+	assert.Equal(t, true, st["connected"], "the stored sign-in is kept")
+	assert.Equal(t, false, st["app_key_set"])
+	assert.Equal(t, true, st["paused_no_key"], "Settings can say the backup is paused for want of a key")
+	calls := e.dbx.revoked
+	assert.False(t, (&DropboxBackup{d: e.h.dbx}).ready(context.Background()), "the backup does not run without a key")
+	assert.Equal(t, calls, e.dbx.revoked, "and asks Dropbox nothing")
+
+	e.h.dbx.appKey = func() string { return "abcdefghij12345" }
+	assert.Equal(t, false, e.status()["paused_no_key"], "with a key (the environment's) it is not paused")
+}
+
+// #15641: Disconnect works with no key (it asks Dropbox nothing) and clears the stored sign-in, so a person who does not want to add a key can leave.
+func TestDisconnectWithNoAppKeyClearsTheSignIn(t *testing.T) {
+	e := newDropboxEnv(t)
+	require.Contains(t, e.signIn(""), "Connected")
+	e.h.dbx.appKey = func() string { return "" }
+	rec := e.call(http.MethodPost, "/api/dropbox/disconnect", true, nil)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Equal(t, 0, e.dbx.revoked, "Dropbox was asked nothing")
+	assert.Equal(t, false, e.status()["connected"])
 }

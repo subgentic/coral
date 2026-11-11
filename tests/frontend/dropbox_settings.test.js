@@ -57,6 +57,11 @@ const { JSDOM } = require('jsdom');
     assert.match($('settings-dropbox-status').textContent, /isn't available in this build/);
     assert.ok(!shown('settings-dropbox-connect') && !shown('settings-dropbox-disconnect'));
 
+    // Signed in with the key an earlier build shipped, none in this build (#15641): paused, said once, with Disconnect and no Connect.
+    await status({ app_key_set: false, connected: true, state: 'connected', account_id: 'dbid:AAA', paused_no_key: true });
+    assert.match($('settings-dropbox-status').textContent, /Dropbox backup is paused: this build has no Dropbox app key/);
+    assert.ok(shown('settings-dropbox-disconnect') && !shown('settings-dropbox-connect'));
+
     // Not connected: Connect.
     await status({ app_key_set: true, connected: false, state: 'disconnected' });
     assert.match($('settings-dropbox-status').textContent, /Not connected/);
