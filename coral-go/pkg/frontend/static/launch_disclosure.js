@@ -6,7 +6,7 @@ import { showConfirmModal } from './confirm_dialog.js';
 import { announceNotice } from './notifications.js';
 import { browserLocal } from './safe_storage.js';
 let readGeneration = 0;
-const HINT_KEY = 'coral-launch-notice'; // "p|53" or "d|73": this browser last saw the notice unseen, on a phone-sized or a wider screen, at that height (theme_init.js reserves its row before first paint)
+const HINT_KEY = 'coral-launch-notice'; // "p|57" or "d|73": this browser last saw the notice unseen, on a phone-sized or a wider screen, at that height (theme_init.js reserves its row before first paint)
 const hint = {
     set(px) { browserLocal.set(HINT_KEY, `${window.innerWidth <= 600 ? 'p' : 'd'}|${Math.max(0, Math.min(999, Math.round(px)))}`); }, // storage that is blocked just means no reserved row
     clear() { browserLocal.remove(HINT_KEY); },

@@ -37,7 +37,9 @@ const { guardSettings } = require('./helpers/settings_guard');
                 const notice = document.getElementById('launch-disclosure-banner');
                 return { buttons: [...notice.querySelectorAll('button')].filter(b => b.getClientRects().length).map(b => ({ name: (b.getAttribute('aria-label') || b.textContent).trim(), ...r(b) })), toasts: [...document.querySelectorAll('#toast-host > .toast')].filter(t => t.getClientRects().length).map(r), notice: r(notice) }; })()`);
             check(g.buttons.length >= 1 && g.toasts.length >= 1, `${at}the notice's buttons and a toast are on screen: ${JSON.stringify(g)}`);
-            const covered = g.buttons.filter(b => g.toasts.some(t => t.l < b.r && t.r > b.l && t.t < b.b && t.b > b.t));
+            // the notice is capped at 25dvh and scrolls inside itself (layout.css), so at 200% text the longer headline (#15079) leaves a button partly or wholly below the notice's own box: only the part inside that box is on screen, and a toast under the box covers none of it
+            const shown = g.buttons.map(b => ({ ...b, t: Math.max(b.t, g.notice.t), b: Math.min(b.b, g.notice.b) })).filter(b => b.b > b.t);
+            const covered = shown.filter(b => g.toasts.some(t => t.l < b.r && t.r > b.l && t.t < b.b && t.b > b.t));
             check(covered.length === 0, `${at}no toast covers the notice's buttons: ${JSON.stringify(covered)} under ${JSON.stringify(g.toasts)}`);
             await shot(`launch-notice-toast-${w}${big ? '-200' : ''}${view ? '-' + view : ''}`);
             await ev(`document.documentElement.style.fontSize = ''; document.querySelectorAll('#toast-host > .toast').forEach(t => t.remove()); true`);
