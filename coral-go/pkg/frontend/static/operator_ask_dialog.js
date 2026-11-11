@@ -48,7 +48,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     const close = document.createElement('button'); close.type = 'button'; close.className = 'btn'; close.textContent = 'Close';
     // Dismiss closes a question with no answer and nothing said to the agent, as the row's own Dismiss does (#12599): the same route and the same toast with Undo. A wait has no ask row to close, so it has no Dismiss.
     const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'btn btn-quiet'; dismiss.textContent = 'Dismiss'; dismiss.title = 'Take it out of Needs you; nobody is told'; dismiss.hidden = missingCloudSource || a.kind !== 'ask' || (fromAnotherComputer(a) && decisionNeedsPerson(a.server)); // the close route is served for this computer's question and, through the Hub, for the computer's owner (coral-hub batch-125): a phone's rows have no Dismiss of their own (#14419), so the dialog must
-    row.append(close, ...(dismiss.hidden ? [] : [dismiss])); // Close and Dismiss stay in the footer; Send reply is on the row right under the reply box (#13148, the Operator: 'The send reply is too far away from text input')
+    row.append(...(a.superseded && !dismiss.hidden ? [dismiss, close] : [close, ...(dismiss.hidden ? [] : [dismiss])])); // an older question the agent asked again since: Dismiss comes first (#15078) // Close and Dismiss stay in the footer; Send reply is on the row right under the reply box (#13148, the Operator: 'The send reply is too far away from text input')
     let tray = null;
     const finish = () => { if (tray) tray.destroy(); dlg.close(); dlg.remove(); if (onDone) onDone(); };
     let sending = false; const choices = [];
@@ -56,8 +56,9 @@ export function openAskDialog(a, onDone, runners = {}) {
     const replyText = () => [box.value.trim(), tray ? tray.hexes().map(h => `coral://artifacts/${h}`).join('\n') : ''].filter(Boolean).join('\n\n');
     const sync = () => { send.disabled = missingCloudSource || sending || picturesBlocked(); choices.forEach(c => { c.disabled = missingCloudSource || sending || (binary && picturesBlocked()); }); }; // Send waits for a picture going up, and for a failed one to be taken out
     let binary = yesNoButtons(a), offered = null;
+    let review = null;
     const drawOffers = () => {
-        offered?.remove(); offered = null; choices.length = 0;
+        offered?.remove(); offered = null; review?.remove(); review = null; choices.length = 0;
         binary = yesNoButtons(a);
         const offers = buttonsOffered(a);
         if (offers.length) { // what the asker offered: one tap per choice, each with what it does
@@ -102,6 +103,19 @@ export function openAskDialog(a, onDone, runners = {}) {
             const hint = document.createElement('p'); hint.className = 'inbox-ask-offers-hint'; hint.textContent = binary ? 'Sends Yes or No with any text and pictures below.' : offers.every(b => isReply(b.action)) ? 'Replies are sent as you.' : 'These actions run as you when you choose one.';
             offered.append(head, list, hint);
         }
+        if (!offers.length && a.kind === 'ask' && a.task_in_review) { // the linked task waits in review (#15078): the two answers a review wants, from the task's own state, never from the words
+            review = document.createElement('span'); review.className = 'inbox-ask-review'; review.setAttribute('role', 'group'); review.setAttribute('aria-label', 'Answer this review');
+            const answer = (word, text) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = word; b.addEventListener('click', async () => {
+                if (sending || picturesBlocked()) return;
+                const draft = replyText();
+                if (!text && !draft) { err.textContent = 'Write what to change in the box first.'; box.focus(); return; }
+                sending = true; err.textContent = ''; sync();
+                try { await replyToAsk(a, text ? (draft ? `${text}\n\n${draft}` : text) : `Changes requested:\n\n${draft}`); finish(); showToast(`Sent: ${word}`); }
+                catch (e) { err.textContent = e.message || 'Not sent.'; sending = false; sync(); }
+            }); choices.push(b); return b; };
+            review.append(answer('Approve', 'Approved.'), answer('Request changes', ''));
+            sendRow.insertBefore(review, send);
+        }
         if (offered && !binary) reading.append(offered);
         if (offered && binary) { offered.classList.add('inbox-ask-yes-no'); offered.replaceChildren(offered.querySelector('.inbox-ask-offers-list')); sendRow.insertBefore(offered, send); }
     };
@@ -113,7 +127,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     const sendRow = document.createElement('div'); sendRow.className = 'inbox-ask-sendrow'; const pickSlot = document.createElement('span'); pickSlot.className = 'inbox-ask-pick'; sendRow.append(pickSlot, send); addSlot.append(sendRow); // Add image on the left, Send reply on the right, the pictures note under them (#13148)
     compose.append(label, pics, err);
     if (missingCloudSource) dlg.setAttribute('aria-describedby', err.id);
-    const contextNote = document.createElement('p'); contextNote.className = 'inbox-ask-sub'; contextNote.textContent = questionContextNote(a); contextNote.hidden = !contextNote.textContent;
+    const contextNote = document.createElement('p'); contextNote.className = 'inbox-ask-sub'; contextNote.textContent = questionContextNote(a) || (a.superseded ? `Older: ${who} asked again since. Dismiss this one if the newer question replaces it.` : ''); /* an older question is never closed on its own (#15078) */ contextNote.hidden = !contextNote.textContent;
     dlg.append(title, sub, ...(contextNote.hidden ? [] : [contextNote]), ...(links.hidden ? [] : [links]), reading, compose, foot);
     drawOffers();
     if (!missingCloudSource && !fromAnotherComputer(a)) { // the picture is stored on the question's own team, as a goal's pictures are
@@ -138,7 +152,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     send.addEventListener('click', async () => {
         if (sending || picturesBlocked()) return;
         sending = true; err.textContent = ''; sync();
-        try { await replyToAsk(a, replyText()); finish(); }
+        try { await replyToAsk(a, replyText()); finish(); showToast(`Reply sent to ${markHidden(a.asker, { strict: true })}`); } // the dialog closes: say it went (#15078)
         catch (e) { err.textContent = e.message || 'Not sent.'; sending = false; sync(); box.focus(); } // the text stays
     });
     document.body.append(dlg);

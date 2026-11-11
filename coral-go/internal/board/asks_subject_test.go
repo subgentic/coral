@@ -114,3 +114,21 @@ func TestCancelledLinkedTaskMayNoLongerApply(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, closed)
 }
+
+// #15078: a question about a task that is in review says so, so the Inbox offers Approve and Request changes; any other state does not.
+func TestAskSubjectSaysWhenItsTaskIsInReview(t *testing.T) {
+	s, ctx := askBoard(t)
+	task, err := s.CreateTask(ctx, "alpha", "Review the app", "", "medium", "Lead", "Dev A")
+	require.NoError(t, err)
+	q := askPost(t, s, ctx, "Lead", "@Dev B approve the app?", true, 0)
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q.ID, 0, task.ID))
+	read := func() AskSubject {
+		rows, err := s.AskSubjectsOf(ctx, "alpha", []int64{q.ID})
+		require.NoError(t, err)
+		return rows[q.ID]
+	}
+	assert.False(t, read().TaskInReview, "a task not in review")
+	_, err = s.db.ExecContext(ctx, `UPDATE board_tasks SET status = 'review_pending' WHERE id = ? AND board_id = 'alpha'`, task.ID)
+	require.NoError(t, err)
+	assert.True(t, read().TaskInReview, "a task waiting in review")
+}

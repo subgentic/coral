@@ -49,6 +49,30 @@ type operatorAskRow struct {
 	GoalTitle        string `json:"goal_title,omitempty"`
 	TaskTitle        string `json:"task_title,omitempty"`
 	MayNoLongerApply string `json:"may_no_longer_apply,omitempty"`
+	// TaskInReview: the linked task is in review, so the Inbox offers Approve and Request changes (#15078). State the board holds, never read from the words.
+	TaskInReview bool `json:"task_in_review,omitempty"`
+	// Superseded: the same agent has asked again on this team since (#15078). The row says so and offers Dismiss first; nothing is closed on its own.
+	Superseded bool `json:"superseded,omitempty"`
+}
+
+// markSuperseded flags, among rows[from:] (one team's open questions), every question of an agent that has asked again since: the newest of each asker is not flagged (#15078). Waits are not questions and
+// are never in the range; nothing is closed here.
+func markSuperseded(rows []operatorAskRow, from int) {
+	newest := map[string]int{}
+	for i := from; i < len(rows); i++ {
+		if rows[i].Kind != "ask" {
+			continue
+		}
+		k := strings.ToLower(rows[i].Asker)
+		if j, ok := newest[k]; !ok || rows[i].ID > rows[j].ID {
+			newest[k] = i
+		}
+	}
+	for i := from; i < len(rows); i++ {
+		if rows[i].Kind == "ask" && newest[strings.ToLower(rows[i].Asker)] != i {
+			rows[i].Superseded = true
+		}
+	}
 }
 
 // OperatorAsks answers GET /api/operator-asks.
@@ -83,7 +107,8 @@ func (h *BoardHandler) OperatorAsks(w http.ResponseWriter, r *http.Request) {
 		}
 		withButtons, _ := h.bs.AskButtonsOf(ctx, p.Project, ids)
 		subjects, links := h.askSubjects(ctx, p.Project, ids) // the goal and task each question is about (#12164)
-		var reviewed map[string]bool                          // read once per team, and only when a message of it is only links to files (#12096)
+		boardStart := len(rows)
+		var reviewed map[string]bool // read once per team, and only when a message of it is only links to files (#12096)
 		for _, a := range asks {
 			if hexes := onlyFileLinks(a.Content); len(hexes) > 0 && len(withButtons[a.MessageID]) == 0 { // a question with answer buttons is never hidden (Security's SHOULD)
 				if reviewed == nil {
@@ -98,8 +123,9 @@ func (h *BoardHandler) OperatorAsks(w http.ResponseWriter, r *http.Request) {
 			}
 			text, cut := operatorAskText(a.Content)
 			rows = append(rows, operatorAskRow{Board: p.Project, BoardLabel: clitext.CleanName(p.BoardLabel), Kind: "ask", ID: a.MessageID, Asker: clitext.CleanName(a.Asker), Text: text, Cut: cut, At: a.At.UTC().Format(time.RFC3339), Buttons: withButtons[a.MessageID],
-				GoalID: subjects[a.MessageID].GoalID, TaskID: subjects[a.MessageID].TaskID, GoalTitle: links.goalTitle(ctx, subjects[a.MessageID].GoalID), TaskTitle: links.taskTitle(ctx, subjects[a.MessageID].TaskID), MayNoLongerApply: subjects[a.MessageID].MayNoLongerApply})
+				GoalID: subjects[a.MessageID].GoalID, TaskID: subjects[a.MessageID].TaskID, GoalTitle: links.goalTitle(ctx, subjects[a.MessageID].GoalID), TaskTitle: links.taskTitle(ctx, subjects[a.MessageID].TaskID), MayNoLongerApply: subjects[a.MessageID].MayNoLongerApply, TaskInReview: subjects[a.MessageID].TaskInReview})
 		}
+		markSuperseded(rows, boardStart)
 		waits, err := h.bs.ListOperatorQuestions(ctx, p.Project)
 		if err != nil {
 			continue

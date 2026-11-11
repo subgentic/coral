@@ -344,6 +344,7 @@ function inboxNeedsToolbar() {
     const serverListed = reviewFilters() ? pageSummary?.total : pageSummary?.queryTotal;
     const listedReviews = Number.isSafeInteger(serverListed) ? serverListed : rows.filter(s => s.review).length;
     const listedComplete = Number.isSafeInteger(serverListed);
+    const cards = rows.filter(s => NF.kindOf(s) !== 'welcome'); // the welcome cards are listed, never unread, and have their own pill: the All pill does not count them (it said 'All 0 of 6', #15078)
     const pillCount = (n, m) => {
         const value = `${completeCount ? '' : 'at least '}${n}`;
         return completeCount && listedComplete && n === m ? value : `${value} of ${listedComplete ? '' : 'at least '}${m}`;
@@ -352,7 +353,7 @@ function inboxNeedsToolbar() {
         filters: needsFilters,
         options: { team: { values: teams, labels: {} }, agent: { values: names, labels: {} }, goal: { values: goalNames, labels: {} } },
         pills: { label: 'Show agents waiting on', current: needsFilters.kind || 'all',
-            items: [{ key: 'all', label: 'All', count: attention !== null && attention !== undefined ? pillCount(rows.filter(s => !s.review && needsUnread(s)).length + attention, rows.filter(s => !s.review).length + listedReviews) : said(rows.filter(needsUnread).length, rows.length) }, ...NF.KINDS.filter(kindShown).map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: k === 'review' && attention !== null && attention !== undefined ? pillCount(attention, listedReviews) : said(counts[i], listed[i]) }))],
+            items: [{ key: 'all', label: 'All', count: attention !== null && attention !== undefined ? pillCount(rows.filter(s => !s.review && needsUnread(s)).length + attention, cards.filter(s => !s.review).length + listedReviews) : said(rows.filter(needsUnread).length, cards.length) }, ...NF.KINDS.filter(kindShown).map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: k === 'review' && attention !== null && attention !== undefined ? pillCount(attention, listedReviews) : said(counts[i], listed[i]) }))],
             onPick: key => { needsFilters = { ...needsFilters, kind: key === 'all' ? '' : key }; persistNeedsFilters(); renderInboxNav(true); } },
     });
     // Group by goal is an option of the Filters panel, with the other ways to show the list (#14378, the Operator): not a checkbox always on the page under the header. It is shut with the panel, so it takes no room until asked for.
