@@ -133,7 +133,8 @@ export function attachVersions(dialog, hooks) {
         dialog.classList.toggle('av-has-versions', !bar.hidden);
         if (bar.hidden) return;
         const rows = st.rows, row = rows[i], total = rows.length, latest = i === total - 1;
-        if (!latest && hooks.wantLatest?.()) { choose(rows[total - 1]); return; } // opened from Needs you: the newest version, not the one the row was made for
+        const wantLatest = hooks.wantLatest?.(); // asked once, for the first version drawn, so an open that already shows the newest uses it up (#15601: left set, it sent the person's next pick of v2 back to v3)
+        if (!latest && wantLatest) { choose(rows[total - 1]); return; } // opened from Needs you: the newest version, not the one the row was made for
         const files = new Set(rows.map(r => r.name).filter(Boolean)).size; // one series can hold several files (a task's chain, #12144): a decision on the newest covers them all (#15233)
         dialog.dataset.coversFiles = files > 1 ? String(files) : '';
         if (st.seenOf !== rows[0].digest) { st.seenOf = rows[0].digest; st.seen = new Set(); } // the versions shown since this series opened: a file none of whose versions was shown has not been opened (#15254)
