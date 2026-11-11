@@ -43,6 +43,11 @@ const { removeBoards } = require('./helpers/board_cleanup');
             check(g.selTop >= -1 && g.selBottom <= g.viewH, at + 'the actions line is on screen after a row far down is ticked: ' + JSON.stringify(g));
             check(g.selTop <= 8, at + 'the actions line sits at the top of the list: ' + JSON.stringify(g));
             check(/selected/.test(g.text) && g.hit, at + 'it is the actions line, not covered by a row: ' + JSON.stringify(g));
+            // #15656: each selection mount replaces the bar's ResizeObserver; the old one is disconnected (one live observer however often rows are ticked and cleared)
+            await ev(`(() => { const R = window.ResizeObserver; window.__liveRO = new Set(); window.ResizeObserver = class extends R { constructor(cb) { super(cb); this.__sel = /--sel-up/.test(String(cb)); } observe(t, o) { if (this.__sel) window.__liveRO.add(this); return super.observe(t, o); } disconnect() { window.__liveRO.delete(this); return super.disconnect(); } }; return true; })()`);
+            for (let k = 0; k < 4; k++) { await ev(`(() => { const rs = ${rows}; rs[rs.length - 1 - (${k} % 2)].querySelector('.dt-check input, .dt-mail-lead').click(); return true; })()`); await ev(framesJs(3)); }
+            const live = await ev(`window.__liveRO.size`);
+            check(live <= 1, at + 'ticking and clearing rows leaves at most one live selection observer, not one per mount: ' + live);
             await shot('needs_sticky_' + w);
         }
     } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
