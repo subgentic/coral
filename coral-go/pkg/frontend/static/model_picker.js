@@ -95,8 +95,9 @@ function fill(container, agentType, data) {
     const models = (data && Array.isArray(data.models) ? data.models : []).filter(m => m && typeof m.value === 'string' && m.value && !/^default( \(recommended\))?$/i.test(m.display_name || m.value)); // the list's own "Default (recommended)" is the first option already: not a second one (#15143)
     container._modelList = models;
     if (!models.length) { wrap.hidden = true; input.hidden = false; return; }   // no list: the text box, as before
-    select.innerHTML = `<option value="">Default</option>`
-        + modelOptions(models, data && data.groups)
+    const named = models.find(m => m.value === 'default' && m.display_name); container._defaultNamed = !!named; // the CLI lists its own default ('Default (recommended)'): that is the one Default entry, not a second beside it (#15079)
+    select.innerHTML = `<option value="">${named ? escapeHtml(named.display_name) : 'Default'}</option>`
+        + modelOptions(named ? models.filter(m => m !== named) : models, data && data.groups)
         + `<option value="${escapeAttr(OTHER)}">Other…</option>`
         + (familyOf(agentType) && peekCanAdd(_acfServer(container)) !== false ? `<option value="${escapeAttr(ADD)}">Add a model…</option>` : '');
     wrap.hidden = false;
@@ -131,7 +132,7 @@ export function syncModelPicker(container, fromCode = true) {
         select.insertBefore(opt, select.querySelector(`option[value="${OTHER}"]`));
     }
     const known = listed || unlisted;
-    select.value = known ? v : OTHER;
+    select.value = known ? (v === 'default' && container._defaultNamed ? '' : v) : OTHER;
     container._lastSel = select.value;   // what the list showed before "Add a model…" was chosen, to go back to
     input.hidden = known;
     if (id) {

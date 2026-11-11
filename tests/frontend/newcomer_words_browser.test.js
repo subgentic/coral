@@ -21,14 +21,9 @@ const BASE = require('./test_base').BASE;
         await ev(`[...document.querySelectorAll('.sidebar-footer .sidebar-new-btn-full')].find(b => b.textContent.trim() === 'New team').click(); true`);
         await require('./helpers/new_agent').passComputerStep(ev, waitFor);
         await waitFor(`!!window.__nt.dlg(${N.team})`, 'New team opens from the sidebar button', 8000);
-        // 2. Set all workers to: a model too
+        // 2. the team members (the set-all-workers model list is #15079's)
         await t.to(2, { template: /Coding/ });
         await waitFor(`document.querySelectorAll('#team-agents-list .team-agent-row').length >= 2`, 'the template members', 8000);
-        await ev(`(() => { const i = document.getElementById('team-set-all-model'); i.value = 'claude-haiku-5-5'; i.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-        const models = await ev(`[...document.querySelectorAll('#team-agents-list .team-agent-row')].map(r => ({ role: window.__coral && window.__coral.getAgentConfig ? '' : '', model: (document.getElementById(r.dataset.acfId)?.querySelector('.acf-model') || {}).value || '', name: (document.getElementById(r.dataset.acfId)?.querySelector('.acf-name, input[name=name]') || {}).value || r.textContent.slice(0, 30) }))`);
-        const withModel = models.filter(m => m.model === 'claude-haiku-5-5');
-        assert.ok(withModel.length >= 1 && withModel.length < models.length, 'the workers took the model and the Orchestrator kept its own: ' + JSON.stringify(models));
-        assert.match(await ev(`document.getElementById('team-undo').textContent`), /^Set \d+ workers? to model claude-haiku-5-5\.$/, 'it says what it did');
         // 3. plain words in the team Settings (step 3, Workflow)
         await t.click('button', N.next); await t.step(3);
         await ev(`(() => { const d = window.__nt.dlg(${N.team}); const x = [...d.querySelectorAll('[role=tab]')].filter(window.__na.vis).find(e => window.__na.name(e) === 'Workflow'); if (x) x.click(); return true; })()`);

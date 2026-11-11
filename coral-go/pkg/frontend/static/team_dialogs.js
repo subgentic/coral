@@ -15,8 +15,7 @@ const { goalWrite } = await importOnce('./goal_write.js');
 const { _acfServer, _effectiveServer, _settingsFor } = await importOnce('./launch_models.js');
 const { defaultPermissionMode, trackPermissionPick, _getPermissionFlagsForAgentMode, _normalizePermFlagsForAgent, _updatePermModeDescription, _hasPermFlag } = await importOnce('./permission_flags.js');
 const { _findPersona, _getSavedTeamTemplates, _upsertSavedTeamTemplates } = await importOnce('./persona_store.js');
-const { getAgentConfig, renderAgentConfigForm, setAgentConfig, resetProviderChoices, _syncACFModelField } = await importOnce('./agent_config_form.js');
-const { syncModelPicker } = await importOnce('./model_picker.js');
+const { getAgentConfig, renderAgentConfigForm, setAgentConfig, resetProviderChoices } = await importOnce('./agent_config_form.js');
 const { markFieldInvalid, _launchBlocked, _launchOn, _onServerSuffix, _refreshAfterLaunch, _resetDirInputs, _showLaunchStep, hideLaunchModal, showTeamLaunchFailures } = await importOnce('./launch_core.js');
 const { _syncFlagButtons } = await importOnce('./flag_shortcuts.js');
 const { showSettingsModal } = await importOnce('./settings_dialog.js');
@@ -420,9 +419,6 @@ async function _initTeamForm() {
     const banner = document.getElementById('generated-team-banner');
     if (banner) banner.style.display = 'none';
 
-    const allModel = document.getElementById('team-set-all-model'); // a model typed for every worker applies when the field is left (#15312)
-    if (allModel && !allModel.dataset.wired) { allModel.dataset.wired = '1'; allModel.addEventListener('change', () => { if (allModel.value.trim()) _setAllWorkers(''); }); }
-
     // Reset form
     _teamFolderGeneration++;
     document.getElementById("team-board-name").value = "";
@@ -704,30 +700,44 @@ function _pickTeamTemplate(name) {
     _loadTeamTemplate(name);
 }
 
-/** Give one member's form a model the way a person's choice does (#15312): typed into the Model field, kept when the provider is changed back and forth. */
-function _giveModel(containerId, model) {
-    const c = document.getElementById(containerId), input = c?.querySelector('.acf-model');
-    if (!input) return;
-    input.value = model; c.dataset.acfModelDirty = 'true'; c.dataset.acfModelClassifying = 'false';
-    syncModelPicker(c); _syncACFModelField(c);
-}
-
-/** Set all workers to a provider (#7407) and a model (#15312): every member whose role is not the Orchestrator takes the provider, and their Model and Thinking go back to the provider's defaults unless a model is typed in the field beside it, which they take too; Mode, role and prompt stay. With only a model typed, the workers keep their providers and take the model. */
+/** Set all workers to a provider (#7407): every member whose role is not the Orchestrator takes it, and their Model and Thinking go back to the provider's defaults; Mode, role and prompt stay. */
 function _setAllWorkers(type) {
-    const sel = document.getElementById('team-set-all'), modelBox = document.getElementById('team-set-all-model'), model = (modelBox?.value || '').trim();
-    if (!type && !model) return;
+    const sel = document.getElementById('team-set-all');
+    if (!type) return;
     let n = 0;
     for (const row of teamRows()) {
         if (isOrchestrator(rowRole(row))) continue;
-        if (type) { row.dataset.followsTeamType = ''; resetProviderChoices(row.dataset.acfId, type); }
-        if (model) _giveModel(row.dataset.acfId, model);
+        row.dataset.followsTeamType = '';
+        resetProviderChoices(row.dataset.acfId, type);
         n++;
     }
     if (sel) sel.value = '';
-    const label = type ? [...(document.getElementById('team-agent-type')?.options || [])].find(o => o.value === type)?.textContent.replace(/ \(.*\)$/, '') || type : '';
+    const label = [...(document.getElementById('team-agent-type')?.options || [])].find(o => o.value === type)?.textContent.replace(/ \(.*\)$/, '') || type;
     _clearTeamUndo();
     const line = document.getElementById('team-undo');
-    if (line) line.textContent = `Set ${n} ${n === 1 ? 'worker' : 'workers'} to ${[label, model && `model ${model}`].filter(Boolean).join(', ')}.`;
+    if (line) line.textContent = `Set ${n} ${n === 1 ? 'worker' : 'workers'} to ${label}. Pick a model for them below.`;
+    document.getElementById('team-set-all-model')?.setAttribute('hidden', ''); setTimeout(_fillAllModels, 800); // the new provider's list arrives a moment after the change
+    _syncTeamMembers();
+}
+
+/** Set all workers' model (#15079): after a provider is chosen, a second list offers that provider's models; choosing one sets it on every worker (the Orchestrator keeps its own), as the provider list does for the provider. */
+const _workerBoxes = () => teamRows().filter(r => !isOrchestrator(rowRole(r))).map(r => document.getElementById(r.dataset.acfId)).filter(Boolean);
+function _fillAllModels() {
+    const sel = document.getElementById('team-set-all-model'), box = _workerBoxes().find(b => b.querySelector('.acf-model-select'));
+    if (!sel || !box) return;
+    const keep = sel.value;
+    sel.replaceChildren(new Option('Model: each worker\'s default', ''), ...[...box.querySelector('.acf-model-select').options].filter(o => o.value && !o.dataset.unlisted && !o.value.startsWith('__')).map(o => new Option(o.textContent, o.value)));
+    sel.value = [...sel.options].some(o => o.value === keep) ? keep : '';
+    sel.hidden = false;
+}
+function _setAllModel(value) {
+    let n = 0;
+    for (const box of _workerBoxes()) {
+        const s = box.querySelector('.acf-model-select');
+        if (!s || ![...s.options].some(o => o.value === value)) continue;
+        s.value = value; s.dispatchEvent(new Event('change', { bubbles: true })); n++;
+    }
+    _clearTeamUndo(); const line = document.getElementById('team-undo'); if (line) line.textContent = n ? `Set the model of ${n} ${n === 1 ? 'worker' : 'workers'}.` : 'No worker offers that model.';
     _syncTeamMembers();
 }
 
@@ -952,4 +962,4 @@ async function _openLaunchedTeam(server, boardName, goal, agents, seen, boardSet
 }
 window.launchTeam = launchTeam;
 
-export { _openLaunchedTeam, _addTeamAgent, _applyACFPresetFor, _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards, _moveTeamAgent, _removeMemberFromDialog, _moveMemberFromDialog, _renderTeamTemplateSelector, _syncTemplateMenu, _removeTeamAgent, _undoTeamAgentRemoval, _syncTeamMembers, _pickTeamTemplate, _setAllWorkers, _addOrchestrator, teamStepMove };
+export { _fillAllModels, _setAllModel, _openLaunchedTeam, _addTeamAgent, _applyACFPresetFor, _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards, _moveTeamAgent, _removeMemberFromDialog, _moveMemberFromDialog, _renderTeamTemplateSelector, _syncTemplateMenu, _removeTeamAgent, _undoTeamAgentRemoval, _syncTeamMembers, _pickTeamTemplate, _setAllWorkers, _addOrchestrator, teamStepMove };

@@ -70,6 +70,17 @@ const { coralReady } = require('./helpers/wait');
         await ev(`{ const s = document.querySelector('#acf-t .acf-model-select'); s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); true }`);
         assert.equal(await formModel(), '', 'Default sends no model');
 
+        console.log('2b. the CLI lists its own Default: one Default entry, not two (#15079)');
+        await ev(`window.__serve.claude = { models: [{ value: 'default', display_name: 'Default (recommended)' }, ${JSON.stringify(OPUS)}], refreshing: false }; localStorage.removeItem('coral-models:v1:local:claude'); window.__acf.setAgentConfig('acf-t', { agentType: 'codex', model: '' }); true`); await sleep(300); // sleep-ok: the form's async loads have no completion event
+        await ev(`window.__acf.setAgentConfig('acf-t', { agentType: 'claude', model: '' }); true`);
+        await waitFor(`[...document.querySelectorAll('#acf-t .acf-model-select option')].some(o => o.textContent === 'Default (recommended)')`, 'the CLI default names the blank entry', 4000);
+        b = await box();
+        assert.deepEqual(b.options, ['Default (recommended)', 'Opus 4.1', 'Other…', 'Add a model…'], 'one Default entry: ' + JSON.stringify(b.options));
+        assert.equal(b.value, '', 'and a blank model selects it');
+        await ev(`window.__acf.setAgentConfig('acf-t', { agentType: 'claude', model: 'default' }); true`); await sleep(300); // sleep-ok: the form's async loads have no completion event
+        assert.equal((await box()).value, '', 'a stored "default" selects that same entry');
+        await ev(`window.__serve.claude = { models: [${JSON.stringify(OPUS)}, ${JSON.stringify(SONNET)}], refreshing: false }; true`);
+
         console.log('3. values set from code');
         await ev(`window.__acf.setAgentConfig('acf-t', { agentType: 'claude', model: ${JSON.stringify(OPUS.value)} }); true`); await sleep(300); // sleep-ok: the form's async loads have no completion event
         b = await box(); assert.equal(b.value, OPUS.value, 'a known model is selected'); assert.equal(b.inputShown, false);

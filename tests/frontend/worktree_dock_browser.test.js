@@ -55,7 +55,7 @@ const S = `(window.__coralStatic || '/static/')`;
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev);
         // The launch notice (a fresh profile has not acknowledged it) announces itself on first paint into the same shared status region, one announcement at a time; let it finish so the next text read is the worktree notice's own (#14786).
-        await waitFor(`!document.getElementById('launch-disclosure-banner') || ((document.getElementById('notice-live') || {}).textContent || '').includes('Agents default to auto mode.')`, 'the launch notice to be announced', 6000);
+        await waitFor(`!document.getElementById('launch-disclosure-banner') || ((document.getElementById('notice-live') || {}).textContent || '').includes('Agents default to auto mode: they can act without asking you; protections vary by agent.')`, 'the launch notice to be announced', 6000);
         await ev(`localStorage.clear(); window.__copied = null; navigator.clipboard.writeText = t => { window.__copied = t; return Promise.resolve(); }; true`);
         const bar = () => ev(`(() => { const d = document.getElementById('worktree-dock'); if (!d || d.hidden) return null; const q = s => d.querySelector(s);
             return { title: (q('.worktree-dock-title') || {}).textContent, buttons: [...d.querySelectorAll('.worktree-dock-line button')].map(b => b.classList.contains('ic-close') ? '×' : b.textContent), open: (q('.worktree-dock-details') || {}).getAttribute && q('.worktree-dock-details').getAttribute('aria-expanded'), bodyHidden: q('.worktree-dock-body').hidden,

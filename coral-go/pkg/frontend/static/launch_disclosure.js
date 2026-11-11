@@ -12,7 +12,7 @@ const hint = {
     clear() { browserLocal.remove(HINT_KEY); },
     release() { document.getElementById('launch-notice-room')?.remove(); document.documentElement.removeAttribute('data-launch-notice'); }, // the notice fills the room, or there is none to fill
 };
-const headline = 'Agents default to auto mode.';
+const headline = 'Agents default to auto mode: they can act without asking you; protections vary by agent.';
 function disclosureSection(id, title, disclosure) {
     const section = document.createElement('details'); section.className = 'disclosure';
     const summary = document.createElement('summary');
