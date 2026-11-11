@@ -861,6 +861,15 @@ func (h *SessionsHandler) readPromptScreenText(ctx context.Context, name, agentT
 			}
 		}
 	}
+	if ok && s.commandOpenMissing && agentType == at.Claude {
+		// No read shows the top of the request (the dialog is taller than the terminal and its top is in neither the pane's history nor the PTY's ring, #15492): the call the agent's hook reported before it asked may still be
+		// the whole request, when the screen's own part of it is that call's end.
+		if whole, wok := h.screenWithStoredRequest(sessionID, text); wok {
+			if ws, wsok := parseAgentScreen(agentType, whole); wsok && !ws.commandOpenMissing && sameQuestion(s, ws) {
+				s, text = ws, whole
+			}
+		}
+	}
 	if ok {
 		if agentType == at.Hermes && s.Kind == promptKindApproval {
 			applyHermesCommand(&s, h.hermesStoredCommand(ctx, sessionID)) // the screen drops a hidden character; Hermes's stored call has it (#12170)
