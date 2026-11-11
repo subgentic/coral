@@ -214,10 +214,10 @@ func TestTheSettingIsOnByDefaultAndATeamThatSavedItOffKeepsItOff(t *testing.T) {
 func TestTheOrchestratorAndOtherCLIsAreLeftAlone(t *testing.T) {
 	h := newCompactHarness(t, true)
 	h.agent("Boss", "s1", "claude", "Orchestrator", 500000, time.Minute)
-	h.agent("Hx", "s2", "hermes", "Dev", 500000, time.Minute)
+	h.agent("Hx", "s2", "opencode", "Dev", 500000, time.Minute)
 	h.agent("Dev", "s3", "claude", "Dev", 500000, time.Minute)
 	h.run(0)
-	assert.Equal(t, []string{compactLine}, h.sent(), "the orchestrator holds the most state and a CLI with no known command (Hermes: Coral has no context size for it yet) is never guessed at")
+	assert.Equal(t, []string{compactLine}, h.sent(), "the orchestrator holds the most state and a CLI with no known command is never guessed at")
 	s := board.DefaultHealthSettings()
 	s.CompactContext = board.HealthCompact{On: true, ThresholdK: 200, Orchestrator: true}
 	require.NoError(t, h.bs.SetHealthSettings(context.Background(), "team", s))
@@ -231,7 +231,8 @@ func TestTheCompactLineIsFixedWhateverTheAgentWasDoing(t *testing.T) {
 	for _, bare := range []string{"codex", "agy", "antigravity", "pi"} {
 		assert.Equal(t, "/compact", compactCommand(bare), bare+": the CLI's own bare command, nothing of Coral's in it")
 	}
-	for _, other := range []string{"hermes", "opencode", "gemini", "terminal", ""} {
+	assert.Equal(t, "/compress", compactCommand("hermes"), "Hermes's own command (its slash menu lists /compact as the alias)")
+	for _, other := range []string{"opencode", "gemini", "terminal", ""} {
 		assert.Empty(t, compactCommand(other), other)
 	}
 	for _, other := range []string{"codex", "agy", "antigravity", "hermes", "pi", "opencode", "gemini", "terminal", ""} {
@@ -489,8 +490,7 @@ func TestTheServiceIsSafeToReadWhileItRuns(t *testing.T) {
 	<-done
 }
 
-// #15506: each harness is sent its own CLI's compaction command (read from that CLI's slash menu: Codex 0.166, Antigravity 1.5, Pi 1.4), through the same gates as Claude's. A Hermes agent is not: Coral
-// records no context size for it, so nothing would say when it is due.
+// #15506: each harness is sent its own CLI's compaction command (read from that CLI's slash menu: Codex 0.166, Antigravity 1.5, Pi 1.4), through the same gates as Claude's. Hermes (0.22) has /compress; its context size is the growth of its session totals over the calls they hold (#15508).
 func TestEachHarnessWithAKnownCommandIsSentItsOwnCompact(t *testing.T) {
 	for _, tc := range []struct{ agentType, line string }{
 		{"claude", compactLine},
@@ -498,6 +498,7 @@ func TestEachHarnessWithAKnownCommandIsSentItsOwnCompact(t *testing.T) {
 		{"agy", "Dev: /compact"},
 		{"antigravity", "Dev: /compact"},
 		{"pi", "Dev: /compact"},
+		{"hermes", "Dev: /compress"},
 	} {
 		t.Run(tc.agentType, func(t *testing.T) {
 			h := newCompactHarness(t, true)

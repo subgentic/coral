@@ -83,14 +83,16 @@ func clearedText(next int64) string {
 }
 
 // compactCommand is the command that compacts an agent of this type, "" for a type with none known to Coral (never guessed). Each is read from that CLI's own slash menu (#15506): Claude's /compact takes a
-// focus line; Codex 0.166, Antigravity 1.5 and Pi 1.4 each have a bare /compact. Hermes has /compress (alias /compact), but Coral records no context size for a Hermes agent (its poller keeps cumulative
-// totals only), so nothing would say when it is due: it stays unwired until it has one (#15508).
+// focus line; Codex 0.166, Antigravity 1.5 and Pi 1.4 each have a bare /compact; Hermes 0.22 has /compress (/compact is its alias). A Hermes agent's context size is its
+// session totals' growth over the calls it holds (the poller records it, #15508).
 func compactCommand(agentType string) string {
 	switch agentType {
 	case at.Claude:
 		return "/compact " + compactFocusClaude
 	case at.Codex, at.Agy, at.Antigravity, at.Pi:
 		return "/compact"
+	case at.Hermes:
+		return "/compress"
 	}
 	return ""
 }

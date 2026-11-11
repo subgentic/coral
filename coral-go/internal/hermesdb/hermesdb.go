@@ -59,6 +59,10 @@ type Session struct {
 	MessageCount int
 	InputTokens  int64
 	OutputTokens int64
+	// The running totals of the cached part of the input and of the model calls made, which newer Hermes keeps beside the two above (0 when the column is not there): the size of a request is what one call carried (#15508).
+	CacheReadTokens  int64
+	CacheWriteTokens int64
+	APICalls         int64
 }
 
 // Message is the row of one turn: role user, assistant or tool; ToolCalls the assistant's calls as Hermes wrote them (JSON, OpenAI shape); ToolName and ToolCallID on a tool's result.
@@ -199,14 +203,15 @@ func (d *DB) Session(ctx context.Context, id string) (s Session, ok bool, err er
 	}
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
-	q := fmt.Sprintf("SELECT id, model, %s, %s, %s, started_at, %s, %s, %s, %s, %s FROM sessions WHERE id = ?",
+	q := fmt.Sprintf("SELECT id, model, %s, %s, %s, started_at, %s, %s, %s, %s, %s, %s, %s, %s FROM sessions WHERE id = ?",
 		d.optional("sessions", "cwd"), d.optional("sessions", "title"), d.optional("sessions", "source"),
 		d.optional("sessions", "last_activity_at"), d.optional("sessions", "ended_at"), d.optional("sessions", "message_count"),
-		d.optional("sessions", "input_tokens"), d.optional("sessions", "output_tokens"))
+		d.optional("sessions", "input_tokens"), d.optional("sessions", "output_tokens"),
+		d.optional("sessions", "cache_read_tokens"), d.optional("sessions", "cache_write_tokens"), d.optional("sessions", "api_call_count"))
 	var model, cwd, title, source sql.NullString
 	var started, last, ended sql.NullFloat64
-	var count, in, out sql.NullInt64
-	err = d.db.QueryRowContext(ctx, q, id).Scan(&s.ID, &model, &cwd, &title, &source, &started, &last, &ended, &count, &in, &out)
+	var count, in, out, cr, cw, calls sql.NullInt64
+	err = d.db.QueryRowContext(ctx, q, id).Scan(&s.ID, &model, &cwd, &title, &source, &started, &last, &ended, &count, &in, &out, &cr, &cw, &calls)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Session{}, false, nil
 	}
@@ -216,6 +221,7 @@ func (d *DB) Session(ctx context.Context, id string) (s Session, ok bool, err er
 	s.Model, s.CWD, s.Title, s.Source = cut(model.String), cut(cwd.String), cut(title.String), cut(source.String)
 	s.StartedAt, s.LastActivity, s.EndedAt = started.Float64, last.Float64, ended.Float64
 	s.MessageCount, s.InputTokens, s.OutputTokens = int(count.Int64), in.Int64, out.Int64
+	s.CacheReadTokens, s.CacheWriteTokens, s.APICalls = cr.Int64, cw.Int64, calls.Int64
 	return s, true, nil
 }
 
