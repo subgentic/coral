@@ -1,0 +1,2 @@
+.artifact-viewer-body:focus-visible, .artifact-viewer-body [tabindex="-1"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; } /* the document, and the passage chosen by keyboard (#15173) */
+.artifact-viewer-body [tabindex="-1"]:focus-visible { background: color-mix(in srgb, var(--accent) 12%, transparent); }
