@@ -463,7 +463,7 @@ func (h *SessionsHandler) restartCommand(ctx context.Context, p *restartPlan) (s
 	} else if p.stored != nil && !p.pickedMode { // a mode picked in the restart dialog is the person asking for something else: it ends the choice (below)
 		keepFull = h.keepFullAccessForRelaunch(ctx, p.agentType, p.stored.SessionID, "restart", p.stored.Capabilities, p.capsJSON)
 	}
-	cmd, err := h.launchCommand(ctx, agent.GetAgent(p.agentType), agent.LaunchParams{
+	restartParams := agent.LaunchParams{
 		KeepFullAccess: keepFull,
 		SessionID:      p.newSessionID,
 		SessionName:    p.newSessionName,
@@ -484,10 +484,12 @@ func (h *SessionsHandler) restartCommand(ctx context.Context, p *restartPlan) (s
 		CoralHost:       h.cfg.AgentHost(),
 		CoralPort:       h.cfg.Port,
 		RunTag:          h.runTagFor(ctx, p.newSessionID, storedSessionID(p.stored), ""),
-	})
+	}
+	cmd, err := h.launchCommand(ctx, agent.GetAgent(p.agentType), restartParams)
 	if err != nil {
 		return "", func(w http.ResponseWriter) { errInternalServer(w, fmt.Sprintf("launch command failed: %v", err)) }
 	}
+	noteStartMessage(p.agentType, restartParams) // the restart's first message is the instructions again: Coral's turn in the chat, not the person's (#15283)
 	if !p.req.KeepFullAccess && p.stored != nil && p.pickedMode && keepFullAccessType(p.agentType) {
 		h.clearKeepFullAccess(ctx, p.stored.SessionID, "the restart picked a permission mode")
 	}

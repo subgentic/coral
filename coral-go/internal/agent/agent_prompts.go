@@ -201,6 +201,9 @@ func (p LaunchParams) startMessage() string {
 	return BuildBoardActionPrompt(p.boardPromptName(), p.Role, p.Prompt, p.PromptOverrides, p.BoardType)
 }
 
+// StartMessage is the first message the launch starts the CLI with ("" when it sends none).
+func (p LaunchParams) StartMessage() string { return p.startMessage() }
+
 // boardPromptName is the name an agent's prompt shows for its board: the label when known,
 // else the board key (#3536).
 func (p LaunchParams) boardPromptName() string {

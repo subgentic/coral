@@ -111,6 +111,10 @@ func (l *textLog) note(name, text string) {
 
 func noteDeliveredText(name, text string) { delivered.note(name, text) }
 
+// NoteDeliveredText records that Coral itself gave text to the session name as its first message, outside the input gate: the instructions a restart or a wake starts the CLI with (#15283). The transcript records that
+// turn as the person's own, so the chat drew the agent's whole role prompt as a wall of text in a "You" bubble; flagged, it folds like any other delivery.
+func NoteDeliveredText(name, text string) { delivered.note(name, text) }
+
 // NoteOperatorText records that the Operator sent text to the session name just now (from the dashboard's composer or the send route, #5482).
 func NoteOperatorText(name, text string) { operatorSent.note(name, text) }
 
