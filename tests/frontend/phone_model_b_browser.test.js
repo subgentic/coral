@@ -8,7 +8,7 @@ const { install: installTP, seed, openTeam, goTab } = require('./helpers/team_pa
 const { removeBoards } = require('./helpers/board_cleanup');
 const { DATA_WORLD } = require('./helpers/census_world');
 const BASE = require('./test_base').BASE;
-const { quietLaunchNotice } = require('./helpers/launch_notice');
+const { quietLaunchNotice, restoreLaunchNotice } = require('./helpers/launch_notice');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -85,5 +85,5 @@ const { quietLaunchNotice } = require('./helpers/launch_notice');
         await detail('a goal', '#team-page-view', async () => { await inTeam('Goals'); await ev(`(document.querySelector('#team-panel-goals tbody .dt-primary') || document.querySelector('#team-panel-goals .team-row-btn, #team-panel-goals tbody button')).click(); true`); await waitFor(`!!document.querySelector('#team-panel-goals .goal-main .goals-back')`, 'the goal page', 10000); }, `!!document.querySelector('#team-page-head') && getComputedStyle(document.getElementById('team-page-head')).display !== 'none' && document.querySelector('.team-tab[aria-selected="true"]').textContent.includes('Goals')`);
         await detail('a task', '#team-page-view', async () => { await inTeam('Tasks'); await ev(`document.querySelector('#team-panel-tasks .dt-primary').click(); true`); await waitFor(`!!document.querySelector('#team-panel-item #team-task-title')`, 'the task page', 10000); }, `getComputedStyle(document.getElementById('team-page-head')).display !== 'none' && document.querySelector('.team-tab[aria-selected="true"]').textContent.includes('Tasks')`);
         console.log('PASS the phone model, slice B: the team page bar');
-    } finally { await removeBoards(ev, [TEAM]); await client.close(); }
+    } finally { await removeBoards(ev, [TEAM]); await restoreLaunchNotice(ev); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

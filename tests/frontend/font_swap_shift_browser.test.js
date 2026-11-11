@@ -6,7 +6,7 @@ const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
 const { coralReady, framesJs } = require('./helpers/wait');
-const { quietLaunchNotice } = require('./helpers/launch_notice');
+const { quietLaunchNotice, restoreLaunchNotice } = require('./helpers/launch_notice');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const Network = client.Network, team = 'fs-' + Date.now().toString(36), out = [];
@@ -25,6 +25,6 @@ const { quietLaunchNotice } = require('./helpers/launch_notice');
         }
         for (const w of [420, 1280]) { const a = out.find(o => o[0] === w && !o[1])[2], b = out.find(o => o[0] === w && o[1])[2];
             assert.deepEqual([b.page, b.box, b.heights], [a.page, a.box, a.heights], `${w}: the page with the web fonts blocked is laid out as the page with them loaded (page ${b.page} vs ${a.page}, table ${b.box} vs ${a.box}); an icon's name is not allowed to take room before its font arrives`); }
-    } finally { await Network.setBlockedURLs({ urls: [] }).catch(() => {}); await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
+    } finally { await Network.setBlockedURLs({ urls: [] }).catch(() => {}); await removeBoards(ev, [team]).catch(() => {}); await restoreLaunchNotice(ev); await client.close(); }
     console.log('font_swap_shift_browser: ok');
 })().catch(e => { console.error(e && e.message || e); process.exit(1); });

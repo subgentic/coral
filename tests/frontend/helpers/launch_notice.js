@@ -4,4 +4,8 @@ async function quietLaunchNotice(Page, ev, url) {
     if (acked) { await Page.navigate({ url }); await Page.loadEventFired(); }
     return acked;
 }
-module.exports = { quietLaunchNotice };
+// Takes the acknowledgement back at the suite's end (the owner's DELETE, as phone_landscape_fold does): the suite acknowledged the notice on a shared server and must leave the server as it found it, or --fail-on-leak fails the run (v2.0.65 gate5: font_swap_shift, phone_pass, phone_model_b).
+async function restoreLaunchNotice(ev) {
+    return ev(`fetch('/api/launch-disclosure/ack', { method: 'DELETE' }).then(r => r.ok)`).catch(() => false);
+}
+module.exports = { quietLaunchNotice, restoreLaunchNotice };
