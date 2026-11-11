@@ -207,7 +207,27 @@ func killTree(known []member, root member, tag string) []member {
 // anyAlive reports whether any of ms is still the process it was.
 func anyAlive(ms []member) bool {
 	for _, m := range ms {
-		if err := syscall.Kill(m.pid, 0); (err == nil || err == syscall.EPERM) && m.current() {
+		if err := syscall.Kill(m.pid, 0); (err == nil || err == syscall.EPERM) && m.current() && !m.zombie() {
+			return true
+		}
+	}
+	return false
+}
+
+// zombie reports whether m has ended and only waits for its parent to collect it. kill(pid, 0) still succeeds for such a process, so it was taken for alive: the kill of a terminal then waited out its whole
+// grace for a process that was already gone when whatever adopted it (init, a runner with no init at all) did not collect it at once: "an interactive shell ends within a second of Kill, took 5.09 s" in go-race,
+// and a second or more under load (#14881).
+func (m member) zombie() bool {
+	p, err := process.NewProcess(int32(m.pid))
+	if err != nil {
+		return false
+	}
+	status, err := p.Status()
+	if err != nil {
+		return false
+	}
+	for _, s := range status {
+		if s == process.Zombie {
 			return true
 		}
 	}
