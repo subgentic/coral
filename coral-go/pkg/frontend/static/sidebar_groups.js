@@ -191,7 +191,7 @@ function drawTable() {
     const focusTargets = '.group-chip, .dt-primary, .dt-quiet, .inbox-answer, a.inbox-ask-subject-link';
     const held = host.contains(a) && a.matches(focusTargets) ? { cls: a.className, data: JSON.stringify(a.dataset), href: a.getAttribute('href'), row: a.closest('tbody tr') ? [...a.closest('tbody').children].indexOf(a.closest('tr')) : -1 } : null;
     if (host.dataset.drawn !== drawn) {
-        host.innerHTML = html; host.dataset.drawn = drawn; drawnUrgent = src.urgentSignature ? src.urgentSignature() : ''; // the waiting agents this drawing shows (a module variable: a data attribute is an injection the payload census refuses) // a redraw of what is there would drop the focus from a row the keyboard is on
+        host.innerHTML = html; host.dataset.drawn = drawn;
         if (bar?.node) host.prepend(bar.node);
         if (folderPage) folderHead(bar.node, folderPage);
         if (lead) { // a phone: the strip is a tab list and everything under it is its panel (#11281); the panel adds no box (display: contents)
@@ -255,9 +255,7 @@ if (typeof document !== 'undefined') {
 }
 
 // The same for a pointer that only RESTS over the list (#14173, the Beta Tester: a new permission row arrived, the rows moved and a click opened the wrong item): while a mouse pointer is over the table of a source with
-// holdRedraw, a redraw waits and the table says so in one line ("New items are waiting; they appear when the pointer leaves the list"); it happens once when the pointer leaves. A hold is never longer than its cap (2 s for a waiting agent, 10 s otherwise)
-// from the first redraw it held, so a pointer left over the list does not freeze it. Only a fine, hovering pointer: a touch screen has no hover (its press is held above).
-const HOVER_HOLD_MS = 10000, URGENT_HOLD_MS = 2000; // a row that needs the person (a waiting agent, a permission) is held 2 s at most: enough that a row does not jump under a click, not enough to hide that an agent is waiting (QA Reviewer 2 on #14173); other new rows, 10 s
+// holdRedraw, a redraw waits and the table says so in one line ("2 new waiting. Show", #15339): the rows stay put until the person presses Show or the pointer leaves the list. Only a fine, hovering pointer: a touch screen has no hover (its press is held above).
 const canHover = () => typeof matchMedia === 'function' && matchMedia('(hover: hover)').matches; // a touch screen has no hover: only a pointer that can rest on the list holds it
 let hoverOver = false, hoverHeldSince = null;
 // A row the person just acted on (Ignore, Dismiss, Done, Answer) leaves at once (#14373, saved_files_actions): the hold is for rows that change on their own while the pointer rests, not for the result of the person's own completed action.
@@ -269,13 +267,13 @@ if (typeof document !== 'undefined') {
     document.addEventListener('coral:action-start', e => { if (e.detail && open) e.detail.table = open; }); // the table on screen when the action began
     document.addEventListener('coral:action-result', e => { const t = e.detail && e.detail.table; if (!t || t !== open) return; actedRefresh = true; try { refreshGroupTable(t.kind); } finally { actedRefresh = false; } }); // only that table, still on screen
 }
-let holdCap = HOVER_HOLD_MS, drawnUrgent = '';
-const hovering = () => hoverOver && hoverHeldSince !== null ? Date.now() - hoverHeldSince < holdCap : hoverOver;
-function showHeldNote() {
+function showHeldNote(n) {
     const host = document.getElementById('group-table-view');
-    if (!host || host.querySelector('.group-table-held')) return;
-    const n = document.createElement('p'); n.className = 'item-meta group-table-held'; n.setAttribute('role', 'status'); n.textContent = 'The list has changed. It updates in a moment, or when you move the pointer away.';
-    host.append(n); // under the table, sticky at the bottom of the view: a line above it would itself move the rows it is meant to hold still
+    let p = host.querySelector('.group-table-held');
+    if (!p) { p = document.createElement('p'); p.className = 'item-meta group-table-held'; p.setAttribute('role', 'status'); host.append(p); }
+    const b = document.createElement('button'); b.className = 'btn btn-small btn-quiet'; b.textContent = 'Show';
+    b.onclick = () => { const k = deferredKind; deferredKind = null; hoverHeldSince = null; p.remove(); actedRefresh = true; try { refreshGroupTable(k); } finally { actedRefresh = false; } };
+    p.replaceChildren(`${n || 'Some'} new waiting. `, b);
 }
 function leaveList() { hoverOver = false; const k = deferredKind, had = hoverHeldSince !== null; hoverHeldSince = null; document.querySelectorAll('.group-table-held').forEach(n => n.remove()); if (k && had && !holding()) { deferredKind = null; setTimeout(() => refreshGroupTable(k), 0); } }
 if (typeof document !== 'undefined') {
@@ -289,7 +287,7 @@ export function refreshGroupTable(kind) {
     const src = sources.get(kind);
     if (open && open.kind === kind) {
         if (src?.holdRedraw && holding()) { deferredKind = kind; if (actedRefresh) actedDeferred = true; flushLater(); return; } // the person's own result keeps being theirs while the press hold lets go of it (#14483)
-        if (src?.holdRedraw && hoverOver && !actedRefresh) { if (hoverHeldSince === null) hoverHeldSince = Date.now(); holdCap = src.urgentSignature && src.urgentSignature() !== drawnUrgent ? URGENT_HOLD_MS : HOVER_HOLD_MS; if (hovering()) { deferredKind = kind; showHeldNote(); setTimeout(() => { const k = deferredKind; if (k && !holding()) { deferredKind = null; refreshGroupTable(k); } }, Math.max(60, holdCap - (Date.now() - hoverHeldSince) + 60)); return; } } // a pointer resting on the list: the rows stay where they are, up to HOVER_HOLD_MS
+        if (src?.holdRedraw && hoverOver && !actedRefresh) { if (hoverHeldSince === null) hoverHeldSince = Date.now(); const n = src.newCount?.(), cap = n == null ? 1e4 : 2e3; if (n || Date.now() - hoverHeldSince < cap) { deferredKind = kind; showHeldNote(n); if (!n) setTimeout(() => { const k = deferredKind; if (k && !holding()) { deferredKind = null; refreshGroupTable(k); } }, cap + 100); return; } hoverHeldSince = null; }
         const host = document.getElementById('group-table-view');
         if (!host || host.style.display === 'none') { open = null; return; }
         if (drawTable()) return;
